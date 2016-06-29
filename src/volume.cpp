@@ -11,6 +11,7 @@
 #include "util/quota.hpp"
 #include "util/sha256.hpp"
 #include "config.hpp"
+#include "kv.pb.h"
 
 extern "C" {
 #include <unistd.h>
@@ -22,7 +23,7 @@ extern "C" {
 
 /* TVolumeBackend - abstract */
 
-TError TVolumeBackend::Configure(std::shared_ptr<TValueMap> Config) {
+TError TVolumeBackend::Configure() {
     return TError::Success();
 }
 
@@ -30,11 +31,11 @@ TError TVolumeBackend::Clear() {
     return Volume->GetPath().ClearDirectory();
 }
 
-TError TVolumeBackend::Save(std::shared_ptr<TValueMap> Config) {
+TError TVolumeBackend::Save() {
     return TError::Success();
 }
 
-TError TVolumeBackend::Restore(std::shared_ptr<TValueMap> Config) {
+TError TVolumeBackend::Restore() {
     return TError::Success();
 }
 
@@ -47,7 +48,7 @@ TError TVolumeBackend::Resize(uint64_t space_limit, uint64_t inode_limit) {
 class TVolumePlainBackend : public TVolumeBackend {
 public:
 
-    TError Configure(std::shared_ptr<TValueMap> Config) override {
+    TError Configure() override {
 
         if (Volume->HaveQuota())
             return TError(EError::NotSupported, "Plain backend have no support of quota");
@@ -110,21 +111,21 @@ public:
         return supported;
     }
 
-    TError Configure(std::shared_ptr<TValueMap> Config) override {
+    TError Configure() override {
 
-        if (Volume->IsAutoPath())
+        if (Volume->IsAutoPath)
             return TError(EError::NotSupported, "Quota backend requires path");
 
         if (!Volume->HaveQuota())
             return TError(EError::NotSupported, "Quota backend requires space_limit");
 
-        if (Volume->IsReadOnly())
+        if (Volume->IsReadOnly)
             return TError(EError::NotSupported, "Quota backed doesn't support read_only");
 
-        if (!Volume->IsAutoStorage())
+        if (!Volume->IsAutoStorage)
             return TError(EError::NotSupported, "Quota backed doesn't support storage");
 
-        if (Config->HasValue(V_LAYERS))
+        if (Volume->IsLayersSet)
             return TError(EError::NotSupported, "Quota backed doesn't support layers");
 
         return TError::Success();
@@ -180,7 +181,7 @@ public:
         return TVolumeQuotaBackend::Supported();
     }
 
-    TError Configure(std::shared_ptr<TValueMap> Config) override {
+    TError Configure() override {
 
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::NotSupported, "project quota is disabled");
@@ -273,12 +274,15 @@ public:
         return TPath("/dev/loop" + std::to_string(LoopDev));
     }
 
-    TError Save(std::shared_ptr<TValueMap> Config) override {
-        return Config->Set<int>(V_LOOP_DEV, LoopDev);
+    TError Save() override {
+        Volume->LoopDev = LoopDev;
+
+        return TError::Success();
     }
 
-    TError Restore(std::shared_ptr<TValueMap> Config) override {
-        LoopDev = Config->Get<int>(V_LOOP_DEV);
+    TError Restore() override {
+        LoopDev = Volume->LoopDev;
+
         return TError::Success();
     }
 
@@ -350,7 +354,7 @@ remove_file:
         if (error)
             goto free_loop;
 
-        if (!Volume->IsReadOnly()) {
+        if (!Volume->IsReadOnly) {
             error = path.Chown(Volume->GetCred());
             if (error)
                 goto umount_loop;
@@ -420,7 +424,7 @@ public:
         return supported;
     }
 
-    TError Configure(std::shared_ptr<TValueMap> Config) override {
+    TError Configure() override {
 
         if (!Supported())
             return TError(EError::InvalidValue, "overlay not supported");
@@ -503,7 +507,7 @@ err:
         if (error)
             L_ERR() << "Can't umount overlay: " << error << std::endl;
 
-        if (Volume->IsAutoStorage()) {
+        if (Volume->IsAutoStorage) {
             error2 = storage.ClearDirectory();
             if (error2) {
                 if (!error)
@@ -561,12 +565,15 @@ public:
         return "/dev/rbd" + std::to_string(DeviceIndex);
     }
 
-    TError Save(std::shared_ptr<TValueMap> Config) override {
-        return Config->Set<int>(V_LOOP_DEV, DeviceIndex);
+    TError Save() override {
+        Volume->LoopDev = DeviceIndex;
+
+        return TError::Success();
     }
 
-    TError Restore(std::shared_ptr<TValueMap> Config) override {
-        DeviceIndex = Config->Get<int>(V_LOOP_DEV);
+    TError Restore() override {
+        DeviceIndex = Volume->LoopDev;
+
         return TError::Success();
     }
 
@@ -670,20 +677,20 @@ public:
 /* TVolume */
 
 TError TVolume::OpenBackend() {
-    if (GetBackend() == "plain")
+    if (BackendType == "plain")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
-    else if (GetBackend() == "quota")
+    else if (BackendType == "quota")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeQuotaBackend());
-    else if (GetBackend() == "native")
+    else if (BackendType == "native")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeNativeBackend());
-    else if (GetBackend() == "overlay")
+    else if (BackendType == "overlay")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeOverlayBackend());
-    else if (GetBackend() == "loop")
+    else if (BackendType == "loop")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLoopBackend());
-    else if (GetBackend() == "rbd")
+    else if (BackendType == "rbd")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend());
     else
-        return TError(EError::InvalidValue, "Unknown volume backend: " + GetBackend());
+        return TError(EError::InvalidValue, "Unknown volume backend: " + BackendType);
 
     Backend->Volume = this;
 
@@ -692,7 +699,7 @@ TError TVolume::OpenBackend() {
 
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(std::string type) const {
-    return TPath(config().volumes().volume_dir()) / GetId() / type;
+    return TPath(config().volumes().volume_dir()) / Id / type;
 }
 
 /* /chroot/porto/<type>_<id> */
@@ -700,32 +707,24 @@ TPath TVolume::GetChrootInternal(TPath container_root, std::string type) const {
     TPath porto_path = container_root / config().container().chroot_porto_dir();
     if (!porto_path.Exists() && porto_path.Mkdir(0755))
         return TPath();
-    return porto_path / (type + "_" + GetId());
+    return porto_path / (type + "_" + Id);
 }
 
 TPath TVolume::GetPath() const {
-    return Config->Get<std::string>(V_PATH);
-}
-
-bool TVolume::IsAutoPath() const {
-    return Config->Get<bool>(V_AUTO_PATH);
-}
-
-bool TVolume::IsAutoStorage() const {
-    return !Config->HasValue(V_STORAGE);
+    return Path;
 }
 
 TPath TVolume::GetStorage() const {
-    if (Config->HasValue(V_STORAGE))
-        return TPath(Config->Get<std::string>(V_STORAGE));
+    if (!IsAutoStorage)
+        return TPath(StoragePath);
     else
-        return GetInternal(GetBackend());
+        return GetInternal(BackendType);
 }
 
 unsigned long TVolume::GetMountFlags() const {
     unsigned flags = 0;
 
-    if (IsReadOnly())
+    if (IsReadOnly)
         flags |= MS_RDONLY;
 
     flags |= MS_NODEV | MS_NOSUID;
@@ -736,7 +735,7 @@ unsigned long TVolume::GetMountFlags() const {
 std::vector<TPath> TVolume::GetLayers() const {
     std::vector<TPath> result;
 
-    for (auto layer: Config->Get<std::vector<std::string>>(V_LAYERS)) {
+    for (auto layer: Layers) {
         TPath path(layer);
         if (!path.IsAbsolute())
             path = TPath(config().volumes().layers_dir()) / layer;
@@ -748,7 +747,7 @@ std::vector<TPath> TVolume::GetLayers() const {
 
 TError TVolume::CheckGuarantee(TVolumeHolder &holder,
         uint64_t space_guarantee, uint64_t inode_guarantee) const {
-    auto backend = GetBackend();
+    auto backend = BackendType;
     TStatFS current, total;
     TPath storage;
 
@@ -758,7 +757,7 @@ TError TVolume::CheckGuarantee(TVolumeHolder &holder,
     if (!space_guarantee && !inode_guarantee)
         return TError::Success();
 
-    if (IsAutoStorage())
+    if (IsAutoStorage)
         storage = TPath(config().volumes().volume_dir());
     else
         storage = GetStorage();
@@ -767,7 +766,7 @@ TError TVolume::CheckGuarantee(TVolumeHolder &holder,
     if (error)
         return error;
 
-    if (!IsReady() || StatFS(current))
+    if (!IsReady || StatFS(current))
         current.Reset();
 
     /* Check available space as is */
@@ -791,20 +790,20 @@ TError TVolume::CheckGuarantee(TVolumeHolder &holder,
                 volume->GetStorage().GetDev() != storage.GetDev())
             continue;
 
-        auto volume_backend = volume->GetBackend();
+        auto volume_backend = volume->BackendType;
 
         /* rbd stored remotely, plain cannot provide usage */
         if (volume_backend == "rbd" || volume_backend == "plain")
             continue;
 
         TStatFS stat;
-        uint64_t volume_space_guarantee, volume_inode_guarantee;
+        uint64_t volume_space_guarantee = SpaceGuarantee;
+        uint64_t volume_inode_guarantee = InodeGuarantee;
 
-        volume->GetGuarantee(volume_space_guarantee, volume_inode_guarantee);
         if (!volume_space_guarantee && !volume_inode_guarantee)
             continue;
 
-        if (!volume->IsReady() || volume->StatFS(stat))
+        if (!volume->IsReady || volume->StatFS(stat))
             stat.Reset();
 
         space_guaranteed += volume_space_guarantee;
@@ -862,9 +861,9 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Volume path must be a directory");
         if (!path.CanWrite(creator_cred))
             return TError(EError::Permission, "Volume path usage not permitted");
-        error = Config->Set<std::string>(V_PATH, path.ToString());
-        if (error)
-            return error;
+
+        Path = path.ToString();
+
     } else {
         TPath volume_path;
 
@@ -875,12 +874,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         if (volume_path.IsEmpty())
             return TError(EError::InvalidValue, "Cannot choose automatic volume path");
 
-        error = Config->Set<std::string>(V_PATH, volume_path.ToString());
-        if (error)
-            return error;
-        error = Config->Set<bool>(V_AUTO_PATH, true);
-        if (error)
-            return error;
+        Path = volume_path.ToString();
+        IsAutoPath = true;
     }
 
     /* Verify storage path */
@@ -896,39 +891,31 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Storage path must be a directory");
         if (!storage.CanWrite(creator_cred))
             return TError(EError::Permission, "Storage path usage not permitted");
+
+        IsAutoStorage = false;
     }
 
     /* Save original creator. Just for the record. */
-    error = Config->Set<std::string>(V_CREATOR, creator_container->GetName() + " " +
-                    creator_cred.User() + " " + creator_cred.Group());
-    if (error)
-        return error;
+    Creator = creator_container->GetName() + " " + creator_cred.User() + " " +
+              creator_cred.Group();
 
     /* Set default credentials to creator */
-    error = Config->Set<std::string>(V_USER, creator_cred.User());
-    if (error)
-        return error;
-    error = Config->Set<std::string>(V_GROUP, creator_cred.Group());
-    if (error)
-        return error;
+    Cred.Uid = creator_cred.Uid;
+    Cred.Gid = creator_cred.Gid;
 
     /* Default permissions for volume root directory */
-    error = Config->Set<std::string>(V_PERMISSIONS, "0775");
-    if (error)
-        return error;
+    Permissions = 0755;
+
+    if (properties.count(V_CREATOR))
+        return TError(EError::InvalidProperty,
+                      "Setting read-only property: " + std::string(V_CREATOR));
+
+    if (properties.count(V_READY))
+        return TError(EError::InvalidProperty,
+                      "Setting read-only property: " + std::string(V_READY));
 
     /* Apply properties */
-    for (auto p: properties) {
-        error = Config->SetValue(p.first, p.second);
-        if (error)
-            return error;
-    }
-
-    error = UserId(Config->Get<std::string>(V_USER), Cred.Uid);
-    if (error)
-        return error;
-
-    error = GroupId(Config->Get<std::string>(V_GROUP), Cred.Gid);
+    error = SetProperty(properties);
     if (error)
         return error;
 
@@ -940,16 +927,11 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             !creator_cred.IsMemberOf(Cred.Gid))
         return TError(EError::Permission, "Changing group is not permitted");
 
-    /* Verify default permissions */
-    error = StringToOct(Config->Get<std::string>(V_PERMISSIONS), Permissions);
-    if (error)
-        return error;
-
     /* Verify and resolve layers */
-    if (Config->HasValue(V_LAYERS)) {
-        auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
+    if (IsLayersSet) {
+        std::vector <std::string> layers;
 
-        for (auto &l: layers) {
+        for (auto &l: Layers) {
             TPath layer(l);
             if (!layer.IsNormal())
                 return TError(EError::InvalidValue, "Layer path must be normalized");
@@ -970,31 +952,27 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             if (!layer.IsDirectoryFollow())
                 return TError(EError::InvalidValue, "Layer must be a directory");
         }
-
-        error = Config->Set<std::vector<std::string>>(V_LAYERS, layers);
-        if (error)
-            return error;
     }
 
     /* Verify guarantees */
-    if (Config->HasValue(V_SPACE_LIMIT) && Config->HasValue(V_SPACE_GUARANTEE) &&
-            Config->Get<uint64_t>(V_SPACE_LIMIT) < Config->Get<uint64_t>(V_SPACE_GUARANTEE))
+    if (properties.count(V_SPACE_LIMIT) && properties.count(V_SPACE_GUARANTEE) &&
+            SpaceLimit < SpaceGuarantee)
         return TError(EError::InvalidValue, "Space guarantree bigger than limit");
 
-    if (Config->HasValue(V_INODE_LIMIT) && Config->HasValue(V_INODE_GUARANTEE) &&
-            Config->Get<uint64_t>(V_INODE_LIMIT) < Config->Get<uint64_t>(V_INODE_GUARANTEE))
+    if (properties.count(V_INODE_LIMIT) && properties.count(V_INODE_GUARANTEE) &&
+            InodeLimit < InodeGuarantee)
         return TError(EError::InvalidValue, "Inode guarantree bigger than limit");
 
     /* Autodetect volume backend */
-    if (!Config->HasValue(V_BACKEND)) {
+    if (!properties.count(V_BACKEND)) {
         if (HaveQuota() && !TVolumeNativeBackend::Supported())
-            error = Config->Set<std::string>(V_BACKEND, "loop");
-        else if (Config->HasValue(V_LAYERS) && TVolumeOverlayBackend::Supported())
-            error = Config->Set<std::string>(V_BACKEND, "overlay");
+            BackendType = "loop";
+        else if (IsLayersSet && TVolumeOverlayBackend::Supported())
+            BackendType = "overlay";
         else if (TVolumeNativeBackend::Supported())
-            error = Config->Set<std::string>(V_BACKEND, "native");
+            BackendType = "native";
         else
-            error = Config->Set<std::string>(V_BACKEND, "plain");
+            BackendType = "plain";
         if (error)
             return error;
     }
@@ -1003,13 +981,11 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
-    error = Backend->Configure(Config);
+    error = Backend->Configure();
     if (error)
         return error;
 
-    uint64_t space_guarantee, inode_guarantee;
-    GetGuarantee(space_guarantee, inode_guarantee);
-    error = CheckGuarantee(holder, space_guarantee, inode_guarantee);
+    error = CheckGuarantee(holder, SpaceGuarantee, InodeGuarantee);
     if (error)
         return error;
 
@@ -1018,23 +994,23 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
 TError TVolume::Build() {
     TPath storage = GetStorage();
-    TPath path = GetPath();
+    TPath path = Path;
     TPath internal = GetInternal("");
 
     L_ACT() << "Build volume: " << path
-            << " backend: " << GetBackend() << std::endl;
+            << " backend: " << BackendType << std::endl;
 
     TError error = internal.Mkdir(0755);
     if (error)
         goto err_internal;
 
-    if (IsAutoStorage()) {
+    if (IsAutoStorage) {
         error = storage.Mkdir(0755);
         if (error)
             goto err_storage;
     }
 
-    if (IsAutoPath()) {
+    if (IsAutoPath) {
         error = path.Mkdir(0755);
         if (error)
             goto err_path;
@@ -1044,11 +1020,11 @@ TError TVolume::Build() {
     if (error)
         goto err_build;
 
-    error = Backend->Save(Config);
+    error = Backend->Save();
     if (error)
         goto err_save;
 
-    if (Config->HasValue(V_LAYERS) && GetBackend() != "overlay") {
+    if (IsLayersSet && BackendType != "overlay") {
         L_ACT() << "Merge layers into volume: " << path << std::endl;
 
         auto layers = GetLayers();
@@ -1071,17 +1047,17 @@ TError TVolume::Build() {
             return error;
     }
 
-    return TError::Success();
+    return Save();
 
 err_merge:
 err_save:
     (void)Backend->Destroy();
 err_build:
-    if (IsAutoPath()) {
+    if (IsAutoPath) {
         (void)path.RemoveAll();
     }
 err_path:
-    if (IsAutoStorage())
+    if (IsAutoStorage)
         (void)storage.RemoveAll();
 err_storage:
     (void)internal.RemoveAll();
@@ -1097,11 +1073,10 @@ TError TVolume::Clear() {
 TError TVolume::Destroy(TVolumeHolder &holder) {
     TPath internal = GetInternal("");
     TPath storage = GetStorage();
-    TPath path = GetPath();
     TError ret = TError::Success(), error;
 
     L_ACT() << "Destroy volume: " << GetPath()
-            << " backend: " << GetBackend() << std::endl;
+            << " backend: " << BackendType << std::endl;
 
     if (Backend) {
         error = Backend->Destroy();
@@ -1112,7 +1087,7 @@ TError TVolume::Destroy(TVolumeHolder &holder) {
         }
     }
 
-    if (IsAutoStorage() && storage.Exists()) {
+    if (IsAutoStorage && storage.Exists()) {
         error = storage.RemoveAll();
         if (error) {
             L_ERR() << "Can't remove storage: " << error << std::endl;
@@ -1121,8 +1096,8 @@ TError TVolume::Destroy(TVolumeHolder &holder) {
         }
     }
 
-    if (IsAutoPath() && path.Exists()) {
-        error = path.RemoveAll();
+    if (IsAutoPath && GetPath().Exists()) {
+        error = GetPath().RemoveAll();
         if (error) {
             L_ERR() << "Can't remove volume path: " << error << std::endl;
             if (!ret)
@@ -1139,17 +1114,23 @@ TError TVolume::Destroy(TVolumeHolder &holder) {
         }
     }
 
-    if (Config->HasValue(V_LAYERS)) {
-        auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
-        Config->Set<std::vector<std::string>>(V_LAYERS, {});
-        for (auto &layer: layers) {
+    if (IsLayersSet) {
+        for (auto &layer: Layers) {
             if (StringStartsWith(layer, "_weak_")) {
                 error = holder.RemoveLayer(layer);
                 if (error && error.GetError() != EError::Busy)
                     L_ERR() << "Cannot remove layer: " << error << std::endl;
             }
         }
+
+        Layers.clear();
     }
+
+
+    auto kvnode = Storage->GetNode(Id);
+    error = kvnode->Remove();
+    if (!ret && error)
+        ret = error;
 
     return ret;
 }
@@ -1158,24 +1139,24 @@ TError TVolume::StatFS(TStatFS &result) const {
     return Backend->StatFS(result);
 }
 
-TError TVolume::Tune(TVolumeHolder &holder,
-        const std::map<std::string, std::string> &properties) {
-    TError error;
+TError TVolume::Tune(TVolumeHolder &holder, const std::map<std::string,
+                     std::string> &properties) {
 
-    for (auto p: properties) {
-        auto prop = Config->Find(p.first);
-        if (!prop)
-            return TError(EError::InvalidProperty,
-                    "Invalid volume property: " + p.first);
-        if (!prop->HasFlag(DYNAMIC_VALUE))
-            return TError(EError::InvalidProperty,
-                    "Volume property " + p.first + " cannot be changed");
+    for (auto &p : properties) {
+        if (p.first != V_INODE_LIMIT ||
+            p.first != V_INODE_GUARANTEE ||
+            p.first != V_SPACE_LIMIT ||
+            p.first != V_SPACE_GUARANTEE)
+            /* Prop not found omitted */
+                return TError(EError::InvalidProperty,
+                              "Volume property " + p.first + " cannot be changed");
     }
 
-    if (properties.count(V_SPACE_LIMIT) || properties.count(V_INODE_LIMIT)) {
-        uint64_t spaceLimit, inodeLimit;
+    TError error;
 
-        GetQuota(spaceLimit, inodeLimit);
+    if (properties.count(V_SPACE_LIMIT) || properties.count(V_INODE_LIMIT)) {
+        uint64_t spaceLimit = SpaceLimit, inodeLimit = InodeLimit;
+
         if (properties.count(V_SPACE_LIMIT)) {
             error = StringToSize(properties.at(V_SPACE_LIMIT), spaceLimit);
             if (error)
@@ -1186,13 +1167,13 @@ TError TVolume::Tune(TVolumeHolder &holder,
             if (error)
                 return error;
         }
+
         error = Resize(spaceLimit, inodeLimit);
     }
 
     if (properties.count(V_SPACE_GUARANTEE) || properties.count(V_INODE_GUARANTEE)) {
-        uint64_t space_guarantee, inode_guarantee;
+        uint64_t space_guarantee = SpaceGuarantee, inode_guarantee = InodeGuarantee;
 
-        GetGuarantee(space_guarantee, inode_guarantee);
         if (properties.count(V_SPACE_GUARANTEE)) {
             error = StringToSize(properties.at(V_SPACE_GUARANTEE), space_guarantee);
             if (error)
@@ -1208,64 +1189,81 @@ TError TVolume::Tune(TVolumeHolder &holder,
         error = CheckGuarantee(holder, space_guarantee, inode_guarantee);
         if (error)
             return error;
-        Config->Set<uint64_t>(V_SPACE_GUARANTEE, space_guarantee);
-        Config->Set<uint64_t>(V_INODE_GUARANTEE, inode_guarantee);
+
+        SpaceGuarantee = space_guarantee;
+        InodeGuarantee = inode_guarantee;
     }
 
-    return error;
+    return Save();
 }
 
 TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
     L_ACT() << "Resize volume: " << GetPath() << " to bytes: "
             << space_limit << " inodes: " << inode_limit << std::endl;
+
     TError error = Backend->Resize(space_limit, inode_limit);
     if (error)
         return error;
-    Config->Set<uint64_t>(V_SPACE_LIMIT, space_limit);
-    Config->Set<uint64_t>(V_INODE_LIMIT, inode_limit);
-    return TError::Success();
+
+    SpaceLimit = space_limit;
+    InodeLimit = inode_limit;
+
+    return Save();
 }
 
 TError TVolume::GetUpperLayer(TPath &upper) {
-    if (GetBackend() == "overlay")
+    if (BackendType == "overlay")
         upper = GetStorage() / "upper";
     else
-        upper = GetPath();
+        upper = Path;
     return TError::Success();
 }
 
 TError TVolume::LinkContainer(std::string name) {
-    std::vector<std::string> containers(Config->Get<std::vector<std::string>>(V_CONTAINERS));
-    containers.push_back(name);
-    return Config->Set<std::vector<std::string>>(V_CONTAINERS, containers);
+    Containers.push_back(name);
+
+    return Save();
 }
 
 bool TVolume::UnlinkContainer(std::string name) {
-    auto containers(Config->Get<std::vector<std::string>>(V_CONTAINERS));
-    containers.erase(std::remove(containers.begin(), containers.end(), name), containers.end());
-    TError error = Config->Set<std::vector<std::string>>(V_CONTAINERS, containers);
-    return containers.empty();
+    Containers.erase(std::remove(Containers.begin(), Containers.end(), name),
+                     Containers.end());
+
+    (void)Save();
+
+    return Containers.empty();
 }
 
 std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) {
     std::map<std::string, std::string> ret;
     TStatFS stat;
 
-    if (IsReady() && !StatFS(stat)) {
+    if (IsReady && !StatFS(stat)) {
         ret[V_SPACE_USED] = std::to_string(stat.SpaceUsage);
         ret[V_INODE_USED] = std::to_string(stat.InodeUsage);
         ret[V_SPACE_AVAILABLE] = std::to_string(stat.SpaceAvail);
         ret[V_INODE_AVAILABLE] = std::to_string(stat.InodeAvail);
     }
 
-    for (auto name: Config->List()) {
-        auto property = Config->Find(name);
-        if (!property->HasFlag(HIDDEN_VALUE) && property->HasValue())
-            property->GetString(ret[name]);
-    }
+    /* Let's skip HasValue for now */
 
-    if (Config->HasValue(V_LAYERS)) {
-        auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
+    ret[V_STORAGE] = StoragePath;
+    ret[V_BACKEND] = BackendType;
+    ret[V_USER] = UserName(Cred.Uid);
+    ret[V_GROUP] = GroupName(Cred.Gid);
+    ret[V_PERMISSIONS] = std::to_string(Permissions);
+    ret[V_CREATOR] = Creator;
+    ret[V_READY] = IsReady ? "true" : "false";
+    ret[V_PRIVATE] = Private;
+    ret[V_READ_ONLY] = IsReadOnly ? "true" : "false";
+    ret[V_SPACE_LIMIT] = std::to_string(SpaceLimit);
+    ret[V_INODE_LIMIT] = std::to_string(InodeLimit);
+    ret[V_SPACE_GUARANTEE] = std::to_string(SpaceGuarantee);
+    ret[V_INODE_GUARANTEE] = std::to_string(InodeGuarantee);
+
+    if (IsLayersSet) {
+        std::vector<std::string> layers = Layers;
+
         for (auto &l: layers) {
             TPath path(l);
             if (path.IsAbsolute())
@@ -1284,29 +1282,84 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
     return TError(EError::Permission, "Permission denied");
 }
 
-TError TVolume::Restore() {
+static void SetNode(kv::TNode &node, std::string key, std::string value) {
+    auto pair = node.add_pairs();
+
+    pair->set_key(key);
+    pair->set_val(value);
+}
+
+TError TVolume::Save() {
+    auto kvnode = Storage->GetNode(Id);
+    kv::TNode node;
     TError error;
+    std::string tmp;
 
-    if (!IsReady())
-        return TError(EError::Busy, "Volume not ready");
+    kvnode->Create();
 
-    error = UserId(Config->Get<std::string>(V_USER), Cred.Uid);
-    if (!error)
-        error = GroupId(Config->Get<std::string>(V_GROUP), Cred.Gid);
-    if (error)
-        return TError(EError::InvalidValue, "Bad volume " + GetPath().ToString() + " credentials: " +
-                      Config->Get<std::string>(V_USER) + " " +
-                      Config->Get<std::string>(V_GROUP));
+    /*
+     * Storing all state values on save,
+     * the previous scheme stored knobs selectively.
+     */
 
-    error = StringToOct(Config->Get<std::string>(V_PERMISSIONS), Permissions);
+    SetNode(node, V_ID, Id);
+    SetNode(node, V_PATH, Path);
+    SetNode(node, V_AUTO_PATH, IsAutoPath ? "true" : "false");
+    SetNode(node, V_STORAGE, StoragePath);
+    SetNode(node, V_BACKEND, BackendType);
+    SetNode(node, V_USER, UserName(Cred.Uid));
+    SetNode(node, V_GROUP, GroupName(Cred.Gid));
+    SetNode(node, V_PERMISSIONS, std::to_string(Permissions));
+    SetNode(node, V_CREATOR, Creator);
+    SetNode(node, V_READY, IsReady ? "true" : "false");
+    SetNode(node, V_PRIVATE, Private);
+
+    error = StrListToString(Containers, tmp);
     if (error)
         return error;
+
+    SetNode(node, V_CONTAINERS, tmp);
+    SetNode(node, V_LOOP_DEV, std::to_string(LoopDev));
+    SetNode(node, V_READ_ONLY, IsReadOnly ? "true" : "false");
+
+    error = StrListToString(Layers, tmp);
+    if (error)
+        return error;
+
+    SetNode(node, V_LAYERS, tmp);
+    SetNode(node, V_SPACE_LIMIT, std::to_string(SpaceLimit));
+    SetNode(node, V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
+    SetNode(node, V_INODE_LIMIT, std::to_string(InodeLimit));
+    SetNode(node, V_INODE_GUARANTEE, std::to_string(InodeGuarantee));
+
+    return kvnode->Append(node);
+}
+
+TError TVolume::Restore(const kv::TNode &node) {
+    std::map<std::string, std::string> props;
+
+    for (int i = 0; i < node.pairs_size(); i++) {
+        std::string key = node.pairs(i).key();
+        std::string value = node.pairs(i).val();
+
+        props[key] = value;
+    }
+
+    if (!props.count(V_ID))
+        return TError(EError::InvalidValue, "No volume id stored");
+
+    TError error = SetProperty(props);
+    if (error)
+        return error;
+
+    if (!IsReady)
+        return TError(EError::Busy, "Volume not ready");
 
     error = OpenBackend();
     if (error)
         return error;
 
-    error = Backend->Restore(Config);
+    error = Backend->Restore();
     if (error)
         return error;
 
@@ -1338,52 +1391,16 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
     };
 }
 
-static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
-    m->Add(V_PATH, new TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-    m->Add(V_AUTO_PATH, new TBoolValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-    m->Add(V_STORAGE, new TStringValue(PERSISTENT_VALUE));
-
-    m->Add(V_BACKEND, new TStringValue(PERSISTENT_VALUE));
-
-    m->Add(V_USER, new TStringValue(PERSISTENT_VALUE));
-    m->Add(V_GROUP, new TStringValue(PERSISTENT_VALUE));
-    m->Add(V_PERMISSIONS, new TStringValue(PERSISTENT_VALUE));
-    m->Add(V_CREATOR, new TStringValue(READ_ONLY_VALUE | PERSISTENT_VALUE));
-
-    m->Add(V_ID, new TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-    m->Add(V_READY, new TBoolValue(READ_ONLY_VALUE | PERSISTENT_VALUE));
-    m->Add(V_PRIVATE, new TStringValue(PERSISTENT_VALUE));
-    m->Add(V_CONTAINERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-
-    m->Add(V_LOOP_DEV, new TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-    m->Add(V_READ_ONLY, new TBoolValue(PERSISTENT_VALUE));
-    m->Add(V_LAYERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-
-    m->Add(V_SPACE_LIMIT, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
-    m->Add(V_INODE_LIMIT, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
-
-    m->Add(V_SPACE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
-    m->Add(V_INODE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
-}
-
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
-    std::string id = std::to_string(NextId);
-    auto node = Storage->GetNode(id);
-    auto config = std::make_shared<TValueMap>(node);
-    RegisterVolumeProperties(config);
-    TError error = config->Set<std::string>(V_ID, id);
-    if (error) {
-        config->Remove();
-        return error;
-    }
-    volume = std::make_shared<TVolume>(config);
+    volume = std::make_shared<TVolume>(Storage);
+    volume->Id = std::to_string(NextId);
+
     NextId++;
+
     return TError::Success();
 }
 
-void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
-    volume->Config->Remove();
-}
+void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {}
 
 TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
     std::vector<std::shared_ptr<TKeyValueNode>> list;
@@ -1420,28 +1437,24 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     for (auto &node : list) {
         L_ACT() << "Restore volume: " << node->Name << std::endl;
 
-        auto config = std::make_shared<TValueMap>(node);
-        RegisterVolumeProperties(config);
-        error = config->Restore();
-        if (error || !config->HasValue(V_ID)) {
-            L_WRN() << "Corrupted volume config " << node << " removed: " << error << std::endl;
-            (void)config->Remove();
-            continue;
-        }
+        auto volume = std::make_shared<TVolume>(Storage);
+        kv::TNode n;
+        error = node->Load(n);
+        if (error)
+            return error;
 
-        uint64_t id;
-        if (!StringToUint64(config->Get<std::string>(V_ID), id)) {
-            if (id >= NextId)
-                NextId = id + 1;
-        }
-
-        auto volume = std::make_shared<TVolume>(config);
-        error = volume->Restore();
+        error = volume->Restore(n);
         if (error) {
             L_WRN() << "Corrupted volume " << node << " removed: " << error << std::endl;
             (void)volume->Destroy(*this);
             (void)Remove(volume);
             continue;
+        }
+
+        uint64_t id;
+        if (!StringToUint64(volume->Id, id)) {
+            if (id >= NextId)
+                NextId = id + 1;
         }
 
         error = Register(volume);
@@ -1461,7 +1474,21 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
                 (void)volume->Destroy(*this);
                 (void)Unregister(volume);
                 (void)Remove(volume);
+
+                L_WRN() << "Cannot unlink volume " << volume->GetPath() <<
+                           "from container " << name << std::endl; 
+
+                continue;
             }
+        }
+
+        error = volume->Save();
+        if (error) {
+            (void)volume->Destroy(*this);
+            (void)Unregister(volume);
+            (void)Remove(volume);
+
+            continue;
         }
 
         L() << "Volume " << volume->GetPath() << " restored" << std::endl;
@@ -1477,7 +1504,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     for (auto dir_name: subdirs) {
         bool used = false;
         for (auto v: Volumes) {
-            if (v.second->GetId() == dir_name) {
+            if (v.second->Id == dir_name) {
                 used = true;
                 break;
             }
@@ -1634,5 +1661,126 @@ TError SanitizeLayer(TPath layer, bool merge) {
                 return error;
         }
     }
+    return TError::Success();
+}
+
+TError TVolume::SetProperty(const std::map<std::string, std::string> &properties) {
+    TError error;
+
+    for (auto &prop : properties) {
+
+        L_ACT() << "Volume restoring : " << prop.first << " : " << prop.second << std::endl;
+
+        if (prop.first == V_PATH) {
+            Path = prop.second;
+
+        } else if (prop.first == V_AUTO_PATH) {
+            if (prop.second == "true")
+                IsAutoPath = true;
+            else if (prop.second == "false")
+                IsAutoPath = false;
+            else
+                return TError(EError::InvalidValue, "Invalid bool value");
+
+        } else if (prop.first == V_STORAGE) {
+            StoragePath = prop.second;
+
+        } else if (prop.first == V_BACKEND) {
+            BackendType = prop.second;
+
+        } else if (prop.first == V_USER) {
+            error = UserId(prop.second, Cred.Uid);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_GROUP) {
+            error = GroupId(prop.second, Cred.Gid);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_PERMISSIONS) {
+            error = StringToOct(prop.second, Permissions);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_CREATOR) {
+            Creator = prop.second;
+
+        } else if (prop.first == V_ID) {
+            Id = prop.second;
+
+        } else if (prop.first == V_READY) {
+            if (prop.second == "true")
+                IsReady = true;
+            else if (prop.second == "false")
+                IsReady = false;
+            else
+                return TError(EError::InvalidValue, "Invalid bool value");
+
+        } else if (prop.first == V_PRIVATE) {
+            Private = prop.second;
+
+        } else if (prop.first == V_CONTAINERS) {
+            error = StringToStrList(prop.second, Containers);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_LOOP_DEV) {
+            error = StringToInt(prop.second, LoopDev);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_READ_ONLY) {
+            if (prop.second == "true")
+                IsReadOnly = true;
+            else if (prop.second == "false")
+                IsReadOnly = false;
+            else
+                return TError(EError::InvalidValue, "Invalid bool value");
+
+        } else if (prop.first == V_LAYERS) {
+            error = StringToStrList(prop.second, Layers);
+            if (error)
+                return error;
+
+            IsLayersSet = true;
+
+        } else if (prop.first == V_SPACE_LIMIT) {
+            uint64_t limit;
+            error = StringToSize(prop.second, limit);
+            if (error)
+                return error;
+
+            SpaceLimit = limit;
+
+        } else if (prop.first == V_SPACE_GUARANTEE) {
+            uint64_t guarantee;
+            error = StringToSize(prop.second, guarantee);
+            if (error)
+                return error;
+
+            SpaceGuarantee = guarantee;
+
+        } else if (prop.first == V_INODE_LIMIT) {
+            uint64_t limit;
+            error = StringToSize(prop.second, limit);
+            if (error)
+                return error;
+
+            InodeLimit = limit;
+
+        } else if (prop.first == V_INODE_GUARANTEE) {
+            uint64_t guarantee;
+            error = StringToSize(prop.second, guarantee);
+            if (error)
+                return error;
+
+            InodeGuarantee = guarantee;
+
+        } else {
+            return TError(EError::InvalidValue, "Invalid value name: " + prop.first);
+        }
+    }
+
     return TError::Success();
 }

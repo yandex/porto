@@ -50,9 +50,9 @@ TError SanitizeLayer(TPath layer, bool merge);
 class TVolumeBackend {
 public:
     TVolume *Volume;
-    virtual TError Configure(std::shared_ptr<TValueMap> Config);
-    virtual TError Save(std::shared_ptr<TValueMap> Config);
-    virtual TError Restore(std::shared_ptr<TValueMap> Config);
+    virtual TError Configure();
+    virtual TError Save();
+    virtual TError Restore();
     virtual TError Build() =0;
     virtual TError Destroy() =0;
     virtual TError StatFS(TStatFS &result) =0;
@@ -64,15 +64,43 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TLockable,
                 public TNonCopyable {
     friend class TVolumeHolder;
-    std::shared_ptr<TValueMap> Config;
     TCred Cred;
     unsigned Permissions;
+    std::shared_ptr<TKeyValueStorage> Storage;
 
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();
 
 public:
-    TVolume(std::shared_ptr<TValueMap> config) : Config(config) {
+    std::string Path;
+    bool IsAutoPath;
+    std::string StoragePath;
+    bool IsAutoStorage;
+    std::string BackendType;
+    std::string Creator;
+    std::string Id;
+    bool IsReady;
+    std::string Private;
+    std::vector<std::string> Containers;
+    int LoopDev;
+    bool IsReadOnly;
+    std::vector<std::string> Layers;
+    bool IsLayersSet;
+    uint64_t SpaceLimit;
+    uint64_t SpaceGuarantee;
+    uint64_t InodeLimit;
+    uint64_t InodeGuarantee;
+
+    TVolume(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {
+        IsAutoStorage = true;
+        IsAutoPath = false;
+        IsReady = false;
+        LoopDev = -1;
+        SpaceLimit = 0;
+        SpaceGuarantee = 0;
+        InodeLimit = 0;
+        InodeGuarantee = 0;
+        IsLayersSet = false;
         Statistics->Volumes++;
     }
     ~TVolume() {
@@ -87,52 +115,42 @@ public:
     TError Build();
     TError Destroy(TVolumeHolder &holder);
 
-    TError Restore();
+    TError Save();
+    TError Restore(const kv::TNode &node);
     TError Clear();
 
     const std::vector<std::string> GetContainers() const {
-        return Config->Get<std::vector<std::string>>(V_CONTAINERS);
+        return Containers;
     }
     TError LinkContainer(const std::string name);
     bool UnlinkContainer(const std::string name);
 
     TError CheckPermission(const TCred &ucred) const;
 
-    std::string GetBackend() const { return Config->Get<std::string>(V_BACKEND); }
     TPath GetPath() const;
-    bool IsAutoPath() const;
-    bool IsAutoStorage() const;
     TPath GetStorage() const;
     TPath GetInternal(std::string type) const;
     TPath GetChrootInternal(TPath container_root, std::string type) const;
-    std::string GetId() const { return Config->Get<std::string>(V_ID); }
-    bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
     unsigned long GetMountFlags() const;
 
     /* Protected with TVolume->Lock() _and_ TVolumeHolder->Lock() */
-    TError SetReady(bool ready) { return Config->Set<bool>(V_READY, ready); }
-    bool IsReady() const { return Config->Get<bool>(V_READY); }
+    TError SetReady(bool ready) { IsReady = ready; return Save(); }
 
     TError Tune(TVolumeHolder &holder,
             const std::map<std::string, std::string> &properties);
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit);
 
-    void GetGuarantee(uint64_t &space_guarantee, uint64_t &inode_guarantee) const {
-        space_guarantee = Config->Get<uint64_t>(V_SPACE_GUARANTEE);
-        inode_guarantee = Config->Get<uint64_t>(V_INODE_GUARANTEE);
-    }
     TError CheckGuarantee(TVolumeHolder &holder,
             uint64_t space_guarantee, uint64_t inode_guarantee) const;
 
     bool HaveQuota() const {
-        return Config->HasValue(V_SPACE_LIMIT) ||
-               Config->HasValue(V_INODE_LIMIT);
+        return SpaceLimit || InodeLimit;
     }
 
     void GetQuota(uint64_t &space_limit, uint64_t &inode_limit) const {
-        space_limit = Config->Get<uint64_t>(V_SPACE_LIMIT);
-        inode_limit = Config->Get<uint64_t>(V_INODE_LIMIT);
+        space_limit = SpaceLimit;
+        inode_limit = InodeLimit;
     }
 
     TError StatFS(TStatFS &result) const;
@@ -143,6 +161,8 @@ public:
 
     TCred GetCred() const { return Cred; }
     unsigned GetPermissions() const { return Permissions; }
+
+    TError SetProperty(const std::map<std::string, std::string> &properties);
 
     std::map<std::string, std::string> GetProperties(TPath container_root);
 };

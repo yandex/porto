@@ -1099,7 +1099,7 @@ noinline TError TuneVolume(TContext &context,
     vholder_lock.unlock();
 
     auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady())
+    if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
     error = volume->CheckPermission(client->GetCred());
@@ -1152,7 +1152,7 @@ noinline TError LinkVolume(TContext &context,
     vholder_lock.unlock();
 
     auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady())
+    if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
     error = volume->CheckPermission(client->GetCred());
@@ -1226,7 +1226,7 @@ noinline TError UnlinkVolume(TContext &context,
     vholder_lock.unlock();
 
     auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady())
+    if (!volume->IsReady)
         return TError::Success();
 
     vholder_lock.lock();
@@ -1413,7 +1413,7 @@ noinline TError ExportLayer(TContext &context,
     vholder_lock.unlock();
 
     auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady())
+    if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
     TPath upper;
