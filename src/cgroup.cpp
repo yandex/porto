@@ -4,7 +4,6 @@
 #include "cgroup.hpp"
 #include "device.hpp"
 #include "config.hpp"
-#include "value.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"

@@ -7,7 +7,6 @@
 
 #include "common.hpp"
 #include "kvalue.hpp"
-#include "value.hpp"
 #include "container.hpp"
 #include "client.hpp"
 

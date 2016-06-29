@@ -5,7 +5,6 @@
 #include "version.hpp"
 #include "holder.hpp"
 #include "property.hpp"
-#include "container_value.hpp"
 #include "volume.hpp"
 #include "event.hpp"
 #include "protobuf.hpp"
