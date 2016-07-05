@@ -71,7 +71,7 @@ void TTask::Abort(const TError &error) const {
     if (error2)
         L_ERR() << error2 << std::endl;
 
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
 }
 
 static int ChildFn(void *arg) {
