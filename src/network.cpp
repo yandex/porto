@@ -174,8 +174,8 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
     }
 
     uint64_t prio = NET_DEFAULT_PRIO;
-    uint64_t rate = NET_MAX_GUARANTEE;
-    uint64_t ceil = NET_MAX_LIMIT;
+    uint64_t rate = config().network().default_max_guarantee();
+    uint64_t ceil = rate;
 
     error = AddTrafficClass(dev.Index,
                             TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
@@ -648,6 +648,8 @@ TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
 
 TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
                                  uint64_t prio, uint64_t rate, uint64_t ceil) {
+    uint64_t max = config().network().default_max_guarantee();
+    uint64_t rbuffer, cbuffer;
     struct rtnl_class *cls;
     TError error;
     int ret;
@@ -673,13 +675,16 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
     if (!rate)
         rate = 1;
 
+    if (rate > max)
+        rate = max;
+
     rtnl_htb_set_rate(cls, rate);
 
     /*
      * Zero ceil must be no limit. Libnl set default ceil equal to rate.
      */
-    if (!ceil || ceil > NET_MAX_LIMIT)
-        ceil = NET_MAX_LIMIT;
+    if (!ceil || ceil > max)
+        ceil = max;
 
     rtnl_htb_set_ceil(cls, ceil);
 
@@ -689,9 +694,19 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
 
     rtnl_tc_set_mtu(TC_CAST(cls), 9000);
 
-    rtnl_htb_set_rbuffer(cls, 10000);
+    rbuffer = rate / 100 + 9000;
+    if (rbuffer > INT32_MAX)
+        rbuffer = INT32_MAX;
 
-    /* rtnl_htb_set_cbuffer(tclass, cburst); */
+    rtnl_htb_set_rbuffer(cls, rbuffer);
+
+    cbuffer = ceil / 100 + 9000;
+    if (cbuffer > INT32_MAX)
+        cbuffer = INT32_MAX;
+
+    rtnl_htb_set_cbuffer(cls, cbuffer);
+
+    /* FIXME add support for 64-bit rate and ceil */
 
     Nl->Dump("add", cls);
     ret = rtnl_class_add(GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
