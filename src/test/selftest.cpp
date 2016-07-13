@@ -1770,7 +1770,9 @@ static void TestRootProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "/ls -1 /dev"));
     v = StartWaitAndGetData(api, name, "stdout");
 
-    vector<string> devs = { "null", "zero", "full", "urandom", "random", "console", "tty" };
+    vector<string> devs = { "null", "zero", "full", "urandom",
+                            "random", "console", "tty", "stdin", "stdout",
+                            "stderr" };
     vector<string> other = { "ptmx", "pts", "shm", "fd" };
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
