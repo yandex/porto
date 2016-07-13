@@ -154,13 +154,11 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
 
     TNlHtb qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
 
-    if (!qdisc.Valid(link, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR))) {
-        (void)qdisc.Remove(link);
-        TError error = qdisc.Create(link, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR));
-        if (error) {
-            L_ERR() << "Can't create root qdisc: " << error << std::endl;
-            return error;
-        }
+    (void)qdisc.Remove(link);
+    error = qdisc.Create(link, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR));
+    if (error) {
+        L_ERR() << "Can't create root qdisc: " << error << std::endl;
+        return error;
     }
 
     TNlCgFilter filter(TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR), 1);
