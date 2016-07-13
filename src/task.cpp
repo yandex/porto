@@ -265,6 +265,89 @@ TError TTask::ChildRemountRootRo() {
     return TError::Success();
 }
 
+TError TTask::ChildMountRun() {
+    TPath run = Env->Root / "run";
+    std::vector<std::string> run_paths, subdirs;
+    std::vector<struct stat> run_paths_stat;
+    TError error;
+
+    if (run.Exists()) {
+        error = run.ListSubdirs(subdirs);
+        if (error)
+            return error;
+    }
+
+    /* We want to recreate /run dir tree with up to RUN_SUBDIR_LIMIT nodes */
+    if (subdirs.size() >= RUN_SUBDIR_LIMIT)
+        return TError(EError::Unknown, "Too many subdirectories in /run!");
+
+    run_paths.reserve(RUN_SUBDIR_LIMIT);
+    for (const auto &i: subdirs) {
+
+        /* Skip creating special directories, we'll do it later */
+        if (i == "shm" || i == "lock")
+            continue;
+
+        run_paths.push_back(i);
+    }
+
+    for (auto i = run_paths.begin(); i != run_paths.end(); ++i) {
+        auto current = *i;
+        TPath current_path = run / current;
+
+        error = current_path.ListSubdirs(subdirs);
+        if (error)
+            return error;
+
+        if (subdirs.size() + run_paths.size() >= RUN_SUBDIR_LIMIT)
+            return TError(EError::Unknown, "Too many subdirectories in /run!");
+
+        for (auto dir : subdirs)
+            run_paths.push_back(current + "/" + dir);
+    }
+
+    for (const auto &i: run_paths) {
+        struct stat current_stat;
+        TPath current_path = run / i;
+
+        error = current_path.StatStrict(current_stat);
+        if (error)
+            return error;
+
+        run_paths_stat.push_back(current_stat);
+    }
+
+    error = run.MkdirAll(0755);
+    if (!error)
+        error = run.Mount("tmpfs", "tmpfs",
+                MS_NOSUID | MS_NODEV | MS_STRICTATIME,
+                { "mode=755", "size=32m"});
+    if (error)
+        return error;
+
+    for (unsigned int i = 0; i < run_paths.size(); i++) {
+        TPath current = run / run_paths[i];
+        auto &current_stat = run_paths_stat[i];
+        mode_t mode = current_stat.st_mode;
+
+        /* forbid other-writable directory without sticky bit */
+        if ((mode & 01002) == 02) {
+            L() << "Other writable without sticky: " << current << std::endl;
+            mode &= ~02;
+        }
+
+        error = current.Mkdir(mode);
+        if (error)
+            return error;
+
+        error = current.Chown(current_stat.st_uid, current_stat.st_gid);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 TError TTask::ChildMountRootFs() {
     TError error;
 
@@ -290,8 +373,6 @@ TError TTask::ChildMountRootFs() {
         { "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
             { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5" }},
         { "/proc", "proc", MS_NOSUID | MS_NOEXEC | MS_NODEV, {}},
-        { "/run", "tmpfs", MS_NOSUID | MS_NODEV | MS_STRICTATIME,
-            { "mode=755", "size=32m" }},
         { "/sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {}},
     };
 
@@ -303,6 +384,10 @@ TError TTask::ChildMountRootFs() {
         if (error)
             return error;
     }
+
+    error = ChildMountRun();
+    if (error)
+        return error;
 
     struct {
         const std::string path;
