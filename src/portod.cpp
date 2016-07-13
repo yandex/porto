@@ -45,6 +45,8 @@ using std::string;
 using std::map;
 using std::vector;
 
+std::string PreviousVersion;
+
 static pid_t slavePid;
 static bool stdlog = false;
 static bool failsafe = false;
@@ -495,6 +497,8 @@ static int SlaveMain() {
     if (ret)
         return ret;
 
+    L_SYS() << "Previous version: " << PreviousVersion << std::endl;
+
     TRpcWorker worker(config().daemon().workers());
 
     ret = TuneLimits();
@@ -869,12 +873,15 @@ static int MasterMain(bool respawn) {
         return ret;
 
     TPath pathVer(PORTO_VERSION_FILE);
-    std::string prevVer;
 
-    if (pathVer.ReadAll(prevVer))
+    if (pathVer.ReadAll(PreviousVersion)) {
         (void)pathVer.Mkfile(0644);
-    else
-        L_SYS() << "Updating from previous version: " << prevVer << std::endl;
+        PreviousVersion = "";
+    } else {
+        if (PreviousVersion[0] == 'v')
+            PreviousVersion = PreviousVersion.substr(1);
+        L_SYS() << "Previous version: " << PreviousVersion << std::endl;
+    }
 
     if (pathVer.WriteAll(PORTO_VERSION))
         L_ERR() << "Can't update current version" << std::endl;
@@ -930,6 +937,8 @@ static int MasterMain(bool respawn) {
             break;
         if (!respawn)
             break;
+
+        PreviousVersion = PORTO_VERSION;
     }
 
     error = TPath(PORTO_SOCKET_PATH).Unlink();

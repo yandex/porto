@@ -57,3 +57,5 @@ constexpr uint64_t CONTAINER_LEVEL_MAX = 7;
 constexpr uint64_t RUN_SUBDIR_LIMIT = 100u;
 
 extern void AckExitStatus(int pid);
+
+extern std::string PreviousVersion;

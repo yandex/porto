@@ -428,3 +428,7 @@ TError StringToUintMap(const std::string &value, TUintMap &result) {
 
     return TError::Success();
 }
+
+int CompareVersions(const std::string &a, const std::string &b) {
+    return strverscmp(a.c_str(), b.c_str());
+}

@@ -48,3 +48,4 @@ TError StrListToString(const std::vector<std::string> lines, std::string &value)
 TError StringToCpuValue(const std::string &str, double &value);
 TError UintMapToString(const TUintMap &map, std::string &value);
 TError StringToUintMap(const std::string &value, TUintMap &result);
+int CompareVersions(const std::string &a, const std::string &b);
