@@ -111,6 +111,7 @@ public:
     const std::string FS_IOPS_LIMIT = "memory.fs_iops_limit";
     const std::string ANON_USAGE = "memory.anon.usage";
     const std::string ANON_LIMIT = "memory.anon.limit";
+    const std::string FAIL_CNT = "memory.failcnt";
 
     TMemorySubsystem() : TSubsystem("memory") {}
 
@@ -171,6 +172,10 @@ public:
     TError SetIopsLimit(TCgroup &cg, uint64_t limit);
     TError SetDirtyLimit(TCgroup &cg, uint64_t limit);
     TError SetupOOMEvent(TCgroup &cg, int &fd);
+
+    TError GetFailCnt(TCgroup &cg, uint64_t &cnt) {
+        return cg.GetUint64(FAIL_CNT, cnt);
+    }
 };
 
 class TFreezerSubsystem : public TSubsystem {
