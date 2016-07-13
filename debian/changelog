@@ -1,3 +1,17 @@
+yandex-porto (2.10.2) unstable; urgency=low
+
+  * test/selftest: fix net_guarantee
+  * porto : recreate $ROOTFS/run subdirectories in the container
+  * porto: add symlinks /dev/std{in,out,err}
+  * porto: fix selftest for root environment
+  * porto: fix race on volume layers tmp dir creation
+  * porto: fix wrong exit call in the forked child.
+  * porto: set oom_killed if application hit the limit during the execution
+  * network: sanitize htb configuration
+  * network: always recreate htb qdisc at upgrade
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 13 Jul 2016 18:12:59 +0300
+
 yandex-porto (2.10.1) unstable; urgency=low
 
   * network: set default rate to 1mbit for all htb classes except root
