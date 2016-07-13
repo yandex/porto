@@ -1327,11 +1327,7 @@ noinline TError ImportLayer(TContext &context,
     if (!tarball.CanRead(client->GetCred()))
         return TError(EError::Permission, "client has not read access to tarball");
 
-    if (!layers_tmp.Exists()) {
-        error = layers_tmp.Mkdir(0700);
-        if (error)
-            return error;
-    }
+    /* layers_tmp should already be created on startup */
 
     auto vholder_lock = context.Vholder->ScopedLock();
     if (layer.Exists()) {
@@ -1362,16 +1358,12 @@ noinline TError ImportLayer(TContext &context,
         goto err;
 
     error = layer_tmp.Rename(layer);
-    (void)layers_tmp.Rmdir();
-    if (error)
-        goto err;
 
     return TError::Success();
 
 err:
     (void)layer_tmp.RemoveAll();
 err_tmp:
-    (void)layers_tmp.Rmdir();
     return error;
 }
 
