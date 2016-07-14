@@ -25,10 +25,7 @@ constexpr uint64_t ROOT_TC_MAJOR = 1;
 constexpr uint64_t ROOT_TC_MINOR = 0;
 constexpr uint64_t DEFAULT_TC_MINOR = 2;
 
-/* FIXME add support for 64-bit rate and ceil */
-const uint64_t NET_MAX_LIMIT = UINT32_MAX;
-const uint64_t NET_MAX_GUARANTEE = UINT32_MAX;
-constexpr uint64_t NET_DEFAULT_PRIO = 3;
+constexpr auto NET_DEFAULT_PRIO = 3;
 
 constexpr uint64_t ROOT_CONTAINER_ID = 1;
 constexpr uint64_t PORTO_ROOT_CONTAINER_ID = 3;

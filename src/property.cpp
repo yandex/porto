@@ -2024,11 +2024,6 @@ TError TNetGuarantee::Set(const std::string &guarantee) {
     if (error)
         return error;
 
-    for (auto &kv : new_guarantee) {
-        if (kv.second > NET_MAX_GUARANTEE)
-            return TError(EError::InvalidValue, "Net guarantee too large");
-    }
-
     TUintMap old_guarantee = CurrentContainer->NetGuarantee;
     CurrentContainer->NetGuarantee = new_guarantee;
 
@@ -2057,9 +2052,6 @@ TError TNetGuarantee::SetIndexed(const std::string &index,
     error = StringToSize(guarantee, val);
     if (error)
         return TError(EError::InvalidValue, "Invalid value " + guarantee);
-
-    if (val > NET_MAX_GUARANTEE)
-        return TError(EError::InvalidValue, "Net guarantee too large");
 
     uint64_t old_guarantee = CurrentContainer->NetGuarantee[index];
     CurrentContainer->NetGuarantee[index] = val;
@@ -2109,11 +2101,6 @@ TError TNetLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    for (auto &kv : new_limit) {
-        if (kv.second > NET_MAX_LIMIT)
-            return TError(EError::InvalidValue, "Net limit too large");
-    }
-
     TUintMap old_limit = CurrentContainer->NetLimit;
     CurrentContainer->NetLimit = new_limit;
 
@@ -2142,9 +2129,6 @@ TError TNetLimit::SetIndexed(const std::string &index,
     error = StringToSize(limit, val);
     if (error)
         return TError(EError::InvalidValue, "Invalid value " + limit);
-
-    if (val > NET_MAX_LIMIT)
-        return TError(EError::InvalidValue, "Net limit too large");
 
     uint64_t old_limit = CurrentContainer->NetLimit[index];
     CurrentContainer->NetLimit[index] = val;
