@@ -134,7 +134,9 @@ public:
     TCapabilities() : TProperty(P_CAPABILITIES, CAPABILITIES_SET,
                                 "Limit container capabilities: "
                                 "list of capabilities without CAP_"
-                                " prefix (man 7 capabilities)", true) {}
+                                " prefix (man 7 capabilities)") {
+        IsHidden = true;
+    }
 } static Capabilities;
 
 TError TCapabilities::Set(const std::string &caps_str) {
@@ -704,10 +706,13 @@ TError TMemoryGuarantee::Get(std::string &value) {
 class TMemTotalGuarantee : public TProperty {
 public:
     TError Get(std::string &value);
-    TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE,
+    TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, 0,
                                      "Total amount of memory "
                                      "guaranteed for porto "
-                                     "containers") {}
+                                     "containers") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
     TError Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
 
@@ -1295,7 +1300,9 @@ public:
     TError Set(const std::string &gw);
     TError Get(std::string &value);
     TDefaultGw() : TProperty(P_DEFAULT_GW, DEFAULT_GW_SET,
-                             "Default gateway: <interface> <ip>; ...", true) {}
+                             "Default gateway: <interface> <ip>; ...") {
+        IsHidden = true;
+    }
 } static DefaultGw;
 
 TError TDefaultGw::Set(const std::string &gw) {
@@ -1385,8 +1392,10 @@ class TRawRootPid : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawRootPid() : TProperty(P_RAW_ROOT_PID, "", true, true) {
-        SetMask = ROOT_PID_SET;
+    TRawRootPid() : TProperty(P_RAW_ROOT_PID, ROOT_PID_SET, "") {
+        IsReadOnly = true;
+        IsSerializable = true;
+        IsHidden = true;
     }
 } static RawRootPid;
 
@@ -1419,8 +1428,10 @@ class TRawLoopDev : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, "", true, true) {
-        SetMask = LOOP_DEV_SET;
+    TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, LOOP_DEV_SET, "") {
+        IsReadOnly = true;
+        IsSerializable = true;
+        IsHidden = true;
     }
 } static RawLoopDev;
 
@@ -1438,9 +1449,10 @@ class TRawStartTime : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawStartTime()
-                           : TProperty(P_RAW_START_TIME, "", true, true) {
-        SetMask = START_TIME_SET;
+    TRawStartTime() : TProperty(P_RAW_START_TIME, START_TIME_SET, "") {
+        IsReadOnly = true;
+        IsSerializable = true;
+        IsHidden = true;
     }
 } static RawStartTime;
 
@@ -1458,8 +1470,10 @@ class TRawDeathTime : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawDeathTime() : TProperty(P_RAW_DEATH_TIME, "", true, true) {
-        SetMask = DEATH_TIME_SET;
+    TRawDeathTime() : TProperty(P_RAW_DEATH_TIME, DEATH_TIME_SET, "") {
+        IsReadOnly = true;
+        IsSerializable = true;
+        IsHidden = true;
     }
 } static RawDeathTime;
 
@@ -2397,9 +2411,12 @@ TError TWeak::Get(std::string &value) {
 class TAbsoluteName : public TProperty {
 public:
     TError Get(std::string &value);
-    TAbsoluteName() : TProperty(D_ABSOLUTE_NAME,
+    TAbsoluteName() : TProperty(D_ABSOLUTE_NAME, 0,
                                 "container name including "
-                                "porto namespaces (ro)") {}
+                                "porto namespaces (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static AbsoluteName;
 
 TError TAbsoluteName::Get(std::string &value) {
@@ -2415,10 +2432,13 @@ TError TAbsoluteName::Get(std::string &value) {
 class TAbsoluteNamespace : public TProperty {
 public:
     TError Get(std::string &value);
-    TAbsoluteNamespace() : TProperty(D_ABSOLUTE_NAMESPACE,
+    TAbsoluteNamespace() : TProperty(D_ABSOLUTE_NAMESPACE, 0,
                                      "container namespace "
                                      "including parent "
-                                     "namespaces (ro)") {}
+                                     "namespaces (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static AbsoluteNamespace;
 
 TError TAbsoluteNamespace::Get(std::string &value) {
@@ -2432,8 +2452,8 @@ class TState : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TState() : TProperty(D_STATE, "container state (ro)", false, true) {
-        SetMask = STATE_SET;
+    TState() : TProperty(D_STATE, STATE_SET, "container state (ro)") {
+        IsReadOnly = true;
     }
 } static State;
 
@@ -2473,10 +2493,9 @@ public:
     TError SetFromRestore(const std::string &value);
     TError GetToSave(std::string &value);
     TError Get(std::string &value);
-    TOomKilled() : TProperty(D_OOM_KILLED,
-                             "container has been killed by OOM (ro)",
-                             false, true) {
-        SetMask = OOM_KILLED_SET;
+    TOomKilled() : TProperty(D_OOM_KILLED, OOM_KILLED_SET,
+                             "container has been killed by OOM (ro)") {
+        IsReadOnly = true;
     }
 } static OomKilled;
 
@@ -2508,9 +2527,12 @@ TError TOomKilled::Get(std::string &value) {
 class TParent : public TProperty {
 public:
     TError Get(std::string &value);
-    TParent() : TProperty(D_PARENT,
-                          "parent container name (ro) (deprecated)",
-                          true, false) {}
+    TParent() : TProperty(D_PARENT, 0,
+                          "parent container name (ro) (deprecated)") {
+        IsReadOnly = true;
+        IsHidden = true;
+        IsSerializable = false;
+    }
 } static Parent;
 
 TError TParent::Get(std::string &value) {
@@ -2524,10 +2546,9 @@ class TRespawnCount : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRespawnCount() : TProperty(D_RESPAWN_COUNT,
-                                "current respawn count (ro)",
-                                false, true) {
-        SetMask = RESPAWN_COUNT_SET;
+    TRespawnCount() : TProperty(D_RESPAWN_COUNT, RESPAWN_COUNT_SET,
+                                "current respawn count (ro)") {
+        IsReadOnly = true;
     }
 } static RespawnCount;
 
@@ -2544,7 +2565,10 @@ TError TRespawnCount::Get(std::string &value) {
 class TRootPid : public TProperty {
 public:
     TError Get(std::string &value);
-    TRootPid() : TProperty(D_ROOT_PID, "root task pid (ro)", true) {}
+    TRootPid() : TProperty(D_ROOT_PID, 0, "root task pid (ro)") {
+        IsHidden = true;
+        IsSerializable = false;
+    }
 } static RootPid;
 
 TError TRootPid::Get(std::string &value) {
@@ -2566,9 +2590,9 @@ public:
     TError SetFromRestore(const std::string &value);
     TError GetToSave(std::string &value);
     TError Get(std::string &value);
-    TExitStatusProperty() : TProperty(D_EXIT_STATUS, "container exit status (ro)",
-                              false, true) {
-        SetMask = EXIT_STATUS_SET;
+    TExitStatusProperty() : TProperty(D_EXIT_STATUS, EXIT_STATUS_SET,
+                                      "container exit status (ro)") {
+        IsReadOnly = true;
     }
 } static ExitStatusProperty;
 
@@ -2593,7 +2617,10 @@ TError TExitStatusProperty::Get(std::string &value) {
 class TStartErrno : public TProperty {
 public:
     TError Get(std::string &value);
-    TStartErrno() : TProperty(D_START_ERRNO, "container start error (ro)") {}
+    TStartErrno() : TProperty(D_START_ERRNO, 0, "container start error (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static StartErrno;
 
 TError TStartErrno::Get(std::string &value) {
@@ -2606,7 +2633,10 @@ class TStdout : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TStdout() : TProperty(D_STDOUT, "stdout (optional start [offset]) (ro)") {}
+    TStdout() : TProperty(D_STDOUT, 0, "stdout (optional start [offset]) (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static Stdout;
 
 TError TStdout::Get(std::string &value) {
@@ -2634,8 +2664,11 @@ TError TStdout::GetIndexed(const std::string &index,
 class TStdoutOffset : public TProperty {
 public:
     TError Get(std::string &value);
-    TStdoutOffset() : TProperty(D_STDOUT_OFFSET,
-                                "stored stdout offset (ro)") {}
+    TStdoutOffset() : TProperty(D_STDOUT_OFFSET, 0,
+                                "stored stdout offset (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static StdoutOffset;
 
 TError TStdoutOffset::Get(std::string &value) {
@@ -2652,8 +2685,11 @@ class TStderr : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TStderr() : TProperty(D_STDERR,
-                          "stderr (optional start [offset]) (ro))") {}
+    TStderr() : TProperty(D_STDERR, 0,
+                          "stderr (optional start [offset]) (ro))") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static Stderr;
 
 TError TStderr::Get(std::string &value) {
@@ -2681,7 +2717,10 @@ TError TStderr::GetIndexed(const std::string &index,
 class TStderrOffset : public TProperty {
 public:
     TError Get(std::string &value);
-    TStderrOffset() : TProperty(D_STDERR_OFFSET, "stored stderr offset (ro)") {}
+    TStderrOffset() : TProperty(D_STDERR_OFFSET, 0, "stored stderr offset (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static StderrOffset;
 
 TError TStderrOffset::Get(std::string &value) {
@@ -2697,8 +2736,11 @@ TError TStderrOffset::Get(std::string &value) {
 class TMemUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TMemUsage() : TProperty(D_MEMORY_USAGE,
-                            "current memory usage [bytes] (ro)") {}
+    TMemUsage() : TProperty(D_MEMORY_USAGE, 0,
+                            "current memory usage [bytes] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static MemUsage;
 
 TError TMemUsage::Get(std::string &value) {
@@ -2723,8 +2765,11 @@ TError TMemUsage::Get(std::string &value) {
 class TAnonUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TAnonUsage() : TProperty(D_ANON_USAGE,
-                             "current anonymous memory usage [bytes] (ro)") {}
+    TAnonUsage() : TProperty(D_ANON_USAGE, 0,
+                             "current anonymous memory usage [bytes] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static AnonUsage;
 
 TError TAnonUsage::Get(std::string &value) {
@@ -2746,7 +2791,10 @@ TError TAnonUsage::Get(std::string &value) {
 class TMinorFaults : public TProperty {
 public:
     TError Get(std::string &value);
-    TMinorFaults() : TProperty(D_MINOR_FAULTS, "minor page faults (ro)") {}
+    TMinorFaults() : TProperty(D_MINOR_FAULTS, 0, "minor page faults (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static MinorFaults;
 
 TError TMinorFaults::Get(std::string &value) {
@@ -2768,7 +2816,10 @@ TError TMinorFaults::Get(std::string &value) {
 class TMajorFaults : public TProperty {
 public:
     TError Get(std::string &value);
-    TMajorFaults() : TProperty(D_MAJOR_FAULTS, "major page faults (ro)") {}
+    TMajorFaults() : TProperty(D_MAJOR_FAULTS, 0, "major page faults (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static MajorFaults;
 
 TError TMajorFaults::Get(std::string &value) {
@@ -2790,8 +2841,11 @@ TError TMajorFaults::Get(std::string &value) {
 class TMaxRss : public TProperty {
 public:
     TError Get(std::string &value);
-    TMaxRss() : TProperty(D_MAX_RSS,
-                          "peak anonymous memory usage [bytes] (ro)") {}
+    TMaxRss() : TProperty(D_MAX_RSS, 0,
+                          "peak anonymous memory usage [bytes] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
     TError Init(void) {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
         TUintMap stat;
@@ -2821,7 +2875,10 @@ TError TMaxRss::Get(std::string &value) {
 class TCpuUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TCpuUsage() : TProperty(D_CPU_USAGE, "consumed CPU time [nanoseconds] (ro)") {}
+    TCpuUsage() : TProperty(D_CPU_USAGE, 0, "consumed CPU time [nanoseconds] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static CpuUsage;
 
 TError TCpuUsage::Get(std::string &value) {
@@ -2847,8 +2904,11 @@ TError TCpuUsage::Get(std::string &value) {
 class TCpuSystem : public TProperty {
 public:
     TError Get(std::string &value);
-    TCpuSystem() : TProperty(D_CPU_SYSTEM,
-                             "consumed system CPU time [nanoseconds] (ro)") {}
+    TCpuSystem() : TProperty(D_CPU_SYSTEM, 0,
+                             "consumed system CPU time [nanoseconds] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static CpuSystem;
 
 TError TCpuSystem::Get(std::string &value) {
@@ -2875,8 +2935,11 @@ class TNetBytes : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetBytes() : TProperty(D_NET_BYTES,
-                            "tx bytes: <interface>: <bytes>;... (ro)") {}
+    TNetBytes() : TProperty(D_NET_BYTES, 0,
+                            "tx bytes: <interface>: <bytes>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetBytes;
 
 TError TNetBytes::Get(std::string &value) {
@@ -2911,8 +2974,11 @@ class TNetPackets : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetPackets() : TProperty(D_NET_PACKETS,
-                              "tx packets: <interface>: <packets>;... (ro)") {}
+    TNetPackets() : TProperty(D_NET_PACKETS, 0,
+                              "tx packets: <interface>: <packets>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetPackets;
 
 TError TNetPackets::Get(std::string &value) {
@@ -2947,9 +3013,12 @@ class TNetDrops : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetDrops() : TProperty(D_NET_DROPS,
+    TNetDrops() : TProperty(D_NET_DROPS, 0,
                             "dropped tx packets: <interface>: "
-                            "<packets>;... (ro)") {}
+                            "<packets>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetDrops;
 
 TError TNetDrops::Get(std::string &value) {
@@ -2984,9 +3053,12 @@ class TNetOverlimits : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetOverlimits() : TProperty(D_NET_OVERLIMITS,
+    TNetOverlimits() : TProperty(D_NET_OVERLIMITS, 0,
                                  "overlimti tx packets: "
-                                 "<interface>: <packets>;... (ro)") {}
+                                 "<interface>: <packets>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetOverlimits;
 
 TError TNetOverlimits::Get(std::string &value) {
@@ -3021,8 +3093,11 @@ class TNetRxBytes : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetRxBytes() : TProperty(D_NET_RX_BYTES,
-                              "rx bytes: <interface>: <bytes>;... (ro)") {}
+    TNetRxBytes() : TProperty(D_NET_RX_BYTES, 0,
+                              "rx bytes: <interface>: <bytes>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetRxBytes;
 
 TError TNetRxBytes::Get(std::string &value) {
@@ -3057,8 +3132,11 @@ class TNetRxPackets : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetRxPackets() : TProperty(D_NET_RX_PACKETS,
-                                "rx packets: <interface>: <packets>;... (ro)") {}
+    TNetRxPackets() : TProperty(D_NET_RX_PACKETS, 0,
+                                "rx packets: <interface>: <packets>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetRxPackets;
 
 TError TNetRxPackets::Get(std::string &value) {
@@ -3093,9 +3171,12 @@ class TNetRxDrops : public TProperty {
 public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetRxDrops() : TProperty(D_NET_RX_DROPS,
+    TNetRxDrops() : TProperty(D_NET_RX_DROPS, 0,
                               "dropped rx packets: "
-                              "<interface>: <packets>;... (ro)") {}
+                              "<interface>: <packets>;... (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static NetRxDrops;
 
 TError TNetRxDrops::Get(std::string &value) {
@@ -3131,7 +3212,10 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TIoRead() : TProperty(D_IO_READ, "read from disk [bytes] (ro)") {}
+    TIoRead() : TProperty(D_IO_READ, 0, "read from disk [bytes] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static IoRead;
 
 void TIoRead::Populate(TUintMap &m) {
@@ -3184,7 +3268,10 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TIoWrite() : TProperty(D_IO_WRITE, "written to disk [bytes] (ro)") {}
+    TIoWrite() : TProperty(D_IO_WRITE, 0, "written to disk [bytes] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static IoWrite;
 
 void TIoWrite::Populate(TUintMap &m) {
@@ -3237,7 +3324,10 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TIoOps() : TProperty(D_IO_OPS, "io operations (ro)") {}
+    TIoOps() : TProperty(D_IO_OPS, 0, "io operations (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static IoOps;
 
 void TIoOps::Populate(TUintMap &m) {
@@ -3288,7 +3378,10 @@ TError TIoOps::GetIndexed(const std::string &index,
 class TTime : public TProperty {
 public:
     TError Get(std::string &value);
-    TTime() : TProperty(D_TIME, "running time [seconds] (ro)") {}
+    TTime() : TProperty(D_TIME, 0, "running time [seconds] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
 } static Time;
 
 TError TTime::Get(std::string &value) {
@@ -3336,7 +3429,11 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TPortoStat() : TProperty(D_PORTO_STAT, "porto statistics (ro)", true) {}
+    TPortoStat() : TProperty(D_PORTO_STAT, 0, "porto statistics (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+        IsHidden = true;
+    }
 } static PortoStat;
 
 void TPortoStat::Populate(TUintMap &m) {
@@ -3394,7 +3491,12 @@ public:
     TError Get(std::string &value) {
         return TError(EError::NotSupported, "Not supported: " + Name);
     }
-    TNetTos() : TProperty(P_NET_TOS, NET_TOS_SET, "IP TOS") {}
+    TNetTos() : TProperty(P_NET_TOS, NET_TOS_SET, "IP TOS") {
+        IsHidden = true;
+        IsSerializable = false;
+        IsReadOnly = true;
+        IsSupported = false;
+    }
 } static NetTos;
 
 void InitContainerProperties(void) {

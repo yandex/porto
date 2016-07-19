@@ -179,19 +179,15 @@ public:
         return TError::Success();
     }
     virtual TError Get(std::string &value) = 0;
-    TProperty(std::string name, uint64_t set_mask,
-                       std::string desc, bool hidden = false,
-                       bool serializable = true)
-                       : Name(name), SetMask(set_mask), Desc(desc),
-                       IsSupported(true), IsReadOnly(false), IsHidden(hidden),
-                       IsSerializable(serializable) {}
+    TProperty(std::string name, uint64_t set_mask, std::string desc) :
+              Name(name), SetMask(set_mask), Desc(desc) {
 
-    TProperty(std::string name, std::string desc,
-                       bool hidden = false, bool serializable = false)
-                       : Name(name), SetMask(0), Desc(desc), IsSupported(true),
-                       IsReadOnly(true), IsHidden(hidden),
-                       IsSerializable(serializable) {}
-
+        /* Default property is user-writable and serializable */
+        IsSupported = true;
+        IsReadOnly = false;
+        IsHidden = false;
+        IsSerializable = true;
+    }
     virtual TError GetIndexed(const std::string &index, std::string &value) {
         return TError(EError::InvalidValue, "Invalid subscript for property");
     }
