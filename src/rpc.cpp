@@ -14,7 +14,7 @@
 
 using std::string;
 
-extern std::map<std::string, TContainerProperty*> ContainerPropMap;
+extern std::map<std::string, TProperty*> ContainerPropMap;
 
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
     if (Verbose)

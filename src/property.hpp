@@ -159,7 +159,7 @@ constexpr const char *D_IO_OPS = "io_ops";
 constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 
-class TContainerProperty {
+class TProperty {
 public:
     std::string Name;
     uint64_t SetMask;
@@ -179,14 +179,14 @@ public:
         return TError::Success();
     }
     virtual TError Get(std::string &value) = 0;
-    TContainerProperty(std::string name, uint64_t set_mask,
+    TProperty(std::string name, uint64_t set_mask,
                        std::string desc, bool hidden = false,
                        bool serializable = true)
                        : Name(name), SetMask(set_mask), Desc(desc),
                        IsSupported(true), IsReadOnly(false), IsHidden(hidden),
                        IsSerializable(serializable) {}
 
-    TContainerProperty(std::string name, std::string desc,
+    TProperty(std::string name, std::string desc,
                        bool hidden = false, bool serializable = false)
                        : Name(name), SetMask(0), Desc(desc), IsSupported(true),
                        IsReadOnly(true), IsHidden(hidden),
@@ -235,19 +235,6 @@ constexpr const uint64_t PermittedCaps = CAP_MASK(CAP_CHOWN) |
                                          CAP_MASK(CAP_SYS_RESOURCE) |
                                          CAP_MASK(CAP_MKNOD) |
                                          CAP_MASK(CAP_AUDIT_WRITE);
-
-class TContainerNetTos : public TContainerProperty {
-public:
-    TError Set(const std::string &tos) {
-        return TError(EError::NotSupported, Name + " is not supported");
-    }
-    TError Get(std::string &value) {
-        return TError(EError::NotSupported, "Not supported: " + Name);
-    }
-    TContainerNetTos(std::string name, uint64_t set_mask,
-                     std::string desc)
-                     : TContainerProperty(name, set_mask, desc) {}
-};
 
 
 void InitContainerProperties(void);

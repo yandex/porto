@@ -49,10 +49,8 @@ using std::map;
 
 __thread TContainer *CurrentContainer = nullptr;
 __thread TClient *CurrentClient = nullptr;
-extern TContainerCapabilities ContainerCapabilities;
-extern TContainerState ContainerState;
 
-std::map<std::string, TContainerProperty*> ContainerPropMap;
+std::map<std::string, TProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        std::shared_ptr<TKeyValueStorage> storage,
@@ -890,7 +888,7 @@ TError TContainer::Create(const TCred &cred) {
     }
 
     if (OwnerCred.IsRootUser())
-        Caps = ContainerCapabilities.AllCaps;
+        Caps = 0xffffffffffffffff >> (63 - LastCapability);
 
     SetState(EContainerState::Stopped);
     PropMask |= STATE_SET;
@@ -1706,8 +1704,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     /* Valid container state cannot be empty */
     if (container_state.length() > 0) {
-        ContainerState.SetFromRestore(container_state);
-        PropMask |= ContainerState.SetMask;
+        (*ContainerPropMap.find(D_STATE)).second->SetFromRestore(container_state);
+        PropMask |= STATE_SET;
     }
 
     // There are several points where we save value to the persistent store
