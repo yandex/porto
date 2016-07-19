@@ -236,6 +236,65 @@ extern TStatistics *Statistics;
  * Of course, some properties can be read-only
  */
 
+TError TContainerProperty::IsAliveAndStopped(void) {
+    auto state = CurrentContainer->GetState();
+
+    if (state == EContainerState::Dead)
+        return TError(EError::InvalidState,
+                      "Cannot change property while in the dead state");
+
+    if (state != EContainerState::Stopped &&
+        state != EContainerState::Unknown)
+        return TError(EError::InvalidState,
+                "Cannot change property in runtime");
+
+    return TError::Success();
+}
+
+TError TContainerProperty::IsAlive(void) {
+    auto state = CurrentContainer->GetState();
+
+    if (state == EContainerState::Dead)
+        return TError(EError::InvalidState,
+                      "Cannot change property while in the dead state");
+
+    return TError::Success();
+}
+
+TError TContainerProperty::IsDead(void) {
+    auto state = CurrentContainer->GetState();
+
+    if (state != EContainerState::Dead)
+        return TError(EError::InvalidState,
+                      "Available only in dead state: " + Name);
+
+    return TError::Success();
+}
+
+TError TContainerProperty::IsRunning(void) {
+    auto state = CurrentContainer->GetState();
+
+    /*
+     * This snippet is taken from TContainer::GetProperty.
+     * The method name misguides a bit, but may be the semantic
+     * of such properties is that we can look at the value in
+     * the dead state too...
+     */
+    if (state == EContainerState::Stopped)
+        return TError(EError::InvalidState,
+                      "Not available in stopped state: " + Name);
+
+    return TError::Success();
+}
+
+class TContainerUser : public TContainerProperty {
+public:
+    TError Set(const std::string &username);
+    TError Get(std::string &value);
+    TContainerUser(std::string name, uint64_t set_mask, std::string desc)
+                   : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerUser::Set(const std::string &username) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -284,6 +343,14 @@ TError TContainerUser::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerGroup : public TContainerProperty {
+public:
+    TError Set(const std::string &groupname);
+    TError Get(std::string &value);
+    TContainerGroup(std::string name, uint64_t set_mask, std::string desc)
+                    : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerGroup::Set(const std::string &groupname) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -319,151 +386,19 @@ TError TContainerGroup::Get(std::string &value) {
     return TError::Success();
 }
 
-void InitContainerProperties(void) {
-    ContainerPropMap[ContainerUser.Name] = &ContainerUser;
-    ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
-    ContainerMemoryGuarantee.Init();
-    ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
-    ContainerPropMap[ContainerCommand.Name] = &ContainerCommand;
-    ContainerPropMap[ContainerVirtMode.Name] = &ContainerVirtMode;
-    ContainerPropMap[ContainerCwd.Name] = &ContainerCwd;
-    ContainerPropMap[ContainerStdinPath.Name] = &ContainerStdinPath;
-    ContainerPropMap[ContainerStdoutPath.Name] = &ContainerStdoutPath;
-    ContainerPropMap[ContainerStderrPath.Name] = &ContainerStderrPath;
-    ContainerPropMap[ContainerIsolate.Name] = &ContainerIsolate;
-    ContainerPropMap[ContainerBindDns.Name] = &ContainerBindDns;
-    ContainerPropMap[ContainerRoot.Name] = &ContainerRoot;
-    ContainerPropMap[ContainerNet.Name] = &ContainerNet;
-    ContainerPropMap[ContainerHostname.Name] = &ContainerHostname;
-    ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
-    ContainerPropMap[ContainerEnv.Name] = &ContainerEnv;
-    ContainerPropMap[ContainerBind.Name] = &ContainerBind;
-    ContainerPropMap[ContainerIp.Name] = &ContainerIp;
-    ContainerCapabilities.Init();
-    ContainerPropMap[ContainerCapabilities.Name] = &ContainerCapabilities;
-    ContainerPropMap[ContainerDefaultGw.Name] = &ContainerDefaultGw;
-    ContainerPropMap[ContainerResolvConf.Name] = &ContainerResolvConf;
-    ContainerPropMap[ContainerDevices.Name] = &ContainerDevices;
-    ContainerPropMap[ContainerRawRootPid.Name] = &ContainerRawRootPid;
-    ContainerPropMap[ContainerRawLoopDev.Name] = &ContainerRawLoopDev;
-    ContainerPropMap[ContainerRawStartTime.Name] = &ContainerRawStartTime;
-    ContainerPropMap[ContainerRawDeathTime.Name] = &ContainerRawDeathTime;
-    ContainerPropMap[ContainerUlimit.Name] = &ContainerUlimit;
-    ContainerPropMap[ContainerPortoNamespace.Name] = &ContainerPortoNamespace;
-    ContainerPropMap[ContainerStdoutLimit.Name] = &ContainerStdoutLimit;
-    ContainerPropMap[ContainerMemoryLimit.Name] = &ContainerMemoryLimit;
-    ContainerAnonLimit.Init();
-    ContainerPropMap[ContainerAnonLimit.Name] = &ContainerAnonLimit;
-    ContainerDirtyLimit.Init();
-    ContainerPropMap[ContainerDirtyLimit.Name] = &ContainerDirtyLimit;
-    ContainerRechargeOnPgfault.Init();
-    ContainerPropMap[ContainerRechargeOnPgfault.Name] = &ContainerRechargeOnPgfault;
-    ContainerPropMap[ContainerCpuPolicy.Name] = &ContainerCpuPolicy;
-    ContainerPropMap[ContainerCpuLimit.Name] = &ContainerCpuLimit;
-    ContainerPropMap[ContainerCpuGuarantee.Name] = &ContainerCpuGuarantee;
-    ContainerIoPolicy.Init();
-    ContainerPropMap[ContainerIoPolicy.Name] = &ContainerIoPolicy;
-    ContainerIoLimit.Init();
-    ContainerPropMap[ContainerIoLimit.Name] = &ContainerIoLimit;
-    ContainerIopsLimit.Init();
-    ContainerPropMap[ContainerIopsLimit.Name] = &ContainerIopsLimit;
-    ContainerPropMap[ContainerNetGuarantee.Name] = &ContainerNetGuarantee;
-    ContainerPropMap[ContainerNetLimit.Name] = &ContainerNetLimit;
-    ContainerPropMap[ContainerNetPriority.Name] = &ContainerNetPriority;
-    ContainerPropMap[ContainerRespawn.Name] = &ContainerRespawn;
-    ContainerPropMap[ContainerMaxRespawns.Name] = &ContainerMaxRespawns;
-    ContainerPropMap[ContainerPrivate.Name] = &ContainerPrivate;
-    ContainerPropMap[ContainerNetTos.Name] = &ContainerNetTos;
-    ContainerPropMap[ContainerAgingTime.Name] = &ContainerAgingTime;
-    ContainerPropMap[ContainerEnablePorto.Name] = &ContainerEnablePorto;
-    ContainerPropMap[ContainerWeak.Name] = &ContainerWeak;
-    ContainerPropMap[ContainerAbsoluteName.Name] = &ContainerAbsoluteName;
-    ContainerPropMap[ContainerAbsoluteNamespace.Name] = &ContainerAbsoluteNamespace;
-    ContainerMemTotalGuarantee.Init();
-    ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
-    ContainerPropMap[ContainerOomKilled.Name] = &ContainerOomKilled;
-    ContainerPropMap[ContainerState.Name] = &ContainerState;
-    ContainerPropMap[ContainerParent.Name] = &ContainerParent;
-    ContainerPropMap[ContainerRespawnCount.Name] = &ContainerRespawnCount;
-    ContainerPropMap[ContainerRootPid.Name] = &ContainerRootPid;
-    ContainerPropMap[ContainerExitStatus.Name] = &ContainerExitStatus;
-    ContainerPropMap[ContainerStartErrno.Name] = &ContainerStartErrno;
-    ContainerPropMap[ContainerStdout.Name] = &ContainerStdout;
-    ContainerPropMap[ContainerStdoutOffset.Name] = &ContainerStdoutOffset;
-    ContainerPropMap[ContainerStderr.Name] = &ContainerStderr;
-    ContainerPropMap[ContainerStderrOffset.Name] = &ContainerStderrOffset;
-    ContainerPropMap[ContainerMemUsage.Name] = &ContainerMemUsage;
-    ContainerPropMap[ContainerAnonUsage.Name] = &ContainerAnonUsage;
-    ContainerPropMap[ContainerMinorFaults.Name] = &ContainerMinorFaults;
-    ContainerPropMap[ContainerMajorFaults.Name] = &ContainerMajorFaults;
-    ContainerMaxRss.Init();
-    ContainerPropMap[ContainerMaxRss.Name] = &ContainerMaxRss;
-    ContainerPropMap[ContainerCpuUsage.Name] = &ContainerCpuUsage;
-    ContainerPropMap[ContainerCpuSystem.Name] = &ContainerCpuSystem;
-    ContainerPropMap[ContainerNetBytes.Name] = &ContainerNetBytes;
-    ContainerPropMap[ContainerNetPackets.Name] = &ContainerNetPackets;
-    ContainerPropMap[ContainerNetDrops.Name] = &ContainerNetDrops;
-    ContainerPropMap[ContainerNetOverlimits.Name] = &ContainerNetOverlimits;
-    ContainerPropMap[ContainerNetRxBytes.Name] = &ContainerNetRxBytes;
-    ContainerPropMap[ContainerNetRxPackets.Name] = &ContainerNetRxPackets;
-    ContainerPropMap[ContainerNetRxDrops.Name] = &ContainerNetRxDrops;
-    ContainerPropMap[ContainerIoRead.Name] = &ContainerIoRead;
-    ContainerPropMap[ContainerIoWrite.Name] = &ContainerIoWrite;
-    ContainerPropMap[ContainerIoOps.Name] = &ContainerIoOps;
-    ContainerPropMap[ContainerTime.Name] = &ContainerTime;
-    ContainerPropMap[ContainerPortoStat.Name] = &ContainerPortoStat;
-}
+class TContainerMemoryGuarantee : public TContainerProperty {
+public:
+    TError Set(const std::string &mem_guarantee);
+    TError Get(std::string &value);
+    TContainerMemoryGuarantee(std::string name, uint64_t set_mask,
+                              std::string desc)
+                              : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportGuarantee();
 
-TError TContainerProperty::IsAliveAndStopped(void) {
-    auto state = CurrentContainer->GetState();
-
-    if (state == EContainerState::Dead)
-        return TError(EError::InvalidState,
-                      "Cannot change property while in the dead state");
-
-    if (state != EContainerState::Stopped &&
-        state != EContainerState::Unknown)
-        return TError(EError::InvalidState,
-                "Cannot change property in runtime");
-
-    return TError::Success();
-}
-
-TError TContainerProperty::IsAlive(void) {
-    auto state = CurrentContainer->GetState();
-
-    if (state == EContainerState::Dead)
-        return TError(EError::InvalidState,
-                      "Cannot change property while in the dead state");
-
-    return TError::Success();
-}
-
-TError TContainerProperty::IsDead(void) {
-    auto state = CurrentContainer->GetState();
-
-    if (state != EContainerState::Dead)
-        return TError(EError::InvalidState,
-                      "Available only in dead state: " + Name);
-
-    return TError::Success();
-}
-
-TError TContainerProperty::IsRunning(void) {    
-    auto state = CurrentContainer->GetState();
-    
-    /*
-     * This snippet is taken from TContainer::GetProperty.
-     * The method name misguides a bit, but may be the semantic
-     * of such properties is that we can look at the value in
-     * the dead state too...
-     */
-    if (state == EContainerState::Stopped)
-        return TError(EError::InvalidState,
-                      "Not available in stopped state: " + Name);
-
-    return TError::Success();
-}
+        return TError::Success();
+    }
+};
 
 TError TContainerMemoryGuarantee::Set(const std::string &mem_guarantee) {
     TError error = IsAlive();
@@ -515,12 +450,32 @@ TError TContainerMemoryGuarantee::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerMemTotalGuarantee : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMemTotalGuarantee(std::string name, std::string desc)
+                                : TContainerProperty(name, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportGuarantee();
+
+        return TError::Success();
+    }
+};
+
 TError TContainerMemTotalGuarantee::Get(std::string &value) {
     uint64_t total = CurrentContainer->GetHierarchyMemGuarantee();
     value = std::to_string(total);
 
     return TError::Success();
 }
+
+class TContainerCommand : public TContainerProperty {
+public:
+    TError Set(const std::string &command);
+    TError Get(std::string &value);
+    TContainerCommand(std::string name, uint64_t set_mask, std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerCommand::Set(const std::string &command) {
     TError error = IsAliveAndStopped();
@@ -540,6 +495,14 @@ TError TContainerCommand::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerVirtMode : public TContainerProperty {
+public:
+    TError Set(const std::string &virt_mode);
+    TError Get(std::string &value);
+    TContainerVirtMode(std::string name, uint64_t set_mask, std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerVirtMode::Set(const std::string &virt_mode) {
     TError error = IsAliveAndStopped();
@@ -604,6 +567,14 @@ TError TContainerVirtMode::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerStdinPath : public TContainerProperty {
+public:
+    TError Set(const std::string &path);
+    TError Get(std::string &value);
+    TContainerStdinPath(std::string name, uint64_t set_mask, std::string desc)
+                    : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerStdinPath::Set(const std::string &path) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -620,6 +591,14 @@ TError TContainerStdinPath::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerStdoutPath : public TContainerProperty {
+public:
+    TError Set(const std::string &path);
+    TError Get(std::string &value);
+    TContainerStdoutPath(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerStdoutPath::Set(const std::string &path) {
     TError error = IsAliveAndStopped();
@@ -638,6 +617,14 @@ TError TContainerStdoutPath::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerStderrPath : public TContainerProperty {
+public:
+    TError Set(const std::string &path);
+    TError Get(std::string &value);
+    TContainerStderrPath(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerStderrPath::Set(const std::string &path) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -654,6 +641,14 @@ TError TContainerStderrPath::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerBindDns : public TContainerProperty {
+public:
+    TError Set(const std::string &bind_needed);
+    TError Get(std::string &value);
+    TContainerBindDns(std::string name, uint64_t set_mask, std::string desc)
+                    : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerBindDns::Get(std::string &value) {
     value = CurrentContainer->BindDns ? "true" : "false";
@@ -677,6 +672,14 @@ TError TContainerBindDns::Set(const std::string &bind_needed) {
 
     return TError::Success();
 }
+
+class TContainerIsolate : public TContainerProperty {
+public:
+    TError Set(const std::string &isolate_needed);
+    TError Get(std::string &value);
+    TContainerIsolate(std::string name, uint64_t set_mask, std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerIsolate::Get(std::string &value) {
     value = CurrentContainer->Isolate ? "true" : "false";
@@ -731,6 +734,14 @@ TError TContainerIsolate::Set(const std::string &isolate_needed) {
     return TError::Success();
 }
 
+class TContainerRoot : public TContainerProperty {
+public:
+    TError Set(const std::string &root);
+    TError Get(std::string &value);
+    TContainerRoot(std::string name, uint64_t set_mask, std::string desc)
+                   : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerRoot::Get(std::string &value) {
     value = CurrentContainer->Root;
 
@@ -761,6 +772,14 @@ TError TContainerRoot::Set(const std::string &root) {
     return TError::Success();
 }
 
+class TContainerNet : public TContainerProperty {
+public:
+    TError Set(const std::string &net_desc);
+    TError Get(std::string &value);
+    TContainerNet(std::string name, uint64_t set_mask, std::string desc)
+                  : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerNet::Set(const std::string &net_desc) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -783,6 +802,15 @@ TError TContainerNet::Set(const std::string &net_desc) {
 TError TContainerNet::Get(std::string &value) {
     return StrListToString(CurrentContainer->NetProp, value);
 }
+
+class TContainerCwd : public TContainerProperty {
+public:
+    TError Set(const std::string &cwd);
+    TError Get(std::string &value);
+    TContainerCwd(std::string name, uint64_t set_mask, std::string desc)
+                  : TContainerProperty(name, set_mask, desc) {}
+    void Propagate(const std::string &value);
+};
 
 TError TContainerCwd::Set(const std::string &cwd) {
     TError error = IsAliveAndStopped();
@@ -821,6 +849,14 @@ void TContainerCwd::Propagate(const std::string &cwd) {
     }
 }
 
+class TContainerRootRo : public TContainerProperty {
+public:
+    TError Set(const std::string &ro);
+    TError Get(std::string &value);
+    TContainerRootRo(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerRootRo::Set(const std::string &ro) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -844,6 +880,14 @@ TError TContainerRootRo::Get(std::string &ro) {
     return TError::Success();
 }
 
+class TContainerHostname : public TContainerProperty {
+public:
+    TError Set(const std::string &hostname);
+    TError Get(std::string &value);
+    TContainerHostname(std::string name, uint64_t set_mask, std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerHostname::Set(const std::string &hostname) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -860,6 +904,16 @@ TError TContainerHostname::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerEnv : public TContainerProperty {
+public:
+    TError Set(const std::string &env);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &env_val);
+    TContainerEnv(std::string name, uint64_t set_mask, std::string desc)
+                  : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerEnv::Set(const std::string &env_val) {
     TError error = IsAliveAndStopped();
@@ -919,6 +973,14 @@ TError TContainerEnv::GetIndexed(const std::string &index, std::string &value) {
     return TError::Success();
 }
 
+class TContainerBind : public TContainerProperty {
+public:
+    TError Set(const std::string &bind_str);
+    TError Get(std::string &value);
+    TContainerBind(std::string name, uint64_t set_mask, std::string desc)
+                   : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerBind::Set(const std::string &bind_str) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -974,6 +1036,14 @@ TError TContainerBind::Get(std::string &value) {
     return StrListToString(bind_str_list, value);
 }
 
+class TContainerIp : public TContainerProperty {
+public:
+    TError Set(const std::string &ipaddr);
+    TError Get(std::string &value);
+    TContainerIp(std::string name, uint64_t set_mask, std::string desc)
+                 : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerIp::Set(const std::string &ipaddr) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -998,6 +1068,60 @@ TError TContainerIp::Set(const std::string &ipaddr) {
 TError TContainerIp::Get(std::string &value) {
     return StrListToString(CurrentContainer->IpList, value);
 }
+
+class TContainerCapabilities : public TContainerProperty {
+public:
+    const std::map<std::string, uint64_t> SupportedCaps = {
+        { "AUDIT_READ",         CAP_AUDIT_READ },
+        { "CHOWN",              CAP_CHOWN },
+        { "DAC_OVERRIDE",       CAP_DAC_OVERRIDE },
+        { "DAC_READ_SEARCH",    CAP_DAC_READ_SEARCH },
+        { "FOWNER",             CAP_FOWNER },
+        { "FSETID",             CAP_FSETID },
+        { "KILL",               CAP_KILL },
+        { "SETGID",             CAP_SETGID },
+        { "SETUID",             CAP_SETUID },
+        { "SETPCAP",            CAP_SETPCAP },
+        { "LINUX_IMMUTABLE",    CAP_LINUX_IMMUTABLE },
+        { "NET_BIND_SERVICE",   CAP_NET_BIND_SERVICE },
+        { "NET_BROADCAST",      CAP_NET_BROADCAST },
+        { "NET_ADMIN",          CAP_NET_ADMIN },
+        { "NET_RAW",            CAP_NET_RAW },
+        { "IPC_LOCK",           CAP_IPC_LOCK },
+        { "IPC_OWNER",          CAP_IPC_OWNER },
+        { "SYS_MODULE",         CAP_SYS_MODULE },
+        { "SYS_RAWIO",          CAP_SYS_RAWIO },
+        { "SYS_CHROOT",         CAP_SYS_CHROOT },
+        { "SYS_PTRACE",         CAP_SYS_PTRACE },
+        { "SYS_PACCT",          CAP_SYS_PACCT },
+        { "SYS_ADMIN",          CAP_SYS_ADMIN },
+        { "SYS_BOOT",           CAP_SYS_BOOT },
+        { "SYS_NICE",           CAP_SYS_NICE },
+        { "SYS_RESOURCE",       CAP_SYS_RESOURCE },
+        { "SYS_TIME",           CAP_SYS_TIME },
+        { "SYS_TTY_CONFIG",     CAP_SYS_TTY_CONFIG },
+        { "MKNOD",              CAP_MKNOD },
+        { "LEASE",              CAP_LEASE },
+        { "AUDIT_WRITE",        CAP_AUDIT_WRITE },
+        { "AUDIT_CONTROL",      CAP_AUDIT_CONTROL },
+        { "SETFCAP",            CAP_SETFCAP },
+        { "MAC_OVERRIDE",       CAP_MAC_OVERRIDE },
+        { "MAC_ADMIN",          CAP_MAC_ADMIN },
+        { "SYSLOG",             CAP_SYSLOG },
+        { "WAKE_ALARM",         CAP_WAKE_ALARM },
+        { "BLOCK_SUSPEND",      CAP_BLOCK_SUSPEND },
+    };
+    uint64_t AllCaps;
+    TError Init(void) {
+        AllCaps = 0xffffffffffffffff >> (63 - LastCapability);
+
+        return TError::Success();
+    }
+    TError Set(const std::string &caps);
+    TError Get(std::string &value);
+    TContainerCapabilities(std::string name, uint64_t set_mask, std::string desc)
+                           : TContainerProperty(name, set_mask, desc, true) {}
+};
 
 TError TContainerCapabilities::Set(const std::string &caps_str) {
     TError error = IsAliveAndStopped();
@@ -1042,6 +1166,14 @@ TError TContainerCapabilities::Get(std::string &value) {
     return StrListToString(caps, value);
 }
 
+class TContainerDefaultGw : public TContainerProperty {
+public:
+    TError Set(const std::string &gw);
+    TError Get(std::string &value);
+    TContainerDefaultGw(std::string name, uint64_t set_mask, std::string desc)
+                        : TContainerProperty(name, set_mask, desc, true) {}
+};
+
 TError TContainerDefaultGw::Set(const std::string &gw) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -1068,6 +1200,14 @@ TError TContainerDefaultGw::Get(std::string &value) {
     return StrListToString(CurrentContainer->DefaultGw, value);
 }
 
+class TContainerResolvConf : public TContainerProperty {
+public:
+    TError Set(const std::string &conf);
+    TError Get(std::string &value);
+    TContainerResolvConf(std::string name, uint64_t set_mask, std::string desc)
+                         : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerResolvConf::Set(const std::string &conf_str) {
     TError error = IsAliveAndStopped();
     if (error)
@@ -1089,6 +1229,14 @@ TError TContainerResolvConf::Get(std::string &value) {
     return StrListToString(CurrentContainer->ResolvConf, value);
 }
 
+class TContainerDevices : public TContainerProperty {
+public:
+    TError Set(const std::string &dev);
+    TError Get(std::string &value);
+    TContainerDevices(std::string name, uint64_t set_mask, std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerDevices::Set(const std::string &dev_str) {
     std::vector<std::string> dev_list;
 
@@ -1105,6 +1253,16 @@ TError TContainerDevices::Set(const std::string &dev_str) {
 TError TContainerDevices::Get(std::string &value) {
     return StrListToString(CurrentContainer->Devices, value);
 }
+
+class TContainerRawRootPid : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawRootPid(std::string name, std::string desc)
+                         : TContainerProperty(name, desc, true, true) {
+        SetMask = ROOT_PID_SET;
+    }
+};
 
 TError TContainerRawRootPid::SetFromRestore(const std::string &value) {
     std::vector<std::string> str_list;
@@ -1131,6 +1289,16 @@ TError TContainerRawRootPid::Get(std::string &value) {
    return TError::Success();
 }
 
+class TContainerRawLoopDev : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawLoopDev(std::string name, std::string desc)
+                    : TContainerProperty(name, desc, true, true) {
+        SetMask = LOOP_DEV_SET;
+    }
+};
+
 TError TContainerRawLoopDev::SetFromRestore(const std::string &value) {
     return StringToInt(value, CurrentContainer->LoopDev);
 }
@@ -1140,6 +1308,16 @@ TError TContainerRawLoopDev::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerRawStartTime : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawStartTime(std::string name, std::string desc)
+                           : TContainerProperty(name, desc, true, true) {
+        SetMask = START_TIME_SET;
+    }
+};
 
 TError TContainerRawStartTime::SetFromRestore(const std::string &value) {
     return StringToUint64(value, CurrentContainer->StartTime);
@@ -1151,6 +1329,16 @@ TError TContainerRawStartTime::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerRawDeathTime : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawDeathTime(std::string name, std::string desc)
+                           : TContainerProperty(name, desc, true, true) {
+        SetMask = DEATH_TIME_SET;
+    }
+};
+
 TError TContainerRawDeathTime::SetFromRestore(const std::string &value) {
     return StringToUint64(value, CurrentContainer->DeathTime);
 }
@@ -1160,6 +1348,33 @@ TError TContainerRawDeathTime::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerUlimit : public TContainerProperty {
+    const std::map<std::string,int> nameToIdx = {
+        { "as", RLIMIT_AS },
+        { "core", RLIMIT_CORE },
+        { "cpu", RLIMIT_CPU },
+        { "data", RLIMIT_DATA },
+        { "fsize", RLIMIT_FSIZE },
+        { "locks", RLIMIT_LOCKS },
+        { "memlock", RLIMIT_MEMLOCK },
+        { "msgqueue", RLIMIT_MSGQUEUE },
+        { "nice", RLIMIT_NICE },
+        { "nofile", RLIMIT_NOFILE },
+        { "nproc", RLIMIT_NPROC },
+        { "rss", RLIMIT_RSS },
+        { "rtprio", RLIMIT_RTPRIO },
+        { "rttime", RLIMIT_RTTIME },
+        { "sigpending", RLIMIT_SIGPENDING },
+        { "stask", RLIMIT_STACK },
+    };
+public:
+    TError Set(const std::string &ulimit);
+    TError Get(std::string &value);
+    TContainerUlimit(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+    void Propagate(std::map<int, struct rlimit> &ulimits);
+};
 
 TError TContainerUlimit::Set(const std::string &ulimit_str) {
     TError error = IsAliveAndStopped();
@@ -1266,6 +1481,15 @@ void TContainerUlimit::Propagate(std::map<int, struct rlimit> &ulimits) {
     }
 }
 
+class TContainerPortoNamespace : public TContainerProperty {
+public:
+    TError Set(const std::string &ns);
+    TError Get(std::string &value);
+    TContainerPortoNamespace(std::string name, uint64_t set_mask,
+                              std::string desc)
+                              : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerPortoNamespace::Set(const std::string &ns) {
     TError error = IsAlive();
     if (error)
@@ -1282,6 +1506,15 @@ TError TContainerPortoNamespace::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerStdoutLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerStdoutLimit(std::string name, uint64_t set_mask,
+                          std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerStdoutLimit::Set(const std::string &limit) {
     TError error = IsAlive();
@@ -1309,6 +1542,15 @@ TError TContainerStdoutLimit::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerMemoryLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerMemoryLimit(std::string name, uint64_t set_mask,
+                          std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerMemoryLimit::Set(const std::string &limit) {
     TError error = IsAlive();
@@ -1350,6 +1592,21 @@ TError TContainerMemoryLimit::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerAnonLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerAnonLimit(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportAnonLimit();
+
+        return TError::Success();
+    }
+
+};
+
 TError TContainerAnonLimit::Set(const std::string &limit) {
     TError error = IsAlive();
     if (error)
@@ -1386,6 +1643,21 @@ TError TContainerAnonLimit::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerDirtyLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerDirtyLimit(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportDirtyLimit();
+
+        return TError::Success();
+    }
+
+};
+
 TError TContainerDirtyLimit::Set(const std::string &limit) {
     TError error = IsAlive();
     if (error)
@@ -1421,6 +1693,21 @@ TError TContainerDirtyLimit::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerRechargeOnPgfault : public TContainerProperty {
+public:
+    TError Set(const std::string &recharge);
+    TError Get(std::string &value);
+    TContainerRechargeOnPgfault(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportRechargeOnPgfault();
+
+        return TError::Success();
+    }
+
+};
 
 TError TContainerRechargeOnPgfault::Set(const std::string &recharge) {
     TError error = IsAlive();
@@ -1459,6 +1746,16 @@ TError TContainerRechargeOnPgfault::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerCpuPolicy : public TContainerProperty {
+public:
+    TError Set(const std::string &policy);
+    TError Get(std::string &value);
+    TContainerCpuPolicy(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Propagate(const std::string &policy);
+};
 
 TError TContainerCpuPolicy::Set(const std::string &policy) {
     TError error = IsAlive();
@@ -1541,6 +1838,15 @@ TError TContainerCpuPolicy::Propagate(const std::string &policy) {
     return error;
 }
 
+class TContainerCpuLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerCpuLimit(std::string name, uint64_t set_mask,
+                       std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerCpuLimit::Set(const std::string &limit) {
     TError error = IsAlive();
     if (error)
@@ -1579,6 +1885,15 @@ TError TContainerCpuLimit::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerCpuGuarantee : public TContainerProperty {
+public:
+    TError Set(const std::string &guarantee);
+    TError Get(std::string &value);
+    TContainerCpuGuarantee(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerCpuGuarantee::Set(const std::string &guarantee) {
     TError error = IsAlive();
     if (error)
@@ -1616,6 +1931,21 @@ TError TContainerCpuGuarantee::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerIoPolicy : public TContainerProperty {
+public:
+    TError Set(const std::string &policy);
+    TError Get(std::string &value);
+    TContainerIoPolicy(std::string name, uint64_t set_mask,
+                       std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = BlkioSubsystem.SupportPolicy();
+
+        return TError::Success();
+    }
+    TError Propagate(const std::string &policy);
+};
 
 TError TContainerIoPolicy::Set(const std::string &policy) {
     TError error = IsAlive();
@@ -1695,6 +2025,20 @@ TError TContainerIoPolicy::Propagate(const std::string &policy) {
     return error;
 }
 
+class TContainerIoLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerIoLimit(std::string name, uint64_t set_mask,
+                      std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportIoLimit();
+
+        return TError::Success();
+    }
+};
+
 TError TContainerIoLimit::Set(const std::string &limit) {
     TError error = IsAlive();
     if (error)
@@ -1729,6 +2073,20 @@ TError TContainerIoLimit::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerIopsLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerIopsLimit(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportIoLimit();
+
+        return TError::Success();
+    }
+};
+
 TError TContainerIopsLimit::Set(const std::string &limit) {
     TError error = IsAlive();
     if (error)
@@ -1762,6 +2120,17 @@ TError TContainerIopsLimit::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerNetGuarantee : public TContainerProperty {
+public:
+    TError Set(const std::string &guarantee);
+    TError Get(std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &guarantee);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetGuarantee(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerNetGuarantee::Set(const std::string &guarantee) {
     TError error = IsAlive();
@@ -1837,6 +2206,17 @@ TError TContainerNetGuarantee::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerNetLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &limit);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetLimit(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerNetLimit::Set(const std::string &limit) {
     TError error = IsAlive();
     if (error)
@@ -1910,6 +2290,17 @@ TError TContainerNetLimit::GetIndexed(const std::string &index,
 
     return TError::Success();
 }
+
+class TContainerNetPriority : public TContainerProperty {
+public:
+    TError Set(const std::string &prio);
+    TError Get(std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &prio);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetPriority(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerNetPriority::Set(const std::string &prio) {
     TError error = IsAlive();
@@ -1985,6 +2376,15 @@ TError TContainerNetPriority::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerRespawn : public TContainerProperty {
+public:
+    TError Set(const std::string &respawn);
+    TError Get(std::string &value);
+    TContainerRespawn(std::string name, uint64_t set_mask,
+                      std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerRespawn::Set(const std::string &respawn) {
     TError error = IsAlive();
     if (error)
@@ -2008,6 +2408,15 @@ TError TContainerRespawn::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerMaxRespawns : public TContainerProperty {
+public:
+    TError Set(const std::string &max);
+    TError Get(std::string &value);
+    TContainerMaxRespawns(std::string name, uint64_t set_mask,
+                          std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerMaxRespawns::Set(const std::string &max) {
     TError error = IsAlive();
     if (error)
@@ -2029,6 +2438,15 @@ TError TContainerMaxRespawns::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerPrivate : public TContainerProperty {
+public:
+    TError Set(const std::string &max);
+    TError Get(std::string &value);
+    TContainerPrivate(std::string name, uint64_t set_mask,
+                      std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerPrivate::Set(const std::string &value) {
     TError error = IsAlive();
     if (error)
@@ -2048,6 +2466,14 @@ TError TContainerPrivate::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerAgingTime : public TContainerProperty {
+public:
+    TError Set(const std::string &time);
+    TError Get(std::string &value);
+    TContainerAgingTime(std::string name, uint64_t set_mask, std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+};
 
 TError TContainerAgingTime::Set(const std::string &time) {
     TError error = IsAlive();
@@ -2070,6 +2496,15 @@ TError TContainerAgingTime::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerEnablePorto : public TContainerProperty {
+public:
+    TError Set(const std::string &enabled);
+    TError Get(std::string &value);
+    TContainerEnablePorto(std::string name, uint64_t set_mask, std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
+    void Propagate(bool value);
+};
 
 TError TContainerEnablePorto::Set(const std::string &enabled) {
     TError error = IsAlive();
@@ -2118,6 +2553,14 @@ void TContainerEnablePorto::Propagate(bool value) {
     }
 }
 
+class TContainerWeak : public TContainerProperty {
+public:
+    TError Set(const std::string &weak);
+    TError Get(std::string &value);
+    TContainerWeak(std::string name, uint64_t set_mask, std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
+};
+
 TError TContainerWeak::Set(const std::string &weak) {
     TError error = IsAlive();
     if (error)
@@ -2141,6 +2584,15 @@ TError TContainerWeak::Get(std::string &value) {
     return TError::Success();
 }
 
+/* Read-only properties derived from data filelds follow below... */
+
+class TContainerAbsoluteName : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerAbsoluteName(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
 TError TContainerAbsoluteName::Get(std::string &value) {
     if (CurrentContainer->IsRoot() || CurrentContainer->IsPortoRoot())
         value = CurrentContainer->GetName();
@@ -2151,12 +2603,29 @@ TError TContainerAbsoluteName::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerAbsoluteNamespace : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerAbsoluteNamespace(std::string name, std::string desc)
+                                : TContainerProperty(name, desc) {}
+};
+
 TError TContainerAbsoluteNamespace::Get(std::string &value) {
     value = std::string(PORTO_ROOT_CONTAINER) + "/" +
             CurrentContainer->GetPortoNamespace();
 
     return TError::Success();
 }
+
+class TContainerState : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerState(std::string name, std::string desc)
+                    : TContainerProperty(name, desc, false, true) {
+        SetMask = STATE_SET;
+    }
+};
 
 TError TContainerState::SetFromRestore(const std::string &value) {
     /*
@@ -2189,6 +2658,17 @@ TError TContainerState::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerOomKilled : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError GetToSave(std::string &value);
+    TError Get(std::string &value);
+    TContainerOomKilled(std::string name, std::string desc)
+                    : TContainerProperty(name, desc, false, true) {
+        SetMask = OOM_KILLED_SET;
+    }
+};
+
 TError TContainerOomKilled::SetFromRestore(const std::string &value) {
     if (value == "true")
         CurrentContainer->OomKilled = true;
@@ -2214,12 +2694,29 @@ TError TContainerOomKilled::Get(std::string &value) {
     return GetToSave(value);
 }
 
+class TContainerParent : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerParent(std::string name, std::string desc)
+                     : TContainerProperty(name, desc, true, false) {}
+};
+
 TError TContainerParent::Get(std::string &value) {
     auto p = CurrentContainer->GetParent();
     value = p ? p->GetName() : "";
 
     return TError::Success();
 }
+
+class TContainerRespawnCount : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRespawnCount(std::string name, std::string desc)
+                           : TContainerProperty(name, desc, false, true) {
+        SetMask = RESPAWN_COUNT_SET;
+    }
+};
 
 TError TContainerRespawnCount::SetFromRestore(const std::string &value) {
     return StringToUint64(value, CurrentContainer->RespawnCount);
@@ -2230,6 +2727,13 @@ TError TContainerRespawnCount::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerRootPid : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerRootPid(std::string name, std::string desc)
+                      : TContainerProperty(name, desc, true) {}
+};
 
 TError TContainerRootPid::Get(std::string &value) {
     TError error = IsRunning();
@@ -2244,6 +2748,17 @@ TError TContainerRootPid::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerExitStatus : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError GetToSave(std::string &value);
+    TError Get(std::string &value);
+    TContainerExitStatus(std::string name, std::string desc)
+                         : TContainerProperty(name, desc, false, true) {
+        SetMask = EXIT_STATUS_SET;
+    }
+};
 
 TError TContainerExitStatus::SetFromRestore(const std::string &value) {
     return StringToInt(value, CurrentContainer->ExitStatus);
@@ -2263,11 +2778,26 @@ TError TContainerExitStatus::Get(std::string &value) {
     return GetToSave(value);
 }
 
+class TContainerStartErrno : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerStartErrno(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
+};
+
 TError TContainerStartErrno::Get(std::string &value) {
     value = std::to_string(CurrentContainer->TaskStartErrno);
 
     return TError::Success();
 }
+
+class TContainerStdout : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerStdout(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+};
 
 TError TContainerStdout::Get(std::string &value) {
     TError error = IsRunning();
@@ -2291,6 +2821,13 @@ TError TContainerStdout::GetIndexed(const std::string &index,
                                               index);
 }
 
+class TContainerStdoutOffset : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerStdoutOffset(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
 TError TContainerStdoutOffset::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2300,6 +2837,14 @@ TError TContainerStdoutOffset::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerStderr : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerStderr(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+};
 
 TError TContainerStderr::Get(std::string &value) {
     TError error = IsRunning();
@@ -2323,6 +2868,13 @@ TError TContainerStderr::GetIndexed(const std::string &index,
                                               index);
 }
 
+class TContainerStderrOffset : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerStderrOffset(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
 TError TContainerStderrOffset::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2332,6 +2884,13 @@ TError TContainerStderrOffset::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerMemUsage : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMemUsage(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
 
 TError TContainerMemUsage::Get(std::string &value) {
     TError error = IsRunning();
@@ -2352,6 +2911,13 @@ TError TContainerMemUsage::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerAnonUsage : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerAnonUsage(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
+
 TError TContainerAnonUsage::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2367,6 +2933,13 @@ TError TContainerAnonUsage::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerMinorFaults : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMinorFaults(std::string name, std::string desc)
+                          : TContainerProperty(name, desc) {}
+};
 
 TError TContainerMinorFaults::Get(std::string &value) {
     TError error = IsRunning();
@@ -2384,6 +2957,13 @@ TError TContainerMinorFaults::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerMajorFaults : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMajorFaults(std::string name, std::string desc)
+                          : TContainerProperty(name, desc) {}
+};
+
 TError TContainerMajorFaults::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2400,6 +2980,22 @@ TError TContainerMajorFaults::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerMaxRss : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMaxRss(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+    TError Init(void) {
+        TCgroup rootCg = MemorySubsystem.RootCgroup();
+        TUintMap stat;
+
+        TError error = MemorySubsystem.Statistics(rootCg, stat);
+        IsSupported = !error && (stat.find("total_max_rss") != stat.end());
+
+        return TError::Success();
+    }
+};
+
 TError TContainerMaxRss::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2414,6 +3010,13 @@ TError TContainerMaxRss::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerCpuUsage : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerCpuUsage(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
 
 TError TContainerCpuUsage::Get(std::string &value) {
     TError error = IsRunning();
@@ -2435,6 +3038,13 @@ TError TContainerCpuUsage::Get(std::string &value) {
     return TError::Success();
 }
 
+class TContainerCpuSystem : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerCpuSystem(std::string name, std::string desc)
+                        : TContainerProperty(name, desc) {}
+};
+
 TError TContainerCpuSystem::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2454,6 +3064,14 @@ TError TContainerCpuSystem::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerNetBytes : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetBytes(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
 
 TError TContainerNetBytes::Get(std::string &value) {
     TError error = IsRunning();
@@ -2483,6 +3101,14 @@ TError TContainerNetBytes::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerNetPackets : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetPackets(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
+};
+
 TError TContainerNetPackets::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2510,6 +3136,14 @@ TError TContainerNetPackets::GetIndexed(const std::string &index,
 
     return TError::Success();
 }
+
+class TContainerNetDrops : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetDrops(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
 
 TError TContainerNetDrops::Get(std::string &value) {
     TError error = IsRunning();
@@ -2539,6 +3173,14 @@ TError TContainerNetDrops::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerNetOverlimits : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetOverlimits(std::string name, std::string desc)
+                            : TContainerProperty(name, desc) {}
+};
+
 TError TContainerNetOverlimits::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2566,6 +3208,14 @@ TError TContainerNetOverlimits::GetIndexed(const std::string &index,
 
     return TError::Success();
 }
+
+class TContainerNetRxBytes : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetRxBytes(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
+};
 
 TError TContainerNetRxBytes::Get(std::string &value) {
     TError error = IsRunning();
@@ -2595,6 +3245,14 @@ TError TContainerNetRxBytes::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerNetRxPackets : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetRxPackets(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
 TError TContainerNetRxPackets::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2623,6 +3281,14 @@ TError TContainerNetRxPackets::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerNetRxDrops : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetRxDrops(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
+};
+
 TError TContainerNetRxDrops::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2650,6 +3316,15 @@ TError TContainerNetRxDrops::GetIndexed(const std::string &index,
 
     return TError::Success();
 }
+
+class TContainerIoRead : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerIoRead(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+};
 
 void TContainerIoRead::Populate(TUintMap &m) {
     auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
@@ -2696,6 +3371,15 @@ TError TContainerIoRead::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerIoWrite : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerIoWrite(std::string name, std::string desc)
+                      : TContainerProperty(name, desc) {}
+};
+
 void TContainerIoWrite::Populate(TUintMap &m) {
     auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
     auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
@@ -2740,6 +3424,15 @@ TError TContainerIoWrite::GetIndexed(const std::string &index, std::string &valu
 
     return TError::Success();
 }
+
+class TContainerIoOps : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerIoOps(std::string name, std::string desc)
+                    : TContainerProperty(name, desc) {}
+};
 
 void TContainerIoOps::Populate(TUintMap &m) {
     auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
@@ -2786,6 +3479,13 @@ TError TContainerIoOps::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TContainerTime : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerTime(std::string name, std::string desc)
+                   : TContainerProperty(name, desc) {}
+};
+
 TError TContainerTime::Get(std::string &value) {
     TError error = IsRunning();
     if (error)
@@ -2825,6 +3525,15 @@ TError TContainerTime::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TContainerPortoStat : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerPortoStat(std::string name, std::string desc)
+                        : TContainerProperty(name, desc, true) {}
+};
 
 void TContainerPortoStat::Populate(TUintMap &m) {
     m["spawned"] = Statistics->Spawned;
@@ -2871,4 +3580,99 @@ TError TContainerPortoStat::GetIndexed(const std::string &index,
     value = std::to_string(m[index]);
 
     return TError::Success();
+}
+
+void InitContainerProperties(void) {
+    ContainerPropMap[ContainerUser.Name] = &ContainerUser;
+    ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
+    ContainerMemoryGuarantee.Init();
+    ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
+    ContainerPropMap[ContainerCommand.Name] = &ContainerCommand;
+    ContainerPropMap[ContainerVirtMode.Name] = &ContainerVirtMode;
+    ContainerPropMap[ContainerCwd.Name] = &ContainerCwd;
+    ContainerPropMap[ContainerStdinPath.Name] = &ContainerStdinPath;
+    ContainerPropMap[ContainerStdoutPath.Name] = &ContainerStdoutPath;
+    ContainerPropMap[ContainerStderrPath.Name] = &ContainerStderrPath;
+    ContainerPropMap[ContainerIsolate.Name] = &ContainerIsolate;
+    ContainerPropMap[ContainerBindDns.Name] = &ContainerBindDns;
+    ContainerPropMap[ContainerRoot.Name] = &ContainerRoot;
+    ContainerPropMap[ContainerNet.Name] = &ContainerNet;
+    ContainerPropMap[ContainerHostname.Name] = &ContainerHostname;
+    ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
+    ContainerPropMap[ContainerEnv.Name] = &ContainerEnv;
+    ContainerPropMap[ContainerBind.Name] = &ContainerBind;
+    ContainerPropMap[ContainerIp.Name] = &ContainerIp;
+    ContainerCapabilities.Init();
+    ContainerPropMap[ContainerCapabilities.Name] = &ContainerCapabilities;
+    ContainerPropMap[ContainerDefaultGw.Name] = &ContainerDefaultGw;
+    ContainerPropMap[ContainerResolvConf.Name] = &ContainerResolvConf;
+    ContainerPropMap[ContainerDevices.Name] = &ContainerDevices;
+    ContainerPropMap[ContainerRawRootPid.Name] = &ContainerRawRootPid;
+    ContainerPropMap[ContainerRawLoopDev.Name] = &ContainerRawLoopDev;
+    ContainerPropMap[ContainerRawStartTime.Name] = &ContainerRawStartTime;
+    ContainerPropMap[ContainerRawDeathTime.Name] = &ContainerRawDeathTime;
+    ContainerPropMap[ContainerUlimit.Name] = &ContainerUlimit;
+    ContainerPropMap[ContainerPortoNamespace.Name] = &ContainerPortoNamespace;
+    ContainerPropMap[ContainerStdoutLimit.Name] = &ContainerStdoutLimit;
+    ContainerPropMap[ContainerMemoryLimit.Name] = &ContainerMemoryLimit;
+    ContainerAnonLimit.Init();
+    ContainerPropMap[ContainerAnonLimit.Name] = &ContainerAnonLimit;
+    ContainerDirtyLimit.Init();
+    ContainerPropMap[ContainerDirtyLimit.Name] = &ContainerDirtyLimit;
+    ContainerRechargeOnPgfault.Init();
+    ContainerPropMap[ContainerRechargeOnPgfault.Name] = &ContainerRechargeOnPgfault;
+    ContainerPropMap[ContainerCpuPolicy.Name] = &ContainerCpuPolicy;
+    ContainerPropMap[ContainerCpuLimit.Name] = &ContainerCpuLimit;
+    ContainerPropMap[ContainerCpuGuarantee.Name] = &ContainerCpuGuarantee;
+    ContainerIoPolicy.Init();
+    ContainerPropMap[ContainerIoPolicy.Name] = &ContainerIoPolicy;
+    ContainerIoLimit.Init();
+    ContainerPropMap[ContainerIoLimit.Name] = &ContainerIoLimit;
+    ContainerIopsLimit.Init();
+    ContainerPropMap[ContainerIopsLimit.Name] = &ContainerIopsLimit;
+    ContainerPropMap[ContainerNetGuarantee.Name] = &ContainerNetGuarantee;
+    ContainerPropMap[ContainerNetLimit.Name] = &ContainerNetLimit;
+    ContainerPropMap[ContainerNetPriority.Name] = &ContainerNetPriority;
+    ContainerPropMap[ContainerRespawn.Name] = &ContainerRespawn;
+    ContainerPropMap[ContainerMaxRespawns.Name] = &ContainerMaxRespawns;
+    ContainerPropMap[ContainerPrivate.Name] = &ContainerPrivate;
+    ContainerPropMap[ContainerNetTos.Name] = &ContainerNetTos;
+    ContainerPropMap[ContainerAgingTime.Name] = &ContainerAgingTime;
+    ContainerPropMap[ContainerEnablePorto.Name] = &ContainerEnablePorto;
+    ContainerPropMap[ContainerWeak.Name] = &ContainerWeak;
+    ContainerPropMap[ContainerAbsoluteName.Name] = &ContainerAbsoluteName;
+    ContainerPropMap[ContainerAbsoluteNamespace.Name] = &ContainerAbsoluteNamespace;
+    ContainerMemTotalGuarantee.Init();
+    ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
+    ContainerPropMap[ContainerOomKilled.Name] = &ContainerOomKilled;
+    ContainerPropMap[ContainerState.Name] = &ContainerState;
+    ContainerPropMap[ContainerParent.Name] = &ContainerParent;
+    ContainerPropMap[ContainerRespawnCount.Name] = &ContainerRespawnCount;
+    ContainerPropMap[ContainerRootPid.Name] = &ContainerRootPid;
+    ContainerPropMap[ContainerExitStatus.Name] = &ContainerExitStatus;
+    ContainerPropMap[ContainerStartErrno.Name] = &ContainerStartErrno;
+    ContainerPropMap[ContainerStdout.Name] = &ContainerStdout;
+    ContainerPropMap[ContainerStdoutOffset.Name] = &ContainerStdoutOffset;
+    ContainerPropMap[ContainerStderr.Name] = &ContainerStderr;
+    ContainerPropMap[ContainerStderrOffset.Name] = &ContainerStderrOffset;
+    ContainerPropMap[ContainerMemUsage.Name] = &ContainerMemUsage;
+    ContainerPropMap[ContainerAnonUsage.Name] = &ContainerAnonUsage;
+    ContainerPropMap[ContainerMinorFaults.Name] = &ContainerMinorFaults;
+    ContainerPropMap[ContainerMajorFaults.Name] = &ContainerMajorFaults;
+    ContainerMaxRss.Init();
+    ContainerPropMap[ContainerMaxRss.Name] = &ContainerMaxRss;
+    ContainerPropMap[ContainerCpuUsage.Name] = &ContainerCpuUsage;
+    ContainerPropMap[ContainerCpuSystem.Name] = &ContainerCpuSystem;
+    ContainerPropMap[ContainerNetBytes.Name] = &ContainerNetBytes;
+    ContainerPropMap[ContainerNetPackets.Name] = &ContainerNetPackets;
+    ContainerPropMap[ContainerNetDrops.Name] = &ContainerNetDrops;
+    ContainerPropMap[ContainerNetOverlimits.Name] = &ContainerNetOverlimits;
+    ContainerPropMap[ContainerNetRxBytes.Name] = &ContainerNetRxBytes;
+    ContainerPropMap[ContainerNetRxPackets.Name] = &ContainerNetRxPackets;
+    ContainerPropMap[ContainerNetRxDrops.Name] = &ContainerNetRxDrops;
+    ContainerPropMap[ContainerIoRead.Name] = &ContainerIoRead;
+    ContainerPropMap[ContainerIoWrite.Name] = &ContainerIoWrite;
+    ContainerPropMap[ContainerIoOps.Name] = &ContainerIoOps;
+    ContainerPropMap[ContainerTime.Name] = &ContainerTime;
+    ContainerPropMap[ContainerPortoStat.Name] = &ContainerPortoStat;
 }
