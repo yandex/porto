@@ -19,15 +19,12 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <sys/prctl.h>
-#include <sys/syscall.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <wordexp.h>
 #include <grp.h>
 #include <linux/kdev_t.h>
 #include <net/if.h>
-#include <linux/capability.h>
 }
 
 using std::stringstream;
@@ -79,49 +76,6 @@ static int ChildFn(void *arg) {
     TTask *task = static_cast<TTask*>(arg);
     task->StartChild();
     return EXIT_FAILURE;
-}
-
-TError TTask::ChildApplyCapabilities() {
-    uint64_t effective, permitted, inheritable;
-
-    if (!Env->Cred.IsRootUser())
-        return TError::Success();
-
-    effective = permitted = -1;
-    inheritable = Env->Caps;
-
-    TError error = SetCap(effective, permitted, inheritable);
-    if (error)
-        return error;
-
-    for (int i = 0; i <= LastCapability; i++) {
-        if (!(Env->Caps & (1ULL << i)) && i != CAP_SETPCAP) {
-            TError error = DropBoundedCap(i);
-            if (error)
-                return error;
-        }
-    }
-
-    if (!(Env->Caps & (1ULL << CAP_SETPCAP))) {
-        TError error = DropBoundedCap(CAP_SETPCAP);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-TError TTask::ChildDropPriveleges() {
-    if (setgid(Env->Cred.Gid) < 0)
-        return TError(EError::Unknown, errno, "setgid()");
-
-    if (setgroups(Env->Cred.Groups.size(), Env->Cred.Groups.data()) < 0)
-        return TError(EError::Unknown, errno, "setgroups()");
-
-    if (setuid(Env->Cred.Uid) < 0)
-        return TError(EError::Unknown, errno, "setuid()");
-
-    return TError::Success();
 }
 
 TError TTask::ChildExec() {
@@ -636,10 +590,6 @@ TError TTask::ConfigureChild() {
             return error;
     }
 
-    error = ChildApplyCapabilities();
-    if (error)
-        return error;
-
     if (Env->QuadroFork) {
         Pid = fork();
         if (Pid < 0)
@@ -657,6 +607,10 @@ TError TTask::ConfigureChild() {
                 NULL,
             };
             auto envp = Env->Env.Envp();
+
+            error = PortoInitCapabilities.ApplyLimit();
+            if (error)
+                return error;
 
             CloseFds(-1, { fd } );
             fexecve(fd, (char *const *)argv, envp);
@@ -682,7 +636,15 @@ TError TTask::ConfigureChild() {
         }
     }
 
-    error = ChildDropPriveleges();
+    error = Env->Cred.Apply();
+    if (error)
+        return error;
+
+    error = Env->CapAmbient.ApplyAmbient();
+    if (error)
+        return error;
+
+    error = Env->CapLimit.ApplyLimit();
     if (error)
         return error;
 
@@ -917,6 +879,10 @@ TError TTask::Start() {
                 NULL,
             };
             auto envp = Env->Env.Envp();
+
+            error = PortoInitCapabilities.ApplyLimit();
+            if (error)
+                _exit(EXIT_FAILURE);
 
             CloseFds(-1, { fd } );
             fexecve(fd, (char *const *)argv, envp);

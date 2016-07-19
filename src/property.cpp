@@ -12,7 +12,6 @@
 #include "statistics.hpp"
 
 extern "C" {
-#include <linux/capability.h>
 #include <sys/sysinfo.h>
 }
 
@@ -81,106 +80,203 @@ TError TProperty::IsRunning(void) {
     return TError::Success();
 }
 
-class TCapabilities : public TProperty {
+class TCapLimit : public TProperty {
 public:
-    const std::map<std::string, uint64_t> SupportedCaps = {
-        { "AUDIT_READ",         CAP_AUDIT_READ },
-        { "CHOWN",              CAP_CHOWN },
-        { "DAC_OVERRIDE",       CAP_DAC_OVERRIDE },
-        { "DAC_READ_SEARCH",    CAP_DAC_READ_SEARCH },
-        { "FOWNER",             CAP_FOWNER },
-        { "FSETID",             CAP_FSETID },
-        { "KILL",               CAP_KILL },
-        { "SETGID",             CAP_SETGID },
-        { "SETUID",             CAP_SETUID },
-        { "SETPCAP",            CAP_SETPCAP },
-        { "LINUX_IMMUTABLE",    CAP_LINUX_IMMUTABLE },
-        { "NET_BIND_SERVICE",   CAP_NET_BIND_SERVICE },
-        { "NET_BROADCAST",      CAP_NET_BROADCAST },
-        { "NET_ADMIN",          CAP_NET_ADMIN },
-        { "NET_RAW",            CAP_NET_RAW },
-        { "IPC_LOCK",           CAP_IPC_LOCK },
-        { "IPC_OWNER",          CAP_IPC_OWNER },
-        { "SYS_MODULE",         CAP_SYS_MODULE },
-        { "SYS_RAWIO",          CAP_SYS_RAWIO },
-        { "SYS_CHROOT",         CAP_SYS_CHROOT },
-        { "SYS_PTRACE",         CAP_SYS_PTRACE },
-        { "SYS_PACCT",          CAP_SYS_PACCT },
-        { "SYS_ADMIN",          CAP_SYS_ADMIN },
-        { "SYS_BOOT",           CAP_SYS_BOOT },
-        { "SYS_NICE",           CAP_SYS_NICE },
-        { "SYS_RESOURCE",       CAP_SYS_RESOURCE },
-        { "SYS_TIME",           CAP_SYS_TIME },
-        { "SYS_TTY_CONFIG",     CAP_SYS_TTY_CONFIG },
-        { "MKNOD",              CAP_MKNOD },
-        { "LEASE",              CAP_LEASE },
-        { "AUDIT_WRITE",        CAP_AUDIT_WRITE },
-        { "AUDIT_CONTROL",      CAP_AUDIT_CONTROL },
-        { "SETFCAP",            CAP_SETFCAP },
-        { "MAC_OVERRIDE",       CAP_MAC_OVERRIDE },
-        { "MAC_ADMIN",          CAP_MAC_ADMIN },
-        { "SYSLOG",             CAP_SYSLOG },
-        { "WAKE_ALARM",         CAP_WAKE_ALARM },
-        { "BLOCK_SUSPEND",      CAP_BLOCK_SUSPEND },
-    };
-    uint64_t AllCaps;
-    TError Init(void) {
-        AllCaps = 0xffffffffffffffff >> (63 - LastCapability);
+    TCapLimit() : TProperty(P_CAPABILITIES, CAPABILITIES_SET,
+            "Limit capabilities in container: SYS_ADMIN;NET_ADMIN;... see man capabilities") {}
 
+    void Sanitize() {
+        TCapabilities allowed, limit;
+
+        if (CurrentContainer->OwnerCred.IsRootUser()) {
+            allowed = AllCapabilities;
+            limit = AllCapabilities;
+        } else if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
+            allowed = OsModeCapabilities;
+            limit = OsModeCapabilities;
+        } else {
+            allowed = AppModeCapabilities;
+            limit = SuidCapabilities;
+        }
+
+        if (!(CurrentContainer->PropMask & CAPABILITIES_SET)) {
+            CurrentContainer->CapLimit = limit;
+        } else {
+            CurrentContainer->CapLimit.Permitted &= limit.Permitted;
+            limit.Permitted &= CurrentContainer->CapLimit.Permitted;
+        }
+
+        if (HasAmbientCapabilities) {
+            allowed.Permitted &= limit.Permitted;
+            CurrentContainer->CapAllowed = allowed;
+            CurrentContainer->CapAmbient.Permitted &= allowed.Permitted;
+        }
+    }
+
+    TError CommitLimit(TCapabilities &limit) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+
+        if (limit.Permitted & ~AllCapabilities.Permitted) {
+            limit.Permitted &= ~AllCapabilities.Permitted;
+            return TError(EError::InvalidValue,
+                          "Unsupported capability: " + limit.Format());
+        }
+
+        TCapabilities bound;
+        if (CurrentClient->Cred.IsRootUser())
+            bound = AllCapabilities;
+        else if (CurrentContainer->VirtMode == VIRT_MODE_OS)
+            bound = OsModeCapabilities;
+        else
+            bound = SuidCapabilities;
+
+        /* root user can allow any capabilities in own containers */
+        if (!CurrentClient->Cred.IsRootUser() ||
+                !CurrentContainer->OwnerCred.IsRootUser()) {
+            for (auto p = CurrentContainer->GetParent(); p; p = p->GetParent())
+                bound.Permitted &= p->CapLimit.Permitted;
+        }
+
+        if (limit.Permitted & ~bound.Permitted) {
+            limit.Permitted &= ~bound.Permitted;
+            return TError(EError::Permission,
+                          "Not allowed capability: " + limit.Format() +
+                          ", you can set only: " + bound.Format());
+        }
+
+        CurrentContainer->CapLimit = limit;
+        CurrentContainer->PropMask |= CAPABILITIES_SET;
+        Sanitize();
         return TError::Success();
     }
-    TError Set(const std::string &caps);
-    TError Get(std::string &value);
-    TCapabilities() : TProperty(P_CAPABILITIES, CAPABILITIES_SET,
-                                "Limit container capabilities: "
-                                "list of capabilities without CAP_"
-                                " prefix (man 7 capabilities)") {
-        IsHidden = true;
+
+    TError Get(std::string &value) {
+        value = CurrentContainer->CapLimit.Format();
+        return TError::Success();
+    }
+
+    TError Set(const std::string &value) {
+        TCapabilities caps;
+        TError error = caps.Parse(value);
+        if (error)
+            return error;
+        return CommitLimit(caps);
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TCapabilities caps;
+        TError error = caps.Parse(index);
+        if (error)
+            return error;
+        value = BoolToString((CurrentContainer->CapLimit.Permitted &
+                              caps.Permitted) == caps.Permitted);
+        return TError::Success();
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        TCapabilities caps;
+        bool val;
+
+        TError error = caps.Parse(index);
+        if (!error)
+            error = StringToBool(value, val);
+        if (error)
+            return error;
+        if (val)
+            caps.Permitted = CurrentContainer->CapLimit.Permitted | caps.Permitted;
+        else
+            caps.Permitted = CurrentContainer->CapLimit.Permitted & ~caps.Permitted;
+        return CommitLimit(caps);
     }
 } static Capabilities;
 
-TError TCapabilities::Set(const std::string &caps_str) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
+class TCapAmbient : public TProperty {
+public:
+    TCapAmbient() : TProperty(P_CAPABILITIES_AMBIENT, CAPABILITIES_AMBIENT_SET,
+            "Raise capabilities in container: NET_BIND_SERVICE;SYS_PTRACE;...") {}
 
-    if (!CurrentClient->Cred.IsRootUser())
-        return TError(EError::Permission, "Only root can change this property");
-
-    std::vector<std::string> caps;
-    error = StringToStrList(caps_str, caps);
-    if (error)
-        return error;
-
-    uint64_t cap_mask = 0lu;
-
-    for (auto &cap: caps) {
-        if (SupportedCaps.find(cap) == SupportedCaps.end())
-            return TError(EError::InvalidValue,
-                    "Unsupported capability " + cap);
-
-        if (SupportedCaps.at(cap) > LastCapability)
-            return TError(EError::InvalidValue,
-                    "Unsupported kernel capability " + cap);
-
-        cap_mask |= CAP_MASK(SupportedCaps.at(cap));
-
+    TError Init() {
+        IsSupported = HasAmbientCapabilities;
+        return TError::Success();
     }
-    CurrentContainer->Caps = cap_mask;
-    CurrentContainer->PropMask |= CAPABILITIES_SET;
 
-    return TError::Success();
-}
+    TError CommitAmbient(TCapabilities &ambient) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
 
-TError TCapabilities::Get(std::string &value) {
-   std::vector<std::string> caps;
+        if (ambient.Permitted & ~AllCapabilities.Permitted) {
+            ambient.Permitted &= ~AllCapabilities.Permitted;
+            return TError(EError::InvalidValue,
+                          "Unsupported capability: " + ambient.Format());
+        }
 
-    for (const auto &cap : SupportedCaps)
-        if (CurrentContainer->Caps & CAP_MASK(cap.second))
-            caps.push_back(cap.first);
+        /* check allowed ambient capabilities */
+        TCapabilities limit = CurrentContainer->CapAllowed;
+        if (ambient.Permitted & ~limit.Permitted &&
+                !CurrentClient->Cred.IsRootUser()) {
+            ambient.Permitted &= ~limit.Permitted;
+            return TError(EError::Permission,
+                          "Not allowed capability: " + ambient.Format() +
+                          ", you can set only: " + limit.Format());
+        }
 
-    return StrListToString(caps, value);
-}
+        /* try to raise capabilities limit if required */
+        limit = CurrentContainer->CapLimit;
+        if (ambient.Permitted & ~limit.Permitted) {
+            limit.Permitted |= ambient.Permitted;
+            error = Capabilities.CommitLimit(limit);
+            if (error)
+                return error;
+        }
+
+        CurrentContainer->CapAmbient = ambient;
+        CurrentContainer->PropMask |= CAPABILITIES_AMBIENT_SET;
+
+        return TError::Success();
+    }
+
+    TError Get(std::string &value) {
+        value = CurrentContainer->CapAmbient.Format();
+        return TError::Success();
+    }
+
+    TError Set(const std::string &value) {
+        TCapabilities caps;
+        TError error = caps.Parse(value);
+        if (error)
+            return error;
+        return CommitAmbient(caps);
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TCapabilities caps;
+        TError error = caps.Parse(index);
+        if (error)
+            return error;
+        value = BoolToString((CurrentContainer->CapAmbient.Permitted &
+                              caps.Permitted) == caps.Permitted);
+        return TError::Success();
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        TCapabilities caps;
+        bool val;
+
+        TError error = caps.Parse(index);
+        if (!error)
+            error = StringToBool(value, val);
+        if (error)
+            return error;
+        if (val)
+            caps.Permitted = CurrentContainer->CapAmbient.Permitted | caps.Permitted;
+        else
+            caps.Permitted = CurrentContainer->CapAmbient.Permitted & ~caps.Permitted;
+        return CommitAmbient(caps);
+    }
+} static CapabilitiesAmbient;
 
 class TCwd : public TProperty {
 public:
@@ -320,25 +416,24 @@ TError TUlimit::Get(std::string &value) {
     std::stringstream str;
     bool first = true;
 
-   for (auto limit_elem : nameToIdx) {
+    for (auto limit_elem : nameToIdx) {
         auto value = CurrentContainer->Rlimit.find(limit_elem.second);
         if (value == CurrentContainer->Rlimit.end())
             continue;
 
         if (first)
-             first = false;
+            first = false;
         else
-             str << ";";
+            str << ";";
 
         str << limit_elem.first << " " <<
             std::to_string((*value).second.rlim_cur) << " " <<
             std::to_string((*value).second.rlim_max);
+    }
 
-   }
+    value = str.str();
 
-   value = str.str();
-
-   return TError::Success();
+    return TError::Success();
 }
 
 void TUlimit::Propagate(std::map<int, struct rlimit> &ulimits) {
@@ -567,28 +662,17 @@ TError TUser::Set(const std::string &username) {
 
     TCred &cur_user = CurrentClient->Cred;
 
-    if (cur_user.CanControl(new_user)) {
-        owner.Uid = new_user.Uid;
-        owner.Groups.clear();
-        owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
-                            new_user.Groups.end());
+    if (!cur_user.CanControl(new_user))
+        return TError(EError::Permission,
+                      "Client is not allowed to set user : " + username);
 
-        if (!(CurrentContainer->PropMask & CAPABILITIES_SET)) {
-            if (owner.IsRootUser())
-                CurrentContainer->Caps = Capabilities.AllCaps;
-            else if (CurrentContainer->VirtMode == VIRT_MODE_OS)
-                CurrentContainer->Caps = PermittedCaps;
-            else
-                CurrentContainer->Caps = 0;
-        }
-
-        CurrentContainer->PropMask |= USER_SET;
-
-        return TError::Success();
-    }
-
-    return TError(EError::Permission,
-                  "Client is not allowed to set user : " + username);
+    owner.Uid = new_user.Uid;
+    owner.Groups.clear();
+    owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
+                        new_user.Groups.end());
+    CurrentContainer->PropMask |= USER_SET;
+    Capabilities.Sanitize();
+    return TError::Success();
 }
 
 TError TUser::Get(std::string &value) {
@@ -769,13 +853,13 @@ TError TVirtMode::Set(const std::string &virt_mode) {
 
     if (virt_mode == P_VIRT_MODE_APP)
         CurrentContainer->VirtMode = VIRT_MODE_APP;
-
     else if (virt_mode == P_VIRT_MODE_OS)
         CurrentContainer->VirtMode = VIRT_MODE_OS;
-
     else
         return TError(EError::InvalidValue, std::string("Unsupported ") +
                       P_VIRT_MODE + ": " + virt_mode);
+    CurrentContainer->PropMask |= VIRT_MODE_SET;
+    Capabilities.Sanitize();
 
     if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
         if (!(CurrentContainer->PropMask & CWD_SET)) {
@@ -798,12 +882,7 @@ TError TVirtMode::Set(const std::string &virt_mode) {
 
         if (!(CurrentContainer->PropMask & NET_SET))
             CurrentContainer->NetProp = { "none" };
-
-        if (!(CurrentContainer->PropMask & CAPABILITIES_SET))
-            CurrentContainer->Caps = PermittedCaps;
     }
-
-    CurrentContainer->PropMask |= VIRT_MODE_SET;
 
     return TError::Success();
 }
@@ -1417,10 +1496,10 @@ TError TRawRootPid::Get(std::string &value) {
         else
              str << ";";
         str << v;
-   }
+    }
 
-   value = str.str();
-   return TError::Success();
+    value = str.str();
+    return TError::Success();
 }
 
 class TRawLoopDev : public TProperty {
@@ -3535,8 +3614,9 @@ void InitContainerProperties(void) {
     ContainerPropMap[EnvProperty.Name] = &EnvProperty;
     ContainerPropMap[Bind.Name] = &Bind;
     ContainerPropMap[Ip.Name] = &Ip;
-    Capabilities.Init();
     ContainerPropMap[Capabilities.Name] = &Capabilities;
+    CapabilitiesAmbient.Init();
+    ContainerPropMap[CapabilitiesAmbient.Name] = &CapabilitiesAmbient;
     ContainerPropMap[DefaultGw.Name] = &DefaultGw;
     ContainerPropMap[ResolvConf.Name] = &ResolvConf;
     ContainerPropMap[Devices.Name] = &Devices;

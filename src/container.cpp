@@ -79,7 +79,9 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     VirtMode = VIRT_MODE_APP;
     NetProp = { "inherited" };
     Hostname = "";
-    Caps = 0;
+    CapAmbient = NoCapabilities;
+    CapAllowed = HasAmbientCapabilities ? AppModeCapabilities : NoCapabilities;
+    CapLimit = SuidCapabilities;
     LoopDev = -1;
 
     if (IsRoot())
@@ -423,6 +425,13 @@ std::shared_ptr<const TContainer> TContainer::GetRoot() const {
 
 std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
+}
+
+std::shared_ptr<const TContainer> TContainer::GetIsolationDomain() const {
+    auto domain = shared_from_this();
+    while (!domain->Isolate && domain->Parent)
+        domain = domain->Parent;
+    return domain;
 }
 
 TError TContainer::OpenNetns(TNamespaceFd &netns) const {
@@ -853,7 +862,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->BindMounts = BindMounts;
 
-    taskEnv->Caps = Caps;
+    taskEnv->CapAmbient = CapAmbient;
+    taskEnv->CapLimit = CapLimit;
 
     if (!taskEnv->Root.IsRoot() && PortoEnabled) {
         TBindMount bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false, false };
@@ -928,8 +938,11 @@ TError TContainer::Create(const TCred &cred) {
         return error;
     }
 
-    if (OwnerCred.IsRootUser())
-        Caps = 0xffffffffffffffff >> (63 - LastCapability);
+    if (OwnerCred.IsRootUser()) {
+        if (HasAmbientCapabilities)
+            CapAllowed = AllCapabilities;
+        CapLimit = AllCapabilities;
+    }
 
     SetState(EContainerState::Stopped);
     PropMask |= STATE_SET;
@@ -961,6 +974,23 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (!meta && !Command.length())
         return TError(EError::InvalidValue, "container command is empty");
 
+    /*  PidNsCapabilities must be isolated from host pid-namespace */
+    if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
+            client && !client->Cred.IsRootUser() && GetIsolationDomain()->IsRoot())
+        return TError(EError::Permission, "Capabilities require pid isolation: " +
+                      PidNsCapabilities.Format());
+
+    /* MemCgCapabilities requires memory limit */
+    if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&
+            client && !client->Cred.IsRootUser()) {
+        bool limited = false;
+        for (auto p = Parent; p; p = p->Parent)
+            limited = limited || p->MemLimit;
+        if (!limited)
+            return TError(EError::Permission, "Capabilities require memory limit: " +
+                          MemCgCapabilities.Format());
+    }
+
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
     ExitStatus = -1;
@@ -985,6 +1015,14 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     error = PrepareNetwork(NetCfg);
     if (error)
         goto error;
+
+    /* NetNsCapabilities must be isoalted from host net-namespace */
+    if ((CapAmbient.Permitted & NetNsCapabilities.Permitted) &&
+            client && !client->Cred.IsRootUser() && Net == GetRoot()->Net) {
+        error = TError(EError::Permission, "Capabilities require net isolation: " +
+                       NetNsCapabilities.Format());
+        goto error;
+    }
 
     if (!meta || (meta && Isolate)) {
 

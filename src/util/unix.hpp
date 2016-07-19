@@ -31,8 +31,6 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 std::string GetHostName();
 TError SetHostName(const std::string &name);
 bool FdHasEvent(int fd);
-TError DropBoundedCap(int cap);
-TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable);
 void CloseFds(int max, const std::set<int> &except, bool openStd = false);
 TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags);
 TError SetSysctl(const std::string &name, const std::string &value);

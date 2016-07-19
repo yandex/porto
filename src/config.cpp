@@ -109,6 +109,7 @@ load_cred:
     Verbose |= config().log().verbose();
 
     InitCred();
+    InitCapabilities();
 }
 
 int TConfig::Test(const std::string &path) {

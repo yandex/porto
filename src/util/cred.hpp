@@ -18,8 +18,6 @@ void InitCred();
 
 extern gid_t GetPortoGroupId();
 
-extern int LastCapability;
-
 struct TCred {
     uid_t Uid;
     gid_t Gid;
@@ -32,6 +30,8 @@ struct TCred {
 
     TError Load(const std::string &user);
     TError LoadGroups(const std::string &user);
+
+    TError Apply() const;
 
     std::string User() const {
         return UserName(Uid);
@@ -57,3 +57,31 @@ struct TCred {
         return os << cred.ToString();
     }
 };
+
+void InitCapabilities();
+
+struct TCapabilities {
+    uint64_t Permitted;
+
+    TError Parse(const std::string &str);
+    std::string Format() const;
+    TError Apply(int mask) const;
+    TError ApplyLimit() const;
+    TError ApplyAmbient() const;
+    TError Load(pid_t pid, int type);
+    void Dump();
+    friend std::ostream& operator<<(std::ostream& os, const TCapabilities &c) {
+        return os << c.Format();
+    }
+};
+
+extern bool HasAmbientCapabilities;
+extern TCapabilities NoCapabilities;
+extern TCapabilities PortoInitCapabilities;
+extern TCapabilities MemCgCapabilities;
+extern TCapabilities PidNsCapabilities;
+extern TCapabilities NetNsCapabilities;
+extern TCapabilities AppModeCapabilities;
+extern TCapabilities OsModeCapabilities;
+extern TCapabilities SuidCapabilities;
+extern TCapabilities AllCapabilities;

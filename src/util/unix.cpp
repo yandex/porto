@@ -216,44 +216,6 @@ bool FdHasEvent(int fd) {
     return pfd.revents != 0;
 }
 
-TError DropBoundedCap(int cap) {
-    if (prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) < 0)
-        return TError(EError::Unknown, errno,
-                      "prctl(PR_CAPBSET_DROP, " + std::to_string(cap) + ")");
-
-    return TError::Success();
-}
-
-TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable) {
-    struct __user_cap_header_struct hdrp = {
-        .version = _LINUX_CAPABILITY_VERSION_3,
-        .pid = getpid(),
-    };
-
-    struct __user_cap_data_struct datap[2] = {
-        {
-            .effective = (uint32_t)effective,
-            .permitted = (uint32_t)permitted,
-            .inheritable = (uint32_t)inheritable,
-        },
-        {
-            .effective = (uint32_t)(effective >> 32),
-            .permitted = (uint32_t)(permitted >> 32),
-            .inheritable = (uint32_t)(inheritable >> 32),
-        }
-    };
-
-    if (syscall(SYS_capset, &hdrp, datap) < 0) {
-        int err = errno;
-        return TError(EError::Unknown, err, "capset(" +
-                      std::to_string(effective) + ", " +
-                      std::to_string(permitted) + ", " +
-                      std::to_string(inheritable) + ")");
-    }
-
-    return TError::Success();
-}
-
 TScopedFd::TScopedFd(int fd) : Fd(fd) {
 }
 

@@ -8,6 +8,8 @@
 
 #define noinline __attribute__((noinline))
 
+#define BIT(nr) (1ULL << (nr))
+
 class TNonCopyable {
 protected:
     TNonCopyable() = default;

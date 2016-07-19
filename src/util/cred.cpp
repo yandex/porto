@@ -7,6 +7,10 @@ extern "C" {
 #include <grp.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <sys/prctl.h>
+#include <sys/syscall.h>
+#include <linux/capability.h>
+#include <linux/securebits.h>
 }
 
 static gid_t PortoGroup;
@@ -18,8 +22,6 @@ gid_t GetPortoGroupId() {
 
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
-
-int LastCapability;
 
 TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
     struct passwd pwd, *ptr;
@@ -175,17 +177,31 @@ bool TCred::IsMemberOf(std::string groupname) const {
     return IsMemberOf(gid);
 }
 
+TError TCred::Apply() const {
+    if (prctl(PR_SET_SECUREBITS, SECBIT_KEEP_CAPS | SECBIT_NO_SETUID_FIXUP, 0, 0, 0) < 0)
+        return TError(EError::Unknown, errno, "prctl(PR_SET_KEEPCAPS, 1)");
+
+    if (setgid(Gid) < 0)
+        return TError(EError::Unknown, errno, "setgid()");
+
+    if (setgroups(Groups.size(), Groups.data()) < 0)
+        return TError(EError::Unknown, errno, "setgroups()");
+
+    if (setuid(Uid) < 0)
+        return TError(EError::Unknown, errno, "setuid()");
+
+    if (prctl(PR_SET_SECUREBITS, 0, 0, 0, 0) < 0)
+        return TError(EError::Unknown, errno, "prctl(PR_SET_KEEPCAPS, 0)");
+
+    return TError::Success();
+}
+
 void InitCred() {
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error)
         L_WRN() << "Cannot find group porto: " << error << std::endl;
-
-    if (TPath("/proc/sys/kernel/cap_last_cap").ReadInt(LastCapability)) {
-        L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 36" << std::endl;
-        LastCapability = 36; //FIXME
-    }
 }
 
 bool TCred::CanControl(TCred &cred) const {
@@ -196,4 +212,234 @@ bool TCred::CanControl(TCred &cred) const {
         return true;
 
     return cred.IsMemberOf(UserName(Uid) + CONT_SUFFIX);
+}
+
+#ifndef CAP_BLOCK_SUSPEND
+#define CAP_BLOCK_SUSPEND 36
+#endif
+
+#ifndef CAP_AUDIT_READ
+#define CAP_AUDIT_READ 37
+#endif
+
+#ifndef PR_CAP_AMBIENT
+#define PR_CAP_AMBIENT              47
+# define PR_CAP_AMBIENT_IS_SET      1
+# define PR_CAP_AMBIENT_RAISE       2
+# define PR_CAP_AMBIENT_LOWER       3
+# define PR_CAP_AMBIENT_CLEAR_ALL   4
+#endif
+
+static const TFlagsNames CapNames = {
+    { BIT(CAP_CHOWN),            "CHOWN" },
+    { BIT(CAP_DAC_OVERRIDE),     "DAC_OVERRIDE" },
+    { BIT(CAP_DAC_READ_SEARCH),  "DAC_READ_SEARCH" },
+    { BIT(CAP_FOWNER),           "FOWNER" },
+    { BIT(CAP_FSETID),           "FSETID" },
+    { BIT(CAP_KILL),             "KILL" },
+    { BIT(CAP_SETGID),           "SETGID" },
+    { BIT(CAP_SETUID),           "SETUID" },
+    { BIT(CAP_SETPCAP),          "SETPCAP" },
+    { BIT(CAP_LINUX_IMMUTABLE),  "LINUX_IMMUTABLE" },
+    { BIT(CAP_NET_BIND_SERVICE), "NET_BIND_SERVICE" },
+    { BIT(CAP_NET_BROADCAST),    "NET_BROADCAST" },
+    { BIT(CAP_NET_ADMIN),        "NET_ADMIN" },
+    { BIT(CAP_NET_RAW),          "NET_RAW" },
+    { BIT(CAP_IPC_LOCK),         "IPC_LOCK" },
+    { BIT(CAP_IPC_OWNER),        "IPC_OWNER" },
+    { BIT(CAP_SYS_MODULE),       "SYS_MODULE" },
+    { BIT(CAP_SYS_RAWIO),        "SYS_RAWIO" },
+    { BIT(CAP_SYS_CHROOT),       "SYS_CHROOT" },
+    { BIT(CAP_SYS_PTRACE),       "SYS_PTRACE" },
+    { BIT(CAP_SYS_PACCT),        "SYS_PACCT" },
+    { BIT(CAP_SYS_ADMIN),        "SYS_ADMIN" },
+    { BIT(CAP_SYS_BOOT),         "SYS_BOOT" },
+    { BIT(CAP_SYS_NICE),         "SYS_NICE" },
+    { BIT(CAP_SYS_RESOURCE),     "SYS_RESOURCE" },
+    { BIT(CAP_SYS_TIME),         "SYS_TIME" },
+    { BIT(CAP_SYS_TTY_CONFIG),   "SYS_TTY_CONFIG" },
+    { BIT(CAP_MKNOD),            "MKNOD" },
+    { BIT(CAP_LEASE),            "LEASE" },
+    { BIT(CAP_AUDIT_WRITE),      "AUDIT_WRITE" },
+    { BIT(CAP_AUDIT_CONTROL),    "AUDIT_CONTROL" },
+    { BIT(CAP_SETFCAP),          "SETFCAP" },
+    { BIT(CAP_MAC_OVERRIDE),     "MAC_OVERRIDE" },
+    { BIT(CAP_MAC_ADMIN),        "MAC_ADMIN" },
+    { BIT(CAP_SYSLOG),           "SYSLOG" },
+    { BIT(CAP_WAKE_ALARM),       "WAKE_ALARM" },
+    { BIT(CAP_BLOCK_SUSPEND),    "BLOCK_SUSPEND" },
+    { BIT(CAP_AUDIT_READ),       "AUDIT_READ" },
+};
+
+static int LastCapability;
+
+bool HasAmbientCapabilities = false;
+
+std::string TCapabilities::Format() const {
+    return StringFormatFlags(Permitted, CapNames, "; ");
+}
+
+TError TCapabilities::Parse(const std::string &string) {
+    return StringParseFlags(string, CapNames, Permitted, ';');
+}
+
+TError TCapabilities::Load(pid_t pid, int type) {
+    struct __user_cap_header_struct header = {
+        .version = _LINUX_CAPABILITY_VERSION_3,
+        .pid = getpid(),
+    };
+    struct __user_cap_data_struct data[2];
+
+    if (syscall(SYS_capget, &header, data) < 0)
+        return TError(EError::Unknown, errno, "capget " + Format());
+
+    switch (type) {
+        case 0: Permitted = data[0].effective | (uint64_t)data[1].effective << 32; break;
+        case 1: Permitted = data[0].permitted | (uint64_t)data[1].permitted << 32; break;
+        case 2: Permitted = data[0].inheritable | (uint64_t)data[1].inheritable << 32; break;
+    }
+
+    return TError::Success();
+}
+
+void TCapabilities::Dump() {
+    Load(0, 0);
+    L() << "Effective: " << Format() << std::endl;
+    Load(0, 1);
+    L() << "Permitted: " << Format() << std::endl;
+    Load(0, 2);
+    L() << "Inheritable: " << Format() << std::endl;
+}
+
+TError TCapabilities::Apply(int mask) const {
+    struct __user_cap_header_struct header = {
+        .version = _LINUX_CAPABILITY_VERSION_3,
+        .pid = getpid(),
+    };
+    struct __user_cap_data_struct data[2];
+
+    if (mask != 7 && syscall(SYS_capget, &header, data) < 0)
+        return TError(EError::Unknown, errno, "capget");
+
+    if (mask & 1) {
+        data[0].effective = Permitted;
+        data[1].effective = Permitted >> 32;
+    }
+    if (mask & 2) {
+        data[0].permitted = Permitted;
+        data[1].permitted = Permitted >> 32;
+    }
+    if (mask & 4) {
+        data[0].inheritable = Permitted;
+        data[1].inheritable = Permitted >> 32;
+    }
+
+    if (syscall(SYS_capset, &header, data) < 0)
+        return TError(EError::Unknown, errno, "capset " + Format());
+
+    return TError::Success();
+}
+
+TError TCapabilities::ApplyLimit() const {
+    for (int cap = 0; cap <= LastCapability; cap++) {
+        if (!(Permitted & BIT(cap)) && cap != CAP_SETPCAP &&
+                prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) < 0)
+            return TError(EError::Unknown, errno,
+                    "prctl(PR_CAPBSET_DROP, " + std::to_string(cap) + ")");
+
+    }
+
+    if (!(Permitted & BIT(CAP_SETPCAP)) &&
+            prctl(PR_CAPBSET_DROP, CAP_SETPCAP, 0, 0, 0) < 0)
+        return TError(EError::Unknown, errno, "prctl(PR_CAPBSET_DROP, CAP_SETPCAP)");
+
+    return TError::Success();
+}
+
+TError TCapabilities::ApplyAmbient() const {
+    if (!HasAmbientCapabilities)
+        return TError::Success();
+
+    TError error = Apply(4);
+    if (error)
+        return error;
+
+    for (int cap = 0; cap <= LastCapability; cap++) {
+        if (Permitted & BIT(cap)) {
+            if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0, 0)) {
+                return TError(EError::Unknown, errno,
+                        "prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE)");
+            }
+        } else {
+            if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_LOWER, cap, 0, 0))
+                return TError(EError::Unknown, errno,
+                        "prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_LOWER)");
+        }
+    }
+
+    return TError::Success();
+}
+
+TCapabilities NoCapabilities;
+TCapabilities PortoInitCapabilities;
+TCapabilities MemCgCapabilities;
+TCapabilities PidNsCapabilities;
+TCapabilities NetNsCapabilities;
+TCapabilities AppModeCapabilities;
+TCapabilities OsModeCapabilities;
+TCapabilities SuidCapabilities;
+TCapabilities AllCapabilities;
+
+void InitCapabilities() {
+    if (TPath("/proc/sys/kernel/cap_last_cap").ReadInt(LastCapability)) {
+        L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap" << std::endl;
+        LastCapability = CAP_AUDIT_READ;
+    }
+
+    HasAmbientCapabilities = prctl(PR_CAP_AMBIENT,
+                                   PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) == 0;
+
+    NoCapabilities.Permitted = 0;
+
+    PortoInitCapabilities.Permitted = BIT(CAP_KILL);
+
+    AllCapabilities.Permitted = BIT(LastCapability + 1) - 1;
+
+    MemCgCapabilities.Permitted =
+        BIT(CAP_IPC_LOCK);
+
+    PidNsCapabilities.Permitted =
+        BIT(CAP_KILL) |
+        BIT(CAP_SYS_PTRACE);
+
+    NetNsCapabilities.Permitted =
+        BIT(CAP_NET_BIND_SERVICE) |
+        BIT(CAP_NET_ADMIN) |
+        BIT(CAP_NET_RAW);
+
+    AppModeCapabilities.Permitted =
+        MemCgCapabilities.Permitted |
+        PidNsCapabilities.Permitted |
+        NetNsCapabilities.Permitted;
+
+    OsModeCapabilities.Permitted =
+        AppModeCapabilities.Permitted |
+        BIT(CAP_CHOWN) |
+        BIT(CAP_DAC_OVERRIDE) |
+        BIT(CAP_FOWNER) |
+        BIT(CAP_FSETID) |
+        BIT(CAP_SETGID) |
+        BIT(CAP_SETUID) |
+        BIT(CAP_SYS_CHROOT) |
+        BIT(CAP_MKNOD) |
+        BIT(CAP_AUDIT_WRITE);
+
+    SuidCapabilities.Permitted =
+        OsModeCapabilities.Permitted |
+        BIT(CAP_SETPCAP) |
+        BIT(CAP_SETFCAP) |
+        BIT(CAP_LINUX_IMMUTABLE) |
+        BIT(CAP_SYS_ADMIN) |
+        BIT(CAP_SYS_NICE) |
+        BIT(CAP_SYS_RESOURCE);
 }

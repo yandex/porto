@@ -143,7 +143,9 @@ public:
     std::vector<std::string> EnvCfg;
     std::vector<TBindMount> BindMounts;
     std::vector<std::string> IpList;
-    uint64_t Caps;
+    TCapabilities CapAmbient;   /* get at start */
+    TCapabilities CapAllowed;   /* can set as ambient */
+    TCapabilities CapLimit;     /* can get by suid */
     std::vector<std::string> DefaultGw;
     std::vector<std::string> ResolvConf;
     std::vector<std::string> Devices;
@@ -218,6 +220,7 @@ public:
     bool IsPortoRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<TContainer> GetParent() const;
+    std::shared_ptr<const TContainer> GetIsolationDomain() const;
     TError OpenNetns(TNamespaceFd &netns) const;
 
     std::vector<pid_t> Processes();

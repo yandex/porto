@@ -10,10 +10,6 @@
 #include "container.hpp"
 #include "client.hpp"
 
-extern "C" {
-#include <linux/capability.h>
-}
-
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr uint64_t ROOT_PID_SET = (1lu << 0);
 constexpr const char *P_RAW_ID = "_id";
@@ -100,6 +96,8 @@ constexpr const char *P_DEVICES = "devices";
 constexpr uint64_t DEVICES_SET = (1lu << 44);
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr uint64_t CAPABILITIES_SET = (1lu << 45);
+constexpr const char *P_CAPABILITIES_AMBIENT = "capabilities_ambient";
+constexpr uint64_t CAPABILITIES_AMBIENT_SET = (1lu << 57);
 constexpr const char *P_IP = "ip";
 constexpr uint64_t IP_SET = (1lu << 46);
 constexpr const char *P_DEFAULT_GW = "default_gw";
@@ -209,29 +207,5 @@ public:
             return TError(EError::Unknown, "Trying to restore non-serializable value");
     }
 };
-
-
-#ifndef CAP_AUDIT_READ
-#define CAP_AUDIT_READ 37
-#define CAP_BLOCK_SUSPEND 36
-#endif
-
-#define CAP_MASK(CAP) (1ULL << CAP)
-constexpr const uint64_t PermittedCaps = CAP_MASK(CAP_CHOWN) |
-                                         CAP_MASK(CAP_DAC_OVERRIDE) |
-                                         CAP_MASK(CAP_FOWNER) |
-                                         CAP_MASK(CAP_FSETID) |
-                                         CAP_MASK(CAP_KILL) |
-                                         CAP_MASK(CAP_SETGID) |
-                                         CAP_MASK(CAP_SETUID) |
-                                         CAP_MASK(CAP_NET_BIND_SERVICE) |
-                                         CAP_MASK(CAP_NET_ADMIN) |
-                                         CAP_MASK(CAP_NET_RAW) |
-                                         CAP_MASK(CAP_IPC_LOCK) |
-                                         CAP_MASK(CAP_SYS_CHROOT) |
-                                         CAP_MASK(CAP_SYS_RESOURCE) |
-                                         CAP_MASK(CAP_MKNOD) |
-                                         CAP_MASK(CAP_AUDIT_WRITE);
-
 
 void InitContainerProperties(void);

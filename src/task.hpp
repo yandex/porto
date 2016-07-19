@@ -57,7 +57,8 @@ struct TTaskEnv : public TNonCopyable {
     std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;
     int LoopDev;
-    uint64_t Caps;
+    TCapabilities CapLimit;
+    TCapabilities CapAmbient;
     bool NewMountNs;
     std::vector<TCgroup> Cgroups;
     TCred OwnerCred, Cred;
@@ -78,7 +79,6 @@ class TTask: public TNonCopyable {
     void ReportPid(pid_t pid) const;
 
     TError ChildApplyCapabilities();
-    TError ChildDropPriveleges();
     TError ChildExec();
     TError ChildBindDns();
     TError ChildMountBinds();
