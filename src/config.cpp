@@ -72,6 +72,9 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_enable_quota(true);
 
     config().mutable_network()->set_autoconf_timeout_s(120);
+
+    // FIXME set to true and deprecate this option
+    config().mutable_privileges()->set_enforce_bind_permissions(false);
 }
 
 bool TConfig::LoadFile(const std::string &path) {

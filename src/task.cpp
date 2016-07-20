@@ -196,6 +196,7 @@ TError TTask::ChildBindDns() {
 TError TTask::ChildBindDirectores() {
     for (auto &bindMap : Env->BindMap) {
         TPath src, dest;
+        TError error;
 
         if (bindMap.Source.IsAbsolute())
             src = bindMap.Source;
@@ -208,12 +209,21 @@ TError TTask::ChildBindDirectores() {
             dest = Env->Root / Env->Cwd / bindMap.Dest;
 
         if (!StringStartsWith(dest.RealPath().ToString(), Env->Root.ToString()))
-            return TError(EError::InvalidValue, "Container bind mount "
-                          + src.ToString() + " resolves to root "
-                          + dest.RealPath().ToString()
-                          + " (" + Env->Root.ToString() + ")");
+            return TError(EError::InvalidValue, "Bind mount target " + dest.ToString() +
+                    " outside of container root " + Env->Root.ToString());
 
-        TError error;
+        if (!src.Exists())
+            return TError(EError::InvalidValue, "Bind mount source does not exist " + src.ToString());
+
+        if (!src.HasAccess(Env->OwnerCred, bindMap.Rdonly ? 4 : 6)) {
+            if (config().privileges().enforce_bind_permissions())
+                return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
+                        " have not enough permissions for bind mount source " + src.ToString());
+            else
+                L_WRN() << Env->Container << ": User " << Env->OwnerCred.ToString() <<
+                    " have not enough permissions for bind mount source " + src.ToString() << std::endl;
+        }
+
         if (src.IsDirectoryFollow())
             error = dest.MkdirAll(0755);
         else

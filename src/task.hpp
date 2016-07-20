@@ -59,7 +59,7 @@ struct TTaskEnv : public TNonCopyable {
     uint64_t Caps;
     bool NewMountNs;
     std::vector<TCgroup> Cgroups;
-    TCred Cred;
+    TCred OwnerCred, Cred;
 
     TUnixSocket Sock, MasterSock;
     TUnixSocket Sock2,  MasterSock2;

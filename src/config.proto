@@ -82,6 +82,7 @@ message TCfg {
 		repeated string root_group = 2 [deprecated=true];
 		repeated string restricted_root_user = 3 /* [deprecated=true] */;
 		repeated string restricted_root_group = 4 [deprecated=true];
+		optional bool enforce_bind_permissions = 5;
 	}
 
 	message TVolumesCfg {

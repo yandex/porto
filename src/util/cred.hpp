@@ -49,7 +49,11 @@ struct TCred {
     bool IsMemberOf(std::string groupname) const;
     bool IsPermitted(const TCred &requirement) const;
 
+    std::string ToString() const {
+        return User() + ":" + Group();
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const TCred& cred) {
-        return os << cred.User() << ":" << cred.Group();
+        return os << cred.ToString();
     }
 };

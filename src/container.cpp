@@ -766,6 +766,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->RootRdOnly = RootRo;
 
+    taskEnv->OwnerCred = OwnerCred;
+
     if (VirtMode == VIRT_MODE_OS) {
         user = "root";
         taskEnv->Cred = TCred(0, 0);
