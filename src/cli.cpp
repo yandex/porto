@@ -105,7 +105,7 @@ void THelpCmd::Usage() {
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist, [](const Porto::Property &p) { return p.Name; });
+        nameWidth = MaxFieldLength(plist, [](const Porto::Property &p) { return p.Name; });
 
         for (const auto &p : plist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
