@@ -94,6 +94,7 @@ public:
         IsAutoStorage = true;
         IsAutoPath = false;
         IsReady = false;
+        IsReadOnly = false;
         LoopDev = -1;
         SpaceLimit = 0;
         SpaceGuarantee = 0;
