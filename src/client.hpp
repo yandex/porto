@@ -22,6 +22,7 @@ namespace rpc {
 class TClient : public TEpollSource {
 public:
     TCred Cred;
+    TCred TaskCred;
     TClient(std::shared_ptr<TEpollLoop> loop);
     TClient(TCred cred);
     ~TClient();
@@ -33,7 +34,11 @@ public:
 
     int GetFd() const;
     pid_t GetPid() const;
-    const TCred& GetCred() const;
+
+    const TCred& GetCred() const {
+        return Cred;
+    }
+
     const std::string& GetComm() const;
 
     void BeginRequest();

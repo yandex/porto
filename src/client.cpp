@@ -93,10 +93,6 @@ pid_t TClient::GetPid() const {
     return Pid;
 }
 
-const TCred& TClient::GetCred() const {
-    return Cred;
-}
-
 const std::string& TClient::GetComm() const {
     return Comm;
 }
@@ -110,6 +106,7 @@ uint64_t TClient::GetRequestTimeMs() {
 }
 
 TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
+    std::shared_ptr<TContainer> ct;
     struct ucred cr;
     socklen_t len = sizeof(cr);
     TError error;
@@ -117,13 +114,27 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
     if (getsockopt(Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len))
         return TError(EError::Unknown, errno, "Cannot identify client: getsockopt() failed");
 
-    if (!initial && Pid == cr.pid && Cred.Uid == cr.uid && Cred.Gid == cr.gid &&
-            !ClientContainer.expired())
+    /* check that request from the same pid and container is still here */
+    if (!initial && Pid == cr.pid && TaskCred.Uid == cr.uid &&
+            TaskCred.Gid == cr.gid && !ClientContainer.expired())
         return TError::Success();
 
-    Cred.Uid = cr.uid;
-    Cred.Gid = cr.gid;
+    TaskCred.Uid = cr.uid;
+    TaskCred.Gid = cr.gid;
     Pid = cr.pid;
+
+    error = holder.FindTaskContainer(Pid, ct);
+    if (error && error.GetErrno() != ENOENT)
+        L_WRN() << "Cannot identify container of pid " << Pid
+                << " : " << error << std::endl;
+    if (error)
+        return error;
+
+    if (!ct->PortoEnabled)
+        return TError(EError::Permission,
+                      "Porto disabled in container " + ct->GetName());
+
+    ClientContainer = ct;
 
     error = TPath("/proc/" + std::to_string(Pid) + "/comm").ReadAll(Comm, 64);
     if (error)
@@ -131,25 +142,20 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
     else
         Comm.resize(Comm.length() - 1); /* cut \n at the end */
 
-    error = LoadGroups();
-    if (error && error.GetErrno() != ENOENT)
-        L_WRN() << "Cannot load supplementary group list" << Pid
-                << " : " << error << std::endl;
+    if (ct->IsRoot()) {
+        Cred.Uid = cr.uid;
+        Cred.Gid = cr.gid;
+        error = LoadGroups();
+        if (error && error.GetErrno() != ENOENT)
+            L_WRN() << "Cannot load supplementary group list" << Pid
+                    << " : " << error << std::endl;
+    } else {
+        /* requests from containers are executed in behalf of their owners */
+        Cred = ct->OwnerCred;
+    }
 
     ReadOnlyAccess = !Cred.IsPortoUser();
 
-    std::shared_ptr<TContainer> container;
-    error = holder.FindTaskContainer(Pid, container);
-    if (error && error.GetErrno() != ENOENT)
-        L_WRN() << "Cannot identify container of pid " << Pid
-                << " : " << error << std::endl;
-    if (error)
-        return error;
-
-    if (!container->PortoEnabled)
-        return TError(EError::Permission, "Porto disabled in container " + container->GetName());
-
-    ClientContainer = container;
     return TError::Success();
 }
 
