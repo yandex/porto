@@ -18,6 +18,9 @@ TError StringToInt(const std::string &string, int &value);
 TError StringToOct(const std::string &str, unsigned &value);
 TError StringToDouble(const std::string &str, double &value);
 
+TError StringToBool(const std::string &str, bool &value);
+std::string BoolToString(bool value);
+
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
 TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);
 std::string MergeEscapeStrings(std::vector<std::string> &strings, std::string sep, std::string rep);
@@ -30,6 +33,8 @@ typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
 std::string StringFormatFlags(uint64_t flags,
                               const TFlagsNames &names,
                               const std::string sep = ",");
+TError StringParseFlags(const std::string &str, const TFlagsNames &names,
+                        uint64_t &result, const char sep = ',');
 
 std::string StringFormat(const char *format, ...)
                          __attribute__ ((format (printf, 1, 2)));

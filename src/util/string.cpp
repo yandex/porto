@@ -82,6 +82,19 @@ TError StringToDouble(const std::string &str, double &value) {
     return TError::Success();
 }
 
+TError StringToBool(const std::string &str, bool &value) {
+    if (str == "true")
+        value = true;
+    else if (str == "false")
+        value = false;
+    else
+        return TError(EError::Unknown, string(__func__) + ": Bad boolean value " + str);
+    return TError::Success();
+}
+
+std::string BoolToString(bool value) {
+    return value ? "true" : "false";
+}
 
 TError StringToValue(const std::string &str, double &value, std::string &unit) {
     const char *ptr = str.c_str();
@@ -276,6 +289,28 @@ std::string StringFormatFlags(uint64_t flags,
     }
 
     return result.str();
+}
+
+TError StringParseFlags(const std::string &str, const TFlagsNames &names,
+                        uint64_t &result, const char sep) {
+    std::stringstream ss(str);
+    std::string name;
+
+    result = 0;
+    while (std::getline(ss, name, sep)) {
+        bool found = false;
+        name = StringTrim(name);
+        for (auto &n: names) {
+            if (n.second == name) {
+                result |= n.first;
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return TError(EError::InvalidValue, "Unknown \"" + name + "\"");
+    }
+    return TError::Success();
 }
 
 std::string StringFormat(const char *format, ...) {
