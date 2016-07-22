@@ -27,10 +27,11 @@ struct TExitStatus {
     int Status;
 };
 
-struct TBindMap {
+struct TBindMount {
     TPath Source;
     TPath Dest;
-    bool Rdonly;
+    bool ReadOnly;
+    bool ReadWrite;
 };
 
 struct TTaskEnv : public TNonCopyable {
@@ -52,7 +53,7 @@ struct TTaskEnv : public TNonCopyable {
     bool SetEtcHostname;
     bool BindDns;
     std::string ResolvConf;
-    std::vector<TBindMap> BindMap;
+    std::vector<TBindMount> BindMounts;
     std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;
     int LoopDev;
@@ -80,7 +81,7 @@ class TTask: public TNonCopyable {
     TError ChildDropPriveleges();
     TError ChildExec();
     TError ChildBindDns();
-    TError ChildBindDirectores();
+    TError ChildMountBinds();
     TError ChildMountRun();
     TError ChildMountRootFs();
     TError ChildRemountRootRo();

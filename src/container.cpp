@@ -851,14 +851,14 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->Rlimit = Rlimit;
 
-    taskEnv->BindMap = BindMap;
+    taskEnv->BindMounts = BindMounts;
 
     taskEnv->Caps = Caps;
 
     if (!taskEnv->Root.IsRoot() && PortoEnabled) {
-        TBindMap bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false };
+        TBindMount bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false, false };
 
-        taskEnv->BindMap.push_back(bm);
+        taskEnv->BindMounts.push_back(bm);
     }
 
     if (client) {
@@ -901,7 +901,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     // Create new mount namespaces if we have to make any changes
     taskEnv->NewMountNs = taskEnv->Isolate ||
-                          taskEnv->BindMap.size() || taskEnv->BindDns ||
+                          taskEnv->BindMounts.size() || taskEnv->BindDns ||
                           !taskEnv->Root.IsRoot() || taskEnv->RootRdOnly;
 
     Task = std::unique_ptr<TTask>(new TTask(taskEnv));

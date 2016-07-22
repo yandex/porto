@@ -1217,11 +1217,11 @@ TError TBind::Set(const std::string &bind_str) {
     if (error)
         return error;
 
-    std::vector<TBindMap> bm;
+    std::vector<TBindMount> bindMounts;
 
     for (auto &line : binds) {
         std::vector<std::string> tok;
-        TBindMap m;
+        TBindMount bm;
 
         TError error = SplitEscapedString(line, ' ', tok);
         if (error)
@@ -1230,36 +1230,35 @@ TError TBind::Set(const std::string &bind_str) {
         if (tok.size() != 2 && tok.size() != 3)
             return TError(EError::InvalidValue, "Invalid bind in: " + line);
 
-        m.Source = tok[0];
-        m.Dest = tok[1];
-        m.Rdonly = false;
+        bm.Source = tok[0];
+        bm.Dest = tok[1];
+        bm.ReadOnly = false;
+        bm.ReadWrite = false;
 
         if (tok.size() == 3) {
             if (tok[2] == "ro")
-                m.Rdonly = true;
+                bm.ReadOnly = true;
             else if (tok[2] == "rw")
-                m.Rdonly = false;
+                bm.ReadWrite = true;
             else
                 return TError(EError::InvalidValue, "Invalid bind type in: " + line);
         }
 
-        bm.push_back(m);
-
+        bindMounts.push_back(bm);
     }
 
-    CurrentContainer->BindMap = bm;
+    CurrentContainer->BindMounts = bindMounts;
     CurrentContainer->PropMask |= BIND_SET;
 
     return TError::Success();
 }
 
 TError TBind::Get(std::string &value) {
-    std::vector<std::string> bind_str_list;
-    for (auto m : CurrentContainer->BindMap)
-        bind_str_list.push_back(m.Source.ToString() + " " + m.Dest.ToString() +
-                                (m.Rdonly ? " ro" : " rw"));
-
-    return StrListToString(bind_str_list, value);
+    std::vector<std::string> list;
+    for (const auto &bm : CurrentContainer->BindMounts)
+        list.push_back(bm.Source.ToString() + " " + bm.Dest.ToString() +
+                       (bm.ReadOnly ? " ro" : bm.ReadWrite ? " rw" : ""));
+    return StrListToString(list, value);
 }
 
 class TIp : public TProperty {

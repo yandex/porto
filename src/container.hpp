@@ -141,7 +141,7 @@ public:
     std::vector<std::weak_ptr<TContainer>> Children;
     std::string Hostname;
     std::vector<std::string> EnvCfg;
-    std::vector<TBindMap> BindMap;
+    std::vector<TBindMount> BindMounts;
     std::vector<std::string> IpList;
     uint64_t Caps;
     std::vector<std::string> DefaultGw;

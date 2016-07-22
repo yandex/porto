@@ -193,20 +193,21 @@ TError TTask::ChildBindDns() {
     return TError::Success();
 }
 
-TError TTask::ChildBindDirectores() {
-    for (auto &bindMap : Env->BindMap) {
+TError TTask::ChildMountBinds() {
+    for (const auto &bm : Env->BindMounts) {
+        bool ro = bm.ReadOnly;
         TPath src, dest;
         TError error;
 
-        if (bindMap.Source.IsAbsolute())
-            src = bindMap.Source;
+        if (bm.Source.IsAbsolute())
+            src = bm.Source;
         else
-            src = Env->ParentCwd / bindMap.Source;
+            src = Env->ParentCwd / bm.Source;
 
-        if (bindMap.Dest.IsAbsolute())
-            dest = Env->Root / bindMap.Dest;
+        if (bm.Dest.IsAbsolute())
+            dest = Env->Root / bm.Dest;
         else
-            dest = Env->Root / Env->Cwd / bindMap.Dest;
+            dest = Env->Root / Env->Cwd / bm.Dest;
 
         if (!StringStartsWith(dest.RealPath().ToString(), Env->Root.ToString()))
             return TError(EError::InvalidValue, "Bind mount target " + dest.ToString() +
@@ -215,11 +216,19 @@ TError TTask::ChildBindDirectores() {
         if (!src.Exists())
             return TError(EError::InvalidValue, "Bind mount source does not exist " + src.ToString());
 
-        if (!src.HasAccess(Env->OwnerCred, bindMap.Rdonly ? 4 : 6)) {
-            if (config().privileges().enforce_bind_permissions())
-                return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
-                        " have not enough permissions for bind mount source " + src.ToString());
-            else
+        /*
+         * ReadOnly  -> ro
+         * ReadWrite -> rw
+         * neither   -> rw if have write permissions
+         */
+        if (!src.HasAccess(Env->OwnerCred, ro ? 4 : 6)) {
+            if (config().privileges().enforce_bind_permissions()) {
+                if (!ro && !bm.ReadWrite && src.HasAccess(Env->OwnerCred, 4))
+                    ro = true;
+                else
+                    return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
+                            " have not enough permissions for bind mount source " + src.ToString());
+            } else
                 L_WRN() << Env->Container << ": User " << Env->OwnerCred.ToString() <<
                     " have not enough permissions for bind mount source " + src.ToString() << std::endl;
         }
@@ -232,7 +241,7 @@ TError TTask::ChildBindDirectores() {
             return error;
 
         // Drop nosuid,noexec,nodev
-        error = dest.BindRemount(src, bindMap.Rdonly ? MS_RDONLY : 0);
+        error = dest.BindRemount(src, ro ? MS_RDONLY : 0);
         if (error)
             return error;
     }
@@ -256,10 +265,8 @@ TError TTask::ChildRemountRootRo() {
             continue;
 
         bool skip = false;
-        for (auto &bindMap : Env->BindMap) {
-            TPath dest = bindMap.Dest;
-
-            if (dest.NormalPath() == path.NormalPath()) {
+        for (const auto &bm : Env->BindMounts) {
+            if (bm.Dest.NormalPath() == path.NormalPath()) {
                 skip = true;
                 break;
             }
@@ -593,7 +600,7 @@ TError TTask::ConfigureChild() {
     if (error)
         return error;
 
-    error = ChildBindDirectores();
+    error = ChildMountBinds();
     if (error)
         return error;
 
