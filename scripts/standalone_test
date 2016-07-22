@@ -1,0 +1,89 @@
+#!/bin/bash
+
+cleanup_spawner() {
+    echo "Stopping portod: $PORTOD_PID"
+    kill -2 $PORTOD_PID
+    wait $1
+
+    if [ $respawns ]; then
+        echo "portod respawned $respawns times"
+    fi
+
+    exit 0
+}
+
+spawner() {
+    PORTO_DIR=$1
+    limit=$2
+    let respawns=0
+    EXIT_CODE=0
+    trap "cleanup_spawner" TERM INT QUIT
+
+    until [ "$respawns" -ge "$limit" ]; do
+
+        $PORTO_DIR/portod &
+        PORTOD_PID=$!
+
+        wait $PORTOD_PID
+        EXIT_CODE=$?
+
+        let respawns=respawns+1
+        sleep 1
+    done
+
+    echo "portod respawned $respawns times"
+
+    exit $EXIT_CODE
+}
+
+cleanup() {
+    echo "Test cleanup..."
+    if [ "$TEST_PID" ]; then
+        kill -15 $TEST_PID
+    fi
+    if [ "$SPAWNER_PID" ]; then
+        kill -15 $SPAWNER_PID
+        wait $SPAWNER_PID
+    fi
+    exit 1
+}
+
+PORTO_DIR=$1
+RESPAWN_LIMIT=$2
+shift 2
+
+trap "cleanup" TERM INT QUIT
+
+service yandex-porto stop || true;
+killall -9 portod || true;
+
+spawner "$PORTO_DIR" "$RESPAWN_LIMIT" &
+SPAWNER_PID=$!
+
+#Give daemon some time to start...
+sleep 1
+
+
+$PORTO_DIR/portotest $@ &
+TEST_PID=$!
+wait $TEST_PID
+TEST_EXIT_CODE=$?
+
+kill -15 $SPAWNER_PID
+wait $SPAWNER_PID
+SPAWNER_EXIT_CODE=$?
+
+
+if [ $TEST_EXIT_CODE -eq 0 ]; then
+
+    if [ $SPAWNER_EXIT_CODE -ne 0 ]; then
+        echo "Daemon failed with code: $SPAWNER_EXIT_CODE"
+        exit $SPAWNER_EXIT_CODE
+    fi
+
+    exit $TEST_EXIT_CODE
+
+else
+    echo "Test failed with code: $TEST_EXIT_CODE"
+    exit $TEST_EXIT_CODE
+fi

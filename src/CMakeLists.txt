@@ -107,3 +107,8 @@ install(
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
 )
+
+add_custom_target(test COMMAND sudo scripts/standalone_test ${CMAKE_BINARY_DIR} 5
+                  --except package
+                  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                  DEPENDS portod portotest portoinit)
