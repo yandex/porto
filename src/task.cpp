@@ -233,6 +233,15 @@ TError TTask::ChildMountBinds() {
                     " have not enough permissions for bind mount source " + src.ToString() << std::endl;
         }
 
+        if (dest.Exists() && !dest.CanWrite(Env->OwnerCred)) {
+            if (config().privileges().enforce_bind_permissions())
+                return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
+                        " have no write permissions for bind mount target " + dest.ToString());
+            else
+                L_WRN() << Env->Container << ": User " << Env->OwnerCred.ToString() <<
+                    " have no write permissions for bind mount target " + dest.ToString() << std::endl;
+        }
+
         if (src.IsDirectoryFollow())
             error = dest.MkdirAll(0755);
         else
