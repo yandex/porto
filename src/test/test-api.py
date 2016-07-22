@@ -1,6 +1,8 @@
 import porto
 import sys
 import os
+import pwd
+import grp
 
 def Catch(func, *args, **kwargs):
     try:
@@ -8,6 +10,11 @@ def Catch(func, *args, **kwargs):
     except:
         return sys.exc_info()[0]
     return None
+
+if os.getuid() == 0:
+    #Drop root privileges (otherwise overlay quota will fail)
+    os.setgid(grp.getgrnam("porto").gr_gid)
+    os.setuid(pwd.getpwnam("porto-alice").pw_uid)
 
 c = porto.Connection()
 c.connect()
