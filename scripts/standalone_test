@@ -69,6 +69,28 @@ TEST_PID=$!
 wait $TEST_PID
 TEST_EXIT_CODE=$?
 
+if [ $TEST_EXIT_CODE -eq 0 ]; then
+
+    PYTHON_TESTS=`ls $PORTO_DIR/src/test/test-*.py`
+
+    for pytest in $PYTHON_TESTS; do
+
+        python $pytest &
+        TEST_PID=$!
+
+        wait $TEST_PID
+        TEST_EXIT_CODE=$?
+
+        if [ $TEST_EXIT_CODE -ne 0 ]; then
+            echo "test $pytest failed with code: $TEST_EXIT_CODE"
+            break
+        fi
+    done
+
+else
+    echo "selftest failed with code: $TEST_EXIT_CODE"
+fi
+
 kill -15 $SPAWNER_PID
 wait $SPAWNER_PID
 SPAWNER_EXIT_CODE=$?
@@ -80,6 +102,8 @@ if [ $TEST_EXIT_CODE -eq 0 ]; then
         echo "Daemon failed with code: $SPAWNER_EXIT_CODE"
         exit $SPAWNER_EXIT_CODE
     fi
+
+    echo "$0: All tests passed successfully"
 
     exit $TEST_EXIT_CODE
 
