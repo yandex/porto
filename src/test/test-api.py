@@ -1,20 +1,11 @@
 import porto
 import sys
 import os
-import pwd
-import grp
 
-def Catch(func, *args, **kwargs):
-    try:
-        func(*args, **kwargs)
-    except:
-        return sys.exc_info()[0]
-    return None
+import test_common
+from test_common import *
 
-if os.getuid() == 0:
-    #Drop root privileges (otherwise overlay quota will fail)
-    os.setgid(grp.getgrnam("porto").gr_gid)
-    os.setuid(pwd.getpwnam("porto-alice").pw_uid)
+DropPrivileges()
 
 c = porto.Connection()
 c.connect()

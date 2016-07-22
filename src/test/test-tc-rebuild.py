@@ -1,5 +1,7 @@
 import porto
 import subprocess
+import test_common
+from test_common import *
 
 conn = porto.Connection()
 
