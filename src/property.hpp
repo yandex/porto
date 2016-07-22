@@ -158,6 +158,7 @@ constexpr const char *D_IO_WRITE = "io_write";
 constexpr const char *D_IO_OPS = "io_ops";
 constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
+constexpr const char *D_MEM_TOTAL_LIMIT = "memory_limit_total";
 
 class TProperty {
 public:

@@ -443,6 +443,45 @@ uint64_t TContainer::GetHierarchyMemGuarantee(void) const {
     return (CurrentMemGuarantee > val) ? CurrentMemGuarantee : val;
 }
 
+uint64_t TContainer::GetHierarchyMemLimit(std::shared_ptr<const TContainer> root) const {
+    uint64_t val = MemLimit;
+    std::shared_ptr<const TContainer> p = shared_from_this();
+
+    if (State == EContainerState::Meta) {
+        auto children_limit = 0lu;
+
+        for (auto iter : p->Children) {
+            if (auto child = iter.lock()) {
+                auto child_limit = child->GetHierarchyMemLimit(p);
+
+                if (child_limit) {
+                    children_limit += child_limit;
+                } else {
+                    children_limit = 0;
+                    break;
+                }
+            }
+        }
+
+        if (children_limit)
+            val = val > 0 ?
+                  (val > children_limit ? children_limit : val)
+                  : children_limit;
+    }
+
+    while (p != root) {
+
+        if (p->MemLimit)
+            val = val > 0 ?
+                  (val > p->MemLimit ? p->MemLimit : val)
+                  : p->MemLimit;
+
+        p = p->GetParent();
+    }
+
+    return val;
+}
+
 vector<pid_t> TContainer::Processes() {
     auto cg = GetCgroup(FreezerSubsystem);
 

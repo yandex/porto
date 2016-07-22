@@ -3499,6 +3499,23 @@ public:
     }
 } static NetTos;
 
+class TMemTotalLimit : public TProperty {
+public:
+    TError Get(std::string &value);
+    TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, 0,
+                                 "Total memory limit for container "
+                                 "in hierarchy") {
+        IsSerializable = false;
+        IsReadOnly = true;
+    }
+} static MemTotalLimit;
+
+TError TMemTotalLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->GetHierarchyMemLimit(nullptr));
+
+    return TError::Success();
+}
+
 void InitContainerProperties(void) {
     ContainerPropMap[User.Name] = &User;
     ContainerPropMap[Group.Name] = &Group;
@@ -3592,4 +3609,5 @@ void InitContainerProperties(void) {
     ContainerPropMap[IoOps.Name] = &IoOps;
     ContainerPropMap[Time.Name] = &Time;
     ContainerPropMap[PortoStat.Name] = &PortoStat;
+    ContainerPropMap[MemTotalLimit.Name] = &MemTotalLimit;
 }
