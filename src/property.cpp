@@ -2,24 +2,56 @@
 #include "task.hpp"
 #include "config.hpp"
 #include "cgroup.hpp"
+#include "client.hpp"
 #include "container.hpp"
 #include "network.hpp"
+#include "statistics.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include <sstream>
-#include "statistics.hpp"
 
 extern "C" {
 #include <sys/sysinfo.h>
 }
 
-extern __thread TContainer *CurrentContainer;
-extern __thread TClient *CurrentClient;
+__thread TContainer *CurrentContainer = nullptr;
+__thread TClient *CurrentClient = nullptr;
+std::map<std::string, TProperty*> ContainerProperties;
 
-extern std::map<std::string, TProperty*> ContainerPropMap;
-extern TStatistics *Statistics;
+TProperty::TProperty(std::string name, uint64_t set_mask, std::string desc) {
+    Name = name;
+    SetMask = set_mask;
+    Desc = desc;
+    ContainerProperties[name] = this;
+}
+
+TError TProperty::Set(const std::string &value) {
+    if (IsReadOnly)
+        return TError(EError::InvalidValue, "Read-only value: " + Name);
+    return TError(EError::NotSupported, "Not implemented: " + Name);
+}
+
+TError TProperty::GetIndexed(const std::string &index, std::string &value) {
+    return TError(EError::InvalidValue, "Invalid subscript for property");
+}
+
+TError TProperty::SetIndexed(const std::string &index, const std::string &value) {
+    return TError(EError::InvalidValue, "Invalid subscript for property");
+}
+
+TError TProperty::GetToSave(std::string &value) {
+    if (IsSerializable)
+        return Get(value);
+    return TError(EError::Unknown, "Trying to save non-serializable value");
+}
+
+TError TProperty::SetFromRestore(const std::string &value) {
+    if (IsSerializable)
+        return Set(value);
+    return TError(EError::Unknown, "Trying to restore non-serializable value");
+}
 
 /*
  * Note for properties:
@@ -169,9 +201,8 @@ public:
     TCapAmbient() : TProperty(P_CAPABILITIES_AMBIENT, CAPABILITIES_AMBIENT_SET,
             "Raise capabilities in container: NET_BIND_SERVICE;SYS_PTRACE;...") {}
 
-    TError Init() {
+    void Init(void) {
         IsSupported = HasAmbientCapabilities;
-        return TError::Success();
     }
 
     TError CommitAmbient(TCapabilities &ambient) {
@@ -523,11 +554,10 @@ public:
     TError Get(std::string &value);
     TIoPolicy() : TProperty(P_IO_POLICY, IO_POLICY_SET,
                             "IO policy: normal, batch (dynamic)") {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = BlkioSubsystem.SupportPolicy();
-
-        return TError::Success();
     }
+
     TError Propagate(const std::string &policy);
 } static IoPolicy;
 
@@ -702,10 +732,8 @@ public:
     TMemoryGuarantee() : TProperty(P_MEM_GUARANTEE, MEM_GUARANTEE_SET,
                                     "Guaranteed amount of memory "
                                     "[bytes] (dynamic)") {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
-
-        return TError::Success();
     }
 } static MemoryGuarantee;
 
@@ -769,10 +797,8 @@ public:
         IsReadOnly = true;
         IsSerializable = false;
     }
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
-
-        return TError::Success();
     }
 } static MemTotalGuarantee;
 
@@ -1444,7 +1470,6 @@ public:
     TError Get(std::string &value);
     TRawRootPid() : TProperty(P_RAW_ROOT_PID, ROOT_PID_SET, "") {
         IsReadOnly = true;
-        IsSerializable = true;
         IsHidden = true;
     }
 } static RawRootPid;
@@ -1480,7 +1505,6 @@ public:
     TError Get(std::string &value);
     TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, LOOP_DEV_SET, "") {
         IsReadOnly = true;
-        IsSerializable = true;
         IsHidden = true;
     }
 } static RawLoopDev;
@@ -1501,7 +1525,6 @@ public:
     TError Get(std::string &value);
     TRawStartTime() : TProperty(P_RAW_START_TIME, START_TIME_SET, "") {
         IsReadOnly = true;
-        IsSerializable = true;
         IsHidden = true;
     }
 } static RawStartTime;
@@ -1522,7 +1545,6 @@ public:
     TError Get(std::string &value);
     TRawDeathTime() : TProperty(P_RAW_DEATH_TIME, DEATH_TIME_SET, "") {
         IsReadOnly = true;
-        IsSerializable = true;
         IsHidden = true;
     }
 } static RawDeathTime;
@@ -1653,10 +1675,8 @@ public:
     TError Get(std::string &value);
     TAnonLimit() : TProperty(P_ANON_LIMIT, ANON_LIMIT_SET,
                              "Anonymous memory limit [bytes] (dynamic)") {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportAnonLimit();
-
-        return TError::Success();
     }
 
 } static AnonLimit;
@@ -1704,10 +1724,8 @@ public:
     TDirtyLimit() : TProperty(P_DIRTY_LIMIT, DIRTY_LIMIT_SET,
                               "Dirty file cache limit [bytes] "
                               "(dynamic)" ) {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportDirtyLimit();
-
-        return TError::Success();
     }
 } static DirtyLimit;
 
@@ -1755,10 +1773,8 @@ public:
                                      RECHARGE_ON_PGFAULT_SET,
                                      "Recharge memory on "
                                      "page fault (dynamic)") {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportRechargeOnPgfault();
-
-        return TError::Success();
     }
 } static RechargeOnPgfault;
 
@@ -1901,10 +1917,8 @@ public:
     TIoLimit()  : TProperty(P_IO_LIMIT, IO_LIMIT_SET,
                             "Filesystem bandwidth limit [bytes/s] "
                             "(dynamic)") {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportIoLimit();
-
-        return TError::Success();
     }
 } static IoLimit;
 
@@ -1949,10 +1963,8 @@ public:
     TIopsLimit() : TProperty(P_IO_OPS_LIMIT, IO_OPS_LIMIT_SET,
                              "Filesystem IOPS limit "
                              "[operations/s] (dynamic)") {}
-    TError Init(void) {
+    void Init(void) {
         IsSupported = MemorySubsystem.SupportIoLimit();
-
-        return TError::Success();
     }
 } static IopsLimit;
 
@@ -2896,14 +2908,12 @@ public:
         IsReadOnly = true;
         IsSerializable = false;
     }
-    TError Init(void) {
+    void Init(void) {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
         TUintMap stat;
 
         TError error = MemorySubsystem.Statistics(rootCg, stat);
         IsSupported = !error && (stat.find("total_max_rss") != stat.end());
-
-        return TError::Success();
     }
 } static MaxRss;
 
@@ -3567,98 +3577,6 @@ TError TMemTotalLimit::Get(std::string &value) {
 }
 
 void InitContainerProperties(void) {
-    ContainerPropMap[User.Name] = &User;
-    ContainerPropMap[Group.Name] = &Group;
-    MemoryGuarantee.Init();
-    ContainerPropMap[MemoryGuarantee.Name] = &MemoryGuarantee;
-    ContainerPropMap[Command.Name] = &Command;
-    ContainerPropMap[VirtMode.Name] = &VirtMode;
-    ContainerPropMap[Cwd.Name] = &Cwd;
-    ContainerPropMap[StdinPath.Name] = &StdinPath;
-    ContainerPropMap[StdoutPath.Name] = &StdoutPath;
-    ContainerPropMap[StderrPath.Name] = &StderrPath;
-    ContainerPropMap[Isolate.Name] = &Isolate;
-    ContainerPropMap[BindDns.Name] = &BindDns;
-    ContainerPropMap[Root.Name] = &Root;
-    ContainerPropMap[Net.Name] = &Net;
-    ContainerPropMap[Hostname.Name] = &Hostname;
-    ContainerPropMap[RootRo.Name] = &RootRo;
-    ContainerPropMap[EnvProperty.Name] = &EnvProperty;
-    ContainerPropMap[Bind.Name] = &Bind;
-    ContainerPropMap[Ip.Name] = &Ip;
-    ContainerPropMap[Capabilities.Name] = &Capabilities;
-    CapabilitiesAmbient.Init();
-    ContainerPropMap[CapabilitiesAmbient.Name] = &CapabilitiesAmbient;
-    ContainerPropMap[DefaultGw.Name] = &DefaultGw;
-    ContainerPropMap[ResolvConf.Name] = &ResolvConf;
-    ContainerPropMap[Devices.Name] = &Devices;
-    ContainerPropMap[RawRootPid.Name] = &RawRootPid;
-    ContainerPropMap[RawLoopDev.Name] = &RawLoopDev;
-    ContainerPropMap[RawStartTime.Name] = &RawStartTime;
-    ContainerPropMap[RawDeathTime.Name] = &RawDeathTime;
-    ContainerPropMap[Ulimit.Name] = &Ulimit;
-    ContainerPropMap[PortoNamespace.Name] = &PortoNamespace;
-    ContainerPropMap[StdoutLimit.Name] = &StdoutLimit;
-    ContainerPropMap[MemoryLimit.Name] = &MemoryLimit;
-    AnonLimit.Init();
-    ContainerPropMap[AnonLimit.Name] = &AnonLimit;
-    DirtyLimit.Init();
-    ContainerPropMap[DirtyLimit.Name] = &DirtyLimit;
-    RechargeOnPgfault.Init();
-    ContainerPropMap[RechargeOnPgfault.Name] = &RechargeOnPgfault;
-    ContainerPropMap[CpuPolicy.Name] = &CpuPolicy;
-    ContainerPropMap[CpuLimit.Name] = &CpuLimit;
-    ContainerPropMap[CpuGuarantee.Name] = &CpuGuarantee;
-    IoPolicy.Init();
-    ContainerPropMap[IoPolicy.Name] = &IoPolicy;
-    IoLimit.Init();
-    ContainerPropMap[IoLimit.Name] = &IoLimit;
-    IopsLimit.Init();
-    ContainerPropMap[IopsLimit.Name] = &IopsLimit;
-    ContainerPropMap[NetGuarantee.Name] = &NetGuarantee;
-    ContainerPropMap[NetLimit.Name] = &NetLimit;
-    ContainerPropMap[NetPriority.Name] = &NetPriority;
-    ContainerPropMap[Respawn.Name] = &Respawn;
-    ContainerPropMap[MaxRespawns.Name] = &MaxRespawns;
-    ContainerPropMap[Private.Name] = &Private;
-    ContainerPropMap[NetTos.Name] = &NetTos;
-    ContainerPropMap[AgingTime.Name] = &AgingTime;
-    ContainerPropMap[EnablePorto.Name] = &EnablePorto;
-    ContainerPropMap[Weak.Name] = &Weak;
-    ContainerPropMap[AbsoluteName.Name] = &AbsoluteName;
-    ContainerPropMap[AbsoluteNamespace.Name] = &AbsoluteNamespace;
-    MemTotalGuarantee.Init();
-    ContainerPropMap[MemTotalGuarantee.Name] = &MemTotalGuarantee;
-    ContainerPropMap[OomKilled.Name] = &OomKilled;
-    ContainerPropMap[State.Name] = &State;
-    ContainerPropMap[Parent.Name] = &Parent;
-    ContainerPropMap[RespawnCount.Name] = &RespawnCount;
-    ContainerPropMap[RootPid.Name] = &RootPid;
-    ContainerPropMap[ExitStatusProperty.Name] = &ExitStatusProperty;
-    ContainerPropMap[StartErrno.Name] = &StartErrno;
-    ContainerPropMap[Stdout.Name] = &Stdout;
-    ContainerPropMap[StdoutOffset.Name] = &StdoutOffset;
-    ContainerPropMap[Stderr.Name] = &Stderr;
-    ContainerPropMap[StderrOffset.Name] = &StderrOffset;
-    ContainerPropMap[MemUsage.Name] = &MemUsage;
-    ContainerPropMap[AnonUsage.Name] = &AnonUsage;
-    ContainerPropMap[MinorFaults.Name] = &MinorFaults;
-    ContainerPropMap[MajorFaults.Name] = &MajorFaults;
-    MaxRss.Init();
-    ContainerPropMap[MaxRss.Name] = &MaxRss;
-    ContainerPropMap[CpuUsage.Name] = &CpuUsage;
-    ContainerPropMap[CpuSystem.Name] = &CpuSystem;
-    ContainerPropMap[NetBytes.Name] = &NetBytes;
-    ContainerPropMap[NetPackets.Name] = &NetPackets;
-    ContainerPropMap[NetDrops.Name] = &NetDrops;
-    ContainerPropMap[NetOverlimits.Name] = &NetOverlimits;
-    ContainerPropMap[NetRxBytes.Name] = &NetRxBytes;
-    ContainerPropMap[NetRxPackets.Name] = &NetRxPackets;
-    ContainerPropMap[NetRxDrops.Name] = &NetRxDrops;
-    ContainerPropMap[IoRead.Name] = &IoRead;
-    ContainerPropMap[IoWrite.Name] = &IoWrite;
-    ContainerPropMap[IoOps.Name] = &IoOps;
-    ContainerPropMap[Time.Name] = &Time;
-    ContainerPropMap[PortoStat.Name] = &PortoStat;
-    ContainerPropMap[MemTotalLimit.Name] = &MemTotalLimit;
+    for (auto prop: ContainerProperties)
+        prop.second->Init();
 }

@@ -47,11 +47,6 @@ using std::shared_ptr;
 using std::unique_ptr;
 using std::map;
 
-__thread TContainer *CurrentContainer = nullptr;
-__thread TClient *CurrentClient = nullptr;
-
-std::map<std::string, TProperty*> ContainerPropMap;
-
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        std::shared_ptr<TKeyValueStorage> storage,
                        const std::string &name, std::shared_ptr<TContainer> parent,
@@ -214,7 +209,7 @@ TError TContainer::RotateStdFile(TStdStream &stream, uint64_t &offset_value) {
 void TContainer::CreateStdStreams() {
     Stdin = TStdStream(STDIN_FILENO,
                        ActualStdPath(StdinPath, !(PropMask & STDIN_SET), false),
-                       ActualStdPath(StdinPath, !(PropMask & STDIN_SET) > 0, true),
+                       ActualStdPath(StdinPath, !(PropMask & STDIN_SET), true),
                        !(PropMask & STDIN_SET));
     Stdout = TStdStream(STDOUT_FILENO,
                         ActualStdPath(StdoutPath, !(PropMask & STDOUT_SET), false),
@@ -849,7 +844,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                     "resolv_conf requires separate root");
 
         taskEnv->BindDns = false;
-        CurrentContainer->BindDns = false;
+        BindDns = false;
         for (auto &line: ResolvConf)
             taskEnv->ResolvConf += line + "\n";
     }
@@ -1596,8 +1591,8 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     std::string idx;
     ParsePropertyName(property, idx);
 
-    auto prop = ContainerPropMap.find(property);
-    if (prop == ContainerPropMap.end())
+    auto prop = ContainerProperties.find(property);
+    if (prop == ContainerProperties.end())
         return TError(EError::InvalidProperty,
                               "Unknown container property: " + property);
 
@@ -1628,14 +1623,14 @@ TError TContainer::SetProperty(const string &origProperty,
     string value = StringTrim(origValue);
     TError error;
 
-    auto new_prop = ContainerPropMap.find(property);
-    if (new_prop == ContainerPropMap.end())
+    auto new_prop = ContainerProperties.find(property);
+    if (new_prop == ContainerProperties.end())
         return TError(EError::Unknown, "Invalid property " + property);
 
     if (!(*new_prop).second->IsSupported)
         return TError(EError::NotSupported, property + " is not supported");
 
-    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentContainer = this;
     CurrentClient = client.get();
     if (idx.length())
         error = (*new_prop).second->SetIndexed(idx, value);
@@ -1706,7 +1701,7 @@ void TContainer::RestoreStdPath(const std::string &property,
         if (path.IsRegularStrict()) {
             L_ACT() << GetName() << ": restore " << property << " "
                     << path.ToString() << std::endl;
-            ContainerPropMap[property]->Set(path.ToString());
+            ContainerProperties[property]->Set(path.ToString());
         }
     }
 
@@ -1741,10 +1736,10 @@ TError TContainer::Save(void) {
     pair->set_val(GetName());
 
     TClient fakeroot(TCred(0,0));
-    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentContainer = this;
     CurrentClient = &fakeroot;
 
-    for (auto knob : ContainerPropMap) {
+    for (auto knob : ContainerProperties) {
         std::string value;
 
         if (!(knob.second->IsSerializable) ||
@@ -1772,7 +1767,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     CgroupEmptySince = 0;
 
     TClient fakeroot(TCred(0,0));
-    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentContainer = this;
     CurrentClient = &fakeroot;
 
     std::string container_state;
@@ -1793,8 +1788,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             continue;
         }
 
-        auto prop = ContainerPropMap.find(key);
-        if (prop != ContainerPropMap.end()) {
+        auto prop = ContainerProperties.find(key);
+        if (prop != ContainerProperties.end()) {
 
             if (Verbose)
                 L_ACT() << "Restoring as new property" << key << " = " << value << std::endl;
@@ -1813,7 +1808,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     /* Valid container state cannot be empty */
     if (container_state.length() > 0) {
-        (*ContainerPropMap.find(D_STATE)).second->SetFromRestore(container_state);
+        (*ContainerProperties.find(D_STATE)).second->SetFromRestore(container_state);
         PropMask |= STATE_SET;
     }
 

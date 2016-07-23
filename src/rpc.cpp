@@ -5,6 +5,7 @@
 #include "version.hpp"
 #include "holder.hpp"
 #include "property.hpp"
+#include "container.hpp"
 #include "volume.hpp"
 #include "event.hpp"
 #include "protobuf.hpp"
@@ -13,8 +14,6 @@
 #include "util/cred.hpp"
 
 using std::string;
-
-extern std::map<std::string, TProperty*> ContainerPropMap;
 
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
     if (Verbose)
@@ -703,9 +702,10 @@ noinline TError ListProperty(TContext &context,
     if (error)
         return TError(EError::Unknown, "Can't find root container");
 
-   for (auto elem : ContainerPropMap) {
-        if (!elem.second->IsSupported || elem.second->IsReadOnly ||
-            elem.second->IsHidden)
+    for (auto elem : ContainerProperties) {
+        if (!elem.second->IsSupported ||
+                elem.second->IsReadOnly ||
+                elem.second->IsHidden)
             continue;
 
         auto entry = list->add_list();
@@ -728,7 +728,7 @@ noinline TError ListData(TContext &context,
     if (error)
         return TError(EError::Unknown, "Can't find root container");
 
-    for (auto elem : ContainerPropMap) {
+    for (auto elem : ContainerProperties) {
         if (!elem.second->IsSupported || !elem.second->IsReadOnly ||
             elem.second->IsHidden)
             continue;
