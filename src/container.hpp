@@ -209,6 +209,8 @@ public:
     void Release();
     bool IsAcquired() const;
 
+    void SanitizeCapabilities();
+
     const std::string GetName() const;
     const std::string GetTextId(const std::string &separator = "+") const;
     const int GetId() const { return Id; }

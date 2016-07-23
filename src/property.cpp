@@ -85,34 +85,6 @@ public:
     TCapLimit() : TProperty(P_CAPABILITIES, CAPABILITIES_SET,
             "Limit capabilities in container: SYS_ADMIN;NET_ADMIN;... see man capabilities") {}
 
-    void Sanitize() {
-        TCapabilities allowed, limit;
-
-        if (CurrentContainer->OwnerCred.IsRootUser()) {
-            allowed = AllCapabilities;
-            limit = AllCapabilities;
-        } else if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
-            allowed = OsModeCapabilities;
-            limit = OsModeCapabilities;
-        } else {
-            allowed = AppModeCapabilities;
-            limit = SuidCapabilities;
-        }
-
-        if (!(CurrentContainer->PropMask & CAPABILITIES_SET)) {
-            CurrentContainer->CapLimit = limit;
-        } else {
-            CurrentContainer->CapLimit.Permitted &= limit.Permitted;
-            limit.Permitted &= CurrentContainer->CapLimit.Permitted;
-        }
-
-        if (HasAmbientCapabilities) {
-            allowed.Permitted &= limit.Permitted;
-            CurrentContainer->CapAllowed = allowed;
-            CurrentContainer->CapAmbient.Permitted &= allowed.Permitted;
-        }
-    }
-
     TError CommitLimit(TCapabilities &limit) {
         TError error = IsAliveAndStopped();
         if (error)
@@ -148,7 +120,7 @@ public:
 
         CurrentContainer->CapLimit = limit;
         CurrentContainer->PropMask |= CAPABILITIES_SET;
-        Sanitize();
+        CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
 
@@ -234,7 +206,7 @@ public:
 
         CurrentContainer->CapAmbient = ambient;
         CurrentContainer->PropMask |= CAPABILITIES_AMBIENT_SET;
-
+        CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
 
@@ -671,7 +643,7 @@ TError TUser::Set(const std::string &username) {
     owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
                         new_user.Groups.end());
     CurrentContainer->PropMask |= USER_SET;
-    Capabilities.Sanitize();
+    CurrentContainer->SanitizeCapabilities();
     return TError::Success();
 }
 
@@ -859,7 +831,7 @@ TError TVirtMode::Set(const std::string &virt_mode) {
         return TError(EError::InvalidValue, std::string("Unsupported ") +
                       P_VIRT_MODE + ": " + virt_mode);
     CurrentContainer->PropMask |= VIRT_MODE_SET;
-    Capabilities.Sanitize();
+    CurrentContainer->SanitizeCapabilities();
 
     if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
         if (!(CurrentContainer->PropMask & CWD_SET)) {

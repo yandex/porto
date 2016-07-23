@@ -80,8 +80,8 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     NetProp = { "inherited" };
     Hostname = "";
     CapAmbient = NoCapabilities;
-    CapAllowed = HasAmbientCapabilities ? AppModeCapabilities : NoCapabilities;
-    CapLimit = SuidCapabilities;
+    CapAllowed = NoCapabilities;
+    CapLimit = NoCapabilities;
     LoopDev = -1;
 
     if (IsRoot())
@@ -929,19 +929,13 @@ TError TContainer::Create(const TCred &cred) {
     CgroupEmptySince = 0;
 
     OwnerCred = TCred(cred.Uid, cred.Gid);
-
     PropMask |= USER_SET | GROUP_SET;
+    SanitizeCapabilities();
 
     TError error = FindGroups(UserName(OwnerCred.Uid), OwnerCred.Gid, OwnerCred.Groups);
     if (error) {
         L_ERR() << "Can't set container owner: " << error << std::endl;
         return error;
-    }
-
-    if (OwnerCred.IsRootUser()) {
-        if (HasAmbientCapabilities)
-            CapAllowed = AllCapabilities;
-        CapLimit = AllCapabilities;
     }
 
     SetState(EContainerState::Stopped);
@@ -951,6 +945,39 @@ TError TContainer::Create(const TCred &cred) {
     PropMask |= RESPAWN_COUNT_SET;
 
     return Save(); /* Serialize on creation  */
+}
+
+void TContainer::SanitizeCapabilities() {
+    TCapabilities allowed, limit;
+
+    /* root user can allow any capabilities in own containers */
+    if (OwnerCred.IsRootUser()) {
+        allowed = AllCapabilities;
+        limit = AllCapabilities;
+    } else {
+        if (VirtMode == VIRT_MODE_OS) {
+            allowed = OsModeCapabilities;
+            limit = OsModeCapabilities;
+        } else {
+            allowed = AppModeCapabilities;
+            limit = SuidCapabilities;
+        }
+        for (auto p = Parent; p; p = p->Parent)
+            limit.Permitted &= p->CapLimit.Permitted;
+    }
+
+    if (!(PropMask & CAPABILITIES_SET)) {
+        CapLimit = limit;
+    } else {
+        CapLimit.Permitted &= limit.Permitted;
+        limit.Permitted &= CapLimit.Permitted;
+    }
+
+    if (HasAmbientCapabilities) {
+        allowed.Permitted &= limit.Permitted;
+        CapAllowed = allowed;
+        CapAmbient.Permitted &= allowed.Permitted;
+    }
 }
 
 TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
@@ -973,6 +1000,9 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     if (!meta && !Command.length())
         return TError(EError::InvalidValue, "container command is empty");
+
+    /* apply parent limits for capabilities */
+    SanitizeCapabilities();
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
     if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
