@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 2.8)
 
 PROJECT(yandex-porto)
 
-OPTION(ENABLE_TEST "Enables building portotest utility" ON)
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
 OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)

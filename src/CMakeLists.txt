@@ -95,20 +95,15 @@ if(NOT ENABLE_ASAN)
 	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 endif()
 
-set(TEST_TARGETS "")
-if(ENABLE_TEST)
-	add_executable(portotest portotest.cpp version.c config.cpp protobuf.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp)
-	target_link_libraries(portotest porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
-	set(TEST_TARGETS "portotest")
-endif()
+add_executable(portotest portotest.cpp version.c config.cpp protobuf.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp)
+target_link_libraries(portotest porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 
 install(
-    TARGETS portod portoctl ${TEST_TARGETS} portoinit
-    RUNTIME DESTINATION sbin
-    LIBRARY DESTINATION lib
+	TARGETS portod portoctl portoinit portotest
+	RUNTIME DESTINATION sbin
+	LIBRARY DESTINATION lib
 )
 
-add_custom_target(test COMMAND sudo scripts/standalone_test ${CMAKE_BINARY_DIR} 5
-                  --except package
-                  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                  DEPENDS portod portotest portoinit)
+add_custom_target(test COMMAND ${CMAKE_SOURCE_DIR}/scripts/standalone_test
+		  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+		  DEPENDS portod portotest portoinit)

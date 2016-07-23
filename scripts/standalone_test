@@ -1,113 +1,71 @@
-#!/bin/bash
+#!/bin/sh
 
-cleanup_spawner() {
-    echo "Stopping portod: $PORTOD_PID"
-    kill -2 $PORTOD_PID
-    wait $1
+# set -x
 
-    if [ $respawns ]; then
-        echo "portod respawned $respawns times"
+PORTO_BIN=$(pwd)
+PORTO_SRC=$(dirname $(dirname $0))
+
+die() {
+    echo $@
+    exit 2
+}
+
+stopper() {
+    if [ -n "$PORTOD_PID" ] ; then
+        kill -INT $PORTOD_PID
+        wait $PORTOD_PID
+        unset PORTOD_PID
     fi
-
     exit 0
 }
 
-spawner() {
-    PORTO_DIR=$1
-    limit=$2
-    let respawns=0
-    EXIT_CODE=0
-    trap "cleanup_spawner" TERM INT QUIT
-
-    until [ "$respawns" -ge "$limit" ]; do
-
-        $PORTO_DIR/portod &
+starter() {
+    trap stopper TERM INT QUIT EXIT
+    while test -x $PORTO_BIN/portod ; do
+        $PORTO_BIN/portod --verbose &
         PORTOD_PID=$!
-
         wait $PORTOD_PID
-        EXIT_CODE=$?
+        echo "portod exit code:" $?
+    done
+}
 
-        let respawns=respawns+1
+poke_porto() {
+    $PORTO_BIN/portoctl get / state >/dev/null 2>&1
+}
+
+start_porto() {
+    starter &
+    STARTER_PID=$!
+    while ! poke_porto ; do
+        kill -0 $STARTER_PID || die "cannot start porto"
         sleep 1
     done
-
-    echo "portod respawned $respawns times"
-
-    exit $EXIT_CODE
 }
 
-cleanup() {
-    echo "Test cleanup..."
-    if [ "$TEST_PID" ]; then
-        kill -15 $TEST_PID
+stop_porto() {
+    if [ -n "$STARTER_PID" ] ; then
+        kill $STARTER_PID
+        wait $STARTER_PID
+        unset STARTER_PID
     fi
-    if [ "$SPAWNER_PID" ]; then
-        kill -15 $SPAWNER_PID
-        wait $SPAWNER_PID
-    fi
-    exit 1
+    poke_porto && die "cannot stop porto"
 }
 
-PORTO_DIR=$1
-RESPAWN_LIMIT=$2
-shift 2
-
-trap "cleanup" TERM INT QUIT
-
-service yandex-porto stop || true;
-killall -9 portod || true;
-
-spawner "$PORTO_DIR" "$RESPAWN_LIMIT" &
-SPAWNER_PID=$!
-
-#Give daemon some time to start...
-sleep 1
-
-
-$PORTO_DIR/portotest $@ &
-TEST_PID=$!
-wait $TEST_PID
-TEST_EXIT_CODE=$?
-
-if [ $TEST_EXIT_CODE -eq 0 ]; then
-
-    PYTHON_TESTS=`ls $PORTO_DIR/src/test/test-*.py`
-
-    for pytest in $PYTHON_TESTS; do
-
-        python $pytest &
-        TEST_PID=$!
-
-        wait $TEST_PID
-        TEST_EXIT_CODE=$?
-
-        if [ $TEST_EXIT_CODE -ne 0 ]; then
-            echo "test $pytest failed with code: $TEST_EXIT_CODE"
-            break
-        fi
-    done
-
-else
-    echo "selftest failed with code: $TEST_EXIT_CODE"
-fi
-
-kill -15 $SPAWNER_PID
-wait $SPAWNER_PID
-SPAWNER_EXIT_CODE=$?
-
-
-if [ $TEST_EXIT_CODE -eq 0 ]; then
-
-    if [ $SPAWNER_EXIT_CODE -ne 0 ]; then
-        echo "Daemon failed with code: $SPAWNER_EXIT_CODE"
-        exit $SPAWNER_EXIT_CODE
+kill_porto() {
+    if poke_porto ; then
+        service yandex-porto stop || true
+        killall -9 portod || true
+        sleep 1
+        poke_porto && die "cannot kill porto"
     fi
+}
 
-    echo "$0: All tests passed successfully"
+trap stop_porto TERM INT QUIT EXIT
+kill_porto
+start_porto
 
-    exit $TEST_EXIT_CODE
+$PORTO_BIN/portotest || die "portotest failed"
 
-else
-    echo "Test failed with code: $TEST_EXIT_CODE"
-    exit $TEST_EXIT_CODE
-fi
+for pytest in $PORTO_SRC/src/test/test-*.py; do
+    PYTHONPATH=$PORTO_SRC/src/api/python python $pytest || die "$pytest failed"
+done
