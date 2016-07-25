@@ -236,7 +236,7 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
 
     // check permissions
     if (client && checkPerm) {
-        error = c->CheckPermission(client->GetCred());
+        error = c->CheckPermission(client->Cred);
         if (error)
             return error;
     }

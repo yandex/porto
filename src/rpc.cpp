@@ -311,7 +311,7 @@ static noinline TError CreateContainer(TContext &context,
         return TError(EError::Busy, "Parent container " + parent->GetName() + " is busy");
 
     std::shared_ptr<TContainer> container;
-    err = context.Cholder->Create(holder_lock, name, client->GetCred(), container);
+    err = context.Cholder->Create(holder_lock, name, client->Cred, container);
 
     if (!err && weak) {
         container->IsWeak = true;
@@ -407,7 +407,7 @@ noinline TError StartContainer(TContext &context,
         if (err)
             goto release;
 
-        err = container->CheckPermission(client->GetCred());
+        err = container->CheckPermission(client->Cred);
         if (err)
             goto release;
 
@@ -1008,7 +1008,7 @@ noinline TError CreateVolume(TContext &context,
     if (req.has_path() && !req.path().empty())
         volume_path = container_root / req.path();
 
-    error = volume->Configure(volume_path, client->GetCred(),
+    error = volume->Configure(volume_path, client->Cred,
                               clientContainer, properties, *context.Vholder);
     if (error) {
         context.Vholder->Remove(volume);
@@ -1101,7 +1101,7 @@ noinline TError TuneVolume(TContext &context,
     if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
-    error = volume->CheckPermission(client->GetCred());
+    error = volume->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -1133,7 +1133,7 @@ noinline TError LinkVolume(TContext &context,
         if (error)
             return error;
 
-        error = container->CheckPermission(client->GetCred());
+        error = container->CheckPermission(client->Cred);
         if (error)
             return error;
     } else {
@@ -1154,7 +1154,7 @@ noinline TError LinkVolume(TContext &context,
     if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
-    error = volume->CheckPermission(client->GetCred());
+    error = volume->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -1196,7 +1196,7 @@ noinline TError UnlinkVolume(TContext &context,
         if (error)
             return error;
 
-        error = container->CheckPermission(client->GetCred());
+        error = container->CheckPermission(client->Cred);
         if (error)
             return error;
     } else {
@@ -1209,7 +1209,7 @@ noinline TError UnlinkVolume(TContext &context,
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
 
-    error = volume->CheckPermission(client->GetCred());
+    error = volume->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -1326,7 +1326,7 @@ noinline TError ImportLayer(TContext &context,
     if (!tarball.IsRegularFollow())
         return TError(EError::InvalidValue, "tarball not a file");
 
-    if (!tarball.CanRead(client->GetCred()))
+    if (!tarball.CanRead(client->Cred))
         return TError(EError::Permission, "client has not read access to tarball");
 
     /* layers_tmp should already be created on startup */
@@ -1391,14 +1391,14 @@ noinline TError ExportLayer(TContext &context,
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
 
-    if (!tarball.DirName().CanWrite(client->GetCred()))
+    if (!tarball.DirName().CanWrite(client->Cred))
         return TError(EError::Permission, "client has no write access to tarball directory");
 
     auto vholder_lock = context.Vholder->ScopedLock();
     auto volume = context.Vholder->Find(req.volume());
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
-    error = volume->CheckPermission(client->GetCred());
+    error = volume->CheckPermission(client->Cred);
     if (error)
         return error;
     vholder_lock.unlock();
@@ -1418,7 +1418,7 @@ noinline TError ExportLayer(TContext &context,
         return error;
     }
 
-    error = tarball.Chown(client->GetCred());
+    error = tarball.Chown(client->Cred);
     if (error) {
         (void)tarball.Unlink();
         return error;

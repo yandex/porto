@@ -63,8 +63,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TLockable,
                 public TNonCopyable {
     friend class TVolumeHolder;
-    TCred Cred;
-    unsigned Permissions;
     std::shared_ptr<TKeyValueStorage> Storage;
 
     std::unique_ptr<TVolumeBackend> Backend;
@@ -72,35 +70,27 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
 
 public:
     std::string Path;
-    bool IsAutoPath;
+    bool IsAutoPath = false;
     std::string StoragePath;
-    bool IsAutoStorage;
+    bool IsAutoStorage = true;
     std::string BackendType;
     std::string Creator;
     std::string Id;
-    bool IsReady;
+    bool IsReady = false;
     std::string Private;
     std::vector<std::string> Containers;
-    int LoopDev;
-    bool IsReadOnly;
+    int LoopDev = -1;
+    bool IsReadOnly = false;
     std::vector<std::string> Layers;
-    bool IsLayersSet;
-    uint64_t SpaceLimit;
-    uint64_t SpaceGuarantee;
-    uint64_t InodeLimit;
-    uint64_t InodeGuarantee;
+    bool IsLayersSet = false;
+    uint64_t SpaceLimit = 0;
+    uint64_t SpaceGuarantee = 0;
+    uint64_t InodeLimit = 0;
+    uint64_t InodeGuarantee = 0;
+    TCred VolumeOwner;
+    unsigned VolumePerms = 0755;
 
     TVolume(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {
-        IsAutoStorage = true;
-        IsAutoPath = false;
-        IsReady = false;
-        IsReadOnly = false;
-        LoopDev = -1;
-        SpaceLimit = 0;
-        SpaceGuarantee = 0;
-        InodeLimit = 0;
-        InodeGuarantee = 0;
-        IsLayersSet = false;
         Statistics->Volumes++;
     }
     ~TVolume() {
@@ -158,9 +148,6 @@ public:
     TError GetUpperLayer(TPath &upper);
 
     std::vector<TPath> GetLayers() const;
-
-    TCred GetCred() const { return Cred; }
-    unsigned GetPermissions() const { return Permissions; }
 
     TError SetProperty(const std::map<std::string, std::string> &properties);
 

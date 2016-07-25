@@ -35,10 +35,6 @@ public:
     int GetFd() const;
     pid_t GetPid() const;
 
-    const TCred& GetCred() const {
-        return Cred;
-    }
-
     const std::string& GetComm() const;
 
     void BeginRequest();

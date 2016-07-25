@@ -59,11 +59,11 @@ public:
     TError Build() override {
         TPath storage = Volume->GetStorage();
 
-        TError error = storage.Chown(Volume->GetCred());
+        TError error = storage.Chown(Volume->VolumeOwner);
         if (error)
             return error;
 
-        error = storage.Chmod(Volume->GetPermissions());
+        error = storage.Chmod(Volume->VolumePerms);
         if (error)
             return error;
 
@@ -203,11 +203,11 @@ public:
                 return error;
         }
 
-        error = storage.Chown(Volume->GetCred());
+        error = storage.Chown(Volume->VolumeOwner);
         if (error)
             return error;
 
-        error = storage.Chmod(Volume->GetPermissions());
+        error = storage.Chmod(Volume->VolumePerms);
         if (error)
             return error;
 
@@ -339,7 +339,7 @@ remove_file:
 
         if (!image.Exists()) {
             L_ACT() << "Allocate loop image with size " << space_limit << std::endl;
-            error = MakeImage(image, Volume->GetCred(), space_limit);
+            error = MakeImage(image, Volume->VolumeOwner, space_limit);
             if (error)
                 return error;
         } else {
@@ -355,11 +355,11 @@ remove_file:
             goto free_loop;
 
         if (!Volume->IsReadOnly) {
-            error = path.Chown(Volume->GetCred());
+            error = path.Chown(Volume->VolumeOwner);
             if (error)
                 goto umount_loop;
 
-            error = path.Chmod(Volume->GetPermissions());
+            error = path.Chmod(Volume->VolumePerms);
             if (error)
                 goto umount_loop;
         }
@@ -465,11 +465,11 @@ public:
                 goto err;
         }
 
-        error = upper.Chown(Volume->GetCred());
+        error = upper.Chown(Volume->VolumeOwner);
         if (error)
             goto err;
 
-        error = upper.Chmod(Volume->GetPermissions());
+        error = upper.Chmod(Volume->VolumePerms);
         if (error)
             goto err;
 
@@ -900,11 +900,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
               creator_cred.Group();
 
     /* Set default credentials to creator */
-    Cred.Uid = creator_cred.Uid;
-    Cred.Gid = creator_cred.Gid;
-
-    /* Default permissions for volume root directory */
-    Permissions = 0755;
+    VolumeOwner = creator_cred;
 
     if (properties.count(V_CREATOR))
         return TError(EError::InvalidProperty,
@@ -920,11 +916,11 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         return error;
 
     /* Verify default credentials */
-    if (Cred.Uid != creator_cred.Uid && !creator_cred.IsRootUser())
+    if (VolumeOwner.Uid != creator_cred.Uid && !creator_cred.IsRootUser())
         return TError(EError::Permission, "Changing user is not permitted");
 
-    if (Cred.Gid != creator_cred.Gid && !creator_cred.IsRootUser() &&
-            !creator_cred.IsMemberOf(Cred.Gid))
+    if (VolumeOwner.Gid != creator_cred.Gid && !creator_cred.IsRootUser() &&
+            !creator_cred.IsMemberOf(VolumeOwner.Gid))
         return TError(EError::Permission, "Changing group is not permitted");
 
     /* Verify and resolve layers */
@@ -1038,11 +1034,11 @@ TError TVolume::Build() {
         if (error)
             goto err_merge;
 
-        error = path.Chown(GetCred());
+        error = path.Chown(VolumeOwner);
         if (error)
             return error;
 
-        error = path.Chmod(GetPermissions());
+        error = path.Chmod(VolumePerms);
         if (error)
             return error;
     }
@@ -1249,9 +1245,9 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
 
     ret[V_STORAGE] = StoragePath;
     ret[V_BACKEND] = BackendType;
-    ret[V_USER] = UserName(Cred.Uid);
-    ret[V_GROUP] = GroupName(Cred.Gid);
-    ret[V_PERMISSIONS] = std::to_string(Permissions);
+    ret[V_USER] = VolumeOwner.User();
+    ret[V_GROUP] = VolumeOwner.Group();
+    ret[V_PERMISSIONS] = StringFormat("%#o", VolumePerms);
     ret[V_CREATOR] = Creator;
     ret[V_READY] = IsReady ? "true" : "false";
     ret[V_PRIVATE] = Private;
@@ -1276,7 +1272,7 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
 }
 
 TError TVolume::CheckPermission(const TCred &ucred) const {
-    if (ucred.IsPermitted(Cred))
+    if (ucred.IsPermitted(VolumeOwner))
         return TError::Success();
 
     return TError(EError::Permission, "Permission denied");
@@ -1307,9 +1303,9 @@ TError TVolume::Save() {
     SetNode(node, V_AUTO_PATH, IsAutoPath ? "true" : "false");
     SetNode(node, V_STORAGE, StoragePath);
     SetNode(node, V_BACKEND, BackendType);
-    SetNode(node, V_USER, UserName(Cred.Uid));
-    SetNode(node, V_GROUP, GroupName(Cred.Gid));
-    SetNode(node, V_PERMISSIONS, std::to_string(Permissions));
+    SetNode(node, V_USER, VolumeOwner.User());
+    SetNode(node, V_GROUP, VolumeOwner.Group());
+    SetNode(node, V_PERMISSIONS, StringFormat("%#o", VolumePerms));
     SetNode(node, V_CREATOR, Creator);
     SetNode(node, V_READY, IsReady ? "true" : "false");
     SetNode(node, V_PRIVATE, Private);
@@ -1689,17 +1685,17 @@ TError TVolume::SetProperty(const std::map<std::string, std::string> &properties
             BackendType = prop.second;
 
         } else if (prop.first == V_USER) {
-            error = UserId(prop.second, Cred.Uid);
+            error = UserId(prop.second, VolumeOwner.Uid);
             if (error)
                 return error;
 
         } else if (prop.first == V_GROUP) {
-            error = GroupId(prop.second, Cred.Gid);
+            error = GroupId(prop.second, VolumeOwner.Gid);
             if (error)
                 return error;
 
         } else if (prop.first == V_PERMISSIONS) {
-            error = StringToOct(prop.second, Permissions);
+            error = StringToOct(prop.second, VolumePerms);
             if (error)
                 return error;
 
