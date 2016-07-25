@@ -103,7 +103,7 @@ static void ShouldHaveOnlyRoot(Porto::Connection &api) {
     ExpectEq(containers[0], string("/"));
 }
 
-static void TestDataMap(Porto::Connection &api, const std::string &name, const std::string &data, bool zero) {
+static void TestDataMap(Porto::Connection &api, const std::string &name, const std::string &data, int zero) {
     std::string full;
     vector<string> lines;
     int nr_nonzero = 0;
@@ -130,9 +130,9 @@ static void TestDataMap(Porto::Connection &api, const std::string &name, const s
             nr_nonzero++;
     }
 
-    if (zero)
+    if (zero == 1)
         ExpectEq(nr_nonzero, 0);
-    else
+    if (zero == 0)
         ExpectNeq(nr_nonzero, 0);
 
     ExpectApiFailure(api.GetData(name, data + "[invalid]", full), EError::InvalidValue);
@@ -3067,9 +3067,9 @@ static void TestRoot(Porto::Connection &api) {
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        TestDataMap(api, porto_root, "io_write", true);
-        TestDataMap(api, porto_root, "io_read", true);
-        TestDataMap(api, porto_root, "io_ops", true);
+        TestDataMap(api, porto_root, "io_write", 2);
+        TestDataMap(api, porto_root, "io_read", 2);
+        TestDataMap(api, porto_root, "io_ops", 2);
     }
 
     if (NetworkEnabled()) {
@@ -3199,9 +3199,9 @@ static void TestData(Porto::Connection &api) {
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        TestDataMap(api, root, "io_write", false);
-        TestDataMap(api, root, "io_read", false);
-        TestDataMap(api, root, "io_ops", false);
+        TestDataMap(api, root, "io_write", 0);
+        TestDataMap(api, root, "io_read", 0);
+        TestDataMap(api, root, "io_ops", 0);
     }
 
     ExpectApiSuccess(api.GetData(wget, "cpu_usage", v));
@@ -3214,8 +3214,8 @@ static void TestData(Porto::Connection &api) {
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        TestDataMap(api, wget, "io_write", false);
-        TestDataMap(api, wget, "io_ops", false);
+        TestDataMap(api, wget, "io_write", 0);
+        TestDataMap(api, wget, "io_ops", 0);
     }
 
     ExpectApiSuccess(api.GetData(noop, "cpu_usage", v));
@@ -3231,9 +3231,9 @@ static void TestData(Porto::Connection &api) {
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        TestDataMap(api, noop, "io_write", true);
-        TestDataMap(api, noop, "io_read", true);
-        TestDataMap(api, noop, "io_ops", true);
+        TestDataMap(api, noop, "io_write", 1);
+        TestDataMap(api, noop, "io_read", 1);
+        TestDataMap(api, noop, "io_ops", 1);
     }
 
     if (NetworkEnabled()) {
