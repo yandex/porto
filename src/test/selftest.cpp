@@ -926,15 +926,6 @@ static void TestNsCgTc(Porto::Connection &api) {
     ExpectNeq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
 
     Say() << "Check that task cgroups are correct" << std::endl;
-    auto cgmap = GetCgroups("self");
-    for (auto name : cgmap) {
-        // skip systemd cgroups
-        if (name.first.find("systemd") != string::npos)
-            continue;
-
-        ExpectEq(name.second, "/");
-    }
-
     ExpectCorrectCgroups(pid, name);
     AsAlice(api);
 
