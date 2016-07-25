@@ -187,21 +187,28 @@ TError TTask::ChildMountBinds() {
                     " have not enough permissions for bind mount source " + src.ToString() << std::endl;
         }
 
-        if (dest.Exists() && !dest.HasAccess(Env->OwnerCred, TPath::WU)) {
-            if (config().privileges().enforce_bind_permissions())
-                return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
-                        " have no write permissions for bind mount target " + dest.ToString());
+        if (dest.Exists()) {
+            if (!dest.HasAccess(Env->OwnerCred, TPath::WU)) {
+                if (config().privileges().enforce_bind_permissions())
+                    return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
+                            " have no write permissions for bind mount target " + dest.ToString());
+                else
+                    L_WRN() << Env->Container << ": User " << Env->OwnerCred.ToString() <<
+                        " have no write permissions for bind mount target " + dest.ToString() << std::endl;
+            }
+            if (src.IsDirectoryFollow() != dest.IsDirectoryFollow())
+                return TError(EError::InvalidProperty,
+                        "Bind mount source and target must be both file or directory");
+        } else {
+            if (src.IsDirectoryFollow())
+                error = dest.MkdirAll(0755);
             else
-                L_WRN() << Env->Container << ": User " << Env->OwnerCred.ToString() <<
-                    " have no write permissions for bind mount target " + dest.ToString() << std::endl;
+                error = dest.CreateAll(0600);
+            if (!error)
+                error = dest.Chown(Env->OwnerCred);
+            if (error)
+                return error;
         }
-
-        if (src.IsDirectoryFollow())
-            error = dest.MkdirAll(0755);
-        else
-            error = dest.CreateAll(0600);
-        if (error)
-            return error;
 
         // Drop nosuid,noexec,nodev
         error = dest.BindRemount(src, ro ? MS_RDONLY : 0);
