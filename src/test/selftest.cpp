@@ -4682,10 +4682,6 @@ static void TestSigPipe(Porto::Connection &api) {
 }
 
 static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
-    AsRoot(api);
-    RotateDaemonLogs(api);
-    AsAlice(api);
-
     int pid = ReadPid(config().master_pid().path());
     if (kill(pid, sig))
         throw "Can't send " + std::to_string(sig) + " to master";
@@ -5299,9 +5295,6 @@ static void CheckErrorCounters(Porto::Connection &api) {
 }
 
 static void TestStats(Porto::Connection &api) {
-    if (!needDaemonChecks)
-        return;
-
     AsRoot(api);
 
     int respawns = WordCount(config().master_log().path(), "SYS Spawned");
@@ -5328,28 +5321,6 @@ static void TestStats(Porto::Connection &api) {
         throw string("ERROR: Unexpected number of warnings: " + std::to_string(warns));
 
     AsAlice(api);
-}
-
-static void TestPackage(Porto::Connection &api) {
-    if (!needDaemonChecks)
-        return;
-
-    AsRoot(api);
-
-    Expect(TPath(config().master_log().path()).Exists());
-    Expect(TPath(config().slave_log().path()).Exists());
-    Expect(TPath(PORTO_SOCKET_PATH).Exists());
-
-    ExpectEq(system("stop yandex-porto"), 0);
-
-    Expect(TPath(config().master_log().path()).Exists());
-    Expect(TPath(config().slave_log().path()).Exists());
-    Expect(!TPath(PORTO_SOCKET_PATH).Exists());
-
-    ExpectEq(system("start yandex-porto"), 0);
-    WaitPortod(api);
-
-    expectedErrors = expectedRespawns = expectedWarns = 0;
 }
 
 static void TestConvertPath(Porto::Connection &api) {
@@ -5451,7 +5422,6 @@ int SelfTest(std::vector<std::string> args) {
         // { "remove_dead", TestRemoveDead }, FIXME
         // { "log_rotate", TestLogRotate }, FIXME
         { "stats", TestStats },
-        { "package", TestPackage },
     };
 
     int ret = EXIT_SUCCESS;
@@ -5460,21 +5430,12 @@ int SelfTest(std::vector<std::string> args) {
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
 
-    needDaemonChecks = getenv("NOCHECK") == nullptr;
-
     config.Load();
     Porto::Connection api;
 
     InitUsersAndGroups();
 
     try {
-        if (needDaemonChecks) {
-            RestartDaemon(api);
-
-            ExpectEq(WordCount(config().master_log().path(), "Started"), 1);
-            ExpectEq(WordCount(config().slave_log().path(), "Started"), 1);
-        }
-
         for (auto t : tests) {
             if (except ^ (std::find(args.begin(), args.end(), t.first) == args.end()))
                 continue;
@@ -5488,9 +5449,6 @@ int SelfTest(std::vector<std::string> args) {
         }
 
         AsRoot(api);
-
-        if (!needDaemonChecks)
-            goto exit;
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
         ret = EXIT_FAILURE;

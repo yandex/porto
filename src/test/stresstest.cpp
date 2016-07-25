@@ -269,7 +269,6 @@ int StressTest(int threads, int iter, bool killPorto) {
 
         config.Load();
         Porto::Connection api;
-        RestartDaemon(api);
 
         for (i = 1; i <= threads; i++)
             thrTasks.push_back(std::thread(Tasks, i, iter));

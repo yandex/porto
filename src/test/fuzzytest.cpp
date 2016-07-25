@@ -183,7 +183,6 @@ int FuzzyTest(int thrnr, int iter) {
 
     config.Load();
     Porto::Connection api;
-    RestartDaemon(api);
 
     for (auto i = 0; i < thrnr; i++)
         threads.push_back(std::thread(ThreadMain, i, iter));

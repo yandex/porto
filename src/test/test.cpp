@@ -476,7 +476,7 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     Expect(system(("cp " + cmd + " " + path.ToString()).c_str()) == 0);
 }
 
-void RotateDaemonLogs(Porto::Connection &api) {
+void TruncateLogs(Porto::Connection &api) {
     // Truncate slave log
     TPath slaveLog(config().slave_log().path());
     ExpectSuccess(slaveLog.Unlink());
@@ -494,34 +494,6 @@ void RotateDaemonLogs(Porto::Connection &api) {
     pid = ReadPid(config().master_pid().path());
     if (kill(pid, SIGUSR1))
         throw string("Can't send SIGUSR1 to master");
-
-    WaitPortod(api);
-}
-
-void RestartDaemon(Porto::Connection &api) {
-    std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
-
-    if (Pgrep("portod") != 1)
-        throw string("Porto is not running (or multiple portod processes)");
-
-    if (Pgrep("portod-slave") != 1)
-        throw string("Porto slave is not running");
-
-    // Remove porto cgroup to clear statistics
-    int pid = ReadPid(config().master_pid().path());
-    if (kill(pid, SIGINT))
-        throw string("Can't send SIGINT to slave");
-
-    // We need to wait longer because porto may need to remove huge number of
-    // containers
-    WaitPortod(api, 5 * 60);
-
-    RotateDaemonLogs(api);
-
-    // Clean statistics
-    pid = ReadPid(config().master_pid().path());
-    if (kill(pid, SIGHUP))
-        throw string("Can't send SIGHUP to master");
 
     WaitPortod(api);
 }
