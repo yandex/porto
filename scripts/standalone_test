@@ -6,7 +6,7 @@ PORTO_BIN=$(pwd)
 PORTO_SRC=$(dirname $(dirname $0))
 
 die() {
-    echo $@
+    echo FAIL: $@
     exit 2
 }
 
@@ -59,6 +59,8 @@ kill_porto() {
         poke_porto && die "cannot kill porto"
     fi
 }
+
+test $(id -u) = "0" || die "current user not root"
 
 trap stop_porto TERM INT QUIT EXIT
 kill_porto
