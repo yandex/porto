@@ -3053,20 +3053,13 @@ static void TestRoot(Porto::Connection &api) {
 
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectApiSuccess(api.GetData(porto_root, "cpu_usage", v));
-    ExpectEq(v, "0");
     ExpectApiSuccess(api.GetData(porto_root, "memory_usage", v));
-    ExpectEq(v, "0");
 
     for (auto &link : links) {
         ExpectApiSuccess(api.GetData(porto_root, "net_bytes[" + link->GetName() + "]", v));
-        ExpectEq(v, "0");
         ExpectApiSuccess(api.GetData(porto_root, "net_packets[" + link->GetName() + "]", v));
-        ExpectEq(v, "0");
         ExpectApiSuccess(api.GetData(porto_root, "net_drops[" + link->GetName() + "]", v));
-        ExpectEq(v, "0");
         ExpectApiSuccess(api.GetData(porto_root, "net_overlimits[" + link->GetName() + "]", v));
-        ExpectEq(v, "0");
-
         ExpectApiSuccess(api.GetData(porto_root, "net_rx_bytes[" + link->GetName() + "]", v));
         ExpectApiSuccess(api.GetData(porto_root, "net_rx_packets[" + link->GetName() + "]", v));
         ExpectApiSuccess(api.GetData(porto_root, "net_rx_drops[" + link->GetName() + "]", v));
