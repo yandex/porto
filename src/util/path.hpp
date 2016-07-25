@@ -97,13 +97,13 @@ public:
 
     enum Access {
         X   = 001,
-        R   = 002,
-        W   = 004,
+        W   = 002,
+        R   = 004,
         RW  = 006,
         RWX = 007,
         U   = 010,  /* owner user */
-        RU  = 012,
-        WU  = 014,
+        WU  = 012,
+        RU  = 014,
         RWU = 016, /* (read and write) or owner user */
     };
 
