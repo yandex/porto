@@ -1406,12 +1406,12 @@ static void TestUserGroupProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check integer user & group" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "user", "123"));
-    ExpectApiSuccess(api.SetProperty(name, "group", "234"));
+    ExpectApiSuccess(api.SetProperty(name, "user", "9999"));
+    ExpectApiSuccess(api.SetProperty(name, "group", "9999"));
     ExpectApiSuccess(api.GetProperty(name, "user", user));
     ExpectApiSuccess(api.GetProperty(name, "group", group));
-    ExpectEq(user, "123");
-    ExpectEq(group, "234");
+    ExpectEq(user, "9999");
+    ExpectEq(group, "9999");
 
     ExpectApiSuccess(api.Destroy(name));
     AsAlice(api);
