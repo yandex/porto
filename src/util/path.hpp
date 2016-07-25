@@ -95,9 +95,21 @@ public:
     std::string ToString() const;
     bool Exists() const;
 
-    bool HasAccess(const TCred &cred, int mask) const;
-    bool CanRead(const TCred &cred) const { return HasAccess(cred, 4); }
-    bool CanWrite(const TCred &cred) const { return HasAccess(cred, 2); }
+    enum Access {
+        X   = 001,
+        R   = 002,
+        W   = 004,
+        RW  = 006,
+        RWX = 007,
+        U   = 010,  /* owner user */
+        RU  = 012,
+        WU  = 014,
+        RWU = 016, /* (read and write) or owner user */
+    };
+
+    bool HasAccess(const TCred &cred, enum Access mask) const;
+    bool CanRead(const TCred &cred) const { return HasAccess(cred, W); }
+    bool CanWrite(const TCred &cred) const { return HasAccess(cred, R); }
 
     TError Chdir() const;
     TError Chroot() const;

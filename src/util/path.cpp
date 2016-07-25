@@ -100,15 +100,18 @@ bool TPath::Exists() const {
     return access(Path.c_str(), F_OK) == 0;
 }
 
-bool TPath::HasAccess(const TCred &cred, int mask) const {
+bool TPath::HasAccess(const TCred &cred, enum Access mask) const {
     struct stat st;
     int mode;
 
-    if (!cred.Uid && !access(c_str(), mask))
+    if (!cred.Uid && !access(c_str(), mask & TPath::RWX))
         return true;
 
     if (stat(c_str(), &st))
         return false;
+
+    if ((mask & TPath::U) && cred.Uid == st.st_uid)
+        return true;
 
     if (cred.Uid == st.st_uid)
         mode = st.st_mode >> 6;
@@ -117,7 +120,7 @@ bool TPath::HasAccess(const TCred &cred, int mask) const {
     else
         mode = st.st_mode;
 
-    return (mode & mask) == mask;
+    return (mode & mask & TPath::RWX) == (mask & TPath::RWX);
 }
 
 std::string TPath::ToString() const {

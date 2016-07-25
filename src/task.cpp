@@ -175,9 +175,9 @@ TError TTask::ChildMountBinds() {
          * ReadWrite -> rw
          * neither   -> rw if have write permissions
          */
-        if (!src.HasAccess(Env->OwnerCred, ro ? 4 : 6)) {
+        if (!src.HasAccess(Env->OwnerCred, ro ? TPath::RU : TPath::RWU)) {
             if (config().privileges().enforce_bind_permissions()) {
-                if (!ro && !bm.ReadWrite && src.HasAccess(Env->OwnerCred, 4))
+                if (!ro && !bm.ReadWrite && src.HasAccess(Env->OwnerCred, TPath::RU))
                     ro = true;
                 else
                     return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
@@ -187,7 +187,7 @@ TError TTask::ChildMountBinds() {
                     " have not enough permissions for bind mount source " + src.ToString() << std::endl;
         }
 
-        if (dest.Exists() && !dest.CanWrite(Env->OwnerCred)) {
+        if (dest.Exists() && !dest.HasAccess(Env->OwnerCred, TPath::WU)) {
             if (config().privileges().enforce_bind_permissions())
                 return TError(EError::Permission, "User " + Env->OwnerCred.ToString() +
                         " have no write permissions for bind mount target " + dest.ToString());

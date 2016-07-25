@@ -41,8 +41,8 @@ TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
     if (clientFd >= 0) {
         if (client) {
             TPath fd(StringFormat("/proc/%u/fd/%u", client->GetPid(), clientFd));
-            if (!fd.HasAccess(client->TaskCred, Stream ? 2 : 4) &&
-                    !fd.HasAccess(client->Cred, Stream ? 2 : 4))
+            if (!fd.HasAccess(client->TaskCred, Stream ? TPath::W : TPath::R) &&
+                    !fd.HasAccess(client->Cred, Stream ? TPath::W : TPath::R))
                 return TError(EError::Permission,
                               std::string("client have no ") +
                               (Stream ? "write" : "read") +
