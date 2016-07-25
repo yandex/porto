@@ -1880,10 +1880,10 @@ static bool TestPathsHelper(Porto::Connection &api,
 }
 
 static void TestPaths(Porto::Connection &api) {
-    std::string cmd = "mkdir -p /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2";
     AsRoot(api);
-    ExpectEq(system(cmd.c_str()), 0);
+    ExpectEq(system("mkdir /myroot && chmod 777 /myroot"), 0);
     AsAlice(api);
+    ExpectEq(system("mkdir /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2"), 0);
 
     /* isolate, root, cwd, bind, cout_path, cerr_path */
     TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "", "");
@@ -1899,7 +1899,7 @@ static void TestPaths(Porto::Connection &api) {
     AsAlice(api);
 
     AsRoot(api);
-    ExpectEq(system("rm -rf /myroot/"), 0);
+    ExpectEq(system("rm -rf /myroot"), 0);
     AsAlice(api);
 }
 
