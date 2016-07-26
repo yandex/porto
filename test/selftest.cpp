@@ -38,6 +38,10 @@ using std::pair;
 
 namespace test {
 
+static int initialErrors;
+static int initialRespawns;
+static int initialWarns;
+
 static int expectedErrors;
 static int expectedRespawns;
 static int expectedWarns;
@@ -5259,11 +5263,28 @@ static void TestLogRotate(Porto::Connection &api) {
     ExpectLess(st.st_blocks * 512, config().container().max_log_size());
 }
 
+static void InitErrorCounters(Porto::Connection &api) {
+    std::string v;
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    StringToInt(v, initialRespawns);
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
+    StringToInt(v, initialErrors);
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
+    StringToInt(v, initialWarns);
+
+    expectedRespawns = initialRespawns;
+    expectedErrors = initialErrors;
+    expectedWarns = initialWarns;
+}
+
 static void CheckErrorCounters(Porto::Connection &api) {
     std::string v;
 
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    ExpectEq(v, std::to_string(expectedRespawns + 1));
+    ExpectEq(v, std::to_string(expectedRespawns));
 
     ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
     ExpectEq(v, std::to_string(expectedErrors));
@@ -5275,13 +5296,13 @@ static void CheckErrorCounters(Porto::Connection &api) {
 static void TestStats(Porto::Connection &api) {
     AsRoot(api);
 
-    int respawns = WordCount(config().master_log().path(), "SYS Spawned");
+    int respawns = WordCount(config().master_log().path(), "SYS Spawned") + 1;
     int errors = WordCount(config().slave_log().path(), "ERR ");
     int warns = WordCount(config().slave_log().path(), "WRN ");
 
     std::string v;
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    ExpectEq(v, std::to_string(respawns));
+    //ExpectEq(v, std::to_string(respawns));
 
     ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
     ExpectEq(v, std::to_string(errors));
@@ -5289,7 +5310,7 @@ static void TestStats(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
     ExpectEq(v, std::to_string(warns));
 
-    if (respawns - 1 != expectedRespawns)
+    if (respawns != expectedRespawns)
         throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));
 
     if (errors != expectedErrors)
@@ -5342,8 +5363,33 @@ static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("abc"));
 }
 
+void TruncateLogs(Porto::Connection &api) {
+    AsRoot(api);
+
+    // Truncate slave log
+    TPath slaveLog(config().slave_log().path());
+    ExpectSuccess(slaveLog.Unlink());
+
+    int pid = ReadPid(config().slave_pid().path());
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to slave");
+
+    // Truncate master log
+    TPath masterLog(config().master_log().path());
+    ExpectSuccess(masterLog.Unlink());
+
+    pid = ReadPid(config().master_pid().path());
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to master");
+
+    WaitPortod(api);
+
+    AsAlice(api);
+}
+
 int SelfTest(std::vector<std::string> args) {
     pair<string, std::function<void(Porto::Connection &)>> tests[] = {
+        { "truncate_logs", TruncateLogs },
         { "path", TestPath },
         { "idmap", TestIdmap },
         { "format", TestFormat },
@@ -5414,6 +5460,9 @@ int SelfTest(std::vector<std::string> args) {
     InitUsersAndGroups();
 
     try {
+
+        InitErrorCounters(api);
+
         for (auto t : tests) {
             if (except ^ (std::find(args.begin(), args.end(), t.first) == args.end()))
                 continue;

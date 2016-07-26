@@ -66,7 +66,6 @@ namespace test {
 
     void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove = true);
 
-    void TruncateLogs(Porto::Connection &api);
     void PrintFds(const std::string &path, struct dirent **lst, int nr);
     bool NetworkEnabled();
     void TestDaemon(Porto::Connection &api);

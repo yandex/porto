@@ -480,28 +480,6 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     Expect(system(("cp " + cmd + " " + path.ToString()).c_str()) == 0);
 }
 
-void TruncateLogs(Porto::Connection &api) {
-    // Truncate slave log
-    TPath slaveLog(config().slave_log().path());
-    ExpectSuccess(slaveLog.Unlink());
-
-    int pid = ReadPid(config().slave_pid().path());
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to slave");
-
-    WaitPortod(api);
-
-    // Truncate master log
-    TPath masterLog(config().master_log().path());
-    ExpectSuccess(masterLog.Unlink());
-
-    pid = ReadPid(config().master_pid().path());
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to master");
-
-    WaitPortod(api);
-}
-
 void PrintFds(const std::string &path, struct dirent **lst, int nr) {
     for (int i = 0; i < nr; i++) {
         if (lst[i]->d_name == string(".") ||
