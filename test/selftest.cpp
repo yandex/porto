@@ -2498,40 +2498,22 @@ static void TestNetProperty(Porto::Connection &api) {
 }
 
 static void TestCapabilitiesProperty(Porto::Connection &api) {
-    string pid;
-    string name = "a";
+    std::string name = "a";
+    std::string pid;
 
     int lastCap;
     TError error = TPath("/proc/sys/kernel/cap_last_cap").ReadInt(lastCap);
     if (error)
         throw error.GetMsg();
 
-    uint64_t defaultCap = 0;
-    for (int i = 0; i <= lastCap; i++)
-        defaultCap |= (1ULL << i);
+    uint64_t allCap = (1ULL << (lastCap + 1)) - 1;
 
-    uint64_t customCap = (1ULL << CAP_CHOWN) |
-        (1ULL << CAP_DAC_OVERRIDE) |
-        (1ULL << CAP_FSETID) |
-        (1ULL << CAP_FOWNER) |
-        (1ULL << CAP_MKNOD) |
-        (1ULL << CAP_NET_RAW) |
-        (1ULL << CAP_SETGID) |
-        (1ULL << CAP_SETUID) |
-        (1ULL << CAP_SETFCAP) |
-        (1ULL << CAP_SETPCAP) |
-        (1ULL << CAP_NET_BIND_SERVICE) |
-        (1ULL << CAP_SYS_CHROOT) |
-        (1ULL << CAP_KILL) |
-        (1ULL << CAP_AUDIT_WRITE);
+    uint64_t defaultCap = 0x00000000a9ac77fb;
+
+    Say() << "Check default capabilities for non-root container" << std::endl;
 
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-
-    Say() << "Make sure capabilities don't work for non-root container" << std::endl;
-
-    ExpectApiFailure(api.SetProperty(name, "capabilities", "CHOWN"), EError::Permission);
-
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     ExpectEq(GetCap(pid, "CapInh"), 0);
@@ -2540,35 +2522,42 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
     ExpectEq(GetCap(pid, "CapBnd"), defaultCap);
     ExpectApiSuccess(api.Stop(name));
 
+    Say() << "Checking custom capabilities" << std::endl;
+
+    ExpectApiFailure(api.SetProperty(name, "capabilities", "SYS_BOOT"), EError::Permission);
+
+    ExpectApiSuccess(api.SetProperty(name, "capabilities", "CHOWN"));
+
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.GetData(name, "root_pid", pid));
+    ExpectEq(GetCap(pid, "CapInh"), 0);
+    ExpectEq(GetCap(pid, "CapPrm"), 0);
+    ExpectEq(GetCap(pid, "CapEff"), 0);
+    ExpectEq(GetCap(pid, "CapBnd"), 1);
+    ExpectApiSuccess(api.Destroy(name));
 
     AsRoot(api);
-    ExpectApiSuccess(api.SetProperty(name, "user", "root"));
-    ExpectApiSuccess(api.SetProperty(name, "group", "root"));
 
-    Say() << "Checking default capabilities" << std::endl;
+    Say() << "Checking default capabilities for root container" << std::endl;
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
-    ExpectEq(GetCap(pid, "CapInh"), defaultCap);
-    ExpectEq(GetCap(pid, "CapPrm"), defaultCap);
-    ExpectEq(GetCap(pid, "CapEff"), defaultCap);
-    ExpectEq(GetCap(pid, "CapBnd"), defaultCap);
-
+    ExpectEq(GetCap(pid, "CapInh"), 0);
+    ExpectEq(GetCap(pid, "CapPrm"), allCap);
+    ExpectEq(GetCap(pid, "CapEff"), allCap);
+    ExpectEq(GetCap(pid, "CapBnd"), allCap);
     ExpectApiSuccess(api.Stop(name));
 
-    Say() << "Checking custom capabilities" << std::endl;
-    ExpectApiFailure(api.SetProperty(name, "capabilities", "CHOWN; INVALID"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; SYS_CHROOT; KILL; AUDIT_WRITE"));
-
+    Say() << "Check limiting root capabilities" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "capabilities", "CHOWN"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-
-    ExpectEq(GetCap(pid, "CapInh"), customCap);
-    ExpectEq(GetCap(pid, "CapPrm"), customCap);
-    ExpectEq(GetCap(pid, "CapEff"), customCap);
-    ExpectEq(GetCap(pid, "CapBnd"), customCap);
-
-    ExpectApiSuccess(api.Stop(name));
+    ExpectEq(GetCap(pid, "CapInh"), 0);
+    ExpectEq(GetCap(pid, "CapPrm"), 1);
+    ExpectEq(GetCap(pid, "CapEff"), 1);
+    ExpectEq(GetCap(pid, "CapBnd"), 1);
 
     ExpectApiSuccess(api.Destroy(name));
 }
@@ -3662,7 +3651,7 @@ static void TestVirtModeProperty(Porto::Connection &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "devices", "" },
-        { "capabilities", "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_RESOURCE" },
+        { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; SETGID; SETUID; NET_BIND_SERVICE; NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; MKNOD; AUDIT_WRITE" },
     };
     std::string s;
 
