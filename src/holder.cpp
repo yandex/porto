@@ -11,7 +11,6 @@
 #include "cgroup.hpp"
 #include "network.hpp"
 #include "kvalue.hpp"
-#include "kv.pb.h"
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
@@ -180,7 +179,7 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id);
+    auto c = std::make_shared<TContainer>(shared_from_this(), name, parent, id);
     error = c->Create(cred);
     if (error)
         return error;
@@ -311,101 +310,41 @@ std::vector<std::shared_ptr<TContainer> > TContainerHolder::List(bool all) const
     return ret;
 }
 
-TError TContainerHolder::RestoreId(const kv::TNode &node, int &id) {
-    std::string value = "";
-
-    TError error = Storage->Get(node, P_RAW_ID, value);
-    if (error) {
-        // FIXME before v1.0 we didn't store id for meta or stopped containers;
-        // don't try to recover, just assign new safe one
-        error = IdMap.Get(id);
-        if (error)
-            return error;
-        L_WRN() << "Couldn't restore container id, using " << id << std::endl;
-    } else {
-        error = StringToInt(value, id);
-        if (error)
-            return error;
-
-        error = IdMap.GetAt(id);
-        if (error) {
-            // FIXME before v1.0 there was a possibility for two containers
-            // to use the same id, allocate new one upon restore we see this
-
-            error = IdMap.Get(id);
-            if (error)
-                return error;
-            L_WRN() << "Container ids clashed, using new " << id << std::endl;
-        }
-        return error;
-    }
-
-    return TError::Success();
-}
-
-std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes) {
-    // FIXME since v1.0 we use container id as kvalue node name and because
-    // we need to create containers in particular order we create this
-    // name-sorted map
-    std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node;
-
-    for (auto node : nodes) {
-        std::string name;
-        kv::TNode n;
-
-        TError error = node->Load(n);
-        if (!error)
-            error = TKeyValueStorage::Get(n, P_RAW_NAME, name);
-
-        if (error) {
-            L_ERR() << "Can't load key-value node " << node->Name << ": " << error << std::endl;
-            node->Remove();
-            Statistics->RestoreFailed++;
-            continue;
-        }
-
-        name2node[name] = node;
-    }
-
-    return name2node;
-}
-
 bool TContainerHolder::RestoreFromStorage() {
-    std::vector<std::shared_ptr<TKeyValueNode>> nodes;
+    std::list<TKeyValue> nodes;
 
     auto holder_lock = LockContainers();
 
-    TError error = Storage->ListNodes(nodes);
-    if (error) {
-        L_ERR() << "Can't list key-value nodes: " << error << std::endl;
+    TError error = TKeyValue::ListAll(ContainersKV, nodes);
+    if (error)
         return false;
-    }
 
-    auto name2node = SortNodes(nodes);
-    bool restored = false;
-    for (auto &pair : name2node) {
-        auto node = pair.second;
-        auto name = pair.first;
-
-        L_ACT() << "Found " << name << " container in kvs" << std::endl;
-
-        kv::TNode n;
-        error = node->Load(n);
-        if (error)
-            continue;
-
-        restored = true;
-        error = Restore(holder_lock, name, n);
-        if (error) {
-            L_ERR() << "Can't restore " << name << ": " << error << std::endl;
-            Statistics->RestoreFailed++;
-            node->Remove();
+    for (auto node = nodes.begin(); node != nodes.end(); ) {
+        error = node->Load();
+        if (error || !node->Has(P_RAW_NAME)) {
+            L_ERR() << "Cannot load " << node->Path << ": " << error << std::endl;
+            (void)node->Path.Unlink();
+            node = nodes.erase(node);
             continue;
         }
+        /* key for sorting */
+        node->Name = node->Get(P_RAW_NAME);
+        ++node;
+    }
+    nodes.sort();
 
-        // FIXME since v1.0 we need to cleanup kvalue nodes with old naming
-        if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
-            node->Remove();
+    bool restored = false;
+    for (auto &node : nodes) {
+        L_ACT() << "Found " << node.Name << " container in kvs" << std::endl;
+
+        restored = true;
+        error = Restore(holder_lock, node);
+        if (error) {
+            L_ERR() << "Can't restore " << node.Name << ": " << error << std::endl;
+            Statistics->RestoreFailed++;
+            node.Path.Unlink();
+            continue;
+        }
     }
 
     if (restored) {
@@ -420,33 +359,35 @@ bool TContainerHolder::RestoreFromStorage() {
     return restored;
 }
 
-TError TContainerHolder::Restore(TScopedLock &holder_lock, const std::string &name,
-                                 const kv::TNode &node) {
-    if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
+TError TContainerHolder::Restore(TScopedLock &holder_lock, TKeyValue &node) {
+    if (node.Name == ROOT_CONTAINER || node.Name == PORTO_ROOT_CONTAINER)
         return TError::Success();
 
-    L_ACT() << "Restore container " << name << " (" << node.ShortDebugString() << ")" << std::endl;
+    L_ACT() << "Restore container " << node.Name << std::endl;
 
-    auto parent = GetParent(name);
+    auto parent = GetParent(node.Name);
     if (!parent)
         return TError(EError::InvalidValue, "invalid parent container");
 
     int id = 0;
-    TError error = RestoreId(node, id);
-    if (error)
+    TError error = StringToInt(node.Get(P_RAW_ID), id);
+    if (!error)
+        error = IdMap.Get(id);
+    if (error) {
+        L_WRN() << "Couldn't restore container id, using " << id << ": " << error << std::endl;
         return error;
-
+    }
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id);
+    auto c = std::make_shared<TContainer>(shared_from_this(), node.Name, parent, id);
     error = c->Restore(holder_lock, node);
     if (error) {
-        L_ERR() << "Can't restore container " << name << ": " << error << std::endl;
+        L_ERR() << "Can't restore container " << node.Name << ": " << error << std::endl;
         return error;
     }
 
-    Containers[name] = c;
+    Containers[node.Name] = c;
     Statistics->Created++;
     return TError::Success();
 }

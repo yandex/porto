@@ -11,7 +11,7 @@
 #include "util/quota.hpp"
 #include "util/sha256.hpp"
 #include "config.hpp"
-#include "kv.pb.h"
+#include "kvalue.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -20,6 +20,8 @@ extern "C" {
 #include <sys/vfs.h>
 #include <sys/mount.h>
 }
+
+TPath VolumesKV;
 
 /* TVolumeBackend - abstract */
 
@@ -1123,8 +1125,8 @@ TError TVolume::Destroy(TVolumeHolder &holder) {
     }
 
 
-    auto kvnode = Storage->GetNode(Id);
-    error = kvnode->Remove();
+    TPath node(VolumesKV / Id);
+    error = node.Unlink();
     if (!ret && error)
         ret = error;
 
@@ -1278,73 +1280,54 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
     return TError(EError::Permission, "Permission denied");
 }
 
-static void SetNode(kv::TNode &node, std::string key, std::string value) {
-    auto pair = node.add_pairs();
-
-    pair->set_key(key);
-    pair->set_val(value);
-}
-
 TError TVolume::Save() {
-    auto kvnode = Storage->GetNode(Id);
-    kv::TNode node;
+    TKeyValue node(VolumesKV / Id);
     TError error;
     std::string tmp;
-
-    kvnode->Create();
 
     /*
      * Storing all state values on save,
      * the previous scheme stored knobs selectively.
      */
 
-    SetNode(node, V_ID, Id);
-    SetNode(node, V_PATH, Path);
-    SetNode(node, V_AUTO_PATH, IsAutoPath ? "true" : "false");
-    SetNode(node, V_STORAGE, StoragePath);
-    SetNode(node, V_BACKEND, BackendType);
-    SetNode(node, V_USER, VolumeOwner.User());
-    SetNode(node, V_GROUP, VolumeOwner.Group());
-    SetNode(node, V_PERMISSIONS, StringFormat("%#o", VolumePerms));
-    SetNode(node, V_CREATOR, Creator);
-    SetNode(node, V_READY, IsReady ? "true" : "false");
-    SetNode(node, V_PRIVATE, Private);
+    node.Set(V_ID, Id);
+    node.Set(V_PATH, Path);
+    node.Set(V_AUTO_PATH, IsAutoPath ? "true" : "false");
+    node.Set(V_STORAGE, StoragePath);
+    node.Set(V_BACKEND, BackendType);
+    node.Set(V_USER, VolumeOwner.User());
+    node.Set(V_GROUP, VolumeOwner.Group());
+    node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
+    node.Set(V_CREATOR, Creator);
+    node.Set(V_READY, IsReady ? "true" : "false");
+    node.Set(V_PRIVATE, Private);
 
     error = StrListToString(Containers, tmp);
     if (error)
         return error;
 
-    SetNode(node, V_CONTAINERS, tmp);
-    SetNode(node, V_LOOP_DEV, std::to_string(LoopDev));
-    SetNode(node, V_READ_ONLY, IsReadOnly ? "true" : "false");
+    node.Set(V_CONTAINERS, tmp);
+    node.Set(V_LOOP_DEV, std::to_string(LoopDev));
+    node.Set(V_READ_ONLY, IsReadOnly ? "true" : "false");
 
     error = StrListToString(Layers, tmp);
     if (error)
         return error;
 
-    SetNode(node, V_LAYERS, tmp);
-    SetNode(node, V_SPACE_LIMIT, std::to_string(SpaceLimit));
-    SetNode(node, V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
-    SetNode(node, V_INODE_LIMIT, std::to_string(InodeLimit));
-    SetNode(node, V_INODE_GUARANTEE, std::to_string(InodeGuarantee));
+    node.Set(V_LAYERS, tmp);
+    node.Set(V_SPACE_LIMIT, std::to_string(SpaceLimit));
+    node.Set(V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
+    node.Set(V_INODE_LIMIT, std::to_string(InodeLimit));
+    node.Set(V_INODE_GUARANTEE, std::to_string(InodeGuarantee));
 
-    return kvnode->Append(node);
+    return node.Save();
 }
 
-TError TVolume::Restore(const kv::TNode &node) {
-    std::map<std::string, std::string> props;
-
-    for (int i = 0; i < node.pairs_size(); i++) {
-        std::string key = node.pairs(i).key();
-        std::string value = node.pairs(i).val();
-
-        props[key] = value;
-    }
-
-    if (!props.count(V_ID))
+TError TVolume::Restore(const TKeyValue &node) {
+    if (!node.Has(V_ID))
         return TError(EError::InvalidValue, "No volume id stored");
 
-    TError error = SetProperty(props);
+    TError error = SetProperty(node.Data);
     if (error)
         return error;
 
@@ -1388,18 +1371,16 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
 }
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
-    volume = std::make_shared<TVolume>(Storage);
+    volume = std::make_shared<TVolume>();
     volume->Id = std::to_string(NextId);
-
     NextId++;
-
     return TError::Success();
 }
 
 void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {}
 
 TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
-    std::vector<std::shared_ptr<TKeyValueNode>> list;
+    std::list<TKeyValue> nodes;
     TError error;
 
     TPath volumes = config().volumes().volume_dir();
@@ -1430,22 +1411,25 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
             return error;
     }
 
-    error = Storage->ListNodes(list);
+    error = TKeyValue::ListAll(VolumesKV, nodes);
     if (error)
         return error;
 
-    for (auto &node : list) {
-        L_ACT() << "Restore volume: " << node->Name << std::endl;
+    for (auto &node : nodes) {
+        L_ACT() << "Restore volume: " << node.Path << std::endl;
 
-        auto volume = std::make_shared<TVolume>(Storage);
-        kv::TNode n;
-        error = node->Load(n);
-        if (error)
-            return error;
-
-        error = volume->Restore(n);
+        error = node.Load();
         if (error) {
-            L_WRN() << "Corrupted volume " << node << " removed: " << error << std::endl;
+            L_WRN() << "Cannot load " << node.Path << " removed: " << error << std::endl;
+            node.Path.Unlink();
+            continue;
+        }
+
+        auto volume = std::make_shared<TVolume>();
+
+        error = volume->Restore(node);
+        if (error) {
+            L_WRN() << "Corrupted volume " << node.Path << " removed: " << error << std::endl;
             (void)volume->Destroy(*this);
             (void)Remove(volume);
             continue;
@@ -1459,7 +1443,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
 
         error = Register(volume);
         if (error) {
-            L_WRN() << "Cannot register volume " << node << " removed: " << error << std::endl;
+            L_WRN() << "Cannot register volume " << node.Path << " removed: " << error << std::endl;
             (void)volume->Destroy(*this);
             (void)Remove(volume);
             continue;

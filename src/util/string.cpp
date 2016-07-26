@@ -262,7 +262,14 @@ bool StringStartsWith(const std::string &str, const std::string &prefix) {
     if (str.length() < prefix.length())
         return false;
 
-    return str.substr(0, prefix.length()) == prefix;
+    return !str.compare(0, prefix.length(), prefix);
+}
+
+bool StringEndsWith(const std::string &str, const std::string &sfx) {
+    if (str.length() < sfx.length())
+        return false;
+
+    return !str.compare(str.length() - sfx.length(), sfx.length(), sfx);
 }
 
 std::string StringFormatFlags(uint64_t flags,

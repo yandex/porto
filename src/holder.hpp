@@ -18,32 +18,22 @@ class TEvent;
 class TEpollLoop;
 class TClient;
 class TContainer;
-class TKeyValueStorage;
-class TKeyValueNode;
+class TKeyValue;
 class TNetwork;
-
-namespace kv {
-    class TNode;
-};
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     TIdMap IdMap;
-    std::shared_ptr<TKeyValueStorage> Storage;
 
-    TError RestoreId(const kv::TNode &node, int &id);
     void ScheduleLogRotatation();
     void ScheduleCgroupSync();
-    std::map<std::string, std::shared_ptr<TKeyValueNode>>
-        SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
     void Unlink(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);
 
 public:
     std::shared_ptr<TEventQueue> Queue = nullptr;
     std::shared_ptr<TEpollLoop> EpollLoop;
 
-    TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
-                     std::shared_ptr<TKeyValueStorage> storage) :
-        IdMap(1, CONTAINER_ID_MAX), Storage(storage), EpollLoop(epollLoop) { }
+    TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop) :
+        IdMap(1, CONTAINER_ID_MAX), EpollLoop(epollLoop) { }
     TError ValidName(const std::string &name) const;
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);
@@ -59,8 +49,7 @@ public:
                      std::shared_ptr<TContainer> &c,
                      TNestedScopedLock &l);
 
-    TError Restore(TScopedLock &holder_lock, const std::string &name,
-                   const kv::TNode &node);
+    TError Restore(TScopedLock &holder_lock, TKeyValue &node);
     bool RestoreFromStorage();
     void RemoveLeftovers();
     TError Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);

@@ -6,7 +6,6 @@ extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 }
 
@@ -37,44 +36,6 @@ bool WriteDelimitedTo(
     return true;
 }
 
-bool ReadDelimitedFrom(
-                       google::protobuf::io::ZeroCopyInputStream* rawInput,
-                       google::protobuf::MessageLite* message) {
-    InterruptibleInputStream *is = nullptr;
-    try {
-        is = dynamic_cast<InterruptibleInputStream *>(rawInput);
-    } catch (...) { }
-
-    if (is)
-        is->SetLimit(8, false);
-
-    // We create a new coded stream for each message.  Don't worry, this is fast,
-    // and it makes sure the 64MB total size limit is imposed per-message rather
-    // than on the whole stream.  (See the CodedInputStream interface for more
-    // info on this limit.)
-    google::protobuf::io::CodedInputStream input(rawInput);
-
-    // Read the size.
-    uint32_t size;
-    if (!input.ReadVarint32(&size)) return false;
-
-    if (is)
-        is->SetLimit(size, true);
-
-    // Tell the stream not to read beyond that size.
-    google::protobuf::io::CodedInputStream::Limit limit =
-        input.PushLimit(size);
-
-    // Parse the message.
-    if (!message->MergeFromCodedStream(&input)) return false;
-    if (!input.ConsumedEntireMessage()) return false;
-
-    // Release the limit.
-    input.PopLimit(limit);
-
-    return true;
-}
-
 TError ConnectToRpcServer(const std::string& path, int &fd)
 {
     struct sockaddr_un peer_addr;
@@ -97,93 +58,4 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     }
 
     return TError::Success();
-}
-
-void InterruptibleInputStream::ReserveChunk() {
-    if (Pos + CHUNK_SIZE > BufSize) {
-        Buf = (uint8_t *)realloc(Buf, Pos + CHUNK_SIZE);
-        if (!Buf)
-            throw std::bad_alloc();
-    }
-}
-
-InterruptibleInputStream::InterruptibleInputStream(int fd) : Fd(fd) {
-}
-
-InterruptibleInputStream::~InterruptibleInputStream() {
-    free(Buf);
-}
-
-bool InterruptibleInputStream::Next(const void **data, int *size) {
-    int n;
-
-    Leftovers = 0;
-
-    if (Backed) {
-        *data = &Buf[Pos - Backed];
-        *size = Backed;
-        Backed = 0;
-
-        return true;
-    }
-
-    ReserveChunk();
-
-    int64_t startPos = Pos;
-    int sz = 0;
-    while ((n = read(Fd, &Buf[Pos], CHUNK_SIZE)) > 0) {
-        Pos += n;
-        sz += n;
-
-        if (Limit && sz >= Limit) {
-            if (Enforce)
-                Leftovers = sz - Limit;
-            break;
-        }
-
-        if ((size_t)n < CHUNK_SIZE)
-            break;
-
-        ReserveChunk();
-    }
-    if (n < 0 && errno == EINTR)
-        interrupted++;
-
-    *data = &Buf[startPos];
-    *size = sz;
-    return *size != 0;
-}
-
-void InterruptibleInputStream::BackUp(int count) {
-    Backed = count;
-}
-
-bool InterruptibleInputStream::Skip(int count) {
-    while (count) {
-        uint8_t tmp;
-        int n = read(Fd, &tmp, 1);
-        if (n != 1)
-            return false;
-        count--;
-    }
-
-    return true;
-}
-
-int64_t InterruptibleInputStream::ByteCount() const {
-    return Pos - Backed;
-}
-
-int InterruptibleInputStream::Interrupted() {
-    return interrupted;
-}
-
-void InterruptibleInputStream::GetBuf(uint8_t **buf, size_t *pos) const {
-    *buf = Buf;
-    *pos = Pos;
-}
-
-void InterruptibleInputStream::SetLimit(size_t limit, bool enforce) {
-    Limit = limit;
-    Enforce = enforce;
 }

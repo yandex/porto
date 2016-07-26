@@ -1,53 +1,44 @@
 #pragma once
 
 #include <string>
-#include <vector>
-#include <mutex>
-
+#include <map>
+#include <list>
 #include "common.hpp"
-#include "util/mount.hpp"
-#include "util/locks.hpp"
+#include "util/path.hpp"
 
-class TKeyValueNode;
-
-namespace kv {
-    class TNode;
-};
-
-class TKeyValueStorage : public std::enable_shared_from_this<TKeyValueStorage>,
-                         public TLockable, public TNonCopyable {
-
+class TKeyValue {
 public:
-    const TPath Root;
-    TKeyValueStorage(const TPath &root) : Root(root) {}
+    const TPath Path;
+    std::string Name;
+    std::map<std::string, std::string> Data;
 
-    TError MountTmpfs(std::string size);
+    TKeyValue(const TPath &path) : Path(path) { }
 
-    std::shared_ptr<TKeyValueNode> GetNode(const std::string &name);
-    std::shared_ptr<TKeyValueNode> GetNode(uint64_t id);
-    TError Dump();
-    TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list);
-    TError Destroy();
+    friend bool operator<(const TKeyValue &lhs, const TKeyValue &rhs) {
+        return lhs.Name < rhs.Name;
+    }
 
-    static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
-};
+    bool Has(const std::string &key) const {
+        return Data.count(key);
+    }
 
-class TKeyValueNode : public TNonCopyable {
-    std::shared_ptr<TKeyValueStorage> Storage;
+    std::string Get(const std::string &key) const {
+        auto it = Data.find(key);
+        return it == Data.end() ? "" : it->second;
+    }
 
-    void Merge(kv::TNode &node, kv::TNode &next) const;
-    TPath GetPath() const { return Storage->Root / Name; }
-public:
-    const std::string Name;
+    void Set(const std::string &key, const std::string &val) {
+        Data[key] = val;
+    }
 
-    TKeyValueNode(std::shared_ptr<TKeyValueStorage> storage,
-                  const std::string &name) :
-        Storage(storage), Name(name) {}
+    void Del(const std::string &key) {
+        Data.erase(key);
+    }
 
-    TError Load(kv::TNode &node) const;
-    TError Save(const kv::TNode &node) const;
-    TError Append(const kv::TNode &node) const;
-    TError Append(const std::string& key, const std::string& value) const;
-    TError Remove() const;
-    TError Create() const;
+    TError Load();
+    TError Save();
+
+    static TError Mount(const TPath &root);
+    static TError ListAll(const TPath &root, std::list<TKeyValue> &nodes);
+    static void DumpAll(const TPath &root);
 };

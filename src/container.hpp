@@ -12,7 +12,6 @@
 #include "cgroup.hpp"
 #include "task.hpp"
 
-class TKeyValueStorage;
 class TEpollSource;
 class TCgroup;
 class TSubsystem;
@@ -29,10 +28,7 @@ class TContainerWaiter;
 class TClient;
 class TVolume;
 class TVolumeHolder;
-
-namespace kv {
-    class TNode;
-};
+class TKeyValue;
 
 struct TEnv;
 
@@ -55,7 +51,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
-    std::shared_ptr<TKeyValueStorage> Storage;
     int Acquired = 0;
     int Id;
     TScopedFd OomEventFd;
@@ -196,7 +191,6 @@ public:
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
     TContainer(std::shared_ptr<TContainerHolder> holder,
-               std::shared_ptr<TKeyValueStorage> storage,
                const std::string &name, std::shared_ptr<TContainer> parent,
                int id);
     ~TContainer();
@@ -248,7 +242,7 @@ public:
     TError SetProperty(const std::string &property, const std::string &value,
                        std::shared_ptr<TClient> &client);
 
-    TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
+    TError Restore(TScopedLock &holder_lock, const TKeyValue &node);
     TError Save(void);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
@@ -327,6 +321,7 @@ public:
 
 extern std::mutex ContainersMutex;
 extern std::map<std::string, std::shared_ptr<TContainer>> Containers;
+extern TPath ContainersKV;
 
 static inline std::unique_lock<std::mutex> LockContainers() {
     return std::unique_lock<std::mutex>(ContainersMutex);

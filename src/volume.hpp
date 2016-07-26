@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "kvalue.hpp"
 #include "common.hpp"
 #include "statistics.hpp"
 #include "util/mount.hpp"
@@ -43,6 +42,7 @@ class TVolumeHolder;
 class TVolume;
 class TContainer;
 class TContainerHolder;
+class TKeyValue;
 
 TError ValidateLayerName(const std::string &name);
 
@@ -65,7 +65,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TLockable,
                 public TNonCopyable {
     friend class TVolumeHolder;
-    std::shared_ptr<TKeyValueStorage> Storage;
 
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();
@@ -92,7 +91,7 @@ public:
     TCred VolumeOwner;
     unsigned VolumePerms = 0755;
 
-    TVolume(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {
+    TVolume() {
         Statistics->Volumes++;
     }
     ~TVolume() {
@@ -108,7 +107,7 @@ public:
     TError Destroy(TVolumeHolder &holder);
 
     TError Save();
-    TError Restore(const kv::TNode &node);
+    TError Restore(const TKeyValue &node);
     TError Clear();
 
     const std::vector<std::string> GetContainers() const {
@@ -159,11 +158,10 @@ public:
 class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
                       public TLockable,
                       public TNonCopyable {
-    std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;
     uint64_t NextId = 1;
 public:
-    TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {}
+    TVolumeHolder() {}
     const std::vector<std::pair<std::string, std::string>> ListProperties();
     TError Create(std::shared_ptr<TVolume> &volume);
     void Remove(std::shared_ptr<TVolume> volume);
@@ -177,3 +175,5 @@ public:
     bool LayerInUse(TPath layer);
     TError RemoveLayer(const std::string &name);
 };
+
+extern TPath VolumesKV;

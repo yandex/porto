@@ -39,7 +39,7 @@ message TCfg {
 
 	message TKeyvalCfg {
 		optional TFileCfg file = 1;
-		optional string size = 2;
+		optional string size = 2 [deprecated=true];
 	}
 
 	message TDaemonCfg {
@@ -108,4 +108,6 @@ message TCfg {
 	optional TFileCfg version = 13 [deprecated=true];
 	optional TFileCfg journal_dir = 14 [deprecated=true];
 	optional uint64 journal_ttl_ms = 15 [deprecated=true];
+	optional uint64 keyvalue_limit = 16;
+	optional uint64 keyvalue_size = 17;
 }

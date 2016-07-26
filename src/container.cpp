@@ -25,7 +25,6 @@
 #include "util/unix.hpp"
 #include "client.hpp"
 #include "stream.hpp"
-#include "kv.pb.h"
 
 extern "C" {
 #include <sys/types.h>
@@ -40,6 +39,7 @@ extern "C" {
 
 std::mutex ContainersMutex;
 std::map<std::string, std::shared_ptr<TContainer>> Containers;
+TPath ContainersKV;
 
 using std::string;
 using std::vector;
@@ -48,11 +48,10 @@ using std::unique_ptr;
 using std::map;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
-                       std::shared_ptr<TKeyValueStorage> storage,
                        const std::string &name, std::shared_ptr<TContainer> parent,
                        int id) :
     Holder(holder), Name(StripParentName(name)), Parent(parent),
-    Storage(storage), Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1)
+    Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1)
 {
     Statistics->Containers++;
     PropMask = 0lu;
@@ -335,10 +334,10 @@ void TContainer::RemoveKvs() {
     if (IsRoot() || IsPortoRoot())
         return;
 
-    auto kvnode = Storage->GetNode(Id);
-    TError error = kvnode->Remove();
+    TPath path(ContainersKV / std::to_string(Id));
+    TError error = path.Unlink();
     if (error)
-        L_ERR() << "Can't remove key-value node " << kvnode->Name << ": " << error << std::endl;
+        L_ERR() << "Can't remove key-value node " << path << ": " << error << std::endl;
 }
 
 void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
@@ -1729,30 +1728,12 @@ void TContainer::RestoreStdPath(const std::string &property,
 }
 
 TError TContainer::Save(void) {
-
-    /* Ensure that we're saving context with lock acquired... */
-
-    auto kvnode = Storage->GetNode(Id);
-    kv::TNode new_node;
+    TKeyValue node(ContainersKV / std::to_string(Id));
     TError error;
 
-    /* By creating we truncate existing node */
-    kvnode->Create();
-
-    /*
-     * _id and _name are exceptional knobs.
-     * We restore Id and Name earlier than other knobs
-     * (because of proper container restore order and id sets).
-     * So let's save them manually.
-     */
-
-    auto pair = new_node.add_pairs();
-    pair->set_key(std::string(P_RAW_ID));
-    pair->set_val(std::to_string(Id));
-
-    pair = new_node.add_pairs();
-    pair->set_key(std::string(P_RAW_NAME));
-    pair->set_val(GetName());
+    /* These are not properties */
+    node.Set(P_RAW_ID, std::to_string(Id));
+    node.Set(P_RAW_NAME, GetName());
 
     TClient fakeroot(TCred(0,0));
     CurrentContainer = this;
@@ -1769,18 +1750,16 @@ TError TContainer::Save(void) {
         if (error)
             return error;
 
-        auto pair = new_node.add_pairs();
-        pair->set_key(knob.first);
-        pair->set_val(value);
+        node.Set(knob.first, value);
     }
 
     CurrentContainer = nullptr;
     CurrentClient = nullptr;
 
-    return kvnode->Append(new_node);
+    return node.Save();
 }
 
-TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
+TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
     L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
     CgroupEmptySince = 0;
@@ -1792,10 +1771,10 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     std::string container_state;
     TError error;
 
-    for (int i = 0; i < node.pairs_size(); i++) {
+    for (auto &kv: node.Data) {
 
-        std::string key = node.pairs(i).key();
-        std::string value = node.pairs(i).val();
+        std::string key = kv.first;
+        std::string value = kv.second;
         error = TError::Success();
 
         if (key == D_STATE) {

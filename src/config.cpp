@@ -34,8 +34,9 @@ void TConfig::LoadDefaults() {
     config().mutable_log()->set_verbose(false);
 
     config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
-    config().mutable_keyval()->mutable_file()->set_perm(0755);
-    config().mutable_keyval()->set_size("size=32m");
+
+    config().set_keyvalue_limit(1 << 20);
+    config().set_keyvalue_size(32 << 20);
 
     config().mutable_daemon()->set_max_clients(1000);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
@@ -65,8 +66,6 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_enable_smart(true);
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
-    config().mutable_volumes()->mutable_keyval()->mutable_file()->set_perm(0755);
-    config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
 
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");

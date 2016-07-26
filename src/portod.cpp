@@ -5,6 +5,7 @@
 
 #include "version.hpp"
 #include "statistics.hpp"
+#include "kvalue.hpp"
 #include "rpc.hpp"
 #include "holder.hpp"
 #include "cgroup.hpp"
@@ -14,6 +15,7 @@
 #include "context.hpp"
 #include "client.hpp"
 #include "epoll.hpp"
+#include "container.hpp"
 #include "volume.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
@@ -434,28 +436,25 @@ exit:
         c.second->CloseConnection();
     clients.clear();
 
-    if (discardState)
+    if (discardState) {
         context.Destroy();
+
+        error = ContainersKV.UmountAll();
+        if (error)
+            L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
+
+        error = VolumesKV.UmountAll();
+        if (error)
+            L_ERR() << "Can't destroy volume key-value storage: " << error << std::endl;
+    }
 
     return ret;
 }
 
 static void KvDump() {
     TLogger::OpenLog(true, "", 0);
-
-    auto containers = std::make_shared<TKeyValueStorage>(config().keyval().file().path());
-    TError error = containers->MountTmpfs(config().keyval().size());
-    if (error)
-        L_ERR() << "Can't mount containers key-value storage: " << error << std::endl;
-    else
-        containers->Dump();
-
-    auto volumes = std::make_shared<TKeyValueStorage>(config().volumes().keyval().file().path());
-    error = volumes->MountTmpfs(config().volumes().keyval().size());
-    if (error)
-        L_ERR() << "Can't mount volumes key-value storage: " << error << std::endl;
-    else
-        volumes->Dump();
+    TKeyValue::DumpAll(TPath(config().keyval().file().path()));
+    TKeyValue::DumpAll(TPath(config().volumes().keyval().file().path()));
 }
 
 static int TuneLimits() {
@@ -552,6 +551,20 @@ static int SlaveMain() {
 
     TNetwork::InitializeUnmanagedDevices();
     InitContainerProperties();
+
+    ContainersKV = TPath(config().keyval().file().path());
+    error = TKeyValue::Mount(ContainersKV);
+    if (error) {
+        L_ERR() << "Cannot mount containers keyvalue: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    VolumesKV = TPath(config().volumes().keyval().file().path());
+    error = TKeyValue::Mount(VolumesKV);
+    if (error) {
+        L_ERR() << "Cannot mount volumes keyvalue: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
 
     TContext context;
     try {
