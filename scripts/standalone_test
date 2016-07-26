@@ -66,7 +66,7 @@ trap stop_porto TERM INT QUIT EXIT
 kill_porto
 start_porto
 
-$PORTO_BIN/portotest || die "portotest failed"
+$PORTO_BIN/portotest $@ || die "portotest failed"
 
 for pytest in $PORTO_SRC/src/test/test-*.py; do
     PYTHONPATH=$PORTO_SRC/src/api/python python $pytest || die "$pytest failed"
