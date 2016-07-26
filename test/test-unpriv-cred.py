@@ -38,8 +38,9 @@ c.connect()
 r = c.Create("test")
 assert r.GetProperty("user") == "porto-bob"
 assert r.GetProperty("group") == "porto-bob"
+assert Catch(r.SetProperty, "group", "porto-charlie") == porto.exceptions.PermissionError
 r.SetProperty("user", "porto-charlie")
-assert r.GetProperty("group") == "porto-charlie"
+assert r.GetProperty("group") == "porto-bob"
 r.SetProperty("group", "porto-charlie")
 r.SetProperty("command", "ls")
 r.Start()
@@ -56,7 +57,11 @@ SwitchUser("porto-alice", alice_uid, alice_gid)
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
+assert r.GetProperty("user") == "porto-alice"
+assert r.GetProperty("group") == "porto-alice"
+assert Catch(r.SetProperty, "group", "porto-david") == porto.exceptions.PermissionError
 r.SetProperty("user", "porto-david")
+r.SetProperty("group", "porto-david")
 r.SetProperty("command", "ls")
 r.Start()
 assert r.Wait() == "test"
