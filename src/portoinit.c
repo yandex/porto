@@ -37,9 +37,11 @@ int main(int argc, char *argv[]) {
 
     prctl(PR_SET_NAME, "portoinit");
 
-    signal(SIGINT, forward);
-    signal(SIGQUIT, forward);
-    signal(SIGTERM, forward);
+    if (target >= 0) {
+        signal(SIGINT, forward);
+        signal(SIGQUIT, forward);
+        signal(SIGTERM, forward);
+    }
 
     while (1) {
         int status;

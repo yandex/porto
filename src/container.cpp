@@ -1179,7 +1179,7 @@ TError TContainer::KillAll(TScopedLock &holder_lock, uint64_t timeout_ms) {
     }
 
     // try to stop all tasks gracefully
-    if (timeout_ms) {
+    if (timeout_ms && State != EContainerState::Meta) {
         if (!SendSignal(SIGTERM)) {
             TScopedUnlock unlock(holder_lock);
             int ret;
