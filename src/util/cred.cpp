@@ -26,8 +26,14 @@ static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
 TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
     struct passwd pwd, *ptr;
     char buf[PwdBufSize];
+    int id, err;
 
-    if (getpwnam_r(user.c_str(), &pwd, buf, PwdBufSize, &ptr) || !ptr)
+    if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0)
+        err = getpwuid_r(id, &pwd, buf, PwdBufSize, &ptr);
+    else
+        err = getpwnam_r(user.c_str(), &pwd, buf, PwdBufSize, &ptr);
+
+    if (err || !ptr)
         return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
 
     uid = pwd.pw_uid;
