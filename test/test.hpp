@@ -82,6 +82,7 @@ namespace test {
         FSIO,
         CFS_BANDWIDTH,
         CFS_GROUPSCHED,
+        CFS_RESERVE,
         IPVLAN,
         MAX_RSS,
         CFQ,

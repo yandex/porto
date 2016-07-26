@@ -651,6 +651,8 @@ bool KernelSupports(const KernelFeature &feature) {
 }
 
 void InitKernelFeatures() {
+    kernel_features[static_cast<int>(KernelFeature::CFS_RESERVE)] =
+        HaveCgKnob("cpu", "cpu.cfs_reserve_us");
     kernel_features[static_cast<int>(KernelFeature::CFS_BANDWIDTH)] =
         HaveCgKnob("cpu", "cpu.cfs_period_us");
     kernel_features[static_cast<int>(KernelFeature::CFS_GROUPSCHED)] =
@@ -670,6 +672,8 @@ void InitKernelFeatures() {
     std::cout << "Kernel features:" << std::endl;
     std::cout << std::left << std::setw(30) << "  SMART" <<
         (KernelSupports(KernelFeature::SMART) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  CFS_RESERVE" <<
+        (KernelSupports(KernelFeature::CFS_RESERVE) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  CFS_BANDWIDTH" <<
         (KernelSupports(KernelFeature::CFS_BANDWIDTH) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  CFS_GROUPSCHED" <<

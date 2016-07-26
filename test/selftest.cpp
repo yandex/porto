@@ -3110,6 +3110,8 @@ static void TestRoot(Porto::Connection &api) {
     Say() << "Check cpu_limit/cpu_guarantee" << std::endl;
     if (KernelSupports(KernelFeature::CFS_BANDWIDTH))
         ExpectEq(GetCgKnob("cpu", "", "cpu.cfs_quota_us"), "-1");
+    if (KernelSupports(KernelFeature::CFS_RESERVE))
+        ExpectEq(GetCgKnob("cpu", "", "cpu.cfs_reserve_us"), "0");
     if (KernelSupports(KernelFeature::CFS_GROUPSCHED))
         ExpectEq(GetCgKnob("cpu", "", "cpu.shares"), "1024");
     if (KernelSupports(KernelFeature::CFQ))
@@ -3380,7 +3382,8 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1.5c"));
     }
 
-    if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
+    if (KernelSupports(KernelFeature::CFS_GROUPSCHED) ||
+            KernelSupports(KernelFeature::CFS_RESERVE)) {
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "test"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
@@ -3449,7 +3452,9 @@ static void TestLimits(Porto::Connection &api) {
         TestCoresConvertion(api, name, "cpu_limit");
     }
 
-    if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
+    if (KernelSupports(KernelFeature::CFS_RESERVE)) {
+
+    } else if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
         Say() << "Check cpu_guarantee" << std::endl;
         uint64_t rootShares, shares;
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.shares"), rootShares));
