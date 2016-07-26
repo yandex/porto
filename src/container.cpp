@@ -922,15 +922,12 @@ TError TContainer::Create(const TCred &cred) {
 
     CgroupEmptySince = 0;
 
-    OwnerCred = TCred(cred.Uid, cred.Gid);
+    OwnerCred = cred;
+    TError error = OwnerCred.LoadGroups(OwnerCred.User());
+    if (error)
+        return error;
     PropMask |= USER_SET | GROUP_SET;
     SanitizeCapabilities();
-
-    TError error = FindGroups(UserName(OwnerCred.Uid), OwnerCred.Gid, OwnerCred.Groups);
-    if (error) {
-        L_ERR() << "Can't set container owner: " << error << std::endl;
-        return error;
-    }
 
     SetState(EContainerState::Stopped);
     PropMask |= STATE_SET;

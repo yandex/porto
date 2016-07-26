@@ -641,89 +641,78 @@ TError TIoPolicy::Propagate(const std::string &policy) {
 
 class TUser : public TProperty {
 public:
-    TError Set(const std::string &username);
-    TError Get(std::string &value);
     TUser() : TProperty(P_USER, USER_SET, "Start command with given user") {}
+
+    TError Get(std::string &value) {
+        value = UserName(CurrentContainer->OwnerCred.Uid);
+        return TError::Success();
+    }
+
+    TError Set(const std::string &username) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+
+        TCred newCred;
+        gid_t oldGid = CurrentContainer->OwnerCred.Gid;
+        error = newCred.Load(username);
+        if (error) {
+            /* root user can set any numeric id */
+            if (CurrentClient->Cred.IsRootUser()) {
+                newCred.Gid = oldGid;
+                error = UserId(username, newCred.Uid);
+            }
+            if (error)
+                return error;
+        }
+
+        /* try to preserve current group if possible */
+        if (newCred.IsMemberOf(oldGid) ||
+                CurrentClient->Cred.IsMemberOf(oldGid) ||
+                CurrentClient->Cred.IsRootUser())
+            newCred.Gid = oldGid;
+
+        if (!CurrentClient->Cred.CanControl(newCred))
+            return TError(EError::Permission,
+                    "Client is not allowed to set user : " + username);
+
+        CurrentContainer->OwnerCred = newCred;
+        CurrentContainer->PropMask |= USER_SET;
+        CurrentContainer->SanitizeCapabilities();
+        return TError::Success();
+    }
 } static User;
-
-TError TUser::Set(const std::string &username) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    uid_t new_uid;
-    error = UserId(username, new_uid);
-    if (error)
-        return error;
-
-    TCred &owner = CurrentContainer->OwnerCred;
-    TCred new_user(new_uid, owner.Gid);
-    error = FindGroups(username, new_user.Gid, new_user.Groups);
-    if (error)
-        return error;
-
-    TCred &cur_user = CurrentClient->Cred;
-
-    if (!cur_user.CanControl(new_user))
-        return TError(EError::Permission,
-                      "Client is not allowed to set user : " + username);
-
-    owner.Uid = new_user.Uid;
-    owner.Groups.clear();
-    owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
-                        new_user.Groups.end());
-    CurrentContainer->PropMask |= USER_SET;
-    CurrentContainer->SanitizeCapabilities();
-    return TError::Success();
-}
-
-TError TUser::Get(std::string &value) {
-    value = UserName(CurrentContainer->OwnerCred.Uid);
-
-    return TError::Success();
-}
 
 class TGroup : public TProperty {
 public:
-    TError Set(const std::string &groupname);
-    TError Get(std::string &value);
     TGroup() : TProperty(P_GROUP, GROUP_SET, "Start command with given group") {}
+
+    TError Get(std::string &value) {
+        value = GroupName(CurrentContainer->OwnerCred.Gid);
+        return TError::Success();
+    }
+
+    TError Set(const std::string &groupname) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+
+        gid_t newGid;
+        error = GroupId(groupname, newGid);
+        if (error)
+            return error;
+
+        if (!CurrentContainer->OwnerCred.IsMemberOf(newGid) &&
+                !CurrentClient->Cred.IsMemberOf(newGid) &&
+                !CurrentClient->Cred.IsRootUser())
+            return TError(EError::Permission, "Desired group : " + groupname +
+                    " isn't in current user supplementary group list");
+
+        CurrentContainer->OwnerCred.Gid = newGid;
+        CurrentContainer->PropMask |= GROUP_SET;
+        return TError::Success();
+    }
 } static Group;
-
-TError TGroup::Set(const std::string &groupname) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    gid_t new_gid;
-    error = GroupId(groupname, new_gid);
-    if (error)
-        return error;
-
-    if (CurrentClient->Cred.IsRootUser()) {
-        CurrentContainer->OwnerCred.Gid = new_gid;
-        CurrentContainer->PropMask |= GROUP_SET;
-
-        return TError::Success();
-    }
-
-    if (CurrentContainer->OwnerCred.IsMemberOf(new_gid)) {
-        CurrentContainer->OwnerCred.Gid = new_gid;
-        CurrentContainer->PropMask |= GROUP_SET;
-
-        return TError::Success();
-    }
-
-    return TError(EError::Permission, "Desired group : " + groupname +
-                  " isn't in current user supplementary group list");
-}
-    TError SetValue(const std::string &value);
-
-TError TGroup::Get(std::string &value) {
-    value = GroupName(CurrentContainer->OwnerCred.Gid);
-
-    return TError::Success();
-}
 
 class TMemoryGuarantee : public TProperty {
 public:
