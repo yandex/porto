@@ -90,6 +90,8 @@ message TContainerStartRequest {
 
 message TContainerStopRequest {
 	required string name = 1;
+	// Timeout between SIGTERM and SIGKILL, default 30s
+	optional uint32 timeout_ms = 2;
 }
 
 message TContainerPauseRequest {

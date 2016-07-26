@@ -181,10 +181,14 @@ class _RPC(object):
         request.start.name = name
         self.call(request, self.timeout)
 
-    def Stop(self, name):
+    def Stop(self, name, timeout_s=None):
         request = rpc_pb2.TContainerRequest()
         request.stop.name = name
-        self.call(request, self.timeout)
+        if timeout_s is not None and timeout_s >= 0:
+            request.stop.timeout_ms = timeout_s * 1000
+        else:
+            timeout_s = 30
+        self.call(request, max(self.timeout, timeout_s + 1))
 
     def Kill(self, name, sig):
         request = rpc_pb2.TContainerRequest()
@@ -373,8 +377,8 @@ class Container(object):
     def Start(self):
         self.rpc.Start(self.name)
 
-    def Stop(self):
-        self.rpc.Stop(self.name)
+    def Stop(self, timeout=None):
+        self.rpc.Stop(self.name, timeout)
 
     def Kill(self, sig):
         self.rpc.Kill(self.name, sig)
@@ -509,8 +513,8 @@ class Connection(object):
     def Start(self, name):
         self.rpc.Start(name)
 
-    def Stop(self, name):
-        self.rpc.Stop(name)
+    def Stop(self, name, timeout=None):
+        self.rpc.Stop(name, timeout)
 
     def Kill(self, name, sig):
         self.rpc.Kill(name, sig)

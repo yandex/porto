@@ -344,8 +344,12 @@ int Connection::Start(const std::string &name) {
     return Impl->Rpc();
 }
 
-int Connection::Stop(const std::string &name) {
-    Impl->Req.mutable_stop()->set_name(name);
+int Connection::Stop(const std::string &name, int timeout) {
+    auto stop = Impl->Req.mutable_stop();
+
+    stop->set_name(name);
+    if (timeout >= 0)
+        stop->set_timeout_ms(timeout * 1000);
 
     return Impl->Rpc();
 }

@@ -1165,7 +1165,7 @@ TError TContainer::SendTreeSignal(TScopedLock &holder_lock, int signal) {
     return SendSignal(SIGKILL);
 }
 
-TError TContainer::KillAll(TScopedLock &holder_lock) {
+TError TContainer::KillAll(TScopedLock &holder_lock, uint64_t timeout_ms) {
     auto cg = GetCgroup(FreezerSubsystem);
 
     L_ACT() << "Kill all " << GetName() << std::endl;
@@ -1179,12 +1179,15 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     }
 
     // try to stop all tasks gracefully
-    if (!SendSignal(SIGTERM)) {
-        TScopedUnlock unlock(holder_lock);
-        int ret;
-        if (!SleepWhile([&]{ return cg.IsEmpty() == false; }, ret,
-                        config().container().kill_timeout_ms()) || ret)
-            L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+    if (timeout_ms) {
+        if (!SendSignal(SIGTERM)) {
+            TScopedUnlock unlock(holder_lock);
+            int ret;
+            if (!SleepWhile([&]{ return cg.IsEmpty() == false; }, ret,
+                        timeout_ms) || ret)
+
+                L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+        }
     }
 
     TError error = Freeze(holder_lock);
@@ -1423,7 +1426,7 @@ bool TContainer::IsAcquired() const {
     return (Acquired || (Parent && Parent->IsAcquired()));
 }
 
-TError TContainer::Stop(TScopedLock &holder_lock) {
+TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout_ms) {
     auto state = GetState();
 
     if (state == EContainerState::Stopped ||
@@ -1435,24 +1438,29 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
     ShutdownOom();
 
     if (Task && Task->IsRunning()) {
-        TError error = KillAll(holder_lock);
+        TError error = KillAll(holder_lock, timeout_ms);
         if (error) {
             L_ERR() << "Can't kill all tasks in container: " << error << std::endl;
             return error;
         }
 
         auto cg = GetCgroup(FreezerSubsystem);
+        uint64_t kill_timeout = config().container().kill_timeout_ms();
 
         TScopedUnlock unlock(holder_lock);
         int ret;
         if (!SleepWhile([&] () -> int {
                     if (!cg.Exists() || cg.IsEmpty())
                         return 0;
+
                     kill(Task->GetPid(), 0);
+
                     return errno != ESRCH;
-                }, ret, config().container().stop_timeout_ms()) || ret) {
+                }, ret, kill_timeout) || ret) {
+
             L_ERR() << "Can't wait for container to stop" << std::endl;
-            return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");
+            return TError(EError::Unknown, "Container didn't stop in " +
+                          std::to_string(kill_timeout + timeout_ms) + "ms");
         }
 
         Task->Exit(-1);
@@ -2071,13 +2079,13 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
         OomKilled = true;
         PropMask |= OOM_KILLED_SET;
 
-        error = KillAll(holder_lock);
+        error = KillAll(holder_lock, config().container().kill_timeout_ms());
         if (error)
             L_WRN() << "Can't kill all tasks in container: " << error << std::endl;
     }
 
     if (!Isolate) {
-        TError error = KillAll(holder_lock);
+        TError error = KillAll(holder_lock, config().container().kill_timeout_ms());
         if (error)
             L_WRN() << "Can't kill all tasks in non-isolated container: " << error << std::endl;
     }
@@ -2157,7 +2165,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't respawn busy container");
 
-    TError error = StopTree(holder_lock);
+    TError error = StopTree(holder_lock, config().container().kill_timeout_ms());
     if (error)
         return error;
 
@@ -2347,12 +2355,15 @@ bool TContainerWaiter::MatchWildcard(const std::string &name) {
     return false;
 }
 
-TError TContainer::StopTree(TScopedLock &holder_lock) {
+TError TContainer::StopTree(TScopedLock &holder_lock, uint64_t timeout_ms) {
     if (IsFrozen()) {
         TError error = Resume(holder_lock);
         if (error)
             return error;
     }
+
+    uint64_t current_ms = GetCurrentTimeMs();
+    uint64_t limit_ms = current_ms + timeout_ms;
 
     TError error = ApplyForTreePostorder(holder_lock, [&] (TScopedLock &holder_lock,
                                                            TContainer &child) {
@@ -2362,15 +2373,18 @@ TError TContainer::StopTree(TScopedLock &holder_lock) {
                 return error;
         }
 
+        current_ms = GetCurrentTimeMs();
         if (child.GetState() != EContainerState::Stopped)
-            return child.Stop(holder_lock);
+            return child.Stop(holder_lock, limit_ms > current_ms ? limit_ms - current_ms : 0);
+
         return TError::Success();
     });
 
     if (error)
         return error;
 
-    error = Stop(holder_lock);
+    current_ms = GetCurrentTimeMs();
+    error = Stop(holder_lock, limit_ms > current_ms ? limit_ms - current_ms : 0);
     if (error)
         return error;
 

@@ -87,7 +87,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError ConfigureNetwork(struct TNetCfg &NetCfg);
     TError PrepareTask(std::shared_ptr<TClient> client, struct TNetCfg *NetCfg);
-    TError KillAll(TScopedLock &holder_lock);
+    TError KillAll(TScopedLock &holder_lock, uint64_t timeout_ms);
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
@@ -234,8 +234,8 @@ public:
     void Destroy(TScopedLock &holder_lock);
     void DestroyWeak();
     TError Start(std::shared_ptr<TClient> client, bool meta);
-    TError Stop(TScopedLock &holder_lock);
-    TError StopTree(TScopedLock &holder_lock);
+    TError Stop(TScopedLock &holder_lock, uint64_t timeout_ms);
+    TError StopTree(TScopedLock &holder_lock, uint64_t timeout_ms);
     TError CheckPausedParent();
     TError CheckAcquiredChild(TScopedLock &holder_lock);
     TError Pause(TScopedLock &holder_lock);

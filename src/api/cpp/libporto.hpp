@@ -48,7 +48,7 @@ public:
     int Destroy(const std::string &name);
 
     int Start(const std::string &name);
-    int Stop(const std::string &name);
+    int Stop(const std::string &name, int timeout = -1);
     int Kill(const std::string &name, int sig);
     int Pause(const std::string &name);
     int Resume(const std::string &name);

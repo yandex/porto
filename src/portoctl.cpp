@@ -822,11 +822,18 @@ public:
 
 class TStopCmd final : public ICmd {
 public:
-    TStopCmd(Porto::Connection *api) : ICmd(api, "stop", 1, "<container1> [container2...]", "stop container") {}
+    TStopCmd(Porto::Connection *api) : ICmd(api, "stop", 1, "[-T <seconds>] <container1> [container2...]", "stop container",
+             "    -T <seconds> per-container stop timeout\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
-        for (const auto &arg : env->GetArgs()) {
-            int ret = Api->Stop(arg);
+        int timeout = -1;
+
+        const auto &containers = env->GetOpts({
+            { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
+        });
+
+        for (const auto &arg : containers) {
+            int ret = Api->Stop(arg, timeout);
             if (ret) {
                 PrintError("Can't stop container");
                 return ret;

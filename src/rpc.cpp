@@ -473,7 +473,10 @@ noinline TError StopContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't stop busy container");
 
-    return container->StopTree(holder_lock);
+    uint64_t timeout_ms = req.has_timeout_ms() ?
+        req.timeout_ms() : config().container().stop_timeout_ms();
+
+    return container->StopTree(holder_lock, timeout_ms);
 }
 
 noinline TError PauseContainer(TContext &context,

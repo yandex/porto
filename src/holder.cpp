@@ -271,7 +271,7 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TCont
                 return error;
         }
 
-        error = c->StopTree(holder_lock);
+        error = c->StopTree(holder_lock, config().container().kill_timeout_ms());
         if (error)
             return error;
     }
