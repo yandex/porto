@@ -1,19 +1,13 @@
-#!/bin/bash
+#!/bin/sh -x
 
-SUDO=sudo
+for g in porto porto-containers ; do
+	getent $g || groupadd $g
+done
 
-$SUDO useradd porto-alice || true
-$SUDO usermod -G porto porto-alice || true
-$SUDO useradd porto-bob || true
-$SUDO usermod -G porto porto-bob || true
-$SUDO useradd porto-charlie || true
-$SUDO usermod -G porto porto-charlie || true
-$SUDO useradd porto-david || true
-$SUDO groupadd porto-containers || true
-$SUDO usermod -aG porto-containers porto-alice || true
-$SUDO groupadd porto-bob-containers || true
-$SUDO usermod -aG porto-bob-containers porto-charlie || true
-$SUDO usermod -aG porto-bob-containers porto-david || true
-$SUDO groupadd porto-alice-group || true
-$SUDO usermod -aG porto-alice-group porto-alice || true
-#Assuming that porto is already running
+for u in porto-alice porto-bob; do
+	id $u || useradd $u -G porto
+	getent group ${u}-containers || groupadd ${u}-containers
+done
+
+id porto-charlie || useradd porto-charlie -G porto-containers
+id porto-david || useradd porto-david -G porto-alice-containers

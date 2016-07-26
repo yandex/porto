@@ -1,10 +1,11 @@
-#!/bin/bash
+#!/bin/sh -x
 
-SUDO=sudo
+for u in porto-alice porto-bob porto-charlie porto-david ; do
+	id $u && userdel $u
+	getent group ${u}-containers && groupdel ${u}-containers
+done
 
-$SUDO groupdel porto-bob-containers || true
-$SUDO groupdel porto-alice-group || true
-$SUDO userdel porto-alice || true
-$SUDO userdel porto-bob || true
-$SUDO userdel porto-charlie || true
-$SUDO userdel porto-david || true
+# for g in porto porto-containers ; do
+#	getent group $g && groupdel $g
+# done
+
