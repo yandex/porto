@@ -30,25 +30,29 @@ david_uid=pwd.getpwnam("porto-david").pw_uid
 david_gid=grp.getgrnam("porto-david").gr_gid
 porto_gid=grp.getgrnam("porto").gr_gid
 
-Case="Case 1: charlie sets alice and alice-group from porto-containers"
+Case="Case 1: bob sets charlie from porto-containers"
 
-SwitchUser("porto-charlie", charlie_uid, charlie_gid)
+SwitchUser("porto-bob", bob_uid, bob_gid)
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
-r.SetProperty("user", "porto-alice")
-r.SetProperty("group", "porto-alice-group")
+assert r.GetProperty("user") == "porto-bob"
+assert r.GetProperty("group") == "porto-bob"
+r.SetProperty("user", "porto-charlie")
+assert r.GetProperty("group") == "porto-charlie"
+r.SetProperty("group", "porto-charlie")
 r.SetProperty("command", "ls")
 r.Start()
 assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-alice"
+assert r.GetProperty("user") == "porto-charlie"
+assert r.GetProperty("group") == "porto-charlie"
 print "%s OK!" %(Case)
 r.Destroy()
 SwitchRoot()
 
-Case="Case 2: bob sets david from bob-containers"
+Case="Case 2: alice sets david from alice-containers"
 
-SwitchUser("porto-bob", bob_uid, bob_gid)
+SwitchUser("porto-alice", alice_uid, alice_gid)
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
@@ -57,6 +61,7 @@ r.SetProperty("command", "ls")
 r.Start()
 assert r.Wait() == "test"
 assert r.GetProperty("user") == "porto-david"
+assert r.GetProperty("group") == "porto-david"
 print "%s OK!" %(Case)
 r.Destroy()
 SwitchRoot()
@@ -71,13 +76,14 @@ r.SetProperty("command", "ls")
 r.Start()
 assert r.Wait() == "test"
 assert r.GetProperty("user") == "porto-bob"
+assert r.GetProperty("group") == "porto-bob"
 print "%s OK!" %(Case)
 r.Destroy()
 SwitchRoot()
 
-Case="Case 4: charlie sets bob (not in *-containers), catching exception"
+Case="Case 4: alice sets bob (not in *-containers), catching exception"
 
-SwitchUser("porto-charlie", charlie_uid, charlie_gid)
+SwitchUser("porto-alice", alice_uid, alice_gid)
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
@@ -94,7 +100,7 @@ c = porto.Connection()
 c.connect()
 r = c.Create("test")
 r.SetProperty("user", "porto-charlie")
-assert Catch(r.SetProperty, "group", "porto-alice-group") == porto.exceptions.PermissionError
+assert Catch(r.SetProperty, "group", "porto-alice") == porto.exceptions.PermissionError
 print "%s OK!" %(Case)
 r.Destroy()
 SwitchRoot()
@@ -104,24 +110,22 @@ c = porto.Connection()
 c.connect()
 r = c.Create("test")
 r.SetProperty("user", "porto-bob")
-r.SetProperty("group", "porto-alice-group")
+r.SetProperty("group", "porto-alice")
 r.SetProperty("command", "ls")
 r.Start()
 assert r.Wait() == "test"
 assert r.GetProperty("user") == "porto-bob"
-assert r.GetProperty("group") == "porto-alice-group"
+assert r.GetProperty("group") == "porto-alice"
 print "%s OK!" %(Case)
 r.Destroy()
 
-Case="Case 7: alice starts container created by bob with uid of david (david not in porto, porto-containers and porto-alice-containers), catching exception"
+Case="Case 7: alice starts container created by bob (bob not in porto-containers and porto-alice-containers), catching exception"
 
 SwitchUser("porto-bob", bob_uid, bob_gid)
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
 r.SetProperty("command", "ls")
-r.SetProperty("user", "porto-david")
-r.SetProperty("group", "porto-bob-containers")
 SwitchRoot()
 SwitchUser("porto-alice", alice_uid, alice_gid)
 c = porto.Connection()
@@ -135,8 +139,8 @@ c.connect()
 r = c.Find("test")
 r.Start()
 assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-david"
-assert r.GetProperty("group") == "porto-bob-containers"
+assert r.GetProperty("user") == "porto-bob"
+assert r.GetProperty("group") == "porto-bob"
 r.Destroy()
 print "%s OK!" %(Case)
 SwitchRoot()
