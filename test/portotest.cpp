@@ -3,12 +3,12 @@
 
 #include "config.hpp"
 #include "version.hpp"
-#include "util/signal.hpp"
-#include "util/unix.hpp"
-#include "util/string.hpp"
-#include "util/log.hpp"
-#include "test/test.hpp"
-#include "util/netlink.hpp"
+#include "signal.hpp"
+#include "unix.hpp"
+#include "string.hpp"
+#include "log.hpp"
+#include "test.hpp"
+#include "netlink.hpp"
 
 using std::string;
 

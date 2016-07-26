@@ -26,5 +26,9 @@ if(EXISTS "/usr/bin/g++-4.7")
 	set(CMAKE_CXX_COMPILER "g++-4.7")
 endif()
 
+enable_testing()
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_subdirectory(src)
+add_subdirectory(test)

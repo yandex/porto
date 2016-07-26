@@ -1,3 +1,5 @@
+project(porto)
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/api/cpp)
 
@@ -85,25 +87,18 @@ link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
 
 add_executable(portod portod.cpp version.c cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp env.cpp device.cpp network.cpp kvalue.cpp config.cpp property.cpp context.cpp volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
-target_link_libraries(portod porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
+target_link_libraries(portod libporto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 
 add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp version.c cli.cpp config.cpp portotop.cpp)
-target_link_libraries(portoctl porto protobufs util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
+target_link_libraries(portoctl libporto protobufs util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
 
 add_executable(portoinit portoinit.c version.c)
 if(NOT ENABLE_ASAN)
 	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 endif()
 
-add_executable(portotest portotest.cpp version.c config.cpp protobuf.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp)
-target_link_libraries(portotest porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
-
 install(
-	TARGETS portod portoctl portoinit portotest
+	TARGETS portod portoctl portoinit
 	RUNTIME DESTINATION sbin
 	LIBRARY DESTINATION lib
 )
-
-add_custom_target(test COMMAND ${CMAKE_SOURCE_DIR}/scripts/standalone_test
-		  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-		  DEPENDS portod portotest portoinit)
