@@ -546,15 +546,24 @@ void TestDaemon(Porto::Connection &api) {
     if (WordCount("/etc/nsswitch.conf", "sss"))
         sssFd = 3;
 
-    int nl = NetworkEnabled() ? 1 : 0;
-
-    //nl++; // event netlink
-
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 5(epoll) 6(netlink socket) 128(event pipe) 129(ack pipe)
+    /**
+     * .
+     * ..
+     * 0 (stdin)
+     * 1 (stdout)
+     * 128 (event pipe)
+     * 129 (ack pipe)
+     * 130 (rpc socket)
+     * 2 (stderr)
+     * 3 (portod.log)
+     * 4 (epoll)
+     * 5 (host netlink)
+     * 6 (signalfd)
+     */
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    ExpectLessEq(nr, 2 + 8 + nl + sssFd);
-    ExpectLessEq(2 + 8 + nl, nr);
+    ExpectLessEq(nr, 12 + sssFd);
+    ExpectLessEq(12, nr);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());
@@ -563,11 +572,23 @@ void TestDaemon(Porto::Connection &api) {
     Say() << "Make sure portod-master doesn't have invalid FDs" << std::endl;
     Say() << "Number of portod-master fds=" << nr << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
-
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(epoll) 5(event pipe) 6(ack pipe)
+    /**
+     * .
+     * ..
+     * 0 (stdin)
+     * 1 (stdout)
+     * 130 (rpc socket)
+     * 2 (stderr)
+     * 3 (portoloop.log)
+     * 4 (epoll)
+     * 6 (event pipe)
+     * 7 (ack pipe)
+     * 9 (signalfd)
+     */
     nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    ExpectLessEq(nr, 2 + 7 + sssFd);
+    ExpectLessEq(nr, 11 + sssFd);
+    ExpectLessEq(11, nr);
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
