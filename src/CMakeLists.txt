@@ -61,8 +61,8 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 add_custom_command(
 	OUTPUT version.c
 	DEPENDS ${CMAKE_SOURCE_DIR}/debian/changelog
-		${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN
-	COMMAND ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN > ${CMAKE_CURRENT_BINARY_DIR}/version.c
+		${CMAKE_SOURCE_DIR}/scripts/version
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/version > ${CMAKE_CURRENT_BINARY_DIR}/version.c
 	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 	VERBATIM)
 add_library(version STATIC version.c)
