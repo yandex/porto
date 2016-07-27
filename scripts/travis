@@ -1,4 +1,0 @@
-#!/bin/sh
-set -ex
-cmake -D USE_SYSTEM_LIBNL=OFF .
-make

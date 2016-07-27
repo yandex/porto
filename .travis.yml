@@ -2,7 +2,10 @@ os: linux
 
 language: cpp
 
-script: ./script/travis
+script:
+  - ls -l
+  - cmake -D USE_SYSTEM_LIBNL=OFF .
+  - make
 
 compiler: gcc
 
