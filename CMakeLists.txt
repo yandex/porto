@@ -32,3 +32,13 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_subdirectory(src)
 add_subdirectory(test)
+
+if(ENABLE_PYTHON)
+	add_subdirectory(src/api/python)
+endif()
+
+set_source_files_properties(tags PROPERTIES GENERATED true)
+add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+set_source_files_properties(TAGS PROPERTIES GENERATED true)
+add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

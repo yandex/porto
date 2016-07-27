@@ -1,8 +1,5 @@
 project(porto)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/api/cpp)
-
 if(USE_SYSTEM_LIBNL)
 	find_library(LIBNL NAMES libnl-3.a libnl-3 nl-3)
 	find_library(LIBNL_ROUTE NAMES libnl-route-3.a libnl-route-3 nl-route-3)
@@ -37,62 +34,61 @@ else()
 	SET(LIBNL_ROUTE ${INSTALL_DIR}/lib/libnl-route-3.a)
 endif()
 
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
+
 find_library(PB NAMES libprotobuf.a)
 find_package(Protobuf REQUIRED)
 # FindProtobuf requires only the libraries to be present
 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
 	message(FATAL_ERROR "Couldn't find protoc executable.")
 endif()
-include_directories(${PROTOBUF_INCLUDE_DIRS})
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+PROTOBUF_GENERATE_CPP(RPC_PROTO_SRCS RPC_PROTO_HDRS rpc.proto)
+add_library(rpc_proto STATIC ${RPC_PROTO_SRCS})
+
+PROTOBUF_GENERATE_CPP(KV_PROTO_SRCS KV_PROTO_HDRS kv.proto)
+add_library(kv_proto STATIC ${KV_PROTO_SRCS})
+
+PROTOBUF_GENERATE_CPP(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS config.proto)
+add_library(config STATIC ${CONFIG_PROTO_SRCS} config.cpp)
+add_dependencies(config rpc_proto) # rpc.pp.h -> error.hpp -> config.hpp
+
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
 
-find_package(Curses REQUIRED)
-include_directories(${CURSES_INCLUDE_DIR})
+include_directories(${PROTOBUF_INCLUDE_DIRS})
 
-set(PYTHON_SOURCES "")
-if(ENABLE_PYTHON)
-	add_custom_command(
-		OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/rpc_pb2.py
-		COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
-		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
-		VERBATIM)
-	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
-	include(FindPythonInterp)
-	install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/api/python
-			COMMAND ${PYTHON_EXECUTABLE} setup.py install
-			--root=\$ENV{DESTDIR}
-			--prefix=\${CMAKE_INSTALL_PREFIX})")
-endif()
+add_custom_command(
+	OUTPUT version.c
+	DEPENDS ${CMAKE_SOURCE_DIR}/debian/changelog
+		${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN
+	COMMAND ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN > ${CMAKE_CURRENT_BINARY_DIR}/version.c
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	VERBATIM)
+add_library(version STATIC version.c)
 
-
-add_custom_target(version ALL
-		   COMMAND ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN
-			   ${CMAKE_SOURCE_DIR}/debian/changelog
-			   ${CMAKE_CURRENT_BINARY_DIR}/version.c VERBATIM)
-add_custom_command(OUTPUT version.c DEPENDS version)
-
-set_source_files_properties(tags PROPERTIES GENERATED true)
-add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_source_files_properties(TAGS PROPERTIES GENERATED true)
-add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-
-add_library(protobufs STATIC ${PROTO_SRCS})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_subdirectory(api/cpp)
 add_subdirectory(util)
 
-link_directories(${yandex-porto_BINARY_DIR})
-include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
+include_directories(${libporto_SOURCE_DIR})
 
-add_executable(portod portod.cpp version.c cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp env.cpp device.cpp network.cpp kvalue.cpp config.cpp property.cpp context.cpp volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
-target_link_libraries(portod libporto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
+add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp
+		      event.cpp task.cpp env.cpp device.cpp network.cpp
+		      kvalue.cpp config.cpp property.cpp context.cpp
+		      volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
+target_link_libraries(portod version porto util config
+			     rpc_proto kv_proto
+			     pthread rt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
-add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp version.c cli.cpp config.cpp portotop.cpp)
-target_link_libraries(portoctl libporto protobufs util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
+add_executable(portoctl portoctl.cpp cli.cpp portotop.cpp)
+target_link_libraries(portoctl version porto util
+			       rt ${PB} ${CURSES_LIBRARIES})
 
-add_executable(portoinit portoinit.c version.c)
+add_executable(portoinit portoinit.c)
+target_link_libraries(portoinit version)
 if(NOT ENABLE_ASAN)
 	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 endif()
