@@ -22,6 +22,14 @@ Porto into your existing infrastructure.
 
 # BUILDING #
 
+Install required dependecies
+
+```
+$ aptitude install  libncurses5-dev libprotobuf-dev protobuf-compiler libnl-3-dev  libnl-route-3-dev 
+```
+
+Build and install
+
 ```
 $ cmake .
 $ make
