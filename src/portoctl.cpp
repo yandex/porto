@@ -104,9 +104,10 @@ public:
 
     TError SetProperty(const std::string &key, const std::string &val) {
 
-        if (key == "virt_mode") {
+        if (key == "virt_mode")
             StartOS = val == "os";
-        } else if (key == "env") {
+
+        if (key == "env") {
             Environment.push_back(val);
         } else if (key == "space_limit") {
             SpaceLimit = val;
