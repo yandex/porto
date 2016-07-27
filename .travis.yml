@@ -2,7 +2,7 @@ os: linux
 
 language: cpp
 
-script: ./travis/run-build.sh
+script: ./script/travis
 
 compiler: gcc
 
