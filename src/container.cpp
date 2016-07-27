@@ -428,6 +428,23 @@ std::shared_ptr<const TContainer> TContainer::GetIsolationDomain() const {
     return domain;
 }
 
+pid_t TContainer::GetPidFor(pid_t pid) const {
+    if (!Task)
+        return 0;
+    if (InPidNamespace(pid, getpid()))
+        return Task->Pid;
+    if (Task->WPid != Task->Pid && InPidNamespace(pid, Task->WPid))
+        return Task->VPid;
+    if (InPidNamespace(pid, Task->Pid)) {
+        if (!Isolate)
+            return Task->VPid;
+        if (VirtMode == VIRT_MODE_OS)
+            return 1;
+        return 2;
+    }
+    return 0;
+}
+
 TError TContainer::OpenNetns(TNamespaceFd &netns) const {
     if (Task)
         return netns.Open(Task->GetPid(), "ns/net");

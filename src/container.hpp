@@ -225,6 +225,7 @@ public:
     std::shared_ptr<const TContainer> GetIsolationDomain() const;
     TError OpenNetns(TNamespaceFd &netns) const;
 
+    pid_t GetPidFor(pid_t pid) const;
     std::vector<pid_t> Processes();
 
     TError SendSignal(int signal);

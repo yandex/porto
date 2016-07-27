@@ -74,8 +74,6 @@ class TTask: public TNonCopyable {
     enum ETaskState { Stopped, Started } State;
     int ExitStatus;
 
-    pid_t Pid, VPid, WPid;
-
     void ReportPid(pid_t pid) const;
 
     TError ChildApplyCapabilities();
@@ -88,6 +86,8 @@ class TTask: public TNonCopyable {
     TError ChildIsolateFs();
 
 public:
+    pid_t Pid, VPid, WPid;
+
     TTask(std::unique_ptr<TTaskEnv> &env);
     TTask(pid_t pid);
     ~TTask();
@@ -95,7 +95,6 @@ public:
     TError Start();
     pid_t GetPid() const;
     pid_t GetWPid() const;
-    pid_t GetPidFor(pid_t pid) const;
     std::vector<int> GetPids() const;
     bool IsRunning() const;
     int GetExitStatus() const;

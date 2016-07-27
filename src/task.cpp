@@ -965,16 +965,6 @@ std::vector<int> TTask::GetPids() const {
     return {Pid, VPid, WPid};
 }
 
-pid_t TTask::GetPidFor(pid_t pid) const {
-    if (InPidNamespace(pid, getpid()))
-        return Pid;
-    if (WPid != Pid && InPidNamespace(pid, WPid))
-        return VPid;
-    if (InPidNamespace(pid, Pid))
-        return 1;
-    return 0;
-}
-
 bool TTask::IsRunning() const {
     return State == Started;
 }

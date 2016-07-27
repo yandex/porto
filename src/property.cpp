@@ -2599,26 +2599,19 @@ TError TRespawnCount::Get(std::string &value) {
 
 class TRootPid : public TProperty {
 public:
-    TError Get(std::string &value);
     TRootPid() : TProperty(D_ROOT_PID, 0, "root task pid (ro)") {
         IsHidden = true;
         IsSerializable = false;
     }
+
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        value = std::to_string(CurrentContainer->GetPidFor(CurrentClient->GetPid()));
+        return TError::Success();
+    }
 } static RootPid;
-
-TError TRootPid::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-   
-    if (CurrentContainer->Task && CurrentClient)
-        value = std::to_string(CurrentContainer->Task->
-                               GetPidFor(CurrentClient->GetPid()));
-    else
-        value = "";
-
-    return TError::Success();
-}
 
 class TExitStatusProperty : public TProperty {
 public:
