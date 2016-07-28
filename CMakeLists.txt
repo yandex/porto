@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 2.8)
 
+if(NOT DEFINED ENV{CXX})
+	execute_process(COMMAND g++ -dumpversion OUTPUT_VARIABLE GXX_VERSION)
+	if(${GXX_VERSION} VERSION_LESS 4.7 AND EXISTS "/usr/bin/g++-4.7")
+		set(CMAKE_C_COMPILER "/usr/bin/gcc-4.7")
+		set(CMAKE_CXX_COMPILER "/usr/bin/g++-4.7")
+	endif()
+endif()
+
 PROJECT(yandex-porto)
 
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
@@ -54,10 +62,6 @@ else()
 	include_directories(${INSTALL_DIR}/include/libnl3)
 	SET(LIBNL ${INSTALL_DIR}/lib/libnl-3.a)
 	SET(LIBNL_ROUTE ${INSTALL_DIR}/lib/libnl-route-3.a)
-endif()
-
-if(EXISTS "/usr/bin/g++-4.7")
-	set(CMAKE_CXX_COMPILER "g++-4.7")
 endif()
 
 enable_testing()
