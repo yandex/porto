@@ -60,8 +60,10 @@ TError TMountNamespace::MountBinds() {
          * neither   -> rw if have write permissions
          */
         if (!src.HasAccess(OwnerCred, ro ? TPath::RU : TPath::RWU)) {
-            if (config().privileges().enforce_bind_permissions()) {
-                if (!ro && !bm.ReadWrite && src.HasAccess(OwnerCred, TPath::RU))
+            bool sysPath = IsSystemPath(src);
+
+            if (config().privileges().enforce_bind_permissions() || sysPath) {
+                if (!sysPath && !ro && !bm.ReadWrite && src.HasAccess(OwnerCred, TPath::RU))
                     ro = true;
                 else
                     return TError(EError::Permission, "User " + OwnerCred.ToString() +
