@@ -107,8 +107,18 @@ bool TPath::HasAccess(const TCred &cred, enum Access mask) const {
     if (!cred.Uid && !access(c_str(), mask & TPath::RWX))
         return true;
 
-    if (stat(c_str(), &st))
-        return false;
+    if (stat(c_str(), &st)) {
+        if (!(mask & TPath::P) || errno != ENOENT)
+            return false;
+        TPath dir = DirName();
+        while (stat(dir.c_str(), &st)) {
+            if (errno != ENOENT)
+                return false;
+            if (dir.Path.size() <= 1)
+                return false;
+            dir = dir.DirName();
+        }
+    }
 
     if ((mask & TPath::U) && cred.Uid == st.st_uid)
         return true;

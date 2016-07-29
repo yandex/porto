@@ -105,6 +105,8 @@ public:
         WU  = 012,
         RU  = 014,
         RWU = 016, /* (read and write) or owner user */
+        P   = 020, /* if not exits -> check parent directory */
+        WUP = 032, /* write or owner or at parent */
     };
 
     bool HasAccess(const TCred &cred, enum Access mask) const;
