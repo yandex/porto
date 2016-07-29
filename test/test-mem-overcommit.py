@@ -12,6 +12,7 @@ def Catch(func, *args, **kwargs):
     return None
 
 #Note that test was developed on 8G machine
+#TODO fix that
 
 c = porto.Connection()
 c.connect()
@@ -39,11 +40,11 @@ r.SetProperty("memory_guarantee", "384000000")
 r = c.Find("test/test3")
 r.SetProperty("memory_guarantee", "384000000")
 r = c.Find("test/testa")
-assert Catch(r.SetProperty, "memory_guarantee", "6.5G") == porto.exceptions.ResourceNotAvailable
+assert Catch(r.SetProperty, "memory_guarantee", "1000G") == porto.exceptions.ResourceNotAvailable
 r = c.Find("testa")
 r.SetProperty("memory_guarantee", "3.0G")
 assert r.GetProperty("memory_guarantee") == "3221225472"
-assert Catch(r.SetProperty, "memory_guarantee", "6.5G") == porto.exceptions.ResourceNotAvailable
+assert Catch(r.SetProperty, "memory_guarantee", "1000G") == porto.exceptions.ResourceNotAvailable
 assert r.GetProperty("memory_guarantee") == "3221225472"
 r.SetProperty("memory_guarantee", "0")
 assert r.GetProperty("memory_guarantee") == "0"
@@ -55,42 +56,42 @@ c.Destroy("testa")
 c.Destroy("test")
 
 r = c.Create("test1")
-r.SetProperty("memory_guarantee", "1G")
+r.SetProperty("memory_guarantee", "1M")
 r = c.Create("test2")
-r.SetProperty("memory_guarantee", "1G")
+r.SetProperty("memory_guarantee", "1M")
 
 r = c.Create("test1/test1")
-r.SetProperty("memory_guarantee", "1G")
+r.SetProperty("memory_guarantee", "1M")
 r = c.Create("test1/test2")
 assert r.GetProperty("memory_guarantee") == "0"
 
 r = c.Create("test2/test1")
 assert r.GetProperty("memory_guarantee") == "0"
 r = c.Create("test2/test2")
-r.SetProperty("memory_guarantee", "1G")
+r.SetProperty("memory_guarantee", "1M")
 
 r = c.Create("test1/test2/test1")
-r.SetProperty("memory_guarantee", "1G")
+r.SetProperty("memory_guarantee", "1M")
 r = c.Create("test1/test2/test2")
-r.SetProperty("memory_guarantee", "0.9G")
+r.SetProperty("memory_guarantee", "0.9M")
 
 r = c.Create("test2/test1/test1")
-r.SetProperty("memory_guarantee", "1.75G")
+r.SetProperty("memory_guarantee", "1.75M")
 r = c.Create("test2/test1/test2")
 assert r.GetProperty("memory_guarantee") == "0"
 
 r = c.Find("test1")
-r.SetProperty("memory_guarantee", "2G")
-assert r.GetProperty("memory_guarantee") == "2147483648"
-r.SetProperty("memory_guarantee", "3G")
-assert r.GetProperty("memory_guarantee") == "3221225472"
+r.SetProperty("memory_guarantee", "2M")
+assert r.GetProperty("memory_guarantee") == "2097152"
+r.SetProperty("memory_guarantee", "3M")
+assert r.GetProperty("memory_guarantee") == "3145728"
 
 r = c.Find("test2")
-r.SetProperty("memory_guarantee", "2G")
-assert r.GetProperty("memory_guarantee") == "2147483648"
-r.SetProperty("memory_guarantee", "2.6G")
-assert r.GetProperty("memory_guarantee") == "2791728742"
-assert Catch(r.SetProperty, "memory_guarantee", "3.0G") == porto.exceptions.ResourceNotAvailable
+r.SetProperty("memory_guarantee", "2M")
+assert r.GetProperty("memory_guarantee") == "2097152"
+r.SetProperty("memory_guarantee", "2.6M")
+assert r.GetProperty("memory_guarantee") == "2726297"
+assert Catch(r.SetProperty, "memory_guarantee", "1000G") == porto.exceptions.ResourceNotAvailable
 
 c.Destroy("test1/test2/test1")
 c.Destroy("test1/test2/test2")
