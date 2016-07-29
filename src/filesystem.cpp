@@ -73,16 +73,17 @@ TError TMountNamespace::MountBinds() {
                     " have not enough permissions for bind mount source " + src.ToString() << std::endl;
         }
 
+        if (!dest.HasAccess(OwnerCred, TPath::WUP)) {
+            if (config().privileges().enforce_bind_permissions() ||
+                    IsSystemPath(dest))
+                return TError(EError::Permission, "User " + OwnerCred.ToString() +
+                        " have no write permissions for bind mount target " + dest.ToString());
+            else
+                L_WRN() << Container << ": User " << OwnerCred.ToString() <<
+                    " have no write permissions for bind mount target " + dest.ToString() << std::endl;
+        }
+
         if (dest.Exists()) {
-            if (!dest.HasAccess(OwnerCred, TPath::WU)) {
-                if (config().privileges().enforce_bind_permissions() ||
-                        IsSystemPath(dest))
-                    return TError(EError::Permission, "User " + OwnerCred.ToString() +
-                            " have no write permissions for bind mount target " + dest.ToString());
-                else
-                    L_WRN() << Container << ": User " << OwnerCred.ToString() <<
-                        " have no write permissions for bind mount target " + dest.ToString() << std::endl;
-            }
             if (src.IsDirectoryFollow() != dest.IsDirectoryFollow())
                 return TError(EError::InvalidProperty,
                         "Bind mount source and target must be both file or directory");
