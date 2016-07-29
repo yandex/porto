@@ -43,6 +43,7 @@ include_directories(${libporto_SOURCE_DIR})
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp
 		      event.cpp task.cpp env.cpp device.cpp network.cpp
+		      filesystem.cpp
 		      kvalue.cpp config.cpp property.cpp context.cpp
 		      volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
 target_link_libraries(portod version porto util config

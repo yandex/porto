@@ -6,6 +6,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
+#include "config.hpp"
 
 extern "C" {
 #include <sys/mount.h>
@@ -15,6 +16,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/fcntl.h>
+#include <linux/kdev_t.h>
 #include <linux/loop.h>
 #include <unistd.h>
 }

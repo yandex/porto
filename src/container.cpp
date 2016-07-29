@@ -814,18 +814,19 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
     taskEnv->Command = Command;
-    taskEnv->Cwd = Cwd;
-    taskEnv->ParentCwd = Parent->Cwd;
+    taskEnv->Mnt.Cwd = Cwd;
+    taskEnv->Mnt.ParentCwd = Parent->Cwd;
 
-    taskEnv->LoopDev = LoopDev;
-    if (taskEnv->LoopDev >= 0)
-        taskEnv->Root = GetTmpDir();
+    taskEnv->Mnt.LoopDev = LoopDev;
+    if (taskEnv->Mnt.LoopDev >= 0)
+        taskEnv->Mnt.Root = GetTmpDir();
     else
-        taskEnv->Root = Root;
+        taskEnv->Mnt.Root = Root;
 
-    taskEnv->RootRdOnly = RootRo;
+    taskEnv->Mnt.RootRdOnly = RootRo;
 
     taskEnv->OwnerCred = OwnerCred;
+    taskEnv->Mnt.OwnerCred = OwnerCred;
 
     if (VirtMode == VIRT_MODE_OS) {
         user = "root";
@@ -849,20 +850,20 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->Hostname = Hostname;
     taskEnv->SetEtcHostname = (VirtMode == VIRT_MODE_OS) &&
-                                !taskEnv->Root.IsRoot() &&
-                                !taskEnv->RootRdOnly;
+                                !taskEnv->Mnt.Root.IsRoot() &&
+                                !taskEnv->Mnt.RootRdOnly;
 
-    taskEnv->BindDns = BindDns;
+    taskEnv->Mnt.BindDns = BindDns;
 
     if (PropMask & RESOLV_CONF_SET) {
-        if (taskEnv->Root.IsRoot())
+        if (taskEnv->Mnt.Root.IsRoot())
             return TError(EError::InvalidValue,
                     "resolv_conf requires separate root");
 
-        taskEnv->BindDns = false;
+        taskEnv->Mnt.BindDns = false;
         BindDns = false;
         for (auto &line: ResolvConf)
-            taskEnv->ResolvConf += line + "\n";
+            taskEnv->Mnt.ResolvConf += line + "\n";
     }
 
     taskEnv->Stdin = Stdin;
@@ -871,16 +872,11 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->Rlimit = Rlimit;
 
-    taskEnv->BindMounts = BindMounts;
+    taskEnv->Mnt.BindMounts = BindMounts;
+    taskEnv->Mnt.BindPortoSock = PortoEnabled;
 
     taskEnv->CapAmbient = CapAmbient;
     taskEnv->CapLimit = CapLimit;
-
-    if (!taskEnv->Root.IsRoot() && PortoEnabled) {
-        TBindMount bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false, false };
-
-        taskEnv->BindMounts.push_back(bm);
-    }
 
     if (client) {
         error = ConfigureDevices(taskEnv->Devices);
@@ -922,8 +918,10 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     // Create new mount namespaces if we have to make any changes
     taskEnv->NewMountNs = taskEnv->Isolate ||
-                          taskEnv->BindMounts.size() || taskEnv->BindDns ||
-                          !taskEnv->Root.IsRoot() || taskEnv->RootRdOnly;
+                          taskEnv->Mnt.BindMounts.size() ||
+                          taskEnv->Mnt.BindDns ||
+                          !taskEnv->Mnt.Root.IsRoot() ||
+                          taskEnv->Mnt.RootRdOnly;
 
     Task = std::unique_ptr<TTask>(new TTask(taskEnv));
 

@@ -5,11 +5,13 @@
 #include <memory>
 
 #include "util/namespace.hpp"
+#include "util/mount.hpp"
 #include "util/path.hpp"
 #include "util/cred.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
 #include "env.hpp"
+#include "filesystem.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -27,21 +29,11 @@ struct TExitStatus {
     int Status;
 };
 
-struct TBindMount {
-    TPath Source;
-    TPath Dest;
-    bool ReadOnly;
-    bool ReadWrite;
-};
-
 struct TTaskEnv : public TNonCopyable {
     std::string Container;
     std::string Command;
     TScopedFd PortoInitFd;
-    TPath Cwd;
-    TPath ParentCwd;
-    TPath Root; /* path in ParentNs.Mnt */
-    bool RootRdOnly;
+    TMountNamespace Mnt;
     TEnv Env;
     bool Isolate = false;
     bool TripleFork;
@@ -51,12 +43,8 @@ struct TTaskEnv : public TNonCopyable {
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
     bool SetEtcHostname;
-    bool BindDns;
-    std::string ResolvConf;
-    std::vector<TBindMount> BindMounts;
     std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;
-    int LoopDev;
     TCapabilities CapLimit;
     TCapabilities CapAmbient;
     bool NewMountNs;
