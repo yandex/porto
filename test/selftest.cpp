@@ -38,13 +38,14 @@ using std::pair;
 
 namespace test {
 
-static int initialErrors;
-static int initialRespawns;
-static int initialWarns;
+static int loggedRespawns;
+static int loggedErrors;
+static int loggedWarns;
 
-static int expectedErrors;
 static int expectedRespawns;
+static int expectedErrors;
 static int expectedWarns;
+
 static bool needDaemonChecks;
 
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
@@ -4663,6 +4664,36 @@ static void TestSigPipe(Porto::Connection &api) {
     ExpectEq(before, after);
 }
 
+static void InitErrorCounters(Porto::Connection &api) {
+    std::string v;
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    StringToInt(v, expectedRespawns);
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
+    StringToInt(v, expectedErrors);
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
+    StringToInt(v, expectedWarns);
+
+    loggedRespawns = WordCount(config().master_log().path(), "SYS Spawned") - expectedRespawns;
+    loggedErrors = WordCount(config().slave_log().path(), "ERR ") - expectedErrors;
+    loggedWarns = WordCount(config().slave_log().path(), "WRN ") - expectedWarns;
+}
+
+static void CheckErrorCounters(Porto::Connection &api) {
+    std::string v;
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    ExpectEq(v, std::to_string(expectedRespawns));
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
+    ExpectEq(v, std::to_string(expectedErrors));
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
+    ExpectEq(v, std::to_string(expectedWarns));
+}
+
 static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
     int pid = ReadPid(config().master_pid().path());
     if (kill(pid, sig))
@@ -4670,11 +4701,13 @@ static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
     WaitProcessExit(std::to_string(pid));
     WaitPortod(api, times);
 
-    std::string v;
-    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    ExpectEq(v, "1");
+    loggedRespawns += expectedRespawns;
+    loggedErrors += expectedErrors;
+    loggedWarns += expectedWarns;
 
-    expectedErrors = expectedRespawns = expectedWarns = 0;
+    expectedRespawns = 1;
+    expectedErrors = expectedWarns = 0;
+    CheckErrorCounters(api);
 }
 
 static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
@@ -4684,10 +4717,7 @@ static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
     WaitProcessExit(std::to_string(portodPid));
     WaitPortod(api, times);
     expectedRespawns++;
-
-    std::string v;
-    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    ExpectEq(v, std::to_string(expectedRespawns + 1));
+    CheckErrorCounters(api);
 }
 
 static bool RespawnTicks(Porto::Connection &api, const std::string &name, int maxTries = 3) {
@@ -4965,9 +4995,9 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectSuccess(TPath("/sys/fs/cgroup/memory/porto/cgroup.procs").WriteAll(pid));
     auto cgmap = GetCgroups(pid);
     ExpectEq(cgmap["memory"], "/porto");
+    expectedWarns++; // Task belongs to invalid subsystem
     KillSlave(api, SIGKILL);
     AsAlice(api);
-    expectedWarns++; // Task belongs to invalid subsystem
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     ExpectCorrectCgroups(pid, name);
@@ -5263,60 +5293,20 @@ static void TestLogRotate(Porto::Connection &api) {
     ExpectLess(st.st_blocks * 512, config().container().max_log_size());
 }
 
-static void InitErrorCounters(Porto::Connection &api) {
-    std::string v;
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    StringToInt(v, initialRespawns);
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
-    StringToInt(v, initialErrors);
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
-    StringToInt(v, initialWarns);
-
-    expectedRespawns = initialRespawns;
-    expectedErrors = initialErrors;
-    expectedWarns = initialWarns;
-}
-
-static void CheckErrorCounters(Porto::Connection &api) {
-    std::string v;
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    ExpectEq(v, std::to_string(expectedRespawns));
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
-    ExpectEq(v, std::to_string(expectedErrors));
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
-    ExpectEq(v, std::to_string(expectedWarns));
-}
-
 static void TestStats(Porto::Connection &api) {
     AsRoot(api);
 
-    int respawns = WordCount(config().master_log().path(), "SYS Spawned") + 1;
+    int respawns = WordCount(config().master_log().path(), "SYS Spawned");
     int errors = WordCount(config().slave_log().path(), "ERR ");
     int warns = WordCount(config().slave_log().path(), "WRN ");
 
-    std::string v;
-    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
-    //ExpectEq(v, std::to_string(respawns));
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
-    ExpectEq(v, std::to_string(errors));
-
-    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
-    ExpectEq(v, std::to_string(warns));
-
-    if (respawns != expectedRespawns)
+    if (respawns != loggedRespawns + expectedRespawns)
         throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));
 
-    if (errors != expectedErrors)
+    if (errors != loggedErrors + expectedErrors)
         throw string("ERROR: Unexpected number of errors: " + std::to_string(errors));
 
-    if (warns != expectedWarns)
+    if (warns != loggedWarns + expectedWarns)
         throw string("ERROR: Unexpected number of warnings: " + std::to_string(warns));
 
     AsAlice(api);
@@ -5385,6 +5375,10 @@ void TruncateLogs(Porto::Connection &api) {
     WaitPortod(api);
 
     AsAlice(api);
+
+    loggedRespawns = -expectedRespawns;
+    loggedErrors = -expectedErrors;
+    loggedWarns = -expectedWarns;
 }
 
 int SelfTest(std::vector<std::string> args) {
