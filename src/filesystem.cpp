@@ -8,6 +8,29 @@ extern "C" {
 #include <linux/kdev_t.h>
 }
 
+static std::vector<TPath> SystemPaths = {
+    "/bin",
+    "/boot",
+    "/dev",
+    "/etc",
+    "/lib",
+    "/lib32",
+    "/lib64",
+    "/libx32",
+    "/proc",
+    "/root",
+    "/sbin",
+    "/sys",
+    "/usr",
+    "/var",
+};
+
+bool IsSystemPath(const TPath &path) {
+    TPath normal = path.NormalPath();
+
+    return normal.IsRoot() || normal.IsInside(SystemPaths);
+}
+
 TError TMountNamespace::MountBinds() {
     for (const auto &bm : BindMounts) {
         bool ro = bm.ReadOnly;
@@ -50,7 +73,8 @@ TError TMountNamespace::MountBinds() {
 
         if (dest.Exists()) {
             if (!dest.HasAccess(OwnerCred, TPath::WU)) {
-                if (config().privileges().enforce_bind_permissions())
+                if (config().privileges().enforce_bind_permissions() ||
+                        IsSystemPath(dest))
                     return TError(EError::Permission, "User " + OwnerCred.ToString() +
                             " have no write permissions for bind mount target " + dest.ToString());
                 else

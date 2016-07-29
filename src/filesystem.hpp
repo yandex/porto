@@ -17,7 +17,7 @@ struct TBindMount {
 
 struct TMountNamespace {
 public:
-    std::string Container;
+    std::string Container; /* for logging and errors */
     TCred OwnerCred;
     TPath Cwd;
     TPath ParentCwd;
@@ -36,3 +36,5 @@ public:
     TError MountRootFs();
     TError IsolateFs();
 };
+
+bool IsSystemPath(const TPath &path);

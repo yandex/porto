@@ -347,6 +347,14 @@ TPath TPath::InnerPath(const TPath &path, bool absolute) const {
         return TPath(path.Path.substr(len + 1));
 }
 
+bool TPath::IsInside(const std::vector<TPath> paths) const {
+    for (auto &path: paths) {
+        if (!path.InnerPath(*this).IsEmpty())
+            return true;
+    }
+    return false;
+}
+
 TError TPath::StatFS(TStatFS &result) const {
     struct statvfs st;
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <functional>
 
 #include "util/error.hpp"
@@ -78,6 +79,7 @@ public:
     TPath AbsolutePath() const;
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
+    bool IsInside(const std::vector<TPath> paths) const;
 
     TError StatStrict(struct stat &st) const;
     TError StatFollow(struct stat &st) const;
