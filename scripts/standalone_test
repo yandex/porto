@@ -68,6 +68,6 @@ start_porto
 
 $PORTO_BIN/portotest $@ || die "portotest failed"
 
-for pytest in $PORTO_SRC/src/test/test-*.py; do
+for pytest in $PORTO_SRC/test/test-*.py; do
     PYTHONPATH=$PORTO_SRC/src/api/python python $pytest || die "$pytest failed"
 done
