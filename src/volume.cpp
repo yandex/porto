@@ -1604,6 +1604,16 @@ TError TVolumeHolder::RemoveLayer(const std::string &name) {
     return error;
 }
 
+TError ValidateLayerName(const std::string &name) {
+    auto pos = name.find_first_not_of(PORTO_NAME_CHARS);
+    if (pos != std::string::npos)
+        return TError(EError::InvalidValue,
+                "forbidden character '" + name.substr(pos, 1) + "' in layer name");
+    if (name == "." || name == ".."|| name == "_tmp_" )
+        return TError(EError::InvalidValue, "invalid layer name '" + name + "'");
+    return TError::Success();
+}
+
 TError SanitizeLayer(TPath layer, bool merge) {
     std::vector<std::string> content;
 

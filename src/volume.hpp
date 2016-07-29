@@ -44,6 +44,8 @@ class TVolume;
 class TContainer;
 class TContainerHolder;
 
+TError ValidateLayerName(const std::string &name);
+
 TError SanitizeLayer(TPath layer, bool merge);
 
 class TVolumeBackend {

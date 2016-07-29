@@ -1308,9 +1308,9 @@ noinline TError ImportLayer(TContext &context,
         return error;
 
     std::string layer_name = req.layer();
-    if (layer_name.find_first_of("/\\\n\r\t ") != string::npos ||
-        layer_name == "_tmp_")
-        return TError(EError::InvalidValue, "invalid layer name");
+    error = ValidateLayerName(layer_name);
+    if (error)
+        return error;
 
     TPath layers = TPath(config().volumes().layers_dir());
     TPath layers_tmp = layers / "_tmp_";
@@ -1437,7 +1437,12 @@ noinline TError RemoveLayer(TContext &context,
     if (error)
         return error;
 
-    return context.Vholder->RemoveLayer(req.layer());
+    std::string layer_name = req.layer();
+    error = ValidateLayerName(layer_name);
+    if (error)
+        return error;
+
+    return context.Vholder->RemoveLayer(layer_name);
 }
 
 noinline TError ListLayers(TContext &context,
