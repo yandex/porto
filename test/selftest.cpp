@@ -1193,6 +1193,7 @@ static void TestIsolateProperty(Porto::Connection &api) {
 }
 
 static void TestContainerNamespaces(Porto::Connection &api) {
+    bool def = config().container().default_porto_namespace();
     std::string val;
 
     Say() << "Test container namespaces" << std::endl;
@@ -1200,14 +1201,14 @@ static void TestContainerNamespaces(Porto::Connection &api) {
     Say() << "Check default value" << std::endl;
     ExpectApiSuccess(api.Create("c"));
     ExpectApiSuccess(api.GetProperty("c", "porto_namespace", val));
-    ExpectEq(val, "");
+    ExpectEq(val, def ? "c/" : "");
 
     Say() << "Check inheritance" << std::endl;
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "my-prefix-"));
     ExpectApiSuccess(api.GetProperty("c", "porto_namespace", val));
     ExpectApiSuccess(api.Create("c/d"));
     ExpectApiSuccess(api.GetProperty("c/d", "porto_namespace", val));
-    ExpectEq(val, "");
+    ExpectEq(val, def ? "d/" : "");
     ExpectApiSuccess(api.SetProperty("c/d", "porto_namespace", "second-prefix-"));
     ExpectApiSuccess(api.GetProperty("c/d", "porto_namespace", val));
     ExpectEq(val, "second-prefix-");
@@ -1215,6 +1216,13 @@ static void TestContainerNamespaces(Porto::Connection &api) {
     Say() << "Check simple prefix" << std::endl;
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "simple-prefix-"));
     ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+
+    ExpectApiSuccess(api.GetProperty("c", "absolute_namespace", val));
+    ExpectEq(val, "/porto/simple-prefix-");
+
+    ExpectApiSuccess(api.GetProperty("c/d", "absolute_namespace", val));
+    ExpectEq(val, "/porto/simple-prefix-second-prefix-");
+
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty("c/d", "user", "root"));
     ExpectApiSuccess(api.Start("c/d"));
@@ -2641,6 +2649,7 @@ static void TestEnablePortoProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("a"));
     ExpectApiSuccess(api.Create("a/b"));
 
+    ExpectApiSuccess(api.SetProperty("a", "porto_namespace", ""));
     ExpectApiSuccess(api.SetProperty("a/b", "command", "/portotest connectivity"));
     ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
     ExpectApiSuccess(api.SetProperty("a/b", "porto_namespace", "a/"));

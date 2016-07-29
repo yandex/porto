@@ -64,6 +64,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_batch_io_weight(10);
     config().mutable_container()->set_empty_wait_timeout_ms(5000);
     config().mutable_container()->set_enable_smart(true);
+    config().mutable_container()->set_default_porto_namespace(true);
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
 

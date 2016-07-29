@@ -80,6 +80,10 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
 
     if (IsRoot())
         NsName = std::string(PORTO_ROOT_CONTAINER) + "/";
+    else if (IsPortoRoot())
+        NsName = "";
+    else if (config().container().default_porto_namespace())
+        NsName = Name + "/";
     else
         NsName = "";
 
