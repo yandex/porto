@@ -26,28 +26,16 @@ extern "C" {
 #include <net/if.h>
 }
 
-using std::stringstream;
-using std::string;
-using std::vector;
-using std::map;
-
-// TTask
-//
-
-TTask::TTask(std::unique_ptr<TTaskEnv> &env) : Env(std::move(env)) {}
-
-TTask::TTask(pid_t pid) : Pid(pid) {}
-
-void TTask::ReportPid(pid_t pid) const {
-    TError error = Env->Sock.SendPid(pid);
+void TTaskEnv::ReportPid(pid_t pid) {
+    TError error = Sock.SendPid(pid);
     if (error) {
         L_ERR() << error << std::endl;
         Abort(error);
     }
-    Env->ReportStage++;
+    ReportStage++;
 }
 
-void TTask::Abort(const TError &error) const {
+void TTaskEnv::Abort(const TError &error) {
     TError error2;
 
     /*
@@ -57,13 +45,13 @@ void TTask::Abort(const TError &error) const {
      */
     L() << "abort due to " << error << std::endl;
 
-    for (int stage = Env->ReportStage; stage < 2; stage++) {
-        error2 = Env->Sock.SendPid(getpid());
+    for (int stage = ReportStage; stage < 2; stage++) {
+        error2 = Sock.SendPid(getpid());
         if (error2)
             L_ERR() << error2 << std::endl;
     }
 
-    error2 = Env->Sock.SendError(error);
+    error2 = Sock.SendError(error);
     if (error2)
         L_ERR() << error2 << std::endl;
 
@@ -72,34 +60,35 @@ void TTask::Abort(const TError &error) const {
 
 static int ChildFn(void *arg) {
     SetProcessName("portod-spawn-c");
-    TTask *task = static_cast<TTask*>(arg);
+    TTaskEnv *task = static_cast<TTaskEnv*>(arg);
     task->StartChild();
     return EXIT_FAILURE;
 }
 
-TError TTask::ChildExec() {
+TError TTaskEnv::ChildExec() {
 
     /* set environment for wordexp */
-    TError error = Env->Env.Apply();
+    TError error = Env.Apply();
 
-    auto envp = Env->Env.Envp();
+    auto envp = Env.Envp();
 
-    if (Env->Command.empty()) {
+    if (CT->Command.empty()) {
+        auto name = CT->GetName();
         const char *args[] = {
             "portoinit",
             "--container",
-            Env->Container.c_str(),
+            name.c_str(),
             NULL,
         };
         SetDieOnParentExit(0);
-        fexecve(Env->PortoInitFd.GetFd(), (char *const *)args, envp);
+        fexecve(PortoInitFd.GetFd(), (char *const *)args, envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
-                      std::to_string(Env->PortoInitFd.GetFd()) +  ", portoinit)");
+                      std::to_string(PortoInitFd.GetFd()) +  ", portoinit)");
     }
 
     wordexp_t result;
 
-    int ret = wordexp(Env->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+    int ret = wordexp(CT->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
         return TError(EError::Unknown, EINVAL, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
@@ -117,7 +106,7 @@ TError TTask::ChildExec() {
     }
 
     if (Verbose) {
-        L() << "command=" << Env->Command << std::endl;
+        L() << "command=" << CT->Command << std::endl;
         for (unsigned i = 0; result.we_wordv[i]; i++)
             L() << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;
         for (unsigned i = 0; envp[i]; i++)
@@ -126,11 +115,12 @@ TError TTask::ChildExec() {
     SetDieOnParentExit(0);
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
-    return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ")");
+    return TError(EError::InvalidValue, errno, std::string("execvpe(") +
+            result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ")");
 }
 
-TError TTask::ChildApplyLimits() {
-    for (auto pair : Env->Rlimit) {
+TError TTaskEnv::ChildApplyLimits() {
+    for (const auto &pair :CT->Rlimit) {
         int ret = setrlimit(pair.first, &pair.second);
         if (ret < 0)
             return TError(EError::Unknown, errno,
@@ -142,27 +132,27 @@ TError TTask::ChildApplyLimits() {
     return TError::Success();
 }
 
-TError TTask::ChildSetHostname() {
-    if (Env->Hostname == "")
+TError TTaskEnv::ChildSetHostname() {
+    if (CT->Hostname == "")
         return TError::Success();
 
-    if (Env->SetEtcHostname) {
+    if (SetEtcHostname) {
         TPath path("/etc/hostname");
         if (path.Exists()) {
-            TError error = path.WriteAll(Env->Hostname + "\n");
+            TError error = path.WriteAll(CT->Hostname + "\n");
             if (error)
                 return error;
         }
     }
 
-    return SetHostName(Env->Hostname);
+    return SetHostName(CT->Hostname);
 }
 
-TError TTask::ConfigureChild() {
+TError TTaskEnv::ConfigureChild() {
     TError error;
 
     /* Die together with waiter */
-    if (Env->TripleFork)
+    if (TripleFork)
         SetDieOnParentExit(SIGKILL);
 
     error = ChildApplyLimits();
@@ -174,14 +164,14 @@ TError TTask::ConfigureChild() {
 
     umask(0);
 
-    if (Env->NewMountNs) {
+    if (NewMountNs) {
         // Remount to slave to receive propogations from parent namespace
         error = TPath("/").Remount(MS_SLAVE | MS_REC);
         if (error)
             return error;
     }
 
-    if (Env->Isolate) {
+    if (CT->Isolate) {
         // remount proc so PID namespace works
         TPath tmpProc("/proc");
         error = tmpProc.UmountAll();
@@ -193,25 +183,25 @@ TError TTask::ConfigureChild() {
             return error;
     }
 
-    error = Env->Mnt.MountRootFs();
+    error = Mnt.MountRootFs();
     if (error)
         return error;
 
-    for (auto &dev: Env->Devices) {
-        error = dev.Makedev(Env->Mnt.Root);
+    for (auto &dev: Devices) {
+        error = dev.Makedev(Mnt.Root);
         if (error)
             return error;
     }
 
-    error =  Env->Mnt.MountBinds();
+    error =  Mnt.MountBinds();
     if (error)
         return error;
 
-    error =  Env->Mnt.RemountRootRo();
+    error =  Mnt.RemountRootRo();
     if (error)
         return error;
 
-    error =  Env->Mnt.IsolateFs();
+    error =  Mnt.IsolateFs();
     if (error)
         return error;
 
@@ -219,34 +209,35 @@ TError TTask::ConfigureChild() {
     if (error)
         return error;
 
-    error = Env->Mnt.Cwd.Chdir();
+    error = Mnt.Cwd.Chdir();
     if (error)
         return error;
 
-    if (Env->NewMountNs) {
+    if (NewMountNs) {
         // Make all shared: subcontainers will get propgation from us
         error = TPath("/").Remount(MS_SHARED | MS_REC);
         if (error)
             return error;
     }
 
-    if (Env->QuadroFork) {
-        Pid = fork();
-        if (Pid < 0)
+    if (QuadroFork) {
+        pid_t pid = fork();
+        if (pid < 0)
             return TError(EError::Unknown, errno, "fork()");
 
-        if (Pid) {
-            auto fd = Env->PortoInitFd.GetFd();
-            auto pid_ = std::to_string(Pid);
+        if (pid) {
+            auto fd = PortoInitFd.GetFd();
+            auto pid_ = std::to_string(pid);
+            auto name = CT->GetName();
             const char * argv[] = {
                 "portoinit",
                 "--container",
-                Env->Container.c_str(),
+                name.c_str(),
                 "--wait",
                 pid_.c_str(),
                 NULL,
             };
-            auto envp = Env->Env.Envp();
+            auto envp = Env.Envp();
 
             error = PortoInitCapabilities.ApplyLimit();
             if (error)
@@ -256,55 +247,55 @@ TError TTask::ConfigureChild() {
             fexecve(fd, (char *const *)argv, envp);
             return TError(EError::Unknown, errno, "fexecve()");
         } else {
-            Pid = getpid();
+            pid = getpid();
 
-            Env->MasterSock2.Close();
+            MasterSock2.Close();
 
-            error = Env->Sock2.SendPid(Pid);
+            error = Sock2.SendPid(pid);
             if (error)
                 return error;
-            error = Env->Sock2.RecvZero();
+            error = Sock2.RecvZero();
             if (error)
                 return error;
             /* Parent forwards VPid */
-            Env->ReportStage++;
+            ReportStage++;
 
-            Env->Sock2.Close();
+            Sock2.Close();
 
             if (setsid() < 0)
                 return TError(EError::Unknown, errno, "setsid()");
         }
     }
 
-    error = Env->Cred.Apply();
+    error = Cred.Apply();
     if (error)
         return error;
 
-    error = Env->CapAmbient.ApplyAmbient();
+    error = CT->CapAmbient.ApplyAmbient();
     if (error)
         return error;
 
-    error = Env->CapLimit.ApplyLimit();
+    error = CT->CapLimit.ApplyLimit();
     if (error)
         return error;
 
-    error = Env->Stdin.OpenInChild(Env->Cred);
+    error = Stdin.OpenInChild(Cred);
     if (error)
         return error;
 
-    error = Env->Stdout.OpenInChild(Env->Cred);
+    error = Stdout.OpenInChild(Cred);
     if (error)
         return error;
 
-    error = Env->Stderr.OpenInChild(Env->Cred);
+    error = Stderr.OpenInChild(Cred);
     if (error)
         return error;
 
     return TError::Success();
 }
 
-TError TTask::WaitAutoconf() {
-    if (Env->Autoconf.empty())
+TError TTaskEnv::WaitAutoconf() {
+    if (Autoconf.empty())
         return TError::Success();
 
     SetProcessName("portod-autoconf");
@@ -314,7 +305,7 @@ TError TTask::WaitAutoconf() {
     if (error)
         return error;
 
-    for (auto &name: Env->Autoconf) {
+    for (auto &name: Autoconf) {
         TNlLink link(sock, name);
 
         error = link.Load();
@@ -329,22 +320,22 @@ TError TTask::WaitAutoconf() {
     return TError::Success();
 }
 
-void TTask::StartChild() {
+void TTaskEnv::StartChild() {
     TError error;
 
     /* WPid reported by parent */
-    Env->ReportStage++;
+    ReportStage++;
 
     /* Wait for report WPid in parent */
-    error = Env->Sock.RecvZero();
+    error = Sock.RecvZero();
     if (error)
         Abort(error);
 
     /* Report VPid in pid namespace we're enter */
-    if (!Env->Isolate)
+    if (!CT->Isolate)
         ReportPid(getpid());
-    else if (!Env->QuadroFork)
-        Env->ReportStage++;
+    else if (!QuadroFork)
+        ReportStage++;
 
     /* Apply configuration */
     error = ConfigureChild();
@@ -352,7 +343,7 @@ void TTask::StartChild() {
         Abort(error);
 
     /* Wait for Wakeup */
-    error = Env->Sock.RecvZero();
+    error = Sock.RecvZero();
     if (error)
         Abort(error);
 
@@ -367,16 +358,16 @@ void TTask::StartChild() {
     Abort(error);
 }
 
-TError TTask::Start() {
+TError TTaskEnv::Start() {
     TError error;
 
-    Pid = VPid = WPid = 0;
-    ExitStatus = 0;
+    CT->Task.Pid = 0;
+    CT->TaskVPid = 0;
+    CT->WaitTask.Pid = 0;
 
-    error = TUnixSocket::SocketPair(Env->MasterSock, Env->Sock);
+    error = TUnixSocket::SocketPair(MasterSock, Sock);
     if (error)
         return error;
-
 
     // we want our child to have portod master as parent, so we
     // are doing double fork here (fork + clone);
@@ -384,7 +375,7 @@ TError TTask::Start() {
 
     pid_t forkPid = ForkFromThread();
     if (forkPid < 0) {
-        Env->Sock.Close();
+        Sock.Close();
         TError error(EError::Unknown, errno, "fork()");
         L() << "Can't spawn child: " << error << std::endl;
         return error;
@@ -403,31 +394,31 @@ TError TTask::Start() {
         (void)setsid();
 
         // move to target cgroups
-        for (auto &cg : Env->Cgroups) {
+        for (auto &cg : Cgroups) {
             error = cg.Attach(getpid());
             if (error)
                 Abort(error);
         }
 
         /* Default stdin/stdio/stderr are in host mount namespace */
-        error = Env->Stdin.OpenOnHost(Env->Cred);
+        error = Stdin.OpenOnHost(Cred);
         if (error)
             Abort(error);
 
-        error = Env->Stdout.OpenOnHost(Env->Cred);
+        error = Stdout.OpenOnHost(Cred);
         if (error)
             Abort(error);
 
-        error = Env->Stderr.OpenOnHost(Env->Cred);
+        error = Stderr.OpenOnHost(Cred);
         if (error)
             Abort(error);
 
         /* Enter parent namespaces */
-        error = Env->ParentNs.Enter();
+        error = ParentNs.Enter();
         if (error)
             Abort(error);
 
-        if (Env->TripleFork) {
+        if (TripleFork) {
             /*
              * Enter into pid-namespace. fork() hangs in libc if child pid
              * collide with parent pid outside. vfork() has no such problem.
@@ -440,21 +431,21 @@ TError TTask::Start() {
                 _exit(EXIT_SUCCESS);
         }
 
-        if (Env->QuadroFork) {
-            error = TUnixSocket::SocketPair(Env->MasterSock2, Env->Sock2);
+        if (QuadroFork) {
+            error = TUnixSocket::SocketPair(MasterSock2, Sock2);
             if (error)
                 Abort(error);
         }
 
         int cloneFlags = SIGCHLD;
-        if (Env->Isolate)
+        if (CT->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
 
-        if (Env->NewMountNs)
+        if (NewMountNs)
             cloneFlags |= CLONE_NEWNS;
 
         /* Create UTS namspace if hostname is changed or isolate=true */
-        if (Env->Isolate || Env->Hostname != "")
+        if (CT->Isolate || CT->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
@@ -467,58 +458,59 @@ TError TTask::Start() {
         }
 
         /* Report WPid in host pid namespace */
-        if (Env->TripleFork)
+        if (TripleFork)
             ReportPid(GetTid());
         else
             ReportPid(clonePid);
 
         /* Report VPid in parent pid namespace for new pid-ns */
-        if (Env->Isolate && !Env->QuadroFork)
+        if (CT->Isolate && !QuadroFork)
             ReportPid(clonePid);
 
         /* WPid reported, wakeup child */
-        error = Env->MasterSock.SendZero();
+        error = MasterSock.SendZero();
         if (error)
             Abort(error);
 
-        /* ChildCallback() reports VPid here if !Env->Isolate */
-        if (!Env->Isolate && !Env->QuadroFork)
-            Env->ReportStage++;
+        /* ChildCallback() reports VPid here if !Isolate */
+        if (!CT->Isolate && !QuadroFork)
+            ReportStage++;
 
         /*
          * QuadroFork waiter receives application VPid from init
          * task and forwards it into host.
          */
-        if (Env->QuadroFork) {
+        if (QuadroFork) {
             pid_t appPid, appVPid;
 
             /* close other side before reading */
-            Env->Sock2.Close();
+            Sock2.Close();
 
-            error = Env->MasterSock2.RecvPid(appPid, appVPid);
+            error = MasterSock2.RecvPid(appPid, appVPid);
             if (error)
                 Abort(error);
             /* Forward VPid */
             ReportPid(appPid);
-            error = Env->MasterSock2.SendZero();
+            error = MasterSock2.SendZero();
             if (error)
                 Abort(error);
 
-            Env->MasterSock2.Close();
+            MasterSock2.Close();
         }
 
-        if (Env->TripleFork) {
-            auto fd = Env->PortoInitFd.GetFd();
+        if (TripleFork) {
+            auto fd = PortoInitFd.GetFd();
             auto pid = std::to_string(clonePid);
+            auto name = CT->GetName();
             const char * argv[] = {
                 "portoinit",
                 "--container",
-                Env->Container.c_str(),
+                name.c_str(),
                 "--wait",
                 pid.c_str(),
                 NULL,
             };
-            auto envp = Env->Env.Envp();
+            auto envp = Env.Envp();
 
             error = PortoInitCapabilities.ApplyLimit();
             if (error)
@@ -533,17 +525,17 @@ TError TTask::Start() {
         _exit(EXIT_SUCCESS);
     }
 
-    Env->Sock.Close();
+    Sock.Close();
 
-    error = Env->MasterSock.SetRecvTimeout(config().container().start_timeout_ms());
+    error = MasterSock.SetRecvTimeout(config().container().start_timeout_ms());
     if (error)
         goto kill_all;
 
-    error = Env->MasterSock.RecvPid(WPid, VPid);
+    error = MasterSock.RecvPid(CT->WaitTask.Pid, CT->TaskVPid);
     if (error)
         goto kill_all;
 
-    error = Env->MasterSock.RecvPid(Pid, VPid);
+    error = MasterSock.RecvPid(CT->Task.Pid, CT->TaskVPid);
     if (error)
         goto kill_all;
 
@@ -555,12 +547,12 @@ TError TTask::Start() {
     forkPid = 0;
 
     /* Task was alive, even if it already died we'll get zombie */
-    error = Env->MasterSock.SendZero();
+    error = MasterSock.SendZero();
     if (error)
         L() << "Task wakeup error: " << error << std::endl;
 
     /* Prefer reported error if any */
-    error = Env->MasterSock.RecvError();
+    error = MasterSock.RecvError();
     if (error)
         goto kill_all;
 
@@ -569,101 +561,18 @@ TError TTask::Start() {
         goto kill_all;
     }
 
-    ClearEnv();
-    State = Started;
     return TError::Success();
 
 kill_all:
     L_ACT() << "Kill partialy constructed container: " << error << std::endl;
-    for (auto &cg : Env->Cgroups)
+    for (auto &cg : Cgroups)
         (void)cg.KillAll(SIGKILL);
     if (forkPid) {
         (void)kill(forkPid, SIGKILL);
         (void)waitpid(forkPid, nullptr, 0);
     }
-    Pid = VPid = WPid = 0;
-    ExitStatus = -1;
+    CT->Task.Pid = 0;
+    CT->TaskVPid = 0;
+    CT->WaitTask.Pid = 0;
     return error;
-}
-
-pid_t TTask::GetPid() const {
-    return Pid;
-}
-
-pid_t TTask::GetWPid() const {
-    return WPid;
-}
-
-std::vector<int> TTask::GetPids() const {
-    return {Pid, VPid, WPid};
-}
-
-bool TTask::IsRunning() const {
-    return State == Started;
-}
-
-int TTask::GetExitStatus() const {
-    return ExitStatus;
-}
-
-void TTask::Exit(int status) {
-    ExitStatus = status;
-    State = Stopped;
-}
-
-TError TTask::Kill(int signal) const {
-    if (!Pid)
-        throw "Tried to kill invalid process!";
-
-    L_ACT() << "kill " << signal << " " << Pid << std::endl;
-
-    int ret = kill(Pid, signal);
-    if (ret != 0)
-        return TError(EError::Unknown, errno, "kill(" + std::to_string(Pid) + ")");
-
-    return TError::Success();
-}
-
-bool TTask::IsZombie() const {
-    std::vector<std::string> lines;
-    TError err = TPath("/proc/" + std::to_string(Pid) + "/status").ReadLines(lines);
-    if (err)
-        return false;
-
-    for (auto &l : lines)
-        if (l.compare(0, 7, "State:\t") == 0)
-            return l.substr(7, 1) == "Z";
-
-    return false;
-}
-
-bool TTask::HasCorrectParent() {
-    pid_t ppid;
-    TError error = GetTaskParent(WPid, ppid);
-    if (error) {
-        L() << "Can't get ppid of restored task: " << error << std::endl;
-        return false;
-    }
-
-    if (ppid != getppid()) {
-        L() << "Invalid ppid of restored task: " << ppid << " != " << getppid() << std::endl;
-        return false;
-    }
-
-    return true;
-}
-
-void TTask::Restore(std::vector<int> pids) {
-    ExitStatus = 0;
-    Pid = pids[0];
-    VPid = pids[1];
-    WPid = pids[2];
-    State = Started;
-}
-
-void TTask::ClearEnv() {
-    Env = nullptr;
-}
-
-TTask::~TTask() {
 }

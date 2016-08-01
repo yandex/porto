@@ -56,6 +56,50 @@ bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs) {
     return RetryIfFailed(handler, ret, times, resolution);
 }
 
+bool TTask::IsRunning() const {
+    return Pid && !kill(Pid, 0);
+}
+
+TError TTask::Kill(int signal) const {
+    if (!Pid)
+        TError(EError::Unknown, "Task is not running");
+    L_ACT() << "kill " << signal << " " << Pid << std::endl;
+    if (kill(Pid, signal))
+        return TError(EError::Unknown, errno, "kill(" + std::to_string(Pid) + ")");
+    return TError::Success();
+}
+
+bool TTask::IsZombie() const {
+    std::string path = "/proc/" + std::to_string(Pid) + "/stat";
+    FILE *file;
+    char state;
+    int res;
+
+    file = fopen(path.c_str(), "r");
+    if (!file)
+        return false;
+    res = fscanf(file, "%*d (%*[^)]) %c", &state);
+    fclose(file);
+    if (res != 1)
+        return false;
+    return state == 'Z';
+}
+
+pid_t TTask::GetPPid() const {
+    std::string path = "/proc/" + std::to_string(Pid) + "/stat";
+    int res, ppid;
+    FILE *file;
+
+    file = fopen(path.c_str(), "r");
+    if (!file)
+        return 0;
+    res = fscanf(file, "%*d (%*[^)]) %*c %d", &ppid);
+    fclose(file);
+    if (res != 1)
+        return 0;
+    return ppid;
+}
+
 pid_t GetPid() {
     return getpid();
 }
@@ -66,22 +110,6 @@ pid_t GetPPid() {
 
 pid_t GetTid() {
     return syscall(SYS_gettid);
-}
-
-TError GetTaskParent(pid_t pid, pid_t &parent_pid) {
-    std::string path = "/proc/" + std::to_string(pid) + "/stat";
-    int res, ppid;
-    FILE *file;
-
-    file = fopen(path.c_str(), "r");
-    if (!file)
-        return TError(EError::Unknown, errno, "fopen(" + path + ")");
-    res = fscanf(file, "%*d (%*[^)]) %*c %d", &ppid);
-    fclose(file);
-    if (res != 1)
-        return TError(EError::Unknown, errno, "Cannot parse " + path);
-    parent_pid = ppid;
-    return TError::Success();
 }
 
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens) {

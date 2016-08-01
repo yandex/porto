@@ -25,6 +25,7 @@
 #include "util/unix.hpp"
 #include "client.hpp"
 #include "stream.hpp"
+#include "filesystem.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -243,7 +244,7 @@ bool TContainer::IsLostAndRestored() const {
 
 void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
     if (LostAndRestored && State == EContainerState::Running &&
-        (!Task || Processes().empty())) {
+        (!Task.Pid || Processes().empty())) {
         L() << "Lost and restored container " << GetName() << " is empty"
                       << ", mark them dead." << std::endl;
         ExitTree(holder_lock, -1, false);
@@ -432,15 +433,15 @@ std::shared_ptr<const TContainer> TContainer::GetIsolationDomain() const {
 }
 
 pid_t TContainer::GetPidFor(pid_t pid) const {
-    if (!Task)
+    if (!Task.Pid)
         return 0;
     if (InPidNamespace(pid, getpid()))
-        return Task->Pid;
-    if (Task->WPid != Task->Pid && InPidNamespace(pid, Task->WPid))
-        return Task->VPid;
-    if (InPidNamespace(pid, Task->Pid)) {
+        return Task.Pid;
+    if (WaitTask.Pid != Task.Pid && InPidNamespace(pid, WaitTask.Pid))
+        return TaskVPid;
+    if (InPidNamespace(pid, Task.Pid)) {
         if (!Isolate)
-            return Task->VPid;
+            return TaskVPid;
         if (VirtMode == VIRT_MODE_OS)
             return 1;
         return 2;
@@ -449,8 +450,8 @@ pid_t TContainer::GetPidFor(pid_t pid) const {
 }
 
 TError TContainer::OpenNetns(TNamespaceFd &netns) const {
-    if (Task)
-        return netns.Open(Task->GetPid(), "ns/net");
+    if (Task.Pid)
+        return netns.Open(Task.Pid, "ns/net");
     if (Net == GetRoot()->Net)
         return netns.Open(GetTid(), "ns/net");
     return TError(EError::InvalidValue, "Cannot open netns: container not running");
@@ -585,7 +586,7 @@ TError TContainer::ApplyDynamicProperties() {
 std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
     auto p = Parent;
     while (p) {
-        if (p->Task && p->Task->IsRunning())
+        if (p->Task.Pid)
             return p;
         p = p->Parent;
     }
@@ -805,18 +806,17 @@ TError TContainer::GetEnvironment(TEnv &env) {
 }
 
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
+                               struct TTaskEnv *taskEnv,
                                struct TNetCfg *NetCfg) {
     auto user = UserName(OwnerCred.Uid);
-    auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
     auto parent = FindRunningParent();
     TError error;
 
-    taskEnv->Container = GetName();
+    taskEnv->CT = this;
 
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
-    taskEnv->Command = Command;
     taskEnv->Mnt.Cwd = Cwd;
     taskEnv->Mnt.ParentCwd = Parent->Cwd;
 
@@ -828,7 +828,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->Mnt.RootRdOnly = RootRo;
 
-    taskEnv->OwnerCred = OwnerCred;
     taskEnv->Mnt.OwnerCred = OwnerCred;
 
     if (VirtMode == VIRT_MODE_OS) {
@@ -845,13 +844,10 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     if (error)
         return error;
 
-    taskEnv->Isolate = Isolate;
     taskEnv->TripleFork = false;
     taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) &&
-                          taskEnv->Isolate &&
-                          !taskEnv->Command.empty();
+                          Isolate && !Command.empty();
 
-    taskEnv->Hostname = Hostname;
     taskEnv->SetEtcHostname = (VirtMode == VIRT_MODE_OS) &&
                                 !taskEnv->Mnt.Root.IsRoot() &&
                                 !taskEnv->Mnt.RootRdOnly;
@@ -873,13 +869,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->Stdout = Stdout;
     taskEnv->Stderr = Stderr;
 
-    taskEnv->Rlimit = Rlimit;
-
     taskEnv->Mnt.BindMounts = BindMounts;
     taskEnv->Mnt.BindPortoSock = PortoEnabled;
-
-    taskEnv->CapAmbient = CapAmbient;
-    taskEnv->CapLimit = CapLimit;
 
     if (client) {
         error = ConfigureDevices(taskEnv->Devices);
@@ -890,14 +881,14 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     }
 
     if (parent && client) {
-        pid_t parent_pid = parent->Task->GetPid();
+        pid_t parent_pid = parent->Task.Pid;
 
         error = taskEnv->ParentNs.Open(parent_pid);
         if (error)
             return error;
 
         /* one more fork for creating nested pid-namespace */
-        if (taskEnv->Isolate && !InPidNamespace(parent_pid, getpid()))
+        if (Isolate && !InPidNamespace(parent_pid, getpid()))
             taskEnv->TripleFork = true;
     }
 
@@ -907,7 +898,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     if (NetCfg)
         taskEnv->Autoconf = NetCfg->Autoconf;
 
-    if (taskEnv->Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
+    if (Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");
         TPath path;
         TError error = exe.ReadLink(path);
@@ -920,13 +911,11 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     }
 
     // Create new mount namespaces if we have to make any changes
-    taskEnv->NewMountNs = taskEnv->Isolate ||
+    taskEnv->NewMountNs = Isolate ||
                           taskEnv->Mnt.BindMounts.size() ||
                           taskEnv->Mnt.BindDns ||
                           !taskEnv->Mnt.Root.IsRoot() ||
                           taskEnv->Mnt.RootRdOnly;
-
-    Task = std::unique_ptr<TTask>(new TTask(taskEnv));
 
     return TError::Success();
 }
@@ -1045,6 +1034,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         return error;
 
+    struct TTaskEnv TaskEnv;
     struct TNetCfg NetCfg;
 
     error = ParseNetConfig(NetCfg);
@@ -1065,11 +1055,11 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     if (!meta || (meta && Isolate)) {
 
-        error = PrepareTask(client, &NetCfg);
+        error = PrepareTask(client, &TaskEnv, &NetCfg);
         if (error)
             goto error;
 
-        error = Task->Start();
+        error = TaskEnv.Start();
 
         /* Always report OOM stuation if any */
         if (error && HasOomReceived()) {
@@ -1085,10 +1075,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         }
 
         TaskStartErrno = -1;
-
-        L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
-
-        RootPid = Task->GetPids();
+        L() << GetName() << " started " << std::to_string(Task.Pid) << std::endl;
         PropMask |= ROOT_PID_SET;
     }
 
@@ -1373,7 +1360,6 @@ void TContainer::FreeResources() {
             L_ERR() << "Can't remove traffic class: " << error << std::endl;
     }
 
-    Task = nullptr;
     if (Net && IsRoot()) {
         error = Net->Destroy();
         if (error)
@@ -1452,7 +1438,7 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout_ms) {
 
     ShutdownOom();
 
-    if (Task && Task->IsRunning()) {
+    if (Task.Pid) {
         TError error = KillAll(holder_lock, timeout_ms);
         if (error) {
             L_ERR() << "Can't kill all tasks in container: " << error << std::endl;
@@ -1468,8 +1454,7 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout_ms) {
                     if (!cg.Exists() || cg.IsEmpty())
                         return 0;
 
-                    kill(Task->GetPid(), 0);
-
+                    kill(Task.Pid, 0);
                     return errno != ESRCH;
                 }, ret, kill_timeout) || ret) {
 
@@ -1478,7 +1463,9 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout_ms) {
                           std::to_string(kill_timeout + timeout_ms) + "ms");
         }
 
-        Task->Exit(-1);
+        Task.Pid = 0;
+        TaskVPid = 0;
+        WaitTask.Pid = 0;
     }
 
     SetState(EContainerState::Stopped);
@@ -1574,7 +1561,7 @@ TError TContainer::Kill(int sig) {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    return Task->Kill(sig);
+    return Task.Kill(sig);
 }
 
 void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
@@ -1838,15 +1825,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
     }
 
     if (started) {
-        std::vector<int> pids = RootPid;
-
-        if (pids.size() == 1)
-            pids = {pids[0], 0, pids[0]};
-
-        if (pids[0] == GetPid())
-            pids = {0, 0, 0};
-
-        L_ACT() << GetName() << ": restore started container " << pids[0] << std::endl;
+        L_ACT() << GetName() << ": restore started container " << Task.Pid << std::endl;
 
         auto parent = Parent;
         while (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
@@ -1869,24 +1848,16 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
         if (error)
             goto error;
 
-        error = PrepareTask(nullptr, nullptr);
-        if (error) {
-            FreeResources();
-            goto error;
-        }
-
-        Task->Restore(pids);
-
-        pid_t pid = Task->GetPid();
+        pid_t pid = Task.Pid;
         pid_t ppid;
 
         TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
 
-        error = GetTaskParent(Task->GetWPid(), ppid);
-        if (!error)
+        ppid = WaitTask.GetPPid();
+        if (ppid)
             error = FreezerSubsystem.TaskCgroup(pid, taskCg);
 
-        if (error) {
+        if (!ppid || error) {
             L() << "Cannot get ppid or cgroup of restored task " << pid
                 << ": " << error << std::endl;
             LostAndRestored = true;
@@ -1894,7 +1865,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
             L() << "Invalid ppid of restored task " << pid << ": "
                 << ppid << " != " << getppid() << std::endl;
             LostAndRestored = true;
-        } else if (Task->IsZombie()) {
+        } else if (Task.IsZombie()) {
             L() << "Task " << pid << " is zombie and belongs to porto" << std::endl;
         } else if (taskCg != freezerCg) {
             L_WRN() << "Task " << pid << " belongs to wrong freezer cgroup: "
@@ -1932,7 +1903,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
 
             error = RestoreNetwork();
             if (error) {
-                if (Task->HasCorrectParent() && !Task->IsZombie())
+                if (Task.GetPPid() != getppid() && !Task.IsZombie())
                     L_WRN() << "Cannot restore network: " << error << std::endl;
                 LostAndRestored = true;
             }
@@ -1965,7 +1936,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
                 SetState(EContainerState::Paused);
         }
 
-        if (!Task->IsZombie())
+        if (!Task.IsZombie())
             SyncStateWithCgroup(holder_lock);
 
         if (MayRespawn())
@@ -1985,15 +1956,15 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
             SetState(EContainerState::Meta);
         else
             SetState(EContainerState::Stopped);
-        Task = nullptr;
+
+        Task.Pid = 0;
+        TaskVPid = 0;
+        WaitTask.Pid = 0;
     }
 
     RestoreStdPath(P_STDOUT_PATH, StdoutPath, !(PropMask & STDOUT_SET));
     RestoreStdPath(P_STDERR_PATH, StderrPath, !(PropMask & STDERR_SET));
     CreateStdStreams();
-
-    if (Task)
-        Task->ClearEnv();
 
     if (Parent)
         Parent->AddChild(shared_from_this());
@@ -2053,10 +2024,10 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
 void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     TError error;
 
-    if (!Task)
+    if (!Task.Pid)
         return;
 
-    L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
+    L_EVT() << "Exit " << GetName() << " (root_pid " << Task.Pid << ")"
             << " with status " << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
 
@@ -2069,7 +2040,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     PropMask |= DEATH_TIME_SET;
 
     if (oomKilled) {
-        L_EVT() << Task->GetPid() << " killed by OOM" << std::endl;
+        L_EVT() << Task.Pid << " killed by OOM" << std::endl;
 
         OomKilled = true;
         PropMask |= OOM_KILLED_SET;
@@ -2085,10 +2056,11 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
             L_WRN() << "Can't kill all tasks in non-isolated container: " << error << std::endl;
     }
 
-    Task->Exit(status);
+    Task.Pid = 0;
+    TaskVPid = 0;
+    WaitTask.Pid = 0;
     SetState(EContainerState::Dead);
 
-    RootPid = {0, 0, 0};
     PropMask |= ROOT_PID_SET;
 
     error = RotateStdFile(Stdout, StdoutOffset);
@@ -2108,10 +2080,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 }
 
 bool TContainer::MayExit(int pid) {
-    if (!Task)
-        return false;
-
-    if (Task->GetWPid() != pid)
+    if (WaitTask.Pid != pid)
         return false;
 
     if (GetState() == EContainerState::Dead)
@@ -2134,7 +2103,7 @@ bool TContainer::MayReceiveOom(int fd) {
     if (OomEventFd.GetFd() != fd)
         return false;
 
-    if (!Task)
+    if (!Task.Pid)
         return false;
 
     if (GetState() == EContainerState::Dead)
@@ -2208,7 +2177,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
             }
             break;
         case EEventType::RotateLogs:
-            if (GetState() == EContainerState::Running && Task) {
+            if (GetState() == EContainerState::Running && Task.Pid) {
                 error = RotateStdFile(Stdout, StdoutOffset);
                 if (error)
                     L_ERR() << "Can't rotate stdout_offset: " << error

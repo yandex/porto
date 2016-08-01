@@ -1455,38 +1455,34 @@ TError TDevices::Get(std::string &value) {
 
 class TRawRootPid : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError Get(std::string &value);
     TRawRootPid() : TProperty(P_RAW_ROOT_PID, ROOT_PID_SET, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
-} static RawRootPid;
-
-TError TRawRootPid::SetFromRestore(const std::string &value) {
-    std::vector<std::string> str_list;
-    TError error = StringToStrList(value, str_list);
-    if (error)
-        return error;
-
-    return StringsToIntegers(str_list, CurrentContainer->RootPid);
-}
-
-TError TRawRootPid::Get(std::string &value) {
-    std::stringstream str;
-    bool first = true;
-
-    for (auto v : CurrentContainer->RootPid) {
-        if (first)
-             first = false;
-        else
-             str << ";";
-        str << v;
+    TError Get(std::string &value) {
+        value = StringFormat("%d;%d;%d", CurrentContainer->Task.Pid,
+                                         CurrentContainer->TaskVPid,
+                                         CurrentContainer->WaitTask.Pid);
+        return TError::Success();
     }
-
-    value = str.str();
-    return TError::Success();
-}
+    TError SetFromRestore(const std::string &value) {
+        std::vector<std::string> val;
+        TError error = StringToStrList(value, val);
+        if (!error && val.size() > 0)
+            error = StringToInt(val[0], CurrentContainer->Task.Pid);
+        else
+            CurrentContainer->Task.Pid = 0;
+        if (!error && val.size() > 1)
+            error = StringToInt(val[1], CurrentContainer->TaskVPid);
+        else
+            CurrentContainer->TaskVPid = 0;
+        if (!error && val.size() > 2)
+            error = StringToInt(val[2], CurrentContainer->WaitTask.Pid);
+        else
+            CurrentContainer->WaitTask.Pid = CurrentContainer->Task.Pid;
+        return error;
+    }
+} static RawRootPid;
 
 class TRawLoopDev : public TProperty {
 public:

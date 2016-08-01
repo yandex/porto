@@ -10,6 +10,15 @@
 
 class TPath;
 
+struct TTask {
+    pid_t Pid = 0;
+
+    bool IsRunning() const;
+    bool IsZombie() const;
+    pid_t GetPPid() const;
+    TError Kill(int signal) const;
+};
+
 pid_t ForkFromThread(void);
 std::string CurrentTimeFormat(const char *fmt, bool msec = false);
 
@@ -19,7 +28,6 @@ bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs);
 pid_t GetPid();
 pid_t GetPPid();
 pid_t GetTid();
-TError GetTaskParent(pid_t pid, pid_t &parent_pid);
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 
 uint64_t GetCurrentTimeMs();

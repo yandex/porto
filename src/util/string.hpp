@@ -10,8 +10,6 @@ typedef std::map<std::string, uint64_t> TUintMap;
 
 std::string CommaSeparatedList(const std::vector<std::string> &list, const std::string &sep = ",");
 
-TError StringsToIntegers(const std::vector<std::string> &strings,
-                         std::vector<int> &integers);
 TError StringToUint64(const std::string &string, uint64_t &value);
 TError StringToInt64(const std::string &str, int64_t &value);
 TError StringToInt(const std::string &string, int &value);

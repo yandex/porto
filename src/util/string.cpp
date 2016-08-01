@@ -21,19 +21,6 @@ string CommaSeparatedList(const vector<string> &list, const std::string &sep) {
     return ret;
 }
 
-TError StringsToIntegers(const std::vector<std::string> &strings,
-                         std::vector<int> &integers) {
-    for (auto l : strings) {
-        try {
-            integers.push_back(stoi(l));
-        } catch (...) {
-            return TError(EError::Unknown, string(__func__) + ": Bad integer value " + l);
-        }
-    }
-
-    return TError::Success();
-}
-
 TError StringToUint64(const std::string &str, uint64_t &value) {
     try {
         value = stoull(str);

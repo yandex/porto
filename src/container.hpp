@@ -10,7 +10,6 @@
 #include "util/log.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
-#include "task.hpp"
 
 class TEpollSource;
 class TCgroup;
@@ -23,12 +22,12 @@ class TContainerHolder;
 class TNetwork;
 class TNamespaceFd;
 class TNlLink;
-class TTask;
 class TContainerWaiter;
 class TClient;
 class TVolume;
 class TVolumeHolder;
 class TKeyValue;
+struct TBindMount;
 
 struct TEnv;
 
@@ -81,7 +80,9 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ParseNetConfig(struct TNetCfg &NetCfg);
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError ConfigureNetwork(struct TNetCfg &NetCfg);
-    TError PrepareTask(std::shared_ptr<TClient> client, struct TNetCfg *NetCfg);
+    TError PrepareTask(std::shared_ptr<TClient> client,
+                       struct TTaskEnv *TaskEnv,
+                       struct TNetCfg *NetCfg);
     TError KillAll(TScopedLock &holder_lock, uint64_t timeout_ms);
     void RemoveKvs();
 
@@ -144,7 +145,7 @@ public:
     std::vector<std::string> DefaultGw;
     std::vector<std::string> ResolvConf;
     std::vector<std::string> Devices;
-    std::vector<int> RootPid;
+
     int LoopDev;
     uint64_t StartTime;
     uint64_t DeathTime;
@@ -178,8 +179,9 @@ public:
     uint64_t StdoutOffset;
     uint64_t StderrOffset;
 
-    // TODO: make private
-    std::unique_ptr<TTask> Task;
+    TTask Task;
+    pid_t TaskVPid;
+    TTask WaitTask;
     std::shared_ptr<TNetwork> Net;
 
     TPath GetTmpDir() const;
