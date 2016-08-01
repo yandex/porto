@@ -259,38 +259,43 @@ void CloseFds(int max, const std::set<int> &except, bool openStd) {
     }
 }
 
-TError Run(const std::vector<std::string> &command, int &status, bool stdio) {
-    int pid = fork();
-    if (pid < 0) {
-        return TError(EError::Unknown, errno, "fork()");
-    } else if (pid > 0) {
-        int ret;
+TError RunCommand(const std::vector<std::string> &command) {
+    pid_t pid = fork();
+    if (pid < 0)
+        return TError(EError::Unknown, errno, "RunCommand: fork");
+
+    if (pid > 0) {
+        int ret, status;
 retry:
         ret = waitpid(pid, &status, 0);
         if (ret < 0) {
             if (errno == EINTR)
                 goto retry;
-            return TError(EError::Unknown, errno, "waitpid(" + std::to_string(pid) + ")");
+            return TError(EError::Unknown, errno, "RunCommand: waitpid");
         }
-    } else {
-        SetDieOnParentExit(SIGKILL);
-        if (!stdio) {
-            CloseFds(-1, {});
-            open("/dev/null", O_RDONLY);
-            open("/dev/null", O_WRONLY);
-            open("/dev/null", O_WRONLY);
-        }
-
-        char **p = (char **)malloc(sizeof(*p) * (command.size() + 1));
-        for (size_t i = 0; i < command.size(); i++)
-            p[i] = strdup(command[i].c_str());
-        p[command.size()] = nullptr;
-
-        execvp(command[0].c_str(), p);
-        _exit(EXIT_FAILURE);
+        if (WIFSIGNALED(status))
+            return TError(EError::Unknown, "RunCommand: " + command[0] +
+                    " killed by signal " + std::to_string(WTERMSIG(status)));
+        if (WEXITSTATUS(status))
+            return TError(EError::Unknown, "RunCommand: " + command[0] +
+                    " exit code " + std::to_string(WEXITSTATUS(status)));
+        return TError::Success();
     }
 
-    return TError::Success();
+    SetDieOnParentExit(SIGKILL);
+
+    CloseFds(-1, {});
+    open("/dev/null", O_RDONLY);
+    open("/dev/null", O_WRONLY);
+    open("/dev/null", O_WRONLY);
+
+    const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
+    for (size_t i = 0; i < command.size(); i++)
+        argv[i] = command[i].c_str();
+    argv[command.size()] = nullptr;
+
+    execvp(argv[0], (char **)argv);
+    _exit(EXIT_FAILURE);
 }
 
 TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
@@ -325,46 +330,21 @@ int GetNumCores() {
 }
 
 TError PackTarball(const TPath &tar, const TPath &path) {
-    int status;
-
-    TError error = Run({ "tar", "--one-file-system", "--numeric-owner",
-                         "--sparse",  "--transform", "s:^./::",
-                         "-cpaf", tar.ToString(), "-C", path.ToString(), "." }, status);
-    if (error)
-        return error;
-
-    if (status)
-        return TError(EError::Unknown, "Can't create tar " + std::to_string(status));
-
-    return TError::Success();
+    return RunCommand({ "tar", "--one-file-system", "--numeric-owner",
+                        "--sparse",  "--transform", "s:^./::",
+                        "-cpaf", tar.ToString(),
+                        "-C", path.ToString(), "." });
 }
 
 TError UnpackTarball(const TPath &tar, const TPath &path) {
-    int status;
-
-    TError error = Run({ "tar", "--numeric-owner", "-pxf", tar.ToString(), "-C", path.ToString() }, status);
-    if (error)
-        return error;
-
-    if (status)
-        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
-
-    return TError::Success();
+    return RunCommand({ "tar", "--numeric-owner", "-pxf", tar.ToString(),
+                        "-C", path.ToString() });
 }
 
 TError CopyRecursive(const TPath &src, const TPath &dst) {
-    int status;
-
-    TError error = Run({ "cp", "--archive", "--force",
-                               "--one-file-system", "--no-target-directory",
-                               src.ToString(), dst.ToString() }, status);
-    if (error)
-        return error;
-
-    if (status)
-        return TError(EError::Unknown, "Can't execute cp " + std::to_string(status));
-
-    return TError::Success();
+    return RunCommand({ "cp", "--archive", "--force",
+                        "--one-file-system", "--no-target-directory",
+                        src.ToString(), dst.ToString() });
 }
 
 void DumpMallocInfo() {

@@ -289,8 +289,8 @@ public:
     }
 
     static TError MakeImage(const TPath &path, const TCred &cred, off_t size) {
-        int fd, status;
         TError error;
+        int fd;
 
         fd = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
         if (fd < 0)
@@ -309,15 +309,9 @@ public:
         close(fd);
         fd = -1;
 
-        error = Run({ "mkfs.ext4", "-F", path.ToString()}, status);
+        error = RunCommand({ "mkfs.ext4", "-F", path.ToString()});
         if (error)
             goto remove_file;
-
-        if (status) {
-            error = TError(EError::Unknown, error.GetErrno(),
-                    "mkfs.ext4 returned " + std::to_string(status) + ": " + error.GetMsg());
-            goto remove_file;
-        }
 
         return TError::Success();
 
@@ -594,13 +588,8 @@ public:
     }
 
     TError UnmapDevice(std::string device) {
-        int status;
         L_ACT() << "Unmap rbd device " << device << std::endl;
-        TError error = Run({"rbd", "unmap", device}, status);
-        if (!error && status)
-            error = TError(EError::Unknown, "rbd unmap " + device +
-                                " returned " + std::to_string(status));
-        return error;
+        return RunCommand({"rbd", "unmap", device});
     }
 
     TError Build() override {

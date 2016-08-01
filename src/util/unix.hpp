@@ -46,7 +46,7 @@ public:
 
 TError SetOomScoreAdj(int value);
 
-TError Run(const std::vector<std::string> &command, int &status, bool stdio = false);
+TError RunCommand(const std::vector<std::string> &command);
 TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 int GetNumCores();
 TError PackTarball(const TPath &tar, const TPath &path);
