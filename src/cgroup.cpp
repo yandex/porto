@@ -691,17 +691,17 @@ std::vector<TSubsystem *> Hierarchies;
 
 TError InitializeCgroups() {
     TPath root(config().daemon().sysfs_root());
-    std::vector<std::shared_ptr<TMount>> mounts;
+    std::list<TMount> mounts;
     TMount mount;
     TError error;
 
-    error = mount.Find(root);
+    error = root.FindMount(mount);
     if (error) {
         L_ERR() << "Cannot find cgroups root mount: " << error << std::endl;
         return error;
     }
 
-    if (mount.GetMountpoint() != root) {
+    if (mount.Target != root) {
         error = root.Mount("cgroup", "tmpfs", 0, {});
         if (error) {
             L_ERR() << "Cannot mount cgroups root: " << error << std::endl;
@@ -709,7 +709,7 @@ TError InitializeCgroups() {
         }
     }
 
-    error = TMount::Snapshot(mounts);
+    error = TPath::ListAllMounts(mounts);
     if (error) {
         L_ERR() << "Can't create mount snapshot: " << error << std::endl;
         return error;
@@ -717,10 +717,8 @@ TError InitializeCgroups() {
 
     for (auto subsys: AllSubsystems) {
         for (auto &mnt: mounts) {
-            auto data = mnt->GetData();
-            if (mnt->GetType() == "cgroup" &&
-                    std::find(data.begin(), data.end(), subsys->Type) != data.end()) {
-                subsys->Root = mnt->GetMountpoint();
+            if (mnt.Type == "cgroup" && mnt.HasOption(subsys->Type)) {
+                subsys->Root = mnt.Target;
                 L() << "Found cgroup subsystem " << subsys->Type << " mounted at " << subsys->Root << std::endl;
                 break;
             }

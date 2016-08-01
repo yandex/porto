@@ -10,7 +10,6 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <sys/mount.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <libgen.h>
@@ -18,6 +17,7 @@ extern "C" {
 #include <linux/fs.h>
 #include <sys/syscall.h>
 #include <dirent.h>
+#include <mntent.h>
 }
 
 std::string TPath::DirNameStr() const {
@@ -900,4 +900,64 @@ TError TPath::ReadInt(int &value) const {
     if (!error)
         error = StringToInt(text, value);
     return error;
+}
+
+TError TPath::FindMount(TMount &mount) const {
+    std::string mounts = "/proc/self/mounts";
+    struct mntent* mnt, mntbuf;
+    char buf[4096];
+    FILE *file;
+
+    auto device = GetDev();
+    if (!device)
+        return TError(EError::Unknown, "device not found: " + Path);
+
+    file = setmntent(mounts.c_str(), "r");
+    if (!file)
+        return TError(EError::Unknown, errno, "setmntent " + mounts );
+
+    TPath normal = NormalPath();
+    bool found = false;
+    while ((mnt = getmntent_r(file, &mntbuf, buf, sizeof buf))) {
+        TPath source(mnt->mnt_fsname);
+        TPath target(mnt->mnt_dir);
+
+        if (!target.InnerPath(normal).IsEmpty() &&
+                (target.GetDev() == device || source.GetBlockDev() == device)) {
+            mount.Source = source;
+            mount.Target = target;
+            mount.Type = mnt->mnt_type;
+            mount.Options = mnt->mnt_opts;
+            found = true;
+            /* get last matching mountpoint */
+        }
+    }
+    endmntent(file);
+
+    if (!found)
+        return TError(EError::Unknown, "mountpoint not found: " + Path);
+
+    return TError::Success();
+}
+
+TError TPath::ListAllMounts(std::list<TMount> &list) {
+    std::string mounts = "/proc/self/mounts";
+    struct mntent* mnt, mntbuf;
+    char buf[4096];
+    FILE* file;
+
+    file = setmntent(mounts.c_str(), "r");
+    if (!file)
+        return TError(EError::Unknown, errno, "setmntent(" + mounts + ")");
+    while ((mnt = getmntent_r(file, &mntbuf, buf, sizeof buf)))
+        list.emplace_back(TMount{mnt->mnt_fsname, mnt->mnt_dir,
+                                 mnt->mnt_type, mnt->mnt_opts});
+    endmntent(file);
+    return TError::Success();
+}
+
+bool TMount::HasOption(const std::string &option) const {
+    std::string options = "," + Options + ",";
+    std::string mask = "," + option + ",";
+    return options.find(mask) != std::string::npos;
 }

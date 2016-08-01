@@ -1,5 +1,4 @@
 #include "quota.hpp"
-#include "mount.hpp"
 
 extern "C" {
 #include <linux/quota.h>
@@ -7,7 +6,6 @@ extern "C" {
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/mount.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <fts.h>
@@ -251,16 +249,15 @@ TError TProjectQuota::FindDevice() {
 	if (!Device.IsEmpty())
 		return TError::Success();
 
-	error = mount.Find(Path);
+	error = Path.FindMount(mount);
 	if (error)
 		return error;
 
-	if (mount.GetType() != "ext4")
-		return TError(EError::NotSupported,
-				"Unsupported filesystem " + mount.GetType());
+	if (mount.Type != "ext4")
+		return TError(EError::NotSupported, "Unsupported filesystem " + mount.Type);
 
-	Device = mount.GetSource();
-	RootPath = mount.GetMountpoint();
+	Device = mount.Source;
+	RootPath = mount.Target;
 	return TError::Success();
 }
 

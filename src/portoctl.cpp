@@ -1000,23 +1000,25 @@ public:
         if (error)
             return error;
 
-        vector<shared_ptr<TMount>> mounts;
-        error = TMount::Snapshot(mounts);
+        std::list<TMount> mounts;
+        error = TPath::ListAllMounts(mounts);
         if (error)
             return error;
 
-        for (auto &mount : mounts) {
-            auto data = mount->GetData();
+        for (auto &mnt : mounts) {
+            if (mnt.Type != "cgroup")
+                continue;
+
             bool found = true;
             for (auto &ss : subsystems) {
-                if (std::find(data.begin(), data.end(), ss) == data.end()) {
+                if (!mnt.HasOption(ss)) {
                     found = false;
                     break;
                 }
             }
 
             if (found) {
-                root = mount->GetMountpoint();
+                root = mnt.Target;
                 return TError::Success();
             }
         }

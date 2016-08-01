@@ -93,8 +93,8 @@ TError TKeyValue::Mount(const TPath &root) {
             return error;
     }
 
-    error = mount.Find(root);
-    if (error || mount.GetMountpoint() != root) {
+    error = root.FindMount(mount);
+    if (error || mount.Target != root) {
         error = root.Mount("tmpfs", "tmpfs",
                            MS_NOEXEC | MS_NOSUID | MS_NODEV,
                            { "size=" + std::to_string(config().keyvalue_size()),
@@ -103,7 +103,8 @@ TError TKeyValue::Mount(const TPath &root) {
                              "gid=" + std::to_string(GetPortoGroupId()) });
         if (error)
             return error;
-    }
+    } else if (mount.Type != "tmpfs")
+        return TError(EError::Unknown, "KeyValue: found non-tmpfs mount at " + root.ToString());
 
     std::vector<std::string> names;
     error = root.ReadDirectory(names);

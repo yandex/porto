@@ -2,11 +2,15 @@
 
 #include <string>
 #include <vector>
-#include <functional>
+#include <list>
 
 #include "util/error.hpp"
-#include "string.hpp"
 #include "util/cred.hpp"
+#include "util/string.hpp"
+
+extern "C" {
+#include <sys/mount.h>
+}
 
 struct TStatFS {
     uint64_t SpaceUsage;
@@ -18,6 +22,8 @@ struct TStatFS {
         SpaceUsage = SpaceAvail = InodeUsage = InodeAvail = 0;
     }
 };
+
+struct TMount;
 
 class TPath {
     std::string Path;
@@ -152,6 +158,9 @@ public:
     static std::string MountFlagsToString(unsigned long flags);
     static std::string UmountFlagsToString(unsigned long flags);
 
+    TError FindMount(TMount &mount) const;
+    static TError ListAllMounts(std::list<TMount> &list);
+
     TError Mount(TPath source, std::string type, unsigned long flags,
                  std::vector<std::string> options) const;
     TError Bind(TPath source) const;
@@ -165,4 +174,19 @@ public:
     TError ReadInt(int &value) const;
 
     TError WriteAll(const std::string &text) const;
+};
+
+struct TMount {
+    TPath Source;
+    TPath Target;
+    std::string Type;
+    std::string Options;
+
+    bool HasOption(const std::string &option) const;
+
+    friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
+        stream << mount.Source << " " << mount.Target
+               << " -t " << mount.Type << " -o " << mount.Options;
+        return stream;
+    }
 };

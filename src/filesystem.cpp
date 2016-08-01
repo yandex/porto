@@ -112,13 +112,13 @@ TError TMountNamespace::RemountRootRo() {
         return TError::Success();
 
     // remount everything except binds to ro
-    std::vector<std::shared_ptr<TMount>> snapshot;
-    TError error = TMount::Snapshot(snapshot);
+    std::list<TMount> mounts;
+    TError error = TPath::ListAllMounts(mounts);
     if (error)
         return error;
 
-    for (auto mnt : snapshot) {
-        TPath path = Root.InnerPath(mnt->GetMountpoint());
+    for (auto &mnt : mounts) {
+        TPath path = Root.InnerPath(mnt.Target);
         if (path.IsEmpty())
             continue;
 
@@ -132,7 +132,7 @@ TError TMountNamespace::RemountRootRo() {
         if (skip)
             continue;
 
-        error = mnt->GetMountpoint().Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
+        error = mnt.Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
         if (error)
             return error;
     }

@@ -2,6 +2,7 @@
 #include <string>
 #include <algorithm>
 #include <csignal>
+#include <iostream>
 
 #include "version.hpp"
 #include "statistics.hpp"

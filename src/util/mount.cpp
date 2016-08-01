@@ -21,62 +21,6 @@ extern "C" {
 #include <unistd.h>
 }
 
-TError TMount::Snapshot(std::vector<std::shared_ptr<TMount>> &result, const TPath mounts) {
-    FILE* f = setmntent(mounts.c_str(), "r");
-    if (!f)
-        return TError(EError::Unknown, errno, "setmntent(" + mounts.ToString() + ")");
-
-    struct mntent* m, mntbuf;
-    std::array<char, 4096> buf;
-    while ((m = getmntent_r(f, &mntbuf, buf.data(), buf.size()))) {
-        std::vector<std::string> flags;
-        TError error = SplitString(m->mnt_opts, ',', flags);
-        if (error) {
-            endmntent(f);
-            return error;
-        }
-        result.push_back(std::make_shared<TMount>(m->mnt_fsname, m->mnt_dir, m->mnt_type, flags));
-    }
-    endmntent(f);
-    return TError::Success();
-}
-
-TError TMount::Find(TPath path, const TPath mounts) {
-
-    path = path.NormalPath();
-    auto device = path.GetDev();
-    if (!device)
-        return TError(EError::Unknown, "device not found: " + path.ToString() + ")");
-
-    FILE* f = setmntent(mounts.c_str(), "r");
-    if (!f)
-        return TError(EError::Unknown, errno, "setmntent(" + mounts.ToString() + ")");
-
-    struct mntent* m, mntbuf;
-    std::array<char, 4096> buf;
-    TError error(EError::Unknown, "mountpoint not found: " + path.ToString() + ")");
-
-    while ((m = getmntent_r(f, &mntbuf, buf.data(), buf.size()))) {
-
-        TPath source(m->mnt_fsname);
-        TPath target(m->mnt_dir);
-
-        if (target.InnerPath(path).IsEmpty() ||
-                (target.GetDev() != device &&
-                 source.GetBlockDev() != device))
-            continue;
-
-        Source = source;
-        Target = target;
-        Type = m->mnt_type;
-        Data.clear();
-        error = SplitString(m->mnt_opts, ',', Data);
-    }
-    endmntent(f);
-
-    return error;
-}
-
 TError SetupLoopDevice(TPath image, int &dev)
 {
     static std::mutex BigLoopLock;
