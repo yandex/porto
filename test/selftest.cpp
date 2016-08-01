@@ -2019,60 +2019,6 @@ static void TestHostnameProperty(Porto::Connection &api) {
     AsAlice(api);
 }
 
-static void TestBindProperty(Porto::Connection &api) {
-    string name = "a";
-    ExpectApiSuccess(api.Create(name));
-
-    Say() << "Check bind parsing" << std::endl;
-    ExpectApiFailure(api.SetProperty(name, "bind", "/tmp"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin"));
-    ExpectApiFailure(api.SetProperty(name, "bind", "/tmp /bin xyz"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro"));
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin rw"));
-    ExpectApiFailure(api.SetProperty(name, "bind", "/tmp /bin ro; q"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro; /tmp /sbin"));
-
-    Say() << "Check bind without root isolation" << std::endl;
-    string path = config().container().tmp_dir() + "/" + name;
-
-    TPath tmp("/tmp/27389");
-    if (tmp.Exists())
-        ExpectSuccess(tmp.RemoveAll());
-    ExpectSuccess(tmp.MkdirAll(0755));
-
-    ExpectApiSuccess(api.SetProperty(name, "command", "cat /proc/self/mountinfo"));
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/bin bin ro; /tmp/27389 tmp"));
-    string v = StartWaitAndGetData(api, name, "stdout");
-    auto m = ParseMountinfo(v);
-
-    ExpectNeq(m[path + "/bin"].flags.find("ro,"), string::npos);
-    ExpectNeq(m[path + "/tmp"].flags.find("rw,"), string::npos);
-    ExpectApiSuccess(api.Stop(name));
-
-    path = TMPDIR + "/" + name;
-
-    RemakeDir(api, path);
-    AsRoot(api);
-    BootstrapCommand("/bin/cat", path, false);
-    AsAlice(api);
-
-    ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
-    ExpectApiSuccess(api.SetProperty(name, "root", path));
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
-    v = StartWaitAndGetData(api, name, "stdout");
-    m = ParseMountinfo(v);
-    ExpectNeq(m["/"].flags.find("rw,"), string::npos);
-    ExpectNeq(m["/bin"].flags.find("ro,"), string::npos);
-    ExpectNeq(m["/tmp"].flags.find("rw,"), string::npos);
-    ExpectApiSuccess(api.Stop(name));
-
-    Say() << "Make sure bind creates missing directories" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/sbin /a/b/c ro; /sbin/init /x/y/z/init ro"));
-    ExpectApiSuccess(api.Start(name));
-
-    ExpectApiSuccess(api.Destroy(name));
-}
-
 static vector<string> StringToVec(const std::string &s) {
     vector<string> lines;
 
@@ -5418,7 +5364,6 @@ int SelfTest(std::vector<std::string> args) {
         { "root_property", TestRootProperty },
         { "root_readonly", TestRootRdOnlyProperty },
         { "hostname_property", TestHostnameProperty },
-        { "bind_property", TestBindProperty },
         { "net_property", TestNetProperty },
         { "capabilities_property", TestCapabilitiesProperty },
         { "enable_porto_property", TestEnablePortoProperty },
