@@ -746,7 +746,7 @@ TError TPath::Bind(TPath source) const {
     L_ACT() << "bind mount " << Path << " " << source << " " << std::endl;
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND, NULL))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() +
-                ", " + Path + ", , M_BIND, )");
+                ", " + Path + ", , MS_BIND, )");
     return TError::Success();
 }
 
@@ -776,12 +776,17 @@ TError TPath::Umount(unsigned long flags) const {
 }
 
 TError TPath::UmountAll() const {
-    TError error = Umount(UMOUNT_NOFOLLOW);
-    if (error && error.GetErrno() == EINVAL)
-        return TError::Success(); /* not a mountpoint */
-    if (error)
-        error = Umount(UMOUNT_NOFOLLOW | MNT_DETACH);
-    return error;
+    L_ACT() << "UmountAll " << Path << " " << std::endl;
+    while (1) {
+        if (umount2(c_str(), UMOUNT_NOFOLLOW)) {
+            if (errno == EINVAL)
+                return TError::Success(); /* not a mountpoint */
+            if (errno == EBUSY)
+                umount2(c_str(), UMOUNT_NOFOLLOW | MNT_DETACH);
+            else
+                return TError(EError::Unknown, errno, "umount2(" + Path + ")");
+        }
+    }
 }
 
 TError TPath::ReadAll(std::string &text, size_t max) const {
