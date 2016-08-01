@@ -287,7 +287,7 @@ void CloseFds(int max, const std::set<int> &except, bool openStd) {
     }
 }
 
-TError RunCommand(const std::vector<std::string> &command) {
+TError RunCommand(const std::vector<std::string> &command, const TPath &cwd) {
     pid_t pid = fork();
     if (pid < 0)
         return TError(EError::Unknown, errno, "RunCommand: fork");
@@ -316,6 +316,20 @@ retry:
     open("/dev/null", O_RDONLY);
     open("/dev/null", O_WRONLY);
     open("/dev/null", O_WRONLY);
+
+    /* Remount everything except CWD Read-Only */
+    if (!cwd.IsRoot()) {
+        std::list<TMount> mounts;
+        if (unshare(CLONE_NEWNS) || TPath("/").Remount(MS_PRIVATE | MS_REC) ||
+                TPath::ListAllMounts(mounts))
+            _exit(EXIT_FAILURE);
+        for (auto &mnt: mounts)
+            mnt.Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
+        cwd.BindRemount(cwd, 0);
+    }
+
+    if (cwd.Chdir())
+        _exit(EXIT_FAILURE);
 
     const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
     for (size_t i = 0; i < command.size(); i++)
@@ -361,18 +375,17 @@ TError PackTarball(const TPath &tar, const TPath &path) {
     return RunCommand({ "tar", "--one-file-system", "--numeric-owner",
                         "--sparse",  "--transform", "s:^./::",
                         "-cpaf", tar.ToString(),
-                        "-C", path.ToString(), "." });
+                        "-C", path.ToString(), "." }, tar.DirName());
 }
 
 TError UnpackTarball(const TPath &tar, const TPath &path) {
-    return RunCommand({ "tar", "--numeric-owner", "-pxf", tar.ToString(),
-                        "-C", path.ToString() });
+    return RunCommand({ "tar", "--numeric-owner", "-pxf", tar.ToString()}, path);
 }
 
 TError CopyRecursive(const TPath &src, const TPath &dst) {
     return RunCommand({ "cp", "--archive", "--force",
                         "--one-file-system", "--no-target-directory",
-                        src.ToString(), dst.ToString() });
+                        src.ToString(), "." }, dst);
 }
 
 void DumpMallocInfo() {

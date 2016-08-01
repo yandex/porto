@@ -309,7 +309,7 @@ public:
         close(fd);
         fd = -1;
 
-        error = RunCommand({ "mkfs.ext4", "-F", path.ToString()});
+        error = RunCommand({ "mkfs.ext4", "-F", path.ToString()}, path.DirName());
         if (error)
             goto remove_file;
 
@@ -589,7 +589,7 @@ public:
 
     TError UnmapDevice(std::string device) {
         L_ACT() << "Unmap rbd device " << device << std::endl;
-        return RunCommand({"rbd", "unmap", device});
+        return RunCommand({"rbd", "unmap", device}, "/");
     }
 
     TError Build() override {
