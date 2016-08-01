@@ -38,24 +38,17 @@ struct TTaskEnv {
     TUnixSocket Sock2, MasterSock2;
     int ReportStage = 0;
 
-    void ReportPid(pid_t pid);
-
     TError Start();
-    TError ChildApplyCapabilities();
-    TError ChildExec();
-    TError ChildBindDns();
-    TError ChildMountBinds();
-    TError ChildMountRun();
-    TError ChildMountRootFs();
-    TError ChildRemountRootRo();
-    TError ChildIsolateFs();
+    void StartChild();
 
+    TError ConfigureChild();
     TError ChildApplyLimits();
     TError WriteResolvConf();
     TError ChildSetHostname();
-    TError ConfigureChild();
+
     TError WaitAutoconf();
-    void StartChild();
-    void Restore(std::vector<int> pids);
+    TError ChildExec();
+
+    void ReportPid(pid_t pid);
     void Abort(const TError &error);
 };
