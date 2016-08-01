@@ -133,55 +133,27 @@ TError TTaskEnv::ChildApplyLimits() {
 }
 
 TError TTaskEnv::WriteResolvConf() {
-    char tmp[] = "/run/resolv.conf.XXXXXX";
-    std::string buf;
-    TError error;
+    std::string cfg;
 
     if (CT->BindDns || !CT->ResolvConf.size())
         return TError::Success();
 
-    TPath path("/etc/resolv.conf");
-    if (!path.Exists()) {
-        error = path.Mkfile(0644);
-        if (error)
-            return error;
-    } else if (!path.IsRegularStrict())
-        return TError(EError::InvalidValue, "non-regular file /etc/resolv.conf");
-
-
-    TScopedFd fd(mkstemp(tmp));
-    if (fd.GetFd() < 0)
-        return TError(EError::Unknown, errno,
-                "cannot create temporary resolv.conf");
-
     for (auto &line: CT->ResolvConf)
-        buf += line + "\n";
+        cfg += line + "\n";
 
-    if (unlink(tmp) || fchmod(fd.GetFd(), 0644) ||
-            write(fd.GetFd(), buf.c_str(), buf.size()) != (ssize_t)buf.size())
-        return TError(EError::Unknown, errno,
-                "cannot write temporary resolv.conf");
-
-    error = path.UmountAll();
-    if (!error)
-        error = path.Bind("/proc/self/fd/" + std::to_string(fd.GetFd()));
-    return error;
+    return TPath("/etc/resolv.conf").WritePrivate(cfg);
 }
 
-TError TTaskEnv::ChildSetHostname() {
-    if (CT->Hostname == "")
-        return TError::Success();
+TError TTaskEnv::SetHostname() {
+    TError error;
 
-    if (SetEtcHostname) {
-        TPath path("/etc/hostname");
-        if (path.Exists()) {
-            TError error = path.WriteAll(CT->Hostname + "\n");
-            if (error)
-                return error;
-        }
+    if (CT->Hostname.size()) {
+        error = TPath("/etc/hostname").WritePrivate(CT->Hostname + "\n");
+        if (!error)
+            error = SetHostName(CT->Hostname);
     }
 
-    return SetHostName(CT->Hostname);
+    return error;
 }
 
 TError TTaskEnv::ConfigureChild() {
@@ -245,7 +217,7 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
-    error = ChildSetHostname();
+    error = SetHostname();
     if (error)
         return error;
 

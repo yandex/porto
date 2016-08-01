@@ -848,10 +848,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) &&
                           Isolate && !Command.empty();
 
-    taskEnv->SetEtcHostname = (VirtMode == VIRT_MODE_OS) &&
-                                !taskEnv->Mnt.Root.IsRoot() &&
-                                !taskEnv->Mnt.RootRdOnly;
-
     taskEnv->Mnt.BindDns = BindDns && !ResolvConf.size();
 
     taskEnv->Stdin = Stdin;
@@ -903,6 +899,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->NewMountNs = Isolate ||
                           taskEnv->Mnt.BindMounts.size() ||
                           taskEnv->Mnt.BindDns ||
+                          Hostname.size() ||
                           ResolvConf.size() ||
                           !taskEnv->Mnt.Root.IsRoot() ||
                           taskEnv->Mnt.RootRdOnly;

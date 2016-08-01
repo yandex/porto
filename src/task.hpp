@@ -27,7 +27,6 @@ struct TTaskEnv {
     bool QuadroFork;
     TStdStream Stdin, Stdout, Stderr;
     TNamespaceSnapshot ParentNs;
-    bool SetEtcHostname;
     std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;
     bool NewMountNs;
@@ -44,7 +43,7 @@ struct TTaskEnv {
     TError ConfigureChild();
     TError ChildApplyLimits();
     TError WriteResolvConf();
-    TError ChildSetHostname();
+    TError SetHostname();
 
     TError WaitAutoconf();
     TError ChildExec();

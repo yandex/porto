@@ -174,6 +174,7 @@ public:
     TError ReadInt(int &value) const;
 
     TError WriteAll(const std::string &text) const;
+    TError WritePrivate(const std::string &text) const;
 };
 
 struct TMount {

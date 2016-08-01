@@ -860,6 +860,32 @@ TError TPath::WriteAll(const std::string &text) const {
     return error;
 }
 
+TError TPath::WritePrivate(const std::string &text) const {
+    std::string tmp = "/run/" + BaseName() + ".XXXXXX";
+    std::string buf;
+    TError error;
+
+    if (!Exists()) {
+        error = Mkfile(0644);
+        if (error)
+            return error;
+    } else if (!IsRegularStrict())
+        return TError(EError::InvalidValue, "non-regular file " + Path);
+
+    TScopedFd fd(mkstemp(&tmp[0]));
+    if (fd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "cannot create temporary " + tmp);
+
+    if (unlink(tmp.c_str()) || fchmod(fd.GetFd(), 0644) ||
+            write(fd.GetFd(), text.c_str(), text.size()) != (ssize_t)text.size())
+        return TError(EError::Unknown, errno, "cannot write temporary " + tmp);
+
+    error = UmountAll();
+    if (!error)
+        error = Bind("/proc/self/fd/" + std::to_string(fd.GetFd()));
+    return error;
+}
+
 TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
     char *line = nullptr;
     size_t line_len = 0;
