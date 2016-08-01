@@ -135,7 +135,7 @@ TError TTaskEnv::ChildApplyLimits() {
 TError TTaskEnv::WriteResolvConf() {
     std::string cfg;
 
-    if (CT->BindDns || !CT->ResolvConf.size())
+    if (!CT->ResolvConf.size())
         return TError::Success();
 
     for (auto &line: CT->ResolvConf)
@@ -197,6 +197,12 @@ TError TTaskEnv::ConfigureChild() {
 
     for (auto &dev: Devices) {
         error = dev.Makedev(Mnt.Root);
+        if (error)
+            return error;
+    }
+
+    if (!Mnt.Root.IsRoot() && CT->BindDns && !CT->ResolvConf.size()) {
+        error = Mnt.BindResolvConf();
         if (error)
             return error;
     }

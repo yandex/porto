@@ -364,12 +364,6 @@ TError TMountNamespace::MountRootFs() {
     if (error)
         return error;
 
-    if (BindDns) {
-        error = BindResolvConf();
-        if (error)
-            return error;
-    }
-
     return TError::Success();
 }
 

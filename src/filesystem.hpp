@@ -24,7 +24,6 @@ public:
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRdOnly;
     std::vector<TBindMount> BindMounts;
-    bool BindDns;
     bool BindPortoSock;
     int LoopDev;
 
