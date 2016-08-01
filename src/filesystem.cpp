@@ -368,18 +368,6 @@ TError TMountNamespace::MountRootFs() {
         error = BindResolvConf();
         if (error)
             return error;
-    } else if (ResolvConf.length()) {
-        TPath resolvconf = Root + "/etc/resolv.conf";
-        if (!resolvconf.IsRegularStrict()) {
-            if (!resolvconf.Exists())
-                error = resolvconf.Mkfile(0644);
-            else
-                error = TError(EError::InvalidState, "non-regular file");
-        }
-        if (!error)
-            error = resolvconf.WriteAll(ResolvConf);
-        if (error)
-            return TError(error, "cannot write /etc/resolv.conf");
     }
 
     return TError::Success();

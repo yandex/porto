@@ -26,7 +26,6 @@ public:
     std::vector<TBindMount> BindMounts;
     bool BindDns;
     bool BindPortoSock;
-    std::string ResolvConf;
     int LoopDev;
 
     TError MountBinds();

@@ -852,18 +852,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                                 !taskEnv->Mnt.Root.IsRoot() &&
                                 !taskEnv->Mnt.RootRdOnly;
 
-    taskEnv->Mnt.BindDns = BindDns;
-
-    if (PropMask & RESOLV_CONF_SET) {
-        if (taskEnv->Mnt.Root.IsRoot())
-            return TError(EError::InvalidValue,
-                    "resolv_conf requires separate root");
-
-        taskEnv->Mnt.BindDns = false;
-        BindDns = false;
-        for (auto &line: ResolvConf)
-            taskEnv->Mnt.ResolvConf += line + "\n";
-    }
+    taskEnv->Mnt.BindDns = BindDns && !ResolvConf.size();
 
     taskEnv->Stdin = Stdin;
     taskEnv->Stdout = Stdout;
@@ -914,6 +903,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->NewMountNs = Isolate ||
                           taskEnv->Mnt.BindMounts.size() ||
                           taskEnv->Mnt.BindDns ||
+                          ResolvConf.size() ||
                           !taskEnv->Mnt.Root.IsRoot() ||
                           taskEnv->Mnt.RootRdOnly;
 

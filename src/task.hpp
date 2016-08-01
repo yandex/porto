@@ -51,6 +51,7 @@ struct TTaskEnv {
     TError ChildIsolateFs();
 
     TError ChildApplyLimits();
+    TError WriteResolvConf();
     TError ChildSetHostname();
     TError ConfigureChild();
     TError WaitAutoconf();
