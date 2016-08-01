@@ -238,6 +238,46 @@ TError TMountNamespace::BindResolvConf() {
     return TError::Success();
 }
 
+TError TMountNamespace::MountTraceFs() {
+    TError error;
+
+    if (!config().container().enable_tracefs())
+        return TError::Success();
+
+    TPath debugfs(Root / "sys/kernel/debug");
+    if (debugfs.Exists()) {
+        TPath tmp = debugfs / "tmp";
+        TPath tmp_tracefs = tmp / "tracing";
+        TPath tracefs = debugfs / "tracing";
+        error = debugfs.Mount("none", "tmpfs", 0, {"mode=755"});
+        if (!error)
+            error = tracefs.Mkdir(0700);
+        if (!error)
+            error = tmp.Mkdir(0700);
+        if (!error)
+            error = tmp.Mount("none", "debugfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
+        if (!error)
+            error = tracefs.Bind(tmp_tracefs);
+        if (!error)
+            error = tmp.Umount(0);
+        if (!error)
+            error = tmp.Rmdir();
+        if (!error)
+            error = debugfs.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
+        if (error)
+            return error;
+    }
+
+    TPath tracefs(Root / "sys/kernel/tracing");
+    if (tracefs.Exists()) {
+        error = tracefs.Mount("none", "tracefs", MS_RDONLY | MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 TError TMountNamespace::MountRootFs() {
     TError error;
 
@@ -278,6 +318,10 @@ TError TMountNamespace::MountRootFs() {
     error = MountRun();
     if (error)
         return error;
+
+    error = MountTraceFs();
+    if (error)
+        L_ERR() << "Cannot mount tracefs " << error << std::endl;
 
     if (BindPortoSock) {
         TPath sock(PORTO_SOCKET_PATH);

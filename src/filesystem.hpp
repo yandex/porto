@@ -31,6 +31,7 @@ public:
     TError BindResolvConf();
     TError RemountRootRo();
     TError MountRun();
+    TError MountTraceFs();
     TError MountRootFs();
     TError IsolateFs();
 };

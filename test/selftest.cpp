@@ -1679,6 +1679,13 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
         "/",
     };
 
+    if (config().container().enable_tracefs()) {
+        expected.insert("/sys/kernel/debug");
+        expected.insert("/sys/kernel/debug/tracing");
+        if (TPath("/sys/kernel/tracing").Exists())
+            expected.insert("/sys/kernel/tracing");
+    }
+
     ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
     ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
     ExpectApiSuccess(api.SetProperty(name, "bind_dns", "false"));
