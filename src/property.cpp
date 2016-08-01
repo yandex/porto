@@ -1172,6 +1172,21 @@ TError TRootRo::Get(std::string &ro) {
     return TError::Success();
 }
 
+class TUmask : public TProperty {
+public:
+    TUmask() : TProperty(P_UMASK, UMASK_SET, "Set file mode creation mask") { }
+    TError Get(std::string &value) {
+        value = StringFormat("%#o", CurrentContainer->Umask);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        return StringToOct(value, CurrentContainer->Umask);
+    }
+} static Umask;
+
 class THostname : public TProperty {
 public:
     TError Set(const std::string &hostname);

@@ -58,6 +58,7 @@ constexpr const char *P_ENABLE_PORTO = "enable_porto";
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
 constexpr const char *P_WEAK = "weak";
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
+constexpr const char *P_UMASK = "umask";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
@@ -147,6 +148,7 @@ constexpr uint64_t OOM_KILLED_SET = (1lu << 54);
 constexpr uint64_t RESPAWN_COUNT_SET = (1lu << 55);
 constexpr uint64_t EXIT_STATUS_SET = (1lu << 56);
 constexpr uint64_t CAPABILITIES_AMBIENT_SET = (1lu << 57);
+constexpr uint64_t UMASK_SET = (1ul << 58);
 
 constexpr const char *P_VIRT_MODE_APP = "app";
 constexpr const char *P_VIRT_MODE_OS = "os";

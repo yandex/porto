@@ -69,6 +69,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     StderrPath = "stderr";
     Root = "/";
     RootRo = false;
+    Umask = 0002;
     Isolate = true;
     BindDns = false; /* Because root is default */
     VirtMode = VIRT_MODE_APP;

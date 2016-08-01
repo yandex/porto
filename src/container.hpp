@@ -130,6 +130,7 @@ public:
     std::string StderrPath;
     std::string Root;
     bool RootRo;
+    mode_t Umask;
     int VirtMode = 0;
     bool BindDns;
     bool Isolate;

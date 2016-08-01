@@ -309,6 +309,8 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
+    umask(CT->Umask);
+
     return TError::Success();
 }
 
