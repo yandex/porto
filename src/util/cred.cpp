@@ -386,6 +386,10 @@ TError TCapabilities::ApplyAmbient() const {
     return TError::Success();
 }
 
+TError TCapabilities::ApplyEffective() const {
+    return Apply(1);
+}
+
 TCapabilities NoCapabilities;
 TCapabilities PortoInitCapabilities;
 TCapabilities MemCgCapabilities;

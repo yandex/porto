@@ -297,6 +297,12 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
+    if (!Cred.IsRootUser()) {
+        error = CT->CapAmbient.ApplyEffective();
+        if (error)
+            return error;
+    }
+
     error = Stdin.OpenInChild(Cred);
     if (error)
         return error;

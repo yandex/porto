@@ -68,6 +68,7 @@ struct TCapabilities {
     TError Apply(int mask) const;
     TError ApplyLimit() const;
     TError ApplyAmbient() const;
+    TError ApplyEffective() const;
     TError Load(pid_t pid, int type);
     void Dump();
     friend std::ostream& operator<<(std::ostream& os, const TCapabilities &c) {
