@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "util/log.hpp"
 #include "client.hpp"
+#include "container.hpp"
 
 extern "C" {
 #include <sys/ioctl.h>
@@ -11,95 +12,101 @@ extern "C" {
 #include <sys/stat.h>
 };
 
-TStdStream::TStdStream() {
+bool TStdStream::IsNull(void) const {
+    return Path.IsEmpty() || Path.ToString() == "/dev/null";
 }
 
-TStdStream::TStdStream(int stream,
-                       const TPath &inner_path, const TPath &host_path,
-                       bool managed_by_porto) :
-    Stream(stream),
-    PathOnHost(host_path), PathInContainer(inner_path),
-    ManagedByPorto(managed_by_porto)
-{
-    if (PathInContainer == "/dev/null") {
-        PathOnHost = "/dev/null";
-        ManagedByPorto = true;
+/* /dev/fd/%d redirects into client task fd */
+bool TStdStream::IsRedirect(void) const {
+    return StringStartsWith(Path.ToString(), "/dev/fd/");
+}
+
+TPath TStdStream::ResolveOutside(const TContainer &container) const {
+    if (IsNull() || IsRedirect())
+        return TPath();
+    if (Outside) {
+        if (Path.IsAbsolute())
+            return Path;
+        return container.WorkPath() / Path;
     }
-
-    if (StringStartsWith(PathInContainer.ToString(), "/dev/fd/"))
-        ManagedByPorto = true;
+    if (Path.IsAbsolute())
+        return container.RootPath() / Path;
+    return container.RootPath() / container.Cwd / Path;
 }
 
-TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
-    int clientFd = -1;
+TError TStdStream::Open(const TPath &path, const TCred &cred) {
+    int fd, flags;
 
-    if (StringStartsWith(PathInContainer.ToString(), "/dev/fd/") &&
-            StringToInt(PathInContainer.ToString().substr(8), clientFd))
-        return TError(EError::InvalidValue, "invalid std path: " +
-                                            PathInContainer.ToString());
+    Offset = 0;
+    Created = false;
 
-    if (clientFd >= 0) {
-        if (client) {
-            TPath fd(StringFormat("/proc/%u/fd/%u", client->GetPid(), clientFd));
-            if (!fd.HasAccess(client->TaskCred, Stream ? TPath::W : TPath::R) &&
-                    !fd.HasAccess(client->Cred, Stream ? TPath::W : TPath::R))
-                return TError(EError::Permission,
-                              std::string("client have no ") +
-                              (Stream ? "write" : "read") +
-                              " access to " + PathInContainer.ToString());
-            PathOnHost = fd;
-        } else
-            PathOnHost = "/dev/null";
-    }
-
-    return TError::Success();
-}
-
-TError TStdStream::Open(const TPath &path, const TCred &cred) const {
-    int flags = O_RDONLY;
-
-    if (Stream != STDIN_FILENO)
-        flags = O_WRONLY | O_CREAT | O_APPEND;
+    if (Stream)
+        flags = O_WRONLY | O_APPEND;
+    else
+        flags = O_RDONLY;
 
     /* Never assign controlling terminal at open */
     flags |= O_NOCTTY;
 
-    int ret = open(path.ToString().c_str(), flags, 0660);
-    if (ret < 0)
-        return TError(EError::InvalidValue, errno,
-                      "open(" + path.ToString() + ") -> " +
-                      std::to_string(ret));
+retry:
+    fd = open(path.c_str(), flags);
+    if (fd < 0 && errno == ENOENT && Stream) {
+        fd = open(path.c_str(), flags | O_CREAT | O_EXCL, 0660);
+        if (fd < 0 && errno == EEXIST)
+            goto retry;
+        Created = true;
+        if (fd >= 0 && fchown(fd, cred.Uid, cred.Gid))
+            return TError(EError::Unknown, errno, "fchown " + path.ToString());
+    }
+    if (fd < 0)
+        return TError(EError::InvalidValue, errno, "open " + path.ToString());
 
-    if (ret != Stream) {
-        if (dup2(ret, Stream) < 0) {
-            close(ret);
-            return TError(EError::Unknown, errno, "dup2(" + std::to_string(ret) +
+    if (fd != Stream) {
+        if (dup2(fd, Stream) < 0) {
+            close(fd);
+            return TError(EError::Unknown, errno, "dup2(" + std::to_string(fd) +
                           ", " + std::to_string(Stream) + ")");
         }
-        close(ret);
-        ret = Stream;
-    }
-
-    if (path.IsRegularStrict()) {
-        ret = fchown(ret, cred.Uid, cred.Gid);
-        if (ret < 0)
-            return TError(EError::Unknown, errno, "fchown(" + path.ToString() + ")");
+        close(fd);
     }
 
     return TError::Success();
 }
 
-TError TStdStream::OpenOnHost(const TCred &cred) const {
-    if (ManagedByPorto)
-        return Open(PathOnHost, cred);
+TError TStdStream::OpenOutside(const TContainer &container, const TClient &client) {
+    if (IsNull())
+        return Open("/dev/null", container.OwnerCred);
+
+    if (IsRedirect()) {
+        int clientFd = -1;
+        TError error;
+
+        error = StringToInt(Path.ToString().substr(8), clientFd);
+        if (error)
+            return error;
+
+        TPath path(StringFormat("/proc/%u/fd/%u", client.GetPid(), clientFd));
+        error = Open(path, container.OwnerCred);
+        if (error)
+            return error;
+
+        /* check permissions agains our copy */
+        path = StringFormat("/proc/self/fd/%u", Stream);
+        if (!path.HasAccess(client.TaskCred, Stream ? TPath::W : TPath::R) &&
+                !path.HasAccess(client.Cred, Stream ? TPath::W : TPath::R))
+            return TError(EError::Permission,
+                    "Not enough permissions for redirect: " + Path.ToString());
+    } else if (Outside)
+        return Open(ResolveOutside(container), container.OwnerCred);
+
     return TError::Success();
 }
 
-TError TStdStream::OpenInChild(const TCred &cred) const {
+TError TStdStream::OpenInside(const TContainer &container) {
     TError error;
 
-    if (!ManagedByPorto)
-        error = Open(PathInContainer, cred);
+    if (!Outside && !IsNull() && !IsRedirect())
+        error = Open(Path, container.OwnerCred);
 
     /* Assign controlling terminal for our own session */
     if (!error && isatty(Stream))
@@ -108,48 +115,77 @@ TError TStdStream::OpenInChild(const TCred &cred) const {
     return error;
 }
 
-TError TStdStream::Rotate(off_t limit, off_t &loss) const {
-    loss = 0;
-    if (PathOnHost.IsRegularStrict())
-        return PathOnHost.RotateLog(config().container().max_log_size(), loss);
-    return TError::Success();
+TError TStdStream::Remove(const TContainer &container) {
+    if (!Created)
+        return TError::Success();
+    TPath path = ResolveOutside(container);
+    if (path.IsEmpty() || !path.IsRegularStrict())
+        return TError::Success();
+    Created = false;
+    TError error = path.Unlink();
+    if (error)
+        L_ERR() << "Cannot remove " << path << " : " << error << std::endl;
+    return error;
 }
 
-TError TStdStream::Cleanup() {
-    if (ManagedByPorto && PathOnHost.IsRegularStrict() && Stream) {
-        TError err = PathOnHost.Unlink();
-        if (err)
-            L_ERR() << "Can't remove std log: " << err << std::endl;
-        return err;
+TError TStdStream::Rotate(const TContainer &container) {
+    TPath path = ResolveOutside(container);
+    if (path.IsEmpty() || !path.IsRegularStrict())
+        return TError::Success();
+    off_t loss;
+    TError error = path.RotateLog(Limit, loss);
+    if (error) {
+        L_ERR() << "Cannot rotate " << path << " : " << error << std::endl;
+        return error;
     }
-
+    Offset += loss;
     return TError::Success();
 }
 
-TError TStdStream::Read(std::string &text, off_t limit, uint64_t base, const std::string &start_offset) const {
-    uint64_t offset = 0;
+TError TStdStream::Read(const TContainer &container, std::string &text,
+                        const std::string &range) const {
+    std::string off = "", lim = "";
+    uint64_t offset, limit;
     TError error;
+    TPath path = ResolveOutside(container);
 
-    if (!PathOnHost.IsRegularStrict()) {
-        if (!PathOnHost.Exists())
-            return TError(EError::InvalidData, "file not found");
+    if (path.IsEmpty())
+        return TError(EError::InvalidData, "data not available");
+    if (!path.Exists())
+        return TError(EError::InvalidData, "file not found");
+    if (!path.IsRegularStrict())
         return TError(EError::InvalidData, "file is non-regular");
+
+    /* [offset][:limit] */
+    if (range.size()) {
+        auto sep = range.find(':');
+        if (sep != std::string::npos) {
+            off = range.substr(0, sep);
+            lim = range.substr(sep + 1);
+        } else
+            off = range;
     }
 
-    if (start_offset != "") {
-        TError error = StringToUint64(start_offset, offset);
+    if (off.size()) {
+        error = StringToUint64(off, offset);
         if (error)
             return error;
+        if (offset < Offset)
+            return TError(EError::InvalidData, "requested offset lower than current " + std::to_string(Offset));
+        offset -= Offset;
+    } else
+        offset = 0;
 
-        if (offset < base)
-            return TError(EError::InvalidData,
-                    "requested offset lower than current " + std::to_string(base));
-        offset -= base;
-    }
+    if (lim.size()) {
+        error = StringToUint64(lim, limit);
+        if (error)
+            return error;
+    } else
+        limit = Limit;
 
-    int fd = open(PathOnHost.c_str(), O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC);
+    int fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + PathOnHost.ToString() + ")");
+        return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
 
     uint64_t size = lseek(fd, 0, SEEK_END);
 
@@ -157,16 +193,16 @@ TError TStdStream::Read(std::string &text, off_t limit, uint64_t base, const std
         limit = 0;
     else if (size <= offset + limit)
         limit = size - offset;
-    else if (start_offset == "")
+    else if (!off.size())
         offset = size - limit;
 
     if (limit) {
         text.resize(limit);
-        auto result = pread(fd, &text[0], limit, offset);
+        ssize_t result = pread(fd, &text[0], limit, offset);
 
         if (result < 0)
-            error = TError(EError::Unknown, errno, "read(" + PathOnHost.ToString() + ")");
-        else if (result < limit)
+            error = TError(EError::Unknown, errno, "read " + path.ToString());
+        else if ((uint64_t)result < limit)
             text.resize(result);
     }
 

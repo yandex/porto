@@ -61,7 +61,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TEpollSource> Source;
     bool IsMeta = false;
 
-    TStdStream Stdin, Stdout, Stderr;
     int Level; // 0 for root, 1 for porto_root, etc
 
     // data
@@ -93,11 +92,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareResources(std::shared_ptr<TClient> client);
     void FreeResources();
 
-    void RestoreStdPath(const std::string &property,
-                        const std::string &path, bool is_default);
-    void CreateStdStreams();
-    TError PrepareStdStreams(std::shared_ptr<TClient> client);
-
     void ExitTree(TScopedLock &holder_lock, int status, bool oomKilled);
     void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
 
@@ -125,9 +119,7 @@ public:
     uint64_t CurrentMemGuarantee;
     std::string Command;
     std::string Cwd;
-    std::string StdinPath;
-    std::string StdoutPath;
-    std::string StderrPath;
+    TStdStream Stdin, Stdout, Stderr;
     std::string Root;
     bool RootRo;
     mode_t Umask;
@@ -152,7 +144,6 @@ public:
     uint64_t DeathTime;
     std::map<int, struct rlimit> Rlimit;
     std::string NsName;
-    uint64_t StdoutLimit;
     uint64_t MemLimit;
     uint64_t AnonMemLimit;
     uint64_t DirtyMemLimit;
@@ -177,8 +168,6 @@ public:
     bool OomKilled;
     int ExitStatus;
     int TaskStartErrno = -1;
-    uint64_t StdoutOffset;
-    uint64_t StderrOffset;
 
     TTask Task;
     pid_t TaskVPid;
@@ -188,8 +177,6 @@ public:
     TPath GetTmpDir() const;
     TPath RootPath() const;
     TPath WorkPath() const;
-    TPath ActualStdPath(const std::string &path_str, bool is_default, bool host) const;
-    TError RotateStdFile(TStdStream &stream, uint64_t &offset_value);
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
@@ -278,10 +265,6 @@ public:
 
     /* protected with TVolumeHolder->Lock */
     std::vector<std::shared_ptr<TVolume>> Volumes;
-
-    const TStdStream& GetStdin() const { return Stdin; }
-    const TStdStream& GetStdout() const { return Stdout; }
-    const TStdStream& GetStderr() const { return Stderr; }
 
     TError GetEnvironment(TEnv &env);
 };

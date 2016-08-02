@@ -9,7 +9,6 @@
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 #include "container.hpp"
-#include "stream.hpp"
 #include "cgroup.hpp"
 #include "env.hpp"
 #include "filesystem.hpp"
@@ -19,13 +18,13 @@ extern "C" {
 }
 
 struct TTaskEnv {
-    TContainer *CT;
+    std::shared_ptr<TContainer> CT;
+    std::shared_ptr<TClient> Client;
     TScopedFd PortoInitFd;
     TMountNamespace Mnt;
     TEnv Env;
     bool TripleFork;
     bool QuadroFork;
-    TStdStream Stdin, Stdout, Stderr;
     TNamespaceSnapshot ParentNs;
     std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;

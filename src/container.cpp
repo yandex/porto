@@ -24,7 +24,6 @@
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 #include "client.hpp"
-#include "stream.hpp"
 #include "filesystem.hpp"
 
 extern "C" {
@@ -52,7 +51,8 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        const std::string &name, std::shared_ptr<TContainer> parent,
                        int id) :
     Holder(holder), Name(StripParentName(name)), Parent(parent),
-    Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1)
+    Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1),
+    Stdin(0), Stdout(1), Stderr(2)
 {
     Statistics->Containers++;
     PropMask = 0lu;
@@ -64,9 +64,11 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     else
         Cwd = WorkPath().ToString();
 
-    StdinPath = "/dev/null";
-    StdoutPath = "stdout";
-    StderrPath = "stderr";
+    Stdin.SetOutside("/dev/null");
+    Stdout.SetOutside("stdout");
+    Stderr.SetOutside("stderr");
+    Stdout.Limit = config().container().stdout_limit();
+    Stderr.Limit = config().container().stdout_limit();
     Root = "/";
     RootRo = false;
     Umask = 0002;
@@ -89,7 +91,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     else
         NsName = "";
 
-    StdoutLimit = config().container().stdout_limit();
     MemLimit = 0;
     AnonMemLimit = 0;
     DirtyMemLimit = 0;
@@ -119,8 +120,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     IsWeak = false;
     ExitStatus = 0;
     TaskStartErrno = -1;
-    StdoutOffset = 0;
-    StderrOffset = 0;
 }
 
 TContainer::~TContainer() {
@@ -169,70 +168,6 @@ TPath TContainer::RootPath() const {
     }
 
     return Parent->RootPath() / path;
-}
-
-TPath TContainer::ActualStdPath(const std::string &path_str,
-                                bool is_default, bool host) const {
-    TPath path(path_str);
-
-    if (is_default) {
-        /* /dev/null is /dev/null */
-        if (path == "/dev/null")
-            return path;
-
-        /* By default, std files are located on host in a special folder */
-        return WorkPath() / path;
-    } else {
-	/* Custom std paths are given relative to container root and/or cwd. */
-        TPath cwd(Cwd);
-        TPath ret;
-
-        if (host)
-            ret = RootPath();
-
-        if (path.IsAbsolute())
-            ret /= path;
-        else
-            ret /= cwd / path;
-
-        return ret;
-    }
-}
-
-TError TContainer::RotateStdFile(TStdStream &stream, uint64_t &offset_value) {
-    off_t loss;
-    TError error = stream.Rotate(config().container().max_log_size(), loss);
-
-    if (!error && loss) {
-            offset_value += loss;
-    }
-
-    return error;
-}
-
-void TContainer::CreateStdStreams() {
-    Stdin = TStdStream(STDIN_FILENO,
-                       ActualStdPath(StdinPath, !(PropMask & STDIN_SET), false),
-                       ActualStdPath(StdinPath, !(PropMask & STDIN_SET), true),
-                       !(PropMask & STDIN_SET));
-    Stdout = TStdStream(STDOUT_FILENO,
-                        ActualStdPath(StdoutPath, !(PropMask & STDOUT_SET), false),
-                        ActualStdPath(StdoutPath, !(PropMask & STDOUT_SET), true),
-                        !(PropMask & STDOUT_SET));
-    Stderr = TStdStream(STDERR_FILENO,
-                        ActualStdPath(StderrPath, !(PropMask & STDERR_SET), false),
-                        ActualStdPath(StderrPath, !(PropMask & STDERR_SET), true),
-                        !(PropMask & STDERR_SET));
-}
-
-TError TContainer::PrepareStdStreams(std::shared_ptr<TClient> client) {
-    TError err = Stdin.Prepare(OwnerCred, client);
-    if (err)
-        return err;
-    err = Stdout.Prepare(OwnerCred, client);
-    if (err)
-        return err;
-    return Stderr.Prepare(OwnerCred, client);
 }
 
 EContainerState TContainer::GetState() const {
@@ -813,7 +748,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     auto parent = FindRunningParent();
     TError error;
 
-    taskEnv->CT = this;
+    taskEnv->CT = shared_from_this();
+    taskEnv->Client = client;
 
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
@@ -848,10 +784,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->TripleFork = false;
     taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) &&
                           Isolate && !Command.empty();
-
-    taskEnv->Stdin = Stdin;
-    taskEnv->Stdout = Stdout;
-    taskEnv->Stderr = Stderr;
 
     taskEnv->Mnt.BindMounts = BindMounts;
     taskEnv->Mnt.BindPortoSock = PortoEnabled;
@@ -1302,14 +1234,6 @@ TError TContainer::PrepareResources(std::shared_ptr<TClient> client) {
         return error;
     }
 
-    CreateStdStreams();
-    error = PrepareStdStreams(client);
-    if (error) {
-        L_ERR() << "Can't prepare std streams: " << error << std::endl;
-        FreeResources();
-        return error;
-    }
-
     return TError::Success();
 }
 
@@ -1357,10 +1281,6 @@ void TContainer::FreeResources() {
     if (IsRoot() || IsPortoRoot())
         return;
 
-    Stdin.Cleanup();
-    Stdout.Cleanup();
-    Stderr.Cleanup();
-
     int loopNr = LoopDev;
     LoopDev = -1;
     PropMask |= LOOP_DEV_SET;
@@ -1384,6 +1304,9 @@ void TContainer::FreeResources() {
         if (error)
             L_ERR() << "Cannot remove working dir: " << error << std::endl;
     }
+
+    Stdout.Remove(*this);
+    Stderr.Remove(*this);
 }
 
 void TContainer::AcquireForced() {
@@ -1677,33 +1600,6 @@ TError TContainer::RestoreNetwork() {
     return TError::Success();
 }
 
-void TContainer::RestoreStdPath(const std::string &property,
-                                const std::string &stdpath,
-                                bool is_default) {
-    TPath path = ActualStdPath(stdpath, is_default, true);
-
-    if (is_default && !path.Exists()) {
-        TPath root(Root);
-        std::string cwd(Cwd);
-        std::string name(stdpath + "." + GetTextId("_"));
-
-        if (root.IsRegularFollow())
-            path = GetTmpDir() / name;
-        else
-            path = root / cwd / name;
-
-        /* Restore from < 2.7 */
-        if (path.IsRegularStrict()) {
-            L_ACT() << GetName() << ": restore " << property << " "
-                    << path.ToString() << std::endl;
-            ContainerProperties[property]->Set(path.ToString());
-        }
-    }
-
-    if (is_default && GetState() == EContainerState::Stopped && path.IsRegularStrict())
-        path.Unlink();
-}
-
 TError TContainer::Save(void) {
     TKeyValue node(ContainersKV / std::to_string(Id));
     TError error;
@@ -1948,10 +1844,6 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
         WaitTask.Pid = 0;
     }
 
-    RestoreStdPath(P_STDOUT_PATH, StdoutPath, !(PropMask & STDOUT_SET));
-    RestoreStdPath(P_STDERR_PATH, StderrPath, !(PropMask & STDERR_SET));
-    CreateStdStreams();
-
     if (Parent)
         Parent->AddChild(shared_from_this());
 
@@ -2049,13 +1941,8 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 
     PropMask |= ROOT_PID_SET;
 
-    error = RotateStdFile(Stdout, StdoutOffset);
-    if (error)
-        L_ERR() << "Can't rotate stdout_offset: " << error << std::endl;
-
-    error = RotateStdFile(Stderr, StderrOffset);
-    if (error)
-        L_ERR() << "Can't rotate stderr_offset: " << error << std::endl;
+    Stdout.Rotate(*this);
+    Stderr.Rotate(*this);
 
     error = Save();
     if (error)
@@ -2164,14 +2051,8 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task.Pid) {
-                error = RotateStdFile(Stdout, StdoutOffset);
-                if (error)
-                    L_ERR() << "Can't rotate stdout_offset: " << error
-                            << std::endl;
-                error = RotateStdFile(Stderr, StderrOffset);
-                if (error)
-                    L_ERR() << "Can't rotate stderr_offset: " << error
-                            << std::endl;
+                Stdout.Rotate(*this);
+                Stderr.Rotate(*this);
             }
             break;
         case EEventType::Respawn:

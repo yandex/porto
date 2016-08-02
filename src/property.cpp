@@ -859,10 +859,10 @@ TError TVirtMode::Set(const std::string &virt_mode) {
             CurrentContainer->Command = "/sbin/init";
 
         if (!(CurrentContainer->PropMask & STDOUT_SET))
-            CurrentContainer->StdoutPath = "/dev/null";
+            CurrentContainer->Stdout.SetOutside("/dev/null");
 
         if (!(CurrentContainer->PropMask & STDERR_SET))
-            CurrentContainer->StderrPath = "/dev/null";
+            CurrentContainer->Stderr.SetOutside("/dev/null");
 
         if (!(CurrentContainer->PropMask & BIND_DNS_SET))
             CurrentContainer->BindDns = false;
@@ -893,78 +893,156 @@ TError TVirtMode::Get(std::string &value) {
 
 class TStdinPath : public TProperty {
 public:
-    TError Set(const std::string &path);
-    TError Get(std::string &value);
     TStdinPath() : TProperty(P_STDIN_PATH, STDIN_SET,
-                             "Container standard input path") {}
-} static StdinPath;
-
-TError TStdinPath::Set(const std::string &path) {
-    TError error = IsAliveAndStopped();
-    if (error)
+            "Container standard input path") {}
+    TError Get(std::string &value) {
+        value = CurrentContainer->Stdin.Path.ToString();
+        return TError::Success();
+    }
+    TError Set(const std::string &path) {
+        TError error = IsAliveAndStopped();
+        if (!error) {
+            CurrentContainer->Stdin.SetInside(path);
+            CurrentContainer->PropMask |= STDIN_SET;
+        }
         return error;
+    }
 
-    CurrentContainer->StdinPath = path;
-    CurrentContainer->PropMask |= STDIN_SET;
-
-    return TError::Success();
-}
-
-TError TStdinPath::Get(std::string &value) {
-    value = CurrentContainer->StdinPath;
-
-    return TError::Success();
-}
+} static StdinPath;
 
 class TStdoutPath : public TProperty {
 public:
-    TError Set(const std::string &path);
-    TError Get(std::string &value);
     TStdoutPath() : TProperty(P_STDOUT_PATH, STDOUT_SET,
-                              "Container standard output path") {}
-} static StdoutPath;
-
-TError TStdoutPath::Set(const std::string &path) {
-    TError error = IsAliveAndStopped();
-    if (error)
+            "Container standard output path") {}
+    TError Get(std::string &value) {
+        value =  CurrentContainer->Stdout.Path.ToString();
+        return TError::Success();
+    }
+    TError Set(const std::string &path) {
+        TError error = IsAliveAndStopped();
+        if (!error) {
+            CurrentContainer->Stdout.SetInside(path);
+            CurrentContainer->PropMask |= STDOUT_SET;
+        }
         return error;
-
-    CurrentContainer->StdoutPath = path;
-    CurrentContainer->PropMask |= STDOUT_SET;
-
-    return TError::Success();
-}
-
-TError TStdoutPath::Get(std::string &value) {
-    value = CurrentContainer->StdoutPath;
-
-    return TError::Success();
-}
+    }
+} static StdoutPath;
 
 class TStderrPath : public TProperty {
 public:
-    TError Set(const std::string &path);
-    TError Get(std::string &value);
     TStderrPath() : TProperty(P_STDERR_PATH, STDERR_SET,
-                              "Container standard error path") {}
+            "Container standard error path") {}
+    TError Get(std::string &value) {
+        value = CurrentContainer->Stderr.Path.ToString();
+        return TError::Success();
+    }
+    TError Set(const std::string &path) {
+        TError error = IsAliveAndStopped();
+        if (!error) {
+            CurrentContainer->Stderr.SetInside(path);
+            CurrentContainer->PropMask |= STDERR_SET;
+        }
+        return error;
+    }
 } static StderrPath;
 
-TError TStderrPath::Set(const std::string &path) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
+class TStdoutLimit : public TProperty {
+public:
+    TStdoutLimit() : TProperty(P_STDOUT_LIMIT, STDOUT_LIMIT_SET,
+            "Limit for stored stdout and stderr size (dynamic)") {}
+    TError Get(std::string &value) {
+        value = std::to_string(CurrentContainer->Stdout.Limit);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        uint64_t limit;
+        TError error = StringToSize(value, limit);
+        if (error)
+            return error;
 
-    CurrentContainer->StderrPath = path;
-    CurrentContainer->PropMask |= STDERR_SET;
+        auto limit_max = config().container().stdout_limit();
+        if (limit > limit_max)
+            return TError(EError::InvalidValue,
+                    "Maximum limit is: " + std::to_string(limit_max));
 
-    return TError::Success();
-}
+        CurrentContainer->Stdout.Limit = limit;
+        CurrentContainer->Stderr.Limit = limit;
+        CurrentContainer->PropMask |= STDOUT_LIMIT_SET;
+        return TError::Success();
+    }
+} static StdoutLimit;
 
-TError TStderrPath::Get(std::string &value) {
-    value = CurrentContainer->StderrPath;
+class TStdoutOffset : public TProperty {
+public:
+    TStdoutOffset() : TProperty(D_STDOUT_OFFSET, 0,
+            "Offset of stored stdout (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        value = std::to_string(CurrentContainer->Stdout.Offset);
+        return TError::Success();
+    }
+} static StdoutOffset;
 
-    return TError::Success();
-}
+class TStderrOffset : public TProperty {
+public:
+    TStderrOffset() : TProperty(D_STDERR_OFFSET, 0,
+            "Offset of stored stderr (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        value = std::to_string(CurrentContainer->Stderr.Offset);
+        return TError::Success();
+    }
+} static StderrOffset;
+
+class TStdout : public TProperty {
+public:
+    TStdout() : TProperty(D_STDOUT, 0, "stdout [[offset][:length]] (ro)") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        return CurrentContainer->Stdout.Read(*CurrentContainer, value);
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        return CurrentContainer->Stdout.Read(*CurrentContainer, value, index);
+    }
+} static Stdout;
+
+class TStderr : public TProperty {
+public:
+    TStderr() : TProperty(D_STDERR, 0, "stderr [[offset][:length]] (ro))") {
+        IsReadOnly = true;
+        IsSerializable = false;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        return CurrentContainer->Stderr.Read(*CurrentContainer, value);
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        return CurrentContainer->Stderr.Read(*CurrentContainer, value, index);
+    }
+} static Stderr;
 
 class TBindDns : public TProperty {
 public:
@@ -1581,42 +1659,6 @@ TError TPortoNamespace::Set(const std::string &ns) {
 
 TError TPortoNamespace::Get(std::string &value) {
     value = CurrentContainer->NsName;
-
-    return TError::Success();
-}
-
-class TStdoutLimit : public TProperty {
-public:
-    TError Set(const std::string &limit);
-    TError Get(std::string &value);
-    TStdoutLimit() : TProperty(P_STDOUT_LIMIT, STDOUT_LIMIT_SET,
-                               "Limit returned stdout/stderr "
-                               "size (dynamic)") {}
-} static StdoutLimit;
-
-TError TStdoutLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    uint64_t new_size = 0lu;
-    error = StringToSize(limit, new_size);
-    if (error)
-        return error;
-
-    auto max = config().container().stdout_limit();
-    if (new_size > max)
-        return TError(EError::InvalidValue, "Maximum number of bytes: " +
-                      std::to_string(max));
-
-    CurrentContainer->StdoutLimit = new_size;
-    CurrentContainer->PropMask |= STDOUT_LIMIT_SET;
-
-    return TError::Success();
-}
-
-TError TStdoutLimit::Get(std::string &value) {
-    value = std::to_string(CurrentContainer->StdoutLimit);
 
     return TError::Success();
 }
@@ -2664,110 +2706,6 @@ public:
 
 TError TStartErrno::Get(std::string &value) {
     value = std::to_string(CurrentContainer->TaskStartErrno);
-
-    return TError::Success();
-}
-
-class TStdout : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TStdout() : TProperty(D_STDOUT, 0, "stdout (optional start [offset]) (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static Stdout;
-
-TError TStdout::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    return CurrentContainer->GetStdout().Read(value,
-                                              CurrentContainer->StdoutLimit,
-                                              CurrentContainer->StdoutOffset);
-}
-
-TError TStdout::GetIndexed(const std::string &index,
-                                    std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    return CurrentContainer->GetStdout().Read(value,
-                                              CurrentContainer->StdoutLimit,
-                                              CurrentContainer->StdoutOffset,
-                                              index);
-}
-
-class TStdoutOffset : public TProperty {
-public:
-    TError Get(std::string &value);
-    TStdoutOffset() : TProperty(D_STDOUT_OFFSET, 0,
-                                "stored stdout offset (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static StdoutOffset;
-
-TError TStdoutOffset::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    value = std::to_string(CurrentContainer->StdoutOffset);
-
-    return TError::Success();
-}
-
-class TStderr : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TStderr() : TProperty(D_STDERR, 0,
-                          "stderr (optional start [offset]) (ro))") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static Stderr;
-
-TError TStderr::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    return CurrentContainer->GetStderr().Read(value,
-                                              CurrentContainer->StdoutLimit,
-                                              CurrentContainer->StderrOffset);
-}
-
-TError TStderr::GetIndexed(const std::string &index,
-                                    std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    return CurrentContainer->GetStderr().Read(value,
-                                              CurrentContainer->StdoutLimit,
-                                              CurrentContainer->StderrOffset,
-                                              index);
-}
-
-class TStderrOffset : public TProperty {
-public:
-    TError Get(std::string &value);
-    TStderrOffset() : TProperty(D_STDERR_OFFSET, 0, "stored stderr offset (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static StderrOffset;
-
-TError TStderrOffset::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    value = std::to_string(CurrentContainer->StderrOffset);
 
     return TError::Success();
 }

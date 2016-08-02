@@ -642,19 +642,19 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     struct stat st;
     off_t hole_len;
     TError error;
-    int fd;
 
-    loss = 0;
-
-    if (lstat(c_str(), &st))
-        return TError(EError::Unknown, errno, "lstat(" + Path + ")");
-
-    if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage)
-        return TError::Success();
-
-    fd = open(c_str(), O_RDWR | O_NOCTTY);
+    int fd = open(c_str(), O_RDWR | O_NOCTTY);
     if (fd < 0)
         return TError(EError::Unknown, errno, "open(" + Path + ")");
+
+    if (fstat(fd, &st))
+        return TError(EError::Unknown, errno, "fstat(" + Path + ")");
+
+    if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage) {
+        loss = 0;
+        close(fd);
+        return TError::Success();
+    }
 
     /* Keep half of allowed size or trucate to zero */
     hole_len = st.st_size - max_disk_usage / 2;

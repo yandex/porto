@@ -303,15 +303,15 @@ TError TTaskEnv::ConfigureChild() {
             return error;
     }
 
-    error = Stdin.OpenInChild(Cred);
+    error = CT->Stdin.OpenInside(*CT);
     if (error)
         return error;
 
-    error = Stdout.OpenInChild(Cred);
+    error = CT->Stdout.OpenInside(*CT);
     if (error)
         return error;
 
-    error = Stderr.OpenInChild(Cred);
+    error = CT->Stderr.OpenInside(*CT);
     if (error)
         return error;
 
@@ -426,16 +426,16 @@ TError TTaskEnv::Start() {
                 Abort(error);
         }
 
-        /* Default stdin/stdio/stderr are in host mount namespace */
-        error = Stdin.OpenOnHost(Cred);
+        /* Default streams and redirections are outside */
+        error = CT->Stdin.OpenOutside(*CT, *Client);
         if (error)
             Abort(error);
 
-        error = Stdout.OpenOnHost(Cred);
+        error = CT->Stdout.OpenOutside(*CT, *Client);
         if (error)
             Abort(error);
 
-        error = Stderr.OpenOnHost(Cred);
+        error = CT->Stderr.OpenOutside(*CT, *Client);
         if (error)
             Abort(error);
 

@@ -3547,7 +3547,7 @@ static void TestLimits(Porto::Connection &api) {
 
         Say() << "Make sure we have a cap for private property" << std::endl;
         std::string tooLong = std::string(config().container().private_max() + 1, 'a');
-        ExpectApiFailure(api.SetProperty(name, "stdout_limit", tooLong), EError::InvalidValue);
+        ExpectApiFailure(api.SetProperty(name, "private", tooLong), EError::InvalidValue);
     }
 
     ExpectApiSuccess(api.Destroy(name));

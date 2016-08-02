@@ -1,35 +1,42 @@
 #pragma once
 
 #include <string>
-#include <memory>
-
 #include <util/path.hpp>
 
+class TContainer;
 class TClient;
 
 class TStdStream {
-private:
-    int Stream;             /* 0 - stdin, 1 - stdout, 2 - stderr */
-
-    TPath PathOnHost;
-    TPath PathInContainer;
-    bool ManagedByPorto;
-
-    TError Open(const TPath &path, const TCred &cred) const;
-
 public:
-    TStdStream();
-    TStdStream(int stream, const TPath &inner_path, const TPath &host_path,
-               bool managed_by_porto);
+    int Stream;             /* 0 - stdin, 1 - sstdout, 2 - stderr */
+    TPath Path;
+    bool Outside = false;
+    bool Created = false;
+    uint64_t Limit = 0;
+    uint64_t Offset = 0;
 
-    TError Prepare(const TCred &cred, std::shared_ptr<TClient> client);
+    TStdStream(int stream): Stream(stream) { }
 
-    TError OpenOnHost(const TCred &cred) const; // called in child, but host ns
-    TError OpenInChild(const TCred &cred) const; // called before actual execve
+    void SetOutside(const std::string &path) {
+        Path = path;
+        Outside = true;
+    }
 
-    TError Rotate(off_t limit, off_t &loss) const;
-    TError Cleanup();
+    void SetInside(const std::string &path) {
+        Path = path;
+        Outside = false;
+    }
 
-    TError Read(std::string &text, off_t limit, uint64_t base,
-                const std::string &start_offset = "") const;
+    bool IsNull(void) const;
+    bool IsRedirect(void) const;
+    TPath ResolveOutside(const TContainer &container) const;
+
+    TError Open(const TPath &path, const TCred &cred);
+    TError OpenOutside(const TContainer &container, const TClient &client);
+    TError OpenInside(const TContainer &container);
+
+    TError Remove(const TContainer &container);
+    TError Rotate(const TContainer &container);
+    TError Read(const TContainer &container, std::string &text,
+                const std::string &range = "") const;
 };
