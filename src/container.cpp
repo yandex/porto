@@ -114,9 +114,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Private = "";
     AgingTime = config().container().default_aging_time_s();
     PortoEnabled = true;
-    for (auto c = parent; c; c = c->GetParent()) {
-        PortoEnabled &= c->PortoEnabled;
-    }
     IsWeak = false;
     ExitStatus = 0;
     TaskStartErrno = -1;
@@ -440,6 +437,13 @@ uint64_t TContainer::GetHierarchyMemLimit(std::shared_ptr<const TContainer> root
     }
 
     return val;
+}
+
+bool TContainer::IsPortoEnabled(void) const {
+    for (auto ct = shared_from_this(); ct; ct = ct->Parent)
+        if (!ct->PortoEnabled)
+            return false;
+    return true;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -786,7 +790,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                           Isolate && !Command.empty();
 
     taskEnv->Mnt.BindMounts = BindMounts;
-    taskEnv->Mnt.BindPortoSock = PortoEnabled;
+    taskEnv->Mnt.BindPortoSock = IsPortoEnabled();
 
     if (client) {
         error = ConfigureDevices(taskEnv->Devices);

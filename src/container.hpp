@@ -201,6 +201,7 @@ public:
     const int GetLevel() const { return Level; }
     uint64_t GetHierarchyMemGuarantee(void) const;
     uint64_t GetHierarchyMemLimit(std::shared_ptr<const TContainer> root) const;
+    bool IsPortoEnabled(void) const;
 
     bool IsRoot() const;
     bool IsPortoRoot() const;

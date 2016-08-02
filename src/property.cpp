@@ -2408,60 +2408,24 @@ TError TAgingTime::Get(std::string &value) {
 
 class TEnablePorto : public TProperty {
 public:
-    TError Set(const std::string &enabled);
-    TError Get(std::string &value);
     TEnablePorto() : TProperty(P_ENABLE_PORTO, ENABLE_PORTO_SET,
-                               "Allow container communication "
-                               "with porto (dynamic)") {}
-    void Propagate(bool value);
-} static EnablePorto;
-
-TError TEnablePorto::Set(const std::string &enabled) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    if (enabled == "true") {
-        auto p = CurrentContainer->GetParent();
-        if (p && !p->PortoEnabled)
+            "Allow container communication with porto (dynamic)") {}
+    TError Get(std::string &value) {
+        value = BoolToString(CurrentContainer->IsPortoEnabled());
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        bool enable;
+        TError error = StringToBool(value, enable);
+        if (error)
+            return error;
+        if (enable && !CurrentContainer->GetParent()->IsPortoEnabled())
             return TError(EError::InvalidValue, "Porto disabled in parent container");
-
-        CurrentContainer->PortoEnabled = true;
-        Propagate(true);
-
-    } else if (enabled == "false") {
-        CurrentContainer->PortoEnabled = false;
-        Propagate(false);
-
-    } else {
-        return TError(EError::InvalidValue, "Invalid bool value");
+        CurrentContainer->PortoEnabled = enable;
+        CurrentContainer->PropMask |= ENABLE_PORTO_SET;
+        return TError::Success();
     }
-
-    CurrentContainer->PropMask |= ENABLE_PORTO_SET;
-
-    return TError::Success();
-}
-
-TError TEnablePorto::Get(std::string &value) {
-    value = CurrentContainer->PortoEnabled ? "true" : "false";
-
-    return TError::Success();
-}
-
-void TEnablePorto::Propagate(bool value) {
-    for (auto iter : CurrentContainer->Children) {
-        if (auto child = iter.lock()) {
-            auto old = CurrentContainer;
-            CurrentContainer = child.get();
-
-            if (!(CurrentContainer->PropMask & ENABLE_PORTO_SET))
-                CurrentContainer->PortoEnabled = value;
-
-            Propagate(value);
-            CurrentContainer = old;
-        }
-    }
-}
+} static EnablePorto;
 
 class TWeak : public TProperty {
 public:
