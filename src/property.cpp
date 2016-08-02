@@ -283,48 +283,20 @@ public:
 
 class TCwd : public TProperty {
 public:
-    TError Set(const std::string &cwd);
-    TError Get(std::string &value);
     TCwd() : TProperty(P_CWD, CWD_SET, "Container working directory") {}
-    void Propagate(const std::string &value);
-} static Cwd;
-
-TError TCwd::Set(const std::string &cwd) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    CurrentContainer->Cwd = cwd;
-    Propagate(cwd);
-    CurrentContainer->PropMask |= CWD_SET;
-
-    return TError::Success();
-}
-
-TError TCwd::Get(std::string &value) {
-    value = CurrentContainer->Cwd;
-
-    return TError::Success();
-}
-
-void TCwd::Propagate(const std::string &cwd) {
-
-    for (auto iter : CurrentContainer->Children) {
-        if (auto child = iter.lock()) {
-
-            auto old = CurrentContainer;
-            CurrentContainer = child.get();
-
-            if (!(CurrentContainer->PropMask & CWD_SET) &&
-                !(CurrentContainer->Isolate)) {
-
-                CurrentContainer->Cwd = cwd;
-                Cwd.Propagate(cwd);
-            }
-            CurrentContainer = old;
-        }
+    TError Get(std::string &value) {
+        value = CurrentContainer->GetCwd();
+        return TError::Success();
     }
-}
+    TError Set(const std::string &cwd) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        CurrentContainer->Cwd = cwd;
+        CurrentContainer->PropMask |= CWD_SET;
+        return TError::Success();
+    }
+} static Cwd;
 
 class TUlimit : public TProperty {
     const std::map<std::string,int> nameToIdx = {
@@ -849,11 +821,8 @@ TError TVirtMode::Set(const std::string &virt_mode) {
     CurrentContainer->SanitizeCapabilities();
 
     if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
-        if (!(CurrentContainer->PropMask & CWD_SET)) {
-
+        if (!(CurrentContainer->PropMask & CWD_SET))
             CurrentContainer->Cwd = "/";
-            Cwd.Propagate("/");
-        }
 
         if (!(CurrentContainer->PropMask & COMMAND_SET))
             CurrentContainer->Command = "/sbin/init";
@@ -1108,11 +1077,6 @@ TError TIsolate::Set(const std::string &isolate_needed) {
 
         auto p = CurrentContainer->GetParent();
         if (p) {
-            if (!(CurrentContainer->PropMask & CWD_SET)) {
-                CurrentContainer->Cwd = p->Cwd;
-
-                Cwd.Propagate(p->Cwd);
-            }
             if (!(CurrentContainer->PropMask & ULIMIT_SET)) {
                CurrentContainer->Rlimit = p->Rlimit;
 
@@ -1129,7 +1093,6 @@ TError TIsolate::Set(const std::string &isolate_needed) {
                 IoPolicy.Propagate(CurrentContainer->IoPolicy);
             }
         }
-
     }
 
     CurrentContainer->PropMask |= ISOLATE_SET;
@@ -1163,11 +1126,6 @@ TError TRoot::Set(const std::string &root) {
             CurrentContainer->VirtMode != VIRT_MODE_OS &&
             CurrentContainer->Isolate) {
             CurrentContainer->BindDns = true;
-        }
-
-        if (!(CurrentContainer->PropMask & CWD_SET)) {
-            CurrentContainer->Cwd = "/";
-            Cwd.Propagate("/");
         }
     }
     CurrentContainer->PropMask |= ROOT_SET;

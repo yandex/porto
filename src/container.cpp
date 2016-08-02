@@ -167,6 +167,16 @@ TPath TContainer::RootPath() const {
     return Parent->RootPath() / path;
 }
 
+std::string TContainer::GetCwd() const {
+    for (auto ct = shared_from_this(); ct; ct = ct->Parent) {
+        if (ct->PropMask & CWD_SET)
+            return ct->Cwd;
+        if (ct->Root != "/")
+            return "/";
+    }
+    return Cwd;
+}
+
 EContainerState TContainer::GetState() const {
     return State;
 }
@@ -721,7 +731,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     env.ClearEnv();
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    env.SetEnv("HOME", Cwd);
+    env.SetEnv("HOME", GetCwd());
     env.SetEnv("USER", UserName(OwnerCred.Uid));
 
     env.SetEnv("container", "lxc");
@@ -758,8 +768,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
-    taskEnv->Mnt.Cwd = Cwd;
-    taskEnv->Mnt.ParentCwd = Parent->Cwd;
+    taskEnv->Mnt.Cwd = GetCwd();
+    taskEnv->Mnt.ParentCwd = Parent->GetCwd();
 
     taskEnv->Mnt.LoopDev = LoopDev;
     if (taskEnv->Mnt.LoopDev >= 0)

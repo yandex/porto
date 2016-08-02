@@ -176,6 +176,7 @@ public:
 
     TPath GetTmpDir() const;
     TPath RootPath() const;
+    std::string GetCwd() const;
     TPath WorkPath() const;
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);

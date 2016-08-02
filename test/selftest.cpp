@@ -3906,7 +3906,7 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     ExpectNeq(parentCgmap["cpu"], childCgmap["cpu"]);
     ExpectNeq(parentCgmap["cpuacct"], childCgmap["cpuacct"]);
 
-    ExpectEq(GetCwd(parentPid), GetCwd(childPid));
+    ExpectNeq(GetCwd(parentPid), GetCwd(childPid));
 
     for (auto &ns : namespaces)
         ExpectEq(GetNamespace(parentPid, ns), GetNamespace(childPid, ns));
