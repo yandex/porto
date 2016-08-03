@@ -1248,9 +1248,6 @@ TError TContainer::PrepareResources(std::shared_ptr<TClient> client) {
         return error;
     }
 
-    Stdout.Test(*this);
-    Stderr.Test(*this);
-
     return TError::Success();
 }
 

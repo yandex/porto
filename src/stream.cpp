@@ -113,18 +113,13 @@ TError TStdStream::OpenInside(const TContainer &container) {
     return error;
 }
 
-void TStdStream::Test(const TContainer &container) {
-    TPath path = ResolveOutside(container);
-    Created = !path.IsEmpty() && !path.Exists();
-}
-
 TError TStdStream::Remove(const TContainer &container) {
-    if (!Created)
+    /* Custom stdout/stderr files are not removed */
+    if (!Outside || Path.IsAbsolute())
         return TError::Success();
     TPath path = ResolveOutside(container);
     if (path.IsEmpty() || !path.IsRegularStrict())
         return TError::Success();
-    Created = false;
     TError error = path.Unlink();
     if (error && error.GetErrno() == ENOENT)
         return TError::Success();
