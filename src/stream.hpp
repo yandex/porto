@@ -35,7 +35,9 @@ public:
     TError OpenOutside(const TContainer &container, const TClient &client);
     TError OpenInside(const TContainer &container);
 
+    void Test(const TContainer &container);
     TError Remove(const TContainer &container);
+
     TError Rotate(const TContainer &container);
     TError Read(const TContainer &container, std::string &text,
                 const std::string &range = "") const;

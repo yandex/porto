@@ -38,7 +38,6 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) {
     int fd, flags;
 
     Offset = 0;
-    Created = false;
 
     if (Stream)
         flags = O_WRONLY | O_APPEND;
@@ -54,7 +53,6 @@ retry:
         fd = open(path.c_str(), flags | O_CREAT | O_EXCL, 0660);
         if (fd < 0 && errno == EEXIST)
             goto retry;
-        Created = true;
         if (fd >= 0 && fchown(fd, cred.Uid, cred.Gid))
             return TError(EError::Unknown, errno, "fchown " + path.ToString());
     }
@@ -115,6 +113,11 @@ TError TStdStream::OpenInside(const TContainer &container) {
     return error;
 }
 
+void TStdStream::Test(const TContainer &container) {
+    TPath path = ResolveOutside(container);
+    Created = !path.IsEmpty() && !path.Exists();
+}
+
 TError TStdStream::Remove(const TContainer &container) {
     if (!Created)
         return TError::Success();
@@ -123,6 +126,8 @@ TError TStdStream::Remove(const TContainer &container) {
         return TError::Success();
     Created = false;
     TError error = path.Unlink();
+    if (error && error.GetErrno() == ENOENT)
+        return TError::Success();
     if (error)
         L_ERR() << "Cannot remove " << path << " : " << error << std::endl;
     return error;
