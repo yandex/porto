@@ -114,7 +114,7 @@ TError TCgroup::GetBool(const std::string &knob, bool &value) const {
     std::string string;
     TError error = Get(knob, string);
     if (!error)
-        value = string != "0";
+        value = StringTrim(string) != "0";
     return error;
 }
 
@@ -374,50 +374,47 @@ TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, int &fd) {
 }
 
 // Freezer
-TError TFreezerSubsystem::WaitState(TCgroup &cg,
-                                    const std::string &state) const {
-    int ret;
-    if (!RetryIfFailed([&] {
-                std::string s;
-                TError error = cg.Get("freezer.state", s);
-                if (error)
-                    L_ERR() << "Can't freeze cgroup: " << error << std::endl;
+TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const {
+    uint64_t deadline = GetCurrentTimeMs() + config().daemon().freezer_wait_timeout_s() * 1000;
+    std::string cur;
+    TError error;
 
-                return StringTrim(s) != state;
-            }, ret, config().daemon().freezer_wait_timeout_s() * 10, 100) || ret) {
-        std::string s = "?";
-        (void)cg.Get("freezer.state", s);
+    do {
+        error = cg.Get("freezer.state", cur);
+        if (error || StringTrim(cur) == state)
+            return error;
+    } while (!WaitDeadline(deadline));
 
-        TError error(EError::Unknown, "Can't wait " + std::to_string(config().daemon().freezer_wait_timeout_s()) + "s for freezer state " + state + ", current state is " + s);
-        if (error)
-            L_ERR() << cg << ": " << error << std::endl;
-        return error;
-    }
-    return TError::Success();
+    return TError(EError::Unknown, "Freezer " + cg.Name + " timeout waiting " + state);
 }
 
 TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
-    return cg.Set("freezer.state", "FROZEN");
-}
-
-TError TFreezerSubsystem::Unfreeze(TCgroup &cg) const {
-    return cg.Set("freezer.state", "THAWED");
-}
-
-TError TFreezerSubsystem::WaitForFreeze(TCgroup &cg) const {
+    TError error = cg.Set("freezer.state", "FROZEN");
+    if (error)
+        return error;
     return WaitState(cg, "FROZEN");
 }
 
-TError TFreezerSubsystem::WaitForUnfreeze(TCgroup &cg) const {
+TError TFreezerSubsystem::Thaw(TCgroup &cg, bool wait) const {
+    TError error = cg.Set("freezer.state", "THAWED");
+    if (error || !wait)
+        return error;
     return WaitState(cg, "THAWED");
 }
 
 bool TFreezerSubsystem::IsFrozen(TCgroup &cg) const {
-    std::string s;
-    TError error = cg.Get("freezer.state", s);
-    if (error)
-        return false;
-    return StringTrim(s) != "THAWED";
+    std::string state;
+    return !cg.Get("freezer.state", state) && StringTrim(state) != "THAWED";
+}
+
+bool TFreezerSubsystem::IsSelfFreezing(TCgroup &cg) const {
+    bool val;
+    return !cg.GetBool("freezer.self_freezing", val) && val;
+}
+
+bool TFreezerSubsystem::IsParentFreezing(TCgroup &cg) const {
+    bool val;
+    return !cg.GetBool("freezer.parent_freezing", val) && val;
 }
 
 // Cpu

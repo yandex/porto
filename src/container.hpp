@@ -82,7 +82,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareTask(std::shared_ptr<TClient> client,
                        struct TTaskEnv *TaskEnv,
                        struct TNetCfg *NetCfg);
-    TError KillAll(TScopedLock &holder_lock, uint64_t timeout_ms);
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
@@ -92,7 +91,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareResources(std::shared_ptr<TClient> client);
     void FreeResources();
 
-    void ExitTree(TScopedLock &holder_lock, int status, bool oomKilled);
+    void ExitOne(TScopedLock &holder_lock, int status, bool oomKilled);
     void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
 
     void CleanupWaiters();
@@ -108,9 +107,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
                                                        TContainer &container)> fn);
 
     void DestroyVolumes(TScopedLock &holder_lock);
-
-    TError Unfreeze(TScopedLock &holder_lock);
-    TError Freeze(TScopedLock &holder_lock);
 
 public:
     uint64_t PropMask;
@@ -178,7 +174,12 @@ public:
     TPath RootPath() const;
     std::string GetCwd() const;
     TPath WorkPath() const;
-    EContainerState GetState() const;
+    EContainerState GetState() const {
+        return State;
+    }
+    bool IsValid() {
+        return State != EContainerState::Unknown;
+    }
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
     TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -214,19 +215,19 @@ public:
     pid_t GetPidFor(pid_t pid) const;
     std::vector<pid_t> Processes();
 
-    TError SendSignal(int signal);
-    TError SendTreeSignal(TScopedLock &holder_lock, int signal);
     void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);
     void Destroy(TScopedLock &holder_lock);
     void DestroyWeak();
     TError Start(std::shared_ptr<TClient> client, bool meta);
-    TError Stop(TScopedLock &holder_lock, uint64_t timeout_ms);
-    TError StopTree(TScopedLock &holder_lock, uint64_t timeout_ms);
-    TError CheckPausedParent();
+    TError StopOne(TScopedLock &holder_lock, uint64_t deadline);
+    TError Stop(TScopedLock &holder_lock, uint64_t timeout);
     TError CheckAcquiredChild(TScopedLock &holder_lock);
+
     TError Pause(TScopedLock &holder_lock);
     TError Resume(TScopedLock &holder_lock);
+
+    TError Terminate(TScopedLock &holder_lock, uint64_t deadline);
     TError Kill(int sig);
 
     TError GetProperty(const std::string &property, std::string &value,
@@ -255,13 +256,9 @@ public:
     void CleanupExpiredChildren();
     TError UpdateTrafficClasses();
 
-    bool MayExit(int pid);
     bool MayRespawn();
     bool MayReceiveOom(int fd);
     bool HasOomReceived();
-
-    bool IsFrozen();
-    bool IsValid();
 
     std::shared_ptr<TVolumeHolder> VolumeHolder;
 

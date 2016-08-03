@@ -768,7 +768,6 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
 
     while (true) {
         std::vector<struct epoll_event> events;
-        int tmp;
 
         error = loop->GetEvents(events, -1);
         if (error) {
@@ -783,16 +782,20 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
 
             switch (s) {
             case SIGINT:
-            case SIGTERM:
+            case SIGTERM: {
                 if (kill(slavePid, s) < 0)
                     L_ERR() << "Can't send " << s << " to slave" << std::endl;
 
                 L() << "Waiting for slave to exit..." << std::endl;
-                RetryIfFailed([&]() { return waitpid(slavePid, nullptr, WNOHANG) != slavePid; },
-                              tmp, 60 * 10, 100);
+                uint64_t deadline = GetCurrentTimeMs() + 1000;
+                do {
+                    if (waitpid(slavePid, nullptr, WNOHANG) == slavePid)
+                        break;
+                } while (!WaitDeadline(deadline));
 
                 ret = -s;
                 goto exit;
+            }
             case SIGUSR1:
                 DaemonOpenLog(true);
                 break;

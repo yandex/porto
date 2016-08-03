@@ -34,29 +34,7 @@ extern "C" {
 #include <linux/fs.h>
 }
 
-bool RetryIfFailed(std::function<int()> handler, int &ret, int times, int timeoMs) {
-    while (times-- > 0) {
-        auto tmp = handler();
-
-        if (tmp == 0) {
-            ret = tmp;
-            return true;
-        }
-
-        usleep(timeoMs * 1000);
-    }
-
-    return false;
-}
-
-bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs) {
-    const int resolution = 5;
-    int times = timeoMs / resolution;
-
-    return RetryIfFailed(handler, ret, times, resolution);
-}
-
-bool TTask::IsRunning() const {
+bool TTask::Exists() const {
     return Pid && !kill(Pid, 0);
 }
 
@@ -165,6 +143,17 @@ uint64_t GetCurrentTimeMs() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+bool WaitDeadline(uint64_t deadline, uint64_t wait) {
+    uint64_t now = GetCurrentTimeMs();
+    if (!deadline || int64_t(deadline - now) < 0)
+        return true;
+    if (deadline - now < wait)
+        wait = deadline - now;
+    if (wait)
+        usleep(wait * 1000);
+    return false;
 }
 
 size_t GetTotalMemory() {

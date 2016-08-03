@@ -13,7 +13,7 @@ class TPath;
 struct TTask {
     pid_t Pid = 0;
 
-    bool IsRunning() const;
+    bool Exists() const;
     bool IsZombie() const;
     pid_t GetPPid() const;
     TError Kill(int signal) const;
@@ -22,15 +22,13 @@ struct TTask {
 pid_t ForkFromThread(void);
 std::string CurrentTimeFormat(const char *fmt, bool msec = false);
 
-bool RetryIfFailed(std::function<int()> handler, int &ret, int times = 10, int timeoMs = 100);
-bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs);
-
 pid_t GetPid();
 pid_t GetPPid();
 pid_t GetTid();
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 
 uint64_t GetCurrentTimeMs();
+bool WaitDeadline(uint64_t deadline, uint64_t sleep = 100);
 size_t GetTotalMemory();
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);

@@ -262,15 +262,7 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TCont
     TError error;
 
     if (c->GetState() != EContainerState::Stopped) {
-        // we are destroying container and we don't need any exit status, so
-        // forcefully kill all processes for destroy to be faster
-        if (!c->IsRoot()) {
-            error = c->SendTreeSignal(holder_lock, SIGKILL);
-            if (error)
-                return error;
-        }
-
-        error = c->StopTree(holder_lock, config().container().kill_timeout_ms());
+        error = c->Stop(holder_lock, 0);
         if (error)
             return error;
     }
@@ -488,9 +480,9 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             // check whether container can exit under holder lock,
             // assume container state is not changed when only holding
             // container lock
-            if (target->MayExit(event.Exit.Pid)) {
+            if (target->WaitTask.Pid == event.Exit.Pid) {
                 TNestedScopedLock lock(*target, holder_lock);
-                if (target->IsValid() && target->MayExit(event.Exit.Pid)) {
+                if (target->IsValid() && target->WaitTask.Pid == event.Exit.Pid) {
                     // we don't want any concurrent stop/start/pause/etc and
                     // don't care whether parent acquired or not
                     target->AcquireForced();
