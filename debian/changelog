@@ -1,3 +1,16 @@
+yandex-porto (2.11.1) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add symlinks /dev/std{in,out,err}
+
+  [ Maxim Samoylov ]
+  * porto: fix selftest for root environment
+  * porto: fix race on volume layers tmp dir creation
+  * porto: fix wrong exit call in the forked child.
+  * porto: fix property restore bug
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 03 Aug 2016 12:54:47 +0300
+
 yandex-porto (2.11) unstable; urgency=low
 
   * porto: recreate $ROOTFS/run subdirectories in the container
