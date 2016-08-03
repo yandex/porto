@@ -1408,9 +1408,13 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     TPath layers_tmp = layers / "_tmp_";
     if (layers_tmp.Exists()) {
         L_ACT() << "Remove stale layers..." << std::endl;
-        error = layers_tmp.RemoveAll();
+        error = layers_tmp.ClearDirectory();
         if (error)
             L_ERR() << "Cannot remove stale layers: " << error << std::endl;
+    } else {
+        error = layers_tmp.Mkdir(0700);
+        if (error)
+            return error;
     }
 
     error = Storage->ListNodes(list);
@@ -1560,13 +1564,9 @@ TError TVolumeHolder::RemoveLayer(const std::string &name) {
     if (!layer.Exists())
         return TError(EError::LayerNotFound, "Layer " + name + " not found");
 
+    /* layers_tmp should already be created on startup */
     TPath layers_tmp = layers / "_tmp_";
     TPath layer_tmp = layers_tmp / name;
-    if (!layers_tmp.Exists()) {
-        error = layers_tmp.Mkdir(0700);
-        if (error)
-            return error;
-    }
 
     auto lock = ScopedLock();
     if (LayerInUse(layer))
@@ -1577,7 +1577,7 @@ TError TVolumeHolder::RemoveLayer(const std::string &name) {
 
     if (!error)
         error = layer_tmp.RemoveAll();
-    (void)layers_tmp.Rmdir();
+
     return error;
 }
 
