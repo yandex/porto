@@ -14,7 +14,6 @@ enum class EEventType {
     RotateLogs,
     Respawn,
     OOM,
-    CgroupSync,
     WaitTimeout,
     UpdateNetwork,
     DestroyWeak,

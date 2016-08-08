@@ -55,8 +55,6 @@ std::string TEvent::GetMsg() const {
             return "respawn";
         case EEventType::OOM:
             return "OOM killed with fd " + std::to_string(OOM.Fd);
-        case EEventType::CgroupSync:
-            return "cgroup sync";
         case EEventType::WaitTimeout:
             return "wait timeout";
         case EEventType::UpdateNetwork:

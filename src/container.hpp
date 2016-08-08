@@ -53,14 +53,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int Acquired = 0;
     int Id;
     TScopedFd OomEventFd;
-    size_t CgroupEmptySince = 0;
     size_t RunningChildren = 0; // changed under holder lock
-    bool LostAndRestored = false;
     std::list<std::weak_ptr<TContainerWaiter>> Waiters;
 
     std::shared_ptr<TEpollSource> Source;
-    bool IsMeta = false;
-
     int Level; // 0 for root, 1 for porto_root, etc
 
     // data
@@ -160,8 +156,8 @@ public:
     bool PortoEnabled;
     bool IsWeak;
     EContainerState State = EContainerState::Unknown;
-    bool OomKilled;
-    int ExitStatus;
+    bool OomKilled = false;
+    int ExitStatus = 0;
     int TaskStartErrno = -1;
 
     TTask Task;
@@ -233,7 +229,10 @@ public:
     TError SetProperty(const std::string &property, const std::string &value);
 
     TError Restore(TScopedLock &holder_lock, const TKeyValue &node);
+    void SyncState(TScopedLock &holder_lock);
+
     TError Save(void);
+    TError Load(const TKeyValue &node);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
     bool CanRemoveDead() const;
@@ -248,8 +247,6 @@ public:
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
-    bool IsLostAndRestored() const;
-    void SyncStateWithCgroup(TScopedLock &holder_lock);
     void CleanupExpiredChildren();
     TError UpdateTrafficClasses();
 

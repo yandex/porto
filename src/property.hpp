@@ -94,7 +94,7 @@ constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 constexpr const char *D_MEM_TOTAL_LIMIT = "memory_limit_total";
 
-constexpr uint64_t ROOT_PID_SET = (1lu << 0);
+constexpr uint64_t ROOT_PID_SET = (1llu << 0);
 constexpr uint64_t LOOP_DEV_SET = (1lu << 2);
 constexpr uint64_t START_TIME_SET = (1lu << 4);
 constexpr uint64_t DEATH_TIME_SET = (1lu << 5);

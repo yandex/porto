@@ -25,7 +25,6 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     TIdMap IdMap;
 
     void ScheduleLogRotatation();
-    void ScheduleCgroupSync();
     void Unlink(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);
 
 public:

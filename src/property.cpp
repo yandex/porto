@@ -2499,39 +2499,24 @@ TError TState::Get(std::string &value) {
 
 class TOomKilled : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError GetToSave(std::string &value);
-    TError Get(std::string &value);
     TOomKilled() : TProperty(D_OOM_KILLED, OOM_KILLED_SET,
                              "container has been killed by OOM (ro)") {
         IsReadOnly = true;
     }
-} static OomKilled;
-
-TError TOomKilled::SetFromRestore(const std::string &value) {
-    if (value == "true")
-        CurrentContainer->OomKilled = true;
-    else if (value == "false")
-        CurrentContainer->OomKilled = false;
-    else
-        return TError(EError::InvalidValue, "Invalid bool value");
-
-    return TError::Success();
-}
-
-TError TOomKilled::GetToSave(std::string &value) {
-    value = CurrentContainer->OomKilled ? "true" : "false";
-
-    return TError::Success();
-}
-
-TError TOomKilled::Get(std::string &value) {
-    TError error = IsDead();
-    if (error)
+    TError SetFromRestore(const std::string &value) {
+        return StringToBool(value, CurrentContainer->OomKilled);
+    }
+    TError GetToSave(std::string &value) {
+        value = BoolToString(CurrentContainer->OomKilled);
+        return TError::Success();
+    }
+    TError Get(std::string &value) {
+        TError error = IsDead();
+        if (!error)
+            value = BoolToString(CurrentContainer->OomKilled);
         return error;
-
-    return GetToSave(value);
-}
+    }
+} static OomKilled;
 
 class TParent : public TProperty {
 public:

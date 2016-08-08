@@ -327,8 +327,6 @@ bool TContainerHolder::RestoreFromStorage() {
 
     bool restored = false;
     for (auto &node : nodes) {
-        L_ACT() << "Found " << node.Name << " container in kvs" << std::endl;
-
         restored = true;
         error = Restore(holder_lock, node);
         if (error) {
@@ -336,15 +334,6 @@ bool TContainerHolder::RestoreFromStorage() {
             Statistics->RestoreFailed++;
             node.Path.Unlink();
             continue;
-        }
-    }
-
-    if (restored) {
-        for (auto &c: Containers) {
-            if (c.second->IsLostAndRestored()) {
-                ScheduleCgroupSync();
-                break;
-            }
         }
     }
 
@@ -421,11 +410,6 @@ void TContainerHolder::ScheduleLogRotatation() {
     Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, e);
 }
 
-void TContainerHolder::ScheduleCgroupSync() {
-    TEvent e(EEventType::CgroupSync);
-    Queue->Add(5000, e);
-}
-
 bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (Verbose)
         L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
@@ -493,31 +477,6 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             }
         }
         AckExitStatus(event.Exit.Pid);
-        delivered = true;
-        break;
-    }
-    case EEventType::CgroupSync:
-    {
-        bool rearm = false;
-        auto list = List();
-        for (auto &target : list) {
-            // don't lock container here, LostAndRestored is never changed
-            // after startup
-            if (target->IsLostAndRestored())
-                rearm = true;
-
-            if (target->IsAcquired())
-                continue;
-
-            TNestedScopedLock lock(*target, holder_lock);
-            if (target->IsValid() && target->IsLostAndRestored()) {
-                if (target->IsAcquired())
-                    continue;
-                target->SyncStateWithCgroup(holder_lock);
-            }
-        }
-        if (rearm)
-            ScheduleCgroupSync();
         delivered = true;
         break;
     }

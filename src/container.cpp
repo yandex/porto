@@ -55,7 +55,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Stdin(0), Stdout(1), Stderr(2)
 {
     Statistics->Containers++;
-    PropMask = 0lu;
+    PropMask = 0llu;
     MemGuarantee = 0;
     CurrentMemGuarantee = 0;
 
@@ -115,8 +115,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     AgingTime = config().container().default_aging_time_s();
     PortoEnabled = true;
     IsWeak = false;
-    ExitStatus = 0;
-    TaskStartErrno = -1;
 }
 
 TContainer::~TContainer() {
@@ -177,19 +175,6 @@ std::string TContainer::GetCwd() const {
     return Cwd;
 }
 
-bool TContainer::IsLostAndRestored() const {
-    return LostAndRestored;
-}
-
-void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
-    if (LostAndRestored && State == EContainerState::Running &&
-        (!Task.Pid || Processes().empty())) {
-        L() << "Lost and restored container " << GetName() << " is empty"
-                      << ", mark them dead." << std::endl;
-        Exit(holder_lock, -1, false);
-    }
-}
-
 TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
     if (Net) {
         auto lock = Net->ScopedLock();
@@ -242,9 +227,6 @@ TError TContainer::UpdateSoftLimit() {
 }
 
 void TContainer::SetState(EContainerState newState) {
-    if (newState == EContainerState::Running && IsMeta)
-        newState = EContainerState::Meta;
-
     if (State == newState)
         return;
 
@@ -853,8 +835,6 @@ void TContainer::AddChild(std::shared_ptr<TContainer> child) {
 TError TContainer::Create(const TCred &cred) {
     L_ACT() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
 
-    CgroupEmptySince = 0;
-
     OwnerCred = cred;
     TError error = OwnerCred.LoadGroups(OwnerCred.User());
     if (error)
@@ -948,12 +928,6 @@ TError TContainer::Start(bool meta) {
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
-    ExitStatus = -1;
-    PropMask |= EXIT_STATUS_SET;
-
-    OomKilled = false;
-    PropMask |= OOM_KILLED_SET;
-
     StartTime = GetCurrentTimeMs();
     PropMask |= START_TIME_SET;
 
@@ -1006,7 +980,6 @@ TError TContainer::Start(bool meta) {
         PropMask |= ROOT_PID_SET;
     }
 
-    IsMeta = meta;
     if (meta)
         SetState(EContainerState::Meta);
     else
@@ -1307,6 +1280,11 @@ TError TContainer::StopOne(TScopedLock &holder_lock, uint64_t deadline) {
     Task.Pid = 0;
     TaskVPid = 0;
     WaitTask.Pid = 0;
+    DeathTime = 0;
+    ExitStatus = 0;
+    OomKilled = false;
+
+    PropMask &= ~(ROOT_PID_SET | DEATH_TIME_SET | OOM_KILLED_SET | EXIT_STATUS_SET);
 
     SetState(EContainerState::Stopped);
     FreeResources();
@@ -1374,13 +1352,15 @@ void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
     DeathTime = GetCurrentTimeMs();
     PropMask |= DEATH_TIME_SET;
 
-    OomKilled = oomKilled;
-    PropMask |= OOM_KILLED_SET;
+    if (oomKilled) {
+        OomKilled = oomKilled;
+        PropMask |= OOM_KILLED_SET;
+    }
 
     Task.Pid = 0;
     TaskVPid = 0;
     WaitTask.Pid = 0;
-    PropMask |= ROOT_PID_SET;
+    PropMask &= ~ROOT_PID_SET;
 
     if (State == EContainerState::Meta)
         SetState(EContainerState::Stopped);
@@ -1642,22 +1622,15 @@ TError TContainer::Save(void) {
     return node.Save();
 }
 
-TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
-    L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
-
-    CgroupEmptySince = 0;
-
-    CurrentContainer = this;
-    SystemClient.StartRequest();
-
+TError TContainer::Load(const TKeyValue &node) {
     std::string container_state;
     TError error;
 
-    for (auto &kv: node.Data) {
+    CurrentContainer = this;
 
+    for (auto &kv: node.Data) {
         std::string key = kv.first;
         std::string value = kv.second;
-        error = TError::Success();
 
         if (key == D_STATE) {
             /*
@@ -1668,197 +1641,128 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
             continue;
         }
 
-        auto prop = ContainerProperties.find(key);
-        if (prop != ContainerProperties.end()) {
+        if (key == P_RAW_ID || key == P_RAW_NAME)
+            continue;
 
-            if (Verbose)
-                L_ACT() << "Restoring as new property" << key << " = " << value << std::endl;
+        auto it = ContainerProperties.find(key);
+        if (it == ContainerProperties.end()) {
+            L_WRN() << "Unknown property: " << key << ", skipped" << std::endl;
+            continue;
+        }
+        auto prop = it->second;
 
-            error = (*prop).second->SetFromRestore(value);
-            if (!error) {
-                PropMask |= (*prop).second->SetMask; /* Indicate that we've set the value */
-                continue;
-            }
+        error = prop->SetFromRestore(value);
+        if (error) {
+            L_ERR() << "Cannot load " << key << ", skipped" << std::endl;
+            continue;
         }
 
-        if (error)
-            L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
-
+        PropMask |= prop->SetMask;
     }
 
-    /* Valid container state cannot be empty */
-    if (container_state.length() > 0) {
-        (*ContainerProperties.find(D_STATE)).second->SetFromRestore(container_state);
+    if (container_state.size()) {
+        error = ContainerProperties[D_STATE]->SetFromRestore(container_state);
         PropMask |= STATE_SET;
+    } else
+        error = TError(EError::Unknown, "Container has no state");
+
+    CurrentContainer = nullptr;
+
+    return error;
+}
+
+void TContainer::SyncState(TScopedLock &holder_lock) {
+    TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
+    TError error;
+
+    L_ACT() << "Sync " << GetName() << " state " << ContainerStateName(State) << std::endl;
+
+    if (!freezerCg.Exists()) {
+        if (State != EContainerState::Stopped)
+            L_WRN() << "Freezer not found" << std::endl;
+        State = EContainerState::Stopped;
+        return;
     }
 
-    // There are several points where we save value to the persistent store
-    // which we may use as indication for events like:
-    // - Container create failed
-    // - Container create succeed
-    // - Container start failed
-    // - Container start succeed
-    //
-    // -> Create
-    // { SET user, group
-    // } SET state -> stopped
-    //
-    // -> Start
-    // { SET respawn_count, oom_killed, start_errno
-    // } SET state -> running
-
-    bool started = (PropMask & ROOT_PID_SET) > 0;
-    bool created = (PropMask & STATE_SET) > 0;
-
-    if (!created) {
-        error = TError(EError::Unknown, "Container has not been created");
-        goto error;
-    }
-
-    if (started) {
-        L_ACT() << GetName() << ": restore started container " << Task.Pid << std::endl;
-
-        auto parent = Parent;
-        while (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
-            if (parent->State == EContainerState::Running ||
-                    parent->State == EContainerState::Meta ||
-                    parent->State == EContainerState::Dead)
-                break;
-            bool meta = parent->Command.empty();
-
-            L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
-
-            error = parent->Start(meta);
-            if (error)
-                goto error;
-
-            parent = parent->Parent;
-        }
-
-        error = PrepareResources();
-        if (error)
-            goto error;
-
-        pid_t pid = Task.Pid;
-        pid_t ppid;
-
-        TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
-
-        ppid = WaitTask.GetPPid();
-        if (ppid)
-            error = FreezerSubsystem.TaskCgroup(pid, taskCg);
-
-        if (!ppid || error) {
-            L() << "Cannot get ppid or cgroup of restored task " << pid
-                << ": " << error << std::endl;
-            LostAndRestored = true;
-        } else if (ppid != getppid()) {
-            L() << "Invalid ppid of restored task " << pid << ": "
-                << ppid << " != " << getppid() << std::endl;
-            LostAndRestored = true;
-        } else if (Task.IsZombie()) {
-            L() << "Task " << pid << " is zombie and belongs to porto" << std::endl;
-        } else if (taskCg != freezerCg) {
-            L_WRN() << "Task " << pid << " belongs to wrong freezer cgroup: "
-                    << taskCg << " should be " << freezerCg << std::endl;
-            LostAndRestored = true;
-        } else {
-            L() << "Task " << pid << " is running and belongs to porto" << std::endl;
-
-            std::vector<pid_t> tasks;
-            error = freezerCg.GetTasks(tasks);
-            if (error) {
-                L_WRN() << "Cannot dump cgroups " << freezerCg << " " << error << std::endl;
-                LostAndRestored = true;
-            } else {
-                /* Sweep all tasks from freezer cgroup into correct cgroups */
-                for (pid_t pid: tasks) {
-                    for (auto hy: Hierarchies) {
-                        TCgroup currentCg, correctCg = GetCgroup(*hy);
-                        error = hy->TaskCgroup(pid, currentCg);
-                        if (error || currentCg == correctCg)
-                            continue;
-
-                        /* Recheck freezer cgroup */
-                        TCgroup currentFr;
-                        error = FreezerSubsystem.TaskCgroup(pid, currentFr);
-                        if (error || currentFr != freezerCg)
-                            continue;
-
-                        L_WRN() << "Process " << pid << " in " << currentCg
-                                << " while should be in " << correctCg << std::endl;
-                        (void)correctCg.Attach(pid);
-                    }
-                }
-            }
-
-            error = RestoreNetwork();
-            if (error) {
-                if (Task.GetPPid() != getppid() && !Task.IsZombie())
-                    L_WRN() << "Cannot restore network: " << error << std::endl;
-                LostAndRestored = true;
-            }
-        }
-
-        if (State == EContainerState::Dead) {
-            // we started recording death time since porto v1.15,
-            // use some sensible default
-            if (!(PropMask & DEATH_TIME_SET)) {
-                DeathTime = GetCurrentTimeMs();
-                PropMask |= DEATH_TIME_SET;
-            }
-
-            SetState(EContainerState::Dead);
-        } else {
-            // we started recording start time since porto v1.15,
-            // use some sensible default
-            if (!(PropMask & START_TIME_SET)) {
-                StartTime = GetCurrentTimeMs();
-                PropMask |= START_TIME_SET;
-            }
-
-            if (Command.empty())
-                SetState(EContainerState::Meta);
-            else
-                SetState(EContainerState::Running);
-
-            auto cg = GetCgroup(FreezerSubsystem);
-            if (FreezerSubsystem.IsFrozen(cg))
-                SetState(EContainerState::Paused);
-        }
-
-        if (!Task.IsZombie())
-            SyncStateWithCgroup(holder_lock);
-
-        if (MayRespawn())
-            ScheduleRespawn();
-    } else {
-        L_ACT() << GetName() << ": restore created container " << std::endl;
-
-        // we didn't report to user that we started container,
-        // make sure nobody is running
-
-        auto freezerCg = GetCgroup(FreezerSubsystem);
-        if (freezerCg.Exists() && !freezerCg.IsEmpty())
-            (void)freezerCg.KillAll(9);
-
-        if (State == EContainerState::Meta &&
-                Command.empty())
-            SetState(EContainerState::Meta);
-        else
-            SetState(EContainerState::Stopped);
-
+    if (State == EContainerState::Stopped) {
+        L() << "Found unexpected freezer" << std::endl;
+        Reap(holder_lock, false);
+    } else if (State == EContainerState::Meta && !WaitTask.Pid && !Isolate) {
+        /* meta container */
+    } else if (!WaitTask.Exists()) {
+        if (State != EContainerState::Dead)
+            L() << "Task no found" << std::endl;
+        Reap(holder_lock, false);
+    } else if (WaitTask.GetPPid() != getppid()) {
+        L() << "Wrong ppid " << WaitTask.GetPPid() << " " << getppid() << std::endl;
+        Reap(holder_lock, false);
+    } else if (WaitTask.IsZombie()) {
+        L() << "Task is zombie" << std::endl;
         Task.Pid = 0;
-        TaskVPid = 0;
-        WaitTask.Pid = 0;
+    } else if (FreezerSubsystem.TaskCgroup(WaitTask.Pid, taskCg)) {
+        L() << "Cannot check freezer" << std::endl;
+        Reap(holder_lock, false);
+    } else if (taskCg != freezerCg) {
+        L() << "Task in wrong freezer" << std::endl;
+        WaitTask.Kill(SIGKILL);
+        Task.Kill(SIGKILL);
+        Reap(holder_lock, false);
     }
+
+    std::vector<pid_t> tasks;
+    error = freezerCg.GetTasks(tasks);
+    if (error)
+        L_WRN() << "Cannot dump cgroups " << freezerCg << " " << error << std::endl;
+
+    for (pid_t pid: tasks) {
+        for (auto hy: Hierarchies) {
+            TCgroup currentCg, correctCg = GetCgroup(*hy);
+            error = hy->TaskCgroup(pid, currentCg);
+            if (error || currentCg == correctCg)
+                continue;
+
+            /* Recheck freezer cgroup */
+            TCgroup currentFr;
+            error = FreezerSubsystem.TaskCgroup(pid, currentFr);
+            if (error || currentFr != freezerCg)
+                continue;
+
+            L_WRN() << "Task " << pid << " in " << currentCg
+                    << " while should be in " << correctCg << std::endl;
+            (void)correctCg.Attach(pid);
+        }
+    }
+}
+
+TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
+    TError error;
+
+    L_ACT() << "Restore container " << GetName() << std::endl;
+
+    SystemClient.StartRequest();
+
+    error = Load(node);
+    if (error)
+        goto out;
+
+    SyncState(holder_lock);
+
+    if (Task.Pid) {
+        error = RestoreNetwork();
+        if (error && !WaitTask.IsZombie()) {
+            L_WRN() << "Cannot restore network: " << error << std::endl;
+            goto out;
+        }
+    }
+
+    if (MayRespawn())
+            ScheduleRespawn();
 
     if (Parent)
         Parent->AddChild(shared_from_this());
 
-error:
+out:
     SystemClient.FinishRequest();
-    CurrentContainer = nullptr;
 
     if (!error)
         error = Save();
