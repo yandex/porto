@@ -19,7 +19,7 @@ extern "C" {
 
 struct TTaskEnv {
     std::shared_ptr<TContainer> CT;
-    std::shared_ptr<TClient> Client;
+    TClient *Client;
     TScopedFd PortoInitFd;
     TMountNamespace Mnt;
     TEnv Env;

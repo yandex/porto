@@ -22,13 +22,18 @@ extern "C" {
 #include <unistd.h>
 };
 
+TClient SystemClient("<system>");
+__thread TClient *CurrentClient = nullptr;
+
 TClient::TClient(std::shared_ptr<TEpollLoop> loop) : TEpollSource(loop, -1) {
     ConnectionTime = GetCurrentTimeMs();
     Statistics->Clients++;
 }
 
-TClient::TClient(TCred cred) : TEpollSource(), Cred(cred) {
-    Statistics->Clients++;
+TClient::TClient(const std::string &special) {
+    Cred = TCred(0, 0);
+    Comm = special;
+    ReadOnlyAccess = false;
 }
 
 TClient::~TClient() {
@@ -85,20 +90,15 @@ void TClient::CloseConnection() {
     WeakContainers.clear();
 }
 
-int TClient::GetFd() const {
-    return Fd;
-}
-
-pid_t TClient::GetPid() const {
-    return Pid;
-}
-
-const std::string& TClient::GetComm() const {
-    return Comm;
-}
-
-void TClient::BeginRequest() {
+void TClient::StartRequest() {
     RequestStartMs = GetCurrentTimeMs();
+    PORTO_ASSERT(CurrentClient == nullptr);
+    CurrentClient = this;
+}
+
+void TClient::FinishRequest() {
+    PORTO_ASSERT(CurrentClient == this);
+    CurrentClient = nullptr;
 }
 
 uint64_t TClient::GetRequestTimeMs() {

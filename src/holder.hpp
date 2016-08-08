@@ -43,7 +43,7 @@ public:
     TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &c);
 
     TError GetLocked(TScopedLock &holder_lock,
-                     const std::shared_ptr<TClient> client,
+                     const TClient *client,
                      const std::string &name,
                      const bool checkPerm,
                      std::shared_ptr<TContainer> &c,

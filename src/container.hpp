@@ -79,8 +79,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ParseNetConfig(struct TNetCfg &NetCfg);
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError ConfigureNetwork(struct TNetCfg &NetCfg);
-    TError PrepareTask(std::shared_ptr<TClient> client,
-                       struct TTaskEnv *TaskEnv,
+    TError PrepareTask(struct TTaskEnv *TaskEnv,
                        struct TNetCfg *NetCfg);
     void RemoveKvs();
 
@@ -88,7 +87,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void ScheduleRespawn();
     TError Respawn(TScopedLock &holder_lock);
     void StopChildren(TScopedLock &holder_lock);
-    TError PrepareResources(std::shared_ptr<TClient> client);
+    TError PrepareResources();
     void FreeResources();
 
     void ExitOne(TScopedLock &holder_lock, int status, bool oomKilled);
@@ -219,7 +218,7 @@ public:
     TError Create(const TCred &cred);
     void Destroy(TScopedLock &holder_lock);
     void DestroyWeak();
-    TError Start(std::shared_ptr<TClient> client, bool meta);
+    TError Start(bool meta);
     TError StopOne(TScopedLock &holder_lock, uint64_t deadline);
     TError Stop(TScopedLock &holder_lock, uint64_t timeout);
     TError CheckAcquiredChild(TScopedLock &holder_lock);
@@ -230,10 +229,8 @@ public:
     TError Terminate(TScopedLock &holder_lock, uint64_t deadline);
     TError Kill(int sig);
 
-    TError GetProperty(const std::string &property, std::string &value,
-                       std::shared_ptr<TClient> &client) const;
-    TError SetProperty(const std::string &property, const std::string &value,
-                       std::shared_ptr<TClient> &client);
+    TError GetProperty(const std::string &property, std::string &value) const;
+    TError SetProperty(const std::string &property, const std::string &value);
 
     TError Restore(TScopedLock &holder_lock, const TKeyValue &node);
     TError Save(void);

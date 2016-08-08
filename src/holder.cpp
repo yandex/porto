@@ -46,7 +46,7 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
 
     container->NetProp = { "host" };
 
-    error = container->Start(nullptr, true);
+    error = container->Start(true);
     if (error)
         return error;
 
@@ -64,7 +64,7 @@ TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
 
     container->Isolate = false;
 
-    error = container->Start(nullptr, true);
+    error = container->Start(true);
     if (error)
         return error;
 
@@ -204,7 +204,7 @@ TError TContainerHolder::Get(const std::string &name, std::shared_ptr<TContainer
 }
 
 TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
-                                   const std::shared_ptr<TClient> client,
+                                   const TClient *client,
                                    const std::string &name,
                                    const bool checkPerm,
                                    std::shared_ptr<TContainer> &c,

@@ -23,21 +23,21 @@ class TClient : public TEpollSource {
 public:
     TCred Cred;
     TCred TaskCred;
+    pid_t Pid = 0;
+    std::string Comm;
+
     TClient(std::shared_ptr<TEpollLoop> loop);
-    TClient(TCred cred);
+    TClient(const std::string &special);
     ~TClient();
 
-    bool ReadOnlyAccess;
+    bool ReadOnlyAccess = true;
 
     TError AcceptConnection(TContext &context, int listenFd);
     void CloseConnection();
 
-    int GetFd() const;
-    pid_t GetPid() const;
+    void StartRequest();
+    void FinishRequest();
 
-    const std::string& GetComm() const;
-
-    void BeginRequest();
     uint64_t GetRequestTimeMs();
 
     TError IdentifyClient(TContainerHolder &holder, bool initial);
@@ -66,10 +66,8 @@ public:
 
 private:
     std::mutex Mutex;
-    pid_t Pid;
-    std::string Comm;
-    uint64_t ConnectionTime;
-    uint64_t RequestStartMs;
+    uint64_t ConnectionTime = 0;
+    uint64_t RequestStartMs = 0;
     bool Processing = false;
 
     TError LoadGroups();
@@ -81,3 +79,6 @@ private:
     std::vector<uint8_t> Buffer;
     std::weak_ptr<TContainer> ClientContainer;
 };
+
+extern TClient SystemClient;
+extern __thread TClient *CurrentClient;

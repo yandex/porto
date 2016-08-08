@@ -5,6 +5,7 @@
 #include "event.hpp"
 #include "holder.hpp"
 #include "volume.hpp"
+#include "client.hpp"
 #include "container.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
@@ -25,19 +26,23 @@ TError TContext::Initialize() {
 
     auto holder_lock = LockContainers();
 
+    SystemClient.StartRequest();
+
     error = Cholder->CreateRoot(holder_lock);
     if (error) {
         L_ERR() << "Can't create root container: " << error << std::endl;
-        return error;
+        goto out;
     }
 
     error = Cholder->CreatePortoRoot(holder_lock);
     if (error) {
         L_ERR() << "Can't create porto root container: " << error << std::endl;
-        return error;
+        goto out;
     }
 
-    return TError::Success();
+out:
+    SystemClient.FinishRequest();
+    return error;
 }
 
 TError TContext::Destroy() {

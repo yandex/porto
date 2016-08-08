@@ -71,7 +71,8 @@ retry:
     return TError::Success();
 }
 
-TError TStdStream::OpenOutside(const TContainer &container, const TClient &client) {
+TError TStdStream::OpenOutside(const TContainer &container,
+                               const TClient &client) {
     if (IsNull())
         return Open("/dev/null", container.OwnerCred);
 
@@ -79,11 +80,15 @@ TError TStdStream::OpenOutside(const TContainer &container, const TClient &clien
         int clientFd = -1;
         TError error;
 
+        if (!client.Pid)
+            return TError(EError::InvalidValue,
+                    "Cannot open redirect without client pid");
+
         error = StringToInt(Path.ToString().substr(8), clientFd);
         if (error)
             return error;
 
-        TPath path(StringFormat("/proc/%u/fd/%u", client.GetPid(), clientFd));
+        TPath path(StringFormat("/proc/%u/fd/%u", client.Pid, clientFd));
         error = Open(path, container.OwnerCred);
         if (error)
             return error;

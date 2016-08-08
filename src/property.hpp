@@ -188,6 +188,4 @@ void InitContainerProperties(void);
 
 class TContainer;
 extern __thread TContainer *CurrentContainer;
-class TClient;
-extern __thread TClient *CurrentClient;
 extern std::map<std::string, TProperty*> ContainerProperties;

@@ -17,7 +17,6 @@ extern "C" {
 }
 
 __thread TContainer *CurrentContainer = nullptr;
-__thread TClient *CurrentClient = nullptr;
 std::map<std::string, TProperty*> ContainerProperties;
 
 TProperty::TProperty(std::string name, uint64_t set_mask, std::string desc) {
@@ -2583,7 +2582,7 @@ public:
         TError error = IsRunning();
         if (error)
             return error;
-        value = std::to_string(CurrentContainer->GetPidFor(CurrentClient->GetPid()));
+        value = std::to_string(CurrentContainer->GetPidFor(CurrentClient->Pid));
         return TError::Success();
     }
 } static RootPid;
