@@ -331,9 +331,7 @@ TError TUlimit::Set(const std::string &ulimit_str) {
         return error;
 
     std::vector<std::string> ulimits;
-    error = StringToStrList(ulimit_str, ulimits);
-    if (error)
-        return error;
+    SplitEscapedString(ulimit_str, ulimits, ';');
 
     /*
      * The final copy will be slow, but we don't want
@@ -1159,7 +1157,7 @@ TError TNet::Set(const std::string &net_desc) {
         return error;
 
     std::vector<std::string> new_net_desc;
-    error = StringToStrList(net_desc, new_net_desc);
+    SplitEscapedString(net_desc, new_net_desc, ';');
 
     TNetCfg cfg;
     error = cfg.ParseNet(new_net_desc);
@@ -1173,7 +1171,8 @@ TError TNet::Set(const std::string &net_desc) {
 }
 
 TError TNet::Get(std::string &value) {
-    return StrListToString(CurrentContainer->NetProp, value);
+    value = MergeEscapeStrings(CurrentContainer->NetProp, ';');
+    return TError::Success();
 }
 
 class TRootRo : public TProperty {
@@ -1262,10 +1261,7 @@ TError TEnvProperty::Set(const std::string &env_val) {
         return error;
 
     std::vector<std::string> envs;
-
-    error = StringToStrList(env_val, envs);
-    if (error)
-        return error;
+    SplitEscapedString(env_val, envs, ';');
 
     TEnv env;
     error =  env.Parse(envs, true);
@@ -1279,7 +1275,8 @@ TError TEnvProperty::Set(const std::string &env_val) {
 }
 
 TError TEnvProperty::Get(std::string &value) {
-    return StrListToString(CurrentContainer->EnvCfg, value);
+    value = MergeEscapeStrings(CurrentContainer->EnvCfg, ';');
+    return TError::Success();
 }
 
 TError TEnvProperty::SetIndexed(const std::string &index, const std::string &env_val) {
@@ -1329,9 +1326,7 @@ TError TBind::Set(const std::string &bind_str) {
         return error;
 
     std::vector<std::string> binds;
-    error = StringToStrList(bind_str, binds);
-    if (error)
-        return error;
+    SplitEscapedString(bind_str, binds, ';');
 
     std::vector<TBindMount> bindMounts;
 
@@ -1339,10 +1334,7 @@ TError TBind::Set(const std::string &bind_str) {
         std::vector<std::string> tok;
         TBindMount bm;
 
-        TError error = SplitEscapedString(line, ' ', tok);
-        if (error)
-            return error;
-
+        SplitEscapedString(line, tok, ' ');
         if (tok.size() != 2 && tok.size() != 3)
             return TError(EError::InvalidValue, "Invalid bind in: " + line);
 
@@ -1374,7 +1366,8 @@ TError TBind::Get(std::string &value) {
     for (const auto &bm : CurrentContainer->BindMounts)
         list.push_back(bm.Source.ToString() + " " + bm.Dest.ToString() +
                        (bm.ReadOnly ? " ro" : bm.ReadWrite ? " rw" : ""));
-    return StrListToString(list, value);
+    value = MergeEscapeStrings(list, ';');
+    return TError::Success();
 }
 
 class TIp : public TProperty {
@@ -1391,9 +1384,7 @@ TError TIp::Set(const std::string &ipaddr) {
         return error;
 
     std::vector<std::string> ipaddrs;
-    error = StringToStrList(ipaddr, ipaddrs);
-    if (error)
-        return error;
+    SplitEscapedString(ipaddr, ipaddrs, ';');
 
     TNetCfg cfg;
     error = cfg.ParseIp(ipaddrs);
@@ -1407,7 +1398,8 @@ TError TIp::Set(const std::string &ipaddr) {
 }
 
 TError TIp::Get(std::string &value) {
-    return StrListToString(CurrentContainer->IpList, value);
+    value = MergeEscapeStrings(CurrentContainer->IpList, ';');
+    return TError::Success();
 }
 
 class TDefaultGw : public TProperty {
@@ -1427,10 +1419,7 @@ TError TDefaultGw::Set(const std::string &gw) {
 
     TNetCfg cfg;
     std::vector<std::string> gws;
-
-    error = StringToStrList(gw, gws);
-    if (error)
-        return error;
+    SplitEscapedString(gw, gws, ';');
 
     error = cfg.ParseGw(gws);
     if (error)
@@ -1443,7 +1432,8 @@ TError TDefaultGw::Set(const std::string &gw) {
 }
 
 TError TDefaultGw::Get(std::string &value) {
-    return StrListToString(CurrentContainer->DefaultGw, value);
+    value = MergeEscapeStrings(CurrentContainer->DefaultGw, ';');
+    return TError::Success();
 }
 
 class TResolvConf : public TProperty {
@@ -1461,10 +1451,7 @@ TError TResolvConf::Set(const std::string &conf_str) {
         return error;
 
     std::vector<std::string> conf;
-
-    error = StringToStrList(conf_str, conf);
-    if (error)
-        return error;
+    SplitEscapedString(conf_str, conf, ';');
 
     CurrentContainer->ResolvConf = conf;
     CurrentContainer->PropMask |= RESOLV_CONF_SET;
@@ -1473,7 +1460,8 @@ TError TResolvConf::Set(const std::string &conf_str) {
 }
 
 TError TResolvConf::Get(std::string &value) {
-    return StrListToString(CurrentContainer->ResolvConf, value);
+    value = MergeEscapeStrings(CurrentContainer->ResolvConf, ';');
+    return TError::Success();
 }
 
 class TDevices : public TProperty {
@@ -1489,10 +1477,7 @@ public:
 TError TDevices::Set(const std::string &dev_str) {
     std::vector<std::string> dev_list;
 
-    TError error = StringToStrList(dev_str, dev_list);
-    if (error)
-        return error;
-
+    SplitEscapedString(dev_str, dev_list, ';');
     CurrentContainer->Devices = dev_list;
     CurrentContainer->PropMask |= DEVICES_SET;
 
@@ -1500,7 +1485,8 @@ TError TDevices::Set(const std::string &dev_str) {
 }
 
 TError TDevices::Get(std::string &value) {
-    return StrListToString(CurrentContainer->Devices, value);
+    value = MergeEscapeStrings(CurrentContainer->Devices, ';');
+    return TError::Success();
 }
 
 class TRawRootPid : public TProperty {
@@ -1517,8 +1503,10 @@ public:
     }
     TError SetFromRestore(const std::string &value) {
         std::vector<std::string> val;
-        TError error = StringToStrList(value, val);
-        if (!error && val.size() > 0)
+        TError error;
+
+        SplitEscapedString(value, val, ';');
+        if (val.size() > 0)
             error = StringToInt(val[0], CurrentContainer->Task.Pid);
         else
             CurrentContainer->Task.Pid = 0;

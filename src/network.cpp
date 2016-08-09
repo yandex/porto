@@ -854,11 +854,9 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
 
     for (auto &line : lines) {
         std::vector<std::string> settings;
+        TError error;
 
-        TError error = SplitEscapedString(line, ' ', settings);
-        if (error)
-            return error;
-
+        SplitEscapedString(line, settings, ' ');
         if (settings.size() == 0)
             return TError(EError::InvalidValue, "Invalid net in: " + line);
 
@@ -1083,10 +1081,9 @@ TError TNetCfg::ParseIp(std::vector<std::string> lines) {
     IpVec.clear();
     for (auto &line : lines) {
         std::vector<std::string> settings;
-        TError error = SplitEscapedString(line, ' ', settings);
-        if (error)
-            return error;
+        TError error;
 
+        SplitEscapedString(line, settings, ' ');
         if (settings.size() != 2)
             return TError(EError::InvalidValue, "Invalid ip address/prefix in: " + line);
 
@@ -1118,10 +1115,9 @@ TError TNetCfg::ParseGw(std::vector<std::string> lines) {
     GwVec.clear();
     for (auto &line : lines) {
         std::vector<std::string> settings;
-        TError error = SplitEscapedString(line, ' ', settings);
-        if (error)
-            return error;
+        TError error;
 
+        SplitEscapedString(line, settings, ' ');
         if (settings.size() != 2)
             return TError(EError::InvalidValue, "Invalid gateway address/prefix in: " + line);
 

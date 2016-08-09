@@ -730,7 +730,7 @@ std::string TPath::UmountFlagsToString(unsigned long flags) {
 
 TError TPath::Mount(TPath source, std::string type, unsigned long flags,
                     std::vector<std::string> options) const {
-    std::string data = MergeEscapeStrings(options, ",", "\\,");
+    std::string data = MergeEscapeStrings(options, ',');
 
     if (data.length() > 4096)
         return TError(EError::Unknown, E2BIG, "mount option too big: " +

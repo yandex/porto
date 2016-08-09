@@ -11,16 +11,6 @@ using std::vector;
 using std::istringstream;
 using std::stringstream;
 
-string CommaSeparatedList(const vector<string> &list, const std::string &sep) {
-    string ret;
-    for (auto c = list.begin(); c != list.end(); ) {
-        ret += *c;
-        if (++c != list.end())
-            ret += sep;
-    }
-    return ret;
-}
-
 TError StringToUint64(const std::string &str, uint64_t &value) {
     try {
         value = stoull(str);
@@ -183,40 +173,40 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
     return TError::Success();
 }
 
-TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
+void SplitEscapedString(const std::string &str, std::vector<std::string> &list, char sep) {
     stringstream ss;
-    for (auto i = s.begin(); i != s.end(); i++) {
-        if (*i == '\\' && (i + 1) != s.end() && *(i + 1) == sep) {
+    auto i = str.begin();
+
+    do {
+        if (i == str.end() || *i == sep) {
+            /* legacy kludge: trim spaces and skip empty strings */
+            auto s = StringTrim(ss.str());
+            if (s.size())
+                list.push_back(s);
+            ss.str("");
+        } else if (*i == '\\' && *(i + 1) == sep) {
             ss << sep;
             i++;
-        } else if (*i == sep) {
-            if (ss.str().length())
-                tokens.push_back(ss.str());
-            ss.str("");
         } else {
             ss << *i;
         }
-    }
-
-    if (ss.str().length())
-        tokens.push_back(ss.str());
-
-    return TError::Success();
+    } while (i++ != str.end());
 }
 
-std::string MergeEscapeStrings(std::vector<std::string> &strings,
-                               std::string sep, std::string rep) {
-    std::stringstream str;
+std::string MergeEscapeStrings(const std::vector<std::string> &list, char sep) {
+    std::stringstream ss;
     bool first = true;
+    auto ssp = std::string(1, sep);
+    auto rep = "\\" + ssp;
 
-    for (auto s : strings) {
+    for (auto &str : list) {
         if (!first)
-            str << sep;
+            ss << ssp;
         first = false;
-        str << StringReplaceAll(s, sep, rep);
+        ss << StringReplaceAll(str, ssp, rep);
     }
 
-    return str.str();
+    return ss.str();
 }
 
 std::string StringTrim(const std::string& s, const std::string &what) {
@@ -325,40 +315,6 @@ std::string StringFormat(const char *format, ...) {
     return result;
 }
 
-TError StrListToString(const std::vector<std::string> lines, std::string &value) {
-    std::stringstream str;
-
-    for (auto v : lines) {
-        if (str.str().length())
-            str << "; ";
-        str << StringReplaceAll(v, ";", "\\;");
-    }
-
-    value = str.str();
-
-    return TError::Success();
-}
-
-TError StringToStrList(const std::string &str, std::vector<std::string> &value) {
-    std::vector<std::string> split;
-
-    TError error = SplitEscapedString(str, ';', split);
-    if (error)
-        return error;
-
-    value.clear();
-
-    for (auto &val : split) {
-        std::string tmp = StringTrim(val);
-        if (!tmp.length())
-            continue;
-
-        value.push_back(tmp);
-    }
-
-    return TError::Success();
-}
-
 TError StringToCpuValue(const std::string &str, double &value) {
     double val;
     std::string unit;
@@ -399,14 +355,13 @@ TError UintMapToString(const TUintMap &map, std::string &value) {
 
 TError StringToUintMap(const std::string &value, TUintMap &result) {
     std::vector<std::string> lines;
-    TError error = SplitEscapedString(value, ';', lines);
-    if (error)
-        return error;
+    TError error;
 
+    SplitEscapedString(value, lines, ';');
     for (auto &line : lines) {
         std::vector<std::string> nameval;
 
-        (void)SplitEscapedString(line, ':', nameval);
+        SplitEscapedString(line, nameval, ':');
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid format");
 

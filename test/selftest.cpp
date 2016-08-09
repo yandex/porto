@@ -1592,13 +1592,8 @@ struct TMountInfo {
     std::string source;
 };
 
-static map<string, TMountInfo> ParseMountinfo(string s) {
+static map<string, TMountInfo> ParseMountinfo(std::vector<std::string> lines) {
     map<string, TMountInfo> m;
-    vector<string> lines;
-
-    TError error = SplitString(s, '\n', lines);
-    if (error)
-        throw error.GetMsg();
 
     for (auto &line : lines) {
         vector<string> tok;
@@ -1692,7 +1687,9 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     auto v = StartWaitAndGetData(api, name, "stdout");
-    auto m = ParseMountinfo(v);
+    std::vector<std::string> lines;
+    ExpectSuccess(SplitString(v, '\n', lines));
+    auto m = ParseMountinfo(lines);
     ExpectEq(m.size(), expected.size());
     for (auto pair : m)
         Expect(expected.find(pair.first) != expected.end());
@@ -1806,7 +1803,9 @@ static void TestRootProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     v = StartWaitAndGetData(api, name, "stdout");
 
-    auto m = ParseMountinfo(v);
+    std::vector<std::string> lines;
+    ExpectSuccess(SplitString(v, '\n', lines));
+    auto m = ParseMountinfo(lines);
     ExpectNeq(m["/etc/resolv.conf"].flags.find("ro,"), string::npos);
     ExpectNeq(m["/etc/hosts"].flags.find("ro,"), string::npos);
     ExpectNeq(m["/sys"].flags.find("ro,"), string::npos);
@@ -3250,11 +3249,11 @@ static bool CanTestLimits() {
 static TUintMap ParseMap(const std::string &s) {
     TUintMap m;
     std::vector<std::string> lines;
-    TError error = SplitEscapedString(s, ';', lines);
+    SplitEscapedString(s, lines, ';');
     for (auto &line : lines) {
         std::vector<std::string> nameval;
 
-        ExpectSuccess(SplitEscapedString(line, ':', nameval));
+        SplitEscapedString(line, nameval, ':');
         ExpectEq(nameval.size(), 2);
 
         std::string key = StringTrim(nameval[0]);
@@ -4547,7 +4546,7 @@ static void TestVolumeImpl(Porto::Connection &api) {
 
     vector<string> v;
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-    auto m = ParseMountinfo(CommaSeparatedList(v, ""));
+    auto m = ParseMountinfo(v);
     Expect(m.find(a) != m.end());
     Expect(m.find(b) != m.end());
 
@@ -4828,7 +4827,7 @@ static void TestRecovery(Porto::Connection &api) {
         { "command", "sleep 1000" },
         { "user", Alice.User() },
         { "group", Bob.Group() },
-        { "env", "a=a; b=b" },
+        { "env", "a=a;b=b" },
     };
 
     Say() << "Make sure we can restore stopped child when parent is dead" << std::endl;
@@ -5074,7 +5073,7 @@ static void TestVolumeFiles(Porto::Connection &api, const std::string &path) {
     vector<string> v;
 
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-    auto m = ParseMountinfo(CommaSeparatedList(v, ""));
+    auto m = ParseMountinfo(v);
     Expect(m.find(path) != m.end());
 }
 
@@ -5115,7 +5114,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
 
     vector<string> v;
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-    auto m = ParseMountinfo(CommaSeparatedList(v, ""));
+    auto m = ParseMountinfo(v);
     Expect(m.find(a) != m.end());
     Expect(m.find(b) != m.end());
 
@@ -5124,7 +5123,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
 
     v.clear();
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-    m = ParseMountinfo(CommaSeparatedList(v, ""));
+    m = ParseMountinfo(v);
     Expect(m.find(a) == m.end());
     Expect(m.find(b) == m.end());
 

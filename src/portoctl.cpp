@@ -118,7 +118,7 @@ public:
             VolumeStorage = val;
         } else if (key == "layers") {
             NeedVolume = true;
-            return SplitEscapedString(val, ';', Layers);
+            SplitEscapedString(val, Layers, ';');
         } else
             Properties.emplace_back(key, val);
 
@@ -185,7 +185,7 @@ public:
             error = ImportLayers();
             if (error)
                 return error;
-            config["layers"] = CommaSeparatedList(VolumeLayers, ";");
+            config["layers"] = MergeEscapeStrings(VolumeLayers, ';');
         }
 
         if (VolumeBackend != "")
@@ -382,7 +382,7 @@ public:
                 goto err;
         }
 
-        if (Api->SetProperty(Container, "env", CommaSeparatedList(Environment, ";")))
+        if (Api->SetProperty(Container, "env", MergeEscapeStrings(Environment, ';')))
             goto err;
 
         return TError::Success();

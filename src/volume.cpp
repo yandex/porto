@@ -598,17 +598,13 @@ public:
         std::vector<std::string> tok;
         TError error, error2;
 
-        error = SplitEscapedString(Volume->GetStorage().ToString(), '@', tok);
-        if (error)
-            return error;
+        SplitEscapedString(Volume->GetStorage().ToString(), tok, '@');
         if (tok.size() != 2)
             return TError(EError::InvalidValue, "Invalid rbd storage");
         id = tok[0];
         image = tok[1];
         tok.clear();
-        error = SplitEscapedString(image, '/', tok);
-        if (error)
-            return error;
+        SplitEscapedString(image, tok, '/');
         if (tok.size() != 2)
             return TError(EError::InvalidValue, "Invalid rbd storage");
         pool = tok[0];
@@ -1256,7 +1252,7 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
             if (path.IsAbsolute())
                 l = container_root.InnerPath(path).ToString();
         }
-        ret[V_LAYERS] = MergeEscapeStrings(layers, ";", "\\;");
+        ret[V_LAYERS] = MergeEscapeStrings(layers, ';');
     }
 
     return ret;
@@ -1290,20 +1286,10 @@ TError TVolume::Save() {
     node.Set(V_CREATOR, Creator);
     node.Set(V_READY, IsReady ? "true" : "false");
     node.Set(V_PRIVATE, Private);
-
-    error = StrListToString(Containers, tmp);
-    if (error)
-        return error;
-
-    node.Set(V_CONTAINERS, tmp);
+    node.Set(V_CONTAINERS, MergeEscapeStrings(Containers, ';'));
     node.Set(V_LOOP_DEV, std::to_string(LoopDev));
     node.Set(V_READ_ONLY, IsReadOnly ? "true" : "false");
-
-    error = StrListToString(Layers, tmp);
-    if (error)
-        return error;
-
-    node.Set(V_LAYERS, tmp);
+    node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
     node.Set(V_SPACE_LIMIT, std::to_string(SpaceLimit));
     node.Set(V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
     node.Set(V_INODE_LIMIT, std::to_string(InodeLimit));
@@ -1700,10 +1686,7 @@ TError TVolume::SetProperty(const std::map<std::string, std::string> &properties
             Private = prop.second;
 
         } else if (prop.first == V_CONTAINERS) {
-            error = StringToStrList(prop.second, Containers);
-            if (error)
-                return error;
-
+            SplitEscapedString(prop.second, Containers, ';');
         } else if (prop.first == V_LOOP_DEV) {
             error = StringToInt(prop.second, LoopDev);
             if (error)
@@ -1718,12 +1701,8 @@ TError TVolume::SetProperty(const std::map<std::string, std::string> &properties
                 return TError(EError::InvalidValue, "Invalid bool value");
 
         } else if (prop.first == V_LAYERS) {
-            error = StringToStrList(prop.second, Layers);
-            if (error)
-                return error;
-
+            SplitEscapedString(prop.second, Layers, ';');
             IsLayersSet = true;
-
         } else if (prop.first == V_SPACE_LIMIT) {
             uint64_t limit;
             error = StringToSize(prop.second, limit);

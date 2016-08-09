@@ -8,8 +8,6 @@
 
 typedef std::map<std::string, uint64_t> TUintMap;
 
-std::string CommaSeparatedList(const std::vector<std::string> &list, const std::string &sep = ",");
-
 TError StringToUint64(const std::string &string, uint64_t &value);
 TError StringToInt64(const std::string &str, int64_t &value);
 TError StringToInt(const std::string &string, int &value);
@@ -20,8 +18,10 @@ TError StringToBool(const std::string &str, bool &value);
 std::string BoolToString(bool value);
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
-TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);
-std::string MergeEscapeStrings(std::vector<std::string> &strings, std::string sep, std::string rep);
+
+std::string MergeEscapeStrings(const std::vector<std::string> &list, char sep);
+void SplitEscapedString(const std::string &str, std::vector<std::string> &list, char sep);
+
 std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);
@@ -42,8 +42,6 @@ std::string StringFormatSize(uint64_t value);
 
 TError StringToValue(const std::string &str, double &value, std::string &unit);
 TError StringToSize(const std::string &str, uint64_t &size);
-TError StringToStrList(const std::string &str, std::vector<std::string> &value);
-TError StrListToString(const std::vector<std::string> lines, std::string &value);
 TError StringToCpuValue(const std::string &str, double &value);
 TError UintMapToString(const TUintMap &map, std::string &value);
 TError StringToUintMap(const std::string &value, TUintMap &result);
