@@ -1316,7 +1316,7 @@ noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &r
             error = TError(EError::LayerAlreadyExists, "Layer already exists");
             goto err_tmp;
         }
-        if (context.Vholder->LayerInUse(layer)) {
+        if (context.Vholder->LayerInUse(layer_name)) {
             error = TError(EError::Busy, "layer in use");
             goto err_tmp;
         }

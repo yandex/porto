@@ -434,7 +434,7 @@ public:
         TPath work = storage / "work";
         TError error;
         std::stringstream lower;
-        int index = 0;
+        int layer_idx = 0;
 
         if (Volume->HaveQuota()) {
             Volume->GetQuota(quota.SpaceLimit, quota.InodeLimit);
@@ -445,10 +445,38 @@ public:
                   return error;
         }
 
-        for (auto &layer: Volume->GetLayers()) {
-            if (index++)
+        for (auto &name: Volume->Layers) {
+            TPath path, temp;
+            TFile pin;
+
+            if (name[0] == '/') {
+                error = pin.OpenDir(name);
+                if (Volume->CreatorRoot.InnerPath(pin.RealPath()).IsEmpty()) {
+                    error = TError(EError::Permission, "Layer path outside root: " + name);
+                    goto err;
+                }
+                path = pin.ProcPath();
+                if (!path.CanWrite(Volume->CreatorCred)) {
+                    error = TError(EError::Permission, "Layer path not permitted: " + name);
+                    goto err;
+                }
+            } else
+                path = TPath(config().volumes().layers_dir()) / name;
+
+            temp = Volume->GetInternal("layer_" + std::to_string(layer_idx++));
+            error = temp.Mkdir(700);
+            if (!error)
+                error = temp.BindRemount(path, MS_RDONLY | MS_NODEV);
+            if (!error)
+                error = temp.Remount(MS_PRIVATE);
+            if (error)
+                goto err;
+
+            pin.Close();
+
+            if (layer_idx > 1)
                 lower << ":";
-            lower << StringReplaceAll(layer.ToString(), ":", "\\:");
+            lower << StringReplaceAll(temp.ToString(), ":", "\\:");
         }
 
         if (!upper.Exists()) {
@@ -477,9 +505,16 @@ public:
                                         { "lowerdir=" + lower.str(),
                                           "upperdir=" + upper.ToString(),
                                           "workdir=" + work.ToString() });
+err:
+        while (layer_idx--) {
+            TPath temp = Volume->GetInternal("layer_" + std::to_string(layer_idx));
+            (void)temp.UmountAll();
+            (void)temp.Rmdir();
+        }
+
         if (!error)
             return error;
-err:
+
         if (Volume->HaveQuota())
             (void)quota.Destroy();
         return error;
@@ -715,19 +750,6 @@ unsigned long TVolume::GetMountFlags() const {
     return flags;
 }
 
-std::vector<TPath> TVolume::GetLayers() const {
-    std::vector<TPath> result;
-
-    for (auto layer: Layers) {
-        TPath path(layer);
-        if (!path.IsAbsolute())
-            path = TPath(config().volumes().layers_dir()) / layer;
-        result.push_back(path);
-    }
-
-    return result;
-}
-
 TError TVolume::CheckGuarantee(TVolumeHolder &holder,
         uint64_t space_guarantee, uint64_t inode_guarantee) const {
     auto backend = BackendType;
@@ -897,6 +919,9 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     Creator = creator_container->GetName() + " " + creator_cred.User() + " " +
               creator_cred.Group();
 
+    CreatorCred = creator_cred;
+    CreatorRoot = container_root;
+
     /* Set default credentials to creator */
     VolumeOwner = creator_cred;
 
@@ -926,11 +951,13 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                 l = layer.ToString();
                 if (!layer.Exists())
                     return TError(EError::LayerNotFound, "Layer not found");
+                /* Racy. Permissions and isolation will be rechecked later */
                 if (!layer.CanWrite(creator_cred))
-                    return TError(EError::Permission, "Layer path not permitted");
+                    return TError(EError::Permission, "Layer path not permitted: " + l);
             } else {
-                if (l.find('/') != std::string::npos)
-                    return TError(EError::InvalidValue, "Internal layer storage has no directories");
+                error = ValidateLayerName(l);
+                if (error)
+                    return error;
                 layer = TPath(config().volumes().layers_dir()) / layer;
             }
             if (!layer.Exists())
@@ -1013,9 +1040,45 @@ TError TVolume::Build() {
     if (IsLayersSet && BackendType != "overlay") {
         L_ACT() << "Merge layers into volume: " << path << std::endl;
 
-        auto layers = GetLayers();
-        for (auto layer = layers.rbegin(); layer != layers.rend(); ++layer) {
-            error = CopyRecursive(*layer, path);
+
+        for (auto &name : Layers) {
+            if (name[0] == '/') {
+                TPath temp;
+                TFile pin;
+
+                error = pin.OpenDir(name);
+                if (error)
+                    goto err_merge;
+
+                if (CreatorRoot.InnerPath(pin.RealPath()).IsEmpty()) {
+                    error = TError(EError::Permission, "Layer path outside root: " + name);
+                    goto err_merge;
+                }
+
+                temp = GetInternal("temp");
+                error = temp.Mkdir(0700);
+                if (!error)
+                    error = temp.BindRemount(pin.ProcPath(), MS_RDONLY | MS_NODEV);
+                if (!error)
+                    error = temp.Remount(MS_PRIVATE);
+                if (error) {
+                    (void)temp.Rmdir();
+                    goto err_merge;
+                }
+
+                pin.Close();
+
+                if (!temp.CanWrite(CreatorCred))
+                    error = TError(EError::Permission, "Layer path not permitted: " + name);
+                else
+                    error = CopyRecursive(temp, path);
+
+                (void)temp.UmountAll();
+                (void)temp.Rmdir();
+            } else {
+                TPath layer = TPath(config().volumes().layers_dir()) / name;
+                error = CopyRecursive(layer, path);
+            }
             if (error)
                 goto err_merge;
         }
@@ -1529,12 +1592,11 @@ std::vector<TPath> TVolumeHolder::ListPaths() const {
     return ret;
 }
 
-bool TVolumeHolder::LayerInUse(TPath layer) {
+bool TVolumeHolder::LayerInUse(const std::string &name) {
     for (auto &volume : Volumes) {
-        for (auto &l: volume.second->GetLayers()) {
-            if (l.NormalPath() == layer)
-                return true;
-        }
+        auto &layers = volume.second->Layers;
+        if (std::find(layers.begin(), layers.end(), name) != layers.end())
+            return true;
     }
     return false;
 }
@@ -1552,7 +1614,7 @@ TError TVolumeHolder::RemoveLayer(const std::string &name) {
     TPath layer_tmp = layers_tmp / name;
 
     auto lock = ScopedLock();
-    if (LayerInUse(layer))
+    if (LayerInUse(name))
         error = TError(EError::Busy, "Layer " + name + "in use");
     else
         error = layer.Rename(layer_tmp);

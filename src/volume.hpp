@@ -89,6 +89,8 @@ public:
     uint64_t InodeLimit = 0;
     uint64_t InodeGuarantee = 0;
     TCred VolumeOwner;
+    TCred CreatorCred;
+    TPath CreatorRoot;
     unsigned VolumePerms = 0755;
 
     TVolume() {
@@ -148,8 +150,6 @@ public:
 
     TError GetUpperLayer(TPath &upper);
 
-    std::vector<TPath> GetLayers() const;
-
     TError SetProperty(const std::map<std::string, std::string> &properties);
 
     std::map<std::string, std::string> GetProperties(TPath container_root);
@@ -179,7 +179,7 @@ public:
     TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
 
-    bool LayerInUse(TPath layer);
+    bool LayerInUse(const std::string &name);
     TError RemoveLayer(const std::string &name);
 };
 
