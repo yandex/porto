@@ -836,6 +836,21 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     TPath container_root = creator_container->RootPath();
     TError error;
 
+    /* Verify properties */
+    for (auto &pair: properties) {
+        TVolumeProperty *prop = nullptr;
+        for (auto &p: VolumeProperties) {
+            if (p.Name == pair.first) {
+                prop = &p;
+                break;
+            }
+        }
+        if (!prop)
+            return TError(EError::InvalidProperty, "Unknown: " + pair.first);
+        if (prop->ReadOnly)
+            return TError(EError::InvalidProperty, "Read-only: " + pair.first);
+    }
+
     /* Verify volume path */
     if (!path.IsEmpty()) {
         if (!path.IsAbsolute())
@@ -888,14 +903,6 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Set default credentials to creator */
     VolumeOwner = creator_cred;
-
-    if (properties.count(V_CREATOR))
-        return TError(EError::InvalidProperty,
-                      "Setting read-only property: " + std::string(V_CREATOR));
-
-    if (properties.count(V_READY))
-        return TError(EError::InvalidProperty,
-                      "Setting read-only property: " + std::string(V_READY));
 
     /* Apply properties */
     error = SetProperty(properties);
@@ -1322,28 +1329,26 @@ TError TVolume::Restore(const TKeyValue &node) {
 
 /* TVolumeHolder */
 
-const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProperties() {
-    return {
-        { V_BACKEND,     "plain|quota|native|overlay|loop|rbd (default - autodetect)" },
-        { V_STORAGE,     "path to data storage (default - internal)" },
-        { V_READY,       "true|false - contruction complete (ro)" },
-        { V_PRIVATE,     "user-defined property" },
-        { V_USER,        "user (default - creator)" },
-        { V_GROUP,       "group (default - creator)" },
-        { V_PERMISSIONS, "directory permissions (default - 0775)" },
-        { V_CREATOR,     "container user group (ro)" },
-        { V_READ_ONLY,   "true|false (default - false)" },
-        { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers" },
-        { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)" },
-        { V_INODE_LIMIT, "disk inode limit (dynamic, default zero - unlimited)"},
-        { V_SPACE_GUARANTEE,    "disk space guarantee (dynamic, default - zero)" },
-        { V_INODE_GUARANTEE,    "disk inode guarantee (dynamic, default - zero)" },
-        { V_SPACE_USED,  "current disk space usage (ro)" },
-        { V_INODE_USED,  "current disk inode used (ro)" },
-        { V_SPACE_AVAILABLE,    "available disk space (ro)" },
-        { V_INODE_AVAILABLE,    "available disk inodes (ro)" },
-    };
-}
+std::vector<TVolumeProperty> VolumeProperties = {
+    { V_BACKEND,     "plain|quota|native|overlay|loop|rbd (default - autodetect)", false },
+    { V_STORAGE,     "path to data storage (default - internal)", false },
+    { V_READY,       "true|false - contruction complete (ro)", true },
+    { V_PRIVATE,     "user-defined property", false },
+    { V_USER,        "user (default - creator)", false },
+    { V_GROUP,       "group (default - creator)", false },
+    { V_PERMISSIONS, "directory permissions (default - 0775)", false },
+    { V_CREATOR,     "container user group (ro)", true },
+    { V_READ_ONLY,   "true|false (default - false)", true },
+    { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
+    { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)", false },
+    { V_INODE_LIMIT, "disk inode limit (dynamic, default zero - unlimited)", false },
+    { V_SPACE_GUARANTEE,    "disk space guarantee (dynamic, default - zero)", false },
+    { V_INODE_GUARANTEE,    "disk inode guarantee (dynamic, default - zero)", false },
+    { V_SPACE_USED,  "current disk space usage (ro)", true },
+    { V_INODE_USED,  "current disk inode used (ro)", true },
+    { V_SPACE_AVAILABLE,    "available disk space (ro)", true },
+    { V_INODE_AVAILABLE,    "available disk inodes (ro)", true },
+};
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
     volume = std::make_shared<TVolume>();

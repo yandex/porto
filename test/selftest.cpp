@@ -4520,7 +4520,7 @@ static void TestVolumeHolder(Porto::Connection &api) {
     Say() << "Try to create volume with invalid path" << std::endl;
     b = "b";
     ExpectApiFailure(api.CreateVolume(b, prop_default), EError::InvalidValue);
-    ExpectApiFailure(api.CreateVolume(a, prop_invalid), EError::InvalidValue);
+    ExpectApiFailure(api.CreateVolume(a, prop_invalid), EError::InvalidProperty);
 }
 
 static void TestVolumeImpl(Porto::Connection &api) {

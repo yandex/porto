@@ -155,6 +155,14 @@ public:
     std::map<std::string, std::string> GetProperties(TPath container_root);
 };
 
+struct TVolumeProperty {
+    std::string Name;
+    std::string Desc;
+    bool ReadOnly;
+};
+
+extern std::vector<TVolumeProperty> VolumeProperties;
+
 class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
                       public TLockable,
                       public TNonCopyable {
@@ -162,7 +170,6 @@ class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
     uint64_t NextId = 1;
 public:
     TVolumeHolder() {}
-    const std::vector<std::pair<std::string, std::string>> ListProperties();
     TError Create(std::shared_ptr<TVolume> &volume);
     void Remove(std::shared_ptr<TVolume> volume);
     TError Register(std::shared_ptr<TVolume> volume);

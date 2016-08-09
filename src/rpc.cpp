@@ -940,10 +940,10 @@ noinline TError ListVolumeProperties(TContext &context,
                                      const rpc::TVolumePropertyListRequest &req,
                                      rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_volumepropertylist();
-    for (auto kv: context.Vholder->ListProperties()) {
+    for (auto &prop: VolumeProperties) {
         auto p = list->add_properties();
-        p->set_name(kv.first);
-        p->set_desc(kv.second);
+        p->set_name(prop.Name);
+        p->set_desc(prop.Desc);
     }
 
     return TError::Success();
