@@ -449,10 +449,10 @@ public:
                   return error;
         }
 
-        for (auto layer: Volume->GetLayers()) {
+        for (auto &layer: Volume->GetLayers()) {
             if (index++)
                 lower << ":";
-            lower << layer;
+            lower << StringReplaceAll(layer.ToString(), ":", "\\:");
         }
 
         if (!upper.Exists()) {
