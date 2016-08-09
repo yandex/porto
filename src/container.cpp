@@ -1362,7 +1362,7 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout) {
     return TError::Success();
 }
 
-void TContainer::ExitOne(TScopedLock &holder_lock, int status, bool oomKilled) {
+void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
     TError error;
 
     error = Terminate(holder_lock, 0);
@@ -1370,9 +1370,6 @@ void TContainer::ExitOne(TScopedLock &holder_lock, int status, bool oomKilled) {
         L_WRN() << "Cannot terminate container " << GetName() << " : " << error << std::endl;
 
     ShutdownOom();
-
-    ExitStatus = status;
-    PropMask |= EXIT_STATUS_SET;
 
     DeathTime = GetCurrentTimeMs();
     PropMask |= DEATH_TIME_SET;
@@ -1385,7 +1382,10 @@ void TContainer::ExitOne(TScopedLock &holder_lock, int status, bool oomKilled) {
     WaitTask.Pid = 0;
     PropMask |= ROOT_PID_SET;
 
-    SetState(EContainerState::Dead);
+    if (State == EContainerState::Meta)
+        SetState(EContainerState::Stopped);
+    else
+        SetState(EContainerState::Dead);
 
     error = Save();
     if (error)
@@ -1405,17 +1405,21 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
             WEXITSTATUS(status) > 128 && WEXITSTATUS(status) < 128 + SIGRTMIN)
         status = WEXITSTATUS(status) - 128;
 
-    L_EVT() << "Exit " << GetName() << " with status "
-            << status << (oomKilled ? " invoked by OOM" : "")
-            << std::endl;
+    L_EVT() << "Exit " << GetName() << " " << FormatExitStatus(status)
+            << (oomKilled ? " invoked by OOM" : "") << std::endl;
+
+    ExitStatus = status;
+    PropMask |= EXIT_STATUS_SET;
 
     ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
                                            TContainer &child) {
-        child.ExitOne(holder_lock, 0, oomKilled);
+        if (child.State != EContainerState::Stopped &&
+                child.State != EContainerState::Dead)
+            child.Reap(holder_lock, oomKilled);
         return TError::Success();
     });
 
-    ExitOne(holder_lock, status, oomKilled);
+    Reap(holder_lock, oomKilled);
 }
 
 TError TContainer::CheckAcquiredChild(TScopedLock &holder_lock) {

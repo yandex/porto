@@ -276,6 +276,13 @@ void CloseFds(int max, const std::set<int> &except, bool openStd) {
     }
 }
 
+std::string FormatExitStatus(int status) {
+    if (WIFSIGNALED(status))
+        return StringFormat("exit signal: %d (%s)", WTERMSIG(status),
+                            strsignal(WTERMSIG(status)));
+    return StringFormat("exit code: %d", WEXITSTATUS(status));
+}
+
 TError RunCommand(const std::vector<std::string> &command, const TPath &cwd) {
     pid_t pid = fork();
     if (pid < 0)
@@ -292,10 +299,7 @@ retry:
         }
         if (WIFSIGNALED(status))
             return TError(EError::Unknown, "RunCommand: " + command[0] +
-                    " killed by signal " + std::to_string(WTERMSIG(status)));
-        if (WEXITSTATUS(status))
-            return TError(EError::Unknown, "RunCommand: " + command[0] +
-                    " exit code " + std::to_string(WEXITSTATUS(status)));
+                          " " + FormatExitStatus(status));
         return TError::Success();
     }
 

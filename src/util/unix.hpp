@@ -52,6 +52,7 @@ public:
 
 TError SetOomScoreAdj(int value);
 
+std::string FormatExitStatus(int status);
 TError RunCommand(const std::vector<std::string> &command, const TPath &cwd);
 TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 int GetNumCores();

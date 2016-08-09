@@ -90,7 +90,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareResources();
     void FreeResources();
 
-    void ExitOne(TScopedLock &holder_lock, int status, bool oomKilled);
+    void Reap(TScopedLock &holder_lock, bool oomKilled);
     void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
 
     void CleanupWaiters();
