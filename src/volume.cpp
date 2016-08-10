@@ -9,7 +9,6 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/quota.hpp"
-#include "util/sha256.hpp"
 #include "config.hpp"
 #include "kvalue.hpp"
 
