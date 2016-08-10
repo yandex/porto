@@ -233,47 +233,8 @@ bool FdHasEvent(int fd) {
     return pfd.revents != 0;
 }
 
-TScopedFd::TScopedFd(int fd) : Fd(fd) {
-}
-
-TScopedFd::~TScopedFd() {
-    if (Fd >= 0)
-        close(Fd);
-}
-
-int TScopedFd::GetFd() const {
-    return Fd;
-}
-
-TScopedFd &TScopedFd::operator=(int fd) {
-    if (Fd >= 0)
-        close(Fd);
-
-    Fd = fd;
-
-    return *this;
-}
-
 TError SetOomScoreAdj(int value) {
     return TPath("/proc/self/oom_score_adj").WriteAll(std::to_string(value));
-}
-
-void CloseFds(int max, const std::set<int> &except, bool openStd) {
-    if (max < 0)
-        max = getdtablesize();
-
-    for (int i = 0; i < max; i++) {
-        if (std::find(except.begin(), except.end(), i) != except.end())
-            continue;
-
-        close(i);
-
-        if (i < 3 && openStd) {
-            int fd = open("/dev/null", O_RDWR);
-            if (fd != i)
-                L_ERR() << "Got unexpected std fd " << fd << ", expected " << i << std::endl;
-        }
-    }
 }
 
 std::string FormatExitStatus(int status) {
@@ -305,10 +266,11 @@ retry:
 
     SetDieOnParentExit(SIGKILL);
 
-    CloseFds(-1, {});
-    open("/dev/null", O_RDONLY);
-    open("/dev/null", O_WRONLY);
-    open("/dev/null", O_WRONLY);
+    TFile::CloseAll({});
+    if (open("/dev/null", O_RDONLY) < 0 ||
+            open("/dev/null", O_WRONLY) < 0 ||
+            open("/dev/null", O_WRONLY) < 0)
+        _exit(EXIT_FAILURE);
 
     /* Remount everything except CWD Read-Only */
     if (!cwd.IsRoot()) {
@@ -619,35 +581,11 @@ TError TUnixSocket::SetRecvTimeout(int timeout_ms) const {
     return TError::Success();
 }
 
-TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags) {
-    unsigned old_flags, new_flags;
-
-    if (ioctl(fd, FS_IOC_GETFLAGS, &old_flags))
-        return TError(EError::Unknown, errno, "ioctlFS_IOC_GETFLAGS)");
-
-    new_flags = (old_flags & ~del_flags) | add_flags;
-    if ((new_flags != old_flags) && ioctl(fd, FS_IOC_SETFLAGS, &new_flags))
-        return TError(EError::Unknown, errno, "ioctl(FS_IOC_SETFLAGS)");
-
-    return TError::Success();
-}
-
 TError SetSysctl(const std::string &name, const std::string &value) {
     std::string path = "/proc/sys/" + name;
     std::replace(path.begin() + 10, path.end(), '.', '/');
-
-    int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open sysctl " + name);
-
-    ssize_t ret = write(fd, value.c_str(), value.length());
-    if (ret != (ssize_t)value.length()) {
-        close(fd);
-        return TError(EError::Unknown, errno, "Cannot write sysctl " + name);
-    }
-
-    close(fd);
-    return TError::Success();
+    L_ACT() << "Set sysctl " << name << " = " << value << std::endl;
+    return TPath(path).WriteAll(value);
 }
 
 static std::mutex ForkLock;

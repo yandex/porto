@@ -37,18 +37,7 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 std::string GetHostName();
 TError SetHostName(const std::string &name);
 bool FdHasEvent(int fd);
-void CloseFds(int max, const std::set<int> &except, bool openStd = false);
-TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags);
 TError SetSysctl(const std::string &name, const std::string &value);
-
-class TScopedFd : public TNonCopyable {
-    int Fd;
-public:
-    TScopedFd(int fd = -1);
-    ~TScopedFd();
-    int GetFd() const;
-    TScopedFd &operator=(int fd);
-};
 
 TError SetOomScoreAdj(int value);
 

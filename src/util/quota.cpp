@@ -125,7 +125,8 @@ TError TProjectQuota::GetProjectId(const TPath &path, uint32_t &id) {
 		fd = open(path.c_str(), O_CLOEXEC | O_RDONLY | O_NOCTTY |
 					O_NOFOLLOW | O_NONBLOCK);
 	if (fd < 0)
-		fd = open(path.DirName().c_str(), O_RDONLY | O_DIRECTORY);
+		fd = open(path.DirName().c_str(), O_RDONLY | O_CLOEXEC |
+						  O_DIRECTORY);
 	if (fd < 0)
 		return TError(EError::Unknown, errno, "Cannot open: " + path.ToString());
 	ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
@@ -143,11 +144,11 @@ TError TProjectQuota::SetProjectIdOne(const char *path, uint32_t id) {
 	int fd, ret;
 	TError error;
 
-	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW |
-				O_NOATIME | O_NONBLOCK);
+	fd = open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW |
+			O_NOATIME | O_NONBLOCK);
 	if (fd < 0 && errno == EPERM)
-		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW |
-					O_NONBLOCK);
+		fd = open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW |
+				O_NONBLOCK);
 	if (fd < 0)
 		return TError(EError::Unknown, errno, "Cannot open: " + std::string(path));
 

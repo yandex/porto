@@ -1,4 +1,5 @@
 #include <sstream>
+#include <algorithm>
 
 #include "path.hpp"
 #include "util/string.hpp"
@@ -166,29 +167,30 @@ TError TPath::Chroot() const {
 
 // https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
 TError TPath::PivotRoot() const {
-    TScopedFd oldroot, newroot;
+    TFile oldroot, newroot;
+    TError error;
 
-    oldroot = open("/", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (oldroot.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(/)");
+    error = oldroot.OpenDir("/");
+    if (error)
+        return error;
 
-    newroot = open(Path.c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (newroot.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
+    error = newroot.OpenDir(*this);
+    if (error)
+        return error;
 
-    if (fchdir(newroot.GetFd()))
+    if (fchdir(newroot.Fd))
         return TError(EError::Unknown, errno, "fchdir(newroot)");
 
     if (syscall(__NR_pivot_root, ".", "."))
         return TError(EError::Unknown, errno, "pivot_root()");
 
-    if (fchdir(oldroot.GetFd()) < 0)
+    if (fchdir(oldroot.Fd) < 0)
         return TError(EError::Unknown, errno, "fchdir(oldroot)");
 
     if (umount2(".", MNT_DETACH) < 0)
         return TError(EError::Unknown, errno, "umount2(.)");
 
-    if (fchdir(newroot.GetFd()) < 0)
+    if (fchdir(newroot.Fd) < 0)
         return TError(EError::Unknown, errno, "fchdir(newroot) reenter");
 
     return TError::Success();
@@ -509,13 +511,13 @@ restart:
             sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_CLOEXEC |
                                     O_NOFOLLOW | O_NOCTTY | O_NONBLOCK);
             if (sub_fd >= 0) {
-                error = ChattrFd(sub_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
+                error = TFile::Chattr(sub_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
                 close(sub_fd);
                 if (error)
                     L_ERR() << "Cannot change "  << de->d_name <<
                         " attributes: " << error << std::endl;
             }
-            error = ChattrFd(dir_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
+            error = TFile::Chattr(dir_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
             if (error)
                 L_ERR() << "Cannot change directory attributes: " << error << std::endl;
 
@@ -643,7 +645,7 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     off_t hole_len;
     TError error;
 
-    int fd = open(c_str(), O_RDWR | O_NOCTTY);
+    int fd = open(c_str(), O_RDWR | O_CLOEXEC | O_NOCTTY);
     if (fd < 0)
         return TError(EError::Unknown, errno, "open(" + Path + ")");
 
@@ -672,15 +674,17 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
 }
 
 TError TPath::Chattr(unsigned add_flags, unsigned del_flags) const {
-    int fd;
+    TError error;
+    TFile file;
 
-    fd = open(c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW |
-                       O_NOCTTY | O_NONBLOCK);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
-    TError error = ChattrFd(fd, add_flags, del_flags);
-    close(fd);
-    return error;
+    error = file.Open(*this, O_RDONLY | O_CLOEXEC | O_NOFOLLOW |
+                             O_NOCTTY | O_NONBLOCK);
+    if (error)
+        return error;
+    error = TFile::Chattr(file.Fd, add_flags, del_flags);
+    if (error)
+        return TError(error, Path);
+    return TError::Success();
 }
 
 #ifndef MS_LAZYTIME
@@ -792,79 +796,37 @@ TError TPath::UmountAll() const {
 
 TError TPath::ReadAll(std::string &text, size_t max) const {
     TError error;
+    TFile file;
 
-    int fd = open(Path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open for read: " + Path);
+    error = file.OpenRead(*this);
+    if (error)
+        return error;
 
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "stat(" + Path + ")");
-    }
+    error = file.ReadAll(text, max);
+    if (error)
+        return TError(error, Path);
 
-    if (st.st_size > (off_t)max) {
-        close(fd);
-        return TError(EError::Unknown, "File too large: " + Path);
-    }
-
-    size_t size = st.st_size;
-    if (st.st_size < 4096)
-        size = 4096;
-    text.resize(size);
-
-    size_t off = 0;
-    ssize_t ret;
-    do {
-        if (size - off < 1024) {
-            size += 16384;
-            if (size > max) {
-                error = TError(EError::Unknown, "File too large: " + Path);
-                break;
-            }
-            text.resize(size);
-        }
-        ret = read(fd, &text[off], size - off);
-        if (ret < 0) {
-            error = TError(EError::Unknown, errno, "read(" + Path + ")");
-            break;
-        }
-        off += ret;
-    } while (ret > 0);
-
-    text.resize(off);
-    close(fd);
-
-    return error;
+    return TError::Success();
 }
 
 TError TPath::WriteAll(const std::string &text) const {
     TError error;
+    TFile file;
 
-    int fd = open(Path.c_str(), O_WRONLY | O_CLOEXEC | O_TRUNC);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open for write: " + Path);
+    error = file.OpenTrunc(*this);
+    if (error)
+        return error;
 
-    size_t len = text.length(), off = 0;
-    do {
-        ssize_t ret = write(fd, &text[off], len - off);
-        if (ret < 0) {
-            error = TError(EError::Unknown, errno, "write(" + Path + ")");
-            break;
-        }
-        off += ret;
-    } while (off < len);
+    error = file.WriteAll(text);
+    if (error)
+        return TError(error, Path);
 
-    if (close(fd) < 0 && !error)
-        error = TError(EError::Unknown, errno, "close(" + Path + ")");
-
-    return error;
+    return TError::Success();
 }
 
 TError TPath::WritePrivate(const std::string &text) const {
-    std::string tmp = "/run/" + BaseName() + ".XXXXXX";
-    std::string buf;
     TError error;
+    TFile temp;
 
     if (!Exists()) {
         error = Mkfile(0644);
@@ -873,17 +835,20 @@ TError TPath::WritePrivate(const std::string &text) const {
     } else if (!IsRegularStrict())
         return TError(EError::InvalidValue, "non-regular file " + Path);
 
-    TScopedFd fd(mkstemp(&tmp[0]));
-    if (fd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "cannot create temporary " + tmp);
+    error = temp.CreateTemp("/run");
+    if (error)
+        return error;
 
-    if (unlink(tmp.c_str()) || fchmod(fd.GetFd(), 0644) ||
-            write(fd.GetFd(), text.c_str(), text.size()) != (ssize_t)text.size())
-        return TError(EError::Unknown, errno, "cannot write temporary " + tmp);
+    if (fchmod(temp.Fd, 0644))
+        return TError(EError::Unknown, errno, "fchmod");
+
+    error = temp.WriteAll(text);
+    if (error)
+        return TError(error, Path);
 
     error = UmountAll();
     if (!error)
-        error = Bind("/proc/self/fd/" + std::to_string(fd.GetFd()));
+        error = Bind(temp.ProcPath());
     return error;
 }
 
@@ -992,4 +957,150 @@ bool TMount::HasOption(const std::string &option) const {
     std::string options = "," + Options + ",";
     std::string mask = "," + option + ",";
     return options.find(mask) != std::string::npos;
+}
+
+TError TFile::Open(const TPath &path, int flags) {
+    if (Fd >= 0)
+        close(Fd);
+    SetFd = open(path.c_str(), flags);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+    return TError::Success();
+}
+
+TError TFile::OpenRead(const TPath &path) {
+    return Open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY);
+}
+
+TError TFile::OpenWrite(const TPath &path) {
+    return Open(path, O_WRONLY | O_CLOEXEC | O_NOCTTY);
+}
+
+TError TFile::OpenReadWrite(const TPath &path) {
+    return Open(path, O_RDWR | O_CLOEXEC | O_NOCTTY);
+}
+
+TError TFile::OpenAppend(const TPath &path) {
+    return Open(path, O_WRONLY | O_CLOEXEC | O_APPEND | O_NOCTTY);
+}
+
+TError TFile::OpenTrunc(const TPath &path) {
+    return Open(path, O_WRONLY | O_CLOEXEC | O_TRUNC | O_NOCTTY);
+}
+
+TError TFile::OpenDir(const TPath &path) {
+    return Open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOCTTY);
+}
+
+#ifndef O_TMPFILE
+#define O_TMPFILE (O_DIRECTORY | 020000000)
+#endif
+
+TError TFile::CreateTemp(const TPath &path) {
+    if (Fd >= 0)
+        close(Fd);
+    SetFd = open(path.c_str(), O_RDWR | O_TMPFILE | O_CLOEXEC, 0600);
+    if (Fd < 0) {
+        std::string temp = path.ToString() + "/porto.XXXXXX";
+        SetFd = mkostemp(&temp[0], O_CLOEXEC);
+        if (Fd < 0)
+            return TError(EError::Unknown, errno, "Cannot create temporary " + temp);
+        if (unlink(temp.c_str()))
+            return TError(EError::Unknown, errno, "Cannot unlink " + temp);
+    }
+    return TError::Success();
+}
+
+TError TFile::CreateNew(const TPath &path, int mode) {
+    if (Fd >= 0)
+        close(Fd);
+    SetFd = open(path.c_str(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, mode);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot create " + path.ToString());
+    return TError::Success();
+}
+
+void TFile::Close(void) {
+    if (Fd >= 0)
+        close(Fd);
+    SetFd = -1;
+}
+
+void TFile::CloseAll(std::vector<int> except) {
+    int max = getdtablesize();
+    for (int fd = 0; fd < max; fd++) {
+        if (std::find(except.begin(), except.end(), fd) == except.end())
+            close(fd);
+    }
+}
+
+TPath TFile::RealPath(void) const {
+    TPath path;
+    if (Fd >= 0)
+        (void)ProcPath().ReadLink(path);
+    return path;
+}
+
+TPath TFile::ProcPath(void) const {
+    if (Fd < 0)
+        return TPath();
+    return TPath("/proc/self/fd/" + std::to_string(Fd));
+}
+
+TError TFile::ReadAll(std::string &text, size_t max) const {
+    struct stat st;
+    if (fstat(Fd, &st) < 0)
+        return TError(EError::Unknown, errno, "fstat");
+
+    if (st.st_size > (off_t)max)
+        return TError(EError::Unknown, "File too large: " + std::to_string(st.st_size));
+
+    size_t size = st.st_size;
+    if (st.st_size < 4096)
+        size = 4096;
+    text.resize(size);
+
+    size_t off = 0;
+    ssize_t ret;
+    do {
+        if (size - off < 1024) {
+            size += 16384;
+            if (size > max)
+                return TError(EError::Unknown, "File too large: " + std::to_string(size));
+            text.resize(size);
+        }
+        ret = read(Fd, &text[off], size - off);
+        if (ret < 0)
+            return TError(EError::Unknown, errno, "read");
+        off += ret;
+    } while (ret > 0);
+
+    text.resize(off);
+
+    return TError::Success();
+}
+
+TError TFile::WriteAll(const std::string &text) const {
+    size_t len = text.length(), off = 0;
+    do {
+        ssize_t ret = write(Fd, &text[off], len - off);
+        if (ret < 0)
+            return TError(EError::Unknown, errno, "write");
+        off += ret;
+    } while (off < len);
+
+    return TError::Success();
+}
+
+TError TFile::Chattr(int fd, unsigned add_flags, unsigned del_flags) {
+    unsigned old_flags, new_flags;
+
+    if (ioctl(fd, FS_IOC_GETFLAGS, &old_flags))
+        return TError(EError::Unknown, errno, "ioctlFS_IOC_GETFLAGS)");
+
+    new_flags = (old_flags & ~del_flags) | add_flags;
+    if ((new_flags != old_flags) && ioctl(fd, FS_IOC_SETFLAGS, &new_flags))
+        return TError(EError::Unknown, errno, "ioctl(FS_IOC_SETFLAGS)");
+
+    return TError::Success();
 }

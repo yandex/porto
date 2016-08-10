@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "util/namespace.hpp"
-#include "util/mount.hpp"
 #include "util/path.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
@@ -20,7 +19,7 @@ extern "C" {
 struct TTaskEnv {
     std::shared_ptr<TContainer> CT;
     TClient *Client;
-    TScopedFd PortoInitFd;
+    TFile PortoInit;
     TMountNamespace Mnt;
     TEnv Env;
     bool TripleFork;

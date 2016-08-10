@@ -3,7 +3,6 @@
 #include "config.hpp"
 #include "protobuf.hpp"
 #include "util/unix.hpp"
-#include "util/mount.hpp"
 #include "util/log.hpp"
 
 extern "C" {
@@ -80,11 +79,12 @@ void TConfig::LoadDefaults() {
 }
 
 bool TConfig::LoadFile(const std::string &path) {
-    TScopedFd fd(open(path.c_str(), O_RDONLY | O_CLOEXEC));
-    if (fd.GetFd() < 0)
+    TFile file;
+
+    if (file.OpenRead(path))
         return false;
 
-    google::protobuf::io::FileInputStream pist(fd.GetFd());
+    google::protobuf::io::FileInputStream pist(file.Fd);
 
     if (!google::protobuf::TextFormat::Merge(&pist, &Cfg) ||
         !Cfg.IsInitialized()) {
@@ -115,18 +115,19 @@ load_cred:
 }
 
 int TConfig::Test(const std::string &path) {
+    TFile file;
+
     if (access(path.c_str(), F_OK)) {
         std::cerr << "Config " << path << " doesn't exist" << std::endl;
         return EXIT_FAILURE;
     }
 
-    TScopedFd fd(open(path.c_str(), O_RDONLY | O_CLOEXEC));
-    if (fd.GetFd() < 0) {
+    if (file.OpenRead(path)) {
         std::cerr << "Can't open " << path << std::endl;
         return EXIT_FAILURE;
     }
 
-    google::protobuf::io::FileInputStream pist(fd.GetFd());
+    google::protobuf::io::FileInputStream pist(file.Fd);
 
     cfg::TCfg cfg;
     if (!google::protobuf::TextFormat::Merge(&pist, &cfg))

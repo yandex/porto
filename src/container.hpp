@@ -52,7 +52,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     const std::shared_ptr<TContainer> Parent;
     int Acquired = 0;
     int Id;
-    TScopedFd OomEventFd;
+    TFile OomEvent;
     size_t RunningChildren = 0; // changed under holder lock
     std::list<std::weak_ptr<TContainerWaiter>> Waiters;
 

@@ -525,21 +525,19 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 void TContainer::ShutdownOom() {
     if (Source)
         Holder->EpollLoop->RemoveSource(Source->Fd);
-    OomEventFd = -1;
     Source = nullptr;
+    OomEvent.Close();
 }
 
 TError TContainer::PrepareOomMonitor() {
     TCgroup memoryCg = GetCgroup(MemorySubsystem);
     TError error;
-    int fd;
 
-    error = MemorySubsystem.SetupOOMEvent(memoryCg, fd);
+    error = MemorySubsystem.SetupOOMEvent(memoryCg, OomEvent);
     if (error)
         return error;
 
-    OomEventFd = fd;
-    Source = std::make_shared<TEpollSource>(Holder->EpollLoop, fd,
+    Source = std::make_shared<TEpollSource>(Holder->EpollLoop, OomEvent.Fd,
                                             EPOLL_EVENT_OOM, shared_from_this());
 
     error = Holder->EpollLoop->AddSource(Source);
@@ -811,9 +809,9 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
         if (error)
             return error;
         path = path.DirName() / "portoinit";
-        taskEnv->PortoInitFd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-        if (taskEnv->PortoInitFd.GetFd() < 0)
-            return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+        error = taskEnv->PortoInit.OpenRead(path);
+        if (error)
+            return error;
     }
 
     // Create new mount namespaces if we have to make any changes
@@ -1789,7 +1787,7 @@ bool TContainer::MayRespawn() {
 }
 
 bool TContainer::MayReceiveOom(int fd) {
-    if (OomEventFd.GetFd() != fd)
+    if (OomEvent.Fd != fd)
         return false;
 
     if (!Task.Pid)
@@ -1805,7 +1803,7 @@ bool TContainer::MayReceiveOom(int fd) {
 bool TContainer::HasOomReceived() {
     uint64_t val;
 
-    return read(OomEventFd.GetFd(), &val, sizeof(val)) == sizeof(val) && val != 0;
+    return read(OomEvent.Fd, &val, sizeof(val)) == sizeof(val) && val != 0;
 }
 
 void TContainer::ScheduleRespawn() {
@@ -1864,7 +1862,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
                     L_WRN() << "Can't get container memory.failcnt" << std::endl;
 
                 Exit(holder_lock, event.Exit.Status,
-                     FdHasEvent(OomEventFd.GetFd()) || failcnt);
+                     FdHasEvent(OomEvent.Fd) || failcnt);
             }
             break;
         case EEventType::RotateLogs:

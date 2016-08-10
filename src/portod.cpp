@@ -143,8 +143,8 @@ public:
 static TError CreatePortoSocket() {
     TPath path(PORTO_SOCKET_PATH);
     struct sockaddr_un addr;
-    TScopedFd fd;
     TError error;
+    TFile sock;
 
     if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD) {
         struct stat fd_stat, sk_stat;
@@ -164,8 +164,8 @@ static TError CreatePortoSocket() {
         L_WRN() << "Unlinked porto socket. Recreating..." << std::endl;
     }
 
-    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    if (fd.GetFd() < 0)
+    sock.SetFd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (sock.Fd < 0)
         return TError(EError::Unknown, errno, "socket()");
 
     memset(&addr, 0, sizeof(addr));
@@ -174,10 +174,10 @@ static TError CreatePortoSocket() {
 
     (void)path.Unlink();
 
-    if (fchmod(fd.GetFd(), PORTO_SOCKET_MODE) < 0)
+    if (fchmod(sock.Fd, PORTO_SOCKET_MODE) < 0)
         return TError(EError::Unknown, errno, "fchmod()");
 
-    if (bind(fd.GetFd(), (struct sockaddr *) &addr, sizeof(addr)) < 0)
+    if (bind(sock.Fd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
         return TError(EError::Unknown, errno, "bind()");
 
     error = path.Chown(0, GetPortoGroupId());
@@ -188,10 +188,12 @@ static TError CreatePortoSocket() {
     if (error)
         return error;
 
-    if (listen(fd.GetFd(), 0) < 0)
+    if (listen(sock.Fd, 0) < 0)
         return TError(EError::Unknown, errno, "listen()");
 
-    if (dup2(fd.GetFd(), PORTO_SK_FD) != PORTO_SK_FD)
+    if (sock.Fd == PORTO_SK_FD)
+        sock.SetFd = -1;
+    else if (dup2(sock.Fd, PORTO_SK_FD) != PORTO_SK_FD)
         return TError(EError::Unknown, errno, "dup2()");
 
     return TError::Success();

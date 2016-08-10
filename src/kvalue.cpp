@@ -3,7 +3,6 @@
 #include "kv.pb.h"
 #include "protobuf.hpp"
 #include "util/log.hpp"
-#include "util/mount.hpp"
 
 extern "C" {
 #include <fcntl.h>

@@ -118,8 +118,8 @@ public:
     };
 
     bool HasAccess(const TCred &cred, enum Access mask) const;
-    bool CanRead(const TCred &cred) const { return HasAccess(cred, W); }
-    bool CanWrite(const TCred &cred) const { return HasAccess(cred, R); }
+    bool CanRead(const TCred &cred) const { return HasAccess(cred, R); }
+    bool CanWrite(const TCred &cred) const { return HasAccess(cred, W); }
 
     TError Chdir() const;
     TError Chroot() const;
@@ -190,4 +190,30 @@ struct TMount {
                << " -t " << mount.Type << " -o " << mount.Options;
         return stream;
     }
+};
+
+class TFile {
+public:
+    union {
+        const int Fd;
+        int SetFd;
+    };
+    TFile() : Fd(-1) { }
+    ~TFile() { Close(); }
+    TError Open(const TPath &path, int flags);
+    TError OpenRead(const TPath &path);
+    TError OpenWrite(const TPath &path);
+    TError OpenReadWrite(const TPath &path);
+    TError OpenTrunc(const TPath &path);
+    TError OpenAppend(const TPath &path);
+    TError OpenDir(const TPath &path);
+    TError CreateTemp(const TPath &path);
+    TError CreateNew(const TPath &path, int mode);
+    void Close(void);
+    static void CloseAll(std::vector<int> except);
+    TPath RealPath(void) const;
+    TPath ProcPath(void) const;
+    TError ReadAll(std::string &text, size_t max) const;
+    TError WriteAll(const std::string &text) const;
+    static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
 };

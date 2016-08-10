@@ -5,7 +5,6 @@
 
 #include "util/error.hpp"
 #include "util/path.hpp"
-#include "util/mount.hpp"
 #include "util/cred.hpp"
 
 struct TBindMount {

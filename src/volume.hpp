@@ -4,7 +4,7 @@
 
 #include "common.hpp"
 #include "statistics.hpp"
-#include "util/mount.hpp"
+#include "util/loop.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 #include "util/locks.hpp"

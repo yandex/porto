@@ -8,7 +8,6 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/mount.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -352,24 +351,22 @@ TError TMemorySubsystem::SetDirtyLimit(TCgroup &cg, uint64_t limit) {
     return cg.SetUint64(DIRTY_RATIO, 50);
 }
 
-TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, int &fd) {
+TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, TFile &event) {
     TError error;
-    int cfd;
+    TFile knob;
 
-    fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-    if (fd < 0)
+    error = knob.OpenRead(cg.Knob(OOM_CONTROL));
+    if (error)
+        return error;
+
+    event.Close();
+    event.SetFd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (event.Fd < 0)
         return TError(EError::Unknown, errno, "Cannot create eventfd");
 
-    cfd = open(cg.Knob(OOM_CONTROL).c_str(), O_RDONLY | O_CLOEXEC);
-    if (cfd < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "Cannot open oom_control");
-    }
-
-    error = cg.Set(EVENT_CONTROL, std::to_string(fd) + " " + std::to_string(cfd));
+    error = cg.Set(EVENT_CONTROL, std::to_string(event.Fd) + " " + std::to_string(knob.Fd));
     if (error)
-        close(fd);
-    close(cfd);
+        event.Close();
     return error;
 }
 

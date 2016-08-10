@@ -171,7 +171,7 @@ public:
     TError SetIoLimit(TCgroup &cg, uint64_t limit);
     TError SetIopsLimit(TCgroup &cg, uint64_t limit);
     TError SetDirtyLimit(TCgroup &cg, uint64_t limit);
-    TError SetupOOMEvent(TCgroup &cg, int &fd);
+    TError SetupOOMEvent(TCgroup &cg, TFile &event);
 
     TError GetFailCnt(TCgroup &cg, uint64_t &cnt) {
         return cg.GetUint64(FAIL_CNT, cnt);

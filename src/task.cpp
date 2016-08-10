@@ -7,7 +7,6 @@
 #include "device.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
-#include "util/mount.hpp"
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
@@ -81,9 +80,10 @@ TError TTaskEnv::ChildExec() {
             NULL,
         };
         SetDieOnParentExit(0);
-        fexecve(PortoInitFd.GetFd(), (char *const *)args, envp);
+        TFile::CloseAll({PortoInit.Fd});
+        fexecve(PortoInit.Fd, (char *const *)args, envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
-                      std::to_string(PortoInitFd.GetFd()) +  ", portoinit)");
+                      std::to_string(PortoInit.Fd) +  ", portoinit)");
     }
 
     wordexp_t result;
@@ -113,6 +113,7 @@ TError TTaskEnv::ChildExec() {
             L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     SetDieOnParentExit(0);
+    TFile::CloseAll({0, 1, 2, Sock.GetFd()});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
     return TError(EError::InvalidValue, errno, std::string("execvpe(") +
@@ -244,7 +245,6 @@ TError TTaskEnv::ConfigureChild() {
             return TError(EError::Unknown, errno, "fork()");
 
         if (pid) {
-            auto fd = PortoInitFd.GetFd();
             auto pid_ = std::to_string(pid);
             auto name = CT->GetName();
             const char * argv[] = {
@@ -261,8 +261,8 @@ TError TTaskEnv::ConfigureChild() {
             if (error)
                 return error;
 
-            CloseFds(-1, { fd } );
-            fexecve(fd, (char *const *)argv, envp);
+            TFile::CloseAll({PortoInit.Fd});
+            fexecve(PortoInit.Fd, (char *const *)argv, envp);
             return TError(EError::Unknown, errno, "fexecve()");
         } else {
             pid = getpid();
@@ -525,7 +525,6 @@ TError TTaskEnv::Start() {
         }
 
         if (TripleFork) {
-            auto fd = PortoInitFd.GetFd();
             auto pid = std::to_string(clonePid);
             auto name = CT->GetName();
             const char * argv[] = {
@@ -542,8 +541,8 @@ TError TTaskEnv::Start() {
             if (error)
                 _exit(EXIT_FAILURE);
 
-            CloseFds(-1, { fd } );
-            fexecve(fd, (char *const *)argv, envp);
+            TFile::CloseAll({PortoInit.Fd});
+            fexecve(PortoInit.Fd, (char *const *)argv, envp);
             kill(clonePid, SIGKILL);
             _exit(EXIT_FAILURE);
         }

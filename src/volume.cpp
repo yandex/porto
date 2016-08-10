@@ -290,24 +290,23 @@ public:
 
     static TError MakeImage(const TPath &path, const TCred &cred, off_t size) {
         TError error;
-        int fd;
+        TFile image;
 
-        fd = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
-        if (fd < 0)
-            return TError(EError::Unknown, errno, "creat(" + path.ToString() + ")");
+        error = image.CreateNew(path, 0644);
+        if (error)
+            return error;
 
-        if (fchown(fd, cred.Uid, cred.Gid)) {
+        if (fchown(image.Fd, cred.Uid, cred.Gid)) {
             error = TError(EError::Unknown, errno, "chown(" + path.ToString() + ")");
             goto remove_file;
         }
 
-        if (fallocate(fd, 0, 0, size) && ftruncate(fd, size)) {
+        if (fallocate(image.Fd, 0, 0, size) && ftruncate(image.Fd, size)) {
             error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
             goto remove_file;
         }
 
-        close(fd);
-        fd = -1;
+        image.Close();
 
         error = RunCommand({ "mkfs.ext4", "-F", path.ToString()}, path.DirName());
         if (error)
@@ -317,9 +316,6 @@ public:
 
 remove_file:
         (void)path.Unlink();
-        if (fd >= 0)
-            close(fd);
-
         return error;
     }
 
