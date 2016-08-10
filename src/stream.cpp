@@ -155,11 +155,11 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
     TPath path = ResolveOutside(container);
 
     if (path.IsEmpty())
-        return TError(EError::InvalidData, "data not available");
+        return TError(EError::InvalidData, "Data not available");
     if (!path.Exists())
-        return TError(EError::InvalidData, "file not found");
+        return TError(EError::InvalidData, "File not found");
     if (!path.IsRegularStrict())
-        return TError(EError::InvalidData, "file is non-regular");
+        return TError(EError::InvalidData, "File is non-regular");
 
     /* [offset][:limit] */
     if (range.size()) {
@@ -176,7 +176,7 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
         if (error)
             return error;
         if (offset < Offset)
-            return TError(EError::InvalidData, "requested offset lower than current " + std::to_string(Offset));
+            return TError(EError::InvalidData, "Requested offset lower than current " + std::to_string(Offset));
         offset -= Offset;
     } else
         offset = 0;
@@ -188,11 +188,16 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
     } else
         limit = Limit;
 
-    int fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
+    TFile file;
 
-    uint64_t size = lseek(fd, 0, SEEK_END);
+    error = file.Open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC);
+    if (error)
+        return error;
+
+    if (file.RealPath() != path)
+        return TError(EError::Permission, "Real path doesn't match: " + path.ToString());
+
+    uint64_t size = lseek(file.Fd, 0, SEEK_END);
 
     if (size <= offset)
         limit = 0;
@@ -203,14 +208,14 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
 
     if (limit) {
         text.resize(limit);
-        ssize_t result = pread(fd, &text[0], limit, offset);
+        ssize_t result = pread(file.Fd, &text[0], limit, offset);
 
         if (result < 0)
-            error = TError(EError::Unknown, errno, "read " + path.ToString());
-        else if ((uint64_t)result < limit)
+            return TError(EError::Unknown, errno, "Read " + path.ToString());
+
+        if ((uint64_t)result < limit)
             text.resize(result);
     }
 
-    close(fd);
     return TError::Success();
 }
