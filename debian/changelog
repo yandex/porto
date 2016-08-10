@@ -1,3 +1,188 @@
+yandex-porto (3.0.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add symlinks /dev/std{in,out,err}
+
+  [ Maxim Samoylov ]
+  * porto: fix selftest for root environment
+  * porto: fix property restore bug
+  * porto: clean up read-only ctor for knobs
+  * porto: move string to string list conversion to util/
+  * porto: support indexing for reworked properties
+  * porto: rework virt_mode property and its dependencies
+  * porto: rework root_readonly property
+  * porto: rework hostname property
+  * porto: rework env property
+  * porto: rework bind property
+  * porto: rework ip property
+  * porto: hidden flag for refactored properties
+  * porto: rework capabilities property
+  * porto: rework default_gw knob
+  * porto: rework resolv_conf property
+  * porto: rework devices property
+  * porto: implement separate interface for knob saving/restoring
+  * porto: rework raw properties
+  * porto: rework ulimit property
+  * porto: rework porto_namespace property
+  * porto: rework stdout limit property
+  * porto: rework memory limit property
+  * porto: rework anon_limit property
+  * porto: rework dirty_limit property
+  * porto: rework recharge_on_pgfault property
+  * porto: add helper functions to work with cpu shares
+  * porto: rework cpu limit-related properties
+  * porto: rework io limits properties
+  * porto: extract UintMap string helpers to util/string.cpp
+  * porto: rework net limit properties
+  * porto: rework respawn properties
+  * porto: rework private property
+  * porto: reworked stub for unsupported NetTos knob
+  * porto: rework aging_time property
+  * porto: rework enable_porto property
+  * porto: rework weak property
+  * porto: rework external weak container creation
+  * porto: save container state after each state change.
+  * porto: rework absolute_name and absolute_namespace data properties
+  * porto: rework state property
+  * porto: rework oom_killed read-only property
+  * porto: rework parent data field
+  * porto: rework respawn_count read-only property
+  * porto: rework root_pid data field
+  * porto: rework exit_state read-only property
+  * porto: rework start_errno data field
+  * porto: rework container stdout/stderr retrieval interface
+  * porto: rework container memory statistics data fields
+  * porto: rework container cpu accounting data fields
+  * porto: rework container net statistics data fields
+  * porto: rework container io statistics data fields
+  * porto: rework time data field
+  * porto: rework porto_stat data field
+  * porto: remove old property and data heritage
+  * porto: replace auto type in common.hpp
+  * porto: volume property interface rework
+  * porto: drop TValueMap and friends
+  * porto: fix race on volume layers tmp dir creation
+  * porto: fix wrong exit call in the forked child.
+  * porto: move container property definitions to its implementation
+  * porto: move property declaration next to method definitions
+  * porto: encapsulate property names and description
+  * porto: make property definition clearer
+
+  [ Konstantin Khlebnikov ]
+  * porto: check user permissions for bind mount source path
+  * porto: execute requests from containers in behalf of their owners
+  * portoctl: fix property list alignment
+  * volume: initialize IsReadOnly
+
+  [ Maxim Samoylov ]
+  * porto: add standalone test script
+  * porto: re-implement porto fuzzer in python
+  * porto: run python tests in standalone_test
+  * porto: drop root privileges in test/test-api.py
+  * porto: generalize python tests a bit
+  * porto: introduce mem_total_limit knob
+
+  [ Konstantin Khlebnikov ]
+  * porto: autodetect bind mount mode if ro/rw not specified
+  * util/string: add StringParseFlags and StringToBool
+  * porto: check write permissions for bindmount target
+  * porto: refactor capabilities
+  * porto: enforce capabilities limit of parent containers
+  * properties: cleanup initialization
+  * volume: cleanup properties
+  * porto: cleanup standalone test
+  * network: sanitize htb configuration
+  * network: fix compilation
+  * porto: cleanup version control
+  * porto: do not run test when building package
+  * selftest: update default capabilities limit
+  * porto: allow any bind mount for source/target owners
+  * selftest: remove restarts from tests
+  * selftest: do not check cgroups of current process
+  * selftest: use 9999 for numeric uid/gid tests
+  * util/path: fix misprint in read write access check
+  * selftest: fix permissions TestPaths
+  * porto: change owner of auto created bind mount target
+  * selftest: do not expect zero cpu, mem and net usage of portod
+  * selftest: do not expect zero io counters of portod
+
+  [ Maxim Samoylov ]
+  * porto: fix broken container stop semantics
+  * porto: stop using SIGTERM for meta container on stop
+
+  [ Konstantin Khlebnikov ]
+  * porto: move tests out of source directory
+  * selftest: update test for capabilities
+  * selftest: add branches for new cpu-guarantee
+  * util/cred: load users by numeric id
+  * porto: change supplementary groups when user changed
+  * test: cleanup test user layout
+  * test: update test-unpriv-cred.py
+  * selftest: fix boundled cgroup detection
+  * selftest: update fd checks
+  * selftest: truncate logs
+  * porto: update .gitignore
+  * scripts/standalone_test pass arguments into portotest
+  * test/test-unpriv-cred.py: fix and check more corner cases
+  * porto: cleanup cmake
+  * porto: move GIT-VERSION-GEN to scripts/version
+  * AUTHORS: Maxim Samoylov
+  * porto: move libnl into root cmake file
+  * travis: move script and enable external libnl
+  * porto: fix non-isolated root_pid for requests from parent container
+  * portoctl: do not hide invalid virt_mode
+
+  [ Vladimir Vishnevsky ]
+  * Introduced 'Install required dependecies' section Fixed debian build
+
+  [ Konstantin Khlebnikov ]
+  * porto: move travis script into config
+  * porto: fix c++ compiler version check
+  * porto: use gcc 4.7 in travis
+  * porto: fix external libnl for ancient cmake
+  * test: check error counters after restart
+  * test: fix path to python tests
+  * test/test-mem-overcommit: scale down checks to megabytes
+  * porto: restrict character set for layer names
+  * util/path: optionally check parent permissions for non-existent files
+  * filesystem: detach mount namespace operations
+  * filesystem: require write permission for binding into system directories
+  * filesystem: strictly check read pemission for binding system directories
+  * filesystem: check write permission for parent directory when creating bind mount target
+  * porto: rewrite key-value serialization
+  * porto: configure porto_namespace by default for all containers
+  * selftest: remove testcase "bind_property"
+  * util/mount: cleanup and move into path
+  * util/unix: refactor and rename Run to RunCommand
+  * porto: cleanup container startup
+  * test/test-portoctl-exec.py: run by current user
+  * util/path: UmountAll should umount ALL layers of mountpoints
+  * porto: write custom resolv.conf into file in /run
+  * task: remove old methods
+  * porto: change /etc/hostname in the same way as /etc/resolv.conf
+  * porto: run sub-commands in read-only mount namespace
+  * porto: property resolv_conf overrides bind_dns
+  * porto: add property umask, change default to 0002
+  * porto: mount read-only tracefs part of debugfs
+  * porto: drop effective capabilities before opening stdout inside container
+  * porto: refactor stream management
+  * property: cleanup enable_porto
+  * property: cleanup cwd
+  * porto: test presence of custom stdout/stderr outside container
+  * porto: do not remove custom stdout/stderr files
+  * porto: refactor stop, pause, exit sequences
+  * porto: refactor client management
+  * porto: do not reap stopped sub-containers
+  * porto: rewrite restoring sequence
+  * overlay: escape paths in arguments
+  * porto: cleanup string split/merge operations
+  * volume: verify set properties
+  * porto: replace TScopedFd with TFile
+  * volume: pin layers before checking permissions
+  * stream: recheck real path
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 10 Aug 2016 16:14:09 +0300
+
 yandex-porto (2.11) unstable; urgency=low
 
   * porto: recreate $ROOTFS/run subdirectories in the container
