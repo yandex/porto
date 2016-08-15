@@ -34,11 +34,13 @@ TClient::TClient(const std::string &special) {
     Cred = TCred(0, 0);
     Comm = special;
     ReadOnlyAccess = false;
+    SpecialClient = true;
 }
 
 TClient::~TClient() {
     CloseConnection();
-    Statistics->Clients--;
+    if (!SpecialClient)
+        Statistics->Clients--;
 }
 
 TError TClient::AcceptConnection(TContext &context, int listenFd) {

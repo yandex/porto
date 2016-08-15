@@ -31,6 +31,7 @@ public:
     ~TClient();
 
     bool ReadOnlyAccess = true;
+    bool SpecialClient = false;
 
     TError AcceptConnection(TContext &context, int listenFd);
     void CloseConnection();
