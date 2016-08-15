@@ -1584,29 +1584,21 @@ TError TRawDeathTime::Get(std::string &value) {
 
 class TPortoNamespace : public TProperty {
 public:
-    TError Set(const std::string &ns);
-    TError Get(std::string &value);
     TPortoNamespace() : TProperty(P_PORTO_NAMESPACE, PORTO_NAMESPACE_SET,
-                                  "Porto containers namespace "
-                                  "(container name prefix) (dynamic)") {}
+            "Porto containers namespace (container name prefix)") {}
+    TError Get(std::string &value) {
+        value = CurrentContainer->NsName;
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        CurrentContainer->NsName = value;
+        CurrentContainer->PropMask |= PORTO_NAMESPACE_SET;
+        return TError::Success();
+    }
 } static PortoNamespace;
-
-TError TPortoNamespace::Set(const std::string &ns) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    CurrentContainer->NsName = ns;
-    CurrentContainer->PropMask |= PORTO_NAMESPACE_SET;
-
-    return TError::Success();
-}
-
-TError TPortoNamespace::Get(std::string &value) {
-    value = CurrentContainer->NsName;
-
-    return TError::Success();
-}
 
 class TMemoryLimit : public TProperty {
 public:
