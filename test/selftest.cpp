@@ -30,6 +30,7 @@ extern "C" {
 
 const std::string oomMemoryLimit = "32M";
 const std::string oomCommand = "sort -S 1G /dev/urandom";
+std::string portoctl;
 
 using std::string;
 using std::vector;
@@ -1215,7 +1216,7 @@ static void TestContainerNamespaces(Porto::Connection &api) {
 
     Say() << "Check simple prefix" << std::endl;
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "simple-prefix-"));
-    ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+    ExpectApiSuccess(api.SetProperty("c/d", "command", portoctl + " create test"));
 
     ExpectApiSuccess(api.GetProperty("c", "absolute_namespace", val));
     ExpectEq(val, "/porto/simple-prefix-");
@@ -1234,7 +1235,7 @@ static void TestContainerNamespaces(Porto::Connection &api) {
 
     Say() << "Check container prefix" << std::endl;
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "c/"));
-    ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+    ExpectApiSuccess(api.SetProperty("c/d", "command", portoctl + " create test"));
     ExpectApiSuccess(api.Start("c/d"));
     WaitContainer(api, "c/d");
     ExpectApiSuccess(api.Destroy("c/second-prefix-test"));
@@ -5407,6 +5408,10 @@ int SelfTest(std::vector<std::string> args) {
 
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
+
+    TPath exe("/proc/self/exe"), path;
+    exe.ReadLink(path);
+    portoctl = (path.DirName() / "portoctl").ToString();
 
     config.Load();
     Porto::Connection api;
