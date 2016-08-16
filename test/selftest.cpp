@@ -31,6 +31,7 @@ extern "C" {
 const std::string oomMemoryLimit = "32M";
 const std::string oomCommand = "sort -S 1G /dev/urandom";
 std::string portoctl;
+std::string portoinit;
 
 using std::string;
 using std::vector;
@@ -1903,7 +1904,7 @@ static void TestPaths(Porto::Connection &api) {
     AsRoot(api);
     ExpectEq(system("mkdir /myroot && chmod 777 /myroot"), 0);
     AsAlice(api);
-    ExpectEq(system("mkdir /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2"), 0);
+    ExpectEq(system(("mkdir /myroot/bin && cp " + portoinit + " /myroot/bin/test2").c_str()), 0);
 
     /* isolate, root, cwd, bind, cout_path, cerr_path */
     TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "", "");
@@ -5412,6 +5413,7 @@ int SelfTest(std::vector<std::string> args) {
     TPath exe("/proc/self/exe"), path;
     exe.ReadLink(path);
     portoctl = (path.DirName() / "portoctl").ToString();
+    portoinit = (path.DirName() / "portoinit").ToString();
 
     config.Load();
     Porto::Connection api;
