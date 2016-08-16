@@ -439,8 +439,8 @@ public:
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
-        uint64_t rate = config().network().default_guarantee();
-        if (c->IsRoot())
+        uint64_t rate = 0;
+        if (c->IsRoot() || c->IsPortoRoot())
             rate = NET_MAX_GUARANTEE;
         return TUintMap({{ "default", rate }});
     }

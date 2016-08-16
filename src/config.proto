@@ -7,7 +7,7 @@ message TCfg {
 		repeated string devices = 3 [deprecated=true];
 		optional uint32 default_prio = 4 [deprecated=true];
 		optional uint32 default_max_guarantee = 5 [deprecated=true];
-		optional uint32 default_guarantee = 6;
+		optional uint32 default_guarantee = 6 [deprecated=true];
 		optional uint32 default_limit = 7 [deprecated=true];
 		message TNetworkAlias {
 			required string iface = 1;
