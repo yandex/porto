@@ -677,8 +677,7 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
 
 TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t parent,
                              uint64_t prio, uint64_t rate, uint64_t ceil) const {
-    uint64_t max = config().network().default_max_guarantee();
-    uint64_t rbuffer, cbuffer;
+    uint64_t max_rate, quantum, rbuffer, cbuffer;
     struct rtnl_class *cls;
     TError error;
     int ret;
@@ -704,35 +703,43 @@ TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t pare
     if (!rate)
         rate = 1;
 
-    if (rate > max)
-        rate = max;
+    /* rate must be <= INT_MAX to prevent overflows in libnl */
+    max_rate = config().network().default_max_guarantee();
+    if (rate > max_rate)
+        rate = max_rate;
 
     rtnl_htb_set_rate(cls, rate);
 
     /*
      * Zero ceil must be no limit. Libnl set default ceil equal to rate.
      */
-    if (!ceil || ceil > max)
-        ceil = max;
+    if (!ceil || ceil > max_rate)
+        ceil = max_rate;
 
-    rtnl_htb_set_ceil(cls, ceil);
+    quantum = dev.MTU * 2;
 
-    rtnl_htb_set_prio(cls, prio);
-
-    rtnl_htb_set_quantum(cls, 10000);
-
-    rtnl_tc_set_mtu(TC_CAST(cls), 9000);
-
-    rbuffer = rate / 100 + 9000;
+    rbuffer = rate / 1000 + dev.MTU;
     if (rbuffer > INT32_MAX)
         rbuffer = INT32_MAX;
 
-    rtnl_htb_set_rbuffer(cls, rbuffer);
-
-    cbuffer = ceil / 100 + 9000;
+    cbuffer = ceil / 1000 + dev.MTU;
     if (cbuffer > INT32_MAX)
         cbuffer = INT32_MAX;
 
+    if (config().network().has_htb_quantum())
+        quantum = config().network().htb_quantum();
+
+    if (config().network().has_htb_rbuffer())
+        rbuffer = config().network().htb_rbuffer();
+
+    if (config().network().has_htb_cbuffer())
+        cbuffer = config().network().htb_cbuffer();
+
+    rtnl_htb_set_ceil(cls, ceil);
+    rtnl_htb_set_prio(cls, prio);
+    rtnl_tc_set_mtu(TC_CAST(cls), dev.MTU);
+    rtnl_htb_set_quantum(cls, quantum);
+    rtnl_htb_set_rbuffer(cls, rbuffer);
     rtnl_htb_set_cbuffer(cls, cbuffer);
 
     /* FIXME add support for 64-bit rate and ceil */
