@@ -180,7 +180,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     }
 
     ExpectApiSuccess(api.GetProperty(name, "net_guarantee[default]", v));
-    ExpectEq(v, std::to_string(config().network().default_guarantee()));
+    ExpectEq(v, "0");
     ExpectApiSuccess(api.GetProperty(name, "net_limit[default]", v));
     ExpectEq(v, "0");
     ExpectApiSuccess(api.GetProperty(name, "net_priority[default]", v));
