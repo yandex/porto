@@ -64,12 +64,12 @@ TError TCgroup::Remove() const {
     /* workaround for bad synchronization */
     if (error && error.GetErrno() == EBUSY &&
             !Path().StatStrict(st) && st.st_nlink == 2) {
-        for (int i = 0; i < 100; i++) {
-            usleep(config().daemon().cgroup_remove_timeout_s() * 10000);
+        uint64_t deadline = GetCurrentTimeMs() + config().daemon().cgroup_remove_timeout_s() * 1000;
+        do {
             error = Path().Rmdir();
             if (!error || error.GetErrno() != EBUSY)
                 break;
-        }
+        } while (!WaitDeadline(deadline));
     }
 
     if (error && (error.GetErrno() != ENOENT || Exists()))

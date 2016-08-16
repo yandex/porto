@@ -1301,7 +1301,7 @@ TError TContainer::StopOne(TScopedLock &holder_lock, uint64_t deadline) {
 }
 
 TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout) {
-    uint64_t deadline = GetCurrentTimeMs() + timeout;
+    uint64_t deadline = timeout ? GetCurrentTimeMs() + timeout : 0;
     auto cg = GetCgroup(FreezerSubsystem);
     TError error;
 

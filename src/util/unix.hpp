@@ -28,7 +28,7 @@ pid_t GetTid();
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 
 uint64_t GetCurrentTimeMs();
-bool WaitDeadline(uint64_t deadline, uint64_t sleep = 100);
+bool WaitDeadline(uint64_t deadline, uint64_t sleep = 10);
 size_t GetTotalMemory();
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
