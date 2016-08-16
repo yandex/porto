@@ -12,7 +12,6 @@
 #include "util/crc32.hpp"
 
 extern "C" {
-#include <fnmatch.h>
 #include <linux/if.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
@@ -21,11 +20,51 @@ extern "C" {
 #include <netlink/route/qdisc/htb.h>
 }
 
+std::shared_ptr<TNetwork> HostNetwork;
 static std::unordered_map<ino_t, std::weak_ptr<TNetwork>> Networks;
 static std::mutex NetworksMutex;
 
+static std::vector<std::string> UnmanagedDevices;
+static std::vector<int> UnmanagedGroups;
+
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
+}
+
+TNetworkDevice::TNetworkDevice(struct rtnl_link *link) {
+    Name = rtnl_link_get_name(link);
+    Type = rtnl_link_get_type(link) ?: "";
+    Index = rtnl_link_get_ifindex(link);
+    Link = rtnl_link_get_link(link);
+    Group = rtnl_link_get_group(link);
+    MTU = rtnl_link_get_mtu(link);
+
+    Managed = true;
+    Prepared = false;
+    Missing = false;
+
+    for (auto &pattern: UnmanagedDevices)
+        if (StringMatch(Name, pattern))
+            Managed = false;
+
+    if (std::find(UnmanagedGroups.begin(), UnmanagedGroups.end(), Group) !=
+            UnmanagedGroups.end())
+        Managed = false;
+}
+
+std::string TNetworkDevice::GetDesc(void) const {
+    return std::to_string(Index) + ":" + Name + " (" + Type + ")";
+}
+
+uint64_t TNetworkDevice::GetConfig(const TUintMap &cfg, uint64_t def) const {
+    for (auto &it: cfg) {
+        if (StringMatch(Name, it.first))
+            return it.second;
+    }
+    auto it = cfg.find("default");
+    if (it != cfg.end())
+        return it->second;
+    return def;
 }
 
 void TNetwork::AddNetwork(ino_t inode, std::shared_ptr<TNetwork> &net) {
@@ -56,9 +95,6 @@ void TNetwork::RefreshNetworks() {
             net->RefreshClasses(false);
     }
 }
-
-static std::vector<std::string> UnmanagedDevices;
-static std::vector<int> UnmanagedGroups;
 
 void TNetwork::InitializeUnmanagedDevices() {
     std::ifstream groupCfg("/etc/iproute2/group");
@@ -124,7 +160,7 @@ TError TNetwork::Destroy() {
     return TError::Success();
 }
 
-TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
+TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     TError error;
 
     //
@@ -143,12 +179,12 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
     //      +- 1:6 container b
     //
 
-    L() << "Prepare network device " << dev.Index << ":" << dev.Name << std::endl;
+    L() << "Setup queue for network device " << dev.GetDesc() << std::endl;
 
     TNlLink link(Nl, dev.Name);
     error = link.Load();
     if (error) {
-        L_ERR() << "Can't open link: " << error << std::endl;
+        L_ERR() << "Cannot load link: " << error << std::endl;
         return error;
     }
 
@@ -158,7 +194,7 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
         (void)qdisc.Remove(link);
         TError error = qdisc.Create(link, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR));
         if (error) {
-            L_ERR() << "Can't create root qdisc: " << error << std::endl;
+            L_ERR() << "Cannot create root qdisc: " << error << std::endl;
             return error;
         }
     }
@@ -177,10 +213,9 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
     uint64_t rate = config().network().default_max_guarantee();
     uint64_t ceil = rate;
 
-    error = AddTrafficClass(dev.Index,
-                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
-                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
-                            prio, rate, ceil);
+    error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
+                  TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
+                  prio, rate, ceil);
     if (error) {
         L_ERR() << "Can't create root tclass: " << error << std::endl;
         return error;
@@ -188,19 +223,17 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
 
     rate = config().network().default_guarantee();
 
-    error = AddTrafficClass(dev.Index,
-                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
-                            TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
-                            prio, rate, ceil);
+    error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
+                  TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
+                  prio, rate, ceil);
     if (error) {
         L_ERR() << "Can't create default tclass: " << error << std::endl;
         return error;
     }
 
-    error = AddTrafficClass(dev.Index,
-                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
-                            TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
-                            prio, rate, ceil);
+    error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
+                  TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
+                  prio, rate, ceil);
     if (error) {
         L_ERR() << "Can't create porto tclass: " << error << std::endl;
         return error;
@@ -274,6 +307,7 @@ TError TNetwork::ConnectNew(TNamespaceFd &netns) {
 
 TError TNetwork::RefreshDevices() {
     struct nl_cache *cache;
+    TError error;
     int ret;
 
     ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &cache);
@@ -286,48 +320,42 @@ TError TNetwork::RefreshDevices() {
     for (auto obj = nl_cache_get_first(cache); obj; obj = nl_cache_get_next(obj)) {
         auto link = (struct rtnl_link *)obj;
         int flags = rtnl_link_get_flags(link);
-        int group = rtnl_link_get_group(link);
-        TNetworkDevice dev;
 
-        dev.Name = rtnl_link_get_name(link);
-        dev.Type = rtnl_link_get_type(link) ?: "";
-        dev.Index = rtnl_link_get_ifindex(link);
-        dev.Managed = true;
-        dev.Prepared = false;
-        dev.Missing = false;
-
-        if ((flags & IFF_LOOPBACK) || !(flags & IFF_RUNNING))
+        if (flags & IFF_LOOPBACK)
             continue;
 
+        /* Do not setup queue on down links in host namespace */
+        if (!ManagedNamespace && !(flags & IFF_RUNNING))
+            continue;
+
+        TNetworkDevice dev(link);
+
+        /* Ignore our veth pairs */
         if (dev.Type == "veth" &&
             (StringStartsWith(dev.Name, "portove-") ||
              StringStartsWith(dev.Name, "L3-")))
             continue;
 
-        for (auto &pattern: UnmanagedDevices)
-            if (!fnmatch(pattern.c_str(), dev.Name.c_str(), 0))
-                dev.Managed = false;
-
-        if (std::find(UnmanagedGroups.begin(), UnmanagedGroups.end(),
-                      group) != UnmanagedGroups.end())
-            dev.Managed = false;
+        /* In managed namespace we control all devices */
+        if (ManagedNamespace)
+            dev.Managed = true;
 
         bool found = false;
         for (auto &d: Devices) {
             if (d.Name != dev.Name || d.Index != dev.Index)
                 continue;
-            d.Missing = false;
-            if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") != "htb") {
+            d = dev;
+            if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") != "htb")
                 Nl->Dump("Detected missing qdisc", link);
-                d.Prepared = false;
-            }
+            else
+                d.Prepared = true;
             found = true;
             break;
         }
         if (!found) {
             Nl->Dump("New network device", link);
             if (!dev.Managed)
-                L() << "Unmanaged device " << dev.Index << ":" << dev.Name << std::endl;
+                L() << "Unmanaged device " << dev.GetDesc() << std::endl;
             Devices.push_back(dev);
         }
     }
@@ -336,7 +364,7 @@ TError TNetwork::RefreshDevices() {
 
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
-            L() << "Del network device " << dev->Index << ":" << dev->Name << std::endl;
+            L() << "Delete network device " << dev->GetDesc() << std::endl;
             dev = Devices.erase(dev);
         } else
             dev++;
@@ -345,7 +373,7 @@ TError TNetwork::RefreshDevices() {
     for (auto &dev: Devices) {
         if (!dev.Managed || dev.Prepared)
             continue;
-        TError error = PrepareDevice(dev);
+        error = SetupQueue(dev);
         if (error)
             return error;
         NewManagedDevices = true;
@@ -541,7 +569,7 @@ TError TNetwork::PutNatAddress(const std::vector<TNlAddr> &addrs) {
     return TError::Success();
 }
 
-std::string TNetwork::GetIfaceName(const std::string &prefix) {
+std::string TNetwork::NewDeviceName(const std::string &prefix) {
     for (int retry = 0; retry < 100; retry++) {
         std::string name = prefix + std::to_string(IfaceName++);
         TNlLink link(Nl, name);
@@ -551,28 +579,36 @@ std::string TNetwork::GetIfaceName(const std::string &prefix) {
     return prefix + "0";
 }
 
-std::string TNetwork::MatchIface(const std::string &pattern) {
+std::string TNetwork::MatchDevice(const std::string &pattern) {
     for (auto &dev: Devices) {
-        if (!fnmatch(pattern.c_str(), dev.Name.c_str(), 0))
+        if (StringMatch(dev.Name, pattern))
             return dev.Name;
     }
     return pattern;
 }
 
-TError TNetwork::GetInterfaceCounters(ETclassStat stat,
-                                      std::map<std::string, uint64_t> &result) {
+TError TNetwork::GetDeviceStat(ENetStat kind, TUintMap &stat) {
     struct nl_cache *cache;
     rtnl_link_stat_id_t id;
 
-    switch (stat) {
-        case ETclassStat::RxBytes:
+    switch (kind) {
+        case ENetStat::RxBytes:
             id = RTNL_LINK_RX_BYTES;
             break;
-        case ETclassStat::RxPackets:
+        case ENetStat::RxPackets:
             id = RTNL_LINK_RX_PACKETS;
             break;
-        case ETclassStat::RxDrops:
+        case ENetStat::RxDrops:
             id = RTNL_LINK_RX_DROPPED;
+            break;
+        case ENetStat::TxBytes:
+            id = RTNL_LINK_TX_BYTES;
+            break;
+        case ENetStat::TxPackets:
+            id = RTNL_LINK_TX_PACKETS;
+            break;
+        case ENetStat::TxDrops:
+            id = RTNL_LINK_TX_DROPPED;
             break;
         default:
             return TError(EError::Unknown, "Unsupported netlink statistics");
@@ -585,7 +621,9 @@ TError TNetwork::GetInterfaceCounters(ETclassStat stat,
     for (auto &dev: Devices) {
         auto link = rtnl_link_get(cache, dev.Index);
         if (link)
-            result[dev.Name] = rtnl_link_get_stat(link, id);
+            stat[dev.Name] = rtnl_link_get_stat(link, id);
+        else
+            L_WRN() << "Cannot find device " << dev.GetDesc() << std::endl;
         rtnl_link_put(link);
     }
 
@@ -593,31 +631,24 @@ TError TNetwork::GetInterfaceCounters(ETclassStat stat,
     return TError::Success();
 }
 
-
-TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
-                                    std::map<std::string, uint64_t> &result) {
-    uint32_t handle = TC_HANDLE(ROOT_TC_MAJOR, minor);
+TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) {
     rtnl_tc_stat rtnlStat;
 
-    switch (stat) {
-    case ETclassStat::Packets:
+    switch (kind) {
+    case ENetStat::Packets:
         rtnlStat = RTNL_TC_PACKETS;
         break;
-    case ETclassStat::Bytes:
+    case ENetStat::Bytes:
         rtnlStat = RTNL_TC_BYTES;
         break;
-    case ETclassStat::Drops:
+    case ENetStat::Drops:
         rtnlStat = RTNL_TC_DROPS;
         break;
-    case ETclassStat::Overlimits:
+    case ENetStat::Overlimits:
         rtnlStat = RTNL_TC_OVERLIMITS;
         break;
-    case ETclassStat::RxBytes:
-    case ETclassStat::RxPackets:
-    case ETclassStat::RxDrops:
-        return GetInterfaceCounters(stat, result);
     default:
-        return TError(EError::Unknown, "Unsupported netlink statistics");
+        return GetDeviceStat(kind, stat);
     }
 
     for (auto &dev: Devices) {
@@ -634,20 +665,18 @@ TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
 
         cls = rtnl_class_get(cache, dev.Index, handle);
         if (cls) {
-            result[dev.Name] = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
+            stat[dev.Name] = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
             rtnl_class_put(cls);
-        } else {
-            L_WRN() << "Cannot find tc class " << minor << " at "
-                    << dev.Index << ":" << dev.Name << std::endl;
-        }
+        } else
+            L_WRN() << "Cannot find tc class " << handle << " at " << dev.GetDesc() << std::endl;
         nl_cache_free(cache);
     }
 
     return TError::Success();
 }
 
-TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
-                                 uint64_t prio, uint64_t rate, uint64_t ceil) {
+TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t parent,
+                             uint64_t prio, uint64_t rate, uint64_t ceil) const {
     uint64_t max = config().network().default_max_guarantee();
     uint64_t rbuffer, cbuffer;
     struct rtnl_class *cls;
@@ -658,7 +687,7 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
     if (!cls)
         return TError(EError::Unknown, "Cannot allocate rtnl_class object");
 
-    rtnl_tc_set_ifindex(TC_CAST(cls), ifIndex);
+    rtnl_tc_set_ifindex(TC_CAST(cls), dev.Index);
     rtnl_tc_set_parent(TC_CAST(cls), parent);
     rtnl_tc_set_handle(TC_CAST(cls), handle);
 
@@ -711,14 +740,14 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
     Nl->Dump("add", cls);
     ret = rtnl_class_add(GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
     if (ret < 0)
-        error = Nl->Error(ret, "Cannot add traffic class to " + std::to_string(ifIndex));
+        error = Nl->Error(ret, "Cannot add traffic class to " + dev.GetDesc());
 
 free_class:
     rtnl_class_put(cls);
     return error;
 }
 
-TError TNetwork::DelTrafficClass(int ifIndex, uint32_t handle) {
+TError TNetwork::DelTC(const TNetworkDevice &dev, uint32_t handle) const {
     struct rtnl_class *cls;
     TError error;
     int ret;
@@ -727,7 +756,7 @@ TError TNetwork::DelTrafficClass(int ifIndex, uint32_t handle) {
     if (!cls)
         return TError(EError::Unknown, "Cannot allocate rtnl_class object");
 
-    rtnl_tc_set_ifindex(TC_CAST(cls), ifIndex);
+    rtnl_tc_set_ifindex(TC_CAST(cls), dev.Index);
     rtnl_tc_set_handle(TC_CAST(cls), handle);
 
     Nl->Dump("del", cls);
@@ -738,7 +767,7 @@ TError TNetwork::DelTrafficClass(int ifIndex, uint32_t handle) {
         std::vector<uint32_t> handles({handle});
         struct nl_cache *cache;
 
-        ret = rtnl_class_alloc_cache(GetSock(), ifIndex, &cache);
+        ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &cache);
         if (ret < 0) {
             error = Nl->Error(ret, "Cannot allocate class cache");
             goto out;
@@ -766,46 +795,23 @@ TError TNetwork::DelTrafficClass(int ifIndex, uint32_t handle) {
     }
 
     if (ret < 0)
-        error = Nl->Error(ret, "Cannot remove traffic class");
+        error = Nl->Error(ret, "Cannot remove traffic class at " + dev.GetDesc());
 out:
     rtnl_class_put(cls);
     return error;
 }
 
-TError TNetwork::UpdateTrafficClasses(int parent, int minor,
-        std::map<std::string, uint64_t> &Prio,
-        std::map<std::string, uint64_t> &Rate,
-        std::map<std::string, uint64_t> &Ceil) {
+TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
+                          TUintMap &rate, TUintMap &ceil) {
     TError error, result;
-
-    for (auto &i: Prio) {
-        if (i.first != "default" && !DeviceIndex(i.first))
-            L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
-    }
-
-    for (auto &i: Rate) {
-        if (i.first != "default" && !DeviceIndex(i.first))
-            L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
-    }
-
-    for (auto &i: Ceil) {
-        if (i.first != "default" && !DeviceIndex(i.first))
-            L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
-    }
 
     for (auto &dev: Devices) {
         if (!dev.Managed)
             continue;
-        auto name = dev.Name;
-        auto prio = (Prio.find(name) != Prio.end()) ? Prio[name] : Prio["default"];
-        auto rate = (Rate.find(name) != Rate.end()) ? Rate[name] : Rate["default"];
-        auto ceil = (Ceil.find(name) != Ceil.end()) ? Ceil[name] : Ceil["default"];
-        error = AddTrafficClass(dev.Index,
-                                TC_HANDLE(ROOT_TC_MAJOR, parent),
-                                TC_HANDLE(ROOT_TC_MAJOR, minor),
-                                prio, rate, ceil);
+        error = AddTC(dev, handle, parent, dev.GetConfig(prio),
+                      dev.GetConfig(rate), dev.GetConfig(ceil));
         if (error) {
-            L_WRN() << "Cannot add tc class " << dev.Index << ":" << dev.Name << " " << error << std::endl;
+            L_WRN() << "Cannot add tc class: " << error << std::endl;
             if (!result)
                 result = error;
         }
@@ -814,20 +820,22 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
     return result;
 }
 
-TError TNetwork::RemoveTrafficClasses(int minor) {
-    TError error;
+TError TNetwork::DestroyTC(uint32_t handle) {
+    TError error, result;
 
     for (auto &dev: Devices) {
         if (!dev.Managed)
             continue;
-        error = DelTrafficClass(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, minor));
-        if (error)
-            return error;
+        error = DelTC(dev, handle);
+        if (error) {
+            L_WRN() << "Cannot del tc class: " << error << std::endl;
+            if (!result)
+                result = error;
+        }
     }
-    return TError::Success();
+
+    return result;
 }
-
-
 
 void TNetCfg::Reset() {
     /* default - create new empty netns */
@@ -1145,7 +1153,7 @@ std::string TNetCfg::GenerateHw(const std::string &name) {
 
 TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
     auto parentNl = ParentNet->GetNl();
-    TNlLink peer(parentNl, ParentNet->GetIfaceName("portove-"));
+    TNlLink peer(parentNl, ParentNet->NewDeviceName("portove-"));
     TError error;
 
     std::string hw = veth.Hw;
@@ -1171,7 +1179,7 @@ TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
 }
 
 TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
-    std::string peerName = ParentNet->GetIfaceName("L3-");
+    std::string peerName = ParentNet->NewDeviceName("L3-");
     auto parentNl = ParentNet->GetNl();
     TNlLink peer(parentNl, peerName);
     TNlAddr gate4, gate6;
@@ -1245,7 +1253,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         if (error)
             return error;
 
-        error = ParentNet->AddAnnounce(addr, ParentNet->MatchIface(l3.Master));
+        error = ParentNet->AddAnnounce(addr, ParentNet->MatchDevice(l3.Master));
         if (error)
             return error;
     }
@@ -1269,7 +1277,7 @@ TError TNetCfg::ConfigureInterfaces() {
     }
 
     for (auto &ipvlan : IpVlan) {
-        std::string master = ParentNet->MatchIface(ipvlan.Master);
+        std::string master = ParentNet->MatchDevice(ipvlan.Master);
 
         TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
         error = link.AddIpVlan(master, ipvlan.Mode, ipvlan.Mtu);
@@ -1285,7 +1293,7 @@ TError TNetCfg::ConfigureInterfaces() {
     }
 
     for (auto &mvlan : MacVlan) {
-        std::string master = ParentNet->MatchIface(mvlan.Master);
+        std::string master = ParentNet->MatchDevice(mvlan.Master);
 
         std::string hw = mvlan.Hw;
         if (hw.empty() && !Hostname.empty())
@@ -1328,34 +1336,45 @@ TError TNetCfg::ConfigureInterfaces() {
     if (error)
         return error;
 
-    for (auto &name: links) {
-        TNlLink link(target_nl, name);
-        bool hasConfig = false;
+    Net->ManagedNamespace = true;
 
+    error = Net->RefreshDevices();
+    if (error)
+        return error;
+
+    Net->NewManagedDevices = false;
+
+    for (auto &name: links) {
+        if (!Net->DeviceIndex(name))
+            return TError(EError::Unknown, "network device " + name + " not found");
+    }
+
+    for (auto &dev: Net->Devices) {
+        if (!NetUp) {
+            bool found = false;
+            for (auto &ip: IpVec)
+                if (ip.Iface == dev.Name)
+                    found = true;
+            for (auto &gw: GwVec)
+                if (gw.Iface == dev.Name)
+                    found = true;
+            for (auto &ac: Autoconf)
+                if (ac == dev.Name)
+                    found = true;
+            if (!found)
+                continue;
+        }
+
+        TNlLink link(target_nl, dev.Name);
         error = link.Load();
         if (error)
             return error;
-
-        for (auto &ip: IpVec)
-            if (ip.Iface == name)
-                hasConfig = true;
-
-        for (auto &gw: GwVec)
-            if (gw.Iface == name)
-                hasConfig = true;
-
-        for (auto &ac: Autoconf)
-            if (ac == name)
-                hasConfig = true;
-
-        if (NetUp || hasConfig) {
-            error = link.Up();
-            if (error)
-                return error;
-        }
+        error = link.Up();
+        if (error)
+            return error;
 
         for (auto &ip: IpVec) {
-            if (ip.Iface == name) {
+            if (ip.Iface == dev.Name) {
                 error = link.AddAddress(ip.Addr);
                 if (error)
                     return error;
@@ -1363,20 +1382,12 @@ TError TNetCfg::ConfigureInterfaces() {
         }
 
         for (auto &gw: GwVec) {
-            if (gw.Iface == name) {
+            if (gw.Iface == dev.Name) {
                 error = link.SetDefaultGw(gw.Addr);
                 if (error)
                     return error;
             }
         }
-
-        TNetworkDevice dev;
-        dev.Name = link.GetName();
-        dev.Type = link.GetType();
-        dev.Index = link.GetIndex();
-        dev.Managed = true;
-        dev.Prepared = false;
-        Net->Devices.push_back(dev);
     }
 
     return TError::Success();
@@ -1386,18 +1397,12 @@ TError TNetCfg::PrepareNetwork() {
     TError error;
 
     if (Inherited) {
-
         Net = Parent->Net;
-        ParentId = Parent->GetId();
         error = Parent->OpenNetns(NetNs);
         if (error)
             return error;
-
     } else if (NewNetNs) {
-
         Net = std::make_shared<TNetwork>();
-        ParentId = PORTO_ROOT_CONTAINER_ID;
-
         error = Net->ConnectNew(NetNs);
         if (error)
             return error;
@@ -1408,21 +1413,9 @@ TError TNetCfg::PrepareNetwork() {
             return error;
         }
 
-        for (auto &dev: Net->Devices) {
-            error = Net->PrepareDevice(dev);
-            if (error) {
-                (void)DestroyNetwork();
-                return error;
-            }
-        }
-
         TNetwork::AddNetwork(NetNs.GetInode(), Net);
-
     } else if (Host) {
-
         Net = std::make_shared<TNetwork>();
-        ParentId = ROOT_TC_MINOR;
-
         error = Net->Connect();
         if (error)
             return error;
@@ -1444,9 +1437,8 @@ TError TNetCfg::PrepareNetwork() {
             Net->NatBaseV6.Parse(AF_INET6, config().network().nat_first_ipv6());
         if (config().network().has_nat_count())
             Net->NatBitmap.Resize(config().network().nat_count());
-
+        HostNetwork = Net;
     } else if (NetNsName != "") {
-
         error = NetNs.Open("/var/run/netns/" + NetNsName);
         if (error)
             return error;
@@ -1466,11 +1458,7 @@ TError TNetCfg::PrepareNetwork() {
 
             TNetwork::AddNetwork(NetNs.GetInode(), Net);
         }
-
-        ParentId = PORTO_ROOT_CONTAINER_ID;
-
     } else if (NetCtName != "") {
-
         std::shared_ptr<TContainer> target;
         error = Holder->Get(NetCtName, target);
         if (error)
@@ -1485,8 +1473,6 @@ TError TNetCfg::PrepareNetwork() {
             return error;
 
         Net = target->Net;
-        ParentId = target->GetId();
-
     }
 
     return TError::Success();

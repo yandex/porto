@@ -11,14 +11,39 @@
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 
+class TContainer;
+
+enum class ENetStat {
+    Packets,
+    Bytes,
+    Drops,
+    Overlimits,
+
+    RxPackets,
+    RxBytes,
+    RxDrops,
+
+    TxPackets,
+    TxBytes,
+    TxDrops,
+};
+
 class TNetworkDevice {
 public:
     std::string Name;
     std::string Type;
     int Index;
+    int Link;
+    int Group;
+    int MTU;
     bool Managed;
     bool Prepared;
     bool Missing;
+
+    TNetworkDevice(struct rtnl_link *);
+
+    std::string GetDesc(void) const;
+    uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0) const;
 };
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
@@ -32,10 +57,10 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
 public:
     std::vector<TNetworkDevice> Devices;
 
-    TError PrepareDevice(TNetworkDevice &dev);
     TError RefreshDevices();
     TError RefreshClasses(bool force);
 
+    bool ManagedNamespace = false;
     bool NewManagedDevices = false;
 
     int DeviceIndex(const std::string &name) {
@@ -58,21 +83,18 @@ public:
 
     TError Destroy();
 
-    TError GetTrafficCounters(int minor, ETclassStat stat,
-                              std::map<std::string, uint64_t> &result);
+    TError SetupQueue(TNetworkDevice &dev);
 
-    TError GetInterfaceCounters(ETclassStat stat,
-                                std::map<std::string, uint64_t> &result);
+    TError AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t parent,
+                 uint64_t prio, uint64_t rate, uint64_t ceil) const;
+    TError DelTC(const TNetworkDevice &dev, uint32_t handle) const;
 
-    TError UpdateTrafficClasses(int parent, int minor,
-            std::map<std::string, uint64_t> &Prio,
-            std::map<std::string, uint64_t> &Rate,
-            std::map<std::string, uint64_t> &Ceil);
-    TError RemoveTrafficClasses(int minor);
+    TError CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
+                    TUintMap &rate, TUintMap &ceil);
+    TError DestroyTC(uint32_t handle);
 
-    TError AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
-                           uint64_t prio, uint64_t rate, uint64_t ceil);
-    TError DelTrafficClass(int ifIndex, uint32_t handle);
+    TError GetDeviceStat(ENetStat kind, TUintMap &stat);
+    TError GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat);
 
     TError GetGateAddress(std::vector<TNlAddr> addrs,
                           TNlAddr &gate4, TNlAddr &gate6, int &mtu);
@@ -82,8 +104,8 @@ public:
     TError GetNatAddress(std::vector <TNlAddr> &addrs);
     TError PutNatAddress(const std::vector <TNlAddr> &addrs);
 
-    std::string GetIfaceName(const std::string &prefix);
-    std::string MatchIface(const std::string &pattern);
+    std::string NewDeviceName(const std::string &prefix);
+    std::string MatchDevice(const std::string &pattern);
 
     static void AddNetwork(ino_t inode, std::shared_ptr<TNetwork> &net);
     static std::shared_ptr<TNetwork> GetNetwork(ino_t inode);
@@ -148,7 +170,6 @@ struct TNetCfg {
     std::shared_ptr<TNetwork> ParentNet;
     std::shared_ptr<TNetwork> Net;
     unsigned Id;
-    unsigned ParentId;
     TCred OwnerCred;
     bool NewNetNs;
     bool Inherited;
@@ -181,3 +202,5 @@ struct TNetCfg {
     TError PrepareNetwork();
     TError DestroyNetwork();
 };
+
+extern std::shared_ptr<TNetwork> HostNetwork;

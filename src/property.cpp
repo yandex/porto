@@ -2006,7 +2006,8 @@ TError TNetGuarantee::Set(const std::string &guarantee) {
     TUintMap old_guarantee = CurrentContainer->NetGuarantee;
     CurrentContainer->NetGuarantee = new_guarantee;
 
-    error = CurrentContainer->UpdateTrafficClasses();
+    if (!IsRunning())
+        error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
         CurrentContainer->PropMask |= NET_GUARANTEE_SET;
     } else {
@@ -2035,7 +2036,8 @@ TError TNetGuarantee::SetIndexed(const std::string &index,
     uint64_t old_guarantee = CurrentContainer->NetGuarantee[index];
     CurrentContainer->NetGuarantee[index] = val;
 
-    error = CurrentContainer->UpdateTrafficClasses();
+    if (!IsRunning())
+        error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
         CurrentContainer->PropMask |= NET_GUARANTEE_SET;
     } else {
@@ -2083,7 +2085,8 @@ TError TNetLimit::Set(const std::string &limit) {
     TUintMap old_limit = CurrentContainer->NetLimit;
     CurrentContainer->NetLimit = new_limit;
 
-    error = CurrentContainer->UpdateTrafficClasses();
+    if (!IsRunning())
+        error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
         CurrentContainer->PropMask |= NET_LIMIT_SET;
     } else {
@@ -2112,7 +2115,8 @@ TError TNetLimit::SetIndexed(const std::string &index,
     uint64_t old_limit = CurrentContainer->NetLimit[index];
     CurrentContainer->NetLimit[index] = val;
 
-    error = CurrentContainer->UpdateTrafficClasses();
+    if (!IsRunning())
+        error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
         CurrentContainer->PropMask |= NET_LIMIT_SET;
     } else {
@@ -2166,7 +2170,8 @@ TError TNetPriority::Set(const std::string &prio) {
     TUintMap old_prio = CurrentContainer->NetPriority;
     CurrentContainer->NetPriority = new_prio;
 
-    error = CurrentContainer->UpdateTrafficClasses();
+    if (!IsRunning())
+        error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
         CurrentContainer->PropMask |= NET_PRIO_SET;
     } else {
@@ -2198,7 +2203,8 @@ TError TNetPriority::SetIndexed(const std::string &index,
     uint64_t old_prio = CurrentContainer->NetPriority[index];
     CurrentContainer->NetPriority[index] = val;
 
-    error = CurrentContainer->UpdateTrafficClasses();
+    if (!IsRunning())
+        error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
         CurrentContainer->PropMask |= NET_PRIO_SET;
     } else {
@@ -2792,281 +2798,55 @@ TError TCpuSystem::Get(std::string &value) {
     return TError::Success();
 }
 
-class TNetBytes : public TProperty {
+class TNetStat : public TProperty {
 public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetBytes() : TProperty(D_NET_BYTES, 0,
-                            "tx bytes: <interface>: <bytes>;... (ro)") {
+    ENetStat Kind;
+
+    TNetStat(std::string name, ENetStat kind, std::string desc) :
+            TProperty(name, 0, desc) {
+        Kind = kind;
         IsReadOnly = true;
         IsSerializable = false;
     }
-} static NetBytes;
 
-TError TNetBytes::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Bytes, m);
-
-    return UintMapToString(m, value);
-}
-
-TError TNetBytes::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Bytes, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TNetPackets : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetPackets() : TProperty(D_NET_PACKETS, 0,
-                              "tx packets: <interface>: <packets>;... (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        TUintMap stat;
+        error = CurrentContainer->GetNetStat(Kind, stat);
+        if (error)
+            return error;
+        return UintMapToString(stat, value);
     }
-} static NetPackets;
 
-TError TNetPackets::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Packets, m);
-
-    return UintMapToString(m, value);
-}
-
-TError TNetPackets::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Packets, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TNetDrops : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetDrops() : TProperty(D_NET_DROPS, 0,
-                            "dropped tx packets: <interface>: "
-                            "<packets>;... (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        TUintMap stat;
+        error = CurrentContainer->GetNetStat(Kind, stat);
+        if (error)
+            return error;
+        if (stat.find(index) == stat.end())
+            return TError(EError::InvalidValue, "network device " + index + " no found");
+        value = std::to_string(stat[index]);
+        return TError::Success();
     }
-} static NetDrops;
+};
 
-TError TNetDrops::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
+TNetStat NetBytes(D_NET_BYTES, ENetStat::Bytes, "tx bytes: <interface>: <bytes>;... (ro)");
+TNetStat NetPackets(D_NET_PACKETS, ENetStat::Packets, "tx packets: <interface>: <packets>;... (ro)");
+TNetStat NetDrops(D_NET_DROPS, ENetStat::Drops, "tx drops: <interface>: <packets>;... (ro)");
+TNetStat NetOverlimits(D_NET_OVERLIMITS, ENetStat::Overlimits, "tx overlimits: <interface>: <packets>;... (ro)");
 
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Drops, m);
+TNetStat NetRxBytes(D_NET_RX_BYTES, ENetStat::RxBytes, "device rx bytes: <interface>: <bytes>;... (ro)");
+TNetStat NetRxPackets(D_NET_RX_PACKETS, ENetStat::RxPackets, "device rx packets: <interface>: <packets>;... (ro)");
+TNetStat NetRxDrops(D_NET_RX_DROPS, ENetStat::RxDrops, "device rx drops: <interface>: <packets>;... (ro)");
 
-    return UintMapToString(m, value);
-}
-
-TError TNetDrops::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Drops, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TNetOverlimits : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetOverlimits() : TProperty(D_NET_OVERLIMITS, 0,
-                                 "overlimti tx packets: "
-                                 "<interface>: <packets>;... (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static NetOverlimits;
-
-TError TNetOverlimits::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Overlimits, m);
-
-    return UintMapToString(m, value);
-}
-
-TError TNetOverlimits::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::Overlimits, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TNetRxBytes : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetRxBytes() : TProperty(D_NET_RX_BYTES, 0,
-                              "rx bytes: <interface>: <bytes>;... (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static NetRxBytes;
-
-TError TNetRxBytes::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::RxBytes, m);
-
-    return UintMapToString(m, value);
-}
-
-TError TNetRxBytes::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::RxBytes, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TNetRxPackets : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetRxPackets() : TProperty(D_NET_RX_PACKETS, 0,
-                                "rx packets: <interface>: <packets>;... (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static NetRxPackets;
-
-TError TNetRxPackets::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::RxPackets, m);
-
-    return UintMapToString(m, value);
-}
-
-TError TNetRxPackets::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::RxPackets, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TNetRxDrops : public TProperty {
-public:
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetRxDrops() : TProperty(D_NET_RX_DROPS, 0,
-                              "dropped rx packets: "
-                              "<interface>: <packets>;... (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static NetRxDrops;
-
-TError TNetRxDrops::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::RxDrops, m);
-
-    return UintMapToString(m, value);
-}
-
-TError TNetRxDrops::GetIndexed(const std::string &index,
-                                      std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    (void)CurrentContainer->GetStat(ETclassStat::RxDrops, m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
+TNetStat NetTxBytes(D_NET_TX_BYTES, ENetStat::TxBytes, "device tx bytes: <interface>: <bytes>;... (ro)");
+TNetStat NetTxPackets(D_NET_TX_PACKETS, ENetStat::TxPackets, "device tx packets: <interface>: <packets>;... (ro)");
+TNetStat NetTxDrops(D_NET_TX_DROPS, ENetStat::TxDrops, "device tx drops: <interface>: <packets>;... (ro)");
 
 class TIoRead : public TProperty {
 public:

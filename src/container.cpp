@@ -34,7 +34,6 @@ extern "C" {
 #include <fcntl.h>
 #include <sys/fsuid.h>
 #include <sys/stat.h>
-#include <fnmatch.h>
 }
 
 std::mutex ContainersMutex;
@@ -175,10 +174,10 @@ std::string TContainer::GetCwd() const {
     return Cwd;
 }
 
-TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
+TError TContainer::GetNetStat(ENetStat kind, TUintMap &stat) {
     if (Net) {
         auto lock = Net->ScopedLock();
-        return Net->GetTrafficCounters(Id, stat, m);
+        return Net->GetTrafficStat(GetTrafficClass(), kind, stat);
     } else
         return TError(EError::NotSupported, "Network statistics is not available");
 }
@@ -631,6 +630,10 @@ void TContainer::CleanupExpiredChildren() {
     }
 }
 
+uint32_t TContainer::GetTrafficClass() const {
+    return TcHandle(ROOT_TC_MAJOR, Id);
+}
+
 TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     TError error;
 
@@ -693,7 +696,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     if (!IsRoot()) {
         auto netcls = GetCgroup(NetclsSubsystem);
         error = netcls.Set("net_cls.classid",
-                std::to_string(TcHandle(ROOT_TC_MAJOR, Id)));
+                           std::to_string(GetTrafficClass()));
         if (error) {
             L_ERR() << "Can't set classid: " << error << std::endl;
             return error;
@@ -1134,11 +1137,18 @@ void TContainer::FreeResources() {
         if (error)
             L_ERR() << "Cannot free network resources: " << error << std::endl;
 
-        auto lock = Net->ScopedLock();
-
-        error = Net->RemoveTrafficClasses(Id);
+        auto net_lock = Net->ScopedLock();
+        error = Net->DestroyTC(GetTrafficClass());
         if (error)
             L_ERR() << "Can't remove traffic class: " << error << std::endl;
+        net_lock.unlock();
+
+        if (Net != HostNetwork) {
+            net_lock = HostNetwork->ScopedLock();
+            error = HostNetwork->DestroyTC(GetTrafficClass());
+            if (error)
+                L_ERR() << "Can't remove traffic class: " << error << std::endl;
+        }
     }
 
     if (Net && IsRoot()) {
@@ -1932,20 +1942,43 @@ void TContainer::CleanupWaiters() {
 }
 
 TError TContainer::UpdateTrafficClasses() {
-    if (Net) {
-        int parentId;
+    uint32_t handle, parent;
+    TError error;
 
-        if (IsRoot())
-            parentId = 0;
-        else if (Net == Parent->Net)
-            parentId = Parent->Id;
-        else
-            parentId = PORTO_ROOT_CONTAINER_ID;
+    handle = GetTrafficClass();
+    parent = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
 
-        auto net_lock = Net->ScopedLock();
-        return Net->UpdateTrafficClasses(parentId, Id, NetPriority, NetGuarantee, NetLimit);
+    /* link class to closest meta container */
+    for (auto p = Parent; p; p = p->Parent) {
+        if (p->State == EContainerState::Meta) {
+            parent = p->GetTrafficClass();
+            break;
+        }
+        if (p->State == EContainerState::Stopped)
+            return TError::Success();
     }
-    return TError::Success();
+
+    auto net_lock = HostNetwork->ScopedLock();
+    error = HostNetwork->CreateTC(handle, parent, NetPriority,
+                                  NetGuarantee, NetLimit);
+    if (error)
+        return error;
+    net_lock.unlock();
+
+    if (Net && Net != HostNetwork) {
+        parent = TcHandle(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID);
+        for (auto p = Parent; p; p = p->Parent) {
+            if (p->State == EContainerState::Meta && p->Net == Net) {
+                parent = p->GetTrafficClass();
+                break;
+            }
+        }
+        auto net_lock = Net->ScopedLock();
+        error = Net->CreateTC(handle, parent, NetPriority,
+                              NetGuarantee, NetLimit);
+    }
+
+    return error;
 }
 
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
@@ -1997,7 +2030,7 @@ void TContainerWaiter::AddWildcard(std::shared_ptr<TContainerWaiter> &waiter) {
 
 bool TContainerWaiter::MatchWildcard(const std::string &name) {
     for (const auto &wildcard: Wildcards)
-        if (!fnmatch(wildcard.c_str(), name.c_str(), FNM_PATHNAME))
+        if (StringMatch(name, wildcard))
             return true;
     return false;
 }

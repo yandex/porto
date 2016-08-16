@@ -16,9 +16,9 @@ class TCgroup;
 class TSubsystem;
 class TPropertyMap;
 class TValueMap;
-enum class ETclassStat;
 class TEvent;
 class TContainerHolder;
+enum class ENetStat;
 class TNetwork;
 class TNamespaceFd;
 class TNlLink;
@@ -74,7 +74,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ConfigureDevices(std::vector<TDevice> &devices);
     TError ParseNetConfig(struct TNetCfg &NetCfg);
     TError PrepareNetwork(struct TNetCfg &NetCfg);
-    TError ConfigureNetwork(struct TNetCfg &NetCfg);
     TError PrepareTask(struct TTaskEnv *TaskEnv,
                        struct TNetCfg *NetCfg);
     void RemoveKvs();
@@ -175,8 +174,6 @@ public:
     bool IsValid() {
         return State != EContainerState::Unknown;
     }
-    TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
-
     TContainer(std::shared_ptr<TContainerHolder> holder,
                const std::string &name, std::shared_ptr<TContainer> parent,
                int id);
@@ -206,6 +203,9 @@ public:
     std::shared_ptr<TContainer> GetParent() const;
     std::shared_ptr<const TContainer> GetIsolationDomain() const;
     TError OpenNetns(TNamespaceFd &netns) const;
+
+    TError GetNetStat(ENetStat kind, TUintMap &stat);
+    uint32_t GetTrafficClass() const;
 
     pid_t GetPidFor(pid_t pid) const;
     std::vector<pid_t> Processes();

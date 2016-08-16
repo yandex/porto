@@ -39,17 +39,6 @@ public:
     uint64_t GetOffset(const TNlAddr &base) const;
 };
 
-enum class ETclassStat {
-    Packets,
-    Bytes,
-    Drops,
-    Overlimits,
-
-    RxPackets,
-    RxBytes,
-    RxDrops,
-};
-
 uint32_t TcHandle(uint16_t maj, uint16_t min);
 
 class TNl : public std::enable_shared_from_this<TNl>,
