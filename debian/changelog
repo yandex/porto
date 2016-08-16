@@ -1,3 +1,12 @@
+yandex-porto (2.10.3) unstable; urgency=low
+
+  * Revert "network: always recreate htb qdisc at upgrade"
+  * Revert "network: sanitize htb configuration"
+  * Revert "network: set default rate to 1mbit for all htb classes except root"
+  * Revert "test/selftest: fix net_guarantee"
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 16 Aug 2016 14:56:03 +0300
+
 yandex-porto (2.10.2) unstable; urgency=low
 
   * test/selftest: fix net_guarantee
