@@ -28,7 +28,7 @@ static const std::vector<std::pair<std::string, std::vector<std::string>>> propv
     { "io_policy", { "normal", "batch", "invalid" } },
     { "respawn", { "true", "false", "-1" } },
     { "max_respawns", { "-1", "0", "5", } },
-    { "net", {  "host", "none", "macvlan eth0 eth0" } },
+    { "net", {  "inherited", "none", "macvlan eth0 eth0" } },
     { "enable_porto", {  "true", "false", } },
 };
 

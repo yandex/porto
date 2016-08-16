@@ -847,9 +847,8 @@ TError TNetwork::DestroyTC(uint32_t handle) {
 void TNetCfg::Reset() {
     /* default - create new empty netns */
     NewNetNs = true;
-    Host = false;
     Inherited = false;
-    HostIface.clear();
+    Steal.clear();
     MacVlan.clear();
     IpVlan.clear();
     Veth.clear();
@@ -877,24 +876,18 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
 
         std::string type = StringTrim(settings[0]);
 
+        if (type == "host" && settings.size() == 1)
+            type = "inherited";
+
         if (type == "none") {
             none = true;
         } else if (type == "inherited") {
             NewNetNs = false;
             Inherited = true;
-        } else if (type == "host") {
-            THostNetCfg hnet;
-
-            if (settings.size() > 2)
+        } else if (type == "steal" || type == "host" /* legacy */) {
+            if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid net in: " + line);
-
-            if (settings.size() == 1) {
-                NewNetNs = false;
-                Host = true;
-            } else {
-                hnet.Dev = StringTrim(settings[1]);
-                HostIface.push_back(hnet);
-            }
+            Steal.push_back(StringTrim(settings[1]));
         } else if (type == "container") {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid net in: " + line);
@@ -1083,8 +1076,8 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
         }
     }
 
-    int single = none + Host + Inherited;
-    int mixed = HostIface.size() + MacVlan.size() + IpVlan.size() + Veth.size() + L3lan.size();
+    int single = none + Inherited;
+    int mixed = Steal.size() + MacVlan.size() + IpVlan.size() + Veth.size() + L3lan.size();
 
     if (single > 1 || (single == 1 && mixed))
         return TError(EError::InvalidValue, "none/host/inherited can't be mixed with other types");
@@ -1275,12 +1268,12 @@ TError TNetCfg::ConfigureInterfaces() {
     auto target_nl = Net->GetNl();
     TError error;
 
-    for (auto &host : HostIface) {
-        TNlLink link(source_nl, host.Dev);
-        error = link.ChangeNs(host.Dev, NetNs.GetFd());
+    for (auto &dev : Steal) {
+        TNlLink link(source_nl, dev);
+        error = link.ChangeNs(dev, NetNs.GetFd());
         if (error)
             return error;
-        links.emplace_back(host.Dev);
+        links.emplace_back(dev);
     }
 
     for (auto &ipvlan : IpVlan) {
@@ -1403,12 +1396,7 @@ TError TNetCfg::ConfigureInterfaces() {
 TError TNetCfg::PrepareNetwork() {
     TError error;
 
-    if (Inherited) {
-        Net = Parent->Net;
-        error = Parent->OpenNetns(NetNs);
-        if (error)
-            return error;
-    } else if (NewNetNs) {
+    if (NewNetNs) {
         Net = std::make_shared<TNetwork>();
         error = Net->ConnectNew(NetNs);
         if (error)
@@ -1421,7 +1409,7 @@ TError TNetCfg::PrepareNetwork() {
         }
 
         TNetwork::AddNetwork(NetNs.GetInode(), Net);
-    } else if (Host) {
+    } else if (!Parent) {
         Net = std::make_shared<TNetwork>();
         error = Net->Connect();
         if (error)
@@ -1445,6 +1433,11 @@ TError TNetCfg::PrepareNetwork() {
         if (config().network().has_nat_count())
             Net->NatBitmap.Resize(config().network().nat_count());
         HostNetwork = Net;
+    } else if (Inherited) {
+        Net = Parent->Net;
+        error = Parent->OpenNetns(NetNs);
+        if (error)
+            return error;
     } else if (NetNsName != "") {
         error = NetNs.Open("/var/run/netns/" + NetNsName);
         if (error)

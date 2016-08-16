@@ -44,8 +44,6 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
 
     container->Isolate = false;
 
-    container->NetProp = { "host" };
-
     error = container->Start(true);
     if (error)
         return error;

@@ -2236,15 +2236,15 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "net", ""), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", "host"));
+    ExpectApiFailure(api.SetProperty(name, "net", "steal"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", "inherited"));
     ExpectApiSuccess(api.SetProperty(name, "net", "none"));
-    ExpectApiFailure(api.SetProperty(name, "net", "host; macvlan " + link + " " + link), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "host; host veth0"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "host; host " + link), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "net", "host; host"));
-    ExpectApiFailure(api.SetProperty(name, "net", "host; none"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "host; inherited"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "none; macvlan " + link + " " + link), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "inherited; steal veth0"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "none; steal " + link), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "net", "inherited; inherited"));
     ExpectApiFailure(api.SetProperty(name, "net", "inherited; none"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "none; inherited"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "net", "inherited; macvlan " + link + " eth0"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "net", "none; macvlan " + link + " eth0"), EError::InvalidValue);
 
@@ -2262,8 +2262,8 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectEq(linkMap.at("lo").up, true);
     ExpectApiSuccess(api.Stop(name));
 
-    Say() << "Check net=host" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "net", "host"));
+    Say() << "Check net=inherited" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "net", "inherited"));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     ExpectEq(containerLink.size(), hostLink.size());
@@ -2317,9 +2317,9 @@ static void TestNetProperty(Porto::Connection &api) {
     auto mode = StartWaitAndGetData(api, name, "stdout");
     ExpectNeq(mode.find("bridge"), std::string::npos);
     ExpectApiSuccess(api.Stop(name));
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth0 passthru"));
+    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth0 private"));
     mode = StartWaitAndGetData(api, name, "stdout");
-    ExpectNeq(mode.find("passthru"), std::string::npos);
+    ExpectNeq(mode.find("private"), std::string::npos);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check net=macvlan" << std::endl;

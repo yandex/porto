@@ -1135,20 +1135,19 @@ public:
     TError Set(const std::string &net_desc);
     TError Get(std::string &value);
     TNet() : TProperty(P_NET, NET_SET,
-                       "Container network settings: "
-                       "none | "
-                       "inherited | "
-                       "host [interface] | "
-                       "container <name> | "
-                       "macvlan <master> <name> [bridge|private|vepa|passthru] "
-                       "[mtu] [hw] | "
-                       "ipvlan <master> <name> [l2|l3] [mtu] | "
-                       "veth <name> <bridge> [mtu] [hw] | "
-                       "L3 <name> [master] | "
-                       "NAT [name] | "
-                       "MTU <name> <mtu> | "
-                       "autoconf <name> | "
-                       "netns <name>") {}
+ "Container network settings: "
+ "none | "
+ "inherited (default) | "
+ "steal <name> | "
+ "container <name> | "
+ "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
+ "ipvlan <master> <name> [l2|l3] [mtu] | "
+ "veth <name> <bridge> [mtu] [hw] | "
+ "L3 <name> [master] | "
+ "NAT [name] | "
+ "MTU <name> <mtu> | "
+ "autoconf <name> (SLAAC) | "
+ "netns <name>") {}
 } static Net;
 
 TError TNet::Set(const std::string &net_desc) {

@@ -115,11 +115,6 @@ public:
     static void RefreshNetworks();
 };
 
-
-struct THostNetCfg {
-    std::string Dev;
-};
-
 struct TMacVlanNetCfg {
     std::string Master;
     std::string Name;
@@ -173,11 +168,10 @@ struct TNetCfg {
     TCred OwnerCred;
     bool NewNetNs;
     bool Inherited;
-    bool Host;
     bool NetUp;
     bool SaveIp;
     std::string Hostname;
-    std::vector<THostNetCfg> HostIface;
+    std::vector<std::string> Steal;
     std::vector<TMacVlanNetCfg> MacVlan;
     std::vector<TIpVlanNetCfg> IpVlan;
     std::vector<TVethNetCfg> Veth;
