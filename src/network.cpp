@@ -796,12 +796,12 @@ TError TNetwork::DelTC(const TNetworkDevice &dev, uint32_t handle) const {
             rtnl_tc_set_handle(TC_CAST(cls), handles[i]);
             Nl->Dump("del", cls);
             ret = rtnl_class_delete(GetSock(), cls);
-            if (ret < 0)
+            if (ret < 0 && ret != -NLE_OBJ_NOTFOUND)
                 break;
         }
     }
 
-    if (ret < 0)
+    if (ret < 0 && ret != -NLE_OBJ_NOTFOUND)
         error = Nl->Error(ret, "Cannot remove traffic class at " + dev.GetDesc());
 out:
     rtnl_class_put(cls);
