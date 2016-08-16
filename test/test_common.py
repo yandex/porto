@@ -24,3 +24,5 @@ def DropPrivileges():
     if os.getuid() == 0:
         SwitchUser("porto-alice", pwd.getpwnam("porto-alice").pw_uid,
                    grp.getgrnam("porto-alice").gr_gid)
+
+portoctl = os.getcwd() + "/portoctl"
