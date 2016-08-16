@@ -429,11 +429,19 @@ public:
     TContainerValue(P_NET_GUARANTEE,
             "Guaranteed container network bandwidth: <interface>|default <Bps>;... (dynamic)") { }
 
+    TError CheckValue(const TUintMap &value) override {
+        for (auto &kv: value) {
+            if (kv.second > NET_MAX_GUARANTEE)
+                return TError(EError::InvalidValue, "Net guarantee too large");
+        }
+        return TError::Success();
+    }
+
     TUintMap GetDefault() const override {
         auto c = GetContainer();
         uint64_t rate = config().network().default_guarantee();
         if (c->IsRoot())
-            rate = config().network().default_max_guarantee();
+            rate = NET_MAX_GUARANTEE;
         return TUintMap({{ "default", rate }});
     }
 };
@@ -443,6 +451,14 @@ public:
     TNetLimitProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
     TContainerValue(P_NET_LIMIT,
             "Maximum container network bandwidth: <interface>|default <Bps>;... (dynamic)") { }
+
+    TError CheckValue(const TUintMap &value) override {
+        for (auto &kv: value) {
+            if (kv.second > NET_MAX_LIMIT)
+                return TError(EError::InvalidValue, "Net limit too large");
+        }
+        return TError::Success();
+    }
 
     TUintMap GetDefault() const override {
         return TUintMap({{ "default", 0 }});
