@@ -11,7 +11,6 @@
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
-#include "util/namespace.hpp"
 #include "util/log.hpp"
 #include "util/cred.hpp"
 
@@ -978,148 +977,6 @@ public:
         }
 
         return ret;
-    }
-};
-
-class TEnterCmd final : public ICmd {
-public:
-    TEnterCmd(Porto::Connection *api) : ICmd(api, "enter", 1,
-            "[-C] <container> [command]",
-            "execute command in container namespace",
-            "    -C          do not enter cgroups\n"
-            "                default command is /bin/bash\n"
-            ) {}
-
-    void PrintErrno(const string &str) {
-        std::cerr << str << ": " << strerror(errno) << std::endl;
-    }
-
-    TError GetCgMount(const string &subsys, TPath &root) {
-        vector<string> subsystems;
-        TError error = SplitString(subsys, ',', subsystems);
-        if (error)
-            return error;
-
-        std::list<TMount> mounts;
-        error = TPath::ListAllMounts(mounts);
-        if (error)
-            return error;
-
-        for (auto &mnt : mounts) {
-            if (mnt.Type != "cgroup")
-                continue;
-
-            bool found = true;
-            for (auto &ss : subsystems) {
-                if (!mnt.HasOption(ss)) {
-                    found = false;
-                    break;
-                }
-            }
-
-            if (found) {
-                root = mnt.Target;
-                return TError::Success();
-            }
-        }
-
-        return TError(EError::Unknown, "Can't find root for " + subsys);
-    }
-
-    int Execute(TCommandEnviroment *env) final override {
-        bool enterCgroups = true;
-        const auto &args = env->GetOpts({
-            { 'C', false, [&](const char *arg) { enterCgroups = false; } },
-        });
-
-        string cmd;
-        for (size_t i = 1; i < args.size(); ++i) {
-            cmd += args[i];
-            cmd += " ";
-        }
-
-        if (!cmd.length())
-            cmd = "/bin/bash";
-
-        string pidStr;
-        int ret = Api->GetData(args[0], "root_pid", pidStr);
-        if (ret) {
-            PrintError("Can't get container root_pid");
-            return EXIT_FAILURE;
-        }
-
-        int pid;
-        TError error = StringToInt(pidStr, pid);
-        if (error) {
-            PrintError(error, "Can't parse root_pid");
-            return EXIT_FAILURE;
-        }
-
-        if (!pid) {
-            std::cerr << "Task pid in this namespace is unknown." << std::endl;
-            std::cerr << "Try enter parent container or enter from host." << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        TNamespaceSnapshot ns;
-        error = ns.Open(pid);
-        if (error) {
-            PrintError(error, "Can't create namespace snapshot");
-            return EXIT_FAILURE;
-        }
-
-        if (enterCgroups) {
-            map<string, string> cgmap;
-            TError error = GetTaskCgroups(pid, cgmap);
-            if (error) {
-                PrintError(error, "Can't get task cgroups");
-                return EXIT_FAILURE;
-
-            }
-
-            for (auto &cg : cgmap) {
-                TPath root;
-                TError error = GetCgMount(cg.first, root);
-                if (error) {
-                    PrintError(error, "Cannot find cgroup mounts, try option \"-C\"");
-                    return EXIT_FAILURE;
-                }
-
-                error = TPath(root / cg.second / "cgroup.procs").WriteAll(std::to_string(GetPid()));
-                if (error) {
-                    PrintError(error, "Cannot enter cgroups, try option \"-C\"");
-                    return EXIT_FAILURE;
-                }
-            }
-        }
-
-        error = ns.Enter();
-        if (error) {
-            PrintError(error, "Cannot enter namespaces");
-            return EXIT_FAILURE;
-        }
-
-        wordexp_t result;
-        ret = wordexp(cmd.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
-        if (ret) {
-            errno = EINVAL;
-            PrintErrno("Can't parse command");
-            return EXIT_FAILURE;
-        }
-
-        int status = EXIT_FAILURE;
-        int child = fork();
-        if (child) {
-            if (waitpid(child, &status, 0) < 0)
-                PrintErrno("Can't wait child");
-        } else if (child < 0) {
-            PrintErrno("Can't fork");
-        } else {
-            execvp(result.we_wordv[0], (char *const *)result.we_wordv);
-            PrintErrno("Can't execute " + string(result.we_wordv[0]));
-        }
-
-        return status;
     }
 };
 
@@ -2326,7 +2183,6 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TGetDataCmd>();
     handler.RegisterCommand<TGetCmd>();
     handler.RegisterCommand<TRawCmd>();
-    handler.RegisterCommand<TEnterCmd>();
     handler.RegisterCommand<TRunCmd>();
     handler.RegisterCommand<TExecCmd>();
     handler.RegisterCommand<TShellCmd>();

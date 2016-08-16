@@ -48,13 +48,6 @@ _portoctl ()
 	create|destroy|start|stop|restart|pause|resume|wait)
 		_porto_containers
 		;;
-	enter)
-		if [ -z "$ct" ] ; then
-			_porto_containers "-C"
-		else
-			_command_offset $(( $COMP_CWORD + $ct - $cword + 1 ))
-		fi
-		;;
 	exec|run)
 		if [ "$prev" = "-L" ] ; then
 			_porto_layers
