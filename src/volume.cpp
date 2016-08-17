@@ -114,6 +114,16 @@ public:
                 });
     }
 
+    TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        return Volume->GetPath().Mount("porto:" + Volume->Id, "tmpfs",
+                Volume->GetMountFlags() | MS_REMOUNT,
+                { "size=" + std::to_string(space_limit),
+                  "uid=" + std::to_string(Volume->VolumeOwner.Uid),
+                  "gid=" + std::to_string(Volume->VolumeOwner.Gid),
+                  "mode=" + StringFormat("%#o", Volume->VolumePerms)
+                });
+    }
+
     TError Destroy() override {
         TPath path = Volume->GetPath();
         TError error = path.UmountAll();
@@ -1232,9 +1242,9 @@ TError TVolume::Tune(TVolumeHolder &holder, const std::map<std::string,
                      std::string> &properties) {
 
     for (auto &p : properties) {
-        if (p.first != V_INODE_LIMIT ||
-            p.first != V_INODE_GUARANTEE ||
-            p.first != V_SPACE_LIMIT ||
+        if (p.first != V_INODE_LIMIT &&
+            p.first != V_INODE_GUARANTEE &&
+            p.first != V_SPACE_LIMIT &&
             p.first != V_SPACE_GUARANTEE)
             /* Prop not found omitted */
                 return TError(EError::InvalidProperty,
