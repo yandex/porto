@@ -91,7 +91,7 @@ public:
     TCred VolumeOwner;
     TCred CreatorCred;
     TPath CreatorRoot;
-    unsigned VolumePerms = 0755;
+    unsigned VolumePerms = 0775;
 
     TVolume() {
         Statistics->Volumes++;
