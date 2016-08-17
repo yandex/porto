@@ -110,7 +110,7 @@ public:
     static void AddNetwork(ino_t inode, std::shared_ptr<TNetwork> &net);
     static std::shared_ptr<TNetwork> GetNetwork(ino_t inode);
 
-    static void InitializeUnmanagedDevices();
+    static void InitializeConfig();
 
     static void RefreshNetworks();
 };

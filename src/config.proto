@@ -6,8 +6,8 @@ message TCfg {
 		optional bool debug = 2 [deprecated=true];
 		repeated string devices = 3 [deprecated=true];
 		optional uint32 default_prio = 4 [deprecated=true];
-		optional uint32 default_max_guarantee = 5;
-		optional uint32 default_guarantee = 6;
+		optional uint32 default_max_guarantee = 5 [deprecated=true];
+		optional uint32 default_guarantee = 6 [deprecated=true];
 		optional uint32 default_limit = 7 [deprecated=true];
 		message TNetworkAlias {
 			required string iface = 1;
@@ -21,9 +21,14 @@ message TCfg {
 		optional uint32 autoconf_timeout_s = 13;
 		repeated string unmanaged_device = 14;
 		repeated string unmanaged_group = 15;
-		optional uint32 htb_quantum = 16;
-		optional uint32 htb_rbuffer = 17;
-		optional uint32 htb_cbuffer = 18;
+		optional string device_qdisc = 16;
+		optional string device_rate = 17;
+		optional string device_quantum = 18;
+		optional string default_rate = 19;
+		optional string porto_rate = 20;
+		optional string container_rate = 21;
+		optional string htb_rbuffer = 22;
+		optional string htb_cbuffer = 23;
 	}
 
 	message TFileCfg {

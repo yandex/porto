@@ -17,9 +17,6 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().Clear();
 
-    config().mutable_network()->set_default_guarantee(125000); /* 1Mbit */
-    config().mutable_network()->set_default_max_guarantee(2000000000); /* 16Gbit */
-
     config().mutable_slave_pid()->set_path("/run/portod.pid");
     config().mutable_slave_pid()->set_perm(0644);
     config().mutable_slave_log()->set_path("/var/log/portod.log");
@@ -71,6 +68,12 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
     config().mutable_volumes()->set_enable_quota(true);
+
+    config().mutable_network()->set_device_qdisc("default: htb");
+    config().mutable_network()->set_device_rate("default: 2000000000"); /* 16Gbit */
+    config().mutable_network()->set_default_rate("default: 125000");    /* 1Mbit */
+    config().mutable_network()->set_porto_rate("default: 125000");      /* 1Mbit */
+    config().mutable_network()->set_container_rate("default: 125000");  /* 1Mbit */
 
     config().mutable_network()->set_autoconf_timeout_s(120);
 

@@ -552,7 +552,7 @@ static int SlaveMain() {
             return EXIT_FAILURE;
     }
 
-    TNetwork::InitializeUnmanagedDevices();
+    TNetwork::InitializeConfig();
     InitContainerProperties();
 
     ContainersKV = TPath(config().keyval().file().path());

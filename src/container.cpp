@@ -101,11 +101,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     IoLimit = 0;
     IopsLimit = 0;
 
-    NetGuarantee["default"] = IsRoot() ?
-        config().network().default_max_guarantee() :
-        config().network().default_guarantee();
-
-    NetLimit["default"] = 0;
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;

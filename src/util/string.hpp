@@ -7,6 +7,7 @@
 #include "util/error.hpp"
 
 typedef std::map<std::string, uint64_t> TUintMap;
+typedef std::map<std::string, std::string> TStringMap;
 
 TError StringToUint64(const std::string &string, uint64_t &value);
 TError StringToInt64(const std::string &str, int64_t &value);
@@ -44,6 +45,11 @@ std::string StringFormatSize(uint64_t value);
 TError StringToValue(const std::string &str, double &value, std::string &unit);
 TError StringToSize(const std::string &str, uint64_t &size);
 TError StringToCpuValue(const std::string &str, double &value);
+
 TError UintMapToString(const TUintMap &map, std::string &value);
 TError StringToUintMap(const std::string &value, TUintMap &result);
+
+std::string StringMapToString(const TStringMap &map);
+TError StringToStringMap(const std::string &value, TStringMap &result);
+
 int CompareVersions(const std::string &a, const std::string &b);

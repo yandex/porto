@@ -27,6 +27,15 @@ static std::mutex NetworksMutex;
 static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
 
+static TStringMap DeviceQdisc;
+static TUintMap DeviceRate;
+static TUintMap DefaultRate;
+static TUintMap PortoRate;
+static TUintMap ContainerRate;
+static TUintMap DeviceQuantum;
+static TUintMap HTBrbuffer;
+static TUintMap HTBcbuffer;
+
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
@@ -96,7 +105,7 @@ void TNetwork::RefreshNetworks() {
     }
 }
 
-void TNetwork::InitializeUnmanagedDevices() {
+void TNetwork::InitializeConfig() {
     std::ifstream groupCfg("/etc/iproute2/group");
     int id;
     std::string name;
@@ -131,6 +140,23 @@ void TNetwork::InitializeUnmanagedDevices() {
         L_SYS() << "Unmanaged network device group: " << id << ":" << group << std::endl;
         UnmanagedGroups.push_back(id);
     }
+
+    if (config().network().has_device_qdisc())
+        StringToStringMap(config().network().device_qdisc(), DeviceQdisc);
+    if (config().network().has_device_rate())
+        StringToUintMap(config().network().device_rate(), DeviceRate);
+    if (config().network().has_default_rate())
+        StringToUintMap(config().network().default_rate(), DefaultRate);
+    if (config().network().has_porto_rate())
+        StringToUintMap(config().network().porto_rate(), PortoRate);
+    if (config().network().has_container_rate())
+        StringToUintMap(config().network().container_rate(), ContainerRate);
+    if (config().network().has_device_quantum())
+        StringToUintMap(config().network().device_quantum(), DeviceQuantum);
+    if (config().network().has_htb_rbuffer())
+        StringToUintMap(config().network().htb_rbuffer(), HTBrbuffer);
+    if (config().network().has_htb_cbuffer())
+        StringToUintMap(config().network().htb_cbuffer(), HTBcbuffer);
 }
 
 TError TNetwork::Destroy() {
@@ -210,7 +236,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     }
 
     uint64_t prio = NET_DEFAULT_PRIO;
-    uint64_t rate = config().network().default_max_guarantee();
+    uint64_t rate = dev.GetConfig(DeviceRate);
     uint64_t ceil = rate;
 
     error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
@@ -221,8 +247,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         return error;
     }
 
-    rate = config().network().default_guarantee();
-
+    rate = dev.GetConfig(DefaultRate);
     error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
                   TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
                   prio, rate, ceil);
@@ -231,6 +256,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         return error;
     }
 
+    rate = dev.GetConfig(PortoRate);
     error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
                   TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
                   prio, rate, ceil);
@@ -703,8 +729,8 @@ TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t pare
     if (!rate)
         rate = 1;
 
-    /* rate must be <= INT_MAX to prevent overflows in libnl */
-    max_rate = config().network().default_max_guarantee();
+    /* rate must be <= INT32_MAX to prevent overflows in libnl */
+    max_rate = dev.GetConfig(DeviceRate, INT32_MAX);
     if (rate > max_rate)
         rate = max_rate;
 
@@ -716,24 +742,9 @@ TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t pare
     if (!ceil || ceil > max_rate)
         ceil = max_rate;
 
-    quantum = dev.MTU * 2;
-
-    rbuffer = rate / 1000 + dev.MTU;
-    if (rbuffer > INT32_MAX)
-        rbuffer = INT32_MAX;
-
-    cbuffer = ceil / 1000 + dev.MTU;
-    if (cbuffer > INT32_MAX)
-        cbuffer = INT32_MAX;
-
-    if (config().network().has_htb_quantum())
-        quantum = config().network().htb_quantum();
-
-    if (config().network().has_htb_rbuffer())
-        rbuffer = config().network().htb_rbuffer();
-
-    if (config().network().has_htb_cbuffer())
-        cbuffer = config().network().htb_cbuffer();
+    quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2);
+    rbuffer = dev.GetConfig(HTBrbuffer, dev.MTU * 10);
+    cbuffer = dev.GetConfig(HTBcbuffer, dev.MTU * 10);
 
     rtnl_htb_set_ceil(cls, ceil);
     rtnl_htb_set_prio(cls, prio);
@@ -815,8 +826,16 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
     for (auto &dev: Devices) {
         if (!dev.Managed)
             continue;
+        uint64_t def;
+        if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
+            def = dev.GetConfig(DeviceRate);
+        else if (handle == TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID))
+            def = dev.GetConfig(PortoRate);
+        else
+            def = dev.GetConfig(ContainerRate);
         error = AddTC(dev, handle, parent, dev.GetConfig(prio),
-                      dev.GetConfig(rate), dev.GetConfig(ceil));
+                      dev.GetConfig(rate, def),
+                      dev.GetConfig(ceil, dev.GetConfig(DeviceRate)));
         if (error) {
             L_WRN() << "Cannot add tc class: " << error << std::endl;
             if (!result)

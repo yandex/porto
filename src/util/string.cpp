@@ -386,6 +386,38 @@ TError StringToUintMap(const std::string &value, TUintMap &result) {
     return TError::Success();
 }
 
+std::string StringMapToString(const TStringMap &map) {
+    std::stringstream str;
+
+    for (auto kv : map) {
+        if (str.str().length())
+            str << "; ";
+        str << kv.first << ": " << kv.second;
+    }
+
+    return str.str();
+}
+
+TError StringToStringMap(const std::string &value, TStringMap &result) {
+    std::vector<std::string> lines;
+    TError error;
+
+    SplitEscapedString(value, lines, ';');
+    for (auto &line : lines) {
+        std::vector<std::string> nameval;
+
+        SplitEscapedString(line, nameval, ':');
+        if (nameval.size() != 2)
+            return TError(EError::InvalidValue, "Invalid format");
+
+        std::string key = StringTrim(nameval[0]);
+        std::string val = StringTrim(nameval[1]);
+        result[key] = val;
+    }
+
+    return TError::Success();
+}
+
 int CompareVersions(const std::string &a, const std::string &b) {
     return strverscmp(a.c_str(), b.c_str());
 }
