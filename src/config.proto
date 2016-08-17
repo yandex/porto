@@ -29,6 +29,9 @@ message TCfg {
 		optional string container_rate = 21;
 		optional string htb_rbuffer = 22;
 		optional string htb_cbuffer = 23;
+		optional string default_qdisc = 24;
+		optional string default_qdisc_limit = 25;
+		optional string default_qdisc_quantum = 26;
 	}
 
 	message TFileCfg {

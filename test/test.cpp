@@ -349,26 +349,6 @@ bool TcClassExist(uint32_t handle) {
     return nr == links.size();
 }
 
-bool TcQdiscExist(uint32_t handle) {
-    size_t nr = 0;
-    for (auto &link : links) {
-        TNlHtb qdisc(-1, handle);
-        if (qdisc.Exists(*link))
-            nr++;
-    }
-    return nr == links.size();
-}
-
-bool TcCgFilterExist(uint32_t parent, uint32_t handle) {
-    size_t nr = 0;
-    for (auto &link : links) {
-        TNlCgFilter filter(parent, handle);
-        if (filter.Exists(*link))
-            nr++;
-    }
-    return nr == links.size();
-}
-
 int WordCount(const std::string &path, const std::string &word) {
     int nr = 0;
 

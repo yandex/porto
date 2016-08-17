@@ -36,6 +36,10 @@ static TUintMap DeviceQuantum;
 static TUintMap HTBrbuffer;
 static TUintMap HTBcbuffer;
 
+static TStringMap DefaultQdisc;
+static TUintMap DefaultQdiscLimit;
+static TUintMap DefaultQdiscQuantum;
+
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
@@ -66,6 +70,17 @@ std::string TNetworkDevice::GetDesc(void) const {
 }
 
 uint64_t TNetworkDevice::GetConfig(const TUintMap &cfg, uint64_t def) const {
+    for (auto &it: cfg) {
+        if (StringMatch(Name, it.first))
+            return it.second;
+    }
+    auto it = cfg.find("default");
+    if (it != cfg.end())
+        return it->second;
+    return def;
+}
+
+std::string TNetworkDevice::GetConfig(const TStringMap &cfg, std::string def) const {
     for (auto &it: cfg) {
         if (StringMatch(Name, it.first))
             return it.second;
@@ -157,6 +172,13 @@ void TNetwork::InitializeConfig() {
         StringToUintMap(config().network().htb_rbuffer(), HTBrbuffer);
     if (config().network().has_htb_cbuffer())
         StringToUintMap(config().network().htb_cbuffer(), HTBcbuffer);
+
+    if (config().network().has_default_qdisc())
+        StringToStringMap(config().network().default_qdisc(), DefaultQdisc);
+    if (config().network().has_default_qdisc_limit())
+        StringToUintMap(config().network().default_qdisc_limit(), DefaultQdiscLimit);
+    if (config().network().has_default_qdisc_quantum())
+        StringToUintMap(config().network().default_qdisc_quantum(), DefaultQdiscQuantum);
 }
 
 TError TNetwork::Destroy() {
@@ -177,8 +199,8 @@ TError TNetwork::Destroy() {
             continue;
         }
 
-        TNlHtb htb(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
-        error = htb.Remove(link);
+        TNlQdisc qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+        error = qdisc.Delete(link);
         if (error)
             L_ERR() << "Cannot remove htb: " << error << std::endl;
     }
@@ -214,11 +236,14 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         return error;
     }
 
-    TNlHtb qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+    TNlQdisc qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+    qdisc.Kind = dev.GetConfig(DeviceQdisc);
+    qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
+    qdisc.Quantum = 10;
 
-    if (!qdisc.Valid(link, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR))) {
-        (void)qdisc.Remove(link);
-        TError error = qdisc.Create(link, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR));
+    if (!qdisc.Check(link)) {
+        (void)qdisc.Delete(link);
+        error = qdisc.Create(link);
         if (error) {
             L_ERR() << "Cannot create root qdisc: " << error << std::endl;
             return error;
@@ -254,6 +279,19 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     if (error) {
         L_ERR() << "Can't create default tclass: " << error << std::endl;
         return error;
+    }
+
+    if (!ManagedNamespace) {
+        TNlQdisc defq(TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
+                      TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR));
+        defq.Kind = dev.GetConfig(DefaultQdisc);
+        defq.Limit = dev.GetConfig(DefaultQdiscLimit);
+        defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+        if (!defq.Check(link)) {
+            error = defq.Create(link);
+            if (error)
+                return error;
+        }
     }
 
     rate = dev.GetConfig(PortoRate);

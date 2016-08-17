@@ -3025,25 +3025,6 @@ static void TestRoot(Porto::Connection &api) {
         TestDataMap(api, porto_root, "io_ops", 2);
     }
 
-    if (NetworkEnabled()) {
-        uint32_t defClass = TcHandle(1, 2);
-        uint32_t rootClass = TcHandle(1, 1);
-        uint32_t portoRootClass = TcHandle(1, 3);
-        uint32_t nextClass = TcHandle(1, 4);
-
-        uint32_t rootQdisc = TcHandle(1, 0);
-        uint32_t nextQdisc = TcHandle(2, 0);
-
-        ExpectEq(TcQdiscExist(rootQdisc), true);
-        ExpectEq(TcQdiscExist(nextQdisc), false);
-        ExpectEq(TcClassExist(defClass), true);
-        ExpectEq(TcClassExist(rootClass), true);
-        ExpectEq(TcClassExist(portoRootClass), true);
-        ExpectEq(TcClassExist(nextClass), false);
-        ExpectEq(TcCgFilterExist(rootQdisc, 1), true);
-        ExpectEq(TcCgFilterExist(rootQdisc, 2), false);
-    }
-
     Say() << "Check root properties & data" << std::endl;
     for (auto p : properties)
         ExpectApiSuccess(api.GetProperty(root, p, v));

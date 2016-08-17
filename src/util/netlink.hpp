@@ -126,15 +126,18 @@ public:
     bool Exists(const TNlLink &link);
 };
 
-class TNlHtb : public TNonCopyable {
-    const uint32_t Parent, Handle;
-
+class TNlQdisc {
 public:
-    TNlHtb(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
-    TError Create(const TNlLink &link, uint32_t defaultClass);
-    TError Remove(const TNlLink &link);
-    bool Exists(const TNlLink &link);
-    bool Valid(const TNlLink &link, uint32_t defaultClass);
+    const uint32_t Parent, Handle;
+    std::string Kind;
+    uint32_t Default = 0;
+    uint32_t Limit = 0;
+    uint32_t Quantum = 0;
+    TNlQdisc(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
+
+    TError Create(const TNlLink &link);
+    TError Delete(const TNlLink &link);
+    bool Check(const TNlLink &link);
 };
 
 class TNlCgFilter : public TNonCopyable {

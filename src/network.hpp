@@ -44,6 +44,7 @@ public:
 
     std::string GetDesc(void) const;
     uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0) const;
+    std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
 };
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,

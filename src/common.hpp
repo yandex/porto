@@ -21,9 +21,10 @@ private:
     TNonCopyable& operator= (TNonCopyable const&&) = delete;
 };
 
-constexpr uint64_t ROOT_TC_MAJOR = 1;
-constexpr uint64_t ROOT_TC_MINOR = 0;
-constexpr uint64_t DEFAULT_TC_MINOR = 2;
+constexpr int ROOT_TC_MAJOR = 1;
+constexpr int ROOT_TC_MINOR = 0;
+constexpr int DEFAULT_TC_MINOR = 2;
+constexpr int DEFAULT_TC_MAJOR = 2;
 
 constexpr auto NET_DEFAULT_PRIO = 3;
 

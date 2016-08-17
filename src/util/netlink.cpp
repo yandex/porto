@@ -17,6 +17,8 @@ extern "C" {
 #include <netlink/route/cls/cgroup.h>
 #include <netlink/route/qdisc.h>
 #include <netlink/route/qdisc/htb.h>
+#include <netlink/route/qdisc/sfq.h>
+#include <netlink/route/qdisc/fq_codel.h>
 
 #include <netlink/route/rtnl.h>
 #include <netlink/route/link.h>
@@ -669,10 +671,13 @@ bool TNlClass::Exists(const TNlLink &link) {
     return !GetProperties(link, prio, rate, ceil);
 }
 
-TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
+TError TNlQdisc::Create(const TNlLink &link) {
     TError error = TError::Success();
     int ret;
     struct rtnl_qdisc *qdisc;
+
+    if (Kind == "")
+        return Delete(link);
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
@@ -682,20 +687,38 @@ TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
     rtnl_tc_set_handle(TC_CAST(qdisc), Handle);
 
-    ret = rtnl_tc_set_kind(TC_CAST(qdisc), "htb");
+    ret = rtnl_tc_set_kind(TC_CAST(qdisc), Kind.c_str());
     if (ret < 0) {
-        error = TError(EError::Unknown, std::string("Unable to set qdisc type: ") + nl_geterror(ret));
+        error = link.Error(ret, "Cannot to set qdisc type: " + Kind);
         goto free_qdisc;
     }
 
-    rtnl_htb_set_defcls(qdisc, defaultClass);
-    rtnl_htb_set_rate2quantum(qdisc, 10);
+    if (Kind == "htb") {
+        if (Default)
+            rtnl_htb_set_defcls(qdisc, Default);
+        if (Quantum)
+            rtnl_htb_set_rate2quantum(qdisc, Quantum);
+    }
 
-    link.Dump("add", qdisc);
+    if (Kind == "sfq") {
+        if (Limit)
+            rtnl_sfq_set_limit(qdisc, Limit);
+        if (Quantum)
+            rtnl_sfq_set_quantum(qdisc, Quantum);
+    }
 
-    ret = rtnl_qdisc_add(link.GetSock(), qdisc, NLM_F_CREATE);
+    if (Kind == "fq_codel") {
+        if (Limit)
+            rtnl_qdisc_fq_codel_set_limit(qdisc, Limit);
+        if (Quantum)
+            rtnl_qdisc_fq_codel_set_quantum(qdisc, Quantum);
+    }
+
+    link.Dump("create", qdisc);
+
+    ret = rtnl_qdisc_add(link.GetSock(), qdisc, NLM_F_CREATE  | NLM_F_REPLACE);
     if (ret < 0)
-        error = TError(EError::Unknown, std::string("Unable to add qdisc: ") + nl_geterror(ret));
+        error = link.Error(ret, "Cannot create qdisc");
 
 free_qdisc:
     rtnl_qdisc_put(qdisc);
@@ -703,8 +726,9 @@ free_qdisc:
     return error;
 }
 
-TError TNlHtb::Remove(const TNlLink &link) {
+TError TNlQdisc::Delete(const TNlLink &link) {
     struct rtnl_qdisc *qdisc;
+    int ret;
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
@@ -714,64 +738,55 @@ TError TNlHtb::Remove(const TNlLink &link) {
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
 
     link.Dump("remove", qdisc);
-
-    rtnl_qdisc_delete(link.GetSock(), qdisc);
+    ret = rtnl_qdisc_delete(link.GetSock(), qdisc);
     rtnl_qdisc_put(qdisc);
+    if (ret < 0)
+        return link.Error(ret, "Cannot remove qdisc");
 
     return TError::Success();
 }
 
-bool TNlHtb::Exists(const TNlLink &link) {
-    int ret;
+bool TNlQdisc::Check(const TNlLink &link) {
     struct nl_cache *qdiscCache;
-    bool exists;
-
-    ret = rtnl_qdisc_alloc_cache(link.GetSock(), &qdiscCache);
-    if (ret < 0)
-        return false;
-
-    link.LogCache(qdiscCache);
-
-    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
-    exists = qdisc != nullptr;
-    rtnl_qdisc_put(qdisc);
-    nl_cache_free(qdiscCache);
-
-    return exists;
-}
-
-bool TNlHtb::Valid(const TNlLink &link, uint32_t defaultClass) {
+    bool result = false;
     int ret;
-    struct nl_cache *qdiscCache;
-    bool valid = true;
 
     ret = rtnl_qdisc_alloc_cache(link.GetSock(), &qdiscCache);
     if (ret < 0) {
-        L_ERR() << "can't alloc qdisc cache" << std::endl;
+        L_ERR() <<  link.Error(ret, "cannot alloc qdisc cache") << std::endl;
         return false;
     }
 
     struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
-    if (qdisc) {
-        link.Dump("found", qdisc);
-        if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) != link.GetIndex())
-            valid = false;
-        else if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
-            valid = false;
-        else if (rtnl_tc_get_handle(TC_CAST(qdisc)) != Handle)
-            valid = false;
-        else if (rtnl_tc_get_kind(TC_CAST(qdisc)) != std::string("htb"))
-            valid = false;
-        else if (TC_H_MIN(rtnl_htb_get_defcls(qdisc)) != TC_H_MIN(defaultClass))
-            valid = false;
-    } else {
-        valid = false;
+    if (!qdisc) {
+        result = Kind == "";
+        goto out;
     }
 
+    link.Dump("found", qdisc);
+    if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) != link.GetIndex())
+        goto out;
+
+    if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
+        goto out;
+
+    if (rtnl_tc_get_handle(TC_CAST(qdisc)) != Handle)
+        goto out;
+
+    if (rtnl_tc_get_kind(TC_CAST(qdisc)) != Kind)
+        goto out;
+
+    if (Kind == "htb") {
+        if (rtnl_htb_get_defcls(qdisc) != Default)
+            goto out;
+    }
+
+    result = true;
+
+out:
     rtnl_qdisc_put(qdisc);
     nl_cache_free(qdiscCache);
-
-    return valid;
+    return result;
 }
 
 TError TNlCgFilter::Create(const TNlLink &link) {
