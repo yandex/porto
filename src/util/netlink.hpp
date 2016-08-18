@@ -53,13 +53,14 @@ public:
     TError Connect();
     void Disconnect();
 
-    struct nl_sock *GetSock() { return Sock; }
+    struct nl_sock *GetSock() const { return Sock; }
 
     int GetFd();
     TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all);
 
     static TError Error(int nl_err, const std::string &desc);
-    void Dump(const std::string &prefix, void *obj);
+    void Dump(const std::string &prefix, void *obj) const;
+    void DumpCache(struct nl_cache *cache) const;
 
     TError ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add);
 };
@@ -112,8 +113,6 @@ public:
 
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };
-
-    void LogCache(struct nl_cache *cache) const;
 };
 
 class TNlClass : public TNonCopyable {
@@ -128,26 +127,30 @@ public:
 
 class TNlQdisc {
 public:
+    const int Index;
     const uint32_t Parent, Handle;
     std::string Kind;
     uint32_t Default = 0;
     uint32_t Limit = 0;
     uint32_t Quantum = 0;
-    TNlQdisc(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
+    TNlQdisc(int index, uint32_t parent, uint32_t handle) :
+        Index(index), Parent(parent), Handle(handle) {}
 
-    TError Create(const TNlLink &link);
-    TError Delete(const TNlLink &link);
-    bool Check(const TNlLink &link);
+    TError Create(const TNl &nl);
+    TError Delete(const TNl &nl);
+    bool Check(const TNl &nl);
 };
 
 class TNlCgFilter : public TNonCopyable {
+    const int Index;
     const int FilterPrio = 10;
     const char *FilterType = "cgroup";
     const uint32_t Parent, Handle;
 
 public:
-    TNlCgFilter(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
-    TError Create(const TNlLink &link);
-    bool Exists(const TNlLink &link);
-    TError Remove(const TNlLink &link);
+    TNlCgFilter(int index, uint32_t parent, uint32_t handle) :
+        Index(index), Parent(parent), Handle(handle) {}
+    TError Create(const TNl &nl);
+    bool Exists(const TNl &nl);
+    TError Delete(const TNl &nl);
 };

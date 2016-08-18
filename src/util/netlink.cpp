@@ -16,6 +16,7 @@ extern "C" {
 #include <netlink/route/classifier.h>
 #include <netlink/route/cls/cgroup.h>
 #include <netlink/route/qdisc.h>
+#include <netlink/route/qdisc/fifo.h>
 #include <netlink/route/qdisc/htb.h>
 #include <netlink/route/qdisc/sfq.h>
 #include <netlink/route/qdisc/fq_codel.h>
@@ -38,7 +39,7 @@ TError TNl::Error(int nl_err, const std::string &desc) {
     return TError(EError::Unknown, desc + ": " + std::string(nl_geterror(nl_err)));
 }
 
-void TNl::Dump(const std::string &prefix, void *obj) {
+void TNl::Dump(const std::string &prefix, void *obj) const {
     std::stringstream ss;
     struct nl_dump_params dp = {};
 
@@ -619,7 +620,7 @@ bool TNlLink::ValidMacAddr(const std::string &hw) {
     return ether_aton(hw.c_str()) != nullptr;
 }
 
-void TNlLink::LogCache(struct nl_cache *cache) const {
+void TNl::DumpCache(struct nl_cache *cache) const {
 
     if (!Verbose)
         return;
@@ -633,10 +634,7 @@ void TNlLink::LogCache(struct nl_cache *cache) const {
     auto &str = L();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
-    if (Link)
-        str << "netlink " << rtnl_link_get_name(Link) << " cache: ";
-    else
-        str << "netlink cache: ";
+    str << "netlink cache: ";
     nl_cache_dump(cache, &dp);
 }
 
@@ -671,26 +669,31 @@ bool TNlClass::Exists(const TNlLink &link) {
     return !GetProperties(link, prio, rate, ceil);
 }
 
-TError TNlQdisc::Create(const TNlLink &link) {
+TError TNlQdisc::Create(const TNl &nl) {
     TError error = TError::Success();
     int ret;
     struct rtnl_qdisc *qdisc;
 
     if (Kind == "")
-        return Delete(link);
+        return Delete(nl);
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
         return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
-    rtnl_tc_set_ifindex(TC_CAST(qdisc), link.GetIndex());
+    rtnl_tc_set_ifindex(TC_CAST(qdisc), Index);
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
     rtnl_tc_set_handle(TC_CAST(qdisc), Handle);
 
     ret = rtnl_tc_set_kind(TC_CAST(qdisc), Kind.c_str());
     if (ret < 0) {
-        error = link.Error(ret, "Cannot to set qdisc type: " + Kind);
+        error = nl.Error(ret, "Cannot to set qdisc type: " + Kind);
         goto free_qdisc;
+    }
+
+    if (Kind == "bfifo" || Kind == "pfifo") {
+        if (Limit)
+            rtnl_qdisc_fifo_set_limit(qdisc, Limit);
     }
 
     if (Kind == "htb") {
@@ -714,11 +717,11 @@ TError TNlQdisc::Create(const TNlLink &link) {
             rtnl_qdisc_fq_codel_set_quantum(qdisc, Quantum);
     }
 
-    link.Dump("create", qdisc);
+    nl.Dump("create", qdisc);
 
-    ret = rtnl_qdisc_add(link.GetSock(), qdisc, NLM_F_CREATE  | NLM_F_REPLACE);
+    ret = rtnl_qdisc_add(nl.GetSock(), qdisc, NLM_F_CREATE  | NLM_F_REPLACE);
     if (ret < 0)
-        error = link.Error(ret, "Cannot create qdisc");
+        error = nl.Error(ret, "Cannot create qdisc");
 
 free_qdisc:
     rtnl_qdisc_put(qdisc);
@@ -726,7 +729,7 @@ free_qdisc:
     return error;
 }
 
-TError TNlQdisc::Delete(const TNlLink &link) {
+TError TNlQdisc::Delete(const TNl &nl) {
     struct rtnl_qdisc *qdisc;
     int ret;
 
@@ -734,37 +737,37 @@ TError TNlQdisc::Delete(const TNlLink &link) {
     if (!qdisc)
         return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
-    rtnl_tc_set_ifindex(TC_CAST(qdisc), link.GetIndex());
+    rtnl_tc_set_ifindex(TC_CAST(qdisc), Index);
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
 
-    link.Dump("remove", qdisc);
-    ret = rtnl_qdisc_delete(link.GetSock(), qdisc);
+    nl.Dump("remove", qdisc);
+    ret = rtnl_qdisc_delete(nl.GetSock(), qdisc);
     rtnl_qdisc_put(qdisc);
     if (ret < 0)
-        return link.Error(ret, "Cannot remove qdisc");
+        return nl.Error(ret, "Cannot remove qdisc");
 
     return TError::Success();
 }
 
-bool TNlQdisc::Check(const TNlLink &link) {
+bool TNlQdisc::Check(const TNl &nl) {
     struct nl_cache *qdiscCache;
     bool result = false;
     int ret;
 
-    ret = rtnl_qdisc_alloc_cache(link.GetSock(), &qdiscCache);
+    ret = rtnl_qdisc_alloc_cache(nl.GetSock(), &qdiscCache);
     if (ret < 0) {
-        L_ERR() <<  link.Error(ret, "cannot alloc qdisc cache") << std::endl;
+        L_ERR() <<  nl.Error(ret, "cannot alloc qdisc cache") << std::endl;
         return false;
     }
 
-    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
+    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, Index, Handle);
     if (!qdisc) {
         result = Kind == "";
         goto out;
     }
 
-    link.Dump("found", qdisc);
-    if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) != link.GetIndex())
+    nl.Dump("found", qdisc);
+    if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) != Index)
         goto out;
 
     if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
@@ -789,14 +792,14 @@ out:
     return result;
 }
 
-TError TNlCgFilter::Create(const TNlLink &link) {
+TError TNlCgFilter::Create(const TNl &nl) {
     TError error = TError::Success();
     struct nl_msg *msg;
     int ret;
 	struct tcmsg tchdr;
 
     tchdr.tcm_family = AF_UNSPEC;
-    tchdr.tcm_ifindex = link.GetIndex();
+    tchdr.tcm_ifindex = Index;
     tchdr.tcm_handle = Handle;
     tchdr.tcm_parent = Parent;
 	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_ALL));
@@ -823,15 +826,15 @@ TError TNlCgFilter::Create(const TNlLink &link) {
 		goto free_msg;
     }
 
-    L() << "netlink " << link.GetDesc()
+    L() << "netlink " << Index
         << ": add tfilter id 0x" << std::hex << Handle
         << " parent 0x" << Parent << std::dec  << std::endl;
 
-    ret = nl_send_sync(link.GetSock(), msg);
+    ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
         error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 
-    if (!Exists(link))
+    if (!Exists(nl))
         error = TError(EError::Unknown, "BUG: created filter doesn't exist");
 
     return error;
@@ -842,23 +845,24 @@ free_msg:
     return error;
 }
 
-bool TNlCgFilter::Exists(const TNlLink &link) {
+bool TNlCgFilter::Exists(const TNl &nl) {
     int ret;
     struct nl_cache *clsCache;
 
-    ret = rtnl_cls_alloc_cache(link.GetSock(), link.GetIndex(), Parent, &clsCache);
+    ret = rtnl_cls_alloc_cache(nl.GetSock(), Index, Parent, &clsCache);
     if (ret < 0) {
         L_ERR() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
         return false;
     }
 
-    link.LogCache(clsCache);
+    nl.DumpCache(clsCache);
 
     struct CgFilterIter {
         uint32_t parent;
         uint32_t handle;
         bool exists;
     } data = { Parent, Handle, false };
+
     nl_cache_foreach(clsCache, [](struct nl_object *obj, void *data) {
                      CgFilterIter *p = (CgFilterIter *)data;
                      if (rtnl_tc_get_handle(TC_CAST(obj)) == p->handle &&
@@ -870,7 +874,7 @@ bool TNlCgFilter::Exists(const TNlLink &link) {
     return data.exists;
 }
 
-TError TNlCgFilter::Remove(const TNlLink &link) {
+TError TNlCgFilter::Delete(const TNl &nl) {
     TError error = TError::Success();
     struct rtnl_cls *cls;
     int ret;
@@ -879,7 +883,7 @@ TError TNlCgFilter::Remove(const TNlLink &link) {
     if (!cls)
         return TError(EError::Unknown, std::string("Unable to allocate filter object"));
 
-    rtnl_tc_set_ifindex(TC_CAST(cls), link.GetIndex());
+    rtnl_tc_set_ifindex(TC_CAST(cls), Index);
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
@@ -891,11 +895,11 @@ TError TNlCgFilter::Remove(const TNlLink &link) {
     rtnl_cls_set_protocol(cls, 0);
     rtnl_tc_set_parent(TC_CAST(cls), Parent);
 
-    link.Dump("remove", cls);
+    nl.Dump("remove", cls);
 
-    ret = rtnl_cls_delete(link.GetSock(), cls, 0);
+    ret = rtnl_cls_delete(nl.GetSock(), cls, 0);
     if (ret < 0)
-        error = TError(EError::Unknown, std::string("Unable to remove filter: ") + nl_geterror(ret));
+        error = nl.Error(ret, "Cannot to remove filter");
 
 free_cls:
     rtnl_cls_put(cls);

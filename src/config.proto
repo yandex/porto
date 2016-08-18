@@ -33,6 +33,8 @@ message TCfg {
 		optional string default_qdisc = 24;
 		optional string default_qdisc_limit = 25;
 		optional string default_qdisc_quantum = 26;
+		optional string container_qdisc = 28;
+		optional string container_qdisc_limit = 29;
 	}
 
 	message TFileCfg {

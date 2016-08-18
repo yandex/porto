@@ -75,6 +75,7 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_container_rate("default: 125000");  /* 1Mbit */
     config().mutable_network()->set_default_qdisc("default: sfq");
     config().mutable_network()->set_default_qdisc_limit("default: 10000");
+    config().mutable_network()->set_container_qdisc("default: bfifo");
 
     config().mutable_network()->set_autoconf_timeout_s(120);
 

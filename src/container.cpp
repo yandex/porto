@@ -1954,8 +1954,8 @@ TError TContainer::UpdateTrafficClasses() {
     }
 
     auto net_lock = HostNetwork->ScopedLock();
-    error = HostNetwork->CreateTC(handle, parent, NetPriority,
-                                  NetGuarantee, NetLimit);
+    error = HostNetwork->CreateTC(handle, parent, !IsMeta(),
+                                  NetPriority, NetGuarantee, NetLimit);
     if (error)
         return error;
     net_lock.unlock();
@@ -1969,8 +1969,8 @@ TError TContainer::UpdateTrafficClasses() {
             }
         }
         auto net_lock = Net->ScopedLock();
-        error = Net->CreateTC(handle, parent, NetPriority,
-                              NetGuarantee, NetLimit);
+        error = Net->CreateTC(handle, parent, !IsMeta(),
+                              NetPriority, NetGuarantee, NetLimit);
     }
 
     return error;

@@ -174,6 +174,9 @@ public:
     bool IsValid() {
         return State != EContainerState::Unknown;
     }
+    bool IsMeta() {
+        return !Command.size();
+    }
     TContainer(std::shared_ptr<TContainerHolder> holder,
                const std::string &name, std::shared_ptr<TContainer> parent,
                int id);

@@ -30,16 +30,19 @@ static std::vector<int> UnmanagedGroups;
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
 static TUintMap DeviceCeil;
-static TUintMap DefaultRate;
 static TUintMap PortoRate;
-static TUintMap ContainerRate;
 static TUintMap DeviceQuantum;
 static TUintMap HTBrbuffer;
 static TUintMap HTBcbuffer;
 
+static TUintMap DefaultRate;
 static TStringMap DefaultQdisc;
 static TUintMap DefaultQdiscLimit;
 static TUintMap DefaultQdiscQuantum;
+
+static TUintMap ContainerRate;
+static TStringMap ContainerQdisc;
+static TUintMap ContainerQdiscLimit;
 
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
@@ -185,6 +188,11 @@ void TNetwork::InitializeConfig() {
         StringToUintMap(config().network().default_qdisc_limit(), DefaultQdiscLimit);
     if (config().network().has_default_qdisc_quantum())
         StringToUintMap(config().network().default_qdisc_quantum(), DefaultQdiscQuantum);
+
+    if (config().network().has_container_qdisc())
+        StringToStringMap(config().network().container_qdisc(), ContainerQdisc);
+    if (config().network().has_container_qdisc_limit())
+        StringToUintMap(config().network().container_qdisc_limit(), ContainerQdiscLimit);
 }
 
 TError TNetwork::Destroy() {
@@ -194,19 +202,11 @@ TError TNetwork::Destroy() {
     L_ACT() << "Removing network..." << std::endl;
 
     for (auto &dev: Devices) {
-        TNlLink link(Nl, dev.Name);
-
         if (!dev.Managed)
             continue;
 
-        error = link.Load();
-        if (error) {
-            L_ERR() << "Cannot open link: " << error << std::endl;
-            continue;
-        }
-
-        TNlQdisc qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
-        error = qdisc.Delete(link);
+        TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+        error = qdisc.Delete(*Nl);
         if (error)
             L_ERR() << "Cannot remove htb: " << error << std::endl;
     }
@@ -258,32 +258,24 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
 
     L() << "Setup queue for network device " << dev.GetDesc() << std::endl;
 
-    TNlLink link(Nl, dev.Name);
-    error = link.Load();
-    if (error) {
-        L_ERR() << "Cannot load link: " << error << std::endl;
-        return error;
-    }
-
-    TNlQdisc qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+    TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
     qdisc.Kind = dev.GetConfig(DeviceQdisc);
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
 
-    if (!qdisc.Check(link)) {
-        (void)qdisc.Delete(link);
-        error = qdisc.Create(link);
+    if (!qdisc.Check(*Nl)) {
+        (void)qdisc.Delete(*Nl);
+        error = qdisc.Create(*Nl);
         if (error) {
             L_ERR() << "Cannot create root qdisc: " << error << std::endl;
             return error;
         }
     }
 
-    TNlCgFilter filter(TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR), 1);
-    if (filter.Exists(link))
-        (void)filter.Remove(link);
+    TNlCgFilter filter(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR), 1);
+    (void)filter.Delete(*Nl);
 
-    error = filter.Create(link);
+    error = filter.Create(*Nl);
     if (error) {
         L_ERR() << "Can't create tc filter: " << error << std::endl;
         return error;
@@ -315,13 +307,13 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     }
 
     if (!ManagedNamespace) {
-        TNlQdisc defq(TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
+        TNlQdisc defq(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
                       TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR));
         defq.Kind = dev.GetConfig(DefaultQdisc);
         defq.Limit = dev.GetConfig(DefaultQdiscLimit);
         defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
-        if (!defq.Check(link)) {
-            error = defq.Create(link);
+        if (!defq.Check(*Nl)) {
+            error = defq.Create(*Nl);
             if (error)
                 return error;
         }
@@ -890,8 +882,8 @@ out:
     return error;
 }
 
-TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
-                          TUintMap &rate, TUintMap &ceil) {
+TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
+                          TUintMap &prio, TUintMap &rate, TUintMap &ceil) {
     TError error, result;
 
     for (auto &dev: Devices) {
@@ -912,6 +904,19 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
             if (!result)
                 result = error;
         }
+
+        if (leaf) {
+            TNlQdisc ctq(dev.Index, handle,
+                         TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
+            ctq.Kind = dev.GetConfig(ContainerQdisc);
+            ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
+            error = ctq.Create(*Nl);
+            if (error) {
+                L_WRN() << "Cannot add container tc qdisc: " << error << std::endl;
+                if (!result)
+                    result = error;
+            }
+        }
     }
 
     return result;
@@ -923,6 +928,11 @@ TError TNetwork::DestroyTC(uint32_t handle) {
     for (auto &dev: Devices) {
         if (!dev.Managed)
             continue;
+
+        TNlQdisc ctq(dev.Index, handle,
+                     TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
+        (void)ctq.Delete(*Nl);
+
         error = DelTC(dev, handle);
         if (error) {
             L_WRN() << "Cannot del tc class: " << error << std::endl;

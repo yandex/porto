@@ -92,8 +92,8 @@ public:
                  uint64_t prio, uint64_t rate, uint64_t ceil) const;
     TError DelTC(const TNetworkDevice &dev, uint32_t handle) const;
 
-    TError CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
-                    TUintMap &rate, TUintMap &ceil);
+    TError CreateTC(uint32_t handle, uint32_t parent, bool leaf,
+                    TUintMap &prio, TUintMap &rate, TUintMap &ceil);
     TError DestroyTC(uint32_t handle);
 
     TError GetDeviceStat(ENetStat kind, TUintMap &stat);

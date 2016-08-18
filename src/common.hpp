@@ -25,6 +25,7 @@ constexpr int ROOT_TC_MAJOR = 1;
 constexpr int ROOT_TC_MINOR = 0;
 constexpr int DEFAULT_TC_MINOR = 2;
 constexpr int DEFAULT_TC_MAJOR = 2;
+constexpr int CONTAINER_TC_MINOR = 0;
 
 constexpr uint64_t NET_DEFAULT_PRIO = 3;
 constexpr uint64_t NET_MAX_RATE = 2000000000; /* 16Gbit */;
