@@ -29,6 +29,7 @@ static std::vector<int> UnmanagedGroups;
 
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
+static TUintMap DeviceCeil;
 static TUintMap DefaultRate;
 static TUintMap PortoRate;
 static TUintMap ContainerRate;
@@ -51,6 +52,9 @@ TNetworkDevice::TNetworkDevice(struct rtnl_link *link) {
     Link = rtnl_link_get_link(link);
     Group = rtnl_link_get_group(link);
     MTU = rtnl_link_get_mtu(link);
+
+    Rate = NET_MAX_RATE;
+    Ceil = NET_MAX_RATE;
 
     Managed = true;
     Prepared = false;
@@ -160,6 +164,8 @@ void TNetwork::InitializeConfig() {
         StringToStringMap(config().network().device_qdisc(), DeviceQdisc);
     if (config().network().has_device_rate())
         StringToUintMap(config().network().device_rate(), DeviceRate);
+    if (config().network().has_device_ceil())
+        StringToUintMap(config().network().device_rate(), DeviceCeil);
     if (config().network().has_default_rate())
         StringToUintMap(config().network().default_rate(), DefaultRate);
     if (config().network().has_porto_rate())
@@ -206,6 +212,29 @@ TError TNetwork::Destroy() {
     }
 
     return TError::Success();
+}
+
+void TNetwork::GetDeviceSpeed(TNetworkDevice &dev) const {
+    TPath knob("/sys/class/net/" + dev.Name + "/speed");
+    uint64_t speed, rate, ceil;
+    std::string text;
+
+    if (ManagedNamespace) {
+        dev.Ceil = NET_MAX_RATE;
+        dev.Rate = NET_MAX_RATE;
+        return;
+    }
+
+    if (knob.ReadAll(text) || StringToUint64(text, speed) || speed < 100) {
+        ceil = NET_MAX_RATE;
+        rate = NET_MAX_RATE;
+    } else {
+        ceil = speed * 125000; /* Mbit -> Bps */
+        rate = speed * 112500; /* 90% */
+    }
+
+    dev.Ceil = dev.GetConfig(DeviceCeil, ceil);
+    dev.Rate = dev.GetConfig(DeviceRate, rate);
 }
 
 TError TNetwork::SetupQueue(TNetworkDevice &dev) {
@@ -261,8 +290,12 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     }
 
     uint64_t prio = NET_DEFAULT_PRIO;
-    uint64_t rate = dev.GetConfig(DeviceRate);
-    uint64_t ceil = rate;
+    uint64_t rate, ceil;
+
+    GetDeviceSpeed(dev);
+
+    ceil = dev.Ceil;
+    rate = dev.Rate;
 
     error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
                   TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
@@ -768,7 +801,7 @@ TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t pare
         rate = 1;
 
     /* rate must be <= INT32_MAX to prevent overflows in libnl */
-    max_rate = dev.GetConfig(DeviceRate, INT32_MAX);
+    max_rate = dev.Ceil < INT32_MAX ? dev.Ceil : INT32_MAX;
     if (rate > max_rate)
         rate = max_rate;
 
@@ -866,14 +899,14 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, TUintMap &prio,
             continue;
         uint64_t def;
         if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
-            def = dev.GetConfig(DeviceRate);
+            def = dev.Rate;
         else if (handle == TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID))
             def = dev.GetConfig(PortoRate);
         else
             def = dev.GetConfig(ContainerRate);
         error = AddTC(dev, handle, parent, dev.GetConfig(prio),
                       dev.GetConfig(rate, def),
-                      dev.GetConfig(ceil, dev.GetConfig(DeviceRate)));
+                      dev.GetConfig(ceil, dev.Ceil));
         if (error) {
             L_WRN() << "Cannot add tc class: " << error << std::endl;
             if (!result)

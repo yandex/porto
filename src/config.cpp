@@ -70,7 +70,6 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_enable_quota(true);
 
     config().mutable_network()->set_device_qdisc("default: htb");
-    config().mutable_network()->set_device_rate("default: 2000000000"); /* 16Gbit */
     config().mutable_network()->set_default_rate("default: 125000");    /* 1Mbit */
     config().mutable_network()->set_porto_rate("default: 125000");      /* 1Mbit */
     config().mutable_network()->set_container_rate("default: 125000");  /* 1Mbit */

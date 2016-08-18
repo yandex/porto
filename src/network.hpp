@@ -36,6 +36,7 @@ public:
     int Link;
     int Group;
     int MTU;
+    uint64_t Rate, Ceil;
     bool Managed;
     bool Prepared;
     bool Missing;
@@ -84,6 +85,7 @@ public:
 
     TError Destroy();
 
+    void GetDeviceSpeed(TNetworkDevice &dev) const;
     TError SetupQueue(TNetworkDevice &dev);
 
     TError AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t parent,

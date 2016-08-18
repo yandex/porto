@@ -23,6 +23,7 @@ message TCfg {
 		repeated string unmanaged_group = 15;
 		optional string device_qdisc = 16;
 		optional string device_rate = 17;
+		optional string device_ceil = 27;
 		optional string device_quantum = 18;
 		optional string default_rate = 19;
 		optional string porto_rate = 20;
