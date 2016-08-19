@@ -86,6 +86,57 @@ public:
     }
 };
 
+/* TVolumeTmpfsBackend - tmpfs */
+
+class TVolumeTmpfsBackend : public TVolumeBackend {
+public:
+
+    TError Configure(std::shared_ptr<TValueMap> Config) override {
+
+        if (!Volume->HaveQuota())
+            return TError(EError::NotSupported, "tmpfs backend requires space_limit");
+
+        if (!Volume->IsAutoStorage())
+            return TError(EError::NotSupported, "tmpfs backed doesn't support storage");
+
+        return TError::Success();
+    }
+
+    TError Build() override {
+        uint64_t spaceLimit, inodeLimit;
+        Volume->GetQuota(spaceLimit, inodeLimit);
+        return Volume->GetPath().Mount("porto:" + Volume->GetId(), "tmpfs",
+                Volume->GetMountFlags(),
+                { "size=" + std::to_string(spaceLimit),
+                  "uid=" + std::to_string(Volume->GetCred().Uid),
+                  "gid=" + std::to_string(Volume->GetCred().Gid),
+                  "mode=" + StringFormat("%#o", Volume->GetPermissions())
+                });
+    }
+
+    TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        return Volume->GetPath().Mount("porto:" + Volume->GetId(), "tmpfs",
+                Volume->GetMountFlags() | MS_REMOUNT,
+                { "size=" + std::to_string(space_limit),
+                  "uid=" + std::to_string(Volume->GetCred().Uid),
+                  "gid=" + std::to_string(Volume->GetCred().Gid),
+                  "mode=" + StringFormat("%#o", Volume->GetPermissions())
+                });
+    }
+
+    TError Destroy() override {
+        TPath path = Volume->GetPath();
+        TError error = path.UmountAll();
+        if (error)
+            L_ERR() << "Can't umount volume: " << error << std::endl;
+        return error;
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->GetPath().StatFS(result);
+    }
+};
+
 /* TVolumeQuotaBackend - project quota */
 
 class TVolumeQuotaBackend : public TVolumeBackend {
@@ -672,6 +723,8 @@ public:
 TError TVolume::OpenBackend() {
     if (GetBackend() == "plain")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
+    else if (GetBackend() == "tmpfs")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeTmpfsBackend());
     else if (GetBackend() == "quota")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeQuotaBackend());
     else if (GetBackend() == "native")
@@ -752,7 +805,7 @@ TError TVolume::CheckGuarantee(TVolumeHolder &holder,
     TStatFS current, total;
     TPath storage;
 
-    if (backend == "rbd")
+    if (backend == "rbd" || backend == "tmpfs")
         return TError::Success();
 
     if (!space_guarantee && !inode_guarantee)
@@ -884,7 +937,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     }
 
     /* Verify storage path */
-    if (backend != "rbd" && properties.count(V_STORAGE)) {
+    if (backend != "rbd" && backend != "tmpfs" && properties.count(V_STORAGE)) {
         TPath storage(properties.at(V_STORAGE));
         if (!storage.IsAbsolute())
             return TError(EError::InvalidValue, "Storage path must be absolute");
@@ -1317,7 +1370,7 @@ TError TVolume::Restore() {
 
 const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProperties() {
     return {
-        { V_BACKEND,     "plain|quota|native|overlay|loop|rbd (default - autodetect)" },
+        { V_BACKEND,     "plain|tmpfs|quota|native|overlay|loop|rbd (default - autodetect)" },
         { V_STORAGE,     "path to data storage (default - internal)" },
         { V_READY,       "true|false - contruction complete (ro)" },
         { V_PRIVATE,     "user-defined property" },
