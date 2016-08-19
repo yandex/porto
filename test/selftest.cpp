@@ -3494,7 +3494,8 @@ static void TestLimits(Porto::Connection &api) {
         for (auto &link : links) {
             TNlClass tclass(link->GetIndex(), -1, stoul(handle));
             ExpectSuccess(tclass.Load(*link->GetNl()));
-            ExpectEq(tclass.Prio, netPrio + i);
+            if (tclass.Kind == "htb")
+                ExpectEq(tclass.Prio, netPrio + i);
             ExpectEq(tclass.Rate, netGuarantee + i);
             ExpectEq(tclass.Ceil, netCeil + i);
 

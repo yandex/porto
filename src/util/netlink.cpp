@@ -657,9 +657,21 @@ TError TNlClass::Load(const TNl &nl) {
         return TError(EError::Unknown, "Can't find tc class");
     }
 
-    Prio = rtnl_htb_get_prio(tclass);
-    Rate = rtnl_htb_get_rate(tclass);
-    Ceil = rtnl_htb_get_ceil(tclass);
+    Kind = rtnl_tc_get_kind(TC_CAST(tclass));
+
+    if (Kind == "htb") {
+        Prio = rtnl_htb_get_prio(tclass);
+        Rate = rtnl_htb_get_rate(tclass);
+        Ceil = rtnl_htb_get_ceil(tclass);
+    }
+
+    if (Kind == "hfsc") {
+        struct tc_service_curve sc;
+        if (!rtnl_class_hfsc_get_fsc(tclass, &sc))
+            Rate = sc.m2;
+        if (!rtnl_class_hfsc_get_usc(tclass, &sc))
+            Ceil = sc.m2;
+    }
 
     rtnl_class_put(tclass);
     nl_cache_free(cache);
