@@ -905,7 +905,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
                 result = error;
         }
 
-        if (leaf) {
+        if (!error && leaf) {
             TNlQdisc ctq(dev.Index, handle,
                          TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
             ctq.Kind = dev.GetConfig(ContainerQdisc);
