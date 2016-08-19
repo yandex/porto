@@ -314,7 +314,7 @@ class TUlimit : public TProperty {
         { "rtprio", RLIMIT_RTPRIO },
         { "rttime", RLIMIT_RTTIME },
         { "sigpending", RLIMIT_SIGPENDING },
-        { "stask", RLIMIT_STACK },
+        { "stack", RLIMIT_STACK },
     };
 public:
     TError Set(const std::string &ulimit);
