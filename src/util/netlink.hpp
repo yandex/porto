@@ -115,16 +115,6 @@ public:
     std::shared_ptr<TNl> GetNl() { return Nl; };
 };
 
-class TNlClass : public TNonCopyable {
-    const uint32_t Parent, Handle;
-
-public:
-    TNlClass(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
-
-    TError GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil);
-    bool Exists(const TNlLink &link);
-};
-
 class TNlQdisc {
 public:
     const int Index;
@@ -139,6 +129,30 @@ public:
     TError Create(const TNl &nl);
     TError Delete(const TNl &nl);
     bool Check(const TNl &nl);
+};
+
+class TNlClass {
+public:
+    int Index = 0;
+    uint32_t Parent = -1;
+    uint32_t Handle = -1;
+    std::string Kind;
+    uint64_t Prio = 0;
+    uint64_t Rate = 0;
+    uint64_t Ceil = 0;
+    uint64_t RateBurst = 0;
+    uint64_t CeilBurst = 0;
+    uint64_t Quantum = 0;
+    uint64_t MTU = 0;
+
+    TNlClass() {}
+    TNlClass(int index, uint32_t parent, uint32_t handle) :
+        Index(index), Parent(parent), Handle(handle) {}
+
+    TError Create(const TNl &nl);
+    TError Delete(const TNl &nl);
+    TError Load(const TNl &nl);
+    bool Exists(const TNl &nl);
 };
 
 class TNlCgFilter : public TNonCopyable {

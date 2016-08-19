@@ -3492,12 +3492,11 @@ static void TestLimits(Porto::Connection &api) {
 
         i = 0;
         for (auto &link : links) {
-            uint32_t prio, rate, ceil;
-            TNlClass tclass(-1, stoul(handle));
-            ExpectSuccess(tclass.GetProperties(*link, prio, rate, ceil));
-            ExpectEq(prio, netPrio + i);
-            ExpectEq(rate, netGuarantee + i);
-            ExpectEq(ceil, netCeil + i);
+            TNlClass tclass(link->GetIndex(), -1, stoul(handle));
+            ExpectSuccess(tclass.Load(*link->GetNl()));
+            ExpectEq(tclass.Prio, netPrio + i);
+            ExpectEq(tclass.Rate, netGuarantee + i);
+            ExpectEq(tclass.Ceil, netCeil + i);
 
             i++;
         }

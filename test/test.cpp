@@ -342,8 +342,8 @@ int GetVmRss(const std::string &pid) {
 bool TcClassExist(uint32_t handle) {
     size_t nr = 0;
     for (auto &link : links) {
-        TNlClass tclass(-1, handle);
-        if (tclass.Exists(*link))
+        TNlClass tclass(link->GetIndex(), -1, handle);
+        if (tclass.Exists(*link->GetNl()))
             nr++;
     }
     return nr == links.size();

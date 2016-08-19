@@ -1,4 +1,6 @@
 #include <sstream>
+#include <algorithm>
+#include <cmath>
 
 #include "netlink.hpp"
 #include "util/log.hpp"
@@ -20,6 +22,9 @@ extern "C" {
 #include <netlink/route/qdisc/htb.h>
 #include <netlink/route/qdisc/sfq.h>
 #include <netlink/route/qdisc/fq_codel.h>
+#define class cls
+#include <netlink/route/qdisc/hfsc.h>
+#undef class
 
 #include <netlink/route/rtnl.h>
 #include <netlink/route/link.h>
@@ -638,24 +643,23 @@ void TNl::DumpCache(struct nl_cache *cache) const {
     nl_cache_dump(cache, &dp);
 }
 
-TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
+TError TNlClass::Load(const TNl &nl) {
     struct nl_cache *cache;
     struct rtnl_class *tclass;
-    int index = link.GetIndex();
 
-    int ret = rtnl_class_alloc_cache(link.GetSock(), index, &cache);
+    int ret = rtnl_class_alloc_cache(nl.GetSock(), Index, &cache);
     if (ret < 0)
-            return TError(EError::Unknown, std::string("Unable to allocate class cache: ") + nl_geterror(ret));
+            return nl.Error(ret, "Cannot allocate class cache");
 
-    tclass = rtnl_class_get(cache, index, Handle);
+    tclass = rtnl_class_get(cache, Index, Handle);
     if (!tclass) {
         nl_cache_free(cache);
         return TError(EError::Unknown, "Can't find tc class");
     }
 
-    prio = rtnl_htb_get_prio(tclass);
-    rate = rtnl_htb_get_rate(tclass);
-    ceil = rtnl_htb_get_ceil(tclass);
+    Prio = rtnl_htb_get_prio(tclass);
+    Rate = rtnl_htb_get_rate(tclass);
+    Ceil = rtnl_htb_get_ceil(tclass);
 
     rtnl_class_put(tclass);
     nl_cache_free(cache);
@@ -663,10 +667,8 @@ TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &ra
     return TError::Success();
 }
 
-bool TNlClass::Exists(const TNlLink &link) {
-    uint32_t prio, rate, ceil;
-
-    return !GetProperties(link, prio, rate, ceil);
+bool TNlClass::Exists(const TNl &nl) {
+    return !Load(nl);
 }
 
 TError TNlQdisc::Create(const TNl &nl) {
@@ -701,6 +703,11 @@ TError TNlQdisc::Create(const TNl &nl) {
             rtnl_htb_set_defcls(qdisc, Default);
         if (Quantum)
             rtnl_htb_set_rate2quantum(qdisc, Quantum);
+    }
+
+    if (Kind == "hfsc") {
+        if (Default)
+            rtnl_qdisc_hfsc_set_defcls(qdisc, Default);
     }
 
     if (Kind == "sfq") {
@@ -790,6 +797,149 @@ out:
     rtnl_qdisc_put(qdisc);
     nl_cache_free(qdiscCache);
     return result;
+}
+
+TError TNlClass::Create(const TNl &nl) {
+    struct rtnl_class *cls;
+    TError error;
+    int ret;
+
+    cls = rtnl_class_alloc();
+    if (!cls)
+        return TError(EError::Unknown, "Cannot allocate rtnl_class object");
+
+    rtnl_tc_set_ifindex(TC_CAST(cls), Index);
+    rtnl_tc_set_parent(TC_CAST(cls), Parent);
+    rtnl_tc_set_handle(TC_CAST(cls), Handle);
+
+    ret = rtnl_tc_set_kind(TC_CAST(cls), Kind.c_str());
+    if (ret < 0) {
+        error = nl.Error(ret, "Cannot set class kind");
+        goto free_class;
+    }
+
+    if (Kind == "htb") {
+        /* must be <= INT32_MAX to prevent overflows in libnl */
+        uint64_t maxRate = INT32_MAX;
+
+        /*
+         * HTB doesn't allow 0 rate
+         * FIXME add support for 64-bit rates
+         */
+        rtnl_htb_set_rate(cls, std::min(Rate ?: 1, maxRate));
+        rtnl_htb_set_ceil(cls, std::min(Ceil ?: maxRate, maxRate));
+        rtnl_htb_set_prio(cls, Prio);
+
+        if (MTU)
+            rtnl_tc_set_mtu(TC_CAST(cls), MTU);
+
+        if (Quantum)
+            rtnl_htb_set_quantum(cls, Quantum);
+
+        if (RateBurst)
+            rtnl_htb_set_rbuffer(cls, RateBurst);
+
+        if (CeilBurst)
+            rtnl_htb_set_cbuffer(cls, CeilBurst);
+    }
+
+    if (Kind == "hfsc") {
+        uint64_t maxRate = UINT32_MAX;
+        struct tc_service_curve rsc, fsc, usc;
+
+        rsc.m1 = std::min(Rate, maxRate);
+        rsc.d = rsc.m1 ? std::ceil(Quantum * 1000000. / rsc.m1) : 0;
+        rsc.m2 = std::min(Rate >> Prio, maxRate);
+
+        fsc.m1 = std::min(Ceil >> Prio, maxRate);
+        fsc.d = fsc.m1 ? std::ceil(RateBurst * 1000000. / fsc.m1) : 0;
+        fsc.m2 = std::min(Rate, maxRate);
+
+        usc.m1 = std::min(Ceil * 2, maxRate);
+        usc.d = usc.m1 ? std::ceil(CeilBurst * 1000000. / usc.m1) : 0;
+        usc.m2 = std::min(Ceil, maxRate);
+
+        ret = rtnl_class_hfsc_set_rsc(cls, &rsc);
+        if (error) {
+            error = nl.Error(ret, "Cannot set class rsc");
+            goto free_class;
+        }
+
+        ret = rtnl_class_hfsc_set_fsc(cls, &fsc);
+        if (error) {
+            error = nl.Error(ret, "Cannot set class fsc");
+            goto free_class;
+        }
+
+        ret = rtnl_class_hfsc_set_usc(cls, &usc);
+        if (error) {
+            error = nl.Error(ret, "Cannot set class usc");
+            goto free_class;
+        }
+    }
+
+    nl.Dump("add", cls);
+    ret = rtnl_class_add(nl.GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
+    if (ret < 0)
+        error = nl.Error(ret, "Cannot add traffic class");
+
+free_class:
+    rtnl_class_put(cls);
+    return error;
+}
+
+TError TNlClass::Delete(const TNl &nl) {
+    struct rtnl_class *cls;
+    TError error;
+    int ret;
+
+    cls = rtnl_class_alloc();
+    if (!cls)
+        return TError(EError::Unknown, "Cannot allocate rtnl_class object");
+
+    rtnl_tc_set_ifindex(TC_CAST(cls), Index);
+    rtnl_tc_set_handle(TC_CAST(cls), Handle);
+
+    nl.Dump("del", cls);
+    ret = rtnl_class_delete(nl.GetSock(), cls);
+
+    /* If busy -> remove recursively */
+    if (ret == -NLE_BUSY) {
+        std::vector<uint32_t> handles({Handle});
+        struct nl_cache *cache;
+
+        ret = rtnl_class_alloc_cache(nl.GetSock(), Index, &cache);
+        if (ret < 0) {
+            error = nl.Error(ret, "Cannot allocate class cache");
+            goto out;
+        }
+
+        for (int i = 0; i < (int)handles.size(); i++) {
+            for (auto obj = nl_cache_get_first(cache); obj;
+                      obj = nl_cache_get_next(obj)) {
+                uint32_t handle = rtnl_tc_get_handle(TC_CAST(obj));
+                uint32_t parent = rtnl_tc_get_parent(TC_CAST(obj));
+                if (parent == handles[i])
+                    handles.push_back(handle);
+            }
+        }
+
+        nl_cache_free(cache);
+
+        for (int i = handles.size() - 1; i >= 0; i--) {
+            rtnl_tc_set_handle(TC_CAST(cls), handles[i]);
+            nl.Dump("del", cls);
+            ret = rtnl_class_delete(nl.GetSock(), cls);
+            if (ret < 0 && ret != -NLE_OBJ_NOTFOUND)
+                break;
+        }
+    }
+
+    if (ret < 0 && ret != -NLE_OBJ_NOTFOUND)
+        error = nl.Error(ret, "Cannot remove traffic class");
+out:
+    rtnl_class_put(cls);
+    return error;
 }
 
 TError TNlCgFilter::Create(const TNl &nl) {

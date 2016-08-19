@@ -30,10 +30,11 @@ static std::vector<int> UnmanagedGroups;
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
 static TUintMap DeviceCeil;
-static TUintMap PortoRate;
+static TUintMap DeviceRateBurst;
+static TUintMap DeviceCeilBurst;
 static TUintMap DeviceQuantum;
-static TUintMap HTBrbuffer;
-static TUintMap HTBcbuffer;
+
+static TUintMap PortoRate;
 
 static TUintMap DefaultRate;
 static TStringMap DefaultQdisc;
@@ -177,10 +178,10 @@ void TNetwork::InitializeConfig() {
         StringToUintMap(config().network().container_rate(), ContainerRate);
     if (config().network().has_device_quantum())
         StringToUintMap(config().network().device_quantum(), DeviceQuantum);
-    if (config().network().has_htb_rbuffer())
-        StringToUintMap(config().network().htb_rbuffer(), HTBrbuffer);
-    if (config().network().has_htb_cbuffer())
-        StringToUintMap(config().network().htb_cbuffer(), HTBcbuffer);
+    if (config().network().has_device_rate_burst())
+        StringToUintMap(config().network().device_rate_burst(), DeviceRateBurst);
+    if (config().network().has_device_ceil_burst())
+        StringToUintMap(config().network().device_ceil_burst(), DeviceCeilBurst);
 
     if (config().network().has_default_qdisc())
         StringToStringMap(config().network().default_qdisc(), DefaultQdisc);
@@ -281,26 +282,29 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         return error;
     }
 
-    uint64_t prio = NET_DEFAULT_PRIO;
-    uint64_t rate, ceil;
-
     GetDeviceSpeed(dev);
 
-    ceil = dev.Ceil;
-    rate = dev.Rate;
+    TNlClass cls;
 
-    error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
-                  TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
-                  prio, rate, ceil);
+    cls.Kind = dev.GetConfig(DeviceQdisc);
+    cls.Index = dev.Index;
+    cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR);
+    cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
+    cls.Prio = NET_DEFAULT_PRIO;
+    cls.Rate = dev.Ceil;
+    cls.Ceil = dev.Ceil;
+
+    error = cls.Create(*Nl);
     if (error) {
         L_ERR() << "Can't create root tclass: " << error << std::endl;
         return error;
     }
 
-    rate = dev.GetConfig(DefaultRate);
-    error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
-                  TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
-                  prio, rate, ceil);
+    cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
+    cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
+    cls.Rate = dev.GetConfig(DefaultRate);
+
+    error = cls.Create(*Nl);
     if (error) {
         L_ERR() << "Can't create default tclass: " << error << std::endl;
         return error;
@@ -319,10 +323,11 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         }
     }
 
-    rate = dev.GetConfig(PortoRate);
-    error = AddTC(dev, TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
-                  TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
-                  prio, rate, ceil);
+    cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
+    cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID);
+    cls.Rate = dev.GetConfig(PortoRate);
+
+    error = cls.Create(*Nl);
     if (error) {
         L_ERR() << "Can't create porto tclass: " << error << std::endl;
         return error;
@@ -434,7 +439,8 @@ TError TNetwork::RefreshDevices() {
             if (d.Name != dev.Name || d.Index != dev.Index)
                 continue;
             d = dev;
-            if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") != "htb")
+            if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") !=
+                    dev.GetConfig(DeviceQdisc))
                 Nl->Dump("Detected missing qdisc", link);
             else
                 d.Prepared = true;
@@ -764,141 +770,36 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
     return TError::Success();
 }
 
-TError TNetwork::AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t parent,
-                             uint64_t prio, uint64_t rate, uint64_t ceil) const {
-    uint64_t max_rate, quantum, rbuffer, cbuffer;
-    struct rtnl_class *cls;
-    TError error;
-    int ret;
-
-    cls = rtnl_class_alloc();
-    if (!cls)
-        return TError(EError::Unknown, "Cannot allocate rtnl_class object");
-
-    rtnl_tc_set_ifindex(TC_CAST(cls), dev.Index);
-    rtnl_tc_set_parent(TC_CAST(cls), parent);
-    rtnl_tc_set_handle(TC_CAST(cls), handle);
-
-    ret = rtnl_tc_set_kind(TC_CAST(cls), "htb");
-    if (ret < 0) {
-        error = Nl->Error(ret, "Cannot set HTB class");
-        goto free_class;
-    }
-
-    /*
-     * TC doesn't allow to set 0 rate, but Porto does (because we call them
-     * net_guarantee). So, just map 0 to 1, minimal valid guarantee.
-     */
-    if (!rate)
-        rate = 1;
-
-    /* rate must be <= INT32_MAX to prevent overflows in libnl */
-    max_rate = dev.Ceil < INT32_MAX ? dev.Ceil : INT32_MAX;
-    if (rate > max_rate)
-        rate = max_rate;
-
-    rtnl_htb_set_rate(cls, rate);
-
-    /*
-     * Zero ceil must be no limit. Libnl set default ceil equal to rate.
-     */
-    if (!ceil || ceil > max_rate)
-        ceil = max_rate;
-
-    quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2);
-    rbuffer = dev.GetConfig(HTBrbuffer, dev.MTU * 10);
-    cbuffer = dev.GetConfig(HTBcbuffer, dev.MTU * 10);
-
-    rtnl_htb_set_ceil(cls, ceil);
-    rtnl_htb_set_prio(cls, prio);
-    rtnl_tc_set_mtu(TC_CAST(cls), dev.MTU);
-    rtnl_htb_set_quantum(cls, quantum);
-    rtnl_htb_set_rbuffer(cls, rbuffer);
-    rtnl_htb_set_cbuffer(cls, cbuffer);
-
-    /* FIXME add support for 64-bit rate and ceil */
-
-    Nl->Dump("add", cls);
-    ret = rtnl_class_add(GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
-    if (ret < 0)
-        error = Nl->Error(ret, "Cannot add traffic class to " + dev.GetDesc());
-
-free_class:
-    rtnl_class_put(cls);
-    return error;
-}
-
-TError TNetwork::DelTC(const TNetworkDevice &dev, uint32_t handle) const {
-    struct rtnl_class *cls;
-    TError error;
-    int ret;
-
-    cls = rtnl_class_alloc();
-    if (!cls)
-        return TError(EError::Unknown, "Cannot allocate rtnl_class object");
-
-    rtnl_tc_set_ifindex(TC_CAST(cls), dev.Index);
-    rtnl_tc_set_handle(TC_CAST(cls), handle);
-
-    Nl->Dump("del", cls);
-    ret = rtnl_class_delete(GetSock(), cls);
-
-    /* If busy -> remove recursively */
-    if (ret == -NLE_BUSY) {
-        std::vector<uint32_t> handles({handle});
-        struct nl_cache *cache;
-
-        ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &cache);
-        if (ret < 0) {
-            error = Nl->Error(ret, "Cannot allocate class cache");
-            goto out;
-        }
-
-        for (int i = 0; i < (int)handles.size(); i++) {
-            for (auto obj = nl_cache_get_first(cache); obj;
-                      obj = nl_cache_get_next(obj)) {
-                uint32_t handle = rtnl_tc_get_handle(TC_CAST(obj));
-                uint32_t parent = rtnl_tc_get_parent(TC_CAST(obj));
-                if (parent == handles[i])
-                    handles.push_back(handle);
-            }
-        }
-
-        nl_cache_free(cache);
-
-        for (int i = handles.size() - 1; i >= 0; i--) {
-            rtnl_tc_set_handle(TC_CAST(cls), handles[i]);
-            Nl->Dump("del", cls);
-            ret = rtnl_class_delete(GetSock(), cls);
-            if (ret < 0 && ret != -NLE_OBJ_NOTFOUND)
-                break;
-        }
-    }
-
-    if (ret < 0 && ret != -NLE_OBJ_NOTFOUND)
-        error = Nl->Error(ret, "Cannot remove traffic class at " + dev.GetDesc());
-out:
-    rtnl_class_put(cls);
-    return error;
-}
-
 TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
                           TUintMap &prio, TUintMap &rate, TUintMap &ceil) {
     TError error, result;
+    TNlClass cls;
+
+    cls.Parent = parent;
+    cls.Handle = handle;
 
     for (auto &dev: Devices) {
         if (!dev.Managed)
             continue;
-        uint64_t def;
+
+        uint64_t defRate;
         if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
-            def = dev.Rate;
+            defRate = dev.Rate;
         else if (handle == TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID))
-            def = dev.GetConfig(PortoRate);
+            defRate = dev.GetConfig(PortoRate);
         else
-            def = dev.GetConfig(ContainerRate);
-        error = AddTC(dev, handle, parent, dev.GetConfig(prio),
-                      dev.GetConfig(rate, def),
-                      dev.GetConfig(ceil, dev.Ceil));
+            defRate = dev.GetConfig(ContainerRate);
+
+        cls.Index = dev.Index;
+        cls.Kind = dev.GetConfig(DeviceQdisc);
+        cls.Prio = dev.GetConfig(prio);
+        cls.Rate = dev.GetConfig(rate, defRate);
+        cls.Ceil = dev.GetConfig(ceil);
+        cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2);
+        cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10);
+        cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10);
+
+        error = cls.Create(*Nl);
         if (error) {
             L_WRN() << "Cannot add tc class: " << error << std::endl;
             if (!result)
@@ -933,7 +834,8 @@ TError TNetwork::DestroyTC(uint32_t handle) {
                      TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
         (void)ctq.Delete(*Nl);
 
-        error = DelTC(dev, handle);
+        TNlClass cls(dev.Index, TC_H_UNSPEC, handle);
+        error = cls.Delete(*Nl);
         if (error) {
             L_WRN() << "Cannot del tc class: " << error << std::endl;
             if (!result)

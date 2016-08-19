@@ -88,8 +88,6 @@ public:
     void GetDeviceSpeed(TNetworkDevice &dev) const;
     TError SetupQueue(TNetworkDevice &dev);
 
-    TError AddTC(const TNetworkDevice &dev, uint32_t handle, uint32_t parent,
-                 uint64_t prio, uint64_t rate, uint64_t ceil) const;
     TError DelTC(const TNetworkDevice &dev, uint32_t handle) const;
 
     TError CreateTC(uint32_t handle, uint32_t parent, bool leaf,
