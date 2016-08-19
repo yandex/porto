@@ -1617,6 +1617,9 @@ TError TMemoryLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    if (CurrentContainer->MemLimit == new_size)
+        return TError::Success();
+
     if (CurrentContainer->GetState() == EContainerState::Running ||
         CurrentContainer->GetState() == EContainerState::Meta ||
         CurrentContainer->GetState() == EContainerState::Paused) {
@@ -1669,6 +1672,9 @@ TError TAnonLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    if (CurrentContainer->AnonMemLimit == new_size)
+        return TError::Success();
+
     if (CurrentContainer->GetState() == EContainerState::Running ||
         CurrentContainer->GetState() == EContainerState::Meta ||
         CurrentContainer->GetState() == EContainerState::Paused) {
@@ -1716,6 +1722,9 @@ TError TDirtyLimit::Set(const std::string &limit) {
     error = StringToSize(limit, new_size);
     if (error)
         return error;
+
+    if (CurrentContainer->DirtyMemLimit == new_size)
+        return TError::Success();
 
     if (CurrentContainer->GetState() == EContainerState::Running ||
         CurrentContainer->GetState() == EContainerState::Meta ||
