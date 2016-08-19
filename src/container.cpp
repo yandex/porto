@@ -1788,6 +1788,14 @@ bool TContainer::MayRespawn() {
     if (!ToRespawn)
         return false;
 
+    if (Parent->State != EContainerState::Running &&
+        Parent->State != EContainerState::Meta) {
+
+        /*FIXME: respawn for hierarchies is broken */
+
+        return false;
+    }
+
     return MaxRespawns < 0 || RespawnCount < (uint64_t)MaxRespawns;
 }
 
