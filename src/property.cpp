@@ -818,7 +818,7 @@ class TCapabilitiesProperty : public TListValue, public TContainerValue {
         { "SYS_MODULE",         { CAP_SYS_MODULE, 0 } },
         { "SYS_RAWIO",          { CAP_SYS_RAWIO, 0 } },
         { "SYS_CHROOT",         { CAP_SYS_CHROOT, RESTRICTED_CAP } },
-        { "SYS_PTRACE",         { CAP_SYS_PTRACE, 0 } },
+        { "SYS_PTRACE",         { CAP_SYS_PTRACE, RESTRICTED_CAP } },
         { "SYS_PACCT",          { CAP_SYS_PACCT, 0 } },
         { "SYS_ADMIN",          { CAP_SYS_ADMIN, 0 } },
         { "SYS_BOOT",           { CAP_SYS_BOOT, 0 } },
