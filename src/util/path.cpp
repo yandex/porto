@@ -15,6 +15,7 @@ extern "C" {
 #include <sys/prctl.h>
 #include <libgen.h>
 #include <linux/limits.h>
+#include <linux/falloc.h>
 #include <linux/fs.h>
 #include <sys/syscall.h>
 #include <dirent.h>
@@ -612,10 +613,6 @@ TError TPath::SetXAttr(const std::string name, const std::string value) const {
                 "setxattr(" + Path + ", " + name + ")");
     return TError::Success();
 }
-
-#ifndef FALLOC_FL_COLLAPSE_RANGE
-#define FALLOC_FL_COLLAPSE_RANGE        0x08
-#endif
 
 TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     struct stat st;

@@ -18,7 +18,9 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <sys/mount.h>
+#include <linux/falloc.h>
 }
+
 
 /* TVolumeBackend - abstract */
 
@@ -333,7 +335,7 @@ public:
         return TError::Success();
     }
 
-    static TError MakeImage(const TPath &path, const TCred &cred, off_t size) {
+    static TError MakeImage(const TPath &path, const TCred &cred, off_t size, off_t guarantee) {
         int fd, status;
         TError error;
 
@@ -346,15 +348,22 @@ public:
             goto remove_file;
         }
 
-        if (fallocate(fd, 0, 0, size) && ftruncate(fd, size)) {
+        if (ftruncate(fd, size)) {
             error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
+            goto remove_file;
+        }
+
+        if (guarantee && fallocate(fd, FALLOC_FL_KEEP_SIZE, 0, guarantee)) {
+            error = TError(EError::ResourceNotAvailable, errno,
+                           "cannot fallocate guarantee " + std::to_string(guarantee));
             goto remove_file;
         }
 
         close(fd);
         fd = -1;
 
-        error = Run({ "mkfs.ext4", "-F", path.ToString()}, status);
+        error = Run({ "mkfs.ext4", "-F", "-m", "0", "-E", "nodiscard",
+                     "-O", "^has_journal", path.ToString()}, status);
         if (error)
             goto remove_file;
 
@@ -378,15 +387,18 @@ remove_file:
         TPath path = Volume->GetPath();
         TPath image = GetLoopImage();
         uint64_t space_limit, inode_limit;
+        uint64_t space_guarantee, inode_guarantee;
         TError error;
 
+        Volume->GetGuarantee(space_guarantee, inode_guarantee);
         Volume->GetQuota(space_limit, inode_limit);
         if (!space_limit)
             return TError(EError::InvalidValue, "loop backend requires space_limit");
 
         if (!image.Exists()) {
-            L_ACT() << "Allocate loop image with size " << space_limit << std::endl;
-            error = MakeImage(image, Volume->GetCred(), space_limit);
+            L_ACT() << "Allocate loop image with size " << space_limit
+                    << " guarantee " << space_guarantee << std::endl;
+            error = MakeImage(image, Volume->GetCred(), space_limit, space_guarantee);
             if (error)
                 return error;
         } else {
