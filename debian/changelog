@@ -1,3 +1,10 @@
+yandex-porto (2.10.4) unstable; urgency=low
+
+  * porto: allow SYS_PTRACE in virt_mode=os container
+  * volume: add backend tmpfs
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 22 Aug 2016 10:35:10 +0300
+
 yandex-porto (2.10.3) unstable; urgency=low
 
   * Revert "network: always recreate htb qdisc at upgrade"
