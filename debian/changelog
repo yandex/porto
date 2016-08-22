@@ -1,3 +1,47 @@
+yandex-porto (3.0.1) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * util: remove sha256
+  * selftest: replace "true" with "/bin/true"
+  * porto: disable default porto_namespace for now
+  * porto: make porto_namespace non-dynamic
+  * client: special clients are not accounted
+  * portoctl: remove command enter
+  * porto: refactor traffic classes
+  * porto: tune htb configuration again
+  * porto: speedup container destroy
+  * test: use portoctl from current directory
+  * test: the same for portoinit
+  * porto: deprecate net="host", replace net="host <name>" with net="steal <name>"
+  * porto: ignore missing tc class when removing
+  * test: use portoctl from current directory
+  * volume: add backend tmpfs
+  * volume: default permissions are 0775
+  * porto: add per-device network configuration
+  * porto: add sfq qdisc into default class of htb
+  * volume/tmp: add resize
+  * network: calculate rate and ceil from network device speed
+  * network: add bfifo qdisc to leaf htb classes
+
+  [ Maxim Samoylov ]
+  * porto: do not respawn container if parent is not running
+
+  [ Konstantin Khlebnikov ]
+  * network: do not add leaf qdisc if class creation failed
+  * porto: do not touch cgroup if new memory limit is the same
+  * network: add support for HFSC
+  * network: handle HFSC statistics
+  * test: fix test-tc-rebuild.py for hfsc
+  * network: replace HTB with HFSC
+
+  [ Maxim Samoylov ]
+  * property: fix ulimit keyword
+
+  [ Konstantin Khlebnikov ]
+  * volume: harden space_guarantee and disable journal for backend=loop
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 22 Aug 2016 14:02:37 +0300
+
 yandex-porto (3.0.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
