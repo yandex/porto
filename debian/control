@@ -3,7 +3,7 @@ Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
 Build-Depends:
  cmake, debhelper (>= 8.0.0), pkg-config, autoconf, libtool,
  protobuf-compiler, libprotobuf-dev, libncurses5-dev,
- libnl-3-dev (>=3.2.25), libnl-route-3-dev (>=3.2.25),
+ libnl-3-dev (>=3.2.27), libnl-route-3-dev (>=3.2.27),
  bison, flex, g++ (>= 4:4.7) | g++-4.7,
  dh-python, python-all, python-setuptools,
 Standards-Version: 3.9.2
