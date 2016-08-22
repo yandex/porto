@@ -1,3 +1,9 @@
+yandex-porto (2.10.5) unstable; urgency=low
+
+  * volume: harden space_guarantee and disable journal for backend=loop
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 22 Aug 2016 13:31:41 +0300
+
 yandex-porto (2.10.4) unstable; urgency=low
 
   * porto: allow SYS_PTRACE in virt_mode=os container
