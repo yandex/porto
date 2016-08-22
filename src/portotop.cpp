@@ -866,8 +866,8 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
 
               /* Memory */
               "memory: memory_usage b",
-              "limit: memory_limit b",
-              "guarantee: memory_guarantee b",
+              "limit: memory_limit_total b",
+              "guarantee: memory_guarantee_total b",
 
               /* I/O */
               "maj/s: major_faults'",
