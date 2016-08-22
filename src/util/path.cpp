@@ -22,6 +22,10 @@ extern "C" {
 #include <mntent.h>
 }
 
+#ifndef FALLOC_FL_COLLAPSE_RANGE
+#define FALLOC_FL_COLLAPSE_RANGE        0x08
+#endif
+
 std::string TPath::DirNameStr() const {
     char *dup = strdup(Path.c_str());
     PORTO_ASSERT(dup != nullptr);
