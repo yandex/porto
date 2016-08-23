@@ -287,22 +287,54 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
 
 // Memory
 TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
-    std::string str_limit = limit ? std::to_string(limit) : "-1";
-    uint64_t memswap;
-
-    /* Memory limit cannot be bigger than Memory+Swap limit. */
-    if (SupportSwap() && !cg.GetUint64(MEM_SWAP_LIMIT, memswap) &&
-            (!limit || memswap < limit))
-        (void)cg.Set(MEM_SWAP_LIMIT, str_limit);
+    uint64_t old_limit, cur_limit, new_limit;
+    TError error;
 
     /*
      * Maxumum value depends on arch, kernel version and bugs
      * "-1" works everywhere since 2.6.31
      */
-    TError error = cg.Set(LIMIT, str_limit);
+    if (!limit) {
+        if (SupportSwap())
+            (void)cg.Set(MEM_SWAP_LIMIT, "-1");
+        return cg.Set(LIMIT, "-1");
+    }
+
+    error = cg.GetUint64(LIMIT, old_limit);
+    if (error)
+        return error;
+
+    if (old_limit == limit)
+        return TError::Success();
+
+    /* Memory limit cannot be bigger than Memory+Swap limit. */
+    if (SupportSwap()) {
+        cg.GetUint64(MEM_SWAP_LIMIT, cur_limit);
+        if (cur_limit < limit)
+            (void)cg.SetUint64(MEM_SWAP_LIMIT, limit);
+    }
+
+    cur_limit = old_limit;
+    new_limit = limit;
+    do {
+        error = cg.SetUint64(LIMIT, new_limit);
+        if (error) {
+            if (cur_limit < INT64_MAX)
+                new_limit = (cur_limit + new_limit) / 2;
+            else
+                new_limit *= 2;
+        } else {
+            cur_limit = new_limit;
+            new_limit = limit;
+        }
+    } while (cur_limit != limit && new_limit <= cur_limit - 4096 &&
+             (!error || error.GetErrno() == EBUSY));
 
     if (!error && SupportSwap())
-        cg.Set(MEM_SWAP_LIMIT, str_limit);
+        error = cg.SetUint64(MEM_SWAP_LIMIT, limit);
+
+    if (error)
+        (void)cg.SetUint64(LIMIT, old_limit);
 
     return error;
 }
