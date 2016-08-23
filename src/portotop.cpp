@@ -502,7 +502,7 @@ TColumn::TColumn(std::string title, TPortoValue var, bool left_aligned) :
 }
 int TColumn::PrintTitle(int x, int y, TConsoleScreen &screen) {
     screen.PrintAt(Title, x, y, Width, LeftAligned,
-                   A_BOLD | (Selected ? A_UNDERLINE : 0));
+                   A_BOLD | (Selected ? A_STANDOUT : 0));
     return Width;
 }
 int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected) {
