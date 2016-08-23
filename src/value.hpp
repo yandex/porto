@@ -21,7 +21,7 @@ constexpr unsigned RUNTIME_VALUE    = (1 << 23);
 constexpr unsigned DYNAMIC_VALUE    = (1 << 24);
 // Lack of support in kernel
 const unsigned int UNSUPPORTED_FEATURE = (1 << 25);
-// Value has not saved
+// Value has not applied
 const unsigned int DIRTY_VALUE = (1 << 26);
 // Value has non-default value
 const unsigned int HAS_VALUE = (1 << 27);
@@ -115,7 +115,7 @@ public:
         TError error = CheckValue(value);
         if (error)
             return error;
-        if (HasFlag(PERSISTENT_VALUE) && (!HasValue() || Value != value))
+        if (!HasValue() || Value != value)
             SetFlag(DIRTY_VALUE);
         Value = value;
         SetFlag(HAS_VALUE);
@@ -123,7 +123,7 @@ public:
     }
 
     virtual void Reset() override {
-        if (HasFlag(PERSISTENT_VALUE) && HasValue())
+        if (HasValue())
             SetFlag(DIRTY_VALUE);
         Value = GetDefault();
         ClearFlag(HAS_VALUE);

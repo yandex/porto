@@ -86,6 +86,8 @@ public:
 
     bool HasFlags(const std::string &property, int flags) const;
 
+    bool TestClearDirty(const std::string &property) const;
+
     TError PrepareTaskEnv(const std::string &property, TTaskEnv &taskEnv);
 
     template<typename T>

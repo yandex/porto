@@ -34,6 +34,14 @@ bool TPropertyMap::HasFlags(const std::string &property, int flags) const {
     return prop->HasFlag(flags);
 }
 
+bool TPropertyMap::TestClearDirty(const std::string &property) const {
+    auto prop = Find(property);
+    if (!prop || !prop->HasFlag(DIRTY_VALUE))
+        return false;
+    prop->ClearFlag(DIRTY_VALUE);
+    return true;
+}
+
 TError TPropertyMap::PrepareTaskEnv(const std::string &property,
                                     TTaskEnv &taskEnv) {
     auto prop = Find(property);

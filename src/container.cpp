@@ -406,66 +406,86 @@ TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     TError error;
 
-    error = MemorySubsystem.SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
-    if (error) {
-        L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_MEM_GUARANTEE)) {
+        error = MemorySubsystem.SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
+        if (error) {
+            L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
-    if (error) {
-        if (error.GetErrno() == EBUSY)
-            return TError(EError::InvalidValue, std::string(P_MEM_LIMIT) + " is too low");
+    if (Prop->TestClearDirty(P_MEM_LIMIT)) {
+        error = MemorySubsystem.SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
+        if (error) {
+            if (error.GetErrno() == EBUSY)
+                return TError(EError::InvalidValue, std::string(P_MEM_LIMIT) + " is too low");
 
-        L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
-        return error;
+            L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetAnonLimit(memcg, Prop->Get<uint64_t>(P_ANON_LIMIT));
-    if (error) {
-        L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_ANON_LIMIT)) {
+        error = MemorySubsystem.SetAnonLimit(memcg, Prop->Get<uint64_t>(P_ANON_LIMIT));
+        if (error) {
+            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
-    if (error) {
-        L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_RECHARGE_ON_PGFAULT)) {
+        error = MemorySubsystem.RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
+        if (error) {
+            L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    auto cpucg = GetCgroup(CpuSubsystem);
-    error = CpuSubsystem.SetCpuPolicy(cpucg,
-            Prop->Get<std::string>(P_CPU_POLICY),
-            Prop->Get<double>(P_CPU_GUARANTEE),
-            Prop->Get<double>(P_CPU_LIMIT));
-    if (error) {
-        L_ERR() << "Cannot set cpu policy: " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_CPU_POLICY) ||
+            Prop->TestClearDirty(P_CPU_GUARANTEE) ||
+            Prop->TestClearDirty(P_CPU_LIMIT)) {
+        auto cpucg = GetCgroup(CpuSubsystem);
+        error = CpuSubsystem.SetCpuPolicy(cpucg,
+                Prop->Get<std::string>(P_CPU_POLICY),
+                Prop->Get<double>(P_CPU_GUARANTEE),
+                Prop->Get<double>(P_CPU_LIMIT));
+        if (error) {
+            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
     }
 
-    auto blkcg = GetCgroup(BlkioSubsystem);
-    error = BlkioSubsystem.SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
-    if (error) {
-        L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_IO_POLICY)) {
+        auto blkcg = GetCgroup(BlkioSubsystem);
+        error = BlkioSubsystem.SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetIoLimit(memcg, Prop->Get<uint64_t>(P_IO_LIMIT));
-    if (error) {
-        L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_IO_LIMIT)) {
+        error = MemorySubsystem.SetIoLimit(memcg, Prop->Get<uint64_t>(P_IO_LIMIT));
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IO_OPS_LIMIT));
-    if (error) {
-        L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_IO_OPS_LIMIT)) {
+        error = MemorySubsystem.SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IO_OPS_LIMIT));
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetDirtyLimit(memcg, Prop->Get<uint64_t>(P_DIRTY_LIMIT));
-    if (error) {
-        L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
-        return error;
+    if (Prop->TestClearDirty(P_DIRTY_LIMIT)) {
+        error = MemorySubsystem.SetDirtyLimit(memcg, Prop->Get<uint64_t>(P_DIRTY_LIMIT));
+        if (error) {
+            L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
     return TError::Success();
