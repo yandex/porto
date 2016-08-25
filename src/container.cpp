@@ -897,7 +897,10 @@ TError TContainer::Start(bool meta) {
             return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
         if (RootPath().IsRoot())
             return TError(EError::Permission, "virt_mode=os without chroot only for root");
+    }
 
+    /* virt_mode=os overrides some defaults */
+    if (VirtMode == VIRT_MODE_OS) {
         if (!(PropMask & CWD_SET))
             Cwd = "/";
 
@@ -917,6 +920,27 @@ TError TContainer::Start(bool meta) {
             NetProp = { "none" };
     }
 
+    /* Non-isolated container inherits policy from parent */
+    if (!Isolate && Parent) {
+        if (!(PropMask & CPU_POLICY_SET))
+            CpuPolicy = Parent->CpuPolicy;
+
+        if (!(PropMask & IO_POLICY_SET))
+            IoPolicy = Parent->IoPolicy;
+
+        if (!(PropMask & RECHARGE_ON_PGFAULT_SET))
+            RechargeOnPgfault = Parent->RechargeOnPgfault;
+
+        if (!(PropMask & NET_PRIO_SET))
+            NetPriority = Parent->NetPriority;
+
+        if (!(PropMask & ULIMIT_SET))
+            Rlimit = Parent->Rlimit;
+
+        if (!(PropMask & UMASK_SET))
+            Umask = Parent->Umask;
+    }
+
     if (!meta && !Command.length())
         return TError(EError::InvalidValue, "container command is empty");
 
@@ -924,25 +948,10 @@ TError TContainer::Start(bool meta) {
     SanitizeCapabilities();
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
-    if (!Isolate) {
-        if ((CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
+    if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
             !CurrentClient->Cred.IsRootUser() && GetIsolationDomain()->IsRoot())
-
-            return TError(EError::Permission, "Capabilities require pid isolation: " +
-                      PidNsCapabilities.Format());
-
-        auto p = GetParent();
-        if (p) {
-            if (!(PropMask & ULIMIT_SET))
-                Rlimit = p->Rlimit;
-
-            if (!(PropMask & CPU_POLICY_SET))
-                CpuPolicy = p->CpuPolicy;
-
-            if (!(PropMask & IO_POLICY_SET))
-                IoPolicy = p->IoPolicy;
-        }
-    }
+        return TError(EError::Permission, "Capabilities require pid isolation: " +
+                                          PidNsCapabilities.Format());
 
     /* MemCgCapabilities requires memory limit */
     if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&
