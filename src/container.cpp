@@ -72,7 +72,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     RootRo = false;
     Umask = 0002;
     Isolate = true;
-    BindDns = false; /* Because root is default */
+    BindDns = true;
     VirtMode = VIRT_MODE_APP;
     NetProp = { "inherited" };
     Hostname = "";
@@ -899,6 +899,24 @@ TError TContainer::Start(bool meta) {
             return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
         if (RootPath().IsRoot())
             return TError(EError::Permission, "virt_mode=os without chroot only for root");
+
+        if (!(PropMask & CWD_SET))
+            Cwd = "/";
+
+        if (!(PropMask & COMMAND_SET))
+            Command = "/sbin/init";
+
+        if (!(PropMask & STDOUT_SET))
+            Stdout.SetOutside("/dev/null");
+
+        if (!(PropMask & STDERR_SET))
+            Stderr.SetOutside("/dev/null");
+
+        if (!(PropMask & BIND_DNS_SET))
+            BindDns = false;
+
+        if (!(PropMask & NET_SET))
+            NetProp = { "none" };
     }
 
     if (!meta && !Command.length())
@@ -908,10 +926,31 @@ TError TContainer::Start(bool meta) {
     SanitizeCapabilities();
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
-    if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
+    if (!Isolate) {
+        if ((CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
             !CurrentClient->Cred.IsRootUser() && GetIsolationDomain()->IsRoot())
-        return TError(EError::Permission, "Capabilities require pid isolation: " +
+
+            return TError(EError::Permission, "Capabilities require pid isolation: " +
                       PidNsCapabilities.Format());
+
+        if (!(PropMask & BIND_DNS_SET))
+            BindDns = false;
+
+        auto p = GetParent();
+        if (p) {
+            if (!(PropMask & ULIMIT_SET))
+                Rlimit = p->Rlimit;
+
+            if (!(PropMask & CPU_POLICY_SET))
+                CpuPolicy = p->CpuPolicy;
+
+            if (!(PropMask & IO_POLICY_SET))
+                IoPolicy = p->IoPolicy;
+        }
+    }
+
+    if (Root == "/" && !(PropMask & BIND_DNS_SET))
+        BindDns = false;
 
     /* MemCgCapabilities requires memory limit */
     if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&

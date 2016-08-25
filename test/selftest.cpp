@@ -211,7 +211,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "hostname", v));
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "bind_dns", v));
-    ExpectEq(v, "false");
+    ExpectEq(v, "true");
     ExpectApiSuccess(api.GetProperty(name, "devices", v));
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "capabilities", v));
@@ -1739,17 +1739,11 @@ static void TestRootProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "/sleep 1000"));
     string bindDns;
 
-    ExpectApiSuccess(api.GetProperty(name, "bind_dns", bindDns));
-    ExpectEq(bindDns, "false");
-
     ExpectApiSuccess(api.SetProperty(name, "root", path));
 
     string cwd;
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
     ExpectEq(cwd, "/");
-
-    ExpectApiSuccess(api.GetProperty(name, "bind_dns", bindDns));
-    ExpectEq(bindDns, "true");
 
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
@@ -3609,11 +3603,6 @@ static void TestVirtModeProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Create(name));
     ExpectApiFailure(api.SetProperty(name, "virt_mode", "invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
-
-    for (auto kv : expected) {
-        ExpectApiSuccess(api.GetProperty(name, kv.first, s));
-        ExpectEq(s, kv.second);
-    }
 
     Say() << "Check credentials and default roolback" << std::endl;
 

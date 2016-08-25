@@ -322,7 +322,6 @@ public:
     TUlimit() : TProperty(P_ULIMIT, ULIMIT_SET,
                           "Container resource limits: "
                           "<type> <soft> <hard>; ... (man 2 getrlimit)") {}
-    void Propagate(std::map<int, struct rlimit> &ulimits);
 } static Ulimit;
 
 TError TUlimit::Set(const std::string &ulimit_str) {
@@ -379,7 +378,6 @@ TError TUlimit::Set(const std::string &ulimit_str) {
 
     CurrentContainer->Rlimit = new_limit;
     CurrentContainer->PropMask |= ULIMIT_SET;
-    Propagate(new_limit);
 
     return TError::Success();
 }
@@ -408,32 +406,12 @@ TError TUlimit::Get(std::string &value) {
     return TError::Success();
 }
 
-void TUlimit::Propagate(std::map<int, struct rlimit> &ulimits) {
-
-    for (auto iter : CurrentContainer->Children) {
-        if (auto child = iter.lock()) {
-
-            auto old = CurrentContainer;
-            CurrentContainer = child.get();
-
-            if (!(CurrentContainer->PropMask & ULIMIT_SET) &&
-                !(CurrentContainer->Isolate)) {
-
-                CurrentContainer->Rlimit = ulimits;
-                Ulimit.Propagate(ulimits);
-            }
-            CurrentContainer = old;
-        }
-    }
-}
-
 class TCpuPolicy : public TProperty {
 public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
     TCpuPolicy() : TProperty(P_CPU_POLICY, CPU_POLICY_SET,
                              "CPU policy: rt, normal, idle (dynamic)" ) {}
-    TError Propagate(const std::string &policy);
 } static CpuPolicy;
 
 TError TCpuPolicy::Set(const std::string &policy) {
@@ -461,10 +439,6 @@ TError TCpuPolicy::Set(const std::string &policy) {
 
     }
 
-    error = Propagate(policy);
-    if (error)
-        return error;
-
     CurrentContainer->CpuPolicy = policy;
     CurrentContainer->PropMask |= CPU_POLICY_SET;
 
@@ -477,46 +451,6 @@ TError TCpuPolicy::Get(std::string &value) {
     return TError::Success();
 }
 
-TError TCpuPolicy::Propagate(const std::string &policy) {
-    TError error = TError::Success();
-
-    for (auto iter : CurrentContainer->Children) {
-        if (auto child = iter.lock()) {
-
-            auto old = CurrentContainer;
-            CurrentContainer = child.get();
-
-            if (!(CurrentContainer->PropMask & CPU_POLICY_SET) &&
-                !(CurrentContainer->Isolate)) {
-
-                if (CurrentContainer->GetState() == EContainerState::Running ||
-                    CurrentContainer->GetState() == EContainerState::Meta ||
-                    CurrentContainer->GetState() == EContainerState::Paused) {
-
-                    auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
-                    error = CpuSubsystem.SetCpuPolicy(cpucg, policy,
-                                                      CurrentContainer->CpuGuarantee,
-                                                      CurrentContainer->CpuLimit);
-                }
-
-                if (error) {
-                    L_ERR() << "Cannot set cpu policy: " << error << std::endl;
-                } else {
-                    /* FIXME: Inconsistent state of child tree cpu policy! */
-                    CurrentContainer->CpuPolicy = policy;
-                    error = Propagate(policy);
-                }
-            }
-
-            CurrentContainer = old;
-            if (error)
-                break;
-        }
-    }
-
-    return error;
-}
-
 class TIoPolicy : public TProperty {
 public:
     TError Set(const std::string &policy);
@@ -526,8 +460,6 @@ public:
     void Init(void) {
         IsSupported = BlkioSubsystem.SupportPolicy();
     }
-
-    TError Propagate(const std::string &policy);
 } static IoPolicy;
 
 TError TIoPolicy::Set(const std::string &policy) {
@@ -553,10 +485,6 @@ TError TIoPolicy::Set(const std::string &policy) {
 
     }
 
-    error = Propagate(policy);
-    if (error)
-        return error;
-
     CurrentContainer->IoPolicy = policy;
     CurrentContainer->PropMask |= IO_POLICY_SET;
 
@@ -567,45 +495,6 @@ TError TIoPolicy::Get(std::string &value) {
     value = CurrentContainer->IoPolicy;
 
     return TError::Success();
-}
-
-TError TIoPolicy::Propagate(const std::string &policy) {
-    TError error = TError::Success();
-
-    for (auto iter : CurrentContainer->Children) {
-        if (auto child = iter.lock()) {
-
-            auto old = CurrentContainer;
-            CurrentContainer = child.get();
-
-            if (!(CurrentContainer->PropMask & IO_POLICY_SET) &&
-                !(CurrentContainer->Isolate)) {
-
-                if (CurrentContainer->GetState() == EContainerState::Running ||
-                    CurrentContainer->GetState() == EContainerState::Meta ||
-                    CurrentContainer->GetState() == EContainerState::Paused) {
-
-                    auto blkcg = CurrentContainer->GetCgroup(BlkioSubsystem);
-                    error = BlkioSubsystem.SetPolicy(blkcg, policy == "batch");
-                }
-
-                if (error) {
-                    L_ERR() << "Can't set " << P_IO_POLICY << ": " << error
-                            << std::endl;
-                } else {
-                    /* FIXME: Inconsistent state of child tree IO policy! */
-                    CurrentContainer->IoPolicy = policy;
-                    error = Propagate(policy);
-                }
-            }
-
-            CurrentContainer = old;
-            if (error)
-                break;
-        }
-    }
-
-    return error;
 }
 
 class TUser : public TProperty {
@@ -814,28 +703,9 @@ TError TVirtMode::Set(const std::string &virt_mode) {
     else
         return TError(EError::InvalidValue, std::string("Unsupported ") +
                       P_VIRT_MODE + ": " + virt_mode);
+
     CurrentContainer->PropMask |= VIRT_MODE_SET;
     CurrentContainer->SanitizeCapabilities();
-
-    if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
-        if (!(CurrentContainer->PropMask & CWD_SET))
-            CurrentContainer->Cwd = "/";
-
-        if (!(CurrentContainer->PropMask & COMMAND_SET))
-            CurrentContainer->Command = "/sbin/init";
-
-        if (!(CurrentContainer->PropMask & STDOUT_SET))
-            CurrentContainer->Stdout.SetOutside("/dev/null");
-
-        if (!(CurrentContainer->PropMask & STDERR_SET))
-            CurrentContainer->Stderr.SetOutside("/dev/null");
-
-        if (!(CurrentContainer->PropMask & BIND_DNS_SET))
-            CurrentContainer->BindDns = false;
-
-        if (!(CurrentContainer->PropMask & NET_SET))
-            CurrentContainer->NetProp = { "none" };
-    }
 
     return TError::Success();
 }
@@ -1068,30 +938,6 @@ TError TIsolate::Set(const std::string &isolate_needed) {
     else
         return TError(EError::InvalidValue, "Invalid bool value");
 
-    if (!CurrentContainer->Isolate) {
-        if (!(CurrentContainer->PropMask & BIND_DNS_SET))
-            CurrentContainer->BindDns = false;
-
-        auto p = CurrentContainer->GetParent();
-        if (p) {
-            if (!(CurrentContainer->PropMask & ULIMIT_SET)) {
-               CurrentContainer->Rlimit = p->Rlimit;
-
-               Ulimit.Propagate(CurrentContainer->Rlimit);
-            }
-            if (!(CurrentContainer->PropMask & CPU_POLICY_SET)) {
-                CurrentContainer->CpuPolicy = p->CpuPolicy;
-
-                CpuPolicy.Propagate(CurrentContainer->CpuPolicy);
-            }
-            if (!(CurrentContainer->PropMask & IO_POLICY_SET)) {
-                CurrentContainer->IoPolicy = p->IoPolicy;
-
-                IoPolicy.Propagate(CurrentContainer->IoPolicy);
-            }
-        }
-    }
-
     CurrentContainer->PropMask |= ISOLATE_SET;
 
     return TError::Success();
@@ -1117,14 +963,6 @@ TError TRoot::Set(const std::string &root) {
         return error;
 
     CurrentContainer->Root = root;
-
-    if (root != "/") {
-        if (!(CurrentContainer->PropMask & BIND_DNS_SET) &&
-            CurrentContainer->VirtMode != VIRT_MODE_OS &&
-            CurrentContainer->Isolate) {
-            CurrentContainer->BindDns = true;
-        }
-    }
     CurrentContainer->PropMask |= ROOT_SET;
 
     return TError::Success();
