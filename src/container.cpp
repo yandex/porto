@@ -893,6 +893,8 @@ TError TContainer::Start(bool meta) {
     }
 
     if (VirtMode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
+        if (GetIsolationDomain()->IsRoot())
+            return TError(EError::Permission, "virt_mode=os must be isolated from host");
         if (!Isolate && OwnerCred.Uid != Parent->OwnerCred.Uid)
             return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
         if (RootPath().IsRoot())
