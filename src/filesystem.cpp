@@ -257,7 +257,7 @@ TError TMountNamespace::MountTraceFs() {
         if (!error)
             error = tmp.Mount("none", "debugfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
         if (!error)
-            error = tracefs.Bind(tmp_tracefs);
+            error = tracefs.BindRemount(tmp_tracefs, MS_RDONLY);
         if (!error)
             error = tmp.Umount(0);
         if (!error)
