@@ -1,7 +1,0 @@
-#!/bin/sh
-
-[ $# -eq 2 ] || { echo "Usage: $(basename $0) <source> <destination>"; exit 1; }
-
-lcov --capture --directory $1 --output-file coverage.info
-lcov --remove coverage.info 'test/*' '/usr/*' '*.pb.cc' '*.pb.h' 'portoctl.cpp' 'cli.cpp' 'cli.hpp' 'portotest.cpp' --output-file coverage.info.cleaned
-genhtml coverage.info.cleaned --output-directory $2
