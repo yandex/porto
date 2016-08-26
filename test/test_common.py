@@ -3,6 +3,9 @@ import os
 import pwd
 import grp
 
+layers = dict()
+layers["precise-base-porto"] = "/place/porto-test-layers/ubuntu-precise-base-porto.tar.xz"
+
 def Catch(func, *args, **kwargs):
     try:
         func(*args, **kwargs)
@@ -16,9 +19,12 @@ def SwitchUser(username, uid, gid):
     os.setresuid(uid,uid,0)
 
 def SwitchRoot():
-    if os.getresuid().suid == 0:
+    (ruid, euid, suid) = os.getresuid()
+    if suid == 0:
         os.setuid(0)
         os.setgid(0)
+    else:
+        raise Exception("Cannot switch on root user")
 
 def DropPrivileges():
     if os.getuid() == 0:
@@ -26,3 +32,6 @@ def DropPrivileges():
                    grp.getgrnam("porto-alice").gr_gid)
 
 portoctl = os.getcwd() + "/portoctl"
+
+def GetUidGidByUsername(username):
+    return (pwd.getpwnam(username).pw_uid, grp.getgrnam(username).gr_gid)
