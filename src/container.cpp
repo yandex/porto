@@ -542,7 +542,6 @@ TError TContainer::PrepareOomMonitor() {
 }
 
 TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
-    auto config = Devices;
     auto cg = GetCgroup(DevicesSubsystem);
     TDevice device;
     TError error;
@@ -551,13 +550,13 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
         return TError::Success();
 
     if (Parent->IsPortoRoot() &&
-            (!config.empty() || !OwnerCred.IsRootUser())) {
+            ((PropMask & DEVICES_SET) || !OwnerCred.IsRootUser())) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
             return error;
     }
 
-    for (auto &cfg: config) {
+    for (auto &cfg: Devices) {
         error = device.Parse(cfg);
         if (error)
             return TError(error, "device: " + cfg);
