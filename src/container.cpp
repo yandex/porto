@@ -817,7 +817,8 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
                           Hostname.size() ||
                           ResolvConf.size() ||
                           !taskEnv->Mnt.Root.IsRoot() ||
-                          taskEnv->Mnt.RootRdOnly;
+                          taskEnv->Mnt.RootRdOnly ||
+                          !NetCfg->Inherited;
 
     return TError::Success();
 }

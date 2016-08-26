@@ -192,6 +192,17 @@ TError TTaskEnv::ConfigureChild() {
             return error;
     }
 
+    /* Mount read-only sysfs in new namespaces */
+    if (NewMountNs && Mnt.Root.IsRoot()) {
+        TPath sys("/sys");
+        error = sys.UmountAll();
+        if (error)
+            return error;
+        error = sys.Mount("sysfs", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {});
+        if (error)
+            return error;
+    }
+
     error = Mnt.MountRootFs();
     if (error)
         return error;
