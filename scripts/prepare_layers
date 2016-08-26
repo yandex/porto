@@ -1,0 +1,32 @@
+#!/bin/sh
+
+set -ex
+
+L=$(dirname $(dirname $0))/layers
+N="NAT"
+#N="macvlan eth* eth0; autoconf eth0"
+
+sudo portoctl build -o bootstrap.tgz \
+	-B "$L/bootstrap_bootstrap.sh" net="$N"
+
+portoctl layer -I bootstrap bootstrap.tgz
+
+portoctl build -l bootstrap -o ubuntu-precise.tgz \
+	-B $L/bootstrap_ubuntu_precise.sh \
+	-S $L/base_ubuntu_precise.sh \
+	-S $L/common-misc.sh \
+	-S $L/common-openssh.sh \
+	-S $L/common-devel.sh \
+	-S $L/common-cleanup.sh net="$N"
+
+portoctl layer -I ubuntu-precise ubuntu-precise.tgz
+
+portoctl build -l bootstrap -o ubuntu-xenial.tgz \
+	-B $L/bootstrap_ubuntu_xenial.sh \
+	-S $L/base_ubuntu_xenial.sh \
+	-S $L/common-misc.sh \
+	-S $L/common-openssh.sh \
+	-S $L/common-devel.sh \
+	-S $L/common-cleanup.sh net="$N"
+
+portoctl layer -I ubuntu-xenial ubuntu-xenial.tgz
