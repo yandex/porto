@@ -101,8 +101,6 @@ $ portoctl create invalid
 $ portoctl set invalid command __invalid_command__
 $ portoctl start invalid
 Can't start container: Unknown (No such file or directory: execvpe(__invalid_command__))
-$ portoctl get invalid start_errno
-2
 ```
 
 Container exit status is available via exit\_status data (format is the same as wait syscall, man 2 wait), portoctl get shows human readable status:

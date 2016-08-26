@@ -157,7 +157,6 @@ public:
     EContainerState State = EContainerState::Unknown;
     bool OomKilled = false;
     int ExitStatus = 0;
-    int TaskStartErrno = -1;
 
     TTask Task;
     pid_t TaskVPid;

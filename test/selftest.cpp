@@ -826,8 +826,6 @@ static void TestExitStatus(Porto::Connection &api) {
     ExpectApiFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
-    ExpectApiSuccess(api.GetData(name, "start_errno", ret));
-    ExpectEq(ret, string("2"));
 
     Say() << "Check exit status of invalid directory" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -836,8 +834,6 @@ static void TestExitStatus(Porto::Connection &api) {
     ExpectApiFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
-    ExpectApiSuccess(api.GetData(name, "start_errno", ret));
-    ExpectEq(ret, string("2"));
 
     Say() << "Check exit status when killed by signal" << std::endl;
     ExpectApiSuccess(api.Destroy(name));
@@ -1717,11 +1713,7 @@ static void TestRootProperty(Porto::Connection &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ls"));
     ExpectApiSuccess(api.SetProperty(name, "root", path));
-
     ExpectApiFailure(api.Start(name), EError::InvalidValue);
-    ExpectApiSuccess(api.GetData(name, "start_errno", v));
-    ExpectEq(v, string("2"));
-
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check filesystem isolation" << std::endl;
@@ -2946,7 +2938,6 @@ static void TestRoot(Porto::Connection &api) {
         "oom_killed",
         "respawn_count",
         "exit_status",
-        "start_errno",
         "stdout",
         "stdout_offset",
         "stderr",

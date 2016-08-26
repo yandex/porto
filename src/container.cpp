@@ -1013,12 +1013,9 @@ TError TContainer::Start(bool meta) {
                            "OOM, memory limit too low");
         }
 
-        if (error) {
-            TaskStartErrno = error.GetErrno();
+        if (error)
             goto error;
-        }
 
-        TaskStartErrno = -1;
         L() << GetName() << " started " << std::to_string(Task.Pid) << std::endl;
         PropMask |= ROOT_PID_SET;
     }

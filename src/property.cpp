@@ -2428,21 +2428,6 @@ TError TExitStatusProperty::Get(std::string &value) {
     return GetToSave(value);
 }
 
-class TStartErrno : public TProperty {
-public:
-    TError Get(std::string &value);
-    TStartErrno() : TProperty(D_START_ERRNO, 0, "container start error (ro)") {
-        IsReadOnly = true;
-        IsSerializable = false;
-    }
-} static StartErrno;
-
-TError TStartErrno::Get(std::string &value) {
-    value = std::to_string(CurrentContainer->TaskStartErrno);
-
-    return TError::Success();
-}
-
 class TMemUsage : public TProperty {
 public:
     TError Get(std::string &value);
