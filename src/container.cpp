@@ -977,11 +977,16 @@ TError TContainer::Start(bool meta) {
         goto error;
 
     /* NetNsCapabilities must be isoalted from host net-namespace */
-    if ((CapAmbient.Permitted & NetNsCapabilities.Permitted) &&
-            !CurrentClient->Cred.IsRootUser() && Net == GetRoot()->Net) {
-        error = TError(EError::Permission, "Capabilities require net isolation: " +
-                       NetNsCapabilities.Format());
-        goto error;
+    if (Net == GetRoot()->Net && !CurrentClient->Cred.IsRootUser()) {
+        if (CapAmbient.Permitted & NetNsCapabilities.Permitted) {
+            error = TError(EError::Permission, "Capabilities require net isolation: " +
+                                               NetNsCapabilities.Format());
+            goto error;
+        }
+        if (VirtMode == VIRT_MODE_OS) {
+            error = TError(EError::Permission, "virt_mode=os must be isolated from host network");
+            goto error;
+        }
     }
 
     if (!meta || (meta && Isolate)) {
