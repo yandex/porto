@@ -713,7 +713,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     env.SetEnv("PORTO_NAME", GetName(), true, true);
     env.SetEnv("PORTO_HOST", GetHostName(), true, true);
 
-    /* inherit environment from all parent application containers */
+    /* Inherit environment from containts in isolation domain */
     bool overwrite = true;
     for (auto ct = this; ct; ct = ct->Parent.get()) {
         TError error = env.Parse(EnvCfg, overwrite);
@@ -721,7 +721,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
             return error;
         overwrite = false;
 
-        if (ct->VirtMode == VIRT_MODE_OS)
+        if (ct->Isolate)
             break;
     }
 
