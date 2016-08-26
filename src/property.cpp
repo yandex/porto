@@ -1045,7 +1045,11 @@ public:
         TError error = IsAliveAndStopped();
         if (error)
             return error;
-        return StringToOct(value, CurrentContainer->Umask);
+        error = StringToOct(value, CurrentContainer->Umask);
+        if (error)
+            return error;
+        CurrentContainer->PropMask |= UMASK_SET;
+        return TError::Success();
     }
 } static Umask;
 
