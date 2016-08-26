@@ -202,7 +202,8 @@ TError TTaskEnv::ConfigureChild() {
             return error;
     }
 
-    if (!Mnt.Root.IsRoot() && CT->BindDns && !CT->ResolvConf.size()) {
+    if (NewMountNs && CT->BindDns && !CT->ResolvConf.size() &&
+            !Mnt.Root.IsRoot()) {
         error = Mnt.BindResolvConf();
         if (error)
             return error;

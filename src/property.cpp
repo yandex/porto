@@ -882,35 +882,26 @@ public:
 
 class TBindDns : public TProperty {
 public:
-    TError Set(const std::string &bind_needed);
-    TError Get(std::string &value);
     TBindDns() : TProperty(P_BIND_DNS, BIND_DNS_SET,
                            "Bind /etc/resolv.conf and /etc/hosts"
-                           " of host to container") {}
+                           " from host into container root") {}
+    TError Get(std::string &value) {
+        value = BoolToString(CurrentContainer->BindDns);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+
+        error = StringToBool(value, CurrentContainer->BindDns);
+        if (error)
+            return error;
+        CurrentContainer->PropMask |= BIND_DNS_SET;
+        return TError::Success();
+    }
 } static BindDns;
 
-TError TBindDns::Get(std::string &value) {
-    value = CurrentContainer->BindDns ? "true" : "false";
-
-    return TError::Success();
-}
-
-TError TBindDns::Set(const std::string &bind_needed) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    if (bind_needed == "true")
-        CurrentContainer->BindDns = true;
-    else if (bind_needed == "false")
-        CurrentContainer->BindDns = false;
-    else
-        return TError(EError::InvalidValue, "Invalid bool value");
-
-    CurrentContainer->PropMask |= BIND_DNS_SET;
-
-    return TError::Success();
-}
 
 class TIsolate : public TProperty {
 public:

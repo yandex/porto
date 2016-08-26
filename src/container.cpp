@@ -815,7 +815,6 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     // Create new mount namespaces if we have to make any changes
     taskEnv->NewMountNs = Isolate ||
                           taskEnv->Mnt.BindMounts.size() ||
-                          BindDns ||
                           Hostname.size() ||
                           ResolvConf.size() ||
                           !taskEnv->Mnt.Root.IsRoot() ||
@@ -933,9 +932,6 @@ TError TContainer::Start(bool meta) {
             return TError(EError::Permission, "Capabilities require pid isolation: " +
                       PidNsCapabilities.Format());
 
-        if (!(PropMask & BIND_DNS_SET))
-            BindDns = false;
-
         auto p = GetParent();
         if (p) {
             if (!(PropMask & ULIMIT_SET))
@@ -948,9 +944,6 @@ TError TContainer::Start(bool meta) {
                 IoPolicy = p->IoPolicy;
         }
     }
-
-    if (Root == "/" && !(PropMask & BIND_DNS_SET))
-        BindDns = false;
 
     /* MemCgCapabilities requires memory limit */
     if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&
