@@ -273,14 +273,15 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
     }
 
     if (name == "-v" || name == "--version") {
-        std::cout << "client: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
         std::string version, revision;
-        int ret = PortoApi.GetVersion(version, revision);
 
-        if (!ret)
-            std::cout << "server: " << version << " " << revision << std::endl;
+        std::cout << "client: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
 
-        return EXIT_FAILURE;
+        if (PortoApi.GetVersion(version, revision))
+            return EXIT_FAILURE;
+
+        std::cout << "server: " << version << " " << revision << std::endl;
+        return EXIT_SUCCESS;
     }
 
     int ret = EXIT_FAILURE;
