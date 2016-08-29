@@ -3,9 +3,6 @@ import os
 import pwd
 import grp
 
-layers = dict()
-layers["precise-base-porto"] = "/place/porto-test-layers/ubuntu-precise-base-porto.tar.xz"
-
 def Catch(func, *args, **kwargs):
     try:
         func(*args, **kwargs)
@@ -31,7 +28,10 @@ def DropPrivileges():
         SwitchUser("porto-alice", pwd.getpwnam("porto-alice").pw_uid,
                    grp.getgrnam("porto-alice").gr_gid)
 
-portoctl = os.getcwd() + "/portoctl"
-
 def GetUidGidByUsername(username):
     return (pwd.getpwnam(username).pw_uid, grp.getgrnam(username).gr_gid)
+
+
+portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+portobin = os.getcwd()
+portoctl = portobin + "/portoctl"

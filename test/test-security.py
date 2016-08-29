@@ -12,17 +12,7 @@ import shutil
 import tarfile
 
 import porto
-import test_common
 from test_common import *
-
-
-def PrepareLayer(c, name):
-    try:
-        c.ImportLayer(name, test_common.layers[name])
-    except porto.exceptions.LayerAlreadyExists:
-        pass
-    except:
-        raise
 
 #stdin/stderr/stdout privilege escalation
 
@@ -106,7 +96,6 @@ def ns_escape_container():
         print "FAIL",
 
     sys.stdout.flush()
-    exit(0)
 
 def ns_escape(v):
     (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
@@ -128,7 +117,7 @@ def ns_escape(v):
     r = c.Create("parent")
     r.SetProperty("root", v.path)
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
-    r.SetProperty("bind", os.getcwd() + " /porto ro")
+    r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", "python /porto/test/test-security.py ns_escape_container 2 1")
     r.SetProperty("porto_namespace", "parent")
 
@@ -176,7 +165,7 @@ def read_shadow():
     f = open("/tmp/shadow", "r")
     print f.read()
     f.close()
-    exit(0)
+
 
 def append_sudoers():
     f = open("/tmp/sudoers", "a")
@@ -184,7 +173,7 @@ def append_sudoers():
     sys.stdout.flush()
     #f.write("\tmax7255 (ALL) NOPASSWD: ALL")
     f.close()
-    exit(0)
+
 
 def append_passwd():
     f = open("/tmp/passwd", "a")
@@ -192,12 +181,7 @@ def append_passwd():
     print "Opened passwd for append..."
     sys.stdout.flush()
     f.close()
-    exit(0)
 
-
-def bind_escalation_container():
-    exec(sys.argv[2]+"()")
-    exit(0)
 
 def binds_escalation(v):
     (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
@@ -209,18 +193,18 @@ def binds_escalation(v):
     c = porto.Connection()
     r = c.Create("bind_file")
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
-    r.SetProperty("bind", os.getcwd() + " /porto ro")
+    r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("root", v.path)
     r.SetProperty("bind", "/etc/shadow /tmp/shadow ro")
-    r.SetProperty("command", "python /porto/test/test-security.py bind_escalation_container read_shadow")
+    r.SetProperty("command", "python /porto/test/test-security.py read_shadow")
     assert Catch(r.Start) == porto.exceptions.PermissionError
 
     r.SetProperty("bind", "/etc/passwd /tmp/passwd rw")
-    r.SetProperty("command", "python /porto/test/test-security.py bind_escalation_container append_passwd")
+    r.SetProperty("command", "python /porto/test/test-security.py append_passwd")
     assert Catch(r.Start) == porto.exceptions.PermissionError
 
     r.SetProperty("bind", "/etc/sudoers /tmp/sudoers rw")
-    r.SetProperty("command", "python /porto/test/test-security.py bind_escalation_container append_sudoers")
+    r.SetProperty("command", "python /porto/test/test-security.py append_sudoers")
     assert Catch(r.Start) == porto.exceptions.PermissionError
 
     r.SetProperty("bind", "/sbin /tmp/lol rw")
@@ -275,7 +259,7 @@ def binds_escalation(v):
 def internal_escalation_container():
     c = porto.Connection()
     r = c.Create("test_cont2")
-    exit(0)
+
 
 def internal_escalation(v):
     (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
@@ -288,7 +272,7 @@ def internal_escalation(v):
     r.SetProperty("virt_mode", "os")
     r.SetProperty("root", v.path)
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
-    r.SetProperty("bind", os.getcwd() + " /porto ro")
+    r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", "python /porto/test/test-security.py internal_escalation_container")
 
     r.Start()
@@ -305,7 +289,6 @@ def internal_escalation(v):
 def porto_namespace_escape_container():
     c = porto.Connection()
     c.SetProperty("self", "porto_namespace", "")
-    exit(0)
 
 
 def porto_namespace_escape(v):
@@ -318,7 +301,7 @@ def porto_namespace_escape(v):
     r.SetProperty("porto_namespace", "test")
     r.SetProperty("root", v.path)
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
-    r.SetProperty("bind", os.getcwd() + " /porto ro")
+    r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", \
                   "python /porto/test/test-security.py porto_namespace_escape_container")
     r.Start()
@@ -371,7 +354,6 @@ def layer_escalation_container():
     os.remove("layer0.tar")
     os.remove("layer1.tar")
 
-    exit(0)
 
 def layer_escalation_volume_container():
     os.mkdir("layer")
@@ -380,10 +362,10 @@ def layer_escalation_volume_container():
 
     vol_path = sys.argv[2]
     c = porto.Connection()
-    subprocess.check_call(["/porto/portoctl", "vcreate", "/layer", "path="+vol_path+\
-                          "/../../../../tmp/porto-tests", "layers=/layer"])
+    subprocess.check_call(["/portobin/portoctl", "vcreate", "/layer",
+                           "path={}/../../../../tmp/porto-tests".format(vol_path),
+                           "layers=/layer"])
 
-    exit(0)
 
 def layer_escalation(v):
     (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
@@ -395,7 +377,7 @@ def layer_escalation(v):
     r = c.Create("test")
     r.SetProperty("root", v.path)
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
-    r.SetProperty("bind", os.getcwd() + " /porto ro")
+    r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", "python /porto/test/test-security.py layer_escalation_container")
 
     r.Start()
@@ -424,7 +406,7 @@ def layer_escalation(v):
     r.SetProperty("command", "python /porto/test/test-security.py layer_escalation_volume_container " + v.path)
     r.SetProperty("stdout_path","/tmp/stdout")
     r.SetProperty("stderr_path","/tmp/stderr")
-    r.SetProperty("bind", os.getcwd() + " /porto ro")
+    r.SetProperty("bind", "{} /porto ro; {} /portobin ro".format(portosrc, portobin))
 
     r.Start()
     r.Wait()
@@ -435,16 +417,18 @@ def layer_escalation(v):
 
     SwitchRoot()
 
+
 if len(sys.argv) > 1:
     exec(sys.argv[1]+"()")
+    exit(0)
+
 
 if os.getuid() != 0:
     SwitchRoot()
 
 c = porto.Connection(timeout=120)
 
-PrepareLayer(c, "precise-base-porto")
-v = c.CreateVolume(path=None, layers=["precise-base-porto"])
+v = c.CreateVolume(path=None, layers=["ubuntu-precise"])
 
 try:
     shutil.rmtree("/tmp/porto-tests")
