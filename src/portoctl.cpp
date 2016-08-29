@@ -136,7 +136,7 @@ public:
     TError ImportLayer(const TPath &path, std::string &id) {
         id = "_weak_portoctl-" + std::to_string(GetPid()) + "-" +
              std::to_string(LayerIndex++) + "-" + path.BaseName();
-        std::cerr << "Importing layer " << path << " as " << id << std::endl;
+        std::cout << "Importing layer " << path << " as " << id << std::endl;
         if (Api->ImportLayer(id, path.ToString()))
             return GetLastError();
         ImportedLayers.push_back(id);

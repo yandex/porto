@@ -36,10 +36,10 @@ void PrintAligned(const std::string &name, const std::string &desc,
     if (last.length())
         v.push_back(last);
 
-    std::cerr << "  " << std::left << std::setw(nameWidth) << name
+    std::cout << "  " << std::left << std::setw(nameWidth) << name
         << v[0] << std::endl;
     for (size_t i = 1; i < v.size(); i++)
-        std::cerr << "  " << std::left << std::setw(nameWidth) << " "
+        std::cout << "  " << std::left << std::setw(nameWidth) << " "
             << v[i] << std::endl;
 }
 
@@ -77,9 +77,9 @@ void THelpCmd::Usage() {
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
         termWidth = w.ws_col;
 
-    std::cerr << "Usage: " << program_invocation_short_name << " [-t|--timeout <seconds>] <command> [<args>]" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "Command list:" << std::endl;
+    std::cout << "Usage: " << program_invocation_short_name << " [-t|--timeout <seconds>] <command> [<args>]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Command list:" << std::endl;
 
     using CmdPair = TCommandHandler::RegisteredCommands::value_type;
     int nameWidth = MaxFieldLength(Handler.GetCommands(), [](const CmdPair &p) { return p.first; });
@@ -87,11 +87,11 @@ void THelpCmd::Usage() {
     for (const auto &i : Handler.GetCommands())
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
-    std::cerr << std::endl << "Volume properties:" << std::endl;
+    std::cout << std::endl << "Volume properties:" << std::endl;
     vector<Porto::Property> vlist;
     int ret = Api->ListVolumeProperties(vlist);
     if (ret) {
-        PrintError("Unavailable");
+        PrintError("Volume properties unavailable");
     } else {
         nameWidth = MaxFieldLength(vlist, [](const Porto::Property &p) { return p.Name; });
 
@@ -99,11 +99,11 @@ void THelpCmd::Usage() {
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
-    std::cerr << std::endl << "Property list:" << std::endl;
+    std::cout << std::endl << "Property list:" << std::endl;
     vector<Porto::Property> plist;
     ret = Api->Plist(plist);
     if (ret) {
-        PrintError("Unavailable");
+        PrintError("Properties unavailable");
     } else {
         nameWidth = MaxFieldLength(plist, [](const Porto::Property &p) { return p.Name; });
 
@@ -114,18 +114,18 @@ void THelpCmd::Usage() {
     if (!UsagePrintData)
         return;
 
-    std::cerr << std::endl << "Data list:" << std::endl;
+    std::cout << std::endl << "Data list:" << std::endl;
     vector<Porto::Property> dlist;
     ret = Api->Dlist(dlist);
     if (ret) {
-        PrintError("Unavailable");
+        PrintError("Data properties unavailable");
     } else {
         nameWidth = MaxFieldLength(dlist, [](const Porto::Property &d) { return d.Name; });
 
         for (const auto &d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
     }
-    std::cerr << std::endl;
+    std::cout << std::endl;
 }
 
 int THelpCmd::Execute(TCommandEnviroment *env) {
@@ -199,7 +199,7 @@ void ICmd::PrintError(const string &str) {
 }
 
 void ICmd::PrintUsage() {
-    std::cerr << "Usage: " << program_invocation_short_name
+    std::cout << "Usage: " << program_invocation_short_name
               << " " << Name << " " << Usage << std::endl
               << std::endl << Desc << std::endl << Help;
 }
@@ -273,12 +273,12 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
     }
 
     if (name == "-v" || name == "--version") {
-        std::cerr << "client: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
+        std::cout << "client: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
         std::string version, revision;
         int ret = PortoApi.GetVersion(version, revision);
 
         if (!ret)
-            std::cerr << "server: " << version << " " << revision << std::endl;
+            std::cout << "server: " << version << " " << revision << std::endl;
 
         return EXIT_FAILURE;
     }
