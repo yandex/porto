@@ -382,14 +382,21 @@ void TContainerHolder::RemoveLeftovers() {
             L_ERR() << "Cannot dump porto " << hy->Type << " cgroups : "
                     << error << std::endl;
 
-        for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); cg++) {
-            std::string name = cg->Name.substr(strlen(PORTO_ROOT_CGROUP) + 1);
+        for (auto &cg: cgroups) {
+            std::string name = cg.Name.substr(strlen(PORTO_ROOT_CGROUP) + 1);
             if (Containers.count(name))
                 continue;
 
-            if (!cg->IsEmpty())
-                (void)cg->KillAll(9);
-            (void)cg->Remove();
+            if (!cg.IsEmpty())
+                (void)cg.KillAll(9);
+
+            if (hy == &FreezerSubsystem && FreezerSubsystem.IsFrozen(cg)) {
+                (void)FreezerSubsystem.Thaw(cg);
+                if (FreezerSubsystem.IsParentFreezing(cg))
+                    continue;
+            }
+
+            (void)cg.Remove();
         }
     }
 

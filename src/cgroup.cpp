@@ -702,8 +702,8 @@ TBlkioSubsystem     BlkioSubsystem;
 TDevicesSubsystem   DevicesSubsystem;
 
 std::vector<TSubsystem *> AllSubsystems = {
-    { &MemorySubsystem   },
     { &FreezerSubsystem  },
+    { &MemorySubsystem   },
     { &CpuSubsystem      },
     { &CpuacctSubsystem  },
     { &NetclsSubsystem   },
