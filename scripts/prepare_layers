@@ -2,31 +2,40 @@
 
 set -ex
 
+: ${COMPRESS=tgz}
+: ${NET=NAT}
+# ${NET=macvlan eth* eth0; autoconf eth0}
+: ${PORTOCTL=portoctl}
+
 L=$(dirname $(dirname $0))/layers
-N="NAT"
-#N="macvlan eth* eth0; autoconf eth0"
 
-sudo portoctl build -o bootstrap.tgz \
-	-B "$L/bootstrap_bootstrap.sh" net="$N"
+rm -f bootstrap.$COMPRESS
+sudo $PORTOCTL build -o bootstrap.$COMPRESS \
+	-B "$L/bootstrap_bootstrap.sh" net="$NET"
 
-portoctl layer -I bootstrap bootstrap.tgz
+$PORTOCTL layer -R bootstrap || true
+$PORTOCTL layer -I bootstrap bootstrap.$COMPRESS
 
-portoctl build -l bootstrap -o ubuntu-precise.tgz \
+rm -f ubuntu-precise.$COMPRESS
+$PORTOCTL build -l bootstrap -o ubuntu-precise.$COMPRESS \
 	-B $L/bootstrap_ubuntu_precise.sh \
 	-S $L/base_ubuntu_precise.sh \
 	-S $L/common-misc.sh \
 	-S $L/common-openssh.sh \
 	-S $L/common-devel.sh \
-	-S $L/common-cleanup.sh net="$N"
+	-S $L/common-cleanup.sh net="$NET"
 
-portoctl layer -I ubuntu-precise ubuntu-precise.tgz
+$PORTOCTL layer -R ubuntu-precise || true
+$PORTOCTL layer -I ubuntu-precise ubuntu-precise.$COMPRESS
 
-portoctl build -l bootstrap -o ubuntu-xenial.tgz \
+rm -f ubuntu-xenial.$COMPRESS
+$PORTOCTL build -l bootstrap -o ubuntu-xenial.$COMPRESS \
 	-B $L/bootstrap_ubuntu_xenial.sh \
 	-S $L/base_ubuntu_xenial.sh \
 	-S $L/common-misc.sh \
 	-S $L/common-openssh.sh \
 	-S $L/common-devel.sh \
-	-S $L/common-cleanup.sh net="$N"
+	-S $L/common-cleanup.sh net="$NET"
 
-portoctl layer -I ubuntu-xenial ubuntu-xenial.tgz
+$PORTOCTL layer -R ubuntu-xenial || true
+$PORTOCTL layer -I ubuntu-xenial ubuntu-xenial.$COMPRESS
