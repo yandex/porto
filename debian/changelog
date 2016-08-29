@@ -1,3 +1,47 @@
+yandex-porto (3.0.2) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: switch to libnl 3.2.27
+  * porto: fix compilation in travis
+
+  [ Maxim Samoylov ]
+  * portotop: use hierarhical limits for portoctl top
+
+  [ Konstantin Khlebnikov ]
+  * portotop: brighter highlight for sorting column
+  * cgroup: bisect steps for reducing memory limit
+  * porto: virt_mode=os must be isolated from host
+
+  [ Maxim Samoylov ]
+  * property: get rid of knob dependencies on set action
+
+  [ Konstantin Khlebnikov ]
+  * property: keep bind_dns=true but bind only when needed
+  * property: virt_mode=os must be isolated from host network
+  * property: remember custom umask
+  * property: apply defaul defaults for empty set
+  * property: inherit environment variables only within isolation domain
+  * property: cleanup inheritance
+  * property: deprecate start_errno
+  * porto: remove obsolete scripts
+  * filesystem: remount debug/tracing bind read-only
+  * porto: remount sysfs to show devices in new netns
+  * porto: add scripts for building layers
+  * scripts/prepare_layers: update layers
+  * layers: add python-protobuf into common-devel.sh
+
+  [ Maxim Samoylov ]
+  * test: add tests with security-related cases
+
+  [ Konstantin Khlebnikov ]
+  * test/test-security.py: cleanup and fixup
+
+  [ Maxim Samoylov ]
+  * portoctl: print help on stdout instead of stderr
+  * portoctl: exit with EXIT_SUCCESS if server alive
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 29 Aug 2016 13:59:40 +0300
+
 yandex-porto (3.0.1) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
