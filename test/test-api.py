@@ -14,6 +14,7 @@ c.List()
 c.Plist()
 c.Dlist()
 c.Vlist()
+c.Version()
 
 c.ListContainers()
 c.ListVolumes()

@@ -368,6 +368,12 @@ class _RPC(object):
         request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
         return self.call(request, self.timeout).layers.layer
 
+    def Version(self):
+        request = rpc_pb2.TContainerRequest()
+        request.version.CopyFrom(rpc_pb2.TVersionRequest())
+        response = self.call(request, self.timeout)
+        return (response.version.tag, response.version.revision)
+
 
 class Container(object):
     def __init__(self, rpc, name):
@@ -599,6 +605,9 @@ class Connection(object):
 
     def ConvertPath(self, path, source, destination):
         return self.rpc.ConvertPath(self.rpc, path, source, destination)
+
+    def Version(self):
+        return self.rpc.Version()
 
 # Example:
 # from porto import *
