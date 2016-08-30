@@ -2554,7 +2554,7 @@ static void TestEnablePortoProperty(Porto::Connection &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name2, "enable_porto", "false"));
-    ExpectApiFailure(api.SetProperty(name2, "enable_porto", "true"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name2, "enable_porto", "true"), EError::Permission);
 
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
     ExpectApiSuccess(api.SetProperty(name2, "enable_porto", "false"));

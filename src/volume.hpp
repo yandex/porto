@@ -118,8 +118,6 @@ public:
     TError LinkContainer(const std::string name);
     bool UnlinkContainer(const std::string name);
 
-    TError CheckPermission(const TCred &ucred) const;
-
     TPath GetPath() const;
     TPath GetStorage() const;
     TPath GetInternal(std::string type) const;

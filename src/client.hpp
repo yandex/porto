@@ -25,13 +25,17 @@ public:
     TCred TaskCred;
     pid_t Pid = 0;
     std::string Comm;
+    gid_t UserCtGroup = 0;
 
     TClient(std::shared_ptr<TEpollLoop> loop);
     TClient(const std::string &special);
     ~TClient();
 
-    bool ReadOnlyAccess = true;
-    bool SpecialClient = false;
+    EAccessLevel AccessLevel = EAccessLevel::None;
+
+    bool IsSuperUser(void) const;
+    TError CanControl(const TCred &cred);
+    TError CanControl(const TContainer &ct, bool createChild = false);
 
     TError AcceptConnection(TContext &context, int listenFd);
     void CloseConnection();

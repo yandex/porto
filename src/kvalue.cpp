@@ -71,7 +71,7 @@ TError TKeyValue::Save() {
     TPath tmpPath(Path.ToString() + ".tmp");
     error = tmpPath.Mkfile(0640);
     if (!error)
-        error = tmpPath.Chown(0, GetPortoGroupId());
+        error = tmpPath.Chown(RootUser, PortoGroup);
     if (!error)
         error = tmpPath.WriteAll(buf);
     if (!error)
@@ -98,8 +98,8 @@ TError TKeyValue::Mount(const TPath &root) {
                            MS_NOEXEC | MS_NOSUID | MS_NODEV,
                            { "size=" + std::to_string(config().keyvalue_size()),
                              "mode=0750",
-                             "uid=0",
-                             "gid=" + std::to_string(GetPortoGroupId()) });
+                             "uid=" + std::to_string(RootUser),
+                             "gid=" + std::to_string(PortoGroup) });
         if (error)
             return error;
     } else if (mount.Type != "tmpfs")

@@ -31,7 +31,7 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     std::shared_ptr<TContainer> container;
     TError error;
 
-    error = Create(holder_lock, ROOT_CONTAINER, TCred(0, 0), container);
+    error = Create(holder_lock, ROOT_CONTAINER, container);
     if (error)
         return error;
 
@@ -53,7 +53,7 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
 
 TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
     std::shared_ptr<TContainer> container;
-    TError error = Create(holder_lock, PORTO_ROOT_CONTAINER, TCred(0, 0), container);
+    TError error = Create(holder_lock, PORTO_ROOT_CONTAINER, container);
     if (error)
         return error;
 
@@ -146,7 +146,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred, std::shared_ptr<TContainer> &container) {
+TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &name, std::shared_ptr<TContainer> &container) {
     TError error;
 
     error = ValidName(name);
@@ -166,8 +166,8 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     if (parent && parent->GetLevel() == CONTAINER_LEVEL_MAX)
         return TError(EError::InvalidValue, "You shall not go deeper!");
 
-    if (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
-        error = parent->CheckPermission(cred);
+    if (parent) {
+        error = CurrentClient->CanControl(*parent, true);
         if (error)
             return error;
     }
@@ -178,7 +178,7 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
         return error;
 
     auto c = std::make_shared<TContainer>(shared_from_this(), name, parent, id);
-    error = c->Create(cred);
+    error = c->Create(CurrentClient->Cred);
     if (error)
         return error;
 
@@ -232,8 +232,8 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     // check permissions
-    if (client && checkPerm) {
-        error = c->CheckPermission(client->Cred);
+    if (CurrentClient && checkPerm) {
+        error = CurrentClient->CanControl(*c);
         if (error)
             return error;
     }

@@ -386,9 +386,9 @@ void InitUsersAndGroups() {
     ExpectNeq(Alice.Uid, Bob.Uid);
     ExpectNeq(Alice.Gid, Bob.Gid);
 
-    Expect(!Nobody.IsPortoUser());
-    Expect(Alice.IsPortoUser());
-    Expect(Bob.IsPortoUser());
+    Expect(!Nobody.IsMemberOf(PortoGroup));
+    Expect(Alice.IsMemberOf(PortoGroup));
+    Expect(Bob.IsMemberOf(PortoGroup));
 }
 
 void AsRoot(Porto::Connection &api) {

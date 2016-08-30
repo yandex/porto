@@ -7,6 +7,7 @@
 #include "container.hpp"
 #include "holder.hpp"
 #include "config.hpp"
+#include "client.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/crc32.hpp"
@@ -1481,9 +1482,11 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        error = target->CheckPermission(OwnerCred);
-        if (error)
-            return TError(error, "net container " + NetCtName);
+        if (CurrentClient) {
+            error = CurrentClient->CanControl(*target);
+            if (error)
+                return TError(error, "net container " + NetCtName);
+        }
 
         error = target->OpenNetns(NetNs);
         if (error)

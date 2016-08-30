@@ -49,8 +49,9 @@ using std::map;
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        const std::string &name, std::shared_ptr<TContainer> parent,
                        int id) :
-    Holder(holder), Name(StripParentName(name)), Parent(parent),
+    Holder(holder), Name(StripParentName(name)),
     Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1),
+    Parent(parent),
     Stdin(0), Stdout(1), Stderr(2)
 {
     Statistics->Containers++;
@@ -107,7 +108,12 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     RespawnCount = 0;
     Private = "";
     AgingTime = config().container().default_aging_time_s();
-    PortoEnabled = true;
+
+    if (Parent && Parent->AccessLevel < EAccessLevel::ChildOnly)
+        AccessLevel = Parent->AccessLevel;
+    else
+        AccessLevel = EAccessLevel::Normal;
+
     IsWeak = false;
 }
 
@@ -336,6 +342,14 @@ std::shared_ptr<const TContainer> TContainer::GetRoot() const {
         return shared_from_this();
 }
 
+bool TContainer::IsChildOf(const TContainer &ct) const {
+    for (auto ptr = Parent.get(); ptr; ptr = ptr->Parent.get()) {
+        if (ptr == &ct)
+            return true;
+    }
+    return false;
+}
+
 std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
 }
@@ -419,13 +433,6 @@ uint64_t TContainer::GetHierarchyMemLimit(std::shared_ptr<const TContainer> root
     }
 
     return val;
-}
-
-bool TContainer::IsPortoEnabled(void) const {
-    for (auto ct = shared_from_this(); ct; ct = ct->Parent)
-        if (!ct->PortoEnabled)
-            return false;
-    return true;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -772,7 +779,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
                           Isolate && !Command.empty();
 
     taskEnv->Mnt.BindMounts = BindMounts;
-    taskEnv->Mnt.BindPortoSock = IsPortoEnabled();
+    taskEnv->Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
 
 
     error = ConfigureDevices(taskEnv->Devices);
@@ -950,13 +957,13 @@ TError TContainer::Start(bool meta) {
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
     if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
-            !CurrentClient->Cred.IsRootUser() && GetIsolationDomain()->IsRoot())
+            !CurrentClient->IsSuperUser() && GetIsolationDomain()->IsRoot())
         return TError(EError::Permission, "Capabilities require pid isolation: " +
                                           PidNsCapabilities.Format());
 
     /* MemCgCapabilities requires memory limit */
     if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&
-            !CurrentClient->Cred.IsRootUser()) {
+            !CurrentClient->IsSuperUser()) {
         bool limited = false;
         for (auto p = Parent; p; p = p->Parent)
             limited = limited || p->MemLimit;
@@ -964,6 +971,11 @@ TError TContainer::Start(bool meta) {
             return TError(EError::Permission, "Capabilities require memory limit: " +
                           MemCgCapabilities.Format());
     }
+
+    /* Propogate lower access levels into child */
+    if (Parent && Parent->AccessLevel < EAccessLevel::ChildOnly &&
+                  Parent->AccessLevel < AccessLevel)
+        AccessLevel = Parent->AccessLevel;
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
@@ -986,7 +998,7 @@ TError TContainer::Start(bool meta) {
         goto error;
 
     /* NetNsCapabilities must be isoalted from host net-namespace */
-    if (Net == GetRoot()->Net && !CurrentClient->Cred.IsRootUser()) {
+    if (Net == GetRoot()->Net && !CurrentClient->IsSuperUser()) {
         if (CapAmbient.Permitted & NetNsCapabilities.Permitted) {
             error = TError(EError::Permission, "Capabilities require net isolation: " +
                                                NetNsCapabilities.Format());
@@ -1942,18 +1954,6 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
         default:
             break;
     }
-}
-
-TError TContainer::CheckPermission(const TCred &ucred) {
-    // for root we report more meaningful errors from handlers, so don't
-    // check permissions here
-    if (IsRoot() || IsPortoRoot())
-        return TError::Success();
-
-    if (ucred.CanControl(OwnerCred))
-        return TError::Success();
-
-    return TError(EError::Permission, "Permission error");
 }
 
 std::string TContainer::GetPortoNamespace() const {

@@ -49,7 +49,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
-    const std::shared_ptr<TContainer> Parent;
     int Acquired = 0;
     int Id;
     TFile OomEvent;
@@ -103,6 +102,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void DestroyVolumes(TScopedLock &holder_lock);
 
 public:
+    const std::shared_ptr<TContainer> Parent;
+
     uint64_t PropMask;
     TCred OwnerCred;
     uint64_t MemGuarantee;
@@ -152,7 +153,7 @@ public:
     uint64_t RespawnCount;
     std::string Private;
     uint64_t AgingTime;
-    bool PortoEnabled;
+    EAccessLevel AccessLevel;
     bool IsWeak;
     EContainerState State = EContainerState::Unknown;
     bool OomKilled = false;
@@ -195,12 +196,14 @@ public:
     const std::string GetTextId(const std::string &separator = "+") const;
     const int GetId() const { return Id; }
     const int GetLevel() const { return Level; }
+
     uint64_t GetHierarchyMemGuarantee(void) const;
     uint64_t GetHierarchyMemLimit(std::shared_ptr<const TContainer> root) const;
-    bool IsPortoEnabled(void) const;
 
     bool IsRoot() const;
     bool IsPortoRoot() const;
+    bool IsChildOf(const TContainer &ct) const;
+
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<TContainer> GetParent() const;
     std::shared_ptr<const TContainer> GetIsolationDomain() const;
@@ -241,8 +244,6 @@ public:
     std::vector<std::string> GetChildren();
     std::shared_ptr<TContainer> FindRunningParent() const;
     void DeliverEvent(TScopedLock &holder_lock, const TEvent &event);
-
-    TError CheckPermission(const TCred &ucred);
 
     static void ParsePropertyName(std::string &name, std::string &idx);
     size_t GetRunningChildren() { return RunningChildren; }

@@ -13,12 +13,8 @@ extern "C" {
 #include <linux/securebits.h>
 }
 
-static gid_t PortoGroup;
-
-gid_t GetPortoGroupId() {
-    PORTO_ASSERT(PortoGroup);
-    return PortoGroup;
-}
+gid_t PortoGroup;
+gid_t PortoCtGroup;
 
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
@@ -141,46 +137,19 @@ TError TCred::Load(const std::string &user) {
     return error;
 }
 
-bool TCred::IsPortoUser() const {
-    return IsRootUser() || IsMemberOf(PortoGroup);
-}
-
-/* Returns true for priveleged or if uid/gid intersects */
-bool TCred::IsPermitted(const TCred &requirement) const {
-
-    if (Uid == requirement.Uid)
-        return true;
-
-    if (IsRootUser())
-        return true;
-
-    if (IsMemberOf(requirement.Gid))
-        return true;
-
-    for (auto gid: requirement.Groups)
-        if (IsMemberOf(gid))
-            return true;
-
-    return false;
-}
-
 bool TCred::IsMemberOf(gid_t group) const {
+    if (group == NoGroup)
+        return false;
+
+    if (Gid == group)
+        return true;
 
     for (auto id: Groups) {
         if (id == group)
             return true;
     }
 
-    return Gid == group;
-}
-
-bool TCred::IsMemberOf(std::string groupname) const {
-    gid_t gid;
-
-    if (GroupId(groupname, gid))
-        return false;
-
-    return IsMemberOf(gid);
+    return false;
 }
 
 TError TCred::Apply() const {
@@ -206,18 +175,13 @@ void InitCred() {
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
-    if (error)
+    if (error) {
         L_WRN() << "Cannot find group porto: " << error << std::endl;
-}
+        PortoGroup = NoGroup;
+    }
 
-bool TCred::CanControl(TCred &cred) const {
-    if (IsRootUser() || Uid == cred.Uid)
-        return true;
-
-    if (cred.IsMemberOf(PORTO_CONT_GROUP_NAME))
-        return true;
-
-    return cred.IsMemberOf(UserName(Uid) + CONT_SUFFIX);
+    if (GroupId(PORTO_CT_GROUP_NAME, PortoCtGroup))
+        PortoCtGroup = NoGroup;
 }
 
 #ifndef CAP_BLOCK_SUSPEND

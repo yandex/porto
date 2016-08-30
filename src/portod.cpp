@@ -180,7 +180,7 @@ static TError CreatePortoSocket() {
     if (bind(sock.Fd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
         return TError(EError::Unknown, errno, "bind()");
 
-    error = path.Chown(0, GetPortoGroupId());
+    error = path.Chown(RootUser, PortoGroup);
     if (error)
         return error;
 

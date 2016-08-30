@@ -128,7 +128,7 @@ public:
         }
 
         TCapabilities bound;
-        if (CurrentClient->Cred.IsRootUser())
+        if (CurrentClient->IsSuperUser())
             bound = AllCapabilities;
         else if (CurrentContainer->VirtMode == VIRT_MODE_OS)
             bound = OsModeCapabilities;
@@ -136,7 +136,7 @@ public:
             bound = SuidCapabilities;
 
         /* root user can allow any capabilities in own containers */
-        if (!CurrentClient->Cred.IsRootUser() ||
+        if (!CurrentClient->IsSuperUser() ||
                 !CurrentContainer->OwnerCred.IsRootUser()) {
             for (auto p = CurrentContainer->GetParent(); p; p = p->GetParent())
                 bound.Permitted &= p->CapLimit.Permitted;
@@ -218,7 +218,7 @@ public:
         /* check allowed ambient capabilities */
         TCapabilities limit = CurrentContainer->CapAllowed;
         if (ambient.Permitted & ~limit.Permitted &&
-                !CurrentClient->Cred.IsRootUser()) {
+                !CurrentClient->IsSuperUser()) {
             ambient.Permitted &= ~limit.Permitted;
             return TError(EError::Permission,
                           "Not allowed capability: " + ambient.Format() +
@@ -515,8 +515,8 @@ public:
         gid_t oldGid = CurrentContainer->OwnerCred.Gid;
         error = newCred.Load(username);
         if (error) {
-            /* root user can set any numeric id */
-            if (CurrentClient->Cred.IsRootUser()) {
+            /* super user can set any numeric id */
+            if (CurrentClient->IsSuperUser()) {
                 newCred.Gid = oldGid;
                 error = UserId(username, newCred.Uid);
             }
@@ -527,12 +527,12 @@ public:
         /* try to preserve current group if possible */
         if (newCred.IsMemberOf(oldGid) ||
                 CurrentClient->Cred.IsMemberOf(oldGid) ||
-                CurrentClient->Cred.IsRootUser())
+                CurrentClient->IsSuperUser())
             newCred.Gid = oldGid;
 
-        if (!CurrentClient->Cred.CanControl(newCred))
-            return TError(EError::Permission,
-                    "Client is not allowed to set user : " + username);
+        error = CurrentClient->CanControl(newCred);
+        if (error)
+            return error;
 
         CurrentContainer->OwnerCred = newCred;
         CurrentContainer->PropMask |= USER_SET;
@@ -562,7 +562,7 @@ public:
 
         if (!CurrentContainer->OwnerCred.IsMemberOf(newGid) &&
                 !CurrentClient->Cred.IsMemberOf(newGid) &&
-                !CurrentClient->Cred.IsRootUser())
+                !CurrentClient->IsSuperUser())
             return TError(EError::Permission, "Desired group : " + groupname +
                     " isn't in current user supplementary group list");
 
@@ -2193,19 +2193,46 @@ TError TAgingTime::Get(std::string &value) {
 class TEnablePorto : public TProperty {
 public:
     TEnablePorto() : TProperty(P_ENABLE_PORTO, ENABLE_PORTO_SET,
-            "Allow container communication with porto (dynamic)") {}
+            "Proto access level: false | read-only | child-only | true (dynamic)") {}
     TError Get(std::string &value) {
-        value = BoolToString(CurrentContainer->IsPortoEnabled());
+        switch (CurrentContainer->AccessLevel) {
+            case EAccessLevel::None:
+                value = "false";
+                break;
+            case EAccessLevel::ReadOnly:
+                value = "read-only";
+                break;
+            case EAccessLevel::ChildOnly:
+                value = "child-only";
+                break;
+            default:
+                value = "true";
+                break;
+        }
         return TError::Success();
     }
     TError Set(const std::string &value) {
-        bool enable;
-        TError error = StringToBool(value, enable);
-        if (error)
-            return error;
-        if (enable && !CurrentContainer->GetParent()->IsPortoEnabled())
-            return TError(EError::InvalidValue, "Porto disabled in parent container");
-        CurrentContainer->PortoEnabled = enable;
+        EAccessLevel level;
+
+        if (value == "false")
+            level = EAccessLevel::None;
+        else if (value == "read-only")
+            level = EAccessLevel::ReadOnly;
+        else if (value == "child-only")
+            level = EAccessLevel::ChildOnly;
+        else if (value == "true")
+            level = EAccessLevel::Normal;
+        else
+            return TError(EError::InvalidValue, "Unknown access level: " + value);
+
+        if (level > EAccessLevel::ChildOnly) {
+            for (auto p = CurrentContainer->Parent; p; p = p->Parent)
+                if (p->AccessLevel < EAccessLevel::ChildOnly)
+                    return TError(EError::Permission,
+                            "Parent container has access lower than child");
+        }
+
+        CurrentContainer->AccessLevel = level;
         CurrentContainer->PropMask |= ENABLE_PORTO_SET;
         return TError::Success();
     }

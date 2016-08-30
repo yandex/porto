@@ -31,15 +31,14 @@ TClient::TClient(std::shared_ptr<TEpollLoop> loop) : TEpollSource(loop, -1) {
 }
 
 TClient::TClient(const std::string &special) {
-    Cred = TCred(0, 0);
+    Cred = TCred(RootUser, RootGroup);
     Comm = special;
-    ReadOnlyAccess = false;
-    SpecialClient = true;
+    AccessLevel = EAccessLevel::Internal;
 }
 
 TClient::~TClient() {
     CloseConnection();
-    if (!SpecialClient)
+    if (AccessLevel != EAccessLevel::Internal)
         Statistics->Clients--;
 }
 
@@ -132,7 +131,11 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
     if (error)
         return error;
 
-    if (!ct->IsPortoEnabled())
+    AccessLevel = ct->AccessLevel;
+    for (auto p = ct->Parent; p; p = p->Parent)
+        AccessLevel = std::min(AccessLevel, p->AccessLevel);
+
+    if (AccessLevel == EAccessLevel::None)
         return TError(EError::Permission,
                       "Porto disabled in container " + ct->GetName());
 
@@ -156,7 +159,13 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
         Cred = ct->OwnerCred;
     }
 
-    ReadOnlyAccess = !Cred.IsPortoUser();
+    if (Cred.IsRootUser()) {
+        if (AccessLevel == EAccessLevel::Normal)
+            AccessLevel = EAccessLevel::SuperUser;
+    } else if (!Cred.IsMemberOf(PortoGroup)) {
+        if (AccessLevel >= EAccessLevel::ReadOnly)
+            AccessLevel = EAccessLevel::ReadOnly;
+    }
 
     return TError::Success();
 }
@@ -267,11 +276,65 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
     return TError::Success();
 }
 
+bool TClient::IsSuperUser(void) const {
+    return AccessLevel >= EAccessLevel::SuperUser;
+}
+
 TError TClient::GetClientContainer(std::shared_ptr<TContainer> &container) const {
     container = ClientContainer.lock();
     if (!container)
         return TError(EError::ContainerDoesNotExist, "Cannot find client container");
     return TError::Success();
+}
+
+TError TClient::CanControl(const TCred &other) {
+
+    if (AccessLevel <= EAccessLevel::ReadOnly)
+        return TError(EError::Permission, "No write access at all");
+
+    if (IsSuperUser() || Cred.Uid == other.Uid)
+        return TError::Success();
+
+    /* Everybody can control users from group porto-containers */
+    if (other.IsMemberOf(PortoCtGroup))
+        return TError::Success();
+
+    /* Load group $USER-containers lazily */
+    if (!UserCtGroup && GroupId(Cred.User() + USER_CT_SUFFIX, UserCtGroup))
+        UserCtGroup = NoGroup;
+
+    if (other.IsMemberOf(UserCtGroup))
+        return TError::Success();
+
+    return TError(EError::Permission, "User " + Cred.ToString() +
+                                      " cannot control " + other.ToString());
+}
+
+TError TClient::CanControl(const TContainer &ct, bool createChild) {
+
+    if (AccessLevel < EAccessLevel::ChildOnly)
+        return TError(EError::Permission, "No write access at all");
+
+    if (!createChild || !ct.IsPortoRoot()) {
+        TError error = CanControl(ct.OwnerCred);
+        if (error)
+            return error;
+    }
+
+    if (AccessLevel > EAccessLevel::ChildOnly)
+        return TError::Success();
+
+    auto base = ClientContainer.lock();
+    while (base && base->AccessLevel != EAccessLevel::ChildOnly)
+        base = base->Parent;
+
+    if (!base)
+        return TError(EError::Permission, "Base for child-only not found");
+
+    if ((createChild && base.get() == &ct) || ct.IsChildOf(*base))
+        return TError::Success();
+
+    return TError(EError::Permission, "Not a child container: " + ct.GetName());
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {

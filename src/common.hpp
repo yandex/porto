@@ -21,6 +21,15 @@ private:
     TNonCopyable& operator= (TNonCopyable const&&) = delete;
 };
 
+enum class EAccessLevel {
+    None,
+    ReadOnly,
+    ChildOnly,
+    Normal,
+    SuperUser,
+    Internal,
+};
+
 constexpr int ROOT_TC_MAJOR = 1;
 constexpr int ROOT_TC_MINOR = 0;
 constexpr int DEFAULT_TC_MINOR = 2;
@@ -42,8 +51,8 @@ constexpr const char *PORTO_ROOT_CGROUP = "/porto";
 constexpr const char *PORTO_DAEMON_CGROUP = "/portod";
 
 constexpr const char *PORTO_GROUP_NAME = "porto";
-constexpr const char *PORTO_CONT_GROUP_NAME = "porto-containers";
-constexpr const char *CONT_SUFFIX = "-containers";
+constexpr const char *PORTO_CT_GROUP_NAME = "porto-containers";
+constexpr const char *USER_CT_SUFFIX = "-containers";
 constexpr const char *PORTO_SOCKET_PATH = "/run/portod.socket";
 constexpr uint64_t PORTO_SOCKET_MODE = 0666;
 

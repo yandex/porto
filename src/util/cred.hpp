@@ -16,7 +16,14 @@ std::string GroupName(gid_t gid);
 
 void InitCred();
 
-extern gid_t GetPortoGroupId();
+constexpr uid_t RootUser = (uid_t)0;
+constexpr gid_t RootGroup = (gid_t)0;
+
+constexpr uid_t NoUser = (uid_t)-1;
+constexpr gid_t NoGroup = (gid_t)-1;
+
+extern gid_t PortoGroup;
+extern gid_t PortoCtGroup;
 
 struct TCred {
     uid_t Uid;
@@ -24,7 +31,7 @@ struct TCred {
     std::vector<gid_t> Groups;
 
     TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
-    TCred() : Uid(-1), Gid(-1) {}
+    TCred() : Uid(NoUser), Gid(NoGroup) {}
 
     static TCred Current();
 
@@ -41,13 +48,9 @@ struct TCred {
         return GroupName(Gid);
     }
 
-    bool IsPortoUser() const;
-    bool IsRootUser() const { return Uid == 0; }
-    bool CanControl(TCred &cred) const;
+    bool IsRootUser() const { return Uid == RootUser; }
 
     bool IsMemberOf(gid_t group) const;
-    bool IsMemberOf(std::string groupname) const;
-    bool IsPermitted(const TCred &requirement) const;
 
     std::string ToString() const {
         return User() + ":" + Group();

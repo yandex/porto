@@ -277,8 +277,8 @@ static void SendReply(TClient &client, rpc::TContainerResponse &response, bool l
 }
 
 static TError CheckPortoWriteAccess() {
-    if (CurrentClient->ReadOnlyAccess)
-        return TError(EError::Permission, "Client is not a member of porto group");
+    if (CurrentClient->AccessLevel <= EAccessLevel::ReadOnly)
+        return TError(EError::Permission, "No write access at all");
     return TError::Success();
 }
 
@@ -308,7 +308,7 @@ static noinline TError CreateContainer(TContext &context,
         return TError(EError::Busy, "Parent container " + parent->GetName() + " is busy");
 
     std::shared_ptr<TContainer> container;
-    err = context.Cholder->Create(holder_lock, name, CurrentClient->Cred, container);
+    err = context.Cholder->Create(holder_lock, name, container);
 
     if (!err && weak) {
         container->IsWeak = true;
@@ -402,14 +402,14 @@ noinline TError StartContainer(TContext &context,
         if (err)
             goto release;
 
-        err = container->CheckPermission(CurrentClient->Cred);
-        if (err)
-            goto release;
-
         if (i + 1 != nameVec.end())
             if (container->GetState() == EContainerState::Running ||
                 container->GetState() == EContainerState::Meta)
                 continue;
+
+        err = CurrentClient->CanControl(*container);
+        if (err)
+            goto release;
 
         if (!topContainer) {
             topContainer = container;
@@ -1085,7 +1085,7 @@ noinline TError TuneVolume(TContext &context,
     if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
-    error = volume->CheckPermission(CurrentClient->Cred);
+    error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
@@ -1116,9 +1116,11 @@ noinline TError LinkVolume(TContext &context,
         if (error)
             return error;
 
-        error = container->CheckPermission(CurrentClient->Cred);
-        if (error)
-            return error;
+        if (container != clientContainer) {
+            error = CurrentClient->CanControl(*container);
+            if (error)
+                return error;
+        }
     } else {
         container = clientContainer;
     }
@@ -1137,7 +1139,7 @@ noinline TError LinkVolume(TContext &context,
     if (!volume->IsReady)
         return TError(EError::Busy, "Volume not ready");
 
-    error = volume->CheckPermission(CurrentClient->Cred);
+    error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
@@ -1178,9 +1180,11 @@ noinline TError UnlinkVolume(TContext &context,
         if (error)
             return error;
 
-        error = container->CheckPermission(CurrentClient->Cred);
-        if (error)
-            return error;
+        if (container != clientContainer) {
+            error = CurrentClient->CanControl(*container);
+            if (error)
+                return error;
+        }
     } else {
         container = clientContainer;
     }
@@ -1191,7 +1195,7 @@ noinline TError UnlinkVolume(TContext &context,
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
 
-    error = volume->CheckPermission(CurrentClient->Cred);
+    error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
@@ -1375,9 +1379,11 @@ noinline TError ExportLayer(TContext &context, const rpc::TLayerExportRequest &r
     auto volume = context.Vholder->Find(req.volume());
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
-    error = volume->CheckPermission(CurrentClient->Cred);
+
+    error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
+
     vholder_lock.unlock();
 
     auto volume_lock = volume->ScopedLock();

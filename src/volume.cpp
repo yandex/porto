@@ -1382,13 +1382,6 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
     return ret;
 }
 
-TError TVolume::CheckPermission(const TCred &ucred) const {
-    if (ucred.IsPermitted(VolumeOwner))
-        return TError::Success();
-
-    return TError(EError::Permission, "Permission denied");
-}
-
 TError TVolume::Save() {
     TKeyValue node(VolumesKV / Id);
     TError error;
