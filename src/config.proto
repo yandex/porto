@@ -91,6 +91,7 @@ message TCfg {
 		optional bool enable_smart = 17;
 		optional bool default_porto_namespace = 18;
 		optional bool enable_tracefs = 19;
+		optional uint32 normal_io_weight = 20;
 	}
 
 	message TPrivilegesCfg {

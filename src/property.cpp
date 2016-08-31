@@ -420,27 +420,12 @@ TError TCpuPolicy::Set(const std::string &policy) {
         return error;
 
     if (policy != "normal" && policy != "rt" && policy != "idle")
-        return TError(EError::InvalidValue, "invalid policy");
+        return TError(EError::InvalidValue, "invalid policy: " + policy);
 
-
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuPolicy(cpucg, policy,
-                                          CurrentContainer->CpuGuarantee,
-                                          CurrentContainer->CpuLimit);
-
-        if (error) {
-            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
-            return error;
-        }
-
+    if (CurrentContainer->CpuPolicy != policy) {
+        CurrentContainer->CpuPolicy = policy;
+        CurrentContainer->SetProp(EProperty::CPU_POLICY);
     }
-
-    CurrentContainer->CpuPolicy = policy;
-    CurrentContainer->SetProp(EProperty::CPU_POLICY);
 
     return TError::Success();
 }
@@ -456,9 +441,9 @@ public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
     TIoPolicy() : TProperty(P_IO_POLICY, EProperty::IO_POLICY,
-                            "IO policy: normal, batch (dynamic)") {}
+                            "IO policy: normal | batch (dynamic)") {}
     void Init(void) {
-        IsSupported = BlkioSubsystem.SupportPolicy();
+        IsSupported = BlkioSubsystem.SupportIoPolicy();
     }
 } static IoPolicy;
 
@@ -468,25 +453,12 @@ TError TIoPolicy::Set(const std::string &policy) {
         return error;
 
     if (policy != "normal" && policy != "batch")
-        return TError(EError::InvalidValue, "invalid policy");
+        return TError(EError::InvalidValue, "invalid policy: " + policy);
 
-
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto blkcg = CurrentContainer->GetCgroup(BlkioSubsystem);
-        error = BlkioSubsystem.SetPolicy(blkcg, policy == "batch");
-
-        if (error) {
-            L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
-            return error;
-        }
-
+    if (CurrentContainer->IoPolicy != policy) {
+        CurrentContainer->IoPolicy = policy;
+        CurrentContainer->SetProp(EProperty::IO_POLICY);
     }
-
-    CurrentContainer->IoPolicy = policy;
-    CurrentContainer->SetProp(EProperty::IO_POLICY);
 
     return TError::Success();
 }
@@ -608,22 +580,10 @@ TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
                 " of " + std::to_string(total) + ", reserve " + std::to_string(reserve) + ")");
     }
 
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.SetGuarantee(memcg, new_val);
-
-        if (error) {
-            CurrentContainer->CurrentMemGuarantee = CurrentContainer->MemGuarantee;
-            L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
-
-            return error;
-        }
+    if (CurrentContainer->MemGuarantee != new_val) {
+        CurrentContainer->MemGuarantee = new_val;
+        CurrentContainer->SetProp(EProperty::MEM_GUARANTEE);
     }
-
-    CurrentContainer->MemGuarantee = new_val;
-    CurrentContainer->SetProp(EProperty::MEM_GUARANTEE);
 
     return TError::Success();
 }

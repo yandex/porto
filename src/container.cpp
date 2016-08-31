@@ -509,7 +509,7 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestClearPropDirty(EProperty::IO_POLICY)) {
         auto blkcg = GetCgroup(BlkioSubsystem);
-        error = BlkioSubsystem.SetPolicy(blkcg, IoPolicy == "batch");
+        error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
         if (error) {
             L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
             return error;
@@ -1871,6 +1871,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
 
     if (Parent)
         Parent->AddChild(shared_from_this());
+
+    error = ApplyDynamicProperties();
 
 out:
     SystemClient.FinishRequest();

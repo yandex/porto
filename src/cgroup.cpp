@@ -631,21 +631,22 @@ TError TBlkioSubsystem::Statistics(TCgroup &cg,
     return TError::Success();
 }
 
-TError TBlkioSubsystem::SetPolicy(TCgroup &cg, bool batch) {
-    if (!SupportPolicy())
+TError TBlkioSubsystem::SetIoPolicy(TCgroup &cg, const std::string &policy) const {
+    if (!SupportIoPolicy())
         return TError::Success();
 
-    std::string rootWeight;
-    if (!batch) {
-        TError error = RootCgroup().Get("blkio.weight", rootWeight);
-        if (error)
-            return TError(EError::Unknown, "Can't get root blkio.weight");
-    }
+    uint64_t weight;
+    if (policy == "normal")
+        weight = config().container().normal_io_weight();
+    else if (policy == "batch")
+        weight = config().container().batch_io_weight();
+    else
+        return TError(EError::InvalidValue, "unknown policy: " + policy);
 
-    return cg.Set("blkio.weight", batch ? std::to_string(config().container().batch_io_weight()) : rootWeight);
+    return cg.SetUint64("blkio.weight", weight);
 }
 
-bool TBlkioSubsystem::SupportPolicy() {
+bool TBlkioSubsystem::SupportIoPolicy() const {
     return RootCgroup().Has("blkio.weight");
 }
 

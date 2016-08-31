@@ -3045,7 +3045,8 @@ static void TestRoot(Porto::Connection &api) {
     if (KernelSupports(KernelFeature::CFS_GROUPSCHED))
         ExpectEq(GetCgKnob("cpu", "", "cpu.shares"), "1024");
     if (KernelSupports(KernelFeature::CFQ))
-        ExpectEq(GetCgKnob("blkio", "", "blkio.weight"), "1000");
+        ExpectEq(GetCgKnob("blkio", "", "blkio.weight"),
+                 std::to_string(config().container().normal_io_weight()));
 }
 
 static void ExpectNonZeroLink(Porto::Connection &api, const std::string &name,
@@ -3412,21 +3413,20 @@ static void TestLimits(Porto::Connection &api) {
 
     if (KernelSupports(KernelFeature::CFQ)) {
         Say() << "Check io_policy" << std::endl;
-        uint64_t rootWeight, weight;
-        ExpectSuccess(StringToUint64(GetCgKnob("blkio", "", "blkio.weight"), rootWeight));
+        uint64_t weight;
 
         ExpectApiFailure(api.SetProperty(name, "io_policy", "invalid"), EError::InvalidValue);
 
         ExpectApiSuccess(api.SetProperty(name, "io_policy", "normal"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
-        ExpectEq(weight, rootWeight);
+        ExpectEq(weight, config().container().normal_io_weight());
         ExpectApiSuccess(api.Stop(name));
 
         ExpectApiSuccess(api.SetProperty(name, "io_policy", "batch"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
-        Expect(weight != rootWeight || weight == config().container().batch_io_weight());
+        ExpectEq(weight, config().container().batch_io_weight());
         ExpectApiSuccess(api.Stop(name));
     }
 

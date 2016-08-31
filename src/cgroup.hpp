@@ -232,8 +232,8 @@ public:
     TError Statistics(TCgroup &cg,
                       const std::string &file,
                       std::vector<BlkioStat> &stat) const;
-    TError SetPolicy(TCgroup &cg, bool batch);
-    bool SupportPolicy();
+    TError SetIoPolicy(TCgroup &cg, const std::string &policy) const;
+    bool SupportIoPolicy() const;
 };
 
 class TDevicesSubsystem : public TSubsystem {
