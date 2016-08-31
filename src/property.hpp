@@ -96,61 +96,65 @@ constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 constexpr const char *D_MEM_TOTAL_LIMIT = "memory_limit_total";
 
-constexpr uint64_t ROOT_PID_SET = (1llu << 0);
-constexpr uint64_t LOOP_DEV_SET = (1lu << 2);
-constexpr uint64_t START_TIME_SET = (1lu << 4);
-constexpr uint64_t DEATH_TIME_SET = (1lu << 5);
-constexpr uint64_t COMMAND_SET = (1 << 6);
-constexpr uint64_t USER_SET = (1lu << 7);
-constexpr uint64_t GROUP_SET = (1lu << 8);
-constexpr uint64_t ENV_SET = (1 << 9);
-constexpr uint64_t PORTO_NAMESPACE_SET = (1lu << 10);
-constexpr uint64_t ROOT_SET = (1 << 11);
-constexpr uint64_t ROOT_RDONLY_SET = (1 << 12);
-constexpr uint64_t CWD_SET = (1 << 13);
-constexpr uint64_t STDIN_SET = (1 << 14);
-constexpr uint64_t STDOUT_SET = (1 << 15);
-constexpr uint64_t STDERR_SET = (1 << 16);
-constexpr uint64_t STDOUT_LIMIT_SET = (1lu << 17);
-constexpr uint64_t MEM_GUARANTEE_SET = (1lu << 20);
-constexpr uint64_t MEM_LIMIT_SET = (1lu << 21);
-constexpr uint64_t DIRTY_LIMIT_SET = (1lu << 22);
-constexpr uint64_t ANON_LIMIT_SET = (1lu << 23);
-constexpr uint64_t RECHARGE_ON_PGFAULT_SET = (1lu << 24);
-constexpr uint64_t CPU_POLICY_SET = (1lu << 25);
-constexpr uint64_t CPU_GUARANTEE_SET = (1lu << 26);
-constexpr uint64_t CPU_LIMIT_SET = (1lu << 27);
-constexpr uint64_t IO_POLICY_SET = (1lu << 28);
-constexpr uint64_t IO_LIMIT_SET = (1lu << 29);
-constexpr uint64_t IO_OPS_LIMIT_SET = (1lu << 30);
-constexpr uint64_t NET_GUARANTEE_SET = (1lu << 31);
-constexpr uint64_t NET_LIMIT_SET = (1lu << 32);
-constexpr uint64_t NET_PRIO_SET = (1lu << 33);
-constexpr uint64_t RESPAWN_SET = (1lu << 34);
-constexpr uint64_t MAX_RESPAWNS_SET = (1lu << 35);
-constexpr uint64_t ISOLATE_SET = (1lu << 36);
-constexpr uint64_t PRIVATE_SET = (1lu << 37);
-constexpr uint64_t ULIMIT_SET = (1lu << 38);
-constexpr uint64_t HOSTNAME_SET = (1lu << 39);
-constexpr uint64_t BIND_DNS_SET = (1lu << 40);
-constexpr uint64_t BIND_SET = (1lu << 41);
-constexpr uint64_t NET_SET = (1lu << 42);
-constexpr uint64_t NET_TOS_SET = (1lu << 43);
-constexpr uint64_t DEVICES_SET = (1lu << 44);
-constexpr uint64_t CAPABILITIES_SET = (1lu << 45);
-constexpr uint64_t IP_SET = (1lu << 46);
-constexpr uint64_t DEFAULT_GW_SET = (1lu << 47);
-constexpr uint64_t VIRT_MODE_SET = (1lu << 48);
-constexpr uint64_t AGING_TIME_SET = (1lu << 49);
-constexpr uint64_t ENABLE_PORTO_SET = (1lu << 50);
-constexpr uint64_t RESOLV_CONF_SET = (1lu << 51);
-constexpr uint64_t WEAK_SET = (1lu << 52);
-constexpr uint64_t STATE_SET = (1lu << 53);
-constexpr uint64_t OOM_KILLED_SET = (1lu << 54);
-constexpr uint64_t RESPAWN_COUNT_SET = (1lu << 55);
-constexpr uint64_t EXIT_STATUS_SET = (1lu << 56);
-constexpr uint64_t CAPABILITIES_AMBIENT_SET = (1lu << 57);
-constexpr uint64_t UMASK_SET = (1ul << 58);
+enum class EProperty {
+    NONE,
+    ROOT_PID,
+    LOOP_DEV,
+    START_TIME,
+    DEATH_TIME,
+    COMMAND,
+    USER,
+    GROUP,
+    ENV,
+    PORTO_NAMESPACE,
+    ROOT,
+    ROOT_RDONLY,
+    CWD,
+    STDIN,
+    STDOUT,
+    STDERR,
+    STDOUT_LIMIT,
+    MEM_GUARANTEE,
+    MEM_LIMIT,
+    DIRTY_LIMIT,
+    ANON_LIMIT,
+    RECHARGE_ON_PGFAULT,
+    CPU_POLICY,
+    CPU_GUARANTEE,
+    CPU_LIMIT,
+    IO_POLICY,
+    IO_LIMIT,
+    IO_OPS_LIMIT,
+    NET_GUARANTEE,
+    NET_LIMIT,
+    NET_PRIO,
+    RESPAWN,
+    MAX_RESPAWNS,
+    ISOLATE,
+    PRIVATE,
+    ULIMIT,
+    HOSTNAME,
+    BIND_DNS,
+    BIND,
+    NET,
+    NET_TOS,
+    DEVICES,
+    CAPABILITIES,
+    IP,
+    DEFAULT_GW,
+    VIRT_MODE,
+    AGING_TIME,
+    ENABLE_PORTO,
+    RESOLV_CONF,
+    WEAK,
+    STATE,
+    OOM_KILLED,
+    RESPAWN_COUNT,
+    EXIT_STATUS,
+    CAPABILITIES_AMBIENT,
+    UMASK,
+    NR_PROPERTIES,
+};
 
 constexpr const char *P_VIRT_MODE_APP = "app";
 constexpr const char *P_VIRT_MODE_OS = "os";
@@ -161,18 +165,17 @@ constexpr const char *P_CMD_VIRT_MODE_OS = "/sbin/init";
 class TProperty {
 public:
     std::string Name;
-    uint64_t SetMask;
+    EProperty Prop;
     std::string Desc;
     bool IsSupported = true;
     bool IsReadOnly = false;
     bool IsHidden = false;
-    bool IsSerializable = true;
     TError IsAliveAndStopped(void);
     TError IsAlive(void);
     TError IsDead(void);
     TError IsRunning(void);
 
-    TProperty(std::string name, uint64_t set_mask, std::string desc);
+    TProperty(std::string name, EProperty prop, std::string desc);
 
     virtual void Init(void) {}
 

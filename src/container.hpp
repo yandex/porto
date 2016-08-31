@@ -10,6 +10,7 @@
 #include "util/log.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
+#include "property.hpp"
 
 class TEpollSource;
 class TCgroup;
@@ -103,8 +104,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
 public:
     const std::shared_ptr<TContainer> Parent;
-
-    uint64_t PropMask;
+    bool PropSet[(int)EProperty::NR_PROPERTIES];
     TCred OwnerCred;
     uint64_t MemGuarantee;
     uint64_t CurrentMemGuarantee;
@@ -181,6 +181,18 @@ public:
                const std::string &name, std::shared_ptr<TContainer> parent,
                int id);
     ~TContainer();
+
+    bool HasProp(EProperty prop) const {
+        return PropSet[(int)prop];
+    }
+
+    void SetProp(EProperty prop) {
+        PropSet[(int)prop] = true;
+    }
+
+    void ClearProp(EProperty prop) {
+        PropSet[(int)prop] = false;
+    }
 
     std::string GetPortoNamespace() const;
     std::string ContainerStateName(EContainerState state);

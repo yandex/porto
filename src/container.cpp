@@ -55,7 +55,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Stdin(0), Stdout(1), Stderr(2)
 {
     Statistics->Containers++;
-    PropMask = 0llu;
+    std::fill(PropSet, PropSet + sizeof(PropSet), false);
     MemGuarantee = 0;
     CurrentMemGuarantee = 0;
 
@@ -167,7 +167,7 @@ TPath TContainer::RootPath() const {
 
 std::string TContainer::GetCwd() const {
     for (auto ct = shared_from_this(); ct; ct = ct->Parent) {
-        if (ct->PropMask & CWD_SET)
+        if (ct->HasProp(EProperty::CWD))
             return ct->Cwd;
         if (ct->Root != "/")
             return "/";
@@ -557,7 +557,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
         return TError::Success();
 
     if (Parent->IsPortoRoot() &&
-            ((PropMask & DEVICES_SET) || !OwnerCred.IsRootUser())) {
+            (HasProp(EProperty::DEVICES) || !OwnerCred.IsRootUser())) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
             return error;
@@ -841,14 +841,16 @@ TError TContainer::Create(const TCred &cred) {
     TError error = OwnerCred.LoadGroups(OwnerCred.User());
     if (error)
         return error;
-    PropMask |= USER_SET | GROUP_SET;
+    SetProp(EProperty::USER);
+    SetProp(EProperty::GROUP);
+
     SanitizeCapabilities();
 
     SetState(EContainerState::Stopped);
-    PropMask |= STATE_SET;
+    SetProp(EProperty::STATE);
 
     RespawnCount = 0;
-    PropMask |= RESPAWN_COUNT_SET;
+    SetProp(EProperty::RESPAWN_COUNT);
 
     return Save(); /* Serialize on creation  */
 }
@@ -872,7 +874,7 @@ void TContainer::SanitizeCapabilities() {
             limit.Permitted &= p->CapLimit.Permitted;
     }
 
-    if (!(PropMask & CAPABILITIES_SET)) {
+    if (!HasProp(EProperty::CAPABILITIES)) {
         CapLimit = limit;
     } else {
         CapLimit.Permitted &= limit.Permitted;
@@ -909,43 +911,43 @@ TError TContainer::Start(bool meta) {
 
     /* virt_mode=os overrides some defaults */
     if (VirtMode == VIRT_MODE_OS) {
-        if (!(PropMask & CWD_SET))
+        if (!HasProp(EProperty::CWD))
             Cwd = "/";
 
-        if (!(PropMask & COMMAND_SET))
+        if (!HasProp(EProperty::COMMAND))
             Command = "/sbin/init";
 
-        if (!(PropMask & STDOUT_SET))
+        if (!HasProp(EProperty::STDOUT))
             Stdout.SetOutside("/dev/null");
 
-        if (!(PropMask & STDERR_SET))
+        if (!HasProp(EProperty::STDERR))
             Stderr.SetOutside("/dev/null");
 
-        if (!(PropMask & BIND_DNS_SET))
+        if (!HasProp(EProperty::BIND_DNS))
             BindDns = false;
 
-        if (!(PropMask & NET_SET))
+        if (!HasProp(EProperty::NET))
             NetProp = { "none" };
     }
 
     /* Non-isolated container inherits policy from parent */
     if (!Isolate && Parent) {
-        if (!(PropMask & CPU_POLICY_SET))
+        if (!HasProp(EProperty::CPU_POLICY))
             CpuPolicy = Parent->CpuPolicy;
 
-        if (!(PropMask & IO_POLICY_SET))
+        if (!HasProp(EProperty::IO_POLICY))
             IoPolicy = Parent->IoPolicy;
 
-        if (!(PropMask & RECHARGE_ON_PGFAULT_SET))
+        if (!HasProp(EProperty::RECHARGE_ON_PGFAULT))
             RechargeOnPgfault = Parent->RechargeOnPgfault;
 
-        if (!(PropMask & NET_PRIO_SET))
+        if (!HasProp(EProperty::NET_PRIO))
             NetPriority = Parent->NetPriority;
 
-        if (!(PropMask & ULIMIT_SET))
+        if (!HasProp(EProperty::ULIMIT))
             Rlimit = Parent->Rlimit;
 
-        if (!(PropMask & UMASK_SET))
+        if (!HasProp(EProperty::UMASK))
             Umask = Parent->Umask;
     }
 
@@ -980,7 +982,7 @@ TError TContainer::Start(bool meta) {
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
     StartTime = GetCurrentTimeMs();
-    PropMask |= START_TIME_SET;
+    SetProp(EProperty::START_TIME);
 
     error = PrepareResources();
     if (error)
@@ -1030,7 +1032,7 @@ TError TContainer::Start(bool meta) {
             goto error;
 
         L() << GetName() << " started " << std::to_string(Task.Pid) << std::endl;
-        PropMask |= ROOT_PID_SET;
+        SetProp(EProperty::ROOT_PID);
     }
 
     if (meta)
@@ -1102,8 +1104,7 @@ TError TContainer::PrepareLoop() {
             return error;
     }
 
-    if (!(PropMask & ROOT_SET) ||
-            loop_image == Parent->Root)
+    if (!HasProp(EProperty::ROOT) || loop_image == Parent->Root)
         return TError::Success();
 
     int loop_dev;
@@ -1112,7 +1113,7 @@ TError TContainer::PrepareLoop() {
         return error;
 
     LoopDev = loop_dev;
-    PropMask |= LOOP_DEV_SET;
+    SetProp(EProperty::LOOP_DEV);
 
     return error;
 }
@@ -1215,7 +1216,7 @@ void TContainer::FreeResources() {
 
     int loopNr = LoopDev;
     LoopDev = -1;
-    PropMask |= LOOP_DEV_SET;
+    SetProp(EProperty::LOOP_DEV);
 
     if (loopNr >= 0) {
         error = PutLoopDev(loopNr);
@@ -1340,11 +1341,16 @@ TError TContainer::StopOne(TScopedLock &holder_lock, uint64_t deadline) {
     Task.Pid = 0;
     TaskVPid = 0;
     WaitTask.Pid = 0;
-    DeathTime = 0;
-    ExitStatus = 0;
-    OomKilled = false;
+    ClearProp(EProperty::ROOT_PID);
 
-    PropMask &= ~(ROOT_PID_SET | DEATH_TIME_SET | OOM_KILLED_SET | EXIT_STATUS_SET);
+    DeathTime = 0;
+    ClearProp(EProperty::DEATH_TIME);
+
+    ExitStatus = 0;
+    ClearProp(EProperty::EXIT_STATUS);
+
+    OomKilled = false;
+    ClearProp(EProperty::OOM_KILLED);
 
     SetState(EContainerState::Stopped);
     FreeResources();
@@ -1410,17 +1416,17 @@ void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
     ShutdownOom();
 
     DeathTime = GetCurrentTimeMs();
-    PropMask |= DEATH_TIME_SET;
+    SetProp(EProperty::DEATH_TIME);
 
     if (oomKilled) {
         OomKilled = oomKilled;
-        PropMask |= OOM_KILLED_SET;
+        SetProp(EProperty::OOM_KILLED);
     }
 
     Task.Pid = 0;
     TaskVPid = 0;
     WaitTask.Pid = 0;
-    PropMask &= ~ROOT_PID_SET;
+    ClearProp(EProperty::ROOT_PID);
 
     if (State == EContainerState::Meta)
         SetState(EContainerState::Stopped);
@@ -1449,7 +1455,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
             << (oomKilled ? " invoked by OOM" : "") << std::endl;
 
     ExitStatus = status;
-    PropMask |= EXIT_STATUS_SET;
+    SetProp(EProperty::EXIT_STATUS);
 
     ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
                                            TContainer &child) {
@@ -1663,9 +1669,9 @@ TError TContainer::Save(void) {
     for (auto knob : ContainerProperties) {
         std::string value;
 
-        if (!(knob.second->IsSerializable) ||
-            !(PropMask & knob.second->SetMask))
-            continue; /* Skip knobs without a value */
+        /* Skip knobs without a value */
+        if (knob.second->Prop == EProperty::NONE || !HasProp(knob.second->Prop))
+            continue;
 
         error = knob.second->GetToSave(value);
         if (error)
@@ -1717,12 +1723,12 @@ TError TContainer::Load(const TKeyValue &node) {
             continue;
         }
 
-        PropMask |= prop->SetMask;
+        SetProp(prop->Prop);
     }
 
     if (container_state.size()) {
         error = ContainerProperties[D_STATE]->SetFromRestore(container_state);
-        PropMask |= STATE_SET;
+        SetProp(EProperty::STATE);
     } else
         error = TError(EError::Unknown, "Container has no state");
 
@@ -1895,7 +1901,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
     error = Start(false);
     SystemClient.FinishRequest();
     RespawnCount++;
-    PropMask |= RESPAWN_COUNT_SET;
+    SetProp(EProperty::RESPAWN_COUNT);
 
     if (error)
         return error;

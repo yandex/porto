@@ -19,9 +19,9 @@ extern "C" {
 __thread TContainer *CurrentContainer = nullptr;
 std::map<std::string, TProperty*> ContainerProperties;
 
-TProperty::TProperty(std::string name, uint64_t set_mask, std::string desc) {
+TProperty::TProperty(std::string name, EProperty prop, std::string desc) {
     Name = name;
-    SetMask = set_mask;
+    Prop = prop;
     Desc = desc;
     ContainerProperties[name] = this;
 }
@@ -41,13 +41,13 @@ TError TProperty::SetIndexed(const std::string &index, const std::string &value)
 }
 
 TError TProperty::GetToSave(std::string &value) {
-    if (IsSerializable)
+    if (Prop != EProperty::NONE)
         return Get(value);
     return TError(EError::Unknown, "Trying to save non-serializable value");
 }
 
 TError TProperty::SetFromRestore(const std::string &value) {
-    if (IsSerializable)
+    if (Prop != EProperty::NONE)
         return Set(value);
     return TError(EError::Unknown, "Trying to restore non-serializable value");
 }
@@ -113,7 +113,7 @@ TError TProperty::IsRunning(void) {
 
 class TCapLimit : public TProperty {
 public:
-    TCapLimit() : TProperty(P_CAPABILITIES, CAPABILITIES_SET,
+    TCapLimit() : TProperty(P_CAPABILITIES, EProperty::CAPABILITIES,
             "Limit capabilities in container: SYS_ADMIN;NET_ADMIN;... see man capabilities") {}
 
     TError CommitLimit(TCapabilities &limit) {
@@ -150,7 +150,7 @@ public:
         }
 
         CurrentContainer->CapLimit = limit;
-        CurrentContainer->PropMask |= CAPABILITIES_SET;
+        CurrentContainer->SetProp(EProperty::CAPABILITIES);
         CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
@@ -197,7 +197,7 @@ public:
 
 class TCapAmbient : public TProperty {
 public:
-    TCapAmbient() : TProperty(P_CAPABILITIES_AMBIENT, CAPABILITIES_AMBIENT_SET,
+    TCapAmbient() : TProperty(P_CAPABILITIES_AMBIENT, EProperty::CAPABILITIES_AMBIENT,
             "Raise capabilities in container: NET_BIND_SERVICE;SYS_PTRACE;...") {}
 
     void Init(void) {
@@ -235,7 +235,7 @@ public:
         }
 
         CurrentContainer->CapAmbient = ambient;
-        CurrentContainer->PropMask |= CAPABILITIES_AMBIENT_SET;
+        CurrentContainer->SetProp(EProperty::CAPABILITIES_AMBIENT);
         CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
@@ -282,7 +282,7 @@ public:
 
 class TCwd : public TProperty {
 public:
-    TCwd() : TProperty(P_CWD, CWD_SET, "Container working directory") {}
+    TCwd() : TProperty(P_CWD, EProperty::CWD, "Container working directory") {}
     TError Get(std::string &value) {
         value = CurrentContainer->GetCwd();
         return TError::Success();
@@ -292,7 +292,7 @@ public:
         if (error)
             return error;
         CurrentContainer->Cwd = cwd;
-        CurrentContainer->PropMask |= CWD_SET;
+        CurrentContainer->SetProp(EProperty::CWD);
         return TError::Success();
     }
 } static Cwd;
@@ -319,7 +319,7 @@ class TUlimit : public TProperty {
 public:
     TError Set(const std::string &ulimit);
     TError Get(std::string &value);
-    TUlimit() : TProperty(P_ULIMIT, ULIMIT_SET,
+    TUlimit() : TProperty(P_ULIMIT, EProperty::ULIMIT,
                           "Container resource limits: "
                           "<type> <soft> <hard>; ... (man 2 getrlimit)") {}
 } static Ulimit;
@@ -377,7 +377,7 @@ TError TUlimit::Set(const std::string &ulimit_str) {
     }
 
     CurrentContainer->Rlimit = new_limit;
-    CurrentContainer->PropMask |= ULIMIT_SET;
+    CurrentContainer->SetProp(EProperty::ULIMIT);
 
     return TError::Success();
 }
@@ -410,7 +410,7 @@ class TCpuPolicy : public TProperty {
 public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
-    TCpuPolicy() : TProperty(P_CPU_POLICY, CPU_POLICY_SET,
+    TCpuPolicy() : TProperty(P_CPU_POLICY, EProperty::CPU_POLICY,
                              "CPU policy: rt, normal, idle (dynamic)" ) {}
 } static CpuPolicy;
 
@@ -440,7 +440,7 @@ TError TCpuPolicy::Set(const std::string &policy) {
     }
 
     CurrentContainer->CpuPolicy = policy;
-    CurrentContainer->PropMask |= CPU_POLICY_SET;
+    CurrentContainer->SetProp(EProperty::CPU_POLICY);
 
     return TError::Success();
 }
@@ -455,7 +455,7 @@ class TIoPolicy : public TProperty {
 public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
-    TIoPolicy() : TProperty(P_IO_POLICY, IO_POLICY_SET,
+    TIoPolicy() : TProperty(P_IO_POLICY, EProperty::IO_POLICY,
                             "IO policy: normal, batch (dynamic)") {}
     void Init(void) {
         IsSupported = BlkioSubsystem.SupportPolicy();
@@ -486,7 +486,7 @@ TError TIoPolicy::Set(const std::string &policy) {
     }
 
     CurrentContainer->IoPolicy = policy;
-    CurrentContainer->PropMask |= IO_POLICY_SET;
+    CurrentContainer->SetProp(EProperty::IO_POLICY);
 
     return TError::Success();
 }
@@ -499,7 +499,7 @@ TError TIoPolicy::Get(std::string &value) {
 
 class TUser : public TProperty {
 public:
-    TUser() : TProperty(P_USER, USER_SET, "Start command with given user") {}
+    TUser() : TProperty(P_USER, EProperty::USER, "Start command with given user") {}
 
     TError Get(std::string &value) {
         value = UserName(CurrentContainer->OwnerCred.Uid);
@@ -535,7 +535,7 @@ public:
             return error;
 
         CurrentContainer->OwnerCred = newCred;
-        CurrentContainer->PropMask |= USER_SET;
+        CurrentContainer->SetProp(EProperty::USER);
         CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
@@ -543,7 +543,7 @@ public:
 
 class TGroup : public TProperty {
 public:
-    TGroup() : TProperty(P_GROUP, GROUP_SET, "Start command with given group") {}
+    TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
 
     TError Get(std::string &value) {
         value = GroupName(CurrentContainer->OwnerCred.Gid);
@@ -567,7 +567,7 @@ public:
                     " isn't in current user supplementary group list");
 
         CurrentContainer->OwnerCred.Gid = newGid;
-        CurrentContainer->PropMask |= GROUP_SET;
+        CurrentContainer->SetProp(EProperty::GROUP);
         return TError::Success();
     }
 } static Group;
@@ -576,7 +576,7 @@ class TMemoryGuarantee : public TProperty {
 public:
     TError Set(const std::string &mem_guarantee);
     TError Get(std::string &value);
-    TMemoryGuarantee() : TProperty(P_MEM_GUARANTEE, MEM_GUARANTEE_SET,
+    TMemoryGuarantee() : TProperty(P_MEM_GUARANTEE, EProperty::MEM_GUARANTEE,
                                     "Guaranteed amount of memory "
                                     "[bytes] (dynamic)") {}
     void Init(void) {
@@ -623,7 +623,7 @@ TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
     }
 
     CurrentContainer->MemGuarantee = new_val;
-    CurrentContainer->PropMask |= MEM_GUARANTEE_SET;
+    CurrentContainer->SetProp(EProperty::MEM_GUARANTEE);
 
     return TError::Success();
 }
@@ -637,12 +637,11 @@ TError TMemoryGuarantee::Get(std::string &value) {
 class TMemTotalGuarantee : public TProperty {
 public:
     TError Get(std::string &value);
-    TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, 0,
+    TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, EProperty::NONE,
                                      "Total amount of memory "
                                      "guaranteed for porto "
                                      "containers") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
     void Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
@@ -660,7 +659,7 @@ class TCommand : public TProperty {
 public:
     TError Set(const std::string &command);
     TError Get(std::string &value);
-    TCommand() : TProperty(P_COMMAND, COMMAND_SET,
+    TCommand() : TProperty(P_COMMAND, EProperty::COMMAND,
                            "Command executed upon container start") {}
 } static Command;
 
@@ -670,7 +669,7 @@ TError TCommand::Set(const std::string &command) {
         return error;
 
     CurrentContainer->Command = command;
-    CurrentContainer->PropMask |= COMMAND_SET;
+    CurrentContainer->SetProp(EProperty::COMMAND);
 
     return TError::Success();
 }
@@ -687,7 +686,7 @@ class TVirtMode : public TProperty {
 public:
     TError Set(const std::string &virt_mode);
     TError Get(std::string &value);
-    TVirtMode() : TProperty(P_VIRT_MODE, VIRT_MODE_SET,
+    TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
                             "Virtualization mode: os|app") {}
 } static VirtMode;
 
@@ -704,7 +703,7 @@ TError TVirtMode::Set(const std::string &virt_mode) {
         return TError(EError::InvalidValue, std::string("Unsupported ") +
                       P_VIRT_MODE + ": " + virt_mode);
 
-    CurrentContainer->PropMask |= VIRT_MODE_SET;
+    CurrentContainer->SetProp(EProperty::VIRT_MODE);
     CurrentContainer->SanitizeCapabilities();
 
     return TError::Success();
@@ -729,7 +728,7 @@ TError TVirtMode::Get(std::string &value) {
 
 class TStdinPath : public TProperty {
 public:
-    TStdinPath() : TProperty(P_STDIN_PATH, STDIN_SET,
+    TStdinPath() : TProperty(P_STDIN_PATH, EProperty::STDIN,
             "Container standard input path") {}
     TError Get(std::string &value) {
         value = CurrentContainer->Stdin.Path.ToString();
@@ -739,7 +738,7 @@ public:
         TError error = IsAliveAndStopped();
         if (!error) {
             CurrentContainer->Stdin.SetInside(path);
-            CurrentContainer->PropMask |= STDIN_SET;
+            CurrentContainer->SetProp(EProperty::STDIN);
         }
         return error;
     }
@@ -748,7 +747,7 @@ public:
 
 class TStdoutPath : public TProperty {
 public:
-    TStdoutPath() : TProperty(P_STDOUT_PATH, STDOUT_SET,
+    TStdoutPath() : TProperty(P_STDOUT_PATH, EProperty::STDOUT,
             "Container standard output path") {}
     TError Get(std::string &value) {
         value =  CurrentContainer->Stdout.Path.ToString();
@@ -758,7 +757,7 @@ public:
         TError error = IsAliveAndStopped();
         if (!error) {
             CurrentContainer->Stdout.SetInside(path);
-            CurrentContainer->PropMask |= STDOUT_SET;
+            CurrentContainer->SetProp(EProperty::STDOUT);
         }
         return error;
     }
@@ -766,7 +765,7 @@ public:
 
 class TStderrPath : public TProperty {
 public:
-    TStderrPath() : TProperty(P_STDERR_PATH, STDERR_SET,
+    TStderrPath() : TProperty(P_STDERR_PATH, EProperty::STDERR,
             "Container standard error path") {}
     TError Get(std::string &value) {
         value = CurrentContainer->Stderr.Path.ToString();
@@ -776,7 +775,7 @@ public:
         TError error = IsAliveAndStopped();
         if (!error) {
             CurrentContainer->Stderr.SetInside(path);
-            CurrentContainer->PropMask |= STDERR_SET;
+            CurrentContainer->SetProp(EProperty::STDERR);
         }
         return error;
     }
@@ -784,7 +783,7 @@ public:
 
 class TStdoutLimit : public TProperty {
 public:
-    TStdoutLimit() : TProperty(P_STDOUT_LIMIT, STDOUT_LIMIT_SET,
+    TStdoutLimit() : TProperty(P_STDOUT_LIMIT, EProperty::STDOUT_LIMIT,
             "Limit for stored stdout and stderr size (dynamic)") {}
     TError Get(std::string &value) {
         value = std::to_string(CurrentContainer->Stdout.Limit);
@@ -803,17 +802,16 @@ public:
 
         CurrentContainer->Stdout.Limit = limit;
         CurrentContainer->Stderr.Limit = limit;
-        CurrentContainer->PropMask |= STDOUT_LIMIT_SET;
+        CurrentContainer->SetProp(EProperty::STDOUT_LIMIT);
         return TError::Success();
     }
 } static StdoutLimit;
 
 class TStdoutOffset : public TProperty {
 public:
-    TStdoutOffset() : TProperty(D_STDOUT_OFFSET, 0,
+    TStdoutOffset() : TProperty(D_STDOUT_OFFSET, EProperty::NONE,
             "Offset of stored stdout (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -826,10 +824,9 @@ public:
 
 class TStderrOffset : public TProperty {
 public:
-    TStderrOffset() : TProperty(D_STDERR_OFFSET, 0,
+    TStderrOffset() : TProperty(D_STDERR_OFFSET, EProperty::NONE,
             "Offset of stored stderr (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -842,9 +839,9 @@ public:
 
 class TStdout : public TProperty {
 public:
-    TStdout() : TProperty(D_STDOUT, 0, "stdout [[offset][:length]] (ro)") {
+    TStdout() : TProperty(D_STDOUT, EProperty::NONE,
+            "stdout [[offset][:length]] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -862,9 +859,9 @@ public:
 
 class TStderr : public TProperty {
 public:
-    TStderr() : TProperty(D_STDERR, 0, "stderr [[offset][:length]] (ro))") {
+    TStderr() : TProperty(D_STDERR, EProperty::NONE,
+            "stderr [[offset][:length]] (ro))") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -882,7 +879,7 @@ public:
 
 class TBindDns : public TProperty {
 public:
-    TBindDns() : TProperty(P_BIND_DNS, BIND_DNS_SET,
+    TBindDns() : TProperty(P_BIND_DNS, EProperty::BIND_DNS,
                            "Bind /etc/resolv.conf and /etc/hosts"
                            " from host into container root") {}
     TError Get(std::string &value) {
@@ -897,7 +894,7 @@ public:
         error = StringToBool(value, CurrentContainer->BindDns);
         if (error)
             return error;
-        CurrentContainer->PropMask |= BIND_DNS_SET;
+        CurrentContainer->SetProp(EProperty::BIND_DNS);
         return TError::Success();
     }
 } static BindDns;
@@ -907,7 +904,7 @@ class TIsolate : public TProperty {
 public:
     TError Set(const std::string &isolate_needed);
     TError Get(std::string &value);
-    TIsolate() : TProperty(P_ISOLATE, ISOLATE_SET,
+    TIsolate() : TProperty(P_ISOLATE, EProperty::ISOLATE,
                            "Isolate container from parent") {}
 } static Isolate;
 
@@ -929,7 +926,7 @@ TError TIsolate::Set(const std::string &isolate_needed) {
     else
         return TError(EError::InvalidValue, "Invalid bool value");
 
-    CurrentContainer->PropMask |= ISOLATE_SET;
+    CurrentContainer->SetProp(EProperty::ISOLATE);
 
     return TError::Success();
 }
@@ -938,7 +935,7 @@ class TRoot : public TProperty {
 public:
     TError Set(const std::string &root);
     TError Get(std::string &value);
-    TRoot() : TProperty(P_ROOT, ROOT_SET, "Container root directory"
+    TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container root directory"
                         "(container will be chrooted into ths directory)") {}
 } static Root;
 
@@ -954,7 +951,7 @@ TError TRoot::Set(const std::string &root) {
         return error;
 
     CurrentContainer->Root = root;
-    CurrentContainer->PropMask |= ROOT_SET;
+    CurrentContainer->SetProp(EProperty::ROOT);
 
     return TError::Success();
 }
@@ -963,7 +960,7 @@ class TNet : public TProperty {
 public:
     TError Set(const std::string &net_desc);
     TError Get(std::string &value);
-    TNet() : TProperty(P_NET, NET_SET,
+    TNet() : TProperty(P_NET, EProperty::NET,
  "Container network settings: "
  "none | "
  "inherited (default) | "
@@ -994,7 +991,7 @@ TError TNet::Set(const std::string &net_desc) {
 
     CurrentContainer->NetProp = new_net_desc; /* FIXME: Copy vector contents? */
 
-    CurrentContainer->PropMask |= NET_SET;
+    CurrentContainer->SetProp(EProperty::NET);
     return TError::Success();
 }
 
@@ -1007,7 +1004,7 @@ class TRootRo : public TProperty {
 public:
     TError Set(const std::string &ro);
     TError Get(std::string &value);
-    TRootRo() : TProperty(P_ROOT_RDONLY, ROOT_RDONLY_SET,
+    TRootRo() : TProperty(P_ROOT_RDONLY, EProperty::ROOT_RDONLY,
                           "Mount root directory in read-only mode") {}
 } static RootRo;
 
@@ -1022,8 +1019,8 @@ TError TRootRo::Set(const std::string &ro) {
         CurrentContainer->RootRo = false;
     else
         return TError(EError::InvalidValue, "Invalid bool value");
-    
-    CurrentContainer->PropMask |= ROOT_RDONLY_SET;
+
+    CurrentContainer->SetProp(EProperty::ROOT_RDONLY);
 
     return TError::Success();
 }
@@ -1036,7 +1033,7 @@ TError TRootRo::Get(std::string &ro) {
 
 class TUmask : public TProperty {
 public:
-    TUmask() : TProperty(P_UMASK, UMASK_SET, "Set file mode creation mask") { }
+    TUmask() : TProperty(P_UMASK, EProperty::UMASK, "Set file mode creation mask") { }
     TError Get(std::string &value) {
         value = StringFormat("%#o", CurrentContainer->Umask);
         return TError::Success();
@@ -1048,7 +1045,7 @@ public:
         error = StringToOct(value, CurrentContainer->Umask);
         if (error)
             return error;
-        CurrentContainer->PropMask |= UMASK_SET;
+        CurrentContainer->SetProp(EProperty::UMASK);
         return TError::Success();
     }
 } static Umask;
@@ -1057,7 +1054,7 @@ class THostname : public TProperty {
 public:
     TError Set(const std::string &hostname);
     TError Get(std::string &value);
-    THostname() : TProperty(P_HOSTNAME, HOSTNAME_SET, "Container hostname") {}
+    THostname() : TProperty(P_HOSTNAME, EProperty::HOSTNAME, "Container hostname") {}
 } static Hostname;
 
 TError THostname::Set(const std::string &hostname) {
@@ -1066,7 +1063,7 @@ TError THostname::Set(const std::string &hostname) {
         return error;
 
     CurrentContainer->Hostname = hostname;
-    CurrentContainer->PropMask |= HOSTNAME_SET;
+    CurrentContainer->SetProp(EProperty::HOSTNAME);
 
     return TError::Success();
 }
@@ -1083,7 +1080,7 @@ public:
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
     TError SetIndexed(const std::string &index, const std::string &env_val);
-    TEnvProperty() : TProperty(P_ENV, ENV_SET,
+    TEnvProperty() : TProperty(P_ENV, EProperty::ENV,
                        "Container environment variables: <name>=<value>; ...") {}
 } static EnvProperty;
 
@@ -1101,7 +1098,7 @@ TError TEnvProperty::Set(const std::string &env_val) {
         return error;
 
     env.Format(CurrentContainer->EnvCfg);
-    CurrentContainer->PropMask |= ENV_SET;
+    CurrentContainer->SetProp(EProperty::ENV);
 
     return TError::Success();
 }
@@ -1126,7 +1123,7 @@ TError TEnvProperty::SetIndexed(const std::string &index, const std::string &env
         return error;
 
     env.Format(CurrentContainer->EnvCfg);
-    CurrentContainer->PropMask |= ENV_SET;
+    CurrentContainer->SetProp(EProperty::ENV);
 
     return TError::Success();
 }
@@ -1147,7 +1144,7 @@ class TBind : public TProperty {
 public:
     TError Set(const std::string &bind_str);
     TError Get(std::string &value);
-    TBind() : TProperty(P_BIND, BIND_SET,
+    TBind() : TProperty(P_BIND, EProperty::BIND,
                         "Share host directories with container: "
                         "<host_path> <container_path> [ro|rw]; ...") {}
 } static Bind;
@@ -1188,7 +1185,7 @@ TError TBind::Set(const std::string &bind_str) {
     }
 
     CurrentContainer->BindMounts = bindMounts;
-    CurrentContainer->PropMask |= BIND_SET;
+    CurrentContainer->SetProp(EProperty::BIND);
 
     return TError::Success();
 }
@@ -1206,7 +1203,7 @@ class TIp : public TProperty {
 public:
     TError Set(const std::string &ipaddr);
     TError Get(std::string &value);
-    TIp() : TProperty(P_IP, IP_SET,
+    TIp() : TProperty(P_IP, EProperty::IP,
                       "IP configuration: <interface> <ip>/<prefix>; ...") {}
 } static Ip;
 
@@ -1224,7 +1221,7 @@ TError TIp::Set(const std::string &ipaddr) {
         return error;
 
     CurrentContainer->IpList = ipaddrs;
-    CurrentContainer->PropMask |= IP_SET;
+    CurrentContainer->SetProp(EProperty::IP);
 
     return TError::Success();
 }
@@ -1238,7 +1235,7 @@ class TDefaultGw : public TProperty {
 public:
     TError Set(const std::string &gw);
     TError Get(std::string &value);
-    TDefaultGw() : TProperty(P_DEFAULT_GW, DEFAULT_GW_SET,
+    TDefaultGw() : TProperty(P_DEFAULT_GW, EProperty::DEFAULT_GW,
                              "Default gateway: <interface> <ip>; ...") {
         IsHidden = true;
     }
@@ -1258,7 +1255,7 @@ TError TDefaultGw::Set(const std::string &gw) {
         return error;
 
     CurrentContainer->DefaultGw = gws;
-    CurrentContainer->PropMask |= DEFAULT_GW_SET;
+    CurrentContainer->SetProp(EProperty::DEFAULT_GW);
 
     return TError::Success();
 }
@@ -1272,7 +1269,7 @@ class TResolvConf : public TProperty {
 public:
     TError Set(const std::string &conf);
     TError Get(std::string &value);
-    TResolvConf() : TProperty(P_RESOLV_CONF, RESOLV_CONF_SET,
+    TResolvConf() : TProperty(P_RESOLV_CONF, EProperty::RESOLV_CONF,
                               "DNS resolver configuration: "
                               "<resolv.conf option>;...") {}
 } static ResolvConf;
@@ -1286,7 +1283,7 @@ TError TResolvConf::Set(const std::string &conf_str) {
     SplitEscapedString(conf_str, conf, ';');
 
     CurrentContainer->ResolvConf = conf;
-    CurrentContainer->PropMask |= RESOLV_CONF_SET;
+    CurrentContainer->SetProp(EProperty::RESOLV_CONF);
 
     return TError::Success();
 }
@@ -1300,7 +1297,7 @@ class TDevices : public TProperty {
 public:
     TError Set(const std::string &dev);
     TError Get(std::string &value);
-    TDevices() : TProperty(P_DEVICES, DEVICES_SET,
+    TDevices() : TProperty(P_DEVICES, EProperty::DEVICES,
                                    "Devices that container can access: "
                                    "<device> [r][w][m][-] [name] [mode] "
                                    "[user] [group]; ...") {}
@@ -1311,7 +1308,7 @@ TError TDevices::Set(const std::string &dev_str) {
 
     SplitEscapedString(dev_str, dev_list, ';');
     CurrentContainer->Devices = dev_list;
-    CurrentContainer->PropMask |= DEVICES_SET;
+    CurrentContainer->SetProp(EProperty::DEVICES);
 
     return TError::Success();
 }
@@ -1323,7 +1320,7 @@ TError TDevices::Get(std::string &value) {
 
 class TRawRootPid : public TProperty {
 public:
-    TRawRootPid() : TProperty(P_RAW_ROOT_PID, ROOT_PID_SET, "") {
+    TRawRootPid() : TProperty(P_RAW_ROOT_PID, EProperty::ROOT_PID, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
@@ -1358,7 +1355,7 @@ class TRawLoopDev : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, LOOP_DEV_SET, "") {
+    TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, EProperty::LOOP_DEV, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
@@ -1378,7 +1375,7 @@ class TRawStartTime : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawStartTime() : TProperty(P_RAW_START_TIME, START_TIME_SET, "") {
+    TRawStartTime() : TProperty(P_RAW_START_TIME, EProperty::START_TIME, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
@@ -1398,7 +1395,7 @@ class TRawDeathTime : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRawDeathTime() : TProperty(P_RAW_DEATH_TIME, DEATH_TIME_SET, "") {
+    TRawDeathTime() : TProperty(P_RAW_DEATH_TIME, EProperty::DEATH_TIME, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
@@ -1416,7 +1413,7 @@ TError TRawDeathTime::Get(std::string &value) {
 
 class TPortoNamespace : public TProperty {
 public:
-    TPortoNamespace() : TProperty(P_PORTO_NAMESPACE, PORTO_NAMESPACE_SET,
+    TPortoNamespace() : TProperty(P_PORTO_NAMESPACE, EProperty::PORTO_NAMESPACE,
             "Porto containers namespace (container name prefix)") {}
     TError Get(std::string &value) {
         value = CurrentContainer->NsName;
@@ -1427,7 +1424,7 @@ public:
         if (error)
             return error;
         CurrentContainer->NsName = value;
-        CurrentContainer->PropMask |= PORTO_NAMESPACE_SET;
+        CurrentContainer->SetProp(EProperty::PORTO_NAMESPACE);
         return TError::Success();
     }
 } static PortoNamespace;
@@ -1436,7 +1433,7 @@ class TMemoryLimit : public TProperty {
 public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
-    TMemoryLimit() : TProperty(P_MEM_LIMIT, MEM_LIMIT_SET,
+    TMemoryLimit() : TProperty(P_MEM_LIMIT, EProperty::MEM_LIMIT,
                                "Memory hard limit [bytes] (dynamic)") {}
 } static MemoryLimit;
 
@@ -1472,7 +1469,7 @@ TError TMemoryLimit::Set(const std::string &limit) {
     }
 
     CurrentContainer->MemLimit = new_size;
-    CurrentContainer->PropMask |= MEM_LIMIT_SET;
+    CurrentContainer->SetProp(EProperty::MEM_LIMIT);
 
     return TError::Success();
 }
@@ -1487,7 +1484,7 @@ class TAnonLimit : public TProperty {
 public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
-    TAnonLimit() : TProperty(P_ANON_LIMIT, ANON_LIMIT_SET,
+    TAnonLimit() : TProperty(P_ANON_LIMIT, EProperty::ANON_LIMIT,
                              "Anonymous memory limit [bytes] (dynamic)") {}
     void Init(void) {
         IsSupported = MemorySubsystem.SupportAnonLimit();
@@ -1523,7 +1520,7 @@ TError TAnonLimit::Set(const std::string &limit) {
     }
 
     CurrentContainer->AnonMemLimit = new_size;
-    CurrentContainer->PropMask |= ANON_LIMIT_SET;
+    CurrentContainer->SetProp(EProperty::ANON_LIMIT);
 
     return TError::Success();
 }
@@ -1538,7 +1535,7 @@ class TDirtyLimit : public TProperty {
 public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
-    TDirtyLimit() : TProperty(P_DIRTY_LIMIT, DIRTY_LIMIT_SET,
+    TDirtyLimit() : TProperty(P_DIRTY_LIMIT, EProperty::DIRTY_LIMIT,
                               "Dirty file cache limit [bytes] "
                               "(dynamic)" ) {}
     void Init(void) {
@@ -1574,7 +1571,7 @@ TError TDirtyLimit::Set(const std::string &limit) {
     }
 
     CurrentContainer->DirtyMemLimit = new_size;
-    CurrentContainer->PropMask |= ANON_LIMIT_SET;
+    CurrentContainer->SetProp(EProperty::ANON_LIMIT);
 
     return TError::Success();
 }
@@ -1590,7 +1587,7 @@ public:
     TError Set(const std::string &recharge);
     TError Get(std::string &value);
     TRechargeOnPgfault() : TProperty(P_RECHARGE_ON_PGFAULT,
-                                     RECHARGE_ON_PGFAULT_SET,
+                                     EProperty::RECHARGE_ON_PGFAULT,
                                      "Recharge memory on "
                                      "page fault (dynamic)") {}
     void Init(void) {
@@ -1625,7 +1622,7 @@ TError TRechargeOnPgfault::Set(const std::string &recharge) {
     }
 
     CurrentContainer->RechargeOnPgfault = new_val;
-    CurrentContainer->PropMask |= RECHARGE_ON_PGFAULT_SET;
+    CurrentContainer->SetProp(EProperty::RECHARGE_ON_PGFAULT);
 
     return TError::Success();
 }
@@ -1640,7 +1637,7 @@ class TCpuLimit : public TProperty {
 public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
-    TCpuLimit() : TProperty(P_CPU_LIMIT, CPU_LIMIT_SET,
+    TCpuLimit() : TProperty(P_CPU_LIMIT, EProperty::CPU_LIMIT,
                             "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c "
                             " [cores] (dynamic)") {}
 } static CpuLimit;
@@ -1672,7 +1669,7 @@ TError TCpuLimit::Set(const std::string &limit) {
     }
 
     CurrentContainer->CpuLimit = new_limit;
-    CurrentContainer->PropMask |= CPU_LIMIT_SET;
+    CurrentContainer->SetProp(EProperty::CPU_LIMIT);
 
     return TError::Success();
 }
@@ -1687,7 +1684,7 @@ class TCpuGuarantee : public TProperty {
 public:
     TError Set(const std::string &guarantee);
     TError Get(std::string &value);
-    TCpuGuarantee() : TProperty(P_CPU_GUARANTEE, CPU_GUARANTEE_SET,
+    TCpuGuarantee() : TProperty(P_CPU_GUARANTEE, EProperty::CPU_GUARANTEE,
                                 "CPU guarantee: 0-100.0 [%] | "
                                 "0.0c-<CPUS>c [cores] (dynamic)") {}
 } static CpuGuarantee;
@@ -1719,7 +1716,7 @@ TError TCpuGuarantee::Set(const std::string &guarantee) {
     }
 
     CurrentContainer->CpuGuarantee = new_guarantee;
-    CurrentContainer->PropMask |= CPU_GUARANTEE_SET;
+    CurrentContainer->SetProp(EProperty::CPU_GUARANTEE);
 
     return TError::Success();
 }
@@ -1734,7 +1731,7 @@ class TIoLimit : public TProperty {
 public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
-    TIoLimit()  : TProperty(P_IO_LIMIT, IO_LIMIT_SET,
+    TIoLimit()  : TProperty(P_IO_LIMIT, EProperty::IO_LIMIT,
                             "Filesystem bandwidth limit [bytes/s] "
                             "(dynamic)") {}
     void Init(void) {
@@ -1765,7 +1762,7 @@ TError TIoLimit::Set(const std::string &limit) {
     }
 
     CurrentContainer->IoLimit = new_limit;
-    CurrentContainer->PropMask |= IO_LIMIT_SET;
+    CurrentContainer->SetProp(EProperty::IO_LIMIT);
 
     return TError::Success();
 }
@@ -1780,7 +1777,7 @@ class TIopsLimit : public TProperty {
 public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
-    TIopsLimit() : TProperty(P_IO_OPS_LIMIT, IO_OPS_LIMIT_SET,
+    TIopsLimit() : TProperty(P_IO_OPS_LIMIT, EProperty::IO_OPS_LIMIT,
                              "Filesystem IOPS limit "
                              "[operations/s] (dynamic)") {}
     void Init(void) {
@@ -1811,7 +1808,7 @@ TError TIopsLimit::Set(const std::string &limit) {
     }
 
     CurrentContainer->IopsLimit = new_limit;
-    CurrentContainer->PropMask |= IO_OPS_LIMIT_SET;
+    CurrentContainer->SetProp(EProperty::IO_OPS_LIMIT);
 
     return TError::Success();
 }
@@ -1828,7 +1825,7 @@ public:
     TError Get(std::string &value);
     TError SetIndexed(const std::string &index, const std::string &guarantee);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetGuarantee() : TProperty(P_NET_GUARANTEE, NET_GUARANTEE_SET,
+    TNetGuarantee() : TProperty(P_NET_GUARANTEE, EProperty::NET_GUARANTEE,
                                 "Guaranteed container network "
                                 "bandwidth: <interface>|default "
                                 "<Bps>;... (dynamic)") {}
@@ -1850,7 +1847,7 @@ TError TNetGuarantee::Set(const std::string &guarantee) {
     if (!IsRunning())
         error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
-        CurrentContainer->PropMask |= NET_GUARANTEE_SET;
+        CurrentContainer->SetProp(EProperty::NET_GUARANTEE);
     } else {
         L_ERR() << "Cannot update tc : " << error << std::endl;
         CurrentContainer->NetGuarantee = old_guarantee;
@@ -1880,7 +1877,7 @@ TError TNetGuarantee::SetIndexed(const std::string &index,
     if (!IsRunning())
         error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
-        CurrentContainer->PropMask |= NET_GUARANTEE_SET;
+        CurrentContainer->SetProp(EProperty::NET_GUARANTEE);
     } else {
         L_ERR() << "Cannot update tc : " << error << std::endl;
         CurrentContainer->NetGuarantee[index] = old_guarantee;
@@ -1908,7 +1905,7 @@ public:
     TError Get(std::string &value);
     TError SetIndexed(const std::string &index, const std::string &limit);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetLimit() : TProperty(P_NET_LIMIT, NET_LIMIT_SET,
+    TNetLimit() : TProperty(P_NET_LIMIT, EProperty::NET_LIMIT,
                             "Maximum container network bandwidth: "
                             "<interface>|default <Bps>;... (dynamic)") {}
 } static NetLimit;
@@ -1929,7 +1926,7 @@ TError TNetLimit::Set(const std::string &limit) {
     if (!IsRunning())
         error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
-        CurrentContainer->PropMask |= NET_LIMIT_SET;
+        CurrentContainer->SetProp(EProperty::NET_LIMIT);
     } else {
         L_ERR() << "Cannot update tc : " << error << std::endl;
         CurrentContainer->NetLimit = old_limit;
@@ -1959,7 +1956,7 @@ TError TNetLimit::SetIndexed(const std::string &index,
     if (!IsRunning())
         error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
-        CurrentContainer->PropMask |= NET_LIMIT_SET;
+        CurrentContainer->SetProp(EProperty::NET_LIMIT);
     } else {
         L_ERR() << "Cannot update tc : " << error << std::endl;
         CurrentContainer->NetLimit[index] = old_limit;
@@ -1987,7 +1984,7 @@ public:
     TError Get(std::string &value);
     TError SetIndexed(const std::string &index, const std::string &prio);
     TError GetIndexed(const std::string &index, std::string &value);
-    TNetPriority()  : TProperty(P_NET_PRIO, NET_PRIO_SET,
+    TNetPriority()  : TProperty(P_NET_PRIO, EProperty::NET_PRIO,
                                 "Container network priority: "
                                 "<interface>|default 0-7;... "
                                 "(dynamic)") {}
@@ -2014,7 +2011,7 @@ TError TNetPriority::Set(const std::string &prio) {
     if (!IsRunning())
         error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
-        CurrentContainer->PropMask |= NET_PRIO_SET;
+        CurrentContainer->SetProp(EProperty::NET_PRIO);
     } else {
         L_ERR() << "Cannot update tc : " << error << std::endl;
         CurrentContainer->NetPriority = old_prio;
@@ -2047,7 +2044,7 @@ TError TNetPriority::SetIndexed(const std::string &index,
     if (!IsRunning())
         error = CurrentContainer->UpdateTrafficClasses();
     if (!error) {
-        CurrentContainer->PropMask |= NET_PRIO_SET;
+        CurrentContainer->SetProp(EProperty::NET_PRIO);
     } else {
         L_ERR() << "Cannot update tc : " << error << std::endl;
         CurrentContainer->NetPriority[index] = old_prio;
@@ -2073,7 +2070,7 @@ class TRespawn : public TProperty {
 public:
     TError Set(const std::string &respawn);
     TError Get(std::string &value);
-    TRespawn() : TProperty(P_RESPAWN, RESPAWN_SET,
+    TRespawn() : TProperty(P_RESPAWN, EProperty::RESPAWN,
                            "Automatically respawn dead container (dynamic)") {}
 } static Respawn;
 
@@ -2089,7 +2086,7 @@ TError TRespawn::Set(const std::string &respawn) {
     else
         return TError(EError::InvalidValue, "Invalid bool value");
 
-    CurrentContainer->PropMask |= RESPAWN_SET;
+    CurrentContainer->SetProp(EProperty::RESPAWN);
 
     return TError::Success();
 }
@@ -2104,7 +2101,7 @@ class TMaxRespawns : public TProperty {
 public:
     TError Set(const std::string &max);
     TError Get(std::string &value);
-    TMaxRespawns() : TProperty(P_MAX_RESPAWNS, MAX_RESPAWNS_SET,
+    TMaxRespawns() : TProperty(P_MAX_RESPAWNS, EProperty::MAX_RESPAWNS,
                                "Limit respawn count for specific "
                                "container (dynamic)") {}
 } static MaxRespawns;
@@ -2119,7 +2116,7 @@ TError TMaxRespawns::Set(const std::string &max) {
         return TError(EError::InvalidValue, "Invalid integer value " + max);
 
     CurrentContainer->MaxRespawns = new_value;
-    CurrentContainer->PropMask |= MAX_RESPAWNS_SET;
+    CurrentContainer->SetProp(EProperty::MAX_RESPAWNS);
 
     return TError::Success();
 }
@@ -2134,7 +2131,7 @@ class TPrivate : public TProperty {
 public:
     TError Set(const std::string &max);
     TError Get(std::string &value);
-    TPrivate() : TProperty(P_PRIVATE, PRIVATE_SET,
+    TPrivate() : TProperty(P_PRIVATE, EProperty::PRIVATE,
                            "User-defined property (dynamic)") {}
 } static Private;
 
@@ -2162,7 +2159,7 @@ class TAgingTime : public TProperty {
 public:
     TError Set(const std::string &time);
     TError Get(std::string &value);
-    TAgingTime() : TProperty(P_AGING_TIME, AGING_TIME_SET,
+    TAgingTime() : TProperty(P_AGING_TIME, EProperty::AGING_TIME,
                              "After given number of seconds "
                              "container in dead state is "
                              "automatically removed (dynamic)") {}
@@ -2179,7 +2176,7 @@ TError TAgingTime::Set(const std::string &time) {
         return error;
 
     CurrentContainer->AgingTime = new_time;
-    CurrentContainer->PropMask |= AGING_TIME_SET;
+    CurrentContainer->SetProp(EProperty::AGING_TIME);
 
     return TError::Success();
 }
@@ -2192,7 +2189,7 @@ TError TAgingTime::Get(std::string &value) {
 
 class TEnablePorto : public TProperty {
 public:
-    TEnablePorto() : TProperty(P_ENABLE_PORTO, ENABLE_PORTO_SET,
+    TEnablePorto() : TProperty(P_ENABLE_PORTO, EProperty::ENABLE_PORTO,
             "Proto access level: false | read-only | child-only | true (dynamic)") {}
     TError Get(std::string &value) {
         switch (CurrentContainer->AccessLevel) {
@@ -2233,7 +2230,7 @@ public:
         }
 
         CurrentContainer->AccessLevel = level;
-        CurrentContainer->PropMask |= ENABLE_PORTO_SET;
+        CurrentContainer->SetProp(EProperty::ENABLE_PORTO);
         return TError::Success();
     }
 } static EnablePorto;
@@ -2242,7 +2239,7 @@ class TWeak : public TProperty {
 public:
     TError Set(const std::string &weak);
     TError Get(std::string &value);
-    TWeak() : TProperty(P_WEAK, WEAK_SET,
+    TWeak() : TProperty(P_WEAK, EProperty::WEAK,
                         "Destroy container when client disconnects (dynamic)") {}
 } static Weak;
 
@@ -2258,7 +2255,7 @@ TError TWeak::Set(const std::string &weak) {
     else
         return TError(EError::InvalidValue, "Invalid bool value");
 
-    CurrentContainer->PropMask |= WEAK_SET;
+    CurrentContainer->SetProp(EProperty::WEAK);
 
     return TError::Success();
 }
@@ -2274,11 +2271,10 @@ TError TWeak::Get(std::string &value) {
 class TAbsoluteName : public TProperty {
 public:
     TError Get(std::string &value);
-    TAbsoluteName() : TProperty(D_ABSOLUTE_NAME, 0,
+    TAbsoluteName() : TProperty(D_ABSOLUTE_NAME, EProperty::NONE,
                                 "container name including "
                                 "porto namespaces (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static AbsoluteName;
 
@@ -2295,12 +2291,11 @@ TError TAbsoluteName::Get(std::string &value) {
 class TAbsoluteNamespace : public TProperty {
 public:
     TError Get(std::string &value);
-    TAbsoluteNamespace() : TProperty(D_ABSOLUTE_NAMESPACE, 0,
+    TAbsoluteNamespace() : TProperty(D_ABSOLUTE_NAMESPACE, EProperty::NONE,
                                      "container namespace "
                                      "including parent "
                                      "namespaces (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static AbsoluteNamespace;
 
@@ -2315,7 +2310,7 @@ class TState : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TState() : TProperty(D_STATE, STATE_SET, "container state (ro)") {
+    TState() : TProperty(D_STATE, EProperty::STATE, "container state (ro)") {
         IsReadOnly = true;
     }
 } static State;
@@ -2353,7 +2348,7 @@ TError TState::Get(std::string &value) {
 
 class TOomKilled : public TProperty {
 public:
-    TOomKilled() : TProperty(D_OOM_KILLED, OOM_KILLED_SET,
+    TOomKilled() : TProperty(D_OOM_KILLED, EProperty::OOM_KILLED,
                              "container has been killed by OOM (ro)") {
         IsReadOnly = true;
     }
@@ -2375,11 +2370,10 @@ public:
 class TParent : public TProperty {
 public:
     TError Get(std::string &value);
-    TParent() : TProperty(D_PARENT, 0,
+    TParent() : TProperty(D_PARENT, EProperty::NONE,
                           "parent container name (ro) (deprecated)") {
         IsReadOnly = true;
         IsHidden = true;
-        IsSerializable = false;
     }
 } static Parent;
 
@@ -2394,7 +2388,7 @@ class TRespawnCount : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);
     TError Get(std::string &value);
-    TRespawnCount() : TProperty(D_RESPAWN_COUNT, RESPAWN_COUNT_SET,
+    TRespawnCount() : TProperty(D_RESPAWN_COUNT, EProperty::RESPAWN_COUNT,
                                 "current respawn count (ro)") {
         IsReadOnly = true;
     }
@@ -2412,9 +2406,9 @@ TError TRespawnCount::Get(std::string &value) {
 
 class TRootPid : public TProperty {
 public:
-    TRootPid() : TProperty(D_ROOT_PID, 0, "root task pid (ro)") {
+    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE,
+            "root task pid (ro)") {
         IsHidden = true;
-        IsSerializable = false;
     }
 
     TError Get(std::string &value) {
@@ -2431,7 +2425,7 @@ public:
     TError SetFromRestore(const std::string &value);
     TError GetToSave(std::string &value);
     TError Get(std::string &value);
-    TExitStatusProperty() : TProperty(D_EXIT_STATUS, EXIT_STATUS_SET,
+    TExitStatusProperty() : TProperty(D_EXIT_STATUS, EProperty::EXIT_STATUS,
                                       "container exit status (ro)") {
         IsReadOnly = true;
     }
@@ -2458,10 +2452,9 @@ TError TExitStatusProperty::Get(std::string &value) {
 class TMemUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TMemUsage() : TProperty(D_MEMORY_USAGE, 0,
+    TMemUsage() : TProperty(D_MEMORY_USAGE, EProperty::NONE,
                             "current memory usage [bytes] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static MemUsage;
 
@@ -2487,10 +2480,9 @@ TError TMemUsage::Get(std::string &value) {
 class TAnonUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TAnonUsage() : TProperty(D_ANON_USAGE, 0,
+    TAnonUsage() : TProperty(D_ANON_USAGE, EProperty::NONE,
                              "current anonymous memory usage [bytes] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static AnonUsage;
 
@@ -2513,9 +2505,8 @@ TError TAnonUsage::Get(std::string &value) {
 class TMinorFaults : public TProperty {
 public:
     TError Get(std::string &value);
-    TMinorFaults() : TProperty(D_MINOR_FAULTS, 0, "minor page faults (ro)") {
+    TMinorFaults() : TProperty(D_MINOR_FAULTS, EProperty::NONE, "minor page faults (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static MinorFaults;
 
@@ -2538,9 +2529,8 @@ TError TMinorFaults::Get(std::string &value) {
 class TMajorFaults : public TProperty {
 public:
     TError Get(std::string &value);
-    TMajorFaults() : TProperty(D_MAJOR_FAULTS, 0, "major page faults (ro)") {
+    TMajorFaults() : TProperty(D_MAJOR_FAULTS, EProperty::NONE, "major page faults (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static MajorFaults;
 
@@ -2563,10 +2553,9 @@ TError TMajorFaults::Get(std::string &value) {
 class TMaxRss : public TProperty {
 public:
     TError Get(std::string &value);
-    TMaxRss() : TProperty(D_MAX_RSS, 0,
+    TMaxRss() : TProperty(D_MAX_RSS, EProperty::NONE,
                           "peak anonymous memory usage [bytes] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
     void Init(void) {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
@@ -2595,9 +2584,8 @@ TError TMaxRss::Get(std::string &value) {
 class TCpuUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TCpuUsage() : TProperty(D_CPU_USAGE, 0, "consumed CPU time [nanoseconds] (ro)") {
+    TCpuUsage() : TProperty(D_CPU_USAGE, EProperty::NONE, "consumed CPU time [nanoseconds] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static CpuUsage;
 
@@ -2624,10 +2612,9 @@ TError TCpuUsage::Get(std::string &value) {
 class TCpuSystem : public TProperty {
 public:
     TError Get(std::string &value);
-    TCpuSystem() : TProperty(D_CPU_SYSTEM, 0,
+    TCpuSystem() : TProperty(D_CPU_SYSTEM, EProperty::NONE,
                              "consumed system CPU time [nanoseconds] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static CpuSystem;
 
@@ -2656,10 +2643,9 @@ public:
     ENetStat Kind;
 
     TNetStat(std::string name, ENetStat kind, std::string desc) :
-            TProperty(name, 0, desc) {
+            TProperty(name, EProperty::NONE, desc) {
         Kind = kind;
         IsReadOnly = true;
-        IsSerializable = false;
     }
 
     TError Get(std::string &value) {
@@ -2706,9 +2692,8 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TIoRead() : TProperty(D_IO_READ, 0, "read from disk [bytes] (ro)") {
+    TIoRead() : TProperty(D_IO_READ, EProperty::NONE, "read from disk [bytes] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static IoRead;
 
@@ -2762,9 +2747,8 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TIoWrite() : TProperty(D_IO_WRITE, 0, "written to disk [bytes] (ro)") {
+    TIoWrite() : TProperty(D_IO_WRITE, EProperty::NONE, "written to disk [bytes] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static IoWrite;
 
@@ -2818,9 +2802,8 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TIoOps() : TProperty(D_IO_OPS, 0, "io operations (ro)") {
+    TIoOps() : TProperty(D_IO_OPS, EProperty::NONE, "io operations (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static IoOps;
 
@@ -2872,9 +2855,8 @@ TError TIoOps::GetIndexed(const std::string &index,
 class TTime : public TProperty {
 public:
     TError Get(std::string &value);
-    TTime() : TProperty(D_TIME, 0, "running time [seconds] (ro)") {
+    TTime() : TProperty(D_TIME, EProperty::NONE, "running time [seconds] (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
     }
 } static Time;
 
@@ -2896,16 +2878,16 @@ TError TTime::Get(std::string &value) {
 
     // we started recording raw start/death time since porto v1.15;
     // in case we updated from old version, return zero
-    if (!(CurrentContainer->PropMask & START_TIME_SET)) {
+    if (!CurrentContainer->HasProp(EProperty::START_TIME)) {
         CurrentContainer->StartTime = GetCurrentTimeMs();
-        CurrentContainer->PropMask |= START_TIME_SET;
+        CurrentContainer->SetProp(EProperty::START_TIME);
     }
 
-    if (!(CurrentContainer->PropMask & DEATH_TIME_SET) &&
+    if (!CurrentContainer->HasProp(EProperty::DEATH_TIME) &&
         (CurrentContainer->GetState() == EContainerState::Dead)) {
 
         CurrentContainer->DeathTime = GetCurrentTimeMs();
-        CurrentContainer->PropMask |= DEATH_TIME_SET;
+        CurrentContainer->SetProp(EProperty::DEATH_TIME);
     }
 
     if (CurrentContainer->GetState() == EContainerState::Dead)
@@ -2923,9 +2905,8 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TPortoStat() : TProperty(D_PORTO_STAT, 0, "porto statistics (ro)") {
+    TPortoStat() : TProperty(D_PORTO_STAT, EProperty::NONE, "porto statistics (ro)") {
         IsReadOnly = true;
-        IsSerializable = false;
         IsHidden = true;
     }
 } static PortoStat;
@@ -2985,9 +2966,8 @@ public:
     TError Get(std::string &value) {
         return TError(EError::NotSupported, "Not supported: " + Name);
     }
-    TNetTos() : TProperty(P_NET_TOS, NET_TOS_SET, "IP TOS") {
+    TNetTos() : TProperty(P_NET_TOS, EProperty::NET_TOS, "IP TOS") {
         IsHidden = true;
-        IsSerializable = false;
         IsReadOnly = true;
         IsSupported = false;
     }
@@ -2996,10 +2976,9 @@ public:
 class TMemTotalLimit : public TProperty {
 public:
     TError Get(std::string &value);
-    TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, 0,
+    TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, EProperty::NONE,
                                  "Total memory limit for container "
                                  "in hierarchy") {
-        IsSerializable = false;
         IsReadOnly = true;
     }
 } static MemTotalLimit;

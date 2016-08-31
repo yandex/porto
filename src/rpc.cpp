@@ -312,7 +312,7 @@ static noinline TError CreateContainer(TContext &context,
 
     if (!err && weak) {
         container->IsWeak = true;
-        container->PropMask |= WEAK_SET;
+        container->SetProp(EProperty::WEAK);
 
         err = container->Save();
         if (!err)
