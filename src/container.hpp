@@ -105,6 +105,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 public:
     const std::shared_ptr<TContainer> Parent;
     bool PropSet[(int)EProperty::NR_PROPERTIES];
+    bool PropDirty[(int)EProperty::NR_PROPERTIES];
     TCred OwnerCred;
     uint64_t MemGuarantee;
     uint64_t CurrentMemGuarantee;
@@ -188,10 +189,19 @@ public:
 
     void SetProp(EProperty prop) {
         PropSet[(int)prop] = true;
+        PropDirty[(int)prop] = true;
     }
 
     void ClearProp(EProperty prop) {
         PropSet[(int)prop] = false;
+        PropDirty[(int)prop] = true;
+    }
+
+    bool TestClearPropDirty(EProperty prop) {
+        if (!PropDirty[(int)prop])
+            return false;
+        PropDirty[(int)prop] = false;
+        return true;
     }
 
     std::string GetPortoNamespace() const;

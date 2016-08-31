@@ -56,6 +56,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
 {
     Statistics->Containers++;
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
+    std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
     MemGuarantee = 0;
     CurrentMemGuarantee = 0;
 
@@ -447,66 +448,94 @@ TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     TError error;
 
-    error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
-    if (error) {
-        L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::MEM_GUARANTEE)) {
+        error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
+        if (error) {
+            L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetLimit(memcg, MemLimit);
-    if (error) {
-        if (error.GetErrno() == EBUSY)
-            return TError(EError::InvalidValue, std::to_string(MemLimit) + " is too low");
+    if (TestClearPropDirty(EProperty::MEM_LIMIT)) {
+        error = MemorySubsystem.SetLimit(memcg, MemLimit);
+        if (error) {
+            if (error.GetErrno() == EBUSY)
+                return TError(EError::InvalidValue, std::to_string(MemLimit) + " is too low");
 
-        L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
-        return error;
+            L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
-    if (error) {
-        L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
+        error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
+        if (error) {
+            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
-    if (error) {
-        L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::DIRTY_LIMIT)) {
+        error = MemorySubsystem.SetDirtyLimit(memcg, DirtyMemLimit);
+        if (error) {
+            L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    auto cpucg = GetCgroup(CpuSubsystem);
-    error = CpuSubsystem.SetCpuPolicy(cpucg,
-            CpuPolicy,
-            CpuGuarantee,
-            CpuLimit);
-    if (error) {
-        L_ERR() << "Cannot set cpu policy: " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::RECHARGE_ON_PGFAULT)) {
+        error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
+        if (error) {
+            L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    auto blkcg = GetCgroup(BlkioSubsystem);
-    error = BlkioSubsystem.SetPolicy(blkcg, IoPolicy == "batch");
-    if (error) {
-        L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::IO_LIMIT)) {
+        error = MemorySubsystem.SetIoLimit(memcg, IoLimit);
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetIoLimit(memcg, IoLimit);
-    if (error) {
-        L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::IO_OPS_LIMIT)) {
+        error = MemorySubsystem.SetIopsLimit(memcg, IopsLimit);
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetIopsLimit(memcg, IopsLimit);
-    if (error) {
-        L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::IO_POLICY)) {
+        auto blkcg = GetCgroup(BlkioSubsystem);
+        error = BlkioSubsystem.SetPolicy(blkcg, IoPolicy == "batch");
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
+            return error;
+        }
     }
 
-    error = MemorySubsystem.SetDirtyLimit(memcg, DirtyMemLimit);
-    if (error) {
-        L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
-        return error;
+    if (TestClearPropDirty(EProperty::CPU_POLICY) |
+            TestClearPropDirty(EProperty::CPU_LIMIT) |
+            TestClearPropDirty(EProperty::CPU_GUARANTEE)) {
+        auto cpucg = GetCgroup(CpuSubsystem);
+        error = CpuSubsystem.SetCpuPolicy(cpucg, CpuPolicy,
+                                          CpuGuarantee, CpuLimit);
+        if (error) {
+            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::NET_PRIO) |
+            TestClearPropDirty(EProperty::NET_LIMIT) |
+            TestClearPropDirty(EProperty::NET_GUARANTEE)) {
+        error = UpdateTrafficClasses();
+        if (error) {
+            L_ERR() << "Cannot update tc : " << error << std::endl;
+            return error;
+        }
     }
 
     return TError::Success();
@@ -598,12 +627,6 @@ TError TContainer::PrepareCgroups() {
 
     if (IsPortoRoot()) {
         error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
-        if (error)
-            return error;
-    }
-
-    if (!IsRoot()) {
-        error = ApplyDynamicProperties();
         if (error)
             return error;
     }
@@ -998,6 +1021,12 @@ TError TContainer::Start(bool meta) {
     error = PrepareNetwork(NetCfg);
     if (error)
         goto error;
+
+    if (!IsRoot()) {
+        error = ApplyDynamicProperties();
+        if (error)
+            return error;
+    }
 
     /* NetNsCapabilities must be isoalted from host net-namespace */
     if (Net == GetRoot()->Net && !CurrentClient->IsSuperUser()) {
@@ -1570,19 +1599,20 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     std::string idx;
     ParsePropertyName(property, idx);
 
-    auto prop = ContainerProperties.find(property);
-    if (prop == ContainerProperties.end())
+    auto it = ContainerProperties.find(property);
+    if (it == ContainerProperties.end())
         return TError(EError::InvalidProperty,
                               "Unknown container property: " + property);
+    auto prop = it->second;
 
-    if (!(*prop).second->IsSupported)
+    if (!prop->IsSupported)
         return TError(EError::NotSupported, "Not supported: " + property);
 
     CurrentContainer = const_cast<TContainer *>(this);
     if (idx.length())
-        error = (*prop).second->GetIndexed(idx, value);
+        error = prop->GetIndexed(idx, value);
     else
-        error = (*prop).second->Get(value);
+        error = prop->Get(value);
     CurrentContainer = nullptr;
 
     return error;
@@ -1596,30 +1626,45 @@ TError TContainer::SetProperty(const string &origProperty,
     string property = origProperty;
     std::string idx;
     ParsePropertyName(property, idx);
-    string value = StringTrim(origValue);
+    std::string value = StringTrim(origValue);
     TError error;
 
-    auto new_prop = ContainerProperties.find(property);
-    if (new_prop == ContainerProperties.end())
+    auto it = ContainerProperties.find(property);
+    if (it == ContainerProperties.end())
         return TError(EError::Unknown, "Invalid property " + property);
+    auto prop = it->second;
 
-    if (!(*new_prop).second->IsSupported)
+    if (!prop->IsSupported)
         return TError(EError::NotSupported, property + " is not supported");
 
     CurrentContainer = this;
-    if (idx.length())
-        error = (*new_prop).second->SetIndexed(idx, value);
-    else
-        error = (*new_prop).second->Set(value);
+
+    std::string oldValue;
+    error = prop->Get(oldValue);
+
+    if (!error) {
+        if (idx.length())
+            error = prop->SetIndexed(idx, value);
+        else
+            error = prop->Set(value);
+    }
+
+    if (!error && (State == EContainerState::Running ||
+                   State == EContainerState::Meta ||
+                   State == EContainerState::Paused)) {
+        error = ApplyDynamicProperties();
+        if (error) {
+            (void)prop->Set(oldValue);
+            (void)TestClearPropDirty(prop->Prop);
+        }
+    }
+
     CurrentContainer = nullptr;
 
-    if (error)
-        return error;
+    if (!error)
+        error = Save();
 
-    // Write KVS snapshot, otherwise it may grow indefinitely and on next
-    // restart we will merge it forever
-
-    return Save();
+    return error;
 }
 
 TError TContainer::RestoreNetwork() {

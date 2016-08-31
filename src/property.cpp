@@ -1447,29 +1447,10 @@ TError TMemoryLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (CurrentContainer->MemLimit == new_size)
-        return TError::Success();
-
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.SetLimit(memcg, new_size);
-
-        if (error) {
-            if (error.GetErrno() == EBUSY)
-                return TError(EError::InvalidValue,
-                              std::string(P_MEM_LIMIT) + " is too low");
-
-            L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
-
-            return error;
-        }
+    if (CurrentContainer->MemLimit != new_size) {
+        CurrentContainer->MemLimit = new_size;
+        CurrentContainer->SetProp(EProperty::MEM_LIMIT);
     }
-
-    CurrentContainer->MemLimit = new_size;
-    CurrentContainer->SetProp(EProperty::MEM_LIMIT);
 
     return TError::Success();
 }
@@ -1502,25 +1483,10 @@ TError TAnonLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (CurrentContainer->AnonMemLimit == new_size)
-        return TError::Success();
-
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.SetAnonLimit(memcg, new_size);
-
-        if (error) {
-            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
-
-            return error;
-        }
+    if (CurrentContainer->AnonMemLimit != new_size) {
+        CurrentContainer->AnonMemLimit = new_size;
+        CurrentContainer->SetProp(EProperty::ANON_LIMIT);
     }
-
-    CurrentContainer->AnonMemLimit = new_size;
-    CurrentContainer->SetProp(EProperty::ANON_LIMIT);
 
     return TError::Success();
 }
@@ -1553,25 +1519,10 @@ TError TDirtyLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (CurrentContainer->DirtyMemLimit == new_size)
-        return TError::Success();
-
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.SetDirtyLimit(memcg, new_size);
-
-        if (error) {
-            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
-
-            return error;
-        }
+    if (CurrentContainer->DirtyMemLimit != new_size) {
+        CurrentContainer->DirtyMemLimit = new_size;
+        CurrentContainer->SetProp(EProperty::ANON_LIMIT);
     }
-
-    CurrentContainer->DirtyMemLimit = new_size;
-    CurrentContainer->SetProp(EProperty::ANON_LIMIT);
 
     return TError::Success();
 }
@@ -1608,21 +1559,10 @@ TError TRechargeOnPgfault::Set(const std::string &recharge) {
     else
         return TError(EError::InvalidValue, "Invalid bool value");
 
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.RechargeOnPgfault(memcg, new_val);
-
-        if (error) {
-            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
-            return error;
-        }
+    if (CurrentContainer->RechargeOnPgfault != new_val) {
+        CurrentContainer->RechargeOnPgfault = new_val;
+        CurrentContainer->SetProp(EProperty::RECHARGE_ON_PGFAULT);
     }
-
-    CurrentContainer->RechargeOnPgfault = new_val;
-    CurrentContainer->SetProp(EProperty::RECHARGE_ON_PGFAULT);
 
     return TError::Success();
 }
@@ -1652,24 +1592,10 @@ TError TCpuLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuPolicy(cpucg, CurrentContainer->CpuPolicy,
-                                          CurrentContainer->CpuGuarantee,
-                                          new_limit);
-
-        if (error) {
-            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
-            return error;
-        }
-
+    if (CurrentContainer->CpuLimit != new_limit) {
+        CurrentContainer->CpuLimit = new_limit;
+        CurrentContainer->SetProp(EProperty::CPU_LIMIT);
     }
-
-    CurrentContainer->CpuLimit = new_limit;
-    CurrentContainer->SetProp(EProperty::CPU_LIMIT);
 
     return TError::Success();
 }
@@ -1699,24 +1625,10 @@ TError TCpuGuarantee::Set(const std::string &guarantee) {
     if (error)
         return error;
 
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuPolicy(cpucg, CurrentContainer->CpuPolicy,
-                                          new_guarantee,
-                                          CurrentContainer->CpuLimit);
-
-        if (error) {
-            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
-            return error;
-        }
-
+    if (CurrentContainer->CpuGuarantee != new_guarantee) {
+        CurrentContainer->CpuGuarantee = new_guarantee;
+        CurrentContainer->SetProp(EProperty::CPU_GUARANTEE);
     }
-
-    CurrentContainer->CpuGuarantee = new_guarantee;
-    CurrentContainer->SetProp(EProperty::CPU_GUARANTEE);
 
     return TError::Success();
 }
@@ -1749,20 +1661,10 @@ TError TIoLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.SetIoLimit(memcg, new_limit);
-        if (error) {
-            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
-            return error;
-        }
+    if (CurrentContainer->IoLimit != new_limit) {
+        CurrentContainer->IoLimit = new_limit;
+        CurrentContainer->SetProp(EProperty::IO_LIMIT);
     }
-
-    CurrentContainer->IoLimit = new_limit;
-    CurrentContainer->SetProp(EProperty::IO_LIMIT);
 
     return TError::Success();
 }
@@ -1795,20 +1697,10 @@ TError TIopsLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (CurrentContainer->GetState() == EContainerState::Running ||
-        CurrentContainer->GetState() == EContainerState::Meta ||
-        CurrentContainer->GetState() == EContainerState::Paused) {
-
-        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.SetIopsLimit(memcg, new_limit);
-        if (error) {
-            L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
-            return error;
-        }
+    if (CurrentContainer->IopsLimit != new_limit) {
+        CurrentContainer->IopsLimit = new_limit;
+        CurrentContainer->SetProp(EProperty::IO_OPS_LIMIT);
     }
-
-    CurrentContainer->IopsLimit = new_limit;
-    CurrentContainer->SetProp(EProperty::IO_OPS_LIMIT);
 
     return TError::Success();
 }
@@ -1841,19 +1733,12 @@ TError TNetGuarantee::Set(const std::string &guarantee) {
     if (error)
         return error;
 
-    TUintMap old_guarantee = CurrentContainer->NetGuarantee;
-    CurrentContainer->NetGuarantee = new_guarantee;
-
-    if (!IsRunning())
-        error = CurrentContainer->UpdateTrafficClasses();
-    if (!error) {
+    if (CurrentContainer->NetGuarantee != new_guarantee) {
+        CurrentContainer->NetGuarantee = new_guarantee;
         CurrentContainer->SetProp(EProperty::NET_GUARANTEE);
-    } else {
-        L_ERR() << "Cannot update tc : " << error << std::endl;
-        CurrentContainer->NetGuarantee = old_guarantee;
     }
 
-    return error;
+    return TError::Success();
 }
 
 TError TNetGuarantee::Get(std::string &value) {
@@ -1871,19 +1756,12 @@ TError TNetGuarantee::SetIndexed(const std::string &index,
     if (error)
         return TError(EError::InvalidValue, "Invalid value " + guarantee);
 
-    uint64_t old_guarantee = CurrentContainer->NetGuarantee[index];
-    CurrentContainer->NetGuarantee[index] = val;
-
-    if (!IsRunning())
-        error = CurrentContainer->UpdateTrafficClasses();
-    if (!error) {
+    if (CurrentContainer->NetGuarantee[index] != val) {
+        CurrentContainer->NetGuarantee[index] = val;
         CurrentContainer->SetProp(EProperty::NET_GUARANTEE);
-    } else {
-        L_ERR() << "Cannot update tc : " << error << std::endl;
-        CurrentContainer->NetGuarantee[index] = old_guarantee;
     }
 
-    return error;
+    return TError::Success();
 }
 
 TError TNetGuarantee::GetIndexed(const std::string &index,
@@ -1920,19 +1798,12 @@ TError TNetLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    TUintMap old_limit = CurrentContainer->NetLimit;
-    CurrentContainer->NetLimit = new_limit;
-
-    if (!IsRunning())
-        error = CurrentContainer->UpdateTrafficClasses();
-    if (!error) {
+    if (CurrentContainer->NetLimit != new_limit) {
+        CurrentContainer->NetLimit = new_limit;
         CurrentContainer->SetProp(EProperty::NET_LIMIT);
-    } else {
-        L_ERR() << "Cannot update tc : " << error << std::endl;
-        CurrentContainer->NetLimit = old_limit;
     }
 
-    return error;
+    return TError::Success();
 }
 
 TError TNetLimit::Get(std::string &value) {
@@ -1950,19 +1821,12 @@ TError TNetLimit::SetIndexed(const std::string &index,
     if (error)
         return TError(EError::InvalidValue, "Invalid value " + limit);
 
-    uint64_t old_limit = CurrentContainer->NetLimit[index];
-    CurrentContainer->NetLimit[index] = val;
-
-    if (!IsRunning())
-        error = CurrentContainer->UpdateTrafficClasses();
-    if (!error) {
+    if (CurrentContainer->NetLimit[index] != val) {
+        CurrentContainer->NetLimit[index] = val;
         CurrentContainer->SetProp(EProperty::NET_LIMIT);
-    } else {
-        L_ERR() << "Cannot update tc : " << error << std::endl;
-        CurrentContainer->NetLimit[index] = old_limit;
     }
 
-    return error;
+    return TError::Success();
 }
 
 TError TNetLimit::GetIndexed(const std::string &index,
@@ -2005,19 +1869,12 @@ TError TNetPriority::Set(const std::string &prio) {
             return TError(EError::InvalidValue, "invalid value");
     }
 
-    TUintMap old_prio = CurrentContainer->NetPriority;
-    CurrentContainer->NetPriority = new_prio;
-
-    if (!IsRunning())
-        error = CurrentContainer->UpdateTrafficClasses();
-    if (!error) {
+    if (CurrentContainer->NetPriority != new_prio) {
+        CurrentContainer->NetPriority = new_prio;
         CurrentContainer->SetProp(EProperty::NET_PRIO);
-    } else {
-        L_ERR() << "Cannot update tc : " << error << std::endl;
-        CurrentContainer->NetPriority = old_prio;
     }
 
-    return error;
+    return TError::Success();
 }
 
 TError TNetPriority::Get(std::string &value) {
@@ -2038,19 +1895,12 @@ TError TNetPriority::SetIndexed(const std::string &index,
     if (val > 7)
         return TError(EError::InvalidValue, "invalid value");
 
-    uint64_t old_prio = CurrentContainer->NetPriority[index];
-    CurrentContainer->NetPriority[index] = val;
-
-    if (!IsRunning())
-        error = CurrentContainer->UpdateTrafficClasses();
-    if (!error) {
+    if (CurrentContainer->NetPriority[index] != val) {
+        CurrentContainer->NetPriority[index] = val;
         CurrentContainer->SetProp(EProperty::NET_PRIO);
-    } else {
-        L_ERR() << "Cannot update tc : " << error << std::endl;
-        CurrentContainer->NetPriority[index] = old_prio;
     }
 
-    return error;
+    return TError::Success();
 }
 
 TError TNetPriority::GetIndexed(const std::string &index,
