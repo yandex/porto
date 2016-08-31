@@ -135,6 +135,8 @@ public:
 
     bool Handle(const TRequest &request) override {
         HandleRpcRequest(*request.Context, request.Request, request.Client);
+        Statistics->RequestsCompleted++;
+        Statistics->RequestsQueued--;
 
         return true;
     }
@@ -412,8 +414,10 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
                     if (!error) {
                         error = client->IdentifyClient(*context.Cholder, false);
-                        if (!error)
+                        if (!error) {
+                            Statistics->RequestsQueued++;
                             worker.Push(req);
+                        }
                     }
                 }
 
@@ -494,6 +498,7 @@ static int SlaveMain() {
     Statistics->Containers = 0;
     Statistics->Clients = 0;
     Statistics->Volumes = 0;
+    Statistics->RequestsQueued = 0;
 
     ret = DaemonPrepare(false);
     if (ret)

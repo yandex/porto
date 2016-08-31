@@ -2786,6 +2786,8 @@ void TPortoStat::Populate(TUintMap &m) {
     m["containers"] = Statistics->Containers;
     m["volumes"] = Statistics->Volumes;
     m["clients"] = Statistics->Clients;
+    m["requests_queued"] = Statistics->RequestsQueued;
+    m["requests_completed"] = Statistics->RequestsCompleted;
 }
 
 TError TPortoStat::Get(std::string &value) {

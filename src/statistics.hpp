@@ -20,6 +20,8 @@ struct TStatistics {
     std::atomic<uint64_t> Containers;
     std::atomic<uint64_t> Volumes;
     std::atomic<uint64_t> Clients;
+    std::atomic<uint64_t> RequestsQueued;
+    std::atomic<uint64_t> RequestsCompleted;
 };
 
 extern TStatistics *Statistics;
