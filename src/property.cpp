@@ -755,10 +755,10 @@ public:
         if (error)
             return error;
 
-        auto limit_max = config().container().stdout_limit();
-        if (limit > limit_max)
-            return TError(EError::InvalidValue,
-                    "Maximum limit is: " + std::to_string(limit_max));
+        uint64_t limit_max = config().container().stdout_limit_max();
+        if (limit > limit_max && !CurrentClient->IsSuperUser())
+            return TError(EError::Permission,
+                          "Maximum limit is: " + std::to_string(limit_max));
 
         CurrentContainer->Stdout.Limit = limit;
         CurrentContainer->Stderr.Limit = limit;

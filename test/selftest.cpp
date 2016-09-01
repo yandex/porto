@@ -3506,7 +3506,9 @@ static void TestLimits(Porto::Connection &api) {
 
         Say() << "Make sure we have a cap for stdout_limit property" << std::endl;
 
-        ExpectApiFailure(api.SetProperty(name, "stdout_limit", std::to_string(config().container().stdout_limit() + 1)), EError::InvalidValue);
+        ExpectApiFailure(api.SetProperty(name, "stdout_limit",
+                         std::to_string(config().container().stdout_limit_max() + 1)),
+                         EError::Permission);
 
         Say() << "Make sure we have a cap for private property" << std::endl;
         std::string tooLong = std::string(config().container().private_max() + 1, 'a');
@@ -5195,22 +5197,24 @@ static void TestRemoveDead(Porto::Connection &api) {
     ExpectEq(v, std::to_string(1));
 }
 
-static void TestLogRotate(Porto::Connection &api) {
-    std::string v;
+static void TestStdoutLimit(Porto::Connection &api) {
+    std::string v, cwd, limitStr;
     struct stat st;
+    uint64_t limit;
 
     std::string name = "biglog";
     ExpectApiSuccess(api.Create(name));
-    ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
-    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=100 && sleep 5'"));
-    std::string cwd;
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
+    ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
+    ExpectApiSuccess(api.GetProperty(name, "stdout_limit", limitStr));
+    ExpectApiSuccess(api.SetProperty(name, "command", "dd if=/dev/zero bs=1M count=100"));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
 
     TPath stdoutPath(cwd + "/" + v);
     ExpectSuccess(stdoutPath.StatFollow(st));
-    ExpectLess(st.st_blocks * 512, config().container().max_log_size());
+    ExpectSuccess(StringToUint64(limitStr, limit));
+    ExpectLessEq(st.st_size, limit);
 }
 
 static void TestStats(Porto::Connection &api) {
@@ -5326,6 +5330,7 @@ int SelfTest(std::vector<std::string> args) {
         { "paths", TestPaths },
         { "cwd_property", TestCwdProperty },
         { "stdpath_property", TestStdPathProperty },
+        { "stdout_limit", TestStdoutLimit },
         { "root_property", TestRootProperty },
         { "root_readonly", TestRootRdOnlyProperty },
         { "hostname_property", TestHostnameProperty },
@@ -5357,7 +5362,6 @@ int SelfTest(std::vector<std::string> args) {
         { "cgroups", TestCgroups },
         { "version", TestVersion },
         // { "remove_dead", TestRemoveDead }, FIXME
-        // { "log_rotate", TestLogRotate }, FIXME
         { "stats", TestStats },
     };
 

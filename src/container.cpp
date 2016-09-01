@@ -1457,6 +1457,9 @@ void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
     WaitTask.Pid = 0;
     ClearProp(EProperty::ROOT_PID);
 
+    Stdout.Rotate(*this);
+    Stderr.Rotate(*this);
+
     if (State == EContainerState::Meta)
         SetState(EContainerState::Stopped);
     else
@@ -1465,9 +1468,6 @@ void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
     error = Save();
     if (error)
         L_WRN() << "Cannot save container state after exit: " << error << std::endl;
-
-    Stdout.Rotate(*this);
-    Stderr.Rotate(*this);
 
     if (MayRespawn())
         ScheduleRespawn();
