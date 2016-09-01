@@ -301,7 +301,8 @@ TError TMountNamespace::MountRootFs() {
         { "/dev", "tmpfs", MS_NOSUID | MS_STRICTATIME,
             { "mode=755", "size=32m" } },
         { "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
-            { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5" }},
+            { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5",
+              "max=" + std::to_string(config().container().devpts_max()) }},
         { "/proc", "proc", MS_NOSUID | MS_NOEXEC | MS_NODEV, {}},
         { "/sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {}},
     };

@@ -65,6 +65,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_enable_smart(true);
     config().mutable_container()->set_default_porto_namespace(false);
     config().mutable_container()->set_enable_tracefs(true);
+    config().mutable_container()->set_devpts_max(256);
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
 
