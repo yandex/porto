@@ -5204,10 +5204,13 @@ static void TestStdoutLimit(Porto::Connection &api) {
 
     std::string name = "biglog";
     ExpectApiSuccess(api.Create(name));
+
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
     ExpectApiSuccess(api.GetProperty(name, "stdout_limit", limitStr));
+
     ExpectApiSuccess(api.SetProperty(name, "command", "dd if=/dev/zero bs=1M count=100"));
+
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
 
@@ -5215,6 +5218,8 @@ static void TestStdoutLimit(Porto::Connection &api) {
     ExpectSuccess(stdoutPath.StatFollow(st));
     ExpectSuccess(StringToUint64(limitStr, limit));
     ExpectLessEq(st.st_size, limit);
+
+    ExpectApiSuccess(api.Destroy(name));
 }
 
 static void TestStats(Porto::Connection &api) {
