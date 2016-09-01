@@ -1,15 +1,20 @@
 apt-get clean
-rm -f /var/cache/apt/archives/*.deb
-rm -rf /var/lib/apt/lists/*
-rm -f /var/cache/apt/*.bin
-rm -rf /tmp/*
+find var/cache/apt/archives -iname '*.deb' -delete
+find var/lib/apt/lists -type f -delete
+find var/cache/apt -iname '*.bin' -delete
 
-: > /etc/hostname
-: > /etc/resolv.conf
-: > /etc/mtab
+find tmp -mindepth 1 -delete
 
-find /var/log -iname '*.gz' -delete
-find /var/log -iname '*.1' -delete
-find /var/log -type f -print0 | xargs -0 -t tee < /dev/null
+rm -f etc/resolv.conf
+: > etc/resolv.conf
+
+rm -f etc/hostname
+: > etc/hostname
+
+ln -sf ../proc/self/mounts etc/mtab
+
+find var/log -iname '*.gz' -delete
+find var/log -iname '*.[0-9]' -delete
+find var/log -type f -print0 | xargs -0 -t tee < /dev/null
 
 : > /root/.bash_history
