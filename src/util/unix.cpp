@@ -258,10 +258,10 @@ retry:
                 goto retry;
             return TError(EError::Unknown, errno, "RunCommand: waitpid");
         }
-        if (WIFSIGNALED(status))
-            return TError(EError::Unknown, "RunCommand: " + command[0] +
-                          " " + FormatExitStatus(status));
-        return TError::Success();
+        if (WIFEXITED(status) && !WEXITSTATUS(status))
+            return TError::Success();
+        return TError(EError::Unknown, "RunCommand: " + command[0] +
+                                       " " + FormatExitStatus(status));
     }
 
     SetDieOnParentExit(SIGKILL);
@@ -292,7 +292,7 @@ retry:
     argv[command.size()] = nullptr;
 
     execvp(argv[0], (char **)argv);
-    _exit(EXIT_FAILURE);
+    _exit(2);
 }
 
 TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
