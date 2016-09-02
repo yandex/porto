@@ -110,6 +110,7 @@ message TCfg {
 		optional bool enabled = 5 [deprecated=true];
 		optional string layers_dir = 6;
 		optional bool enable_quota = 7;
+		optional string default_place = 8;
 	}
 
 	optional TNetworkCfg network = 1;

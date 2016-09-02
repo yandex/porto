@@ -5054,7 +5054,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.CreateVolume(a, prop_limited));
     ExpectApiSuccess(api.CreateVolume(b, prop_unlimit));
 
-    TPath volume(config().volumes().volume_dir() + "/leftover_volume");
+    TPath volume(config().volumes().default_place() + "/" + config().volumes().volume_dir() + "/leftover_volume");
     AsRoot(api);
     volume.RemoveAll();
     ExpectSuccess(volume.Mkdir(0755));

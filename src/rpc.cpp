@@ -1282,6 +1282,11 @@ noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &r
     if (error)
         return error;
 
+    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    error = CheckPlace(place);
+    if (error)
+        return error;
+
     std::shared_ptr<TContainer> clientContainer;
     error = CurrentClient->GetClientContainer(clientContainer);
     if (error)
@@ -1292,7 +1297,7 @@ noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &r
     if (error)
         return error;
 
-    TPath layers = TPath(config().volumes().layers_dir());
+    TPath layers = place / config().volumes().layers_dir();
     TPath layers_tmp = layers / "_tmp_";
     TPath layer = layers / layer_name;
     TPath layer_tmp = layers_tmp / layer_name;
@@ -1320,7 +1325,7 @@ noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &r
             error = TError(EError::LayerAlreadyExists, "Layer already exists");
             goto err_tmp;
         }
-        if (context.Vholder->LayerInUse(layer_name)) {
+        if (context.Vholder->LayerInUse(layer_name, place)) {
             error = TError(EError::Busy, "layer in use");
             goto err_tmp;
         }
@@ -1415,17 +1420,23 @@ noinline TError RemoveLayer(TContext &context, const rpc::TLayerRemoveRequest &r
     if (error)
         return error;
 
+    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    error = CheckPlace(place);
+    if (error)
+        return error;
+
     std::string layer_name = req.layer();
     error = ValidateLayerName(layer_name);
     if (error)
         return error;
 
-    return context.Vholder->RemoveLayer(layer_name);
+    return context.Vholder->RemoveLayer(layer_name, place);
 }
 
-noinline TError ListLayers(TContext &context,
+noinline TError ListLayers(TContext &context, const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
-    TPath layers_dir = TPath(config().volumes().layers_dir());
+    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    TPath layers_dir = place / config().volumes().layers_dir();
     std::vector<std::string> layers;
 
     TError error = layers_dir.ReadDirectory(layers);
@@ -1516,7 +1527,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else if (req.has_removelayer())
             error = RemoveLayer(context, req.removelayer());
         else if (req.has_listlayers())
-            error = ListLayers(context, rsp);
+            error = ListLayers(context, req.listlayers(), rsp);
         else if (req.has_convertpath())
             error = ConvertPath(context, req.convertpath(), rsp);
         else

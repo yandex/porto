@@ -38,6 +38,8 @@ constexpr const char *V_INODE_USED = "inode_used";
 constexpr const char *V_SPACE_AVAILABLE = "space_available";
 constexpr const char *V_INODE_AVAILABLE = "inode_available";
 
+constexpr const char *V_PLACE = "place";
+
 class TVolumeHolder;
 class TVolume;
 class TContainer;
@@ -47,6 +49,8 @@ class TKeyValue;
 TError ValidateLayerName(const std::string &name);
 
 TError SanitizeLayer(TPath layer, bool merge);
+
+TError CheckPlace(const TPath &place, bool init = false);
 
 class TVolumeBackend {
 public:
@@ -92,6 +96,9 @@ public:
     TCred CreatorCred;
     TPath CreatorRoot;
     unsigned VolumePerms = 0775;
+
+    bool CustomPlace = false;
+    TPath Place;
 
     TVolume() {
         Statistics->Volumes++;
@@ -177,8 +184,8 @@ public:
     TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
 
-    bool LayerInUse(const std::string &name);
-    TError RemoveLayer(const std::string &name);
+    bool LayerInUse(const std::string &name, const TPath &place);
+    TError RemoveLayer(const std::string &name, const TPath &place);
 };
 
 extern TPath VolumesKV;

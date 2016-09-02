@@ -150,7 +150,7 @@ public:
             return false;
 
         if (!tested) {
-            TProjectQuota quota(config().volumes().volume_dir());
+            TProjectQuota quota(config().volumes().default_place() + "/" + config().volumes().volume_dir());
             supported = quota.Supported();
             if (supported)
                 L_SYS() << "Project quota is supported: " << quota.Path << std::endl;
@@ -517,7 +517,7 @@ public:
                     goto err;
                 }
             } else
-                path = TPath(config().volumes().layers_dir()) / name;
+                path = Volume->Place / config().volumes().layers_dir() / name;
 
             temp = Volume->GetInternal("layer_" + std::to_string(layer_idx++));
             error = temp.Mkdir(700);
@@ -775,7 +775,7 @@ TError TVolume::OpenBackend() {
 
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(std::string type) const {
-    return TPath(config().volumes().volume_dir()) / Id / type;
+    return Place / config().volumes().volume_dir() / Id / type;
 }
 
 /* /chroot/porto/<type>_<id> */
@@ -821,7 +821,7 @@ TError TVolume::CheckGuarantee(TVolumeHolder &holder,
         return TError::Success();
 
     if (IsAutoStorage)
-        storage = TPath(config().volumes().volume_dir());
+        storage = Place / config().volumes().volume_dir();
     else
         storage = GetStorage();
 
@@ -927,6 +927,18 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidProperty, "Read-only: " + pair.first);
     }
 
+    /* Verify place */
+    if (properties.count(V_PLACE)) {
+        Place = properties.at(V_PLACE);
+        error = CheckPlace(Place);
+        if (error)
+            return error;
+        CustomPlace = true;
+    } else {
+        Place = config().volumes().default_place();
+        CustomPlace = false;
+    }
+
     /* Verify volume path */
     if (!path.IsEmpty()) {
         if (!path.IsAbsolute())
@@ -1016,7 +1028,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                 error = ValidateLayerName(l);
                 if (error)
                     return error;
-                layer = TPath(config().volumes().layers_dir()) / layer;
+                layer = Place / config().volumes().layers_dir() / layer;
             }
             if (!layer.Exists())
                 return TError(EError::LayerNotFound, "Layer not found");
@@ -1134,7 +1146,7 @@ TError TVolume::Build() {
                 (void)temp.UmountAll();
                 (void)temp.Rmdir();
             } else {
-                TPath layer = TPath(config().volumes().layers_dir()) / name;
+                TPath layer = Place / config().volumes().layers_dir() / name;
                 error = CopyRecursive(layer, path);
             }
             if (error)
@@ -1224,7 +1236,7 @@ TError TVolume::Destroy(TVolumeHolder &holder) {
     if (IsLayersSet) {
         for (auto &layer: Layers) {
             if (StringStartsWith(layer, "_weak_")) {
-                error = holder.RemoveLayer(layer);
+                error = holder.RemoveLayer(layer, Place);
                 if (error && error.GetError() != EError::Busy)
                     L_ERR() << "Cannot remove layer: " << error << std::endl;
             }
@@ -1379,6 +1391,9 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
         ret[V_LAYERS] = MergeEscapeStrings(layers, ';');
     }
 
+    if (CustomPlace)
+        ret[V_PLACE] = Place.ToString();
+
     return ret;
 }
 
@@ -1412,12 +1427,18 @@ TError TVolume::Save() {
     node.Set(V_INODE_LIMIT, std::to_string(InodeLimit));
     node.Set(V_INODE_GUARANTEE, std::to_string(InodeGuarantee));
 
+    if (CustomPlace)
+        node.Set(V_PLACE, Place.ToString());
+
     return node.Save();
 }
 
 TError TVolume::Restore(const TKeyValue &node) {
     if (!node.Has(V_ID))
         return TError(EError::InvalidValue, "No volume id stored");
+
+    Place = config().volumes().default_place();
+    CustomPlace = false;
 
     TError error = SetProperty(node.Data);
     if (error)
@@ -1450,6 +1471,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", true },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
+    { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)", false },
     { V_INODE_LIMIT, "disk inode limit (dynamic, default zero - unlimited)", false },
     { V_SPACE_GUARANTEE,    "disk space guarantee (dynamic, default - zero)", false },
@@ -1469,37 +1491,66 @@ TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
 
 void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {}
 
-TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
-    std::list<TKeyValue> nodes;
+TError CheckPlace(const TPath &place, bool init) {
+    struct stat st;
     TError error;
 
-    TPath volumes = config().volumes().volume_dir();
-    if (!volumes.IsDirectoryFollow()) {
+    if (!place.IsAbsolute() || !place.IsNormal())
+        return TError(EError::InvalidValue, "place path must be normalized");
+
+    TPath volumes = place / config().volumes().volume_dir();
+    if (init && !volumes.IsDirectoryStrict()) {
         (void)volumes.Unlink();
         error = volumes.MkdirAll(0755);
         if (error)
             return error;
     }
+    error = volumes.StatStrict(st);
+    if (error || !S_ISDIR(st.st_mode))
+        return TError(EError::InvalidValue, "in place " + volumes.ToString() + " must be directory");
+    if (st.st_uid != RootUser || st.st_gid != PortoGroup)
+        volumes.Chown(RootUser, PortoGroup);
+    if ((st.st_mode & 0777) != 0755)
+        volumes.Chmod(0755);
 
-    TPath layers = config().volumes().layers_dir();
-    if (!layers.IsDirectoryFollow()) {
+    TPath layers = place / config().volumes().layers_dir();
+    if (init && !layers.IsDirectoryStrict()) {
         (void)layers.Unlink();
         error = layers.MkdirAll(0700);
         if (error)
             return error;
     }
+    error = layers.StatStrict(st);
+    if (error || !S_ISDIR(st.st_mode))
+        return TError(EError::InvalidValue, "in place " + layers.ToString() + " must be directory");
+    if (st.st_uid != RootUser || st.st_gid != PortoGroup)
+        layers.Chown(RootUser, PortoGroup);
+    if ((st.st_mode & 0777) != 0700)
+        layers.Chmod(0700);
 
     TPath layers_tmp = layers / "_tmp_";
-    if (layers_tmp.Exists()) {
-        L_ACT() << "Remove stale layers..." << std::endl;
-        error = layers_tmp.ClearDirectory();
-        if (error)
-            L_ERR() << "Cannot remove stale layers: " << error << std::endl;
-    } else {
-        error = layers_tmp.Mkdir(0700);
-        if (error)
-            return error;
+    if (!layers_tmp.IsDirectoryStrict()) {
+        (void)layers_tmp.Unlink();
+        (void)layers_tmp.Mkdir(0700);
     }
+
+    return TError::Success();
+}
+
+TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
+    std::list<TKeyValue> nodes;
+    TError error;
+
+    TPath place(config().volumes().default_place());
+    error = CheckPlace(place, true);
+    if (error)
+        L_ERR() << "Cannot prepare place: " << error << std::endl;
+
+    L_ACT() << "Remove stale layers..." << std::endl;
+    TPath layers_tmp = place / config().volumes().layers_dir() / "_tmp_";
+    error = layers_tmp.ClearDirectory();
+    if (error)
+        L_ERR() << "Cannot remove stale layers: " << error << std::endl; 
 
     error = TKeyValue::ListAll(VolumesKV, nodes);
     if (error)
@@ -1567,6 +1618,8 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
 
         L() << "Volume " << volume->GetPath() << " restored" << std::endl;
     }
+
+    TPath volumes = place / config().volumes().volume_dir();
 
     L_ACT() << "Remove stale volumes..." << std::endl;
 
@@ -1643,8 +1696,10 @@ std::vector<TPath> TVolumeHolder::ListPaths() const {
     return ret;
 }
 
-bool TVolumeHolder::LayerInUse(const std::string &name) {
+bool TVolumeHolder::LayerInUse(const std::string &name, const TPath &place) {
     for (auto &volume : Volumes) {
+        if (volume.second->Place != place)
+            continue;
         auto &layers = volume.second->Layers;
         if (std::find(layers.begin(), layers.end(), name) != layers.end())
             return true;
@@ -1652,8 +1707,8 @@ bool TVolumeHolder::LayerInUse(const std::string &name) {
     return false;
 }
 
-TError TVolumeHolder::RemoveLayer(const std::string &name) {
-    TPath layers = TPath(config().volumes().layers_dir());
+TError TVolumeHolder::RemoveLayer(const std::string &name, const TPath &place) {
+    TPath layers = place / config().volumes().layers_dir();
     TPath layer = layers / name;
     TError error;
 
@@ -1665,7 +1720,7 @@ TError TVolumeHolder::RemoveLayer(const std::string &name) {
     TPath layer_tmp = layers_tmp / name;
 
     auto lock = ScopedLock();
-    if (LayerInUse(name))
+    if (LayerInUse(name, place))
         error = TError(EError::Busy, "Layer " + name + "in use");
     else
         error = layer.Rename(layer_tmp);
@@ -1848,6 +1903,11 @@ TError TVolume::SetProperty(const std::map<std::string, std::string> &properties
                 return error;
 
             InodeGuarantee = guarantee;
+
+        } else if (prop.first == V_PLACE) {
+
+            Place = prop.second;
+            CustomPlace = true;
 
         } else {
             return TError(EError::InvalidValue, "Invalid value name: " + prop.first);
