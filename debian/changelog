@@ -1,3 +1,22 @@
+yandex-porto (3.0.3) unstable; urgency=low
+
+  * api/python: add method Version
+  * porto: remove left-over freezer first
+  * test/test-mem-overcommit: skip if not supported
+  * porto: add more variants for property enable_porto
+  * porto: enum for properties
+  * porto: apply only changed dynamic properties
+  * porto: add requests statistics
+  * porto: use blkio.weight=500 for io_policy=normal
+  * porto: sanitize stdout_limit restrictions
+  * util/unix: fix error detection in RunCommand
+  * selftest/stdout_limit: remove container
+  * porto: limit count of devpts devices in container with 256
+  * layers/common-cleanup.sh: cleanup
+  * porto: add custom place for layers and volumes
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 05 Sep 2016 16:20:29 +0300
+
 yandex-porto (3.0.2) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
