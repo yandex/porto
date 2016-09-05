@@ -7,6 +7,7 @@
 #include "property.hpp"
 #include "container.hpp"
 #include "volume.hpp"
+#include "layer.hpp"
 #include "event.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
@@ -379,7 +380,7 @@ noinline TError StartContainer(TContext &context,
         return err;
 
     std::shared_ptr<TContainer> target;
-    err = context.Cholder->Get(name, target);
+    err = TContainer::Find(name, target);
     if (err)
         return err;
 
@@ -642,7 +643,7 @@ noinline TError GetContainerCombined(TContext &context,
         TNestedScopedLock lock;
         TError containerError = CurrentClient->ResolveRelativeName(relname, name, true);
         if (!containerError) {
-            containerError = context.Cholder->Get(name, container);
+            containerError = TContainer::Find(name, container);
             if (!containerError && container) {
                 if (container->IsAcquired()) {
                     containerError = TError(EError::Busy, "Can't get data and property of busy container");
@@ -752,8 +753,7 @@ noinline TError Kill(TContext &context,
     return container->Kill(req.sig());
 }
 
-noinline TError Version(TContext &context,
-                        rpc::TContainerResponse &rsp) {
+noinline TError Version(rpc::TContainerResponse &rsp) {
     auto ver = rsp.mutable_version();
 
     ver->set_tag(PORTO_VERSION);
@@ -798,7 +798,7 @@ noinline TError Wait(TContext &context,
         }
 
         std::shared_ptr<TContainer> container;
-        err = context.Cholder->Get(abs_name, container);
+        err = TContainer::Find(abs_name, container);
         if (err) {
             rsp.mutable_wait()->set_name(name);
             return err;
@@ -857,8 +857,7 @@ noinline TError Wait(TContext &context,
     return TError::Queued();
 }
 
-noinline TError ConvertPath(TContext &context,
-                            const rpc::TConvertPathRequest &req,
+noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
                             rpc::TContainerResponse &rsp) {
     auto lock = LockContainers();
     std::string source, destination;
@@ -868,7 +867,7 @@ noinline TError ConvertPath(TContext &context,
     if (req.has_source() && req.source() != "") {
         err = CurrentClient->ResolveRelativeName(req.source(), source, true);
         if (!err)
-            err = context.Cholder->Get(source, sourceContainer);
+            err = TContainer::Find(source, sourceContainer);
     } else
         err = CurrentClient->GetClientContainer(sourceContainer);
     if (err)
@@ -877,7 +876,7 @@ noinline TError ConvertPath(TContext &context,
     if (req.has_destination() && req.destination() != "") {
         err = CurrentClient->ResolveRelativeName(req.destination(), destination, true);
         if (!err)
-            err = context.Cholder->Get(destination, destContainer);
+            err = TContainer::Find(destination, destContainer);
     } else
         err = CurrentClient->GetClientContainer(destContainer);
     if (err)
@@ -936,8 +935,7 @@ noinline TError ConvertPath(TContext &context,
     return TError(EError::InvalidValue, "Can't resolve path: " + details);
 }
 
-noinline TError ListVolumeProperties(TContext &context,
-                                     const rpc::TVolumePropertyListRequest &req,
+noinline TError ListVolumeProperties(const rpc::TVolumePropertyListRequest &req,
                                      rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_volumepropertylist();
     for (auto &prop: VolumeProperties) {
@@ -953,111 +951,48 @@ noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
                                     TPath container_root, TPath volume_path,
                                     std::shared_ptr<TVolume> volume) {
     desc->set_path(volume_path.ToString());
-    for (auto kv: volume->GetProperties(container_root)) {
+    for (auto kv: volume->DumpState(container_root)) {
         auto p = desc->add_properties();
         p->set_name(kv.first);
         p->set_value(kv.second);
     }
-    for (auto name: volume->GetContainers())
+    for (auto &name: volume->Containers)
         desc->add_containers(name);
 }
 
-noinline TError CreateVolume(TContext &context,
-                             const rpc::TVolumeCreateRequest &req,
+noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp) {
     TError error = CheckPortoWriteAccess();
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> clientContainer;
-    error = CurrentClient->GetClientContainer(clientContainer);
+    std::shared_ptr<TContainer> container;
+    error = CurrentClient->GetClientContainer(container);
     if (error)
         return error;
 
-    std::map<std::string, std::string> properties;
+    TStringMap cfg;
     for (auto p: req.properties())
-        properties[p.name()] = p.value();
+        cfg[p.name()] = p.value();
 
-    auto vholder_lock = context.Vholder->ScopedLock();
+    TPath volume_path;
+    TPath container_root = container->RootPath();
+    if (req.has_path() && !req.path().empty())
+        volume_path =  container_root / req.path();
+
     std::shared_ptr<TVolume> volume;
-    error = context.Vholder->Create(volume);
+    error = TVolume::Create(volume_path, cfg, *container,
+                            CurrentClient->TaskCred, volume);
     if (error)
         return error;
 
-    /* cannot block: volume is not registered yet */
-    auto volume_lock = volume->ScopedLock();
-
-    auto container_root = clientContainer->RootPath();
-
-    TPath volume_path("");
-    if (req.has_path() && !req.path().empty())
-        volume_path = container_root / req.path();
-
-    error = volume->Configure(volume_path, CurrentClient->Cred,
-                              clientContainer, properties, *context.Vholder);
-    if (error) {
-        context.Vholder->Remove(volume);
-        return error;
-    }
-
-    volume_path = container_root.InnerPath(volume->GetPath(), true);
-    if (volume_path.IsEmpty()) {
-        /* sanity check */
-        error = TError(EError::Unknown, "volume inner path not found");
-        L_ERR() << error << " " << volume->GetPath() << " in " << container_root << std::endl;
-        context.Vholder->Remove(volume);
-        return error;
-    }
-
-    error = context.Vholder->Register(volume);
-    if (error) {
-        context.Vholder->Remove(volume);
-        return error;
-    }
-
-    vholder_lock.unlock();
-
-    error = volume->Build();
-
-    vholder_lock.lock();
-
-    if (error) {
-        L_WRN() << "Can't build volume: " << error << std::endl;
-        context.Vholder->Unregister(volume);
-        context.Vholder->Remove(volume);
-        return error;
-    }
-
-    auto cholder_lock = LockContainers();
-
-    error = volume->LinkContainer(clientContainer->GetName());
-    if (error) {
-        cholder_lock.unlock();
-
-        L_WRN() << "Can't link volume" << std::endl;
-        (void)volume->Destroy(*context.Vholder);
-        context.Vholder->Unregister(volume);
-        context.Vholder->Remove(volume);
-        return error;
-    }
-
-    //FIXME kill it
-    if (!clientContainer->VolumeHolder)
-        clientContainer->VolumeHolder = context.Vholder;
-    clientContainer->Volumes.emplace_back(volume);
-    cholder_lock.unlock();
-
-    volume->SetReady(true);
-    vholder_lock.unlock();
-
+    volume_path = container_root.InnerPath(volume->Path, true);
     FillVolumeDescription(rsp.mutable_volume(), container_root, volume_path, volume);
-    volume_lock.unlock();
 
     return TError::Success();
 }
 
-noinline TError TuneVolume(TContext &context,
-                           const rpc::TVolumeTuneRequest &req,
+noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req,
                            rpc::TContainerResponse &rsp) {
     TError error = CheckPortoWriteAccess();
     if (error)
@@ -1068,32 +1003,25 @@ noinline TError TuneVolume(TContext &context,
     if (error)
         return error;
 
-    std::map<std::string, std::string> properties;
+    TStringMap cfg;
     for (auto p: req.properties())
-        properties[p.name()] = p.value();
+        cfg[p.name()] = p.value();
 
     TPath volume_path = clientContainer->RootPath() / req.path();
+    std::shared_ptr<TVolume> volume;
 
-    auto vholder_lock = context.Vholder->ScopedLock();
-    auto volume = context.Vholder->Find(volume_path);
-
-    if (!volume)
-        return TError(EError::VolumeNotFound, "Volume not found");
-    vholder_lock.unlock();
-
-    auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady)
-        return TError(EError::Busy, "Volume not ready");
+    error = TVolume::Find(volume_path, volume);
+    if (error)
+        return error;
 
     error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
-    return volume->Tune(*context.Vholder, properties);
+    return volume->Tune(cfg);
 }
 
-noinline TError LinkVolume(TContext &context,
-                           const rpc::TVolumeLinkRequest &req,
+noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req,
                            rpc::TContainerResponse &rsp) {
     TError error = CheckPortoWriteAccess();
     if (error)
@@ -1105,6 +1033,7 @@ noinline TError LinkVolume(TContext &context,
         return error;
 
     auto cholder_lock = LockContainers();
+
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
@@ -1112,7 +1041,7 @@ noinline TError LinkVolume(TContext &context,
         if (err)
             return err;
 
-        TError error = context.Cholder->Get(name, container);
+        TError error = TContainer::Find(name, container);
         if (error)
             return error;
 
@@ -1124,38 +1053,24 @@ noinline TError LinkVolume(TContext &context,
     } else {
         container = clientContainer;
     }
+
     cholder_lock.unlock();
 
     TPath volume_path = clientContainer->RootPath() / req.path();
+    std::shared_ptr<TVolume> volume;
 
-    auto vholder_lock = context.Vholder->ScopedLock();
-    auto volume = context.Vholder->Find(volume_path);
-
-    if (!volume)
-        return TError(EError::VolumeNotFound, "Volume not found");
-    vholder_lock.unlock();
-
-    auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady)
-        return TError(EError::Busy, "Volume not ready");
+    error = TVolume::Find(volume_path, volume);
+    if (error)
+        return error;
 
     error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
-    vholder_lock.lock();
-    auto link = std::find(container->Volumes.begin(), container->Volumes.end(), volume);
-    if (link != container->Volumes.end())
-        return TError(EError::VolumeAlreadyLinked, "Already linked");
-
-    if (!container->VolumeHolder)
-        container->VolumeHolder = context.Vholder;
-    container->Volumes.emplace_back(volume);
-    return volume->LinkContainer(container->GetName());
+    return volume->LinkContainer(*container);
 }
 
-noinline TError UnlinkVolume(TContext &context,
-                             const rpc::TVolumeUnlinkRequest &req,
+noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
                              rpc::TContainerResponse &rsp) {
     TError error = CheckPortoWriteAccess();
     if (error)
@@ -1166,7 +1081,6 @@ noinline TError UnlinkVolume(TContext &context,
     if (error)
         return error;
 
-    auto vholder_lock = context.Vholder->ScopedLock();
     auto cholder_lock = LockContainers();
 
     std::shared_ptr<TContainer> container;
@@ -1176,7 +1090,7 @@ noinline TError UnlinkVolume(TContext &context,
         if (err)
             return err;
 
-        TError error = context.Cholder->Get(name, container);
+        TError error = TContainer::Find(name, container);
         if (error)
             return error;
 
@@ -1189,51 +1103,27 @@ noinline TError UnlinkVolume(TContext &context,
         container = clientContainer;
     }
 
-    TPath volume_path = clientContainer->RootPath() / req.path();
+    cholder_lock.unlock();
 
-    std::shared_ptr<TVolume> volume = context.Vholder->Find(volume_path);
-    if (!volume)
-        return TError(EError::VolumeNotFound, "Volume not found");
+    TPath volume_path = clientContainer->RootPath() / req.path();
+    std::shared_ptr<TVolume> volume;
+
+    error = TVolume::Find(volume_path, volume);
+    if (error)
+        return error;
 
     error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
-    auto link = std::find(container->Volumes.begin(), container->Volumes.end(), volume);
-    if (link == container->Volumes.end())
-        return TError(EError::VolumeNotLinked, "Container not linked to the volume");
-
-    container->Volumes.erase(link);
-    if (!volume->UnlinkContainer(container->GetName()))
-        return TError::Success(); /* Still linked to somebody */
-
-    cholder_lock.unlock();
-    vholder_lock.unlock();
-
-    auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady)
-        return TError::Success();
-
-    vholder_lock.lock();
-    error = volume->SetReady(false);
-    if (error)
-        return error;
-
-    vholder_lock.unlock();
-    error = volume->Destroy(*context.Vholder);
-
-    vholder_lock.lock();
-    context.Vholder->Unregister(volume);
-    context.Vholder->Remove(volume);
-    vholder_lock.unlock();
-
-    volume_lock.unlock();
+    error = volume->UnlinkContainer(*container);
+    if (!error && volume->IsDying)
+        volume->Destroy();
 
     return error;
 }
 
-noinline TError ListVolumes(TContext &context,
-                            const rpc::TVolumeListRequest &req,
+noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
                             rpc::TContainerResponse &rsp) {
     std::shared_ptr<TContainer> clientContainer;
     TError error = CurrentClient->GetClientContainer(clientContainer);
@@ -1242,42 +1132,45 @@ noinline TError ListVolumes(TContext &context,
 
     TPath container_root = clientContainer->RootPath();
 
-    auto vholder_lock = context.Vholder->ScopedLock();
-
     if (req.has_path() && !req.path().empty()) {
         TPath volume_path = container_root / req.path();
-        auto volume = context.Vholder->Find(volume_path);
-        if (volume == nullptr)
-            return TError(EError::VolumeNotFound, "volume not found");
+        std::shared_ptr<TVolume> volume;
+
+        error = TVolume::Find(volume_path, volume);
+        if (error)
+            return error;
+
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        volume_path = container_root.InnerPath(volume->GetPath(), true);
+        volume_path = container_root.InnerPath(volume->Path, true);
         FillVolumeDescription(desc, container_root, volume_path, volume);
         return TError::Success();
     }
 
-    for (auto path : context.Vholder->ListPaths()) {
-        auto volume = context.Vholder->Find(path);
-        if (volume == nullptr)
-            continue;
+    auto volumes_lock = LockVolumes();
+    std::list<std::pair<TPath, std::shared_ptr<TVolume>>> list;
+    for (auto &it : Volumes) {
+        auto volume = it.second;
 
-        auto containers = volume->GetContainers();
         if (req.has_container() &&
-            std::find(containers.begin(), containers.end(),
-                      req.container()) == containers.end())
+                std::find(volume->Containers.begin(), volume->Containers.end(),
+                    req.container()) == volume->Containers.end())
             continue;
 
-        TPath volume_path = container_root.InnerPath(volume->GetPath(), true);
-        if (volume_path.IsEmpty())
-            continue;
+        TPath path = container_root.InnerPath(volume->Path, true);
+        if (!path.IsEmpty())
+            list.push_back(std::make_pair(path, volume));
+    }
+    volumes_lock.unlock();
 
+    for (auto &it: list) {
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, container_root, volume_path, volume);
+        FillVolumeDescription(desc, container_root, it.first, it.second);
     }
 
     return TError::Success();
 }
 
-noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &req) {
+noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     TError error = CheckPortoWriteAccess();
     if (error)
         return error;
@@ -1292,15 +1185,6 @@ noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &r
     if (error)
         return error;
 
-    std::string layer_name = req.layer();
-    error = ValidateLayerName(layer_name);
-    if (error)
-        return error;
-
-    TPath layers = place / config().volumes().layers_dir();
-    TPath layers_tmp = layers / "_tmp_";
-    TPath layer = layers / layer_name;
-    TPath layer_tmp = layers_tmp / layer_name;
     TPath tarball(req.tarball());
 
     if (!tarball.IsAbsolute())
@@ -1317,47 +1201,10 @@ noinline TError ImportLayer(TContext &context, const rpc::TLayerImportRequest &r
     if (!tarball.CanRead(CurrentClient->Cred))
         return TError(EError::Permission, "client has not read access to tarball");
 
-    /* layers_tmp should already be created on startup */
-
-    auto vholder_lock = context.Vholder->ScopedLock();
-    if (layer.Exists()) {
-        if (!req.merge()) {
-            error = TError(EError::LayerAlreadyExists, "Layer already exists");
-            goto err_tmp;
-        }
-        if (context.Vholder->LayerInUse(layer_name, place)) {
-            error = TError(EError::Busy, "layer in use");
-            goto err_tmp;
-        }
-        error = layer.Rename(layer_tmp);
-        if (error)
-            goto err_tmp;
-    } else {
-        error = layer_tmp.Mkdir(0755);
-        if (error)
-            goto err_tmp;
-    }
-    vholder_lock.unlock();
-
-    error = UnpackTarball(tarball, layer_tmp);
-    if (error)
-        goto err;
-
-    error = SanitizeLayer(layer_tmp, req.merge());
-    if (error)
-        goto err;
-
-    error = layer_tmp.Rename(layer);
-
-    return TError::Success();
-
-err:
-    (void)layer_tmp.RemoveAll();
-err_tmp:
-    return error;
+    return ImportLayer(req.layer(), place, tarball, req.merge());
 }
 
-noinline TError ExportLayer(TContext &context, const rpc::TLayerExportRequest &req) {
+noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     TError error = CheckPortoWriteAccess();
     if (error)
         return error;
@@ -1380,20 +1227,13 @@ noinline TError ExportLayer(TContext &context, const rpc::TLayerExportRequest &r
     if (!tarball.DirName().CanWrite(CurrentClient->Cred))
         return TError(EError::Permission, "client has no write access to tarball directory");
 
-    auto vholder_lock = context.Vholder->ScopedLock();
-    auto volume = context.Vholder->Find(req.volume());
+    auto volume = TVolume::Find(req.volume());
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
 
     error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
-
-    vholder_lock.unlock();
-
-    auto volume_lock = volume->ScopedLock();
-    if (!volume->IsReady)
-        return TError(EError::Busy, "Volume not ready");
 
     TPath upper;
     error = volume->GetUpperLayer(upper);
@@ -1415,7 +1255,7 @@ noinline TError ExportLayer(TContext &context, const rpc::TLayerExportRequest &r
     return TError::Success();
 }
 
-noinline TError RemoveLayer(TContext &context, const rpc::TLayerRemoveRequest &req) {
+noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
     TError error = CheckPortoWriteAccess();
     if (error)
         return error;
@@ -1425,15 +1265,10 @@ noinline TError RemoveLayer(TContext &context, const rpc::TLayerRemoveRequest &r
     if (error)
         return error;
 
-    std::string layer_name = req.layer();
-    error = ValidateLayerName(layer_name);
-    if (error)
-        return error;
-
-    return context.Vholder->RemoveLayer(layer_name, place);
+    return RemoveLayer(req.layer(), place);
 }
 
-noinline TError ListLayers(TContext &context, const rpc::TLayerListRequest &req,
+noinline TError ListLayers(const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
     TPath place(req.has_place() ? req.place() : config().volumes().default_place());
     TPath layers_dir = place / config().volumes().layers_dir();
@@ -1505,31 +1340,31 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else if (req.has_kill())
             error = Kill(context, req.kill(), rsp);
         else if (req.has_version())
-            error = Version(context, rsp);
+            error = Version(rsp);
         else if (req.has_wait())
             error = Wait(context, req.wait(), rsp, client);
         else if (req.has_listvolumeproperties())
-            error = ListVolumeProperties(context, req.listvolumeproperties(), rsp);
+            error = ListVolumeProperties(req.listvolumeproperties(), rsp);
         else if (req.has_createvolume())
-            error = CreateVolume(context, req.createvolume(), rsp);
+            error = CreateVolume(req.createvolume(), rsp);
         else if (req.has_linkvolume())
-            error = LinkVolume(context, req.linkvolume(), rsp);
+            error = LinkVolume(req.linkvolume(), rsp);
         else if (req.has_unlinkvolume())
-            error = UnlinkVolume(context, req.unlinkvolume(), rsp);
+            error = UnlinkVolume(req.unlinkvolume(), rsp);
         else if (req.has_listvolumes())
-            error = ListVolumes(context, req.listvolumes(), rsp);
+            error = ListVolumes(req.listvolumes(), rsp);
         else if (req.has_tunevolume())
-            error = TuneVolume(context, req.tunevolume(), rsp);
+            error = TuneVolume(req.tunevolume(), rsp);
         else if (req.has_importlayer())
-            error = ImportLayer(context, req.importlayer());
+            error = ImportLayer(req.importlayer());
         else if (req.has_exportlayer())
-            error = ExportLayer(context, req.exportlayer());
+            error = ExportLayer(req.exportlayer());
         else if (req.has_removelayer())
-            error = RemoveLayer(context, req.removelayer());
+            error = RemoveLayer(req.removelayer());
         else if (req.has_listlayers())
-            error = ListLayers(context, req.listlayers(), rsp);
+            error = ListLayers(req.listlayers(), rsp);
         else if (req.has_convertpath())
-            error = ConvertPath(context, req.convertpath(), rsp);
+            error = ConvertPath(req.convertpath(), rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

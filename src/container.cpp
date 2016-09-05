@@ -23,6 +23,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
+#include "util/loop.hpp"
 #include "client.hpp"
 #include "filesystem.hpp"
 
@@ -45,6 +46,21 @@ using std::vector;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::map;
+
+std::shared_ptr<TContainer> TContainer::Find(const std::string &name) {
+    PORTO_LOCKED(ContainersMutex);
+    auto it = Containers.find(name);
+    if (it == Containers.end())
+        return nullptr;
+    return it->second;
+}
+
+TError TContainer::Find(const std::string &name, std::shared_ptr<TContainer> &ct) {
+    ct = Find(name);
+    if (ct)
+        return TError::Success();
+    return TError(EError::ContainerDoesNotExist, "container " + name + " not found");
+}
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        const std::string &name, std::shared_ptr<TContainer> parent,
@@ -267,41 +283,15 @@ void TContainer::RemoveKvs() {
         L_ERR() << "Can't remove key-value node " << path << ": " << error << std::endl;
 }
 
-void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
-    if (!VolumeHolder)
-        return;
-
-    TScopedUnlock holder_unlock(holder_lock);
-    TScopedLock vholder_lock = VolumeHolder->ScopedLock();
-
-    for (auto volume: Volumes) {
-        if (!volume->UnlinkContainer(GetName()))
-            continue; /* Still linked to somebody */
-        vholder_lock.unlock();
-        auto volume_lock = volume->ScopedLock();
-        if (!volume->IsReady) {
-            volume_lock.unlock();
-            vholder_lock.lock();
-            continue;
-        }
-        vholder_lock.lock();
-        TError error = volume->SetReady(false);
-        vholder_lock.unlock();
-        error = volume->Destroy(*VolumeHolder);
-        vholder_lock.lock();
-        VolumeHolder->Unregister(volume);
-        VolumeHolder->Remove(volume);
-        volume_lock.unlock();
-    }
-
-    Volumes.clear();
-}
-
-void TContainer::Destroy(TScopedLock &holder_lock) {
+void TContainer::Destroy(void) {
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
 
-    SetState(EContainerState::Unknown);
-    DestroyVolumes(holder_lock);
+    while (!Volumes.empty()) {
+        std::shared_ptr<TVolume> volume = Volumes.back();
+        if (!volume->UnlinkContainer(*this) && volume->IsDying)
+            volume->Destroy();
+    }
+
     if (Net) {
         auto lock = Net->ScopedLock();
         Net = nullptr;
@@ -665,7 +655,6 @@ TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     NetCfg.Id = Id;
     NetCfg.Hostname = Hostname;
     NetCfg.NetUp = VirtMode != VIRT_MODE_OS;
-    NetCfg.Holder = Holder;
     NetCfg.OwnerCred = OwnerCred;
 
     error = NetCfg.ParseNet(NetProp);

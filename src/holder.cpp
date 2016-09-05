@@ -193,14 +193,6 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     return TError::Success();
 }
 
-TError TContainerHolder::Get(const std::string &name, std::shared_ptr<TContainer> &c) {
-    if (Containers.find(name) == Containers.end())
-        return TError(EError::ContainerDoesNotExist, "container " + name + " doesn't exist");
-
-    c = Containers[name];
-    return TError::Success();
-}
-
 TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
                                    const TClient *client,
                                    const std::string &name,
@@ -220,7 +212,7 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
     }
 
     // get container
-    error = Get(absoluteName, c);
+    error = TContainer::Find(absoluteName, c);
     if (error)
         return error;
 
@@ -249,11 +241,13 @@ TError TContainerHolder::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer
     if (error)
         return error;
 
+    auto containers_lock = LockContainers();
+
     auto prefix = std::string(PORTO_ROOT_CGROUP) + "/";
     if (freezerCg.Name.substr(0, prefix.length()) != prefix)
-        return Get(ROOT_CONTAINER, c);
+        return TContainer::Find(ROOT_CONTAINER, c);
 
-    return Get(freezerCg.Name.substr(prefix.length()), c);
+    return TContainer::Find(freezerCg.Name.substr(prefix.length()), c);
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
@@ -273,13 +267,13 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TCont
 void TContainerHolder::Unlink(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
     for (auto name: c->GetChildren()) {
         std::shared_ptr<TContainer> child;
-        if (Get(name, child))
+        if (TContainer::Find(name, child))
             continue;
 
         Unlink(holder_lock, child);
     }
 
-    c->Destroy(holder_lock);
+    c->Destroy();
 
     TError error = IdMap.Put(c->GetId());
     PORTO_ASSERT(!error);
@@ -514,7 +508,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
             for (auto name : remove) {
                 std::shared_ptr<TContainer> container;
-                TError error = Get(name, container);
+                TError error = TContainer::Find(name, container);
                 if (error)
                     continue;
 

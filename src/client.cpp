@@ -276,6 +276,20 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
     return TError::Success();
 }
 
+TPath TClient::ComposePath(const TPath &path) {
+    auto base = ClientContainer.lock();
+    if (!base)
+        return TPath();
+    return base->RootPath().InnerPath(path);
+}
+
+TPath TClient::ResolvePath(const TPath &path) {
+    auto base = ClientContainer.lock();
+    if (!base)
+        return TPath();
+    return base->RootPath() / path;
+}
+
 bool TClient::IsSuperUser(void) const {
     return AccessLevel >= EAccessLevel::SuperUser;
 }

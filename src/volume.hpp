@@ -1,12 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
-
 #include "common.hpp"
 #include "statistics.hpp"
-#include "util/loop.hpp"
-#include "util/cred.hpp"
-#include "util/idmap.hpp"
+#include "util/path.hpp"
 #include "util/locks.hpp"
 
 constexpr const char *V_PATH = "path";
@@ -40,48 +38,39 @@ constexpr const char *V_INODE_AVAILABLE = "inode_available";
 
 constexpr const char *V_PLACE = "place";
 
-class TVolumeHolder;
 class TVolume;
 class TContainer;
-class TContainerHolder;
 class TKeyValue;
-
-TError ValidateLayerName(const std::string &name);
-
-TError SanitizeLayer(TPath layer, bool merge);
-
-TError CheckPlace(const TPath &place, bool init = false);
 
 class TVolumeBackend {
 public:
     TVolume *Volume;
-    virtual TError Configure();
-    virtual TError Save();
-    virtual TError Restore();
-    virtual TError Build() =0;
-    virtual TError Destroy() =0;
+    virtual TError Configure(void);
+    virtual TError Save(void);
+    virtual TError Restore(void);
+    virtual TError Build(void) =0;
+    virtual TError Destroy(void) =0;
     virtual TError StatFS(TStatFS &result) =0;
-    virtual TError Clear();
+    virtual TError Clear(void);
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TLockable,
                 public TNonCopyable {
-    friend class TVolumeHolder;
 
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();
 
 public:
-    std::string Path;
+    TPath Path;
     bool IsAutoPath = false;
-    std::string StoragePath;
-    bool IsAutoStorage = true;
+    std::string Storage;
     std::string BackendType;
     std::string Creator;
     std::string Id;
     bool IsReady = false;
+    bool IsDying = false;
     std::string Private;
     std::vector<std::string> Containers;
     int LoopDev = -1;
@@ -106,58 +95,54 @@ public:
     ~TVolume() {
         Statistics->Volumes--;
     }
-    TError Configure(const TPath &path, const TCred &creator_cred,
-                     std::shared_ptr<TContainer> creator_container,
-                     const std::map<std::string, std::string> &properties,
-                     TVolumeHolder &holder);
 
-    /* Protected with TVolume->Lock() */
-    TError Build();
-    TError Destroy(TVolumeHolder &holder);
+    static TError Create(const TPath &path, const TStringMap &cfg,
+                         TContainer &container, const TCred &cred,
+                         std::shared_ptr<TVolume> &volume);
 
-    TError Save();
+    static std::shared_ptr<TVolume> Find(const TPath &path);
+    static TError Find(const TPath &path, std::shared_ptr<TVolume> &volume);
+
+    TError Configure(const TPath &path, const TStringMap &cfg,
+                     const TContainer &container, const TCred &cred);
+    TError ApplyConfig(const TStringMap &cfg);
+    TStringMap DumpState(const TPath &root);
+
+    TError Build(void);
+    TError DestroyOne(void);
+    TError Destroy(void);
+    TError Clear(void);
+
+    TError Save(void);
     TError Restore(const TKeyValue &node);
-    TError Clear();
 
-    const std::vector<std::string> GetContainers() const {
-        return Containers;
-    }
-    TError LinkContainer(const std::string name);
-    bool UnlinkContainer(const std::string name);
+    static void RestoreAll(void);
+    static void DestroyAll(void);
 
-    TPath GetPath() const;
-    TPath GetStorage() const;
+    TError LinkContainer(TContainer &container);
+    TError UnlinkContainer(TContainer &container);
+
+    TPath GetStorage(void) const;
     TPath GetInternal(std::string type) const;
-    TPath GetChrootInternal(TPath container_root, std::string type) const;
-    unsigned long GetMountFlags() const;
+    unsigned long GetMountFlags(void) const;
 
-    /* Protected with TVolume->Lock() _and_ TVolumeHolder->Lock() */
-    TError SetReady(bool ready) { IsReady = ready; return Save(); }
-
-    TError Tune(TVolumeHolder &holder,
-            const std::map<std::string, std::string> &properties);
+    TError Tune(const TStringMap &cfg);
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit);
 
-    TError CheckGuarantee(TVolumeHolder &holder,
-            uint64_t space_guarantee, uint64_t inode_guarantee) const;
+    TError CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee) const;
 
-    bool HaveQuota() const {
+    bool HaveQuota(void) const {
         return SpaceLimit || InodeLimit;
     }
 
-    void GetQuota(uint64_t &space_limit, uint64_t &inode_limit) const {
-        space_limit = SpaceLimit;
-        inode_limit = InodeLimit;
+    bool HaveStorage(void) const {
+        return Storage.size();
     }
 
     TError StatFS(TStatFS &result) const;
 
     TError GetUpperLayer(TPath &upper);
-
-    TError SetProperty(const std::map<std::string, std::string> &properties);
-
-    std::map<std::string, std::string> GetProperties(TPath container_root);
 };
 
 struct TVolumeProperty {
@@ -168,24 +153,10 @@ struct TVolumeProperty {
 
 extern std::vector<TVolumeProperty> VolumeProperties;
 
-class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
-                      public TLockable,
-                      public TNonCopyable {
-    std::map<TPath, std::shared_ptr<TVolume>> Volumes;
-    uint64_t NextId = 1;
-public:
-    TVolumeHolder() {}
-    TError Create(std::shared_ptr<TVolume> &volume);
-    void Remove(std::shared_ptr<TVolume> volume);
-    TError Register(std::shared_ptr<TVolume> volume);
-    void Unregister(std::shared_ptr<TVolume> volume);
-    std::shared_ptr<TVolume> Find(const TPath &path);
-    std::vector<TPath> ListPaths() const;
-    TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
-    void Destroy();
-
-    bool LayerInUse(const std::string &name, const TPath &place);
-    TError RemoveLayer(const std::string &name, const TPath &place);
-};
-
+extern std::mutex VolumesMutex;
+extern std::map<TPath, std::shared_ptr<TVolume>> Volumes;
 extern TPath VolumesKV;
+
+static inline std::unique_lock<std::mutex> LockVolumes() {
+    return std::unique_lock<std::mutex>(VolumesMutex);
+}

@@ -15,7 +15,6 @@ TContext::TContext() {
     Cholder = std::make_shared<TContainerHolder>(EpollLoop);
     Queue = std::make_shared<TEventQueue>(Cholder);
     Cholder->Queue = Queue;
-    Vholder = std::make_shared<TVolumeHolder>();
 }
 
 TError TContext::Initialize() {
@@ -47,7 +46,7 @@ out:
 TError TContext::Destroy() {
     auto holder_lock = LockContainers();
     Cholder->DestroyRoot(holder_lock);
-    Vholder->Destroy();
+    TVolume::DestroyAll();
 
     return TError::Success();
 }

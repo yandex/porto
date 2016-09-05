@@ -593,7 +593,8 @@ static int SlaveMain() {
         }
 
         bool restored = context.Cholder->RestoreFromStorage();
-        context.Vholder->RestoreFromStorage(context.Cholder);
+
+        TVolume::RestoreAll();
 
         L() << "Remove cgroup leftovers..." << std::endl;
         context.Cholder->RemoveLeftovers();

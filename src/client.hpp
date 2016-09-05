@@ -57,6 +57,9 @@ public:
                                std::string &absolute_name,
                                bool resolve_meta = false) const;
 
+    TPath ComposePath(const TPath &path);
+    TPath ResolvePath(const TPath &path);
+
     friend std::ostream& operator<<(std::ostream& stream, TClient& client);
 
     std::shared_ptr<TContainerWaiter> Waiter;

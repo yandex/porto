@@ -1478,7 +1478,7 @@ TError TNetCfg::PrepareNetwork() {
         }
     } else if (NetCtName != "") {
         std::shared_ptr<TContainer> target;
-        error = Holder->Get(NetCtName, target);
+        error = TContainer::Find(NetCtName, target);
         if (error)
             return error;
 

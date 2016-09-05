@@ -26,7 +26,6 @@ class TNlLink;
 class TContainerWaiter;
 class TClient;
 class TVolume;
-class TVolumeHolder;
 class TKeyValue;
 struct TBindMount;
 
@@ -99,8 +98,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplyForTreePostorder(TScopedLock &holder_lock,
                                  std::function<TError (TScopedLock &holder_lock,
                                                        TContainer &container)> fn);
-
-    void DestroyVolumes(TScopedLock &holder_lock);
 
 public:
     const std::shared_ptr<TContainer> Parent;
@@ -239,7 +236,7 @@ public:
 
     void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);
-    void Destroy(TScopedLock &holder_lock);
+    void Destroy(void);
     void DestroyWeak();
     TError Start(bool meta);
     TError StopOne(TScopedLock &holder_lock, uint64_t deadline);
@@ -279,12 +276,13 @@ public:
     bool MayReceiveOom(int fd);
     bool HasOomReceived();
 
-    std::shared_ptr<TVolumeHolder> VolumeHolder;
-
-    /* protected with TVolumeHolder->Lock */
-    std::vector<std::shared_ptr<TVolume>> Volumes;
+    /* protected with VolumesLock */
+    std::list<std::shared_ptr<TVolume>> Volumes;
 
     TError GetEnvironment(TEnv &env);
+
+    static std::shared_ptr<TContainer> Find(const std::string &name);
+    static TError Find(const std::string &name, std::shared_ptr<TContainer> &ct);
 };
 
 class TScopedAcquire : public TNonCopyable {

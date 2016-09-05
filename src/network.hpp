@@ -157,11 +157,9 @@ struct TL3NetCfg {
     bool Nat;
 };
 
-class TContainerHolder;
 class TContainer;
 
 struct TNetCfg {
-    std::shared_ptr<TContainerHolder> Holder;
     std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TNetwork> ParentNet;
     std::shared_ptr<TNetwork> Net;

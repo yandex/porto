@@ -7,8 +7,9 @@
 
 #include "util/path.hpp"
 
-#define PORTO_ASSERT(EXPR) if (!(EXPR)) porto_assert(#EXPR, __LINE__, __FILE__)
+#define PORTO_ASSERT(EXPR) do { if (!(EXPR)) porto_assert(#EXPR, __LINE__, __FILE__); } while (0)
 #define PORTO_RUNTIME_ERROR(MSG) porto_runtime_error((MSG), __LINE__, __FILE__)
+#define PORTO_LOCKED(mutex) do { if (mutex.try_lock()) porto_assert(#mutex " not locked", __LINE__, __FILE__); } while(0)
 
 extern bool Verbose;
 
