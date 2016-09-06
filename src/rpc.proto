@@ -312,6 +312,7 @@ message TLayerImportRequest {
 	required string layer = 1;
 	required string tarball = 2;
 	required bool merge = 3;
+	optional string place = 4;
 }
 
 message TLayerExportRequest {
@@ -321,9 +322,11 @@ message TLayerExportRequest {
 
 message TLayerRemoveRequest {
 	required string layer = 1;
+	optional string place = 2;
 }
 
 message TLayerListRequest {
+	optional string place = 1;
 }
 
 message TLayerListResponse {

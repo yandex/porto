@@ -518,12 +518,15 @@ int Connection::TuneVolume(const std::string &path,
 }
 
 int Connection::ImportLayer(const std::string &layer,
-                           const std::string &tarball, bool merge) {
+                            const std::string &tarball, bool merge,
+                            const std::string &place) {
     auto req = Impl->Req.mutable_importlayer();
 
     req->set_layer(layer);
     req->set_tarball(tarball);
     req->set_merge(merge);
+    if (place.size())
+        req->set_place(place);
     return Impl->Rpc();
 }
 
@@ -536,16 +539,19 @@ int Connection::ExportLayer(const std::string &volume,
     return Impl->Rpc();
 }
 
-int Connection::RemoveLayer(const std::string &layer) {
+int Connection::RemoveLayer(const std::string &layer, const std::string &place) {
     auto req = Impl->Req.mutable_removelayer();
 
     req->set_layer(layer);
+    if (place.size())
+        req->set_place(place);
     return Impl->Rpc();
 }
 
-int Connection::ListLayers(std::vector<std::string> &layers) {
-    Impl->Req.mutable_listlayers();
-
+int Connection::ListLayers(std::vector<std::string> &layers, const std::string &place) {
+    auto req = Impl->Req.mutable_listlayers();
+    if (place.size())
+        req->set_place(place);
     int ret = Impl->Rpc();
     if (!ret) {
         const auto &list = Impl->Rsp.layers().layer();

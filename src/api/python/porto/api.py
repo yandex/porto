@@ -341,11 +341,13 @@ class _RPC(object):
             prop.name, prop.value = name, value
         self.call(request, self.timeout)
 
-    def ImportLayer(self, layer, tarball, merge=False):
+    def ImportLayer(self, layer, tarball, merge=False, place=None):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
         request.importLayer.merge = merge
+        if place is not None:
+            request.importLayer.place = place
         self.call(request, self.timeout)
 
     def ExportLayer(self, volume, tarball):
@@ -354,14 +356,18 @@ class _RPC(object):
         request.exportLayer.tarball = tarball
         self.call(request, self.timeout)
 
-    def RemoveLayer(self, layer):
+    def RemoveLayer(self, layer, place=None):
         request = rpc_pb2.TContainerRequest()
         request.removeLayer.layer = layer
+        if place is not None:
+            request.removeLayer.place = place
         self.call(request, self.timeout)
 
-    def ListLayers(self):
+    def ListLayers(self, place=None):
         request = rpc_pb2.TContainerRequest()
         request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
+        if place is not None:
+            request.listLayers.place = place
         return self.call(request, self.timeout).layers.layer
 
 
@@ -412,18 +418,19 @@ class Container(object):
 
 
 class Layer(object):
-    def __init__(self, rpc, name):
+    def __init__(self, rpc, name, place=None):
         self.rpc = rpc
         self.name = name
+        self.place = place
 
     def __str__(self):
-        return 'Layer `{}`'.format(self.name)
+        return 'Layer `{}` at {}'.format(self.name, self.place or "(default)")
 
     def Merge(self, tarball):
-        self.rpc.ImportLayer(self.name, tarball, merge=True)
+        self.rpc.ImportLayer(self.name, tarball, merge=True, place=self.place)
 
     def Remove(self):
-        self.rpc.RemoveLayer(self.name)
+        self.rpc.RemoveLayer(self.name, place=self.place)
 
 
 class Volume(object):
@@ -444,9 +451,11 @@ class Volume(object):
         return [Container(self.rpc, c) for c in self.rpc.ListVolumes(path=self.path)[0].containers]
 
     def GetLayers(self):
-        layers = self.GetProperty('layers')
+        properties = self.GetProperties()
+        place = properties.get('place')
+        layers = properties['layers']
         layers = layers.split(';') if layers else []
-        return [Layer(self.rpc, l) for l in layers]
+        return [Layer(self.rpc, l, place) for l in layers]
 
     def Link(self, container):
         if isinstance(container, Container):
@@ -566,7 +575,7 @@ class Connection(object):
                 pass
         try:
             self.rpc.ListVolumes(path=path)
-            raise exceptions.Busy("layer `%s` is busy" % path)
+            raise exceptions.Busy("volume `%s` is busy" % path)
         except exceptions.VolumeNotFound:
             pass
 
@@ -578,20 +587,24 @@ class Connection(object):
     def TuneVolume(self, path, **properties):
         self.rpc.TuneVolume(path, **properties)
 
-    def ImportLayer(self, name, tarball):
-        self.rpc.ImportLayer(name, tarball)
-        return Layer(self.rpc, name)
+    def ImportLayer(self, name, tarball, place=None):
+        self.rpc.ImportLayer(name, tarball, merge=False, place=place)
+        return Layer(self.rpc, name, place)
 
-    def FindLayer(self, layer):
-        if layer not in self.rpc.ListLayers():
+    def MergeLayer(self, name, tarball, place=None):
+        self.rpc.ImportLayer(name, tarball, merge=True, place=place)
+        return Layer(self.rpc, name, place)
+
+    def FindLayer(self, layer, place=None):
+        if layer not in self.rpc.ListLayers(place):
             raise exceptions.LayerNotFound("layer `%s` not found" % layer)
-        return Layer(self.rpc, layer)
+        return Layer(self.rpc, layer, place)
 
-    def RemoveLayer(self, name):
-        self.rpc.RemoveLayer(name)
+    def RemoveLayer(self, name, place=None):
+        self.rpc.RemoveLayer(name, place)
 
-    def ListLayers(self):
-        return [Layer(self.rpc, l) for l in self.rpc.ListLayers()]
+    def ListLayers(self, place=None):
+        return [Layer(self.rpc, l) for l in self.rpc.ListLayers(place)]
 
     def ConvertPath(self, path, source, destination):
         return self.rpc.ConvertPath(self.rpc, path, source, destination)

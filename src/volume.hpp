@@ -40,12 +40,16 @@ constexpr const char *V_INODE_USED = "inode_used";
 constexpr const char *V_SPACE_AVAILABLE = "space_available";
 constexpr const char *V_INODE_AVAILABLE = "inode_available";
 
+constexpr const char *V_PLACE = "place";
+
 class TVolumeHolder;
 class TVolume;
 class TContainer;
 class TContainerHolder;
 
 TError SanitizeLayer(TPath layer, bool merge);
+
+TError CheckPlace(const TPath &place, bool init = false);
 
 class TVolumeBackend {
 public:
@@ -67,6 +71,9 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
     std::shared_ptr<TValueMap> Config;
     TCred Cred;
     unsigned Permissions;
+
+    TPath Place;
+    bool CustomPlace = false;
 
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();
@@ -165,6 +172,6 @@ public:
     TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
 
-    bool LayerInUse(TPath layer);
-    TError RemoveLayer(const std::string &name);
+    bool LayerInUse(const TPath &layer);
+    TError RemoveLayer(const std::string &name, const TPath &place);
 };

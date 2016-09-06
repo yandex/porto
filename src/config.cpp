@@ -65,8 +65,9 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_perm(0755);
     config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
 
-    config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
-    config().mutable_volumes()->set_layers_dir("/place/porto_layers");
+    config().mutable_volumes()->set_default_place("/place");
+    config().mutable_volumes()->set_volume_dir("porto_volumes");
+    config().mutable_volumes()->set_layers_dir("porto_layers");
     config().mutable_volumes()->set_enable_quota(true);
 
     config().mutable_network()->set_autoconf_timeout_s(120);

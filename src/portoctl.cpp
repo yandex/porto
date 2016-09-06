@@ -74,6 +74,7 @@ public:
     std::string SpaceLimit;
     std::string VolumeBackend;
     std::string VolumeStorage;
+    std::string Place;
     std::vector<std::string> Layers;
     std::vector<std::string> VolumeLayers;
     std::vector<std::string> ImportedLayers;
@@ -118,6 +119,8 @@ public:
         } else if (key == "layers") {
             NeedVolume = true;
             return SplitEscapedString(val, ';', Layers);
+        } else if (key == "place") {
+            Place = val;
         } else
             Properties.emplace_back(key, val);
 
@@ -137,7 +140,7 @@ public:
         id = "_weak_portoctl-" + std::to_string(GetPid()) + "-" +
              std::to_string(LayerIndex++) + "-" + path.BaseName();
         std::cerr << "Importing layer " << path << " as " << id << std::endl;
-        if (Api->ImportLayer(id, path.ToString()))
+        if (Api->ImportLayer(id, path.ToString(), false, Place))
             return GetLastError();
         ImportedLayers.push_back(id);
         return TError::Success();
@@ -147,7 +150,7 @@ public:
         std::vector<std::string> known;
         TError error;
 
-        if (Api->ListLayers(known))
+        if (Api->ListLayers(known, Place))
             return GetLastError();
 
         for (auto &layer : Layers) {
@@ -196,6 +199,9 @@ public:
 
         if (VolumeStorage != "")
             config["storage"] = VolumeStorage;
+
+        if (Place != "")
+            config["place"] = Place;
 
         if (Api->CreateVolume("", config, Volume))
             return GetLastError();
@@ -472,7 +478,7 @@ err:
         }
 
         for (auto &layer : ImportedLayers) {
-            if (Api->RemoveLayer(layer) && GetLastError().GetError() != EError::LayerNotFound)
+            if (Api->RemoveLayer(layer, Place) && GetLastError().GetError() != EError::LayerNotFound)
                 std::cerr << "Cannot remove layer " << layer << " : " << GetLastError() << std::endl;
         }
         ImportedLayers.clear();
@@ -1914,8 +1920,9 @@ public:
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
-        "-I|-M|-R|-L|-F|-E <layer> [tarball]",
+        "[-P <place>] -I|-M|-R|-L|-F|-E <layer> [tarball]",
         "Manage overlayfs layers in internal storage",
+        "    -P <place>               optional path to place\n"
         "    -I <layer> <tarball>     import layer from tarball\n"
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer> [layer...]    remove layer from storage\n"
@@ -1930,10 +1937,12 @@ public:
     bool list   = false;
     bool export_ = false;
     bool flush = false;
+    std::string place;
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
         const auto &args = env->GetOpts({
+            { 'P', true,  [&](const char *arg) { place = arg;   } },
             { 'I', false, [&](const char *arg) { import = true; } },
             { 'M', false, [&](const char *arg) { merge  = true; } },
             { 'R', false, [&](const char *arg) { remove = true; } },
@@ -1949,7 +1958,7 @@ public:
         if (import) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], path);
+            ret = Api->ImportLayer(args[0], path, false, place);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {
@@ -1961,7 +1970,7 @@ public:
         } else if (merge) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], path, true);
+            ret = Api->ImportLayer(args[0], path, true, place);
             if (ret)
                 PrintError("Can't merge layer");
         } else if (remove) {
@@ -1969,31 +1978,33 @@ public:
                 return EXIT_FAILURE;
 
             for (const auto &arg : args) {
-                ret = Api->RemoveLayer(arg);
+                ret = Api->RemoveLayer(arg, place);
                 if (ret)
                     PrintError("Can't remove layer");
             }
         } else if (flush) {
             std::vector<std::string> layers;
-            ret = Api->ListLayers(layers);
+            ret = Api->ListLayers(layers, place);
             if (ret) {
                 PrintError("Can't list layers");
                 return EXIT_FAILURE;
             } else {
                 for (const auto &l: layers)
-                    (void)Api->RemoveLayer(l);
+                    (void)Api->RemoveLayer(l, place);
             }
         } else if (list) {
             std::vector<std::string> layers;
-            ret = Api->ListLayers(layers);
+            ret = Api->ListLayers(layers, place);
             if (ret) {
                 PrintError("Can't list layers");
             } else {
                 for (const auto &l: layers)
                     std::cout << l << std::endl;
             }
-        } else
+        } else {
+            PrintUsage();
             return EXIT_FAILURE;
+        }
 
         return ret;
     }

@@ -1297,6 +1297,11 @@ noinline TError ImportLayer(TContext &context,
     if (error)
         return error;
 
+    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    error = CheckPlace(place);
+    if (error)
+        return error;
+
     std::shared_ptr<TContainer> clientContainer;
     error = client->GetClientContainer(clientContainer);
     if (error)
@@ -1307,7 +1312,7 @@ noinline TError ImportLayer(TContext &context,
         layer_name == "_tmp_")
         return TError(EError::InvalidValue, "invalid layer name");
 
-    TPath layers = TPath(config().volumes().layers_dir());
+    TPath layers = place / config().volumes().layers_dir();
     TPath layers_tmp = layers / "_tmp_";
     TPath layer = layers / layer_name;
     TPath layer_tmp = layers_tmp / layer_name;
@@ -1432,12 +1437,18 @@ noinline TError RemoveLayer(TContext &context,
     if (error)
         return error;
 
-    return context.Vholder->RemoveLayer(req.layer());
+    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    error = CheckPlace(place);
+    if (error)
+        return error;
+
+    return context.Vholder->RemoveLayer(req.layer(), place);
 }
 
-noinline TError ListLayers(TContext &context,
+noinline TError ListLayers(TContext &context, const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
-    TPath layers_dir = TPath(config().volumes().layers_dir());
+    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    TPath layers_dir = place / config().volumes().layers_dir();
     std::vector<std::string> layers;
 
     TError error = layers_dir.ReadDirectory(layers);
@@ -1528,7 +1539,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else if (req.has_removelayer())
             error = RemoveLayer(context, req.removelayer(), client);
         else if (req.has_listlayers())
-            error = ListLayers(context, rsp);
+            error = ListLayers(context, req.listlayers(), rsp);
         else if (req.has_convertpath())
             error = ConvertPath(context, req.convertpath(), rsp, client);
         else
