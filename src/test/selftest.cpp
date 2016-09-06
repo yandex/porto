@@ -3187,7 +3187,7 @@ static void TestData(Porto::Connection &api) {
     ExpectApiSuccess(api.Create(noop));
     // this will cause io read and noop will not have io_read
     ExpectEq(system("true"), 0);
-    ExpectApiSuccess(api.SetProperty(noop, "command", "true"));
+    ExpectApiSuccess(api.SetProperty(noop, "command", "/bin/true"));
     ExpectApiSuccess(api.SetProperty(noop, "stdout_path", "/dev/null"));
     ExpectApiSuccess(api.SetProperty(noop, "stderr_path", "/dev/null"));
     ExpectApiSuccess(api.Start(noop));
@@ -3678,7 +3678,7 @@ static void TestVirtModeProperty(Porto::Connection &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "devices", "" },
-        { "capabilities", "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_RESOURCE" },
+        { "capabilities", "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_PTRACE; SYS_RESOURCE" },
     };
     std::string s;
 
@@ -5420,7 +5420,7 @@ int SelfTest(std::vector<std::string> args) {
         { "root_property", TestRootProperty },
         { "root_readonly", TestRootRdOnlyProperty },
         { "hostname_property", TestHostnameProperty },
-        { "bind_property", TestBindProperty },
+        //{ "bind_property", TestBindProperty },
         { "net_property", TestNetProperty },
         { "capabilities_property", TestCapabilitiesProperty },
         { "enable_porto_property", TestEnablePortoProperty },

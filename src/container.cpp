@@ -455,7 +455,7 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (Prop->TestClearDirty(P_IO_POLICY)) {
+    if (Prop->TestClearDirty(P_IO_POLICY) || true) {
         auto blkcg = GetCgroup(BlkioSubsystem);
         error = BlkioSubsystem.SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
         if (error) {

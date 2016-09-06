@@ -29,3 +29,7 @@ endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 add_subdirectory(src)
+
+enable_testing()
+add_test(NAME selftest COMMAND ${CMAKE_SOURCE_DIR}/scripts/standalone_test
+	 WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

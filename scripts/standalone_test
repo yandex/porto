@@ -1,0 +1,73 @@
+#!/bin/sh
+
+# set -x
+
+PORTO_BIN=$(pwd)
+PORTO_SRC=$(dirname $(dirname $0))
+
+die() {
+    echo FAIL: $@
+    exit 2
+}
+
+stopper() {
+    if [ -n "$PORTOD_PID" ] ; then
+        kill -INT $PORTOD_PID
+        wait $PORTOD_PID
+        unset PORTOD_PID
+    fi
+    exit 0
+}
+
+starter() {
+    trap stopper TERM INT QUIT EXIT
+    while test -x $PORTO_BIN/portod ; do
+        $PORTO_BIN/portod --verbose &
+        PORTOD_PID=$!
+        wait $PORTOD_PID
+        echo "portod exit code:" $?
+    done
+}
+
+poke_porto() {
+    $PORTO_BIN/portoctl get / state >/dev/null 2>&1
+}
+
+start_porto() {
+    starter &
+    STARTER_PID=$!
+    while ! poke_porto ; do
+        kill -0 $STARTER_PID || die "cannot start porto"
+        sleep 1
+    done
+}
+
+stop_porto() {
+    if [ -n "$STARTER_PID" ] ; then
+        kill $STARTER_PID
+        wait $STARTER_PID
+        unset STARTER_PID
+    fi
+    poke_porto && die "cannot stop porto"
+}
+
+kill_porto() {
+    if poke_porto ; then
+        service yandex-porto stop || true
+        killall -9 portod || true
+        sleep 1
+        poke_porto && die "cannot kill porto"
+    fi
+}
+
+test $(id -u) = "0" || die "current user not root"
+
+trap stop_porto TERM INT QUIT EXIT
+kill_porto
+start_porto
+
+cgexec -g *:/ $PORTO_BIN/portotest $@ || die "portotest failed"
+
+for pytest in $PORTO_SRC/src/test/test-*.py; do
+    PYTHONPATH=$PORTO_SRC/src/api/python python $pytest || die "$pytest failed"
+done
