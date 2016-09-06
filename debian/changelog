@@ -1,3 +1,9 @@
+yandex-porto (2.10.7) unstable; urgency=low
+
+  * porto: add custom place for layers and volumes
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 06 Sep 2016 14:42:15 +0300
+
 yandex-porto (2.10.6) unstable; urgency=low
 
   * porto: apply only changed dynamic properties
