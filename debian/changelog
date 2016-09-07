@@ -1,3 +1,17 @@
+yandex-porto (2.10.8) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: backport test setup
+
+  [ Maxim Samoylov ]
+  * task: fix leak fd into container
+
+  [ Konstantin Khlebnikov ]
+  * porto: cut container namespace in volume list
+  * porto: do not run test when building package
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 07 Sep 2016 15:18:32 +0300
+
 yandex-porto (2.10.7) unstable; urgency=low
 
   * porto: add custom place for layers and volumes
