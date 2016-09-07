@@ -418,18 +418,31 @@ remove_file:
         TPath image = GetLoopImage();
         TError error;
 
-        if (!Volume->SpaceLimit)
-            return TError(EError::InvalidValue, "loop backend requires space_limit");
-
         if (!image.Exists()) {
+            if (!Volume->SpaceLimit)
+                return TError(EError::InvalidValue, "loop backend requires space_limit");
+
             L_ACT() << "Allocate loop image with size " << Volume->SpaceLimit
                     << " guarantee " << Volume->SpaceGuarantee << std::endl;
             error = MakeImage(image, Volume->VolumeOwner,
                               Volume->SpaceLimit, Volume->SpaceGuarantee);
             if (error)
                 return error;
+
         } else {
-            //FIXME call resize2fs
+            struct stat st;
+
+            error = image.StatFollow(st);
+            if (error)
+                return error;
+
+            if (!Volume->SpaceLimit) {
+                Volume->SpaceLimit = st.st_size;
+
+            } else {
+                //FIXME: call resize2fs
+
+            }
         }
 
         error = SetupLoopDevice(image, LoopDev);
