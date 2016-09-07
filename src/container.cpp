@@ -897,15 +897,16 @@ TError TContainer::Start(bool meta) {
             return TError(EError::InvalidState, "Parent container is paused");
     }
 
-    if (!IsRoot() && !IsPortoRoot()) {
+    /* Normalize root path */
+    if (Parent) {
         TPath path(Root);
-        if (!path.IsRoot()) {
 
-            if (path.IsRegularFollow())
-                path = GetTmpDir();
+        path = path.NormalPath();
+        if (path.IsDotDot())
+            return TError(EError::Permission, "root path with ..");
 
-            path = path.NormalPath();
-        }
+        if (path.IsRegularFollow())
+            path = GetTmpDir();
 
         RootPath = Parent->RootPath / path;
     }

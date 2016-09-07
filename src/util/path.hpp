@@ -44,6 +44,11 @@ public:
 
     bool IsNormal() const { return Path == NormalPath().Path; }
 
+    bool IsDotDot() const {
+        return Path[0] == '.' && Path[1] == '.' &&
+              (Path[2] == '/' || Path[2] == '\0');
+    }
+
     const char *c_str() const noexcept { return Path.c_str(); }
 
     TPath operator+(const TPath &p) const {
