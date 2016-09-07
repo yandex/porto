@@ -2209,7 +2209,7 @@ void TContainerWaiter::WakeupWaiter(const TContainer *who, bool wildcard) {
         std::string name;
         TError err;
         if (who)
-            err = client->ComposeRelativeName(*who, name);
+            err = client->ComposeRelativeName(who->GetName(), name);
         if (wildcard && (err || !MatchWildcard(name)))
             return;
         Callback(client, err, name);

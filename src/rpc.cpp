@@ -526,7 +526,7 @@ noinline TError ListContainers(TContext &context,
 
     for (auto &c : context.Cholder->List()) {
         std::string name;
-        if (!client->ComposeRelativeName(*c, name))
+        if (!client->ComposeRelativeName(c->GetName(), name))
             rsp.mutable_list()->add_name(name);
     }
 
@@ -840,7 +840,7 @@ noinline TError Wait(TContext &context,
                 continue;
 
             std::string name;
-            if (!client->ComposeRelativeName(*container, name) &&
+            if (!client->ComposeRelativeName(container->GetName(), name) &&
                     waiter->MatchWildcard(name)) {
                 rsp.mutable_wait()->set_name(name);
                 return TError::Success();
@@ -963,15 +963,19 @@ noinline TError ListVolumeProperties(TContext &context,
 
 noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
                                     TPath container_root, TPath volume_path,
-                                    std::shared_ptr<TVolume> volume) {
+                                    std::shared_ptr<TVolume> volume,
+                                    std::shared_ptr<TClient> client) {
     desc->set_path(volume_path.ToString());
     for (auto kv: volume->GetProperties(container_root)) {
         auto p = desc->add_properties();
         p->set_name(kv.first);
         p->set_value(kv.second);
     }
-    for (auto name: volume->GetContainers())
-        desc->add_containers(name);
+    for (auto name: volume->GetContainers()) {
+        std::string relative;
+        if (!client->ComposeRelativeName(name, relative))
+            desc->add_containers(relative);
+    }
 }
 
 noinline TError CreateVolume(TContext &context,
@@ -1063,7 +1067,7 @@ noinline TError CreateVolume(TContext &context,
     volume->SetReady(true);
     vholder_lock.unlock();
 
-    FillVolumeDescription(rsp.mutable_volume(), container_root, volume_path, volume);
+    FillVolumeDescription(rsp.mutable_volume(), container_root, volume_path, volume, client);
     volume_lock.unlock();
 
     return TError::Success();
@@ -1264,7 +1268,7 @@ noinline TError ListVolumes(TContext &context,
             return TError(EError::VolumeNotFound, "volume not found");
         auto desc = rsp.mutable_volumelist()->add_volumes();
         volume_path = container_root.InnerPath(volume->GetPath(), true);
-        FillVolumeDescription(desc, container_root, volume_path, volume);
+        FillVolumeDescription(desc, container_root, volume_path, volume, client);
         return TError::Success();
     }
 
@@ -1284,7 +1288,7 @@ noinline TError ListVolumes(TContext &context,
             continue;
 
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, container_root, volume_path, volume);
+        FillVolumeDescription(desc, container_root, volume_path, volume, client);
     }
 
     return TError::Success();

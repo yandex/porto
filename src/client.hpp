@@ -42,7 +42,7 @@ public:
 
     std::string GetContainerName() const;
 
-    TError ComposeRelativeName(const TContainer &target,
+    TError ComposeRelativeName(const std::string &name,
                                std::string &relative_name) const;
 
     TError ResolveRelativeName(const std::string &relative_name,
