@@ -130,6 +130,7 @@ TError TTask::ChildExec() {
     TError error = Env->Env.Apply();
 
     auto envp = Env->Env.Envp();
+    auto fd = Env->PortoInitFd.GetFd();
 
     if (Env->Command.empty()) {
         const char *args[] = {
@@ -139,6 +140,7 @@ TError TTask::ChildExec() {
             NULL,
         };
         SetDieOnParentExit(0);
+        CloseFds(-1, {fd});
         fexecve(Env->PortoInitFd.GetFd(), (char *const *)args, envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
                       std::to_string(Env->PortoInitFd.GetFd()) +  ", portoinit)");
@@ -171,6 +173,8 @@ TError TTask::ChildExec() {
             L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     SetDieOnParentExit(0);
+    fd = Env->Sock.GetFd();
+    CloseFds(-1, {0, 1, 2, fd});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
     return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ")");
