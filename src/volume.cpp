@@ -93,6 +93,38 @@ public:
     }
 };
 
+/* TVolumeBindBackend - bind mount */
+
+class TVolumeBindBackend : public TVolumeBackend {
+public:
+
+    TError Configure() override {
+
+        if (!Volume->HaveStorage())
+            return TError(EError::NotSupported, "bind backed require storage");
+
+        if (Volume->HaveQuota())
+            return TError(EError::NotSupported, "bind backend doesn't support quota");
+
+        if (Volume->HaveLayers())
+            return TError(EError::NotSupported, "bind backend doesn't support layers");
+
+        return TError::Success();
+    }
+
+    TError Build() override {
+        return Volume->Path.BindRemount(Volume->GetStorage(), Volume->GetMountFlags());
+    }
+
+    TError Destroy() override {
+        return Volume->Path.UmountAll();
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->Path.StatFS(result);
+    }
+};
+
 /* TVolumeTmpfsBackend - tmpfs */
 
 class TVolumeTmpfsBackend : public TVolumeBackend {
@@ -775,6 +807,8 @@ TError TVolume::Find(const TPath &path, std::shared_ptr<TVolume> &volume) {
 TError TVolume::OpenBackend() {
     if (BackendType == "plain")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
+    else if (BackendType == "bind")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeBindBackend());
     else if (BackendType == "tmpfs")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeTmpfsBackend());
     else if (BackendType == "quota")
@@ -1544,7 +1578,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
-    { V_BACKEND,     "plain|tmpfs|quota|native|overlay|loop|rbd (default - autodetect)", false },
+    { V_BACKEND,     "plain|bind|tmpfs|quota|native|overlay|loop|rbd (default - autodetect)", false },
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_PRIVATE,     "user-defined property", false },
@@ -1770,6 +1804,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_CONTAINERS) {
             SplitEscapedString(prop.second, Containers, ';');
+
         } else if (prop.first == V_LOOP_DEV) {
             error = StringToInt(prop.second, LoopDev);
             if (error)
