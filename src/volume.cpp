@@ -354,7 +354,12 @@ class TVolumeLoopBackend : public TVolumeBackend {
 public:
 
     TPath GetLoopImage() {
-        return Volume->GetStorage() / "loop.img";
+        TPath storage = Volume->GetStorage();
+
+        if (Volume->IsFileStorage)
+            return storage;
+
+        return storage / "loop.img";
     }
 
     TPath GetLoopDevice() {
@@ -1051,8 +1056,12 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
 
         if (!path.Exists())
             return TError(EError::InvalidValue, "Storage path does not exist");
-        if (!path.IsDirectoryFollow())
-            return TError(EError::InvalidValue, "Storage path must be a directory");
+        if (!path.IsDirectoryFollow()) {
+            if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop")) {
+                IsFileStorage = true;
+            } else
+                return TError(EError::InvalidValue, "Storage path must be a directory");
+        }
         if (!path.CanWrite(cred))
             return TError(EError::Permission, "Storage path usage not permitted");
     }
@@ -1101,7 +1110,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
 
     /* Autodetect volume backend */
     if (!cfg.count(V_BACKEND)) {
-        if (HaveQuota() && !TVolumeNativeBackend::Supported())
+        if ((HaveQuota() && !TVolumeNativeBackend::Supported()) || IsFileStorage)
             BackendType = "loop";
         else if (HaveLayers() && TVolumeOverlayBackend::Supported())
             BackendType = "overlay";

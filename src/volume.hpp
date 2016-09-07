@@ -66,6 +66,7 @@ public:
     TPath Path;
     bool IsAutoPath = false;
     std::string Storage;
+    bool IsFileStorage = false;
     std::string BackendType;
     std::string Creator;
     std::string Id;
