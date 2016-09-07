@@ -13,34 +13,37 @@ extern "C" {
 
 static std::mutex BigLoopLock;
 
-TError SetupLoopDevice(const TPath &imagePath, int &loopNr) {
-    TFile control, image, loop;
+TError SetupLoopDev(int &loopNr, const TPath &image, bool ro) {
+    TFile ctl, img, dev;
     struct loop_info64 info;
     int nr, retry = 10;
     TError error;
 
-    error = image.OpenReadWrite(imagePath);
+    if (ro)
+        error = img.OpenRead(image);
+    else
+        error = img.OpenReadWrite(image);
     if (error)
         return error;
 
-    error = control.OpenReadWrite("/dev/loop-control");
+    error = ctl.OpenReadWrite("/dev/loop-control");
     if (error)
         return error;
 
     auto lock = std::unique_lock<std::mutex>(BigLoopLock);
 
 again:
-    nr = ioctl(control.Fd, LOOP_CTL_GET_FREE);
+    nr = ioctl(ctl.Fd, LOOP_CTL_GET_FREE);
     if (nr < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
 
-    error = loop.OpenReadWrite("/dev/loop" + std::to_string(nr));
+    error = dev.OpenReadWrite("/dev/loop" + std::to_string(nr));
     if (error)
         return error;
 
-    if (ioctl(loop.Fd, LOOP_SET_FD, image.Fd) < 0) {
+    if (ioctl(dev.Fd, LOOP_SET_FD, img.Fd) < 0) {
         if (errno == EBUSY) {
-            if (!ioctl(loop.Fd, LOOP_GET_STATUS64, &info) || errno == ENXIO) {
+            if (!ioctl(dev.Fd, LOOP_GET_STATUS64, &info) || errno == ENXIO) {
                 if (--retry > 0)
                     goto again;
             }
@@ -49,11 +52,11 @@ again:
     }
 
     memset(&info, 0, sizeof(info));
-    strncpy((char *)info.lo_file_name, imagePath.c_str(), LO_NAME_SIZE);
+    strncpy((char *)info.lo_file_name, image.c_str(), LO_NAME_SIZE);
 
-    if (ioctl(loop.Fd, LOOP_SET_STATUS64, &info) < 0) {
+    if (ioctl(dev.Fd, LOOP_SET_STATUS64, &info) < 0) {
         error = TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
-        (void)ioctl(loop.Fd, LOOP_CLR_FD, 0);
+        (void)ioctl(dev.Fd, LOOP_CLR_FD, 0);
         return error;
     }
 

@@ -3611,7 +3611,7 @@ static void TestVirtModeProperty(Porto::Connection &api) {
 
     int nr;
     AsRoot(api);
-    TError error = SetupLoopDevice(tmpimg, nr);
+    TError error = SetupLoopDev(nr, tmpimg, false);
     if (error)
         throw error.GetMsg();
     AsBob(api);

@@ -1125,7 +1125,7 @@ TError TContainer::PrepareLoop() {
         return TError::Success();
 
     int loop_dev;
-    error = SetupLoopDevice(loop_image, loop_dev);
+    error = SetupLoopDev(loop_dev, loop_image, RootRo);
     if (error)
         return error;
 

@@ -353,6 +353,24 @@ class TVolumeLoopBackend : public TVolumeBackend {
 
 public:
 
+    TError Configure() override {
+
+        /* Do not allow read-write loop share storage */
+        if (Volume->HaveStorage()) {
+            for (auto &it: Volumes) {
+                auto other = it.second;
+
+                if (other->BackendType == "loop" && other->HaveStorage() &&
+                        other->Storage == Volume->Storage &&
+                        (!other->IsReadOnly || !Volume->IsReadOnly))
+                    return TError(EError::Busy, "Storage already in use by volume " +
+                                                other->Path.ToString());
+            }
+        }
+
+        return TError::Success();
+    }
+
     TPath GetLoopImage() {
         TPath storage = Volume->GetStorage();
 
@@ -470,7 +488,7 @@ remove_file:
             }
         }
 
-        error = SetupLoopDevice(image, LoopDev);
+        error = SetupLoopDev(LoopDev, image, Volume->IsReadOnly);
         if (error)
             return error;
 
@@ -519,6 +537,8 @@ free_loop:
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        if (Volume->IsReadOnly)
+            return TError(EError::Busy, "Volume is read-only");
         return ResizeLoopDev(LoopDev, GetLoopImage(),
                              Volume->SpaceLimit, space_limit);
     }
@@ -1630,7 +1650,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_GROUP,       "group (default - creator)", false },
     { V_PERMISSIONS, "directory permissions (default - 0775)", false },
     { V_CREATOR,     "container user group (ro)", true },
-    { V_READ_ONLY,   "true|false (default - false)", true },
+    { V_READ_ONLY,   "true|false (default - false)", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)", false },
