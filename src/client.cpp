@@ -208,15 +208,14 @@ std::string TClient::GetContainerName() const {
         return "<deleted container>";
 }
 
-TError TClient::ComposeRelativeName(const TContainer &target,
+TError TClient::ComposeRelativeName(const std::string &name,
                                     std::string &relative_name) const {
-    std::string name = target.GetName();
     auto base = ClientContainer.lock();
     if (!base)
         return TError(EError::ContainerDoesNotExist, "Cannot find client container");
     std::string ns = base->GetPortoNamespace();
 
-    if (target.IsRoot()) {
+    if (name == ROOT_CONTAINER) {
         relative_name = ROOT_CONTAINER;
         return TError::Success();
     }

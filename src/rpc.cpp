@@ -523,7 +523,7 @@ noinline TError ListContainers(TContext &context, rpc::TContainerResponse &rsp) 
 
     for (auto &c : context.Cholder->List()) {
         std::string name;
-        if (!CurrentClient->ComposeRelativeName(*c, name))
+        if (!CurrentClient->ComposeRelativeName(c->GetName(), name))
             rsp.mutable_list()->add_name(name);
     }
 
@@ -830,7 +830,7 @@ noinline TError Wait(TContext &context,
                 continue;
 
             std::string name;
-            if (!client->ComposeRelativeName(*container, name) &&
+            if (!client->ComposeRelativeName(container->GetName(), name) &&
                     waiter->MatchWildcard(name)) {
                 rsp.mutable_wait()->set_name(name);
                 return TError::Success();
@@ -956,8 +956,11 @@ noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
         p->set_name(kv.first);
         p->set_value(kv.second);
     }
-    for (auto &name: volume->Containers)
-        desc->add_containers(name);
+    for (auto &name: volume->Containers) {
+        std::string relative;
+        if (!CurrentClient->ComposeRelativeName(name, relative))
+            desc->add_containers(relative);
+    }
 }
 
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
