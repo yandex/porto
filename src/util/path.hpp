@@ -154,6 +154,7 @@ public:
     TError ClearDirectory() const;
     TError StatFS(TStatFS &result) const;
     TError SetXAttr(const std::string name, const std::string value) const;
+    TError Truncate(off_t size) const;
     TError RotateLog(off_t max_disk_usage, off_t &loss) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
 

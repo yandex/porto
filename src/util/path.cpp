@@ -641,6 +641,12 @@ TError TPath::SetXAttr(const std::string name, const std::string value) const {
     return TError::Success();
 }
 
+TError TPath::Truncate(off_t size) const {
+    if (truncate(c_str(), size))
+        return TError(EError::Unknown, errno, "truncate(" + Path + ")");
+    return TError::Success();
+}
+
 TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     struct stat st;
     off_t hole_len;

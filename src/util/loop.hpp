@@ -5,3 +5,4 @@
 
 TError SetupLoopDevice(const TPath &imagePath, int &loopNr);
 TError PutLoopDev(const int loopNr);
+TError ResizeLoopDev(int loopNr, const TPath &image, off_t current, off_t target);

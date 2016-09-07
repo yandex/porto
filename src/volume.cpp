@@ -418,6 +418,25 @@ remove_file:
         return error;
     }
 
+    static TError ResizeImage(const TPath &image, off_t current, off_t target) {
+        std::string size = std::to_string(target >> 10) + "K";
+        TError error;
+
+        if (current < target) {
+            error = image.Truncate(target);
+            if (error)
+                return error;
+        }
+
+        error = RunCommand({"resize2fs", "-f", image.ToString(), size},
+                           image.DirName().ToString());
+
+        if (!error && current > target)
+            error = image.Truncate(target);
+
+        return error;
+    }
+
     TError Build() override {
         TPath path = Volume->Path;
         TPath image = GetLoopImage();
@@ -444,9 +463,10 @@ remove_file:
             if (!Volume->SpaceLimit) {
                 Volume->SpaceLimit = st.st_size;
 
-            } else {
-                //FIXME: call resize2fs
-
+            } else if ((uint64_t)st.st_size != Volume->SpaceLimit) {
+                error = ResizeImage(image, st.st_size, Volume->SpaceLimit);
+                if (error)
+                    return error;
             }
         }
 
@@ -499,7 +519,8 @@ free_loop:
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        return TError(EError::NotSupported, "loop backend doesn't suppport resize");
+        return ResizeLoopDev(LoopDev, GetLoopImage(),
+                             Volume->SpaceLimit, space_limit);
     }
 
     TError StatFS(TStatFS &result) override {
@@ -1401,6 +1422,8 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
         }
 
         error = Resize(spaceLimit, inodeLimit);
+        if (error)
+            return error;
     }
 
     if (properties.count(V_SPACE_GUARANTEE) || properties.count(V_INODE_GUARANTEE)) {
