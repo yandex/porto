@@ -98,7 +98,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     CapAmbient = NoCapabilities;
     CapAllowed = NoCapabilities;
     CapLimit = NoCapabilities;
-    LoopDev = -1;
 
     if (IsRoot())
         NsName = std::string(PORTO_ROOT_CONTAINER) + "/";
@@ -161,10 +160,6 @@ std::string TContainer::ContainerStateName(EContainerState state) {
 /* Working directory in host namespace */
 TPath TContainer::WorkPath() const {
     return TPath(config().container().tmp_dir()) / GetName();
-}
-
-TPath TContainer::GetTmpDir() const {
-    return TPath(config().container().tmp_dir()) / std::to_string(Id);
 }
 
 std::string TContainer::GetCwd() const {
@@ -747,9 +742,8 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     taskEnv->Mnt.Cwd = GetCwd();
     taskEnv->Mnt.ParentCwd = Parent->GetCwd();
 
-    taskEnv->Mnt.LoopDev = LoopDev;
-    if (taskEnv->Mnt.LoopDev >= 0)
-        taskEnv->Mnt.Root = GetTmpDir();
+    if (RootVolume)
+        taskEnv->Mnt.Root = Parent->RootPath.InnerPath(RootVolume->Path);
     else
         taskEnv->Mnt.Root = Root;
 
@@ -904,9 +898,6 @@ TError TContainer::Start(bool meta) {
         path = path.NormalPath();
         if (path.IsDotDot())
             return TError(EError::Permission, "root path with ..");
-
-        if (path.IsRegularFollow())
-            path = GetTmpDir();
 
         RootPath = Parent->RootPath / path;
     }
@@ -1108,33 +1099,6 @@ TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
     return TError::Success();
 }
 
-TError TContainer::PrepareLoop() {
-    TPath loop_image(Root);
-    if (!loop_image.IsRegularFollow())
-        return TError::Success();
-
-    TError error;
-    TPath temp_path = GetTmpDir();
-    if (!temp_path.Exists()) {
-        error = temp_path.Mkdir(0755);
-        if (error)
-            return error;
-    }
-
-    if (!HasProp(EProperty::ROOT) || loop_image == Parent->Root)
-        return TError::Success();
-
-    int loop_dev;
-    error = SetupLoopDev(loop_dev, loop_image, RootRo);
-    if (error)
-        return error;
-
-    LoopDev = loop_dev;
-    SetProp(EProperty::LOOP_DEV);
-
-    return error;
-}
-
 TError TContainer::PrepareWorkDir() {
     if (IsRoot() || IsPortoRoot())
         return TError::Success();
@@ -1169,11 +1133,23 @@ TError TContainer::PrepareResources() {
         return error;
     }
 
-    error = PrepareLoop();
-    if (error) {
-        L_ERR() << "Can't prepare loop device: " << error << std::endl;
-        FreeResources();
-        return error;
+    if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
+        TStringMap cfg;
+
+        cfg[V_BACKEND] = "loop";
+        cfg[V_STORAGE] = RootPath.ToString();
+        cfg[V_READ_ONLY] = BoolToString(RootRo);
+
+        RootPath = Parent->RootPath;
+
+        error = TVolume::Create(TPath(), cfg, *this, OwnerCred, RootVolume);
+        if (error) {
+            L_ERR() << "Cannot create root volume: " << error << std::endl;
+            FreeResources();
+            return error;
+        }
+
+        RootPath = RootVolume->Path;
     }
 
     return TError::Success();
@@ -1231,21 +1207,26 @@ void TContainer::FreeResources() {
     if (IsRoot() || IsPortoRoot())
         return;
 
-    int loopNr = LoopDev;
-    LoopDev = -1;
-    SetProp(EProperty::LOOP_DEV);
-
-    if (loopNr >= 0) {
-        error = PutLoopDev(loopNr);
+    /* Legacy non-volume root on loop device */
+    if (LoopDev >= 0) {
+        error = PutLoopDev(LoopDev);
         if (error)
-            L_ERR() << "Can't put loop device " << loopNr << ": " << error << std::endl;
+            L_ERR() << "Can't put loop device " << LoopDev << ": " << error << std::endl;
+        LoopDev = -1;
+        SetProp(EProperty::LOOP_DEV);
+
+        TPath tmp(config().container().tmp_dir() + "/" + std::to_string(Id));
+        if (tmp.Exists()) {
+            error = tmp.RemoveAll();
+            if (error)
+                L_ERR() << "Can't remove " << tmp << ": " << error << std::endl;
+        }
     }
 
-    TPath temp_path = GetTmpDir();
-    if (temp_path.Exists()) {
-        error = temp_path.RemoveAll();
-        if (error)
-            L_ERR() << "Can't remove " << temp_path << ": " << error << std::endl;
+    if (RootVolume) {
+        RootVolume->UnlinkContainer(*this);
+        RootVolume->Destroy();
+        RootVolume = nullptr;
     }
 
     TPath work_path = WorkPath();

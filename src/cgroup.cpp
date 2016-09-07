@@ -668,8 +668,6 @@ TError TDevicesSubsystem::ApplyDefault(TCgroup &cg) {
         "c 5:2 rw",     // /dev/ptmx
         "c 136:* rw",   // /dev/pts/*
         "c 254:0 rm",   // /dev/rtc0         FIXME
-        "c 10:237 rmw", // /dev/loop-control FIXME
-        "b 7:* rmw"     // /dev/loop*        FIXME
     };
 
     for (auto &rule: rules) {

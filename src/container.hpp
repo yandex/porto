@@ -67,7 +67,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareWorkDir();
     TError RestoreNetwork();
     TError PrepareOomMonitor();
-    TError PrepareLoop();
     void ShutdownOom();
     TError PrepareCgroups();
     TError ConfigureDevices(std::vector<TDevice> &devices);
@@ -128,7 +127,7 @@ public:
     std::vector<std::string> ResolvConf;
     std::vector<std::string> Devices;
 
-    int LoopDev;
+    int LoopDev = -1; /* legacy */
     uint64_t StartTime;
     uint64_t DeathTime;
     std::map<int, struct rlimit> Rlimit;
@@ -157,13 +156,13 @@ public:
     bool OomKilled = false;
     int ExitStatus = 0;
     TPath RootPath; /* path in host namespace */
+    std::shared_ptr<TVolume> RootVolume;
 
     TTask Task;
     pid_t TaskVPid;
     TTask WaitTask;
     std::shared_ptr<TNetwork> Net;
 
-    TPath GetTmpDir() const;
     std::string GetCwd() const;
     TPath WorkPath() const;
     EContainerState GetState() const {

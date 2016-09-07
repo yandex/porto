@@ -24,7 +24,6 @@ public:
     bool RootRdOnly;
     std::vector<TBindMount> BindMounts;
     bool BindPortoSock;
-    int LoopDev;
 
     TError MountBinds();
     TError BindResolvConf();

@@ -108,7 +108,7 @@ TError TMountNamespace::MountBinds() {
 }
 
 TError TMountNamespace::RemountRootRo() {
-    if (!RootRdOnly || LoopDev >= 0)
+    if (!RootRdOnly)
         return TError::Success();
 
     // remount everything except binds to ro
@@ -284,11 +284,7 @@ TError TMountNamespace::MountRootFs() {
     if (Root.IsRoot())
         return TError::Success();
 
-    if (LoopDev >= 0)
-        error = Root.Mount("/dev/loop" + std::to_string(LoopDev),
-                                "ext4", RootRdOnly ? MS_RDONLY : 0, {});
-    else
-        error = Root.Bind(Root);
+    error = Root.Bind(Root);
     if (error)
         return error;
 
