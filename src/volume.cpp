@@ -180,7 +180,7 @@ public:
         if (Volume->HaveStorage())
             return TError(EError::NotSupported, "Quota backed doesn't support storage");
 
-        if (Volume->IsLayersSet)
+        if (Volume->HaveLayers())
             return TError(EError::NotSupported, "Quota backed doesn't support layers");
 
         return TError::Success();
@@ -1020,32 +1020,28 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         return TError(EError::Permission, "Changing group is not permitted");
 
     /* Verify and resolve layers */
-    if (IsLayersSet) {
-        std::vector <std::string> layers;
-
-        for (auto &l: Layers) {
-            TPath layer(l);
-            if (!layer.IsNormal())
-                return TError(EError::InvalidValue, "Layer path must be normalized");
-            if (layer.IsAbsolute()) {
-                layer = container_root / layer;
-                l = layer.ToString();
-                if (!layer.Exists())
-                    return TError(EError::LayerNotFound, "Layer not found");
-                /* Racy. Permissions and isolation will be rechecked later */
-                if (!layer.CanWrite(cred))
-                    return TError(EError::Permission, "Layer path not permitted: " + l);
-            } else {
-                error = ValidateLayerName(l);
-                if (error)
-                    return error;
-                layer = Place / config().volumes().layers_dir() / layer;
-            }
+    for (auto &l: Layers) {
+        TPath layer(l);
+        if (!layer.IsNormal())
+            return TError(EError::InvalidValue, "Layer path must be normalized");
+        if (layer.IsAbsolute()) {
+            layer = container_root / layer;
+            l = layer.ToString();
             if (!layer.Exists())
                 return TError(EError::LayerNotFound, "Layer not found");
-            if (!layer.IsDirectoryFollow())
-                return TError(EError::InvalidValue, "Layer must be a directory");
+            /* Racy. Permissions and isolation will be rechecked later */
+            if (!layer.CanWrite(cred))
+                return TError(EError::Permission, "Layer path not permitted: " + l);
+        } else {
+            error = ValidateLayerName(l);
+            if (error)
+                return error;
+            layer = Place / config().volumes().layers_dir() / layer;
         }
+        if (!layer.Exists())
+            return TError(EError::LayerNotFound, "Layer not found");
+        if (!layer.IsDirectoryFollow())
+            return TError(EError::InvalidValue, "Layer must be a directory");
     }
 
     /* Verify guarantees */
@@ -1061,7 +1057,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
     if (!cfg.count(V_BACKEND)) {
         if (HaveQuota() && !TVolumeNativeBackend::Supported())
             BackendType = "loop";
-        else if (IsLayersSet && TVolumeOverlayBackend::Supported())
+        else if (HaveLayers() && TVolumeOverlayBackend::Supported())
             BackendType = "overlay";
         else if (TVolumeNativeBackend::Supported())
             BackendType = "native";
@@ -1119,7 +1115,7 @@ TError TVolume::Build() {
     if (error)
         goto err_save;
 
-    if (IsLayersSet && BackendType != "overlay") {
+    if (HaveLayers() && BackendType != "overlay") {
         L_ACT() << "Merge layers into volume: " << path << std::endl;
 
 
@@ -1469,7 +1465,7 @@ TStringMap TVolume::DumpState(const TPath &root) {
     ret[V_SPACE_GUARANTEE] = std::to_string(SpaceGuarantee);
     ret[V_INODE_GUARANTEE] = std::to_string(InodeGuarantee);
 
-    if (IsLayersSet) {
+    if (HaveLayers()) {
         std::vector<std::string> layers = Layers;
 
         for (auto &l: layers) {
@@ -1786,7 +1782,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_LAYERS) {
             SplitEscapedString(prop.second, Layers, ';');
-            IsLayersSet = true;
+
         } else if (prop.first == V_SPACE_LIMIT) {
             uint64_t limit;
             error = StringToSize(prop.second, limit);

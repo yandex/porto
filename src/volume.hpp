@@ -76,7 +76,6 @@ public:
     int LoopDev = -1;
     bool IsReadOnly = false;
     std::vector<std::string> Layers;
-    bool IsLayersSet = false;
     uint64_t SpaceLimit = 0;
     uint64_t SpaceGuarantee = 0;
     uint64_t InodeLimit = 0;
@@ -138,6 +137,10 @@ public:
 
     bool HaveStorage(void) const {
         return Storage.size();
+    }
+
+    bool HaveLayers(void) const {
+        return !Layers.empty();
     }
 
     TError StatFS(TStatFS &result) const;
