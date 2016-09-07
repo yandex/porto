@@ -87,6 +87,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Stdout.Limit = config().container().stdout_limit();
     Stderr.Limit = config().container().stdout_limit();
     Root = "/";
+    RootPath = TPath("/");
     RootRo = false;
     Umask = 0002;
     Isolate = true;
@@ -164,22 +165,6 @@ TPath TContainer::WorkPath() const {
 
 TPath TContainer::GetTmpDir() const {
     return TPath(config().container().tmp_dir()) / std::to_string(Id);
-}
-
-/* Returns normalized root path in host namespace */
-TPath TContainer::RootPath() const {
-
-    if (IsRoot() || IsPortoRoot())
-        return TPath("/");
-
-    TPath path(Root);
-    if (!path.IsRoot()) {
-        if (path.IsRegularFollow())
-            path = GetTmpDir();
-        path = path.NormalPath();
-    }
-
-    return Parent->RootPath() / path;
 }
 
 std::string TContainer::GetCwd() const {
@@ -912,12 +897,25 @@ TError TContainer::Start(bool meta) {
             return TError(EError::InvalidState, "Parent container is paused");
     }
 
+    if (!IsRoot() && !IsPortoRoot()) {
+        TPath path(Root);
+        if (!path.IsRoot()) {
+
+            if (path.IsRegularFollow())
+                path = GetTmpDir();
+
+            path = path.NormalPath();
+        }
+
+        RootPath = Parent->RootPath / path;
+    }
+
     if (VirtMode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
         if (GetIsolationDomain()->IsRoot())
             return TError(EError::Permission, "virt_mode=os must be isolated from host");
         if (!Isolate && OwnerCred.Uid != Parent->OwnerCred.Uid)
             return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
-        if (RootPath().IsRoot())
+        if (RootPath.IsRoot())
             return TError(EError::Permission, "virt_mode=os without chroot only for root");
     }
 

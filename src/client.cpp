@@ -280,14 +280,14 @@ TPath TClient::ComposePath(const TPath &path) {
     auto base = ClientContainer.lock();
     if (!base)
         return TPath();
-    return base->RootPath().InnerPath(path);
+    return base->RootPath.InnerPath(path);
 }
 
 TPath TClient::ResolvePath(const TPath &path) {
     auto base = ClientContainer.lock();
     if (!base)
         return TPath();
-    return base->RootPath() / path;
+    return base->RootPath / path;
 }
 
 bool TClient::IsSuperUser(void) const {

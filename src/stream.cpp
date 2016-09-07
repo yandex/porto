@@ -30,8 +30,8 @@ TPath TStdStream::ResolveOutside(const TContainer &container) const {
         return container.WorkPath() / Path;
     }
     if (Path.IsAbsolute())
-        return container.RootPath() / Path;
-    return container.RootPath() / container.GetCwd() / Path;
+        return container.RootPath / Path;
+    return container.RootPath / container.GetCwd() / Path;
 }
 
 TError TStdStream::Open(const TPath &path, const TCred &cred) {

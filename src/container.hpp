@@ -156,6 +156,7 @@ public:
     EContainerState State = EContainerState::Unknown;
     bool OomKilled = false;
     int ExitStatus = 0;
+    TPath RootPath; /* path in host namespace */
 
     TTask Task;
     pid_t TaskVPid;
@@ -163,7 +164,6 @@ public:
     std::shared_ptr<TNetwork> Net;
 
     TPath GetTmpDir() const;
-    TPath RootPath() const;
     std::string GetCwd() const;
     TPath WorkPath() const;
     EContainerState GetState() const {

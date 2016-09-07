@@ -949,7 +949,6 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
 TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
                           const TContainer &container, const TCred &cred) {
     auto backend = cfg.count(V_BACKEND) ? cfg.at(V_BACKEND) : "";
-    TPath container_root = container.RootPath();
     TError error;
 
     /* Verify properties */
@@ -995,12 +994,12 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         Path = path.ToString();
 
     } else {
-        if (container_root.IsRoot()) {
+        if (container.RootPath.IsRoot()) {
             /* /place/porto_volumes/<id>/volume */
             Path = GetInternal("volume");
         } else {
             /* /chroot/porto/volume_<id> */
-            TPath porto_path = container_root / config().container().chroot_porto_dir();
+            TPath porto_path = container.RootPath / config().container().chroot_porto_dir();
             if (!porto_path.Exists()) {
                 error = porto_path.Mkdir(0755);
                 if (error)
@@ -1015,7 +1014,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
     Creator = container.GetName() + " " + cred.User() + " " + cred.Group();
 
     CreatorCred = cred;
-    CreatorRoot = container_root;
+    CreatorRoot = container.RootPath;
 
     /* Set default credentials to creator */
     VolumeOwner = cred;
@@ -1034,7 +1033,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
             return TError(EError::InvalidValue, "Storage path must be normalized");
 
         /* Convert path to host-based */
-        path = container_root / Storage;
+        path = container.RootPath / Storage;
         Storage = path.ToString();
 
         if (!path.Exists())
@@ -1059,7 +1058,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         if (!layer.IsNormal())
             return TError(EError::InvalidValue, "Layer path must be normalized");
         if (layer.IsAbsolute()) {
-            layer = container_root / layer;
+            layer = container.RootPath / layer;
             l = layer.ToString();
             if (!layer.Exists())
                 return TError(EError::LayerNotFound, "Layer not found");

@@ -976,9 +976,8 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
         cfg[p.name()] = p.value();
 
     TPath volume_path;
-    TPath container_root = container->RootPath();
     if (req.has_path() && !req.path().empty())
-        volume_path =  container_root / req.path();
+        volume_path =  container->RootPath / req.path();
 
     std::shared_ptr<TVolume> volume;
     error = TVolume::Create(volume_path, cfg, *container,
@@ -986,8 +985,9 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
     if (error)
         return error;
 
-    volume_path = container_root.InnerPath(volume->Path, true);
-    FillVolumeDescription(rsp.mutable_volume(), container_root, volume_path, volume);
+    volume_path = container->RootPath.InnerPath(volume->Path, true);
+    FillVolumeDescription(rsp.mutable_volume(), container->RootPath,
+                          volume_path, volume);
 
     return TError::Success();
 }
@@ -1007,7 +1007,7 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req,
     for (auto p: req.properties())
         cfg[p.name()] = p.value();
 
-    TPath volume_path = clientContainer->RootPath() / req.path();
+    TPath volume_path = clientContainer->RootPath / req.path();
     std::shared_ptr<TVolume> volume;
 
     error = TVolume::Find(volume_path, volume);
@@ -1056,7 +1056,7 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req,
 
     cholder_lock.unlock();
 
-    TPath volume_path = clientContainer->RootPath() / req.path();
+    TPath volume_path = clientContainer->RootPath / req.path();
     std::shared_ptr<TVolume> volume;
 
     error = TVolume::Find(volume_path, volume);
@@ -1105,7 +1105,7 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
 
     cholder_lock.unlock();
 
-    TPath volume_path = clientContainer->RootPath() / req.path();
+    TPath volume_path = clientContainer->RootPath / req.path();
     std::shared_ptr<TVolume> volume;
 
     error = TVolume::Find(volume_path, volume);
@@ -1130,7 +1130,7 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
     if (error)
         return error;
 
-    TPath container_root = clientContainer->RootPath();
+    TPath container_root = clientContainer->RootPath;
 
     if (req.has_path() && !req.path().empty()) {
         TPath volume_path = container_root / req.path();
@@ -1190,7 +1190,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = clientContainer->RootPath() / tarball;
+    tarball = clientContainer->RootPath / tarball;
 
     if (!tarball.Exists())
         return TError(EError::InvalidValue, "tarball not found");
@@ -1219,7 +1219,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = clientContainer->RootPath() / tarball;
+    tarball = clientContainer->RootPath / tarball;
 
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
