@@ -1324,9 +1324,14 @@ TError TVolume::Destroy(void) {
             auto container = TContainer::Find(name);
             containers_lock.unlock();
             volumes_lock.lock();
-            if (container)
-                container->Volumes.erase(std::find(container->Volumes.begin(),
-                            container->Volumes.end(), volume));
+            if (container) {
+                auto vol_iter = std::find(container->Volumes.begin(),
+                                          container->Volumes.end(),
+                                          volume);
+
+                if (vol_iter != container->Volumes.end())
+                    container->Volumes.erase(vol_iter);
+            }
         }
     }
 
