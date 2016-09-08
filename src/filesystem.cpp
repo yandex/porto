@@ -284,10 +284,6 @@ TError TMountNamespace::MountRootFs() {
     if (Root.IsRoot())
         return TError::Success();
 
-    error = Root.Bind(Root);
-    if (error)
-        return error;
-
     struct {
         std::string target;
         std::string type;

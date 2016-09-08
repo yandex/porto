@@ -26,6 +26,14 @@ extern "C" {
 #define FALLOC_FL_COLLAPSE_RANGE        0x08
 #endif
 
+struct FileHandle {
+    struct file_handle head;
+    char data[MAX_HANDLE_SZ];
+    FileHandle() {
+        head.handle_bytes = MAX_HANDLE_SZ;
+    }
+};
+
 std::string TPath::DirNameStr() const {
     char *dup = strdup(Path.c_str());
     PORTO_ASSERT(dup != nullptr);
@@ -164,6 +172,8 @@ TError TPath::Chdir() const {
 }
 
 TError TPath::Chroot() const {
+    L_ACT() << "chroot " << Path << std::endl;
+
     if (chroot(Path.c_str()) < 0)
         return TError(EError::Unknown, errno, "chroot(" + Path + ")");
 
@@ -175,6 +185,8 @@ TError TPath::PivotRoot() const {
     TFile oldroot, newroot;
     TError error;
 
+    L_ACT() << "pivot root " << Path << std::endl;
+
     error = oldroot.OpenDir("/");
     if (error)
         return error;
@@ -182,6 +194,16 @@ TError TPath::PivotRoot() const {
     error = newroot.OpenDir(*this);
     if (error)
         return error;
+
+    /* old and new root must be at different mounts */
+    if (oldroot.GetMountId() == newroot.GetMountId()) {
+        error = BindAll(*this);
+        if (error)
+            return error;
+        error = newroot.OpenDir(*this);
+        if (error)
+            return error;
+    }
 
     if (fchdir(newroot.Fd))
         return TError(EError::Unknown, errno, "fchdir(newroot)");
@@ -463,7 +485,7 @@ TError TPath::ClearDirectory() const {
     struct stat top_st, st;
     TError error = TError::Success();
 
-    L_ACT() << "ClearDirectory " << Path << std::endl;
+    L_ACT() << "clear directory " << Path << std::endl;
 
     top_fd = open(Path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC |
                                 O_NOFOLLOW | O_NOATIME);
@@ -505,7 +527,7 @@ restart:
         }
 
         if (Verbose)
-            L_ACT() << "ClearDirectory unlink " << de->d_name << std::endl;
+            L_ACT() << "clear directory: unlink " << de->d_name << std::endl;
         if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
             continue;
 
@@ -545,7 +567,7 @@ restart:
                 top = dir;
             dir_fd = sub_fd;
             if (Verbose)
-                L_ACT() << "ClearDirectory enter " << de->d_name << std::endl;
+                L_ACT() << "clear directory: enter " << de->d_name << std::endl;
             goto deeper;
         }
         if (errno == ENOENT)
@@ -564,7 +586,7 @@ restart:
             dir = top;
             dir_fd = top_fd;
             if (Verbose)
-                L_ACT() << "ClearDirectory restart " << Path << std::endl;
+                L_ACT() << "clear directory: restart " << Path << std::endl;
             goto restart; /* Restart from top directory */
         }
         closedir(top); /* closes top_fd */
@@ -739,13 +761,14 @@ std::string TPath::UmountFlagsToString(unsigned long flags) {
     return StringFormatFlags(flags, UmountFlags);
 }
 
-TError TPath::Mount(TPath source, std::string type, unsigned long flags,
-                    std::vector<std::string> options) const {
+TError TPath::Mount(const TPath &source, const std::string &type, unsigned long flags,
+                    const std::vector<std::string> &options) const {
     std::string data = MergeEscapeStrings(options, ',');
 
-    if (data.length() > 4096)
+    if (data.length() >= 4096)
         return TError(EError::Unknown, E2BIG, "mount option too big: " +
                       std::to_string(data.length()));
+
     L_ACT() << "mount -t " << type << " " << source << " " << Path
             << " -o " << data <<  " " << MountFlagsToString(flags) << std::endl;
     if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
@@ -754,11 +777,19 @@ TError TPath::Mount(TPath source, std::string type, unsigned long flags,
     return TError::Success();
 }
 
-TError TPath::Bind(TPath source) const {
+TError TPath::Bind(const TPath &source) const {
     L_ACT() << "bind mount " << Path << " " << source << " " << std::endl;
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND, NULL))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() +
                 ", " + Path + ", , MS_BIND, )");
+    return TError::Success();
+}
+
+TError TPath::BindAll(const TPath &source) const {
+    L_ACT() << "bind mount all " << Path << " " << source << " " << std::endl;
+    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | MS_REC, NULL))
+        return TError(EError::Unknown, errno, "mount(" + source.ToString() +
+                ", " + Path + ", , MS_BIND | MS_REC, )");
     return TError::Success();
 }
 
@@ -771,7 +802,7 @@ TError TPath::Remount(unsigned long flags) const {
     return TError::Success();
 }
 
-TError TPath::BindRemount(TPath source, unsigned long flags) const {
+TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
     TError error = Bind(source);
     if (!error)
         error = Remount(MS_REMOUNT | MS_BIND | flags);
@@ -788,7 +819,7 @@ TError TPath::Umount(unsigned long flags) const {
 }
 
 TError TPath::UmountAll() const {
-    L_ACT() << "UmountAll " << Path << " " << std::endl;
+    L_ACT() << "umount all " << Path << std::endl;
     while (1) {
         if (umount2(c_str(), UMOUNT_NOFOLLOW)) {
             if (errno == EINVAL)
@@ -1110,4 +1141,12 @@ TError TFile::Chattr(int fd, unsigned add_flags, unsigned del_flags) {
         return TError(EError::Unknown, errno, "ioctl(FS_IOC_SETFLAGS)");
 
     return TError::Success();
+}
+
+int TFile::GetMountId(void) const {
+    FileHandle fh;
+    int mnt;
+    if (name_to_handle_at(Fd, "", &fh.head, &mnt, AT_EMPTY_PATH))
+        return -1;
+    return mnt;
 }

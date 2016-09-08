@@ -167,11 +167,12 @@ public:
     TError FindMount(TMount &mount) const;
     static TError ListAllMounts(std::list<TMount> &list);
 
-    TError Mount(TPath source, std::string type, unsigned long flags,
-                 std::vector<std::string> options) const;
-    TError Bind(TPath source) const;
+    TError Mount(const TPath &source, const std::string &type, unsigned long flags,
+                 const std::vector<std::string> &options) const;
+    TError Bind(const TPath &source) const;
+    TError BindAll(const TPath &source) const;
     TError Remount(unsigned long flags) const;
-    TError BindRemount(TPath source, unsigned long flags) const;
+    TError BindRemount(const TPath &source, unsigned long flags) const;
     TError Umount(unsigned long flags) const;
     TError UmountAll() const;
 
@@ -222,4 +223,5 @@ public:
     TError ReadAll(std::string &text, size_t max) const;
     TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
+    int GetMountId(void) const;
 };
