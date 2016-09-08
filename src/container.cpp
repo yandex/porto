@@ -73,8 +73,6 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Statistics->Containers++;
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
-    MemGuarantee = 0;
-    CurrentMemGuarantee = 0;
 
     if (IsRoot() || IsPortoRoot())
         Cwd = "/";
@@ -108,16 +106,10 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     else
         NsName = "";
 
-    MemLimit = 0;
-    AnonMemLimit = 0;
-    DirtyMemLimit = 0;
-    RechargeOnPgfault = false;
     CpuPolicy = "normal";
     CpuLimit = GetNumCores();
     CpuGuarantee = 0;
     IoPolicy = "normal";
-    IoLimit = 0;
-    IopsLimit = 0;
 
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
@@ -357,53 +349,39 @@ TError TContainer::OpenNetns(TNamespaceFd &netns) const {
     return TError(EError::InvalidValue, "Cannot open netns: container not running");
 }
 
-uint64_t TContainer::GetHierarchyMemGuarantee(void) const {
-    uint64_t val = 0lu;
+uint64_t TContainer::GetTotalMemGuarantee(void) const {
+    uint64_t sum = 0lu;
 
     for (auto iter : Children)
         if (auto child = iter.lock())
-            val += child->GetHierarchyMemGuarantee();
+            sum += child->GetTotalMemGuarantee();
 
-    return (CurrentMemGuarantee > val) ? CurrentMemGuarantee : val;
+    return std::max(NewMemGuarantee, sum);
 }
 
-uint64_t TContainer::GetHierarchyMemLimit(std::shared_ptr<const TContainer> root) const {
-    uint64_t val = MemLimit;
-    std::shared_ptr<const TContainer> p = shared_from_this();
+uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
+    uint64_t lim = 0;
 
-    if (State == EContainerState::Meta) {
-        auto children_limit = 0lu;
-
-        for (auto iter : p->Children) {
-            if (auto child = iter.lock()) {
-                auto child_limit = child->GetHierarchyMemLimit(p);
-
-                if (child_limit) {
-                    children_limit += child_limit;
-                } else {
-                    children_limit = 0;
+    /* Container without load limited with total limit of childrens */
+    if (Command.empty() && VirtMode == VIRT_MODE_APP) {
+        for (auto it : Children) {
+            if (auto child = it.lock()) {
+                auto child_lim = child->GetTotalMemLimit(this);
+                if (!child_lim || child_lim > UINT64_MAX - lim) {
+                    lim = 0;
                     break;
                 }
+                lim += child_lim;
             }
         }
-
-        if (children_limit)
-            val = val > 0 ?
-                  (val > children_limit ? children_limit : val)
-                  : children_limit;
     }
 
-    while (p != root) {
-
-        if (p->MemLimit)
-            val = val > 0 ?
-                  (val > p->MemLimit ? p->MemLimit : val)
-                  : p->MemLimit;
-
-        p = p->GetParent();
+    for (auto p = this; p && p != base; p = p->Parent.get()) {
+        if (p->MemLimit && (p->MemLimit < lim || !lim))
+            lim = p->MemLimit;
     }
 
-    return val;
+    return lim;
 }
 
 vector<pid_t> TContainer::Processes() {

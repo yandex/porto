@@ -566,18 +566,16 @@ TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
     if (error)
         return error;
 
-    CurrentContainer->CurrentMemGuarantee = new_val;
+    CurrentContainer->NewMemGuarantee = new_val;
 
-    uint64_t usage = CurrentContainer->GetRoot()->GetHierarchyMemGuarantee();
     uint64_t total = GetTotalMemory();
+    uint64_t usage = CurrentContainer->GetRoot()->GetTotalMemGuarantee();
     uint64_t reserve = config().daemon().memory_guarantee_reserve();
-    if (usage + reserve > total) {
-        CurrentContainer->CurrentMemGuarantee = CurrentContainer->MemGuarantee;
 
-        return TError(EError::ResourceNotAvailable,
-                "can't guarantee all available memory: requested " +
-                std::to_string(new_val) + " (will be " + std::to_string(usage) +
-                " of " + std::to_string(total) + ", reserve " + std::to_string(reserve) + ")");
+    if (usage + reserve > total) {
+        CurrentContainer->NewMemGuarantee = CurrentContainer->MemGuarantee;
+        int64_t left = total - reserve - CurrentContainer->GetRoot()->GetTotalMemGuarantee();
+        return TError(EError::ResourceNotAvailable, "Only " + std::to_string(left) + " bytes left");
     }
 
     if (CurrentContainer->MemGuarantee != new_val) {
@@ -596,7 +594,6 @@ TError TMemoryGuarantee::Get(std::string &value) {
 
 class TMemTotalGuarantee : public TProperty {
 public:
-    TError Get(std::string &value);
     TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, EProperty::NONE,
                                      "Total amount of memory "
                                      "guaranteed for porto "
@@ -606,14 +603,11 @@ public:
     void Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
     }
+    TError Get(std::string &value) {
+        value = std::to_string(CurrentContainer->GetTotalMemGuarantee());
+        return TError::Success();
+    }
 } static MemTotalGuarantee;
-
-TError TMemTotalGuarantee::Get(std::string &value) {
-    uint64_t total = CurrentContainer->GetHierarchyMemGuarantee();
-    value = std::to_string(total);
-
-    return TError::Success();
-}
 
 class TCommand : public TProperty {
 public:
@@ -2787,19 +2781,16 @@ public:
 
 class TMemTotalLimit : public TProperty {
 public:
-    TError Get(std::string &value);
     TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, EProperty::NONE,
                                  "Total memory limit for container "
                                  "in hierarchy") {
         IsReadOnly = true;
     }
+    TError Get(std::string &value) {
+       value = std::to_string(CurrentContainer->GetTotalMemLimit());
+       return TError::Success();
+    }
 } static MemTotalLimit;
-
-TError TMemTotalLimit::Get(std::string &value) {
-    value = std::to_string(CurrentContainer->GetHierarchyMemLimit(nullptr));
-
-    return TError::Success();
-}
 
 void InitContainerProperties(void) {
     for (auto prop: ContainerProperties)

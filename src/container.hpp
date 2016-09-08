@@ -103,8 +103,6 @@ public:
     bool PropSet[(int)EProperty::NR_PROPERTIES];
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
     TCred OwnerCred;
-    uint64_t MemGuarantee;
-    uint64_t CurrentMemGuarantee;
     std::string Command;
     std::string Cwd;
     TStdStream Stdin, Stdout, Stderr;
@@ -132,19 +130,27 @@ public:
     uint64_t DeathTime;
     std::map<int, struct rlimit> Rlimit;
     std::string NsName;
-    uint64_t MemLimit;
-    uint64_t AnonMemLimit;
-    uint64_t DirtyMemLimit;
-    bool RechargeOnPgfault;
+
+    uint64_t MemLimit = 0;
+    uint64_t MemGuarantee = 0;
+    uint64_t NewMemGuarantee = 0;
+    uint64_t AnonMemLimit = 0;
+    uint64_t DirtyMemLimit = 0;
+
+    bool RechargeOnPgfault = false;
+
+    std::string IoPolicy;
+    uint64_t IoLimit = 0;
+    uint64_t IopsLimit = 0;
+
     std::string CpuPolicy;
     double CpuLimit;
     double CpuGuarantee;
-    std::string IoPolicy;
-    uint64_t IoLimit;
-    uint64_t IopsLimit;
+
     TUintMap NetGuarantee;
     TUintMap NetLimit;
     TUintMap NetPriority;
+
     bool ToRespawn;
     int MaxRespawns;
     uint64_t RespawnCount;
@@ -215,8 +221,8 @@ public:
     const int GetId() const { return Id; }
     const int GetLevel() const { return Level; }
 
-    uint64_t GetHierarchyMemGuarantee(void) const;
-    uint64_t GetHierarchyMemLimit(std::shared_ptr<const TContainer> root) const;
+    uint64_t GetTotalMemGuarantee(void) const;
+    uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
 
     bool IsRoot() const;
     bool IsPortoRoot() const;

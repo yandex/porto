@@ -3784,14 +3784,14 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     ExpectApiSuccess(api.Create(system));
     ExpectApiSuccess(api.Create(monit));
 
-    size_t total = GetTotalMemory();
+    auto total = GetTotalMemory();
 
     Say() << "Single container can't go over reserve" << std::endl;
     ExpectApiFailure(api.SetProperty(system, "memory_guarantee", std::to_string(total)), EError::ResourceNotAvailable);
     ExpectApiSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(total - config().daemon().memory_guarantee_reserve())));
 
     Say() << "Distributed guarantee can't go over reserve" << std::endl;
-    size_t chunk = (total - config().daemon().memory_guarantee_reserve()) / 4;
+    auto chunk = (total - config().daemon().memory_guarantee_reserve()) / 4;
 
     ExpectApiSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(chunk)));
     ExpectApiSuccess(api.SetProperty(monit, "memory_guarantee", std::to_string(chunk)));

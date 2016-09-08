@@ -95,20 +95,17 @@ verify(d)
 print "Setting limit for a/b3/c2"
 c.SetProperty("a/b3/c2","memory_limit", "55M")
 d["a/b3/c2"] = "57671680"
-verify(d)
-
-print "Starting a/b3/c2/d1"
-c.Start("a/b3/c2/d1")
 d["a/b3"] = "191889408"
 d["a"] = "233832448"
 d["/"] = "233832448"
 verify(d)
 
+print "Starting a/b3/c2/d1"
+c.Start("a/b3/c2/d1")
+verify(d)
+
 print "Stopping a/b3"
 c.Stop("a/b3")
-d["a/b3"] = "0"
-d["a"] = "0"
-d["/"] = "0"
 verify(d)
 
 cleanup()

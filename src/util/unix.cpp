@@ -156,12 +156,11 @@ bool WaitDeadline(uint64_t deadline, uint64_t wait) {
     return false;
 }
 
-size_t GetTotalMemory() {
+uint64_t GetTotalMemory() {
     struct sysinfo si;
     if (sysinfo(&si) < 0)
         return 0;
-
-    return si.totalram;
+    return (uint64_t)si.totalram * si.mem_unit;
 }
 
 static __thread std::string *processName;
