@@ -727,6 +727,8 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 
     taskEnv->Mnt.RootRdOnly = RootRo;
 
+    taskEnv->Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
+
     taskEnv->Mnt.OwnerCred = OwnerCred;
 
     if (VirtMode == VIRT_MODE_OS) {

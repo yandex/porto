@@ -196,7 +196,7 @@ TError TMountNamespace::MountRun() {
     if (!error)
         error = run.Mount("tmpfs", "tmpfs",
                 MS_NOSUID | MS_NODEV | MS_STRICTATIME,
-                { "mode=755", "size=32m"});
+                { "mode=755", "size=" + std::to_string(RunSize) });
     if (error)
         return error;
 
@@ -249,7 +249,7 @@ TError TMountNamespace::MountTraceFs() {
         TPath tmp = debugfs / "tmp";
         TPath tmp_tracefs = tmp / "tracing";
         TPath tracefs = debugfs / "tracing";
-        error = debugfs.Mount("none", "tmpfs", 0, {"mode=755"});
+        error = debugfs.Mount("none", "tmpfs", 0, {"mode=755", "size=0"});
         if (!error)
             error = tracefs.Mkdir(0700);
         if (!error)
@@ -291,7 +291,7 @@ TError TMountNamespace::MountRootFs() {
         std::vector<std::string> opts;
     } mounts[] = {
         { "/dev", "tmpfs", MS_NOSUID | MS_STRICTATIME,
-            { "mode=755", "size=32m" } },
+            { "mode=755", "size=" + std::to_string(config().container().dev_size()) }},
         { "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
             { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5",
               "max=" + std::to_string(config().container().devpts_max()) }},
