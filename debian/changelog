@@ -1,3 +1,9 @@
+yandex-porto (2.10.10) unstable; urgency=low
+
+  * porto: thaw container if freeze failed
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 09 Sep 2016 14:48:11 +0300
+
 yandex-porto (2.10.9) unstable; urgency=low
 
   * porto: serialize layers import and remove
