@@ -1002,6 +1002,7 @@ TError TContainer::Freeze(TScopedLock &holder_lock) {
         TScopedUnlock unlock(holder_lock);
         error = FreezerSubsystem.WaitForFreeze(cg);
         if (error) {
+            (void)FreezerSubsystem.Unfreeze(cg);
             L_ERR() << "Can't wait for freeze container: " << error << std::endl;
             return error;
         }
@@ -1082,6 +1083,11 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
                         config().container().kill_timeout_ms()) || ret)
             L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
     }
+
+    // try to shoot without freeze
+    (void)SendSignal(SIGKILL);
+    (void)SendSignal(SIGKILL);
+    (void)SendSignal(SIGKILL);
 
     TError error = Freeze(holder_lock);
     if (error)
