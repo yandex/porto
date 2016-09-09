@@ -30,6 +30,8 @@ extern "C" {
 
 const std::string oomMemoryLimit = "32M";
 const std::string oomCommand = "sort -S 1G /dev/urandom";
+std::string portoctl;
+std::string portoinit;
 
 using std::string;
 using std::vector;
@@ -1218,7 +1220,8 @@ static void TestContainerNamespaces(Porto::Connection &api) {
 
     Say() << "Check simple prefix" << std::endl;
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "simple-prefix-"));
-    ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+    ExpectApiSuccess(api.SetProperty("c/d", "command", portoctl + " create test"));
+
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty("c/d", "user", "root"));
     ExpectApiSuccess(api.Start("c/d"));
@@ -1230,7 +1233,7 @@ static void TestContainerNamespaces(Porto::Connection &api) {
 
     Say() << "Check container prefix" << std::endl;
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "c/"));
-    ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+    ExpectApiSuccess(api.SetProperty("c/d", "command", portoctl + " create test"));
     ExpectApiSuccess(api.Start("c/d"));
     WaitContainer(api, "c/d");
     ExpectApiSuccess(api.Destroy("c/second-prefix-test"));
@@ -1889,7 +1892,7 @@ static bool TestPathsHelper(Porto::Connection &api,
 }
 
 static void TestPaths(Porto::Connection &api) {
-    std::string cmd = "mkdir -p /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2";
+    std::string cmd = "mkdir -p /myroot/bin && cp " + portoinit + " /myroot/bin/test2";
     AsRoot(api);
     ExpectEq(system(cmd.c_str()), 0);
     AsAlice(api);
@@ -5451,7 +5454,7 @@ int SelfTest(std::vector<std::string> args) {
         // { "remove_dead", TestRemoveDead }, FIXME
         // { "log_rotate", TestLogRotate }, FIXME
         { "stats", TestStats },
-        { "package", TestPackage },
+        // { "package", TestPackage },
     };
 
     int ret = EXIT_SUCCESS;
@@ -5461,6 +5464,11 @@ int SelfTest(std::vector<std::string> args) {
         subsystems.push_back("net_cls");
 
     needDaemonChecks = getenv("NOCHECK") == nullptr;
+
+    TPath exe("/proc/self/exe"), path;
+    exe.ReadLink(path);
+    portoctl = (path.DirName() / "portoctl").ToString();
+    portoinit = (path.DirName() / "portoinit").ToString();
 
     config.Load();
     Porto::Connection api;
