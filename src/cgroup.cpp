@@ -421,7 +421,10 @@ TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
     TError error = cg.Set("freezer.state", "FROZEN");
     if (error)
         return error;
-    return WaitState(cg, "FROZEN");
+    error = WaitState(cg, "FROZEN");
+    if (error)
+        (void)cg.Set("freezer.state", "THAWED");
+    return error;
 }
 
 TError TFreezerSubsystem::Thaw(TCgroup &cg, bool wait) const {
