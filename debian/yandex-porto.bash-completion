@@ -77,7 +77,7 @@ _portoctl ()
 		*)
 			COMPREPLY=( $( compgen -W "-M -l -L -B -S -o -O -k" -- "$cur" ) )
 			compopt -o filenames
-			COMPREPLY+=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
+			COMPREPLY+=( $( compgen -S "=" -W "$_porto_properies $_porto_volume_properies" -- "$cur" ) )
 			compopt -o nospace
 			;;
 		esac
@@ -199,15 +199,30 @@ _portoctl ()
 		esac
 		;;
 	layer)
-		case "$cword" in
-		2)
-			COMPREPLY=( $( compgen -W "-I -M -R -L" -- "$cur" ) )
-			;;
-		3)
-			COMPREPLY=( $( compgen -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
-			;;
-		4)
+		case "$prev" in
+		-P)
 			_filedir
+			;;
+		-E)
+			_porto_volumes
+			;;
+		-F)
+			;;
+		-I|-M|-R)
+			if [ "$cword" -eq "5" ] ; then
+				COMPREPLY=( $( compgen -W "$(portoctl layer -P ${words[3]} -L 2>/dev/null)" -- "$cur" ) )
+			else
+				COMPREPLY=( $( compgen -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
+			fi
+			;;
+		*)
+			if [ "$cword" -eq "2" ] ; then
+				COMPREPLY=( $( compgen -W "-P -I -M -R -L -F -E" -- "$cur" ) )
+			elif [ "$cword" -eq "4" ] && [ "x${words[2]}" = "x-P" ] ; then
+				COMPREPLY=( $( compgen -W "-I -M -R -L -F" -- "$cur" ) )
+			else
+				_filedir
+			fi
 			;;
 		esac
 		;;
