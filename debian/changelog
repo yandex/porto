@@ -1,3 +1,11 @@
+yandex-porto (2.10.9) unstable; urgency=low
+
+  * porto: serialize layers import and remove
+  * bash-completion: update completion for layers
+  * test: use portoctl from current directory
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 09 Sep 2016 10:04:37 +0300
+
 yandex-porto (2.10.8) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
