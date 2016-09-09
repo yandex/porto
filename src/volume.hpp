@@ -175,3 +175,9 @@ public:
     bool LayerInUse(const TPath &layer);
     TError RemoveLayer(const std::string &name, const TPath &place);
 };
+
+extern std::mutex LayersMutex;
+
+static inline std::unique_lock<std::mutex> LockLayers() {
+    return std::unique_lock<std::mutex>(LayersMutex);
+}

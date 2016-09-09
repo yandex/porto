@@ -1338,6 +1338,8 @@ noinline TError ImportLayer(TContext &context,
 
     /* layers_tmp should already be created on startup */
 
+    auto layers_lock = LockLayers();
+
     auto vholder_lock = context.Vholder->ScopedLock();
     if (layer.Exists()) {
         if (!req.merge()) {

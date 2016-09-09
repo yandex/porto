@@ -21,6 +21,7 @@ extern "C" {
 #include <linux/falloc.h>
 }
 
+std::mutex LayersMutex;
 
 /* TVolumeBackend - abstract */
 
@@ -1691,6 +1692,8 @@ TError TVolumeHolder::RemoveLayer(const std::string &name, const TPath &place) {
     /* layers_tmp should already be created on startup */
     TPath layers_tmp = layers / "_tmp_";
     TPath layer_tmp = layers_tmp / name;
+
+    auto layers_lock = LockLayers();
 
     auto lock = ScopedLock();
     if (LayerInUse(layer))
