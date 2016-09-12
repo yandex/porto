@@ -241,13 +241,16 @@ TError TContainerHolder::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer
     if (error)
         return error;
 
+    std::string prefix = std::string(PORTO_CGROUP_PREFIX) + "/";
+    std::string name = freezerCg.Name;
+    std::replace(name.begin(), name.end(), '%', '/');
+
     auto containers_lock = LockContainers();
 
-    auto prefix = std::string(PORTO_ROOT_CGROUP) + "/";
-    if (freezerCg.Name.substr(0, prefix.length()) != prefix)
+    if (!StringStartsWith(name, prefix))
         return TContainer::Find(ROOT_CONTAINER, c);
 
-    return TContainer::Find(freezerCg.Name.substr(prefix.length()), c);
+    return TContainer::Find(name.substr(prefix.length()), c);
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
@@ -333,6 +336,13 @@ bool TContainerHolder::RestoreFromStorage() {
 }
 
 TError TContainerHolder::Restore(TScopedLock &holder_lock, TKeyValue &node) {
+
+    if (node.Name == PORTO_ROOT_CONTAINER && !node.Has(P_CONTROLLERS)) {
+        auto ct = Containers[PORTO_ROOT_CONTAINER];
+        ct->Controllers = ct->Parent->Controllers;
+        config().mutable_container()->set_all_controllers(true);
+    }
+
     if (node.Name == ROOT_CONTAINER || node.Name == PORTO_ROOT_CONTAINER)
         return TError::Success();
 
@@ -371,26 +381,39 @@ void TContainerHolder::RemoveLeftovers() {
     for (auto hy: Hierarchies) {
         std::vector<TCgroup> cgroups;
 
-        error = hy->Cgroup(PORTO_ROOT_CGROUP).ChildsAll(cgroups);
+        error = hy->RootCgroup().ChildsAll(cgroups);
         if (error)
             L_ERR() << "Cannot dump porto " << hy->Type << " cgroups : "
                     << error << std::endl;
 
-        for (auto &cg: cgroups) {
-            std::string name = cg.Name.substr(strlen(PORTO_ROOT_CGROUP) + 1);
-            if (Containers.count(name))
+        for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); ++cg) {
+            if (!StringStartsWith(cg->Name, PORTO_CGROUP_PREFIX))
                 continue;
 
-            if (!cg.IsEmpty())
-                (void)cg.KillAll(9);
+            if (cg->Name == PORTO_DAEMON_CGROUP &&
+                    (hy->Controllers & (CGROUP_MEMORY | CGROUP_CPUACCT)))
+                continue;
 
-            if (hy == &FreezerSubsystem && FreezerSubsystem.IsFrozen(cg)) {
-                (void)FreezerSubsystem.Thaw(cg);
-                if (FreezerSubsystem.IsParentFreezing(cg))
+            bool found = false;
+            for (auto &it: Containers) {
+                if (it.second->GetCgroup(*hy) == *cg) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+                continue;
+
+            if (!cg->IsEmpty())
+                (void)cg->KillAll(9);
+
+            if (hy == &FreezerSubsystem && FreezerSubsystem.IsFrozen(*cg)) {
+                (void)FreezerSubsystem.Thaw(*cg);
+                if (FreezerSubsystem.IsParentFreezing(*cg))
                     continue;
             }
 
-            (void)cg.Remove();
+            (void)cg->Remove();
         }
     }
 

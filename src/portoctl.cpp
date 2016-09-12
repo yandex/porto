@@ -1222,13 +1222,13 @@ public:
         }
 
         auto freezer = cgmap["freezer"];
-        auto prefix = std::string(PORTO_ROOT_CGROUP) + "/";
-        if (freezer.length() < prefix.length() || freezer.substr(0, prefix.length()) != prefix) {
+        if (!StringStartsWith(freezer, PORTO_CGROUP_PREFIX)) {
             std::cerr << "Process " << pid << " is not managed by porto" << std::endl;
             return EXIT_FAILURE;
         }
 
-        Print(freezer.replace(0, prefix.length(), ""));
+        std::replace(freezer.begin(), freezer.end(), '%', '/');
+        Print(freezer.substr(strlen(PORTO_CGROUP_PREFIX + 1)));
 
         return EXIT_SUCCESS;
     }

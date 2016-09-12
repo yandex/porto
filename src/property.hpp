@@ -59,6 +59,7 @@ constexpr const char *P_RESOLV_CONF = "resolv_conf";
 constexpr const char *P_WEAK = "weak";
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 constexpr const char *P_UMASK = "umask";
+constexpr const char *P_CONTROLLERS = "controllers";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
@@ -95,6 +96,7 @@ constexpr const char *D_IO_OPS = "io_ops";
 constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 constexpr const char *D_MEM_TOTAL_LIMIT = "memory_limit_total";
+constexpr const char *D_CGROUPS = "cgroups";
 
 enum class EProperty {
     NONE,
@@ -153,6 +155,7 @@ enum class EProperty {
     EXIT_STATUS,
     CAPABILITIES_AMBIENT,
     UMASK,
+    CONTROLLERS,
     NR_PROPERTIES,
 };
 
@@ -174,7 +177,7 @@ public:
     TError IsAlive(void);
     TError IsDead(void);
     TError IsRunning(void);
-
+    TError WantControllers(uint64_t controllers) const;
     TProperty(std::string name, EProperty prop, std::string desc);
 
     virtual void Init(void) {}

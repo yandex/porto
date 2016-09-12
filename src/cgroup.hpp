@@ -8,13 +8,25 @@
 struct TDevice;
 class TCgroup;
 
+#define CGROUP_FREEZER  0x0001ull
+#define CGROUP_MEMORY   0x0002ull
+#define CGROUP_CPU      0x0004ull
+#define CGROUP_CPUACCT  0x0008ull
+#define CGROUP_NETCLS   0x0010ull
+#define CGROUP_BLKIO    0x0020ull
+#define CGROUP_DEVICES  0x0040ull
+
+extern const TFlagsNames ControllersName;
+
 class TSubsystem {
 public:
+    const uint64_t Kind;
+    uint64_t Controllers;
     const std::string Type;
     const TSubsystem *Hierarchy;
     TPath Root;
 
-    TSubsystem(const std::string &type) : Type(type) { }
+    TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
     virtual void InitializeSubsystem() { }
 
     TCgroup RootCgroup() const;
@@ -113,7 +125,7 @@ public:
     const std::string ANON_LIMIT = "memory.anon.limit";
     const std::string FAIL_CNT = "memory.failcnt";
 
-    TMemorySubsystem() : TSubsystem("memory") {}
+    TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
 
     TError Statistics(TCgroup &cg, TUintMap &stat) const {
         return cg.GetUintMap(STAT, stat);
@@ -180,7 +192,7 @@ public:
 
 class TFreezerSubsystem : public TSubsystem {
 public:
-    TFreezerSubsystem() : TSubsystem("freezer") {}
+    TFreezerSubsystem() : TSubsystem(CGROUP_FREEZER, "freezer") {}
 
     TError WaitState(TCgroup &cg, const std::string &state) const;
     TError Freeze(TCgroup &cg) const;
@@ -194,7 +206,7 @@ class TCpuSubsystem : public TSubsystem {
 public:
     bool HasShares, HasQuota, HasSmart, HasReserve;
     uint64_t BasePeriod, BaseShares;
-    TCpuSubsystem() : TSubsystem("cpu") { }
+    TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;
     TError SetCpuPolicy(TCgroup &cg, const std::string &policy,
                         double guarantee, double limit);
@@ -202,14 +214,14 @@ public:
 
 class TCpuacctSubsystem : public TSubsystem {
 public:
-    TCpuacctSubsystem() : TSubsystem("cpuacct") {}
+    TCpuacctSubsystem() : TSubsystem(CGROUP_CPUACCT, "cpuacct") {}
     TError Usage(TCgroup &cg, uint64_t &value) const;
     TError SystemUsage(TCgroup &cg, uint64_t &value) const;
 };
 
 class TNetclsSubsystem : public TSubsystem {
 public:
-    TNetclsSubsystem() : TSubsystem("net_cls") {}
+    TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
 };
 
 struct BlkioStat {
@@ -228,7 +240,7 @@ class TBlkioSubsystem : public TSubsystem {
     TError GetDevice(const std::string &majmin,
                      std::string &device) const;
 public:
-    TBlkioSubsystem() : TSubsystem("blkio") {}
+    TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
     TError Statistics(TCgroup &cg,
                       const std::string &file,
                       std::vector<BlkioStat> &stat) const;
@@ -238,7 +250,7 @@ public:
 
 class TDevicesSubsystem : public TSubsystem {
 public:
-    TDevicesSubsystem() : TSubsystem("devices") {}
+    TDevicesSubsystem() : TSubsystem(CGROUP_DEVICES, "devices") {}
     TError ApplyDefault(TCgroup &cg);
     TError ApplyDevice(TCgroup &cg, const TDevice &device);
 };

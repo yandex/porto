@@ -111,6 +111,15 @@ TError TProperty::IsRunning(void) {
     return TError::Success();
 }
 
+TError TProperty::WantControllers(uint64_t controllers) const {
+    if (CurrentContainer->GetState() == EContainerState::Stopped) {
+        CurrentContainer->Controllers |= controllers;
+        CurrentContainer->RequiredControllers |= controllers;
+    } else if ((CurrentContainer->Controllers & controllers) != controllers)
+        return TError(EError::NotSupported, "Cannot enable controllers in runtime");
+    return TError::Success();
+}
+
 class TCapLimit : public TProperty {
 public:
     TCapLimit() : TProperty(P_CAPABILITIES, EProperty::CAPABILITIES,
@@ -419,6 +428,10 @@ TError TCpuPolicy::Set(const std::string &policy) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_CPU);
+    if (error)
+        return error;
+
     if (policy != "normal" && policy != "rt" && policy != "idle")
         return TError(EError::InvalidValue, "invalid policy: " + policy);
 
@@ -449,6 +462,10 @@ public:
 
 TError TIoPolicy::Set(const std::string &policy) {
     TError error = IsAlive();
+    if (error)
+        return error;
+
+    error = WantControllers(CGROUP_BLKIO);
     if (error)
         return error;
 
@@ -558,6 +575,10 @@ public:
 
 TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
     TError error = IsAlive();
+    if (error)
+        return error;
+
+    error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -935,6 +956,10 @@ TError TNet::Set(const std::string &net_desc) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_NETCLS);
+    if (error)
+        return error;
+
     std::vector<std::string> new_net_desc;
     SplitEscapedString(net_desc, new_net_desc, ';');
 
@@ -1003,6 +1028,80 @@ public:
         return TError::Success();
     }
 } static Umask;
+
+class TControllers : public TProperty {
+public:
+    TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS, "Cgroup controllers") { }
+    TError Get(std::string &value) {
+        value = StringFormatFlags(CurrentContainer->Controllers, ControllersName, "; ");
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        uint64_t val;
+        error = StringParseFlags(value, ControllersName, val, ';');
+        if (error)
+            return error;
+        if ((val & CurrentContainer->RequiredControllers) != CurrentContainer->RequiredControllers)
+            return TError(EError::InvalidValue, "Cannot disable required controllers");
+        CurrentContainer->Controllers = val;
+        CurrentContainer->SetProp(EProperty::CONTROLLERS);
+        return TError::Success();
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        uint64_t val;
+        TError error = StringParseFlags(index, ControllersName, val, ';');
+        if (error)
+            return error;
+        value = BoolToString((CurrentContainer->Controllers & val) == val);
+        return TError::Success();
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        uint64_t val;
+        bool enable;
+        TError error = StringParseFlags(index, ControllersName, val, ';');
+        if (error)
+            return error;
+        error = StringToBool(value, enable);
+        if (error)
+            return error;
+        if (enable)
+            val = CurrentContainer->Controllers | val;
+        else
+            val = CurrentContainer->Controllers & ~val;
+        if ((val & CurrentContainer->RequiredControllers) != CurrentContainer->RequiredControllers)
+            return TError(EError::InvalidValue, "Cannot disable required controllers");
+        CurrentContainer->Controllers = val;
+        CurrentContainer->SetProp(EProperty::CONTROLLERS);
+        return TError::Success();
+    }
+} static Controllers;
+
+class TCgroups : public TProperty {
+public:
+    TCgroups() : TProperty(D_CGROUPS, EProperty::NONE, "Cgroups") {
+        IsReadOnly = true;
+        IsHidden = true;
+    }
+    TError Get(std::string &value) {
+        TStringMap map;
+        for (auto &subsys: Subsystems)
+            map[subsys->Type] = CurrentContainer->GetCgroup(*subsys).Path().ToString();
+        value = StringMapToString(map);
+        return TError::Success();
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        for (auto &subsys: Subsystems) {
+            if (subsys->Type != index)
+                continue;
+            value = CurrentContainer->GetCgroup(*subsys).Path().ToString();
+            return TError::Success();
+        }
+        return TError(EError::InvalidProperty, "Unknown cgroup subststem: " + index);
+    }
+} static Cgroups;
 
 class THostname : public TProperty {
 public:
@@ -1249,28 +1348,28 @@ TError TResolvConf::Get(std::string &value) {
 
 class TDevices : public TProperty {
 public:
-    TError Set(const std::string &dev);
-    TError Get(std::string &value);
     TDevices() : TProperty(P_DEVICES, EProperty::DEVICES,
                                    "Devices that container can access: "
                                    "<device> [r][w][m][-] [name] [mode] "
                                    "[user] [group]; ...") {}
+    TError Get(std::string &value) {
+        value = MergeEscapeStrings(CurrentContainer->Devices, ';');
+        return TError::Success();
+    }
+    TError Set(const std::string &dev) {
+        TError error = WantControllers(CGROUP_DEVICES);
+        if (error)
+            return error;
+
+        std::vector<std::string> dev_list;
+
+        SplitEscapedString(dev, dev_list, ';');
+        CurrentContainer->Devices = dev_list;
+        CurrentContainer->SetProp(EProperty::DEVICES);
+
+        return TError::Success();
+    }
 } static Devices;
-
-TError TDevices::Set(const std::string &dev_str) {
-    std::vector<std::string> dev_list;
-
-    SplitEscapedString(dev_str, dev_list, ';');
-    CurrentContainer->Devices = dev_list;
-    CurrentContainer->SetProp(EProperty::DEVICES);
-
-    return TError::Success();
-}
-
-TError TDevices::Get(std::string &value) {
-    value = MergeEscapeStrings(CurrentContainer->Devices, ';');
-    return TError::Success();
-}
 
 class TRawRootPid : public TProperty {
 public:
@@ -1396,6 +1495,10 @@ TError TMemoryLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_MEMORY);
+    if (error)
+        return error;
+
     uint64_t new_size = 0lu;
     error = StringToSize(limit, new_size);
     if (error)
@@ -1432,6 +1535,10 @@ TError TAnonLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_MEMORY);
+    if (error)
+        return error;
+
     uint64_t new_size = 0lu;
     error = StringToSize(limit, new_size);
     if (error)
@@ -1465,6 +1572,10 @@ public:
 
 TError TDirtyLimit::Set(const std::string &limit) {
     TError error = IsAlive();
+    if (error)
+        return error;
+
+    error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -1505,6 +1616,10 @@ TError TRechargeOnPgfault::Set(const std::string &recharge) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_MEMORY);
+    if (error)
+        return error;
+
     bool new_val;
     if (recharge == "true")
         new_val = true;
@@ -1541,6 +1656,10 @@ TError TCpuLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_CPU);
+    if (error)
+        return error;
+
     double new_limit;
     error = StringToCpuValue(limit, new_limit);
     if (error)
@@ -1571,6 +1690,10 @@ public:
 
 TError TCpuGuarantee::Set(const std::string &guarantee) {
     TError error = IsAlive();
+    if (error)
+        return error;
+
+    error = WantControllers(CGROUP_CPU);
     if (error)
         return error;
 
@@ -1610,6 +1733,10 @@ TError TIoLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_MEMORY);
+    if (error)
+        return error;
+
     uint64_t new_limit = 0lu;
     error = StringToSize(limit, new_limit);
     if (error)
@@ -1646,6 +1773,10 @@ TError TIopsLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_MEMORY);
+    if (error)
+        return error;
+
     uint64_t new_limit = 0lu;
     error = StringToSize(limit, new_limit);
     if (error)
@@ -1679,6 +1810,10 @@ public:
 
 TError TNetGuarantee::Set(const std::string &guarantee) {
     TError error = IsAlive();
+    if (error)
+        return error;
+
+    error = WantControllers(CGROUP_NETCLS);
     if (error)
         return error;
 
@@ -1747,6 +1882,10 @@ TError TNetLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    error = WantControllers(CGROUP_NETCLS);
+    if (error)
+        return error;
+
     TUintMap new_limit;
     error = StringToUintMap(limit, new_limit);
     if (error)
@@ -1810,6 +1949,10 @@ public:
 
 TError TNetPriority::Set(const std::string &prio) {
     TError error = IsAlive();
+    if (error)
+        return error;
+
+    error = WantControllers(CGROUP_NETCLS);
     if (error)
         return error;
 

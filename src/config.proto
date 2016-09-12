@@ -95,6 +95,7 @@ message TCfg {
 		optional uint64 stdout_limit_max = 21;
 		optional uint32 devpts_max = 22;
 		optional uint64 dev_size = 23;
+		optional bool all_controllers = 24;
 	}
 
 	message TPrivilegesCfg {

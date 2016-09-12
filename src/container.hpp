@@ -102,6 +102,7 @@ public:
     const std::shared_ptr<TContainer> Parent;
     bool PropSet[(int)EProperty::NR_PROPERTIES];
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
+    uint64_t Controllers, RequiredControllers;
     TCred OwnerCred;
     std::string Command;
     std::string Cwd;
@@ -237,7 +238,6 @@ public:
     uint32_t GetTrafficClass() const;
 
     pid_t GetPidFor(pid_t pid) const;
-    std::vector<pid_t> Processes();
 
     void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);

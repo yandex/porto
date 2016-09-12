@@ -83,22 +83,18 @@ static void RemakeDir(Porto::Connection &api, const TPath &path) {
     ExpectSuccess(path.MkdirAll(0755));
 }
 
-static void ExpectCorrectCgroups(const string &pid, const string &name) {
+static void ExpectCorrectCgroups(const string &pid, const string &name, const string &name2) {
     auto cgmap = GetCgroups(pid);
-    int expected = subsystems.size();
 
-    for (auto kv : cgmap) {
-        vector<string> cgsubsystems;
-        ExpectSuccess(SplitString(kv.first, ',', cgsubsystems));
-
-        for (auto &subsys : subsystems) {
-            if (std::find(cgsubsystems.begin(), cgsubsystems.end(), subsys) != cgsubsystems.end()) {
-                ExpectEq(kv.second, "/porto/" + name);
-                expected--;
-            }
-        }
+    for (auto &subsys : subsystems) {
+        if (config().container().all_controllers())
+            ExpectEq(cgmap[subsys], "/porto/" + name);
+        else if (subsys == "freezer" ||
+                (subsys == "cpuacct" && cgmap["cpuacct"] != cgmap["cpu"]))
+            ExpectEq(cgmap[subsys], "/porto%" + name);
+        else
+            ExpectEq(cgmap[subsys], "/porto%" + name2);
     }
-    ExpectEq(expected, 0);
 }
 
 static void ShouldHaveOnlyRoot(Porto::Connection &api) {
@@ -511,10 +507,12 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("a", "state", v));
     ExpectEq(v, "meta");
     ExpectNeq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), customLimit);
-    ExpectNeq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
+    if (config().container().all_controllers())
+        ExpectNeq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
     ExpectNeq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
     ExpectApiSuccess(api.Stop("a/b/c"));
-    ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
+    if (config().container().all_controllers())
+        ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
     ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
 
     ExpectApiSuccess(api.Start("a/b/c"));
@@ -590,8 +588,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
     ExpectEq(state, "running");
     ExpectEq(CgExists("memory", "a"), true);
-    ExpectEq(CgExists("memory", "a/b"), true);
-    ExpectEq(CgExists("memory", "a/b/c"), true);
+    ExpectEq(CgExists("memory", "a/b"), config().container().all_controllers());
+    ExpectEq(CgExists("memory", "a/b/c"), config().container().all_controllers());
 
     ExpectApiSuccess(api.Stop("a/b"));
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
@@ -608,13 +606,15 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Start("a/b"));
     ExpectApiSuccess(api.Start("a/b/c"));
     ExpectEq(CgExists("memory", "a"), true);
-    ExpectEq(CgExists("memory", "a/b"), true);
-    ExpectEq(CgExists("memory", "a/b/c"), true);
+    ExpectEq(CgExists("memory", "a/b"), config().container().all_controllers());
+    ExpectEq(CgExists("memory", "a/b/c"), config().container().all_controllers());
 
     if (NetworkEnabled()) {
         ExpectTclass("a", true);
-        ExpectTclass("a/b", true);
-        ExpectTclass("a/b/c", true);
+        if (config().container().all_controllers()) {
+            ExpectTclass("a/b", true);
+            ExpectTclass("a/b/c", true);
+        }
     }
 
     WaitContainer(api, "a/b");
@@ -623,8 +623,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
     ExpectEq(state, "dead");
     ExpectEq(CgExists("memory", "a"), true);
-    ExpectEq(CgExists("memory", "a/b"), true);
-    ExpectEq(CgExists("memory", "a/b/c"), true);
+    ExpectEq(CgExists("memory", "a/b"), config().container().all_controllers());
+    ExpectEq(CgExists("memory", "a/b/c"), config().container().all_controllers());
 
     ExpectApiSuccess(api.Destroy("a/b/c"));
     ExpectApiSuccess(api.Destroy("a/b"));
@@ -925,7 +925,7 @@ static void TestNsCgTc(Porto::Connection &api) {
     ExpectNeq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
 
     Say() << "Check that task cgroups are correct" << std::endl;
-    ExpectCorrectCgroups(pid, name);
+    ExpectCorrectCgroups(pid, name, name);
     AsAlice(api);
 
     string root_cls;
@@ -966,12 +966,12 @@ static void TestNsCgTc(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    ExpectCorrectCgroups(pid, name);
+    ExpectCorrectCgroups(pid, name, name);
 
     ExpectApiSuccess(api.SetProperty(child, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(child));
     ExpectApiSuccess(api.GetData(child, "root_pid", pid));
-    ExpectCorrectCgroups(pid, child);
+    ExpectCorrectCgroups(pid, child, name);
 
     string parent;
     ExpectApiSuccess(api.GetData(child, "parent", parent));
@@ -2989,6 +2989,7 @@ static void TestRoot(Porto::Connection &api) {
         Expect(found);
     }
 
+#if 0
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectApiSuccess(api.GetData(porto_root, "cpu_usage", v));
     ExpectApiSuccess(api.GetData(porto_root, "memory_usage", v));
@@ -3009,7 +3010,7 @@ static void TestRoot(Porto::Connection &api) {
         TestDataMap(api, porto_root, "io_read", 2);
         TestDataMap(api, porto_root, "io_ops", 2);
     }
-
+#endif
     Say() << "Check root properties & data" << std::endl;
     for (auto p : properties)
         ExpectApiSuccess(api.GetProperty(root, p, v));
@@ -3037,6 +3038,7 @@ static void TestRoot(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("a"));
     ExpectApiSuccess(api.Destroy("b"));
 
+#if 0
     Say() << "Check cpu_limit/cpu_guarantee" << std::endl;
     if (KernelSupports(KernelFeature::CFS_BANDWIDTH))
         ExpectEq(GetCgKnob("cpu", "", "cpu.cfs_quota_us"), "-1");
@@ -3047,6 +3049,7 @@ static void TestRoot(Porto::Connection &api) {
     if (KernelSupports(KernelFeature::CFQ))
         ExpectEq(GetCgKnob("blkio", "", "blkio.weight"),
                  std::to_string(config().container().normal_io_weight()));
+#endif
 }
 
 static void ExpectNonZeroLink(Porto::Connection &api, const std::string &name,
@@ -3252,8 +3255,10 @@ static void TestLimits(Porto::Connection &api) {
     Say() << "Check default limits" << std::endl;
     string current;
 
+#if 0
     current = GetCgKnob("memory", "", "memory.use_hierarchy");
     ExpectEq(current, "1");
+#endif
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
@@ -3350,7 +3355,7 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
 
         uint64_t period, quota;
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.cfs_period_us"), period));
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", "/", "cpu.cfs_period_us"), period));
         long ncores = sysconf(_SC_NPROCESSORS_CONF);
 
         const uint64_t minQuota = 1 * 1000;
@@ -3387,8 +3392,7 @@ static void TestLimits(Porto::Connection &api) {
 
     } else if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
         Say() << "Check cpu_guarantee" << std::endl;
-        uint64_t rootShares, shares;
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.shares"), rootShares));
+        uint64_t shares;
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
         ExpectApiSuccess(api.Start(name));
@@ -3972,15 +3976,11 @@ static void TestPermissions(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
 
-    path = "/sys/fs/cgroup/memory/porto";
+    path = CgRoot("memory", name);
     ExpectEq(lstat(path.c_str(), &st), 0);
     ExpectEq(st.st_mode, (0755 | S_IFDIR));
 
-    path = "/sys/fs/cgroup/memory/porto/" + name;
-    ExpectEq(lstat(path.c_str(), &st), 0);
-    ExpectEq(st.st_mode, (0755 | S_IFDIR));
-
-    path = "/sys/fs/cgroup/memory/porto/" + name + "/tasks";
+    path = path + "/tasks";
     ExpectEq(lstat(path.c_str(), &st), 0);
     ExpectEq(st.st_mode, (0644 | S_IFREG));
 
@@ -4914,15 +4914,15 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
     AsRoot(api);
-    ExpectSuccess(TPath("/sys/fs/cgroup/memory/porto/cgroup.procs").WriteAll(pid));
+    ExpectSuccess(TPath(CgRoot("memory", "/") + "cgroup.procs").WriteAll(pid));
     auto cgmap = GetCgroups(pid);
-    ExpectEq(cgmap["memory"], "/porto");
+    ExpectEq(cgmap["memory"], "/");
     expectedWarns++; // Task belongs to invalid subsystem
     KillSlave(api, SIGKILL);
     AsAlice(api);
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    ExpectCorrectCgroups(pid, name);
+    ExpectCorrectCgroups(pid, name, name);
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Make sure some data is persistent" << std::endl;

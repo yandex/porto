@@ -15,6 +15,16 @@ extern "C" {
 #include <sys/eventfd.h>
 }
 
+const TFlagsNames ControllersName = {
+    { CGROUP_FREEZER,   "freezer" },
+    { CGROUP_MEMORY,    "memory" },
+    { CGROUP_CPU,       "cpu" },
+    { CGROUP_CPUACCT,   "cpuacct" },
+    { CGROUP_NETCLS,    "net_cls" },
+    { CGROUP_BLKIO,     "blkio" },
+    { CGROUP_DEVICES,   "devices" },
+};
+
 TPath TCgroup::Path() const {
     if (!Subsystem)
         return TPath();
@@ -168,13 +178,10 @@ TError TCgroup::Childs(std::vector<TCgroup> &cgroups) const {
         return error;
 
     for (auto &name : subdirs) {
-        // FIXME Ignore non-porto subtrees
-        if (IsRoot() && "/" + name != PORTO_ROOT_CGROUP)
+        if (IsRoot() && !StringStartsWith(name, PORTO_CGROUP_PREFIX + 1))
             continue;
-
         cgroups.push_back(Child(name));
     }
-
     return TError::Success();
 }
 
@@ -227,6 +234,9 @@ TError TCgroup::KillAll(int signal) const {
     TError error;
 
     L_ACT() << "KillAll " << signal << " " << *this << std::endl;
+
+    if (IsRoot())
+        return TError(EError::Permission, "Bad idea");
 
     error = GetTasks(tasks);
     if (!error) {
@@ -775,11 +785,13 @@ TError InitializeCgroups() {
         Subsystems.push_back(subsys);
 
         subsys->Hierarchy = subsys;
+        subsys->Controllers |= subsys->Kind;
         for (auto hy: Hierarchies) {
             if (subsys->Root == hy->Root) {
                 L() << "Cgroup subsystem " << subsys->Type
                     << " bound to hierarchy " << hy->Type << std::endl;
                 subsys->Hierarchy = hy;
+                hy->Controllers |= subsys->Kind;
                 break;
             }
         }
@@ -788,6 +800,9 @@ TError InitializeCgroups() {
 
         subsys->InitializeSubsystem();
     }
+
+    for (auto subsys: AllSubsystems)
+        subsys->Controllers |= subsys->Hierarchy->Controllers;
 
     return error;
 }

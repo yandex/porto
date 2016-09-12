@@ -111,6 +111,19 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     CpuGuarantee = 0;
     IoPolicy = "normal";
 
+    if (IsPortoRoot() && !config().container().all_controllers()) {
+        Controllers = RequiredControllers = 0;
+    } else {
+        Controllers = RequiredControllers = CGROUP_FREEZER;
+        if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
+            Controllers |= CGROUP_CPUACCT;
+    }
+    if (!Parent || Parent->IsPortoRoot() ||
+            config().container().all_controllers())
+        Controllers |= CGROUP_MEMORY | CGROUP_CPU | CGROUP_CPUACCT |
+                       CGROUP_NETCLS | CGROUP_BLKIO | CGROUP_DEVICES;
+    SetProp(EProperty::CONTROLLERS);
+
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
@@ -384,14 +397,6 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     return lim;
 }
 
-vector<pid_t> TContainer::Processes() {
-    auto cg = GetCgroup(FreezerSubsystem);
-
-    vector<pid_t> ret;
-    cg.GetProcesses(ret);
-    return ret;
-}
-
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     TError error;
@@ -530,7 +535,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     TDevice device;
     TError error;
 
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot() || IsPortoRoot() || !(Controllers & CGROUP_DEVICES))
         return TError::Success();
 
     if (Parent->IsPortoRoot() &&
@@ -565,6 +570,9 @@ TError TContainer::PrepareCgroups() {
     for (auto hy: Hierarchies) {
         TCgroup cg = GetCgroup(*hy);
 
+        if (!(Controllers & hy->Controllers))
+            continue;
+
         if (cg.Exists()) //FIXME kludge for root and restore
             continue;
 
@@ -573,13 +581,13 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
-    if (IsPortoRoot()) {
+    if (Parent && Parent->IsPortoRoot()) {
         error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
     }
 
-    if (!IsRoot() && !IsPortoRoot()) {
+    if (!IsRoot() && !IsPortoRoot() && (Controllers & CGROUP_MEMORY)) {
         error = PrepareOomMonitor();
         if (error) {
             L_ERR() << "Can't prepare OOM monitoring: " << error << std::endl;
@@ -603,7 +611,10 @@ void TContainer::CleanupExpiredChildren() {
 }
 
 uint32_t TContainer::GetTrafficClass() const {
-    return TcHandle(ROOT_TC_MAJOR, Id);
+    for (auto ct = this; ct; ct = ct->Parent.get())
+        if (ct->Controllers & CGROUP_NETCLS)
+            return TcHandle(ROOT_TC_MAJOR, ct->Id);
+    return TcHandle(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
 }
 
 TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
@@ -664,7 +675,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         }
     }
 
-    if (!IsRoot()) {
+    if (Controllers & CGROUP_NETCLS) {
         auto netcls = GetCgroup(NetclsSubsystem);
         error = netcls.Set("net_cls.classid",
                            std::to_string(GetTrafficClass()));
@@ -1142,10 +1153,10 @@ void TContainer::FreeResources() {
 
     if (!IsRoot()) {
         for (auto hy: Hierarchies) {
-            auto cg = GetCgroup(*hy);
-
-            error = cg.Remove();
-            (void)error; //Logged inside
+            if (Controllers & hy->Controllers) {
+                auto cg = GetCgroup(*hy);
+                (void)cg.Remove(); //Logged inside
+            }
         }
     }
 
@@ -1163,17 +1174,19 @@ void TContainer::FreeResources() {
         if (error)
             L_ERR() << "Cannot free network resources: " << error << std::endl;
 
-        auto net_lock = Net->ScopedLock();
-        error = Net->DestroyTC(GetTrafficClass());
-        if (error)
-            L_ERR() << "Can't remove traffic class: " << error << std::endl;
-        net_lock.unlock();
-
-        if (Net != HostNetwork) {
-            net_lock = HostNetwork->ScopedLock();
-            error = HostNetwork->DestroyTC(GetTrafficClass());
+        if (Controllers & CGROUP_NETCLS) {
+            auto net_lock = Net->ScopedLock();
+            error = Net->DestroyTC(GetTrafficClass());
             if (error)
                 L_ERR() << "Can't remove traffic class: " << error << std::endl;
+            net_lock.unlock();
+
+            if (Net != HostNetwork) {
+                net_lock = HostNetwork->ScopedLock();
+                error = HostNetwork->DestroyTC(GetTrafficClass());
+                if (error)
+                    L_ERR() << "Can't remove traffic class: " << error << std::endl;
+            }
         }
     }
 
@@ -1264,6 +1277,12 @@ TError TContainer::Terminate(TScopedLock &holder_lock, uint64_t deadline) {
 
     L_ACT() << "Terminate tasks in " << GetName() << std::endl;
 
+    if (!(Controllers & CGROUP_FREEZER)) {
+        if (Task.Pid)
+            return TError(EError::NotSupported, "Cannot terminate without freezer");
+        return TError::Success();
+    }
+
     if (cg.IsEmpty())
         return TError::Success();
 
@@ -1341,7 +1360,10 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout) {
     auto cg = GetCgroup(FreezerSubsystem);
     TError error;
 
-    if (FreezerSubsystem.IsFrozen(cg)) {
+    if (!(Controllers & CGROUP_FREEZER)) {
+        if (Task.Pid)
+            return TError(EError::NotSupported, "Cannot stop without freezer");
+    } else if (FreezerSubsystem.IsFrozen(cg)) {
         if (FreezerSubsystem.IsParentFreezing(cg))
             return TError(EError::InvalidState, "Parent container is paused");
 
@@ -1459,6 +1481,9 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
     if (State != EContainerState::Running && State != EContainerState::Meta)
         return TError(EError::InvalidState, "Contaner not running");
 
+    if (!(Controllers & CGROUP_FREEZER))
+        return TError(EError::NotSupported, "Cannot pause without freezer");
+
     // some child subtree may be in stop/destroy and we don't want
     // to freeze parent in that moment
     TError error = CheckAcquiredChild(holder_lock);
@@ -1484,6 +1509,9 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
 
 TError TContainer::Resume(TScopedLock &holder_lock) {
     auto cg = GetCgroup(FreezerSubsystem);
+
+    if (!(Controllers & CGROUP_FREEZER))
+        return TError(EError::NotSupported, "Cannot resume without freezer");
 
     if (FreezerSubsystem.IsParentFreezing(cg))
         return TError(EError::InvalidState, "Parent container is paused");
@@ -1726,6 +1754,9 @@ TError TContainer::Load(const TKeyValue &node) {
     } else
         error = TError(EError::Unknown, "Container has no state");
 
+    if (!node.Has(P_CONTROLLERS))
+        Controllers = GetRoot()->Controllers;
+
     CurrentContainer = nullptr;
 
     return error;
@@ -1768,6 +1799,9 @@ void TContainer::SyncState(TScopedLock &holder_lock) {
         Task.Kill(SIGKILL);
         Reap(holder_lock, false);
     }
+
+    if (!(Controllers & CGROUP_FREEZER))
+        return;
 
     std::vector<pid_t> tasks;
     error = freezerCg.GetTasks(tasks);
@@ -1833,11 +1867,19 @@ out:
 }
 
 TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
-    if (IsRoot())
-        return subsystem.RootCgroup();
-    if (IsPortoRoot())
-        return subsystem.Cgroup(PORTO_ROOT_CGROUP);
-    return subsystem.Cgroup(std::string(PORTO_ROOT_CGROUP) + "/" + GetName());
+    std::string name;
+
+    for (auto ct = this; ct; ct = ct->Parent.get()) {
+        auto enabled = ct->Controllers & subsystem.Controllers;
+        if (name.size())
+            name = ct->Name + (enabled ? "/" : "%") + name;
+        else if (enabled)
+            name = ct->Name;
+        if (ct->IsPortoRoot() && name.size())
+            break;
+    }
+
+    return subsystem.Cgroup(name);
 }
 
 bool TContainer::MayRespawn() {
@@ -1995,6 +2037,9 @@ TError TContainer::UpdateTrafficClasses() {
     uint32_t handle, parent;
     TError error;
 
+    if (!(Controllers & CGROUP_NETCLS))
+        return TError::Success();
+
     handle = GetTrafficClass();
     parent = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
 
@@ -2016,7 +2061,10 @@ TError TContainer::UpdateTrafficClasses() {
     net_lock.unlock();
 
     if (Net && Net != HostNetwork) {
-        parent = TcHandle(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID);
+        if (config().container().all_controllers())
+            parent = TcHandle(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID);
+        else
+            parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
         for (auto p = Parent; p; p = p->Parent) {
             if (p->State == EContainerState::Meta && p->Net == Net) {
                 parent = p->GetTrafficClass();

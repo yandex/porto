@@ -291,7 +291,11 @@ bool CgExists(const std::string &subsystem, const std::string &name) {
 }
 
 std::string CgRoot(const std::string &subsystem, const std::string &name) {
-    return "/sys/fs/cgroup/" + subsystem + "/porto/" + name + "/";
+    if (name == "/")
+        return "/sys/fs/cgroup/" + subsystem + "/";
+    if (config().container().all_controllers())
+        return "/sys/fs/cgroup/" + subsystem + "/porto/" + name + "/";
+    return "/sys/fs/cgroup/" + subsystem + "/porto%" + name + "/";
 }
 
 std::string GetFreezer(const std::string &name) {
@@ -315,8 +319,10 @@ void SetFreezer(const std::string &name, const std::string &state) {
 
 std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob) {
     std::string val;
-    if (TPath(CgRoot(subsys, name) + knob).ReadAll(val))
-        throw std::string("Can't get cgroup knob ");
+    if (TPath(CgRoot(subsys, name) + knob).ReadAll(val)) {
+        Say() << "No " << subsys << " " << name << " " << knob << std::endl;
+        return "(none)";
+    }
     return StringTrim(val, "\n");
 }
 
