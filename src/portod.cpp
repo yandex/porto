@@ -115,7 +115,10 @@ static void DaemonShutdown(bool master, int ret) {
         int sig = -ret;
         Signal(sig, SIG_DFL);
         raise(sig);
-        exit(128 + sig);
+        if (master)
+            exit(128 + sig);
+        else
+            _exit(128 + sig);
     }
 }
 
@@ -748,7 +751,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
         close(ackfd[1]);
         close(sigFd);
 
-        exit(SlaveMain());
+        _exit(SlaveMain());
     }
 
     close(evtfd[0]);
