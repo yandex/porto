@@ -3,7 +3,6 @@
 import os
 import shutil
 import tarfile
-import kv_pb2
 import time
 
 import porto
