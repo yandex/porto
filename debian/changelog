@@ -1,3 +1,59 @@
+yandex-porto (3.0.4) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: rework volume state machine
+  * volumes: IsLayersSet -> HaveLayers
+  * volumes: add backend=bind
+
+  [ Maxim Samoylov ]
+  * container: get rid of RootPath() dynamic evaluation
+
+  [ Konstantin Khlebnikov ]
+  * container: check .. in root path
+
+  [ Maxim Samoylov ]
+  * volume: initialize volume space_limit with existing loop image size
+  * volume: let loop backend use regular files as storage
+  * volume: implement resize operation for loop backend
+
+  [ Konstantin Khlebnikov ]
+  * volume: do not allow read-write loop share storage
+
+  [ Maxim Samoylov ]
+  * container: auto-create volume for root with loop image
+
+  [ Konstantin Khlebnikov ]
+  * bash-completion: update completion for layers
+  * porto: cut container namespace in volume list
+  * filesystem: bind mount root for pivot_root only when needed
+  * container: cleanup memory limit/guarantee
+  * container: mount /run with size of half memory limit
+
+  [ Maxim Samoylov ]
+  * volume: fix for segfault on broken volume restore
+
+  [ Konstantin Khlebnikov ]
+  * porto: thaw container if freeze failed
+
+  [ Maxim Samoylov ]
+  * tests: tests volumes with custom places
+  * volume: prevent user from creating unlimited volume
+
+  [ Konstantin Khlebnikov ]
+  * volume: sanitize error codes
+  * test/test-volume_places: fix
+  * layers: install python protobuf by pip
+  * test/test-volume_places.py: do not restart porto
+
+  [ Maxim Samoylov ]
+  * portod: terminate child process using _exit()
+
+  [ Konstantin Khlebnikov ]
+  * network: connect net=L3 and net=NAT to host network
+  * porto: create only required cgroups
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 13 Sep 2016 19:34:29 +0300
+
 yandex-porto (3.0.3) unstable; urgency=low
 
   * api/python: add method Version
