@@ -99,24 +99,12 @@ assert len(c.ListLayers(place=PLACE_DIR)) == 1
 
 v.Export(DIR + "/tmp_back_ubuntu_precise.tar")
 
-Catch(c.RemoveLayer, "place-ubuntu-precise-tmp")
-c.ImportLayer("place-ubuntu-precise-tmp", DIR + "/tmp_back_ubuntu_precise.tar")
+v.Unlink()
 
-v = c.CreateVolume(path=None, layers=["place-ubuntu-precise-tmp"])
-v.Unlink("/")
+c.RemoveLayer("place-ubuntu-precise", place=PLACE_DIR)
 
-#Check place cleanup
+assert len(os.listdir(PLACE_DIR + "/porto_volumes")) == 0
+assert len(c.ListLayers(place=PLACE_DIR)) == 0
 
-os.kill(int(open("/run/portoloop.pid", "r").read()), 2)
-time.sleep(5)
-
-c = porto.Connection(timeout=60)
-
-assert len(c.ListLayers(place=PLACE_DIR)) == 1
-assert len(c.ListVolumes()) == 0
-place_volumes = os.listdir(PLACE_DIR + "/porto_volumes")
-assert len(place_volumes) == 0
-
-c.RemoveLayer("place-ubuntu-precise-tmp")
 shutil.rmtree(DIR)
 shutil.rmtree(PLACE_DIR)
