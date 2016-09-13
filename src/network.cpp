@@ -1197,14 +1197,15 @@ TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
 }
 
 TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
-    std::string peerName = ParentNet->NewDeviceName("L3-");
-    auto parentNl = ParentNet->GetNl();
+    auto lock = HostNetwork->ScopedLock();
+    std::string peerName = HostNetwork->NewDeviceName("L3-");
+    auto parentNl = HostNetwork->GetNl();
     TNlLink peer(parentNl, peerName);
     TNlAddr gate4, gate6;
     TError error;
 
     if (l3.Nat && l3.Addrs.empty()) {
-        error = ParentNet->GetNatAddress(l3.Addrs);
+        error = HostNetwork->GetNatAddress(l3.Addrs);
         if (error)
             return error;
 
@@ -1218,7 +1219,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         SaveIp = true;
     }
 
-    error = ParentNet->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu);
+    error = HostNetwork->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu);
     if (error)
         return error;
 
@@ -1271,7 +1272,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         if (error)
             return error;
 
-        error = ParentNet->AddAnnounce(addr, ParentNet->MatchDevice(l3.Master));
+        error = HostNetwork->AddAnnounce(addr, HostNetwork->MatchDevice(l3.Master));
         if (error)
             return error;
     }
@@ -1337,14 +1338,14 @@ TError TNetCfg::ConfigureInterfaces() {
         links.emplace_back(veth.Name);
     }
 
+    parent_lock.unlock();
+
     for (auto &l3 : L3lan) {
         error = ConfigureL3(l3);
         if (error)
             return error;
         links.emplace_back(l3.Name);
     }
-
-    parent_lock.unlock();
 
     TNlLink loopback(target_nl, "lo");
     error = loopback.Load();
@@ -1501,19 +1502,16 @@ TError TNetCfg::PrepareNetwork() {
 TError TNetCfg::DestroyNetwork() {
     TError error;
 
-    if (!ParentNet)
-        return TError::Success();
-
     for (auto &l3 : L3lan) {
-        auto lock = ParentNet->ScopedLock();
+        auto lock = HostNetwork->ScopedLock();
         for (auto &addr : l3.Addrs) {
-            error = ParentNet->DelAnnounce(addr);
+            error = HostNetwork->DelAnnounce(addr);
             if (error)
                 L_ERR() << "Cannot remove announce " << addr.Format()
                         << " : " << error << std::endl;
         }
         if (l3.Nat) {
-            error = ParentNet->PutNatAddress(l3.Addrs);
+            error = HostNetwork->PutNatAddress(l3.Addrs);
             if (error)
                 L_ERR() << "Cannot put NAT address : " << error << std::endl;
 
