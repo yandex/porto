@@ -57,7 +57,7 @@ public:
     TError Configure() override {
 
         if (Volume->HaveQuota())
-            return TError(EError::NotSupported, "Plain backend have no support of quota");
+            return TError(EError::InvalidProperty, "Plain backend have no support of quota");
 
         return TError::Success();
     }
@@ -101,13 +101,13 @@ public:
     TError Configure() override {
 
         if (!Volume->HaveStorage())
-            return TError(EError::NotSupported, "bind backed require storage");
+            return TError(EError::InvalidProperty, "bind backed require storage");
 
         if (Volume->HaveQuota())
-            return TError(EError::NotSupported, "bind backend doesn't support quota");
+            return TError(EError::InvalidProperty, "bind backend doesn't support quota");
 
         if (Volume->HaveLayers())
-            return TError(EError::NotSupported, "bind backend doesn't support layers");
+            return TError(EError::InvalidProperty, "bind backend doesn't support layers");
 
         return TError::Success();
     }
@@ -133,10 +133,10 @@ public:
     TError Configure() override {
 
         if (!Volume->SpaceLimit)
-            return TError(EError::NotSupported, "tmpfs backend requires space_limit");
+            return TError(EError::InvalidProperty, "tmpfs backend requires space_limit");
 
         if (Volume->HaveStorage())
-            return TError(EError::NotSupported, "tmpfs backed doesn't support storage");
+            return TError(EError::InvalidProperty, "tmpfs backed doesn't support storage");
 
         return TError::Success();
     }
@@ -216,19 +216,19 @@ public:
     TError Configure() override {
 
         if (Volume->IsAutoPath)
-            return TError(EError::NotSupported, "Quota backend requires path");
+            return TError(EError::InvalidProperty, "Quota backend requires path");
 
         if (!Volume->HaveQuota())
-            return TError(EError::NotSupported, "Quota backend requires space_limit");
+            return TError(EError::InvalidProperty, "Quota backend requires space_limit");
 
         if (Volume->IsReadOnly)
-            return TError(EError::NotSupported, "Quota backed doesn't support read_only");
+            return TError(EError::InvalidProperty, "Quota backed doesn't support read_only");
 
         if (Volume->HaveStorage())
-            return TError(EError::NotSupported, "Quota backed doesn't support storage");
+            return TError(EError::InvalidProperty, "Quota backed doesn't support storage");
 
         if (Volume->HaveLayers())
-            return TError(EError::NotSupported, "Quota backed doesn't support layers");
+            return TError(EError::InvalidProperty, "Quota backed doesn't support layers");
 
         return TError::Success();
     }
@@ -477,7 +477,7 @@ remove_file:
 
         if (!image.Exists()) {
             if (!Volume->SpaceLimit)
-                return TError(EError::InvalidValue, "loop backend requires space_limit");
+                return TError(EError::InvalidProperty, "loop backend requires space_limit");
 
             L_ACT() << "Allocate loop image with size " << Volume->SpaceLimit
                     << " guarantee " << Volume->SpaceGuarantee << std::endl;
@@ -587,10 +587,10 @@ public:
     TError Configure() override {
 
         if (!Supported())
-            return TError(EError::InvalidValue, "overlay not supported");
+            return TError(EError::NotSupported, "overlay not supported");
 
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
-            return TError(EError::NotSupported, "project quota is disabled");
+            return TError(EError::InvalidProperty, "project quota is disabled");
 
         return TError::Success();
     }
@@ -896,7 +896,7 @@ TError TVolume::OpenBackend() {
     else if (BackendType == "rbd")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend());
     else
-        return TError(EError::InvalidValue, "Unknown volume backend: " + BackendType);
+        return TError(EError::NotSupported, "Unknown volume backend: " + BackendType);
 
     Backend->Volume = this;
 
