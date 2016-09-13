@@ -132,7 +132,7 @@ public:
 
     TError Configure() override {
 
-        if (!Volume->HaveQuota())
+        if (!Volume->SpaceLimit)
             return TError(EError::NotSupported, "tmpfs backend requires space_limit");
 
         if (Volume->HaveStorage())
@@ -142,23 +142,38 @@ public:
     }
 
     TError Build() override {
+        std::vector<std::string> mount_options = {
+            "uid=" + std::to_string(Volume->VolumeOwner.Uid),
+            "gid=" + std::to_string(Volume->VolumeOwner.Gid),
+            "mode=" + StringFormat("%#o", Volume->VolumePerms),
+        };
+
+        if (Volume->SpaceLimit)
+            mount_options.emplace_back("size=" + std::to_string(Volume->SpaceLimit));
+
+        if (Volume->InodeLimit)
+            mount_options.emplace_back("nr_inodes=" + std::to_string(Volume->InodeLimit));
+
         return Volume->Path.Mount("porto:" + Volume->Id, "tmpfs",
-                Volume->GetMountFlags(),
-                { "size=" + std::to_string(Volume->SpaceLimit),
-                  "uid=" + std::to_string(Volume->VolumeOwner.Uid),
-                  "gid=" + std::to_string(Volume->VolumeOwner.Gid),
-                  "mode=" + StringFormat("%#o", Volume->VolumePerms)
-                });
+                                  Volume->GetMountFlags(), mount_options);
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        std::vector<std::string> mount_options = {
+            "uid=" + std::to_string(Volume->VolumeOwner.Uid),
+            "gid=" + std::to_string(Volume->VolumeOwner.Gid),
+            "mode=" + StringFormat("%#o", Volume->VolumePerms),
+        };
+
+        if (space_limit)
+            mount_options.emplace_back("size=" + std::to_string(space_limit));
+
+        if (inode_limit)
+            mount_options.emplace_back("nr_inodes=" + std::to_string(inode_limit));
+
         return Volume->Path.Mount("porto:" + Volume->Id, "tmpfs",
-                Volume->GetMountFlags() | MS_REMOUNT,
-                { "size=" + std::to_string(space_limit),
-                  "uid=" + std::to_string(Volume->VolumeOwner.Uid),
-                  "gid=" + std::to_string(Volume->VolumeOwner.Gid),
-                  "mode=" + StringFormat("%#o", Volume->VolumePerms)
-                });
+                                  Volume->GetMountFlags() | MS_REMOUNT,
+                                  mount_options);
     }
 
     TError Destroy() override {
