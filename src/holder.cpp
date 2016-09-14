@@ -37,31 +37,18 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     if (RootContainer->GetId() != ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected root container id");
 
-    error = IdMap.GetAt(DEFAULT_TC_MINOR);
-    if (error)
-        return error;
-
     RootContainer->Isolate = false;
 
     error = RootContainer->Start(true);
     if (error)
         return error;
 
-    return TError::Success();
-}
-
-TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
-    std::shared_ptr<TContainer> container;
-    TError error = Create(holder_lock, PORTO_ROOT_CONTAINER, container);
+    error = IdMap.GetAt(DEFAULT_TC_MINOR);
     if (error)
         return error;
 
-    if (container->GetId() != PORTO_ROOT_CONTAINER_ID)
-        return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(container->GetId()));
 
-    container->Isolate = false;
-
-    error = container->Start(true);
+    error = IdMap.GetAt(LEGACY_CONTAINER_ID);
     if (error)
         return error;
 
@@ -85,7 +72,7 @@ TError TContainerHolder::ValidName(const std::string &name) const {
         return TError(EError::InvalidValue, "container path too long");
 
     if (name[0] == '/') {
-        if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
+        if (name == ROOT_CONTAINER)
             return TError::Success();
         return TError(EError::InvalidValue, "container path starts with '/'");
     }
@@ -129,12 +116,10 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
 
     if (name == ROOT_CONTAINER)
         return nullptr;
-    else if (name == PORTO_ROOT_CONTAINER)
-        return Containers.at(ROOT_CONTAINER);
 
     std::string::size_type n = name.rfind('/');
     if (n == std::string::npos) {
-        return Containers.at(PORTO_ROOT_CONTAINER);
+        return Containers.at(ROOT_CONTAINER);
     } else {
         std::string parentName = name.substr(0, n);
 
@@ -290,7 +275,7 @@ std::vector<std::shared_ptr<TContainer> > TContainerHolder::List(bool all) const
 
     for (auto c : Containers) {
         PORTO_ASSERT(c.first == c.second->GetName());
-        if (!all && (c.second->IsRoot() || c.second->IsPortoRoot()))
+        if (!all && c.second->IsRoot())
             continue;
         ret.push_back(c.second);
     }
@@ -338,13 +323,7 @@ bool TContainerHolder::RestoreFromStorage() {
 
 TError TContainerHolder::Restore(TScopedLock &holder_lock, TKeyValue &node) {
 
-    if (node.Name == PORTO_ROOT_CONTAINER && !node.Has(P_CONTROLLERS)) {
-        auto ct = Containers[PORTO_ROOT_CONTAINER];
-        ct->Controllers = ct->Parent->Controllers;
-        config().mutable_container()->set_all_controllers(true);
-    }
-
-    if (node.Name == ROOT_CONTAINER || node.Name == PORTO_ROOT_CONTAINER)
+    if (node.Name[0] == '/')
         return TError::Success();
 
     L_ACT() << "Restore container " << node.Name << std::endl;

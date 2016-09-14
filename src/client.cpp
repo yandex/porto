@@ -243,12 +243,10 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
 
     /* FIXME get rid of this crap */
     if (!resolve_meta && (relative_name == DOT_CONTAINER ||
-                          relative_name == PORTO_ROOT_CONTAINER ||
                           relative_name == ROOT_CONTAINER))
         return TError(EError::Permission, "System containers are read only");
 
-    if (relative_name == ROOT_CONTAINER ||
-            relative_name == PORTO_ROOT_CONTAINER)
+    if (relative_name == ROOT_CONTAINER)
         absolute_name = relative_name;
     else if (relative_name == SELF_CONTAINER)
         absolute_name = base->GetName();
@@ -256,10 +254,8 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
                 std::string(SELF_CONTAINER) + "/")) {
         absolute_name = (base->IsRoot() ? "" : base->GetName() + "/") +
             relative_name.substr(std::string(SELF_CONTAINER).length() + 1);
-    } else if (StringStartsWith(relative_name,
-                std::string(PORTO_ROOT_CONTAINER) + "/")) {
-        absolute_name = relative_name.substr(
-                std::string(PORTO_ROOT_CONTAINER).length() + 1);
+    } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
+        absolute_name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
         if (!StringStartsWith(absolute_name, ns))
             return TError(EError::Permission,
                     "Absolute container name out of current namespace");
@@ -268,7 +264,7 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
         if (off != std::string::npos)
             absolute_name = ns.substr(0, off);
         else
-            absolute_name = PORTO_ROOT_CONTAINER;
+            absolute_name = ROOT_CONTAINER;
     } else
         absolute_name = ns + relative_name;
 
@@ -328,7 +324,7 @@ TError TClient::CanControl(const TContainer &ct, bool createChild) {
     if (AccessLevel < EAccessLevel::ChildOnly)
         return TError(EError::Permission, "No write access at all");
 
-    if (!createChild || !ct.IsPortoRoot()) {
+    if (!createChild || !ct.IsRoot()) {
         TError error = CanControl(ct.OwnerCred);
         if (error)
             return error;

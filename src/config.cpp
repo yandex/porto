@@ -68,6 +68,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_devpts_max(256);
     config().mutable_container()->set_dev_size(32 << 20);
     config().mutable_container()->set_all_controllers(false);
+    config().mutable_container()->set_legacy_porto(false);
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
 

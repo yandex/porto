@@ -75,7 +75,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
 
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot())
         Cwd = "/";
     else
         Cwd = WorkPath().ToString();
@@ -99,9 +99,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     CapLimit = NoCapabilities;
 
     if (IsRoot())
-        NsName = std::string(PORTO_ROOT_CONTAINER) + "/";
-    else if (IsPortoRoot())
-        NsName = "";
+        NsName = ROOT_PORTO_NAMESPACE;
     else if (config().container().default_porto_namespace())
         NsName = Name + "/";
     else
@@ -112,15 +110,12 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     CpuGuarantee = 0;
     IoPolicy = "normal";
 
-    if (IsPortoRoot() && !config().container().all_controllers()) {
-        Controllers = RequiredControllers = 0;
-    } else {
-        Controllers = RequiredControllers = CGROUP_FREEZER;
-        if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
-            Controllers |= CGROUP_CPUACCT;
-    }
-    if (!Parent || Parent->IsPortoRoot() ||
-            config().container().all_controllers())
+    Controllers = RequiredControllers = CGROUP_FREEZER;
+    if (config().container().legacy_porto())
+        Controllers |= CGROUP_LEGACY;
+    if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
+        Controllers |= CGROUP_CPUACCT;
+    if (!Parent || Parent->IsRoot() || config().container().all_controllers())
         Controllers |= CGROUP_MEMORY | CGROUP_CPU | CGROUP_CPUACCT |
                        CGROUP_NETCLS | CGROUP_BLKIO | CGROUP_DEVICES;
     SetProp(EProperty::CONTROLLERS);
@@ -197,7 +192,7 @@ void TContainer::UpdateRunningChildren(size_t diff) {
 }
 
 TError TContainer::UpdateSoftLimit() {
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot())
         return TError::Success();
 
     if (Parent)
@@ -249,8 +244,6 @@ void TContainer::SetState(EContainerState newState) {
 const string TContainer::StripParentName(const string &name) const {
     if (name == ROOT_CONTAINER)
         return ROOT_CONTAINER;
-    else if (name == PORTO_ROOT_CONTAINER)
-        return PORTO_ROOT_CONTAINER;
 
     std::string::size_type n = name.rfind('/');
     if (n == std::string::npos)
@@ -260,7 +253,7 @@ const string TContainer::StripParentName(const string &name) const {
 }
 
 void TContainer::RemoveKvs() {
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot())
         return;
 
     TPath path(ContainersKV / std::to_string(Id));
@@ -293,19 +286,15 @@ void TContainer::DestroyWeak() {
 }
 
 const std::string TContainer::GetName() const {
-    if (IsRoot() || IsPortoRoot() || Parent->IsPortoRoot())
+    if (IsRoot() || Parent->IsRoot())
         return Name;
     return Parent->GetName() + "/" + Name;
 }
 
 const std::string TContainer::GetTextId(const std::string &separator) const {
-     if (IsRoot() || IsPortoRoot() || Parent->IsPortoRoot())
+     if (IsRoot() || Parent->IsRoot())
          return Name;
      return Parent->GetTextId(separator) + separator + Name;
-}
-
-bool TContainer::IsPortoRoot() const {
-    return Id == PORTO_ROOT_CONTAINER_ID;
 }
 
 bool TContainer::IsChildOf(const TContainer &ct) const {
@@ -525,10 +514,10 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     TDevice device;
     TError error;
 
-    if (IsRoot() || IsPortoRoot() || !(Controllers & CGROUP_DEVICES))
+    if (IsRoot() || !(Controllers & CGROUP_DEVICES))
         return TError::Success();
 
-    if (Parent->IsPortoRoot() &&
+    if (Parent->IsRoot() &&
             (HasProp(EProperty::DEVICES) || !OwnerCred.IsRootUser())) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
@@ -571,13 +560,13 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
-    if (Parent && Parent->IsPortoRoot()) {
+    if (Parent && Parent->IsRoot()) {
         error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
     }
 
-    if (!IsRoot() && !IsPortoRoot() && (Controllers & CGROUP_MEMORY)) {
+    if (!IsRoot() && (Controllers & CGROUP_MEMORY)) {
         error = PrepareOomMonitor();
         if (error) {
             L_ERR() << "Can't prepare OOM monitoring: " << error << std::endl;
@@ -1081,7 +1070,7 @@ TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
 }
 
 TError TContainer::PrepareWorkDir() {
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot())
         return TError::Success();
 
     TPath work = WorkPath();
@@ -1187,7 +1176,7 @@ void TContainer::FreeResources() {
     }
     Net = nullptr;
 
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot())
         return;
 
     /* Legacy non-volume root on loop device */
@@ -1587,7 +1576,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
 
 TError TContainer::SetProperty(const string &origProperty,
                                const string &origValue) {
-    if (IsRoot() || IsPortoRoot())
+    if (IsRoot())
         return TError(EError::Permission, "System containers are read only");
 
     string property = origProperty;
@@ -1744,8 +1733,10 @@ TError TContainer::Load(const TKeyValue &node) {
     } else
         error = TError(EError::Unknown, "Container has no state");
 
-    if (!node.Has(P_CONTROLLERS))
+    if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped) {
+        RootContainer->Controllers |= CGROUP_LEGACY;
         Controllers = RootContainer->Controllers;
+    }
 
     CurrentContainer = nullptr;
 
@@ -1859,16 +1850,22 @@ out:
 TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     std::string name;
 
-    for (auto ct = this; ct; ct = ct->Parent.get()) {
+    if (IsRoot()) {
+        if (Controllers & CGROUP_LEGACY)
+            return subsystem.Cgroup(PORTO_CGROUP_PREFIX);
+        return subsystem.RootCgroup();
+    }
+
+    for (auto ct = this; !ct->IsRoot(); ct = ct->Parent.get()) {
         auto enabled = ct->Controllers & subsystem.Controllers;
         if (name.size())
             name = ct->Name + (enabled ? "/" : "%") + name;
         else if (enabled)
             name = ct->Name;
-        if (ct->IsPortoRoot() && name.size())
-            break;
     }
 
+    name = std::string(PORTO_CGROUP_PREFIX) +
+        ((Controllers & CGROUP_LEGACY) ? "/" : "%") + name;
     return subsystem.Cgroup(name);
 }
 
@@ -2009,7 +2006,7 @@ void TContainer::NotifyWaiters() {
         if (waiter)
             waiter->WakeupWaiter(this);
     }
-    if (!IsRoot() && !IsPortoRoot())
+    if (!IsRoot())
         TContainerWaiter::WakeupWildcard(this);
 }
 
@@ -2051,8 +2048,8 @@ TError TContainer::UpdateTrafficClasses() {
     net_lock.unlock();
 
     if (Net && Net != HostNetwork) {
-        if (config().container().all_controllers())
-            parent = TcHandle(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID);
+        if (Controllers & CGROUP_LEGACY)
+            parent = TcHandle(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID);
         else
             parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
         for (auto p = Parent; p; p = p->Parent) {

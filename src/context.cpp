@@ -32,12 +32,6 @@ TError TContext::Initialize() {
         goto out;
     }
 
-    error = Cholder->CreatePortoRoot(holder_lock);
-    if (error) {
-        L_ERR() << "Can't create porto root container: " << error << std::endl;
-        goto out;
-    }
-
 out:
     SystemClient.FinishRequest();
     return error;

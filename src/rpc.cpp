@@ -819,7 +819,7 @@ noinline TError Wait(TContext &context,
 
     if (!waiter->Wildcards.empty()) {
         for (auto &container : context.Cholder->List()) {
-            if (container->IsRoot() || container->IsPortoRoot())
+            if (container->IsRoot())
                 continue;
 
             /* Wildcard notifies immediately only dead and hollow meta */

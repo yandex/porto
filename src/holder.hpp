@@ -36,7 +36,6 @@ public:
     TError ValidName(const std::string &name) const;
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);
-    TError CreatePortoRoot(TScopedLock &holder_lock);
     TError Create(TScopedLock &holder_lock, const std::string &name, std::shared_ptr<TContainer> &container);
     TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &c);
 

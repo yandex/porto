@@ -87,7 +87,7 @@ static void ExpectCorrectCgroups(const string &pid, const string &name, const st
     auto cgmap = GetCgroups(pid);
 
     for (auto &subsys : subsystems) {
-        if (config().container().all_controllers())
+        if (config().container().legacy_porto())
             ExpectEq(cgmap[subsys], "/porto/" + name);
         else if (subsys == "freezer" ||
                 (subsys == "cpuacct" && cgmap["cpuacct"] != cgmap["cpu"]))
@@ -276,7 +276,7 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const string &nam
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
     ExpectEq(v, string("0"));
     ExpectApiSuccess(api.GetData(name, "parent", v));
-    ExpectEq(v, string("/porto"));
+    ExpectEq(v, string("/"));
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(name, "io_read", v));
@@ -318,7 +318,7 @@ static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
     ExpectApiSuccess(api.GetData(name, "parent", v));
-    ExpectEq(v, string("/porto"));
+    ExpectEq(v, string("/"));
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
         ExpectApiFailure(api.GetData(name, "io_read", v), EError::InvalidState);

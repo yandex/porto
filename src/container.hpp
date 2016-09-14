@@ -226,7 +226,6 @@ public:
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
 
     bool IsRoot() const { return Id == ROOT_CONTAINER_ID; }
-    bool IsPortoRoot() const;
     bool IsChildOf(const TContainer &ct) const;
 
     std::shared_ptr<TContainer> GetParent() const;

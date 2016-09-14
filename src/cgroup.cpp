@@ -23,6 +23,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_NETCLS,    "net_cls" },
     { CGROUP_BLKIO,     "blkio" },
     { CGROUP_DEVICES,   "devices" },
+    { CGROUP_LEGACY,    "legacy" },
 };
 
 TPath TCgroup::Path() const {

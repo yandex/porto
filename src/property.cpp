@@ -2226,12 +2226,10 @@ public:
 } static AbsoluteName;
 
 TError TAbsoluteName::Get(std::string &value) {
-    if (CurrentContainer->IsRoot() || CurrentContainer->IsPortoRoot())
-        value = CurrentContainer->GetName();
+    if (CurrentContainer->IsRoot())
+        value = ROOT_CONTAINER;
     else
-        value = std::string(PORTO_ROOT_CONTAINER) + "/" +
-                CurrentContainer->GetName();
-
+        value = ROOT_PORTO_NAMESPACE + CurrentContainer->GetName();
     return TError::Success();
 }
 
@@ -2247,9 +2245,7 @@ public:
 } static AbsoluteNamespace;
 
 TError TAbsoluteNamespace::Get(std::string &value) {
-    value = std::string(PORTO_ROOT_CONTAINER) + "/" +
-            CurrentContainer->GetPortoNamespace();
-
+    value = ROOT_PORTO_NAMESPACE + CurrentContainer->GetPortoNamespace();
     return TError::Success();
 }
 

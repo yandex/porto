@@ -40,16 +40,16 @@ constexpr uint64_t NET_DEFAULT_PRIO = 3;
 constexpr uint64_t NET_MAX_RATE = 2000000000; /* 16Gbit */;
 
 constexpr uint64_t ROOT_CONTAINER_ID = 1;
-constexpr uint64_t PORTO_ROOT_CONTAINER_ID = 3;
+constexpr uint64_t LEGACY_CONTAINER_ID = 3;
 
 constexpr const char *ROOT_CONTAINER = "/";
+constexpr const char *ROOT_PORTO_NAMESPACE = "/porto/";
+constexpr const char *PORTO_CGROUP_PREFIX = "/porto";
+
 constexpr const char *DOT_CONTAINER = ".";
 constexpr const char *SELF_CONTAINER = "self";
-constexpr const char *PORTO_ROOT_CONTAINER = "/porto";
 
-constexpr int NR_SERVICE_CONTAINERS = 2;
-
-constexpr const char *PORTO_CGROUP_PREFIX = "/porto";
+constexpr int NR_SERVICE_CONTAINERS = 1;
 
 constexpr const char *PORTO_DAEMON_CGROUP = "/portod";
 

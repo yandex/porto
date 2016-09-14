@@ -15,6 +15,7 @@ class TCgroup;
 #define CGROUP_NETCLS   0x0010ull
 #define CGROUP_BLKIO    0x0020ull
 #define CGROUP_DEVICES  0x0040ull
+#define CGROUP_LEGACY   0x1000ull
 
 extern const TFlagsNames ControllersName;
 

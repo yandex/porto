@@ -324,9 +324,9 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         }
     }
 
-    if (config().container().all_controllers()) {
+    if (RootContainer->Controllers & CGROUP_LEGACY) {
         cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID);
+        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID);
         cls.Rate = dev.GetConfig(PortoRate);
 
         error = cls.Create(*Nl);
@@ -803,7 +803,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
         uint64_t defRate;
         if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
             defRate = dev.Rate;
-        else if (handle == TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID))
+        else if (handle == TC_HANDLE(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID))
             defRate = dev.GetConfig(PortoRate);
         else
             defRate = dev.GetConfig(ContainerRate);
