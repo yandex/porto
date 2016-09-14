@@ -590,12 +590,12 @@ TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
     CurrentContainer->NewMemGuarantee = new_val;
 
     uint64_t total = GetTotalMemory();
-    uint64_t usage = CurrentContainer->GetRoot()->GetTotalMemGuarantee();
+    uint64_t usage = RootContainer->GetTotalMemGuarantee();
     uint64_t reserve = config().daemon().memory_guarantee_reserve();
 
     if (usage + reserve > total) {
         CurrentContainer->NewMemGuarantee = CurrentContainer->MemGuarantee;
-        int64_t left = total - reserve - CurrentContainer->GetRoot()->GetTotalMemGuarantee();
+        int64_t left = total - reserve - RootContainer->GetTotalMemGuarantee();
         return TError(EError::ResourceNotAvailable, "Only " + std::to_string(left) + " bytes left");
     }
 

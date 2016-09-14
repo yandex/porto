@@ -38,6 +38,7 @@ extern "C" {
 }
 
 std::mutex ContainersMutex;
+std::shared_ptr<TContainer> RootContainer;
 std::map<std::string, std::shared_ptr<TContainer>> Containers;
 TPath ContainersKV;
 
@@ -303,19 +304,8 @@ const std::string TContainer::GetTextId(const std::string &separator) const {
      return Parent->GetTextId(separator) + separator + Name;
 }
 
-bool TContainer::IsRoot() const {
-    return Id == ROOT_CONTAINER_ID;
-}
-
 bool TContainer::IsPortoRoot() const {
     return Id == PORTO_ROOT_CONTAINER_ID;
-}
-
-std::shared_ptr<const TContainer> TContainer::GetRoot() const {
-    if (Parent)
-        return Parent->GetRoot();
-    else
-        return shared_from_this();
 }
 
 bool TContainer::IsChildOf(const TContainer &ct) const {
@@ -357,7 +347,7 @@ pid_t TContainer::GetPidFor(pid_t pid) const {
 TError TContainer::OpenNetns(TNamespaceFd &netns) const {
     if (Task.Pid)
         return netns.Open(Task.Pid, "ns/net");
-    if (Net == GetRoot()->Net)
+    if (Net == HostNetwork)
         return netns.Open(GetTid(), "ns/net");
     return TError(EError::InvalidValue, "Cannot open netns: container not running");
 }
@@ -999,7 +989,7 @@ TError TContainer::Start(bool meta) {
     }
 
     /* NetNsCapabilities must be isoalted from host net-namespace */
-    if (Net == GetRoot()->Net && !CurrentClient->IsSuperUser()) {
+    if (Net == HostNetwork && !CurrentClient->IsSuperUser()) {
         if (CapAmbient.Permitted & NetNsCapabilities.Permitted) {
             error = TError(EError::Permission, "Capabilities require net isolation: " +
                                                NetNsCapabilities.Format());
@@ -1755,7 +1745,7 @@ TError TContainer::Load(const TKeyValue &node) {
         error = TError(EError::Unknown, "Container has no state");
 
     if (!node.Has(P_CONTROLLERS))
-        Controllers = GetRoot()->Controllers;
+        Controllers = RootContainer->Controllers;
 
     CurrentContainer = nullptr;
 
