@@ -12,8 +12,6 @@
 class TConfig : public TNonCopyable {
     cfg::TCfg Cfg;
 
-    const std::vector<std::string> ConfigFiles = { "/etc/portod.conf", "/etc/default/portod.conf" };
-
     void LoadDefaults();
     bool LoadFile(const std::string &path);
 public:

@@ -12,19 +12,14 @@ class TContainer;
 class TEpollLoop;
 
 struct TEpollSource : public TNonCopyable {
-    std::shared_ptr<TEpollLoop> EpollLoop;
     int Fd;
     int Flags;
     std::weak_ptr<TContainer> Container;
 
-    TEpollSource(std::shared_ptr<TEpollLoop> loop, int fd, int flags,
-                 std::weak_ptr<TContainer> container) : EpollLoop(loop), Fd(fd),
-                                                        Flags(flags),
-                                                        Container(container) {}
-    TEpollSource(std::shared_ptr<TEpollLoop> loop, int fd) : EpollLoop(loop),
-                                                             Fd(fd), Flags(0),
-                                                             Container() {}
-    TEpollSource() : EpollLoop(nullptr), Fd(-1), Flags(0), Container() {}
+    TEpollSource(int fd, int flags, std::weak_ptr<TContainer> container) :
+        Fd(fd), Flags(flags), Container(container) {}
+    TEpollSource(int fd) : Fd(fd), Flags(0), Container() {}
+    TEpollSource() : Fd(-1), Flags(0), Container() {}
 };
 
 class TEpollLoop : public TLockable, public TNonCopyable {

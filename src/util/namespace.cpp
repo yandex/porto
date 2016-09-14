@@ -1,8 +1,5 @@
 #include "namespace.hpp"
 
-using std::pair;
-using std::string;
-
 extern "C" {
 #include <fcntl.h>
 #include <sys/stat.h>

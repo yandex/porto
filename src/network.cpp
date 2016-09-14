@@ -5,7 +5,6 @@
 
 #include "network.hpp"
 #include "container.hpp"
-#include "holder.hpp"
 #include "config.hpp"
 #include "client.hpp"
 #include "util/log.hpp"
@@ -502,12 +501,11 @@ TError TNetwork::RefreshClasses(bool force) {
     for (auto &it: Containers) {
         auto ct = it.second.get();
         if (ct->Net.get() == this &&
-            (ct->GetState() == EContainerState::Running ||
-             ct->GetState() == EContainerState::Meta)) {
+            (ct->State == EContainerState::Running ||
+             ct->State == EContainerState::Meta)) {
             error = ct->UpdateTrafficClasses();
             if (error)
-                L_ERR() << "Cannot refresh tc for " << ct->GetName()
-                        << " : " << error << std::endl;
+                L_ERR() << "Cannot refresh tc for " << ct->Name << " : " << error << std::endl;
         }
     }
     L() << "done" << std::endl;

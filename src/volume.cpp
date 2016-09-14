@@ -4,7 +4,6 @@
 #include "volume.hpp"
 #include "layer.hpp"
 #include "container.hpp"
-#include "holder.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -1085,7 +1084,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
     }
 
     /* Save original creator. Just for the record. */
-    Creator = container.GetName() + " " + cred.User() + " " + cred.Group();
+    Creator = container.Name + " " + cred.User() + " " + cred.Group();
 
     CreatorCred = cred;
     CreatorRoot = container.RootPath;
@@ -1524,7 +1523,7 @@ TError TVolume::LinkContainer(TContainer &container) {
     if (IsDying)
         return TError(EError::Busy, "Volume is dying");
 
-    Containers.push_back(container.GetName());
+    Containers.push_back(container.Name);
     TError error = Save();
     if (error)
         Containers.pop_back();
@@ -1545,8 +1544,8 @@ TError TVolume::UnlinkContainer(TContainer &container) {
         return TError(EError::Busy, "Volume is dying");
 
     container.Volumes.erase(it);
-    Containers.erase(std::remove(Containers.begin(), Containers.end(), container.GetName()),
-                     Containers.end());
+    Containers.erase(std::remove(Containers.begin(), Containers.end(),
+                                 container.Name), Containers.end());
     if (Containers.empty())
         IsDying = true;
 

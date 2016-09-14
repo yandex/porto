@@ -90,10 +90,10 @@ public:
     TPath Place;
 
     TVolume() {
-        Statistics->Volumes++;
+        Statistics->VolumesCount++;
     }
     ~TVolume() {
-        Statistics->Volumes--;
+        Statistics->VolumesCount--;
     }
 
     static TError Create(const TPath &path, const TStringMap &cfg,

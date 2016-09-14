@@ -3,7 +3,6 @@
 #include "rpc.hpp"
 #include "config.hpp"
 #include "version.hpp"
-#include "holder.hpp"
 #include "property.hpp"
 #include "container.hpp"
 #include "volume.hpp"
@@ -13,8 +12,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
-
-using std::string;
+#include "portod.hpp"
 
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
     if (Verbose)
@@ -283,284 +281,113 @@ static TError CheckPortoWriteAccess() {
     return TError::Success();
 }
 
-static noinline TError CreateContainer(TContext &context,
-                                std::string reqName, bool weak,
-                                rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
+static noinline TError CreateContainer(std::string reqName, bool weak,
+                                       rpc::TContainerResponse &rsp) {
+    TError error = CheckPortoWriteAccess();
+    if (error)
+        return error;
 
     std::string name;
-    err = CurrentClient->ResolveRelativeName(reqName, name);
-    if (err)
-        return err;
-
-    auto parent = context.Cholder->GetParent(name);
-    if (!parent)
-        return TError(EError::InvalidValue, "invalid parent container");
-
-    TNestedScopedLock lock(*parent, holder_lock);
-    if (!parent->IsValid())
-        return TError(EError::ContainerDoesNotExist, "Parent container doesn't exist");
-
-    if (parent->IsAcquired())
-        return TError(EError::Busy, "Parent container " + parent->GetName() + " is busy");
-
-    std::shared_ptr<TContainer> container;
-    err = context.Cholder->Create(holder_lock, name, container);
-
-    if (!err && weak) {
-        container->IsWeak = true;
-        container->SetProp(EProperty::WEAK);
-
-        err = container->Save();
-        if (!err)
-            CurrentClient->WeakContainers.emplace_back(container);
-    }
-
-    return err;
-}
-
-noinline TError DestroyContainer(TContext &context,
-                                 const rpc::TContainerDestroyRequest &req,
-                                 rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> parent;
-
-    // we don't want to hold container shared_ptr because Destroy
-    // might think that it has some parent that holds it
-    {
-        std::shared_ptr<TContainer> container;
-        TNestedScopedLock lock;
-        err = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), true, container, lock);
-        if (err)
-            return err;
-
-        parent = container->GetParent();
-
-        {
-            TScopedAcquire acquire(container);
-            if (!acquire.IsAcquired())
-                return TError(EError::Busy, "Can't destroy busy container");
-
-            err = context.Cholder->Destroy(holder_lock, container);
-            if (err)
-                return err;
-        }
-    }
-
-    if (parent) {
-        TNestedScopedLock lock(*parent, holder_lock);
-        parent->CleanupExpiredChildren();
-    }
-
-    return TError::Success();
-}
-
-noinline TError StartContainer(TContext &context,
-                               const rpc::TContainerStartRequest &req,
-                               rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    /* Check if target container exists */
-    std::string name;
-    err = CurrentClient->ResolveRelativeName(req.name(), name);
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> target;
-    err = TContainer::Find(name, target);
-    if (err)
-        return err;
-
-    std::vector<std::string> nameVec;
-    err = SplitString(name, '/', nameVec);
-    if (err)
-        return TError(EError::InvalidValue, "Invalid container name " + req.name());
-
-    std::shared_ptr<TContainer> topContainer = nullptr;
-
-    name = "";
-    for (auto i = nameVec.begin(); i != nameVec.end(); i++) {
-        if (!name.empty())
-            name += "/";
-        name += *i;
-
-        std::shared_ptr<TContainer> container;
-        TNestedScopedLock lock;
-        err = context.Cholder->GetLocked(holder_lock, nullptr, name, false, container, lock);
-        if (err)
-            goto release;
-
-        if (i + 1 != nameVec.end())
-            if (container->GetState() == EContainerState::Running ||
-                container->GetState() == EContainerState::Meta)
-                continue;
-
-        err = CurrentClient->CanControl(*container);
-        if (err)
-            goto release;
-
-        if (!topContainer) {
-            topContainer = container;
-
-            if (!topContainer->Acquire())
-                return TError(EError::Busy, "Can't start busy container " + topContainer->GetName());
-        }
-
-        std::string cmd = container->Command;
-        bool meta = i + 1 != nameVec.end() && cmd.empty();
-
-        auto parent = container->GetParent();
-        if (parent) {
-            // we got concurrent request which stopped our parent
-            if (parent->GetState() != EContainerState::Running &&
-                parent->GetState() != EContainerState::Meta) {
-                err = TError(EError::Busy, "Can't start busy container (concurrent stop/destroy)");
-                goto release;
-            }
-        }
-
-        holder_lock.unlock();
-
-        err = container->Start(meta);
-
-        holder_lock.lock();
-
-        if (err)
-            goto release;
-    }
-
-release:
-    if (topContainer)
-        topContainer->Release();
-
-    return err;
-}
-
-noinline TError StopContainer(TContext &context,
-                              const rpc::TContainerStopRequest &req,
-                              rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), true, container, lock);
+    error = CurrentClient->ResolveName(reqName, name);
     if (error)
         return error;
 
-    TScopedAcquire acquire(container);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't stop busy container");
-
-    uint64_t timeout_ms = req.has_timeout_ms() ?
-        req.timeout_ms() : config().container().stop_timeout_ms();
-
-    return container->Stop(holder_lock, timeout_ms);
-}
-
-noinline TError PauseContainer(TContext &context,
-                               const rpc::TContainerPauseRequest &req,
-                               rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), true, container, lock);
+    std::shared_ptr<TContainer> ct;
+    error = TContainer::Create(name, ct);
     if (error)
         return error;
 
-    TScopedAcquire acquire(container);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't pause busy container");
+    if (!error && weak) {
+        ct->IsWeak = true;
+        ct->SetProp(EProperty::WEAK);
 
-    return container->Pause(holder_lock);
-}
-
-noinline TError ResumeContainer(TContext &context,
-                                const rpc::TContainerResumeRequest &req,
-                                rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), true, container, lock);
-    if (error)
-        return error;
-
-    TScopedAcquire acquire(container);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't resume busy container");
-
-    return container->Resume(holder_lock);
-}
-
-noinline TError ListContainers(TContext &context, rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    for (auto &c : context.Cholder->List()) {
-        std::string name;
-        if (!CurrentClient->ComposeRelativeName(c->GetName(), name))
-            rsp.mutable_list()->add_name(name);
+        error = ct->Save();
+        if (!error)
+            CurrentClient->WeakContainers.emplace_back(ct);
     }
-
-    return TError::Success();
-}
-
-noinline TError GetContainerProperty(TContext &context,
-                                     const rpc::TContainerGetPropertyRequest &req,
-                                     rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), false, container, lock);
-    if (error)
-        return error;
-
-    if (!container->IsValid())
-        return TError(EError::ContainerDoesNotExist, "container doesn't exist");
-
-    string value;
-    error = container->GetProperty(req.property(), value);
-    if (!error)
-        rsp.mutable_getproperty()->set_value(value);
 
     return error;
 }
 
-noinline TError SetContainerProperty(TContext &context,
-                                     const rpc::TContainerSetPropertyRequest &req,
+noinline TError DestroyContainer(const rpc::TContainerDestroyRequest &req,
+                                 rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+    return ct->Destroy();
+}
+
+noinline TError StartContainer(const rpc::TContainerStartRequest &req,
+                               rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+    return ct->Start();
+}
+
+noinline TError StopContainer(const rpc::TContainerStopRequest &req,
+                              rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+    uint64_t timeout_ms = req.has_timeout_ms() ?
+        req.timeout_ms() : config().container().stop_timeout_ms();
+    return ct->Stop(timeout_ms);
+}
+
+noinline TError PauseContainer(const rpc::TContainerPauseRequest &req,
+                               rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+
+    return ct->Pause();
+}
+
+noinline TError ResumeContainer(const rpc::TContainerResumeRequest &req,
+                                rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+    return ct->Resume();
+}
+
+noinline TError ListContainers(rpc::TContainerResponse &rsp) {
+    auto lock = LockContainers();
+    for (auto &it: Containers) {
+        std::string name;
+        if (!it.second->IsRoot() &&
+                !CurrentClient->ComposeName(it.second->Name, name))
+            rsp.mutable_list()->add_name(name);
+    }
+    return TError::Success();
+}
+
+noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &req,
                                      rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->ReadContainer(req.name(), ct);
+    if (!error) {
+        std::string value;
+        error = ct->GetProperty(req.property(), value);
+        if (!error)
+            rsp.mutable_getproperty()->set_value(value);
+    }
+    return error;
+}
+
+noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &req,
+                                     rpc::TContainerResponse &rsp) {
     std::string property = req.property();
     std::string value = req.value();
 
     /* legacy kludge */
-    if (property.find('.') != string::npos) {
+    if (property.find('.') != std::string::npos) {
         if (property == "cpu.smart") {
             if (value == "0") {
                 property = P_CPU_POLICY;
@@ -579,56 +406,29 @@ noinline TError SetContainerProperty(TContext &context,
         }
     }
 
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), true, container, lock);
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
     if (error)
         return error;
 
-    TScopedAcquire acquire(container);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't set property " + property + " of busy container " + container->GetName());
-
-    return container->SetProperty(property, value);
+    return ct->SetProperty(property, value);
 }
 
-noinline TError GetContainerData(TContext &context,
-                                 const rpc::TContainerGetDataRequest &req,
+noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
                                  rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), false, container, lock);
-    if (error)
-        return error;
-
-    if (!container->IsValid())
-        return TError(EError::ContainerDoesNotExist, "container doesn't exist");
-
-    string value;
-    error = container->GetProperty(req.data(), value);
-    if (!error)
-        rsp.mutable_getdata()->set_value(value);
-
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->ReadContainer(req.name(), ct);
+    if (!error) {
+        std::string value;
+        error = ct->GetProperty(req.data(), value);
+        if (!error)
+            rsp.mutable_getdata()->set_value(value);
+    }
     return error;
 }
 
-noinline TError GetContainerCombined(TContext &context,
-                                     const rpc::TContainerGetRequest &req,
+noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
                                      rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    if (!req.variable_size())
-        return TError(EError::InvalidValue, "Properties/data are not specified");
-
-    if (!req.name_size())
-        return TError(EError::InvalidValue, "Containers are not specified");
-
     auto get = rsp.mutable_get();
 
     for (int i = 0; i < req.name_size(); i++) {
@@ -637,26 +437,8 @@ noinline TError GetContainerCombined(TContext &context,
         auto entry = get->add_list();
         entry->set_name(relname);
 
-        std::string name;
-        std::shared_ptr<TContainer> container;
-
-        TNestedScopedLock lock;
-        TError containerError = CurrentClient->ResolveRelativeName(relname, name, true);
-        if (!containerError) {
-            containerError = TContainer::Find(name, container);
-            if (!containerError && container) {
-                if (container->IsAcquired()) {
-                    containerError = TError(EError::Busy, "Can't get data and property of busy container");
-                } else {
-                    lock = TNestedScopedLock(*container, holder_lock);
-                    if (!container->IsValid())
-                        containerError = TError(EError::ContainerDoesNotExist, "container doesn't exist");
-                    else if (container->IsAcquired())
-                        containerError = TError(EError::Busy, "Can't get data and property of busy container");
-                }
-            }
-        }
-
+        std::shared_ptr<TContainer> ct;
+        TError containerError = CurrentClient->ReadContainer(relname, ct, true);
         for (int j = 0; j < req.variable_size(); j++) {
             auto var = req.variable(j);
 
@@ -664,8 +446,8 @@ noinline TError GetContainerCombined(TContext &context,
             std::string value;
 
             TError error = containerError;
-            if (!error && container)
-                error = container->GetProperty(var, value);
+            if (!error)
+                error = ct->GetProperty(var, value);
 
             keyval->set_variable(var);
             if (error) {
@@ -680,77 +462,37 @@ noinline TError GetContainerCombined(TContext &context,
     return TError::Success();
 }
 
-noinline TError ListProperty(TContext &context,
-                             rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
+noinline TError ListProperty(rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, nullptr, ROOT_CONTAINER, false, container, lock);
-    if (error)
-        return TError(EError::Unknown, "Can't find root container");
-
     for (auto elem : ContainerProperties) {
-        if (!elem.second->IsSupported ||
-                elem.second->IsReadOnly ||
-                elem.second->IsHidden)
+        if (elem.second->IsReadOnly || !elem.second->IsSupported || elem.second->IsHidden)
             continue;
-
         auto entry = list->add_list();
         entry->set_name(elem.first);
         entry->set_desc(elem.second->Desc.c_str());
     }
-
     return TError::Success();
 }
 
-noinline TError ListData(TContext &context,
-                         rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
+noinline TError ListData(rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, nullptr, ROOT_CONTAINER, false, container, lock);
-    if (error)
-        return TError(EError::Unknown, "Can't find root container");
-
     for (auto elem : ContainerProperties) {
-        if (!elem.second->IsSupported || !elem.second->IsReadOnly ||
-            elem.second->IsHidden)
+        if (!elem.second->IsReadOnly || !elem.second->IsSupported || elem.second->IsHidden)
             continue;
-
         auto entry = list->add_list();
         entry->set_name(elem.first);
         entry->set_desc(elem.second->Desc.c_str());
     }
-
     return TError::Success();
 }
 
-noinline TError Kill(TContext &context,
-                     const rpc::TContainerKillRequest &req,
+noinline TError Kill(const rpc::TContainerKillRequest &req,
                      rpc::TContainerResponse &rsp) {
-    auto holder_lock = LockContainers();
-
-    TError err = CheckPortoWriteAccess();
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> container;
-    TNestedScopedLock lock;
-    TError error = context.Cholder->GetLocked(holder_lock, CurrentClient, req.name(), true, container, lock);
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.name(), ct);
     if (error)
         return error;
-
-    TScopedAcquire acquire(container);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't kill busy container");
-
-    return container->Kill(req.sig());
+    return ct->Kill(req.sig());
 }
 
 noinline TError Version(rpc::TContainerResponse &rsp) {
@@ -762,8 +504,7 @@ noinline TError Version(rpc::TContainerResponse &rsp) {
     return TError::Success();
 }
 
-noinline TError Wait(TContext &context,
-                     const rpc::TContainerWaitRequest &req,
+noinline TError Wait(const rpc::TContainerWaitRequest &req,
                      rpc::TContainerResponse &rsp,
                      std::shared_ptr<TClient> &client) {
     auto lock = LockContainers();
@@ -786,51 +527,44 @@ noinline TError Wait(TContext &context,
         std::string name = req.name(i);
         std::string abs_name;
 
-        if (name.find('*') != string::npos) {
+        if (name.find('*') != std::string::npos) {
             waiter->Wildcards.push_back(name);
             continue;
         }
 
-        TError err = client->ResolveRelativeName(name, abs_name, true);
-        if (err) {
+        std::shared_ptr<TContainer> ct;
+        TError error = client->ResolveContainer(name, ct);
+        if (error) {
             rsp.mutable_wait()->set_name(name);
-            return err;
-        }
-
-        std::shared_ptr<TContainer> container;
-        err = TContainer::Find(abs_name, container);
-        if (err) {
-            rsp.mutable_wait()->set_name(name);
-            return err;
+            return error;
         }
 
         /* Explicit wait notifies non-running and hollow meta immediately */
-        auto state = container->GetState();
-        if (state != EContainerState::Running &&
-                (state != EContainerState::Meta ||
-                 !container->GetRunningChildren())) {
+        if (ct->State != EContainerState::Running &&
+                (ct->State != EContainerState::Meta ||
+                 !ct->GetRunningChildren())) {
             rsp.mutable_wait()->set_name(name);
             return TError::Success();
         }
 
         if (queueWait)
-            container->AddWaiter(waiter);
+            ct->AddWaiter(waiter);
     }
 
     if (!waiter->Wildcards.empty()) {
-        for (auto &container : context.Cholder->List()) {
-            if (container->IsRoot())
+        for (auto &it: Containers) {
+            auto &ct = it.second;
+            if (ct->IsRoot())
                 continue;
 
             /* Wildcard notifies immediately only dead and hollow meta */
-            auto state = container->GetState();
-            if (state != EContainerState::Dead &&
-                (state != EContainerState::Meta ||
-                 container->GetRunningChildren()))
+            if (ct->State != EContainerState::Dead &&
+                (ct->State != EContainerState::Meta ||
+                 ct->GetRunningChildren()))
                 continue;
 
             std::string name;
-            if (!client->ComposeRelativeName(container->GetName(), name) &&
+            if (!client->ComposeName(ct->Name, name) &&
                     waiter->MatchWildcard(name)) {
                 rsp.mutable_wait()->set_name(name);
                 return TError::Success();
@@ -851,7 +585,7 @@ noinline TError Wait(TContext &context,
     if (req.has_timeout()) {
         TEvent e(EEventType::WaitTimeout, nullptr);
         e.WaitTimeout.Waiter = waiter;
-        context.Queue->Add(req.timeout(), e);
+        EventQueue->Add(req.timeout(), e);
     }
 
     return TError::Queued();
@@ -859,80 +593,49 @@ noinline TError Wait(TContext &context,
 
 noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
                             rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> src, dst;
+    TError error;
+
     auto lock = LockContainers();
-    std::string source, destination;
-    std::shared_ptr<TContainer> sourceContainer, destContainer;
-    TError err;
+    error = CurrentClient->ResolveContainer(
+            (req.has_source() && req.source().length()) ?
+            req.source() : SELF_CONTAINER, src);
+    if (error)
+        return error;
+    error = CurrentClient->ResolveContainer(
+            (req.has_destination() && req.destination().length()) ?
+            req.destination() : SELF_CONTAINER, dst);
+    if (error)
+        return error;
 
-    if (req.has_source() && req.source() != "") {
-        err = CurrentClient->ResolveRelativeName(req.source(), source, true);
-        if (!err)
-            err = TContainer::Find(source, sourceContainer);
-    } else
-        err = CurrentClient->GetClientContainer(sourceContainer);
-    if (err)
-        return err;
-
-    if (req.has_destination() && req.destination() != "") {
-        err = CurrentClient->ResolveRelativeName(req.destination(), destination, true);
-        if (!err)
-            err = TContainer::Find(destination, destContainer);
-    } else
-        err = CurrentClient->GetClientContainer(destContainer);
-    if (err)
-        return err;
-
-    if (sourceContainer == destContainer) {
+    if (src == dst) {
         rsp.mutable_convertpath()->set_path(req.path());
         return TError::Success();
     }
 
-    // There are 3 possible options:
-    // 1) destination is an ancestor of source
-    // 2) source and destination are siblings with identical root
-    // 3) we can't do anything
-    auto src = sourceContainer;
-    auto dest = destContainer;
-    bool src_isolated = false;
-    bool dest_isolated = false;
-    std::string details;
+    TPath srcRoot;
+    if (src->State == EContainerState::Stopped) {
+        for (auto ct = src; ct; ct = ct->Parent)
+            srcRoot = ct->Root / srcRoot;
+    } else
+        srcRoot = src->RootPath;
+    srcRoot = srcRoot.NormalPath();
 
-    for (;;) {
-        L() << "source: " << src->GetName() << std::endl
-            << "destination: " << dest->GetName() << std::endl;
-        if (src == dest) {
-            if (!dest_isolated) {
-                // 1) or 2), build path
-                TPath path = TPath(req.path());
-                for (src = sourceContainer; src != dest; src = src->GetParent()) {
-                    path = TPath(src->Root) / TPath(path);
-                }
-                rsp.mutable_convertpath()->set_path(path.ToString());
-                return TError::Success();
-            } else {
-                // unreachable place, but, technically, 3)
-                PORTO_ASSERT(1);
-            }
-        }
-        if (src->GetLevel() > dest->GetLevel()) {
-            // TODO: think about bind mounts
-            if (!src_isolated && src->Root != "/") {
-                src_isolated = true;
-            }
-            src = src->GetParent();
-        } else {
-            // TODO: think about bind mounts
-            if (!dest_isolated && dest->Root != "/") {
-                dest_isolated = true;
-                details = "source container is unreachable from destination container";
-                // We can't do anything
-                break;
-            }
-            dest = dest->GetParent();
-        }
-    }
+    TPath dstRoot;
+    if (dst->State == EContainerState::Stopped) {
+        for (auto ct = dst; ct; ct = ct->Parent)
+            dstRoot = ct->Root / dstRoot;
+    } else
+        dstRoot = dst->RootPath;
+    dstRoot = dstRoot.NormalPath();
 
-    return TError(EError::InvalidValue, "Can't resolve path: " + details);
+    TPath path(srcRoot / req.path());
+    path = dstRoot.InnerPath(path);
+
+    if (path.IsEmpty())
+        return TError(EError::InvalidValue, "Path is unreachable");
+    rsp.mutable_convertpath()->set_path(path.ToString());
+    return TError::Success();
 }
 
 noinline TError ListVolumeProperties(const rpc::TVolumePropertyListRequest &req,
@@ -958,21 +661,20 @@ noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
     }
     for (auto &name: volume->Containers) {
         std::string relative;
-        if (!CurrentClient->ComposeRelativeName(name, relative))
+        if (!CurrentClient->ComposeName(name, relative))
             desc->add_containers(relative);
     }
 }
 
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp) {
-    TError error = CheckPortoWriteAccess();
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(SELF_CONTAINER, ct, true);
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> container;
-    error = CurrentClient->GetClientContainer(container);
-    if (error)
-        return error;
+    /* FIXME unlock between create and build */
+    CurrentClient->ReleaseContainer();
 
     TStringMap cfg;
     for (auto p: req.properties())
@@ -980,16 +682,16 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
 
     TPath volume_path;
     if (req.has_path() && !req.path().empty())
-        volume_path =  container->RootPath / req.path();
+        volume_path =  ct->RootPath / req.path();
 
     std::shared_ptr<TVolume> volume;
-    error = TVolume::Create(volume_path, cfg, *container,
+    error = TVolume::Create(volume_path, cfg, *ct,
                             CurrentClient->TaskCred, volume);
     if (error)
         return error;
 
-    volume_path = container->RootPath.InnerPath(volume->Path, true);
-    FillVolumeDescription(rsp.mutable_volume(), container->RootPath,
+    volume_path = ct->RootPath.InnerPath(volume->Path, true);
+    FillVolumeDescription(rsp.mutable_volume(), ct->RootPath,
                           volume_path, volume);
 
     return TError::Success();
@@ -1001,16 +703,11 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req,
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> clientContainer;
-    error = CurrentClient->GetClientContainer(clientContainer);
-    if (error)
-        return error;
-
     TStringMap cfg;
     for (auto p: req.properties())
         cfg[p.name()] = p.value();
 
-    TPath volume_path = clientContainer->RootPath / req.path();
+    TPath volume_path = CurrentClient->ResolvePath(req.path());
     std::shared_ptr<TVolume> volume;
 
     error = TVolume::Find(volume_path, volume);
@@ -1026,100 +723,45 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req,
 
 noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req,
                            rpc::TContainerResponse &rsp) {
-    TError error = CheckPortoWriteAccess();
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.has_container() ?
+                                req.container() : SELF_CONTAINER, ct, true);
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> clientContainer;
-    error = CurrentClient->GetClientContainer(clientContainer);
-    if (error)
-        return error;
-
-    auto cholder_lock = LockContainers();
-
-    std::shared_ptr<TContainer> container;
-    if (req.has_container()) {
-        std::string name;
-        TError err = CurrentClient->ResolveRelativeName(req.container(), name, true);
-        if (err)
-            return err;
-
-        TError error = TContainer::Find(name, container);
-        if (error)
-            return error;
-
-        if (container != clientContainer) {
-            error = CurrentClient->CanControl(*container);
-            if (error)
-                return error;
-        }
-    } else {
-        container = clientContainer;
-    }
-
-    cholder_lock.unlock();
-
-    TPath volume_path = clientContainer->RootPath / req.path();
+    TPath volume_path = CurrentClient->ResolvePath(req.path());
     std::shared_ptr<TVolume> volume;
-
     error = TVolume::Find(volume_path, volume);
     if (error)
         return error;
-
     error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
-    return volume->LinkContainer(*container);
+    return volume->LinkContainer(*ct);
 }
 
 noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
                              rpc::TContainerResponse &rsp) {
-    TError error = CheckPortoWriteAccess();
+    std::shared_ptr<TContainer> ct;
+    TError error = CurrentClient->WriteContainer(req.has_container() ?
+                                req.container() : SELF_CONTAINER, ct, true);
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> clientContainer;
-    error = CurrentClient->GetClientContainer(clientContainer);
-    if (error)
-        return error;
-
-    auto cholder_lock = LockContainers();
-
-    std::shared_ptr<TContainer> container;
-    if (req.has_container()) {
-        std::string name;
-        TError err = CurrentClient->ResolveRelativeName(req.container(), name, true);
-        if (err)
-            return err;
-
-        TError error = TContainer::Find(name, container);
-        if (error)
-            return error;
-
-        if (container != clientContainer) {
-            error = CurrentClient->CanControl(*container);
-            if (error)
-                return error;
-        }
-    } else {
-        container = clientContainer;
-    }
-
-    cholder_lock.unlock();
-
-    TPath volume_path = clientContainer->RootPath / req.path();
+    TPath volume_path = CurrentClient->ResolvePath(req.path());
     std::shared_ptr<TVolume> volume;
-
     error = TVolume::Find(volume_path, volume);
     if (error)
         return error;
-
     error = CurrentClient->CanControl(volume->VolumeOwner);
     if (error)
         return error;
 
-    error = volume->UnlinkContainer(*container);
+    error = volume->UnlinkContainer(*ct);
+
+    CurrentClient->ReleaseContainer();
+
     if (!error && volume->IsDying)
         volume->Destroy();
 
@@ -1128,12 +770,8 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
 
 noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
                             rpc::TContainerResponse &rsp) {
-    std::shared_ptr<TContainer> clientContainer;
-    TError error = CurrentClient->GetClientContainer(clientContainer);
-    if (error)
-        return error;
-
-    TPath container_root = clientContainer->RootPath;
+    TPath container_root = CurrentClient->ResolvePath("/");
+    TError error;
 
     if (req.has_path() && !req.path().empty()) {
         TPath volume_path = container_root / req.path();
@@ -1183,17 +821,12 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> clientContainer;
-    error = CurrentClient->GetClientContainer(clientContainer);
-    if (error)
-        return error;
-
     TPath tarball(req.tarball());
 
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = clientContainer->RootPath / tarball;
+    tarball = CurrentClient->ResolvePath(tarball);
 
     if (!tarball.Exists())
         return TError(EError::InvalidValue, "tarball not found");
@@ -1212,17 +845,12 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> clientContainer;
-    error = CurrentClient->GetClientContainer(clientContainer);
-    if (error)
-        return error;
-
     TPath tarball(req.tarball());
 
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = clientContainer->RootPath / tarball;
+    tarball =  CurrentClient->ResolvePath(tarball);
 
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
@@ -1287,23 +915,17 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     return error;
 }
 
-void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
+void HandleRpcRequest(const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
-    string str;
+    std::string str;
 
     client->StartRequest();
 
     bool log = Verbose || !InfoRequest(req);
-    if (log) {
-        std::string ns = "";
-        std::shared_ptr<TContainer> clientContainer;
-        TError error = client->GetClientContainer(clientContainer);
-        if (!error)
-            ns = clientContainer->GetPortoNamespace();
-
-        L_REQ() << RequestAsString(req) << " from " << *client << " [" << ns << "]" << std::endl;
-    }
+    if (log)
+        L_REQ() << RequestAsString(req) << " from " << *client
+                << " [" << client->ClientContainer->GetPortoNamespace() << "]" << std::endl;
 
     rsp.set_error(EError::Unknown);
 
@@ -1313,39 +935,39 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             L_ERR() << "Invalid request " << req.ShortDebugString() << " from " << *client << std::endl;
             error = TError(EError::InvalidMethod, "invalid request");
         } else if (req.has_create())
-            error = CreateContainer(context, req.create().name(), false, rsp);
+            error = CreateContainer(req.create().name(), false, rsp);
         else if (req.has_createweak())
-            error = CreateContainer(context, req.createweak().name(), true, rsp);
+            error = CreateContainer(req.createweak().name(), true, rsp);
         else if (req.has_destroy())
-            error = DestroyContainer(context, req.destroy(), rsp);
+            error = DestroyContainer(req.destroy(), rsp);
         else if (req.has_list())
-            error = ListContainers(context, rsp);
+            error = ListContainers(rsp);
         else if (req.has_getproperty())
-            error = GetContainerProperty(context, req.getproperty(), rsp);
+            error = GetContainerProperty(req.getproperty(), rsp);
         else if (req.has_setproperty())
-            error = SetContainerProperty(context, req.setproperty(), rsp);
+            error = SetContainerProperty(req.setproperty(), rsp);
         else if (req.has_getdata())
-            error = GetContainerData(context, req.getdata(), rsp);
+            error = GetContainerData(req.getdata(), rsp);
         else if (req.has_get())
-            error = GetContainerCombined(context, req.get(), rsp);
+            error = GetContainerCombined(req.get(), rsp);
         else if (req.has_start())
-            error = StartContainer(context, req.start(), rsp);
+            error = StartContainer(req.start(), rsp);
         else if (req.has_stop())
-            error = StopContainer(context, req.stop(), rsp);
+            error = StopContainer(req.stop(), rsp);
         else if (req.has_pause())
-            error = PauseContainer(context, req.pause(), rsp);
+            error = PauseContainer(req.pause(), rsp);
         else if (req.has_resume())
-            error = ResumeContainer(context, req.resume(), rsp);
+            error = ResumeContainer(req.resume(), rsp);
         else if (req.has_propertylist())
-            error = ListProperty(context, rsp);
+            error = ListProperty(rsp);
         else if (req.has_datalist())
-            error = ListData(context, rsp);
+            error = ListData(rsp);
         else if (req.has_kill())
-            error = Kill(context, req.kill(), rsp);
+            error = Kill(req.kill(), rsp);
         else if (req.has_version())
             error = Version(rsp);
         else if (req.has_wait())
-            error = Wait(context, req.wait(), rsp, client);
+            error = Wait(req.wait(), rsp, client);
         else if (req.has_listvolumeproperties())
             error = ListVolumeProperties(req.listvolumeproperties(), rsp);
         else if (req.has_createvolume())
@@ -1384,11 +1006,11 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         error = TError(EError::Unknown, "unknown error");
     }
 
+    client->FinishRequest();
+
     if (error.GetError() != EError::Queued) {
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
         SendReply(*client, rsp, log);
     }
-
-    client->FinishRequest();
 }

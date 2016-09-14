@@ -7,11 +7,11 @@
 #include "container.hpp"
 #include "property.hpp"
 #include "statistics.hpp"
-#include "holder.hpp"
 #include "config.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
+#include "portod.hpp"
 
 #include <google/protobuf/io/coded_stream.h>
 
@@ -25,9 +25,9 @@ extern "C" {
 TClient SystemClient("<system>");
 __thread TClient *CurrentClient = nullptr;
 
-TClient::TClient(std::shared_ptr<TEpollLoop> loop) : TEpollSource(loop, -1) {
+TClient::TClient() : TEpollSource(-1) {
     ConnectionTime = GetCurrentTimeMs();
-    Statistics->Clients++;
+    Statistics->ClientsCount++;
 }
 
 TClient::TClient(const std::string &special) {
@@ -39,10 +39,10 @@ TClient::TClient(const std::string &special) {
 TClient::~TClient() {
     CloseConnection();
     if (AccessLevel != EAccessLevel::Internal)
-        Statistics->Clients--;
+        Statistics->ClientsCount--;
 }
 
-TError TClient::AcceptConnection(TContext &context, int listenFd) {
+TError TClient::AcceptConnection(int listenFd) {
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
     TError error;
@@ -57,7 +57,7 @@ TError TClient::AcceptConnection(TContext &context, int listenFd) {
         return error;
     }
 
-    error = IdentifyClient(*context.Cholder, true);
+    error = IdentifyClient(true);
     if (error) {
         close(Fd);
         Fd = -1;
@@ -98,6 +98,7 @@ void TClient::StartRequest() {
 }
 
 void TClient::FinishRequest() {
+    ReleaseContainer();
     PORTO_ASSERT(CurrentClient == this);
     CurrentClient = nullptr;
 }
@@ -106,7 +107,7 @@ uint64_t TClient::GetRequestTimeMs() {
     return GetCurrentTimeMs() - RequestStartMs;
 }
 
-TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
+TError TClient::IdentifyClient(bool initial) {
     std::shared_ptr<TContainer> ct;
     struct ucred cr;
     socklen_t len = sizeof(cr);
@@ -117,14 +118,16 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
 
     /* check that request from the same pid and container is still here */
     if (!initial && Pid == cr.pid && TaskCred.Uid == cr.uid &&
-            TaskCred.Gid == cr.gid && !ClientContainer.expired())
+            TaskCred.Gid == cr.gid && ClientContainer &&
+            (ClientContainer->State == EContainerState::Running ||
+             ClientContainer->State == EContainerState::Meta))
         return TError::Success();
 
     TaskCred.Uid = cr.uid;
     TaskCred.Gid = cr.gid;
     Pid = cr.pid;
 
-    error = holder.FindTaskContainer(Pid, ct);
+    error = TContainer::FindTaskContainer(Pid, ct);
     if (error && error.GetErrno() != ENOENT)
         L_WRN() << "Cannot identify container of pid " << Pid
                 << " : " << error << std::endl;
@@ -136,8 +139,10 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
         AccessLevel = std::min(AccessLevel, p->AccessLevel);
 
     if (AccessLevel == EAccessLevel::None)
-        return TError(EError::Permission,
-                      "Porto disabled in container " + ct->GetName());
+        return TError(EError::Permission, "Porto disabled in container " + ct->Name);
+
+    if (ct->State != EContainerState::Running && ct->State != EContainerState::Meta)
+        return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 
     ClientContainer = ct;
 
@@ -200,20 +205,8 @@ TError TClient::LoadGroups() {
     return TError::Success();
 }
 
-std::string TClient::GetContainerName() const {
-    auto c = ClientContainer.lock();
-    if (c)
-        return c->GetName();
-    else
-        return "<deleted container>";
-}
-
-TError TClient::ComposeRelativeName(const std::string &name,
-                                    std::string &relative_name) const {
-    auto base = ClientContainer.lock();
-    if (!base)
-        return TError(EError::ContainerDoesNotExist, "Cannot find client container");
-    std::string ns = base->GetPortoNamespace();
+TError TClient::ComposeName(const std::string &name, std::string &relative_name) const {
+    std::string ns = ClientContainer->GetPortoNamespace();
 
     if (name == ROOT_CONTAINER) {
         relative_name = ROOT_CONTAINER;
@@ -225,75 +218,95 @@ TError TClient::ComposeRelativeName(const std::string &name,
         return TError::Success();
     }
 
-    if (name.length() <= ns.length() || name.compare(0, ns.length(), ns) != 0)
-        return TError(EError::ContainerDoesNotExist,
+    if (!StringStartsWith(name, ns))
+        return TError(EError::Permission,
                 "Cannot access container " + name + " from namespace " + ns);
 
     relative_name = name.substr(ns.length());
     return TError::Success();
 }
 
-TError TClient::ResolveRelativeName(const std::string &relative_name,
-                                    std::string &absolute_name,
-                                    bool resolve_meta) const {
-    auto base = ClientContainer.lock();
-    if (!base)
-        return TError(EError::ContainerDoesNotExist, "Cannot find client container");
-    std::string ns = base->GetPortoNamespace();
-
-    /* FIXME get rid of this crap */
-    if (!resolve_meta && (relative_name == DOT_CONTAINER ||
-                          relative_name == ROOT_CONTAINER))
-        return TError(EError::Permission, "System containers are read only");
+TError TClient::ResolveName(const std::string &relative_name, std::string &name) const {
+    std::string ns = ClientContainer->GetPortoNamespace();
 
     if (relative_name == ROOT_CONTAINER)
-        absolute_name = relative_name;
+        name = ROOT_CONTAINER;
     else if (relative_name == SELF_CONTAINER)
-        absolute_name = base->GetName();
-    else if (StringStartsWith(relative_name,
-                std::string(SELF_CONTAINER) + "/")) {
-        absolute_name = (base->IsRoot() ? "" : base->GetName() + "/") +
-            relative_name.substr(std::string(SELF_CONTAINER).length() + 1);
-    } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
-        absolute_name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
-        if (!StringStartsWith(absolute_name, ns))
-            return TError(EError::Permission,
-                    "Absolute container name out of current namespace");
-    } else if (relative_name == DOT_CONTAINER) {
-        size_t off = ns.rfind('/');
-        if (off != std::string::npos)
-            absolute_name = ns.substr(0, off);
-        else
-            absolute_name = ROOT_CONTAINER;
+        name = ClientContainer->Name;
+    else if (relative_name == DOT_CONTAINER)
+        name = TContainer::ParentName(ns);
+    else if (StringStartsWith(relative_name, SELF_CONTAINER + std::string("/")))
+        name = (ClientContainer->IsRoot() ? "" : ClientContainer->Name) +
+            relative_name.substr(strlen(SELF_CONTAINER));
+    else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
+        name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
+        if (!StringStartsWith(name, ns))
+            return TError(EError::Permission, "Absolute container name out of current namespace");
     } else
-        absolute_name = ns + relative_name;
+        name = ns + relative_name;
 
     return TError::Success();
 }
 
+TError TClient::ResolveContainer(const std::string &relative_name,
+                                 std::shared_ptr<TContainer> &ct) const {
+    std::string name;
+    TError error = ResolveName(relative_name, name);
+    if (error)
+        return error;
+    return TContainer::Find(name, ct);
+}
+
+TError TClient::ReadContainer(const std::string &relative_name,
+                              std::shared_ptr<TContainer> &ct, bool try_lock) {
+    auto lock = LockContainers();
+    TError error = ResolveContainer(relative_name, ct);
+    if (error)
+        return error;
+    ReleaseContainer(true);
+    error = ct->LockRead(lock, try_lock);
+    if (error)
+        return error;
+    LockedContainer = ct;
+    return TError::Success();
+}
+
+TError TClient::WriteContainer(const std::string &relative_name,
+                               std::shared_ptr<TContainer> &ct, bool child) {
+    if (AccessLevel <= EAccessLevel::ReadOnly)
+        return TError(EError::Permission, "No write access at all");
+    auto lock = LockContainers();
+    TError error = ResolveContainer(relative_name, ct);
+    if (error)
+        return error;
+    error = CanControl(*ct, child);
+    if (error)
+        return error;
+    ReleaseContainer(true);
+    error = ct->Lock(lock);
+    if (error)
+        return error;
+    LockedContainer = ct;
+    return TError::Success();
+}
+
+void TClient::ReleaseContainer(bool locked) {
+    if (LockedContainer) {
+        LockedContainer->Unlock(locked);
+        LockedContainer = nullptr;
+    }
+}
+
 TPath TClient::ComposePath(const TPath &path) {
-    auto base = ClientContainer.lock();
-    if (!base)
-        return TPath();
-    return base->RootPath.InnerPath(path);
+    return ClientContainer->RootPath.InnerPath(path);
 }
 
 TPath TClient::ResolvePath(const TPath &path) {
-    auto base = ClientContainer.lock();
-    if (!base)
-        return TPath();
-    return base->RootPath / path;
+    return ClientContainer->RootPath / path;
 }
 
 bool TClient::IsSuperUser(void) const {
     return AccessLevel >= EAccessLevel::SuperUser;
-}
-
-TError TClient::GetClientContainer(std::shared_ptr<TContainer> &container) const {
-    container = ClientContainer.lock();
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "Cannot find client container");
-    return TError::Success();
 }
 
 TError TClient::CanControl(const TCred &other) {
@@ -319,12 +332,15 @@ TError TClient::CanControl(const TCred &other) {
                                       " cannot control " + other.ToString());
 }
 
-TError TClient::CanControl(const TContainer &ct, bool createChild) {
+TError TClient::CanControl(const TContainer &ct, bool child) {
 
     if (AccessLevel < EAccessLevel::ChildOnly)
         return TError(EError::Permission, "No write access at all");
 
-    if (!createChild || !ct.IsRoot()) {
+    if (!child && ct.IsRoot())
+        return TError(EError::Permission, "Root container is read-only");
+
+    if (!child || !ct.IsRoot()) {
         TError error = CanControl(ct.OwnerCred);
         if (error)
             return error;
@@ -333,17 +349,16 @@ TError TClient::CanControl(const TContainer &ct, bool createChild) {
     if (AccessLevel > EAccessLevel::ChildOnly)
         return TError::Success();
 
-    auto base = ClientContainer.lock();
+    auto base = ClientContainer;
     while (base && base->AccessLevel != EAccessLevel::ChildOnly)
         base = base->Parent;
-
     if (!base)
         return TError(EError::Permission, "Base for child-only not found");
 
-    if ((createChild && base.get() == &ct) || ct.IsChildOf(*base))
+    if ((child && base.get() == &ct) || ct.IsChildOf(*base))
         return TError::Success();
 
-    return TError(EError::Permission, "Not a child container: " + ct.GetName());
+    return TError(EError::Permission, "Not a child container: " + ct.Name);
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {
@@ -447,7 +462,7 @@ std::ostream& operator<<(std::ostream& stream, TClient& client) {
     if (client.FullLog) {
         client.FullLog = false;
         stream << client.Fd << ":" <<  client.Comm << "(" << client.Pid << ") "
-               << client.Cred << " " << client.GetContainerName();
+               << client.Cred << " " << client.ClientContainer->Name;
     } else {
         stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
     }

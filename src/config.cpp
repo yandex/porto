@@ -10,8 +10,6 @@ extern "C" {
 #include <unistd.h>
 }
 
-using std::string;
-
 TConfig config;
 
 void TConfig::LoadDefaults() {
@@ -111,17 +109,9 @@ bool TConfig::LoadFile(const std::string &path) {
 void TConfig::Load() {
     LoadDefaults();
 
-    for (auto &path : ConfigFiles)
-        if (LoadFile(path))
-            goto load_cred;
+    if (!LoadFile("/etc/portod.conf"))
+        LoadFile("/etc/default/portod.conf");
 
-    if (config().container().default_aging_time_s() <
-        config().daemon().rotate_logs_timeout_s()) {
-        std::cerr << "default_aging_time_s should be greater than rotate_logs_timeout_s" << std::endl;
-        throw string("Invalid configuration");
-    }
-
-load_cred:
     Verbose |= config().log().verbose();
 
     InitCred();

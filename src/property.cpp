@@ -61,58 +61,37 @@ TError TProperty::SetFromRestore(const std::string &value) {
  */
 
 TError TProperty::IsAliveAndStopped(void) {
-    auto state = CurrentContainer->GetState();
-
-    if (state == EContainerState::Dead)
-        return TError(EError::InvalidState,
-                      "Cannot change property while in the dead state");
-
-    if (state != EContainerState::Stopped &&
-        state != EContainerState::Unknown)
-        return TError(EError::InvalidState,
-                "Cannot change property in runtime");
-
+    if (CurrentContainer->State != EContainerState::Stopped)
+        return TError(EError::InvalidState, "Cannot change property for not stopped container");
     return TError::Success();
 }
 
 TError TProperty::IsAlive(void) {
-    auto state = CurrentContainer->GetState();
-
-    if (state == EContainerState::Dead)
-        return TError(EError::InvalidState,
-                      "Cannot change property while in the dead state");
-
+    if (CurrentContainer->State == EContainerState::Dead)
+        return TError(EError::InvalidState, "Cannot change property while in the dead state");
     return TError::Success();
 }
 
 TError TProperty::IsDead(void) {
-    auto state = CurrentContainer->GetState();
-
-    if (state != EContainerState::Dead)
-        return TError(EError::InvalidState,
-                      "Available only in dead state: " + Name);
-
+    if (CurrentContainer->State != EContainerState::Dead)
+        return TError(EError::InvalidState, "Available only in dead state: " + Name);
     return TError::Success();
 }
 
 TError TProperty::IsRunning(void) {
-    auto state = CurrentContainer->GetState();
-
     /*
      * This snippet is taken from TContainer::GetProperty.
      * The method name misguides a bit, but may be the semantic
      * of such properties is that we can look at the value in
      * the dead state too...
      */
-    if (state == EContainerState::Stopped)
-        return TError(EError::InvalidState,
-                      "Not available in stopped state: " + Name);
-
+    if (CurrentContainer->State == EContainerState::Stopped)
+        return TError(EError::InvalidState, "Not available in stopped state: " + Name);
     return TError::Success();
 }
 
 TError TProperty::WantControllers(uint64_t controllers) const {
-    if (CurrentContainer->GetState() == EContainerState::Stopped) {
+    if (CurrentContainer->State == EContainerState::Stopped) {
         CurrentContainer->Controllers |= controllers;
         CurrentContainer->RequiredControllers |= controllers;
     } else if ((CurrentContainer->Controllers & controllers) != controllers)
@@ -632,30 +611,21 @@ public:
 
 class TCommand : public TProperty {
 public:
-    TError Set(const std::string &command);
-    TError Get(std::string &value);
     TCommand() : TProperty(P_COMMAND, EProperty::COMMAND,
                            "Command executed upon container start") {}
+    TError Get(std::string &command) {
+        command = CurrentContainer->Command;
+        return TError::Success();
+    }
+    TError Set(const std::string &command) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        CurrentContainer->Command = command;
+        CurrentContainer->SetProp(EProperty::COMMAND);
+        return TError::Success();
+    }
 } static Command;
-
-TError TCommand::Set(const std::string &command) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    CurrentContainer->Command = command;
-    CurrentContainer->SetProp(EProperty::COMMAND);
-
-    return TError::Success();
-}
-
-TError TCommand::Get(std::string &value) {
-    std::string virt_mode;
-
-    value = CurrentContainer->Command;
-
-    return TError::Success();
-}
 
 class TVirtMode : public TProperty {
 public:
@@ -2122,14 +2092,14 @@ TError TAgingTime::Set(const std::string &time) {
     if (error)
         return error;
 
-    CurrentContainer->AgingTime = new_time;
+    CurrentContainer->AgingTime = new_time * 1000;
     CurrentContainer->SetProp(EProperty::AGING_TIME);
 
     return TError::Success();
 }
 
 TError TAgingTime::Get(std::string &value) {
-    value = std::to_string(CurrentContainer->AgingTime);
+    value = std::to_string(CurrentContainer->AgingTime / 1000);
 
     return TError::Success();
 }
@@ -2229,7 +2199,7 @@ TError TAbsoluteName::Get(std::string &value) {
     if (CurrentContainer->IsRoot())
         value = ROOT_CONTAINER;
     else
-        value = ROOT_PORTO_NAMESPACE + CurrentContainer->GetName();
+        value = ROOT_PORTO_NAMESPACE + CurrentContainer->Name;
     return TError::Success();
 }
 
@@ -2275,17 +2245,14 @@ TError TState::SetFromRestore(const std::string &value) {
         CurrentContainer->State = EContainerState::Paused;
     else if (value == "meta")
         CurrentContainer->State = EContainerState::Meta;
-    else if (value == "unknown")
-        CurrentContainer->State  = EContainerState::Unknown;
     else
-        return TError(EError::Unknown, "Invalid container saved state");
+        return TError(EError::Unknown, "Invalid container saved state: " + value);
 
     return TError::Success();
 }
 
 TError TState::Get(std::string &value) {
-    value = CurrentContainer->ContainerStateName(CurrentContainer->GetState());
-
+    value = TContainer::StateName(CurrentContainer->State);
     return TError::Success();
 }
 
@@ -2321,9 +2288,7 @@ public:
 } static Parent;
 
 TError TParent::Get(std::string &value) {
-    auto p = CurrentContainer->GetParent();
-    value = p ? p->GetName() : "";
-
+    value = TContainer::ParentName(CurrentContainer->Name);
     return TError::Success();
 }
 
@@ -2827,13 +2792,13 @@ TError TTime::Get(std::string &value) {
     }
 
     if (!CurrentContainer->HasProp(EProperty::DEATH_TIME) &&
-        (CurrentContainer->GetState() == EContainerState::Dead)) {
+        (CurrentContainer->State == EContainerState::Dead)) {
 
         CurrentContainer->DeathTime = GetCurrentTimeMs();
         CurrentContainer->SetProp(EProperty::DEATH_TIME);
     }
 
-    if (CurrentContainer->GetState() == EContainerState::Dead)
+    if (CurrentContainer->State == EContainerState::Dead)
         value = std::to_string((CurrentContainer->DeathTime -
                                CurrentContainer->StartTime) / 1000);
     else
@@ -2862,23 +2827,28 @@ void TPortoStat::Populate(TUintMap &m) {
     m["slave_uptime"] = (GetCurrentTimeMs() - Statistics->SlaveStarted) / 1000;
     m["queued_statuses"] = Statistics->QueuedStatuses;
     m["queued_events"] = Statistics->QueuedEvents;
-    m["created"] = Statistics->Created;
     m["remove_dead"] = Statistics->RemoveDead;
     m["slave_timeout_ms"] = Statistics->SlaveTimeoutMs;
-    m["rotated"] = Statistics->Rotated;
     m["restore_failed"] = Statistics->RestoreFailed;
-    m["started"] = Statistics->Started;
-    m["running"] = CurrentContainer->GetRunningChildren();
     uint64_t usage = 0;
     auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
     TError error = MemorySubsystem.Usage(cg, usage);
     if (error)
         L_ERR() << "Can't get memory usage of portod" << std::endl;
     m["memory_usage_mb"] = usage / 1024 / 1024;
+
     m["epoll_sources"] = Statistics->EpollSources;
-    m["containers"] = Statistics->Containers;
-    m["volumes"] = Statistics->Volumes;
-    m["clients"] = Statistics->Clients;
+
+    m["logs_rotated"] = Statistics->LogsRotated;
+
+    m["containers"] = Statistics->ContainersCount;
+    m["containers_running"] = RootContainer->GetRunningChildren();
+    m["containers_created"] = Statistics->ContainersCreated;
+    m["containers_started"] = Statistics->ContainersStarted;
+
+    m["volumes"] = Statistics->VolumesCount;
+    m["clients"] = Statistics->ClientsCount;
+
     m["requests_queued"] = Statistics->RequestsQueued;
     m["requests_completed"] = Statistics->RequestsCompleted;
 }

@@ -3,6 +3,7 @@
 #include "util/log.hpp"
 #include "client.hpp"
 #include "container.hpp"
+#include "statistics.hpp"
 
 extern "C" {
 #include <sys/ioctl.h>
@@ -143,6 +144,8 @@ TError TStdStream::Rotate(const TContainer &container) {
         L_ERR() << "Cannot rotate " << path << " : " << error << std::endl;
         return error;
     }
+    if (loss)
+        Statistics->LogsRotated++;
     Offset += loss;
     return TError::Success();
 }

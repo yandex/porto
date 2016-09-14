@@ -41,10 +41,10 @@ add_subdirectory(util)
 
 include_directories(${libporto_SOURCE_DIR})
 
-add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp
+add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp
 		      event.cpp task.cpp env.cpp device.cpp network.cpp
 		      filesystem.cpp layer.cpp
-		      kvalue.cpp config.cpp property.cpp context.cpp
+		      kvalue.cpp config.cpp property.cpp
 		      volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
 target_link_libraries(portod version porto util config
 			     rpc_proto kv_proto

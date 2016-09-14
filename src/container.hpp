@@ -8,6 +8,7 @@
 #include "util/unix.hpp"
 #include "util/locks.hpp"
 #include "util/log.hpp"
+#include "util/idmap.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
 #include "property.hpp"
@@ -15,14 +16,10 @@
 class TEpollSource;
 class TCgroup;
 class TSubsystem;
-class TPropertyMap;
-class TValueMap;
 class TEvent;
-class TContainerHolder;
 enum class ENetStat;
 class TNetwork;
 class TNamespaceFd;
-class TNlLink;
 class TContainerWaiter;
 class TClient;
 class TVolume;
@@ -32,31 +29,27 @@ struct TBindMount;
 struct TEnv;
 
 enum class EContainerState {
-    Unknown,
     Stopped,
     Dead,
     Running,
     Paused,
-    Meta
+    Meta,
+    Destroyed,
 };
 
 class TProperty;
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
-                   public TNonCopyable,
-                   public TLockable {
+                   public TNonCopyable {
     friend class TProperty;
 
-    std::shared_ptr<TContainerHolder> Holder;
-    const std::string Name;
-    int Acquired = 0;
-    int Id;
+    int Locked = 0;
+
     TFile OomEvent;
-    size_t RunningChildren = 0; // changed under holder lock
+    size_t RunningChildren = 0;
     std::list<std::weak_ptr<TContainerWaiter>> Waiters;
 
     std::shared_ptr<TEpollSource> Source;
-    int Level; // 0 for root, 1 for porto_root, etc
 
     // data
     void UpdateRunningChildren(size_t diff);
@@ -74,32 +67,29 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError PrepareTask(struct TTaskEnv *TaskEnv,
                        struct TNetCfg *NetCfg);
-    void RemoveKvs();
 
-    const std::string StripParentName(const std::string &name) const;
     void ScheduleRespawn();
-    TError Respawn(TScopedLock &holder_lock);
-    void StopChildren(TScopedLock &holder_lock);
+    TError Respawn();
     TError PrepareResources();
     void FreeResources();
 
-    void Reap(TScopedLock &holder_lock, bool oomKilled);
-    void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
+    void Reap(bool oomKilled);
+    void Exit(int status, bool oomKilled);
 
     void CleanupWaiters();
     void NotifyWaiters();
 
-    // fn called for parent first then for all children (from top container to the leafs)
-    TError ApplyForTreePreorder(TScopedLock &holder_lock,
-                                std::function<TError (TScopedLock &holder_lock,
-                                                      TContainer &container)> fn);
-    // fn called for children first then for all parents (from leaf containers to the top)
-    TError ApplyForTreePostorder(TScopedLock &holder_lock,
-                                 std::function<TError (TScopedLock &holder_lock,
-                                                       TContainer &container)> fn);
+    TError CallPostorder(std::function<TError (TContainer &ct)> fn);
 
 public:
     const std::shared_ptr<TContainer> Parent;
+    const std::string Name;
+    const std::string FirstName;
+    const int Level; // 0 for root
+
+    int Id = 0;
+    EContainerState State = EContainerState::Stopped;
+
     bool PropSet[(int)EProperty::NR_PROPERTIES];
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
     uint64_t Controllers, RequiredControllers;
@@ -110,11 +100,11 @@ public:
     std::string Root;
     bool RootRo;
     mode_t Umask;
-    int VirtMode = 0;
+    int VirtMode;
     bool BindDns;
     bool Isolate;
     std::vector<std::string> NetProp;
-    std::vector<std::weak_ptr<TContainer>> Children;
+    std::list<std::shared_ptr<TContainer>> Children;
     std::string Hostname;
     std::vector<std::string> EnvCfg;
     std::vector<TBindMount> BindMounts;
@@ -126,9 +116,10 @@ public:
     std::vector<std::string> ResolvConf;
     std::vector<std::string> Devices;
 
-    int LoopDev = -1; /* legacy */
     uint64_t StartTime;
     uint64_t DeathTime;
+    uint64_t AgingTime;
+
     std::map<int, struct rlimit> Rlimit;
     std::string NsName;
 
@@ -155,14 +146,16 @@ public:
     bool ToRespawn;
     int MaxRespawns;
     uint64_t RespawnCount;
+
     std::string Private;
-    uint64_t AgingTime;
     EAccessLevel AccessLevel;
-    bool IsWeak;
-    EContainerState State = EContainerState::Unknown;
+
+    bool IsWeak = false;
     bool OomKilled = false;
     int ExitStatus = 0;
-    TPath RootPath; /* path in host namespace */
+
+    TPath RootPath; /* path in host namespace, set at start */
+    int LoopDev = -1; /* legacy */
     std::shared_ptr<TVolume> RootVolume;
 
     TTask Task;
@@ -172,19 +165,15 @@ public:
 
     std::string GetCwd() const;
     TPath WorkPath() const;
-    EContainerState GetState() const {
-        return State;
+
+    bool IsMeta() const {
+        return Command.empty();
     }
-    bool IsValid() {
-        return State != EContainerState::Unknown;
-    }
-    bool IsMeta() {
-        return !Command.size();
-    }
-    TContainer(std::shared_ptr<TContainerHolder> holder,
-               const std::string &name, std::shared_ptr<TContainer> parent,
-               int id);
+
+    TContainer(std::shared_ptr<TContainer> parent, const std::string &name);
     ~TContainer();
+
+    void Register();
 
     bool HasProp(EProperty prop) const {
         return PropSet[(int)prop];
@@ -208,25 +197,21 @@ public:
     }
 
     std::string GetPortoNamespace() const;
-    std::string ContainerStateName(EContainerState state);
 
-    void AcquireForced();
-    bool Acquire();
-    void Release();
-    bool IsAcquired() const;
+    TError Lock(TScopedLock &lock, bool shared = false, bool try_lock = false);
+    TError LockRead(TScopedLock &lock, bool try_lock = false) {
+        return Lock(lock, true, try_lock);
+    }
+    void Unlock(bool locked = false);
 
     void SanitizeCapabilities();
-
-    const std::string GetName() const;
-    const std::string GetTextId(const std::string &separator = "+") const;
-    const int GetId() const { return Id; }
-    const int GetLevel() const { return Level; }
-
     uint64_t GetTotalMemGuarantee(void) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
 
     bool IsRoot() const { return Id == ROOT_CONTAINER_ID; }
     bool IsChildOf(const TContainer &ct) const;
+
+    std::list<std::shared_ptr<TContainer>> Subtree();
 
     std::shared_ptr<TContainer> GetParent() const;
     std::shared_ptr<const TContainer> GetIsolationDomain() const;
@@ -237,42 +222,32 @@ public:
 
     pid_t GetPidFor(pid_t pid) const;
 
-    void AddChild(std::shared_ptr<TContainer> child);
-    TError Create(const TCred &cred);
-    void Destroy(void);
-    void DestroyWeak();
-    TError Start(bool meta);
-    TError StopOne(TScopedLock &holder_lock, uint64_t deadline);
-    TError Stop(TScopedLock &holder_lock, uint64_t timeout);
-    TError CheckAcquiredChild(TScopedLock &holder_lock);
-
-    TError Pause(TScopedLock &holder_lock);
-    TError Resume(TScopedLock &holder_lock);
-
-    TError Terminate(TScopedLock &holder_lock, uint64_t deadline);
+    TError Start();
+    TError StopOne(uint64_t deadline);
+    TError Stop(uint64_t timeout);
+    TError Pause();
+    TError Resume();
+    TError Terminate(uint64_t deadline);
     TError Kill(int sig);
+    TError Destroy();
 
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
 
-    TError Restore(TScopedLock &holder_lock, const TKeyValue &node);
-    void SyncState(TScopedLock &holder_lock);
+    void SyncState();
+    bool Expired() const;
+    void DestroyWeak();
 
     TError Save(void);
     TError Load(const TKeyValue &node);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
-    bool CanRemoveDead() const;
-    std::vector<std::string> GetChildren();
     std::shared_ptr<TContainer> FindRunningParent() const;
-    void DeliverEvent(TScopedLock &holder_lock, const TEvent &event);
 
-    static void ParsePropertyName(std::string &name, std::string &idx);
     size_t GetRunningChildren() { return RunningChildren; }
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
-    void CleanupExpiredChildren();
     TError UpdateTrafficClasses();
 
     bool MayRespawn();
@@ -284,27 +259,19 @@ public:
 
     TError GetEnvironment(TEnv &env);
 
+    static TError ValidName(const std::string &name);
+    static std::string ParentName(const std::string &name);
+
+    static std::string StateName(EContainerState state);
+
     static std::shared_ptr<TContainer> Find(const std::string &name);
     static TError Find(const std::string &name, std::shared_ptr<TContainer> &ct);
-};
+    static TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct);
 
-class TScopedAcquire : public TNonCopyable {
-    std::shared_ptr<TContainer> Container;
-    bool Acquired;
+    static TError Create(const std::string &name, std::shared_ptr<TContainer> &ct);
+    static TError Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct);
 
-public:
-    TScopedAcquire(std::shared_ptr<TContainer> c) : Container(c) {
-        if (Container)
-            Acquired = Container->Acquire();
-        else
-            Acquired = true;
-    }
-    ~TScopedAcquire() {
-        if (Acquired && Container)
-            Container->Release();
-    }
-
-    bool IsAcquired() { return Acquired; }
+    static void Event(const TEvent &event);
 };
 
 class TContainerWaiter {
@@ -328,6 +295,7 @@ extern std::mutex ContainersMutex;
 extern std::shared_ptr<TContainer> RootContainer;
 extern std::map<std::string, std::shared_ptr<TContainer>> Containers;
 extern TPath ContainersKV;
+extern TIdMap ContainerIdMap;
 
 static inline std::unique_lock<std::mutex> LockContainers() {
     return std::unique_lock<std::mutex>(ContainersMutex);

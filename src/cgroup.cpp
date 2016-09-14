@@ -442,6 +442,8 @@ TError TFreezerSubsystem::Thaw(TCgroup &cg, bool wait) const {
     TError error = cg.Set("freezer.state", "THAWED");
     if (error || !wait)
         return error;
+    if (IsParentFreezing(cg))
+        return TError(EError::Busy, "parent cgroup is frozen");
     return WaitState(cg, "THAWED");
 }
 

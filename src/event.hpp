@@ -6,7 +6,6 @@
 #include "util/worker.hpp"
 
 class TContainer;
-class TContainerHolder;
 class TContainerWaiter;
 
 enum class EEventType {
@@ -15,7 +14,6 @@ enum class EEventType {
     Respawn,
     OOM,
     WaitTimeout,
-    UpdateNetwork,
     DestroyWeak,
 };
 
@@ -53,7 +51,7 @@ class TEventQueue {
     std::shared_ptr<TEventWorker> Worker;
 
 public:
-    TEventQueue(std::shared_ptr<TContainerHolder> holder);
+    TEventQueue();
     void Start();
     void Stop();
 

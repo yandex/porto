@@ -71,12 +71,11 @@ TError TTaskEnv::ChildExec() {
 
     auto envp = Env.Envp();
 
-    if (CT->Command.empty()) {
-        auto name = CT->GetName();
+    if (CT->IsMeta()) {
         const char *args[] = {
             "portoinit",
             "--container",
-            name.c_str(),
+            CT->Name.c_str(),
             NULL,
         };
         SetDieOnParentExit(0);
@@ -258,11 +257,10 @@ TError TTaskEnv::ConfigureChild() {
 
         if (pid) {
             auto pid_ = std::to_string(pid);
-            auto name = CT->GetName();
             const char * argv[] = {
                 "portoinit",
                 "--container",
-                name.c_str(),
+                CT->Name.c_str(),
                 "--wait",
                 pid_.c_str(),
                 NULL,
@@ -538,11 +536,10 @@ TError TTaskEnv::Start() {
 
         if (TripleFork) {
             auto pid = std::to_string(clonePid);
-            auto name = CT->GetName();
             const char * argv[] = {
                 "portoinit",
                 "--container",
-                name.c_str(),
+                CT->Name.c_str(),
                 "--wait",
                 pid.c_str(),
                 NULL,

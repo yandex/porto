@@ -10,10 +10,8 @@
 #include "util/unix.hpp"
 
 class TContainer;
-class TContainerHolder;
 class TContainerWaiter;
 class TEpollLoop;
-class TContext;
 
 namespace rpc {
     class TContainerRequest;
@@ -26,8 +24,10 @@ public:
     pid_t Pid = 0;
     std::string Comm;
     gid_t UserCtGroup = 0;
+    std::shared_ptr<TContainer> ClientContainer;
+    std::shared_ptr<TContainer> LockedContainer;
 
-    TClient(std::shared_ptr<TEpollLoop> loop);
+    TClient();
     TClient(const std::string &special);
     ~TClient();
 
@@ -35,9 +35,9 @@ public:
 
     bool IsSuperUser(void) const;
     TError CanControl(const TCred &cred);
-    TError CanControl(const TContainer &ct, bool createChild = false);
+    TError CanControl(const TContainer &ct, bool child = false);
 
-    TError AcceptConnection(TContext &context, int listenFd);
+    TError AcceptConnection(int listenFd);
     void CloseConnection();
 
     void StartRequest();
@@ -45,17 +45,17 @@ public:
 
     uint64_t GetRequestTimeMs();
 
-    TError IdentifyClient(TContainerHolder &holder, bool initial);
-    TError GetClientContainer(std::shared_ptr<TContainer> &container) const;
+    TError IdentifyClient(bool initial);
+    TError ComposeName(const std::string &name, std::string &relative_name) const;
+    TError ResolveName(const std::string &relative_name, std::string &name) const;
 
-    std::string GetContainerName() const;
-
-    TError ComposeRelativeName(const std::string &name,
-                               std::string &relative_name) const;
-
-    TError ResolveRelativeName(const std::string &relative_name,
-                               std::string &absolute_name,
-                               bool resolve_meta = false) const;
+    TError ResolveContainer(const std::string &relative_name,
+                            std::shared_ptr<TContainer> &ct) const;
+    TError ReadContainer(const std::string &relative_name,
+                         std::shared_ptr<TContainer> &ct, bool try_lock = false);
+    TError WriteContainer(const std::string &relative_name,
+                          std::shared_ptr<TContainer> &ct, bool child = false);
+    void ReleaseContainer(bool locked = false);
 
     TPath ComposePath(const TPath &path);
     TPath ResolvePath(const TPath &path);
@@ -85,7 +85,6 @@ private:
     uint64_t Length = 0;
     uint64_t Offset = 0;
     std::vector<uint8_t> Buffer;
-    std::weak_ptr<TContainer> ClientContainer;
 };
 
 extern TClient SystemClient;

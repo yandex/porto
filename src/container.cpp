@@ -4,7 +4,9 @@
 #include <csignal>
 #include <cstdlib>
 #include <algorithm>
+#include <condition_variable>
 
+#include "portod.hpp"
 #include "statistics.hpp"
 #include "container.hpp"
 #include "config.hpp"
@@ -13,9 +15,7 @@
 #include "device.hpp"
 #include "property.hpp"
 #include "event.hpp"
-#include "holder.hpp"
 #include "network.hpp"
-#include "context.hpp"
 #include "epoll.hpp"
 #include "kvalue.hpp"
 #include "volume.hpp"
@@ -38,15 +38,69 @@ extern "C" {
 }
 
 std::mutex ContainersMutex;
+static std::condition_variable ContainersCV;
 std::shared_ptr<TContainer> RootContainer;
 std::map<std::string, std::shared_ptr<TContainer>> Containers;
 TPath ContainersKV;
+TIdMap ContainerIdMap(1, CONTAINER_ID_MAX);
 
-using std::string;
-using std::vector;
-using std::shared_ptr;
-using std::unique_ptr;
-using std::map;
+TError TContainer::ValidName(const std::string &name) {
+
+    if (name.length() == 0)
+        return TError(EError::InvalidValue, "container path too short");
+
+    if (name.length() > CONTAINER_PATH_MAX)
+        return TError(EError::InvalidValue, "container path too long");
+
+    if (name[0] == '/') {
+        if (name == ROOT_CONTAINER)
+            return TError::Success();
+        return TError(EError::InvalidValue, "container path starts with '/'");
+    }
+
+    for (std::string::size_type first = 0, i = 0; i <= name.length(); i++) {
+        switch (name[i]) {
+            case '/':
+            case '\0':
+                if (i == first)
+                    return TError(EError::InvalidValue,
+                            "double/trailing '/' in container path");
+                if (i - first > CONTAINER_NAME_MAX)
+                    return TError(EError::InvalidValue,
+                            "container name too long: '" +
+                            name.substr(first, i - first) + "'");
+                if (name.substr(first, i - first) == SELF_CONTAINER)
+                    return TError(EError::InvalidValue,
+                            "container name 'self' is reserved");
+                if (name.substr(first, i - first) == DOT_CONTAINER)
+                    return TError(EError::InvalidValue,
+                            "container name '.' is reserved");
+                first = i + 1;
+            case 'a'...'z':
+            case 'A'...'Z':
+            case '0'...'9':
+            case '_':
+            case '-':
+            case '@':
+            case ':':
+            case '.':
+                /* Ok */
+                break;
+            default:
+                return TError(EError::InvalidValue, "forbidden character '" +
+                                name.substr(i, 1) + "' in container name");
+        }
+    }
+
+    return TError::Success();
+}
+
+std::string TContainer::ParentName(const std::string &name) {
+    auto sep = name.rfind('/');
+    if (sep == std::string::npos)
+        return ROOT_CONTAINER;
+    return name.substr(0, sep);
+}
 
 std::shared_ptr<TContainer> TContainer::Find(const std::string &name) {
     PORTO_LOCKED(ContainersMutex);
@@ -63,15 +117,79 @@ TError TContainer::Find(const std::string &name, std::shared_ptr<TContainer> &ct
     return TError(EError::ContainerDoesNotExist, "container " + name + " not found");
 }
 
-TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
-                       const std::string &name, std::shared_ptr<TContainer> parent,
-                       int id) :
-    Holder(holder), Name(StripParentName(name)),
-    Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1),
-    Parent(parent),
+TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct) {
+    TError error;
+    TCgroup cg;
+
+    error = FreezerSubsystem.TaskCgroup(pid, cg);
+    if (error)
+        return error;
+
+    std::string prefix = std::string(PORTO_CGROUP_PREFIX) + "/";
+    std::string name = cg.Name;
+    std::replace(name.begin(), name.end(), '%', '/');
+
+    auto containers_lock = LockContainers();
+
+    if (!StringStartsWith(name, prefix))
+        return TContainer::Find(ROOT_CONTAINER, ct);
+
+    return TContainer::Find(name.substr(prefix.length()), ct);
+}
+
+/* lock container shared/exclusive and all parent containers as shared */
+TError TContainer::Lock(TScopedLock &lock, bool shared, bool try_lock) {
+    if (Verbose)
+        L() << "Lock " << (shared ? "read " : "write ") << Name << std::endl;
+    while (1) {
+        if (State == EContainerState::Destroyed)
+            return TError(EError::ContainerDoesNotExist, "Container was destroyed");
+        bool busy = Locked && (Locked < 0 || !shared);
+        for (auto ct = Parent.get(); !busy && ct; ct = ct->Parent.get())
+            busy = busy || ct->Locked < 0;
+        if (!busy)
+            break;
+        if (try_lock)
+            return TError(EError::Busy, "Container is busy");
+        ContainersCV.wait(lock);
+    }
+    Locked += shared ? 1 : -1;
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get())
+        ct->Locked++;
+    return TError::Success();
+}
+
+void TContainer::Unlock(bool locked) {
+    if (Verbose)
+        L() << "Unlock " << (Locked > 0 ? "read " : "write ") << Name << std::endl;
+    if (!locked)
+        ContainersMutex.lock();
+    PORTO_ASSERT(Locked);
+    Locked += (Locked > 0) ? -1 : 1;
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        PORTO_ASSERT(ct->Locked > 0);
+        ct->Locked--;
+    }
+    /* not so effective and fair but simple */
+    ContainersCV.notify_all();
+    if (!locked)
+        ContainersMutex.unlock();
+}
+
+void TContainer::Register() {
+    Containers[Name] = shared_from_this();
+    if (Parent)
+        Parent->Children.emplace_back(shared_from_this());
+    Statistics->ContainersCreated++;
+}
+
+TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &name) :
+    Parent(parent), Name(name),
+    FirstName(!parent ? "" : parent->IsRoot() ? name : name.substr(parent->Name.length() + 1)),
+    Level(parent ? parent->Level + 1 : 0),
     Stdin(0), Stdout(1), Stderr(2)
 {
-    Statistics->Containers++;
+    Statistics->ContainersCount++;
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
 
@@ -125,23 +243,148 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     MaxRespawns = -1;
     RespawnCount = 0;
     Private = "";
-    AgingTime = config().container().default_aging_time_s();
+    AgingTime = config().container().default_aging_time_s() * 1000;
 
     if (Parent && Parent->AccessLevel < EAccessLevel::ChildOnly)
         AccessLevel = Parent->AccessLevel;
     else
         AccessLevel = EAccessLevel::Normal;
-
-    IsWeak = false;
 }
 
 TContainer::~TContainer() {
     // so call them explicitly in Tcontainer::Destroy()
     PORTO_ASSERT(Net == nullptr);
-    Statistics->Containers--;
-};
+    Statistics->ContainersCount--;
+}
 
-std::string TContainer::ContainerStateName(EContainerState state) {
+TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &ct) {
+    TError error;
+
+    error = ValidName(name);
+    if (error)
+        return error;
+
+    auto lock = LockContainers();
+
+    if (Containers.find(name) != Containers.end())
+        return TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
+
+    auto max = config().container().max_total();
+    if (Containers.size() >= max + NR_SERVICE_CONTAINERS)
+        return TError(EError::ResourceNotAvailable, "number of containers reached limit: " + std::to_string(max));
+
+    auto parent = TContainer::Find(TContainer::ParentName(name));
+    if (parent) {
+        if (parent->Level == CONTAINER_LEVEL_MAX)
+            return TError(EError::InvalidValue, "You shall not go deeper! Maximum level is " + std::to_string(CONTAINER_LEVEL_MAX));
+        error = CurrentClient->CanControl(*parent, true);
+        if (error)
+            return error;
+    } else if (name != ROOT_CONTAINER)
+        return TError(EError::ContainerDoesNotExist, "parent container not found for " + name);
+
+    L_ACT() << "Create " << name << std::endl;
+
+    ct = std::make_shared<TContainer>(parent, name);
+
+    error = ContainerIdMap.Get(ct->Id);
+    if (error)
+        goto err;
+
+    ct->OwnerCred = CurrentClient->Cred;
+    error = ct->OwnerCred.LoadGroups(ct->OwnerCred.User());
+    if (error)
+        goto err;
+
+    ct->SetProp(EProperty::USER);
+    ct->SetProp(EProperty::GROUP);
+
+    ct->SanitizeCapabilities();
+
+    ct->SetState(EContainerState::Stopped);
+    ct->SetProp(EProperty::STATE);
+
+    ct->RespawnCount = 0;
+    ct->SetProp(EProperty::RESPAWN_COUNT);
+
+    error = ct->Save();
+    if (error)
+        goto err;
+
+    ct->Register();
+
+    return TError::Success();
+
+err:
+    if (ct->Id)
+        ContainerIdMap.Put(ct->Id);
+    ct = nullptr;
+    return error;
+}
+
+TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct) {
+    TError error;
+    int id;
+
+    error = StringToInt(kv.Get(P_RAW_ID), id);
+    if (error)
+        return error;
+
+    L_ACT() << "Restore container " << kv.Name << std::endl;
+
+    auto lock = LockContainers();
+
+    if (Containers.find(kv.Name) != Containers.end())
+        return TError(EError::ContainerAlreadyExists, kv.Name);
+
+    std::shared_ptr<TContainer> parent;
+    error = TContainer::Find(TContainer::ParentName(kv.Name), parent);
+    if (error)
+        return error;
+
+    error = ContainerIdMap.GetAt(id);
+    if (error)
+        return error;
+
+    ct = std::make_shared<TContainer>(parent, kv.Name);
+
+    error = ct->Load(kv);
+    if (error)
+        goto err;
+
+    ct->Id = id;
+
+    ct->SyncState();
+
+    if (ct->Task.Pid) {
+        error = ct->RestoreNetwork();
+        if (error && !ct->WaitTask.IsZombie()) {
+            L_WRN() << "Cannot restore network: " << error << std::endl;
+            goto err;
+        }
+    }
+
+    if (ct->MayRespawn())
+        ct->ScheduleRespawn();
+
+    error = ct->ApplyDynamicProperties();
+    if (error)
+        goto err;
+
+    error = ct->Save();
+    if (error)
+        goto err;
+
+    ct->Register();
+    return TError::Success();
+
+err:
+    ContainerIdMap.Put(id);
+    ct = nullptr;
+    return error;
+}
+
+std::string TContainer::StateName(EContainerState state) {
     switch (state) {
     case EContainerState::Stopped:
         return "stopped";
@@ -153,6 +396,8 @@ std::string TContainer::ContainerStateName(EContainerState state) {
         return "paused";
     case EContainerState::Meta:
         return "meta";
+    case EContainerState::Destroyed:
+        return "destroyed";
     default:
         return "unknown";
     }
@@ -160,7 +405,7 @@ std::string TContainer::ContainerStateName(EContainerState state) {
 
 /* Working directory in host namespace */
 TPath TContainer::WorkPath() const {
-    return TPath(config().container().tmp_dir()) / GetName();
+    return TPath(config().container().tmp_dir()) / Name;
 }
 
 std::string TContainer::GetCwd() const {
@@ -228,7 +473,7 @@ void TContainer::SetState(EContainerState newState) {
     if (State == newState)
         return;
 
-    L_ACT() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
+    L_ACT() << Name << ": change state " << StateName(State) << " -> " << StateName(newState) << std::endl;
     if (newState == EContainerState::Running) {
         UpdateRunningChildren(+1);
     } else if (State == EContainerState::Running) {
@@ -241,29 +486,21 @@ void TContainer::SetState(EContainerState newState) {
         NotifyWaiters();
 }
 
-const string TContainer::StripParentName(const string &name) const {
-    if (name == ROOT_CONTAINER)
-        return ROOT_CONTAINER;
+TError TContainer::Destroy() {
+    TError error;
 
-    std::string::size_type n = name.rfind('/');
-    if (n == std::string::npos)
-        return name;
-    else
-        return name.substr(n + 1);
-}
+    L_ACT() << "Destroy " << Name << std::endl;
 
-void TContainer::RemoveKvs() {
-    if (IsRoot())
-        return;
+    if (State != EContainerState::Stopped) {
+        error = Stop(0);
+        if (error)
+            return error;
+    }
 
-    TPath path(ContainersKV / std::to_string(Id));
-    TError error = path.Unlink();
-    if (error)
-        L_ERR() << "Can't remove key-value node " << path << ": " << error << std::endl;
-}
-
-void TContainer::Destroy(void) {
-    L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
+    while (!Children.empty()) {
+        std::shared_ptr<TContainer> child = *Children.begin();
+        child->Destroy();
+    }
 
     while (!Volumes.empty()) {
         std::shared_ptr<TVolume> volume = Volumes.back();
@@ -275,26 +512,31 @@ void TContainer::Destroy(void) {
         auto lock = Net->ScopedLock();
         Net = nullptr;
     }
-    RemoveKvs();
+
+    auto lock = LockContainers();
+
+    error = ContainerIdMap.Put(Id);
+    if (error)
+        L_WRN() << "Cannot put container id : " << error << std::endl;
+
+    Containers.erase(Name);
+    if (Parent)
+        Parent->Children.remove(shared_from_this());
+    State = EContainerState::Destroyed;
+
+    TPath path(ContainersKV / std::to_string(Id));
+    error = path.Unlink();
+    if (error)
+        L_ERR() << "Can't remove key-value node " << path << ": " << error << std::endl;
+
+    return TError::Success();
 }
 
 void TContainer::DestroyWeak() {
     if (IsWeak) {
         TEvent event(EEventType::DestroyWeak, shared_from_this());
-        Holder->Queue->Add(0, event);
+        EventQueue->Add(0, event);
     }
-}
-
-const std::string TContainer::GetName() const {
-    if (IsRoot() || Parent->IsRoot())
-        return Name;
-    return Parent->GetName() + "/" + Name;
-}
-
-const std::string TContainer::GetTextId(const std::string &separator) const {
-     if (IsRoot() || Parent->IsRoot())
-         return Name;
-     return Parent->GetTextId(separator) + separator + Name;
 }
 
 bool TContainer::IsChildOf(const TContainer &ct) const {
@@ -303,6 +545,15 @@ bool TContainer::IsChildOf(const TContainer &ct) const {
             return true;
     }
     return false;
+}
+
+std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
+    std::list<std::shared_ptr<TContainer>> subtree {shared_from_this()};
+    for (auto it = subtree.rbegin(); it != subtree.rend(); ++it) {
+        for (auto &child: (*it)->Children)
+            subtree.emplace_front(child);
+    }
+    return subtree;
 }
 
 std::shared_ptr<TContainer> TContainer::GetParent() const {
@@ -344,9 +595,8 @@ TError TContainer::OpenNetns(TNamespaceFd &netns) const {
 uint64_t TContainer::GetTotalMemGuarantee(void) const {
     uint64_t sum = 0lu;
 
-    for (auto iter : Children)
-        if (auto child = iter.lock())
-            sum += child->GetTotalMemGuarantee();
+    for (auto &child : Children)
+        sum += child->GetTotalMemGuarantee();
 
     return std::max(NewMemGuarantee, sum);
 }
@@ -355,16 +605,14 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     uint64_t lim = 0;
 
     /* Container without load limited with total limit of childrens */
-    if (Command.empty() && VirtMode == VIRT_MODE_APP) {
-        for (auto it : Children) {
-            if (auto child = it.lock()) {
-                auto child_lim = child->GetTotalMemLimit(this);
-                if (!child_lim || child_lim > UINT64_MAX - lim) {
-                    lim = 0;
-                    break;
-                }
-                lim += child_lim;
+    if (IsMeta() && VirtMode == VIRT_MODE_APP) {
+        for (auto &child : Children) {
+            auto child_lim = child->GetTotalMemLimit(this);
+            if (!child_lim || child_lim > UINT64_MAX - lim) {
+                lim = 0;
+                break;
             }
+            lim += child_lim;
         }
     }
 
@@ -486,7 +734,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 
 void TContainer::ShutdownOom() {
     if (Source)
-        Holder->EpollLoop->RemoveSource(Source->Fd);
+        EpollLoop->RemoveSource(Source->Fd);
     Source = nullptr;
     OomEvent.Close();
 }
@@ -499,10 +747,8 @@ TError TContainer::PrepareOomMonitor() {
     if (error)
         return error;
 
-    Source = std::make_shared<TEpollSource>(Holder->EpollLoop, OomEvent.Fd,
-                                            EPOLL_EVENT_OOM, shared_from_this());
-
-    error = Holder->EpollLoop->AddSource(Source);
+    Source = std::make_shared<TEpollSource>(OomEvent.Fd, EPOLL_EVENT_OOM, shared_from_this());
+    error = EpollLoop->AddSource(Source);
     if (error)
         ShutdownOom();
 
@@ -575,18 +821,6 @@ TError TContainer::PrepareCgroups() {
     }
 
     return TError::Success();
-}
-
-void TContainer::CleanupExpiredChildren() {
-    for (auto iter = Children.begin(); iter != Children.end();) {
-        auto child = iter->lock();
-        if (child) {
-            iter++;
-            continue;
-        }
-
-        iter = Children.erase(iter);
-    }
 }
 
 uint32_t TContainer::GetTrafficClass() const {
@@ -677,7 +911,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     env.SetEnv("container", "lxc");
 
     /* lock these two */
-    env.SetEnv("PORTO_NAME", GetName(), true, true);
+    env.SetEnv("PORTO_NAME", Name, true, true);
     env.SetEnv("PORTO_HOST", GetHostName(), true, true);
 
     /* Inherit environment from containts in isolation domain */
@@ -736,8 +970,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
         return error;
 
     taskEnv->TripleFork = false;
-    taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) &&
-                          Isolate && !Command.empty();
+    taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) && Isolate && !IsMeta();
 
     taskEnv->Mnt.BindMounts = BindMounts;
     taskEnv->Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
@@ -767,7 +1000,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     if (NetCfg)
         taskEnv->Autoconf = NetCfg->Autoconf;
 
-    if (Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
+    if (IsMeta() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");
         TPath path;
         TError error = exe.ReadLink(path);
@@ -789,31 +1022,6 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
                           !NetCfg->Inherited;
 
     return TError::Success();
-}
-
-void TContainer::AddChild(std::shared_ptr<TContainer> child) {
-    Children.push_back(child);
-}
-
-TError TContainer::Create(const TCred &cred) {
-    L_ACT() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
-
-    OwnerCred = cred;
-    TError error = OwnerCred.LoadGroups(OwnerCred.User());
-    if (error)
-        return error;
-    SetProp(EProperty::USER);
-    SetProp(EProperty::GROUP);
-
-    SanitizeCapabilities();
-
-    SetState(EContainerState::Stopped);
-    SetProp(EProperty::STATE);
-
-    RespawnCount = 0;
-    SetProp(EProperty::RESPAWN_COUNT);
-
-    return Save(); /* Serialize on creation  */
 }
 
 void TContainer::SanitizeCapabilities() {
@@ -849,16 +1057,31 @@ void TContainer::SanitizeCapabilities() {
     }
 }
 
-TError TContainer::Start(bool meta) {
+TError TContainer::Start() {
     TError error;
 
     if (State != EContainerState::Stopped)
-        return TError(EError::InvalidState, "Container not stopped");
+        return TError(EError::InvalidState, "Cannot start, container is not stopped: " + Name);
 
     if (Parent) {
+
+        /* Automatically start parent container */
+        if (Parent->State == EContainerState::Stopped) {
+            error = Parent->Start();
+            if (error)
+                return error;
+        }
+
+        if (Parent->State == EContainerState::Paused)
+            return TError(EError::InvalidState, "Parent container is paused: " + Parent->Name);
+
+        if (Parent->State != EContainerState::Running &&
+                Parent->State != EContainerState::Meta)
+            return TError(EError::InvalidState, "Parent container is not running: " + Parent->Name);
+
         auto cg = Parent->GetCgroup(FreezerSubsystem);
         if (FreezerSubsystem.IsFrozen(cg))
-            return TError(EError::InvalidState, "Parent container is paused");
+            return TError(EError::InvalidState, "Parent container is frozen");
     }
 
     /* Normalize root path */
@@ -923,9 +1146,6 @@ TError TContainer::Start(bool meta) {
             Umask = Parent->Umask;
     }
 
-    if (!meta && !Command.length())
-        return TError(EError::InvalidValue, "container command is empty");
-
     /* apply parent limits for capabilities */
     SanitizeCapabilities();
 
@@ -951,7 +1171,7 @@ TError TContainer::Start(bool meta) {
                   Parent->AccessLevel < AccessLevel)
         AccessLevel = Parent->AccessLevel;
 
-    L_ACT() << "Start " << GetName() << " " << Id << std::endl;
+    L_ACT() << "Start " << Name << std::endl;
 
     StartTime = GetCurrentTimeMs();
     SetProp(EProperty::START_TIME);
@@ -990,8 +1210,7 @@ TError TContainer::Start(bool meta) {
         }
     }
 
-    if (!meta || (meta && Isolate)) {
-
+    if (!IsMeta() || Isolate) {
         error = PrepareTask(&TaskEnv, &NetCfg);
         if (error)
             goto error;
@@ -1009,15 +1228,16 @@ TError TContainer::Start(bool meta) {
         if (error)
             goto error;
 
-        L() << GetName() << " started " << std::to_string(Task.Pid) << std::endl;
+        L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
         SetProp(EProperty::ROOT_PID);
     }
 
-    if (meta)
+    if (IsMeta())
         SetState(EContainerState::Meta);
     else
         SetState(EContainerState::Running);
-    Statistics->Started++;
+
+    Statistics->ContainersStarted++;
     error = UpdateSoftLimit();
     if (error)
         L_ERR() << "Can't update meta soft limit: " << error << std::endl;
@@ -1029,44 +1249,13 @@ error:
     return error;
 }
 
-TError TContainer::ApplyForTreePreorder(TScopedLock &holder_lock,
-                                std::function<TError (TScopedLock &holder_lock,
-                                                      TContainer &container)> fn) {
-    for (auto iter : Children)
-        if (auto child = iter.lock()) {
-            TNestedScopedLock lock(*child, holder_lock);
-            if (child->IsValid()) {
-                TError error = fn(holder_lock, *child);
-                if (error)
-                    return error;
-
-                error = child->ApplyForTreePreorder(holder_lock, fn);
-                if (error)
-                    return error;
-            }
-        }
-
-    return TError::Success();
-}
-
-TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
-                                std::function<TError (TScopedLock &holder_lock,
-                                                      TContainer &container)> fn) {
-    for (auto iter : Children)
-        if (auto child = iter.lock()) {
-            TNestedScopedLock lock(*child, holder_lock);
-            if (child->IsValid()) {
-                TError error = child->ApplyForTreePostorder(holder_lock, fn);
-                if (error)
-                    return error;
-
-                error = fn(holder_lock, *child);
-                if (error)
-                    return error;
-            }
-        }
-
-    return TError::Success();
+TError TContainer::CallPostorder(std::function<TError (TContainer &ct)> fn) {
+    for (auto &child : Children) {
+        TError error = child->CallPostorder(fn);
+        if (error)
+            return error;
+    }
+    return fn(*this);
 }
 
 TError TContainer::PrepareWorkDir() {
@@ -1212,49 +1401,22 @@ void TContainer::FreeResources() {
     Stderr.Remove(*this);
 }
 
-void TContainer::AcquireForced() {
-    if (Verbose)
-        L() << "Acquire " << GetName() << " (forced)" << std::endl;
-    Acquired++;
-}
-
-bool TContainer::Acquire() {
-    if (!IsAcquired()) {
-        if (Verbose)
-            L() << "Acquire " << GetName() << std::endl;
-        Acquired++;
-        return true;
-    }
-    return false;
-}
-
-void TContainer::Release() {
-    if (Verbose)
-        L() << "Release " << GetName() << std::endl;
-    PORTO_ASSERT(Acquired > 0);
-    Acquired--;
-}
-
-bool TContainer::IsAcquired() const {
-    return (Acquired || (Parent && Parent->IsAcquired()));
-}
-
 TError TContainer::Kill(int sig) {
     if (State != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state ");
 
-    L_ACT() << "Kill " << GetName() << " pid " << Task.Pid << std::endl;
+    L_ACT() << "Kill " << Name << " pid " << Task.Pid << std::endl;
     return Task.Kill(sig);
 }
 
-TError TContainer::Terminate(TScopedLock &holder_lock, uint64_t deadline) {
+TError TContainer::Terminate(uint64_t deadline) {
     auto cg = GetCgroup(FreezerSubsystem);
     TError error;
 
     if (IsRoot())
         return TError(EError::Permission, "Cannot terminate root container");
 
-    L_ACT() << "Terminate tasks in " << GetName() << std::endl;
+    L_ACT() << "Terminate tasks in " << Name << std::endl;
 
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
@@ -1271,8 +1433,7 @@ TError TContainer::Terminate(TScopedLock &holder_lock, uint64_t deadline) {
     if (Task.Pid && deadline && State != EContainerState::Meta) {
         error = Task.Kill(SIGTERM);
         if (!error) {
-            TScopedUnlock unlock(holder_lock);
-            L_ACT() << "Wait task " << Task.Pid << " after SIGTERM in " << GetName() << std::endl;
+            L_ACT() << "Wait task " << Task.Pid << " after SIGTERM in " << Name << std::endl;
             while (Task.Exists() && !Task.IsZombie() &&
                     !WaitDeadline(deadline));
         }
@@ -1291,23 +1452,22 @@ TError TContainer::Terminate(TScopedLock &holder_lock, uint64_t deadline) {
         return error;
     error = cg.KillAll(SIGKILL);
     if (!FreezerSubsystem.Thaw(cg) && !error) {
-        TScopedUnlock unlock(holder_lock);
         while (!cg.IsEmpty() && !WaitDeadline(deadline));
     }
 
     return error;
 }
 
-TError TContainer::StopOne(TScopedLock &holder_lock, uint64_t deadline) {
+TError TContainer::StopOne(uint64_t deadline) {
     TError error;
 
     if (State == EContainerState::Stopped)
-        return TError(EError::InvalidState, "Container already stopped");
+        return TError::Success();
 
-    L_ACT() << "Stop " << GetName() << std::endl;
+    L_ACT() << "Stop " << Name << std::endl;
 
     if (!IsRoot()) {
-        error = Terminate(holder_lock, deadline);
+        error = Terminate(deadline);
         if (error) {
             L_ERR() << "Cannot termiante tasks in container: " << error << std::endl;
             return error;
@@ -1334,7 +1494,7 @@ TError TContainer::StopOne(TScopedLock &holder_lock, uint64_t deadline) {
     return Save();
 }
 
-TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout) {
+TError TContainer::Stop(uint64_t timeout) {
     uint64_t deadline = timeout ? GetCurrentTimeMs() + timeout : 0;
     auto cg = GetCgroup(FreezerSubsystem);
     TError error;
@@ -1346,37 +1506,24 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout) {
         if (FreezerSubsystem.IsParentFreezing(cg))
             return TError(EError::InvalidState, "Parent container is paused");
 
-        L_ACT() << "Terminate paused container " << GetName() << std::endl;
+        L_ACT() << "Terminate paused container " << Name << std::endl;
 
-        error = cg.KillAll(SIGKILL);
-        if (error)
-            return error;
-
-        ApplyForTreePostorder(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
-            auto cg = child.GetCgroup(FreezerSubsystem);
+        for (auto &ct: Subtree()) {
+            auto cg = ct->GetCgroup(FreezerSubsystem);
             error = cg.KillAll(SIGKILL);
             if (error)
                 return error;
-            return FreezerSubsystem.Thaw(cg, false);
-        });
+            error = FreezerSubsystem.Thaw(cg, false);
+            if (error)
+                return error;
+        }
+    }
 
-        error = FreezerSubsystem.Thaw(cg);
+    for (auto &ct: Subtree()) {
+        error = ct->StopOne(deadline);
         if (error)
             return error;
     }
-
-    error = ApplyForTreePostorder(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
-        if (child.State != EContainerState::Stopped)
-            return child.StopOne(holder_lock, deadline);
-        return TError::Success();
-    });
-
-    if (error)
-        return error;
-
-    error = StopOne(holder_lock, deadline);
-    if (error)
-        return error;
 
     error = UpdateSoftLimit();
     if (error)
@@ -1385,12 +1532,12 @@ TError TContainer::Stop(TScopedLock &holder_lock, uint64_t timeout) {
     return TError::Success();
 }
 
-void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
+void TContainer::Reap(bool oomKilled) {
     TError error;
 
-    error = Terminate(holder_lock, 0);
+    error = Terminate(0);
     if (error)
-        L_WRN() << "Cannot terminate container " << GetName() << " : " << error << std::endl;
+        L_WRN() << "Cannot terminate container " << Name << " : " << error << std::endl;
 
     ShutdownOom();
 
@@ -1423,72 +1570,67 @@ void TContainer::Reap(TScopedLock &holder_lock, bool oomKilled) {
         ScheduleRespawn();
 }
 
-void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
+void TContainer::Exit(int status, bool oomKilled) {
+
+    if (State == EContainerState::Stopped)
+        return;
+
+    auto cg = GetCgroup(MemorySubsystem);
+    uint64_t failcnt = 0lu;
+    TError error;
+
+    error = MemorySubsystem.GetFailCnt(cg, failcnt);
+    if (error)
+        L_WRN() << "Can't get container memory.failcnt: " << error << std::endl;
+
+    if (FdHasEvent(OomEvent.Fd) || failcnt)
+        oomKilled = true;
 
     /* Detect fatal signals: portoinit cannot kill itself */
     if (Isolate && VirtMode == VIRT_MODE_APP && WIFEXITED(status) &&
             WEXITSTATUS(status) > 128 && WEXITSTATUS(status) < 128 + SIGRTMIN)
         status = WEXITSTATUS(status) - 128;
 
-    L_EVT() << "Exit " << GetName() << " " << FormatExitStatus(status)
+    L_EVT() << "Exit " << Name << " " << FormatExitStatus(status)
             << (oomKilled ? " invoked by OOM" : "") << std::endl;
 
     ExitStatus = status;
     SetProp(EProperty::EXIT_STATUS);
 
-    ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
-                                           TContainer &child) {
-        if (child.State != EContainerState::Stopped &&
-                child.State != EContainerState::Dead)
-            child.Reap(holder_lock, oomKilled);
-        return TError::Success();
-    });
-
-    Reap(holder_lock, oomKilled);
+    for (auto &ct: Subtree()) {
+        if (ct->State != EContainerState::Stopped &&
+                ct->State != EContainerState::Dead)
+            ct->Reap(oomKilled);
+    }
 }
 
-TError TContainer::CheckAcquiredChild(TScopedLock &holder_lock) {
-    return ApplyForTreePreorder(holder_lock, [] (TScopedLock &holder_lock,
-                                                 TContainer &child) {
-        if (child.Acquired)
-            return TError(EError::Busy, "child " + child.GetName() + " is busy");
-        return TError::Success();
-    });
-}
-
-TError TContainer::Pause(TScopedLock &holder_lock) {
+TError TContainer::Pause() {
     if (State != EContainerState::Running && State != EContainerState::Meta)
         return TError(EError::InvalidState, "Contaner not running");
 
     if (!(Controllers & CGROUP_FREEZER))
         return TError(EError::NotSupported, "Cannot pause without freezer");
 
-    // some child subtree may be in stop/destroy and we don't want
-    // to freeze parent in that moment
-    TError error = CheckAcquiredChild(holder_lock);
-    if (error)
-        return error;
-
     auto cg = GetCgroup(FreezerSubsystem);
-    error = FreezerSubsystem.Freeze(cg);
+    TError error = FreezerSubsystem.Freeze(cg);
     if (error)
         return error;
 
-    SetState(EContainerState::Paused);
-    ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
-                                           TContainer &child) {
-        if (child.State == EContainerState::Running ||
-                child.State == EContainerState::Meta)
-            child.SetState(EContainerState::Paused);
-        return child.Save();
-    });
+    for (auto &ct: Subtree()) {
+        if (ct->State == EContainerState::Running ||
+                ct->State == EContainerState::Meta) {
+            ct->SetState(EContainerState::Paused);
+            error = ct->Save();
+            if (error)
+                L_ERR() << "Cannot save state after pause: " << error << std::endl;
+        }
+    }
 
-    return Save();
+    return TError::Success();
 }
 
-TError TContainer::Resume(TScopedLock &holder_lock) {
+TError TContainer::Resume() {
     auto cg = GetCgroup(FreezerSubsystem);
-
     if (!(Controllers & CGROUP_FREEZER))
         return TError(EError::NotSupported, "Cannot resume without freezer");
 
@@ -1502,25 +1644,21 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    if (State == EContainerState::Paused)
-        SetState(Command.size() ? EContainerState::Running :
-                                  EContainerState::Meta);
-
-    ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
-                                           TContainer &child) {
-        auto cg = child.GetCgroup(FreezerSubsystem);
+    for (auto &ct: Subtree()) {
+        auto cg = ct->GetCgroup(FreezerSubsystem);
         if (FreezerSubsystem.IsSelfFreezing(cg))
-            FreezerSubsystem.Thaw(cg);
-        if (child.State == EContainerState::Paused)
-            child.SetState(child.Command.size() ? EContainerState::Running :
-                                                  EContainerState::Meta);
-        return child.Save();
-    });
+            FreezerSubsystem.Thaw(cg, false);
+        if (ct->State == EContainerState::Paused)
+            ct->SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
+        error = ct->Save();
+        if (error)
+            L_ERR() << "Cannot save state after resume: " << error << std::endl;
+    }
 
-    return Save();
+    return TError::Success();
 }
 
-void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
+static void ParsePropertyName(std::string &name, std::string &idx) {
     std::vector<std::string> tokens;
     TError error = SplitString(name, '[', tokens);
     if (error || tokens.size() != 2)
@@ -1530,12 +1668,12 @@ void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     idx = StringTrim(tokens[1], " \t\n]");
 }
 
-TError TContainer::GetProperty(const string &origProperty, string &value) const {
+TError TContainer::GetProperty(const std::string &origProperty, std::string &value) const {
     std::string property = origProperty;
     auto dot = property.find('.');
     TError error;
 
-    if (dot != string::npos) {
+    if (dot != std::string::npos) {
         std::string type = property.substr(0, dot);
         if (State == EContainerState::Stopped)
             return TError(EError::InvalidState,
@@ -1574,12 +1712,12 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     return error;
 }
 
-TError TContainer::SetProperty(const string &origProperty,
-                               const string &origValue) {
+TError TContainer::SetProperty(const std::string &origProperty,
+                               const std::string &origValue) {
     if (IsRoot())
         return TError(EError::Permission, "System containers are read only");
 
-    string property = origProperty;
+    std::string property = origProperty;
     std::string idx;
     ParsePropertyName(property, idx);
     std::string value = StringTrim(origValue);
@@ -1663,7 +1801,7 @@ TError TContainer::Save(void) {
 
     /* These are not properties */
     node.Set(P_RAW_ID, std::to_string(Id));
-    node.Set(P_RAW_NAME, GetName());
+    node.Set(P_RAW_NAME, Name);
 
     CurrentContainer = this;
 
@@ -1743,11 +1881,11 @@ TError TContainer::Load(const TKeyValue &node) {
     return error;
 }
 
-void TContainer::SyncState(TScopedLock &holder_lock) {
+void TContainer::SyncState() {
     TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
     TError error;
 
-    L_ACT() << "Sync " << GetName() << " state " << ContainerStateName(State) << std::endl;
+    L_ACT() << "Sync " << Name << " state " << StateName(State) << std::endl;
 
     if (!freezerCg.Exists()) {
         if (State != EContainerState::Stopped)
@@ -1758,27 +1896,27 @@ void TContainer::SyncState(TScopedLock &holder_lock) {
 
     if (State == EContainerState::Stopped) {
         L() << "Found unexpected freezer" << std::endl;
-        Reap(holder_lock, false);
+        Reap(false);
     } else if (State == EContainerState::Meta && !WaitTask.Pid && !Isolate) {
         /* meta container */
     } else if (!WaitTask.Exists()) {
         if (State != EContainerState::Dead)
             L() << "Task no found" << std::endl;
-        Reap(holder_lock, false);
+        Reap(false);
     } else if (WaitTask.GetPPid() != getppid()) {
         L() << "Wrong ppid " << WaitTask.GetPPid() << " " << getppid() << std::endl;
-        Reap(holder_lock, false);
+        Reap(false);
     } else if (WaitTask.IsZombie()) {
         L() << "Task is zombie" << std::endl;
         Task.Pid = 0;
     } else if (FreezerSubsystem.TaskCgroup(WaitTask.Pid, taskCg)) {
         L() << "Cannot check freezer" << std::endl;
-        Reap(holder_lock, false);
+        Reap(false);
     } else if (taskCg != freezerCg) {
         L() << "Task in wrong freezer" << std::endl;
         WaitTask.Kill(SIGKILL);
         Task.Kill(SIGKILL);
-        Reap(holder_lock, false);
+        Reap(false);
     }
 
     if (!(Controllers & CGROUP_FREEZER))
@@ -1809,44 +1947,6 @@ void TContainer::SyncState(TScopedLock &holder_lock) {
     }
 }
 
-TError TContainer::Restore(TScopedLock &holder_lock, const TKeyValue &node) {
-    TError error;
-
-    L_ACT() << "Restore container " << GetName() << std::endl;
-
-    SystemClient.StartRequest();
-
-    error = Load(node);
-    if (error)
-        goto out;
-
-    SyncState(holder_lock);
-
-    if (Task.Pid) {
-        error = RestoreNetwork();
-        if (error && !WaitTask.IsZombie()) {
-            L_WRN() << "Cannot restore network: " << error << std::endl;
-            goto out;
-        }
-    }
-
-    if (MayRespawn())
-            ScheduleRespawn();
-
-    if (Parent)
-        Parent->AddChild(shared_from_this());
-
-    error = ApplyDynamicProperties();
-
-out:
-    SystemClient.FinishRequest();
-
-    if (!error)
-        error = Save();
-
-    return error;
-}
-
 TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     std::string name;
 
@@ -1859,9 +1959,9 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     for (auto ct = this; !ct->IsRoot(); ct = ct->Parent.get()) {
         auto enabled = ct->Controllers & subsystem.Controllers;
         if (name.size())
-            name = ct->Name + (enabled ? "/" : "%") + name;
+            name = ct->FirstName + (enabled ? "/" : "%") + name;
         else if (enabled)
-            name = ct->Name;
+            name = ct->FirstName;
     }
 
     name = std::string(PORTO_CGROUP_PREFIX) +
@@ -1909,81 +2009,131 @@ bool TContainer::HasOomReceived() {
 
 void TContainer::ScheduleRespawn() {
     TEvent e(EEventType::Respawn, shared_from_this());
-    Holder->Queue->Add(config().container().respawn_delay_ms(), e);
+    EventQueue->Add(config().container().respawn_delay_ms(), e);
 }
 
-TError TContainer::Respawn(TScopedLock &holder_lock) {
-    TScopedAcquire acquire(shared_from_this());
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't respawn busy container");
-
-    TError error = Stop(holder_lock, config().container().kill_timeout_ms());
-    if (error)
-        return error;
-
-
-    SystemClient.StartRequest();
-    error = Start(false);
-    SystemClient.FinishRequest();
-    RespawnCount++;
-    SetProp(EProperty::RESPAWN_COUNT);
-
-    if (error)
-        return error;
-
-    return Save();
-}
-
-bool TContainer::CanRemoveDead() const {
-    return State == EContainerState::Dead &&
-        DeathTime / 1000 +
-        AgingTime <= GetCurrentTimeMs() / 1000;
-}
-
-std::vector<std::string> TContainer::GetChildren() {
-    std::vector<std::string> vec;
-
-    for (auto weakChild : Children)
-        if (auto child = weakChild.lock())
-            vec.push_back(child->GetName());
-
-    return vec;
-}
-
-void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
+TError TContainer::Respawn() {
     TError error;
 
-    switch (event.Type) {
-        case EEventType::Exit:
-            {
-                uint64_t failcnt = 0lu;
-                auto cg = GetCgroup(MemorySubsystem);
-                error = MemorySubsystem.GetFailCnt(cg, failcnt);
-                if (error)
-                    L_WRN() << "Can't get container memory.failcnt" << std::endl;
+    error = Stop(config().container().kill_timeout_ms());
+    if (error)
+        return error;
 
-                Exit(holder_lock, event.Exit.Status,
-                     FdHasEvent(OomEvent.Fd) || failcnt);
+    SystemClient.StartRequest();
+    error = Start();
+    SystemClient.FinishRequest();
+
+    RespawnCount++;
+    SetProp(EProperty::RESPAWN_COUNT);
+    (void)Save();
+
+    return error;
+}
+
+bool TContainer::Expired() const {
+    if (State != EContainerState::Dead)
+        return false;
+    return GetCurrentTimeMs() >= DeathTime + AgingTime;
+}
+
+void TContainer::Event(const TEvent &event) {
+    TError error;
+
+    if (Verbose)
+        L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
+
+    auto lock = LockContainers();
+    auto ct = event.Container.lock();
+
+    switch (event.Type) {
+    case EEventType::OOM:
+    {
+        if (ct) {
+            error = ct->Lock(lock);
+            lock.unlock();
+            if (!error) {
+                ct->Exit(SIGKILL, true);
+                ct->Unlock();
+            }
+        }
+        break;
+    }
+    case EEventType::Respawn:
+    {
+        if (ct && ct->MayRespawn()) {
+            error = ct->Lock(lock);
+            lock.unlock();
+            if (!error) {
+                if (ct->MayRespawn())
+                    ct->Respawn();
+                ct->Unlock();
+            }
+        }
+        break;
+    }
+    case EEventType::Exit:
+    {
+        for (auto &it: Containers) {
+            auto ct = it.second;
+            if (ct->WaitTask.Pid != event.Exit.Pid)
+                continue;
+            error = ct->Lock(lock);
+            lock.unlock();
+            if (!error) {
+                ct->Exit(event.Exit.Status, false);
+                ct->Unlock();
             }
             break;
-        case EEventType::RotateLogs:
-            if (State == EContainerState::Running) {
-                Stdout.Rotate(*this);
-                Stderr.Rotate(*this);
+        }
+        AckExitStatus(event.Exit.Pid);
+    }
+    case EEventType::WaitTimeout:
+    {
+        auto w = event.WaitTimeout.Waiter.lock();
+        if (w)
+            w->WakeupWaiter(nullptr);
+        break;
+    }
+    case EEventType::DestroyWeak:
+    {
+        if (ct) {
+            error = ct->Lock(lock);
+            lock.unlock();
+            if (!error) {
+               ct->Destroy();
+               ct->Unlock();
             }
-            break;
-        case EEventType::Respawn:
-            error = Respawn(holder_lock);
-            if (error)
-                L_WRN() << "Can't respawn container: " << error << std::endl;
-            else
-                L() << "Respawned " << GetName() << std::endl;
-            break;
-        case EEventType::OOM:
-            Exit(holder_lock, SIGKILL, true);
-            break;
-        default:
-            break;
+        }
+    }
+    case EEventType::RotateLogs:
+    {
+        for (auto &it : Containers) {
+            auto &ct = it.second;
+
+            if (ct->Expired()) {
+                /* FIXME */
+                Statistics->RemoveDead++;
+            }
+
+            if (ct->State == EContainerState::Running) {
+                error = ct->LockRead(lock);
+                if (!error) {
+                    if (ct->State == EContainerState::Running) {
+                        ct->Stdout.Rotate(*ct);
+                        ct->Stderr.Rotate(*ct);
+                    }
+                    ct->Unlock();
+                }
+            }
+        }
+
+        //ScheduleLogRotatation();
+
+        lock.unlock();
+        TNetwork::RefreshNetworks();
+
+        break;
+    }
     }
 }
 
@@ -2078,7 +2228,7 @@ void TContainerWaiter::WakeupWaiter(const TContainer *who, bool wildcard) {
         std::string name;
         TError err;
         if (who)
-            err = client->ComposeRelativeName(who->GetName(), name);
+            err = client->ComposeName(who->Name, name);
         if (wildcard && (err || !MatchWildcard(name)))
             return;
         Callback(client, err, name);

@@ -440,7 +440,7 @@ static void TestHolder(Porto::Connection &api) {
 
     string parent = "a";
     string child = "a/b";
-    ExpectApiFailure(api.Create(child), EError::InvalidValue);
+    ExpectApiFailure(api.Create(child), EError::ContainerDoesNotExist);
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.Create(child));
     ExpectApiSuccess(api.Destroy(parent));
@@ -657,17 +657,17 @@ static void TestGet(Porto::Connection &api) {
     std::vector<std::string> variable;
     std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
 
-    ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
+    ExpectApiSuccess(api.Get(name, variable, result));
     ExpectEq(result.size(), 0);
 
     name.push_back("a");
     name.push_back("b");
-    ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
+    ExpectApiSuccess(api.Get(name, variable, result));
     ExpectEq(result.size(), 0);
 
     name.clear();
     variable.push_back("cwd");
-    ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
+    ExpectApiSuccess(api.Get(name, variable, result));
     ExpectEq(result.size(), 0);
 
     name.clear();
@@ -766,9 +766,9 @@ static void TestMeta(Porto::Connection &api) {
 }
 
 static void TestEmpty(Porto::Connection &api) {
-    Say() << "Make sure we can't start empty container" << std::endl;
+    Say() << "Make sure we can start empty container" << std::endl;
     ExpectApiSuccess(api.Create("b"));
-    ExpectApiFailure(api.Start("b"), EError::InvalidValue);
+    ExpectApiSuccess(api.Start("b"));
     ExpectApiSuccess(api.Destroy("b"));
 }
 
@@ -2249,11 +2249,11 @@ static void TestNetProperty(Porto::Connection &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
 
-    Say() << "Check net=host:veth0" << std::endl;
+    Say() << "Check net=steal" << std::endl;
 
     CreateVethPair(api);
 
-    ExpectApiSuccess(api.SetProperty(name, "net", "host veth0"));
+    ExpectApiSuccess(api.SetProperty(name, "net", "steal veth0"));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     ExpectEq(containerLink.size(), 2);
@@ -2265,7 +2265,7 @@ static void TestNetProperty(Porto::Connection &api) {
     Expect(linkMap.find("veth0") != linkMap.end());
     ExpectApiSuccess(api.Stop(name));
 
-    Say() << "Make sure net=host:veth0 doesn't preserve L3 address" << std::endl;
+    Say() << "Make sure net=steal doesn't preserve L3 address" << std::endl;
     AsRoot(api);
     if (system("ip link | grep veth1") == 0) {
         Say() << "Delete link veth1" << std::endl;
@@ -2280,7 +2280,7 @@ static void TestNetProperty(Porto::Connection &api) {
     AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ip -o -d addr show dev veth0 to 1.2.3.4"));
-    ExpectApiSuccess(api.SetProperty(name, "net", "host veth0"));
+    ExpectApiSuccess(api.SetProperty(name, "net", "steal veth0"));
     s = StartWaitAndGetData(api, name, "stdout");
     ExpectEq(s, "");
     ExpectApiSuccess(api.Stop(name));
@@ -2414,7 +2414,7 @@ static void TestNetProperty(Porto::Connection &api) {
 
     CreateVethPair(api);
 
-    ExpectApiSuccess(api.SetProperty("a", "net", "host veth0"));
+    ExpectApiSuccess(api.SetProperty("a", "net", "steal veth0"));
     ExpectApiSuccess(api.SetProperty("a/b", "net", "inherited"));
     ExpectApiSuccess(api.Start("a/b"));
     ExpectApiSuccess(api.GetData("a", "root_pid", aPid));

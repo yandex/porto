@@ -8,12 +8,10 @@
 #include "statistics.hpp"
 #include "kvalue.hpp"
 #include "rpc.hpp"
-#include "holder.hpp"
 #include "cgroup.hpp"
 #include "config.hpp"
 #include "event.hpp"
 #include "network.hpp"
-#include "context.hpp"
 #include "client.hpp"
 #include "epoll.hpp"
 #include "container.hpp"
@@ -26,6 +24,7 @@
 #include "util/cred.hpp"
 #include "util/worker.hpp"
 #include "property.hpp"
+#include "portod.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -44,15 +43,19 @@ extern "C" {
 #include <sys/resource.h>
 }
 
-using std::string;
-using std::map;
-using std::vector;
-
 std::string PreviousVersion;
+
+std::unique_ptr<TEpollLoop> EpollLoop;
+std::unique_ptr<TEventQueue> EventQueue;
 
 static pid_t slavePid;
 static bool stdlog = false;
 static bool failsafe = false;
+
+static void FatalError(const std::string &text, TError &error) {
+    L_ERR() << text << ": " << error << std::endl;
+    _exit(EXIT_FAILURE);
+}
 
 static void AllocStatistics() {
     Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
@@ -88,7 +91,7 @@ static int DaemonSyncConfig(bool master) {
 }
 
 static int DaemonPrepare(bool master) {
-    const string procName = master ? "portod" : "portod-slave";
+    const std::string procName = master ? "portod" : "portod-slave";
 
     SetProcessName(procName.c_str());
 
@@ -96,7 +99,7 @@ static int DaemonPrepare(bool master) {
     if (ret)
         return ret;
 
-    L_SYS() << string(80, '-') << std::endl;
+    L_SYS() << std::string(80, '-') << std::endl;
     L_SYS() << "Started " << PORTO_VERSION << " " << PORTO_REVISION << " " << GetPid() << std::endl;
     L_SYS() << config().DebugString() << std::endl;
 
@@ -123,7 +126,6 @@ static void DaemonShutdown(bool master, int ret) {
 }
 
 struct TRequest {
-    TContext *Context;
     std::shared_ptr<TClient> Client;
     rpc::TContainerRequest Request;
 };
@@ -137,7 +139,7 @@ public:
     }
 
     bool Handle(const TRequest &request) override {
-        HandleRpcRequest(*request.Context, request.Request, request.Client);
+        HandleRpcRequest(request.Request, request.Client);
         Statistics->RequestsCompleted++;
         Statistics->RequestsQueued--;
 
@@ -204,7 +206,7 @@ static TError CreatePortoSocket() {
     return TError::Success();
 }
 
-static bool AnotherInstanceRunning(const string &path) {
+static bool AnotherInstanceRunning(const std::string &path) {
     int fd;
 
     if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD)
@@ -231,7 +233,7 @@ void AckExitStatus(int pid) {
     }
 }
 
-static int ReapSpawner(int fd, TContext &context) {
+static int ReapSpawner(int fd) {
     struct pollfd fds[1];
     int nr = 1000;
 
@@ -264,37 +266,28 @@ retry:
         TEvent e(EEventType::Exit);
         e.Exit.Pid = pid;
         e.Exit.Status = status;
-        context.Queue->Add(0, e);
+        EventQueue->Add(0, e);
     }
 
     return 0;
 }
 
-static void StartWorkers(TContext &context, TRpcWorker &worker) {
-    worker.Start();
-    context.Queue->Start();
-}
-
-static void StopWorkers(TContext &context, TRpcWorker &worker) {
-    context.Queue->Stop();
-    worker.Stop();
-}
-
-static int SlaveRpc(TContext &context, TRpcWorker &worker) {
+static int SlaveRpc() {
+    TRpcWorker worker(config().daemon().workers());
     int ret = 0;
     std::map<int, std::shared_ptr<TClient>> clients;
     bool accept_paused = false;
     TError error;
 
-    auto AcceptSource = std::make_shared<TEpollSource>(context.EpollLoop, PORTO_SK_FD);
-    error = context.EpollLoop->AddSource(AcceptSource);
+    auto AcceptSource = std::make_shared<TEpollSource>(PORTO_SK_FD);
+    error = EpollLoop->AddSource(AcceptSource);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    auto MasterSource = std::make_shared<TEpollSource>(context.EpollLoop, REAP_EVT_FD);
-    error = context.EpollLoop->AddSource(MasterSource);
+    auto MasterSource = std::make_shared<TEpollSource>(REAP_EVT_FD);
+    error = EpollLoop->AddSource(MasterSource);
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
@@ -303,8 +296,8 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     /* Don't disturb threads. Deliver signals via signalfd. */
     int sigFd = SignalFd();
 
-    auto sigSource = std::make_shared<TEpollSource>(context.EpollLoop, sigFd);
-    error = context.EpollLoop->AddSource(sigSource);
+    auto sigSource = std::make_shared<TEpollSource>(sigFd);
+    error = EpollLoop->AddSource(sigSource);
     if (error) {
         L_ERR() << "Can't add sigSource to epoll: " << error << std::endl;
         return EXIT_FAILURE;
@@ -312,13 +305,14 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
     std::vector<struct epoll_event> events;
 
-    StartWorkers(context, worker);
+    worker.Start();
+    EventQueue->Start();
 
     bool discardState = false;
     while (true) {
         if (accept_paused && clients.size() * 4 / 3 < config().daemon().max_clients()) {
             L_WRN() << "Resume accepting connections" << std::endl;
-            error = context.EpollLoop->AddSource(AcceptSource);
+            error = EpollLoop->AddSource(AcceptSource);
             if (error) {
                 L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
                 ret = EXIT_FAILURE;
@@ -327,7 +321,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
             accept_paused = false;
         }
 
-        error = context.EpollLoop->GetEvents(events, -1);
+        error = EpollLoop->GetEvents(events, -1);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             ret = EXIT_FAILURE;
@@ -335,13 +329,13 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
         }
 
         if (!failsafe) {
-            ret = ReapSpawner(REAP_EVT_FD, context);
+            ret = ReapSpawner(REAP_EVT_FD);
             if (ret)
                 goto exit;
         }
 
         for (auto ev : events) {
-            auto source = context.EpollLoop->GetSource(ev.data.fd);
+            auto source = EpollLoop->GetSource(ev.data.fd);
             if (!source)
                 continue;
 
@@ -380,17 +374,19 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
             } else if (source->Fd == PORTO_SK_FD) {
                 if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
                     L_WRN() << "Pause accepting connections" << std::endl;
-                    context.EpollLoop->RemoveSource(AcceptSource->Fd);
+                    EpollLoop->RemoveSource(AcceptSource->Fd);
                     accept_paused = true;
                     continue;
                 }
 
-                auto client = std::make_shared<TClient>(context.EpollLoop);
-                error = client->AcceptConnection(context, PORTO_SK_FD);
+                auto client = std::make_shared<TClient>();
+                error = client->AcceptConnection(PORTO_SK_FD);
                 if (!error)
-                    error = context.EpollLoop->AddSource(client);
+                    error = EpollLoop->AddSource(client);
                 if (!error)
                     clients[client->Fd] = client;
+                if (error)
+                    L() << "Drop client: " << error << std::endl;
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the
@@ -400,23 +396,23 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 auto container = source->Container.lock();
 
                 // we don't want any repeated events from OOM fd
-                context.EpollLoop->StopInput(source->Fd);
+                EpollLoop->StopInput(source->Fd);
 
                 if (container) {
                     TEvent e(EEventType::OOM, container);
                     e.OOM.Fd = source->Fd;
-                    context.Queue->Add(0, e);
+                    EventQueue->Add(0, e);
                 }
 
             } else if (clients.find(source->Fd) != clients.end()) {
                 auto client = clients[source->Fd];
 
                 if (ev.events & EPOLLIN) {
-                    TRequest req {&context, client};
+                    TRequest req {client};
                     error = client->ReadRequest(req.Request);
 
                     if (!error) {
-                        error = client->IdentifyClient(*context.Cholder, false);
+                        error = client->IdentifyClient(false);
                         if (!error) {
                             Statistics->RequestsQueued++;
                             worker.Push(req);
@@ -434,20 +430,20 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 }
             } else {
                 L_WRN() << "Unknown event " << source->Fd << std::endl;
-                context.EpollLoop->RemoveSource(source->Fd);
+                EpollLoop->RemoveSource(source->Fd);
             }
         }
     }
 
 exit:
-    StopWorkers(context, worker);
+    EventQueue->Stop();
+    worker.Stop();
 
     for (auto c : clients)
         c.second->CloseConnection();
     clients.clear();
 
     if (discardState) {
-        context.Destroy();
 
         error = ContainersKV.UmountAll();
         if (error)
@@ -467,7 +463,7 @@ static void KvDump() {
     TKeyValue::DumpAll(TPath(config().volumes().keyval().file().path()));
 }
 
-static int TuneLimits() {
+static TError TuneLimits() {
     struct rlimit rlim;
 
     /*
@@ -483,9 +479,152 @@ static int TuneLimits() {
 
     int ret = setrlimit(RLIMIT_NOFILE, &rlim);
     if (ret)
-        return EXIT_FAILURE;
+        return TError(EError::Unknown, errno, "sertlimit");
 
-    return EXIT_SUCCESS;
+    return TError::Success();
+}
+
+static TError CreateRootContainer() {
+    TError error;
+
+    error = TContainer::Create(ROOT_CONTAINER, RootContainer);
+    if (error)
+        return error;
+
+    PORTO_ASSERT(RootContainer->IsRoot());
+
+    RootContainer->Isolate = false;
+
+    error = RootContainer->Start();
+    if (error)
+        return error;
+
+    error = ContainerIdMap.GetAt(DEFAULT_TC_MINOR);
+    if (error)
+        return error;
+
+    error = ContainerIdMap.GetAt(LEGACY_CONTAINER_ID);
+    if (error)
+        return error;
+
+    //ScheduleLogRotatation();
+
+    return TError::Success();
+}
+
+static void RestoreContainers() {
+    std::list<TKeyValue> nodes;
+
+    TError error = TKeyValue::ListAll(ContainersKV, nodes);
+    if (error)
+        FatalError("Cannot list container kv", error);
+
+    for (auto node = nodes.begin(); node != nodes.end(); ) {
+        error = node->Load();
+        if (!error) {
+            if (!node->Has(P_RAW_ID))
+                error = TError(EError::Unknown, "id not found");
+            if (!node->Has(P_RAW_NAME))
+                error = TError(EError::Unknown, "name not found");
+        }
+        if (error) {
+            L_ERR() << "Cannot load " << node->Path << ": " << error << std::endl;
+            (void)node->Path.Unlink();
+            node = nodes.erase(node);
+            continue;
+        }
+        /* key for sorting */
+        node->Name = node->Get(P_RAW_NAME);
+        ++node;
+    }
+
+    nodes.sort();
+
+    for (auto &node : nodes) {
+        if (node.Name[0] == '/')
+            continue;
+
+        std::shared_ptr<TContainer> ct;
+        error = TContainer::Restore(node, ct);
+        if (error) {
+            L_ERR() << "Cannot restore " << node.Name << ": " << error << std::endl;
+            Statistics->RestoreFailed++;
+            node.Path.Unlink();
+            continue;
+        }
+    }
+}
+
+static void CleanupCgroups() {
+    TError error;
+    int pass = 0;
+    bool retry;
+
+again:
+    retry = false;
+
+    /* freezer must be first */
+    for (auto hy: Hierarchies) {
+        std::vector<TCgroup> cgroups;
+
+        error = hy->RootCgroup().ChildsAll(cgroups);
+        if (error)
+            L_ERR() << "Cannot dump porto " << hy->Type << " cgroups : "
+                    << error << std::endl;
+
+        for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); ++cg) {
+            if (!StringStartsWith(cg->Name, PORTO_CGROUP_PREFIX))
+                continue;
+
+            if (cg->Name == PORTO_DAEMON_CGROUP &&
+                    (hy->Controllers & (CGROUP_MEMORY | CGROUP_CPUACCT)))
+                continue;
+
+            bool found = false;
+            for (auto &it: Containers) {
+                if (it.second->GetCgroup(*hy) == *cg) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+                continue;
+
+            if (!cg->IsEmpty())
+                (void)cg->KillAll(9);
+
+            if (hy == &FreezerSubsystem && FreezerSubsystem.IsFrozen(*cg)) {
+                (void)FreezerSubsystem.Thaw(*cg, false);
+                if (FreezerSubsystem.IsParentFreezing(*cg)) {
+                    retry = true;
+                    continue;
+                }
+            }
+
+            (void)cg->Remove();
+        }
+    }
+
+    if (retry && pass++ < 3)
+        goto again;
+}
+
+static void DestroyWeakContainers() {
+    for (auto it: Containers) {
+        auto ct = it.second;
+        if (ct->IsWeak)
+            ct->Destroy();
+    }
+}
+
+static void DestroyContainers() {
+    for (auto it = Containers.rbegin(); it != Containers.rend(); ) {
+        auto ct = it->second;
+        ++it;
+        TError error = ct->Destroy();
+        if (error)
+            L_ERR() << "Cannot destroy container " << ct->Name << ": " << error << std::endl;
+    }
 }
 
 static int SlaveMain() {
@@ -498,9 +637,9 @@ static int SlaveMain() {
         AllocStatistics();
 
     Statistics->SlaveStarted = GetCurrentTimeMs();
-    Statistics->Containers = 0;
-    Statistics->Clients = 0;
-    Statistics->Volumes = 0;
+    Statistics->ContainersCount = 0;
+    Statistics->ClientsCount = 0;
+    Statistics->VolumesCount = 0;
     Statistics->RequestsQueued = 0;
 
     ret = DaemonPrepare(false);
@@ -509,19 +648,13 @@ static int SlaveMain() {
 
     L_SYS() << "Previous version: " << PreviousVersion << std::endl;
 
-    TRpcWorker worker(config().daemon().workers());
-
-    ret = TuneLimits();
-    if (ret) {
-        L_ERR() << "Can't set correct limits: " << strerror(errno) << std::endl;
-        return ret;
-    }
+    error = TuneLimits();
+    if (error)
+        FatalError("Cannot set correct limits", error);
 
     error = CreatePortoSocket();
-    if (error) {
-        L_ERR() << "Cannot create porto socket: " << error << std::endl;
-        return EXIT_FAILURE;
-    }
+    if (error)
+        FatalError("Cannot create porto socket", error);
 
     if (fcntl(PORTO_SK_FD, F_SETFD, FD_CLOEXEC) < 0) {
         L_ERR() << "Can't set close-on-exec flag on PORTO_SK_FD: " << strerror(errno) << std::endl;
@@ -544,92 +677,70 @@ static int SlaveMain() {
 
     error = SetOomScoreAdj(0);
     if (error)
-        L_ERR() << "Can't adjust OOM score: " << error << std::endl;
+        FatalError("Can't adjust OOM score", error);
 
     error = InitializeCgroups();
-    if (error) {
-        L_ERR() << "Cannot initalize cgroups: " << error << std::endl;
-        if (!failsafe)
-            return EXIT_FAILURE;
-    }
+    if (error)
+        FatalError("Cannot initalize cgroups", error);
 
     error = InitializeDaemonCgroups();
-    if (error) {
-        L_ERR() << "Cannot initalize daemon cgroups: " << error << std::endl;
-        if (!failsafe)
-            return EXIT_FAILURE;
-    }
+    if (error)
+        FatalError("Cannot initalize daemon cgroups", error);
 
     TNetwork::InitializeConfig();
     InitContainerProperties();
 
     ContainersKV = TPath(config().keyval().file().path());
     error = TKeyValue::Mount(ContainersKV);
-    if (error) {
-        L_ERR() << "Cannot mount containers keyvalue: " << error << std::endl;
-        return EXIT_FAILURE;
-    }
+    if (error)
+        FatalError("Cannot mount containers keyvalue", error);
 
     VolumesKV = TPath(config().volumes().keyval().file().path());
     error = TKeyValue::Mount(VolumesKV);
-    if (error) {
-        L_ERR() << "Cannot mount volumes keyvalue: " << error << std::endl;
-        return EXIT_FAILURE;
+    if (error)
+        FatalError("Cannot mount volumes keyvalue", error);
+
+    EpollLoop = std::unique_ptr<TEpollLoop>(new TEpollLoop());
+    EventQueue = std::unique_ptr<TEventQueue>(new TEventQueue());
+
+    error = EpollLoop->Create();
+    if (error)
+        FatalError("Cannot initialize epoll", error);
+
+    TPath tmp_dir(config().container().tmp_dir());
+    if (!tmp_dir.IsDirectoryFollow()) {
+        (void)tmp_dir.Unlink();
+        error = tmp_dir.MkdirAll(0755);
+        if (error)
+            FatalError("Cannot create tmp_dir", error);
     }
 
-    TContext context;
-    try {
-        error = context.Initialize();
-        if (error) {
-            L_ERR() << "Initialization error: " << error << std::endl;
-            return EXIT_FAILURE;
-        }
+    SystemClient.StartRequest();
 
-        TPath tmp_dir(config().container().tmp_dir());
-        if (!tmp_dir.IsDirectoryFollow()) {
-            (void)tmp_dir.Unlink();
-            error = tmp_dir.MkdirAll(0755);
-            if (error) {
-                L_ERR() << "Cannot create " << tmp_dir << " : " << error << std::endl;
-                return EXIT_FAILURE;
-            }
-        }
+    error = CreateRootContainer();
+    if (error)
+        FatalError("Cannot create root container", error);
 
-        bool restored = context.Cholder->RestoreFromStorage();
+    RestoreContainers();
 
-        TVolume::RestoreAll();
+    TVolume::RestoreAll();
 
-        L() << "Remove cgroup leftovers..." << std::endl;
-        context.Cholder->RemoveLeftovers();
+    DestroyWeakContainers();
 
-        L() << "Done restoring" << std::endl;
+    SystemClient.FinishRequest();
 
-        if (!restored) {
-            L() << "Remove container leftovers from previous run..." << std::endl;
-            error = tmp_dir.ClearDirectory();
-            if (error)
-                L_ERR() << "Cannot clear " << tmp_dir << " : " << error << std::endl;
-        }
+    L() << "Remove cgroup leftovers..." << std::endl;
+    CleanupCgroups();
 
-        ret = SlaveRpc(context, worker);
-        L_SYS() << "Shutting down..." << std::endl;
-    } catch (string s) {
-        L_ERR() << "EXCEPTION: " << s << std::endl;
-        Crash();
-    } catch (const char *s) {
-        L_ERR() << "EXCEPTION: " << s << std::endl;
-        Crash();
-    } catch (const std::exception &exc) {
-        L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
-        Crash();
-    } catch (...) {
-        L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
-        Crash();
-    }
+    L() << "Done restoring" << std::endl;
+
+    ret = SlaveRpc();
+    L_SYS() << "Shutting down..." << std::endl;
 
     DaemonShutdown(false, ret);
     //FIXME ret >= 0 -> destroy kv storage? why???
-    context.Destroy();
+
+    DestroyContainers();
 
     return ret;
 }
@@ -647,11 +758,11 @@ static void Reap(int pid) {
     (void)waitpid(pid, NULL, 0);
 }
 
-static void UpdateQueueSize(map<int,int> &exited) {
+static void UpdateQueueSize(std::map<int,int> &exited) {
     Statistics->QueuedStatuses = exited.size();
 }
 
-static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus) {
+static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveStatus) {
     while (true) {
         siginfo_t info = { 0 };
         if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
@@ -711,7 +822,7 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
     return nr;
 }
 
-static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
+static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
@@ -729,11 +840,11 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
         return EXIT_FAILURE;
     }
 
-    auto AckSource = std::make_shared<TEpollSource>(loop, ackfd[0]);
+    auto AckSource = std::make_shared<TEpollSource>(ackfd[0]);
 
     int sigFd = SignalFd();
 
-    auto sigSource = std::make_shared<TEpollSource>(loop, sigFd);
+    auto sigSource = std::make_shared<TEpollSource>(sigFd);
 
     slavePid = fork();
     if (slavePid < 0) {
@@ -946,7 +1057,7 @@ static int MasterMain(bool respawn) {
         return EXIT_FAILURE;
     }
 
-    map<int,int> exited;
+    std::map<int,int> exited;
 
     while (true) {
         uint64_t started = GetCurrentTimeMs();
@@ -1015,6 +1126,8 @@ bool RunningInContainer() {
     }
 }
 
+
+
 int main(int argc, char * const argv[]) {
     bool slaveMode = false;
     bool respawn = true;
@@ -1037,7 +1150,7 @@ int main(int argc, char * const argv[]) {
     config.Load();
 
     for (argn = 1; argn < argc; argn++) {
-        string arg(argv[argn]);
+        std::string arg(argv[argn]);
 
         if (arg == "-v" || arg == "--version") {
             std::cout << PORTO_VERSION << " " << PORTO_REVISION << std::endl;

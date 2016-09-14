@@ -1,15 +1,14 @@
 #include "config.hpp"
 #include "statistics.hpp"
 #include "event.hpp"
-#include "holder.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/worker.hpp"
+#include "container.hpp"
 
 class TEventWorker : public TWorker<TEvent, std::priority_queue<TEvent>> {
-    std::shared_ptr<TContainerHolder> Holder;
 public:
-    TEventWorker(std::shared_ptr<TContainerHolder> holder, const size_t nr) : TWorker("portod-event", nr), Holder(holder) {}
+    TEventWorker(const size_t nr) : TWorker("portod-event", nr) {}
 
     const TEvent &Top() override {
         return Queue.top();
@@ -36,7 +35,7 @@ public:
 
     bool Handle(const TEvent &event) override {
         if (event.DueMs <= GetCurrentTimeMs()) {
-            (void)Holder->DeliverEvent(event);
+            TContainer::Event(event);
             return true;
         }
 
@@ -57,8 +56,6 @@ std::string TEvent::GetMsg() const {
             return "OOM killed with fd " + std::to_string(OOM.Fd);
         case EEventType::WaitTimeout:
             return "wait timeout";
-        case EEventType::UpdateNetwork:
-            return "update network";
         case EEventType::DestroyWeak:
             return "destroy weak";
         default:
@@ -80,8 +77,8 @@ void TEventQueue::Add(uint64_t timeoutMs, const TEvent &e) {
     Worker->Push(copy);
 }
 
-TEventQueue::TEventQueue(std::shared_ptr<TContainerHolder> holder) {
-    Worker = std::make_shared<TEventWorker>(holder, config().daemon().event_workers());
+TEventQueue::TEventQueue() {
+    Worker = std::make_shared<TEventWorker>(config().daemon().event_workers());
 }
 
 void TEventQueue::Start() {
