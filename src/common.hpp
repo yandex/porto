@@ -47,6 +47,8 @@ constexpr const char *DOT_CONTAINER = ".";
 constexpr const char *SELF_CONTAINER = "self";
 constexpr const char *PORTO_ROOT_CONTAINER = "/porto";
 
+constexpr int NR_SERVICE_CONTAINERS = 2;
+
 constexpr const char *PORTO_CGROUP_PREFIX = "/porto";
 
 constexpr const char *PORTO_DAEMON_CGROUP = "/portod";

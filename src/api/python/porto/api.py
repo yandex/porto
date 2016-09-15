@@ -508,8 +508,7 @@ class Connection(object):
         return [Container(self.rpc, name) for name in self.rpc.List()]
 
     def Find(self, name):
-        if name not in self.List():
-            raise exceptions.ContainerDoesNotExist("no such container")
+        self.GetProperty(name, "state")
         return Container(self.rpc, name)
 
     def Create(self, name):

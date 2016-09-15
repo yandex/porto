@@ -1325,6 +1325,9 @@ public:
             return ret;
         }
 
+        if (clist.empty())
+            return EXIT_SUCCESS;
+
         vector<string> displayName;
         std::copy(clist.begin(), clist.end(), std::back_inserter(displayName));
 

@@ -428,18 +428,15 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
 
     std::sort(containers.begin(), containers.end());
 
+    root = new TPortoContainer("/");
+    prev = root;
+
     for (auto &c : containers) {
+        if (c == "/")
+            continue;
         curr = new TPortoContainer(c);
         level = curr->GetLevel();
-        if (!root) {
-            /* assume that / container is first in the list */
-            if (c == "/") {
-                root = curr;
-                prev = curr;
-                continue;
-            } else
-                break;
-        } else if (level > prev->GetLevel())
+        if (level > prev->GetLevel())
             curr->Parent = prev;
         else if (level == prev->GetLevel())
             curr->Parent = prev->Parent;

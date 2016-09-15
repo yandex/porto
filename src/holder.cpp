@@ -155,8 +155,10 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     if (Containers.find(name) != Containers.end())
         return TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
 
-    if (Containers.size() + 1 > config().container().max_total())
-        return TError(EError::ResourceNotAvailable, "number of created containers exceeds limit");
+    auto max = config().container().max_total();
+    if (Containers.size() >= max + NR_SERVICE_CONTAINERS)
+        return TError(EError::ResourceNotAvailable, "number of containers reached limit: " +
+                                                    std::to_string(max));
 
     auto parent = GetParent(name);
     if (!parent && name != ROOT_CONTAINER)
@@ -288,7 +290,7 @@ std::vector<std::shared_ptr<TContainer> > TContainerHolder::List(bool all) const
 
     for (auto c : Containers) {
         PORTO_ASSERT(c.first == c.second->GetName());
-        if (!all && c.second->IsPortoRoot())
+        if (!all && (c.second->IsRoot() || c.second->IsPortoRoot()))
             continue;
         ret.push_back(c.second);
     }

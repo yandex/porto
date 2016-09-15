@@ -102,8 +102,7 @@ static void ShouldHaveOnlyRoot(Porto::Connection &api) {
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 1);
-    ExpectEq(containers[0], string("/"));
+    ExpectEq(containers.size(), 0);
 }
 
 static void TestDataMap(Porto::Connection &api, const std::string &name, const std::string &data, int zero) {
@@ -344,9 +343,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("a"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
+    ExpectEq(containers.size(), 1);
+    ExpectEq(containers[0], string("a"));
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
@@ -354,9 +352,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiFailure(api.Create("a"), EError::ContainerAlreadyExists);
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
+    ExpectEq(containers.size(), 1);
+    ExpectEq(containers[0], string("a"));
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
@@ -364,10 +361,9 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("b"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 3);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
-    ExpectEq(containers[2], string("b"));
+    ExpectEq(containers.size(), 2);
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("b"));
     ShouldHaveValidProperties(api, "b");
     ShouldHaveValidData(api, "b");
 
@@ -375,9 +371,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("a"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("b"));
+    ExpectEq(containers.size(), 1);
+    ExpectEq(containers[0], string("b"));
 
     Say() << "Remove container B" << std::endl;
     ExpectApiSuccess(api.Destroy("b"));
@@ -456,17 +451,15 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("a"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
+    ExpectEq(containers.size(), 1);
+    ExpectEq(containers[0], string("a"));
 
     ExpectApiSuccess(api.Create("a/b"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 3);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
-    ExpectEq(containers[2], string("a/b"));
+    ExpectEq(containers.size(), 2);
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("a/b"));
 
     Say() << "Try to create long container path" << std::endl;
 
@@ -489,11 +482,10 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("a/b/c"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 4);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
-    ExpectEq(containers[2], string("a/b"));
-    ExpectEq(containers[3], string("a/b/c"));
+    ExpectEq(containers.size(), 3);
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("a/b"));
+    ExpectEq(containers[2], string("a/b/c"));
 
     ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
 
@@ -4805,10 +4797,9 @@ static void TestRecovery(Porto::Connection &api) {
     KillMaster(api, SIGKILL);
 
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 3);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("parent"));
-    ExpectEq(containers[2], string("parent/child"));
+    ExpectEq(containers.size(), 2);
+    ExpectEq(containers[0], string("parent"));
+    ExpectEq(containers[1], string("parent/child"));
 
     ExpectApiSuccess(api.Destroy("parent"));
 
@@ -4889,10 +4880,9 @@ static void TestRecovery(Porto::Connection &api) {
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 3);
-    ExpectEq(containers[0], string("/"));
-    ExpectEq(containers[1], string("a"));
-    ExpectEq(containers[2], string("a/b"));
+    ExpectEq(containers.size(), 2);
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("a/b"));
     ExpectApiSuccess(api.GetData(parent, "state", v));
     ExpectEq(v, "meta");
 
@@ -4999,7 +4989,7 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Make sure we can recover huge number of containers " << std::endl;
-    const size_t nr = config().container().max_total() - 2;
+    const size_t nr = config().container().max_total();
 
     for (size_t i = 0; i < nr; i++) {
         name = "recover" + std::to_string(i);
@@ -5010,7 +5000,7 @@ static void TestRecovery(Porto::Connection &api) {
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), nr + 1);
+    ExpectEq(containers.size(), nr);
 
     ExpectApiFailure(api.Create("max_plus_one"), EError::ResourceNotAvailable);
 
@@ -5018,7 +5008,7 @@ static void TestRecovery(Porto::Connection &api) {
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), nr + 1);
+    ExpectEq(containers.size(), nr);
 
     for (size_t i = 0; i < nr; i++) {
         name = "recover" + std::to_string(i);
