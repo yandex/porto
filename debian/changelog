@@ -1,3 +1,11 @@
+yandex-porto (2.10.11) unstable; urgency=low
+
+  * network: connect net=L3 and net=NAT to host network
+  * network: add option config.network.proxy_ndp=true/false
+  * network: add addrlabel
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 16 Sep 2016 18:46:47 +0300
+
 yandex-porto (2.10.10) unstable; urgency=low
 
   * porto: thaw container if freeze failed
