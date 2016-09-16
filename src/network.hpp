@@ -181,3 +181,5 @@ struct TNetCfg {
     TError PrepareNetwork();
     TError DestroyNetwork();
 };
+
+extern std::shared_ptr<TNetwork> HostNetwork;
