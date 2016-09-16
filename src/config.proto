@@ -21,6 +21,7 @@ message TCfg {
 		optional uint32 autoconf_timeout_s = 13;
 		repeated string unmanaged_device = 14;
 		repeated string unmanaged_group = 15;
+		optional bool proxy_ndp = 16;
 	}
 
 	message TFileCfg {

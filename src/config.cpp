@@ -71,6 +71,7 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_enable_quota(true);
 
     config().mutable_network()->set_autoconf_timeout_s(120);
+    config().mutable_network()->set_proxy_ndp(true);
 }
 
 bool TConfig::LoadFile(const std::string &path) {
