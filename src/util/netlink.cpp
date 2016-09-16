@@ -11,6 +11,7 @@ extern "C" {
 #include <unistd.h>
 #include <linux/if.h>
 #include <linux/if_ether.h>
+#include <linux/if_addrlabel.h>
 #include <netinet/ether.h>
 #include <netlink/route/class.h>
 #include <netlink/route/classifier.h>
@@ -134,6 +135,50 @@ TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
         return Error(ret, "Cannot modify neighbour for l3 network");
 
     return TError::Success();
+}
+
+TError TNl::AddrLabel(const TNlAddr &prefix, uint32_t label) {
+    struct ifaddrlblmsg al;
+    struct nl_msg *msg;
+    TError error;
+    int ret;
+
+    L() << "netlink add addrlabel " << prefix.Format() << " " << label << std::endl;
+
+    memset(&al, 0, sizeof(al));
+    al.ifal_family = prefix.Family();
+    al.ifal_prefixlen = prefix.Prefix();
+
+    msg = nlmsg_alloc_simple(RTM_NEWADDRLABEL, NLM_F_EXCL|NLM_F_CREATE);
+    if (!msg)
+        return TError(EError::Unknown, "nlmsg_alloc_simple addrlabel");
+
+    ret = nlmsg_append(msg, &al, sizeof(al), NLMSG_ALIGNTO);
+    if (ret < 0) {
+        error = Error(ret, "nlmsg_append addrlabel");
+        goto free_msg;
+    }
+
+    ret = nla_put(msg, IFAL_ADDRESS, prefix.Length(), prefix.Binary());
+    if (ret < 0) {
+        error = Error(ret, "nla_put IFAL_ADDRESS");
+        goto free_msg;
+    }
+
+    ret = nla_put(msg, IFAL_LABEL, sizeof(label), &label);
+    if (ret < 0) {
+        error = Error(ret, "nla_put IFAL_ADDRESS");
+        goto free_msg;
+    }
+
+    ret = nl_send_sync(Sock, msg);
+    if (ret)
+        error = Error(ret, "nl_send_sync addrlabel");
+    msg = nullptr;
+
+free_msg:
+    nlmsg_free(msg);
+    return error;
 }
 
 int TNl::GetFd() {
@@ -931,6 +976,18 @@ bool TNlAddr::IsHost() const {
     return Addr && nl_addr_get_prefixlen(Addr) == nl_addr_get_len(Addr) * 8;
 }
 
+unsigned int TNlAddr::Length() const {
+    return Addr ? nl_addr_get_len(Addr) : 0;
+}
+
+const void *TNlAddr::Binary() const {
+    return Addr ? nl_addr_get_binary_addr(Addr) : nullptr;
+}
+
+unsigned int TNlAddr::Prefix() const {
+    return Addr ? nl_addr_get_prefixlen(Addr) : 0;
+}
+
 TError TNlAddr::Parse(int family, const std::string &string) {
     Forget();
 
@@ -941,7 +998,7 @@ TError TNlAddr::Parse(int family, const std::string &string) {
     return TError::Success();
 }
 
-std::string TNlAddr::Format() {
+std::string TNlAddr::Format() const {
     char buf[128];
     return std::string(nl_addr2str(Addr, buf, sizeof(buf)));
 }

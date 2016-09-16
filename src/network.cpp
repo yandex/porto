@@ -268,6 +268,16 @@ TError TNetwork::ConnectNew(TNamespaceFd &netns) {
     TError error2 = my_netns.SetNs(CLONE_NEWNET);
     PORTO_ASSERT(!error2);
 
+    for (auto &al: config().network().addrlabel()) {
+        TNlAddr prefix;
+        error = prefix.Parse(AF_UNSPEC, al.prefix());
+        if (error)
+            break;
+        error = Nl->AddrLabel(prefix, al.label());
+        if (error)
+            break;
+    }
+
     return error;
 }
 

@@ -22,6 +22,11 @@ message TCfg {
 		repeated string unmanaged_device = 14;
 		repeated string unmanaged_group = 15;
 		optional bool proxy_ndp = 16;
+		message TAddrLabel {
+			required string prefix = 1;
+			required uint32 label = 2;
+		}
+		repeated TAddrLabel addrlabel = 17;
 	}
 
 	message TFileCfg {
