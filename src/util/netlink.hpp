@@ -29,11 +29,15 @@ public:
     void Forget();
 
     TError Parse(int family, const std::string &string);
-    std::string Format();
+    std::string Format() const;
 
     int Family() const;
     bool IsEmpty() const;
     bool IsHost() const;
+
+    unsigned int Length() const;
+    const void * Binary() const;
+    unsigned int Prefix() const;
 
     void AddOffset(uint64_t offset);
     uint64_t GetOffset(const TNlAddr &base) const;
@@ -63,6 +67,7 @@ public:
     void DumpCache(struct nl_cache *cache) const;
 
     TError ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add);
+    TError AddrLabel(const TNlAddr &prefix, uint32_t label);
 };
 
 class TNlLink : public TNonCopyable {

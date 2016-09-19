@@ -36,6 +36,11 @@ message TCfg {
 		optional string container_qdisc = 28;
 		optional string container_qdisc_limit = 29;
 		optional bool proxy_ndp = 30;
+		message TAddrLabel {
+			required string prefix = 1;
+			required uint32 label = 2;
+		}
+		repeated TAddrLabel addrlabel = 31;
 	}
 
 	message TFileCfg {
