@@ -1212,6 +1212,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
     auto lock = HostNetwork->ScopedLock();
     std::string peerName = HostNetwork->NewDeviceName("L3-");
     auto parentNl = HostNetwork->GetNl();
+    auto Nl = Net->GetNl();
     TNlLink peer(parentNl, peerName);
     TNlAddr gate4, gate6;
     TError error;
@@ -1246,7 +1247,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
     if (error)
         return error;
 
-    TNlLink link(Net->GetNl(), l3.Name);
+    TNlLink link(Nl, l3.Name);
     error = link.Load();
     if (error)
         return error;
@@ -1255,8 +1256,10 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
     if (error)
         return error;
 
+    auto peerAddr = peer.GetAddr();
+
     if (!gate4.IsEmpty()) {
-        error = parentNl->ProxyNeighbour(peer.GetIndex(), gate4, true);
+        error = Nl->PermanentNeighbour(link.GetIndex(), gate4, peerAddr, true);
         if (error)
             return error;
         error = link.AddDirectRoute(gate4);
@@ -1268,7 +1271,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
     }
 
     if (!gate6.IsEmpty()) {
-        error = parentNl->ProxyNeighbour(peer.GetIndex(), gate6, true);
+        error = Nl->PermanentNeighbour(link.GetIndex(), gate6, peerAddr, true);
         if (error)
             return error;
         error = link.AddDirectRoute(gate6);

@@ -67,6 +67,8 @@ public:
     void DumpCache(struct nl_cache *cache) const;
 
     TError ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add);
+    TError PermanentNeighbour(int ifindex, const TNlAddr &addr,
+                              const TNlAddr &lladdr, bool add);
     TError AddrLabel(const TNlAddr &prefix, uint32_t label);
 };
 
@@ -88,6 +90,7 @@ public:
     TError Load();
 
     int GetIndex() const;
+    TNlAddr GetAddr() const;
     std::string GetName() const;
     std::string GetType() const;
     std::string GetDesc() const;

@@ -145,6 +145,42 @@ TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
     return TError::Success();
 }
 
+TError TNl::PermanentNeighbour(int ifindex, const TNlAddr &addr,
+                               const TNlAddr &lladdr, bool add) {
+    struct rtnl_neigh *neigh;
+    int ret;
+
+    neigh = rtnl_neigh_alloc();
+    if (!neigh)
+        return TError(EError::Unknown, "Cannot allocate neighbour");
+
+    ret = rtnl_neigh_set_dst(neigh, addr.Addr);
+    if (ret) {
+        rtnl_neigh_put(neigh);
+        return Error(ret, "Cannot set neighbour dst");
+    }
+
+    rtnl_neigh_set_lladdr(neigh, lladdr.Addr);
+    rtnl_neigh_set_state(neigh, NUD_PERMANENT);
+    rtnl_neigh_set_ifindex(neigh, ifindex);
+
+    if (add) {
+        Dump("add", neigh);
+        ret = rtnl_neigh_add(Sock, neigh, NLM_F_CREATE | NLM_F_REPLACE);
+    } else {
+        Dump("del", neigh);
+        ret = rtnl_neigh_delete(Sock, neigh, 0);
+
+        if (ret == -NLE_OBJ_NOTFOUND)
+            ret = 0;
+    }
+    rtnl_neigh_put(neigh);
+    if (ret)
+        return Error(ret, "Cannot modify neighbour entry");
+
+    return TError::Success();
+}
+
 TError TNl::AddrLabel(const TNlAddr &prefix, uint32_t label) {
     struct ifaddrlblmsg al;
     struct nl_msg *msg;
@@ -227,6 +263,10 @@ TError TNlLink::Load() {
 
 int TNlLink::GetIndex() const {
     return rtnl_link_get_ifindex(Link);
+}
+
+TNlAddr TNlLink::GetAddr() const {
+    return TNlAddr(rtnl_link_get_addr(Link));
 }
 
 std::string TNlLink::GetName() const {
@@ -1115,7 +1155,10 @@ free_cls:
 }
 
 TNlAddr::TNlAddr(struct nl_addr *addr) {
-    Addr = nl_addr_get(addr);
+    if (addr)
+        Addr = nl_addr_get(addr);
+    else
+        Addr = nullptr;
 }
 
 TNlAddr::TNlAddr(const TNlAddr &other) {
