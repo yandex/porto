@@ -86,6 +86,7 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_container_qdisc("default: bfifo");
 
     config().mutable_network()->set_autoconf_timeout_s(120);
+    config().mutable_network()->set_proxy_ndp(true);
 
     // FIXME set to true and deprecate this option
     config().mutable_privileges()->set_enforce_bind_permissions(false);

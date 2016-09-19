@@ -1274,9 +1274,11 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         if (error)
             return error;
 
-        error = HostNetwork->AddAnnounce(addr, HostNetwork->MatchDevice(l3.Master));
-        if (error)
-            return error;
+        if (config().network().proxy_ndp()) {
+            error = HostNetwork->AddAnnounce(addr, HostNetwork->MatchDevice(l3.Master));
+            if (error)
+                return error;
+        }
     }
 
     return TError::Success();
@@ -1506,11 +1508,13 @@ TError TNetCfg::DestroyNetwork() {
 
     for (auto &l3 : L3lan) {
         auto lock = HostNetwork->ScopedLock();
-        for (auto &addr : l3.Addrs) {
-            error = HostNetwork->DelAnnounce(addr);
-            if (error)
-                L_ERR() << "Cannot remove announce " << addr.Format()
+        if (config().network().proxy_ndp()) {
+            for (auto &addr : l3.Addrs) {
+                error = HostNetwork->DelAnnounce(addr);
+                if (error)
+                    L_ERR() << "Cannot remove announce " << addr.Format()
                         << " : " << error << std::endl;
+            }
         }
         if (l3.Nat) {
             error = HostNetwork->PutNatAddress(l3.Addrs);
