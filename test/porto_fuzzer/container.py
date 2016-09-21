@@ -22,9 +22,9 @@ def Stop(conn,dest):
     print "Stopping container: " + dest
     timeout = select_by_weight( [
         (200, None),
-        (25, randint(0, 30000)),
-        (12, -randint(0, 2 ** 31)),
-        (12, randint(30000, 2 ** 31))
+        (25, randint(0, 30)),
+        (12, -randint(0, 2 ** 21)),
+        (12, randint(30, 2 ** 21))
     ] )
 
     conn.Stop(dest, timeout)

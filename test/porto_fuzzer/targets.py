@@ -12,9 +12,9 @@ from random import random as randf
 
 def existing_container(conn):
     existing = conn.List()
-    if len(existing) == 1:
+    if len(existing) == 0:
         return get_random_str(NAME_LIMIT)
-    return existing[randint(1, len(existing) - 1)]
+    return existing[randint(0, len(existing) - 1)]
 
 def select_container(conn):
     return select_by_weight( [
@@ -55,7 +55,8 @@ def container_action(conn):
             porto.exceptions.ContainerAlreadyExists,
             porto.exceptions.UnknownError,
             porto.exceptions.ResourceNotAvailable,
-            porto.exceptions.Busy
+            porto.exceptions.Busy,
+            porto.exceptions.NotSupported,
            ):
         return 1
     #Otherwise immediately fail if abnormal exception raised (script or lib bound)
