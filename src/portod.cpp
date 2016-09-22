@@ -586,7 +586,8 @@ again:
 
             bool found = false;
             for (auto &it: Containers) {
-                if (it.second->GetCgroup(*hy) == *cg) {
+                if (it.second->State != EContainerState::Stopped &&
+                        it.second->GetCgroup(*hy) == *cg) {
                     found = true;
                     break;
                 }
@@ -611,6 +612,27 @@ again:
 
     if (retry && pass++ < 3)
         goto again;
+}
+
+static void CleanupTempdir() {
+    TPath temp(config().container().tmp_dir());
+    std::vector<std::string> list;
+    TError error;
+
+    error = temp.ReadDirectory(list);
+    if (error)
+        L_ERR() << "Cannot list temp dir: " << error << std::endl;
+
+    for (auto &name: list) {
+        auto it = Containers.find(name);
+        if (it != Containers.end() &&
+                it->second->State != EContainerState::Stopped)
+            continue;
+        TPath path = temp / name;
+        error = path.RemoveAll();
+        if (error)
+            L_WRN() << "Cannot remove " << path << ": " << error << std::endl;
+    }
 }
 
 static void DestroyWeakContainers() {
@@ -735,6 +757,9 @@ static int SlaveMain() {
 
     L() << "Remove cgroup leftovers..." << std::endl;
     CleanupCgroups();
+
+    L() << "Cleanup temp dir..." << std::endl;
+    CleanupTempdir();
 
     L() << "Done restoring" << std::endl;
 
