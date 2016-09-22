@@ -589,6 +589,9 @@ public:
         if (!Supported())
             return TError(EError::NotSupported, "overlay not supported");
 
+        if (!Volume->HaveLayers())
+            return TError(EError::InvalidProperty, "overlay require layers");
+
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::InvalidProperty, "project quota is disabled");
 
