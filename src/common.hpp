@@ -52,6 +52,7 @@ constexpr const char *SELF_CONTAINER = "self";
 constexpr int NR_SERVICE_CONTAINERS = 1;
 
 constexpr const char *PORTO_DAEMON_CGROUP = "/portod";
+constexpr const char *PORTO_HELPERS_CGROUP = "/portod-helpers";
 
 constexpr const char *PORTO_GROUP_NAME = "porto";
 constexpr const char *PORTO_CT_GROUP_NAME = "porto-containers";

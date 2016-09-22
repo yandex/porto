@@ -846,5 +846,16 @@ TError InitializeDaemonCgroups() {
     if (error)
         return error;
 
+    cg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
+    if (!cg.Exists()) {
+        error = cg.Create();
+        if (error)
+            return error;
+    }
+
+    error = MemorySubsystem.SetLimit(cg, config().daemon().helpers_memory_limit());
+    if (error)
+        return error;
+
     return TError::Success();
 }

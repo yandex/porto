@@ -71,26 +71,3 @@ TError PutLoopDev(const int loopNr) {
         return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
     return error;
 }
-
-TError ResizeLoopDev(int loopNr, const TPath &image, off_t current, off_t target) {
-    auto path = "/dev/loop" + std::to_string(loopNr);
-    auto size = std::to_string(target >> 10) + "K";
-    TError error;
-    TFile dev;
-
-    if (target < current)
-        return TError(EError::NotSupported, "Online shrink is not supported yet");
-
-    error = dev.OpenReadWrite(path);
-    if (error)
-        return error;
-
-    error = image.Truncate(target);
-    if (error)
-        return error;
-
-    if (ioctl(dev.Fd, LOOP_SET_CAPACITY, 0) < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_CAPACITY)");
-
-    return RunCommand({"resize2fs", path, size}, "/");
-}

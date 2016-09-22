@@ -2,6 +2,7 @@
 #include <layer.hpp>
 #include <volume.hpp>
 #include <config.hpp>
+#include "helpers.hpp"
 #include <condition_variable>
 #include <util/unix.hpp>
 #include <util/log.hpp>

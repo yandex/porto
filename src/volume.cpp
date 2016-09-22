@@ -11,6 +11,7 @@
 #include "util/loop.hpp"
 #include "config.hpp"
 #include "kvalue.hpp"
+#include "helpers.hpp"
 
 extern "C" {
 #include <unistd.h>

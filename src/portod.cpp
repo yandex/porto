@@ -580,6 +580,10 @@ again:
                     (hy->Controllers & (CGROUP_MEMORY | CGROUP_CPUACCT)))
                 continue;
 
+            if (cg->Name == PORTO_HELPERS_CGROUP &&
+                    (hy->Controllers & CGROUP_MEMORY))
+                continue;
+
             bool found = false;
             for (auto &it: Containers) {
                 if (it.second->GetCgroup(*hy) == *cg) {

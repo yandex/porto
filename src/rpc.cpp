@@ -9,6 +9,7 @@
 #include "layer.hpp"
 #include "event.hpp"
 #include "protobuf.hpp"
+#include "helpers.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"

@@ -243,57 +243,6 @@ std::string FormatExitStatus(int status) {
     return StringFormat("exit code: %d", WEXITSTATUS(status));
 }
 
-TError RunCommand(const std::vector<std::string> &command, const TPath &cwd) {
-    pid_t pid = fork();
-    if (pid < 0)
-        return TError(EError::Unknown, errno, "RunCommand: fork");
-
-    if (pid > 0) {
-        int ret, status;
-retry:
-        ret = waitpid(pid, &status, 0);
-        if (ret < 0) {
-            if (errno == EINTR)
-                goto retry;
-            return TError(EError::Unknown, errno, "RunCommand: waitpid");
-        }
-        if (WIFEXITED(status) && !WEXITSTATUS(status))
-            return TError::Success();
-        return TError(EError::Unknown, "RunCommand: " + command[0] +
-                                       " " + FormatExitStatus(status));
-    }
-
-    SetDieOnParentExit(SIGKILL);
-
-    TFile::CloseAll({});
-    if (open("/dev/null", O_RDONLY) < 0 ||
-            open("/dev/null", O_WRONLY) < 0 ||
-            open("/dev/null", O_WRONLY) < 0)
-        _exit(EXIT_FAILURE);
-
-    /* Remount everything except CWD Read-Only */
-    if (!cwd.IsRoot()) {
-        std::list<TMount> mounts;
-        if (unshare(CLONE_NEWNS) || TPath("/").Remount(MS_PRIVATE | MS_REC) ||
-                TPath::ListAllMounts(mounts))
-            _exit(EXIT_FAILURE);
-        for (auto &mnt: mounts)
-            mnt.Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
-        cwd.BindRemount(cwd, 0);
-    }
-
-    if (cwd.Chdir())
-        _exit(EXIT_FAILURE);
-
-    const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
-    for (size_t i = 0; i < command.size(); i++)
-        argv[i] = command[i].c_str();
-    argv[command.size()] = nullptr;
-
-    execvp(argv[0], (char **)argv);
-    _exit(2);
-}
-
 TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     FILE *f = popen(cmd.c_str(), "r");
     if (f == nullptr)
@@ -323,23 +272,6 @@ int GetNumCores() {
     }
 
     return ncores;
-}
-
-TError PackTarball(const TPath &tar, const TPath &path) {
-    return RunCommand({ "tar", "--one-file-system", "--numeric-owner",
-                        "--sparse",  "--transform", "s:^./::",
-                        "-cpaf", tar.ToString(),
-                        "-C", path.ToString(), "." }, tar.DirName());
-}
-
-TError UnpackTarball(const TPath &tar, const TPath &path) {
-    return RunCommand({ "tar", "--numeric-owner", "-pxf", tar.ToString()}, path);
-}
-
-TError CopyRecursive(const TPath &src, const TPath &dst) {
-    return RunCommand({ "cp", "--archive", "--force",
-                        "--one-file-system", "--no-target-directory",
-                        src.ToString(), "." }, dst);
 }
 
 void DumpMallocInfo() {
