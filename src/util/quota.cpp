@@ -98,7 +98,7 @@ TError TProjectQuota::EnableProjectQuota() {
 
 	ret = mount(NULL, RootPath.c_str(), NULL, MS_REMOUNT, "quota");
 	if (ret)
-		return TError(EError::Unknown, errno, "Cannot enable quota");
+		return TError(EError::NotSupported, errno, "Cannot enable quota");
 
 	TPath quota = RootPath / PROJECT_QUOTA_FILE;
 	if (!quota.Exists()) {
@@ -110,7 +110,7 @@ TError TProjectQuota::EnableProjectQuota() {
 	ret = quotactl(QCMD(Q_QUOTAON, PRJQUOTA), Device.c_str(),
 		       QFMT_VFS_V1, (caddr_t)quota.c_str());
 	if (ret)
-		error = TError(EError::Unknown, errno, "Cannot enable quota");
+		error = TError(EError::NotSupported, errno, "Cannot enable quota");
 
 	return error;
 }
