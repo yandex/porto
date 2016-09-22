@@ -1,3 +1,34 @@
+yandex-porto (3.0.5) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add global reference to root container
+  * porto: hide root container from list
+  * porto: kill pseudo-container /porto
+  * network: add option config.network.proxy_ndp=true/false
+  * network: add addrlabel
+  * network: add permanent neighbour for host gateway address inside net=L3
+  * fuzzer: fix after api changes
+  * porto: rewrite structure and locking
+  * porto: optional nonblock for get operation
+
+  [ Maxim Samoylov ]
+  * layer: implement synchronization for layer operations
+  * helper: run helper commands in a separate memory cgroups
+  * volume: fail when configuring overlay backend without layers
+  * volume: forbid resize of loop volumes smaller than 512M
+  * volume: check loop storage collisions more careful
+
+  [ Konstantin Khlebnikov ]
+  * util/quota: report NotSupported if cannot enable
+
+  [ Maxim Samoylov ]
+  * test: smoke-test for volume backends
+
+  [ Konstantin Khlebnikov ]
+  * porto: cleanup temp dir after restore
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 22 Sep 2016 18:10:57 +0300
+
 yandex-porto (3.0.4) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
