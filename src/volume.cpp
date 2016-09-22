@@ -554,6 +554,9 @@ free_loop:
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         if (Volume->IsReadOnly)
             return TError(EError::Busy, "Volume is read-only");
+        if (Volume->SpaceLimit < (512ul << 20))
+            return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
+
         return ResizeLoopDev(LoopDev, GetLoopImage(),
                              Volume->SpaceLimit, space_limit);
     }
