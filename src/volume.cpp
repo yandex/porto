@@ -370,29 +370,22 @@ public:
 
     TError Configure() override {
 
+        if (Volume->StorageFile.IsEmpty())
+            Volume->StorageFile = Volume->GetStorage() / "loop.img";
+
         /* Do not allow read-write loop share storage */
         if (Volume->HaveStorage()) {
             for (auto &it: Volumes) {
                 auto other = it.second;
-
-                if (other->BackendType == "loop" && other->HaveStorage() &&
-                        other->Storage == Volume->Storage &&
-                        (!other->IsReadOnly || !Volume->IsReadOnly))
-                    return TError(EError::Busy, "Storage already in use by volume " +
-                                                other->Path.ToString());
+                if (other->BackendType != "loop" ||
+                        (other->IsReadOnly && Volume->IsReadOnly) ||
+                        !other->StorageFile.IsSameInode(Volume->StorageFile))
+                    continue;
+                return TError(EError::Busy, "Storage already used by volume " + other->Path.ToString());
             }
         }
 
         return TError::Success();
-    }
-
-    TPath GetLoopImage() {
-        TPath storage = Volume->GetStorage();
-
-        if (Volume->IsFileStorage)
-            return storage;
-
-        return storage / "loop.img";
     }
 
     TPath GetLoopDevice() {
@@ -409,6 +402,10 @@ public:
 
     TError Restore() override {
         LoopDev = Volume->LoopDev;
+
+        Volume->StorageFile = Volume->GetStorage();
+        if (Volume->StorageFile.IsDirectoryFollow())
+            Volume->StorageFile = Volume->StorageFile / "loop.img";
 
         return TError::Success();
     }
@@ -472,7 +469,7 @@ remove_file:
 
     TError Build() override {
         TPath path = Volume->Path;
-        TPath image = GetLoopImage();
+        TPath image = Volume->StorageFile;
         TError error;
 
         if (!image.Exists()) {
@@ -557,7 +554,7 @@ free_loop:
         if (Volume->SpaceLimit < (512ul << 20))
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
-        return ResizeLoopDev(LoopDev, GetLoopImage(),
+        return ResizeLoopDev(LoopDev, Volume->StorageFile,
                              Volume->SpaceLimit, space_limit);
     }
 
@@ -1119,13 +1116,21 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         if (!path.Exists())
             return TError(EError::InvalidValue, "Storage path does not exist");
         if (!path.IsDirectoryFollow()) {
-            if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop")) {
-                IsFileStorage = true;
-            } else
+            if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop"))
+                StorageFile = path;
+            else
                 return TError(EError::InvalidValue, "Storage path must be a directory");
         }
         if (!path.CanWrite(cred))
             return TError(EError::Permission, "Storage path usage not permitted");
+
+        for (auto &it: Volumes) {
+            auto other = it.second;
+            if (Storage != other->Storage || (IsReadOnly && other->IsReadOnly) ||
+                    (backend == "bind" && other->BackendType == backend))
+                continue;
+            return TError(EError::Busy, "Storage already used by volume " + other->Path.ToString());
+        }
     }
 
     /* Verify default credentials */
@@ -1172,7 +1177,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
 
     /* Autodetect volume backend */
     if (!cfg.count(V_BACKEND)) {
-        if ((HaveQuota() && !TVolumeNativeBackend::Supported()) || IsFileStorage)
+        if ((HaveQuota() && !TVolumeNativeBackend::Supported()) || !StorageFile.IsEmpty())
             BackendType = "loop";
         else if (HaveLayers() && TVolumeOverlayBackend::Supported())
             BackendType = "overlay";

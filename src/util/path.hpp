@@ -101,6 +101,8 @@ public:
     bool IsDirectoryStrict() const;
     bool IsDirectoryFollow() const;
 
+    bool IsSameInode(const TPath &other) const;
+
     unsigned int GetDev() const;
     unsigned int GetBlockDev() const;
 
