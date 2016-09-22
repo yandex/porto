@@ -140,7 +140,8 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
 /* lock container shared/exclusive and all parent containers as shared */
 TError TContainer::Lock(TScopedLock &lock, bool shared, bool try_lock) {
     if (Verbose)
-        L() << "Lock " << (shared ? "read " : "write ") << Name << std::endl;
+        L() << (try_lock ? "TryLock " : "Lock ")
+            << (shared ? "read " : "write ") << Name << std::endl;
     while (1) {
         if (State == EContainerState::Destroyed)
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
@@ -149,8 +150,11 @@ TError TContainer::Lock(TScopedLock &lock, bool shared, bool try_lock) {
             busy = busy || ct->Locked < 0;
         if (!busy)
             break;
-        if (try_lock)
-            return TError(EError::Busy, "Container is busy");
+        if (try_lock) {
+            if (Verbose)
+                L() << "TryLock " << (shared ? "read " : "write ") << "Failed" << Name << std::endl;
+            return TError(EError::Busy, "Container is busy: " + Name);
+        }
         ContainersCV.wait(lock);
     }
     Locked += shared ? 1 : -1;

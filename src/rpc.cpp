@@ -429,6 +429,7 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
 
 noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
                                      rpc::TContainerResponse &rsp) {
+    bool try_lock = req.has_nonblock() && req.nonblock();
     auto get = rsp.mutable_get();
 
     for (int i = 0; i < req.name_size(); i++) {
@@ -438,7 +439,7 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
         entry->set_name(relname);
 
         std::shared_ptr<TContainer> ct;
-        TError containerError = CurrentClient->ReadContainer(relname, ct, true);
+        TError containerError = CurrentClient->ReadContainer(relname, ct, try_lock);
         for (int j = 0; j < req.variable_size(); j++) {
             auto var = req.variable(j);
 

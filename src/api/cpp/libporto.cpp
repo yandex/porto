@@ -255,14 +255,16 @@ int Connection::Dlist(std::vector<Property> &list) {
 
 int Connection::Get(const std::vector<std::string> &name,
                    const std::vector<std::string> &variable,
-                   std::map<std::string, std::map<std::string,
-                                        GetResponse>> &result) {
+                   std::map<std::string, std::map<std::string, GetResponse>> &result,
+                   bool nonblock) {
     auto get = Impl->Req.mutable_get();
 
     for (const auto &n : name)
         get->add_name(n);
     for (const auto &v : variable)
         get->add_variable(v);
+    if (nonblock)
+        get->set_nonblock(nonblock);
 
     int ret = Impl->Rpc();
     if (!ret) {

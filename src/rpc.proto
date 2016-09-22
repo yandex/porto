@@ -130,6 +130,8 @@ message TContainerGetRequest {
 	repeated string name = 1;
 	// list of properties/data
 	repeated string variable = 2;
+	// do not wait busy containers
+	optional bool nonblock = 3;
 }
 
 // Wait while container(s) is/are in running state

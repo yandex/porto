@@ -62,7 +62,8 @@ public:
 
     int Get(const std::vector<std::string> &name,
             const std::vector<std::string> &variable,
-            std::map<std::string, std::map<std::string, GetResponse>> &result);
+            std::map<std::string, std::map<std::string, GetResponse>> &result,
+            bool nonblock = false);
 
     int GetProperty(const std::string &name,
             const std::string &property, std::string &value);
