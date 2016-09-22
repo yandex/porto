@@ -909,9 +909,10 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     TError error = layers_dir.ReadDirectory(layers);
     if (!error) {
         auto list = rsp.mutable_layers();
-        for (auto l: layers)
-            if (l != "_tmp_")
-                list->add_layer(l);
+        for (auto &layer: layers) {
+            if (!LayerIsJunk(layer))
+                list->add_layer(layer);
+        }
     }
     return error;
 }

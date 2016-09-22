@@ -1730,12 +1730,6 @@ void TVolume::RestoreAll(void) {
     if (error)
         L_ERR() << "Cannot prepare place: " << error << std::endl;
 
-    L_ACT() << "Remove stale layers..." << std::endl;
-    TPath layers_tmp = place / config().volumes().layers_dir() / "_tmp_";
-    error = layers_tmp.ClearDirectory();
-    if (error)
-        L_ERR() << "Cannot remove stale layers: " << error << std::endl; 
-
     error = TKeyValue::ListAll(VolumesKV, nodes);
     if (error)
         L_ERR() << "Cannot list nodes: " << error << std::endl;
