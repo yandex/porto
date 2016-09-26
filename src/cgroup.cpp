@@ -778,6 +778,12 @@ TError InitializeCgroups() {
             }
 
             error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
+            /* in kernels < 3.14 cgroup net_cls was in module cls_cgroup */
+            if (error && subsys->Type == "net_cls") {
+                if (system("modprobe cls_cgroup"))
+                    L_ERR() << "Cannot load cls_cgroup" << std::endl;
+                error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
+            }
             if (error) {
                 L_ERR() << "Cannot mount cgroup: " << error << std::endl;
                 (void)subsys->Root.Rmdir();
