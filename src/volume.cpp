@@ -412,26 +412,23 @@ public:
 
     static TError MakeImage(const TPath &path, const TCred &cred, off_t size, off_t guarantee) {
         TError error;
-        TFile image;
+        TScopedFile image;
 
         error = image.CreateNew(path, 0644);
         if (error)
             return error;
 
         if (fchown(image.Fd, cred.Uid, cred.Gid)) {
-            error = TError(EError::Unknown, errno, "chown(" + path.ToString() + ")");
-            goto remove_file;
+            return TError(EError::Unknown, errno, "chown(" + path.ToString() + ")");
         }
 
         if (ftruncate(image.Fd, size)) {
-            error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
-            goto remove_file;
+            return TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
         }
 
         if (guarantee && fallocate(image.Fd, FALLOC_FL_KEEP_SIZE, 0, guarantee)) {
-            error = TError(EError::ResourceNotAvailable, errno,
+            return TError(EError::ResourceNotAvailable, errno,
                            "cannot fallocate guarantee " + std::to_string(guarantee));
-            goto remove_file;
         }
 
         image.Close();
@@ -439,13 +436,10 @@ public:
         error = RunCommand({ "mkfs.ext4", "-F", "-m", "0", "-E", "nodiscard",
                              "-O", "^has_journal", path.ToString()}, path.DirName());
         if (error)
-            goto remove_file;
+            return error;
 
+        image.Release();
         return TError::Success();
-
-remove_file:
-        (void)path.Unlink();
-        return error;
     }
 
     static TError ResizeImage(const TPath &image, off_t current, off_t target) {

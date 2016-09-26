@@ -227,3 +227,20 @@ public:
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
     int GetMountId(void) const;
 };
+
+// Enchanced version of TFile
+// By default will remove file at the end of function scope.
+class TScopedFile: public TFile {
+    bool Preserve = false;
+
+ public:
+    void Release() {
+        Preserve = true;
+    }
+
+    ~TScopedFile() {
+        if (!Preserve) {
+            (void)RealPath().Unlink();
+        }
+    }
+};
