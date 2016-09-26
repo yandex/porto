@@ -14,6 +14,10 @@
 #include "cgroup.hpp"
 #include "property.hpp"
 
+extern "C" {
+#include <sys/resource.h>
+}
+
 class TEpollSource;
 class TCgroup;
 class TSubsystem;
@@ -62,6 +66,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError UpdateSoftLimit();
     void SetState(EContainerState next);
 
+    TError ApplyUlimits();
     TError ApplyDynamicProperties();
     TError PrepareWorkDir();
     TError RestoreNetwork();
@@ -133,7 +138,8 @@ public:
     uint64_t DeathTime;
     uint64_t AgingTime;
 
-    std::map<int, struct rlimit> Rlimit;
+    std::map<int, struct rlimit> Ulimit;
+
     std::string NsName;
 
     uint64_t MemLimit = 0;

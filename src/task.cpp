@@ -120,7 +120,7 @@ TError TTaskEnv::ChildExec() {
 }
 
 TError TTaskEnv::ChildApplyLimits() {
-    for (const auto &pair :CT->Rlimit) {
+    for (const auto &pair :CT->Ulimit) {
         int ret = setrlimit(pair.first, &pair.second);
         if (ret < 0)
             return TError(EError::Unknown, errno,

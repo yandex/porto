@@ -802,6 +802,34 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     return lim;
 }
 
+TError TContainer::ApplyUlimits() {
+    auto cg = GetCgroup(FreezerSubsystem);
+    std::vector<pid_t> prev, pids;
+    TError error;
+    bool retry;
+
+    L_ACT() << "Apply ulimits" << std::endl;
+    do {
+        error = cg.GetTasks(pids);
+        if (error)
+            return error;
+        retry = false;
+        for (auto pid: pids) {
+            if (std::find(prev.begin(), prev.end(), pid) != prev.end())
+                continue;
+            for (auto &it: Ulimit) {
+                if (prlimit(pid, (enum __rlimit_resource)it.first,
+                            &it.second, NULL) && errno != ESRCH)
+                    return TError(EError::Unknown, errno, "prlimit");
+            }
+            retry = true;
+        }
+        prev = pids;
+    } while (retry);
+
+    return TError::Success();
+}
+
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     auto blkcg = GetCgroup(BlkioSubsystem);
@@ -940,6 +968,14 @@ TError TContainer::ApplyDynamicProperties() {
         error = UpdateTrafficClasses();
         if (error) {
             L_ERR() << "Cannot update tc : " << error << std::endl;
+            return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::ULIMIT)) {
+        error = ApplyUlimits();
+        if (error) {
+            L_ERR() << "Cannot update ulimit: " << error << std::endl;
             return error;
         }
     }
@@ -1468,7 +1504,7 @@ TError TContainer::Start() {
             NetPriority = Parent->NetPriority;
 
         if (!HasProp(EProperty::ULIMIT))
-            Rlimit = Parent->Rlimit;
+            Ulimit = Parent->Ulimit;
 
         if (!HasProp(EProperty::UMASK))
             Umask = Parent->Umask;

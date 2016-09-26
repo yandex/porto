@@ -12,10 +12,6 @@
 #include "env.hpp"
 #include "filesystem.hpp"
 
-extern "C" {
-#include <sys/resource.h>
-}
-
 struct TTaskEnv {
     std::shared_ptr<TContainer> CT;
     TClient *Client;
