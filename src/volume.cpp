@@ -444,7 +444,9 @@ public:
         return TError::Success();
 
 remove_file:
-        (void)path.Unlink();
+        TError error2 = path.Unlink();
+        if (error2)
+            L_ERR() << "Cannot cleanup loop image: " << error2 << std::endl;
         return error;
     }
 
