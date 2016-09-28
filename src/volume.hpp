@@ -161,6 +161,6 @@ extern std::mutex VolumesMutex;
 extern std::map<TPath, std::shared_ptr<TVolume>> Volumes;
 extern TPath VolumesKV;
 
-static inline std::unique_lock<std::mutex> LockVolumes() {
+inline std::unique_lock<std::mutex> LockVolumes() {
     return std::unique_lock<std::mutex>(VolumesMutex);
 }
