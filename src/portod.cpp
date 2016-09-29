@@ -45,6 +45,9 @@ extern "C" {
 
 std::string PreviousVersion;
 
+TPidFile PortoMasterPid(PORTO_MASTER_PIDFILE, PORTOD_MASTER_NAME);
+TPidFile PortoSlavePid(PORTO_SLAVE_PIDFILE, PORTOD_SLAVE_NAME);
+
 std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
@@ -71,33 +74,25 @@ static void DaemonOpenLog(bool master) {
     TLogger::OpenLog(stdlog, log.path(), log.perm());
 }
 
-static int DaemonSyncConfig(bool master) {
-    config.Load();
+static int DaemonPrepare(bool master) {
+    TError error;
 
-    const auto &pid = master ? config().master_pid() : config().slave_pid();
+    if (master) {
+        SetProcessName(PORTOD_MASTER_NAME);
+        error = PortoMasterPid.Save(getpid());
+    } else {
+        SetProcessName(PORTOD_SLAVE_NAME);
+        error = PortoSlavePid.Save(getpid());
+    }
 
-    DaemonOpenLog(master);
-
-    TPath pidPath(pid.path());
-    if (!pidPath.Exists())
-        pidPath.Mkfile(pid.perm());
-
-    if (pidPath.WriteAll(std::to_string(getpid()))) {
-        L_ERR() << "Can't create pid file " << pid.path() << "!" << std::endl;
+    if (error) {
+        std::cerr << "Cannot save pid " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    return EXIT_SUCCESS;
-}
+    config.Load();
 
-static int DaemonPrepare(bool master) {
-    const std::string procName = master ? "portod" : "portod-slave";
-
-    SetProcessName(procName.c_str());
-
-    int ret = DaemonSyncConfig(master);
-    if (ret)
-        return ret;
+    DaemonOpenLog(master);
 
     L_SYS() << std::string(80, '-') << std::endl;
     L_SYS() << "Started " << PORTO_VERSION << " " << PORTO_REVISION << " " << GetPid() << std::endl;
@@ -107,12 +102,14 @@ static int DaemonPrepare(bool master) {
 }
 
 static void DaemonShutdown(bool master, int ret) {
-    TPath pidFile(master ? config().master_pid().path() : config().slave_pid().path());
-
     L_SYS() << "Stopped " << ret << std::endl;
 
     TLogger::CloseLog();
-    (void)pidFile.Unlink();
+
+    if (master)
+        PortoMasterPid.Remove();
+    else
+        PortoSlavePid.Remove();
 
     if (ret < 0) {
         int sig = -ret;
@@ -961,10 +958,6 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
                 break;
             case SIGHUP:
             {
-                int ret = DaemonSyncConfig(true);
-                if (ret)
-                    return ret;
-
                 L_SYS() << "Updating" << std::endl;
 
                 const char *stdlogArg = nullptr;

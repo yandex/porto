@@ -1426,7 +1426,7 @@ static void TestCwdProperty(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
-    (void)TPath(config().slave_pid().path()).ReadAll(portodPid);
+    (void)TPath(PORTO_SLAVE_PIDFILE).ReadAll(portodPid);
     portodCwd = GetCwd(portodPid);
 
     Say() << "Check default working directory" << std::endl;
@@ -4154,8 +4154,8 @@ static void TestLeaks(Porto::Connection &api) {
     int perct = 64;
     uint64_t time;
 
-    ExpectSuccess(TPath(config().slave_pid().path()).ReadAll(slavePid));
-    ExpectSuccess(TPath(config().master_pid().path()).ReadAll(masterPid));
+    ExpectSuccess(TPath(PORTO_SLAVE_PIDFILE).ReadAll(slavePid));
+    ExpectSuccess(TPath(PORTO_MASTER_PIDFILE).ReadAll(masterPid));
 
     int initSlave = GetVmRss(slavePid);
     int initMaster = GetVmRss(masterPid);
@@ -4609,7 +4609,7 @@ static void CheckErrorCounters(Porto::Connection &api) {
 }
 
 static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
-    int pid = ReadPid(config().master_pid().path());
+    int pid = ReadPid(PORTO_MASTER_PIDFILE);
     if (kill(pid, sig))
         throw "Can't send " + std::to_string(sig) + " to master";
     WaitProcessExit(std::to_string(pid));
@@ -4625,7 +4625,7 @@ static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
 }
 
 static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
-    int portodPid = ReadPid(config().slave_pid().path());
+    int portodPid = ReadPid(PORTO_SLAVE_PIDFILE);
     if (kill(portodPid, sig))
         throw "Can't send " + std::to_string(sig) + " to slave";
     WaitProcessExit(std::to_string(portodPid));
@@ -5279,7 +5279,7 @@ void TruncateLogs(Porto::Connection &api) {
     TPath slaveLog(config().slave_log().path());
     ExpectSuccess(slaveLog.Unlink());
 
-    int pid = ReadPid(config().slave_pid().path());
+    int pid = ReadPid(PORTO_SLAVE_PIDFILE);
     if (kill(pid, SIGUSR1))
         throw string("Can't send SIGUSR1 to slave");
 
@@ -5287,7 +5287,7 @@ void TruncateLogs(Porto::Connection &api) {
     TPath masterLog(config().master_log().path());
     ExpectSuccess(masterLog.Unlink());
 
-    pid = ReadPid(config().master_pid().path());
+    pid = ReadPid(PORTO_MASTER_PIDFILE);
     if (kill(pid, SIGUSR1))
         throw string("Can't send SIGUSR1 to master");
 

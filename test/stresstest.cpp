@@ -246,8 +246,8 @@ static void StressKill() {
         std::vector<std::string> containers;
         if (api.List(containers) != 0)
             continue;
-        if (TPath(config().slave_pid().path()).ReadInt(pid))
-            Say(std::cerr) << "ERROR: Don't open " << config().slave_pid().path() << std::endl;
+        if (TPath(PORTO_SLAVE_PIDFILE).ReadInt(pid))
+            Say(std::cerr) << "ERROR: Don't open " << PORTO_SLAVE_PIDFILE << std::endl;
         if (kill(pid, SIGKILL)) {
             Say(std::cerr) << "ERROR: Don't send kill to " << pid << std::endl;
         } else {

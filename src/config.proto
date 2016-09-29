@@ -125,8 +125,8 @@ message TCfg {
 	}
 
 	optional TNetworkCfg network = 1;
-	optional TFileCfg master_pid = 2;
-	optional TFileCfg slave_pid = 3;
+	optional TFileCfg master_pid = 2 [deprecated=true];
+	optional TFileCfg slave_pid = 3 [deprecated=true];
 	optional TFileCfg master_log = 4;
 	optional TFileCfg slave_log = 5;
 	optional TRpcSockCfg rpc_sock = 6 [deprecated=true];

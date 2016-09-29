@@ -15,13 +15,9 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().Clear();
 
-    config().mutable_slave_pid()->set_path("/run/portod.pid");
-    config().mutable_slave_pid()->set_perm(0644);
     config().mutable_slave_log()->set_path("/var/log/portod.log");
     config().mutable_slave_log()->set_perm(0644);
 
-    config().mutable_master_pid()->set_path("/run/portoloop.pid");
-    config().mutable_master_pid()->set_perm(0644);
     config().mutable_master_log()->set_path("/var/log/portoloop.log");
     config().mutable_master_log()->set_perm(0644);
 

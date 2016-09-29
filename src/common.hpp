@@ -66,6 +66,12 @@ constexpr int  PORTO_SK_FD = 130;
 
 constexpr const char *PORTO_VERSION_FILE = "/run/portod.version";
 
+constexpr const char *PORTO_MASTER_PIDFILE = "/run/portoloop.pid";
+constexpr const char *PORTO_SLAVE_PIDFILE = "/run/portod.pid";
+
+constexpr const char *PORTOD_MASTER_NAME = "portod";
+constexpr const char *PORTOD_SLAVE_NAME = "portod-slave";
+
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_ID_MAX = 16384;

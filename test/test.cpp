@@ -498,7 +498,7 @@ void TestDaemon(Porto::Connection &api) {
     sleep(1);
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
-    pid = ReadPid(config().slave_pid().path());
+    pid = ReadPid(PORTO_SLAVE_PIDFILE);
     ExpectEq(ChildrenNum(pid), 0);
 
     Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
@@ -530,7 +530,7 @@ void TestDaemon(Porto::Connection &api) {
     ExpectLessEq(12, nr);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
-    pid = ReadPid(config().master_pid().path());
+    pid = ReadPid(PORTO_MASTER_PIDFILE);
     ExpectEq(ChildrenNum(pid), 1);
 
     Say() << "Make sure portod-master doesn't have invalid FDs" << std::endl;
