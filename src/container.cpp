@@ -364,7 +364,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         error = ct->RestoreNetwork();
         if (error && !ct->WaitTask.IsZombie()) {
             L_WRN() << "Cannot restore network: " << error << std::endl;
-            goto err;
+            ct->Reap(false);
         }
     }
 
