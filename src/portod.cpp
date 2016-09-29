@@ -938,11 +938,12 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
                     L_ERR() << "Can't send " << s << " to slave" << std::endl;
 
                 L() << "Waiting for slave to exit..." << std::endl;
-                uint64_t deadline = GetCurrentTimeMs() + 1000;
+                uint64_t deadline = GetCurrentTimeMs() +
+                                    config().daemon().portod_stop_timeout() * 1000;
                 do {
                     if (waitpid(slavePid, nullptr, WNOHANG) == slavePid)
                         break;
-                } while (!WaitDeadline(deadline));
+                } while (!WaitDeadline(deadline, 1));
 
                 ret = -s;
                 goto exit;

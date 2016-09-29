@@ -77,6 +77,7 @@ message TCfg {
 		optional uint32 event_workers = 12;
 		optional bool debug = 13 [deprecated=true];
 		optional uint64 helpers_memory_limit = 14;
+		optional uint32 portod_stop_timeout = 15;
 	}
 
 	message TContainerCfg {
