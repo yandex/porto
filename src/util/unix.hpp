@@ -78,6 +78,7 @@ public:
 
     TPidFile(const std::string &path, const std::string &name): Path(path), Name(name) { }
     TError Load();
+    bool Running();
     TError Save(pid_t pid);
     TError Remove();
 };

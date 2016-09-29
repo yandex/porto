@@ -25,6 +25,7 @@
 #include "util/worker.hpp"
 #include "property.hpp"
 #include "portod.hpp"
+#include "libporto.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -54,6 +55,8 @@ std::unique_ptr<TEventQueue> EventQueue;
 static pid_t slavePid;
 static bool stdlog = false;
 static bool failsafe = false;
+static bool respawnSlave = true;
+static bool slaveMode = false;
 
 static void FatalError(const std::string &text, TError &error) {
     L_ERR() << text << ": " << error << std::endl;
@@ -201,19 +204,6 @@ static TError CreatePortoSocket() {
         return TError(EError::Unknown, errno, "dup2()");
 
     return TError::Success();
-}
-
-static bool AnotherInstanceRunning(const std::string &path) {
-    int fd;
-
-    if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD)
-        return false;
-
-    if (ConnectToRpcServer(path, fd))
-        return false;
-
-    close(fd);
-    return true;
 }
 
 void AckExitStatus(int pid) {
@@ -452,12 +442,6 @@ exit:
     }
 
     return ret;
-}
-
-static void KvDump() {
-    TLogger::OpenLog(true, "", 0);
-    TKeyValue::DumpAll(TPath(config().keyval().file().path()));
-    TKeyValue::DumpAll(TPath(config().volumes().keyval().file().path()));
 }
 
 static TError TuneLimits() {
@@ -848,6 +832,31 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
     return nr;
 }
 
+static int UpgradeMaster() {
+    L_SYS() << "Updating" << std::endl;
+
+    if (kill(slavePid, SIGHUP) < 0) {
+        L_ERR() << "Cannot send SIGHUP to slave: " << strerror(errno) << std::endl;
+    } else {
+        if (waitpid(slavePid, NULL, 0) != slavePid)
+            L_ERR() << "Cannot wait for slave exit status: " << strerror(errno) << std::endl;
+    }
+
+    TLogger::CloseLog();
+
+    std::vector<const char *> args = {{program_invocation_name}};
+    if (stdlog)
+        args.push_back("--stdlog");
+    if (Verbose)
+        args.push_back("--verbose");
+    args.push_back(nullptr);
+
+    execvp(args[0], (char **)args.data());
+
+    std::cerr << "Cannot exec " << args[0] << ": " << strerror(errno) << std::endl;
+    return EXIT_FAILURE;
+}
+
 static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
@@ -953,32 +962,11 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
 
                 L() << "Statuses:" << std::endl;
                 for (auto pair : exited)
-                    L() << pair.first << "=" << pair.second << std::endl;;
+                    L() << pair.first << "=" << pair.second << std::endl;
 
                 break;
             case SIGHUP:
-            {
-                L_SYS() << "Updating" << std::endl;
-
-                const char *stdlogArg = nullptr;
-                if (stdlog)
-                    stdlogArg = "--stdlog";
-
-                if (kill(slavePid, SIGHUP) < 0) {
-                    L_ERR() << "Can't send SIGHUP to slave: " << strerror(errno) << std::endl;
-                } else {
-                    if (waitpid(slavePid, NULL, 0) != slavePid)
-                        L_ERR() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
-                }
-                TLogger::CloseLog();
-                close(evtfd[1]);
-                close(ackfd[0]);
-                loop->Destroy();
-                execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
-                std::cerr << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
-                ret = EXIT_FAILURE;
-                goto exit;
-            }
+                return UpgradeMaster();
             default:
                 /* Ignore other signals */
                 break;
@@ -1027,7 +1015,7 @@ exit:
     return ret;
 }
 
-static int MasterMain(bool respawn) {
+static int MasterMain() {
     Statistics->MasterStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(true);
@@ -1097,7 +1085,7 @@ static int MasterMain(bool respawn) {
 
         if (ret < 0)
             break;
-        if (!respawn)
+        if (!respawnSlave)
             break;
 
         PreviousVersion = PORTO_VERSION;
@@ -1112,99 +1100,64 @@ static int MasterMain(bool respawn) {
     return ret;
 }
 
-bool RunningInContainer() {
-    if (getpid() == 1) {
-        return getenv("container") != nullptr;
-    } else {
-        std::string line;
-        bool inContainer = false;
-
-        FILE *f = fopen("/proc/1/environ", "r");
-        if (!f)
-            return false;
-
-        bool done = false;
-        while (!done) {
-            int c = getc(f);
-
-            if (c == EOF) {
-                done = true;
-                break;
-            } else if (c == '\0') {
-                if (StringStartsWith(line, "container=")) {
-                    done = true;
-                    inContainer = true;
-                    break;
-                }
-
-                line.clear();
-            } else {
-                line += (char)c;
-            }
-        }
-
-        fclose(f);
-
-        return inContainer;
-    }
+static void KvDump() {
+    TLogger::OpenLog(true, "", 0);
+    TKeyValue::DumpAll(TPath(config().keyval().file().path()));
+    TKeyValue::DumpAll(TPath(config().volumes().keyval().file().path()));
 }
 
+static void PrintVersion() {
+    std::cout << "version: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
+    Porto::Connection conn;
+    std::string ver, rev;
+    if (!conn.GetVersion(ver, rev))
+        std::cout << "running: " <<  ver + " " + rev << std::endl;
+}
 
+static bool CheckPortoAlive() {
+    Porto::Connection conn;
+    if (conn.SetTimeout(1) != EError::Success)
+        return false;
+    std::string ver, rev;
+    return !conn.GetVersion(ver, rev);
+}
 
-int main(int argc, char * const argv[]) {
-    bool slaveMode = false;
-    bool respawn = true;
-    int argn;
+static bool RunningInContainer() {
+    if (getpid() == 1)
+        return getenv("container") != nullptr;
+    std::string env;
+    if (TPath("/proc/1/environ").ReadAll(env))
+        return false;
+    return StringStartsWith(env, "container=") ||
+        env.find(std::string("\0container=", 11)) != std::string::npos;
+}
 
+static bool SanityCheck() {
     if (getuid() != 0) {
         std::cerr << "Need root privileges to start" << std::endl;
         return EXIT_FAILURE;
     }
 
-    if (RunningInContainer()) {
-        std::cerr << "Can't start in container" << std::endl;
+    if (!PortoMasterPid.Load() && PortoMasterPid.Pid != getpid() && CheckPortoAlive()) {
+        std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
+
+    if (RunningInContainer()) {
+        std::cerr << "Cannot start in container" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+static int PortodMain() {
+    if (SanityCheck())
+        return EXIT_FAILURE;
 
     CatchFatalSignals();
 
     AllocStatistics();
-
-    config.Load();
-
-    for (argn = 1; argn < argc; argn++) {
-        std::string arg(argv[argn]);
-
-        if (arg == "-v" || arg == "--version") {
-            std::cout << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
-            return EXIT_SUCCESS;
-        } else if (arg == "--kv-dump") {
-            KvDump();
-            return EXIT_SUCCESS;
-        } else if (arg == "--slave") {
-            slaveMode = true;
-        } else if (arg == "--stdlog") {
-            stdlog = true;
-        } else if (arg == "--verbose") {
-            Verbose = true;
-        } else if (arg == "--norespawn") {
-            respawn = false;
-        } else if (arg == "--failsafe") {
-            failsafe = true;
-        } else if (arg == "-t") {
-            if (argn + 1 >= argc)
-                return EXIT_FAILURE;
-            return config.Test(argv[argn + 1]);
-        } else {
-            std::cerr << "Unknown option " << arg << std::endl;
-            return EXIT_FAILURE;
-        }
-    }
-
-    if (!slaveMode && AnotherInstanceRunning(PORTO_SOCKET_PATH)) {
-        std::cerr << "Another instance of portod is running!" << std::endl;
-        return EXIT_FAILURE;
-    }
 
     if (!stdlog) {
         close(0);
@@ -1219,7 +1172,7 @@ int main(int argc, char * const argv[]) {
         if (slaveMode)
             return SlaveMain();
         else
-            return MasterMain(respawn);
+            return MasterMain();
     } catch (std::string s) {
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
@@ -1233,4 +1186,292 @@ int main(int argc, char * const argv[]) {
         L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
         Crash();
     }
+
+    return EXIT_FAILURE;
+}
+
+static int StartPortod() {
+    if (SanityCheck())
+        return EXIT_FAILURE;
+
+    pid_t pid = fork();
+    if (pid < 0)
+        return EXIT_FAILURE;
+
+    if (!pid)
+        return PortodMain();
+
+    uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
+    do {
+        if (CheckPortoAlive())
+            return EXIT_SUCCESS;
+        int status;
+        if (waitpid(pid, &status, WNOHANG) == pid) {
+            std::cerr << "portod exited: " << FormatExitStatus(status) << std::endl;
+            return EXIT_FAILURE;
+        }
+    } while (!WaitDeadline(deadline));
+    std::cerr << "start timeout exceeded" << std::endl;
+    return EXIT_FAILURE;
+}
+
+static int StopPortod() {
+    TError error;
+
+    if (PortoMasterPid.Load()) {
+        std::cerr << "portod already stopped" << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    pid_t pid = PortoMasterPid.Pid;
+    if (CheckPortoAlive()) {
+        if (!kill(pid, SIGINT)) {
+            uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_stop_timeout() * 1000;
+            do {
+                if (PortoMasterPid.Load() || PortoMasterPid.Pid != pid)
+                    return EXIT_SUCCESS;
+            } while (!WaitDeadline(deadline));
+        } else if (errno != ESRCH) {
+            std::cerr << "cannot stop portod: " << strerror(errno) << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+    std::cerr << "portod not responding. sending sigkill" << std::endl;
+    if (kill(pid, SIGKILL) && errno != ESRCH) {
+        std::cerr << "cannot kill portod: " << strerror(errno) << std::endl;
+        return EXIT_FAILURE;
+    }
+    error = PortoMasterPid.Remove();
+    if (error)
+        std::cerr << "cannot remove pidfile: " << error << std::endl;
+    error = PortoSlavePid.Remove();
+    if (error)
+        std::cerr << "cannot remove pidfile: " << error << std::endl;
+    return EXIT_SUCCESS;
+}
+
+static int ReexecPorotd() {
+    if (PortoMasterPid.Load() || PortoSlavePid.Load()) {
+        std::cerr << "portod not running" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (kill(PortoMasterPid.Pid, SIGHUP)) {
+        std::cerr << "cannot send signal" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
+    do {
+        if (!PortoSlavePid.Running() && CheckPortoAlive())
+            return EXIT_SUCCESS;
+    } while (!WaitDeadline(deadline));
+
+    std::cerr << "timeout exceeded" << std::endl;
+    return EXIT_FAILURE;
+}
+
+int UpgradePortod(std::string path) {
+    TPath symlink(PORTO_BINARY_PATH), update(path), backup;
+    uint64_t deadline;
+    TError error;
+
+    if (!update.IsAbsolute() || !update.IsRegularStrict() ||
+            !update.HasAccess(TCred::Current(), TPath::X)) {
+        std::cerr << "require absolute path to executable binary file" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    error = PortoMasterPid.Load();
+    if (!error) {
+        if (!CheckPortoAlive()) {
+            std::cerr << "portod running but not responding" << std::endl;
+            return EXIT_FAILURE;
+        }
+        error = PortoSlavePid.Load();
+        if (error) {
+            std::cerr << "cannot find portod slave: " << error << std::endl;
+            return EXIT_FAILURE;
+        }
+    } else
+        std::cerr << "portod not running, do offline upgrade" << std::endl;
+
+    error = symlink.ReadLink(backup);
+    if (error) {
+        std::cerr << "cannot read symlink " << symlink << ": " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    error = symlink.Unlink();
+    if (error) {
+        std::cerr << "cannot remove old symlink: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    error = symlink.Symlink(update);
+    if (error) {
+        std::cerr << "cannot replace portod symlink: " << error << std::endl;
+        goto undo;
+    }
+
+    /* offline upgrade */
+    if (!PortoMasterPid.Pid)
+        return EXIT_SUCCESS;
+
+    if (kill(PortoMasterPid.Pid, SIGHUP)) {
+        std::cerr << "online upgrade failed: " << strerror(errno) << std::endl;
+        goto undo;
+    }
+
+    deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
+    do {
+        if (!PortoMasterPid.Running() || !PortoSlavePid.Running())
+            break;
+    } while (!WaitDeadline(deadline));
+
+    error = PortoMasterPid.Load();
+    if (error) {
+        std::cerr << "online upgrade failed: " << error << std::endl;
+        goto undo;
+    }
+
+    do {
+        if (CheckPortoAlive()) {
+            PrintVersion();
+            return EXIT_SUCCESS;
+        }
+    } while (!WaitDeadline(deadline));
+
+    std::cerr << "timeout exceeded" << std::endl;
+
+undo:
+    error = symlink.Unlink();
+    if (error)
+        std::cerr << "cannot remove symlink: " << error << std::endl;
+    error = symlink.Symlink(backup);
+    if (error)
+        std::cerr << "cannot restore symlink: " << error << std::endl;
+    return EXIT_FAILURE;
+}
+
+static void Usage() {
+    std::cout
+        << std::endl
+        << "Usage: portod [options...] <command> [argments...]" << std::endl
+        << std::endl
+        << "Option: " << std::endl
+        << "  -h | --help     print this message" << std::endl
+        << "  -v | --version  print version and revision" << std::endl
+        << "  --stdlog        print log into stdout" << std::endl
+        << "  --norespawn     exit after failure" << std::endl
+        << "  --verbose       verbose logging" << std::endl
+        << std::endl
+        << "Commands: " << std::endl
+        << "  status          check current portod status" << std::endl
+        << "  daemon          start portod, this is default" << std::endl
+        << "  start           daemonize and start portod" << std::endl
+        << "  stop            stop running portod" << std::endl
+        << "  restart         stop followed by start" << std::endl
+        << "  reload          reexec portod" << std::endl
+        << "  upgrade <new>   update symlink " << PORTO_BINARY_PATH << " and reexec" << std::endl
+        << "  dump            print internal key-value state" << std::endl
+        << "  help            print this message" << std::endl
+        << "  version         print version and revision" << std::endl
+        << std::endl;
+}
+
+int main(int argc, char **argv) {
+    int opt = 0;
+
+    while (++opt < argc && argv[opt][0] == '-') {
+        std::string arg(argv[opt]);
+
+        if (arg == "-v" || arg == "--version") {
+            PrintVersion();
+            return EXIT_SUCCESS;
+        }
+
+        if (arg == "-h" || arg == "--help") {
+            Usage();
+            return EXIT_SUCCESS;
+        }
+
+        if (arg == "--stdlog")
+            stdlog = true;
+        else if (arg == "--verbose")
+            Verbose = true;
+        else if (arg == "--norespawn")
+            respawnSlave = false;
+        else if (arg == "--slave")
+            slaveMode = true;
+        else if (arg == "--failsafe")
+            failsafe = true;
+        else {
+            std::cerr << "Unknown option: " << arg << std::endl;
+            Usage();
+            return EXIT_FAILURE;
+        }
+    }
+
+    std::string cmd(argv[opt] ?: "");
+
+    if (cmd == "status") {
+        if (!PortoMasterPid.Path.Exists()) {
+            std::cout << "stopped" << std::endl;
+            return EXIT_FAILURE;
+        } else if (CheckPortoAlive()) {
+            std::cout << "running" << std::endl;
+            return EXIT_SUCCESS;
+        } else {
+            std::cout << "unknown" << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (cmd == "help") {
+        Usage();
+        return EXIT_SUCCESS;
+    }
+
+    if (cmd == "version") {
+        PrintVersion();
+        return EXIT_SUCCESS;
+    }
+
+    config.Load();
+
+    if (cmd == "" || cmd == "daemon")
+        return PortodMain();
+
+    if (cmd == "start")
+        return StartPortod();
+
+    if (cmd == "stop")
+        return StopPortod();
+
+    if (cmd == "restart") {
+        StopPortod();
+        return StartPortod();
+    }
+
+    if (cmd == "reload")
+        return ReexecPorotd();
+
+    if (cmd == "upgrade") {
+        if (opt + 2 != argc) {
+            std::cerr << "require one required" << std::endl;
+            return EXIT_FAILURE;
+        }
+        return UpgradePortod(argv[opt + 1]);
+    }
+
+    if (cmd == "dump") {
+        KvDump();
+        return EXIT_SUCCESS;
+    }
+
+    std::cerr << "Unknown command: " << cmd << std::endl;
+    Usage();
+    return EXIT_FAILURE;
 }

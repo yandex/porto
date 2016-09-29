@@ -78,6 +78,7 @@ message TCfg {
 		optional bool debug = 13 [deprecated=true];
 		optional uint64 helpers_memory_limit = 14;
 		optional uint32 portod_stop_timeout = 15;
+		optional uint32 portod_start_timeout = 16;
 	}
 
 	message TContainerCfg {
