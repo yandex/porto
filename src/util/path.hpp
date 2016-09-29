@@ -217,7 +217,9 @@ public:
     TError OpenAppend(const TPath &path);
     TError OpenDir(const TPath &path);
     TError CreateTemp(const TPath &path);
+    TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
+    TError CreateTrunc(const TPath &path, int mode);
     void Close(void);
     static void CloseAll(std::vector<int> except);
     TPath RealPath(void) const;

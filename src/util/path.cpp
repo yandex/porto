@@ -1056,13 +1056,21 @@ TError TFile::CreateTemp(const TPath &path) {
     return TError::Success();
 }
 
-TError TFile::CreateNew(const TPath &path, int mode) {
+TError TFile::Create(const TPath &path, int flags, int mode) {
     if (Fd >= 0)
         close(Fd);
-    SetFd = open(path.c_str(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, mode);
+    SetFd = open(path.c_str(), flags, mode);
     if (Fd < 0)
         return TError(EError::Unknown, errno, "Cannot create " + path.ToString());
     return TError::Success();
+}
+
+TError TFile::CreateNew(const TPath &path, int mode) {
+    return Create(path, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, mode);
+}
+
+TError TFile::CreateTrunc(const TPath &path, int mode) {
+    return Create(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, mode);
 }
 
 void TFile::Close(void) {

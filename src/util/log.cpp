@@ -137,7 +137,7 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
                                           "REQ ",
                                           "RSP ",
                                           "SYS " };
-    std::string name = GetProcessName();
+    std::string name = GetTaskName();
 
     if (Statistics) {
         if (level == LOG_WARN)

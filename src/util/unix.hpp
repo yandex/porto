@@ -7,6 +7,7 @@
 #include <set>
 
 #include "util/signal.hpp"
+#include "util/path.hpp"
 
 class TPath;
 
@@ -32,7 +33,7 @@ bool WaitDeadline(uint64_t deadline, uint64_t sleep = 10);
 uint64_t GetTotalMemory();
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
-std::string GetProcessName();
+std::string GetTaskName(pid_t pid = 0);
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 std::string GetHostName();
 TError SetHostName(const std::string &name);
@@ -67,4 +68,16 @@ public:
     TError SendFd(int fd) const;
     TError RecvFd(int &fd) const;
     TError SetRecvTimeout(int timeout_ms) const;
+};
+
+class TPidFile {
+public:
+    TPath Path;
+    std::string Name;
+    pid_t Pid = 0;
+
+    TPidFile(const std::string &path, const std::string &name): Path(path), Name(name) { }
+    TError Load();
+    TError Save(pid_t pid);
+    TError Remove();
 };

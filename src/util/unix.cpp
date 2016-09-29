@@ -175,7 +175,14 @@ void SetDieOnParentExit(int sig) {
     (void)prctl(PR_SET_PDEATHSIG, sig, 0, 0, 0);
 }
 
-std::string GetProcessName() {
+std::string GetTaskName(pid_t pid) {
+    if (pid) {
+        std::string name;
+        if (TPath("/proc/" + std::to_string(pid) + "/comm").ReadAll(name, 32))
+            return "???";
+        return name.substr(0, name.length() - 1);
+    }
+
     if (!processName) {
         char name[17];
 
@@ -574,4 +581,42 @@ std::string CurrentTimeFormat(const char *fmt, bool msec) {
         ss << "," << std::setw(6) << std::setfill('0') << tv.tv_usec;
 
     return ss.str();
+}
+
+TError TPidFile::Load() {
+    std::string str;
+    TError error;
+    int pid;
+
+    Pid = 0;
+    error = Path.ReadAll(str, 32);
+    if (error)
+        return error;
+    error = StringToInt(str, pid);
+    if (error)
+        return error;
+    if (kill(pid, 0))
+        return TError(EError::Unknown, errno, "Task not found");
+    str = GetTaskName(pid);
+    if (str != Name)
+        return TError(EError::Unknown, "Wrong task name: " + str + " expected: " + Name);
+    Pid = pid;
+    return TError::Success();
+}
+
+TError TPidFile::Save(pid_t pid) {
+    TFile file;
+    TError error = file.CreateTrunc(Path, 0644);
+    if (error)
+        return error;
+    error = file.WriteAll(std::to_string(pid));
+    if (error)
+        return error;
+    Pid = pid;
+    return TError::Success();
+}
+
+TError TPidFile::Remove() {
+    Pid = 0;
+    return Path.Unlink();
 }

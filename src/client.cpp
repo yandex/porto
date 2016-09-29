@@ -145,12 +145,7 @@ TError TClient::IdentifyClient(bool initial) {
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 
     ClientContainer = ct;
-
-    error = TPath("/proc/" + std::to_string(Pid) + "/comm").ReadAll(Comm, 64);
-    if (error)
-        Comm = "<unknown process>";
-    else
-        Comm.resize(Comm.length() - 1); /* cut \n at the end */
+    Comm = GetTaskName(Pid);
 
     if (ct->IsRoot()) {
         Cred.Uid = cr.uid;
