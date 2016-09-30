@@ -1198,7 +1198,7 @@ public:
 
 class TFindCmd final : public ICmd {
 public:
-    TFindCmd(Porto::Connection *api) : ICmd(api, "find", 1, "", "find container for given process id") {}
+    TFindCmd(Porto::Connection *api) : ICmd(api, "find", 1, "<pid>", "find container for given process id") {}
 
     int Execute(TCommandEnviroment *env) final override {
         int pid;
@@ -1227,8 +1227,16 @@ public:
             return EXIT_FAILURE;
         }
 
-        std::replace(freezer.begin(), freezer.end(), '%', '/');
-        Print(freezer.substr(strlen(PORTO_CGROUP_PREFIX + 1)));
+        std::string name = freezer;
+        std::replace(name.begin(), name.end(), '%', '/');
+        // name = ROOT_PORTO_NAMESPACE + name.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
+
+        std::string ns;
+        if (!Api->GetData("self", "absolute_namespace", ns) &&
+                StringStartsWith(name, ns))
+            name = name.substr(ns.length());
+
+        Print(name);
 
         return EXIT_SUCCESS;
     }

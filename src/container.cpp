@@ -50,12 +50,13 @@ TError TContainer::ValidName(const std::string &name) {
         return TError(EError::InvalidValue, "container path too short");
 
     if (name.length() > CONTAINER_PATH_MAX)
-        return TError(EError::InvalidValue, "container path too long");
+        return TError(EError::InvalidValue, "container path too long, limit is " +
+                                            std::to_string(CONTAINER_PATH_MAX));
 
     if (name[0] == '/') {
         if (name == ROOT_CONTAINER)
             return TError::Success();
-        return TError(EError::InvalidValue, "container path starts with '/'");
+        return TError(EError::InvalidValue, "container path starts with '/': " + name);
     }
 
     for (std::string::size_type first = 0, i = 0; i <= name.length(); i++) {
@@ -64,11 +65,12 @@ TError TContainer::ValidName(const std::string &name) {
             case '\0':
                 if (i == first)
                     return TError(EError::InvalidValue,
-                            "double/trailing '/' in container path");
+                            "double/trailing '/' in container path: " + name);
                 if (i - first > CONTAINER_NAME_MAX)
                     return TError(EError::InvalidValue,
-                            "container name too long: '" +
-                            name.substr(first, i - first) + "'");
+                            "container name component too long, limit is " +
+                            std::to_string(CONTAINER_NAME_MAX) +
+                            ": '" + name.substr(first, i - first) + "'");
                 if (name.substr(first, i - first) == SELF_CONTAINER)
                     return TError(EError::InvalidValue,
                             "container name 'self' is reserved");

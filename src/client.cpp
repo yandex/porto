@@ -230,10 +230,11 @@ TError TClient::ResolveName(const std::string &relative_name, std::string &name)
         name = ClientContainer->Name;
     else if (relative_name == DOT_CONTAINER)
         name = TContainer::ParentName(ns);
-    else if (StringStartsWith(relative_name, SELF_CONTAINER + std::string("/")))
-        name = (ClientContainer->IsRoot() ? "" : ClientContainer->Name) +
-            relative_name.substr(strlen(SELF_CONTAINER));
-    else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
+    else if (StringStartsWith(relative_name, SELF_CONTAINER + std::string("/"))) {
+        name = relative_name.substr(strlen(SELF_CONTAINER) + 1);
+        if (!ClientContainer->IsRoot())
+            name = ClientContainer->Name + "/" + name;
+    } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
         name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
         if (!StringStartsWith(name, ns))
             return TError(EError::Permission, "Absolute container name out of current namespace");

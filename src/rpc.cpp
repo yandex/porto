@@ -22,7 +22,7 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
     if (req.has_create())
         return std::string("create ") + req.create().name();
     else if (req.has_createweak())
-        return std::string("create weak ") + req.create().name();
+        return std::string("create weak ") + req.createweak().name();
     else if (req.has_destroy())
         return "destroy " + req.destroy().name();
     else if (req.has_list())
