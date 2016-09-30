@@ -261,7 +261,7 @@ class Layer(object):
         return 'Layer `{}` at {}'.format(self.name, self.place or "(default)")
 
     def Merge(self, tarball):
-        self.conn.ImportLayer(self.name, tarball, merge=True, place=self.place)
+        self.conn.MergeLayer(self.name, tarball, place=self.place)
 
     def Remove(self):
         self.conn.RemoveLayer(self.name, place=self.place)
@@ -562,7 +562,7 @@ class Connection(object):
         self.rpc.call(request, self.rpc.timeout)
         return Layer(self, layer, place)
 
-    def MergeLayer(self, name, tarball, place=None):
+    def MergeLayer(self, layer, tarball, place=None):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
@@ -570,7 +570,7 @@ class Connection(object):
         if place is not None:
             request.importLayer.place = place
         self.rpc.call(request, self.rpc.timeout)
-        return Layer(self, name, place)
+        return Layer(self, layer, place)
 
     def FindLayer(self, layer, place=None):
         if layer not in self._ListLayers(place):
