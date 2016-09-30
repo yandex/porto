@@ -62,7 +62,11 @@ assert c.Find(container_name).name == container_name
 assert container_name in c.List()
 
 assert a.GetData("state") == "stopped"
-a.SetProperty("command", "true")
+a.SetProperty("command", "false")
+assert a.GetProperty("command") == False
+
+a.Set(command="/bin/true", private="test")
+assert a.Get(["command", "state", "private"]) == {"command": "/bin/true", "state": "stopped", "private": "test"}
 
 a.Start()
 assert a.Wait() == a.name

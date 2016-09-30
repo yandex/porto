@@ -225,6 +225,9 @@ class Container(object):
     def Get(self, variables, nonblock = False):
         return self.conn.Get([self.name], variables, nonblock)[self.name]
 
+    def Set(self, **kwargs):
+        self.conn.Set(self.name, **kwargs)
+
     def GetProperties(self):
         return self.Get(self.conn.Plist())
 
@@ -436,6 +439,10 @@ class Connection(object):
         request.setProperty.property = property
         request.setProperty.value = value
         self.rpc.call(request, self.rpc.timeout)
+
+    def Set(self, container, **kwargs):
+        for name, value in kwargs.items():
+            self.SetProperty(container, name, value)
 
     def GetData(self, name, data):
         request = rpc_pb2.TContainerRequest()
