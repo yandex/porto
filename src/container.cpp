@@ -1434,7 +1434,7 @@ TError TContainer::Terminate(uint64_t deadline) {
         return TError::Success();
 
     if (FreezerSubsystem.IsFrozen(cg))
-        return TError(EError::Permission, "Cannot terminate paused container");
+        return cg.KillAll(SIGKILL);
 
     if (Task.Pid && deadline && State != EContainerState::Meta) {
         error = Task.Kill(SIGTERM);
@@ -1443,6 +1443,12 @@ TError TContainer::Terminate(uint64_t deadline) {
             while (Task.Exists() && !Task.IsZombie() &&
                     !WaitDeadline(deadline));
         }
+    }
+
+    if (WaitTask.Pid && Isolate) {
+        error = WaitTask.Kill(SIGKILL);
+        if (error)
+            return error;
     }
 
     for (int pass = 0; pass < 3; pass++) {
@@ -1464,6 +1470,13 @@ TError TContainer::Terminate(uint64_t deadline) {
     return error;
 }
 
+void TContainer::ForgetPid() {
+    Task.Pid = 0;
+    TaskVPid = 0;
+    WaitTask.Pid = 0;
+    ClearProp(EProperty::ROOT_PID);
+}
+
 TError TContainer::StopOne(uint64_t deadline) {
     TError error;
 
@@ -1480,10 +1493,7 @@ TError TContainer::StopOne(uint64_t deadline) {
         }
     }
 
-    Task.Pid = 0;
-    TaskVPid = 0;
-    WaitTask.Pid = 0;
-    ClearProp(EProperty::ROOT_PID);
+    ForgetPid();
 
     DeathTime = 0;
     ClearProp(EProperty::DEATH_TIME);
@@ -1555,10 +1565,7 @@ void TContainer::Reap(bool oomKilled) {
         SetProp(EProperty::OOM_KILLED);
     }
 
-    Task.Pid = 0;
-    TaskVPid = 0;
-    WaitTask.Pid = 0;
-    ClearProp(EProperty::ROOT_PID);
+    ForgetPid();
 
     Stdout.Rotate(*this);
     Stderr.Rotate(*this);
@@ -1896,9 +1903,16 @@ void TContainer::SyncState() {
     if (!freezerCg.Exists()) {
         if (State != EContainerState::Stopped)
             L_WRN() << "Freezer not found" << std::endl;
+        ForgetPid();
         State = EContainerState::Stopped;
         return;
     }
+
+    if (FreezerSubsystem.IsFrozen(freezerCg)) {
+        if (State == EContainerState::Running || State == EContainerState::Meta)
+            State = EContainerState::Paused;
+    } else if (State == EContainerState::Paused)
+        State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
 
     if (State == EContainerState::Stopped) {
         L() << "Found unexpected freezer" << std::endl;
@@ -1923,6 +1937,28 @@ void TContainer::SyncState() {
         WaitTask.Kill(SIGKILL);
         Task.Kill(SIGKILL);
         Reap(false);
+    }
+
+    switch (Parent ? Parent->State : EContainerState::Meta) {
+        case EContainerState::Stopped:
+            if (State != EContainerState::Stopped)
+                Stop(0); /* Also stop paused */
+            break;
+        case EContainerState::Dead:
+            if (State != EContainerState::Dead && State != EContainerState::Stopped)
+                Reap(false);
+            break;
+        case EContainerState::Running:
+        case EContainerState::Meta:
+            /* Any state is ok */
+            break;
+        case EContainerState::Paused:
+            if (State == EContainerState::Running || State == EContainerState::Meta)
+                State = EContainerState::Paused;
+            break;
+        case EContainerState::Destroyed:
+            L_ERR() << "Destroyed parent?" << std::endl;
+            break;
     }
 
     if (!(Controllers & CGROUP_FREEZER))

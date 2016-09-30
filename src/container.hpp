@@ -234,6 +234,7 @@ public:
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
 
+    void ForgetPid();
     void SyncState();
     bool Expired() const;
     void DestroyWeak();
