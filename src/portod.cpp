@@ -1160,23 +1160,8 @@ bool RunningInContainer() {
 int main(int argc, char * const argv[]) {
     bool slaveMode = false;
     bool respawn = true;
+    bool kvDump = false;
     int argn;
-
-    if (getuid() != 0) {
-        std::cerr << "Need root privileges to start" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (RunningInContainer()) {
-        std::cerr << "Can't start in container" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    CatchFatalSignals();
-
-    AllocStatistics();
-
-    config.Load();
 
     for (argn = 1; argn < argc; argn++) {
         std::string arg(argv[argn]);
@@ -1185,8 +1170,7 @@ int main(int argc, char * const argv[]) {
             std::cout << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--kv-dump") {
-            KvDump();
-            return EXIT_SUCCESS;
+            kvDump = true;
         } else if (arg == "--slave") {
             slaveMode = true;
         } else if (arg == "--stdlog") {
@@ -1205,6 +1189,27 @@ int main(int argc, char * const argv[]) {
             std::cerr << "Unknown option " << arg << std::endl;
             return EXIT_FAILURE;
         }
+    }
+
+    if (getuid() != 0) {
+        std::cerr << "Need root privileges to start" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (RunningInContainer()) {
+        std::cerr << "Can't start in container" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    CatchFatalSignals();
+
+    AllocStatistics();
+
+    config.Load();
+
+    if (kvDump) {
+        KvDump();
+        return EXIT_SUCCESS;
     }
 
     if (!slaveMode && AnotherInstanceRunning(PORTO_SOCKET_PATH)) {
