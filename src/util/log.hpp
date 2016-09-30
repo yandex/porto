@@ -33,14 +33,14 @@ public:
     static std::basic_ostream<char> &Log(ELogLevel level = LOG_NOTICE);
 };
 
-static inline std::basic_ostream<char> &L() { return TLogger::Log(LOG_NOTICE); }
-static inline std::basic_ostream<char> &L_WRN() { return TLogger::Log(LOG_WARN); }
-static inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
-static inline std::basic_ostream<char> &L_EVT() { return TLogger::Log(LOG_EVENT); }
-static inline std::basic_ostream<char> &L_ACT() { return TLogger::Log(LOG_ACTION); }
-static inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUEST); }
-static inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
-static inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }
+inline std::basic_ostream<char> &L() { return TLogger::Log(LOG_NOTICE); }
+inline std::basic_ostream<char> &L_WRN() { return TLogger::Log(LOG_WARN); }
+inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
+inline std::basic_ostream<char> &L_EVT() { return TLogger::Log(LOG_EVENT); }
+inline std::basic_ostream<char> &L_ACT() { return TLogger::Log(LOG_ACTION); }
+inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUEST); }
+inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
+inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }
 
 void porto_assert(const char *msg, size_t line, const char *file);
 void porto_runtime_error(const std::string &msg, size_t line, const char *file);

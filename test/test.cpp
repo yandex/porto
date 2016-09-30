@@ -682,7 +682,7 @@ void InitKernelFeatures() {
 }
 
 template<typename T>
-static inline void ExpectEqTemplate(T ret, T exp, const char *where) {
+static void ExpectEqTemplate(T ret, T exp, const char *where) {
     if (ret != exp) {
         Say() << "Unexpected " << ret << " != " << exp << " at " << where << std::endl;
         abort();
@@ -690,7 +690,7 @@ static inline void ExpectEqTemplate(T ret, T exp, const char *where) {
 }
 
 template<typename T>
-static inline void ExpectNeqTemplate(T ret, T exp, const char *where) {
+static void ExpectNeqTemplate(T ret, T exp, const char *where) {
     if (ret == exp) {
         Say() << "Unexpected " << ret << " == " << exp << " at " << where << std::endl;
         abort();
@@ -698,7 +698,7 @@ static inline void ExpectNeqTemplate(T ret, T exp, const char *where) {
 }
 
 template<typename T>
-static inline void ExpectLessTemplate(T ret, T exp, const char *where) {
+static void ExpectLessTemplate(T ret, T exp, const char *where) {
     if (ret >= exp) {
         Say() << "Unexpected " << ret << " >= " << exp << " at " << where << std::endl;
         abort();
@@ -706,7 +706,7 @@ static inline void ExpectLessTemplate(T ret, T exp, const char *where) {
 }
 
 template<typename T>
-static inline void ExpectLessEqTemplate(T ret, T exp, const char *where) {
+static void ExpectLessEqTemplate(T ret, T exp, const char *where) {
     if (ret > exp) {
         Say() << "Unexpected " << ret << " > " << exp << " at " << where << std::endl;
         abort();

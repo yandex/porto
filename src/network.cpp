@@ -45,7 +45,7 @@ static TUintMap ContainerRate;
 static TStringMap ContainerQdisc;
 static TUintMap ContainerQdiscLimit;
 
-static inline std::unique_lock<std::mutex> LockNetworks() {
+inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
 

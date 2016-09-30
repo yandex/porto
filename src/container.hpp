@@ -298,6 +298,6 @@ extern std::map<std::string, std::shared_ptr<TContainer>> Containers;
 extern TPath ContainersKV;
 extern TIdMap ContainerIdMap;
 
-static inline std::unique_lock<std::mutex> LockContainers() {
+inline std::unique_lock<std::mutex> LockContainers() {
     return std::unique_lock<std::mutex>(ContainersMutex);
 }
