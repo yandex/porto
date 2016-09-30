@@ -1,3 +1,33 @@
+yandex-porto (3.0.6) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: load cls_cgroup before mounting net_cls cgroup when needed
+  * porto/volume: log error if cannot cleanup loop image
+
+  [ Maxim Samoylov ]
+  * container: do not remove the container on failed network restore
+  * portod: make portod slave stop timeout configurable
+
+  [ Konstantin Khlebnikov ]
+  * util/unix: TPidFile
+  * portod: remove paths to pid files from config
+  * porto: fix self/xxx in root container and portoctl find
+
+  [ Maxim Samoylov ]
+  * api/python: rework client-side RPC timeout
+  * api/python: get rid of duplicate handlers in RPC
+
+  [ Konstantin Khlebnikov ]
+  * api/python: add container method Set(**kwargs)
+  * api/python: fix MergeLayer
+
+  [ Maxim Samoylov ]
+  * container: verify container state integrity on restore
+  * api/python: fix deadline for connection without timeout
+  * portod: implement new portod cli
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 30 Sep 2016 20:06:26 +0300
+
 yandex-porto (3.0.5) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
