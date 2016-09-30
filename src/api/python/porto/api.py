@@ -67,7 +67,7 @@ class _RPC(object):
         self.timeout = timeout
         self.socket_constructor = socket_constructor
         self.sock = None
-        self.deadline = 0.0
+        self.deadline = None
 
     def _set_locked(fn):
         def _lock(*args, **kwargs):
@@ -79,14 +79,19 @@ class _RPC(object):
     def _set_deadline(fn):
         def _set(*args, **kwargs):
             self = args[0]
-            self.deadline = time.time() + self.timeout
+
+            if self.timeout is not None:
+                self.deadline = time.time() + self.timeout
+            else:
+                self.deadline = None
+
             return fn(*args, **kwargs)
         return _set
 
     def _check_deadline(fn):
         def _check(*args, **kwargs):
             self = args[0]
-            while time.time() < self.deadline:
+            while (self.deadline is None) or (time.time() < self.deadline):
                 try:
                     return fn(*args, **kwargs)
                 except:
