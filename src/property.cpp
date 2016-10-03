@@ -1555,7 +1555,7 @@ TError TDirtyLimit::Set(const std::string &limit) {
 
     if (CurrentContainer->DirtyMemLimit != new_size) {
         CurrentContainer->DirtyMemLimit = new_size;
-        CurrentContainer->SetProp(EProperty::ANON_LIMIT);
+        CurrentContainer->SetProp(EProperty::DIRTY_LIMIT);
     }
 
     return TError::Success();
