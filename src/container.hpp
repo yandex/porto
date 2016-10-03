@@ -207,6 +207,7 @@ public:
     void SanitizeCapabilities();
     uint64_t GetTotalMemGuarantee(void) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
+    bool IsolatedFromHost() const;
 
     bool IsRoot() const { return Id == ROOT_CONTAINER_ID; }
     bool IsChildOf(const TContainer &ct) const;
@@ -214,7 +215,6 @@ public:
     std::list<std::shared_ptr<TContainer>> Subtree();
 
     std::shared_ptr<TContainer> GetParent() const;
-    std::shared_ptr<const TContainer> GetIsolationDomain() const;
     TError OpenNetns(TNamespaceFd &netns) const;
 
     TError GetNetStat(ENetStat kind, TUintMap &stat);

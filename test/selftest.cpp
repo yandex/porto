@@ -2447,7 +2447,7 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
     if (error)
         throw error.GetMsg();
 
-    uint64_t allCap = (1ULL << (lastCap + 1)) - 1;
+    //uint64_t allCap = (1ULL << (lastCap + 1)) - 1;
 
     uint64_t defaultCap = 0x00000000a9ac77fb;
 
@@ -2486,9 +2486,9 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
     ExpectEq(GetCap(pid, "CapInh"), 0);
-    ExpectEq(GetCap(pid, "CapPrm"), allCap);
-    ExpectEq(GetCap(pid, "CapEff"), allCap);
-    ExpectEq(GetCap(pid, "CapBnd"), allCap);
+    ExpectEq(GetCap(pid, "CapPrm"), defaultCap);
+    ExpectEq(GetCap(pid, "CapEff"), defaultCap);
+    ExpectEq(GetCap(pid, "CapBnd"), defaultCap);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check limiting root capabilities" << std::endl;

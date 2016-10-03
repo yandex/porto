@@ -384,10 +384,8 @@ TError TMountNamespace::MountRootFs() {
         "/proc/sysrq-trigger",
         "/proc/irq",
         "/proc/bus",
+        "/proc/sys",
     };
-
-    if (!OwnerCred.IsRootUser())
-        proc_ro.push_back("/proc/sys");
 
     for (auto &p : proc_ro) {
         TPath path = Root + p;

@@ -566,11 +566,11 @@ std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
-std::shared_ptr<const TContainer> TContainer::GetIsolationDomain() const {
-    auto domain = shared_from_this();
-    while (!domain->Isolate && domain->Parent)
-        domain = domain->Parent;
-    return domain;
+bool TContainer::IsolatedFromHost() const {
+    for (auto ct = this; ct; ct = ct->Parent.get())
+        if (ct->Isolate)
+            return true;
+    return false;
 }
 
 pid_t TContainer::GetPidFor(pid_t pid) const {
@@ -769,8 +769,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     if (IsRoot() || !(Controllers & CGROUP_DEVICES))
         return TError::Success();
 
-    if (Parent->IsRoot() &&
-            (HasProp(EProperty::DEVICES) || !OwnerCred.IsRootUser())) {
+    if (Parent->IsRoot() && HasProp(EProperty::DEVICES)) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
             return error;
@@ -1033,34 +1032,36 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 void TContainer::SanitizeCapabilities() {
     TCapabilities allowed, limit;
 
-    /* root user can allow any capabilities in own containers */
+    if (VirtMode == VIRT_MODE_OS) {
+        allowed = OsModeCapabilities;
+        limit = OsModeCapabilities;
+    } else {
+        allowed = AppModeCapabilities;
+        limit = SuidCapabilities;
+    }
+
+    for (auto p = Parent; p; p = p->Parent)
+        limit.Permitted &= p->CapLimit.Permitted;
+
+    /* update default bounding set */
+    if (!HasProp(EProperty::CAPABILITIES))
+        CapLimit = limit;
+
+    /* host root user can allow any capabilities in own containers */
     if (OwnerCred.IsRootUser()) {
         allowed = AllCapabilities;
         limit = AllCapabilities;
-    } else {
-        if (VirtMode == VIRT_MODE_OS) {
-            allowed = OsModeCapabilities;
-            limit = OsModeCapabilities;
-        } else {
-            allowed = AppModeCapabilities;
-            limit = SuidCapabilities;
-        }
-        for (auto p = Parent; p; p = p->Parent)
-            limit.Permitted &= p->CapLimit.Permitted;
     }
 
-    if (!HasProp(EProperty::CAPABILITIES)) {
-        CapLimit = limit;
-    } else {
+    if (HasProp(EProperty::CAPABILITIES)) {
         CapLimit.Permitted &= limit.Permitted;
         limit.Permitted &= CapLimit.Permitted;
     }
 
-    if (HasAmbientCapabilities) {
-        allowed.Permitted &= limit.Permitted;
-        CapAllowed = allowed;
-        CapAmbient.Permitted &= allowed.Permitted;
-    }
+    /* update ambient set */
+    allowed.Permitted &= limit.Permitted;
+    CapAllowed = allowed;
+    CapAmbient.Permitted &= allowed.Permitted;
 }
 
 TError TContainer::Start() {
@@ -1101,13 +1102,13 @@ TError TContainer::Start() {
         RootPath = Parent->RootPath / path;
     }
 
-    if (VirtMode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
-        if (GetIsolationDomain()->IsRoot())
+    if (VirtMode == VIRT_MODE_OS) {
+        if (!IsolatedFromHost())
             return TError(EError::Permission, "virt_mode=os must be isolated from host");
         if (!Isolate && OwnerCred.Uid != Parent->OwnerCred.Uid)
             return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
-        if (RootPath.IsRoot())
-            return TError(EError::Permission, "virt_mode=os without chroot only for root");
+        if (RootPath.IsRoot() && !OwnerCred.IsRootUser())
+            return TError(EError::Permission, "virt_mode=os without chroot only for real root");
     }
 
     /* virt_mode=os overrides some defaults */
@@ -1157,7 +1158,7 @@ TError TContainer::Start() {
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
     if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
-            !CurrentClient->IsSuperUser() && GetIsolationDomain()->IsRoot())
+            !CurrentClient->IsSuperUser() && !IsolatedFromHost())
         return TError(EError::Permission, "Capabilities require pid isolation: " +
                                           PidNsCapabilities.Format());
 

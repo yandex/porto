@@ -123,9 +123,8 @@ public:
         else
             bound = SuidCapabilities;
 
-        /* root user can allow any capabilities in own containers */
-        if (!CurrentClient->IsSuperUser() ||
-                !CurrentContainer->OwnerCred.IsRootUser()) {
+        /* host root user can allow any capabilities in its own containers */
+        if (!CurrentClient->IsSuperUser() || !CurrentContainer->OwnerCred.IsRootUser()) {
             for (auto p = CurrentContainer->GetParent(); p; p = p->GetParent())
                 bound.Permitted &= p->CapLimit.Permitted;
         }
