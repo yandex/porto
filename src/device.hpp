@@ -21,5 +21,5 @@ struct TDevice {
     std::string Format() const;
     std::string CgroupRule(bool allow) const;
     TError Permitted(const TCred &cred) const;
-    TError Makedev(const TPath &root) const;
+    TError Makedev() const;
 };

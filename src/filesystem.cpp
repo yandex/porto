@@ -107,39 +107,6 @@ TError TMountNamespace::MountBinds() {
     return TError::Success();
 }
 
-TError TMountNamespace::RemountRootRo() {
-    if (!RootRdOnly)
-        return TError::Success();
-
-    // remount everything except binds to ro
-    std::list<TMount> mounts;
-    TError error = TPath::ListAllMounts(mounts);
-    if (error)
-        return error;
-
-    for (auto &mnt : mounts) {
-        TPath path = Root.InnerPath(mnt.Target);
-        if (path.IsEmpty())
-            continue;
-
-        bool skip = false;
-        for (const auto &bm : BindMounts) {
-            if (bm.Dest.NormalPath() == path.NormalPath()) {
-                skip = true;
-                break;
-            }
-        }
-        if (skip)
-            continue;
-
-        error = mnt.Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 TError TMountNamespace::MountRun() {
     TPath run = Root / "run";
     std::vector<std::string> run_paths, subdirs;
@@ -223,28 +190,10 @@ TError TMountNamespace::MountRun() {
     return TError::Success();
 }
 
-TError TMountNamespace::BindResolvConf() {
-    std::vector<std::string> files = { "/etc/hosts", "/etc/resolv.conf" };
-
-    for (auto &file : files) {
-        TPath path = Root / file;
-        TError error = path.CreateAll(0600);
-        if (!error)
-            error = path.BindRemount(file, MS_RDONLY);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 TError TMountNamespace::MountTraceFs() {
     TError error;
 
-    if (!config().container().enable_tracefs())
-        return TError::Success();
-
-    TPath debugfs(Root / "sys/kernel/debug");
+    TPath debugfs("/sys/kernel/debug");
     if (debugfs.Exists()) {
         TPath tmp = debugfs / "tmp";
         TPath tmp_tracefs = tmp / "tracing";
@@ -268,7 +217,7 @@ TError TMountNamespace::MountTraceFs() {
             return error;
     }
 
-    TPath tracefs(Root / "sys/kernel/tracing");
+    TPath tracefs("/sys/kernel/tracing");
     if (tracefs.Exists()) {
         error = tracefs.Mount("none", "tracefs", MS_RDONLY | MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
         if (error)
@@ -278,11 +227,8 @@ TError TMountNamespace::MountTraceFs() {
     return TError::Success();
 }
 
-TError TMountNamespace::MountRootFs() {
+TError TMountNamespace::SetupRoot() {
     TError error;
-
-    if (Root.IsRoot())
-        return TError::Success();
 
     struct {
         std::string target;
@@ -312,10 +258,6 @@ TError TMountNamespace::MountRootFs() {
     if (error)
         return error;
 
-    error = MountTraceFs();
-    if (error)
-        L_ERR() << "Cannot mount tracefs " << error << std::endl;
-
     if (BindPortoSock) {
         TPath sock(PORTO_SOCKET_PATH);
         TPath dest = Root / sock;
@@ -326,6 +268,20 @@ TError TMountNamespace::MountRootFs() {
         error = dest.Bind(sock);
         if (error)
             return error;
+    }
+
+    if (BindResolvConf) {
+        std::vector<std::string> files = { "/etc/hosts", "/etc/resolv.conf" };
+
+        for (auto &file : files) {
+            TPath path = Root / file;
+            error = path.CreateAll(0600);
+            if (error)
+                return error;
+            error = path.BindRemount(file, MS_RDONLY);
+            if (error)
+                return error;
+        }
     }
 
     struct {
@@ -380,50 +336,102 @@ TError TMountNamespace::MountRootFs() {
             return error;
     }
 
-    std::vector<std::string> proc_ro = {
+    return TError::Success();
+}
+
+TError TMountNamespace::ProtectProc() {
+    TError error;
+
+    std::vector<TPath> proc_ro = {
         "/proc/sysrq-trigger",
         "/proc/irq",
         "/proc/bus",
         "/proc/sys",
     };
 
-    for (auto &p : proc_ro) {
-        TPath path = Root + p;
+    for (auto &path : proc_ro) {
         error = path.BindRemount(path, MS_RDONLY);
         if (error)
             return error;
     }
 
-    TPath proc_kcore = Root + "/proc/kcore";
-    error = proc_kcore.BindRemount(Root + "/dev/null", MS_RDONLY);
+    TPath proc_kcore("/proc/kcore");
+    error = proc_kcore.BindRemount("/dev/null", MS_RDONLY);
     if (error)
         return error;
 
     return TError::Success();
 }
 
-TError TMountNamespace::IsolateFs() {
+TError TMountNamespace::Setup() {
+    TPath root("/"), proc("/proc"), sys("/sys");
+    TError error;
 
-    if (Root.IsRoot())
-        return TError::Success();
+    // remount as slave to receive propogations from parent namespace
+    error = root.Remount(MS_SLAVE | MS_REC);
+    if (error)
+        return error;
 
-    TError error = Root.PivotRoot();
-    if (error) {
-        L_WRN() << "Can't pivot root, roll back to chroot: " << error << std::endl;
+    // mount proc so PID namespace works
+    error = proc.UmountAll();
+    if (error)
+        return error;
+    error = proc.Mount("proc", "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
+    if (error)
+        return error;
 
-        error = Root.Chroot();
+    // mount sysfs read-only
+    error = sys.UmountAll();
+    if (error)
+        return error;
+    error = sys.Mount("sysfs", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {});
+    if (error)
+        return error;
+
+    if (!Root.IsRoot()) {
+        error = SetupRoot();
         if (error)
             return error;
     }
 
-    // Allow suid binaries and device nodes at container root.
-    error = TPath("/").Remount(MS_REMOUNT | MS_BIND |
-                               (RootRdOnly ? MS_RDONLY : 0));
-    if (error) {
-        L_ERR() << "Can't remount / as suid and dev:" << error << std::endl;
+    error = MountBinds();
+    if (error)
         return error;
+
+    // enter chroot
+    if (!Root.IsRoot()) {
+        // also binds root recursively if needed
+        error = Root.PivotRoot();
+        if (error) {
+            L_WRN() << "Cannot pivot root, roll back to chroot: " << error << std::endl;
+            error = Root.Chroot();
+            if (error)
+                return error;
+        }
+        error = root.Chdir();
+        if (error)
+            return error;
     }
 
-    TPath newRoot("/");
-    return newRoot.Chdir();
+    // allow suid binaries and remount read-only if required
+    error = root.Remount(MS_REMOUNT | MS_BIND | MS_NODEV | (RootRo ? MS_RDONLY : 0));
+    if (error)
+        return error;
+
+    error = ProtectProc();
+    if (error)
+        return error;
+
+    if (config().container().enable_tracefs()) {
+        error = MountTraceFs();
+        if (error)
+            L_WRN() << "Cannot mount tracefs " << error << std::endl;
+    }
+
+    // remount as shared: subcontainers will get propgation from us
+    error = root.Remount(MS_SHARED | MS_REC);
+    if (error)
+        return error;
+
+    return TError::Success();
 }

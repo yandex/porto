@@ -10,8 +10,12 @@
 struct TBindMount {
     TPath Source;
     TPath Dest;
-    bool ReadOnly;
-    bool ReadWrite;
+    bool ReadOnly = false;
+    bool ReadWrite = false;
+
+    TBindMount() {}
+    TBindMount(TPath source, TPath dest, bool ro):
+        Source(source), Dest(dest), ReadOnly(ro), ReadWrite(!ro) {}
 };
 
 struct TMountNamespace {
@@ -21,18 +25,19 @@ public:
     TPath Cwd;
     TPath ParentCwd;
     TPath Root; /* path in ParentNs.Mnt */
-    bool RootRdOnly;
+    bool RootRo;
     std::vector<TBindMount> BindMounts;
     bool BindPortoSock;
+    bool BindResolvConf;
     uint64_t RunSize;
 
-    TError MountBinds();
-    TError BindResolvConf();
-    TError RemountRootRo();
+    TError SetupRoot();
     TError MountRun();
+    TError MountBinds();
+    TError ProtectProc();
     TError MountTraceFs();
-    TError MountRootFs();
-    TError IsolateFs();
+
+    TError Setup();
 };
 
 bool IsSystemPath(const TPath &path);

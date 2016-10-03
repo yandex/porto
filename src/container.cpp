@@ -954,7 +954,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     else
         taskEnv->Mnt.Root = Root;
 
-    taskEnv->Mnt.RootRdOnly = RootRo;
+    taskEnv->Mnt.RootRo = RootRo;
 
     taskEnv->Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
 
@@ -979,7 +979,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 
     taskEnv->Mnt.BindMounts = BindMounts;
     taskEnv->Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
-
+    taskEnv->Mnt.BindResolvConf = BindDns && ResolvConf.empty();
 
     error = ConfigureDevices(taskEnv->Devices);
     if (error) {
@@ -1018,12 +1018,12 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     }
 
     // Create new mount namespaces if we have to make any changes
-    taskEnv->NewMountNs = Isolate ||
+    taskEnv->NewMountNs = Isolate || Parent->IsRoot() ||
                           taskEnv->Mnt.BindMounts.size() ||
                           Hostname.size() ||
                           ResolvConf.size() ||
                           !taskEnv->Mnt.Root.IsRoot() ||
-                          taskEnv->Mnt.RootRdOnly ||
+                          taskEnv->Mnt.RootRo ||
                           !NetCfg->Inherited;
 
     return TError::Success();

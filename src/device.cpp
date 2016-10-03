@@ -162,8 +162,8 @@ TError TDevice::Permitted(const TCred &cred) const {
     return TError::Success();
 }
 
-TError TDevice::Makedev(const TPath &root) const {
-    TPath path = root / Name;
+TError TDevice::Makedev() const {
+    TPath path(Name);
     TError error;
 
     error = path.DirName().MkdirAll(0755);

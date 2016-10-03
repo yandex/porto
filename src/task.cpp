@@ -173,63 +173,16 @@ TError TTaskEnv::ConfigureChild() {
     umask(0);
 
     if (NewMountNs) {
-        // Remount to slave to receive propogations from parent namespace
-        error = TPath("/").Remount(MS_SLAVE | MS_REC);
+        error = Mnt.Setup();
         if (error)
             return error;
     }
-
-    if (CT->Isolate) {
-        // remount proc so PID namespace works
-        TPath tmpProc("/proc");
-        error = tmpProc.UmountAll();
-        if (error)
-            return error;
-        error = tmpProc.Mount("proc", "proc",
-                              MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
-        if (error)
-            return error;
-    }
-
-    /* Mount read-only sysfs in new namespaces */
-    if (NewMountNs && Mnt.Root.IsRoot()) {
-        TPath sys("/sys");
-        error = sys.UmountAll();
-        if (error)
-            return error;
-        error = sys.Mount("sysfs", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {});
-        if (error)
-            return error;
-    }
-
-    error = Mnt.MountRootFs();
-    if (error)
-        return error;
 
     for (auto &dev: Devices) {
-        error = dev.Makedev(Mnt.Root);
+        error = dev.Makedev();
         if (error)
             return error;
     }
-
-    if (NewMountNs && CT->BindDns && !CT->ResolvConf.size() &&
-            !Mnt.Root.IsRoot()) {
-        error = Mnt.BindResolvConf();
-        if (error)
-            return error;
-    }
-
-    error =  Mnt.MountBinds();
-    if (error)
-        return error;
-
-    error =  Mnt.RemountRootRo();
-    if (error)
-        return error;
-
-    error =  Mnt.IsolateFs();
-    if (error)
-        return error;
 
     error = WriteResolvConf();
     if (error)
@@ -242,13 +195,6 @@ TError TTaskEnv::ConfigureChild() {
     error = Mnt.Cwd.Chdir();
     if (error)
         return error;
-
-    if (NewMountNs) {
-        // Make all shared: subcontainers will get propgation from us
-        error = TPath("/").Remount(MS_SHARED | MS_REC);
-        if (error)
-            return error;
-    }
 
     if (QuadroFork) {
         pid_t pid = fork();
