@@ -1567,6 +1567,34 @@ TError TDirtyLimit::Get(std::string &value) {
     return TError::Success();
 }
 
+class THugetlbLimit : public TProperty {
+public:
+    THugetlbLimit() : TProperty(P_HUGETLB_LIMIT, EProperty::HUGETLB_LIMIT,
+                                "Hugetlb memory limit [bytes] (dynamic)") {}
+    void Init(void) {
+        IsSupported = HugetlbSubsystem.Supported();
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CurrentContainer->HugetlbLimit);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        error = WantControllers(CGROUP_HUGETLB);
+        if (error)
+            return error;
+        uint64_t limit = 0lu;
+        error = StringToSize(value, limit);
+        if (error)
+            return error;
+        CurrentContainer->HugetlbLimit = limit;
+        CurrentContainer->SetProp(EProperty::HUGETLB_LIMIT);
+        return TError::Success();
+    }
+} static HugetlbLimit;
+
 class TRechargeOnPgfault : public TProperty {
 public:
     TError Set(const std::string &recharge);
@@ -2408,6 +2436,29 @@ TError TAnonUsage::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class THugetlbUsage : public TProperty {
+public:
+    THugetlbUsage() : TProperty(D_HUGETLB_USAGE, EProperty::NONE,
+                             "current hugetlb memory usage [bytes] (ro)") {
+        IsReadOnly = true;
+    }
+    void Init(void) {
+        IsSupported = HugetlbSubsystem.Supported();
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        auto cg = CurrentContainer->GetCgroup(HugetlbSubsystem);
+        uint64_t val;
+        error = HugetlbSubsystem.GetHugeUsage(cg, val);
+        if (error)
+            return error;
+        value = std::to_string(val);
+        return TError::Success();
+    }
+} static HugetlbUsage;
 
 class TMinorFaults : public TProperty {
 public:

@@ -23,6 +23,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_NETCLS,    "net_cls" },
     { CGROUP_BLKIO,     "blkio" },
     { CGROUP_DEVICES,   "devices" },
+    { CGROUP_HUGETLB,   "hugetlb" },
     { CGROUP_LEGACY,    "legacy" },
 };
 
@@ -715,6 +716,7 @@ TCpuacctSubsystem   CpuacctSubsystem;
 TNetclsSubsystem    NetclsSubsystem;
 TBlkioSubsystem     BlkioSubsystem;
 TDevicesSubsystem   DevicesSubsystem;
+THugetlbSubsystem   HugetlbSubsystem;
 
 std::vector<TSubsystem *> AllSubsystems = {
     { &FreezerSubsystem  },
@@ -724,6 +726,7 @@ std::vector<TSubsystem *> AllSubsystems = {
     { &NetclsSubsystem   },
     { &BlkioSubsystem    },
     { &DevicesSubsystem  },
+    { &HugetlbSubsystem  },
 };
 
 std::vector<TSubsystem *> Subsystems;
@@ -784,6 +787,14 @@ TError InitializeCgroups() {
                     L_ERR() << "Cannot load cls_cgroup" << std::endl;
                 error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
             }
+
+            /* hugetlb is optional yet */
+            if (error && subsys->Type == "hugetlb") {
+                L() << "Seems not supported: " << error << std::endl;
+                error = subsys->Root.Rmdir();
+                continue;
+            }
+
             if (error) {
                 L_ERR() << "Cannot mount cgroup: " << error << std::endl;
                 (void)subsys->Root.Rmdir();
@@ -811,7 +822,8 @@ TError InitializeCgroups() {
     }
 
     for (auto subsys: AllSubsystems)
-        subsys->Controllers |= subsys->Hierarchy->Controllers;
+        if (subsys->Hierarchy)
+            subsys->Controllers |= subsys->Hierarchy->Controllers;
 
     return error;
 }

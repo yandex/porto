@@ -128,6 +128,7 @@ public:
     uint64_t NewMemGuarantee = 0;
     uint64_t AnonMemLimit = 0;
     uint64_t DirtyMemLimit = 0;
+    uint64_t HugetlbLimit = 0;
 
     bool RechargeOnPgfault = false;
 

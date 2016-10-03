@@ -244,6 +244,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
                        CGROUP_NETCLS | CGROUP_BLKIO | CGROUP_DEVICES;
     SetProp(EProperty::CONTROLLERS);
 
+    if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported()) {
+        Controllers |= CGROUP_HUGETLB;
+        SetProp(EProperty::HUGETLB_LIMIT);
+    }
+
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
@@ -699,6 +704,20 @@ TError TContainer::ApplyDynamicProperties() {
         if (error) {
             L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
             return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::HUGETLB_LIMIT)) {
+        auto cg = GetCgroup(HugetlbSubsystem);
+        error = HugetlbSubsystem.SetHugeLimit(cg, HugetlbLimit);
+        if (error) {
+            L_ERR() << "Cannot set " << P_HUGETLB_LIMIT << ": " << error << std::endl;
+            return error;
+        }
+        if (HugetlbSubsystem.SupportGigaPages()) {
+            error = HugetlbSubsystem.SetGigaLimit(cg, 0);
+            if (error)
+                L_WRN() << "Cannot forbid 1GB pages: " << error << std::endl;
         }
     }
 

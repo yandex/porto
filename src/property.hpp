@@ -27,6 +27,7 @@ constexpr const char *P_MEM_GUARANTEE = "memory_guarantee";
 constexpr const char *P_MEM_LIMIT = "memory_limit";
 constexpr const char *P_DIRTY_LIMIT = "dirty_limit";
 constexpr const char *P_ANON_LIMIT = "anon_limit";
+constexpr const char *P_HUGETLB_LIMIT = "hugetlb_limit";
 constexpr const char *P_RECHARGE_ON_PGFAULT = "recharge_on_pgfault";
 constexpr const char *P_CPU_POLICY = "cpu_policy";
 constexpr const char *P_CPU_GUARANTEE = "cpu_guarantee";
@@ -75,6 +76,7 @@ constexpr const char *D_STDERR = "stderr";
 constexpr const char *D_STDERR_OFFSET = "stderr_offset";
 constexpr const char *D_MEMORY_USAGE = "memory_usage";
 constexpr const char *D_ANON_USAGE = "anon_usage";
+constexpr const char *D_HUGETLB_USAGE = "hugetlb_usage";
 constexpr const char *D_MINOR_FAULTS = "minor_faults";
 constexpr const char *D_MAJOR_FAULTS = "major_faults";
 constexpr const char *D_MAX_RSS = "max_rss";
@@ -120,6 +122,7 @@ enum class EProperty {
     MEM_LIMIT,
     DIRTY_LIMIT,
     ANON_LIMIT,
+    HUGETLB_LIMIT,
     RECHARGE_ON_PGFAULT,
     CPU_POLICY,
     CPU_GUARANTEE,

@@ -15,6 +15,7 @@ class TCgroup;
 #define CGROUP_NETCLS   0x0010ull
 #define CGROUP_BLKIO    0x0020ull
 #define CGROUP_DEVICES  0x0040ull
+#define CGROUP_HUGETLB  0x0080ull
 #define CGROUP_LEGACY   0x1000ull
 
 extern const TFlagsNames ControllersName;
@@ -24,7 +25,7 @@ public:
     const uint64_t Kind;
     uint64_t Controllers;
     const std::string Type;
-    const TSubsystem *Hierarchy;
+    const TSubsystem *Hierarchy = nullptr;
     TPath Root;
 
     TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
@@ -256,6 +257,36 @@ public:
     TError ApplyDevice(TCgroup &cg, const TDevice &device);
 };
 
+class THugetlbSubsystem : public TSubsystem {
+public:
+    const std::string HUGE_USAGE = "hugetlb.2MB.usage_in_bytes";
+    const std::string HUGE_LIMIT = "hugetlb.2MB.limit_in_bytes";
+    const std::string GIGA_USAGE = "hugetlb.1GB.usage_in_bytes";
+    const std::string GIGA_LIMIT = "hugetlb.1GB.limit_in_bytes";
+    THugetlbSubsystem() : TSubsystem(CGROUP_HUGETLB, "hugetlb") {}
+
+    /* for now supports only 2MB pages */
+    bool Supported() const {
+        return Hierarchy != nullptr && RootCgroup().Has(HUGE_LIMIT);
+    }
+
+    TError GetHugeUsage(TCgroup &cg, uint64_t &usage) const {
+        return cg.GetUint64(HUGE_USAGE, usage);
+    }
+
+    TError SetHugeLimit(TCgroup &cg, uint64_t limit) const {
+        return cg.SetUint64(HUGE_LIMIT, limit);
+    }
+
+    bool SupportGigaPages() const {
+        return RootCgroup().Has(GIGA_LIMIT);
+    }
+
+    TError SetGigaLimit(TCgroup &cg, uint64_t limit) const {
+        return cg.SetUint64(GIGA_LIMIT, limit);
+    }
+};
+
 extern TMemorySubsystem     MemorySubsystem;
 extern TFreezerSubsystem    FreezerSubsystem;
 extern TCpuSubsystem        CpuSubsystem;
@@ -263,6 +294,7 @@ extern TCpuacctSubsystem    CpuacctSubsystem;
 extern TNetclsSubsystem     NetclsSubsystem;
 extern TBlkioSubsystem      BlkioSubsystem;
 extern TDevicesSubsystem    DevicesSubsystem;
+extern THugetlbSubsystem    HugetlbSubsystem;
 
 extern std::vector<TSubsystem *> AllSubsystems;
 extern std::vector<TSubsystem *> Subsystems;
