@@ -2148,6 +2148,7 @@ void TContainer::Event(const TEvent &event) {
             break;
         }
         AckExitStatus(event.Exit.Pid);
+        break;
     }
     case EEventType::WaitTimeout:
     {
@@ -2166,6 +2167,7 @@ void TContainer::Event(const TEvent &event) {
                ct->Unlock();
             }
         }
+        break;
     }
     case EEventType::RotateLogs:
     {
