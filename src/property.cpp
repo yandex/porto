@@ -1572,7 +1572,7 @@ public:
     THugetlbLimit() : TProperty(P_HUGETLB_LIMIT, EProperty::HUGETLB_LIMIT,
                                 "Hugetlb memory limit [bytes] (dynamic)") {}
     void Init(void) {
-        IsSupported = HugetlbSubsystem.Supported();
+        IsSupported = HugetlbSubsystem.Supported;
     }
     TError Get(std::string &value) {
         value = std::to_string(CurrentContainer->HugetlbLimit);
@@ -2444,7 +2444,7 @@ public:
         IsReadOnly = true;
     }
     void Init(void) {
-        IsSupported = HugetlbSubsystem.Supported();
+        IsSupported = HugetlbSubsystem.Supported;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();

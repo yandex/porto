@@ -265,9 +265,11 @@ public:
     const std::string GIGA_LIMIT = "hugetlb.1GB.limit_in_bytes";
     THugetlbSubsystem() : TSubsystem(CGROUP_HUGETLB, "hugetlb") {}
 
+    bool Supported = false;
+
     /* for now supports only 2MB pages */
-    bool Supported() const {
-        return Hierarchy != nullptr && RootCgroup().Has(HUGE_LIMIT);
+    void InitializeSubsystem() override {
+        Supported = RootCgroup().Has(HUGE_LIMIT);
     }
 
     TError GetHugeUsage(TCgroup &cg, uint64_t &usage) const {

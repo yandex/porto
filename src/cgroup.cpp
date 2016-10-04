@@ -760,6 +760,10 @@ TError InitializeCgroups() {
     }
 
     for (auto subsys: AllSubsystems) {
+
+        if (subsys->Type == "hugetlb" && !config().container().enable_hugetlb())
+                continue;
+
         for (auto &mnt: mounts) {
             if (mnt.Type == "cgroup" && mnt.HasOption(subsys->Type)) {
                 subsys->Root = mnt.Target;

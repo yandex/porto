@@ -1,5 +1,6 @@
 #include "filesystem.hpp"
 #include "config.hpp"
+#include "cgroup.hpp"
 #include "util/log.hpp"
 
 
@@ -332,6 +333,16 @@ TError TMountNamespace::SetupRoot() {
 
     for (auto &s : symlinks) {
         error = (Root + s.path).Symlink(s.target);
+        if (error)
+            return error;
+    }
+
+    if (HugetlbSubsystem.Supported) {
+        TPath path = Root + "/dev/hugepages";
+        error = path.Mkdir(0755);
+        if (error)
+            return error;
+        error = path.Mount("hugetlbfs", "hugetlbfs", MS_NOSUID | MS_NODEV, { "mode=01777" });
         if (error)
             return error;
     }
