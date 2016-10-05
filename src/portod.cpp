@@ -616,18 +616,13 @@ static void CleanupTempdir() {
     }
 }
 
-static void DestroyWeakContainers() {
-    for (auto it: Containers) {
-        auto ct = it.second;
-        if (ct->IsWeak)
-            ct->Destroy();
-    }
-}
-
-static void DestroyContainers() {
+static void DestroyContainers(bool weak) {
+    /* leaves first */
     for (auto it = Containers.rbegin(); it != Containers.rend(); ) {
         auto ct = it->second;
         ++it;
+        if (weak && !ct->IsWeak)
+            continue;
         TError error = ct->Destroy();
         if (error)
             L_ERR() << "Cannot destroy container " << ct->Name << ": " << error << std::endl;
@@ -732,7 +727,7 @@ static int SlaveMain() {
 
     TVolume::RestoreAll();
 
-    DestroyWeakContainers();
+    DestroyContainers(true);
 
     SystemClient.FinishRequest();
 
@@ -750,7 +745,7 @@ static int SlaveMain() {
     DaemonShutdown(false, ret);
     //FIXME ret >= 0 -> destroy kv storage? why???
 
-    DestroyContainers();
+    DestroyContainers(false);
 
     return ret;
 }
