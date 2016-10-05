@@ -340,9 +340,6 @@ TError StringToCpuValue(const std::string &str, double &value) {
     if (value < 0)
         return TError(EError::InvalidValue, "negative cpu count");
 
-    if (value > GetNumCores())
-        return TError(EError::InvalidValue, "value exceeds cpu count");
-
     return TError::Success();
 }
 

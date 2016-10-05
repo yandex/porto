@@ -231,7 +231,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
 
     CpuPolicy = "normal";
     CpuLimit = GetNumCores();
-    CpuGuarantee = 0;
+    CpuGuarantee = IsRoot() ? GetNumCores() : 0;
     IoPolicy = "normal";
 
     Controllers = RequiredControllers = CGROUP_FREEZER;

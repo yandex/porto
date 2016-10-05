@@ -1668,6 +1668,9 @@ TError TCpuLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    if (new_limit > CurrentContainer->Parent->CpuLimit)
+        return TError(EError::InvalidValue, "cpu limit bigger than for parent");
+
     if (CurrentContainer->CpuLimit != new_limit) {
         CurrentContainer->CpuLimit = new_limit;
         CurrentContainer->SetProp(EProperty::CPU_LIMIT);
@@ -1704,6 +1707,9 @@ TError TCpuGuarantee::Set(const std::string &guarantee) {
     error = StringToCpuValue(guarantee, new_guarantee);
     if (error)
         return error;
+
+    if (new_guarantee > CurrentContainer->Parent->CpuGuarantee)
+        return TError(EError::InvalidValue, "cpu guarantee bigger than for parent");
 
     if (CurrentContainer->CpuGuarantee != new_guarantee) {
         CurrentContainer->CpuGuarantee = new_guarantee;
