@@ -606,7 +606,7 @@ static void DestroyContainers(bool weak) {
     for (auto it = Containers.rbegin(); it != Containers.rend(); ) {
         auto ct = it->second;
         ++it;
-        if (weak && !ct->IsWeak)
+        if (ct->IsRoot() || (weak && !ct->IsWeak))
             continue;
         TError error = ct->Destroy();
         if (error)
