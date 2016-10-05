@@ -36,7 +36,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
     config().mutable_daemon()->set_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
-    config().mutable_daemon()->set_workers(4);
+    config().mutable_daemon()->set_workers(32);
     config().mutable_daemon()->set_max_msg_len(32 * 1024 * 1024);
     config().mutable_daemon()->set_event_workers(1);
     config().mutable_daemon()->set_portod_stop_timeout(30);
