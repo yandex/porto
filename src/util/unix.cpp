@@ -250,26 +250,6 @@ std::string FormatExitStatus(int status) {
     return StringFormat("exit code: %d", WEXITSTATUS(status));
 }
 
-TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
-    FILE *f = popen(cmd.c_str(), "r");
-    if (f == nullptr)
-        return TError(EError::Unknown, errno, "Can't execute " + cmd);
-
-    char *line = nullptr;
-    size_t n = 0;
-
-    while (getline(&line, &n, f) >= 0)
-        lines.push_back(line);
-
-    auto ret = pclose(f);
-    free(line);
-
-    if (ret)
-        return TError(EError::Unknown, "popen(" + cmd + ") failed: " + std::to_string(ret));
-
-    return TError::Success();
-}
-
 int GetNumCores() {
     int ncores = sysconf(_SC_NPROCESSORS_CONF);
     if (ncores <= 0) {

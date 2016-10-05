@@ -101,6 +101,8 @@ namespace test {
     void _ExpectLessEq(size_t ret, size_t exp, const char *where);
     void _ExpectLessEq(const std::string &ret, const std::string &exp,
                        const char *where);
+
+    TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 }
 
 #define STRINGIFY(x) #x

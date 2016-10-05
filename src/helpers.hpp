@@ -3,7 +3,8 @@
 #include <vector>
 #include "util/path.hpp"
 
-TError RunCommand(const std::vector<std::string> &command, const TPath &cwd);
+TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
+		  std::string *output = nullptr);
 TError PackTarball(const TPath &tar, const TPath &path);
 TError UnpackTarball(const TPath &tar, const TPath &path);
 TError CopyRecursive(const TPath &src, const TPath &dst);

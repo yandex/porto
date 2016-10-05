@@ -43,7 +43,6 @@ TError SetSysctl(const std::string &name, const std::string &value);
 TError SetOomScoreAdj(int value);
 
 std::string FormatExitStatus(int status);
-TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 int GetNumCores();
 void DumpMallocInfo();
 

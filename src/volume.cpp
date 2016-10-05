@@ -780,15 +780,11 @@ public:
 
     TError MapDevice(std::string id, std::string pool, std::string image,
                      std::string &device) {
-        std::vector<std::string> lines;
         L_ACT() << "Map rbd device " << id << "@" << pool << "/" << image << std::endl;
-        TError error = Popen("rbd --id=\"" + id + "\" --pool=\"" + pool +
-                             "\" map \"" + image + "\"", lines);
+        TError error = RunCommand({"rbd", "--id=" + id, "--pool=" + pool, "map", image}, "/", &device);
         if (error)
             return error;
-        if (lines.size() != 1)
-            return TError(EError::InvalidValue, "rbd map output have wrong lines count");
-        device = StringTrim(lines[0]);
+        device = StringTrim(device);
         return TError::Success();
     }
 

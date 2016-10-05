@@ -12,11 +12,21 @@ extern "C" {
 #include <linux/loop.h>
 }
 
-TError RunCommand(const std::vector<std::string> &command, const TPath &cwd) {
+TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
+                  std::string *output) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
+    TError error;
+    TFile outFd;
+
     pid_t pid = fork();
     if (pid < 0)
         return TError(EError::Unknown, errno, "RunCommand: fork");
+
+    if (output) {
+        error = outFd.CreateTemp("/tmp");
+        if (error)
+            return error;
+    }
 
     if (pid > 0) {
         int ret, status;
@@ -27,22 +37,26 @@ retry:
                 goto retry;
             return TError(EError::Unknown, errno, "RunCommand: waitpid");
         }
+        if (output)
+            outFd.ReadAll(*output, 4096);
         if (WIFEXITED(status) && !WEXITSTATUS(status))
             return TError::Success();
         return TError(EError::Unknown, "RunCommand: " + command[0] +
                                        " " + FormatExitStatus(status));
     }
 
-    TError error = memcg.Attach(GetPid());
+    error = memcg.Attach(GetPid());
     if (error)
         L_WRN() << "cannot attach to helper cgroup: " << error << std::endl;
 
     SetDieOnParentExit(SIGKILL);
 
-    TFile::CloseAll({});
+    TFile::CloseAll({outFd.Fd});
     if (open("/dev/null", O_RDONLY) < 0 ||
             open("/dev/null", O_WRONLY) < 0 ||
             open("/dev/null", O_WRONLY) < 0)
+        _exit(EXIT_FAILURE);
+    if (output && dup2(outFd.Fd, STDOUT_FILENO) != STDOUT_FILENO)
         _exit(EXIT_FAILURE);
 
     /* Remount everything except CWD Read-Only */
