@@ -109,6 +109,18 @@ TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     return Knob(knob).WriteAll(value);
 }
 
+TError TCgroup::GetInt64(const std::string &knob, int64_t &value) const {
+    std::string string;
+    TError error = Get(knob, string);
+    if (!error)
+        error = StringToInt64(string, value);
+    return error;
+}
+
+TError TCgroup::SetInt64(const std::string &knob, int64_t value) const {
+    return Set(knob, std::to_string(value));
+}
+
 TError TCgroup::GetUint64(const std::string &knob, uint64_t &value) const {
     std::string string;
     TError error = Get(knob, string);

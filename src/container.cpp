@@ -244,10 +244,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
                        CGROUP_NETCLS | CGROUP_BLKIO | CGROUP_DEVICES;
     SetProp(EProperty::CONTROLLERS);
 
-    if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported) {
+    if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
         Controllers |= CGROUP_HUGETLB;
-        SetProp(EProperty::HUGETLB_LIMIT);
-    }
 
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;

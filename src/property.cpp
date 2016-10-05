@@ -1575,7 +1575,8 @@ public:
         IsSupported = HugetlbSubsystem.Supported;
     }
     TError Get(std::string &value) {
-        value = std::to_string(CurrentContainer->HugetlbLimit);
+        if (CurrentContainer->HasProp(EProperty::HUGETLB_LIMIT))
+            value = std::to_string(CurrentContainer->HugetlbLimit);
         return TError::Success();
     }
     TError Set(const std::string &value) {
@@ -1585,12 +1586,17 @@ public:
         error = WantControllers(CGROUP_HUGETLB);
         if (error)
             return error;
-        uint64_t limit = 0lu;
-        error = StringToSize(value, limit);
-        if (error)
-            return error;
-        CurrentContainer->HugetlbLimit = limit;
-        CurrentContainer->SetProp(EProperty::HUGETLB_LIMIT);
+        if (value.empty()) {
+            CurrentContainer->HugetlbLimit = -1;
+            CurrentContainer->ClearProp(EProperty::HUGETLB_LIMIT);
+        } else {
+            uint64_t limit = 0lu;
+            error = StringToSize(value, limit);
+            if (error)
+                return error;
+            CurrentContainer->HugetlbLimit = limit;
+            CurrentContainer->SetProp(EProperty::HUGETLB_LIMIT);
+        }
         return TError::Success();
     }
 } static HugetlbLimit;

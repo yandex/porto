@@ -98,6 +98,9 @@ public:
 
     TError GetPids(const std::string &knob, std::vector<pid_t> &pids) const;
 
+    TError GetInt64(const std::string &knob, int64_t &value) const;
+    TError SetInt64(const std::string &knob, int64_t value) const;
+
     TError GetUint64(const std::string &knob, uint64_t &value) const;
     TError SetUint64(const std::string &knob, uint64_t value) const;
 
@@ -276,16 +279,16 @@ public:
         return cg.GetUint64(HUGE_USAGE, usage);
     }
 
-    TError SetHugeLimit(TCgroup &cg, uint64_t limit) const {
-        return cg.SetUint64(HUGE_LIMIT, limit);
+    TError SetHugeLimit(TCgroup &cg, int64_t limit) const {
+        return cg.SetInt64(HUGE_LIMIT, limit);
     }
 
     bool SupportGigaPages() const {
         return RootCgroup().Has(GIGA_LIMIT);
     }
 
-    TError SetGigaLimit(TCgroup &cg, uint64_t limit) const {
-        return cg.SetUint64(GIGA_LIMIT, limit);
+    TError SetGigaLimit(TCgroup &cg, int64_t limit) const {
+        return cg.SetInt64(GIGA_LIMIT, limit);
     }
 };
 
