@@ -223,6 +223,7 @@ public:
 
     pid_t GetPidFor(pid_t pid) const;
 
+    TError StartTask();
     TError Start();
     TError Stop(uint64_t timeout);
     TError Pause();

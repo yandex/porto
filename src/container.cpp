@@ -1081,6 +1081,54 @@ void TContainer::SanitizeCapabilities() {
     CapAmbient.Permitted &= allowed.Permitted;
 }
 
+TError TContainer::StartTask() {
+    struct TTaskEnv TaskEnv;
+    struct TNetCfg NetCfg;
+    TError error;
+
+    error = ParseNetConfig(NetCfg);
+    if (error)
+        return error;
+
+    error = PrepareNetwork(NetCfg);
+    if (error)
+        return error;
+
+    if (!IsRoot()) {
+        error = ApplyDynamicProperties();
+        if (error)
+            return error;
+    }
+
+    /* NetNsCapabilities must be isoalted from host net-namespace */
+    if (Net == HostNetwork && !CurrentClient->IsSuperUser()) {
+        if (CapAmbient.Permitted & NetNsCapabilities.Permitted)
+            return TError(EError::Permission, "Capabilities require net isolation: " +
+                                               NetNsCapabilities.Format());
+        if (VirtMode == VIRT_MODE_OS)
+            return TError(EError::Permission, "virt_mode=os must be isolated from host network");
+    }
+
+    /* Meta container without namespaces don't need task */
+    if (IsMeta() && !Isolate && NetCfg.Inherited)
+        return TError::Success();
+
+    error = PrepareTask(&TaskEnv, &NetCfg);
+    if (error)
+        return error;
+
+    error = TaskEnv.Start();
+
+    /* Always report OOM stuation if any */
+    if (error && HasOomReceived()) {
+        if (error)
+            L() << "Start error: " << error << std::endl;
+        return TError(EError::InvalidValue, ENOMEM, "OOM, memory limit too low");
+    }
+
+    return error;
+}
+
 TError TContainer::Start() {
     TError error;
 
@@ -1204,57 +1252,15 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    struct TTaskEnv TaskEnv;
-    struct TNetCfg NetCfg;
-
-    error = ParseNetConfig(NetCfg);
-    if (error)
+    error = StartTask();
+    if (error) {
+        FreeResources();
         return error;
-
-    error = PrepareNetwork(NetCfg);
-    if (error)
-        goto error;
-
-    if (!IsRoot()) {
-        error = ApplyDynamicProperties();
-        if (error)
-            return error;
     }
 
-    /* NetNsCapabilities must be isoalted from host net-namespace */
-    if (Net == HostNetwork && !CurrentClient->IsSuperUser()) {
-        if (CapAmbient.Permitted & NetNsCapabilities.Permitted) {
-            error = TError(EError::Permission, "Capabilities require net isolation: " +
-                                               NetNsCapabilities.Format());
-            goto error;
-        }
-        if (VirtMode == VIRT_MODE_OS) {
-            error = TError(EError::Permission, "virt_mode=os must be isolated from host network");
-            goto error;
-        }
-    }
+    L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
 
-    if (!IsMeta() || Isolate) {
-        error = PrepareTask(&TaskEnv, &NetCfg);
-        if (error)
-            goto error;
-
-        error = TaskEnv.Start();
-
-        /* Always report OOM stuation if any */
-        if (error && HasOomReceived()) {
-            if (error)
-                L() << "Start error: " << error << std::endl;
-            error = TError(EError::InvalidValue, ENOMEM,
-                           "OOM, memory limit too low");
-        }
-
-        if (error)
-            goto error;
-
-        L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
-        SetProp(EProperty::ROOT_PID);
-    }
+    SetProp(EProperty::ROOT_PID);
 
     if (IsMeta())
         SetState(EContainerState::Meta);
@@ -1266,10 +1272,12 @@ TError TContainer::Start() {
     if (error)
         L_ERR() << "Can't update meta soft limit: " << error << std::endl;
 
-    return Save();
+    error = Save();
+    if (error) {
+        L_ERR() << "Cannot save state after start " << error << std::endl;
+        (void)Reap(false);
+    }
 
-error:
-    FreeResources();
     return error;
 }
 
