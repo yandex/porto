@@ -1832,16 +1832,6 @@ void TVolume::RestoreAll(void) {
     }
 }
 
-void TVolume::DestroyAll(void) {
-    auto volumes_lock = LockVolumes();
-    while (!Volumes.empty()) {
-        auto volume = Volumes.rbegin()->second;
-        volumes_lock.unlock();
-        volume->Destroy();
-        volumes_lock.lock();
-    }
-}
-
 TError TVolume::ApplyConfig(const TStringMap &cfg) {
     TError error;
 

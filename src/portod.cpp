@@ -57,6 +57,7 @@ static bool stdlog = false;
 static bool failsafe = false;
 static bool respawnSlave = true;
 static bool slaveMode = false;
+static bool discardState = false;
 
 static void FatalError(const std::string &text, TError &error) {
     L_ERR() << text << ": " << error << std::endl;
@@ -77,7 +78,7 @@ static void DaemonOpenLog(bool master) {
     TLogger::OpenLog(stdlog, log.path(), log.perm());
 }
 
-static int DaemonPrepare(bool master) {
+static void DaemonPrepare(bool master) {
     TError error;
 
     if (master) {
@@ -88,10 +89,8 @@ static int DaemonPrepare(bool master) {
         error = PortoSlavePid.Save(getpid());
     }
 
-    if (error) {
-        std::cerr << "Cannot save pid " << error << std::endl;
-        return EXIT_FAILURE;
-    }
+    if (error)
+        FatalError("Cannot save pid", error);
 
     config.Load();
 
@@ -100,12 +99,10 @@ static int DaemonPrepare(bool master) {
     L_SYS() << std::string(80, '-') << std::endl;
     L_SYS() << "Started " << PORTO_VERSION << " " << PORTO_REVISION << " " << GetPid() << std::endl;
     L_SYS() << config().DebugString() << std::endl;
-
-    return EXIT_SUCCESS;
 }
 
-static void DaemonShutdown(bool master, int ret) {
-    L_SYS() << "Stopped " << ret << std::endl;
+static void DaemonShutdown(bool master, int code) {
+    L_SYS() << "Stopped " << code << std::endl;
 
     TLogger::CloseLog();
 
@@ -114,8 +111,8 @@ static void DaemonShutdown(bool master, int ret) {
     else
         PortoSlavePid.Remove();
 
-    if (ret < 0) {
-        int sig = -ret;
+    if (code < 0) {
+        int sig = -code;
         Signal(sig, SIG_DFL);
         raise(sig);
         if (master)
@@ -295,7 +292,6 @@ static int SlaveRpc() {
     worker.Start();
     EventQueue->Start();
 
-    bool discardState = false;
     while (true) {
         if (accept_paused && clients.size() * 4 / 3 < config().daemon().max_clients()) {
             L_WRN() << "Resume accepting connections" << std::endl;
@@ -337,7 +333,7 @@ static int SlaveRpc() {
                 switch (sigInfo.ssi_signo) {
                     case SIGINT:
                         discardState = true;
-                        ret = -SIGTERM;
+                        ret = -SIGINT;
                         goto exit;
                     case SIGTERM:
                         ret = -SIGTERM;
@@ -429,17 +425,6 @@ exit:
     for (auto c : clients)
         c.second->CloseConnection();
     clients.clear();
-
-    if (discardState) {
-
-        error = ContainersKV.UmountAll();
-        if (error)
-            L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
-
-        error = VolumesKV.UmountAll();
-        if (error)
-            L_ERR() << "Can't destroy volume key-value storage: " << error << std::endl;
-    }
 
     return ret;
 }
@@ -629,9 +614,18 @@ static void DestroyContainers(bool weak) {
     }
 }
 
+static void DestroyVolumes() {
+    for (auto it = Volumes.rbegin(); it != Volumes.rend(); ) {
+        auto vol = it->second;
+        ++it;
+        TError error = vol->Destroy();
+        if (error)
+            L_ERR() << "Cannot destroy volume " << vol->Path << ": " << error << std::endl;
+    }
+}
+
 static int SlaveMain() {
     TError error;
-    int ret;
 
     SetDieOnParentExit(SIGKILL);
 
@@ -644,9 +638,7 @@ static int SlaveMain() {
     Statistics->VolumesCount = 0;
     Statistics->RequestsQueued = 0;
 
-    ret = DaemonPrepare(false);
-    if (ret)
-        return ret;
+    DaemonPrepare(false);
 
     L_SYS() << "Previous version: " << PreviousVersion << std::endl;
 
@@ -729,6 +721,13 @@ static int SlaveMain() {
 
     DestroyContainers(true);
 
+    if (discardState) {
+        discardState = false;
+        L() << "Discard state..." << std::endl;
+        DestroyContainers(false);
+        DestroyVolumes();
+    }
+
     SystemClient.FinishRequest();
 
     L() << "Remove cgroup leftovers..." << std::endl;
@@ -739,15 +738,35 @@ static int SlaveMain() {
 
     L() << "Done restoring" << std::endl;
 
-    ret = SlaveRpc();
+    int code = SlaveRpc();
     L_SYS() << "Shutting down..." << std::endl;
 
-    DaemonShutdown(false, ret);
-    //FIXME ret >= 0 -> destroy kv storage? why???
+    if (discardState) {
+        discardState = false;
 
-    DestroyContainers(false);
+        L() << "Discard state..." << std::endl;
 
-    return ret;
+        DestroyContainers(false);
+
+        DestroyVolumes();
+
+        error = RootContainer->Destroy();
+        if (error)
+            L_ERR() << "Cannot destroy root container" << error << std::endl;
+        RootContainer = nullptr;
+
+        error = ContainersKV.UmountAll();
+        if (error)
+            L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
+
+        error = VolumesKV.UmountAll();
+        if (error)
+            L_ERR() << "Can't destroy volume key-value storage: " << error << std::endl;
+    }
+
+    DaemonShutdown(false, code);
+
+    return code;
 }
 
 static void DeliverPidStatus(int fd, int pid, int status, size_t queued) {
@@ -1013,9 +1032,7 @@ exit:
 static int MasterMain() {
     Statistics->MasterStarted = GetCurrentTimeMs();
 
-    int ret = DaemonPrepare(true);
-    if (ret)
-        return ret;
+    DaemonPrepare(true);
 
     TPath pathVer(PORTO_VERSION_FILE);
 
@@ -1064,12 +1081,13 @@ static int MasterMain() {
     }
 
     std::map<int,int> exited;
+    int code;
 
     while (true) {
         uint64_t started = GetCurrentTimeMs();
         uint64_t next = started + config().container().respawn_delay_ms();
-        ret = SpawnSlave(ELoop, exited);
-        L() << "Returned " << ret << std::endl;
+        code = SpawnSlave(ELoop, exited);
+        L() << "Returned " << code << std::endl;
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
@@ -1078,9 +1096,7 @@ static int MasterMain() {
             Reap(slavePid);
         }
 
-        if (ret < 0)
-            break;
-        if (!respawnSlave)
+        if (code < 0 || !respawnSlave)
             break;
 
         PreviousVersion = PORTO_VERSION;
@@ -1090,9 +1106,9 @@ static int MasterMain() {
     if (error)
         L_ERR() << "Cannot unlink socket file: " << error << std::endl;
 
-    DaemonShutdown(true, ret);
+    DaemonShutdown(true, code);
 
-    return ret;
+    return code;
 }
 
 static void KvDump() {
@@ -1361,6 +1377,7 @@ static void Usage() {
         << "  --stdlog        print log into stdout" << std::endl
         << "  --norespawn     exit after failure" << std::endl
         << "  --verbose       verbose logging" << std::endl
+        << "  --discard       discard state after start" << std::endl
         << std::endl
         << "Commands: " << std::endl
         << "  status          check current portod status" << std::endl
@@ -1402,6 +1419,8 @@ int main(int argc, char **argv) {
             slaveMode = true;
         else if (arg == "--failsafe")
             failsafe = true;
+        else if (arg == "--discard")
+            discardState = true;
         else {
             std::cerr << "Unknown option: " << arg << std::endl;
             Usage();

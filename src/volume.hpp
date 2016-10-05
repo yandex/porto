@@ -117,7 +117,6 @@ public:
     TError Restore(const TKeyValue &node);
 
     static void RestoreAll(void);
-    static void DestroyAll(void);
 
     TError LinkContainer(TContainer &container);
     TError UnlinkContainer(TContainer &container);
