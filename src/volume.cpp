@@ -1041,12 +1041,8 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
             return TError(EError::InvalidProperty, "Read-only: " + it.first);
     }
 
-    /* Verify place */
     if (cfg.count(V_PLACE)) {
         Place = cfg.at(V_PLACE);
-        error = CheckPlace(Place);
-        if (error)
-            return error;
         CustomPlace = true;
     } else {
         Place = config().volumes().default_place();
@@ -1696,6 +1692,12 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
                        TContainer &container, const TCred &cred,
                        std::shared_ptr<TVolume> &volume) {
     TError error;
+
+    if (cfg.count(V_PLACE)) {
+        error = CheckPlace(cfg.at(V_PLACE));
+        if (error)
+            return error;
+    }
 
     volume = std::make_shared<TVolume>();
 
