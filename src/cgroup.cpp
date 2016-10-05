@@ -372,7 +372,7 @@ TError TMemorySubsystem::GetAnonUsage(TCgroup &cg, uint64_t &usage) const {
     if (!error)
         usage = stat["total_inactive_anon"] +
                 stat["total_active_anon"] +
-                stat["unevictable"] +
+                stat["total_unevictable"] +
                 stat["total_swap"];
     return error;
 }
