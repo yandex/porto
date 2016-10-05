@@ -588,6 +588,14 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         name == "hugetlb_usage")
         return HumanSize(val);
 
+    if (name == "stdout" || name == "stderr") {
+        if (val.size() > 4096)
+            return val.substr(0, 2048) + "\n... skip " +
+                std::to_string(val.size() - 4096) + " bytes ...\n" +
+                val.substr(val.size() - 2048);
+        return val;
+    }
+
     if (name == "time" || name == "aging_time")
         return HumanSec(val);
 
@@ -910,7 +918,9 @@ public:
         string value;
         int ret;
         bool printKey = true;
-        bool printErrors = true;
+        bool printErrors = false;
+        bool printEmpty = false;
+        bool printHuman = true;
 
         const auto &args = env->GetArgs();
         std::string container = args[0];
@@ -921,6 +931,9 @@ public:
             vars.insert(vars.end(), args.begin() + 1, args.end());
             if (args.size() == 2)
                 printKey = false;
+            printErrors = true;
+            printEmpty = true;
+            printHuman = false;
         } else {
             vector<Porto::Property> plist;
             ret = Api->Plist(plist);
@@ -942,10 +955,6 @@ public:
             for (auto d : dlist)
                 vars.push_back(d.Name);
             std::sort(vars.begin(), vars.end());
-            // don't print any error when user lists all properties/data
-            // (container may be / which doesn't support properties or
-            // some property/data may be invalid in given state)
-            printErrors = false;
         }
 
         std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
@@ -968,10 +977,13 @@ public:
                 continue;
             }
 
-            if (args.size() == 1 && data[key].Value == "")
+            auto val = data[key].Value;
+            if (val.empty() && !printEmpty)
                 continue;
 
-            auto val = HumanValue(key, data[key].Value);
+            if (printHuman)
+                val = HumanValue(key, val);
+
             if (printKey)
                 PrintPair(key, val);
             else
