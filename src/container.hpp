@@ -224,7 +224,6 @@ public:
     pid_t GetPidFor(pid_t pid) const;
 
     TError Start();
-    TError StopOne(uint64_t deadline);
     TError Stop(uint64_t timeout);
     TError Pause();
     TError Resume();

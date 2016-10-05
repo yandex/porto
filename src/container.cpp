@@ -1495,66 +1495,60 @@ void TContainer::ForgetPid() {
     ClearProp(EProperty::ROOT_PID);
 }
 
-TError TContainer::StopOne(uint64_t deadline) {
-    TError error;
-
-    if (State == EContainerState::Stopped)
-        return TError::Success();
-
-    L_ACT() << "Stop " << Name << std::endl;
-
-    if (!IsRoot()) {
-        error = Terminate(deadline);
-        if (error) {
-            L_ERR() << "Cannot termiante tasks in container: " << error << std::endl;
-            return error;
-        }
-    }
-
-    ForgetPid();
-
-    DeathTime = 0;
-    ClearProp(EProperty::DEATH_TIME);
-
-    ExitStatus = 0;
-    ClearProp(EProperty::EXIT_STATUS);
-
-    OomKilled = false;
-    ClearProp(EProperty::OOM_KILLED);
-
-    SetState(EContainerState::Stopped);
-    FreeResources();
-
-    return Save();
-}
-
 TError TContainer::Stop(uint64_t timeout) {
     uint64_t deadline = timeout ? GetCurrentTimeMs() + timeout : 0;
-    auto cg = GetCgroup(FreezerSubsystem);
+    auto freezer = GetCgroup(FreezerSubsystem);
     TError error;
 
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
             return TError(EError::NotSupported, "Cannot stop without freezer");
-    } else if (FreezerSubsystem.IsFrozen(cg)) {
-        if (FreezerSubsystem.IsParentFreezing(cg))
+    } else if (FreezerSubsystem.IsParentFreezing(freezer))
             return TError(EError::InvalidState, "Parent container is paused");
 
-        L_ACT() << "Terminate paused container " << Name << std::endl;
+    auto subtree = Subtree();
 
-        for (auto &ct: Subtree()) {
-            auto cg = ct->GetCgroup(FreezerSubsystem);
-            error = cg.KillAll(SIGKILL);
-            if (error)
-                return error;
-            error = FreezerSubsystem.Thaw(cg, false);
+    for (auto &ct : subtree) {
+        auto cg = ct->GetCgroup(FreezerSubsystem);
+
+        if (IsRoot() || ct->State == EContainerState::Stopped)
+            continue;
+
+        error = ct->Terminate(deadline);
+        if (error) {
+            L_ERR() << "Cannot terminate tasks in container: " << error << std::endl;
+            return error;
+        }
+
+        if (FreezerSubsystem.IsSelfFreezing(cg)) {
+            L_ACT() << "Thaw terminated paused container " << ct->Name << std::endl;
+            error = FreezerSubsystem.Thaw(cg, true);
             if (error)
                 return error;
         }
     }
 
-    for (auto &ct: Subtree()) {
-        error = ct->StopOne(deadline);
+    for (auto &ct: subtree) {
+        if (ct->State == EContainerState::Stopped)
+            continue;
+
+        L_ACT() << "Stop " << Name << std::endl;
+
+        ct->ForgetPid();
+
+        ct->DeathTime = 0;
+        ct->ClearProp(EProperty::DEATH_TIME);
+
+        ct->ExitStatus = 0;
+        ct->ClearProp(EProperty::EXIT_STATUS);
+
+        ct->OomKilled = false;
+        ct->ClearProp(EProperty::OOM_KILLED);
+
+        ct->SetState(EContainerState::Stopped);
+        ct->FreeResources();
+
+        error = Save();
         if (error)
             return error;
     }
