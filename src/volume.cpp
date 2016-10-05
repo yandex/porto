@@ -1705,6 +1705,10 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
 
     auto volumes_lock = LockVolumes();
 
+    auto max = config().volumes().max_total();
+    if (Volumes.size() >= max)
+        return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max));
+
     if (!path.IsEmpty() && Volumes.find(path) != Volumes.end())
         return TError(EError::VolumeAlreadyExists, "Volume already exists");
 
