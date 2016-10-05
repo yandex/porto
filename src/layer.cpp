@@ -65,14 +65,14 @@ TError CheckPlace(const TPath &place, bool init) {
         layers.Chmod(0700);
 
     std::vector<std::string> list;
-    error = layers.ListSubdirs(list);
+    error = layers.ReadDirectory(list);
     if (error)
         return error;
 
     for (auto &layer: list) {
         TPath path = layers / layer;
 
-        if (!LayerIsJunk(layer))
+        if (path.IsDirectoryStrict() && !LayerIsJunk(layer))
             continue;
 
         auto lock = LockVolumes();
