@@ -571,14 +571,30 @@ static bool ValidProperty(const vector<Porto::Property> &plist, const string &na
         != plist.end();
 }
 
-static string HumanValue(const string &name, const string &val) {
+static std::string HumanValue(const std::string &name, const std::string &val) {
     if (val == "")
         return val;
 
-    if (name == "memory_guarantee" || name == "memory_limit" ||
-            name == "anon_usage" || name == "anon_limit") {
+    if (name == "memory_guarantee" ||
+        name == "memory_limit" ||
+        name == "memory_usage" ||
+        name == "memory_limit_total" ||
+        name == "memory_guarantee_total" ||
+        name == "anon_usage" ||
+        name == "anon_limit" ||
+        name == "max_rss" ||
+        name == "stdout_limit" ||
+        name == "hugetlb_limit" ||
+        name == "hugetlb_usage")
         return HumanSize(val);
-    } else if (name == "exit_status") {
+
+    if (name == "time" || name == "aging_time")
+        return HumanSec(val);
+
+    if (name == "cpu_usage" || name == "cpu_usage_system")
+        return HumanNsec(val);
+
+    if (name == "exit_status") {
         int status;
         if (StringToInt(val, status))
             return val;
@@ -593,27 +609,6 @@ static string HumanValue(const string &name, const string &val) {
             ret = "Success";
 
         return ret;
-    } else if (name == "errno") {
-        int status;
-        if (StringToInt(val, status))
-            return val;
-
-        string ret;
-
-        if (status < 0)
-            ret = "Prepare failed: " + string(strerror(-status));
-        else if (status > 0)
-            ret = "Exec failed: " + string(strerror(status));
-        else if (status == 0)
-            ret = "Success";
-
-        return ret + " (" + val + ")";
-    } else if (name == "memory_usage" || name == "max_rss") {
-        return HumanSize(val);
-    } else if (name == "cpu_usage" || name == "cpu_usage_system") {
-        return HumanNsec(val);
-    } else if (name == "time") {
-        return HumanSec(val);
     }
 
     return val;
@@ -917,20 +912,6 @@ public:
         bool printKey = true;
         bool printErrors = true;
 
-        vector<Porto::Property> plist;
-        ret = Api->Plist(plist);
-        if (ret) {
-            PrintError("Can't list properties");
-            return EXIT_FAILURE;
-        }
-
-        vector<Porto::Property> dlist;
-        ret = Api->Dlist(dlist);
-        if (ret) {
-            PrintError("Can't list data");
-            return EXIT_FAILURE;
-        }
-
         const auto &args = env->GetArgs();
         std::string container = args[0];
         std::vector<std::string> clist = { container };
@@ -938,11 +919,23 @@ public:
 
         if (args.size() > 1) {
             vars.insert(vars.end(), args.begin() + 1, args.end());
-            // we want to preserve old behavior:
-            // - get without arguments prints all properties/data prefixed with name
-            // - get with arguments prints specified properties/data without prefix
-            printKey = false;
+            if (args.size() == 2)
+                printKey = false;
         } else {
+            vector<Porto::Property> plist;
+            ret = Api->Plist(plist);
+            if (ret) {
+                PrintError("Can't list properties");
+                return EXIT_FAILURE;
+            }
+
+            vector<Porto::Property> dlist;
+            ret = Api->Dlist(dlist);
+            if (ret) {
+                PrintError("Can't list data");
+                return EXIT_FAILURE;
+            }
+
             vars.reserve(plist.size() + dlist.size());
             for (auto p : plist)
                 vars.push_back(p.Name);
@@ -974,6 +967,9 @@ public:
                 }
                 continue;
             }
+
+            if (args.size() == 1 && data[key].Value == "")
+                continue;
 
             auto val = HumanValue(key, data[key].Value);
             if (printKey)
