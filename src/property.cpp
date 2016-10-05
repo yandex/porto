@@ -1553,6 +1553,10 @@ TError TDirtyLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    if (new_size < 1048576)
+        return TError(EError::InvalidValue,
+                      "dirty limit should be at least 1M");
+
     if (CurrentContainer->DirtyMemLimit != new_size) {
         CurrentContainer->DirtyMemLimit = new_size;
         CurrentContainer->SetProp(EProperty::DIRTY_LIMIT);
