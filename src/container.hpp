@@ -210,7 +210,7 @@ public:
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
     bool IsolatedFromHost() const;
 
-    bool IsRoot() const { return Id == ROOT_CONTAINER_ID; }
+    bool IsRoot() const { return !Level; }
     bool IsChildOf(const TContainer &ct) const;
 
     std::list<std::shared_ptr<TContainer>> Subtree();
