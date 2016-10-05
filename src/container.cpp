@@ -1582,10 +1582,7 @@ void TContainer::Reap(bool oomKilled) {
     Stdout.Rotate(*this);
     Stderr.Rotate(*this);
 
-    if (State == EContainerState::Meta)
-        SetState(EContainerState::Stopped);
-    else
-        SetState(EContainerState::Dead);
+    SetState(EContainerState::Dead);
 
     error = Save();
     if (error)
