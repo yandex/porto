@@ -325,6 +325,13 @@ noinline TError StartContainer(const rpc::TContainerStartRequest &req,
     TError error = CurrentClient->WriteContainer(req.name(), ct);
     if (error)
         return error;
+
+    for (auto p = ct->Parent; p && p->State == EContainerState::Stopped; p = p->Parent) {
+        error = CurrentClient->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);
+        if (error)
+            return error;
+    }
+
     return ct->Start();
 }
 
