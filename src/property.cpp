@@ -1598,6 +1598,13 @@ public:
             error = StringToSize(value, limit);
             if (error)
                 return error;
+
+            auto cg = CurrentContainer->GetCgroup(HugetlbSubsystem);
+            uint64_t usage;
+            if (!HugetlbSubsystem.GetHugeUsage(cg, usage) && limit < usage)
+                return TError(EError::InvalidValue,
+                              "current hugetlb usage is greater than limit");
+
             CurrentContainer->HugetlbLimit = limit;
             CurrentContainer->SetProp(EProperty::HUGETLB_LIMIT);
         }
