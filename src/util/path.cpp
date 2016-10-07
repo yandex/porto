@@ -123,7 +123,6 @@ bool TPath::Exists() const {
 
 bool TPath::HasAccess(const TCred &cred, enum Access mask) const {
     struct stat st;
-    int mode;
 
     if (!cred.Uid && !access(c_str(), mask & TPath::RWX))
         return true;
@@ -140,6 +139,12 @@ bool TPath::HasAccess(const TCred &cred, enum Access mask) const {
             dir = dir.DirName();
         }
     }
+
+    return HasAccess(st, cred, mask);
+}
+
+bool TPath::HasAccess(const struct stat &st, const TCred &cred, enum Access mask) {
+    int mode;
 
     if ((mask & TPath::U) && cred.Uid == st.st_uid)
         return true;
@@ -1164,4 +1169,161 @@ int TFile::GetMountId(void) const {
     if (name_to_handle_at(Fd, "", &fh.head, &mnt, AT_EMPTY_PATH))
         return -1;
     return mnt;
+}
+
+TError TFile::Dup(const TFile &other) {
+    if (&other != this) {
+        Close();
+        SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC);
+        if (Fd < 0)
+            return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(other.Fd));
+    }
+    return TError::Success();
+}
+
+TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags) {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    Close();
+    SetFd = openat(dir.Fd, path.c_str(), flags);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot open " + std::to_string(dir.Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::CreateAt(const TFile &dir, const TPath &path, int flags, int mode) {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    Close();
+    SetFd = openat(dir.Fd, path.c_str(), flags, mode);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot create " + std::to_string(dir.Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::MkdirAt(const TPath &path, int mode) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    if (mkdirat(Fd, path.c_str(), mode))
+        return TError(EError::Success, errno, "Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::UnlinkAt(const TPath &path) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    if (unlinkat(Fd, path.c_str(), 0))
+        return TError(EError::Success, errno, "Cannot unlink " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::RmdirAt(const TPath &path) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    if (unlinkat(Fd, path.c_str(), AT_REMOVEDIR))
+        return TError(EError::Success, errno, "Cannot rmdir " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
+    if (oldpath.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + oldpath.Path);
+    if (newpath.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + newpath.Path);
+    if (renameat(Fd, oldpath.c_str(), Fd, newpath.c_str()))
+        return TError(EError::Success, errno, "Cannot rename " +
+                std::to_string(Fd) + " @ " + oldpath.Path + " to " +
+                std::to_string(Fd) + " @ " + newpath.Path);
+    return TError::Success();
+}
+
+TError TFile::Chown(uid_t uid, gid_t gid) const {
+    if (fchown(Fd, uid, gid))
+        return TError(EError::Success, errno, "Cannot chown " + std::to_string(Fd));
+    return TError::Success();
+}
+
+TError TFile::Chmod(mode_t mode) const {
+    if (fchmod(Fd, mode))
+        return TError(EError::Success, errno, "Cannot chmod " + std::to_string(Fd));
+    return TError::Success();
+}
+
+TError TFile::ChownAt(const TPath &path, uid_t uid, gid_t gid) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    if (fchownat(Fd, path.c_str(), uid, gid, AT_SYMLINK_NOFOLLOW))
+        return TError(EError::Success, errno, "Cannot chown " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    if (fchmodat(Fd, path.c_str(), mode, AT_SYMLINK_NOFOLLOW))
+        return TError(EError::Success, errno, "Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::WalkFollow(const TFile &dir, const TPath &path) {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    TError error = Dup(dir);
+    if (error)
+        return error;
+    int next = openat(Fd, path.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY);
+    if (next < 0)
+        error = TError(EError::Unknown, errno, "Cannot walk path: " + path.Path);
+    close(Fd);
+    SetFd = next;
+    return error;
+}
+
+TError TFile::WalkStrict(const TFile &dir, const TPath &path) {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    TError error = Dup(dir);
+    if (error)
+        return error;
+    std::stringstream ss(path.Path);
+    std::string name;
+    while (std::getline(ss, name, '/')) {
+        if (name == "" || name == ".")
+            continue;
+        int next = openat(Fd, name.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
+        if (next < 0)
+            error = TError(EError::Unknown, errno, "Cannot walk: " + name + " in path " + path.Path);
+        close(Fd);
+        SetFd = next;
+        if (next < 0)
+            break;
+    }
+    return error;
+}
+
+TError TFile::Stat(struct stat &st) const {
+    if (fstat(Fd, &st))
+        return TError(EError::Unknown, "Cannot stat: " + std::to_string(Fd));
+    return TError::Success();
+}
+
+TError TFile::StatAt(const TPath &path, bool follow, struct stat &st) const {
+    if (fstatat(Fd, path.c_str(), &st, AT_EMPTY_PATH |
+                (follow ? 0 : AT_SYMLINK_NOFOLLOW)))
+        return TError(EError::Unknown, "Cannot stat: " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+bool TFile::HasAccess(const TCred &cred, enum TPath::Access mask) const {
+    struct stat st;
+    if (fstat(Fd, &st))
+        return false;
+    return TPath::HasAccess(st, cred, mask);
+}
+
+bool TFile::HasAccessAt(const TPath &path, const TCred &cred, enum TPath::Access mask) const {
+    struct stat st;
+    if (path.IsAbsolute() || fstatat(Fd, path.c_str(), &st, 0))
+        return false;
+    return TPath::HasAccess(st, cred, mask);
 }

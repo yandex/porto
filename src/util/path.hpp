@@ -26,6 +26,7 @@ struct TStatFS {
 struct TMount;
 
 class TPath {
+    friend class TFile;
     std::string Path;
 
     std::string DirNameStr() const;
@@ -37,6 +38,8 @@ public:
     TPath() : Path("") {}
 
     bool IsAbsolute() const { return Path[0] == '/'; }
+
+    bool IsSimple() const { return Path.find('/') == std::string::npos; }
 
     bool IsRoot() const { return Path == "/"; }
 
@@ -123,7 +126,7 @@ public:
         P   = 020, /* if not exits -> check parent directory */
         WUP = 032, /* write or owner or at parent */
     };
-
+    static bool HasAccess(const struct stat &st, const TCred &cred, enum Access mask);
     bool HasAccess(const TCred &cred, enum Access mask) const;
     bool CanRead(const TCred &cred) const { return HasAccess(cred, R); }
     bool CanWrite(const TCred &cred) const { return HasAccess(cred, W); }
@@ -228,4 +231,27 @@ public:
     TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
     int GetMountId(void) const;
+    TError Dup(const TFile &other);
+    TError OpenAt(const TFile &dir, const TPath &path, int flags);
+    TError CreateAt(const TFile &dir, const TPath &path, int flags, int mode);
+    TError MkdirAt(const TPath &path, int mode) const;
+    TError UnlinkAt(const TPath &path) const;
+    TError RmdirAt(const TPath &path) const;
+    TError RenameAt(const TPath &oldpath, const TPath &newpath) const;
+    TError Chown(uid_t uid, gid_t gid) const;
+    TError Chown(const TCred &cred) const {
+        return Chown(cred.Uid, cred.Gid);
+    }
+    TError Chmod(mode_t mode) const;
+    TError ChownAt(const TPath &path, uid_t uid, gid_t gid) const;
+    TError ChownAt(const TPath &path, const TCred &cred) const {
+        return ChownAt(path, cred.Uid, cred.Gid);
+    }
+    TError ChmodAt(const TPath &path, mode_t mode) const;
+    TError WalkFollow(const TFile &dir, const TPath &path);
+    TError WalkStrict(const TFile &dir, const TPath &path);
+    TError Stat(struct stat &st) const;
+    TError StatAt(const TPath &path, bool follow, struct stat &st) const;
+    bool HasAccess(const TCred &cred, enum TPath::Access mask) const;
+    bool HasAccessAt(const TPath &path, const TCred &cred, enum TPath::Access mask) const;
 };
