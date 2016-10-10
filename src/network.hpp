@@ -163,12 +163,12 @@ struct TNetCfg {
     std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TNetwork> ParentNet;
     std::shared_ptr<TNetwork> Net;
-    unsigned Id;
+    unsigned Id = 0;
     TCred OwnerCred;
-    bool NewNetNs;
-    bool Inherited;
-    bool NetUp;
-    bool SaveIp;
+    bool NewNetNs = false;
+    bool Inherited = false;
+    bool NetUp = false;
+    bool SaveIp = false;
     std::string Hostname;
     std::vector<std::string> Steal;
     std::vector<TMacVlanNetCfg> MacVlan;
