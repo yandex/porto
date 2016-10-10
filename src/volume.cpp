@@ -1707,8 +1707,15 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
     if (Volumes.size() >= max)
         return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max));
 
-    if (!path.IsEmpty() && Volumes.find(path) != Volumes.end())
-        return TError(EError::VolumeAlreadyExists, "Volume already exists");
+    if (!path.IsEmpty()) {
+        auto it = Volumes.lower_bound(path);
+        if (it != Volumes.end()) {
+            if (it->first == path)
+                return TError(EError::VolumeAlreadyExists, "Volume already exists");
+            if (!path.InnerPath(it->first).IsEmpty())
+                return TError(EError::Busy, "Path overlaps with " + it->first.ToString());
+        }
+    }
 
     volume->Id = std::to_string(NextId++);
 
