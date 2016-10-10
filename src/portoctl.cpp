@@ -912,24 +912,40 @@ public:
 
 class TGetCmd final : public ICmd {
 public:
-    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1, "<container> <variable> [variable...]", "get container property or data") {}
+    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1, "[container|pattern]... [--] [variable]...", "get container property or data") {}
 
     int Execute(TCommandEnviroment *env) final override {
-        string value;
-        int ret;
         bool printKey = true;
         bool printErrors = false;
         bool printEmpty = false;
         bool printHuman = true;
+        bool multiGet = false;
+        std::vector<std::string> list;
+        std::vector<std::string> vars;
+        int ret;
 
         const auto &args = env->GetArgs();
-        std::string container = args[0];
-        std::vector<std::string> clist = { container };
-        std::vector<std::string> vars;
+        int sep = -1;
+        for (auto i = 0u; i < args.size(); i++) {
+            if (args[i] == "--") {
+                sep = i;
+                break;
+            }
+        }
 
-        if (args.size() > 1) {
+        if (sep == 0) {
+            list.push_back("***");
             vars.insert(vars.end(), args.begin() + 1, args.end());
-            if (args.size() == 2)
+        } else if (sep > 0) {
+            list.insert(list.end(), args.begin(), args.begin() + sep);
+            vars.insert(vars.end(), args.begin() + sep + 1, args.end());
+        } else {
+            list.push_back(args[0]);
+            vars.insert(vars.end(), args.begin() + 1, args.end());
+        }
+
+        if (vars.size()) {
+            if (vars.size() == 1)
                 printKey = false;
             printErrors = true;
             printEmpty = true;
@@ -958,36 +974,48 @@ public:
         }
 
         std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-        ret = Api->Get(clist, vars, result);
+        ret = Api->Get(list, vars, result);
         if (ret) {
             PrintError("Can't get containers' data");
             return ret;
         }
 
-        auto &data = result[container];
+        if (result.size() > 1)
+            multiGet = true;
+
         ret = EXIT_SUCCESS;
 
-        for (const auto &key : vars) {
-            if (data[key].Error) {
-                if (printErrors || key == "state") {
-                    TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
-                    PrintError(error, "Can't get " + key);
-                    ret = EXIT_FAILURE;
+        for (auto &it: result) {
+            auto &data = it.second;
+
+            if (multiGet)
+                Print(it.first + ":");
+
+            for (const auto &key : vars) {
+                if (data[key].Error) {
+                    if (printErrors || key == "state") {
+                        TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
+                        PrintError(error, "Can't get " + key);
+                        ret = EXIT_FAILURE;
+                    }
+                    continue;
                 }
+
+                auto val = data[key].Value;
+                if (val.empty() && !printEmpty)
                 continue;
+
+                if (printHuman)
+                    val = HumanValue(key, val);
+
+                if (printKey)
+                    PrintPair(key, val);
+                else
+                    Print(val);
             }
 
-            auto val = data[key].Value;
-            if (val.empty() && !printEmpty)
-                continue;
-
-            if (printHuman)
-                val = HumanValue(key, val);
-
-            if (printKey)
-                PrintPair(key, val);
-            else
-                Print(val);
+            if (multiGet)
+                Print("");
         }
 
         return ret;

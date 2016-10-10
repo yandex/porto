@@ -440,38 +440,67 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
     return error;
 }
 
+static void FillGetResponse(const rpc::TContainerGetRequest &req,
+                            rpc::TContainerGetResponse &rsp,
+                            std::string &name, bool try_lock) {
+    std::shared_ptr<TContainer> ct;
+    TError containerError = CurrentClient->ReadContainer(name, ct, try_lock);
+    auto entry = rsp.add_list();
+    entry->set_name(name);
+    for (int j = 0; j < req.variable_size(); j++) {
+        auto var = req.variable(j);
+
+        auto keyval = entry->add_keyval();
+        std::string value;
+
+        TError error = containerError;
+        if (!error)
+            error = ct->GetProperty(var, value);
+
+        keyval->set_variable(var);
+        if (error) {
+            keyval->set_error(error.GetError());
+            keyval->set_errormsg(error.GetMsg());
+        } else {
+            keyval->set_value(value);
+        }
+    }
+}
+
 noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
                                      rpc::TContainerResponse &rsp) {
     bool try_lock = req.has_nonblock() && req.nonblock();
     auto get = rsp.mutable_get();
+    std::list <std::string> masks, names;
 
     for (int i = 0; i < req.name_size(); i++) {
-        auto relname = req.name(i);
+        auto name = req.name(i);
+        if (name.find_first_of("*?") == std::string::npos)
+            names.push_back(name);
+        else
+            masks.push_back(name);
+    }
 
-        auto entry = get->add_list();
-        entry->set_name(relname);
-
-        std::shared_ptr<TContainer> ct;
-        TError containerError = CurrentClient->ReadContainer(relname, ct, try_lock);
-        for (int j = 0; j < req.variable_size(); j++) {
-            auto var = req.variable(j);
-
-            auto keyval = entry->add_keyval();
-            std::string value;
-
-            TError error = containerError;
-            if (!error)
-                error = ct->GetProperty(var, value);
-
-            keyval->set_variable(var);
-            if (error) {
-                keyval->set_error(error.GetError());
-                keyval->set_errormsg(error.GetMsg());
-            } else {
-                keyval->set_value(value);
+    if (!masks.empty()) {
+        auto lock = LockContainers();
+        for (auto &it: Containers) {
+            auto &ct = it.second;
+            std::string name;
+            if (ct->IsRoot() || CurrentClient->ComposeName(ct->Name, name))
+                continue;
+            if (masks.empty())
+                names.push_back(name);
+            for (auto &mask: masks) {
+                if (mask == "***" || StringMatch(name, mask)) {
+                    names.push_back(name);
+                    break;
+                }
             }
         }
     }
+
+    for (auto &name: names)
+        FillGetResponse(req, *get, name, try_lock);
 
     return TError::Success();
 }
