@@ -338,7 +338,7 @@ class Connection(object):
         return self.rpc.call(request, self.rpc.timeout).list.name
 
     def ListContainers(self, mask = None):
-        return [Container(self, name, mask) for name in self.List()]
+        return [Container(self, name) for name in self.List(mask)]
 
     def Find(self, name):
         self.GetProperty(name, "state")
