@@ -541,7 +541,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
         std::string name = req.name(i);
         std::string abs_name;
 
-        if (name.find('*') != std::string::npos) {
+        if (name.find_first_of("*?") != std::string::npos) {
             waiter->Wildcards.push_back(name);
             continue;
         }

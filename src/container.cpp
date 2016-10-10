@@ -2331,7 +2331,7 @@ void TContainerWaiter::AddWildcard(std::shared_ptr<TContainerWaiter> &waiter) {
 
 bool TContainerWaiter::MatchWildcard(const std::string &name) {
     for (const auto &wildcard: Wildcards)
-        if (StringMatch(name, wildcard))
+        if (wildcard == "***" || StringMatch(name, wildcard))
             return true;
     return false;
 }
