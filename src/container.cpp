@@ -506,9 +506,14 @@ TError TContainer::Destroy() {
             return error;
     }
 
-    while (!Children.empty()) {
-        std::shared_ptr<TContainer> child = *Children.begin();
-        child->Destroy();
+    if (!Children.empty()) {
+        for (auto &ct: Subtree()) {
+            if (ct.get() != this) {
+                error = ct->Destroy();
+                if (error)
+                    return error;
+            }
+        }
     }
 
     while (!Volumes.empty()) {

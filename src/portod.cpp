@@ -603,9 +603,7 @@ static void CleanupTempdir() {
 
 static void DestroyContainers(bool weak) {
     /* leaves first */
-    for (auto it = Containers.rbegin(); it != Containers.rend(); ) {
-        auto ct = it->second;
-        ++it;
+    for (auto &ct: RootContainer->Subtree()) {
         if (ct->IsRoot() || (weak && !ct->IsWeak))
             continue;
         TError error = ct->Destroy();
