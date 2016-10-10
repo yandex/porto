@@ -56,7 +56,7 @@ public:
     int WaitContainers(const std::vector<std::string> &containers,
                        std::string &name, int timeout);
 
-    int List(std::vector<std::string> &clist);
+    int List(std::vector<std::string> &list, const std::string &mask = "");
     int Plist(std::vector<Property> &list);
     int Dlist(std::vector<Property> &list);
 

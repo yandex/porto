@@ -66,6 +66,7 @@ message TContainerDestroyRequest {
 }
 
 message TContainerListRequest {
+	optional string mask = 1;
 }
 
 message TContainerGetPropertyRequest {

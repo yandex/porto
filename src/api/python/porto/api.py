@@ -330,13 +330,15 @@ class Connection(object):
     def disconnect(self):
         self.rpc.disconnect()
 
-    def List(self):
+    def List(self, mask = None):
         request = rpc_pb2.TContainerRequest()
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
+        if mask is not None:
+            request.list.mask = mask
         return self.rpc.call(request, self.rpc.timeout).list.name
 
-    def ListContainers(self):
-        return [Container(self, name) for name in self.List()]
+    def ListContainers(self, mask = None):
+        return [Container(self, name, mask) for name in self.List()]
 
     def Find(self, name):
         self.GetProperty(name, "state")

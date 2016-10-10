@@ -210,13 +210,16 @@ int Connection::Destroy(const std::string &name) {
     return Impl->Rpc();
 }
 
-int Connection::List(std::vector<std::string> &clist) {
+int Connection::List(std::vector<std::string> &list, const std::string &mask) {
     Impl->Req.mutable_list();
+
+    if(!mask.empty())
+        Impl->Req.mutable_list()->set_mask(mask);
 
     int ret = Impl->Rpc();
     if (!ret)
-        clist = std::vector<std::string>(std::begin(Impl->Rsp.list().name()),
-                                         std::end(Impl->Rsp.list().name()));
+        list = std::vector<std::string>(std::begin(Impl->Rsp.list().name()),
+                                        std::end(Impl->Rsp.list().name()));
 
     return ret;
 }

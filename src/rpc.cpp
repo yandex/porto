@@ -365,13 +365,18 @@ noinline TError ResumeContainer(const rpc::TContainerResumeRequest &req,
     return ct->Resume();
 }
 
-noinline TError ListContainers(rpc::TContainerResponse &rsp) {
+noinline TError ListContainers(const rpc::TContainerListRequest &req,
+                               rpc::TContainerResponse &rsp) {
+    std::string mask = req.has_mask() ? req.mask() : "***";
     auto lock = LockContainers();
     for (auto &it: Containers) {
+        auto &ct = it.second;
         std::string name;
-        if (!it.second->IsRoot() &&
-                !CurrentClient->ComposeName(it.second->Name, name))
-            rsp.mutable_list()->add_name(name);
+        if (ct->IsRoot() || CurrentClient->ComposeName(ct->Name, name))
+            continue;
+        if (mask != "***" && !StringMatch(name, mask))
+            continue;
+        rsp.mutable_list()->add_name(name);
     }
     return TError::Success();
 }
@@ -951,7 +956,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         else if (req.has_destroy())
             error = DestroyContainer(req.destroy(), rsp);
         else if (req.has_list())
-            error = ListContainers(rsp);
+            error = ListContainers(req.list(), rsp);
         else if (req.has_getproperty())
             error = GetContainerProperty(req.getproperty(), rsp);
         else if (req.has_setproperty())

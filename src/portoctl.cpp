@@ -1306,7 +1306,7 @@ public:
 
 class TListCmd final : public ICmd {
 public:
-    TListCmd(Porto::Connection *api) : ICmd(api, "list", 0, "[-1] [-f] [-t]", "list created containers") {}
+    TListCmd(Porto::Connection *api) : ICmd(api, "list", 0, "[-1] [-f] [-t] [pattern]", "list created containers") {}
 
     size_t CountChar(const std::string &s, const char ch) {
         size_t count = 0;
@@ -1328,14 +1328,15 @@ public:
         bool details = true;
         bool forest = false;
         bool toplevel = false;
-        (void)env->GetOpts({
+        const auto &args = env->GetOpts({
             { '1', false, [&](const char *arg) { details = false; } },
             { 'f', false, [&](const char *arg) { forest = true; } },
             { 't', false, [&](const char *arg) { toplevel = true; } },
         });
+        std::string mask = args.size() ? args[0] : "";
 
         vector<string> clist;
-        int ret = Api->List(clist);
+        int ret = Api->List(clist, mask);
         if (ret) {
             PrintError("Can't list containers");
             return ret;
