@@ -1316,26 +1316,23 @@ TError TVolume::Clear() {
     return Backend->Clear();
 }
 
-TError TVolume::Destroy(void) {
+TError TVolume::DestroyAll(TPath path) {
     std::list<std::shared_ptr<TVolume>> plan;
     TError error, ret;
 
     auto volumes_lock = LockVolumes();
 
-    Volumes.erase(Path);
-    plan.push_front(shared_from_this());
-
     /* Remove sub-volumes */
-    for (auto it = Volumes.begin(); it != Volumes.end(); ) {
-        if (!Path.InnerPath(it->second->Path).IsEmpty()) {
-            plan.push_front(it->second);
-            it = Volumes.erase(it);
-        } else
-            ++it;
+    for (auto &it: Volumes) {
+        auto &volume = it.second;
+        if (!path.InnerPath(volume->Path).IsEmpty()) {
+            plan.push_front(volume);
+            volume->IsDying = true;
+        }
     }
 
     for (auto &volume: plan) {
-        volume->IsDying = true;
+        Volumes.erase(volume->Path);
         for (auto &name: volume->Containers) {
             L_ACT()  << "Forced unlink volume " << volume->Path
                      << " from " << name << std::endl;
@@ -1348,7 +1345,6 @@ TError TVolume::Destroy(void) {
                 auto vol_iter = std::find(container->Volumes.begin(),
                                           container->Volumes.end(),
                                           volume);
-
                 if (vol_iter != container->Volumes.end())
                     container->Volumes.erase(vol_iter);
             }
@@ -1366,7 +1362,7 @@ TError TVolume::Destroy(void) {
     return ret;
 }
 
-TError TVolume::DestroyOne(void) {
+TError TVolume::DestroyOne() {
     L_ACT() << "Destroy volume: " << Path
             << " backend: " << BackendType << std::endl;
 
@@ -1428,6 +1424,10 @@ TError TVolume::DestroyOne(void) {
     }
 
     return ret;
+}
+
+TError TVolume::Destroy() {
+    return TVolume::DestroyAll(Path);
 }
 
 TError TVolume::StatFS(TStatFS &result) const {

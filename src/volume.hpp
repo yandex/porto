@@ -109,9 +109,11 @@ public:
     TStringMap DumpState(const TPath &root);
 
     TError Build(void);
-    TError DestroyOne(void);
-    TError Destroy(void);
     TError Clear(void);
+
+    static TError DestroyAll(TPath path);
+    TError DestroyOne();
+    TError Destroy();
 
     TError Save(void);
     TError Restore(const TKeyValue &node);

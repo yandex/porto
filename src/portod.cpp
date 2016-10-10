@@ -613,13 +613,9 @@ static void DestroyContainers(bool weak) {
 }
 
 static void DestroyVolumes() {
-    for (auto it = Volumes.rbegin(); it != Volumes.rend(); ) {
-        auto vol = it->second;
-        ++it;
-        TError error = vol->Destroy();
-        if (error)
-            L_ERR() << "Cannot destroy volume " << vol->Path << ": " << error << std::endl;
-    }
+    TError error = TVolume::DestroyAll("/");
+    if (error)
+        L_ERR() << "Cannot destroy volumes: " << error << std::endl;
 }
 
 static int SlaveMain() {
