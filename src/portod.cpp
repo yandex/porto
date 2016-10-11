@@ -852,13 +852,22 @@ static int UpgradeMaster() {
 
     TLogger::CloseLog();
 
-    std::vector<const char *> args = {{program_invocation_name}};
+    std::vector<const char *> args = {{PORTO_BINARY_PATH}};
     if (stdlog)
         args.push_back("--stdlog");
     if (Verbose)
         args.push_back("--verbose");
     args.push_back(nullptr);
 
+    execvp(args[0], (char **)args.data());
+
+    args[0] = program_invocation_name;
+    execvp(args[0], (char **)args.data());
+
+    args[0] = "portod";
+    execvp(args[0], (char **)args.data());
+
+    args[0] = "/usr/sbin/portod";
     execvp(args[0], (char **)args.data());
 
     std::cerr << "Cannot exec " << args[0] << ": " << strerror(errno) << std::endl;
@@ -1024,6 +1033,8 @@ exit:
 }
 
 static int MasterMain() {
+    TError error;
+
     Statistics->MasterStarted = GetCurrentTimeMs();
 
     DaemonPrepare(true);
@@ -1042,8 +1053,26 @@ static int MasterMain() {
     if (pathVer.WriteAll(PORTO_VERSION))
         L_ERR() << "Can't update current version" << std::endl;
 
+    TPath pathBin(PORTO_BINARY_PATH), prevBin;
+    TPath procExe("/proc/self/exe"), thisBin;
+    error = procExe.ReadLink(thisBin);
+    if (error)
+        FatalError("Cannot read /proc/self/exe", error);
+    (void)pathBin.ReadLink(prevBin);
+
+    L_SYS() << "Previous binary: " << prevBin << std::endl;
+
+    L_SYS() << "Current binary: " << thisBin << std::endl;
+
+    if (prevBin != thisBin) {
+        (void)pathBin.Unlink();
+        error = pathBin.Symlink(thisBin);
+        if (error)
+            FatalError("Cannot update " + std::string(PORTO_BINARY_PATH), error);
+    }
+
     std::shared_ptr<TEpollLoop> ELoop = std::make_shared<TEpollLoop>();
-    TError error = ELoop->Create();
+    error = ELoop->Create();
     if (error)
         return EXIT_FAILURE;
 
@@ -1112,11 +1141,19 @@ static void KvDump() {
 }
 
 static void PrintVersion() {
-    std::cout << "version: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
+    TPath thisBin, currBin;
+
+    TPath("/proc/self/exe").ReadLink(thisBin);
+    if (PortoMasterPid.Load() || TPath("/proc/" +
+                std::to_string(PortoMasterPid.Pid) +"/exe").ReadLink(currBin))
+        TPath(PORTO_BINARY_PATH).ReadLink(currBin);
+
+    std::cout << "version: " << PORTO_VERSION << " " << PORTO_REVISION << " " << thisBin << std::endl;
+
     Porto::Connection conn;
     std::string ver, rev;
     if (!conn.GetVersion(ver, rev))
-        std::cout << "running: " <<  ver + " " + rev << std::endl;
+        std::cout << "running: " <<  ver + " " + rev << " " << currBin << std::endl;
 }
 
 static bool CheckPortoAlive() {
@@ -1277,30 +1314,33 @@ static int ReexecPorotd() {
     return EXIT_FAILURE;
 }
 
-int UpgradePortod(std::string path) {
-    TPath symlink(PORTO_BINARY_PATH), update(path), backup;
+int UpgradePortod() {
+    TPath symlink(PORTO_BINARY_PATH), procexe("/proc/self/exe"), update, backup;
     uint64_t deadline;
     TError error;
 
-    if (!update.IsAbsolute() || !update.IsRegularStrict() ||
-            !update.HasAccess(TCred::Current(), TPath::X)) {
-        std::cerr << "require absolute path to executable binary file" << std::endl;
+    error = procexe.ReadLink(update);
+    if (error) {
+        std::cerr << "cannot read /proc/self/exe" << error << std::endl;
         return EXIT_FAILURE;
     }
 
     error = PortoMasterPid.Load();
-    if (!error) {
-        if (!CheckPortoAlive()) {
-            std::cerr << "portod running but not responding" << std::endl;
-            return EXIT_FAILURE;
-        }
-        error = PortoSlavePid.Load();
-        if (error) {
-            std::cerr << "cannot find portod slave: " << error << std::endl;
-            return EXIT_FAILURE;
-        }
-    } else
-        std::cerr << "portod not running, do offline upgrade" << std::endl;
+    if (error) {
+        std::cerr << "portod not running" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (!CheckPortoAlive()) {
+        std::cerr << "portod running but not responding" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    error = PortoSlavePid.Load();
+    if (error) {
+        std::cerr << "cannot find portod slave: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
 
     error = symlink.ReadLink(backup);
     if (error) {
@@ -1308,21 +1348,19 @@ int UpgradePortod(std::string path) {
         return EXIT_FAILURE;
     }
 
-    error = symlink.Unlink();
-    if (error) {
-        std::cerr << "cannot remove old symlink: " << error << std::endl;
-        return EXIT_FAILURE;
-    }
+    if (backup != update) {
+        error = symlink.Unlink();
+        if (error) {
+            std::cerr << "cannot remove old symlink: " << error << std::endl;
+            return EXIT_FAILURE;
+        }
 
-    error = symlink.Symlink(update);
-    if (error) {
-        std::cerr << "cannot replace portod symlink: " << error << std::endl;
-        goto undo;
+        error = symlink.Symlink(update);
+        if (error) {
+            std::cerr << "cannot replace portod symlink: " << error << std::endl;
+            goto undo;
+        }
     }
-
-    /* offline upgrade */
-    if (!PortoMasterPid.Pid)
-        return EXIT_SUCCESS;
 
     if (kill(PortoMasterPid.Pid, SIGHUP)) {
         std::cerr << "online upgrade failed: " << strerror(errno) << std::endl;
@@ -1380,7 +1418,7 @@ static void Usage() {
         << "  stop            stop running portod" << std::endl
         << "  restart         stop followed by start" << std::endl
         << "  reload          reexec portod" << std::endl
-        << "  upgrade <new>   update symlink " << PORTO_BINARY_PATH << " and reexec" << std::endl
+        << "  upgrade         upgrade running portod" << std::endl
         << "  dump            print internal key-value state" << std::endl
         << "  help            print this message" << std::endl
         << "  version         print version and revision" << std::endl
@@ -1466,13 +1504,8 @@ int main(int argc, char **argv) {
     if (cmd == "reload")
         return ReexecPorotd();
 
-    if (cmd == "upgrade") {
-        if (opt + 2 != argc) {
-            std::cerr << "require one required" << std::endl;
-            return EXIT_FAILURE;
-        }
-        return UpgradePortod(argv[opt + 1]);
-    }
+    if (cmd == "upgrade")
+        return UpgradePortod();
 
     if (cmd == "dump") {
         KvDump();

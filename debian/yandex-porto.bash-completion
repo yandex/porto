@@ -228,15 +228,7 @@ _portod ()
 {
 	local cur prev words cword
 	_get_comp_words_by_ref -n : cur prev words cword
-
-	case "$prev" in
-	upgrade)
-		_filedir
-		;;
-	*)
-		COMPREPLY=( $(compgen -W "-h --help -v --version --stdlog --norespawn --verbose status daemon start stop restart reload upgrade dump help version" -- $cur) )
-		;;
-	esac
+	COMPREPLY=( $(compgen -W "-h --help -v --version --stdlog --norespawn --verbose status daemon start stop restart reload upgrade dump help version" -- $cur) )
 }
 
 complete -F _portod portod

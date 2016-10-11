@@ -65,7 +65,7 @@ constexpr int  REAP_ACK_FD = 129;
 constexpr int  PORTO_SK_FD = 130;
 
 constexpr const char *PORTO_VERSION_FILE = "/run/portod.version";
-constexpr const char *PORTO_BINARY_PATH = "/usr/sbin/portod";
+constexpr const char *PORTO_BINARY_PATH = "/run/portod";
 
 constexpr const char *PORTO_MASTER_PIDFILE = "/run/portoloop.pid";
 constexpr const char *PORTO_SLAVE_PIDFILE = "/run/portod.pid";
