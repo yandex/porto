@@ -107,6 +107,8 @@ message TCfg {
 		optional bool all_controllers = 24;
 		optional bool legacy_porto = 25;
 		optional bool enable_hugetlb = 26;
+		optional int32 rt_priority = 27;
+		optional bool enable_cpu_reserve = 28;
 	}
 
 	message TPrivilegesCfg {

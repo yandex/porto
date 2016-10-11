@@ -226,7 +226,8 @@ TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const
     if (!Subsystem)
         return TError(EError::Unknown, "Cannot get from null cgroup");
 
-    file = fopen(Knob(knob).c_str(), "r");;
+    pids.clear();
+    file = fopen(Knob(knob).c_str(), "r");
     if (!file)
         return TError(EError::Unknown, errno, "Cannot open knob " + knob);
     while (fscanf(file, "%d", &pid) == 1)
@@ -524,14 +525,17 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
             return error;
     }
 
-    if (HasReserve) {
+    if (HasReserve && config().container().enable_cpu_reserve()) {
         uint64_t reserve = std::floor(guarantee * BasePeriod);
         uint64_t shares = BaseShares, reserve_shares = BaseShares;
 
         if (policy == "rt") {
+            shares *= 256;
+            reserve = 0;
+        } else if (policy == "high") {
             shares *= 16;
             reserve_shares *= 256;
-        } else if (policy == "normal") {
+        } else if (policy == "normal" || policy == "batch") {
             reserve_shares *= 16;
         } else if (policy == "idle") {
             shares /= 16;
@@ -552,7 +556,9 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
     } else if (HasShares) {
         uint64_t shares = std::floor((guarantee + 1) * BaseShares);
 
-        if (policy == "rt" && (!HasSmart || !config().container().enable_smart()))
+        if (policy == "rt")
+            shares *= 256;
+        else if (policy == "high")
             shares *= 16;
         else if (policy == "idle")
             shares /= 16;
@@ -567,6 +573,46 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
                     config().container().enable_smart()) ? 1 : 0);
         if (error)
             return error;
+    }
+
+    int sched_policy = SCHED_OTHER;
+    struct sched_param sched_param;
+    sched_param.sched_priority = 0;
+
+    if (policy == "idle")
+        sched_policy = SCHED_IDLE;
+
+    if (policy == "batch")
+        sched_policy = SCHED_BATCH;
+
+    if (policy == "rt") {
+        if (HasSmart && config().container().enable_smart()) {
+            sched_policy = -1;
+        } else if (config().container().rt_priority()) {
+            sched_policy = SCHED_RR;
+            sched_param.sched_priority = config().container().rt_priority();
+        }
+    }
+
+    if (sched_policy >= 0) {
+        std::vector<pid_t> prev, pids;
+        bool retry;
+
+        L_ACT() << "Set " << cg << " sched policy " << sched_policy << std::endl;
+        do {
+            error = cg.GetTasks(pids);
+            retry = false;
+            for (auto pid: pids) {
+                if (std::find(prev.begin(), prev.end(), pid) != prev.end() &&
+                        sched_getscheduler(pid) == sched_policy)
+                    continue;
+                if (sched_setscheduler(pid, sched_policy, &sched_param) &&
+                        errno != ESRCH)
+                    return TError(EError::Unknown, errno, "sched_setscheduler");
+                retry = true;
+            }
+            prev = pids;
+        } while (retry);
     }
 
     return TError::Success();

@@ -398,7 +398,7 @@ public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
     TCpuPolicy() : TProperty(P_CPU_POLICY, EProperty::CPU_POLICY,
-                             "CPU policy: rt, normal, idle (dynamic)" ) {}
+            "CPU policy: rt, high, normal, batch, idle (dynamic)") {}
 } static CpuPolicy;
 
 TError TCpuPolicy::Set(const std::string &policy) {
@@ -410,8 +410,9 @@ TError TCpuPolicy::Set(const std::string &policy) {
     if (error)
         return error;
 
-    if (policy != "normal" && policy != "rt" && policy != "idle")
-        return TError(EError::InvalidValue, "invalid policy: " + policy);
+    if (policy != "rt" && policy != "high" && policy != "normal" &&
+            policy != "batch"  && policy != "idle")
+        return TError(EError::InvalidValue, "Unknown cpu policy: " + policy);
 
     if (CurrentContainer->CpuPolicy != policy) {
         CurrentContainer->CpuPolicy = policy;

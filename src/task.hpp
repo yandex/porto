@@ -35,6 +35,9 @@ struct TTaskEnv {
     TUnixSocket Sock2, MasterSock2;
     int ReportStage = 0;
 
+    int SchedPolicy = -1;
+    int SchedPriority = 0;
+
     TError Start();
     void StartChild();
 

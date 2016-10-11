@@ -968,6 +968,24 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
+    taskEnv->SchedPolicy = SCHED_OTHER;
+    taskEnv->SchedPriority = 0;
+
+    if (CpuPolicy == "idle")
+        taskEnv->SchedPolicy = SCHED_IDLE;
+
+    if (CpuPolicy == "batch")
+        taskEnv->SchedPolicy = SCHED_BATCH;
+
+    if (CpuPolicy == "rt") {
+        if (CpuSubsystem.HasSmart && config().container().enable_smart()) {
+            taskEnv->SchedPolicy = -1;
+        } else if (config().container().rt_priority()) {
+            taskEnv->SchedPolicy = SCHED_RR;
+            taskEnv->SchedPriority = config().container().rt_priority();
+        }
+    }
+
     taskEnv->Mnt.Cwd = GetCwd();
     taskEnv->Mnt.ParentCwd = Parent->GetCwd();
 

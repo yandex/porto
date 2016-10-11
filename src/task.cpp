@@ -382,6 +382,13 @@ TError TTaskEnv::Start() {
                 Abort(error);
         }
 
+        if (SchedPolicy >= 0) {
+            struct sched_param param;
+            param.sched_priority = SchedPriority;
+            if (sched_setscheduler(0, SchedPolicy, &param))
+                Abort(TError(EError::Unknown, errno, "sched_setparm"));
+        }
+
         /* Default streams and redirections are outside */
         error = CT->Stdin.OpenOutside(*CT, *Client);
         if (error)
