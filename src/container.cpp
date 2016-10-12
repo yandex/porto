@@ -1572,7 +1572,7 @@ TError TContainer::Stop(uint64_t timeout) {
     for (auto &ct : subtree) {
         auto cg = ct->GetCgroup(FreezerSubsystem);
 
-        if (IsRoot() || ct->State == EContainerState::Stopped)
+        if (ct->IsRoot() || ct->State == EContainerState::Stopped)
             continue;
 
         error = ct->Terminate(deadline);
@@ -1590,7 +1590,7 @@ TError TContainer::Stop(uint64_t timeout) {
     }
 
     for (auto &ct: subtree) {
-        if (ct->State == EContainerState::Stopped)
+        if (ct->IsRoot() || ct->State == EContainerState::Stopped)
             continue;
 
         L_ACT() << "Stop " << Name << std::endl;

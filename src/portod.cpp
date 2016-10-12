@@ -740,6 +740,10 @@ static int SlaveMain() {
 
         L() << "Discard state..." << std::endl;
 
+        error = RootContainer->Stop(0);
+        if (error)
+            L_ERR() << "Failed to stop root container and its children " << error << std::endl;
+
         DestroyContainers(false);
 
         DestroyVolumes();
