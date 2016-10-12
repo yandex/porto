@@ -247,6 +247,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
         Controllers |= CGROUP_HUGETLB;
 
+    if ((Controllers & CGROUP_CPU) && CpusetSubsystem.Supported)
+        Controllers |= CGROUP_CPUSET;
+
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
@@ -726,6 +729,20 @@ TError TContainer::ApplyDynamicProperties() {
                                           CpuGuarantee, CpuLimit);
         if (error) {
             L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::CPU_SET)) {
+        auto cg = GetCgroup(CpusetSubsystem);
+        error = CpusetSubsystem.SetCpus(cg, CpuSet);
+        if (error) {
+            L() << "Cannot set cpuset " << CpuSet << " : " << error << std::endl;
+            return error;
+        }
+        error = CpusetSubsystem.SetMems(cg, "");
+        if (error) {
+            L() << "Cannot set mems: " << error << std::endl;
             return error;
         }
     }

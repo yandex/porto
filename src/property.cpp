@@ -1737,6 +1737,29 @@ TError TCpuGuarantee::Get(std::string &value) {
     return TError::Success();
 }
 
+class TCpuSet : public TProperty {
+public:
+    TCpuSet() : TProperty(P_CPU_SET, EProperty::CPU_SET,
+            "CPU set: [N|N-M,]... | node N (dynamic)") {}
+    TError Get(std::string &value) {
+        value = CurrentContainer->CpuSet;
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        error = WantControllers(CGROUP_CPUSET);
+        if (error)
+            return error;
+        if (CurrentContainer->CpuSet != value) {
+            CurrentContainer->CpuSet = value;
+            CurrentContainer->SetProp(EProperty::CPU_SET);
+        }
+        return TError::Success();
+    }
+} static CpuSet;
+
 class TIoLimit : public TProperty {
 public:
     TError Set(const std::string &limit);

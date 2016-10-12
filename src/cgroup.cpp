@@ -25,6 +25,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_BLKIO,     "blkio" },
     { CGROUP_DEVICES,   "devices" },
     { CGROUP_HUGETLB,   "hugetlb" },
+    { CGROUP_CPUSET,    "cpuset" },
     { CGROUP_LEGACY,    "legacy" },
 };
 
@@ -645,6 +646,57 @@ TError TCpuacctSubsystem::SystemUsage(TCgroup &cg, uint64_t &value) const {
     return TError::Success();
 }
 
+// Cpuset
+TError TCpusetSubsystem::SetCpus(TCgroup &cg, const std::string &cpus) const {
+    std::string val;
+    TError error;
+    TPath copy;
+
+    if (cpus == "")
+        copy = cg.Path().DirName() / "cpuset.cpus";
+
+    if (cpus == "all")
+        copy = TPath("/sys/devices/system/cpu/present");
+
+    if (StringStartsWith(cpus, "node ")) {
+        int id;
+        error = StringToInt(cpus.substr(5), id);
+        if (error)
+            return error;
+        copy = TPath("/sys/devices/system/node/node" + std::to_string(id) + "/cpulist");
+    }
+
+    if (!copy.IsEmpty()) {
+        error = copy.ReadAll(val);
+        if (error)
+            return error;
+    } else
+        val = cpus;
+
+    return cg.Set("cpuset.cpus", val);
+}
+
+TError TCpusetSubsystem::SetMems(TCgroup &cg, const std::string &mems) const {
+    std::string val;
+    TError error;
+    TPath copy;
+
+    if (mems == "")
+        copy = cg.Path().DirName() / "cpuset.mems";
+
+    if (mems == "all")
+        copy = TPath("/sys/devices/system/node/online");
+
+    if (!copy.IsEmpty()) {
+        error = copy.ReadAll(val);
+        if (error)
+            return error;
+    } else
+        val = mems;
+
+    return cg.Set("cpuset.mems", val);
+}
+
 // Netcls
 
 // Blkio
@@ -780,6 +832,7 @@ TMemorySubsystem    MemorySubsystem;
 TFreezerSubsystem   FreezerSubsystem;
 TCpuSubsystem       CpuSubsystem;
 TCpuacctSubsystem   CpuacctSubsystem;
+TCpusetSubsystem    CpusetSubsystem;
 TNetclsSubsystem    NetclsSubsystem;
 TBlkioSubsystem     BlkioSubsystem;
 TDevicesSubsystem   DevicesSubsystem;
@@ -790,6 +843,7 @@ std::vector<TSubsystem *> AllSubsystems = {
     { &MemorySubsystem   },
     { &CpuSubsystem      },
     { &CpuacctSubsystem  },
+    { &CpusetSubsystem   },
     { &NetclsSubsystem   },
     { &BlkioSubsystem    },
     { &DevicesSubsystem  },
@@ -829,7 +883,7 @@ TError InitializeCgroups() {
     for (auto subsys: AllSubsystems) {
 
         if (subsys->Type == "hugetlb" && !config().container().enable_hugetlb())
-                continue;
+            continue;
 
         for (auto &mnt: mounts) {
             if (mnt.Type == "cgroup" && mnt.HasOption(subsys->Type)) {
@@ -861,6 +915,12 @@ TError InitializeCgroups() {
 
             /* hugetlb is optional yet */
             if (error && subsys->Type == "hugetlb") {
+                L() << "Seems not supported: " << error << std::endl;
+                error = subsys->Root.Rmdir();
+                continue;
+            }
+
+            if (error && subsys->Type == "cpuset") {
                 L() << "Seems not supported: " << error << std::endl;
                 error = subsys->Root.Rmdir();
                 continue;

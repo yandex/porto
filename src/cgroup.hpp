@@ -16,6 +16,7 @@ class TCgroup;
 #define CGROUP_BLKIO    0x0020ull
 #define CGROUP_DEVICES  0x0040ull
 #define CGROUP_HUGETLB  0x0080ull
+#define CGROUP_CPUSET   0x0100ull
 #define CGROUP_LEGACY   0x1000ull
 
 extern const TFlagsNames ControllersName;
@@ -224,6 +225,19 @@ public:
     TError SystemUsage(TCgroup &cg, uint64_t &value) const;
 };
 
+class TCpusetSubsystem : public TSubsystem {
+public:
+    TCpusetSubsystem() : TSubsystem(CGROUP_CPUSET, "cpuset") { }
+
+    bool Supported = false;
+    void InitializeSubsystem() override {
+        Supported = true;
+    }
+
+    TError SetCpus(TCgroup &cg, const std::string &cpus) const;
+    TError SetMems(TCgroup &cg, const std::string &mems) const;
+};
+
 class TNetclsSubsystem : public TSubsystem {
 public:
     TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
@@ -296,6 +310,7 @@ extern TMemorySubsystem     MemorySubsystem;
 extern TFreezerSubsystem    FreezerSubsystem;
 extern TCpuSubsystem        CpuSubsystem;
 extern TCpuacctSubsystem    CpuacctSubsystem;
+extern TCpusetSubsystem     CpusetSubsystem;
 extern TNetclsSubsystem     NetclsSubsystem;
 extern TBlkioSubsystem      BlkioSubsystem;
 extern TDevicesSubsystem    DevicesSubsystem;

@@ -142,6 +142,7 @@ public:
     std::string CpuPolicy;
     double CpuLimit;
     double CpuGuarantee;
+    std::string CpuSet;
 
     TUintMap NetGuarantee;
     TUintMap NetLimit;
