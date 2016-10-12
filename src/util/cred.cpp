@@ -171,17 +171,22 @@ TError TCred::Apply() const {
     return TError::Success();
 }
 
-void InitCred() {
+TError InitCred() {
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error) {
-        L_WRN() << "Cannot find group porto: " << error << std::endl;
-        PortoGroup = NoGroup;
+        L_ERR() << "Cannot find group " << PORTO_GROUP_NAME << ": " << error << std::endl;
+        return error;
     }
 
-    if (GroupId(PORTO_CT_GROUP_NAME, PortoCtGroup))
-        PortoCtGroup = NoGroup;
+    error = GroupId(PORTO_CT_GROUP_NAME, PortoCtGroup);
+    if (error) {
+        L_ERR() << "Cannot find group " << PORTO_CT_GROUP_NAME << ": " << error << std::endl;
+        return error;
+    }
+
+    return error;
 }
 
 #ifndef CAP_BLOCK_SUSPEND
