@@ -670,6 +670,7 @@ TError TCpusetSubsystem::SetCpus(TCgroup &cg, const std::string &cpus) const {
         error = copy.ReadAll(val);
         if (error)
             return error;
+        val = StringTrim(val);
     } else
         val = cpus;
 
@@ -691,6 +692,7 @@ TError TCpusetSubsystem::SetMems(TCgroup &cg, const std::string &mems) const {
         error = copy.ReadAll(val);
         if (error)
             return error;
+        val = StringTrim(val);
     } else
         val = mems;
 

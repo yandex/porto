@@ -247,11 +247,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
         Controllers |= CGROUP_HUGETLB;
 
-    if ((Controllers & CGROUP_CPU) && CpusetSubsystem.Supported) {
-        Controllers |= CGROUP_CPUSET;
-        SetProp(EProperty::CPU_SET);
-    }
-
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
@@ -2079,6 +2074,12 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
             name = ct->FirstName + (enabled ? "/" : "%") + name;
         else if (enabled)
             name = ct->FirstName;
+    }
+
+    if (name.empty()) {
+        if (Controllers & CGROUP_LEGACY)
+            return subsystem.Cgroup(PORTO_CGROUP_PREFIX);
+        return subsystem.RootCgroup();
     }
 
     name = std::string(PORTO_CGROUP_PREFIX) +
