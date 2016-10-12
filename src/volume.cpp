@@ -12,6 +12,7 @@
 #include "config.hpp"
 #include "kvalue.hpp"
 #include "helpers.hpp"
+#include "client.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -1623,7 +1624,7 @@ TError TVolume::Save() {
     node.Set(V_CREATOR, Creator);
     node.Set(V_READY, BoolToString(IsReady));
     node.Set(V_PRIVATE, Private);
-    node.Set(V_CONTAINERS, MergeEscapeStrings(Containers, ';'));
+    node.Set(V_RAW_CONTAINERS, MergeEscapeStrings(Containers, ';'));
     node.Set(V_LOOP_DEV, std::to_string(LoopDev));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
     node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
@@ -1673,6 +1674,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_PERMISSIONS, "directory permissions (default - 0775)", false },
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", false },
+    { V_CONTAINERS,  "container;... - initial links, default - self", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)", false },
@@ -1724,11 +1726,32 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
 
     volumes_lock.unlock();
 
-    error = volume->LinkContainer(container);
-    if (error) {
-        L_WRN() << "Cannot link volume: " << error << std::endl;
-        volume->Destroy();
-        return error;
+    if (cfg.count(V_CONTAINERS)) {
+        std::vector<std::string> list;
+
+        if (!CurrentClient) {
+            volume->Destroy();
+            return TError(EError::Unknown, "not client?");
+        }
+
+        SplitEscapedString(cfg.at(V_CONTAINERS), list, ';');
+        for (auto &name: list) {
+            std::shared_ptr<TContainer> ct;
+            error = CurrentClient->WriteContainer(name, ct, true);
+            if (!error)
+                error = volume->LinkContainer(*ct);
+            if (error) {
+                volume->Destroy();
+                return error;
+            }
+        }
+    } else {
+        error = volume->LinkContainer(container);
+        if (error) {
+            L_WRN() << "Cannot link volume: " << error << std::endl;
+            volume->Destroy();
+            return error;
+        }
     }
 
     error = volume->Build();
@@ -1889,8 +1912,10 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
         } else if (prop.first == V_PRIVATE) {
             Private = prop.second;
 
-        } else if (prop.first == V_CONTAINERS) {
+        } else if (prop.first == V_RAW_CONTAINERS) {
             SplitEscapedString(prop.second, Containers, ';');
+
+        } else if (prop.first == V_CONTAINERS) {
 
         } else if (prop.first == V_LOOP_DEV) {
             error = StringToInt(prop.second, LoopDev);

@@ -13,7 +13,8 @@ constexpr const char *V_READY = "ready";
 constexpr const char *V_PRIVATE = "private";
 
 constexpr const char *V_ID = "_id";
-constexpr const char *V_CONTAINERS = "_containers";
+constexpr const char *V_RAW_CONTAINERS = "_containers";
+constexpr const char *V_CONTAINERS = "containers";
 constexpr const char *V_LOOP_DEV = "_loop_dev";
 constexpr const char *V_AUTO_PATH = "_auto_path";
 
