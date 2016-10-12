@@ -267,6 +267,7 @@ public:
     static std::string ParentName(const std::string &name);
 
     static std::string StateName(EContainerState state);
+    static EContainerState ParseState(const std::string &name);
 
     static std::shared_ptr<TContainer> Find(const std::string &name);
     static TError Find(const std::string &name, std::shared_ptr<TContainer> &ct);

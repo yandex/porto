@@ -2295,40 +2295,14 @@ TError TAbsoluteNamespace::Get(std::string &value) {
 
 class TState : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError Get(std::string &value);
     TState() : TProperty(D_STATE, EProperty::STATE, "container state (ro)") {
         IsReadOnly = true;
     }
+    TError Get(std::string &value) {
+        value = TContainer::StateName(CurrentContainer->State);
+        return TError::Success();
+    }
 } static State;
-
-TError TState::SetFromRestore(const std::string &value) {
-    /*
-     * We are just restoring value indication there.
-     * The container must manually call SetState()
-     * TContainer::Restore() handler.
-     */
-
-    if (value == "stopped")
-        CurrentContainer->State = EContainerState::Stopped;
-    else if (value == "dead")
-        CurrentContainer->State = EContainerState::Dead;
-    else if (value == "running")
-        CurrentContainer->State = EContainerState::Running;
-    else if (value == "paused")
-        CurrentContainer->State = EContainerState::Paused;
-    else if (value == "meta")
-        CurrentContainer->State = EContainerState::Meta;
-    else
-        return TError(EError::Unknown, "Invalid container saved state: " + value);
-
-    return TError::Success();
-}
-
-TError TState::Get(std::string &value) {
-    value = TContainer::StateName(CurrentContainer->State);
-    return TError::Success();
-}
 
 class TOomKilled : public TProperty {
 public:

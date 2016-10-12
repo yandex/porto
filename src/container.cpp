@@ -361,6 +361,8 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
     ct = std::make_shared<TContainer>(parent, kv.Name);
 
+    lock.unlock();
+
     error = ct->Load(kv);
     if (error)
         goto err;
@@ -388,6 +390,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         goto err;
 
+    lock.lock();
     ct->Register();
     return TError::Success();
 
@@ -414,6 +417,20 @@ std::string TContainer::StateName(EContainerState state) {
     default:
         return "unknown";
     }
+}
+
+EContainerState TContainer::ParseState(const std::string &name) {
+    if (name == "stopped")
+        return EContainerState::Stopped;
+    if (name == "dead")
+        return EContainerState::Dead;
+    if (name == "running")
+        return EContainerState::Running;
+    if (name == "paused")
+        return EContainerState::Paused;
+    if (name == "meta")
+        return EContainerState::Meta;
+    return EContainerState::Destroyed;
 }
 
 /* Working directory in host namespace */
@@ -1899,7 +1916,7 @@ TError TContainer::Save(void) {
 }
 
 TError TContainer::Load(const TKeyValue &node) {
-    std::string container_state;
+    EContainerState state = EContainerState::Destroyed;
     TError error;
 
     CurrentContainer = this;
@@ -1913,7 +1930,7 @@ TError TContainer::Load(const TKeyValue &node) {
              * We need to set state at the last moment
              * because properties depends on the current value
              */
-            container_state = value;
+            state = ParseState(value);
             continue;
         }
 
@@ -1936,8 +1953,8 @@ TError TContainer::Load(const TKeyValue &node) {
         SetProp(prop->Prop);
     }
 
-    if (container_state.size()) {
-        error = ContainerProperties[D_STATE]->SetFromRestore(container_state);
+    if (state != EContainerState::Destroyed) {
+        SetState(state);
         SetProp(EProperty::STATE);
     } else
         error = TError(EError::Unknown, "Container has no state");
