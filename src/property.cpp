@@ -2915,10 +2915,13 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["logs_rotated"] = Statistics->LogsRotated;
 
-    m["containers"] = Statistics->ContainersCount;
-    m["containers_running"] = RootContainer->GetRunningChildren();
+    m["containers"] = Statistics->ContainersCount - NR_SERVICE_CONTAINERS;
+
     m["containers_created"] = Statistics->ContainersCreated;
     m["containers_started"] = Statistics->ContainersStarted;
+
+    m["running"] = RootContainer->RunningChildren;
+    m["running_children"] = CurrentContainer->RunningChildren;
 
     m["volumes"] = Statistics->VolumesCount;
     m["clients"] = Statistics->ClientsCount;

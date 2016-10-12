@@ -585,7 +585,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
         /* Explicit wait notifies non-running and hollow meta immediately */
         if (ct->State != EContainerState::Running &&
                 (ct->State != EContainerState::Meta ||
-                 !ct->GetRunningChildren())) {
+                 !ct->RunningChildren)) {
             rsp.mutable_wait()->set_name(name);
             return TError::Success();
         }
@@ -602,8 +602,8 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
 
             /* Wildcard notifies immediately only dead and hollow meta */
             if (ct->State != EContainerState::Dead &&
-                (ct->State != EContainerState::Meta ||
-                 ct->GetRunningChildren()))
+                    (ct->State != EContainerState::Meta ||
+                     ct->RunningChildren))
                 continue;
 
             std::string name;

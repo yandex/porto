@@ -46,15 +46,15 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int Locked = 0;
 
     TFile OomEvent;
-    size_t RunningChildren = 0;
+
+    /* protected with ContainersMutex */
     std::list<std::weak_ptr<TContainerWaiter>> Waiters;
 
     std::shared_ptr<TEpollSource> Source;
 
     // data
-    void UpdateRunningChildren(size_t diff);
     TError UpdateSoftLimit();
-    void SetState(EContainerState newState);
+    void SetState(EContainerState next);
 
     TError ApplyDynamicProperties();
     TError PrepareWorkDir();
@@ -88,7 +88,10 @@ public:
     const int Level; // 0 for root
 
     int Id = 0;
+
+    /* protected with exclusive lock and ContainersMutex */
     EContainerState State = EContainerState::Stopped;
+    int RunningChildren = 0;
 
     bool PropSet[(int)EProperty::NR_PROPERTIES];
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
@@ -245,8 +248,6 @@ public:
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
     std::shared_ptr<TContainer> FindRunningParent() const;
-
-    size_t GetRunningChildren() { return RunningChildren; }
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 

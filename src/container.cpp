@@ -310,7 +310,6 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
 
     ct->SanitizeCapabilities();
 
-    ct->SetState(EContainerState::Stopped);
     ct->SetProp(EProperty::STATE);
 
     ct->RespawnCount = 0;
@@ -435,16 +434,6 @@ TError TContainer::GetNetStat(ENetStat kind, TUintMap &stat) {
         return TError(EError::NotSupported, "Network statistics is not available");
 }
 
-void TContainer::UpdateRunningChildren(size_t diff) {
-    RunningChildren += diff;
-
-    if (!RunningChildren && State == EContainerState::Meta)
-        NotifyWaiters();
-
-    if (Parent)
-        Parent->UpdateRunningChildren(diff);
-}
-
 TError TContainer::UpdateSoftLimit() {
     if (IsRoot())
         return TError::Success();
@@ -478,20 +467,25 @@ TError TContainer::UpdateSoftLimit() {
     return TError::Success();
 }
 
-void TContainer::SetState(EContainerState newState) {
-    if (State == newState)
+void TContainer::SetState(EContainerState next) {
+    if (State == next)
         return;
 
-    L_ACT() << Name << ": change state " << StateName(State) << " -> " << StateName(newState) << std::endl;
-    if (newState == EContainerState::Running) {
-        UpdateRunningChildren(+1);
-    } else if (State == EContainerState::Running) {
-        UpdateRunningChildren(-1);
+    L_ACT() << Name << ": change state " << StateName(State) << " -> " << StateName(next) << std::endl;
+
+    auto lock = LockContainers();
+    auto prev = State;
+    State = next;
+
+    if (prev == EContainerState::Running || next == EContainerState::Running) {
+        for (auto p = Parent; p; p = p->Parent) {
+            p->RunningChildren += next == EContainerState::Running ? 1 : -1;
+            if (!p->RunningChildren && p->State == EContainerState::Meta)
+                p->NotifyWaiters();
+        }
     }
 
-    State = newState;
-
-    if (newState != EContainerState::Running && newState != EContainerState::Meta)
+    if (next != EContainerState::Running && next != EContainerState::Meta)
         NotifyWaiters();
 }
 
