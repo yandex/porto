@@ -1293,7 +1293,7 @@ static int StopPortod() {
     return EXIT_SUCCESS;
 }
 
-static int ReexecPorotd() {
+static int ReexecPortod() {
     if (PortoMasterPid.Load() || PortoSlavePid.Load()) {
         std::cerr << "portod not running" << std::endl;
         return EXIT_FAILURE;
@@ -1502,7 +1502,7 @@ int main(int argc, char **argv) {
     }
 
     if (cmd == "reload")
-        return ReexecPorotd();
+        return ReexecPortod();
 
     if (cmd == "upgrade")
         return UpgradePortod();
