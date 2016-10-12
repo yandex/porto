@@ -18,7 +18,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     TError error;
     TFile outFd;
 
-    pid_t pid = fork();
+    pid_t pid = ForkFromThread();
     if (pid < 0)
         return TError(EError::Unknown, errno, "RunCommand: fork");
 
