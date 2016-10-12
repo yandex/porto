@@ -195,8 +195,6 @@ private:
     std::vector<std::string> Config;
     std::vector<TColumn> Columns;
     TPortoContainer RootContainer;
-    TPortoContainer DotContainer;
-    TPortoContainer PortoContainer; // /porto
     std::vector<std::vector<TCommonValue>> Common;
     std::unique_ptr<TPortoContainer> ContainerTree;
 

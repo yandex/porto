@@ -829,25 +829,30 @@ void TPortoTop::AddCommon(int row, const std::string &title, const std::string &
     Common[row].push_back(TCommonValue(title, v));
 }
 TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
-                                                           RootContainer("/"),
-                                                           DotContainer("."),
-                                                           PortoContainer("/porto") {
+                                                           RootContainer("/") {
     if (config.size() == 0)
         ConfigFile = std::string(getenv("HOME")) + "/.portotop";
     else
         ConfigFile = config;
 
     AddCommon(0, "Containers running: ", "porto_stat[running]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "total: ", "porto_stat[created]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "Porto errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "of ", "porto_stat[containers]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Volumes: ", "porto_stat[volumes]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Porto clients: ", "porto_stat[clients]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
+    AddCommon(0, "uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
 
-    AddCommon(1, "Memory: ", "memory_usage", PortoContainer, ValueFlags::Bytes);
-    AddCommon(1, "/ ", "memory_usage", RootContainer, ValueFlags::Bytes);
-    AddCommon(1, ": ", "memory_usage", PortoContainer, ValueFlags::Bytes | ValueFlags::PartOfRoot |
-        ValueFlags::Percents);
+    AddCommon(1, "Memory usage: ", "memory_usage", RootContainer, ValueFlags::Bytes);
+    AddCommon(1, "anon: ", "anon_usage", RootContainer, ValueFlags::Bytes);
+    AddCommon(1, "limit: ", "memory_limit_total", RootContainer, ValueFlags::Bytes);
+    AddCommon(1, "guarantee: ", "memory_guarantee_total", RootContainer, ValueFlags::Bytes);
+    AddCommon(1, "maj/s: ", "major_faults", RootContainer, ValueFlags::DfDt);
 
-    AddCommon(1, "CPU: ", "cpu_usage", PortoContainer, ValueFlags::DfDt | ValueFlags::Percents |
+    AddCommon(1, "CPU usage: ", "cpu_usage", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
+              ValueFlags::Multiplier, 1E9);
+    AddCommon(1, "system: ", "cpu_usage_system", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
               ValueFlags::Multiplier, 1E9);
 
     if (LoadConfig() != -1)
