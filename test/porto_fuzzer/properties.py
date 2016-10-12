@@ -10,6 +10,9 @@ from random import random as randf
 
 from common import *
 
+ACTIVE=False
+ACTIVE_IO=False
+
 def Command():
     cpunr = psutil.cpu_count()
     return ("command",
@@ -19,29 +22,38 @@ def Command():
                         (5, randint(0, RUN_TIME_LIMIT)),
                         (1, randint(RUN_TIME_LIMIT + 1, sys.maxint))
                     ] )
-                ) ),
-                (2, "python /tmp/mem_test.py " +
+                )),
+                (2, "echo {}".format(get_random_str(100))),
+                (2, "cat {}".format(
+                    select_by_weight( [
+                        (1, "/f1.txt"),
+                        (1, "/f2.txt"),
+                        (1, "/f3.txt")
+                    ] )                
+                )),
+                (2, get_random_str(256)),
+                (2 if ACTIVE else 0, "python /tmp/mem_test.py " +
                         str(
                             randint(0, 50000),
                         ) + " " +
                         str(randint(1, 1048576) * PAGE_SIZE)
                 ),
-                (2, "bash /tmp/cpu_test.sh " +
+                (2 if ACTIVE else 0, "bash /tmp/cpu_test.sh " +
                         str(
                             randint(0, cpunr)
                         ) + " " +
                         str(
                             randint(0, 16384)
                         )
-                )#,
-#                (2, "bash /tmp/io_test.sh " +
-#                        str(
-#                            2 ** randint(0, 16)
-#                        ) + " " +
-#                        str(
-#                            randint(0, 50000)
-#                        )
-#                )
+                ),
+                (2 if ACTIVE_IO else 0, "bash /tmp/io_test.sh " +
+                        str(
+                            2 ** randint(0, 16)
+                        ) + " " +
+                        str(
+                            randint(0, 50000)
+                        )
+                )
             ] )
         )
 
@@ -207,3 +219,15 @@ def Hostname():
 
 def VirtMode():
     return ("virt_mode", select_by_weight([ (2, "false"), (1, "true") ]) )
+
+def Root(conn):
+    vlist = conn.ListVolumes()
+    vol = select_by_weight( [
+        (5, ""),
+        (5, vlist[randint(0, len(vlist) - 1)]  if len(vlist) > 0\
+            else get_random_dir(VOL_MNT_PLACE) ),
+        (1, get_random_dir(VOL_PLACE)),
+        (1, get_random_str(256))
+    ] )
+
+    return ("root" )

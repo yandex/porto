@@ -71,3 +71,5 @@ $PORTO_BIN/portotest $@ || die "portotest failed"
 for pytest in $PORTO_SRC/test/test-*.py; do
     PYTHONPATH=$PORTO_SRC/src/api/python python $pytest || die "$pytest failed"
 done
+
+PYTHONPATH=$PORTO_SRC/src/api/python python -u $PORTO_SRC/test/porto_fuzzer/porto_fuzzer.py --timeout 30 --progress 32 2000 || die "fuzzer failed"
