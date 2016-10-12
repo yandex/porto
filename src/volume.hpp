@@ -129,8 +129,6 @@ public:
 
     TError Tune(const TStringMap &cfg);
 
-    TError Resize(uint64_t space_limit, uint64_t inode_limit);
-
     TError CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee) const;
 
     bool HaveQuota(void) const {

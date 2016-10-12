@@ -1466,9 +1466,17 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
                 return error;
         }
 
-        error = Resize(spaceLimit, inodeLimit);
+        L_ACT() << "Resize volume: " << Path << " to bytes: "
+                << spaceLimit << " inodes: " << inodeLimit << std::endl;
+
+        error = Backend->Resize(spaceLimit, inodeLimit);
         if (error)
             return error;
+
+        auto volumes_lock = LockVolumes();
+        SpaceLimit = spaceLimit;
+        InodeLimit = inodeLimit;
+        volumes_lock.unlock();
     }
 
     if (properties.count(V_SPACE_GUARANTEE) || properties.count(V_INODE_GUARANTEE)) {
@@ -1489,23 +1497,11 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
         if (error)
             return error;
 
+        auto volumes_lock = LockVolumes();
         SpaceGuarantee = space_guarantee;
         InodeGuarantee = inode_guarantee;
+        volumes_lock.unlock();
     }
-
-    return Save();
-}
-
-TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
-    L_ACT() << "Resize volume: " << Path << " to bytes: "
-            << space_limit << " inodes: " << inode_limit << std::endl;
-
-    TError error = Backend->Resize(space_limit, inode_limit);
-    if (error)
-        return error;
-
-    SpaceLimit = space_limit;
-    InodeLimit = inode_limit;
 
     return Save();
 }
@@ -1559,7 +1555,6 @@ TError TVolume::UnlinkContainer(TContainer &container) {
 }
 
 TStringMap TVolume::DumpState(const TPath &root) {
-    auto lock = ScopedLock();
     TStringMap ret;
     TStatFS stat;
 
@@ -1569,6 +1564,8 @@ TStringMap TVolume::DumpState(const TPath &root) {
         ret[V_SPACE_AVAILABLE] = std::to_string(stat.SpaceAvail);
         ret[V_INODE_AVAILABLE] = std::to_string(stat.InodeAvail);
     }
+
+    auto lock = LockVolumes();
 
     if (Storage.empty() || BackendType == "rbd")
         ret[V_STORAGE] = Storage;
