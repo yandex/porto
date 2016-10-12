@@ -3,6 +3,7 @@
 #include "statistics.hpp"
 #include "log.hpp"
 #include "util/unix.hpp"
+#include "util/signal.hpp"
 #include "common.hpp"
 
 extern "C" {
@@ -146,6 +147,9 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
         else if (level == LOG_ERROR)
             Statistics->Errors++;
     }
+
+    if (level == LOG_ERROR && Verbose)
+        Stacktrace();
 
     return (*logStream) << CurrentTimeFormat("%F %T", Verbose)
                         << " " << name << "[" << GetTid() << "]: " << prefix[level];
