@@ -1756,14 +1756,16 @@ static void TestRootProperty(Porto::Connection &api) {
 
     vector<string> devs = { "null", "zero", "full", "urandom",
                             "random", "console", "tty", "stdin", "stdout",
-                            "stderr" };
-    vector<string> other = { "ptmx", "pts", "shm", "fd" };
+                            "stderr", "ptmx", "pts", "shm", "fd" };
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
     if (error)
         throw error.GetMsg();
 
-    ExpectEq(devs.size() + other.size(), tokens.size());
+    if (std::find(tokens.begin(), tokens.end(), "hugepages") != tokens.end())
+        devs.push_back("hugepages");
+
+    ExpectEq(devs.size(), tokens.size());
     for (auto &dev : devs)
         Expect(std::find(tokens.begin(), tokens.end(), dev) != tokens.end());
 
