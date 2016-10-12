@@ -22,6 +22,7 @@ enum ELogLevel {
     LOG_REQUEST = 5,
     LOG_RESPONSE = 6,
     LOG_SYSTEM = 7,
+    LOG_STACK = 8,
 };
 
 class TLogger {
@@ -41,6 +42,7 @@ static inline std::basic_ostream<char> &L_ACT() { return TLogger::Log(LOG_ACTION
 static inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUEST); }
 static inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
 static inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }
+static inline std::basic_ostream<char> &L_STK() { return TLogger::Log(LOG_STACK); }
 
 void porto_assert(const char *msg, size_t line, const char *file);
 void porto_runtime_error(const std::string &msg, size_t line, const char *file);

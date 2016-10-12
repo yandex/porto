@@ -21,7 +21,7 @@ extern "C" {
 // published under the WTFPL v2.0
 
 void Stacktrace() {
-    L_ERR() << "Stacktrace:" << std::endl;
+    L_STK() << "Stacktrace:" << std::endl;
 
     unsigned int max_frames = 63;
     // storage array for stack trace address data
@@ -31,7 +31,7 @@ void Stacktrace() {
     int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
 
     if (addrlen == 0) {
-        L_ERR() << "  <empty, possibly corrupt>\n" << std::endl;
+        L_STK() << "  <empty, possibly corrupt>\n" << std::endl;
         return;
     }
 
@@ -77,15 +77,15 @@ void Stacktrace() {
             char* ret = abi::__cxa_demangle(begin_name, funcname, &funcnamesize, &status);
             if (status == 0) {
                 funcname = ret; // use possibly realloc()-ed string
-                L_ERR() << symbollist[i] << ": " << funcname << " " << begin_addr << std::endl;
+                L_STK() << symbollist[i] << ": " << funcname << " " << begin_addr << std::endl;
             } else {
                 // demangling failed. Output function name as a C function with no arguments.
-                L_ERR() << symbollist[i] << ": " << begin_name << "()+"
+                L_STK() << symbollist[i] << ": " << begin_name << "()+"
                         << begin_offset << " " << begin_addr << std::endl;
             }
         } else {
             // couldn't parse the line? print the whole line.
-            L_ERR() << symbollist[i] << std::endl;
+            L_STK() << symbollist[i] << std::endl;
         }
     }
 

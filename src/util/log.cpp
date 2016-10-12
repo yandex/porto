@@ -136,7 +136,8 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
                                           "ACT ",
                                           "REQ ",
                                           "RSP ",
-                                          "SYS " };
+                                          "SYS ",
+                                          "STK ", };
     std::string name = GetTaskName();
 
     if (Statistics) {
