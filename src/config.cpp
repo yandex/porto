@@ -62,6 +62,8 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_enable_smart(true);
     config().mutable_container()->set_enable_cpu_reserve(true);
     config().mutable_container()->set_rt_priority(10);
+    config().mutable_container()->set_rt_nice(-20);
+    config().mutable_container()->set_high_nice(-10);
     config().mutable_container()->set_default_porto_namespace(false);
     config().mutable_container()->set_enable_tracefs(true);
     config().mutable_container()->set_devpts_max(256);

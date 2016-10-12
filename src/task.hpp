@@ -37,6 +37,7 @@ struct TTaskEnv {
 
     int SchedPolicy = -1;
     int SchedPriority = 0;
+    int SchedNice = 0;
 
     TError Start();
     void StartChild();

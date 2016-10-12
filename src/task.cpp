@@ -385,6 +385,8 @@ TError TTaskEnv::Start() {
         if (SchedPolicy >= 0) {
             struct sched_param param;
             param.sched_priority = SchedPriority;
+            if (setpriority(PRIO_PROCESS, 0, SchedNice))
+                Abort(TError(EError::Unknown, errno, "setpriority"));
             if (sched_setscheduler(0, SchedPolicy, &param))
                 Abort(TError(EError::Unknown, errno, "sched_setparm"));
         }

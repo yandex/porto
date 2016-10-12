@@ -13,6 +13,7 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/eventfd.h>
+#include <sys/resource.h>
 }
 
 const TFlagsNames ControllersName = {
@@ -578,6 +579,7 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
     int sched_policy = SCHED_OTHER;
     struct sched_param sched_param;
     sched_param.sched_priority = 0;
+    int sched_nice = 0;
 
     if (policy == "idle")
         sched_policy = SCHED_IDLE;
@@ -592,7 +594,12 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
             sched_policy = SCHED_RR;
             sched_param.sched_priority = config().container().rt_priority();
         }
+        /* just to show in top */
+        sched_nice = config().container().rt_nice();
     }
+
+    if (policy == "high")
+        sched_nice = config().container().high_nice();
 
     if (sched_policy >= 0) {
         std::vector<pid_t> prev, pids;
@@ -606,6 +613,8 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
                 if (std::find(prev.begin(), prev.end(), pid) != prev.end() &&
                         sched_getscheduler(pid) == sched_policy)
                     continue;
+                if (setpriority(PRIO_PROCESS, pid, sched_nice) && errno != ESRCH)
+                    return TError(EError::Unknown, errno, "setpriority");
                 if (sched_setscheduler(pid, sched_policy, &sched_param) &&
                         errno != ESRCH)
                     return TError(EError::Unknown, errno, "sched_setscheduler");

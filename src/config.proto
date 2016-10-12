@@ -109,6 +109,8 @@ message TCfg {
 		optional bool enable_hugetlb = 26;
 		optional int32 rt_priority = 27;
 		optional bool enable_cpu_reserve = 28;
+		optional int32 rt_nice = 29;
+		optional int32 high_nice = 30;
 	}
 
 	message TPrivilegesCfg {

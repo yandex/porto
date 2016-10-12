@@ -964,6 +964,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 
     taskEnv->SchedPolicy = SCHED_OTHER;
     taskEnv->SchedPriority = 0;
+    taskEnv->SchedNice = 0;
 
     if (CpuPolicy == "idle")
         taskEnv->SchedPolicy = SCHED_IDLE;
@@ -978,7 +979,11 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
             taskEnv->SchedPolicy = SCHED_RR;
             taskEnv->SchedPriority = config().container().rt_priority();
         }
+        taskEnv->SchedNice = config().container().rt_nice();
     }
+
+    if (CpuPolicy == "high")
+        taskEnv->SchedNice = config().container().high_nice();
 
     taskEnv->Mnt.Cwd = GetCwd();
     taskEnv->Mnt.ParentCwd = Parent->GetCwd();
