@@ -247,8 +247,10 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
         Controllers |= CGROUP_HUGETLB;
 
-    if ((Controllers & CGROUP_CPU) && CpusetSubsystem.Supported)
+    if ((Controllers & CGROUP_CPU) && CpusetSubsystem.Supported) {
         Controllers |= CGROUP_CPUSET;
+        SetProp(EProperty::CPU_SET);
+    }
 
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
