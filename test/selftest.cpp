@@ -1676,6 +1676,10 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
     std::vector<std::string> lines;
     ExpectSuccess(SplitString(v, '\n', lines));
     auto m = ParseMountinfo(lines);
+
+    if (m.count("/dev/hugepages"))
+        expected.insert("/dev/hugepages");
+
     ExpectEq(m.size(), expected.size());
     for (auto pair : m)
         Expect(expected.find(pair.first) != expected.end());
