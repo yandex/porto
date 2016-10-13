@@ -1583,7 +1583,7 @@ TError TContainer::Stop(uint64_t timeout) {
 
         if (FreezerSubsystem.IsSelfFreezing(cg)) {
             L_ACT() << "Thaw terminated paused container " << ct->Name << std::endl;
-            error = FreezerSubsystem.Thaw(cg, true);
+            error = FreezerSubsystem.Thaw(cg, false);
             if (error)
                 return error;
         }
