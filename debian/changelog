@@ -1,3 +1,90 @@
+yandex-porto (3.0.7) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: remove special defaults for containers created by root
+  * porto: always create mount namespace and protect proc
+  * property: fix dirty_limit applying
+  * porto: add hugetlb limit
+  * porto: add missing breaks into TContainer::Event()
+  * porto: mount hugetlbfs in container
+  * porto: make huge pages unlimited by default
+  * portoctl/get: do not print empty values
+
+  [ Maxim Samoylov ]
+  * container: fix stopping hierarchies with paused children
+  * container: set dead state for meta containers in Reap()
+
+  [ Konstantin Khlebnikov ]
+  * container: fix IsRoot() in construtor
+
+  [ Maxim Samoylov ]
+  * property: enforce child cpu limit and guarantee not bigger than parent setting
+
+  [ Konstantin Khlebnikov ]
+  * cgroup: fix anon_usage failback
+  * portoctl/get: cut long stdout and stderr
+  * container: split Start in two methods
+  * porto: increase default threads count to 32
+  * volumes: limit count with 3000
+  * Signed-off-by: Konstantin Khlebnikov <khlebnikov@yandex-team.ru>
+  * porto: remove non-directories from porto_layers
+  * porto: replace Popen with RunCommand
+  * volume: verify place our of volume lock
+  * porto: after restore destroy weak containers starting from leaves
+  * porto: cleanup discard sequence
+  * portod: do not destroy root in DestroyContainers
+  * porto: get exlusive lock for starting parent containers
+
+  [ Maxim Samoylov ]
+  * property: do not allow dirty_limit to be less than 1M
+  * property: verify hugetlb limit
+
+  [ Konstantin Khlebnikov ]
+  * util/path: add bunch of fd-relative operations
+
+  [ Maxim Samoylov ]
+  * network: initialize TNetCfg members
+
+  [ Konstantin Khlebnikov ]
+  * container: rework recursive destruction
+  * volume: rework recursive destruction
+  * porto: add optional pattern to list command
+  * porto: allow "?" in wait pattern and match any container by "***"
+  * porto: allow container patterns in get command
+  * api/python: fix list pattern
+  * volume: prevent volume path overlaps
+  * portod: keep path to binary in /run/portod
+  * cpu: add policy high and batch
+  * porto: use ForkFromThread in RunCommand
+  * porto: cleanup wait wakeup conditions and locking
+  * portoctl: update top header
+  * volume: protect state with global lock
+  * volume: add property containers for initial links
+  * porto: set nice for rt and high cpu policy
+  * porto: add cpuset
+  * porto: always setup enabled cpuset
+  * porto: fix state restoring
+  * porto: don't enable cpuset for first level containers by default
+
+  [ Maxim Samoylov ]
+  * util/log: Add debug loglevel and use it for stacktraces
+
+  [ Konstantin Khlebnikov ]
+  * porto: print stacktrace for each error in verbose mode
+
+  [ Maxim Samoylov ]
+  * portod: fix typo
+  * portod: stop root container prior to container tree destruction
+  * tests: fuzzer essential enhancements
+
+  [ Konstantin Khlebnikov ]
+  * test/selftest: add hugepages
+  * test/selftest: add hugepages once more
+  * porto: attach process operation
+  * porto: do not wait thaw when terminate paused container
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 13 Oct 2016 19:28:51 +0300
+
 yandex-porto (3.0.6) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
