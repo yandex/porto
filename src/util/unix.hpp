@@ -42,6 +42,8 @@ TError SetSysctl(const std::string &name, const std::string &value);
 
 TError SetOomScoreAdj(int value);
 
+TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result);
+
 std::string FormatExitStatus(int status);
 int GetNumCores();
 void DumpMallocInfo();

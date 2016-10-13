@@ -614,6 +614,13 @@ class Connection(object):
         request.convertPath.destination = destination
         return self.rpc.call(request, self.rpc.timeout).convertPath.path
 
+    def AttachProcess(self, name, pid, comm):
+        request = rpc_pb2.TAttachProcessRequest()
+        request.attachProcess.name = name
+        request.attachProcess.pid = pid
+        request.attachProcess.comm = comm
+        self.rpc.call(request, self.rpc.timeout)
+
     def Version(self):
         request = rpc_pb2.TContainerRequest()
         request.version.CopyFrom(rpc_pb2.TVersionRequest())

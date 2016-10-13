@@ -96,6 +96,10 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
         return "convert " + req.convertpath().path() +
             " from " + req.convertpath().source() +
             " to " + req.convertpath().destination();
+    else if (req.has_attachprocess())
+        return "attach " + std::to_string(req.attachprocess().pid()) +
+            " (" + req.attachprocess().comm() + ") to " +
+            req.attachprocess().name();
     else
         return req.ShortDebugString();
 }
@@ -261,7 +265,8 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_exportlayer() +
         req.has_removelayer() +
         req.has_listlayers() +
-        req.has_convertpath() == 1;
+        req.has_convertpath() +
+        req.has_attachprocess() == 1;
 }
 
 static void SendReply(TClient &client, rpc::TContainerResponse &response, bool log) {
@@ -959,6 +964,62 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     return error;
 }
 
+noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
+    std::shared_ptr<TContainer> oldCt, newCt;
+    TError error;
+    pid_t pid;
+
+    error = TranslatePid(req.pid(), CurrentClient->Pid, pid);
+    if (error)
+        return error;
+
+    /* sanity check and protection against races */
+    auto comm = StringTrim(GetTaskName(pid));
+    if (StringTrim(req.comm()) != comm)
+        return TError(EError::InvalidValue, "wrong task comm for pid");
+
+    error = TContainer::FindTaskContainer(pid, oldCt);
+    if (error)
+        return error;
+
+    error = CurrentClient->WriteContainer(ROOT_PORTO_NAMESPACE + oldCt->Name, oldCt);
+    if (error)
+        return error;
+
+    if (pid == oldCt->Task.Pid || pid == oldCt->WaitTask.Pid)
+        return TError(EError::Busy, "cannot move main process");
+
+    error = CurrentClient->WriteContainer(req.name(), newCt);
+    if (error)
+        return error;
+
+    if (!newCt->IsChildOf(*oldCt))
+        return TError(EError::Permission, "new container must be child of current");
+
+    if (newCt->State != EContainerState::Running &&
+            newCt->State != EContainerState::Meta)
+        return TError(EError::InvalidState, "new container is not running");
+
+    L_ACT() << "Attach process " << pid << " (" << comm << ") from "
+            << oldCt->Name << " to " << newCt->Name << std::endl;
+
+    for (auto hy: Hierarchies) {
+        auto cg = newCt->GetCgroup(*hy);
+        error = cg.Attach(pid);
+        if (error)
+            goto undo;
+    }
+
+    return TError::Success();
+
+undo:
+    for (auto hy: Hierarchies) {
+        auto cg = oldCt->GetCgroup(*hy);
+        (void)cg.Attach(pid);
+    }
+    return error;
+}
+
 void HandleRpcRequest(const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
@@ -1034,6 +1095,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             error = ListLayers(req.listlayers(), rsp);
         else if (req.has_convertpath())
             error = ConvertPath(req.convertpath(), rsp);
+        else if (req.has_attachprocess())
+            error = AttachProcess(req.attachprocess());
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

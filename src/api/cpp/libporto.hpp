@@ -104,6 +104,9 @@ public:
 
     int ConvertPath(const std::string &path, const std::string &src,
                     const std::string &dest, std::string &res);
+
+    int AttachProcess(const std::string &name,
+                      int pid, const std::string &comm);
 };
 
 } /* namespace Porto */

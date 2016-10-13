@@ -582,4 +582,13 @@ int Connection::ConvertPath(const std::string &path, const std::string &src,
     return ret;
 }
 
+int Connection::AttachProcess(const std::string &name,
+                              int pid, const std::string &comm) {
+    auto req = Impl->Req.mutable_attachprocess();
+    req->set_name(name);
+    req->set_pid(pid);
+    req->set_comm(comm);
+    return Impl->Rpc();
+}
+
 } /* namespace Porto */

@@ -143,6 +143,13 @@ message TContainerWaitRequest {
 	optional uint32 timeout = 2;
 }
 
+// Move process into container
+message TAttachProcessRequest {
+	required string name = 1;
+	required uint32 pid = 2;
+	required string comm = 3;
+}
+
 message TContainerRequest {
 	optional TContainerCreateRequest create = 1;
 	optional TContainerDestroyRequest destroy = 2;
@@ -176,6 +183,7 @@ message TContainerRequest {
 	optional TLayerExportRequest exportLayer = 113;
 
 	optional TConvertPathRequest convertPath = 200;
+	optional TAttachProcessRequest attachProcess = 201;
 }
 
 message TContainerListResponse {

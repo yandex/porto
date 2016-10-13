@@ -2222,6 +2222,34 @@ public:
     }
 };
 
+class TAttachCmd final : public ICmd {
+public:
+    TAttachCmd(Porto::Connection *api) : ICmd(api, "attach", 2,
+            "<name> <pid> [comm]", "move process into container") { }
+
+    int Execute(TCommandEnviroment *environment) final override {
+        std::string comm;
+        auto args = environment->GetArgs();
+        auto name = args[0];
+        int pid;
+
+        if (StringToInt(args[1], pid)) {
+            std::cerr << "Cannot parse pid " << args[0] << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if (args.size() > 2)
+            comm = args[2];
+        else
+            comm = GetTaskName(pid);
+
+        auto ret = Api->AttachProcess(name, pid, comm);
+        if (ret)
+            PrintError("Cannot attach");
+        return ret;
+    }
+};
+
 int main(int argc, char *argv[]) {
     Porto::Connection api;
     TCommandHandler handler(api);
@@ -2259,6 +2287,7 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TBuildCmd>();
 
     handler.RegisterCommand<TConvertPathCmd>();
+    handler.RegisterCommand<TAttachCmd>();
 
     TLogger::DisableLog();
 

@@ -8,6 +8,7 @@
 #include "util/cred.hpp"
 #include "util/path.hpp"
 #include "util/log.hpp"
+#include "util/namespace.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -504,6 +505,40 @@ TError SetSysctl(const std::string &name, const std::string &value) {
     std::replace(path.begin() + 10, path.end(), '.', '/');
     L_ACT() << "Set sysctl " << name << " = " << value << std::endl;
     return TPath(path).WriteAll(value);
+}
+
+TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
+    TUnixSocket sock, sk;
+    TNamespaceFd ns;
+    TError error;
+    pid_t child;
+
+    error = TUnixSocket::SocketPair(sock, sk);
+    if (error)
+        return error;
+    error = ns.Open(pidns, "ns/pid");
+    if (error)
+        return error;
+    child = fork();
+    if (child < 0)
+        return TError(EError::Unknown, errno, "fork");
+    if (child) {
+        error = sock.RecvPid(result, pid);
+        kill(child, SIGKILL);
+        waitpid(child, nullptr, 0);
+        return error;
+    }
+    error = ns.SetNs(CLONE_NEWPID);
+    if (error)
+        _exit(EXIT_FAILURE);
+    child = fork();
+    if (child < 0)
+        _exit(EXIT_FAILURE);
+    if (!child)
+        sk.SendPid(pid);
+    else
+        waitpid(child, nullptr, 0);
+    _exit(0);
 }
 
 static std::mutex ForkLock;
