@@ -1000,6 +1000,10 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
             newCt->State != EContainerState::Meta)
         return TError(EError::InvalidState, "new container is not running");
 
+    for (auto ct = newCt; ct && ct != oldCt; ct = ct->Parent)
+        if (ct->Isolate)
+            return TError(EError::InvalidState, "new container must be not isolated from current");
+
     L_ACT() << "Attach process " << pid << " (" << comm << ") from "
             << oldCt->Name << " to " << newCt->Name << std::endl;
 
