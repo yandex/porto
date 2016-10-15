@@ -2405,6 +2405,26 @@ TError TExitStatusProperty::Get(std::string &value) {
     return GetToSave(value);
 }
 
+class TExitCodeProperty : public TProperty {
+public:
+    TExitCodeProperty() : TProperty(D_EXIT_CODE, EProperty::NONE,
+            "container exit code, negative: exit signal, OOM: -99 (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TError error = IsDead();
+        if (error)
+            return error;
+        if (CurrentContainer->OomKilled)
+            value = "-99";
+        else if (WIFSIGNALED(CurrentContainer->ExitStatus))
+            value = std::to_string(-WTERMSIG(CurrentContainer->ExitStatus));
+        else
+            value = std::to_string(WEXITSTATUS(CurrentContainer->ExitStatus));
+        return TError::Success();
+    }
+} static ExitCodeProperty;
+
 class TMemUsage : public TProperty {
 public:
     TError Get(std::string &value);
