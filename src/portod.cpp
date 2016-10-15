@@ -886,12 +886,12 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
 
     slavePid = 0;
 
-    if (pipe2(evtfd, O_NONBLOCK) < 0) {
+    if (pipe2(evtfd, O_NONBLOCK | O_CLOEXEC) < 0) {
         L_ERR() << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
-    if (pipe2(ackfd, O_NONBLOCK) < 0) {
+    if (pipe2(ackfd, O_NONBLOCK | O_CLOEXEC) < 0) {
         L_ERR() << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
