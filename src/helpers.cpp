@@ -17,10 +17,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
     TFile outFd;
-
-    pid_t pid = ForkFromThread();
-    if (pid < 0)
-        return TError(EError::Unknown, errno, "RunCommand: fork");
+    TTask task;
 
     if (output) {
         error = outFd.CreateTemp("/tmp");
@@ -28,21 +25,15 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
             return error;
     }
 
-    if (pid > 0) {
-        int ret, status;
-retry:
-        ret = waitpid(pid, &status, 0);
-        if (ret < 0) {
-            if (errno == EINTR)
-                goto retry;
-            return TError(EError::Unknown, errno, "RunCommand: waitpid");
-        }
-        if (output)
-            outFd.ReadAll(*output, 4096);
-        if (WIFEXITED(status) && !WEXITSTATUS(status))
-            return TError::Success();
-        return TError(EError::Unknown, "RunCommand: " + command[0] +
-                                       " " + FormatExitStatus(status));
+    error = task.Fork();
+    if (error)
+        return error;
+
+    if (task.Pid) {
+        error = task.Wait();
+        if (!error && output)
+            error = outFd.ReadAll(*output, 4096);
+        return error;
     }
 
     error = memcg.Attach(GetPid());

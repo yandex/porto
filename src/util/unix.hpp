@@ -13,6 +13,12 @@ class TPath;
 
 struct TTask {
     pid_t Pid = 0;
+    int Status = 0;
+
+    TError Fork(bool detach = false);
+    TError Wait();
+    void Detach();
+    static bool Deliver(pid_t pid, int status);
 
     bool Exists() const;
     bool IsZombie() const;
@@ -20,7 +26,6 @@ struct TTask {
     TError Kill(int signal) const;
 };
 
-pid_t ForkFromThread(void);
 std::string CurrentTimeFormat(const char *fmt, bool msec = false);
 
 pid_t GetPid();

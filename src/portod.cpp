@@ -349,6 +349,9 @@ static int SlaveRpc() {
                         DumpMallocInfo();
                         break;
                     case SIGCHLD:
+                        if (TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_status)) {
+                            (void)waitpid(sigInfo.ssi_pid, NULL, 0);
+                        }
                         break;
                     default:
                         L_WRN() << "Unexpected signal: " << sigInfo.ssi_signo << std::endl;

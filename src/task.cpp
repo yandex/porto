@@ -341,7 +341,7 @@ void TTaskEnv::StartChild() {
 }
 
 TError TTaskEnv::Start() {
-    TError error;
+    TError error, error2;
 
     CT->Task.Pid = 0;
     CT->TaskVPid = 0;
@@ -355,13 +355,16 @@ TError TTaskEnv::Start() {
     // are doing double fork here (fork + clone);
     // we also need to know child pid so we are using pipe to send it back
 
-    pid_t forkPid = ForkFromThread();
-    if (forkPid < 0) {
+    TTask task;
+
+    error = task.Fork();
+    if (error) {
         Sock.Close();
-        TError error(EError::Unknown, errno, "fork()");
         L() << "Can't spawn child: " << error << std::endl;
         return error;
-    } else if (forkPid == 0) {
+    }
+
+    if (!task.Pid) {
         TError error;
 
         /* Switch from signafd back to normal signal delivery */
@@ -414,7 +417,7 @@ TError TTaskEnv::Start() {
              * Enter into pid-namespace. fork() hangs in libc if child pid
              * collide with parent pid outside. vfork() has no such problem.
              */
-            forkPid = vfork();
+            pid_t forkPid = vfork();
             if (forkPid < 0)
                 Abort(TError(EError::Unknown, errno, "fork()"));
 
@@ -528,12 +531,7 @@ TError TTaskEnv::Start() {
     if (error)
         goto kill_all;
 
-    int status;
-    if (waitpid(forkPid, &status, 0) < 0) {
-        error = TError(EError::Unknown, errno, "wait for middle task failed");
-        goto kill_all;
-    }
-    forkPid = 0;
+    error2 = task.Wait();
 
     /* Task was alive, even if it already died we'll get zombie */
     error = MasterSock.SendZero();
@@ -545,8 +543,8 @@ TError TTaskEnv::Start() {
     if (error)
         goto kill_all;
 
-    if (!error && status) {
-        error = TError(EError::Unknown, "Start failed, status " + std::to_string(status));
+    if (!error && error2) {
+        error = error2;
         goto kill_all;
     }
 
@@ -556,9 +554,9 @@ kill_all:
     L_ACT() << "Kill partialy constructed container: " << error << std::endl;
     for (auto &cg : Cgroups)
         (void)cg.KillAll(SIGKILL);
-    if (forkPid) {
-        (void)kill(forkPid, SIGKILL);
-        (void)waitpid(forkPid, nullptr, 0);
+    if (task.Pid) {
+        task.Kill(SIGKILL);
+        task.Detach();
     }
     CT->Task.Pid = 0;
     CT->TaskVPid = 0;

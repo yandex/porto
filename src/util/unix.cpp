@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <mutex>
 #include <iomanip>
+#include <condition_variable>
 
 #include "util/string.hpp"
 #include "util/cred.hpp"
@@ -36,7 +37,7 @@ extern "C" {
 }
 
 bool TTask::Exists() const {
-    return Pid && !kill(Pid, 0);
+    return Pid && (!kill(Pid, 0) || errno != ESRCH);
 }
 
 TError TTask::Kill(int signal) const {
@@ -546,19 +547,59 @@ static bool PostFork = false;
 static struct timeval ForkTime;
 static struct tm ForkLocalTime;
 
-// after that fork use only syscalls and signal-safe functions
-pid_t ForkFromThread(void) {
-    pid_t ret;
+static std::map<pid_t, TTask *> Tasks;
+static std::condition_variable TasksCV;
 
+// after that fork use only syscalls and signal-safe functions
+TError TTask::Fork(bool detach) {
     PORTO_ASSERT(!PostFork);
-    ForkLock.lock();
+    auto lock = std::unique_lock<std::mutex>(ForkLock);
     gettimeofday(&ForkTime, NULL);
     localtime_r(&ForkTime.tv_sec, &ForkLocalTime);
-    ret = fork();
-    if (!ret)
+    pid_t ret = fork();
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "TTask::Fork");
+    Pid = ret;
+    if (!Pid)
         PostFork = true;
-    ForkLock.unlock();
-    return ret;
+    else if (!detach)
+        Tasks[Pid] = this;
+    return TError::Success();
+}
+
+TError TTask::Wait() {
+    auto lock = std::unique_lock<std::mutex>(ForkLock);
+    while (Pid) {
+        if (kill(Pid, 0) && errno == ESRCH) {
+            Tasks.erase(Pid);
+            Pid = 0;
+            Status = 100;
+            return TError(EError::Unknown, "task not found");
+        }
+        if (Tasks.find(Pid) == Tasks.end())
+            return TError(EError::Unknown, "detached task");
+        TasksCV.wait(lock);
+    }
+    if (Status)
+        return TError(EError::Unknown, FormatExitStatus(Status));
+    return TError::Success();
+}
+
+void TTask::Detach() {
+    auto lock = std::unique_lock<std::mutex>(ForkLock);
+    Tasks.erase(Pid);
+}
+
+bool TTask::Deliver(pid_t pid, int status) {
+    auto lock = std::unique_lock<std::mutex>(ForkLock);
+    auto it = Tasks.find(pid);
+    if (it == Tasks.end())
+        return false;
+    it->second->Pid = 0;
+    it->second->Status = status;
+    lock.unlock();
+    TasksCV.notify_all();
+    return true;
 }
 
 // localtime_r isn't safe after fork because of lock inside
