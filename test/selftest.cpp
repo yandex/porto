@@ -4913,7 +4913,6 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectSuccess(TPath(CgRoot("memory", "/") + "cgroup.procs").WriteAll(pid));
     auto cgmap = GetCgroups(pid);
     ExpectEq(cgmap["memory"], "/");
-    expectedWarns++; // Task belongs to invalid subsystem
     KillSlave(api, SIGKILL);
     AsAlice(api);
 

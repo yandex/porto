@@ -377,12 +377,20 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         }
     }
 
-    if (ct->MayRespawn())
-        ct->ScheduleRespawn();
+    error = ct->PrepareCgroups();
+    if (error)
+        goto err;
 
     error = ct->ApplyDynamicProperties();
     if (error)
         goto err;
+
+    error = ct->SyncCgroups();
+    if (error)
+        goto err;
+
+    if (ct->MayRespawn())
+        ct->ScheduleRespawn();
 
     error = ct->Save();
     if (error)
@@ -853,7 +861,7 @@ TError TContainer::PrepareCgroups() {
         if (!(Controllers & hy->Controllers))
             continue;
 
-        if (cg.Exists()) //FIXME kludge for root and restore
+        if (cg.Exists())
             continue;
 
         error = cg.Create();
@@ -2033,33 +2041,24 @@ void TContainer::SyncState() {
             L_ERR() << "Destroyed parent?" << std::endl;
             break;
     }
+}
+
+TError TContainer::SyncCgroups() {
+    TError error;
 
     if (!(Controllers & CGROUP_FREEZER))
-        return;
+        return TError(EError::NotSupported, "Cannot sync cgroups without freezer");
 
-    std::vector<pid_t> tasks;
-    error = freezerCg.GetTasks(tasks);
-    if (error)
-        L_WRN() << "Cannot dump cgroups " << freezerCg << " " << error << std::endl;
-
-    for (pid_t pid: tasks) {
-        for (auto hy: Hierarchies) {
-            TCgroup currentCg, correctCg = GetCgroup(*hy);
-            error = hy->TaskCgroup(pid, currentCg);
-            if (error || currentCg == correctCg)
-                continue;
-
-            /* Recheck freezer cgroup */
-            TCgroup currentFr;
-            error = FreezerSubsystem.TaskCgroup(pid, currentFr);
-            if (error || currentFr != freezerCg)
-                continue;
-
-            L_WRN() << "Task " << pid << " in " << currentCg
-                    << " while should be in " << correctCg << std::endl;
-            (void)correctCg.Attach(pid);
-        }
+    auto freezer = GetCgroup(FreezerSubsystem);
+    for (auto hy: Hierarchies) {
+        if (hy->Controllers & CGROUP_FREEZER)
+            continue;
+        auto cg = GetCgroup(*hy);
+        error = cg.AttachAll(freezer);
+        if (error)
+            break;
     }
+    return error;
 }
 
 TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {

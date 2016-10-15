@@ -91,6 +91,7 @@ public:
     bool IsEmpty() const;
 
     TError Attach(pid_t pid) const;
+    TError AttachAll(const TCgroup &cg) const;
 
     TPath Knob(const std::string &knob) const;
     bool Has(const std::string &knob) const;

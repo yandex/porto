@@ -179,6 +179,32 @@ TError TCgroup::Attach(pid_t pid) const {
     return error;
 }
 
+TError TCgroup::AttachAll(const TCgroup &cg) const {
+    if (Secondary())
+        return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
+
+    L_ACT() << "Attach all processes from " << cg << " to " << *this << std::endl;
+
+    std::vector<pid_t> pids, prev;
+    bool retry;
+
+    do {
+        TError error = cg.GetProcesses(pids);
+        if (error)
+            return error;
+        retry = false;
+        for (auto pid: pids) {
+            error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
+            if (error && error.GetErrno() != ESRCH)
+                return error;
+            retry = retry || std::find(prev.begin(), prev.end(), pid) == prev.end();
+        }
+        prev = pids;
+    } while (retry);
+
+    return TError::Success();
+}
+
 TCgroup TCgroup::Child(const std::string& name) const {
     PORTO_ASSERT(name[0] != '/');
     if (IsRoot())

@@ -242,6 +242,7 @@ public:
 
     void ForgetPid();
     void SyncState();
+    TError SyncCgroups();
     bool Expired() const;
     void DestroyWeak();
 
