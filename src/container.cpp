@@ -238,8 +238,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     IoPolicy = "normal";
 
     Controllers = RequiredControllers = CGROUP_FREEZER;
-    if (config().container().legacy_porto())
-        Controllers |= CGROUP_LEGACY;
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
         Controllers |= CGROUP_CPUACCT;
     if (!Parent || Parent->IsRoot() || config().container().all_controllers())
@@ -1965,10 +1963,8 @@ TError TContainer::Load(const TKeyValue &node) {
     } else
         error = TError(EError::Unknown, "Container has no state");
 
-    if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped) {
-        RootContainer->Controllers |= CGROUP_LEGACY;
+    if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped)
         Controllers = RootContainer->Controllers;
-    }
 
     CurrentContainer = nullptr;
 
@@ -2062,31 +2058,25 @@ TError TContainer::SyncCgroups() {
 }
 
 TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
-    std::string name;
-
-    if (IsRoot()) {
-        if (Controllers & CGROUP_LEGACY)
-            return subsystem.Cgroup(PORTO_CGROUP_PREFIX);
+    if (IsRoot())
         return subsystem.RootCgroup();
-    }
 
+    if (subsystem.Controllers & CGROUP_FREEZER)
+        return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Name);
+
+    std::string cg;
     for (auto ct = this; !ct->IsRoot(); ct = ct->Parent.get()) {
         auto enabled = ct->Controllers & subsystem.Controllers;
-        if (name.size())
-            name = ct->FirstName + (enabled ? "/" : "%") + name;
-        else if (enabled)
-            name = ct->FirstName;
+        if (!cg.empty())
+            cg = (enabled ? "/" : "%") + cg;
+        if (!cg.empty() || enabled)
+            cg = ct->FirstName + cg;
     }
 
-    if (name.empty()) {
-        if (Controllers & CGROUP_LEGACY)
-            return subsystem.Cgroup(PORTO_CGROUP_PREFIX);
+    if (cg.empty())
         return subsystem.RootCgroup();
-    }
 
-    name = std::string(PORTO_CGROUP_PREFIX) +
-        ((Controllers & CGROUP_LEGACY) ? "/" : "%") + name;
-    return subsystem.Cgroup(name);
+    return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" + cg);
 }
 
 bool TContainer::MayRespawn() {
@@ -2320,10 +2310,7 @@ TError TContainer::UpdateTrafficClasses() {
     net_lock.unlock();
 
     if (Net && Net != HostNetwork) {
-        if (Controllers & CGROUP_LEGACY)
-            parent = TcHandle(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID);
-        else
-            parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
+        parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
         for (auto p = Parent; p; p = p->Parent) {
             if (p->State == EContainerState::Meta && p->Net == Net) {
                 parent = p->GetTrafficClass();

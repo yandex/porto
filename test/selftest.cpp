@@ -87,10 +87,9 @@ static void ExpectCorrectCgroups(const string &pid, const string &name, const st
     auto cgmap = GetCgroups(pid);
 
     for (auto &subsys : subsystems) {
-        if (config().container().legacy_porto())
+        if (subsys == "freezer")
             ExpectEq(cgmap[subsys], "/porto/" + name);
-        else if (subsys == "freezer" ||
-                (subsys == "cpuacct" && cgmap["cpuacct"] != cgmap["cpu"]))
+        else if (subsys == "cpuacct" && cgmap["cpuacct"] != cgmap["cpu"])
             ExpectEq(cgmap[subsys], "/porto%" + name);
         else
             ExpectEq(cgmap[subsys], "/porto%" + name2);

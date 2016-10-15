@@ -313,7 +313,7 @@ bool CgExists(const std::string &subsystem, const std::string &name) {
 std::string CgRoot(const std::string &subsystem, const std::string &name) {
     if (name == "/")
         return "/sys/fs/cgroup/" + subsystem + "/";
-    if (config().container().legacy_porto())
+    if (subsystem == "freezer")
         return "/sys/fs/cgroup/" + subsystem + "/porto/" + name + "/";
     return "/sys/fs/cgroup/" + subsystem + "/porto%" + name + "/";
 }

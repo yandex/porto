@@ -26,7 +26,6 @@ const TFlagsNames ControllersName = {
     { CGROUP_DEVICES,   "devices" },
     { CGROUP_HUGETLB,   "hugetlb" },
     { CGROUP_CPUSET,    "cpuset" },
-    { CGROUP_LEGACY,    "legacy" },
 };
 
 TPath TCgroup::Path() const {
@@ -1033,6 +1032,13 @@ TError InitializeDaemonCgroups() {
     error = MemorySubsystem.SetLimit(cg, config().daemon().helpers_memory_limit());
     if (error)
         return error;
+
+    cg = FreezerSubsystem.Cgroup(PORTO_CGROUP_PREFIX);
+    if (!cg.Exists()) {
+        error = cg.Create();
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }

@@ -17,7 +17,6 @@ class TCgroup;
 #define CGROUP_DEVICES  0x0040ull
 #define CGROUP_HUGETLB  0x0080ull
 #define CGROUP_CPUSET   0x0100ull
-#define CGROUP_LEGACY   0x1000ull
 
 extern const TFlagsNames ControllersName;
 

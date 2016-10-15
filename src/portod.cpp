@@ -550,6 +550,10 @@ again:
                     (hy->Controllers & CGROUP_MEMORY))
                 continue;
 
+            if (cg->Name == PORTO_CGROUP_PREFIX &&
+                    (hy->Controllers & CGROUP_FREEZER))
+                continue;
+
             bool found = false;
             for (auto &it: Containers) {
                 if (it.second->State != EContainerState::Stopped &&

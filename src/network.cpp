@@ -323,18 +323,6 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         }
     }
 
-    if (RootContainer->Controllers & CGROUP_LEGACY) {
-        cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID);
-        cls.Rate = dev.GetConfig(PortoRate);
-
-        error = cls.Create(*Nl);
-        if (error) {
-            L_ERR() << "Can't create porto tclass: " << error << std::endl;
-            return error;
-        }
-    }
-
     dev.Prepared = true;
 
     return TError::Success();
