@@ -167,6 +167,7 @@ public:
     TTask Task;
     pid_t TaskVPid;
     TTask WaitTask;
+    TTask SeizeTask;
     std::shared_ptr<TNetwork> Net;
 
     std::string GetCwd() const;
@@ -242,6 +243,7 @@ public:
 
     void ForgetPid();
     void SyncState();
+    TError Seize();
     TError SyncCgroups();
     bool Expired() const;
     void DestroyWeak();

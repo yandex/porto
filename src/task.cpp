@@ -341,6 +341,7 @@ TError TTaskEnv::Start() {
     CT->Task.Pid = 0;
     CT->TaskVPid = 0;
     CT->WaitTask.Pid = 0;
+    CT->SeizeTask.Pid = 0;
 
     error = TUnixSocket::SocketPair(MasterSock, Sock);
     if (error)
@@ -545,5 +546,6 @@ kill_all:
     CT->Task.Pid = 0;
     CT->TaskVPid = 0;
     CT->WaitTask.Pid = 0;
+    CT->SeizeTask.Pid = 0;
     return error;
 }

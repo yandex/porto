@@ -986,7 +986,8 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
     if (error)
         return error;
 
-    if (pid == oldCt->Task.Pid || pid == oldCt->WaitTask.Pid)
+    if (pid == oldCt->Task.Pid || pid == oldCt->WaitTask.Pid ||
+            pid == oldCt->SeizeTask.Pid)
         return TError(EError::Busy, "cannot move main process");
 
     error = CurrentClient->WriteContainer(req.name(), newCt);

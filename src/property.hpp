@@ -5,6 +5,7 @@
 #include "common.hpp"
 
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
+constexpr const char *P_SEIZE_PID = "seize_pid";
 constexpr const char *P_RAW_ID = "_id";
 constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
 constexpr const char *P_RAW_NAME = "_name";
@@ -105,6 +106,7 @@ constexpr const char *D_CGROUPS = "cgroups";
 enum class EProperty {
     NONE,
     ROOT_PID,
+    SEIZE_PID,
     LOOP_DEV,
     START_TIME,
     DEATH_TIME,

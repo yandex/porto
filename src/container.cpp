@@ -35,6 +35,7 @@ extern "C" {
 #include <fcntl.h>
 #include <sys/fsuid.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 }
 
 std::mutex ContainersMutex;
@@ -1563,6 +1564,8 @@ void TContainer::ForgetPid() {
     TaskVPid = 0;
     WaitTask.Pid = 0;
     ClearProp(EProperty::ROOT_PID);
+    SeizeTask.Pid = 0;
+    ClearProp(EProperty::SEIZE_PID);
 }
 
 TError TContainer::Stop(uint64_t timeout) {
@@ -1971,6 +1974,51 @@ TError TContainer::Load(const TKeyValue &node) {
     return error;
 }
 
+TError TContainer::Seize() {
+    if (SeizeTask.Pid) {
+        if (GetTaskName(SeizeTask.Pid) == "portoinit") {
+            pid_t ppid = SeizeTask.GetPPid();
+            if (ppid == getpid() || ppid == getppid())
+                return TError::Success();
+            while(!kill(SeizeTask.Pid, SIGKILL))
+                usleep(100000);
+        }
+        SeizeTask.Pid = 0;
+    }
+
+    auto pidStr = std::to_string(WaitTask.Pid);
+    const char * argv[] = {
+        "portoinit",
+        "--container",
+        Name.c_str(),
+        "--seize",
+        pidStr.c_str(),
+        NULL,
+    };
+    TPath exe("/proc/self/exe");
+    TPath path;
+    TError error;
+    error = exe.ReadLink(path);
+    if (error)
+        return error;
+    path = path.DirName() / "portoinit";
+    auto cg = GetCgroup(FreezerSubsystem);
+
+    error = SeizeTask.Fork(true);
+    if (error)
+        return error;
+
+    if (SeizeTask.Pid) {
+        SetProp(EProperty::SEIZE_PID);
+        return TError::Success();
+    }
+
+    if (cg.Attach(GetPid()))
+        _exit(EXIT_FAILURE);
+    execv(path.c_str(), (char *const *)argv);
+    _exit(EXIT_FAILURE);
+}
+
 void TContainer::SyncState() {
     TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
     TError error;
@@ -2000,9 +2048,6 @@ void TContainer::SyncState() {
         if (State != EContainerState::Dead)
             L() << "Task no found" << std::endl;
         Reap(false);
-    } else if (WaitTask.GetPPid() != getppid()) {
-        L() << "Wrong ppid " << WaitTask.GetPPid() << " " << getppid() << std::endl;
-        Reap(false);
     } else if (WaitTask.IsZombie()) {
         L() << "Task is zombie" << std::endl;
         Task.Pid = 0;
@@ -2011,9 +2056,22 @@ void TContainer::SyncState() {
         Reap(false);
     } else if (taskCg != freezerCg) {
         L() << "Task in wrong freezer" << std::endl;
-        WaitTask.Kill(SIGKILL);
-        Task.Kill(SIGKILL);
+        if (WaitTask.GetPPid() == getppid()) {
+            if (Task.Pid != WaitTask.Pid && Task.GetPPid() == WaitTask.Pid)
+                Task.Kill(SIGKILL);
+            WaitTask.Kill(SIGKILL);
+        }
         Reap(false);
+    } else {
+        pid_t ppid = WaitTask.GetPPid();
+        if (ppid != getppid()) {
+            L() << "Task reparented to " << ppid << " (" << GetTaskName(ppid) << "). Seize." << std::endl;
+            error = Seize();
+            if (error) {
+                L() << "Cannot seize reparented task: " << error << std::endl;
+                Reap(false);
+            }
+        }
     }
 
     switch (Parent ? Parent->State : EContainerState::Meta) {
@@ -2182,20 +2240,33 @@ void TContainer::Event(const TEvent &event) {
         break;
     }
     case EEventType::Exit:
+    case EEventType::ChildExit:
     {
+        bool delivered = false;
         for (auto &it: Containers) {
             auto ct = it.second;
-            if (ct->WaitTask.Pid != event.Exit.Pid)
+            if (ct->WaitTask.Pid != event.Exit.Pid &&
+                    ct->SeizeTask.Pid != event.Exit.Pid)
                 continue;
             error = ct->Lock(lock);
             lock.unlock();
             if (!error) {
-                ct->Exit(event.Exit.Status, false);
+                if (ct->WaitTask.Pid == event.Exit.Pid ||
+                        ct->SeizeTask.Pid == event.Exit.Pid) {
+                    ct->Exit(event.Exit.Status, false);
+                    delivered = true;
+                }
                 ct->Unlock();
             }
             break;
         }
-        AckExitStatus(event.Exit.Pid);
+        if (event.Type == EEventType::Exit)
+            AckExitStatus(event.Exit.Pid);
+        else {
+            if (!delivered)
+                L() << "Unknown zombie " << event.Exit.Pid << " " << event.Exit.Status << std::endl;
+            (void)waitpid(event.Exit.Pid, NULL, 0);
+        }
         break;
     }
     case EEventType::WaitTimeout:

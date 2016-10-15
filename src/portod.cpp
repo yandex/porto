@@ -351,6 +351,11 @@ static int SlaveRpc() {
                     case SIGCHLD:
                         if (TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_status)) {
                             (void)waitpid(sigInfo.ssi_pid, NULL, 0);
+                        } else {
+                            TEvent e(EEventType::ChildExit);
+                            e.Exit.Pid = sigInfo.ssi_pid;
+                            e.Exit.Status = sigInfo.ssi_status;
+                            EventQueue->Add(0, e);
                         }
                         break;
                     default:

@@ -1374,6 +1374,21 @@ public:
     }
 } static RawRootPid;
 
+class TSeizePid : public TProperty {
+public:
+    TSeizePid() : TProperty(P_SEIZE_PID, EProperty::SEIZE_PID, "") {
+        IsReadOnly = true;
+        IsHidden = true;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CurrentContainer->SeizeTask.Pid);
+        return TError::Success();
+    }
+    TError SetFromRestore(const std::string &value) {
+        return StringToInt(value, CurrentContainer->SeizeTask.Pid);
+    }
+} static SeizePid;
+
 class TRawLoopDev : public TProperty {
 public:
     TError SetFromRestore(const std::string &value);

@@ -10,6 +10,7 @@ class TContainerWaiter;
 
 enum class EEventType {
     Exit,
+    ChildExit,
     RotateLogs,
     Respawn,
     OOM,
