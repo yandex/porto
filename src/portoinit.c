@@ -7,10 +7,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/ptrace.h>
 
 #include "version.hpp"
 
 static pid_t target = -1;
+int seize = 0;
 
 static void forward(int sig) {
     kill(target, sig);
@@ -26,13 +28,16 @@ int main(int argc, char *argv[]) {
             return EXIT_SUCCESS;
         }
 
-        if (!strcmp(argv[argn], "--wait")) {
-            if (++argn == argc)
-                return EXIT_FAILURE;
-            target = atoi(argv[argn]);
-            if (kill(target, 0))
-                return EXIT_FAILURE;
-        }
+        if (!strcmp(argv[argn], "--seize"))
+            seize = 1;
+        else if (strcmp(argv[argn], "--wait"))
+            continue;
+
+        if (++argn == argc)
+            return EXIT_FAILURE;
+        target = atoi(argv[argn]);
+        if (kill(target, 0))
+            return EXIT_FAILURE;
     }
 
     prctl(PR_SET_NAME, "portoinit");
@@ -41,6 +46,11 @@ int main(int argc, char *argv[]) {
         signal(SIGINT, forward);
         signal(SIGQUIT, forward);
         signal(SIGTERM, forward);
+    }
+
+    if (seize) {
+        if (ptrace(PTRACE_SEIZE, target, 0, PTRACE_O_TRACEEXIT))
+            return EXIT_FAILURE;
     }
 
     while (1) {
@@ -57,6 +67,17 @@ int main(int argc, char *argv[]) {
                     continue;
                 return EXIT_FAILURE;
             } else if (pid == target) {
+                if (WIFSTOPPED(status)) {
+                    if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_EXIT << 8))) {
+                        unsigned long msg;
+                        if (ptrace(PTRACE_GETEVENTMSG, target, NULL, &msg))
+                            return EXIT_FAILURE;
+                        status = msg;
+                    } else {
+                        ptrace(PTRACE_CONT, target, 0, WSTOPSIG(status));
+                        continue;
+                    }
+                }
                 if (WIFEXITED(status))
                     return WEXITSTATUS(status);
                 if (WIFSIGNALED(status)) {
