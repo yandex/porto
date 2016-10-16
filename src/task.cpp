@@ -220,26 +220,27 @@ TError TTaskEnv::ConfigureChild() {
             TFile::CloseAll({PortoInit.Fd});
             fexecve(PortoInit.Fd, (char *const *)argv, envp);
             return TError(EError::Unknown, errno, "fexecve()");
-        } else {
-            pid = getpid();
-
-            MasterSock2.Close();
-
-            error = Sock2.SendPid(pid);
-            if (error)
-                return error;
-            error = Sock2.RecvZero();
-            if (error)
-                return error;
-            /* Parent forwards VPid */
-            ReportStage++;
-
-            Sock2.Close();
-
-            if (setsid() < 0)
-                return TError(EError::Unknown, errno, "setsid()");
         }
+
+        if (setsid() < 0)
+            return TError(EError::Unknown, errno, "setsid()");
     }
+
+    /* Report VPid */
+    if (TripleFork) {
+        MasterSock2.Close();
+        error = Sock2.SendPid(getpid());
+        if (error)
+            return error;
+        /* Wait VPid Ack */
+        error = Sock2.RecvZero();
+        if (error)
+            return error;
+        /* Parent forwards VPid */
+        ReportStage++;
+        Sock2.Close();
+    } else
+        ReportPid(getpid());
 
     error = Cred.Apply();
     if (error)
@@ -308,16 +309,10 @@ void TTaskEnv::StartChild() {
     /* WPid reported by parent */
     ReportStage++;
 
-    /* Wait for report WPid in parent */
+    /* Wait WPid Ack */
     error = Sock.RecvZero();
     if (error)
         Abort(error);
-
-    /* Report VPid in pid namespace we're enter */
-    if (!CT->Isolate)
-        ReportPid(getpid());
-    else if (!QuadroFork)
-        ReportStage++;
 
     /* Apply configuration */
     error = ConfigureChild();
@@ -413,6 +408,9 @@ TError TTaskEnv::Start() {
             Abort(error);
 
         if (TripleFork) {
+            error = TUnixSocket::SocketPair(MasterSock2, Sock2);
+            if (error)
+                Abort(error);
             /*
              * Enter into pid-namespace. fork() hangs in libc if child pid
              * collide with parent pid outside. vfork() has no such problem.
@@ -423,12 +421,6 @@ TError TTaskEnv::Start() {
 
             if (forkPid)
                 _exit(EXIT_SUCCESS);
-        }
-
-        if (QuadroFork) {
-            error = TUnixSocket::SocketPair(MasterSock2, Sock2);
-            if (error)
-                Abort(error);
         }
 
         int cloneFlags = SIGCHLD;
@@ -451,31 +443,11 @@ TError TTaskEnv::Start() {
             Abort(error);
         }
 
-        /* Report WPid in host pid namespace */
-        if (TripleFork)
-            ReportPid(GetTid());
-        else
-            ReportPid(clonePid);
-
-        /* Report VPid in parent pid namespace for new pid-ns */
-        if (CT->Isolate && !QuadroFork)
-            ReportPid(clonePid);
-
-        /* WPid reported, wakeup child */
-        error = MasterSock.SendZero();
-        if (error)
-            Abort(error);
-
-        /* ChildCallback() reports VPid here if !Isolate */
-        if (!CT->Isolate && !QuadroFork)
-            ReportStage++;
-
-        /*
-         * QuadroFork waiter receives application VPid from init
-         * task and forwards it into host.
-         */
-        if (QuadroFork) {
+        if (TripleFork) {
             pid_t appPid, appVPid;
+
+            /* Report WPid */
+            ReportPid(GetTid());
 
             /* close other side before reading */
             Sock2.Close();
@@ -483,13 +455,20 @@ TError TTaskEnv::Start() {
             error = MasterSock2.RecvPid(appPid, appVPid);
             if (error)
                 Abort(error);
+
             /* Forward VPid */
             ReportPid(appPid);
+
+            /* Ack VPid */
             error = MasterSock2.SendZero();
             if (error)
                 Abort(error);
 
             MasterSock2.Close();
+        } else {
+            /* Report WPid */
+            ReportPid(clonePid);
+            ReportStage++;
         }
 
         if (TripleFork) {
@@ -524,6 +503,11 @@ TError TTaskEnv::Start() {
         goto kill_all;
 
     error = MasterSock.RecvPid(CT->WaitTask.Pid, CT->TaskVPid);
+    if (error)
+        goto kill_all;
+
+    /* Ack WPid */
+    error = MasterSock.SendZero();
     if (error)
         goto kill_all;
 

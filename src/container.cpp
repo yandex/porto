@@ -611,7 +611,7 @@ pid_t TContainer::GetPidFor(pid_t pid) const {
     if (InPidNamespace(pid, Task.Pid)) {
         if (!Isolate)
             return TaskVPid;
-        if (VirtMode == VIRT_MODE_OS)
+        if (VirtMode == VIRT_MODE_OS || IsMeta())
             return 1;
         return 2;
     }
@@ -1054,7 +1054,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
         return error;
 
     taskEnv->TripleFork = false;
-    taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) && Isolate && !IsMeta();
+    taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) && !IsMeta();
 
     taskEnv->Mnt.BindMounts = BindMounts;
     taskEnv->Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
