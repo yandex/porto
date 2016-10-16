@@ -569,6 +569,20 @@ TError TTask::Fork(bool detach) {
 
 TError TTask::Wait() {
     auto lock = std::unique_lock<std::mutex>(ForkLock);
+    if (Pid) {
+        pid_t pid = Pid;
+        int status;
+        lock.unlock();
+        /* main thread could be blocked on lock that we're holding */
+        if (waitpid(pid, &status, 0) == pid)
+            pid = 0;
+        lock.lock();
+        if (!pid) {
+            Tasks.erase(Pid);
+            Pid = 0;
+            Status = status;
+        }
+    }
     while (Pid) {
         if (kill(Pid, 0) && errno == ESRCH) {
             Tasks.erase(Pid);
