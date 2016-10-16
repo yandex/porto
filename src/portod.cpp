@@ -357,6 +357,7 @@ static int SlaveRpc() {
                         break;
                     case SIGUSR2:
                         DumpMallocInfo();
+                        TContainer::DumpLocks();
                         break;
                     case SIGCHLD:
                         if (TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_status)) {

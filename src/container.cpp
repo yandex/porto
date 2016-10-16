@@ -171,6 +171,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     }
     PendingWrite = false;
     Locked += for_read ? 1 : -1;
+    LastOwner = GetTid();
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
         if (for_read)
             ct->SubtreeRead++;
@@ -200,6 +201,16 @@ void TContainer::Unlock(bool locked) {
     ContainersCV.notify_all();
     if (!locked)
         ContainersMutex.unlock();
+}
+
+void TContainer::DumpLocks() {
+    auto lock = LockContainers();
+    for (auto &it: Containers) {
+        auto &ct = it.second;
+        if (ct->Locked || ct->PendingWrite)
+            L() << ct->Name << " Locked " << ct->Locked << " by " << ct->LastOwner
+                << (ct->PendingWrite ? " PendingWrite" : "") << std::endl;
+    }
 }
 
 void TContainer::Register() {

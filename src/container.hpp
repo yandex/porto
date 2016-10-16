@@ -48,6 +48,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int SubtreeRead = 0;
     int SubtreeWrite = 0;
     bool PendingWrite = false;
+    pid_t LastOwner = 0;
 
     TFile OomEvent;
 
@@ -214,6 +215,7 @@ public:
         return Lock(lock, true, try_lock);
     }
     void Unlock(bool locked = false);
+    static void DumpLocks();
 
     void SanitizeCapabilities();
     uint64_t GetTotalMemGuarantee(bool locked = false) const;
