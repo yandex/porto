@@ -37,10 +37,10 @@ def fuzzer_main(tid, iter_num, verbose=False, timeout=180, print_progress=False,
 
         fail_cnt += select_by_weight(
             [
-                (2, targets.container_action),
-                (2, targets.volume_action),
-                (2, targets.layer_action)
-            ] 
+                (100, targets.container_action),
+                (10, targets.volume_action),
+                (1, targets.layer_action)
+            ]
         )(conn)
 
     print "Connection {} finished: action performed: {}, invalid: {}".format(tid, iter_num, fail_cnt)
