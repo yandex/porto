@@ -44,6 +44,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     friend class TProperty;
 
     int Locked = 0;
+    bool PendingWrite = false;
 
     TFile OomEvent;
 

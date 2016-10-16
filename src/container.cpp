@@ -147,9 +147,9 @@ TError TContainer::Lock(TScopedLock &lock, bool shared, bool try_lock) {
     while (1) {
         if (State == EContainerState::Destroyed)
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
-        bool busy = Locked && (Locked < 0 || !shared);
+        bool busy = (Locked && (Locked < 0 || !shared)) || (shared && PendingWrite);
         for (auto ct = Parent.get(); !busy && ct; ct = ct->Parent.get())
-            busy = busy || ct->Locked < 0;
+            busy = busy || ct->Locked < 0 || ct->PendingWrite;
         if (!busy)
             break;
         if (try_lock) {
@@ -157,8 +157,11 @@ TError TContainer::Lock(TScopedLock &lock, bool shared, bool try_lock) {
                 L() << "TryLock " << (shared ? "read " : "write ") << "Failed" << Name << std::endl;
             return TError(EError::Busy, "Container is busy: " + Name);
         }
+        if (!shared)
+            PendingWrite = true;
         ContainersCV.wait(lock);
     }
+    PendingWrite = false;
     Locked += shared ? 1 : -1;
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get())
         ct->Locked++;
