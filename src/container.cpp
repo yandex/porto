@@ -213,7 +213,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     Parent(parent), Name(name),
     FirstName(!parent ? "" : parent->IsRoot() ? name : name.substr(parent->Name.length() + 1)),
     Level(parent ? parent->Level + 1 : 0),
-    Stdin(0), Stdout(1), Stderr(2)
+    Stdin(0), Stdout(1), Stderr(2),
+    ClientsCount(0)
 {
     Statistics->ContainersCount++;
     std::fill(PropSet, PropSet + sizeof(PropSet), false);

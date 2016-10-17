@@ -40,6 +40,8 @@ TClient::~TClient() {
     CloseConnection();
     if (AccessLevel != EAccessLevel::Internal)
         Statistics->ClientsCount--;
+    if (ClientContainer)
+        ClientContainer->ClientsCount--;
 }
 
 TError TClient::AcceptConnection(int listenFd) {
@@ -144,7 +146,19 @@ TError TClient::IdentifyClient(bool initial) {
     if (ct->State != EContainerState::Running && ct->State != EContainerState::Meta)
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 
+    if (ct->ClientsCount >= config().daemon().max_clients_in_container())
+        return TError(EError::ResourceNotAvailable,
+                "Count of clients from container " + ct->Name +
+                " has reached limit: " + std::to_string(ct->ClientsCount));
+
+    if (ct->ClientsCount < 0)
+        L_ERR() << "Client count underflow" << std::endl;
+
+    if (ClientContainer)
+        ClientContainer->ClientsCount--;
     ClientContainer = ct;
+    ct->ClientsCount++;
+
     Comm = GetTaskName(Pid);
 
     if (ct->IsRoot()) {

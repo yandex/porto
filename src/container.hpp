@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include <memory>
+#include <atomic>
 
 #include "util/unix.hpp"
 #include "util/locks.hpp"
@@ -157,6 +158,7 @@ public:
 
     std::string Private;
     EAccessLevel AccessLevel;
+    std::atomic<int> ClientsCount;
 
     bool IsWeak = false;
     bool OomKilled = false;

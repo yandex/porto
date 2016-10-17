@@ -29,6 +29,7 @@ void TConfig::LoadDefaults() {
     config().set_keyvalue_size(32 << 20);
 
     config().mutable_daemon()->set_max_clients(1000);
+    config().mutable_daemon()->set_max_clients_in_container(500);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);

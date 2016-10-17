@@ -2958,6 +2958,8 @@ void TPortoStat::Populate(TUintMap &m) {
     m["volumes"] = Statistics->VolumesCount;
     m["clients"] = Statistics->ClientsCount;
 
+    m["container_clients"] = CurrentContainer->ClientsCount;
+
     m["requests_queued"] = Statistics->RequestsQueued;
     m["requests_completed"] = Statistics->RequestsCompleted;
 
