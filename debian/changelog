@@ -1,3 +1,33 @@
+yandex-porto (3.0.8) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: forbid process attachment to isolated container
+  * portod: close pipes in master process after upgrade
+  * porto: add property exit_code
+  * fuzzer: perform more container actions
+  * porto: use more fair read-write lock for containers
+  * porto: recreate cgroups and move processes at restore
+  * porto: remove legacy cgroup layout
+  * porto: handle subprocess exit in main event loop
+  * porto: spawn portoinit for non-isolated application containers
+  * portoinit: add waiting for non-child process via ptrace seize
+  * porto: catch reparented wait tasks with ptrace seize
+  * util/task: try to deliver exit status by waiting thread too
+  * container: make read lock hierarchical
+  * rpc/get: lock all containers for read
+  * fuzzer: increase timeout
+  * api/python: operation timeout shouldn't be shorter than connection timeout
+  * scripts/standalone_test: remove logs before start
+  * porto: track requests completion time
+
+  [ Maxim Samoylov ]
+  * container: silence error logging on cgroup EINVAL
+
+  [ Konstantin Khlebnikov ]
+  * porto: limit count of clients for each container with 500
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 17 Oct 2016 15:35:12 +0300
+
 yandex-porto (3.0.7) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
