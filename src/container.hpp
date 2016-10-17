@@ -44,6 +44,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     friend class TProperty;
 
     int Locked = 0;
+    int SubtreeRead = 0;
+    int SubtreeWrite = 0;
     bool PendingWrite = false;
 
     TFile OomEvent;
@@ -205,7 +207,7 @@ public:
 
     std::string GetPortoNamespace() const;
 
-    TError Lock(TScopedLock &lock, bool shared = false, bool try_lock = false);
+    TError Lock(TScopedLock &lock, bool for_read = false, bool try_lock = false);
     TError LockRead(TScopedLock &lock, bool try_lock = false) {
         return Lock(lock, true, try_lock);
     }

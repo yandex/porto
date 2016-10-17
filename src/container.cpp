@@ -140,32 +140,43 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
     return TContainer::Find(name.substr(prefix.length()), ct);
 }
 
-/* lock container shared/exclusive and all parent containers as shared */
-TError TContainer::Lock(TScopedLock &lock, bool shared, bool try_lock) {
+/* lock subtree for read or write */
+TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     if (Verbose)
         L() << (try_lock ? "TryLock " : "Lock ")
-            << (shared ? "read " : "write ") << Name << std::endl;
+            << (for_read ? "read " : "write ") << Name << std::endl;
     while (1) {
-        if (State == EContainerState::Destroyed)
+        if (State == EContainerState::Destroyed) {
+            if (Verbose)
+                L() << "Lock failed, container was destroyed: " << Name << std::endl;
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
-        bool busy = (Locked && (Locked < 0 || !shared)) || (shared && PendingWrite);
+        }
+        bool busy;
+        if (for_read)
+            busy = Locked < 0 || PendingWrite || SubtreeWrite;
+        else
+            busy = Locked || SubtreeRead || SubtreeWrite;
         for (auto ct = Parent.get(); !busy && ct; ct = ct->Parent.get())
-            busy = busy || ct->Locked < 0 || ct->PendingWrite;
+            busy = ct->PendingWrite || (for_read ? ct->Locked < 0 : ct->Locked);
         if (!busy)
             break;
         if (try_lock) {
             if (Verbose)
-                L() << "TryLock " << (shared ? "read " : "write ") << "Failed" << Name << std::endl;
+                L() << "TryLock " << (for_read ? "read" : "write") << " Failed" << Name << std::endl;
             return TError(EError::Busy, "Container is busy: " + Name);
         }
-        if (!shared)
+        if (!for_read)
             PendingWrite = true;
         ContainersCV.wait(lock);
     }
     PendingWrite = false;
-    Locked += shared ? 1 : -1;
-    for (auto ct = Parent.get(); ct; ct = ct->Parent.get())
-        ct->Locked++;
+    Locked += for_read ? 1 : -1;
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        if (for_read)
+            ct->SubtreeRead++;
+        else
+            ct->SubtreeWrite++;
+    }
     return TError::Success();
 }
 
@@ -174,12 +185,17 @@ void TContainer::Unlock(bool locked) {
         L() << "Unlock " << (Locked > 0 ? "read " : "write ") << Name << std::endl;
     if (!locked)
         ContainersMutex.lock();
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        if (Locked > 0) {
+            PORTO_ASSERT(ct->SubtreeRead > 0);
+            ct->SubtreeRead--;
+        } else {
+            PORTO_ASSERT(ct->SubtreeWrite > 0);
+            ct->SubtreeWrite--;
+        }
+    }
     PORTO_ASSERT(Locked);
     Locked += (Locked > 0) ? -1 : 1;
-    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
-        PORTO_ASSERT(ct->Locked > 0);
-        ct->Locked--;
-    }
     /* not so effective and fair but simple */
     ContainersCV.notify_all();
     if (!locked)
@@ -2282,8 +2298,8 @@ void TContainer::Event(const TEvent &event) {
             error = ct->Lock(lock);
             lock.unlock();
             if (!error) {
-               ct->Destroy();
-               ct->Unlock();
+                ct->Destroy();
+                ct->Unlock();
             }
         }
         break;
