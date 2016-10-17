@@ -682,7 +682,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::MEM_GUARANTEE)) {
         error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
         if (error) {
-            L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
             return error;
         }
     }
@@ -693,7 +694,8 @@ TError TContainer::ApplyDynamicProperties() {
             if (error.GetErrno() == EBUSY)
                 return TError(EError::InvalidValue, std::to_string(MemLimit) + " is too low");
 
-            L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
             return error;
         }
     }
@@ -701,7 +703,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
         error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
         if (error) {
-            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
             return error;
         }
     }
@@ -709,7 +712,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::DIRTY_LIMIT)) {
         error = MemorySubsystem.SetDirtyLimit(memcg, DirtyMemLimit);
         if (error) {
-            L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
             return error;
         }
     }
@@ -717,7 +721,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::RECHARGE_ON_PGFAULT)) {
         error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
         if (error) {
-            L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
             return error;
         }
     }
@@ -725,7 +730,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::IO_LIMIT)) {
         error = MemorySubsystem.SetIoLimit(memcg, IoLimit);
         if (error) {
-            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
             return error;
         }
     }
@@ -733,7 +739,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::IO_OPS_LIMIT)) {
         error = MemorySubsystem.SetIopsLimit(memcg, IopsLimit);
         if (error) {
-            L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
             return error;
         }
     }
@@ -742,7 +749,8 @@ TError TContainer::ApplyDynamicProperties() {
         auto blkcg = GetCgroup(BlkioSubsystem);
         error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
         if (error) {
-            L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
             return error;
         }
     }
@@ -751,7 +759,8 @@ TError TContainer::ApplyDynamicProperties() {
         auto cg = GetCgroup(HugetlbSubsystem);
         error = HugetlbSubsystem.SetHugeLimit(cg, HugetlbLimit);
         if (error) {
-            L_ERR() << "Cannot set " << P_HUGETLB_LIMIT << ": " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Cannot set " << P_HUGETLB_LIMIT << ": " << error << std::endl;
             return error;
         }
         if (HugetlbSubsystem.SupportGigaPages()) {
@@ -768,7 +777,8 @@ TError TContainer::ApplyDynamicProperties() {
         error = CpuSubsystem.SetCpuPolicy(cpucg, CpuPolicy,
                                           CpuGuarantee, CpuLimit);
         if (error) {
-            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            if (error.GetErrno() != EINVAL)
+                L_ERR() << "Cannot set cpu policy: " << error << std::endl;
             return error;
         }
     }
