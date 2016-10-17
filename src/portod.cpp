@@ -140,6 +140,16 @@ public:
         Statistics->RequestsCompleted++;
         Statistics->RequestsQueued--;
 
+        auto time = request.Client->GetRequestTimeMs();
+        if (time > 1000)
+            Statistics->RequestsLonger1s++;
+        if (time > 3000)
+            Statistics->RequestsLonger3s++;
+        if (time > 30000)
+            Statistics->RequestsLonger30s++;
+        if (time > 300000)
+            Statistics->RequestsLonger5m++;
+
         return true;
     }
 };

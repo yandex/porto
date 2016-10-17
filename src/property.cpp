@@ -2960,6 +2960,11 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["requests_queued"] = Statistics->RequestsQueued;
     m["requests_completed"] = Statistics->RequestsCompleted;
+
+    m["requests_longer_1s"] = Statistics->RequestsLonger1s;
+    m["requests_longer_3s"] = Statistics->RequestsLonger3s;
+    m["requests_longer_30s"] = Statistics->RequestsLonger30s;
+    m["requests_longer_5m"] = Statistics->RequestsLonger5m;
 }
 
 TError TPortoStat::Get(std::string &value) {
