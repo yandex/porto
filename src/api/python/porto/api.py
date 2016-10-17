@@ -184,13 +184,12 @@ class _RPC(object):
     @_set_locked
     @_set_deadline
     def call(self, request, timeout):
-        if timeout is not None:
-            self.deadline = time.time() + timeout
-
         self._send_request(request)
 
         if timeout is None:
             self.deadline = None
+        elif timeout > self.timeout:
+            self.deadline += timeout - self.timeout
 
         return self._recv_response()
 
