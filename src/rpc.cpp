@@ -447,9 +447,13 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
 
 static void FillGetResponse(const rpc::TContainerGetRequest &req,
                             rpc::TContainerGetResponse &rsp,
-                            std::string &name, bool try_lock) {
+                            std::string &name) {
     std::shared_ptr<TContainer> ct;
-    TError containerError = CurrentClient->ReadContainer(name, ct, try_lock);
+
+    auto lock = LockContainers();
+    TError containerError = CurrentClient->ResolveContainer(name, ct);
+    lock.unlock();
+
     auto entry = rsp.add_list();
     entry->set_name(name);
     for (int j = 0; j < req.variable_size(); j++) {
@@ -504,8 +508,18 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
         }
     }
 
+    /* Lock all containers for read. TODO: lock only common ancestor */
+
+    auto lock = LockContainers();
+    TError error = RootContainer->LockRead(lock, try_lock);
+    lock.unlock();
+    if (error)
+        return error;
+
     for (auto &name: names)
-        FillGetResponse(req, *get, name, try_lock);
+        FillGetResponse(req, *get, name);
+
+    RootContainer->Unlock();
 
     return TError::Success();
 }
