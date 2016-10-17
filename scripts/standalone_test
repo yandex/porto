@@ -64,6 +64,9 @@ test $(id -u) = "0" || die "current user not root"
 
 trap stop_porto TERM INT QUIT EXIT
 kill_porto
+
+rm -f /var/log/portod.log /var/log/portoloop.log
+
 start_porto
 
 $PORTO_BIN/portotest $@ || die "portotest failed"
