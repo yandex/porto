@@ -97,6 +97,9 @@ public:
     EContainerState State = EContainerState::Stopped;
     int RunningChildren = 0;
 
+    /* protected with ContainersMutex */
+    std::list<std::shared_ptr<TContainer>> Children;
+
     bool PropSet[(int)EProperty::NR_PROPERTIES];
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
     uint64_t Controllers, RequiredControllers;
@@ -111,7 +114,6 @@ public:
     bool BindDns;
     bool Isolate;
     std::vector<std::string> NetProp;
-    std::list<std::shared_ptr<TContainer>> Children;
     std::string Hostname;
     std::vector<std::string> EnvCfg;
     std::vector<TBindMount> BindMounts;
@@ -216,7 +218,7 @@ public:
     void Unlock(bool locked = false);
 
     void SanitizeCapabilities();
-    uint64_t GetTotalMemGuarantee(void) const;
+    uint64_t GetTotalMemGuarantee(bool locked = false) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
     bool IsolatedFromHost() const;
 

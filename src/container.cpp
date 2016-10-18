@@ -203,6 +203,7 @@ void TContainer::Unlock(bool locked) {
 }
 
 void TContainer::Register() {
+    PORTO_LOCKED(ContainersMutex);
     Containers[Name] = shared_from_this();
     if (Parent)
         Parent->Children.emplace_back(shared_from_this());
@@ -601,6 +602,7 @@ bool TContainer::IsChildOf(const TContainer &ct) const {
 
 std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
     std::list<std::shared_ptr<TContainer>> subtree {shared_from_this()};
+    auto lock = LockContainers();
     for (auto it = subtree.rbegin(); it != subtree.rend(); ++it) {
         for (auto &child: (*it)->Children)
             subtree.emplace_front(child);
@@ -644,17 +646,30 @@ TError TContainer::OpenNetns(TNamespaceFd &netns) const {
     return TError(EError::InvalidValue, "Cannot open netns: container not running");
 }
 
-uint64_t TContainer::GetTotalMemGuarantee(void) const {
+uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
     uint64_t sum = 0lu;
 
-    for (auto &child : Children)
-        sum += child->GetTotalMemGuarantee();
+    // FIXME ugly
+    if (!locked)
+        ContainersMutex.lock();
 
-    return std::max(NewMemGuarantee, sum);
+    for (auto &child : Children)
+        sum += child->GetTotalMemGuarantee(true);
+
+    sum = std::max(NewMemGuarantee, sum);
+
+    if (!locked)
+        ContainersMutex.unlock();
+
+    return sum;
 }
 
 uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     uint64_t lim = 0;
+
+    // FIXME ugly
+    if (!base)
+        ContainersMutex.lock();
 
     /* Container without load limited with total limit of childrens */
     if (IsMeta() && VirtMode == VIRT_MODE_APP) {
@@ -672,6 +687,9 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
         if (p->MemLimit && (p->MemLimit < lim || !lim))
             lim = p->MemLimit;
     }
+
+    if (!base)
+        ContainersMutex.unlock();
 
     return lim;
 }
