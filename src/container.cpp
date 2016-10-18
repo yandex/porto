@@ -1390,15 +1390,6 @@ TError TContainer::Start() {
     return error;
 }
 
-TError TContainer::CallPostorder(std::function<TError (TContainer &ct)> fn) {
-    for (auto &child : Children) {
-        TError error = child->CallPostorder(fn);
-        if (error)
-            return error;
-    }
-    return fn(*this);
-}
-
 TError TContainer::PrepareWorkDir() {
     if (IsRoot())
         return TError::Success();

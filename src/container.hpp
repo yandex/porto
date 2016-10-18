@@ -83,8 +83,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void CleanupWaiters();
     void NotifyWaiters();
 
-    TError CallPostorder(std::function<TError (TContainer &ct)> fn);
-
 public:
     const std::shared_ptr<TContainer> Parent;
     const std::string Name;
