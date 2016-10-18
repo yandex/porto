@@ -229,7 +229,7 @@ TError TTaskEnv::ConfigureChild() {
     /* Report VPid */
     if (TripleFork) {
         MasterSock2.Close();
-        error = Sock2.SendPid(getpid());
+        error = Sock2.SendPid(GetPid());
         if (error)
             return error;
         /* Wait VPid Ack */
@@ -240,7 +240,7 @@ TError TTaskEnv::ConfigureChild() {
         ReportStage++;
         Sock2.Close();
     } else
-        ReportPid(getpid());
+        ReportPid(GetPid());
 
     error = Cred.Apply();
     if (error)
@@ -376,7 +376,7 @@ TError TTaskEnv::Start() {
 
         // move to target cgroups
         for (auto &cg : Cgroups) {
-            error = cg.Attach(getpid());
+            error = cg.Attach(GetPid());
             if (error)
                 Abort(error);
         }

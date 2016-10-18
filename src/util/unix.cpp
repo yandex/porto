@@ -81,11 +81,11 @@ pid_t TTask::GetPPid() const {
 }
 
 pid_t GetPid() {
-    return getpid();
+    return syscall(SYS_getpid);
 }
 
 pid_t GetPPid() {
-    return getppid();
+    return syscall(SYS_getppid);
 }
 
 pid_t GetTid() {
