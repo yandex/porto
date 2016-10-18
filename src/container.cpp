@@ -418,6 +418,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     return TError::Success();
 
 err:
+    ct->Net = nullptr;
     ContainerIdMap.Put(id);
     ct = nullptr;
     return error;
