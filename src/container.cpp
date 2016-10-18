@@ -1780,40 +1780,50 @@ TError TContainer::Resume() {
     return TError::Success();
 }
 
-static void ParsePropertyName(std::string &name, std::string &idx) {
-    std::vector<std::string> tokens;
-    TError error = SplitString(name, '[', tokens);
-    if (error || tokens.size() != 2)
-        return;
+/* return true if index specified for property */
+static bool ParsePropertyName(std::string &name, std::string &idx) {
+    if (name.size() && name.back() == ']') {
+        auto lb = name.find('[');
 
-    name = tokens[0];
-    idx = StringTrim(tokens[1], " \t\n]");
+        if (lb != std::string::npos) {
+            idx = name.substr(lb + 1);
+            idx.pop_back();
+            name = name.substr(0, lb);
+
+            return true;
+        }
+    }
+
+    return false;
 }
 
 TError TContainer::GetProperty(const std::string &origProperty, std::string &value) const {
-    std::string property = origProperty;
-    auto dot = property.find('.');
     TError error;
-
-    if (dot != std::string::npos) {
-        std::string type = property.substr(0, dot);
-        if (State == EContainerState::Stopped)
-            return TError(EError::InvalidState,
-                          "Not available in stopped state: " + property);
-        for (auto subsys: Subsystems) {
-            if (subsys->Type == type) {
-                auto cg = GetCgroup(*subsys);
-                if (!cg.Has(property))
-                    break;
-                return cg.Get(property, value);
-            }
-        }
-        return TError(EError::InvalidProperty,
-                      "Unknown cgroup attribute: " + property);
-    }
-
+    std::string property = origProperty;
     std::string idx;
-    ParsePropertyName(property, idx);
+
+    if (!ParsePropertyName(property, idx)) {
+        auto dot = property.find('.');
+
+        if (dot != std::string::npos) {
+            std::string type = property.substr(0, dot);
+            if (State == EContainerState::Stopped)
+                return TError(EError::InvalidState,
+                        "Not available in stopped state: " + property);
+            for (auto subsys: Subsystems) {
+                if (subsys->Type == type) {
+                    auto cg = GetCgroup(*subsys);
+                    if (!cg.Has(property))
+                        break;
+                    return cg.Get(property, value);
+                }
+            }
+            return TError(EError::InvalidProperty,
+                    "Unknown cgroup attribute: " + property);
+        }
+    } else if (!idx.length()) {
+        return TError(EError::InvalidProperty, "Empty property index");
+    }
 
     auto it = ContainerProperties.find(property);
     if (it == ContainerProperties.end())
@@ -1841,7 +1851,10 @@ TError TContainer::SetProperty(const std::string &origProperty,
 
     std::string property = origProperty;
     std::string idx;
-    ParsePropertyName(property, idx);
+
+    if (ParsePropertyName(property, idx) && !idx.length())
+        return TError(EError::InvalidProperty, "Empty property index");
+
     std::string value = StringTrim(origValue);
     TError error;
 
