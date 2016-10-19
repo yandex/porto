@@ -207,8 +207,9 @@ void TContainer::DumpLocks() {
     auto lock = LockContainers();
     for (auto &it: Containers) {
         auto &ct = it.second;
-        if (ct->Locked || ct->PendingWrite)
+        if (ct->Locked || ct->PendingWrite || ct->SubtreeRead || ct->SubtreeWrite)
             L() << ct->Name << " Locked " << ct->Locked << " by " << ct->LastOwner
+                << " Read " << ct->SubtreeRead << " Write " << ct->SubtreeWrite
                 << (ct->PendingWrite ? " PendingWrite" : "") << std::endl;
     }
 }
