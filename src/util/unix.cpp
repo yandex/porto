@@ -564,12 +564,13 @@ TError TTask::Fork(bool detach) {
         PostFork = true;
     else if (!detach)
         Tasks[Pid] = this;
+    Running = true;
     return TError::Success();
 }
 
 TError TTask::Wait() {
     auto lock = std::unique_lock<std::mutex>(ForkLock);
-    if (Pid) {
+    if (Running) {
         pid_t pid = Pid;
         int status;
         lock.unlock();
@@ -579,14 +580,14 @@ TError TTask::Wait() {
         lock.lock();
         if (!pid) {
             Tasks.erase(Pid);
-            Pid = 0;
+            Running = false;
             Status = status;
         }
     }
-    while (Pid) {
+    while (Running) {
         if (kill(Pid, 0) && errno == ESRCH) {
             Tasks.erase(Pid);
-            Pid = 0;
+            Running = false;
             Status = 100;
             return TError(EError::Unknown, "task not found");
         }
@@ -609,7 +610,7 @@ bool TTask::Deliver(pid_t pid, int status) {
     auto it = Tasks.find(pid);
     if (it == Tasks.end())
         return false;
-    it->second->Pid = 0;
+    it->second->Running = false;
     it->second->Status = status;
     lock.unlock();
     TasksCV.notify_all();

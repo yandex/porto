@@ -14,6 +14,7 @@ class TPath;
 struct TTask {
     pid_t Pid = 0;
     int Status = 0;
+    bool Running = false;
 
     TError Fork(bool detach = false);
     TError Wait();
