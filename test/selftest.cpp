@@ -1317,7 +1317,8 @@ static void TestEnvProperty(Porto::Connection &api) {
         "USER=porto-alice" + EnvSep +
         "container=lxc" + EnvSep +
         "PORTO_NAME=a" + EnvSep +
-        "PORTO_HOST=" + GetHostName() + EnvSep;
+        "PORTO_HOST=" + GetHostName() + EnvSep +
+        "PORTO_USER=porto-alice" + EnvSep;
     ExpectEnv(api, name, "", empty_env);
 
     Say() << "Check user-defined environment" << std::endl;
@@ -1328,6 +1329,7 @@ static void TestEnvProperty(Porto::Connection &api) {
         "container=lxc" + EnvSep +
         "PORTO_NAME=a" + EnvSep +
         "PORTO_HOST=" + GetHostName() + EnvSep +
+        "PORTO_USER=porto-alice" + EnvSep +
         "a=b" + EnvSep +
         "c=d" + EnvSep;
 
@@ -1341,6 +1343,7 @@ static void TestEnvProperty(Porto::Connection &api) {
         "container=lxc" + EnvSep +
         "PORTO_NAME=a" + EnvSep +
         "PORTO_HOST=" + GetHostName() + EnvSep +
+        "PORTO_USER=porto-alice" + EnvSep +
         "a=e;b" + EnvSep +
         "c=d" + EnvSep;
     ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env);
@@ -1377,6 +1380,8 @@ static void TestUserGroupProperty(Porto::Connection &api) {
 
     ExpectApiFailure(api.SetProperty(name, "user", Bob.User()), EError::Permission);
     ExpectApiFailure(api.SetProperty(name, "group", Bob.Group()), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "owner_user", Bob.User()), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "owner_group", Bob.Group()), EError::Permission);
 
     string user, group;
     ExpectApiSuccess(api.GetProperty(name, "user", user));
@@ -1389,6 +1394,8 @@ static void TestUserGroupProperty(Porto::Connection &api) {
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty(name, "user", Bob.User()));
     ExpectApiSuccess(api.SetProperty(name, "group", Bob.Group()));
+    ExpectApiSuccess(api.SetProperty(name, "owner_user", Bob.User()));
+    ExpectApiSuccess(api.SetProperty(name, "owner_group", Bob.Group()));
     AsAlice(api);
 
     ExpectApiFailure(api.Start(name), EError::Permission);

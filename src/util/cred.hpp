@@ -77,6 +77,7 @@ struct TCapabilities {
     friend std::ostream& operator<<(std::ostream& os, const TCapabilities &c) {
         return os << c.Format();
     }
+    bool HasSetUidGid() const;
 };
 
 extern bool HasAmbientCapabilities;

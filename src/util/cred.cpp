@@ -354,6 +354,10 @@ TError TCapabilities::ApplyEffective() const {
     return Apply(1);
 }
 
+bool TCapabilities::HasSetUidGid() const {
+    return (Permitted & BIT(CAP_SETUID)) && (Permitted & BIT(CAP_SETGID));
+}
+
 TCapabilities NoCapabilities;
 TCapabilities PortoInitCapabilities;
 TCapabilities MemCgCapabilities;

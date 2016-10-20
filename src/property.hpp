@@ -15,6 +15,8 @@ constexpr const char *P_RAW_DEATH_TIME = "_death_time";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";
+constexpr const char *P_OWNER_USER = "owner_user";
+constexpr const char *P_OWNER_GROUP = "owner_group";
 constexpr const char *P_ENV = "env";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_ROOT = "root";
@@ -113,6 +115,8 @@ enum class EProperty {
     COMMAND,
     USER,
     GROUP,
+    OWNER_USER,
+    OWNER_GROUP,
     ENV,
     PORTO_NAMESPACE,
     ROOT,

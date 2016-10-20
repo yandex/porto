@@ -103,6 +103,7 @@ public:
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
     uint64_t Controllers, RequiredControllers;
     TCred OwnerCred;
+    TCred TaskCred;
     std::string Command;
     std::string Cwd;
     TStdStream Stdin, Stdout, Stderr;

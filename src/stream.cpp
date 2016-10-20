@@ -75,7 +75,7 @@ retry:
 TError TStdStream::OpenOutside(const TContainer &container,
                                const TClient &client) {
     if (IsNull())
-        return Open("/dev/null", container.OwnerCred);
+        return Open("/dev/null", container.TaskCred);
 
     if (IsRedirect()) {
         int clientFd = -1;
@@ -90,7 +90,7 @@ TError TStdStream::OpenOutside(const TContainer &container,
             return error;
 
         TPath path(StringFormat("/proc/%u/fd/%u", client.Pid, clientFd));
-        error = Open(path, container.OwnerCred);
+        error = Open(path, container.TaskCred);
         if (error)
             return error;
 
@@ -101,7 +101,7 @@ TError TStdStream::OpenOutside(const TContainer &container,
             return TError(EError::Permission,
                     "Not enough permissions for redirect: " + Path.ToString());
     } else if (Outside)
-        return Open(ResolveOutside(container), container.OwnerCred);
+        return Open(ResolveOutside(container), container.TaskCred);
 
     return TError::Success();
 }
@@ -110,7 +110,7 @@ TError TStdStream::OpenInside(const TContainer &container) {
     TError error;
 
     if (!Outside && !IsNull() && !IsRedirect())
-        error = Open(Path, container.OwnerCred);
+        error = Open(Path, container.TaskCred);
 
     /* Assign controlling terminal for our own session */
     if (!error && isatty(Stream))

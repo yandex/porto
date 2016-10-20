@@ -470,7 +470,7 @@ public:
     TUser() : TProperty(P_USER, EProperty::USER, "Start command with given user") {}
 
     TError Get(std::string &value) {
-        value = UserName(CurrentContainer->OwnerCred.Uid);
+        value = UserName(CurrentContainer->TaskCred.Uid);
         return TError::Success();
     }
 
@@ -480,17 +480,20 @@ public:
             return error;
 
         TCred newCred;
-        gid_t oldGid = CurrentContainer->OwnerCred.Gid;
+        gid_t oldGid = CurrentContainer->TaskCred.Gid;
         error = newCred.Load(username);
         if (error) {
-            /* super user can set any numeric id */
-            if (CurrentClient->IsSuperUser()) {
+            /* root user can set any numeric id */
+            if (CurrentClient->TaskCred.IsRootUser()) {
                 newCred.Gid = oldGid;
                 error = UserId(username, newCred.Uid);
             }
             if (error)
                 return error;
         }
+
+        if (newCred.Uid == CurrentContainer->TaskCred.Uid)
+            return TError::Success();
 
         /* try to preserve current group if possible */
         if (newCred.IsMemberOf(oldGid) ||
@@ -499,10 +502,21 @@ public:
             newCred.Gid = oldGid;
 
         error = CurrentClient->CanControl(newCred);
+        if (error) {
+            auto clientCt = CurrentClient->ClientContainer;
+
+            /* allow if client can change uid/gid in own container */
+            if (CurrentContainer->IsChildOf(*clientCt) &&
+                    (clientCt->CapAmbient.HasSetUidGid() ||
+                     (clientCt->CapLimit.HasSetUidGid() &&
+                      CurrentClient->TaskCred.IsRootUser())))
+                error = TError::Success();
+        }
+
         if (error)
             return error;
 
-        CurrentContainer->OwnerCred = newCred;
+        CurrentContainer->TaskCred = newCred;
         CurrentContainer->SetProp(EProperty::USER);
         CurrentContainer->SanitizeCapabilities();
         return TError::Success();
@@ -514,7 +528,7 @@ public:
     TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
 
     TError Get(std::string &value) {
-        value = GroupName(CurrentContainer->OwnerCred.Gid);
+        value = GroupName(CurrentContainer->TaskCred.Gid);
         return TError::Success();
     }
 
@@ -528,6 +542,79 @@ public:
         if (error)
             return error;
 
+        if (!CurrentContainer->TaskCred.IsMemberOf(newGid) &&
+                !CurrentClient->Cred.IsMemberOf(newGid) &&
+                !CurrentClient->IsSuperUser())
+            error = TError(EError::Permission, "Desired group : " + groupname +
+                           " isn't in current user supplementary group list");
+        if (error) {
+            auto clientCt = CurrentClient->ClientContainer;
+
+            /* allow if client can change uid/gid in own container */
+            if (CurrentContainer->IsChildOf(*clientCt) &&
+                    (clientCt->CapAmbient.HasSetUidGid() ||
+                     (clientCt->CapLimit.HasSetUidGid() &&
+                      CurrentClient->TaskCred.IsRootUser())))
+                error = TError::Success();
+        }
+        if (error)
+            return error;
+
+        CurrentContainer->TaskCred.Gid = newGid;
+        CurrentContainer->SetProp(EProperty::GROUP);
+        return TError::Success();
+    }
+} static Group;
+
+class TOwnerUser : public TProperty {
+public:
+ TOwnerUser() : TProperty(P_OWNER_USER, EProperty::OWNER_USER,
+                          "Container owner user") {}
+
+    TError Get(std::string &value) {
+        value = UserName(CurrentContainer->OwnerCred.Uid);
+        return TError::Success();
+    }
+
+    TError Set(const std::string &username) {
+        TCred newCred;
+        gid_t oldGid = CurrentContainer->OwnerCred.Gid;
+        TError error = newCred.Load(username);
+        if (error)
+            return error;
+
+        /* try to preserve current group if possible */
+        if (newCred.IsMemberOf(oldGid) ||
+                CurrentClient->Cred.IsMemberOf(oldGid) ||
+                CurrentClient->IsSuperUser())
+            newCred.Gid = oldGid;
+
+        error = CurrentClient->CanControl(newCred);
+        if (error)
+            return error;
+
+        CurrentContainer->OwnerCred = newCred;
+        CurrentContainer->SetProp(EProperty::OWNER_USER);
+        return TError::Success();
+    }
+} static OwnerUser;
+
+class TOwnerGroup : public TProperty {
+public:
+    TOwnerGroup() : TProperty(P_OWNER_GROUP, EProperty::OWNER_GROUP,
+                              "Container owner group") {}
+
+    TError Get(std::string &value) {
+        value = GroupName(CurrentContainer->OwnerCred.Gid);
+        return TError::Success();
+    }
+
+    TError Set(const std::string &groupname) {
+        gid_t newGid;
+        TError error = GroupId(groupname, newGid);
+        if (error)
+            return error;
+
         if (!CurrentContainer->OwnerCred.IsMemberOf(newGid) &&
                 !CurrentClient->Cred.IsMemberOf(newGid) &&
                 !CurrentClient->IsSuperUser())
@@ -535,10 +622,9 @@ public:
                     " isn't in current user supplementary group list");
 
         CurrentContainer->OwnerCred.Gid = newGid;
-        CurrentContainer->SetProp(EProperty::GROUP);
         return TError::Success();
     }
-} static Group;
+} static OwnerGroup;
 
 class TMemoryGuarantee : public TProperty {
 public:

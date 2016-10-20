@@ -337,6 +337,18 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (error)
         goto err;
 
+    ct->SetProp(EProperty::OWNER_USER);
+    ct->SetProp(EProperty::OWNER_GROUP);
+
+    /*
+     * For sub-containers of client container use its task credentials.
+     * This is safe because new container will have the same restrictions.
+     */
+    if (ct->IsChildOf(*CurrentClient->ClientContainer))
+        ct->TaskCred = CurrentClient->TaskCred;
+    else
+        ct->TaskCred = CurrentClient->Cred;
+
     ct->SetProp(EProperty::USER);
     ct->SetProp(EProperty::GROUP);
 
@@ -1026,13 +1038,18 @@ TError TContainer::GetEnvironment(TEnv &env) {
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     env.SetEnv("HOME", GetCwd());
-    env.SetEnv("USER", UserName(OwnerCred.Uid));
+
+    if (VirtMode == VIRT_MODE_OS)
+        env.SetEnv("USER", "root");
+    else
+        env.SetEnv("USER", TaskCred.User());
 
     env.SetEnv("container", "lxc");
 
-    /* lock these two */
+    /* lock these */
     env.SetEnv("PORTO_NAME", Name, true, true);
     env.SetEnv("PORTO_HOST", GetHostName(), true, true);
+    env.SetEnv("PORTO_USER", OwnerCred.User(), true, true);
 
     /* Inherit environment from containts in isolation domain */
     bool overwrite = true;
@@ -1051,7 +1068,6 @@ TError TContainer::GetEnvironment(TEnv &env) {
 
 TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
                                struct TNetCfg *NetCfg) {
-    auto user = UserName(OwnerCred.Uid);
     auto parent = FindRunningParent();
     TError error;
 
@@ -1099,11 +1115,10 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     taskEnv->Mnt.OwnerCred = OwnerCred;
 
     if (VirtMode == VIRT_MODE_OS) {
-        user = "root";
         taskEnv->Cred = TCred(0, 0);
     } else {
-        taskEnv->Cred = OwnerCred;
-        error = taskEnv->Cred.LoadGroups(user);
+        taskEnv->Cred = TaskCred;
+        error = taskEnv->Cred.LoadGroups(TaskCred.User());
         if (error)
             return error;
     }
@@ -1412,7 +1427,7 @@ TError TContainer::PrepareWorkDir() {
 
     TError error = work.Mkdir(0755);
     if (!error)
-        error = work.Chown(OwnerCred);
+        error = work.Chown(TaskCred);
     return error;
 }
 
@@ -1445,7 +1460,7 @@ TError TContainer::PrepareResources() {
 
         RootPath = Parent->RootPath;
 
-        error = TVolume::Create(TPath(), cfg, *this, OwnerCred, RootVolume);
+        error = TVolume::Create(TPath(), cfg, *this, TaskCred, RootVolume);
         if (error) {
             L_ERR() << "Cannot create root volume: " << error << std::endl;
             FreeResources();
@@ -2030,6 +2045,9 @@ TError TContainer::Load(const TKeyValue &node) {
 
     if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped)
         Controllers = RootContainer->Controllers;
+
+    if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
+        OwnerCred = TaskCred;
 
     CurrentContainer = nullptr;
 
