@@ -259,7 +259,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if (IsRoot())
         NsName = ROOT_PORTO_NAMESPACE;
     else if (config().container().default_porto_namespace())
-        NsName = Name + "/";
+        NsName = FirstName + "/";
     else
         NsName = "";
 
