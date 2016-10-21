@@ -1,3 +1,21 @@
+yandex-porto (3.0.9) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * container: perform property index parsing stricter
+
+  [ Konstantin Khlebnikov ]
+  * porto: fix locking around children list
+  * porto: do not trust libc getpid after fork
+  * container: drop network if restore failed
+  * container: remove CallPostorder
+  * porto: debug container locks
+  * util/task: fix race between fork and exit
+  * container: also dump subtree locks
+  * porto: split owner and task credentials
+  * property: cleanup permissions checks for changing user and group
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 21 Oct 2016 14:12:05 +0300
+
 yandex-porto (3.0.8) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
