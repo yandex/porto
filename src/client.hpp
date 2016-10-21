@@ -34,6 +34,8 @@ public:
     EAccessLevel AccessLevel = EAccessLevel::None;
 
     bool IsSuperUser(void) const;
+
+    bool CanSetUidGid() const;
     TError CanControl(const TCred &cred);
     TError CanControl(const TContainer &ct, bool child = false);
 

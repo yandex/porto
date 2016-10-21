@@ -482,15 +482,15 @@ public:
         TCred newCred;
         gid_t oldGid = CurrentContainer->TaskCred.Gid;
         error = newCred.Load(username);
-        if (error) {
-            /* root user can set any numeric id */
-            if (CurrentClient->TaskCred.IsRootUser()) {
-                newCred.Gid = oldGid;
-                error = UserId(username, newCred.Uid);
-            }
-            if (error)
-                return error;
+
+        /* allow any numeric id if client can change uid/gid */
+        if (error && CurrentClient->CanSetUidGid()) {
+            newCred.Gid = oldGid;
+            error = UserId(username, newCred.Uid);
         }
+
+        if (error)
+            return error;
 
         if (newCred.Uid == CurrentContainer->TaskCred.Uid)
             return TError::Success();
@@ -502,16 +502,11 @@ public:
             newCred.Gid = oldGid;
 
         error = CurrentClient->CanControl(newCred);
-        if (error) {
-            auto clientCt = CurrentClient->ClientContainer;
 
-            /* allow if client can change uid/gid in own container */
-            if (CurrentContainer->IsChildOf(*clientCt) &&
-                    (clientCt->CapAmbient.HasSetUidGid() ||
-                     (clientCt->CapLimit.HasSetUidGid() &&
-                      CurrentClient->TaskCred.IsRootUser())))
-                error = TError::Success();
-        }
+        /* allow any user in sub-container if client can change uid/gid */
+        if (error && CurrentClient->CanSetUidGid() &&
+                CurrentContainer->IsChildOf(*CurrentClient->ClientContainer))
+            error = TError::Success();
 
         if (error)
             return error;
@@ -547,16 +542,12 @@ public:
                 !CurrentClient->IsSuperUser())
             error = TError(EError::Permission, "Desired group : " + groupname +
                            " isn't in current user supplementary group list");
-        if (error) {
-            auto clientCt = CurrentClient->ClientContainer;
 
-            /* allow if client can change uid/gid in own container */
-            if (CurrentContainer->IsChildOf(*clientCt) &&
-                    (clientCt->CapAmbient.HasSetUidGid() ||
-                     (clientCt->CapLimit.HasSetUidGid() &&
-                      CurrentClient->TaskCred.IsRootUser())))
-                error = TError::Success();
-        }
+        /* allow any group in sub-container if client can change uid/gid */
+        if (error && CurrentClient->CanSetUidGid() &&
+                CurrentContainer->IsChildOf(*CurrentClient->ClientContainer))
+            error = TError::Success();
+
         if (error)
             return error;
 

@@ -319,6 +319,13 @@ bool TClient::IsSuperUser(void) const {
     return AccessLevel >= EAccessLevel::SuperUser;
 }
 
+bool TClient::CanSetUidGid() const {
+    /* loading capabilities by pid is racy, use container limits instead */
+    if (TaskCred.IsRootUser())
+        return ClientContainer->CapLimit.HasSetUidGid();
+    return ClientContainer->CapAmbient.HasSetUidGid();
+}
+
 TError TClient::CanControl(const TCred &other) {
 
     if (AccessLevel <= EAccessLevel::ReadOnly)

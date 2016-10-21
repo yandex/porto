@@ -256,7 +256,7 @@ TError TCapabilities::Parse(const std::string &string) {
 TError TCapabilities::Load(pid_t pid, int type) {
     struct __user_cap_header_struct header = {
         .version = _LINUX_CAPABILITY_VERSION_3,
-        .pid = getpid(),
+        .pid = pid,
     };
     struct __user_cap_data_struct data[2];
 
