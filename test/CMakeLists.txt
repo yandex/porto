@@ -83,12 +83,16 @@ add_test(NAME fuzzer
          --timeout 300 --progress 32 2000
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME stats
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-stats.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME portod_stop
          COMMAND ${CMAKE_BINARY_DIR}/portod stop
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
-                     unpriv-cred prev_release_upgrade fuzzer
+                     unpriv-cred prev_release_upgrade fuzzer stats
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)
