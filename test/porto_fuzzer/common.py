@@ -149,8 +149,9 @@ def check_portod_pid_valid(master, slave):
         return True
 
     except BaseException as e:
-        print "Portod master pid: {} slave pid: {} are invalid!".format(master, slave)
-        raise e
+        raise BaseException("Portod master pid: {}, slave pid: {} are invalid, "\
+                            "{}?".format(master, slave, "not running" if slave is None or\
+                            master is None else "restart"))
 
 def create_dir(path, name):
     if not os.path.exists(path + "/" + name):
@@ -185,4 +186,9 @@ def get_random_dir(base):
 
     return result
 
-
+def print_stacktrace(pid):
+    print subprocess.check_output([
+        "gdb", "-ex", "thread apply all bt",
+        "-ex", "set confirm off", "-ex", "quit",
+        "-q", "-p", str(pid)
+    ])
