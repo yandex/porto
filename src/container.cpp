@@ -318,9 +318,12 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (parent) {
         if (parent->Level == CONTAINER_LEVEL_MAX)
             return TError(EError::InvalidValue, "You shall not go deeper! Maximum level is " + std::to_string(CONTAINER_LEVEL_MAX));
-        error = CurrentClient->CanControl(*parent, true);
+        error = parent->LockRead(lock);
         if (error)
             return error;
+        error = CurrentClient->CanControl(*parent, true);
+        if (error)
+            goto err;
     } else if (name != ROOT_CONTAINER)
         return TError(EError::ContainerDoesNotExist, "parent container not found for " + name);
 
@@ -365,10 +368,15 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
 
     ct->Register();
 
+    if (parent)
+        parent->Unlock(true);
+
     return TError::Success();
 
 err:
-    if (ct->Id)
+    if (parent)
+        parent->Unlock(true);
+    if (ct && ct->Id)
         ContainerIdMap.Put(ct->Id);
     ct = nullptr;
     return error;
