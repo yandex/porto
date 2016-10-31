@@ -58,6 +58,10 @@ add_test(NAME portoctl-wait
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-wait.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME portod_cli
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portod_cli.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME self-container
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-self-container.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
