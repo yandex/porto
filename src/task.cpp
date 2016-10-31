@@ -159,10 +159,6 @@ TError TTaskEnv::SetHostname() {
 TError TTaskEnv::ConfigureChild() {
     TError error;
 
-    /* Die together with waiter */
-    if (TripleFork)
-        SetDieOnParentExit(SIGKILL);
-
     error = ChildApplyLimits();
     if (error)
         return error;
@@ -306,8 +302,13 @@ TError TTaskEnv::WaitAutoconf() {
 void TTaskEnv::StartChild() {
     TError error;
 
-    /* WPid reported by parent */
-    ReportStage++;
+    if (TripleFork) {
+        /* Die together with parent who report WPid */
+        SetDieOnParentExit(SIGKILL);
+    } else {
+        /* Report WPid */
+        ReportPid(GetPid());
+    }
 
     /* Wait WPid Ack */
     error = Sock.RecvZero();
@@ -422,6 +423,9 @@ TError TTaskEnv::Start() {
 
             if (forkPid)
                 _exit(EXIT_SUCCESS);
+
+            /* Report WPid */
+            ReportPid(GetTid());
         }
 
         int cloneFlags = SIGCHLD;
@@ -444,57 +448,46 @@ TError TTaskEnv::Start() {
             Abort(error);
         }
 
-        if (TripleFork) {
-            pid_t appPid, appVPid;
+        if (!TripleFork)
+            _exit(EXIT_SUCCESS);
 
-            /* Report WPid */
-            ReportPid(GetTid());
+        /* close other side before reading */
+        Sock2.Close();
 
-            /* close other side before reading */
-            Sock2.Close();
+        pid_t appPid, appVPid;
+        error = MasterSock2.RecvPid(appPid, appVPid);
+        if (error)
+            Abort(error);
 
-            error = MasterSock2.RecvPid(appPid, appVPid);
-            if (error)
-                Abort(error);
+        /* Forward VPid */
+        ReportPid(appPid);
 
-            /* Forward VPid */
-            ReportPid(appPid);
+        /* Ack VPid */
+        error = MasterSock2.SendZero();
+        if (error)
+            Abort(error);
 
-            /* Ack VPid */
-            error = MasterSock2.SendZero();
-            if (error)
-                Abort(error);
+        MasterSock2.Close();
 
-            MasterSock2.Close();
-        } else {
-            /* Report WPid */
-            ReportPid(clonePid);
-            ReportStage++;
-        }
+        auto pid = std::to_string(clonePid);
+        const char * argv[] = {
+            "portoinit",
+            "--container",
+            CT->Name.c_str(),
+            "--wait",
+            pid.c_str(),
+            NULL,
+        };
+        auto envp = Env.Envp();
 
-        if (TripleFork) {
-            auto pid = std::to_string(clonePid);
-            const char * argv[] = {
-                "portoinit",
-                "--container",
-                CT->Name.c_str(),
-                "--wait",
-                pid.c_str(),
-                NULL,
-            };
-            auto envp = Env.Envp();
-
-            error = PortoInitCapabilities.ApplyLimit();
-            if (error)
-                _exit(EXIT_FAILURE);
-
-            TFile::CloseAll({PortoInit.Fd});
-            fexecve(PortoInit.Fd, (char *const *)argv, envp);
-            kill(clonePid, SIGKILL);
+        error = PortoInitCapabilities.ApplyLimit();
+        if (error)
             _exit(EXIT_FAILURE);
-        }
 
-        _exit(EXIT_SUCCESS);
+        TFile::CloseAll({PortoInit.Fd});
+        fexecve(PortoInit.Fd, (char *const *)argv, envp);
+        kill(clonePid, SIGKILL);
+        _exit(EXIT_FAILURE);
     }
 
     Sock.Close();
