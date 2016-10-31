@@ -129,6 +129,7 @@ def container_action(conn):
     except (
             porto.exceptions.ContainerDoesNotExist,
             porto.exceptions.PermissionError,
+            porto.exceptions.InvalidProperty,
             porto.exceptions.InvalidValue,
             porto.exceptions.InvalidState,
             porto.exceptions.ContainerAlreadyExists,
