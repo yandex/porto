@@ -732,6 +732,8 @@ static int SlaveMain() {
     if (error)
         FatalError("Cannot create root container", error);
 
+    SystemClient.ClientContainer = RootContainer;
+
     RestoreContainers();
 
     TVolume::RestoreAll();

@@ -38,10 +38,11 @@ TClient::TClient(const std::string &special) {
 
 TClient::~TClient() {
     CloseConnection();
-    if (AccessLevel != EAccessLevel::Internal)
+    if (AccessLevel != EAccessLevel::Internal) {
         Statistics->ClientsCount--;
-    if (ClientContainer)
-        ClientContainer->ClientsCount--;
+        if (ClientContainer)
+            ClientContainer->ClientsCount--;
+    }
 }
 
 TError TClient::AcceptConnection(int listenFd) {
