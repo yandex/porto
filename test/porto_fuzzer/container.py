@@ -83,6 +83,8 @@ def SetProperty(conn,dest):
             (25, properties.IoPolicy),
             (20, properties.User),
             (20, properties.Group),
+            (20, properties.OwnerUser),
+            (20, properties.OwnerGroup),
             (12, properties.Hostname),
             (20, properties.VirtMode),
             (20, functools.partial(properties.Root, conn))

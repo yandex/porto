@@ -206,6 +206,10 @@ def User():
         ] )
     )
 
+def OwnerUser():
+    (cmd, value) = User()
+    return ("owner_user", value)
+
 def Group():
     groups = grp.getgrall()
     return ("group", select_by_weight( [
@@ -213,6 +217,10 @@ def Group():
                 (1, str(randint(0, 65536)) )
         ] )
     )
+
+def OwnerGroup():
+    (cmd, value) = Group()
+    return ("owner_group", value)
 
 def Hostname():
     return ("hostname", get_random_str(32) )
