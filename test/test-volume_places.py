@@ -87,7 +87,7 @@ cont.SetProperty("command", "cat /file.txt")
 cont.Start()
 cont.Wait()
 assert cont.Get(["stdout"])["stdout"] == "1234567890"
-cont.Stop()
+cont.Destroy()
 
 #Check what will be if we rename our place
 
