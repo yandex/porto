@@ -2,6 +2,7 @@ import sys
 import os
 import pwd
 import grp
+import time
 
 def Catch(func, *args, **kwargs):
     try:
@@ -31,7 +32,51 @@ def DropPrivileges():
 def GetUidGidByUsername(username):
     return (pwd.getpwnam(username).pw_uid, grp.getgrnam(username).gr_gid)
 
+def GetSlavePid():
+    pid = int(open("/run/portod.pid").read())
+    open("/proc/" + str(pid) + "/status").readline().index("portod-slave")
+    return pid
+
+def GetMasterPid():
+    pid = int(open("/run/portoloop.pid").read())
+    open("/proc/" + str(pid) + "/status").readline().index("portod")
+    return pid
+
+def GetState(pid):
+    if isinstance(pid, int):
+        pid = str(pid)
+    ss = open("/proc/" + pid + "/status").readlines()
+    for s in ss:
+        if s.find("State:") >= 0:
+            return s.split()[1]
+    return ""
+
+def IsRunning(pid):
+    try:
+        os.kill(pid, 0)
+        state = GetState(pid)
+        return state != "Z" and state != "X"
+    except:
+        return False
+
+def IsZombie(pid):
+    return GetState(pid) == "Z"
+
+def KillPid(pid, signal):
+    os.kill(pid, signal)
+    try:
+        ctr = 0
+        while ctr < 100:
+            time.sleep(0.1)
+            os.kill(pid, 0)
+            ctr += 1
+
+        raise BaseException("Too long waited for portod to stop")
+    except OSError:
+        pass
 
 portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 portobin = os.getcwd()
 portoctl = portobin + "/portoctl"
+portod = os.path.abspath(portobin + "/portod")
+portotest = portobin + "/portotest"
