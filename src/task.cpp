@@ -541,7 +541,7 @@ kill_all:
         (void)cg.KillAll(SIGKILL);
     if (task.Pid) {
         task.Kill(SIGKILL);
-        task.Detach();
+        task.Wait();
     }
     CT->Task.Pid = 0;
     CT->TaskVPid = 0;

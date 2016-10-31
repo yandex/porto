@@ -18,7 +18,6 @@ struct TTask {
 
     TError Fork(bool detach = false);
     TError Wait();
-    void Detach();
     static bool Deliver(pid_t pid, int status);
 
     bool Exists() const;

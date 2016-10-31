@@ -360,9 +360,7 @@ static int SlaveRpc() {
                         TContainer::DumpLocks();
                         break;
                     case SIGCHLD:
-                        if (TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_status)) {
-                            (void)waitpid(sigInfo.ssi_pid, NULL, 0);
-                        } else {
+                        if (!TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_status)) {
                             TEvent e(EEventType::ChildExit);
                             e.Exit.Pid = sigInfo.ssi_pid;
                             e.Exit.Status = sigInfo.ssi_status;

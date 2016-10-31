@@ -579,8 +579,10 @@ TError TTask::Wait() {
             pid = 0;
         lock.lock();
         if (!pid) {
-            Tasks.erase(Pid);
-            Running = false;
+            if (Running) {
+                Tasks.erase(Pid);
+                Running = false;
+            }
             Status = status;
         }
     }
@@ -600,11 +602,6 @@ TError TTask::Wait() {
     return TError::Success();
 }
 
-void TTask::Detach() {
-    auto lock = std::unique_lock<std::mutex>(ForkLock);
-    Tasks.erase(Pid);
-}
-
 bool TTask::Deliver(pid_t pid, int status) {
     auto lock = std::unique_lock<std::mutex>(ForkLock);
     auto it = Tasks.find(pid);
@@ -612,8 +609,10 @@ bool TTask::Deliver(pid_t pid, int status) {
         return false;
     it->second->Running = false;
     it->second->Status = status;
+    Tasks.erase(it);
     lock.unlock();
     TasksCV.notify_all();
+    (void)waitpid(pid, NULL, 0);
     return true;
 }
 
