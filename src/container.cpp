@@ -1905,7 +1905,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
 
     auto it = ContainerProperties.find(property);
     if (it == ContainerProperties.end())
-        return TError(EError::Unknown, "Invalid property " + property);
+        return TError(EError::InvalidProperty, "Invalid property " + property);
     auto prop = it->second;
 
     if (!prop->IsSupported)
