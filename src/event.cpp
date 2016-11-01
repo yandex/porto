@@ -58,8 +58,10 @@ std::string TEvent::GetMsg() const {
             return "OOM killed with fd " + std::to_string(OOM.Fd);
         case EEventType::WaitTimeout:
             return "wait timeout";
-        case EEventType::DestroyContainer:
-            return "destroy container";
+        case EEventType::DestroyAgedContainer:
+            return "destroy aged container";
+        case EEventType::DestroyWeakContainer:
+            return "destroy weak container";
         default:
             return "unknown event";
     }

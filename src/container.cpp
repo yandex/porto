@@ -618,13 +618,6 @@ TError TContainer::Destroy() {
     return TError::Success();
 }
 
-void TContainer::DestroyWeak() {
-    if (IsWeak) {
-        TEvent event(EEventType::DestroyContainer, shared_from_this());
-        EventQueue->Add(0, event);
-    }
-}
-
 bool TContainer::IsChildOf(const TContainer &ct) const {
     for (auto ptr = Parent.get(); ptr; ptr = ptr->Parent.get()) {
         if (ptr == &ct)
@@ -2359,12 +2352,28 @@ void TContainer::Event(const TEvent &event) {
         break;
     }
 
-    case EEventType::DestroyContainer:
+    case EEventType::DestroyAgedContainer:
         if (ct) {
             error = ct->Lock(lock);
             lock.unlock();
             if (!error) {
-                ct->Destroy();
+                if (ct->State == EContainerState::Dead &&
+                        GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
+                    Statistics->RemoveDead++;
+                    ct->Destroy();
+                }
+                ct->Unlock();
+            }
+        }
+        break;
+
+    case EEventType::DestroyWeakContainer:
+        if (ct) {
+            error = ct->Lock(lock);
+            lock.unlock();
+            if (!error) {
+                if (ct->IsWeak)
+                    ct->Destroy();
                 ct->Unlock();
             }
         }
@@ -2375,8 +2384,7 @@ void TContainer::Event(const TEvent &event) {
         for (auto &ct: RootContainer->Subtree()) {
             if (ct->State == EContainerState::Dead &&
                     GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
-                TEvent ev(EEventType::DestroyContainer, ct);
-                Statistics->RemoveDead++;
+                TEvent ev(EEventType::DestroyAgedContainer, ct);
                 EventQueue->Add(0, ev);
             }
             if (ct->State == EContainerState::Running) {

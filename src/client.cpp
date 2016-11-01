@@ -12,6 +12,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "portod.hpp"
+#include "event.hpp"
 
 #include <google/protobuf/io/coded_stream.h>
 
@@ -87,9 +88,11 @@ void TClient::CloseConnection() {
     }
 
     for (auto &weakCt: WeakContainers) {
-        auto container = weakCt.lock();
-        if (container)
-            container->DestroyWeak();
+        auto ct = weakCt.lock();
+        if (ct && ct->IsWeak) {
+            TEvent ev(EEventType::DestroyWeakContainer, ct);
+            EventQueue->Add(0, ev);
+        }
     }
     WeakContainers.clear();
 }

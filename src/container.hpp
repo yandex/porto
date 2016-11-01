@@ -252,7 +252,6 @@ public:
     void SyncState();
     TError Seize();
     TError SyncCgroups();
-    void DestroyWeak();
 
     TError Save(void);
     TError Load(const TKeyValue &node);

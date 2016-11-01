@@ -16,7 +16,8 @@ enum class EEventType {
     Respawn,
     OOM,
     WaitTimeout,
-    DestroyContainer,
+    DestroyAgedContainer,
+    DestroyWeakContainer,
 };
 
 class TEventWorker;
