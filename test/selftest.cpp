@@ -5209,24 +5209,25 @@ static void TestStdoutLimit(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
     ExpectApiSuccess(api.GetProperty(name, "stdout_limit", limitStr));
+    ExpectSuccess(StringToUint64(limitStr, limit));
 
-    ExpectApiSuccess(api.SetProperty(name, "command", "dd if=/dev/zero bs=1M count=100"));
+    ExpectApiSuccess(api.SetProperty(name, "command", "dd if=/dev/zero bs=" + limitStr + " count=2"));
 
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
 
     TPath stdoutPath(cwd + "/" + v);
     ExpectSuccess(stdoutPath.StatFollow(st));
-    ExpectSuccess(StringToUint64(limitStr, limit));
     ExpectLessEq(st.st_size, limit);
 
     ExpectApiSuccess(api.Stop(name));
-    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=100; sleep 1000'"));
+    ExpectApiSuccess(api.SetProperty(name, "stdout_limit", "1m"));
+    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=2; sleep 1000'"));
     ExpectApiSuccess(api.Start(name));
 
     usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
     ExpectSuccess(stdoutPath.StatFollow(st));
-    ExpectLessEq(st.st_size, limit);
+    ExpectLessEq(st.st_size, 1<<20);
 
     ExpectApiSuccess(api.Destroy(name));
 }
