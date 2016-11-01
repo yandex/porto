@@ -11,7 +11,9 @@ L=$(dirname $(dirname $0))/layers
 
 rm -f bootstrap.$COMPRESS
 sudo $PORTOCTL build -o bootstrap.$COMPRESS \
-	-B "$L/bootstrap_bootstrap.sh" net="$NET"
+	-B $L/bootstrap_ubuntu_xenial.sh \
+	-S $L/base_ubuntu_xenial.sh \
+	-S $L/common-debootstrap.sh net="$NET"
 
 $PORTOCTL layer -R bootstrap || true
 $PORTOCTL layer -I bootstrap bootstrap.$COMPRESS
