@@ -1,3 +1,33 @@
+yandex-porto (3.0.11) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: system client belongs to root container
+  * porto: lock parent container for read when creating child
+  * util/unix: reap and detach task in TTask::Deliver
+  * task: report wpid before starting child or from child task itself
+  * property: access to unknown property must return InvalidProperty
+
+  [ Maxim Samoylov ]
+  * test: make fuzzer fail more clear
+  * test/fuzzer: use owner_user and owner_group knobs
+
+  [ Konstantin Khlebnikov ]
+  * test/fuzzer: ignore InvalidProperty
+
+  [ Maxim Samoylov ]
+  * test: fix volume_places cleanup
+  * test: move killing tests out of portotest executable
+  * test: test porto with sequential set of tests
+  * test: check portod cli interface
+  * test: check if portod can be successfully upgraded and downgraded
+  * test: add stub for printing portod state
+
+  [ Konstantin Khlebnikov ]
+  * portod: fix log rotation, dead contaienrs gc and network watchdog
+  * selftest: reduce load in stdout_limit
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 01 Nov 2016 15:41:45 +0300
+
 yandex-porto (3.0.10) unstable; urgency=low
 
   * porto: fix default porto_namespace for default_porto_namespace
