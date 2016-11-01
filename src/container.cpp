@@ -620,7 +620,7 @@ TError TContainer::Destroy() {
 
 void TContainer::DestroyWeak() {
     if (IsWeak) {
-        TEvent event(EEventType::DestroyWeak, shared_from_this());
+        TEvent event(EEventType::DestroyContainer, shared_from_this());
         EventQueue->Add(0, event);
     }
 }
@@ -2286,12 +2286,6 @@ TError TContainer::Respawn() {
     return error;
 }
 
-bool TContainer::Expired() const {
-    if (State != EContainerState::Dead)
-        return false;
-    return GetCurrentTimeMs() >= DeathTime + AgingTime;
-}
-
 void TContainer::Event(const TEvent &event) {
     TError error;
 
@@ -2364,8 +2358,8 @@ void TContainer::Event(const TEvent &event) {
             w->WakeupWaiter(nullptr);
         break;
     }
-    case EEventType::DestroyWeak:
-    {
+
+    case EEventType::DestroyContainer:
         if (ct) {
             error = ct->Lock(lock);
             lock.unlock();
@@ -2375,36 +2369,30 @@ void TContainer::Event(const TEvent &event) {
             }
         }
         break;
-    }
+
     case EEventType::RotateLogs:
-    {
-        for (auto &it : Containers) {
-            auto &ct = it.second;
-
-            if (ct->Expired()) {
-                /* FIXME */
+        lock.unlock();
+        for (auto &ct: RootContainer->Subtree()) {
+            if (ct->State == EContainerState::Dead &&
+                    GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
+                TEvent ev(EEventType::DestroyContainer, ct);
                 Statistics->RemoveDead++;
+                EventQueue->Add(0, ev);
             }
-
             if (ct->State == EContainerState::Running) {
-                error = ct->LockRead(lock);
-                if (!error) {
-                    if (ct->State == EContainerState::Running) {
-                        ct->Stdout.Rotate(*ct);
-                        ct->Stderr.Rotate(*ct);
-                    }
-                    ct->Unlock();
-                }
+                ct->Stdout.Rotate(*ct);
+                ct->Stderr.Rotate(*ct);
             }
         }
+        EventQueue->Add(config().daemon().log_rotate_ms(), event);
+        break;
 
-        //ScheduleLogRotatation();
-
+    case EEventType::NetworkWatchdog:
         lock.unlock();
         TNetwork::RefreshNetworks();
-
+        EventQueue->Add(config().network().watchdog_ms(), event);
         break;
-    }
+
     }
 }
 

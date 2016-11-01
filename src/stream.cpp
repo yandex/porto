@@ -141,11 +141,10 @@ TError TStdStream::Rotate(const TContainer &container) {
     off_t loss;
     TError error = path.RotateLog(Limit, loss);
     if (error) {
-        L_ERR() << "Cannot rotate " << path << " : " << error << std::endl;
+        Statistics->LogRotateErrors++;
         return error;
     }
-    if (loss)
-        Statistics->LogsRotated++;
+    Statistics->LogRotateBytes += loss;
     Offset += loss;
     return TError::Success();
 }

@@ -33,7 +33,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
-    config().mutable_daemon()->set_rotate_logs_timeout_s(60);
+    config().mutable_daemon()->set_log_rotate_ms(1000);
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
     config().mutable_daemon()->set_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
@@ -90,6 +90,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_network()->set_autoconf_timeout_s(120);
     config().mutable_network()->set_proxy_ndp(true);
+    config().mutable_network()->set_watchdog_ms(60000);
 
     // FIXME set to true and deprecate this option
     config().mutable_privileges()->set_enforce_bind_permissions(false);

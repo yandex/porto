@@ -302,6 +302,16 @@ static int SlaveRpc() {
     worker.Start();
     EventQueue->Start();
 
+    if (config().daemon().log_rotate_ms()) {
+        TEvent ev(EEventType::RotateLogs);
+        EventQueue->Add(config().daemon().log_rotate_ms(), ev);
+    }
+
+    if (config().network().watchdog_ms()) {
+        TEvent ev(EEventType::NetworkWatchdog);
+        EventQueue->Add(config().network().watchdog_ms(), ev);
+    }
+
     while (true) {
         if (accept_paused && clients.size() * 4 / 3 < config().daemon().max_clients()) {
             L_WRN() << "Resume accepting connections" << std::endl;
@@ -489,8 +499,6 @@ static TError CreateRootContainer() {
     error = ContainerIdMap.GetAt(LEGACY_CONTAINER_ID);
     if (error)
         return error;
-
-    //ScheduleLogRotatation();
 
     return TError::Success();
 }

@@ -50,14 +50,16 @@ std::string TEvent::GetMsg() const {
                 + " for pid " + std::to_string(Exit.Pid);
         case EEventType::RotateLogs:
             return "rotate logs";
+        case EEventType::NetworkWatchdog:
+            return "network watchdog";
         case EEventType::Respawn:
             return "respawn";
         case EEventType::OOM:
             return "OOM killed with fd " + std::to_string(OOM.Fd);
         case EEventType::WaitTimeout:
             return "wait timeout";
-        case EEventType::DestroyWeak:
-            return "destroy weak";
+        case EEventType::DestroyContainer:
+            return "destroy container";
         default:
             return "unknown event";
     }
@@ -70,10 +72,6 @@ bool TEvent::operator<(const TEvent& rhs) const {
 void TEventQueue::Add(uint64_t timeoutMs, const TEvent &e) {
     TEvent copy = e;
     copy.DueMs = GetCurrentTimeMs() + timeoutMs;
-
-    if (Verbose)
-        L() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << " (now " << GetCurrentTimeMs() << " will fire at " << copy.DueMs << ")" << std::endl;
-
     Worker->Push(copy);
 }
 

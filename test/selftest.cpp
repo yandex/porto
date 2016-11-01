@@ -5190,7 +5190,7 @@ static void TestRemoveDead(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
 
-    usleep(2 * 1000 * 1000);
+    usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
     std::string state;
     ExpectApiFailure(api.GetData(name, "state", state), EError::ContainerDoesNotExist);
 
@@ -5218,6 +5218,14 @@ static void TestStdoutLimit(Porto::Connection &api) {
     TPath stdoutPath(cwd + "/" + v);
     ExpectSuccess(stdoutPath.StatFollow(st));
     ExpectSuccess(StringToUint64(limitStr, limit));
+    ExpectLessEq(st.st_size, limit);
+
+    ExpectApiSuccess(api.Stop(name));
+    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=100; sleep 1000'"));
+    ExpectApiSuccess(api.Start(name));
+
+    usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
+    ExpectSuccess(stdoutPath.StatFollow(st));
     ExpectLessEq(st.st_size, limit);
 
     ExpectApiSuccess(api.Destroy(name));
@@ -5367,7 +5375,7 @@ int SelfTest(std::vector<std::string> args) {
         { "volume_recovery", TestVolumeRecovery },
         { "cgroups", TestCgroups },
         { "version", TestVersion },
-        // { "remove_dead", TestRemoveDead }, FIXME
+        { "remove_dead", TestRemoveDead },
         { "stats", TestStats },
     };
 

@@ -3022,7 +3022,8 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["epoll_sources"] = Statistics->EpollSources;
 
-    m["logs_rotated"] = Statistics->LogsRotated;
+    m["log_rotate_bytes"] = Statistics->LogRotateBytes;
+    m["log_rotate_errors"] = Statistics->LogRotateErrors;
 
     m["containers"] = Statistics->ContainersCount - NR_SERVICE_CONTAINERS;
 

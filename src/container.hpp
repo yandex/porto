@@ -252,7 +252,6 @@ public:
     void SyncState();
     TError Seize();
     TError SyncCgroups();
-    bool Expired() const;
     void DestroyWeak();
 
     TError Save(void);
