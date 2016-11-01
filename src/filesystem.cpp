@@ -425,7 +425,7 @@ TError TMountNamespace::Setup() {
     }
 
     // allow suid binaries and remount read-only if required
-    error = root.Remount(MS_REMOUNT | MS_BIND | MS_NODEV | (RootRo ? MS_RDONLY : 0));
+    error = root.Remount(MS_REMOUNT | MS_BIND | (RootRo ? MS_RDONLY : 0));
     if (error)
         return error;
 
