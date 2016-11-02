@@ -1105,6 +1105,30 @@ TPath TFile::ProcPath(void) const {
     return TPath("/proc/self/fd/" + std::to_string(Fd));
 }
 
+TError TFile::ReadTail(std::string &text, off_t max) {
+    off_t old_pos = lseek(Fd, 0, SEEK_CUR);
+    size_t size = old_pos > max ? old_pos - max : old_pos;
+
+    if (old_pos < 0 || lseek(Fd, -size, SEEK_CUR) < 0)
+        return TError(EError::Unknown, errno, "lseek");
+
+    text.resize(size);
+
+    size_t off = 0;
+    ssize_t ret;
+
+    do {
+        ret = read(Fd, &text[off], size - off);
+
+        off += ret;
+    } while (ret > 0 && off > size);
+
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "read");
+
+    return TError::Success();
+}
+
 TError TFile::ReadAll(std::string &text, size_t max) const {
     struct stat st;
     if (fstat(Fd, &st) < 0)

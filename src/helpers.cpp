@@ -16,8 +16,11 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
                   std::string *output) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
-    TFile outFd;
+    TFile outFd, errFd;
     TTask task;
+
+    if (!command.size())
+        return TError(EError::Unknown, "External command is empty");
 
     if (output) {
         error = outFd.CreateTemp("/tmp");
@@ -25,14 +28,35 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
             return error;
     }
 
+    error = errFd.CreateTemp("/tmp");
+    if (error)
+        return error;
+
+    std::string cmdline;
+
+    for (auto &arg : command)
+        cmdline += arg + " ";
+
+    L_ACT() << "invoking external helper with command : " << cmdline << std::endl;
+
     error = task.Fork();
     if (error)
         return error;
 
     if (task.Pid) {
         error = task.Wait();
-        if (!error && output)
-            error = outFd.ReadAll(*output, 4096);
+
+        if (error) {
+            std::string error_log;
+
+            (void)errFd.ReadTail(error_log, 4096);
+
+            L_ERR() << "External helper command: " << command[0] << " failed, stderr : "
+                    << std::endl << error_log << std::endl;
+
+        } else if (output)
+            error = outFd.ReadTail(*output, 4096);
+
         return error;
     }
 
@@ -42,12 +66,14 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
 
     SetDieOnParentExit(SIGKILL);
 
-    TFile::CloseAll({outFd.Fd});
+    TFile::CloseAll({outFd.Fd, errFd.Fd});
     if (open("/dev/null", O_RDONLY) < 0 ||
             open("/dev/null", O_WRONLY) < 0 ||
             open("/dev/null", O_WRONLY) < 0)
         _exit(EXIT_FAILURE);
     if (output && dup2(outFd.Fd, STDOUT_FILENO) != STDOUT_FILENO)
+        _exit(EXIT_FAILURE);
+    if (dup2(errFd.Fd, STDERR_FILENO) != STDERR_FILENO)
         _exit(EXIT_FAILURE);
 
     /* Remount everything except CWD Read-Only */
