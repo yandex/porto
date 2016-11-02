@@ -1,3 +1,16 @@
+yandex-porto (3.0.12) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: recheck container state and age before auto destruction
+  * porto: allow device nodes on root filesystem
+  * layers: split bootstrap layer into several scripts
+  * debian/rules: always install bash-completion
+
+  [ Maxim Samoylov ]
+  * helpers: log stderr of failed helper invocations
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 02 Nov 2016 17:34:17 +0300
+
 yandex-porto (3.0.11) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
