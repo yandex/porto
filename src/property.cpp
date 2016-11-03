@@ -2967,13 +2967,6 @@ TError TTime::Get(std::string &value) {
         return TError::Success();
     }
 
-    // we started recording raw start/death time since porto v1.15;
-    // in case we updated from old version, return zero
-    if (!CurrentContainer->HasProp(EProperty::START_TIME)) {
-        CurrentContainer->StartTime = GetCurrentTimeMs();
-        CurrentContainer->SetProp(EProperty::START_TIME);
-    }
-
     if (!CurrentContainer->HasProp(EProperty::DEATH_TIME) &&
         (CurrentContainer->State == EContainerState::Dead)) {
 
@@ -2990,6 +2983,29 @@ TError TTime::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TCreationTime : public TProperty {
+public:
+    TCreationTime() : TProperty(D_CREATION_TIME, EProperty::NONE, "creation time (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = FormatTime(CurrentContainer->RealCreationTime);
+        return TError::Success();
+    }
+} static CreationTime;
+
+class TStartTime : public TProperty {
+public:
+    TStartTime() : TProperty(D_START_TIME, EProperty::NONE, "start time (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        if (CurrentContainer->RealStartTime)
+            value = FormatTime(CurrentContainer->RealStartTime);
+        return TError::Success();
+    }
+} static StartTime;
 
 class TPortoStat : public TProperty {
 public:

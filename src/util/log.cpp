@@ -151,8 +151,7 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
     if (level == LOG_ERROR && Verbose)
         Stacktrace();
 
-    return (*logStream) << CurrentTimeFormat("%F %T", Verbose)
-                        << " " << name << "[" << GetTid() << "]: " << prefix[level];
+    return (*logStream) << FormatTime(time(nullptr)) << " " << name << "[" << GetTid() << "]: " << prefix[level];
 }
 
 void porto_assert(const char *msg, size_t line, const char *file) {

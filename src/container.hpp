@@ -125,6 +125,9 @@ public:
     std::vector<std::string> ResolvConf;
     std::vector<std::string> Devices;
 
+    time_t RealCreationTime;
+    time_t RealStartTime = 0;
+
     uint64_t StartTime;
     uint64_t DeathTime;
     uint64_t AgingTime;

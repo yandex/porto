@@ -26,7 +26,7 @@ struct TTask {
     TError Kill(int signal) const;
 };
 
-std::string CurrentTimeFormat(const char *fmt, bool msec = false);
+std::string FormatTime(time_t t, const char *fmt = "%F %T");
 
 pid_t GetPid();
 pid_t GetPPid();

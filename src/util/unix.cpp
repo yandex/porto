@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <mutex>
 #include <iomanip>
+#include <chrono>
 #include <condition_variable>
 
 #include "util/string.hpp"
@@ -544,7 +545,7 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
 
 static std::mutex ForkLock;
 static bool PostFork = false;
-static struct timeval ForkTime;
+static time_t ForkTime;
 static struct tm ForkLocalTime;
 
 static std::map<pid_t, TTask *> Tasks;
@@ -554,8 +555,8 @@ static std::condition_variable TasksCV;
 TError TTask::Fork(bool detach) {
     PORTO_ASSERT(!PostFork);
     auto lock = std::unique_lock<std::mutex>(ForkLock);
-    gettimeofday(&ForkTime, NULL);
-    localtime_r(&ForkTime.tv_sec, &ForkLocalTime);
+    ForkTime = time(NULL);
+    localtime_r(&ForkTime, &ForkLocalTime);
     pid_t ret = fork();
     if (ret < 0)
         return TError(EError::Unknown, errno, "TTask::Fork");
@@ -617,17 +618,12 @@ bool TTask::Deliver(pid_t pid, int status) {
 }
 
 // localtime_r isn't safe after fork because of lock inside
-static void CurrentTime(struct timeval &tv, struct tm &tm) {
-    gettimeofday(&tv, NULL);
+static void LocalTime(time_t time, struct tm &tm) {
     if (!PostFork) {
-        localtime_r(&tv.tv_sec, &tm);
+        localtime_r(&time, &tm);
     } else {
-        struct timeval delta;
-        time_t diff;
-
-        timersub(&tv, &ForkTime, &delta);
         tm = ForkLocalTime;
-        diff = tm.tm_sec + delta.tv_sec;
+        time_t diff = tm.tm_sec + time - ForkTime;
         tm.tm_sec = diff % 60;
         diff = tm.tm_min + diff / 60;
         tm.tm_min = diff % 60;
@@ -637,19 +633,12 @@ static void CurrentTime(struct timeval &tv, struct tm &tm) {
     }
 }
 
-std::string CurrentTimeFormat(const char *fmt, bool msec) {
+std::string FormatTime(time_t t, const char *fmt) {
     std::stringstream ss;
-    struct timeval tv;
     struct tm tm;
-    char buf[256];
 
-    CurrentTime(tv, tm);
-    strftime(buf, sizeof(buf), fmt, &tm);
-    ss << buf;
-
-    if (msec)
-        ss << "," << std::setw(6) << std::setfill('0') << tv.tv_usec;
-
+    LocalTime(t, tm);
+    ss << std::put_time(&tm, fmt);
     return ss.str();
 }
 

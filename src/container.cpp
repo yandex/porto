@@ -230,6 +230,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     ClientsCount(0)
 {
     Statistics->ContainersCount++;
+    RealCreationTime = time(nullptr);
+
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
 
@@ -1388,6 +1390,7 @@ TError TContainer::Start() {
         SetState(EContainerState::Running);
 
     StartTime = GetCurrentTimeMs();
+    RealStartTime = time(nullptr);
     SetProp(EProperty::START_TIME);
 
     error = PrepareResources();
@@ -2050,6 +2053,17 @@ TError TContainer::Load(const TKeyValue &node) {
 
     if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
         OwnerCred = TaskCred;
+
+    if (state == EContainerState::Running) {
+        auto now = GetCurrentTimeMs();
+
+        if (!HasProp(EProperty::START_TIME)) {
+            StartTime = now;
+            SetProp(EProperty::START_TIME);
+        }
+
+        RealStartTime = time(nullptr) - (now - StartTime) / 1000;
+    }
 
     CurrentContainer = nullptr;
 
