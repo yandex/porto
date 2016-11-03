@@ -1382,6 +1382,11 @@ TError TContainer::Start() {
 
     L_ACT() << "Start " << Name << std::endl;
 
+    if (IsMeta())
+        SetState(EContainerState::Meta);
+    else
+        SetState(EContainerState::Running);
+
     StartTime = GetCurrentTimeMs();
     SetProp(EProperty::START_TIME);
 
@@ -1391,6 +1396,7 @@ TError TContainer::Start() {
 
     error = StartTask();
     if (error) {
+        SetState(EContainerState::Stopped);
         FreeResources();
         return error;
     }
@@ -1398,11 +1404,6 @@ TError TContainer::Start() {
     L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
 
     SetProp(EProperty::ROOT_PID);
-
-    if (IsMeta())
-        SetState(EContainerState::Meta);
-    else
-        SetState(EContainerState::Running);
 
     Statistics->ContainersStarted++;
     error = UpdateSoftLimit();
