@@ -638,7 +638,14 @@ std::string FormatTime(time_t t, const char *fmt) {
     struct tm tm;
 
     LocalTime(t, tm);
-    ss << std::put_time(&tm, fmt);
+
+    // FIXME gcc 4.x don't have this
+    // ss << std::put_time(&tm, fmt);
+
+    char buf[256];
+    strftime(buf, sizeof(buf), fmt, &tm);
+    ss << buf;
+
     return ss.str();
 }
 
