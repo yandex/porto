@@ -1025,9 +1025,10 @@ public:
 class TRunCmd final : public ICmd {
 public:
     TRunCmd(Porto::Connection *api) : ICmd(api, "run", 2,
-            "[-L layer]... <container> [properties]",
+            "[-L layer] [-W] ... <container> [properties]",
             "create and start container with given properties",
-            "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n")
+            "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
+            "    -W                          wait until container exits\n")
     {}
 
     int Execute(TCommandEnviroment *env) final override {
@@ -1038,6 +1039,10 @@ public:
             { 'L', true, [&](const char *arg) {
                     launcher.Layers.push_back(arg);
                     launcher.NeedVolume = true;
+                }
+            },
+            { 'W', false, [&](const char *arg) {
+                    launcher.WaitExit = true;
                 }
             },
         });

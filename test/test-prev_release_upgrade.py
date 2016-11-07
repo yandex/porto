@@ -75,7 +75,7 @@ c.Wait(["test"])
 #Checking if we can create subcontainers successfully (cgroup migration involved)
 
 r = c.Create("a")
-r.SetProperty("command", "bash -c '" + portoctl + " run a/a command=\"echo 123\" && sleep 2'")
+r.SetProperty("command", "bash -c '" + portoctl + " run -W a/a command=\"echo 123\"'")
 r.Start()
 assert r.Wait() == "a"
 assert r.GetProperty("exit_status") == "0"
