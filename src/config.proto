@@ -81,6 +81,7 @@ message TCfg {
 		optional uint32 portod_stop_timeout = 15;
 		optional uint32 portod_start_timeout = 16;
 		optional int32 max_clients_in_container = 17;
+		optional bool merge_memory_blkio_controllers = 18;
 	}
 
 	message TContainerCfg {

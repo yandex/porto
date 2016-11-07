@@ -908,10 +908,6 @@ TError InitializeCgroups() {
     }
 
     for (auto subsys: AllSubsystems) {
-
-        if (subsys->Type == "hugetlb" && !config().container().enable_hugetlb())
-            continue;
-
         for (auto &mnt: mounts) {
             if (mnt.Type == "cgroup" && mnt.HasOption(subsys->Type)) {
                 subsys->Root = mnt.Target;
@@ -919,6 +915,29 @@ TError InitializeCgroups() {
                 break;
             }
         }
+    }
+
+    if (config().daemon().merge_memory_blkio_controllers() &&
+            MemorySubsystem.Root.IsEmpty() && BlkioSubsystem.Root.IsEmpty()) {
+        TPath path = root / "memory,blkio";
+
+        if (!path.Exists())
+            (void)path.Mkdir(0755);
+        error = path.Mount("cgroup", "cgroup", 0, {"memory", "blkio"});
+        if (!error) {
+            (root / "memory").Symlink("memory,blkio");
+            (root / "blkio").Symlink("memory,blkio");
+            MemorySubsystem.Root = path;
+            BlkioSubsystem.Root = path;
+        } else {
+            L_ERR() << "Cannot merge memory and blkio " << error << std::endl;
+            (void)path.Rmdir();
+        }
+    }
+
+    for (auto subsys: AllSubsystems) {
+        if (subsys->Type == "hugetlb" && !config().container().enable_hugetlb())
+            continue;
 
         if (subsys->Root.IsEmpty()) {
             subsys->Root = root / subsys->Type;
