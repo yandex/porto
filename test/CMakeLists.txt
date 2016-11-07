@@ -10,6 +10,10 @@ add_executable(portotest portotest.cpp test.cpp selftest.cpp stresstest.cpp
 target_link_libraries(portotest version porto util config
 				pthread rt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
+add_test(NAME cleanup_logs
+         COMMAND rm /var/log/portod.log
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME portod_start
          COMMAND ${CMAKE_BINARY_DIR}/portod --discard --verbose restart
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
