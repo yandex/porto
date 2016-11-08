@@ -1796,14 +1796,7 @@ void TContainer::Exit(int status, bool oomKilled) {
         return;
 
     auto cg = GetCgroup(MemorySubsystem);
-    uint64_t failcnt = 0lu;
-    TError error;
-
-    error = MemorySubsystem.GetFailCnt(cg, failcnt);
-    if (error)
-        L_WRN() << "Can't get container memory.failcnt: " << error << std::endl;
-
-    if (FdHasEvent(OomEvent.Fd) || failcnt)
+    if (FdHasEvent(OomEvent.Fd) || MemorySubsystem.GetOomEvents(cg))
         oomKilled = true;
 
     /* Detect fatal signals: portoinit cannot kill itself */

@@ -454,6 +454,13 @@ TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, TFile &event) {
     return error;
 }
 
+uint64_t TMemorySubsystem::GetOomEvents(TCgroup &cg) {
+    TUintMap stat;
+    if (!Statistics(cg, stat))
+        return stat["oom_events"];
+    return 0;
+}
+
 // Freezer
 TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const {
     uint64_t deadline = GetCurrentTimeMs() + config().daemon().freezer_wait_timeout_s() * 1000;
