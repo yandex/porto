@@ -551,7 +551,10 @@ noinline TError ListData(rpc::TContainerResponse &rsp) {
 noinline TError Kill(const rpc::TContainerKillRequest &req,
                      rpc::TContainerResponse &rsp) {
     std::shared_ptr<TContainer> ct;
-    TError error = CurrentClient->WriteContainer(req.name(), ct);
+    TError error = CurrentClient->ReadContainer(req.name(), ct);
+    if (error)
+        return error;
+    error = CurrentClient->CanControl(*ct);
     if (error)
         return error;
     return ct->Kill(req.sig());
