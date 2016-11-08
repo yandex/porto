@@ -304,6 +304,15 @@ TError TClient::WriteContainer(const std::string &relative_name,
     return TError::Success();
 }
 
+TError TClient::LockContainer(std::shared_ptr<TContainer> &ct) {
+    auto lock = LockContainers();
+    ReleaseContainer(true);
+    TError error = ct->Lock(lock);
+    if (!error)
+        LockedContainer = ct;
+    return error;
+}
+
 void TClient::ReleaseContainer(bool locked) {
     if (LockedContainer) {
         LockedContainer->Unlock(locked);

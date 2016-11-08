@@ -221,6 +221,11 @@ public:
     void Unlock(bool locked = false);
     static void DumpLocks();
 
+    /* Only for temporary write lock downgrade
+     * with subsequent upgrade */
+    void DowngradeLock(void);
+    void UpgradeLock(void);
+
     void SanitizeCapabilities();
     uint64_t GetTotalMemGuarantee(bool locked = false) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;

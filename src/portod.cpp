@@ -488,6 +488,10 @@ static TError CreateRootContainer() {
 
     RootContainer->Isolate = false;
 
+    error = SystemClient.LockContainer(RootContainer);
+    if (error)
+        return error;
+
     error = RootContainer->Start();
     if (error)
         return error;
@@ -499,6 +503,8 @@ static TError CreateRootContainer() {
     error = ContainerIdMap.GetAt(LEGACY_CONTAINER_ID);
     if (error)
         return error;
+
+    SystemClient.ReleaseContainer();
 
     return TError::Success();
 }
@@ -635,10 +641,16 @@ static void DestroyContainers(bool weak) {
     for (auto &ct: RootContainer->Subtree()) {
         if (ct->IsRoot() || (weak && !ct->IsWeak))
             continue;
-        TError error = ct->Destroy();
+
+        TError error = SystemClient.LockContainer(ct);
+        if (!error)
+            error = ct->Destroy();
+
         if (error)
             L_ERR() << "Cannot destroy container " << ct->Name << ": " << error << std::endl;
     }
+
+    SystemClient.ReleaseContainer();
 }
 
 static void DestroyVolumes() {
@@ -771,17 +783,26 @@ static int SlaveMain() {
 
         L() << "Discard state..." << std::endl;
 
+        SystemClient.LockContainer(RootContainer);
+
         error = RootContainer->Stop(0);
         if (error)
             L_ERR() << "Failed to stop root container and its children " << error << std::endl;
+
+        SystemClient.ReleaseContainer();
 
         DestroyContainers(false);
 
         DestroyVolumes();
 
+        SystemClient.LockContainer(RootContainer);
+
         error = RootContainer->Destroy();
         if (error)
             L_ERR() << "Cannot destroy root container" << error << std::endl;
+
+        SystemClient.ReleaseContainer();
+
         RootContainer = nullptr;
 
         error = ContainersKV.UmountAll();

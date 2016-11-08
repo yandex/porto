@@ -57,6 +57,8 @@ public:
                          std::shared_ptr<TContainer> &ct, bool try_lock = false);
     TError WriteContainer(const std::string &relative_name,
                           std::shared_ptr<TContainer> &ct, bool child = false);
+
+    TError LockContainer(std::shared_ptr<TContainer> &ct);
     void ReleaseContainer(bool locked = false);
 
     TPath ComposePath(const TPath &path);

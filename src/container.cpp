@@ -181,6 +181,44 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     return TError::Success();
 }
 
+void TContainer::DowngradeLock() {
+    auto lock = LockContainers();
+    PORTO_ASSERT(Locked == -1);
+
+    if (Verbose)
+        L() << "Downgrading write to read " << Name << std::endl;
+
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        ct->SubtreeRead++;
+        ct->SubtreeWrite--;
+    }
+
+    Locked = 1;
+    ContainersCV.notify_all();
+}
+
+void TContainer::UpgradeLock() {
+    auto lock = LockContainers();
+
+    if (Verbose)
+        L() << "Upgrading read back to write " << Name << std::endl;
+
+    PendingWrite = true;
+
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        ct->SubtreeRead--;
+        ct->SubtreeWrite++;
+    }
+
+    while (Locked != 1)
+        ContainersCV.wait(lock);
+
+    Locked = -1;
+    LastOwner = GetTid();
+
+    PendingWrite = false;
+}
+
 void TContainer::Unlock(bool locked) {
     if (Verbose)
         L() << "Unlock " << (Locked > 0 ? "read " : "write ") << Name << std::endl;
@@ -418,7 +456,14 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
     ct->Id = id;
 
+    /* SyncState might stop container, take lock for it */
+    error = SystemClient.LockContainer(ct);
+    if (error)
+        return error;
+
     ct->SyncState();
+
+    SystemClient.ReleaseContainer();
 
     if (ct->Task.Pid) {
         error = ct->RestoreNetwork();
@@ -1400,12 +1445,16 @@ TError TContainer::Start() {
     if (error)
         return error;
 
+    CurrentClient->LockedContainer->DowngradeLock();
+
     error = StartTask();
     if (error) {
         SetState(EContainerState::Stopped);
         FreeResources();
         return error;
     }
+
+    CurrentClient->LockedContainer->UpgradeLock();
 
     L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
 
@@ -1653,6 +1702,8 @@ TError TContainer::Stop(uint64_t timeout) {
 
     auto subtree = Subtree();
 
+    DowngradeLock();
+
     for (auto &ct : subtree) {
         auto cg = ct->GetCgroup(FreezerSubsystem);
 
@@ -1672,6 +1723,8 @@ TError TContainer::Stop(uint64_t timeout) {
                 return error;
         }
     }
+
+    UpgradeLock();
 
     for (auto &ct: subtree) {
         if (ct->IsRoot() || ct->State == EContainerState::Stopped)
@@ -2286,13 +2339,14 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
-    SystemClient.StartRequest();
-    error = Start();
-    SystemClient.FinishRequest();
-
     RespawnCount++;
     SetProp(EProperty::RESPAWN_COUNT);
-    (void)Save();
+
+    SystemClient.StartRequest();
+    SystemClient.LockedContainer = shared_from_this();
+    error = Start();
+    SystemClient.LockedContainer = nullptr;
+    SystemClient.FinishRequest();
 
     return error;
 }
