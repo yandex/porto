@@ -1566,7 +1566,7 @@ TError TMemoryLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (new_size < config().container().min_memory_limit())
+    if (new_size && new_size < config().container().min_memory_limit())
         return TError(EError::InvalidValue, "Should be at least " +
                 std::to_string(config().container().min_memory_limit()));
 
@@ -1610,7 +1610,7 @@ TError TAnonLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (new_size < config().container().min_memory_limit())
+    if (new_size && new_size < config().container().min_memory_limit())
         return TError(EError::InvalidValue, "Should be at least " +
                 std::to_string(config().container().min_memory_limit()));
 
@@ -1654,7 +1654,7 @@ TError TDirtyLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (new_size < config().container().min_memory_limit())
+    if (new_size && new_size < config().container().min_memory_limit())
         return TError(EError::InvalidValue, "Should be at least " +
                 std::to_string(config().container().min_memory_limit()));
 
