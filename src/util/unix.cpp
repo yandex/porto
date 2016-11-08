@@ -43,7 +43,7 @@ bool TTask::Exists() const {
 
 TError TTask::Kill(int signal) const {
     if (!Pid)
-        TError(EError::Unknown, "Task is not running");
+        return TError(EError::Unknown, "Task is not running");
     L_ACT() << "kill " << signal << " " << Pid << std::endl;
     if (kill(Pid, signal))
         return TError(EError::Unknown, errno, "kill(" + std::to_string(Pid) + ")");
