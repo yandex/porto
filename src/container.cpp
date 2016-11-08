@@ -1234,6 +1234,9 @@ TError TContainer::StartTask() {
         return error;
 
     if (!IsRoot()) {
+        /* After restart apply all set dynamic properties */
+        memcpy(PropDirty, PropSet, sizeof(PropDirty));
+
         error = ApplyDynamicProperties();
         if (error)
             return error;
