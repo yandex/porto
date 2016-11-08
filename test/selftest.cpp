@@ -843,9 +843,8 @@ static void TestExitStatus(Porto::Connection &api) {
 
     Say() << "Check oom_killed property" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", oomCommand));
-    ExpectApiSuccess(api.SetProperty(name, "memory_limit", "10"));
-    // limit is so small we can't even start process
-    ExpectApiFailure(api.Start(name), EError::InvalidValue);
+    // limit is so small that we can't even set it
+    ExpectApiFailure(api.SetProperty(name, "memory_limit", "10"), EError::InvalidValue);
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));
