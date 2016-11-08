@@ -72,6 +72,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_dev_size(32 << 20);
     config().mutable_container()->set_all_controllers(false);
     config().mutable_container()->set_enable_hugetlb(true);
+    config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
 

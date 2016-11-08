@@ -1566,6 +1566,10 @@ TError TMemoryLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    if (new_size < config().container().min_memory_limit())
+        return TError(EError::InvalidValue, "Should be at least " +
+                std::to_string(config().container().min_memory_limit()));
+
     if (CurrentContainer->MemLimit != new_size) {
         CurrentContainer->MemLimit = new_size;
         CurrentContainer->SetProp(EProperty::MEM_LIMIT);
@@ -1605,6 +1609,10 @@ TError TAnonLimit::Set(const std::string &limit) {
     error = StringToSize(limit, new_size);
     if (error)
         return error;
+
+    if (new_size < config().container().min_memory_limit())
+        return TError(EError::InvalidValue, "Should be at least " +
+                std::to_string(config().container().min_memory_limit()));
 
     if (CurrentContainer->AnonMemLimit != new_size) {
         CurrentContainer->AnonMemLimit = new_size;
@@ -1646,9 +1654,9 @@ TError TDirtyLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (new_size < 1048576)
-        return TError(EError::InvalidValue,
-                      "dirty limit should be at least 1M");
+    if (new_size < config().container().min_memory_limit())
+        return TError(EError::InvalidValue, "Should be at least " +
+                std::to_string(config().container().min_memory_limit()));
 
     if (CurrentContainer->DirtyMemLimit != new_size) {
         CurrentContainer->DirtyMemLimit = new_size;
