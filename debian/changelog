@@ -1,3 +1,35 @@
+yandex-porto (3.0.13) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * container: set running state earlier
+  * test: verify iteraction of owner_user/user with subcontainers
+
+  [ Konstantin Khlebnikov ]
+  * porto: save container creation and start time
+  * util/unix: gcc 4.x don't have std::put_time
+  * cgroup: try to merge memory and blkio together
+
+  [ Maxim Samoylov ]
+  * event: fix missed event name
+  * portoctl: add wait option for run command
+  * test: cleanup logs prior to testing
+
+  [ Konstantin Khlebnikov ]
+  * container: after restart apply all set dynamic properties
+  * property: memory limit must be at least 1Mb
+
+  [ Maxim Samoylov ]
+  * property: allow memory limit to be set as zero
+  * test/selftest: fixes after elevated minimum memory limit
+  * util/unix: fix typo in TTask::Kill()
+  * rpc: use read lock for container kill operation
+  * container: allow lock downgrading for potential slow operations
+
+  [ Konstantin Khlebnikov ]
+  * cgroup: do not report memory.failcnt as OOM event
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 08 Nov 2016 20:36:41 +0300
+
 yandex-porto (3.0.12) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
