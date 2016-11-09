@@ -908,7 +908,7 @@ static int UpgradeMaster() {
 
     TLogger::CloseLog();
 
-    std::vector<const char *> args = {{PORTO_BINARY_PATH}};
+    std::vector<const char *> args = {PORTO_BINARY_PATH};
     if (stdlog)
         args.push_back("--stdlog");
     if (Verbose)

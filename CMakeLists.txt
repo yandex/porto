@@ -8,11 +8,17 @@ if(NOT DEFINED ENV{CXX})
 	endif()
 endif()
 
+if(USE_CLANG)
+	set(CMAKE_C_COMPILER "/usr/bin/clang")
+	set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
+endif()
+
 PROJECT(yandex-porto)
 
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
 OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)
+OPTION(USE_CLANG "Compile with clang" OFF)
 
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
 	set(CMAKE_BUILD_TYPE Release)
@@ -20,6 +26,7 @@ endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
+set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer --coverage")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "--coverage")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
@@ -27,7 +34,9 @@ set(CMAKE_INSTALL_PREFIX /usr)
 
 if(ENABLE_ASAN)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-common")
-	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libasan")
+	if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libasan")
+	endif()
 endif()
 
 if(USE_SYSTEM_LIBNL)

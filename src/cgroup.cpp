@@ -873,15 +873,15 @@ TDevicesSubsystem   DevicesSubsystem;
 THugetlbSubsystem   HugetlbSubsystem;
 
 std::vector<TSubsystem *> AllSubsystems = {
-    { &FreezerSubsystem  },
-    { &MemorySubsystem   },
-    { &CpuSubsystem      },
-    { &CpuacctSubsystem  },
-    { &CpusetSubsystem   },
-    { &NetclsSubsystem   },
-    { &BlkioSubsystem    },
-    { &DevicesSubsystem  },
-    { &HugetlbSubsystem  },
+    &FreezerSubsystem,
+    &MemorySubsystem,
+    &CpuSubsystem,
+    &CpuacctSubsystem,
+    &CpusetSubsystem,
+    &NetclsSubsystem,
+    &BlkioSubsystem,
+    &DevicesSubsystem,
+    &HugetlbSubsystem,
 };
 
 std::vector<TSubsystem *> Subsystems;
@@ -1014,8 +1014,8 @@ TError InitializeCgroups() {
 
 TError InitializeDaemonCgroups() {
     std::vector<TSubsystem *> DaemonSubsystems = {
-        { &MemorySubsystem   },
-        { &CpuacctSubsystem  },
+        &MemorySubsystem,
+        &CpuacctSubsystem,
     };
 
     for (auto subsys : DaemonSubsystems) {

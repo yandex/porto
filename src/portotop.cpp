@@ -56,7 +56,7 @@ static std::string PrintNumber(double number, int base,
 };
 
 static double DfDt(double curr, double prev,double gone_ms) {
-    return 1000.0d * (curr - prev) / gone_ms;
+    return 1000.0 * (curr - prev) / gone_ms;
 };
 
 static double PartOf(double value, double total) {

@@ -56,9 +56,7 @@ target_link_libraries(portoctl version porto util
 
 add_executable(portoinit portoinit.c)
 target_link_libraries(portoinit version)
-if(NOT ENABLE_ASAN)
-	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
-endif()
+set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 
 install(
 	TARGETS portod portoctl portoinit

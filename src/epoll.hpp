@@ -11,7 +11,8 @@ constexpr int EPOLL_EVENT_OOM = 1;
 class TContainer;
 class TEpollLoop;
 
-struct TEpollSource : public TNonCopyable {
+class TEpollSource : public TNonCopyable {
+public:
     int Fd;
     int Flags;
     std::weak_ptr<TContainer> Container;
