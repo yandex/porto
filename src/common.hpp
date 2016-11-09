@@ -10,6 +10,10 @@
 
 #define BIT(nr) (1ULL << (nr))
 
+#ifndef __has_feature
+# define __has_feature(__x) 0
+#endif
+
 class TNonCopyable {
 protected:
     TNonCopyable() = default;

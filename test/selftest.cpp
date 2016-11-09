@@ -3545,7 +3545,8 @@ static void TestUlimitProperty(Porto::Connection &api) {
     map<string, pair<string, string>> rlim = {
         { "nproc", { "20480", "30720" } },
         { "nofile", { "819200", "1024000" } },
-        { "data", { "8388608000", "10485760000" } },
+        /* RLIMIT_DATA breaks asan build for kernels >= 4.6 */
+        //{ "data", { "8388608000", "10485760000" } },
         { "memlock", { "41943040000", "41943040000" } },
     };
 

@@ -371,7 +371,12 @@ TError TTaskEnv::Start() {
 
         SetProcessName("portod-spawn-p");
 
+        /* FIXME try to replace clone() with  unshare() */
+#if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+        char stack[8192*4];
+#else
         char stack[8192];
+#endif
 
         (void)setsid();
 
