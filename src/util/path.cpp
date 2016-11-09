@@ -573,13 +573,13 @@ restart:
         sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC |
                                             O_NOFOLLOW | O_NOATIME);
         if (sub_fd >= 0) {
+            if (Verbose)
+                L_ACT() << "clear directory: enter " << de->d_name << std::endl;
             if (dir_fd != top_fd)
                 closedir(dir); /* closes dir_fd */
             else
                 top = dir;
             dir_fd = sub_fd;
-            if (Verbose)
-                L_ACT() << "clear directory: enter " << de->d_name << std::endl;
             goto deeper;
         }
         if (errno == ENOENT)
