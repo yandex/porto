@@ -1257,14 +1257,8 @@ static int PortodMain() {
 
     AllocStatistics();
 
-    if (!stdlog) {
-        close(0);
-        close(1);
-        close(2);
-        PORTO_ASSERT(open("/dev/null", O_RDONLY) == 0);
-        PORTO_ASSERT(open("/dev/null", O_WRONLY) == 1);
-        PORTO_ASSERT(open("/dev/null", O_WRONLY) == 2);
-    }
+    close(STDIN_FILENO);
+    PORTO_ASSERT(open("/dev/null", O_RDONLY) == STDIN_FILENO);
 
     try {
         if (slaveMode)

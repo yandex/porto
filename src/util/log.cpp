@@ -56,6 +56,9 @@ void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
         logBuf->SetFd(logFd);
     } else {
         logBuf->Open(path, mode);
+        /* redirect stdout and stderr into log */
+        dup3(logBuf->GetFd(), STDOUT_FILENO, O_CLOEXEC);
+        dup3(logBuf->GetFd(), STDERR_FILENO, O_CLOEXEC);
     }
 }
 
