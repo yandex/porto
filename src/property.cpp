@@ -308,7 +308,7 @@ public:
     TError Get(std::string &value);
     TUlimit() : TProperty(P_ULIMIT, EProperty::ULIMIT,
                           "Container resource limits: "
-                          "<type> <soft> <hard>; ... (man 2 getrlimit)") {}
+                          "<type>: <soft> <hard>|unlimited; ... (man 2 getrlimit)") {}
 } static Ulimit;
 
 TError TUlimit::Set(const std::string &ulimit_str) {
@@ -383,7 +383,7 @@ TError TUlimit::Get(std::string &value) {
         else
             str << ";";
 
-        str << limit_elem.first << " " <<
+        str << limit_elem.first << ": " <<
             std::to_string((*value).second.rlim_cur) << " " <<
             std::to_string((*value).second.rlim_max);
     }
