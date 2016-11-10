@@ -1,3 +1,17 @@
+yandex-porto (3.0.14) unstable; urgency=low
+
+  * porto: fix clang warnings
+  * portod: redirect stdout and stderr into log
+  * util/path: fix use-after-free in ClearDirectory
+  * porto: fix stack overflow with address sanitizer
+  * property: only warn about cpu guarantee misconfiguration
+  * property: add containers_oom into porto_stat
+  * porto: print error in TContainer::Load
+  * container: disable smart when moving task into new cgroup
+  * proprty: add missing colon into ulimit format
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 10 Nov 2016 19:28:25 +0300
+
 yandex-porto (3.0.13) unstable; urgency=low
 
   [ Maxim Samoylov ]
