@@ -1771,6 +1771,7 @@ void TContainer::Reap(bool oomKilled) {
     SetProp(EProperty::DEATH_TIME);
 
     if (oomKilled) {
+        Statistics->ContainersOOM++;
         OomKilled = oomKilled;
         SetProp(EProperty::OOM_KILLED);
     }
