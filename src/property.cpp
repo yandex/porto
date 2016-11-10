@@ -1821,7 +1821,8 @@ TError TCpuGuarantee::Set(const std::string &guarantee) {
         return error;
 
     if (new_guarantee > CurrentContainer->Parent->CpuGuarantee)
-        return TError(EError::InvalidValue, "cpu guarantee bigger than for parent");
+        L_WRN() << CurrentContainer->Name
+                << " cpu guarantee bigger than for parent" << std::endl;
 
     if (CurrentContainer->CpuGuarantee != new_guarantee) {
         CurrentContainer->CpuGuarantee = new_guarantee;
