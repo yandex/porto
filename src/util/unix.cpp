@@ -305,7 +305,7 @@ TError TUnixSocket::SocketPair(TUnixSocket &sock1, TUnixSocket &sock2) {
         return TError(EError::Unknown, errno, "socketpair(AF_UNIX)");
 
     if (setsockopt(sockfds[0], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0 ||
-        setsockopt(sockfds[0], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0) {
+        setsockopt(sockfds[1], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0) {
         close(sockfds[0]);
         close(sockfds[1]);
         return TError(EError::Unknown, errno, "setsockopt(SO_PASSCRED)");
@@ -513,7 +513,7 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
     TUnixSocket sock, sk;
     TNamespaceFd ns;
     TError error;
-    pid_t child;
+    TTask task;
 
     error = TUnixSocket::SocketPair(sock, sk);
     if (error)
@@ -521,24 +521,38 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
     error = ns.Open(pidns, "ns/pid");
     if (error)
         return error;
-    child = fork();
-    if (child < 0)
-        return TError(EError::Unknown, errno, "fork");
-    if (child) {
-        error = sock.RecvPid(result, pid);
-        kill(child, SIGKILL);
-        waitpid(child, nullptr, 0);
+    error = task.Fork();
+    if (error)
+        return error;
+    if (task.Pid) {
+        sk.Close();
+        if (pid > 0) {
+            error = sock.RecvPid(result, pid);
+        } else {
+            error = sock.SendPid(-pid);
+            if (!error)
+                error = sock.RecvPid(pid, result);
+        }
+        task.Wait();
         return error;
     }
     error = ns.SetNs(CLONE_NEWPID);
     if (error)
         _exit(EXIT_FAILURE);
-    child = fork();
+    pid_t child = vfork();
     if (child < 0)
         _exit(EXIT_FAILURE);
-    if (!child)
-        sk.SendPid(pid);
-    else
+    if (!child) {
+        if (pid > 0) {
+            sk.SendPid(pid);
+        } else {
+            sk.RecvPid(result, pid);
+            if (!result)
+                sk.SendInt(0);
+            else
+                sk.SendPid(result);
+        }
+    } else
         waitpid(child, nullptr, 0);
     _exit(0);
 }
@@ -606,8 +620,12 @@ TError TTask::Wait() {
 bool TTask::Deliver(pid_t pid, int status) {
     auto lock = std::unique_lock<std::mutex>(ForkLock);
     auto it = Tasks.find(pid);
-    if (it == Tasks.end())
+    if (it == Tasks.end()) {
+        /* already reaped and detached */
+        if (kill(pid, 0) && errno == ESRCH)
+            return true;
         return false;
+    }
     it->second->Running = false;
     it->second->Status = status;
     Tasks.erase(it);

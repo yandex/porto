@@ -243,7 +243,7 @@ public:
     TError GetNetStat(ENetStat kind, TUintMap &stat);
     uint32_t GetTrafficClass() const;
 
-    pid_t GetPidFor(pid_t pid) const;
+    TError GetPidFor(pid_t pidns, pid_t &pid) const;
 
     TError StartTask();
     TError Start();

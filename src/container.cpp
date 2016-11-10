@@ -710,21 +710,30 @@ bool TContainer::IsolatedFromHost() const {
     return false;
 }
 
-pid_t TContainer::GetPidFor(pid_t pid) const {
-    if (!Task.Pid)
-        return 0;
-    if (InPidNamespace(pid, getpid()))
-        return Task.Pid;
-    if (WaitTask.Pid != Task.Pid && InPidNamespace(pid, WaitTask.Pid))
-        return TaskVPid;
-    if (InPidNamespace(pid, Task.Pid)) {
+TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
+    TError error;
+
+    if (IsRoot()) {
+        pid = 1;
+    } else if (!Task.Pid) {
+        error = TError(EError::InvalidState, "container isn't running");
+    } else if (InPidNamespace(pidns, getpid())) {
+        pid = Task.Pid;
+    } else if (WaitTask.Pid != Task.Pid && InPidNamespace(pidns, WaitTask.Pid)) {
+        pid = TaskVPid;
+    } else if (InPidNamespace(pidns, Task.Pid)) {
         if (!Isolate)
-            return TaskVPid;
-        if (VirtMode == VIRT_MODE_OS || IsMeta())
-            return 1;
-        return 2;
+            pid = TaskVPid;
+        else if (VirtMode == VIRT_MODE_OS || IsMeta())
+            pid = 1;
+        else
+            pid = 2;
+    } else {
+        error = TranslatePid(-Task.Pid, pidns, pid);
+        if (!pid && !error)
+            error = TError(EError::Permission, "pid is unreachable");
     }
-    return 0;
+    return error;
 }
 
 TError TContainer::OpenNetns(TNamespaceFd &netns) const {

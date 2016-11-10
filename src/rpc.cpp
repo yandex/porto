@@ -984,12 +984,18 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
 
 noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
     std::shared_ptr<TContainer> oldCt, newCt;
+    pid_t pid = req.pid();
     TError error;
-    pid_t pid;
 
-    error = TranslatePid(req.pid(), CurrentClient->Pid, pid);
+    if (pid <= 0)
+        return TError(EError::InvalidValue, "invalid pid");
+
+    error = TranslatePid(pid, CurrentClient->Pid, pid);
     if (error)
         return error;
+
+    if (pid <= 0)
+        return TError(EError::InvalidValue, "invalid pid");
 
     /* sanity check and protection against races */
     auto comm = StringTrim(GetTaskName(pid));

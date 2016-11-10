@@ -2463,17 +2463,16 @@ TError TRespawnCount::Get(std::string &value) {
 
 class TRootPid : public TProperty {
 public:
-    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE,
-            "root task pid (ro)") {
-        IsHidden = true;
-    }
-
+    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE, "root task pid (ro)") {}
     TError Get(std::string &value) {
         TError error = IsRunning();
         if (error)
             return error;
-        value = std::to_string(CurrentContainer->GetPidFor(CurrentClient->Pid));
-        return TError::Success();
+        pid_t pid;
+        error = CurrentContainer->GetPidFor(CurrentClient->Pid, pid);
+        if (!error)
+            value = std::to_string(pid);
+        return error;
     }
 } static RootPid;
 
