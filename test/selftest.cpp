@@ -209,7 +209,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "devices", v));
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "capabilities", v));
-    ExpectEq(v, "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; SETGID; SETUID; SETPCAP; LINUX_IMMUTABLE; NET_BIND_SERVICE; NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; SYS_ADMIN; SYS_NICE; SYS_RESOURCE; MKNOD; AUDIT_WRITE; SETFCAP");
+    ExpectEq(v, "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; SETGID; SETUID; SETPCAP; LINUX_IMMUTABLE; NET_BIND_SERVICE; NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; SYS_ADMIN; SYS_BOOT; SYS_NICE; SYS_RESOURCE; MKNOD; AUDIT_WRITE; SETFCAP");
     if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT)) {
         ExpectApiSuccess(api.GetProperty(name, "recharge_on_pgfault", v));
         ExpectEq(v, "false");
@@ -3596,7 +3596,7 @@ static void TestVirtModeProperty(Porto::Connection &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "devices", "" },
-        { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; SETGID; SETUID; NET_BIND_SERVICE; NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; MKNOD; AUDIT_WRITE" },
+        { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; SETGID; SETUID; NET_BIND_SERVICE; NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; SYS_BOOT; MKNOD; AUDIT_WRITE" },
     };
     std::string s;
 
