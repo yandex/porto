@@ -752,7 +752,7 @@ TError TNlClass::Load(const TNl &nl) {
 
     if (Kind == "hfsc") {
         struct tc_service_curve sc;
-        if (!rtnl_class_hfsc_get_fsc(tclass, &sc))
+        if (!rtnl_class_hfsc_get_rsc(tclass, &sc))
             Rate = sc.m2;
         if (!rtnl_class_hfsc_get_usc(tclass, &sc))
             Ceil = sc.m2;
