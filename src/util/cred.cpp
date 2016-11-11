@@ -94,7 +94,8 @@ std::string UserName(uid_t uid) {
         buf.resize(PwdBufSize);
         L() << "Increase user buffer to " << PwdBufSize << std::endl;
     }
-
+    if (!ptr)
+        return std::to_string(uid);
     return std::string(pwd.pw_name);
 }
 
