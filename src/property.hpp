@@ -87,6 +87,7 @@ constexpr const char *D_MAJOR_FAULTS = "major_faults";
 constexpr const char *D_MAX_RSS = "max_rss";
 constexpr const char *D_CPU_USAGE = "cpu_usage";
 constexpr const char *D_CPU_SYSTEM = "cpu_usage_system";
+constexpr const char *D_NET_CLASS_ID = "net_class_id";
 constexpr const char *D_NET_BYTES = "net_bytes";
 constexpr const char *D_NET_PACKETS = "net_packets";
 constexpr const char *D_NET_DROPS = "net_drops";

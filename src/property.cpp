@@ -2737,6 +2737,36 @@ TError TCpuSystem::Get(std::string &value) {
     return TError::Success();
 }
 
+class TNetClassId : public TProperty {
+public:
+    TNetClassId() : TProperty(D_NET_CLASS_ID, EProperty::NONE,
+                              "network tc class: major:minor (hex) (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        uint32_t id = CurrentContainer->GetTrafficClass();
+        auto str = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
+        auto lock = CurrentContainer->Net->ScopedLock();
+        TStringMap map;
+        for (auto &dev: CurrentContainer->Net->Devices)
+            if (dev.Managed)
+                map[dev.Name] = str;
+        value = StringMapToString(map);
+        return TError::Success();
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        uint32_t id = CurrentContainer->GetTrafficClass();
+        auto lock = CurrentContainer->Net->ScopedLock();
+        for (auto &dev: CurrentContainer->Net->Devices) {
+            if (dev.Managed && dev.Name == index) {
+                value = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
+                return TError::Success();
+            }
+        }
+        return TError(EError::InvalidProperty, "network device not found");
+    }
+} NetClassId;
+
 class TNetStat : public TProperty {
 public:
     ENetStat Kind;
