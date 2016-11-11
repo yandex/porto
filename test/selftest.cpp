@@ -2460,7 +2460,7 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
 
     //uint64_t allCap = (1ULL << (lastCap + 1)) - 1;
 
-    uint64_t defaultCap = 0x00000000a9ac77fb;
+    uint64_t defaultCap = 0x00000000a9ec77fb;
 
     Say() << "Check default capabilities for non-root container" << std::endl;
 
@@ -2476,7 +2476,7 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
 
     Say() << "Checking custom capabilities" << std::endl;
 
-    ExpectApiFailure(api.SetProperty(name, "capabilities", "SYS_BOOT"), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "capabilities", "SYS_RAWIO"), EError::Permission);
 
     ExpectApiSuccess(api.SetProperty(name, "capabilities", "CHOWN"));
 
