@@ -21,13 +21,20 @@ static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
 
 TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
     struct passwd pwd, *ptr;
-    char buf[PwdBufSize];
+    std::vector<char> buf(PwdBufSize, '\0');
     int id, err;
 
-    if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0)
-        err = getpwuid_r(id, &pwd, buf, PwdBufSize, &ptr);
-    else
-        err = getpwnam_r(user.c_str(), &pwd, buf, PwdBufSize, &ptr);
+    while (1) {
+        if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0)
+            err = getpwuid_r(id, &pwd, buf.data(), buf.size(), &ptr);
+        else
+            err = getpwnam_r(user.c_str(), &pwd, buf.data(), buf.size(), &ptr);
+        if (!err || errno != ERANGE)
+            break;
+        PwdBufSize *= 2;
+        buf.resize(PwdBufSize);
+        L() << "Increase user buffer to " << PwdBufSize << std::endl;
+    }
 
     if (err || !ptr)
         return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
@@ -53,7 +60,7 @@ TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups
 
 TError UserId(const std::string &user, uid_t &uid) {
     struct passwd pwd, *ptr;
-    char buf[PwdBufSize];
+    std::vector<char> buf(PwdBufSize, '\0');
     int id;
 
     if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0) {
@@ -61,8 +68,16 @@ TError UserId(const std::string &user, uid_t &uid) {
         return TError::Success();
     }
 
-    if (getpwnam_r(user.c_str(), &pwd, buf, PwdBufSize, &ptr) || !ptr)
-        return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
+    while (getpwnam_r(user.c_str(), &pwd, buf.data(), buf.size(), &ptr)) {
+        if (errno != ERANGE)
+            return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
+        PwdBufSize *= 2;
+        buf.resize(PwdBufSize);
+        L() << "Increase user buffer to " << PwdBufSize << std::endl;
+    }
+
+    if (!ptr)
+        return TError(EError::InvalidValue, "Cannot find user: " + user);
 
     uid = pwd.pw_uid;
     return TError::Success();
@@ -70,10 +85,15 @@ TError UserId(const std::string &user, uid_t &uid) {
 
 std::string UserName(uid_t uid) {
     struct passwd pwd, *ptr;
-    char buf[PwdBufSize];
+    std::vector<char> buf(PwdBufSize, '\0');
 
-    if (getpwuid_r(uid, &pwd, buf, PwdBufSize, &ptr) || !ptr)
-        return std::to_string(uid);
+    while (getpwuid_r(uid, &pwd, buf.data(), buf.size(), &ptr)) {
+        if (errno != ERANGE)
+            return std::to_string(uid);
+        PwdBufSize *= 2;
+        buf.resize(PwdBufSize);
+        L() << "Increase user buffer to " << PwdBufSize << std::endl;
+    }
 
     return std::string(pwd.pw_name);
 }
@@ -83,7 +103,7 @@ static size_t GrpBufSize = sysconf(_SC_GETGR_R_SIZE_MAX) > 0 ?
 
 TError GroupId(const std::string &group, gid_t &gid) {
     struct group grp, *ptr;
-    char buf[GrpBufSize];
+    std::vector<char> buf(GrpBufSize, '\0');
     int id;
 
     if (isdigit(group[0]) && !StringToInt(group, id) && id >= 0) {
@@ -91,8 +111,16 @@ TError GroupId(const std::string &group, gid_t &gid) {
         return TError::Success();
     }
 
-    if (getgrnam_r(group.c_str(), &grp, buf, GrpBufSize, &ptr) || !ptr)
-        return TError(EError::InvalidValue, errno, "Cannot find group: " + group);
+    while (getgrnam_r(group.c_str(), &grp, buf.data(), buf.size(), &ptr)) {
+        if (errno != ERANGE)
+            return TError(EError::InvalidValue, errno, "Cannot find group: " + group);
+        GrpBufSize *= 2;
+        buf.resize(GrpBufSize);
+        L() << "Increase group buffer to " << GrpBufSize << std::endl;
+    }
+
+    if (!ptr)
+        return TError(EError::InvalidValue, "Cannot find group: " + group);
 
     gid = grp.gr_gid;
     return TError::Success();
@@ -100,11 +128,17 @@ TError GroupId(const std::string &group, gid_t &gid) {
 
 std::string GroupName(gid_t gid) {
     struct group grp, *ptr;
-    char buf[GrpBufSize];
+    std::vector<char> buf(GrpBufSize, '\0');
 
-    if (getgrgid_r(gid, &grp, buf, GrpBufSize, &ptr) || !ptr)
+    while (getgrgid_r(gid, &grp, buf.data(), buf.size(), &ptr)) {
+        if (errno != ERANGE)
+            return std::to_string(gid);
+        GrpBufSize *= 2;
+        buf.resize(GrpBufSize);
+        L() << "Increase group buffer to " << GrpBufSize << std::endl;
+    }
+    if (!ptr)
         return std::to_string(gid);
-
     return std::string(grp.gr_name);
 }
 
