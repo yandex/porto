@@ -147,6 +147,7 @@ public:
     std::string Kind;
     uint64_t Prio = 0;
     uint64_t Rate = 0;
+    uint64_t defRate = 0;
     uint64_t Ceil = 0;
     uint64_t RateBurst = 0;
     uint64_t CeilBurst = 0;

@@ -796,18 +796,17 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
         if (!dev.Managed)
             continue;
 
-        uint64_t defRate;
         if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
-            defRate = dev.Rate;
+            cls.defRate = dev.Rate;
         else if (handle == TC_HANDLE(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID))
-            defRate = dev.GetConfig(PortoRate);
+            cls.defRate = dev.GetConfig(PortoRate);
         else
-            defRate = dev.GetConfig(ContainerRate);
+            cls.defRate = dev.GetConfig(ContainerRate);
 
         cls.Index = dev.Index;
         cls.Kind = dev.GetConfig(DeviceQdisc);
         cls.Prio = dev.GetConfig(prio);
-        cls.Rate = dev.GetConfig(rate, defRate);
+        cls.Rate = dev.GetConfig(rate);
         cls.Ceil = dev.GetConfig(ceil);
         cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2);
         cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10);

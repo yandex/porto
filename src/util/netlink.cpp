@@ -944,23 +944,21 @@ TError TNlClass::Create(const TNl &nl) {
         uint64_t maxRate = UINT32_MAX;
         struct tc_service_curve rsc, fsc, usc;
 
-        rsc.m1 = std::min(Rate, maxRate);
-        rsc.d = rsc.m1 ? std::ceil(Quantum * 1000000. / rsc.m1) : 0;
-        rsc.m2 = std::min(Rate >> Prio, maxRate);
+        if (Rate) {
+            rsc.m1 = std::min(Rate * 2, maxRate);
+            rsc.m2 = std::min(Rate, maxRate);
+            rsc.d = rsc.m1 ? std::ceil(Quantum * 1000000. / rsc.m1) : 0;
 
-        fsc.m1 = std::min(Ceil >> Prio, maxRate);
-        fsc.d = fsc.m1 ? std::ceil(RateBurst * 1000000. / fsc.m1) : 0;
-        fsc.m2 = std::min(Rate, maxRate);
-
-        usc.m1 = std::min(Ceil * 2, maxRate);
-        usc.d = usc.m1 ? std::ceil(CeilBurst * 1000000. / usc.m1) : 0;
-        usc.m2 = std::min(Ceil, maxRate);
-
-        ret = rtnl_class_hfsc_set_rsc(cls, &rsc);
-        if (error) {
-            error = nl.Error(ret, "Cannot set class rsc");
-            goto free_class;
+            ret = rtnl_class_hfsc_set_rsc(cls, &rsc);
+            if (error) {
+                error = nl.Error(ret, "Cannot set class rsc");
+                goto free_class;
+            }
         }
+
+        fsc.m1 = std::min(std::max(Rate, defRate) * 2, maxRate);
+        fsc.m2 = std::min(std::max(Rate, defRate), maxRate);
+        fsc.d = fsc.m1 ? std::ceil(RateBurst * 1000000. / fsc.m1) : 0;
 
         ret = rtnl_class_hfsc_set_fsc(cls, &fsc);
         if (error) {
@@ -968,10 +966,16 @@ TError TNlClass::Create(const TNl &nl) {
             goto free_class;
         }
 
-        ret = rtnl_class_hfsc_set_usc(cls, &usc);
-        if (error) {
-            error = nl.Error(ret, "Cannot set class usc");
-            goto free_class;
+        if (Ceil) {
+            usc.m1 = std::min(Ceil * 2, maxRate);
+            usc.m2 = std::min(Ceil, maxRate);
+            usc.d = usc.m1 ? std::ceil(CeilBurst * 1000000. / usc.m1) : 0;
+
+            ret = rtnl_class_hfsc_set_usc(cls, &usc);
+            if (error) {
+                error = nl.Error(ret, "Cannot set class usc");
+                goto free_class;
+            }
         }
     }
 
