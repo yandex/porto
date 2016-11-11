@@ -519,6 +519,8 @@ std::string TContainer::StateName(EContainerState state) {
         return "stopped";
     case EContainerState::Dead:
         return "dead";
+    case EContainerState::Starting:
+        return "starting";
     case EContainerState::Running:
         return "running";
     case EContainerState::Paused:
@@ -537,6 +539,8 @@ EContainerState TContainer::ParseState(const std::string &name) {
         return EContainerState::Stopped;
     if (name == "dead")
         return EContainerState::Dead;
+    if (name == "starting")
+        return EContainerState::Starting;
     if (name == "running")
         return EContainerState::Running;
     if (name == "paused")
@@ -620,7 +624,9 @@ void TContainer::SetState(EContainerState next) {
         }
     }
 
-    if (next != EContainerState::Running && next != EContainerState::Meta)
+    if (next != EContainerState::Running &&
+            next != EContainerState::Meta &&
+            next != EContainerState::Starting)
         NotifyWaiters();
 }
 
@@ -1442,10 +1448,7 @@ TError TContainer::Start() {
 
     L_ACT() << "Start " << Name << std::endl;
 
-    if (IsMeta())
-        SetState(EContainerState::Meta);
-    else
-        SetState(EContainerState::Running);
+    SetState(EContainerState::Starting);
 
     StartTime = GetCurrentTimeMs();
     RealStartTime = time(nullptr);
@@ -1465,6 +1468,11 @@ TError TContainer::Start() {
     }
 
     CurrentClient->LockedContainer->UpgradeLock();
+
+    if (IsMeta())
+        SetState(EContainerState::Meta);
+    else
+        SetState(EContainerState::Running);
 
     L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
 
@@ -2189,6 +2197,9 @@ void TContainer::SyncState() {
         return;
     }
 
+    if (State == EContainerState::Starting)
+        State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
+
     if (FreezerSubsystem.IsFrozen(freezerCg)) {
         if (State == EContainerState::Running || State == EContainerState::Meta)
             State = EContainerState::Paused;
@@ -2241,6 +2252,7 @@ void TContainer::SyncState() {
             break;
         case EContainerState::Running:
         case EContainerState::Meta:
+        case EContainerState::Starting:
             /* Any state is ok */
             break;
         case EContainerState::Paused:

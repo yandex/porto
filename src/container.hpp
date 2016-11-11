@@ -32,6 +32,7 @@ struct TEnv;
 enum class EContainerState {
     Stopped,
     Dead,
+    Starting,
     Running,
     Paused,
     Meta,

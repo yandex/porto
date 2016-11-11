@@ -126,6 +126,7 @@ TError TClient::IdentifyClient(bool initial) {
     if (!initial && Pid == cr.pid && TaskCred.Uid == cr.uid &&
             TaskCred.Gid == cr.gid && ClientContainer &&
             (ClientContainer->State == EContainerState::Running ||
+             ClientContainer->State == EContainerState::Starting ||
              ClientContainer->State == EContainerState::Meta))
         return TError::Success();
 
@@ -147,7 +148,9 @@ TError TClient::IdentifyClient(bool initial) {
     if (AccessLevel == EAccessLevel::None)
         return TError(EError::Permission, "Porto disabled in container " + ct->Name);
 
-    if (ct->State != EContainerState::Running && ct->State != EContainerState::Meta)
+    if (ct->State != EContainerState::Running &&
+            ct->State != EContainerState::Starting &&
+            ct->State != EContainerState::Meta)
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 
     if (ct->ClientsCount >= config().daemon().max_clients_in_container())
