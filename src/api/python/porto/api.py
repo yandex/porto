@@ -607,7 +607,7 @@ class Connection(object):
         return [Layer(self, l) for l in self._ListLayers(place)]
 
     def ConvertPath(self, path, source, destination):
-        request = rpc_pb2.TConvertPathRequest()
+        request = rpc_pb2.TContainerRequest()
         request.convertPath.path = path
         request.convertPath.source = source
         request.convertPath.destination = destination
