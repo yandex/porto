@@ -1470,13 +1470,14 @@ TError TContainer::Start() {
     CurrentClient->LockedContainer->DowngradeLock();
 
     error = StartTask();
+
+    CurrentClient->LockedContainer->UpgradeLock();
+
     if (error) {
         SetState(EContainerState::Stopped);
         FreeResources();
         return error;
     }
-
-    CurrentClient->LockedContainer->UpgradeLock();
 
     if (IsMeta())
         SetState(EContainerState::Meta);
