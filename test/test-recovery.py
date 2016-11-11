@@ -28,7 +28,7 @@ def ValidateDefaultProp(r):
             "hostname" : "", "bind_dns" : True, "devices" : "",\
             "capabilities" : "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; " +\
             "KILL; SETGID; SETUID; SETPCAP; LINUX_IMMUTABLE; NET_BIND_SERVICE; " +\
-            "NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; SYS_ADMIN; " +\
+            "NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; SYS_ADMIN; SYS_BOOT; " +\
             "SYS_NICE; SYS_RESOURCE; MKNOD; AUDIT_WRITE; SETFCAP",\
             "isolate" : True, "stdout_limit" : "8388608", "private" : "",\
             "bind" : "", "root_readonly" : False, "max_respawns" : "-1",\
@@ -264,7 +264,8 @@ def TestRecovery(c):
     cgs = {}
     for cg in open("/proc/" + pid + "/cgroup").readlines():
         (subsys, path) = cg.split(":")[1:3]
-        cgs[subsys] = path.rstrip('\n')
+        for i in subsys.split(','):
+            cgs[i] = path.rstrip('\n')
 
     assert cgs["freezer"] == "/porto/a_b"
     for i in ["memory","cpu","cpuacct","devices"]:
