@@ -2204,18 +2204,24 @@ class TConvertPathCmd final : public ICmd {
 
 public:
     TConvertPathCmd(Porto::Connection *api) : ICmd(api, "convert", 1,
-                                           "<path> [-s container] [-d container]",
+                                           "[-s container] [-d container] <path>",
                                            "convert paths between different containers",
                                            "    -s container    source container (client container if omitted)\n"
                                            "    -d container    destination container (client container if omitted)\n") { }
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string path, src, dest;
-        environment->GetOpts({
+        auto args  = environment->GetOpts({
                 {'s', true, [&](const char *arg) { src = arg; }},
                 {'d', true, [&](const char *arg) { dest = arg; }}
-	  });
-        path = environment->GetArgs()[0];
+        });
+
+        if (args.size() != 1) {
+            PrintError("Require exactly one agrument");
+            return EXIT_FAILURE;
+        }
+
+        path = args[0];
 
         std::string converted;
         auto ret = Api->ConvertPath(path, src, dest, converted);
