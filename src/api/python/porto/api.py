@@ -5,7 +5,6 @@ import threading
 
 from . import rpc_pb2
 from . import exceptions
-from functools import wraps
 
 __all__ = ['Connection']
 
@@ -226,7 +225,7 @@ class Container(object):
     def Resume(self):
         self.conn.Resume(self.name)
 
-    def Get(self, variables, nonblock = False):
+    def Get(self, variables, nonblock=False):
         return self.conn.Get([self.name], variables, nonblock)[self.name]
 
     def Set(self, **kwargs):
@@ -329,14 +328,14 @@ class Connection(object):
     def disconnect(self):
         self.rpc.disconnect()
 
-    def List(self, mask = None):
+    def List(self, mask=None):
         request = rpc_pb2.TContainerRequest()
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
         if mask is not None:
             request.list.mask = mask
         return self.rpc.call(request, self.rpc.timeout).list.name
 
-    def ListContainers(self, mask = None):
+    def ListContainers(self, mask=None):
         return [Container(self, name) for name in self.List(mask)]
 
     def Find(self, name):
@@ -392,7 +391,7 @@ class Connection(object):
         request.resume.name = name
         self.rpc.call(request, self.rpc.timeout)
 
-    def Get(self, containers, variables, nonblock = False):
+    def Get(self, containers, variables, nonblock=False):
         request = rpc_pb2.TContainerRequest()
         request.get.name.extend(containers)
         request.get.variable.extend(variables)
