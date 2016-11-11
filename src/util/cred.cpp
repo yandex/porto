@@ -387,6 +387,7 @@ void InitCapabilities() {
         BIT(CAP_IPC_LOCK);
 
     PidNsCapabilities.Permitted =
+        BIT(CAP_SYS_BOOT) |
         BIT(CAP_KILL) |
         BIT(CAP_SYS_PTRACE);
 

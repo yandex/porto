@@ -1674,7 +1674,7 @@ TError TContainer::Terminate(uint64_t deadline) {
         return cg.KillAll(SIGKILL);
 
     if (Task.Pid && deadline && State != EContainerState::Meta) {
-        error = Task.Kill(SIGTERM);
+        error = Task.Kill((VirtMode == VIRT_MODE_APP) ? SIGTERM : SIGPWR);
         if (!error) {
             L_ACT() << "Wait task " << Task.Pid << " after SIGTERM in " << Name << std::endl;
             while (Task.Exists() && !Task.IsZombie() &&

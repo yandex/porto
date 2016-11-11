@@ -20,6 +20,11 @@ ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
 
+tee etc/init/power-status-changed.conf <<EOF
+start on power-status-changed
+exec /sbin/shutdown -h now
+EOF
+
 # Do not mount anything at boot
 sed -e 's/^/#/g' -i lib/init/fstab
 
