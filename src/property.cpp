@@ -2744,6 +2744,8 @@ public:
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
+        if (!CurrentContainer->Net)
+            return TError(EError::InvalidState, "not available");
         uint32_t id = CurrentContainer->GetTrafficClass();
         auto str = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
         auto lock = CurrentContainer->Net->ScopedLock();
@@ -2755,6 +2757,8 @@ public:
         return TError::Success();
     }
     TError GetIndexed(const std::string &index, std::string &value) {
+        if (!CurrentContainer->Net)
+            return TError(EError::InvalidState, "not available");
         uint32_t id = CurrentContainer->GetTrafficClass();
         auto lock = CurrentContainer->Net->ScopedLock();
         for (auto &dev: CurrentContainer->Net->Devices) {
