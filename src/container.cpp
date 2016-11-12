@@ -339,6 +339,7 @@ TContainer::~TContainer() {
 }
 
 TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &ct) {
+    auto nrMax = config().container().max_total();
     TError error;
 
     error = ValidName(name);
@@ -346,13 +347,6 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
         return error;
 
     auto lock = LockContainers();
-
-    if (Containers.find(name) != Containers.end())
-        return TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
-
-    auto max = config().container().max_total();
-    if (Containers.size() >= max + NR_SERVICE_CONTAINERS)
-        return TError(EError::ResourceNotAvailable, "number of containers reached limit: " + std::to_string(max));
 
     auto parent = TContainer::Find(TContainer::ParentName(name));
     if (parent) {
@@ -366,6 +360,17 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
             goto err;
     } else if (name != ROOT_CONTAINER)
         return TError(EError::ContainerDoesNotExist, "parent container not found for " + name);
+
+    if (Containers.find(name) != Containers.end()) {
+        error = TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
+        goto err;
+    }
+
+    if (Containers.size() >= nrMax + NR_SERVICE_CONTAINERS) {
+        error = TError(EError::ResourceNotAvailable,
+                "number of containers reached limit: " + std::to_string(nrMax));
+        goto err;
+    }
 
     L_ACT() << "Create " << name << std::endl;
 
