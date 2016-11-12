@@ -41,3 +41,24 @@ $PORTOCTL build -l bootstrap -o ubuntu-xenial.$COMPRESS \
 
 $PORTOCTL layer -R ubuntu-xenial || true
 $PORTOCTL layer -I ubuntu-xenial ubuntu-xenial.$COMPRESS
+
+rm -f debian-jessie.$COMPRESS
+$PORTOCTL build -l bootstrap -o debian-jessie.$COMPRESS \
+	-B $L/bootstrap_debian_jessie.sh \
+	-S $L/base_debian_jessie.sh \
+	-S $L/common-misc.sh \
+	-S $L/common-openssh.sh \
+	-S $L/common-devel.sh \
+	-S $L/common-cleanup.sh net="$NET"
+
+$PORTOCTL layer -R debian-jessie || true
+$PORTOCTL layer -I debian-jessie debian-jessie.$COMPRESS
+
+rm -f debian-stretch.$COMPRESS
+$PORTOCTL build -l bootstrap -o debian-stretch.$COMPRESS \
+	-B $L/bootstrap_debian_stretch.sh \
+	-S $L/base_debian_stretch.sh \
+	-S $L/common-cleanup.sh net="$NET"
+
+$PORTOCTL layer -R debian-stretch || true
+$PORTOCTL layer -I debian-stretch debian-stretch.$COMPRESS

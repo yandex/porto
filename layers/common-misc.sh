@@ -18,7 +18,6 @@ iproute \
 iptables \
 iputils-ping \
 isc-dhcp-client \
-language-pack-en \
 less \
 lockfile-progs \
 logrotate \
