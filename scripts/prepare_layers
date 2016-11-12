@@ -58,6 +58,9 @@ rm -f debian-stretch.$COMPRESS
 $PORTOCTL build -l bootstrap -o debian-stretch.$COMPRESS \
 	-B $L/bootstrap_debian_stretch.sh \
 	-S $L/base_debian_stretch.sh \
+	-S $L/common-misc.sh \
+	-S $L/common-openssh.sh \
+	-S $L/common-devel.sh \
 	-S $L/common-cleanup.sh net="$NET"
 
 $PORTOCTL layer -R debian-stretch || true

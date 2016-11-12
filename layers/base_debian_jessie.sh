@@ -20,6 +20,10 @@ ff02::1         ip6-allnodes
 ff02::2         ip6-allrouters
 EOF
 
+tee -a etc/inittab <<EOF
+p0::powerfail:/sbin/init 0
+EOF
+
 export DEBIAN_FRONTEND="noninteractive"
 
 APT_GET="apt-get --yes --no-install-recommends"
