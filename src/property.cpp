@@ -1003,10 +1003,6 @@ TError TNet::Set(const std::string &net_desc) {
     if (error)
         return error;
 
-    error = WantControllers(CGROUP_NETCLS);
-    if (error)
-        return error;
-
     std::vector<std::string> new_net_desc;
     SplitEscapedString(net_desc, new_net_desc, ';');
 
@@ -1014,6 +1010,12 @@ TError TNet::Set(const std::string &net_desc) {
     error = cfg.ParseNet(new_net_desc);
     if (error)
         return error;
+
+    if (!cfg.Inherited) {
+        error = WantControllers(CGROUP_NETCLS);
+        if (error)
+            return error;
+    }
 
     CurrentContainer->NetProp = new_net_desc; /* FIXME: Copy vector contents? */
 
