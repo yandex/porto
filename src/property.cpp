@@ -2744,6 +2744,7 @@ public:
     TNetClassId() : TProperty(D_NET_CLASS_ID, EProperty::NONE,
                               "network tc class: major:minor (hex) (ro)") {
         IsReadOnly = true;
+        IsHidden = true;
     }
     TError Get(std::string &value) {
         if (!CurrentContainer->Net)
