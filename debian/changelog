@@ -1,3 +1,34 @@
+yandex-porto (3.0.15) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add separate state for starting containers
+  * property: show root_pid and handle all possible pid namespace combinations
+  * property: show tc class id in net_class_id
+  * porto: stop virt_mode=os container using SIGPWR
+  * selftest: allow SYS_BOOT
+
+  [ Vsevolod Velichko ]
+  * api/python: fix ConvertPath
+  * api/python: style fixes
+
+  [ Konstantin Khlebnikov ]
+  * portoctl: fix command convert
+  * network: reconfigure hfsc
+  * selftest: fix CAP_SYS_BOOT again
+  * selftest: fix net_guarantee check
+  * test/test-recovery: fix SYS_BOOT
+  * util/cred: retry with bigger buffer
+  * container: after failed stop free free resources with write lock
+  * util/cred: fix UserName()
+  * property: fix net_class_id without network
+  * container: fix race in create
+  * network: do not enable net_cls for inherited network
+  * layers: add debian jessie and stretch
+  * layers: fix debian templates
+  * property: hide net_class_id
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 14 Nov 2016 14:43:48 +0300
+
 yandex-porto (3.0.14) unstable; urgency=low
 
   * porto: fix clang warnings
