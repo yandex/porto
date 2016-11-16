@@ -1,3 +1,9 @@
+yandex-porto (3.0.17) unstable; urgency=low
+
+  * capabilies: restore container using system credentials
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 16 Nov 2016 16:30:31 +0300
+
 yandex-porto (3.0.16) unstable; urgency=low
 
   * property: do not warn about bogus cpu guarantee
