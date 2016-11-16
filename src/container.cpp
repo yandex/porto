@@ -1030,6 +1030,16 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
+    if (Controllers & CGROUP_NETCLS) {
+        auto netcls = GetCgroup(NetclsSubsystem);
+        error = netcls.Set("net_cls.classid",
+                           std::to_string(GetTrafficClass()));
+        if (error) {
+            L_ERR() << "Can't set classid: " << error << std::endl;
+            return error;
+        }
+    }
+
     return TError::Success();
 }
 
@@ -1094,16 +1104,6 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         error = UpdateTrafficClasses();
         if (error) {
             L_ERR() << "Network refresh failed" << std::endl;
-            return error;
-        }
-    }
-
-    if (Controllers & CGROUP_NETCLS) {
-        auto netcls = GetCgroup(NetclsSubsystem);
-        error = netcls.Set("net_cls.classid",
-                           std::to_string(GetTrafficClass()));
-        if (error) {
-            L_ERR() << "Can't set classid: " << error << std::endl;
             return error;
         }
     }
