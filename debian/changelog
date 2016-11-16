@@ -1,3 +1,13 @@
+yandex-porto (3.0.16) unstable; urgency=low
+
+  * property: do not warn about bogus cpu guarantee
+  * network: always set net_cls.classid for new cgroups
+  * portoctl: split environment before merging back for run and exec
+  * portod: fix upgrade from older versions
+  * property: add missing SetProp for private and owner_group
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 16 Nov 2016 16:02:46 +0300
+
 yandex-porto (3.0.15) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
