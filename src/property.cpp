@@ -613,6 +613,7 @@ public:
                     " isn't in current user supplementary group list");
 
         CurrentContainer->OwnerCred.Gid = newGid;
+        CurrentContainer->SetProp(EProperty::OWNER_GROUP);
         return TError::Success();
     }
 } static OwnerGroup;
@@ -2238,6 +2239,7 @@ TError TPrivate::Set(const std::string &value) {
         return TError(EError::InvalidValue, "Value is too long");
 
     CurrentContainer->Private = value;
+    CurrentContainer->SetProp(EProperty::PRIVATE);
 
     return TError::Success();
 }
