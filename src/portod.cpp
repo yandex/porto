@@ -1394,13 +1394,20 @@ int UpgradePortod() {
 
     error = symlink.ReadLink(backup);
     if (error) {
-        std::cerr << "cannot read symlink " << symlink << ": " << error << std::endl;
-        return EXIT_FAILURE;
+        if (error.GetErrno() == ENOENT) {
+            if (update != "/usr/sbin/portod") {
+                std::cerr << "old portod can upgrade only to /usr/sbin/portod" << std::endl;
+                return EXIT_FAILURE;
+            }
+        } else {
+            std::cerr << "cannot read symlink " << symlink << ": " << error << std::endl;
+            return EXIT_FAILURE;
+        }
     }
 
     if (backup != update) {
         error = symlink.Unlink();
-        if (error) {
+        if (error && error.GetErrno() != ENOENT) {
             std::cerr << "cannot remove old symlink: " << error << std::endl;
             return EXIT_FAILURE;
         }
