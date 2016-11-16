@@ -108,7 +108,9 @@ public:
             StartOS = val == "os";
 
         if (key == "env") {
-            Environment.push_back(val);
+            std::vector<std::string> list;
+            SplitEscapedString(val, list, ';');
+            Environment.insert(Environment.end(), list.begin(), list.end());
         } else if (key == "space_limit") {
             SpaceLimit = val;
             NeedVolume = true;
