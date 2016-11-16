@@ -2093,6 +2093,8 @@ TError TContainer::Load(const TKeyValue &node) {
 
     CurrentContainer = this;
 
+    OwnerCred = CurrentClient->Cred;
+
     for (auto &kv: node.Data) {
         std::string key = kv.first;
         std::string value = kv.second;

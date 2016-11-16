@@ -513,7 +513,6 @@ public:
 
         CurrentContainer->TaskCred = newCred;
         CurrentContainer->SetProp(EProperty::USER);
-        CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
 } static User;
@@ -586,6 +585,7 @@ public:
 
         CurrentContainer->OwnerCred = newCred;
         CurrentContainer->SetProp(EProperty::OWNER_USER);
+        CurrentContainer->SanitizeCapabilities();
         return TError::Success();
     }
 } static OwnerUser;
