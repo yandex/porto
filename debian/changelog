@@ -1,3 +1,10 @@
+yandex-porto (3.0.18) unstable; urgency=low
+
+  * network: add option quantum for per-container leaf qdisc
+  * network: use pfifo limit=1000p for leaf qdiscs by default
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 17 Nov 2016 12:46:57 +0300
+
 yandex-porto (3.0.17) unstable; urgency=low
 
   * capabilies: restore container using system credentials
