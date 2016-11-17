@@ -44,6 +44,7 @@ static TUintMap DefaultQdiscQuantum;
 static TUintMap ContainerRate;
 static TStringMap ContainerQdisc;
 static TUintMap ContainerQdiscLimit;
+static TUintMap ContainerQdiscQuantum;
 
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
@@ -194,6 +195,8 @@ void TNetwork::InitializeConfig() {
         StringToStringMap(config().network().container_qdisc(), ContainerQdisc);
     if (config().network().has_container_qdisc_limit())
         StringToUintMap(config().network().container_qdisc_limit(), ContainerQdiscLimit);
+    if (config().network().has_container_qdisc_quantum())
+        StringToUintMap(config().network().container_qdisc_quantum(), ContainerQdiscQuantum);
 }
 
 TError TNetwork::Destroy() {
@@ -824,6 +827,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
                          TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
             ctq.Kind = dev.GetConfig(ContainerQdisc);
             ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
+            ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
             error = ctq.Create(*Nl);
             if (error) {
                 L_WRN() << "Cannot add container tc qdisc: " << error << std::endl;

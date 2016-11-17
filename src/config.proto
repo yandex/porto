@@ -35,6 +35,7 @@ message TCfg {
 		optional string default_qdisc_quantum = 26;
 		optional string container_qdisc = 28;
 		optional string container_qdisc_limit = 29;
+		optional string container_qdisc_quantum = 33;
 		optional bool proxy_ndp = 30;
 		message TAddrLabel {
 			required string prefix = 1;
