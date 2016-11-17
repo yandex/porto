@@ -2139,6 +2139,8 @@ TError TContainer::Load(const TKeyValue &node) {
     if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
         OwnerCred = TaskCred;
 
+    SanitizeCapabilities();
+
     if (state == EContainerState::Running) {
         auto now = GetCurrentTimeMs();
 
