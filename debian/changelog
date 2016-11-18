@@ -1,3 +1,22 @@
+yandex-porto (3.0.19) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * container: always sanitize capabilities after restore
+  * porto: start systemd service in postinst script
+  * bash-completion: split portoctl and portod snippets
+  * layers: add libnss-myhostname
+
+  [ Maxim Samoylov ]
+  * property: unify multi-value string format
+  * test: fix recovery test
+  * test: check properties idempotency
+  * test: check property values on upgrade
+
+  [ Konstantin Khlebnikov ]
+  * test: fix cleanup_logs
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 18 Nov 2016 14:36:14 +0300
+
 yandex-porto (3.0.18) unstable; urgency=low
 
   * network: add option quantum for per-container leaf qdisc
