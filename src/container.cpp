@@ -1099,11 +1099,43 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
 
     error = UpdateTrafficClasses();
     if (error) {
+        L_ACT() << "Cleanup stale classes" << std::endl;
+
+        auto lock = Net->ScopedLock();
+        Net->DestroyTC(GetTrafficClass());
+        lock.unlock();
+
+        error = UpdateTrafficClasses();
+        if (!error)
+            return TError::Success();
+
         L_ACT() << "Refresh network" << std::endl;
-        Net->RefreshClasses(true);
+
+        lock.lock();
+        Net->DestroyTC(GetTrafficClass());
+        Net->RefreshDevices();
+        Net->NewManagedDevices = false;
+        lock.unlock();
+
+        Net->RefreshClasses();
+
+        error = UpdateTrafficClasses();
+        if (!error)
+            return TError::Success();
+
+        L_ACT() << "Recreate network" << std::endl;
+
+        lock.lock();
+        Net->RefreshDevices(true);
+        Net->NewManagedDevices = false;
+        Net->MissingClasses = 0;
+        lock.unlock();
+
+        Net->RefreshClasses();
+
         error = UpdateTrafficClasses();
         if (error) {
-            L_ERR() << "Network refresh failed" << std::endl;
+            L_ERR() << "Network recreation failed:" << error << std::endl;
             return error;
         }
     }
@@ -2041,16 +2073,7 @@ TError TContainer::RestoreNetwork() {
             return error;
 
         TNetwork::AddNetwork(netns.GetInode(), Net);
-
-        error = Net->RefreshDevices();
-        if (error)
-            return error;
-        Net->NewManagedDevices = false;
     }
-
-    error = UpdateTrafficClasses();
-    if (error)
-        return error;
 
     return TError::Success();
 }

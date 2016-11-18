@@ -59,11 +59,12 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
 public:
     std::vector<TNetworkDevice> Devices;
 
-    TError RefreshDevices();
-    TError RefreshClasses(bool force);
+    TError RefreshDevices(bool force = false);
+    TError RefreshClasses();
 
     bool ManagedNamespace = false;
     bool NewManagedDevices = false;
+    unsigned MissingClasses = 0;
 
     int DeviceIndex(const std::string &name) {
         for (auto dev: Devices)

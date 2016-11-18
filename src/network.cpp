@@ -124,8 +124,29 @@ void TNetwork::RefreshNetworks() {
     auto lock = LockNetworks();
     for (auto &it: Networks) {
         auto net = it.second.lock();
-        if (net)
-            net->RefreshClasses(false);
+        if (!net)
+            continue;
+
+        auto lock = net->ScopedLock();
+        net->RefreshDevices();
+        if (!net->NewManagedDevices)
+            continue;
+        net->NewManagedDevices = false;
+        net->MissingClasses = 0;
+        lock.unlock();
+
+        net->RefreshClasses();
+
+        if (!net->MissingClasses)
+            continue;
+
+        lock.lock();
+        net->RefreshDevices(true);
+        net->NewManagedDevices = false;
+        net->MissingClasses = 0;
+        lock.unlock();
+
+        net->RefreshClasses();
     }
 }
 
@@ -326,8 +347,6 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         }
     }
 
-    dev.Prepared = true;
-
     return TError::Success();
 }
 
@@ -402,7 +421,7 @@ TError TNetwork::ConnectNew(TNamespaceFd &netns) {
     return error;
 }
 
-TError TNetwork::RefreshDevices() {
+TError TNetwork::RefreshDevices(bool force) {
     struct nl_cache *cache;
     TError error;
     int ret;
@@ -445,7 +464,7 @@ TError TNetwork::RefreshDevices() {
             if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") !=
                     dev.GetConfig(DeviceQdisc))
                 Nl->Dump("Detected missing qdisc", link);
-            else
+            else if (!force)
                 d.Prepared = true;
             found = true;
             break;
@@ -474,21 +493,17 @@ TError TNetwork::RefreshDevices() {
         error = SetupQueue(dev);
         if (error)
             return error;
+        dev.Prepared = true;
         NewManagedDevices = true;
     }
 
     return TError::Success();
 }
 
-TError TNetwork::RefreshClasses(bool force) {
-    auto netLock = ScopedLock();
-    TError error = RefreshDevices();
-    if (error || (!force && !NewManagedDevices))
-        return error;
-    NewManagedDevices = false;
-    netLock.unlock();
+TError TNetwork::RefreshClasses() {
+    TError error;
+    auto lock = LockContainers();
 
-    auto ctLock = LockContainers();
     for (auto &it: Containers) {
         auto ct = it.second.get();
         if (ct->Net.get() == this &&
@@ -499,6 +514,7 @@ TError TNetwork::RefreshClasses(bool force) {
                 L_ERR() << "Cannot refresh tc for " << ct->Name << " : " << error << std::endl;
         }
     }
+
     L() << "done" << std::endl;
 
     return TError::Success();
@@ -796,7 +812,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
     cls.Handle = handle;
 
     for (auto &dev: Devices) {
-        if (!dev.Managed)
+        if (!dev.Managed || !dev.Prepared)
             continue;
 
         if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
@@ -818,6 +834,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
         error = cls.Create(*Nl);
         if (error) {
             L_WRN() << "Cannot add tc class: " << error << std::endl;
+            MissingClasses++;
             if (!result)
                 result = error;
         }
@@ -831,6 +848,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
             error = ctq.Create(*Nl);
             if (error) {
                 L_WRN() << "Cannot add container tc qdisc: " << error << std::endl;
+                MissingClasses++;
                 if (!result)
                     result = error;
             }
@@ -844,7 +862,7 @@ TError TNetwork::DestroyTC(uint32_t handle) {
     TError error, result;
 
     for (auto &dev: Devices) {
-        if (!dev.Managed)
+        if (!dev.Managed || !dev.Prepared)
             continue;
 
         TNlQdisc ctq(dev.Index, handle,

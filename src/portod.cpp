@@ -550,6 +550,8 @@ static void RestoreContainers() {
             continue;
         }
     }
+
+    TNetwork::RefreshNetworks();
 }
 
 static void CleanupCgroups() {
