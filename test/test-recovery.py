@@ -106,11 +106,16 @@ def ValidateRunningData(r):
 
 def RespawnTicks(r):
     old = r.GetData("respawn_count")
-    for i in range(0,3):
-        time.sleep(1.1)
+    tick = 0
+    for i in range(0,5):
+        time.sleep(1)
         new = r.GetData("respawn_count")
-        assert old != new
-        old = new
+        if old != new:
+            tick += 1
+            old = new
+    #Suppose that respawn will likely tick at least 2 times in 5s
+    #otherwise there is some issues there
+    assert tick != 2
 
 
 def TestRecovery(c):
@@ -483,8 +488,13 @@ def TestVolumeRecovery(c):
 
     os.rmdir("/tmp/volume_c")
 
+subprocess.check_call([portod, "--verbose", "reload"])
+
 DropPrivileges()
+
 c = porto.Connection(timeout=30)
 TestRecovery(c)
 TestWaitRecovery(c)
 TestVolumeRecovery(c)
+
+subprocess.check_call([portod, "--verbose", "--discard", "reload"])
