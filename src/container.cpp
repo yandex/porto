@@ -2075,6 +2075,10 @@ TError TContainer::RestoreNetwork() {
         TNetwork::AddNetwork(netns.GetInode(), Net);
     }
 
+    error = UpdateTrafficClasses();
+    if (error)
+        return error;
+
     return TError::Success();
 }
 

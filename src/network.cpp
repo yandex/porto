@@ -833,6 +833,10 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
 
         error = cls.Create(*Nl);
         if (error) {
+            (void)cls.Delete(*Nl);
+            error = cls.Create(*Nl);
+        }
+        if (error) {
             L_WRN() << "Cannot add tc class: " << error << std::endl;
             MissingClasses++;
             if (!result)
@@ -846,6 +850,10 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
             ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
             ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
             error = ctq.Create(*Nl);
+            if (error) {
+                (void)ctq.Delete(*Nl);
+                error = ctq.Create(*Nl);
+            }
             if (error) {
                 L_WRN() << "Cannot add container tc qdisc: " << error << std::endl;
                 MissingClasses++;
