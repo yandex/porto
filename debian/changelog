@@ -1,3 +1,13 @@
+yandex-porto (3.0.20) unstable; urgency=low
+
+  * porto: destroy container if some property cannot be restored
+  * network: recreate network if something goes wrong
+  * test/tc-rebuild: update expected warnings
+  * network: try to destroy tc class and craete again if creation fails
+  * porto: stop virt_mode=os with SIGTERM/SIGPWR only if signals are handled
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 18 Nov 2016 20:26:13 +0300
+
 yandex-porto (3.0.19) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
