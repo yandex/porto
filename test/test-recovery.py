@@ -488,6 +488,44 @@ def TestVolumeRecovery(c):
 
     os.rmdir("/tmp/volume_c")
 
+def TestTCCleanup(c):
+    print "Make sure stale tc classes to be cleaned up"
+
+    SwitchRoot()
+
+    c.connect()
+
+    subprocess.check_call([portod, "--discard", "restart"])
+
+    kvs = set(os.listdir("/run/porto/kvs"))
+
+    c.Create("a")
+    r = c.Create("a/b")
+    r.SetProperty("net_limit", "default: 1024")
+    r.SetProperty("command", "sleep 10000")
+    r.Start()
+
+    kvs2 = set(os.listdir("/run/porto/kvs"))
+
+    for f in kvs2 - kvs:
+        os.unlink("/run/porto/kvs/" + f)
+
+    subprocess.check_call([portod, "reload"])
+
+    r = c.Create("a")
+    r.SetProperty("command", "sleep 100")
+    r.Start()
+
+    r = c.Create("b")
+    r.SetProperty("command", "sleep 100")
+    r.Start()
+
+    c.Destroy("a")
+    c.Destroy("b")
+
+    assert c.GetProperty("/", "porto_stat[errors]") == "0"
+    assert c.GetProperty("/", "porto_stat[warnings]") == "0"
+
 subprocess.check_call([portod, "--verbose", "reload"])
 
 DropPrivileges()
@@ -496,5 +534,6 @@ c = porto.Connection(timeout=30)
 TestRecovery(c)
 TestWaitRecovery(c)
 TestVolumeRecovery(c)
+TestTCCleanup(c)
 
 subprocess.check_call([portod, "--verbose", "--discard", "reload"])
