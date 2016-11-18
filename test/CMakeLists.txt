@@ -86,6 +86,10 @@ add_test(NAME uid_handling
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-uid_handling.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME knobs
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-knobs.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME fuzzer
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
          --timeout 300 --progress 32 2000
@@ -101,6 +105,6 @@ add_test(NAME portod_stop
 
 set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
-                     unpriv-cred prev_release_upgrade uid_handling fuzzer stats
+                     unpriv-cred prev_release_upgrade uid_handling knobs fuzzer stats
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)
