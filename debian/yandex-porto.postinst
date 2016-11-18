@@ -5,8 +5,12 @@
 
 case "$1" in
     configure)
-        chown root:porto /usr/sbin/portoctl || exit 2
-	invoke-rc.d yandex-porto reload || :
+    if [ -x "/bin/systemctl" ] ; then
+	/bin/systemctl enable yandex-porto.service || true
+	/bin/systemctl reload-or-restart yandex-porto.service || true
+    else
+	invoke-rc.d yandex-porto reload || true
+    fi
     ;;
 esac
 
