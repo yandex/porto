@@ -81,6 +81,20 @@ pid_t TTask::GetPPid() const {
     return ppid;
 }
 
+uint64_t TaskHandledSignals(pid_t pid) {
+    std::string path = "/proc/" + std::to_string(pid) + "/stat";
+    unsigned long mask;
+    FILE *file;
+    int res;
+
+    file = fopen(path.c_str(), "r");
+    if (!file)
+        return 0;
+    res = fscanf(file, "%*d (%*[^)]) %*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %*u %*u %*d %*u %*u %*u %*u %*u %*u %*u %*u %*u %lu", &mask);
+    fclose(file);
+    return res == 1 ? mask : 0;
+}
+
 pid_t GetPid() {
     return syscall(SYS_getpid);
 }

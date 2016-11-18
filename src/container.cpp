@@ -1712,11 +1712,24 @@ TError TContainer::Terminate(uint64_t deadline) {
         return cg.KillAll(SIGKILL);
 
     if (Task.Pid && deadline && State != EContainerState::Meta) {
-        error = Task.Kill((VirtMode == VIRT_MODE_APP) ? SIGTERM : SIGPWR);
-        if (!error) {
-            L_ACT() << "Wait task " << Task.Pid << " after SIGTERM in " << Name << std::endl;
-            while (Task.Exists() && !Task.IsZombie() &&
-                    !WaitDeadline(deadline));
+        int sig = SIGTERM;
+
+        if (Isolate && VirtMode == VIRT_MODE_OS) {
+            uint64_t mask = TaskHandledSignals(Task.Pid);
+            if (mask & BIT(SIGPWR - 1))
+                sig = SIGPWR;
+            else if (!(mask & BIT(SIGTERM - 1)))
+                sig = 0;
+        }
+
+        if (sig) {
+            error = Task.Kill(sig);
+            if (!error) {
+                L_ACT() << "Wait task " << Task.Pid << " after signal "
+                        << sig << " in " << Name << std::endl;
+                while (Task.Exists() && !Task.IsZombie() &&
+                        !WaitDeadline(deadline));
+            }
         }
     }
 

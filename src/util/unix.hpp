@@ -39,6 +39,7 @@ uint64_t GetTotalMemory();
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
 std::string GetTaskName(pid_t pid = 0);
+uint64_t TaskHandledSignals(pid_t pid);
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 std::string GetHostName();
 TError SetHostName(const std::string &name);
