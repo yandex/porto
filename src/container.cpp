@@ -2121,7 +2121,8 @@ TError TContainer::Load(const TKeyValue &node) {
         error = prop->SetFromRestore(value);
         if (error) {
             L_ERR() << "Cannot load " << key << ": " << error << std::endl;
-            continue;
+            state = EContainerState::Dead;
+            break;
         }
 
         SetProp(prop->Prop);
