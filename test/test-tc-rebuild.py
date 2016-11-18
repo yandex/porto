@@ -24,7 +24,7 @@ for link in links:
     assert check_qdisc(link)
     del_qdisc(link)
     assert not check_qdisc(link)
-    expected_warnings += 1
+    expected_warnings += 2
 
 # start test container
 test = conn.Create('test')
