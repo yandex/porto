@@ -18,6 +18,7 @@ iproute \
 iptables \
 iputils-ping \
 isc-dhcp-client \
+libnss-myhostname \
 less \
 lockfile-progs \
 logrotate \
