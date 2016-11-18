@@ -26,10 +26,10 @@ def ValidateDefaultProp(r):
             "respawn" : False, "memory_limit" : "0", "stdin_path" : "/dev/null",\
             "stdout_path" : "stdout", "stderr_path" : "stderr", "ulimit" : "",\
             "hostname" : "", "bind_dns" : True, "devices" : "",\
-            "capabilities" : "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; " +\
-            "KILL; SETGID; SETUID; SETPCAP; LINUX_IMMUTABLE; NET_BIND_SERVICE; " +\
-            "NET_ADMIN; NET_RAW; IPC_LOCK; SYS_CHROOT; SYS_PTRACE; SYS_ADMIN; SYS_BOOT; " +\
-            "SYS_NICE; SYS_RESOURCE; MKNOD; AUDIT_WRITE; SETFCAP",\
+            "capabilities" : "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;" +\
+            "KILL;SETGID;SETUID;SETPCAP;LINUX_IMMUTABLE;NET_BIND_SERVICE;" +\
+            "NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;" +\
+            "SYS_NICE;SYS_RESOURCE;MKNOD;AUDIT_WRITE;SETFCAP",\
             "isolate" : True, "stdout_limit" : "8388608", "private" : "",\
             "bind" : "", "root_readonly" : False, "max_respawns" : "-1",\
             "enable_porto" : True

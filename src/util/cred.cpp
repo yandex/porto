@@ -281,7 +281,7 @@ static int LastCapability;
 bool HasAmbientCapabilities = false;
 
 std::string TCapabilities::Format() const {
-    return StringFormatFlags(Permitted, CapNames, "; ");
+    return StringFormatFlags(Permitted, CapNames, ";");
 }
 
 TError TCapabilities::Parse(const std::string &string) {

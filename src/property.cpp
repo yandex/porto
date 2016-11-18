@@ -1083,7 +1083,7 @@ class TControllers : public TProperty {
 public:
     TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS, "Cgroup controllers") { }
     TError Get(std::string &value) {
-        value = StringFormatFlags(CurrentContainer->Controllers, ControllersName, "; ");
+        value = StringFormatFlags(CurrentContainer->Controllers, ControllersName, ";");
         return TError::Success();
     }
     TError Set(const std::string &value) {
