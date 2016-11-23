@@ -2317,7 +2317,7 @@ public:
         else
             return TError(EError::InvalidValue, "Unknown access level: " + value);
 
-        if (level > EAccessLevel::ChildOnly) {
+        if (level > EAccessLevel::ChildOnly && !CurrentClient->IsSuperUser()) {
             for (auto p = CurrentContainer->Parent; p; p = p->Parent)
                 if (p->AccessLevel < EAccessLevel::ChildOnly)
                     return TError(EError::Permission,
