@@ -578,7 +578,7 @@ std::string TContainer::GetCwd() const {
 TError TContainer::GetNetStat(ENetStat kind, TUintMap &stat) {
     if (Net) {
         auto lock = Net->ScopedLock();
-        return Net->GetTrafficStat(GetTrafficClass(), kind, stat);
+        return Net->GetTrafficStat(ContainerTC, kind, stat);
     } else
         return TError(EError::NotSupported, "Network statistics is not available");
 }
@@ -1037,8 +1037,7 @@ TError TContainer::PrepareCgroups() {
 
     if (Controllers & CGROUP_NETCLS) {
         auto netcls = GetCgroup(NetclsSubsystem);
-        error = netcls.Set("net_cls.classid",
-                           std::to_string(GetTrafficClass()));
+        error = netcls.Set("net_cls.classid", std::to_string(LeafTC));
         if (error) {
             L_ERR() << "Can't set classid: " << error << std::endl;
             return error;
@@ -1046,13 +1045,6 @@ TError TContainer::PrepareCgroups() {
     }
 
     return TError::Success();
-}
-
-uint32_t TContainer::GetTrafficClass() const {
-    for (auto ct = this; ct; ct = ct->Parent.get())
-        if (ct->Controllers & CGROUP_NETCLS)
-            return TcHandle(ROOT_TC_MAJOR, ct->Id);
-    return TcHandle(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
 }
 
 TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
@@ -1107,7 +1099,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         L_ACT() << "Cleanup stale classes" << std::endl;
 
         auto lock = Net->ScopedLock();
-        Net->DestroyTC(GetTrafficClass());
+        Net->DestroyTC(ContainerTC, LeafTC);
         lock.unlock();
 
         error = UpdateTrafficClasses();
@@ -1117,7 +1109,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         L_ACT() << "Refresh network" << std::endl;
 
         lock.lock();
-        Net->DestroyTC(GetTrafficClass());
+        Net->DestroyTC(ContainerTC, LeafTC);
         Net->RefreshDevices();
         Net->NewManagedDevices = false;
         lock.unlock();
@@ -1571,6 +1563,8 @@ TError TContainer::PrepareResources() {
         return error;
     }
 
+    ChooseTrafficClasses();
+
     error = PrepareCgroups();
     if (error) {
         L_ERR() << "Can't prepare task cgroups: " << error << std::endl;
@@ -1630,14 +1624,14 @@ void TContainer::FreeResources() {
 
         if (Controllers & CGROUP_NETCLS) {
             auto net_lock = Net->ScopedLock();
-            error = Net->DestroyTC(GetTrafficClass());
+            error = Net->DestroyTC(ContainerTC, LeafTC);
             if (error)
                 L_ERR() << "Can't remove traffic class: " << error << std::endl;
             net_lock.unlock();
 
             if (Net != HostNetwork) {
                 net_lock = HostNetwork->ScopedLock();
-                error = HostNetwork->DestroyTC(GetTrafficClass());
+                error = HostNetwork->DestroyTC(ContainerTC, LeafTC);
                 if (error)
                     L_ERR() << "Can't remove traffic class: " << error << std::endl;
             }
@@ -2101,6 +2095,8 @@ TError TContainer::RestoreNetwork() {
 
         TNetwork::AddNetwork(netns.GetInode(), Net);
     }
+
+    ChooseTrafficClasses();
 
     error = UpdateTrafficClasses();
     if (error)
@@ -2605,43 +2601,41 @@ void TContainer::CleanupWaiters() {
     }
 }
 
+void TContainer::ChooseTrafficClasses() {
+    if (IsRoot()) {
+        ContainerTC = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
+        ParentTC = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
+        LeafTC = TcHandle(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
+    } else if (Controllers & CGROUP_NETCLS) {
+        ContainerTC = TcHandle(ROOT_TC_MAJOR, Id);
+        ParentTC = Parent->ContainerTC;
+        LeafTC = TcHandle(ROOT_TC_MAJOR, Id + CONTAINER_ID_MAX);
+    } else {
+        ContainerTC = Parent->ContainerTC;
+        ParentTC = Parent->ParentTC;
+        LeafTC = Parent->LeafTC;
+    }
+}
+
 TError TContainer::UpdateTrafficClasses() {
-    uint32_t handle, parent;
     TError error;
 
     if (!(Controllers & CGROUP_NETCLS))
         return TError::Success();
 
-    handle = GetTrafficClass();
-    parent = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
-
-    /* link class to closest meta container */
-    for (auto p = Parent; p; p = p->Parent) {
-        if (p->State == EContainerState::Meta) {
-            parent = p->GetTrafficClass();
-            break;
-        }
-        if (p->State == EContainerState::Stopped)
-            return TError::Success();
-    }
-
     auto net_lock = HostNetwork->ScopedLock();
-    error = HostNetwork->CreateTC(handle, parent, !IsMeta(),
+    error = HostNetwork->CreateTC(ContainerTC, ParentTC, LeafTC,
                                   NetPriority, NetGuarantee, NetLimit);
     if (error)
         return error;
     net_lock.unlock();
 
     if (Net && Net != HostNetwork) {
-        parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        for (auto p = Parent; p; p = p->Parent) {
-            if (p->State == EContainerState::Meta && p->Net == Net) {
-                parent = p->GetTrafficClass();
-                break;
-            }
-        }
+        uint32_t parent = ParentTC;
+        if (Net != Parent->Net)
+            parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
         auto net_lock = Net->ScopedLock();
-        error = Net->CreateTC(handle, parent, !IsMeta(),
+        error = Net->CreateTC(ContainerTC, parent, LeafTC,
                               NetPriority, NetGuarantee, NetLimit);
     }
 

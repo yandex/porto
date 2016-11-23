@@ -154,6 +154,10 @@ public:
     double CpuGuarantee;
     std::string CpuSet;
 
+    uint32_t ContainerTC;
+    uint32_t ParentTC;
+    uint32_t LeafTC;
+
     TUintMap NetGuarantee;
     TUintMap NetLimit;
     TUintMap NetPriority;
@@ -243,7 +247,6 @@ public:
     TError OpenNetns(TNamespaceFd &netns) const;
 
     TError GetNetStat(ENetStat kind, TUintMap &stat);
-    uint32_t GetTrafficClass() const;
 
     TError GetPidFor(pid_t pidns, pid_t &pid) const;
 
@@ -272,6 +275,7 @@ public:
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
+    void ChooseTrafficClasses();
     TError UpdateTrafficClasses();
 
     bool MayRespawn();

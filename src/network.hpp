@@ -91,9 +91,9 @@ public:
 
     TError DelTC(const TNetworkDevice &dev, uint32_t handle) const;
 
-    TError CreateTC(uint32_t handle, uint32_t parent, bool leaf,
+    TError CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
                     TUintMap &prio, TUintMap &rate, TUintMap &ceil);
-    TError DestroyTC(uint32_t handle);
+    TError DestroyTC(uint32_t handle, uint32_t leaf);
 
     TError GetDeviceStat(ENetStat kind, TUintMap &stat);
     TError GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat);

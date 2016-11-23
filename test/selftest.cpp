@@ -3480,11 +3480,14 @@ static void TestLimits(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
 
     if (NetworkEnabled()) {
-        string handle = GetCgKnob("net_cls", name, "net_cls.classid");
+        uint32_t handle = stoul(GetCgKnob("net_cls", name, "net_cls.classid"));
+
+        if (handle > 0x14000)
+            handle -= 0x4000;
 
         i = 0;
         for (auto &link : links) {
-            TNlClass tclass(link->GetIndex(), -1, stoul(handle));
+            TNlClass tclass(link->GetIndex(), -1, handle);
             ExpectSuccess(tclass.Load(*link->GetNl()));
             if (tclass.Kind == "htb")
                 ExpectEq(tclass.Prio, netPrio + i);

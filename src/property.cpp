@@ -2769,7 +2769,7 @@ public:
     TError Get(std::string &value) {
         if (!CurrentContainer->Net)
             return TError(EError::InvalidState, "not available");
-        uint32_t id = CurrentContainer->GetTrafficClass();
+        uint32_t id = CurrentContainer->ContainerTC;
         auto str = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
         auto lock = CurrentContainer->Net->ScopedLock();
         TStringMap map;
@@ -2782,7 +2782,7 @@ public:
     TError GetIndexed(const std::string &index, std::string &value) {
         if (!CurrentContainer->Net)
             return TError(EError::InvalidState, "not available");
-        uint32_t id = CurrentContainer->GetTrafficClass();
+        uint32_t id = CurrentContainer->ContainerTC;
         auto lock = CurrentContainer->Net->ScopedLock();
         for (auto &dev: CurrentContainer->Net->Devices) {
             if (dev.Managed && dev.Name == index) {

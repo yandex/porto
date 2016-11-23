@@ -266,20 +266,32 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     TError error;
 
     //
-    // 1:0 qdisc
+    // 1:0 qdisc (hfsc)
     //  |
     // 1:1 / class
     //  |
     //  +- 1:2 default class
+    //  |   |
+    //  |   +- 2:0 default class qdisc (sfq)
     //  |
-    //  +- 1:3 /porto class
+    //  +- 1:4 container a
+    //  |   |
+    //  |   +- 1:4004 leaf a
+    //  |   |   |
+    //  |   |   +- 4:0 qdisc a (pfifo)
+    //  |   |
+    //  |   +- 1:5 container a/b
+    //  |       |
+    //  |       +- 1:4005 leaf a/b
+    //  |           |
+    //  |           +- 5:0 qdisc a/b (pfifo)
+    //  |
+    //  +- 1:6 container b
     //      |
-    //      +- 1:4 container a
-    //      |   |
-    //      |   +- 1:5 container a/b
-    //      |
-    //      +- 1:6 container b
-    //
+    //      +- 1:4006 leaf b
+    //          |
+    //          +- 6:0 qdisc b (pfifo)
+
 
     L() << "Setup queue for network device " << dev.GetDesc() << std::endl;
 
@@ -327,6 +339,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
     cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     cls.Rate = dev.GetConfig(DefaultRate);
+    cls.Ceil = 0;
 
     error = cls.Create(*Nl);
     if (error) {
@@ -334,17 +347,22 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         return error;
     }
 
-    if (!ManagedNamespace) {
+    if (ManagedNamespace) {
         TNlQdisc defq(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
                       TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR));
-        defq.Kind = dev.GetConfig(DefaultQdisc);
-        defq.Limit = dev.GetConfig(DefaultQdiscLimit);
-        defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+        defq.Kind = dev.GetConfig(ContainerQdisc);
+        defq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
+        defq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
         if (!defq.Check(*Nl)) {
             error = defq.Create(*Nl);
             if (error)
                 return error;
         }
+    }
+
+    if (this == HostNetwork.get()) {
+        RootContainer->NetLimit[dev.Name] = dev.Ceil;
+        RootContainer->NetGuarantee[dev.Name] = dev.Rate;
     }
 
     return TError::Success();
@@ -482,6 +500,10 @@ TError TNetwork::RefreshDevices(bool force) {
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
             L() << "Delete network device " << dev->GetDesc() << std::endl;
+            if (this == HostNetwork.get()) {
+                RootContainer->NetLimit.erase(dev->Name);
+                RootContainer->NetGuarantee.erase(dev->Name);
+            }
             dev = Devices.erase(dev);
         } else
             dev++;
@@ -504,9 +526,14 @@ TError TNetwork::RefreshClasses() {
     TError error;
     auto lock = LockContainers();
 
+    /* Must be updated first, other containers are ordered */
+    error = RootContainer->UpdateTrafficClasses();
+    if (error)
+        L_ERR() << "Cannot refresh tc for / : " << error << std::endl;
+
     for (auto &it: Containers) {
         auto ct = it.second.get();
-        if (ct->Net.get() == this &&
+        if (ct->Net.get() == this && !ct->IsRoot() &&
             (ct->State == EContainerState::Running ||
              ct->State == EContainerState::Meta)) {
             error = ct->UpdateTrafficClasses();
@@ -803,17 +830,17 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
     return TError::Success();
 }
 
-TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
+TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
                           TUintMap &prio, TUintMap &rate, TUintMap &ceil) {
     TError error, result;
     TNlClass cls;
 
-    cls.Parent = parent;
-    cls.Handle = handle;
-
     for (auto &dev: Devices) {
         if (!dev.Managed || !dev.Prepared)
             continue;
+
+        cls.Parent = parent;
+        cls.Handle = handle;
 
         if (handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
             cls.defRate = dev.Rate;
@@ -844,11 +871,37 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
         }
 
         if (!error && leaf) {
-            TNlQdisc ctq(dev.Index, handle,
+            TNlQdisc ctq(dev.Index, leaf,
                          TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
-            ctq.Kind = dev.GetConfig(ContainerQdisc);
-            ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
-            ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
+
+            cls.Parent = handle;
+            cls.Handle = leaf;
+
+            if (leaf == TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR)) {
+                cls.Rate = dev.GetConfig(DefaultRate);
+                cls.defRate = cls.Rate;
+                cls.Ceil = 0;
+
+                ctq.Handle = TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR);
+                ctq.Kind = dev.GetConfig(DefaultQdisc);
+                ctq.Limit = dev.GetConfig(DefaultQdiscLimit);
+                ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+            } else {
+                cls.Ceil = 0;
+
+                ctq.Kind = dev.GetConfig(ContainerQdisc);
+                ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
+                ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
+            }
+
+            error = cls.Create(*Nl);
+            if (error) {
+                L_WRN() << "Cannot add leaf tc class: " << error << std::endl;
+                MissingClasses++;
+                if (!result)
+                    result = error;
+            }
+
             error = ctq.Create(*Nl);
             if (error) {
                 (void)ctq.Delete(*Nl);
@@ -866,7 +919,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, bool leaf,
     return result;
 }
 
-TError TNetwork::DestroyTC(uint32_t handle) {
+TError TNetwork::DestroyTC(uint32_t handle, uint32_t leaf) {
     TError error, result;
 
     for (auto &dev: Devices) {
@@ -876,6 +929,11 @@ TError TNetwork::DestroyTC(uint32_t handle) {
         TNlQdisc ctq(dev.Index, handle,
                      TC_HANDLE(TC_H_MIN(handle), CONTAINER_TC_MINOR));
         (void)ctq.Delete(*Nl);
+
+        if (leaf) {
+            TNlClass cls(dev.Index, TC_H_UNSPEC, leaf);
+            (void)cls.Delete(*Nl);
+        }
 
         TNlClass cls(dev.Index, TC_H_UNSPEC, handle);
         error = cls.Delete(*Nl);
@@ -1470,6 +1528,7 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
+        HostNetwork = Net;
         TNetwork::AddNetwork(NetNs.GetInode(), Net);
 
         error = Net->RefreshDevices();
@@ -1483,7 +1542,6 @@ TError TNetCfg::PrepareNetwork() {
             Net->NatBaseV6.Parse(AF_INET6, config().network().nat_first_ipv6());
         if (config().network().has_nat_count())
             Net->NatBitmap.Resize(config().network().nat_count());
-        HostNetwork = Net;
     } else if (Inherited) {
         Net = Parent->Net;
         error = Parent->OpenNetns(NetNs);

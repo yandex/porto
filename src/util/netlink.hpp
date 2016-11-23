@@ -125,8 +125,8 @@ public:
 
 class TNlQdisc {
 public:
-    const int Index;
-    const uint32_t Parent, Handle;
+    int Index;
+    uint32_t Parent, Handle;
     std::string Kind;
     uint32_t Default = 0;
     uint32_t Limit = 0;
