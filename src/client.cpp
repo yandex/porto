@@ -33,6 +33,7 @@ TClient::TClient() : TEpollSource(-1) {
 
 TClient::TClient(const std::string &special) {
     Cred = TCred(RootUser, RootGroup);
+    TaskCred = TCred(RootUser, RootGroup);
     Comm = special;
     AccessLevel = EAccessLevel::Internal;
 }
