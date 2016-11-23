@@ -374,6 +374,10 @@ public:
         if (Volume->StorageFile.IsEmpty())
             Volume->StorageFile = Volume->GetStorage() / "loop.img";
 
+        if (!Volume->StorageFile.Exists() && !Volume->SpaceLimit)
+            return TError(EError::InvalidProperty,
+                          "loop backend requires space_limit");
+
         /* Do not allow read-write loop share storage */
         if (Volume->HaveStorage()) {
             for (auto &it: Volumes) {
@@ -476,11 +480,9 @@ remove_file:
         TError error;
 
         if (!image.Exists()) {
-            if (!Volume->SpaceLimit)
-                return TError(EError::InvalidProperty, "loop backend requires space_limit");
-
             L_ACT() << "Allocate loop image with size " << Volume->SpaceLimit
                     << " guarantee " << Volume->SpaceGuarantee << std::endl;
+
             error = MakeImage(image, Volume->VolumeOwner,
                               Volume->SpaceLimit, Volume->SpaceGuarantee);
             if (error)
