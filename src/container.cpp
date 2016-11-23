@@ -1805,7 +1805,7 @@ TError TContainer::Stop(uint64_t timeout) {
     UpgradeLock();
 
     for (auto &ct: subtree) {
-        if (ct->IsRoot() || ct->State == EContainerState::Stopped)
+        if (ct->State == EContainerState::Stopped)
             continue;
 
         L_ACT() << "Stop " << Name << std::endl;
