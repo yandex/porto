@@ -622,6 +622,9 @@ public:
                   return error;
         }
 
+        if (unshare(CLONE_FS))
+            return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
+
         for (auto &name: Volume->Layers) {
             TPath path, temp;
             TFile pin;
@@ -640,7 +643,8 @@ public:
             } else
                 path = Volume->Place / config().volumes().layers_dir() / name;
 
-            temp = Volume->GetInternal("layer_" + std::to_string(layer_idx++));
+            std::string layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
+            temp = Volume->GetInternal(layer_id);
             error = temp.Mkdir(700);
             if (!error)
                 error = temp.BindRemount(path, MS_RDONLY | MS_NODEV);
@@ -653,7 +657,7 @@ public:
 
             if (layer_idx > 1)
                 lower << ":";
-            lower << StringReplaceAll(temp.ToString(), ":", "\\:");
+            lower << layer_id;
         }
 
         if (!upper.Exists()) {
@@ -677,14 +681,24 @@ public:
         } else
             work.ClearDirectory();
 
+        error = Volume->GetInternal("").Chdir();
+        if (error)
+            goto err;
+
         error = Volume->Path.Mount("overlay", "overlay",
                                         Volume->GetMountFlags(),
                                         { "lowerdir=" + lower.str(),
                                           "upperdir=" + upper.ToString(),
                                           "workdir=" + work.ToString() });
+
+        if (error && error.GetErrno() == EINVAL && Volume->Layers.size() >= 500)
+            error = TError(EError::InvalidValue, "Too many layers, kernel limits is 499 plus 1 for upper");
+
+        (void)TPath("/").Chdir();
+
 err:
         while (layer_idx--) {
-            TPath temp = Volume->GetInternal("layer_" + std::to_string(layer_idx));
+            TPath temp = Volume->GetInternal("L" + std::to_string(layer_idx));
             (void)temp.UmountAll();
             (void)temp.Rmdir();
         }
