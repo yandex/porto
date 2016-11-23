@@ -247,15 +247,6 @@ TError SetHostName(const std::string &name) {
     return TError::Success();
 }
 
-bool FdHasEvent(int fd) {
-    struct pollfd pfd = {};
-    pfd.fd = fd;
-    pfd.events = POLLIN;
-
-    (void)poll(&pfd, 1, 0);
-    return pfd.revents != 0;
-}
-
 TError SetOomScoreAdj(int value) {
     return TPath("/proc/self/oom_score_adj").WriteAll(std::to_string(value));
 }

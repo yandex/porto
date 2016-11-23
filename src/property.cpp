@@ -2429,6 +2429,25 @@ public:
     }
 } static OomKilled;
 
+class TOomIsFatal : public TProperty {
+public:
+    TOomIsFatal() : TProperty(P_OOM_IS_FATAL, EProperty::OOM_IS_FATAL,
+                              "Kill all affected containers on OOM (dynamic)") {
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (!error)
+            error = StringToBool(value, CurrentContainer->OomIsFatal);
+        if (!error)
+            CurrentContainer->SetProp(EProperty::OOM_IS_FATAL);
+        return error;
+    }
+    TError Get(std::string &value) {
+        value = BoolToString(CurrentContainer->OomIsFatal);
+        return TError::Success();
+    }
+} static OomIsFatal;
+
 class TParent : public TProperty {
 public:
     TError Get(std::string &value);
@@ -3100,6 +3119,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["clients"] = Statistics->ClientsCount;
 
     m["container_clients"] = CurrentContainer->ClientsCount;
+    m["container_oom"] = CurrentContainer->OomEvents;
 
     m["requests_queued"] = Statistics->RequestsQueued;
     m["requests_completed"] = Statistics->RequestsCompleted;

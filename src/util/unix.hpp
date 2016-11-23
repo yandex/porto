@@ -43,7 +43,6 @@ uint64_t TaskHandledSignals(pid_t pid);
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 std::string GetHostName();
 TError SetHostName(const std::string &name);
-bool FdHasEvent(int fd);
 TError SetSysctl(const std::string &name, const std::string &value);
 
 TError SetOomScoreAdj(int value);

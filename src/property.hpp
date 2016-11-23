@@ -65,6 +65,7 @@ constexpr const char *P_WEAK = "weak";
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 constexpr const char *P_UMASK = "umask";
 constexpr const char *P_CONTROLLERS = "controllers";
+constexpr const char *P_OOM_IS_FATAL = "oom_is_fatal";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
@@ -166,6 +167,7 @@ enum class EProperty {
     WEAK,
     STATE,
     OOM_KILLED,
+    OOM_IS_FATAL,
     RESPAWN_COUNT,
     EXIT_STATUS,
     CAPABILITIES_AMBIENT,

@@ -1823,6 +1823,7 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->ExitStatus = 0;
         ct->ClearProp(EProperty::EXIT_STATUS);
 
+        ct->OomEvents = 0;
         ct->OomKilled = false;
         ct->ClearProp(EProperty::OOM_KILLED);
 
@@ -1854,6 +1855,7 @@ void TContainer::Reap(bool oomKilled) {
     SetProp(EProperty::DEATH_TIME);
 
     if (oomKilled) {
+        OomEvents++;
         Statistics->ContainersOOM++;
         OomKilled = oomKilled;
         SetProp(EProperty::OOM_KILLED);
@@ -1879,8 +1881,8 @@ void TContainer::Exit(int status, bool oomKilled) {
     if (State == EContainerState::Stopped)
         return;
 
-    auto cg = GetCgroup(MemorySubsystem);
-    if (FdHasEvent(OomEvent.Fd) || MemorySubsystem.GetOomEvents(cg))
+    /* SIGKILL could be delivered earlier than OOM event */
+    if (!oomKilled && HasOomReceived())
         oomKilled = true;
 
     /* Detect fatal signals: portoinit cannot kill itself */
@@ -1893,6 +1895,13 @@ void TContainer::Exit(int status, bool oomKilled) {
 
     ExitStatus = status;
     SetProp(EProperty::EXIT_STATUS);
+
+    /* Detect memory shortage that happened in syscalls */
+    auto cg = GetCgroup(MemorySubsystem);
+    if (!oomKilled && MemorySubsystem.GetOomEvents(cg)) {
+        L() << "Container " << Name << " hit memory limit" << std::endl;
+        oomKilled = true;
+    }
 
     for (auto &ct: Subtree()) {
         if (ct->State != EContainerState::Stopped &&
@@ -2448,7 +2457,13 @@ void TContainer::Event(const TEvent &event) {
             error = ct->Lock(lock);
             lock.unlock();
             if (!error) {
-                ct->Exit(SIGKILL, true);
+                if (ct->OomIsFatal) {
+                    ct->Exit(SIGKILL, true);
+                } else {
+                    L_EVT() << "Non fatal OOM in " << ct->Name << std::endl;
+                    ct->OomEvents++;
+                    Statistics->ContainersOOM++;
+                }
                 ct->Unlock();
             }
         }

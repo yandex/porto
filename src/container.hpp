@@ -167,6 +167,8 @@ public:
     std::atomic<int> ClientsCount;
 
     bool IsWeak = false;
+    bool OomIsFatal = true;
+    unsigned OomEvents = 0;
     bool OomKilled = false;
     int ExitStatus = 0;
 
