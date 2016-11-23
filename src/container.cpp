@@ -478,27 +478,32 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         }
     }
 
-    error = ct->PrepareCgroups();
-    if (error)
-        goto err;
+    /* Restore cgroups only for running containers */
+    if (ct->State != EContainerState::Stopped &&
+            ct->State != EContainerState::Dead) {
 
-    /* Disable smart if we're moving tasks into another cgroup */
-    if (ct->Task.Pid && CpuSubsystem.HasSmart) {
-        TCgroup cg;
-        bool smart;
-        if (!CpuSubsystem.TaskCgroup(ct->Task.Pid, cg) &&
-                cg != ct->GetCgroup(CpuSubsystem) &&
-                !cg.GetBool("cpu.smart", smart) && smart)
-            cg.SetBool("cpu.smart", false);
+        error = ct->PrepareCgroups();
+        if (error)
+            goto err;
+
+        /* Disable smart if we're moving tasks into another cgroup */
+        if (ct->Task.Pid && CpuSubsystem.HasSmart) {
+            TCgroup cg;
+            bool smart;
+            if (!CpuSubsystem.TaskCgroup(ct->Task.Pid, cg) &&
+                    cg != ct->GetCgroup(CpuSubsystem) &&
+                    !cg.GetBool("cpu.smart", smart) && smart)
+                cg.SetBool("cpu.smart", false);
+        }
+
+        error = ct->ApplyDynamicProperties();
+        if (error)
+            goto err;
+
+        error = ct->SyncCgroups();
+        if (error)
+            goto err;
     }
-
-    error = ct->ApplyDynamicProperties();
-    if (error)
-        goto err;
-
-    error = ct->SyncCgroups();
-    if (error)
-        goto err;
 
     if (ct->MayRespawn())
         ct->ScheduleRespawn();
