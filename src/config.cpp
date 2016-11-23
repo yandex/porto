@@ -61,7 +61,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_batch_io_weight(10);
     config().mutable_container()->set_normal_io_weight(500);
     config().mutable_container()->set_empty_wait_timeout_ms(5000);
-    config().mutable_container()->set_enable_smart(true);
+    config().mutable_container()->set_enable_smart(false);
     config().mutable_container()->set_enable_cpu_reserve(true);
     config().mutable_container()->set_rt_priority(10);
     config().mutable_container()->set_rt_nice(-20);
