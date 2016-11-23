@@ -1783,7 +1783,7 @@ TError TCpuLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
-    if (new_limit > CurrentContainer->Parent->CpuLimit)
+    if (new_limit > CurrentContainer->Parent->CpuLimit && !CurrentClient->IsSuperUser())
         return TError(EError::InvalidValue, "cpu limit bigger than for parent");
 
     if (CurrentContainer->CpuLimit != new_limit) {
