@@ -435,7 +435,7 @@ public:
     TIoPolicy() : TProperty(P_IO_POLICY, EProperty::IO_POLICY,
                             "IO policy: normal | batch (dynamic)") {}
     void Init(void) {
-        IsSupported = BlkioSubsystem.SupportIoPolicy();
+        IsSupported = BlkioSubsystem.HasWeight;
     }
 } static IoPolicy;
 
@@ -1865,83 +1865,98 @@ public:
 
 class TIoLimit : public TProperty {
 public:
-    TError Set(const std::string &limit);
-    TError Get(std::string &value);
-    TIoLimit()  : TProperty(P_IO_LIMIT, EProperty::IO_LIMIT,
-                            "Filesystem bandwidth limit [bytes/s] "
-                            "(dynamic)") {}
+    TIoLimit(std::string name, EProperty prop, std::string desc) :
+        TProperty(name, prop, desc) {}
     void Init(void) {
-        IsSupported = MemorySubsystem.SupportIoLimit();
+        IsSupported = MemorySubsystem.SupportIoLimit() ||
+         BlkioSubsystem.HasThrottler;
     }
-} static IoLimit;
-
-TError TIoLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
-    uint64_t new_limit = 0lu;
-    error = StringToSize(limit, new_limit);
-    if (error)
-        return error;
-
-    if (CurrentContainer->IoLimit != new_limit) {
-        CurrentContainer->IoLimit = new_limit;
-        CurrentContainer->SetProp(EProperty::IO_LIMIT);
+    TError GetMap(const TUintMap &limit, std::string &value) {
+        if (limit.size() == 1 && limit.count("fs")) {
+            value = std::to_string(limit.at("fs"));
+            return TError::Success();
+        }
+        return UintMapToString(limit, value);
     }
+    TError GetMapIndexed(const TUintMap &limit, const std::string &index, std::string &value) {
+        if (!limit.count(index))
+            return TError(EError::InvalidValue, "invalid index " + index);
+        value = std::to_string(limit.at(index));
+        return TError::Success();
+    }
+    TError SetMapMap(TUintMap &limit, const TUintMap &map) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        if (map.count("fs")) {
+            error = WantControllers(CGROUP_MEMORY);
+            if (error)
+                return error;
+        }
+        if (map.size() > map.count("fs")) {
+            error = WantControllers(CGROUP_BLKIO);
+            if (error)
+                return error;
+        }
+        limit = map;
+        CurrentContainer->SetProp(Prop);
+        return TError::Success();
+    }
+    TError SetMap(TUintMap &limit, const std::string &value) {
+        TUintMap map;
+        TError error;
+        if (value.size() && value.find(':') == std::string::npos)
+            error = StringToSize(value, map["fs"]);
+        else
+            error = StringToUintMap(value, map);
+        if (error)
+            return error;
+        return SetMapMap(limit, map);
+    }
+    TError SetMapIndexed(TUintMap &limit, const std::string &index, const std::string &value) {
+        TUintMap map = limit;
+        TError error = StringToSize(value, map[index]);
+        if (error)
+            return error;
+        return SetMapMap(limit, map);
+    }
+};
 
-    return TError::Success();
-}
-
-TError TIoLimit::Get(std::string &value) {
-    value = std::to_string(CurrentContainer->IoLimit);
-
-    return TError::Success();
-}
-
-class TIopsLimit : public TProperty {
+class TIoBpsLimit : public TIoLimit {
 public:
-    TError Set(const std::string &limit);
-    TError Get(std::string &value);
-    TIopsLimit() : TProperty(P_IO_OPS_LIMIT, EProperty::IO_OPS_LIMIT,
-                             "Filesystem IOPS limit "
-                             "[operations/s] (dynamic)") {}
-    void Init(void) {
-        IsSupported = MemorySubsystem.SupportIoLimit();
+    TIoBpsLimit()  : TIoLimit(P_IO_LIMIT, EProperty::IO_LIMIT,
+            "IO bandwidth limit: fs|</path>|<disk> [r|w]: <bytes/s>;... (dynamic)") {}
+    TError Get(std::string &value) {
+        return GetMap(CurrentContainer->IoBpsLimit, value);
     }
-} static IopsLimit;
-
-TError TIopsLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
-    uint64_t new_limit = 0lu;
-    error = StringToSize(limit, new_limit);
-    if (error)
-        return error;
-
-    if (CurrentContainer->IopsLimit != new_limit) {
-        CurrentContainer->IopsLimit = new_limit;
-        CurrentContainer->SetProp(EProperty::IO_OPS_LIMIT);
+    TError Set(const std::string &value) {
+        return SetMap(CurrentContainer->IoBpsLimit, value);
     }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        return GetMapIndexed(CurrentContainer->IoBpsLimit, index, value);
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        return SetMapIndexed(CurrentContainer->IoBpsLimit, index, value);
+    }
+} static IoBpsLimit;
 
-    return TError::Success();
-}
-
-TError TIopsLimit::Get(std::string &value) {
-    value = std::to_string(CurrentContainer->IopsLimit);
-
-    return TError::Success();
-}
+class TIoOpsLimit : public TIoLimit {
+public:
+    TIoOpsLimit()  : TIoLimit(P_IO_OPS_LIMIT, EProperty::IO_OPS_LIMIT,
+            "IOPS limit: fs|</path>|<disk> [r|w]: <iops>;... (dynamic)") {}
+    TError Get(std::string &value) {
+        return GetMap(CurrentContainer->IoOpsLimit, value);
+    }
+    TError Set(const std::string &value) {
+        return SetMap(CurrentContainer->IoOpsLimit, value);
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        return GetMapIndexed(CurrentContainer->IoOpsLimit, index, value);
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        return SetMapIndexed(CurrentContainer->IoOpsLimit, index, value);
+    }
+} static IoOpsLimit;
 
 class TNetGuarantee : public TProperty {
 public:
@@ -2843,170 +2858,108 @@ TNetStat NetTxBytes(D_NET_TX_BYTES, ENetStat::TxBytes, "device tx bytes: <interf
 TNetStat NetTxPackets(D_NET_TX_PACKETS, ENetStat::TxPackets, "device tx packets: <interface>: <packets>;... (ro)");
 TNetStat NetTxDrops(D_NET_TX_DROPS, ENetStat::TxDrops, "device tx drops: <interface>: <packets>;... (ro)");
 
-class TIoRead : public TProperty {
+class TIoStat : public TProperty {
 public:
-    void Populate(TUintMap &m);
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TIoRead() : TProperty(D_IO_READ, EProperty::NONE, "read from disk [bytes] (ro)") {
+    TIoStat(std::string name, EProperty prop, std::string desc) : TProperty(name, prop, desc) {
         IsReadOnly = true;
     }
-} static IoRead;
-
-void TIoRead::Populate(TUintMap &m) {
-    auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
-    auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
-    TUintMap memStat;
-
-    TError error = MemorySubsystem.Statistics(memCg, memStat);
-    if (!error)
-        m["fs"] = memStat["fs_io_bytes"] - memStat["fs_io_write_bytes"];
-
-    std::vector<BlkioStat> blkStat;
-    error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
-    if (!error) {
-        for (auto &s : blkStat)
-            m[s.Device] = s.Read;
+    virtual TError GetMap(TUintMap &map) = 0;
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        TUintMap map;
+        error = GetMap(map);
+        if (error)
+            return error;
+        return UintMapToString(map, value);
     }
-}
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TUintMap map;
+        TError error;
 
-TError TIoRead::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
+        error = IsRunning();
+        if (error)
+            return error;
 
-    TUintMap m;
-    Populate(m);
+        error = GetMap(map);
+        if (error)
+            return error;
 
-    return UintMapToString(m, value);
-}
+        if (map.find(index) != map.end()) {
+            value = std::to_string(map[index]);
+        } else {
+            std::string disk, name;
 
-TError TIoRead::GetIndexed(const std::string &index,
-                                    std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
+            error = BlkioSubsystem.ResolveDisk(index, disk);
+            if (error)
+                return error;
+            error = BlkioSubsystem.DiskName(disk, name);
+            if (error)
+                return error;
+            value = std::to_string(map[name]);
+        }
 
-    TUintMap m;
-    Populate(m);
+        return TError::Success();
+    }
+};
 
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TIoWrite : public TProperty {
+class TIoReadStat : public TIoStat {
 public:
-    void Populate(TUintMap &m);
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TIoWrite() : TProperty(D_IO_WRITE, EProperty::NONE, "written to disk [bytes] (ro)") {
-        IsReadOnly = true;
+    TIoReadStat() : TIoStat(D_IO_READ, EProperty::NONE,
+            "read from disk: <disk>: <bytes>;... (ro)") {}
+    TError GetMap(TUintMap &map) {
+        auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, map, 0, false);
+
+        if (MemorySubsystem.SupportIoLimit()) {
+            auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
+            TUintMap memStat;
+            if (!MemorySubsystem.Statistics(memCg, memStat))
+                map["fs"] = memStat["fs_io_bytes"] - memStat["fs_io_write_bytes"];
+        }
+
+        return TError::Success();
     }
-} static IoWrite;
+} static IoReadStat;
 
-void TIoWrite::Populate(TUintMap &m) {
-    auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
-    auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
-    TUintMap memStat;
-
-    TError error = MemorySubsystem.Statistics(memCg, memStat);
-    if (!error)
-        m["fs"] = memStat["fs_io_write_bytes"];
-
-    std::vector<BlkioStat> blkStat;
-    error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
-    if (!error) {
-        for (auto &s : blkStat)
-            m[s.Device] = s.Write;
-    }
-
-}
-
-TError TIoWrite::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    Populate(m);
-
-    return UintMapToString(m, value);
-}
-
-TError TIoWrite::GetIndexed(const std::string &index, std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    Populate(m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
-
-class TIoOps : public TProperty {
+class TIoWriteStat : public TIoStat {
 public:
-    void Populate(TUintMap &m);
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TIoOps() : TProperty(D_IO_OPS, EProperty::NONE, "io operations (ro)") {
-        IsReadOnly = true;
+    TIoWriteStat() : TIoStat(D_IO_WRITE, EProperty::NONE,
+            "written to disk: <disk>: <bytes>;... (ro)") {}
+    TError GetMap(TUintMap &map) {
+        auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, map, 1, false);
+
+        if (MemorySubsystem.SupportIoLimit()) {
+            auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
+            TUintMap memStat;
+            if (!MemorySubsystem.Statistics(memCg, memStat))
+                map["fs"] = memStat["fs_io_write_bytes"];
+        }
+
+        return TError::Success();
     }
-} static IoOps;
+} static IoWriteStat;
 
-void TIoOps::Populate(TUintMap &m) {
-    auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
-    auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
-    TUintMap memStat;
+class TIoOpsStat : public TIoStat {
+public:
+    TIoOpsStat() : TIoStat(D_IO_OPS, EProperty::NONE,
+            "io operations: <disk>: <ops>;... (ro)") {}
+    TError GetMap(TUintMap &map) {
+        auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, map, 2, true);
 
-    TError error = MemorySubsystem.Statistics(memCg, memStat);
-    if (!error)
-        m["fs"] = memStat["fs_io_operations"];
+        if (MemorySubsystem.SupportIoLimit()) {
+            auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
+            TUintMap memStat;
+            if (!MemorySubsystem.Statistics(memCg, memStat))
+                map["fs"] = memStat["fs_io_operations"];
+        }
 
-    std::vector<BlkioStat> blkStat;
-    error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
-    if (!error) {
-        for (auto &s : blkStat)
-            m[s.Device] = s.Read + s.Write;
+        return TError::Success();
     }
-}
-
-TError TIoOps::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    Populate(m);
-
-    return UintMapToString(m, value);
-}
-
-TError TIoOps::GetIndexed(const std::string &index,
-                                   std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
-    TUintMap m;
-    Populate(m);
-
-    if (m.find(index) == m.end())
-        return TError(EError::InvalidValue, "Invalid subscript for property");
-
-    value = std::to_string(m[index]);
-
-    return TError::Success();
-}
+} static IoOpsStat;
 
 class TTime : public TProperty {
 public:

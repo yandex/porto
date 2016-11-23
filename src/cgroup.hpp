@@ -239,28 +239,24 @@ public:
     TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
 };
 
-struct BlkioStat {
-    std::string Device;
-    uint64_t Read;
-    uint64_t Write;
-    uint64_t Sync;
-    uint64_t Async;
-};
-
 class TBlkioSubsystem : public TSubsystem {
-    TError GetStatLine(const std::vector<std::string> &lines,
-                       const size_t i,
-                       const std::string &name,
-                       uint64_t &val) const;
-    TError GetDevice(const std::string &majmin,
-                     std::string &device) const;
 public:
+    bool HasWeight;
+    bool HasThrottler;
+    bool HasSaneBehavior;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
-    TError Statistics(TCgroup &cg,
-                      const std::string &file,
-                      std::vector<BlkioStat> &stat) const;
+    void InitializeSubsystem() override {
+        HasWeight = RootCgroup().Has("blkio.weight");
+        HasThrottler = RootCgroup().Has("blkio.throttle.read_bps_device");
+        if (RootCgroup().GetBool("cgroup.sane_behavior", HasSaneBehavior))
+            HasSaneBehavior = false;
+    }
+    TError GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops) const;
     TError SetIoPolicy(TCgroup &cg, const std::string &policy) const;
-    bool SupportIoPolicy() const;
+    TError SetIoLimit(TCgroup &cg, const TUintMap &map, bool iops = false);
+
+    TError DiskName(const std::string &disk, std::string &name) const;
+    TError ResolveDisk(const std::string &key, std::string &disk) const;
 };
 
 class TDevicesSubsystem : public TSubsystem {

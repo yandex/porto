@@ -146,8 +146,8 @@ public:
     bool RechargeOnPgfault = false;
 
     std::string IoPolicy;
-    uint64_t IoLimit = 0;
-    uint64_t IopsLimit = 0;
+    TUintMap IoBpsLimit;
+    TUintMap IoOpsLimit;
 
     std::string CpuPolicy;
     double CpuLimit;

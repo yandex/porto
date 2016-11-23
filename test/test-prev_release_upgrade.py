@@ -75,7 +75,9 @@ def SnapshotProps(r):
                                #app: "" -> "<not empty>"
               "command", "cpu_guarantee", "cpu_limit", "cpu_policy",
               "cwd", "devices", "dirty_limit", "enable_porto", "env",
-              "group", "hostname", "io_limit", "io_ops_limit", "io_policy", "ip",
+              "group", "hostname",
+              # "io_limit", "io_ops_limit", FIXME "0" -> ""
+              "io_policy", "ip",
               "isolate", "max_respawns", "memory_guarantee", "memory_limit", "net",
               #"net_guarantee", #FIXME enable later, "default:0" -> ""
               #"net_limit", #FIXME enable later, "default:0" -> ""

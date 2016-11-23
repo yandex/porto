@@ -735,74 +735,165 @@ TError TCpusetSubsystem::SetMems(TCgroup &cg, const std::string &mems) const {
 
 // Blkio
 
-TError TBlkioSubsystem::GetStatLine(const std::vector<std::string> &lines,
-                                    const size_t i,
-                                    const std::string &name,
-                                    uint64_t &val) const {
-    std::vector<std::string> tokens;
-    TError error = SplitString(lines[i], ' ', tokens);
-    if (error)
-        return error;
-
-    if (tokens.size() < 3 || tokens[1] != name)
-        return TError(EError::Unknown, "Unexpected field in blkio statistics");
-
-    return StringToUint64(tokens[2], val);
-}
-
-TError TBlkioSubsystem::GetDevice(const std::string &majmin,
-                                  std::string &device) const {
-    TPath sym("/sys/dev/block/" + majmin), dev;
+TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) const {
+    TPath sym("/sys/dev/block/" + disk), dev;
     TError error = sym.ReadLink(dev);
     if (!error)
-        device = dev.BaseName();
+        name = dev.BaseName();
     return error;
 }
 
-TError TBlkioSubsystem::Statistics(TCgroup &cg,
-                                   const std::string &file,
-                                   std::vector<BlkioStat> &stat) const {
-    std::vector<std::string> lines;
-    TError error = cg.Knob(file).ReadLines(lines);
-    if (error)
-        return error;
+/* converts absolule path or disk or partition name into "major:minor" */
+TError TBlkioSubsystem::ResolveDisk(const std::string &key, std::string &disk) const {
+    TError error;
+    dev_t dev;
+    unsigned tmp;
 
-    BlkioStat s;
-    for (size_t i = 0; i < lines.size(); i += 5) {
-        std::vector<std::string> tokens;
-        error = SplitString(lines[i], ' ', tokens);
-        if (error)
-            return error;
+    if (sscanf(key.c_str(), "%*d:*d%n", &tmp) == 2 && tmp == key.size()) {
+        disk = key;
+        return TError::Success();
+    }
 
-        if (tokens.size() == 3) {
-            error = GetDevice(tokens[0], s.Device);
-            if (error)
-                return error;
-        } else {
-            continue; /* Total */
-        }
+    if (key[0] == '/')
+        dev = TPath(key).GetDev();
+    else
+        dev = TPath("/dev/" + key).GetBlockDev();
 
-        error = GetStatLine(lines, i + 0, "Read", s.Read);
-        if (error)
-            return error;
-        error = GetStatLine(lines, i + 1, "Write", s.Write);
-        if (error)
-            return error;
-        error = GetStatLine(lines, i + 2, "Sync", s.Sync);
-        if (error)
-            return error;
-        error = GetStatLine(lines, i + 3, "Async", s.Async);
-        if (error)
-            return error;
+    if (!dev)
+        return TError(EError::InvalidValue, "Disk not found: " + key);
 
-        stat.push_back(s);
+    disk = StringFormat("%d:%d", major(dev), minor(dev));
+
+    /* convert partition to disk */
+    TPath diskDev("/sys/dev/block/" + disk + "/../dev");
+    if (diskDev.IsRegularStrict() && !diskDev.ReadAll(disk)) {
+        disk = StringTrim(disk);
+        if (sscanf(disk.c_str(), "%*d:*d%n", &tmp) != 2 || tmp != disk.size())
+            TError(EError::InvalidValue, "Unexpected disk format: " + disk);
     }
 
     return TError::Success();
 }
 
+TError TBlkioSubsystem::GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops) const {
+    std::vector<std::string> lines;
+    std::string knob, prev, name;
+    TError error;
+
+    /* get statistics from throttler if possible, it has couners for raids */
+    if (HasThrottler)
+        knob = iops ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";
+    else
+        knob = iops ? "blkio.io_serviced_recursive" : "blkio.io_service_bytes_recursive";
+
+    error = cg.Knob(knob).ReadLines(lines);
+    if (error)
+        return error;
+
+    /* in insane behavior throttler isn't hierarhical */
+    if (HasThrottler && !HasSaneBehavior) {
+        std::vector<TCgroup> list;
+
+        error = cg.ChildsAll(list);
+        if (error)
+            return error;
+
+        for (auto &cg: list) {
+            error = cg.Knob(knob).ReadLines(lines);
+            if (error)
+                return error;
+        }
+    }
+
+    for (auto &line: lines) {
+        std::vector<std::string> word;
+        if (SplitString(line, ' ', word) || word.size() != 3)
+            continue;
+
+        if (word[1] == "Read") {
+            if (dir == 1)
+                continue;
+        } else if (word[1] == "Write") {
+            if (dir == 0)
+                continue;
+        } else
+            continue;
+
+        if (word[0] != prev) {
+            if (DiskName(word[0], name))
+                continue;
+            prev = word[0];
+        }
+
+        uint64_t val;
+        if (!StringToUint64(word[2], val) && val)
+            map[name] += val;
+    }
+
+    return TError::Success();
+}
+
+TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TUintMap &map, bool iops) {
+    std::string knob[2] = {
+        iops ? "blkio.throttle.read_iops_device" : "blkio.throttle.read_bps_device",
+        iops ? "blkio.throttle.write_iops_device" : "blkio.throttle.write_bps_device",
+    };
+    TError error, result;
+    TUintMap plan[2];
+    std::string disk;
+    int dir;
+
+    /* load current limits */
+    for (dir = 0; dir < 2; dir++) {
+        std::vector<std::string> lines;
+        error = cg.Knob(knob[dir]).ReadLines(lines);
+        if (error)
+            return error;
+        for (auto &line: lines) {
+            auto sep = line.find(' ');
+            if (sep != std::string::npos)
+                plan[dir][line.substr(0, sep)] = 0;
+        }
+    }
+
+    for (auto &it: map) {
+        auto key = it.first;
+        auto sep = key.rfind(' ');
+
+        dir = 2;
+        if (sep != std::string::npos) {
+            if (sep != key.size() - 2 || ( key[sep+1] != 'r' && key[sep+1] != 'w'))
+                return TError(EError::InvalidValue, "Invalid io limit key: " + key);
+            dir = key[sep+1] == 'r' ? 0 : 1;
+            key = key.substr(0, sep);
+        }
+
+        if (key == "fs")
+            continue;
+
+        error = ResolveDisk(key, disk);
+        if (error)
+            return error;
+
+        if (dir == 0 || dir == 2)
+            plan[0][disk] = it.second;
+        if (dir == 1 || dir == 2)
+            plan[1][disk] = it.second;
+    }
+
+    for (dir = 0; dir < 2; dir++) {
+        for (auto &it: plan[dir]) {
+            error = cg.Set(knob[dir], it.first + " " + std::to_string(it.second));
+            if (error && !result)
+                result = error;
+        }
+    }
+
+    return result;
+}
+
 TError TBlkioSubsystem::SetIoPolicy(TCgroup &cg, const std::string &policy) const {
-    if (!SupportIoPolicy())
+    if (!HasWeight)
         return TError::Success();
 
     uint64_t weight;
@@ -814,10 +905,6 @@ TError TBlkioSubsystem::SetIoPolicy(TCgroup &cg, const std::string &policy) cons
         return TError(EError::InvalidValue, "unknown policy: " + policy);
 
     return cg.SetUint64("blkio.weight", weight);
-}
-
-bool TBlkioSubsystem::SupportIoPolicy() const {
-    return RootCgroup().Has("blkio.weight");
 }
 
 // Devices

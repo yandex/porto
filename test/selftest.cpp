@@ -175,9 +175,9 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     }
     if (KernelSupports(KernelFeature::FSIO)) {
         ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
-        ExpectEq(v, "0");
+        ExpectEq(v, "");
         ExpectApiSuccess(api.GetProperty(name, "io_ops_limit", v));
-        ExpectEq(v, "0");
+        ExpectEq(v, "");
     }
 
     ExpectApiSuccess(api.GetProperty(name, "net_priority[default]", v));

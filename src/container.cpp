@@ -804,6 +804,7 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
 
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
+    auto blkcg = GetCgroup(BlkioSubsystem);
     TError error;
 
     if (TestClearPropDirty(EProperty::MEM_GUARANTEE)) {
@@ -855,25 +856,34 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (TestClearPropDirty(EProperty::IO_LIMIT)) {
-        error = MemorySubsystem.SetIoLimit(memcg, IoLimit);
-        if (error) {
-            if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
-            return error;
+        if (IoBpsLimit.count("fs")) {
+            error = MemorySubsystem.SetIoLimit(memcg, IoBpsLimit["fs"]);
+            if (error) {
+                if (error.GetErrno() != EINVAL)
+                    L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+                return error;
+            }
         }
+        error = BlkioSubsystem.SetIoLimit(blkcg, IoBpsLimit);
+        if (error)
+            return error;
     }
 
     if (TestClearPropDirty(EProperty::IO_OPS_LIMIT)) {
-        error = MemorySubsystem.SetIopsLimit(memcg, IopsLimit);
-        if (error) {
-            if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
-            return error;
+        if (IoOpsLimit.count("fs")) {
+            error = MemorySubsystem.SetIopsLimit(memcg, IoOpsLimit["fs"]);
+            if (error) {
+                if (error.GetErrno() != EINVAL)
+                    L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
+                return error;
+            }
         }
+        error = BlkioSubsystem.SetIoLimit(blkcg, IoOpsLimit, true);
+        if (error)
+            return error;
     }
 
     if (TestClearPropDirty(EProperty::IO_POLICY)) {
-        auto blkcg = GetCgroup(BlkioSubsystem);
         error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
         if (error) {
             if (error.GetErrno() != EINVAL)
