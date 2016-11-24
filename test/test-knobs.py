@@ -81,11 +81,11 @@ knobs = {
     "stdin_path" : "/place/porto/../stdin.txt",
     "stdout_limit" : "4194304",
     "stdout_path" : "/place/porto/../stdout.txt",
-    "ulimit" : "as: 1048576 1048576;core: 1024 1024;cpu: 1 1;data: 2097152 2097152;"\
-             "fsize: 4096 4096;locks: 16 16;memlock: 4096 4096;"\
-             "msgqueue: 8192 8192;nice: 10 15;"\
-             "nofile: 819200 1024000;nproc: 20480 30720;rss: 65536 65536;"\
-             "rtprio: 1024 1024;rttime: 10000 10000;sigpending: 10 10;"\
+    "ulimit" : "as: 1048576 1048576; core: 1024 1024; cpu: 1 1; data: 2097152 2097152; "\
+             "fsize: 4096 4096; locks: 16 16; memlock: 4096 4096; "\
+             "msgqueue: 8192 8192; nice: 10 15; "\
+             "nofile: 819200 1024000; nproc: 20480 30720; rss: 65536 65536; "\
+             "rtprio: 1024 1024; rttime: 10000 10000; sigpending: 10 10; "\
              "stack: 16384 16384",
     "umask" : "0777",
     "user" : "porto-alice",
