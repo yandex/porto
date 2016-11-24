@@ -1,3 +1,32 @@
+yandex-porto (3.1.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * container: stop root container on shutdown
+
+  [ Maxim Samoylov ]
+  * portod: restore runtime context for not stopped containers only
+
+  [ Konstantin Khlebnikov ]
+  * client: set TaskCred to root for system client
+  * property: allow super user set inconsistent cpu limits
+  * property: allow any state of enable_porto for super user
+  * property: add boolean flag oom_is_fatal
+
+  [ Maxim Samoylov ]
+  * volume: warn user of loop misconfiguration early
+
+  [ Konstantin Khlebnikov ]
+  * volume: remove remove clear storage directories using helper
+  * volume/overlay: handle as much layers as possible
+  * network: add leaf tc classes for each container
+  * porto: switch cpu_policy=rt from cpu.smart to SCHED_RR directly
+  * cgroup: add blkio bps and iops limits
+  * property: fix descriptions and show more network properties
+  * property: make ulimit dynamic
+  * properties: format ulimits in alphabetical order
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 24 Nov 2016 23:11:02 +0300
+
 yandex-porto (3.0.20) unstable; urgency=low
 
   * porto: destroy container if some property cannot be restored
