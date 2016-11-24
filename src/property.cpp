@@ -1339,9 +1339,7 @@ public:
     TError Set(const std::string &gw);
     TError Get(std::string &value);
     TDefaultGw() : TProperty(P_DEFAULT_GW, EProperty::DEFAULT_GW,
-                             "Default gateway: <interface> <ip>; ...") {
-        IsHidden = true;
-    }
+            "Default gateway: <interface> <ip>; ...") {}
 } static DefaultGw;
 
 TError TDefaultGw::Set(const std::string &gw) {
@@ -1965,9 +1963,7 @@ public:
     TError SetIndexed(const std::string &index, const std::string &guarantee);
     TError GetIndexed(const std::string &index, std::string &value);
     TNetGuarantee() : TProperty(P_NET_GUARANTEE, EProperty::NET_GUARANTEE,
-                                "Guaranteed container network "
-                                "bandwidth: <interface>|default "
-                                "<Bps>;... (dynamic)") {}
+            "Guaranteed network bandwidth: <interface>|default: <Bps>;... (dynamic)") {}
 } static NetGuarantee;
 
 TError TNetGuarantee::Set(const std::string &guarantee) {
@@ -2035,8 +2031,7 @@ public:
     TError SetIndexed(const std::string &index, const std::string &limit);
     TError GetIndexed(const std::string &index, std::string &value);
     TNetLimit() : TProperty(P_NET_LIMIT, EProperty::NET_LIMIT,
-                            "Maximum container network bandwidth: "
-                            "<interface>|default <Bps>;... (dynamic)") {}
+            "Maximum network bandwidth: <interface>|default: <Bps>;... (dynamic)") {}
 } static NetLimit;
 
 TError TNetLimit::Set(const std::string &limit) {
@@ -2104,9 +2099,7 @@ public:
     TError SetIndexed(const std::string &index, const std::string &prio);
     TError GetIndexed(const std::string &index, std::string &value);
     TNetPriority()  : TProperty(P_NET_PRIO, EProperty::NET_PRIO,
-                                "Container network priority: "
-                                "<interface>|default 0-7;... "
-                                "(dynamic)") {}
+            "Container network priority: <interface>|default: 0-7;... (dynamic)") {}
 } static NetPriority;
 
 TError TNetPriority::Set(const std::string &prio) {
@@ -2777,9 +2770,8 @@ TError TCpuSystem::Get(std::string &value) {
 class TNetClassId : public TProperty {
 public:
     TNetClassId() : TProperty(D_NET_CLASS_ID, EProperty::NONE,
-                              "network tc class: major:minor (hex) (ro)") {
+            "network tc class: major:minor (hex) (ro)") {
         IsReadOnly = true;
-        IsHidden = true;
     }
     TError Get(std::string &value) {
         if (!CurrentContainer->Net)
