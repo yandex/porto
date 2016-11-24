@@ -326,21 +326,16 @@ public:
     TUlimit() : TProperty(P_ULIMIT, EProperty::ULIMIT,
             "Process resource limits: <type>: <soft> <hard>|unlimited;... (see man prlimit) (dynamic)") {}
 
+    std::string Format(const struct rlimit &rlim) const {
+        return std::to_string(rlim.rlim_cur) + " " +
+               std::to_string(rlim.rlim_max);
+    }
+
     TError Get(std::string &value) {
-        std::stringstream str;
-        bool first = true;
-
-        for (auto &it: CurrentContainer->Ulimit) {
-            if (first)
-                first = false;
-            else
-                str << "; ";
-            str << Name.at(it.first) << ": "
-                << std::to_string(it.second.rlim_cur) << " "
-                << std::to_string(it.second.rlim_max);
-        }
-
-        value = str.str();
+        TStringMap map;
+        for (auto &it: CurrentContainer->Ulimit)
+            map[Name.at(it.first)] = Format(it.second);
+        value = StringMapToString(map);
         return TError::Success();
     }
 
@@ -350,8 +345,7 @@ public:
             return TError(EError::InvalidValue, "Invalid ulimit: " + index);
         auto rlimit = CurrentContainer->Ulimit.find(it->second);
         if (rlimit != CurrentContainer->Ulimit.end())
-            value = std::to_string(rlimit->second.rlim_cur) + " " +
-                std::to_string(rlimit->second.rlim_max);
+            value = Format(rlimit->second);
         else
             value = "";
         return TError::Success();

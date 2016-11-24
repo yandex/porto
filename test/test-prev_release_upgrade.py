@@ -151,8 +151,8 @@ c.Start("test2")
 parent_knobs = [
     ("private", "parent"),
     ("respawn", False),
-    ("ulimit", "data: 16000000 32000000;memlock: 4096 4096;"\
-               "nofile: 100 200;nproc: 500 1000"),
+    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; "\
+               "nofile: 100 200; nproc: 500 1000"),
     ("isolate", True),
     ("user", "porto-alice"),
     ("env", "CONTAINER=porto;PARENT=1")
