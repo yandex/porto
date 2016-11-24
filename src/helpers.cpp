@@ -37,7 +37,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     for (auto &arg : command)
         cmdline += arg + " ";
 
-    L_ACT() << "invoking external helper with command : " << cmdline << std::endl;
+    L_ACT() << "Call helper: " << cmdline << " in " << cwd << std::endl;
 
     error = task.Fork();
     if (error)
@@ -114,6 +114,10 @@ TError CopyRecursive(const TPath &src, const TPath &dst) {
     return RunCommand({ "cp", "--archive", "--force",
                         "--one-file-system", "--no-target-directory",
                         src.ToString(), "." }, dst);
+}
+
+TError ClearRecursive(const TPath &path) {
+    return RunCommand({ "find", ".", "-xdev", "-mindepth", "1", "-delete"}, path);
 }
 
 TError ResizeLoopDev(int loopNr, const TPath &image, off_t current, off_t target) {

@@ -16,6 +16,7 @@
 #include "epoll.hpp"
 #include "container.hpp"
 #include "volume.hpp"
+#include "helpers.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
 #include "util/signal.hpp"
@@ -632,6 +633,9 @@ static void CleanupTempdir() {
                 it->second->State != EContainerState::Stopped)
             continue;
         TPath path = temp / name;
+        error = ClearRecursive(path);
+        if (error)
+            L_WRN() << "Cannot clear " << path << ": " << error << std::endl;
         error = path.RemoveAll();
         if (error)
             L_WRN() << "Cannot remove " << path << ": " << error << std::endl;

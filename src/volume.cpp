@@ -712,6 +712,9 @@ err:
             L_ERR() << "Can't umount overlay: " << error << std::endl;
 
         if (!Volume->HaveStorage()) {
+            error2 = ClearRecursive(storage);
+            if (error2)
+                L_ERR() << "Cannot clear overlay upper: " << error2 << std::endl;
             error2 = storage.ClearDirectory();
             if (error2) {
                 if (!error)
@@ -1385,6 +1388,9 @@ TError TVolume::DestroyOne() {
     }
 
     if (!HaveStorage() && storage.Exists()) {
+        error = ClearRecursive(storage);
+        if (error)
+            L_ERR() << "Cannot clear storage: " << error << std::endl;
         error = storage.RemoveAll();
         if (error) {
             L_ERR() << "Can't remove storage: " << error << std::endl;
@@ -1855,6 +1861,11 @@ void TVolume::RestoreAll(void) {
             if (error)
                 L_ERR() << "Cannot umount volume " << mnt << ": " << error << std::endl;
         }
+
+        error = ClearRecursive(dir);
+        if (error)
+            L_ERR() << "Cannot clear directory " << dir << " : " << error << std::endl;
+
         error = dir.RemoveAll();
         if (error)
             L_ERR() << "Cannot remove directory " << dir << std::endl;

@@ -80,6 +80,10 @@ TError CheckPlace(const TPath &place, bool init) {
             continue;
         lock.unlock();
 
+        error = ClearRecursive(path);
+        if (error)
+            L_WRN() << "Cannot clear junk layer: " << path << ": " << error << std::endl;
+
         error = path.RemoveAll();
         if (error)
             L_WRN() << "cannot delete junk layer: " << path << " : " << error << std::endl;
@@ -208,6 +212,10 @@ TError RemoveLayer(const std::string &name, const TPath &place) {
 
     if (error)
         return error;
+
+    error = ClearRecursive(layer_tmp);
+    if (error)
+        L_WRN() << "Cannot clear layel: " << error << std::endl;
 
     error = layer_tmp.RemoveAll();
     if (error)
