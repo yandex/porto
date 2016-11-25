@@ -120,13 +120,19 @@ TError TTaskEnv::ChildExec() {
 }
 
 TError TTaskEnv::ChildApplyLimits() {
-    for (const auto &pair :CT->Ulimit) {
-        int ret = setrlimit(pair.first, &pair.second);
+    for (const auto &it :CT->Ulimit) {
+        struct rlimit lim;
+        int res;
+        TError error;
+
+        error = ParseUlimit(it.first, it.second, res, lim);
+        if (error)
+            return error;
+
+        int ret = setrlimit(res, &lim);
         if (ret < 0)
             return TError(EError::Unknown, errno,
-                          "setrlimit(" + std::to_string(pair.first) +
-                          ", " + std::to_string(pair.second.rlim_cur) +
-                          ":" + std::to_string(pair.second.rlim_max) + ")");
+                          "setrlimit " + it.first + " " + it.second);
     }
 
     return TError::Success();

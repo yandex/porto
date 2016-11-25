@@ -9,6 +9,10 @@
 #include "util/signal.hpp"
 #include "util/path.hpp"
 
+extern "C" {
+#include <sys/resource.h>
+}
+
 class TPath;
 
 struct TTask {
@@ -52,6 +56,9 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result);
 std::string FormatExitStatus(int status);
 int GetNumCores();
 void DumpMallocInfo();
+
+TError ParseUlimit(const std::string &name, const std::string &value,
+                   int &res, struct rlimit &lim);
 
 class TUnixSocket : public TNonCopyable {
     int SockFd;

@@ -3538,7 +3538,7 @@ static void TestUlimitProperty(Porto::Connection &api) {
     ExpectApiFailure(api.SetProperty(name, "ulimit", "qwe"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "ulimit", "qwe: 123"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "ulimit", "qwe: 123 456"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "ulimit", "as: 123"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "ulimit", "as: 123"));
     ExpectApiFailure(api.SetProperty(name, "ulimit", "as 123 456"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "ulimit", "as: 123 456 789"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "ulimit", "as: 123 :456"), EError::InvalidValue);

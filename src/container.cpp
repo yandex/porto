@@ -804,9 +804,20 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
 
 TError TContainer::ApplyUlimits() {
     auto cg = GetCgroup(FreezerSubsystem);
+    std::map<int, struct rlimit> map;
     std::vector<pid_t> prev, pids;
     TError error;
     bool retry;
+
+    for (auto &it: Ulimit) {
+        int res;
+        struct rlimit lim;
+
+        error = ParseUlimit(it.first, it.second, res, lim);
+        if (error)
+            return error;
+        map[res] = lim;
+    }
 
     L_ACT() << "Apply ulimits" << std::endl;
     do {
@@ -817,7 +828,7 @@ TError TContainer::ApplyUlimits() {
         for (auto pid: pids) {
             if (std::find(prev.begin(), prev.end(), pid) != prev.end())
                 continue;
-            for (auto &it: Ulimit) {
+            for (auto &it: map) {
                 if (prlimit(pid, (enum __rlimit_resource)it.first,
                             &it.second, NULL) && errno != ESRCH)
                     return TError(EError::Unknown, errno, "prlimit");

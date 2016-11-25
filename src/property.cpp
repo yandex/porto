@@ -285,99 +285,21 @@ public:
 } static Cwd;
 
 class TUlimit : public TProperty {
-    const std::map<std::string,int> Index = {
-        { "as", RLIMIT_AS },
-        { "core", RLIMIT_CORE },
-        { "cpu", RLIMIT_CPU },
-        { "data", RLIMIT_DATA },
-        { "fsize", RLIMIT_FSIZE },
-        { "locks", RLIMIT_LOCKS },
-        { "memlock", RLIMIT_MEMLOCK },
-        { "msgqueue", RLIMIT_MSGQUEUE },
-        { "nice", RLIMIT_NICE },
-        { "nofile", RLIMIT_NOFILE },
-        { "nproc", RLIMIT_NPROC },
-        { "rss", RLIMIT_RSS },
-        { "rtprio", RLIMIT_RTPRIO },
-        { "rttime", RLIMIT_RTTIME },
-        { "sigpending", RLIMIT_SIGPENDING },
-        { "stack", RLIMIT_STACK },
-    };
-
-    const std::map<int, std::string> Name = {
-        { RLIMIT_AS, "as" },
-        { RLIMIT_CORE, "core" },
-        { RLIMIT_CPU, "cpu" },
-        { RLIMIT_DATA, "data" },
-        { RLIMIT_FSIZE, "fsize" },
-        { RLIMIT_LOCKS, "locks" },
-        { RLIMIT_MEMLOCK, "memlock" },
-        { RLIMIT_MSGQUEUE, "msgqueue" },
-        { RLIMIT_NICE, "nice" },
-        { RLIMIT_NOFILE, "nofile" },
-        { RLIMIT_NPROC, "nproc" },
-        { RLIMIT_RSS, "rss" },
-        { RLIMIT_RTPRIO, "rtprio" },
-        { RLIMIT_RTTIME, "rttime" },
-        { RLIMIT_SIGPENDING, "sigpending" },
-        { RLIMIT_STACK, "stack" },
-    };
 public:
     TUlimit() : TProperty(P_ULIMIT, EProperty::ULIMIT,
-            "Process resource limits: <type>: <soft> <hard>|unlimited;... (see man prlimit) (dynamic)") {}
-
-    std::string Format(const struct rlimit &rlim) const {
-        return std::to_string(rlim.rlim_cur) + " " +
-               std::to_string(rlim.rlim_max);
-    }
+            "Process resource limits: <type>: [soft]|unlimited [hard];... (see man prlimit) (dynamic)") {}
 
     TError Get(std::string &value) {
-        TStringMap map;
-        for (auto &it: CurrentContainer->Ulimit)
-            map[Name.at(it.first)] = Format(it.second);
-        value = StringMapToString(map);
+        value = StringMapToString(CurrentContainer->Ulimit);
         return TError::Success();
     }
 
     TError GetIndexed(const std::string &index, std::string &value) {
-        auto it = Index.find(index);
-        if (it == Index.end())
-            return TError(EError::InvalidValue, "Invalid ulimit: " + index);
-        auto rlimit = CurrentContainer->Ulimit.find(it->second);
-        if (rlimit != CurrentContainer->Ulimit.end())
-            value = Format(rlimit->second);
+        auto it = CurrentContainer->Ulimit.find(index);
+        if (it != CurrentContainer->Ulimit.end())
+            value = it->second;
         else
             value = "";
-        return TError::Success();
-    }
-
-    TError Parse(const std::string &pair, struct rlimit &rlimit) {
-        std::vector<std::string> softhard;
-        uint64_t soft, hard;
-        TError error;
-
-        (void)SplitString(StringTrim(pair), ' ', softhard);
-        if (softhard.size() != 2)
-            return TError(EError::InvalidValue, "Invalid limits number");
-
-        if (softhard[0] == "unlim" || softhard[0] == "unlimited") {
-            soft = RLIM_INFINITY;
-        } else {
-            error = StringToSize(softhard[0], soft);
-            if (error)
-                return error;
-        }
-
-        if (softhard[1] == "unlim" || softhard[1] == "unlimited") {
-            hard = RLIM_INFINITY;
-        } else {
-            error = StringToSize(softhard[1], hard);
-            if (error)
-                return error;
-        }
-
-        rlimit.rlim_cur = soft;
-        rlimit.rlim_max = hard;
         return TError::Success();
     }
 
@@ -391,36 +313,33 @@ public:
         if (error)
             return error;
 
-        std::map<int, struct rlimit> new_limit;
+        for (auto &it: map) {
+            int res;
+            struct rlimit lim;
 
-        for (auto &it : map) {
-            auto idx = Index.find(it.first);
-            if (idx == Index.end())
-                return TError(EError::InvalidValue, "Invalid ulimit: " + it.first);
-            error = Parse(it.second, new_limit[idx->second]);
+            error = ParseUlimit(it.first, it.second, res, lim);
             if (error)
                 return error;
         }
 
-        CurrentContainer->Ulimit = new_limit;
+        CurrentContainer->Ulimit = map;
         CurrentContainer->SetProp(EProperty::ULIMIT);
         return TError::Success();
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
-        std::map<int, struct rlimit> new_rlimit = CurrentContainer->Ulimit;
-        struct rlimit rlimit;
         TError error;
+        int res;
+        struct rlimit lim;
 
-        auto idx = Index.find(index);
-        if (idx == Index.end())
-            return TError(EError::InvalidValue, "Invalid ulimit: " + index);
-
-        error = Parse(value, rlimit);
-        if (error)
-            return error;
-
-        CurrentContainer->Ulimit[idx->second] = rlimit;
+        if (value == "") {
+            CurrentContainer->Ulimit.erase(index);
+        } else {
+            error = ParseUlimit(index, value, res, lim);
+            if (error)
+                return error;
+            CurrentContainer->Ulimit[index] = value;
+        }
         CurrentContainer->SetProp(EProperty::ULIMIT);
         return TError::Success();
     }

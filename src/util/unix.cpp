@@ -716,3 +716,60 @@ TError TPidFile::Remove() {
     Pid = 0;
     return Path.Unlink();
 }
+
+static const std::map<std::string, int> UlimitIndex = {
+    { "as", RLIMIT_AS },
+    { "core", RLIMIT_CORE },
+    { "cpu", RLIMIT_CPU },
+    { "data", RLIMIT_DATA },
+    { "fsize", RLIMIT_FSIZE },
+    { "locks", RLIMIT_LOCKS },
+    { "memlock", RLIMIT_MEMLOCK },
+    { "msgqueue", RLIMIT_MSGQUEUE },
+    { "nice", RLIMIT_NICE },
+    { "nofile", RLIMIT_NOFILE },
+    { "nproc", RLIMIT_NPROC },
+    { "rss", RLIMIT_RSS },
+    { "rtprio", RLIMIT_RTPRIO },
+    { "rttime", RLIMIT_RTTIME },
+    { "sigpending", RLIMIT_SIGPENDING },
+    { "stack", RLIMIT_STACK },
+};
+
+TError ParseUlimit(const std::string &name, const std::string &value,
+                   int &res, struct rlimit &lim) {
+    auto sep = value.find(' ');
+    auto val = StringTrim(value.substr(0, sep));
+    uint64_t size;
+    TError error;
+
+    auto idx = UlimitIndex.find(name);
+    if (idx == UlimitIndex.end())
+        return TError(EError::InvalidValue, "Invalid ulimit: " + name);
+    res = idx->second;
+
+    if (val == "unlimited" || val == "unlim" || val == "inf" || val == "-1") {
+        lim.rlim_cur = RLIM_INFINITY;
+    } else {
+        error = StringToSize(val, size);
+        if (error)
+            return error;
+        lim.rlim_cur = size;
+    }
+
+    if (sep == std::string::npos) {
+        lim.rlim_max = lim.rlim_cur;
+    } else {
+        val = StringTrim(value.substr(sep+1));
+        if (val == "unlimited" || val == "unlim" || val == "inf" || val == "-1") {
+            lim.rlim_max = RLIM_INFINITY;
+        } else {
+            error = StringToSize(val, size);
+            if (error)
+                return error;
+            lim.rlim_max = size;
+        }
+    }
+
+    return TError::Success();
+}

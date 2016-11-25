@@ -14,10 +14,6 @@
 #include "cgroup.hpp"
 #include "property.hpp"
 
-extern "C" {
-#include <sys/resource.h>
-}
-
 class TEpollSource;
 class TCgroup;
 class TSubsystem;
@@ -138,7 +134,7 @@ public:
     uint64_t DeathTime;
     uint64_t AgingTime;
 
-    std::map<int, struct rlimit> Ulimit;
+    TStringMap Ulimit;
 
     std::string NsName;
 
