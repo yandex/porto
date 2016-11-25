@@ -809,7 +809,9 @@ TError TContainer::ApplyUlimits() {
     TError error;
     bool retry;
 
-    for (auto &it: Ulimit) {
+    auto ulimit = GetUlimit();
+
+    for (auto &it: ulimit) {
         int res;
         struct rlimit lim;
 
@@ -984,10 +986,15 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (TestClearPropDirty(EProperty::ULIMIT)) {
-        error = ApplyUlimits();
-        if (error) {
-            L_ERR() << "Cannot update ulimit: " << error << std::endl;
-            return error;
+        for (auto &ct: Subtree()) {
+            if (ct->State == EContainerState::Stopped ||
+                    ct->State == EContainerState::Dead)
+                continue;
+            error = ct->ApplyUlimits();
+            if (error) {
+                L_ERR() << "Cannot update ulimit: " << error << std::endl;
+                return error;
+            }
         }
     }
 
@@ -1381,6 +1388,17 @@ void TContainer::SanitizeCapabilities() {
     CapAmbient.Permitted &= allowed.Permitted;
 }
 
+TStringMap TContainer::GetUlimit() const {
+    TStringMap map = Ulimit;
+    for (auto p = Parent.get(); p; p = p->Parent.get()) {
+        for (const auto &it: p->Ulimit) {
+            if (map.find(it.first) == map.end())
+                map[it.first] = it.second;
+        }
+    }
+    return map;
+}
+
 TError TContainer::StartTask() {
     struct TTaskEnv TaskEnv;
     struct TNetCfg NetCfg;
@@ -1513,9 +1531,6 @@ TError TContainer::Start() {
 
         if (!HasProp(EProperty::NET_PRIO))
             NetPriority = Parent->NetPriority;
-
-        if (!HasProp(EProperty::ULIMIT))
-            Ulimit = Parent->Ulimit;
 
         if (!HasProp(EProperty::UMASK))
             Umask = Parent->Umask;

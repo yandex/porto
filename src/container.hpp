@@ -235,6 +235,7 @@ public:
     void DowngradeLock(void);
     void UpgradeLock(void);
 
+    TStringMap GetUlimit() const;
     void SanitizeCapabilities();
     uint64_t GetTotalMemGuarantee(bool locked = false) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;

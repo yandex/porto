@@ -120,7 +120,9 @@ TError TTaskEnv::ChildExec() {
 }
 
 TError TTaskEnv::ChildApplyLimits() {
-    for (const auto &it :CT->Ulimit) {
+    auto ulimit = CT->GetUlimit();
+
+    for (const auto &it :ulimit) {
         struct rlimit lim;
         int res;
         TError error;
