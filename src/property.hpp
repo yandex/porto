@@ -66,6 +66,7 @@ constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 constexpr const char *P_UMASK = "umask";
 constexpr const char *P_CONTROLLERS = "controllers";
 constexpr const char *P_OOM_IS_FATAL = "oom_is_fatal";
+constexpr const char *P_THREAD_LIMIT = "thread_limit";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
@@ -108,6 +109,8 @@ constexpr const char *D_START_TIME = "start_time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 constexpr const char *D_MEM_TOTAL_LIMIT = "memory_limit_total";
 constexpr const char *D_CGROUPS = "cgroups";
+constexpr const char *D_PROCESS_COUNT = "process_count";
+constexpr const char *D_THREAD_COUNT = "thread_count";
 
 enum class EProperty {
     NONE,
@@ -173,6 +176,7 @@ enum class EProperty {
     CAPABILITIES_AMBIENT,
     UMASK,
     CONTROLLERS,
+    THREAD_LIMIT,
     NR_PROPERTIES,
 };
 

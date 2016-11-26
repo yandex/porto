@@ -17,6 +17,7 @@ class TCgroup;
 #define CGROUP_DEVICES  0x0040ull
 #define CGROUP_HUGETLB  0x0080ull
 #define CGROUP_CPUSET   0x0100ull
+#define CGROUP_PIDS     0x0200ull
 
 extern const TFlagsNames ControllersName;
 
@@ -86,6 +87,8 @@ public:
     TError GetTasks(std::vector<pid_t> &pids) const {
         return GetPids("tasks", pids);
     }
+
+    TError GetCount(bool threads, uint64_t &count) const;
 
     bool IsEmpty() const;
 
@@ -298,6 +301,17 @@ public:
     }
 };
 
+class TPidsSubsystem : public TSubsystem {
+public:
+    TPidsSubsystem() : TSubsystem(CGROUP_PIDS, "pids") { }
+    bool Supported = false;
+    void InitializeSubsystem() override {
+        Supported = true;
+    }
+    TError GetUsage(TCgroup &cg, uint64_t &usage) const;
+    TError SetLimit(TCgroup &cg, uint64_t limit) const;
+};
+
 extern TMemorySubsystem     MemorySubsystem;
 extern TFreezerSubsystem    FreezerSubsystem;
 extern TCpuSubsystem        CpuSubsystem;
@@ -307,6 +321,7 @@ extern TNetclsSubsystem     NetclsSubsystem;
 extern TBlkioSubsystem      BlkioSubsystem;
 extern TDevicesSubsystem    DevicesSubsystem;
 extern THugetlbSubsystem    HugetlbSubsystem;
+extern TPidsSubsystem       PidsSubsystem;
 
 extern std::vector<TSubsystem *> AllSubsystems;
 extern std::vector<TSubsystem *> Subsystems;

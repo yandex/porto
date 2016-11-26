@@ -144,6 +144,7 @@ public:
     uint64_t AnonMemLimit = 0;
     uint64_t DirtyMemLimit = 0;
     int64_t HugetlbLimit = -1;
+    uint64_t ThreadLimit = 0;
 
     bool RechargeOnPgfault = false;
 

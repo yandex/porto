@@ -26,6 +26,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_DEVICES,   "devices" },
     { CGROUP_HUGETLB,   "hugetlb" },
     { CGROUP_CPUSET,    "cpuset" },
+    { CGROUP_PIDS,      "pids" },
 };
 
 TPath TCgroup::Path() const {
@@ -262,6 +263,27 @@ TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const
     fclose(file);
 
     return TError::Success();
+}
+
+TError TCgroup::GetCount(bool threads, uint64_t &count) const {
+    std::vector<TCgroup> childs;
+    TError error;
+
+    if (!Subsystem)
+        TError(EError::Unknown, "Cannot get from null cgroup");
+    error = ChildsAll(childs);
+    if (error)
+        return error;
+    childs.push_back(*this);
+    count = 0;
+    for (auto &cg: childs) {
+        std::vector<pid_t> pids;
+        error = cg.GetPids(threads ? "tasks" : "cgroup.procs", pids);
+        if (error)
+            break;
+        count += pids.size();
+    }
+    return error;
 }
 
 bool TCgroup::IsEmpty() const {
@@ -949,6 +971,19 @@ TError TDevicesSubsystem::ApplyDevice(TCgroup &cg, const TDevice &device) {
     return error;
 }
 
+// Pids
+
+TError TPidsSubsystem::GetUsage(TCgroup &cg, uint64_t &usage) const {
+    return cg.GetUint64("pids.current", usage);
+}
+
+TError TPidsSubsystem::SetLimit(TCgroup &cg, uint64_t limit) const {
+    if (!limit)
+        return cg.Set("pids.max", "max");
+    return cg.SetUint64("pids.max", limit);
+}
+
+
 TMemorySubsystem    MemorySubsystem;
 TFreezerSubsystem   FreezerSubsystem;
 TCpuSubsystem       CpuSubsystem;
@@ -958,6 +993,7 @@ TNetclsSubsystem    NetclsSubsystem;
 TBlkioSubsystem     BlkioSubsystem;
 TDevicesSubsystem   DevicesSubsystem;
 THugetlbSubsystem   HugetlbSubsystem;
+TPidsSubsystem      PidsSubsystem;
 
 std::vector<TSubsystem *> AllSubsystems = {
     &FreezerSubsystem,
@@ -969,6 +1005,7 @@ std::vector<TSubsystem *> AllSubsystems = {
     &BlkioSubsystem,
     &DevicesSubsystem,
     &HugetlbSubsystem,
+    &PidsSubsystem,
 };
 
 std::vector<TSubsystem *> Subsystems;
@@ -1061,6 +1098,12 @@ TError InitializeCgroups() {
             }
 
             if (error && subsys->Type == "cpuset") {
+                L() << "Seems not supported: " << error << std::endl;
+                error = subsys->Root.Rmdir();
+                continue;
+            }
+
+            if (error && subsys->Type == "pids") {
                 L() << "Seems not supported: " << error << std::endl;
                 error = subsys->Root.Rmdir();
                 continue;

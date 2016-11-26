@@ -319,6 +319,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
         Controllers |= CGROUP_HUGETLB;
 
+    if (Parent && Parent->IsRoot() && PidsSubsystem.Supported)
+        Controllers |= CGROUP_PIDS;
+
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
@@ -995,6 +998,15 @@ TError TContainer::ApplyDynamicProperties() {
                 L_ERR() << "Cannot update ulimit: " << error << std::endl;
                 return error;
             }
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::THREAD_LIMIT)) {
+        auto cg = GetCgroup(PidsSubsystem);
+        error = PidsSubsystem.SetLimit(cg, ThreadLimit);
+        if (error) {
+            L_ERR() << "Cannot set thread limit: " << error << std::endl;
+            return error;
         }
     }
 

@@ -3076,6 +3076,78 @@ public:
     }
 } static MemTotalLimit;
 
+class TProcessCount : public TProperty {
+public:
+    TProcessCount() : TProperty(D_PROCESS_COUNT, EProperty::NONE, "Total process count (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        uint64_t count;
+        if (CurrentContainer->IsRoot()) {
+            count = 0; /* too much work */
+        } else {
+            auto cg = CurrentContainer->GetCgroup(FreezerSubsystem);
+            error = cg.GetCount(false, count);
+        }
+        if (!error)
+            value = std::to_string(count);
+        return error;
+    }
+} static ProcessCount;
+
+class TThreadCount : public TProperty {
+public:
+    TThreadCount() : TProperty(D_THREAD_COUNT, EProperty::NONE, "Total thread count (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        uint64_t count;
+        if (CurrentContainer->IsRoot()) {
+            count = GetTotalThreads();
+        } else if (CurrentContainer->Controllers & CGROUP_PIDS) {
+            auto cg = CurrentContainer->GetCgroup(PidsSubsystem);
+            error = PidsSubsystem.GetUsage(cg, count);
+        } else {
+            auto cg = CurrentContainer->GetCgroup(FreezerSubsystem);
+            error = cg.GetCount(true, count);
+        }
+        if (!error)
+            value = std::to_string(count);
+        return error;
+    }
+} static ThreadCount;
+
+class TThreadLimit : public TProperty {
+public:
+    TThreadLimit() : TProperty(P_THREAD_LIMIT, EProperty::THREAD_LIMIT, "Limit pid usage (dynamic)") {}
+    void Init() {
+        IsSupported = PidsSubsystem.Supported;
+    }
+    TError Get(std::string &value) {
+        if (CurrentContainer->HasProp(EProperty::THREAD_LIMIT))
+            value = std::to_string(CurrentContainer->ThreadLimit);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        uint64_t val;
+        TError error = StringToSize(value, val);
+        if (error)
+            return error;
+        error = WantControllers(CGROUP_PIDS);
+        if (error)
+            return error;
+        CurrentContainer->ThreadLimit = val;
+        CurrentContainer->SetProp(EProperty::THREAD_LIMIT);
+        return TError::Success();
+    }
+} static ThreadLimit;
+
 void InitContainerProperties(void) {
     for (auto prop: ContainerProperties)
         prop.second->Init();

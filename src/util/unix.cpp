@@ -180,6 +180,13 @@ uint64_t GetTotalMemory() {
     return (uint64_t)si.totalram * si.mem_unit;
 }
 
+uint64_t GetTotalThreads() {
+    struct sysinfo si;
+    if (sysinfo(&si) < 0)
+        return 0;
+    return si.procs;
+}
+
 static __thread std::string *processName;
 
 void SetProcessName(const std::string &name) {
