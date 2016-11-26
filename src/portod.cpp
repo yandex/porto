@@ -489,6 +489,11 @@ static TError CreateRootContainer() {
 
     RootContainer->Isolate = false;
 
+    error = StringToStringMap(config().container().default_ulimit(),
+                              RootContainer->Ulimit);
+    if (error)
+        return error;
+
     error = SystemClient.LockContainer(RootContainer);
     if (error)
         return error;

@@ -287,7 +287,7 @@ public:
 class TUlimit : public TProperty {
 public:
     TUlimit() : TProperty(P_ULIMIT, EProperty::ULIMIT,
-            "Process resource limits: <type>: [soft]|unlimited [hard];... (see man prlimit) (dynamic)") {}
+            "Process limits: as|core|data|locks|memlock|nofile|nproc|stack: [soft]|unlimited [hard];... (see man prlimit) (dynamic)") {}
 
     TError Get(std::string &value) {
         value = StringMapToString(CurrentContainer->Ulimit);
