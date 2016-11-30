@@ -1812,8 +1812,6 @@ void TVolume::RestoreAll(void) {
         L_ERR() << "Cannot list nodes: " << error << std::endl;
 
     for (auto &node : nodes) {
-        L_ACT() << "Restore volume: " << node.Path << std::endl;
-
         error = node.Load();
         if (error) {
             L_WRN() << "Cannot load " << node.Path << " removed: " << error << std::endl;
@@ -1821,8 +1819,20 @@ void TVolume::RestoreAll(void) {
             continue;
         }
 
+        /* key for sorting */
+        node.Name = node.Get(V_ID);
+        node.Name.insert(0, 20 - node.Name.size(), '0');
+    }
+
+    nodes.sort();
+
+    for (auto &node : nodes) {
+        if (!node.Name.size())
+            continue;
+
         auto volume = std::make_shared<TVolume>();
 
+        L_ACT() << "Restore volume: " << node.Path << std::endl;
         error = volume->Restore(node);
         if (error) {
             L_WRN() << "Corrupted volume " << node.Path << " removed: " << error << std::endl;
