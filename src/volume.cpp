@@ -1867,6 +1867,13 @@ void TVolume::RestoreAll(void) {
             continue;
         }
 
+        if (!volume->Containers.size()) {
+            L_WRN() << "Volume " << volume->Path << " has no references to containers, "
+                             << "destroying" << std::endl;
+            (void)volume->Destroy();
+            continue;
+        }
+
         L() << "Volume " << volume->Path << " restored" << std::endl;
     }
 
