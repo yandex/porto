@@ -180,6 +180,7 @@ public:
     TError BindRemount(const TPath &source, unsigned long flags) const;
     TError Umount(unsigned long flags) const;
     TError UmountAll() const;
+    TError UmountNested() const;
 
     TError ReadAll(std::string &text, size_t max = 1048576) const;
     TError ReadLines(std::vector<std::string> &lines, size_t max = 1048576) const;

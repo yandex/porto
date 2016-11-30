@@ -844,6 +844,25 @@ TError TPath::UmountAll() const {
     }
 }
 
+TError TPath::UmountNested() const {
+    L_ACT() << "umount nested " << Path << std::endl;
+
+    std::list<TMount> mounts;
+    TError error = ListAllMounts(mounts);
+    if (error)
+        return error;
+
+    for (auto it = mounts.rbegin(); it != mounts.rend(); ++it) {
+        if (InnerPath(it->Target).IsEmpty())
+            continue;
+        error = it->Target.UmountAll();
+        if (error)
+            break;
+    }
+
+    return error;
+}
+
 TError TPath::ReadAll(std::string &text, size_t max) const {
     TError error;
     TFile file;
