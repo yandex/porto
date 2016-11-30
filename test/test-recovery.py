@@ -526,6 +526,39 @@ def TestTCCleanup(c):
     assert c.GetProperty("/", "porto_stat[errors]") == "0"
     assert c.GetProperty("/", "porto_stat[warnings]") == "0"
 
+    c.disconnect()
+    subprocess.check_call([portod, "--discard", "restart"])
+
+    c.connect()
+
+    c.Create("a")
+
+    r = c.Create("a/b")
+    r.SetProperty("net_limit", "default: 1023")
+    r.SetProperty("command", "sleep 100")
+
+    r = c.Create("a/b/c")
+
+    r = c.Create("a/b/c/d")
+    r.SetProperty("net_limit", "default: 512")
+    r.SetProperty("command", "sleep 100")
+
+    r.Start()
+
+    subprocess.check_call([portod, "reload"])
+
+    c.connect()
+
+    assert c.Find("a").name == "a"
+    assert c.Find("a/b").name == "a/b"
+    assert c.Find("a/b/c").name == "a/b/c"
+    assert c.Find("a/b/c/d").name == "a/b/c/d"
+
+    assert c.GetProperty("/", "porto_stat[errors]") == "0"
+    assert c.GetProperty("/", "porto_stat[warnings]") == "0"
+
+    c.Destroy("a")
+
 subprocess.check_call([portod, "--verbose", "reload"])
 
 DropPrivileges()
