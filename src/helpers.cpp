@@ -51,7 +51,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
 
             (void)errFd.ReadTail(error_log, 4096);
 
-            L_ERR() << "External helper command: " << command[0] << " failed, stderr : "
+            L_WRN() << "External helper command: " << command[0] << " failed, stderr : "
                     << std::endl << error_log << std::endl;
 
         } else if (output)
