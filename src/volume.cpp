@@ -926,7 +926,12 @@ TError TVolume::OpenBackend() {
 
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(std::string type) const {
-    return Place / config().volumes().volume_dir() / Id / type;
+
+    TPath base = Place / config().volumes().volume_dir() / Id;
+    if (type.size())
+        return base / type;
+    else
+        return base;
 }
 
 TPath TVolume::GetStorage(void) const {
@@ -1401,6 +1406,8 @@ TError TVolume::DestroyOne() {
         }
     }
 
+    (void)Path.UmountNested(); /* Re-check everything was disposed */
+
     if (!HaveStorage() && storage.Exists()) {
         error = ClearRecursive(storage);
         if (error)
@@ -1423,6 +1430,11 @@ TError TVolume::DestroyOne() {
     }
 
     if (internal.Exists()) {
+
+        error = internal.UmountNested();
+        if (error)
+            L_ERR() << "Cannot umount nested : " << error << std::endl;
+
         error = internal.RemoveAll();
         if (error) {
             L_ERR() << "Can't remove internal: " << error << std::endl;
@@ -1869,12 +1881,10 @@ void TVolume::RestoreAll(void) {
             continue;
 
         TPath dir = volumes / dir_name;
-        TPath mnt = dir / "volume";
-        if (mnt.Exists()) {
-            error = mnt.UmountAll();
-            if (error)
-                L_ERR() << "Cannot umount volume " << mnt << ": " << error << std::endl;
-        }
+
+        error = dir.UmountNested();
+        if (error)
+            L_ERR() << "Cannot umount nested : " << error << std::endl;
 
         error = ClearRecursive(dir);
         if (error)
