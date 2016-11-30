@@ -1,5 +1,6 @@
 #include <sstream>
 #include <algorithm>
+#include <condition_variable>
 
 #include "volume.hpp"
 #include "layer.hpp"
@@ -27,6 +28,8 @@ TPath VolumesKV;
 std::mutex VolumesMutex;
 std::map<TPath, std::shared_ptr<TVolume>> Volumes;
 static uint64_t NextId = 1;
+
+static std::condition_variable VolumesCv;
 
 /* TVolumeBackend - abstract */
 
@@ -1046,6 +1049,50 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
     return TError::Success();
 }
 
+TError TVolume::DependsOn(const TPath &path) {
+    if (IsReady && !path.Exists())
+        return TError(EError::Unknown, "dependecy path " + path.ToString() + " not found");
+
+    for (auto it = Volumes.rbegin(); it != Volumes.rend(); ++it) {
+        auto &vol = it->second;
+        if (!vol->Path.InnerPath(path).IsEmpty()) {
+            if (!vol->IsReady || vol->IsDying)
+                return TError(EError::Busy, "Volume not ready: " + vol->Path.ToString());
+            vol->Nested.insert(shared_from_this());
+            break;
+        }
+    }
+
+    return TError::Success();
+}
+
+TError TVolume::CheckDependencies() {
+    TError error;
+
+    error = DependsOn(Path.DirName());
+
+    if (!error)
+        error = DependsOn(Place);
+
+    if (!error)
+        error = DependsOn(GetStorage());
+
+    for (auto &l : Layers) {
+        TPath layer(l);
+        if (!layer.IsAbsolute())
+            layer = Place / config().volumes().layers_dir() / l;
+        if (!error)
+            error = DependsOn(layer);
+    }
+
+    if (error) {
+        for (auto &it : Volumes)
+            it.second->Nested.erase(shared_from_this());
+    }
+
+    return error;
+}
+
 TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
                           const TContainer &container, const TCred &cred) {
     auto backend = cfg.count(V_BACKEND) ? cfg.at(V_BACKEND) : "";
@@ -1341,23 +1388,68 @@ TError TVolume::Clear() {
     return Backend->Clear();
 }
 
-TError TVolume::DestroyAll(TPath path) {
+void TVolume::DestroyAll() {
     std::list<std::shared_ptr<TVolume>> plan;
+    for (auto &it : Volumes)
+        plan.push_front(it.second);
+    for (auto &vol: plan) {
+        /* Volume can already be removed by parent */
+        if (vol->IsDying)
+            continue;
+        TError error = vol->Destroy();
+        if (error)
+            L_ERR() << "Cannot destroy volume " << vol->Path  << " : " << error << std::endl;
+    }
+}
+
+TError TVolume::Destroy() {
     TError error, ret;
+
+    std::list<std::shared_ptr<TVolume>> plan;
 
     auto volumes_lock = LockVolumes();
 
-    /* Remove sub-volumes */
-    for (auto &it: Volumes) {
-        auto &volume = it.second;
-        if (!path.InnerPath(volume->Path).IsEmpty()) {
-            plan.push_front(volume);
-            volume->IsDying = true;
+    auto cycle = shared_from_this();
+    plan.push_back(shared_from_this());
+    for (auto it = plan.rbegin(); it != plan.rend(); ++it) {
+        auto &v = (*it);
+
+        if (Path != v->Path) {
+            while (!v->IsReady)
+                VolumesCv.wait(volumes_lock);
+        }
+
+        v->IsDying = true;
+
+        for (auto &nested : v->Nested) {
+            if (nested == cycle) {
+                L_WRN() << "Cyclic dependencies for "
+                        << cycle->Path << " detected" << std::endl;
+            } else {
+                auto it = std::find(plan.begin(), plan.end(), nested);
+                if (it == plan.end())
+                    cycle = nested;
+                else
+                    plan.erase(it);
+                plan.push_front(nested);
+            }
         }
     }
 
-    for (auto &volume: plan) {
+    for (auto &volume : plan) {
+        volumes_lock.unlock();
+        error = volume->DestroyOne();
+
+        if (error && !ret)
+            ret = error;
+
+        volumes_lock.lock();
+
+        for (auto &it : Volumes)
+            it.second->Nested.erase(volume);
+
         Volumes.erase(volume->Path);
+
         for (auto &name: volume->Containers) {
             L_ACT()  << "Forced unlink volume " << volume->Path
                      << " from " << name << std::endl;
@@ -1376,13 +1468,7 @@ TError TVolume::DestroyAll(TPath path) {
         }
     }
 
-    volumes_lock.unlock();
-
-    for (auto &volume: plan) {
-        error = volume->DestroyOne();
-        if (error && !ret)
-            ret = error;
-    }
+    VolumesCv.notify_all();
 
     return ret;
 }
@@ -1459,10 +1545,6 @@ TError TVolume::DestroyOne() {
     }
 
     return ret;
-}
-
-TError TVolume::Destroy() {
-    return TVolume::DestroyAll(Path);
 }
 
 TError TVolume::StatFS(TStatFS &result) const {
@@ -1741,18 +1823,40 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
         return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max));
 
     if (!path.IsEmpty()) {
-        auto it = Volumes.lower_bound(path);
-        if (it != Volumes.end()) {
-            if (it->first == path)
+        for (auto &it : Volumes) {
+            auto &vol = it.second;
+
+            if (vol->Path == path)
                 return TError(EError::VolumeAlreadyExists, "Volume already exists");
-            if (!path.InnerPath(it->first).IsEmpty())
-                return TError(EError::Busy, "Path overlaps with " + it->first.ToString());
+
+            if (!path.InnerPath(vol->Path).IsEmpty())
+                return TError(EError::Busy, "Path overlaps with volume " + vol->Path.ToString());
+
+            if (!path.InnerPath(vol->Place).IsEmpty())
+                return TError(EError::Busy, "Path overlaps with place " + vol->Place.ToString());
+
+            TPath storage = vol->GetStorage();
+            if (!path.InnerPath(storage).IsEmpty() ||
+                    !storage.InnerPath(path).IsEmpty())
+                return TError(EError::Busy, "Path overlaps with storage " + storage.ToString());
+
+            for (auto &l: vol->Layers) {
+                TPath layer(l);
+                if (layer.IsAbsolute() &&
+                        (!path.InnerPath(layer).IsEmpty() ||
+                         !layer.InnerPath(path).IsEmpty()))
+                    return TError(EError::Busy, "Path overlaps with layer " + l);
+            }
         }
     }
 
     volume->Id = std::to_string(NextId++);
 
     error = volume->Configure(path, cfg, container, cred);
+    if (error)
+        return error;
+
+    error = volume->CheckDependencies();
     if (error)
         return error;
 
@@ -1794,6 +1898,8 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
         volume->Destroy();
         return error;
     }
+
+    VolumesCv.notify_all();
 
     return TError::Success();
 }
@@ -1868,8 +1974,14 @@ void TVolume::RestoreAll(void) {
         }
 
         if (!volume->Containers.size()) {
-            L_WRN() << "Volume " << volume->Path << " has no references to containers, "
-                             << "destroying" << std::endl;
+            L_WRN() << "Volume " << volume->Path << " has no containers" << std::endl;
+            (void)volume->Destroy();
+            continue;
+        }
+
+        error = volume->CheckDependencies();
+        if (error) {
+            L_WRN() << "Volume " << volume->Path << " has broken dependcies: " << error << std::endl;
             (void)volume->Destroy();
             continue;
         }

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <set>
 #include "common.hpp"
 #include "statistics.hpp"
 #include "util/path.hpp"
@@ -86,6 +87,7 @@ public:
     TCred CreatorCred;
     TPath CreatorRoot;
     unsigned VolumePerms = 0775;
+    std::set<std::shared_ptr<TVolume>> Nested;
 
     bool CustomPlace = false;
     TPath Place;
@@ -109,10 +111,13 @@ public:
     TError ApplyConfig(const TStringMap &cfg);
     TStringMap DumpState(const TPath &root);
 
+    TError DependsOn(const TPath &path);
+    TError CheckDependencies();
+
     TError Build(void);
     TError Clear(void);
 
-    static TError DestroyAll(TPath path);
+    static void DestroyAll();
     TError DestroyOne();
     TError Destroy();
 
@@ -147,6 +152,11 @@ public:
     TError StatFS(TStatFS &result) const;
 
     TError GetUpperLayer(TPath &upper);
+
+    friend bool operator<(const std::shared_ptr<TVolume> &lhs,
+                          const std::shared_ptr<TVolume> &rhs) {
+        return lhs->Path < rhs->Path;
+    }
 };
 
 struct TVolumeProperty {

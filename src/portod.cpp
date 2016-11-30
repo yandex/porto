@@ -664,12 +664,6 @@ static void DestroyContainers(bool weak) {
     SystemClient.ReleaseContainer();
 }
 
-static void DestroyVolumes() {
-    TError error = TVolume::DestroyAll("/");
-    if (error)
-        L_ERR() << "Cannot destroy volumes: " << error << std::endl;
-}
-
 static int SlaveMain() {
     TError error;
 
@@ -773,7 +767,7 @@ static int SlaveMain() {
         discardState = false;
         L() << "Discard state..." << std::endl;
         DestroyContainers(false);
-        DestroyVolumes();
+        TVolume::DestroyAll();
     }
 
     SystemClient.FinishRequest();
@@ -804,7 +798,7 @@ static int SlaveMain() {
 
         DestroyContainers(false);
 
-        DestroyVolumes();
+        TVolume::DestroyAll();
 
         SystemClient.LockContainer(RootContainer);
 
