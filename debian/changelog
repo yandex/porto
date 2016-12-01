@@ -1,3 +1,21 @@
+yandex-porto (3.1.2) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * property: adjust default ulimits
+  * container: add thread/process counters and thread limit by pids cgroup
+
+  [ Maxim Samoylov ]
+  * test: check stale tc cleanup
+  * test: check leaf classes proper restoring
+  * helpers: only warn about unsuccessful helper exit
+  * util/path: implement UmountNested
+  * volume: try to umount nested mountpoints in internal
+  * volume: restore volumes in creation order
+  * volume: destroy restored volume without containers
+  * volume: serialize and maintain dependencies
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 01 Dec 2016 16:55:09 +0300
+
 yandex-porto (3.1.1) unstable; urgency=low
 
   * test/test-knobs: fix spaces in ulimit
