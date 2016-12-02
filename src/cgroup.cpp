@@ -1056,6 +1056,12 @@ TError InitializeCgroups() {
             L_ERR() << "Cannot mount cgroups root: " << error << std::endl;
             return error;
         }
+    } else if (StringStartsWith(mount.Options, "ro,")) {
+        error = root.Remount(MS_REMOUNT | MS_NODEV | MS_NOSUID | MS_NOEXEC);
+        if (error) {
+            L_ERR() << "Cannot remount cgroups root: " << error << std::endl;
+            return error;
+        }
     }
 
     error = TPath::ListAllMounts(mounts);
