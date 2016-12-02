@@ -209,7 +209,7 @@ public:
 
 class TCpuSubsystem : public TSubsystem {
 public:
-    bool HasShares, HasQuota, HasSmart, HasReserve;
+    bool HasShares, HasQuota, HasSmart, HasReserve, HasRtGroup;
     uint64_t BasePeriod, BaseShares;
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;

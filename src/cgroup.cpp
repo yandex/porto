@@ -543,6 +543,9 @@ void TCpuSubsystem::InitializeSubsystem() {
     HasQuota = cg.Has("cpu.cfs_quota_us") &&
                cg.Has("cpu.cfs_period_us");
 
+    HasRtGroup = cg.Has("cpu.rt_runtime_us") &&
+                 cg.Has("cpu.rt_period_us");
+
     HasReserve = HasShares && HasQuota &&
                  cg.Has("cpu.cfs_reserve_us") &&
                  cg.Has("cpu.cfs_reserve_shares");
@@ -557,6 +560,8 @@ void TCpuSubsystem::InitializeSubsystem() {
         L_SYS() << "base shares " << BaseShares << std::endl;
     if (HasQuota)
         L_SYS() << "quota period " << BasePeriod << std::endl;
+    if (HasRtGroup)
+        L_SYS() << "support rt group" << std::endl;
     if (HasReserve)
         L_SYS() << "support reserves" << std::endl;
     if (HasSmart)
@@ -627,6 +632,27 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
     if (HasSmart) {
         error = cg.SetUint64("cpu.smart", (policy == "rt" &&
                     config().container().enable_smart()) ? 1 : 0);
+        if (error)
+            return error;
+    }
+
+    if (HasRtGroup) {
+        int64_t period, runtime;
+        int cores = GetNumCores();
+
+        if (limit >= cores) {
+            period = 1000000;   /* 1s */
+            runtime = -1;
+        } else {
+            period = 100000;    /* 100ms */
+            runtime = limit * period / cores;
+        }
+
+        error = cg.Set("cpu.rt_runtime_us", std::to_string(runtime));
+        if (error)
+            return error;
+
+        error = cg.Set("cpu.rt_period_us", std::to_string(period));
         if (error)
             return error;
     }
