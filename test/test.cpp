@@ -528,7 +528,10 @@ void TestDaemon(Porto::Connection &api) {
     // when sssd is running getgrnam opens unix socket to read database
     int sssFd = 0;
     if (WordCount("/etc/nsswitch.conf", "sss"))
-        sssFd = 3;
+        sssFd = 4;
+
+    // ctest leaks log fd
+    sssFd++;
 
     /**
      * .
