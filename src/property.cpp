@@ -359,17 +359,36 @@ TError TCpuPolicy::Set(const std::string &policy) {
     if (error)
         return error;
 
-    error = WantControllers(CGROUP_CPU);
-    if (error)
-        return error;
-
     if (policy != "rt" && policy != "high" && policy != "normal" &&
-            policy != "batch"  && policy != "idle")
+            policy != "batch"  && policy != "idle" && policy != "iso")
         return TError(EError::InvalidValue, "Unknown cpu policy: " + policy);
 
     if (CurrentContainer->CpuPolicy != policy) {
         CurrentContainer->CpuPolicy = policy;
         CurrentContainer->SetProp(EProperty::CPU_POLICY);
+
+        CurrentContainer->SchedPolicy = SCHED_OTHER;
+        CurrentContainer->SchedPrio = 0;
+        CurrentContainer->SchedNice = 0;
+
+        if (policy == "rt") {
+            CurrentContainer->SchedNice = config().container().rt_nice();
+            if ((!CpuSubsystem.HasSmart ||
+                 !config().container().enable_smart()) &&
+                    config().container().rt_priority()) {
+                CurrentContainer->SchedPolicy = SCHED_RR;
+                CurrentContainer->SchedPrio = config().container().rt_priority();
+            }
+        } else if (policy == "high") {
+            CurrentContainer->SchedNice = config().container().high_nice();
+        } else if (policy == "batch") {
+            CurrentContainer->SchedPolicy = SCHED_BATCH;
+        } else if (policy == "idle") {
+            CurrentContainer->SchedPolicy = SCHED_IDLE;
+        } else if (policy == "iso") {
+            CurrentContainer->SchedPolicy = 4;
+            CurrentContainer->SchedNice = config().container().high_nice();
+        }
     }
 
     return TError::Success();

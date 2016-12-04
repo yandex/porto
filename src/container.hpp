@@ -63,6 +63,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void SetState(EContainerState next);
 
     TError ApplyUlimits();
+    TError ApplySchedPolicy() const;
     TError ApplyDynamicProperties();
     TError PrepareWorkDir();
     TError RestoreNetwork();
@@ -153,6 +154,11 @@ public:
     TUintMap IoOpsLimit;
 
     std::string CpuPolicy;
+
+    int SchedPolicy;
+    int SchedPrio;
+    int SchedNice;
+
     double CpuLimit;
     double CpuGuarantee;
     std::string CpuSet;
@@ -213,6 +219,10 @@ public:
     void ClearProp(EProperty prop) {
         PropSet[(int)prop] = false;
         PropDirty[(int)prop] = true;
+    }
+
+    bool TestPropDirty(EProperty prop) const {
+        return PropDirty[(int)prop];
     }
 
     bool TestClearPropDirty(EProperty prop) {

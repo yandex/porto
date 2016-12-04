@@ -213,7 +213,7 @@ public:
     uint64_t BasePeriod, BaseShares;
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;
-    TError SetCpuPolicy(TCgroup &cg, const std::string &policy,
+    TError SetCpuLimit(TCgroup &cg, const std::string &policy,
                         double guarantee, double limit);
 };
 

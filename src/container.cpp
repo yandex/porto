@@ -304,6 +304,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
         NsName = "";
 
     CpuPolicy = "normal";
+
+    SchedPolicy = SCHED_OTHER;
+    SchedPrio = 0;
+    SchedNice = 0;
+
     CpuLimit = GetNumCores();
     CpuGuarantee = IsRoot() ? GetNumCores() : 0;
     IoPolicy = "normal";
@@ -846,6 +851,36 @@ TError TContainer::ApplyUlimits() {
     return TError::Success();
 }
 
+TError TContainer::ApplySchedPolicy() const {
+    auto cg = GetCgroup(FreezerSubsystem);
+    struct sched_param param;
+    param.sched_priority = SchedPrio;
+    TError error;
+
+    std::vector<pid_t> prev, pids;
+    bool retry;
+
+    L_ACT() << "Set " << cg << " scheduler policy " << CpuPolicy << std::endl;
+    do {
+        error = cg.GetTasks(pids);
+        retry = false;
+        for (auto pid: pids) {
+            if (std::find(prev.begin(), prev.end(), pid) != prev.end() &&
+                    sched_getscheduler(pid) == SchedPolicy)
+                continue;
+            if (setpriority(PRIO_PROCESS, pid, SchedNice) && errno != ESRCH)
+                return TError(EError::Unknown, errno, "setpriority");
+            if (sched_setscheduler(pid, SchedPolicy, &param) &&
+                    errno != ESRCH)
+                return TError(EError::Unknown, errno, "sched_setscheduler");
+            retry = true;
+        }
+        prev = pids;
+    } while (retry);
+
+    return TError::Success();
+}
+
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     auto blkcg = GetCgroup(BlkioSubsystem);
@@ -951,15 +986,23 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (TestClearPropDirty(EProperty::CPU_POLICY) |
+    if (TestPropDirty(EProperty::CPU_POLICY) |
             TestClearPropDirty(EProperty::CPU_LIMIT) |
             TestClearPropDirty(EProperty::CPU_GUARANTEE)) {
         auto cpucg = GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuPolicy(cpucg, CpuPolicy,
+        error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy,
                                           CpuGuarantee, CpuLimit);
         if (error) {
             if (error.GetErrno() != EINVAL)
                 L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::CPU_POLICY)) {
+        error = ApplySchedPolicy();
+        if (error) {
+            L_ERR() << "Cannot set scheduler policy: " << error << std::endl;
             return error;
         }
     }
@@ -1260,29 +1303,6 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
-    taskEnv->SchedPolicy = SCHED_OTHER;
-    taskEnv->SchedPriority = 0;
-    taskEnv->SchedNice = 0;
-
-    if (CpuPolicy == "idle")
-        taskEnv->SchedPolicy = SCHED_IDLE;
-
-    if (CpuPolicy == "batch")
-        taskEnv->SchedPolicy = SCHED_BATCH;
-
-    if (CpuPolicy == "rt") {
-        if (CpuSubsystem.HasSmart && config().container().enable_smart()) {
-            taskEnv->SchedPolicy = -1;
-        } else if (config().container().rt_priority()) {
-            taskEnv->SchedPolicy = SCHED_RR;
-            taskEnv->SchedPriority = config().container().rt_priority();
-        }
-        taskEnv->SchedNice = config().container().rt_nice();
-    }
-
-    if (CpuPolicy == "high")
-        taskEnv->SchedNice = config().container().high_nice();
-
     taskEnv->Mnt.Cwd = GetCwd();
     taskEnv->Mnt.ParentCwd = Parent->GetCwd();
 
@@ -1532,8 +1552,12 @@ TError TContainer::Start() {
 
     /* Non-isolated container inherits policy from parent */
     if (!Isolate && Parent) {
-        if (!HasProp(EProperty::CPU_POLICY))
+        if (!HasProp(EProperty::CPU_POLICY)) {
             CpuPolicy = Parent->CpuPolicy;
+            SchedPolicy = Parent->SchedPolicy;
+            SchedPrio = Parent->SchedPrio;
+            SchedNice = Parent->SchedNice;
+        }
 
         if (!HasProp(EProperty::IO_POLICY))
             IoPolicy = Parent->IoPolicy;

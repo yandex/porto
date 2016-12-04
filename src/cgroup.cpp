@@ -568,7 +568,7 @@ void TCpuSubsystem::InitializeSubsystem() {
         L_SYS() << "support smart" << std::endl;
 }
 
-TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
+TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
                                    double guarantee, double limit) {
     TError error;
 
@@ -593,7 +593,7 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
         if (policy == "rt") {
             shares *= 256;
             reserve = 0;
-        } else if (policy == "high") {
+        } else if (policy == "high" || policy == "iso") {
             shares *= 16;
             reserve_shares *= 256;
         } else if (policy == "normal" || policy == "batch") {
@@ -619,7 +619,7 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
 
         if (policy == "rt")
             shares *= 256;
-        else if (policy == "high")
+        else if (policy == "high" || policy == "iso")
             shares *= 16;
         else if (policy == "idle")
             shares /= 16;
@@ -655,54 +655,6 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
         error = cg.Set("cpu.rt_period_us", std::to_string(period));
         if (error)
             return error;
-    }
-
-    int sched_policy = SCHED_OTHER;
-    struct sched_param sched_param;
-    sched_param.sched_priority = 0;
-    int sched_nice = 0;
-
-    if (policy == "idle")
-        sched_policy = SCHED_IDLE;
-
-    if (policy == "batch")
-        sched_policy = SCHED_BATCH;
-
-    if (policy == "rt") {
-        if (HasSmart && config().container().enable_smart()) {
-            sched_policy = -1;
-        } else if (config().container().rt_priority()) {
-            sched_policy = SCHED_RR;
-            sched_param.sched_priority = config().container().rt_priority();
-        }
-        /* just to show in top */
-        sched_nice = config().container().rt_nice();
-    }
-
-    if (policy == "high")
-        sched_nice = config().container().high_nice();
-
-    if (sched_policy >= 0) {
-        std::vector<pid_t> prev, pids;
-        bool retry;
-
-        L_ACT() << "Set " << cg << " sched policy " << sched_policy << std::endl;
-        do {
-            error = cg.GetTasks(pids);
-            retry = false;
-            for (auto pid: pids) {
-                if (std::find(prev.begin(), prev.end(), pid) != prev.end() &&
-                        sched_getscheduler(pid) == sched_policy)
-                    continue;
-                if (setpriority(PRIO_PROCESS, pid, sched_nice) && errno != ESRCH)
-                    return TError(EError::Unknown, errno, "setpriority");
-                if (sched_setscheduler(pid, sched_policy, &sched_param) &&
-                        errno != ESRCH)
-                    return TError(EError::Unknown, errno, "sched_setscheduler");
-                retry = true;
-            }
-            prev = pids;
-        } while (retry);
     }
 
     return TError::Success();
