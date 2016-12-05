@@ -2542,17 +2542,11 @@ TError TMemUsage::Get(std::string &value) {
         return error;
 
     auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
-
     uint64_t val;
     error = MemorySubsystem.Usage(cg, val);
-    if (error) {
-        L_ERR() << "Can't get memory usage: " << error << std::endl;
-        return error;
-    }
-
-    value = std::to_string(val);
-
-    return TError::Success();
+    if (!error)
+        value = std::to_string(val);
+    return error;
 }
 
 class TAnonUsage : public TProperty {
@@ -2571,13 +2565,10 @@ TError TAnonUsage::Get(std::string &value) {
 
     auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
     uint64_t val;
-
-    if (MemorySubsystem.GetAnonUsage(cg, val))
-        value = "0";
-    else
+    error = MemorySubsystem.GetAnonUsage(cg, val);
+    if (!error)
         value = std::to_string(val);
-
-    return TError::Success();
+    return error;
 }
 
 class THugetlbUsage : public TProperty {
@@ -2596,10 +2587,9 @@ public:
         auto cg = CurrentContainer->GetCgroup(HugetlbSubsystem);
         uint64_t val;
         error = HugetlbSubsystem.GetHugeUsage(cg, val);
-        if (error)
-            return error;
-        value = std::to_string(val);
-        return TError::Success();
+        if (!error)
+            value = std::to_string(val);
+        return error;
     }
 } static HugetlbUsage;
 
@@ -2696,18 +2686,11 @@ TError TCpuUsage::Get(std::string &value) {
         return error;
 
     auto cg = CurrentContainer->GetCgroup(CpuacctSubsystem);
-
     uint64_t val;
     error = CpuacctSubsystem.Usage(cg, val);
-
-    if (error) {
-        L_ERR() << "Can't get CPU usage: " << error << std::endl;
-        value = "-1";
-    } else {
+    if (!error)
         value = std::to_string(val);
-    }
-
-    return TError::Success();
+    return error;
 }
 
 class TCpuSystem : public TProperty {
@@ -2725,18 +2708,11 @@ TError TCpuSystem::Get(std::string &value) {
         return error;
 
     auto cg = CurrentContainer->GetCgroup(CpuacctSubsystem);
-
     uint64_t val;
     error = CpuacctSubsystem.SystemUsage(cg, val);
-
-    if (error) {
-        L_ERR() << "Can't get system CPU usage: " << error << std::endl;
-        value = "-1";
-    } else {
+    if (!error)
         value = std::to_string(val);
-    }
-
-    return TError::Success();
+    return error;
 }
 
 class TNetClassId : public TProperty {
