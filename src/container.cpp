@@ -494,14 +494,44 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         if (error)
             goto err;
 
-        /* Disable smart if we're moving tasks into another cgroup */
-        if (ct->Task.Pid && CpuSubsystem.HasSmart) {
+        TCgroup cpuCg;
+
+        /* Kernel without group rt forbids moving RT tasks in to cpu cgroup */
+        if (ct->Task.Pid && !CpuSubsystem.HasRtGroup) {
+            auto cpuCg = ct->GetCgroup(CpuSubsystem);
             TCgroup cg;
             bool smart;
-            if (!CpuSubsystem.TaskCgroup(ct->Task.Pid, cg) &&
-                    cg != ct->GetCgroup(CpuSubsystem) &&
-                    !cg.GetBool("cpu.smart", smart) && smart)
-                cg.SetBool("cpu.smart", false);
+
+            if (!CpuSubsystem.TaskCgroup(ct->Task.Pid, cg) && cg != cpuCg) {
+
+                /* Disable smart if we're moving tasks into another cgroup */
+                if (CpuSubsystem.HasSmart && !cg.GetBool("cpu.smart", smart) && smart)
+                    cg.SetBool("cpu.smart", false);
+
+                auto freezerCg = ct->GetCgroup(FreezerSubsystem);
+                std::vector<pid_t> prev, pids;
+                struct sched_param param;
+                param.sched_priority = 0;
+                bool retry;
+
+                /* Disable RT for all task in freezer cgroup */
+                do {
+                    error = freezerCg.GetTasks(pids);
+                    retry = false;
+                    for (auto pid: pids) {
+                        if (std::find(prev.begin(), prev.end(), pid) == prev.end() &&
+                                sched_getscheduler(pid) == SCHED_RR &&
+                                !sched_setscheduler(pid, SCHED_OTHER, &param))
+                            retry = true;
+                    }
+                    prev = pids;
+                } while (retry);
+
+                /* Move tasks into correct cpu cgroup */
+                error = cpuCg.AttachAll(freezerCg);
+                if (error)
+                    L_WRN() << "Cannot move to corrent cpu cgroup: " << error << std::endl;
+            }
         }
 
         error = ct->ApplyDynamicProperties();
