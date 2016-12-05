@@ -1,3 +1,9 @@
+yandex-porto (3.1.6) unstable; urgency=low
+
+  * cgroup: fix upgrade for kernels without group rt scheduler
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 05 Dec 2016 20:07:59 +0300
+
 yandex-porto (3.1.5) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
