@@ -1,3 +1,15 @@
+yandex-porto (3.1.5) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * test: two more non-portod fd
+  * container: split scheduler policy and cpu cgroup config
+  * property: remove error logging if cgroup isn't found
+
+  [ Maxim Samoylov ]
+  * test: verify ClearDirectory performance
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 05 Dec 2016 19:14:03 +0300
+
 yandex-porto (3.1.4) unstable; urgency=low
 
   * cgroup: add cpu rt runtime limit
