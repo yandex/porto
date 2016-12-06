@@ -17,6 +17,31 @@ except BaseException as e:
     shutil.rmtree(TMPDIR)
     os.mkdir(TMPDIR)
 
+def DumpLegacyRt(r):
+    res =  (r.GetProperty("cpu.cfs_quota_us"),
+            r.GetProperty("cpu.cfs_period_us"),
+            r.GetProperty("cpu.shares"))
+
+    try:
+        res = res + (r.GetProperty("cpu.cfs_reserve_shares"), r.GetProperty("cpu.cfs_reserve_us"),)
+    except:
+        pass
+
+    try:
+        res = res + (r.GetProperty("cpu.smart"), )
+    except:
+        pass
+
+    return res
+
+def CheckRt(r):
+    pid = r.GetProperty("root_pid")
+    task_stat = open("/proc/{}/stat".format(pid), "r").read().split()
+    (nice, prio, policy) = [task_stat[i] for i in [18, 39, 40]]
+    assert nice == "-20"
+    assert prio == "10"
+    assert policy == "2"
+
 #FIXME: remove it in the future, use capabilities from snapshot
 def CheckCaps(r, new_porto):
     app_caps =  "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"\
@@ -220,6 +245,49 @@ VerifyProps(r, os_knobs)
 snap_os = SnapshotProps(r)
 r.Start()
 
+rt_parent_knobs = [
+    ("private", "rt_parent"),
+    ("respawn", False),
+    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; "\
+               "nofile: 100 200; nproc: 500 1000"),
+    ("isolate", True),
+    ("user", "porto-alice"),
+    ("env", "CONTAINER=porto;PARENT=1")
+]
+
+r = c.Create("rt_parent")
+SetProps(r, rt_parent_knobs)
+VerifyProps(r, rt_parent_knobs)
+snap_rt_parent = SnapshotProps(r)
+
+rt_app_knobs = [
+    ("cpu_limit", "4c"),
+    ("private", "rt_app"),
+    ("respawn", False),
+    ("cpu_policy", "rt"),
+    ("memory_guarantee", "2000000000"),
+    ("command", "sleep 20"),
+    ("memory_limit", "2100000000"),
+    ("cwd", portosrc),
+    ("net_limit", "default: 0"),
+    ("cpu_guarantee", "4c"),
+    ("io_policy", "normal"),
+    ("ulimit", "data: 16000000 32000000;memlock: 4096 4096;"\
+               "nofile: 100 200;nproc: 500 1000"\
+               ),
+    ("recharge_on_pgfault", True),
+    ("isolate", False),
+    ("user", "porto-alice"),
+    ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
+]
+
+r = c.Create("rt_parent/rt_app")
+SetProps(r, rt_app_knobs)
+VerifyProps(r, rt_app_knobs)
+snap_rt_app = SnapshotProps(r)
+r.Start()
+legacy_rt_settings = DumpLegacyRt(r)
+
 c.disconnect()
 
 os.unlink(PORTOD_PATH)
@@ -270,6 +338,17 @@ VerifyProps(r, os_knobs)
 VerifySnapshot(r, snap_os)
 CheckCaps(r, True)
 
+r = c.Find("rt_parent")
+VerifyProps(r, rt_parent_knobs)
+VerifySnapshot(r, snap_rt_parent)
+CheckCaps(r, True)
+
+r = c.Find("rt_parent/rt_app")
+VerifyProps(r, rt_app_knobs)
+VerifySnapshot(r, snap_rt_app)
+CheckCaps(r, True)
+CheckRt(r)
+
 c.disconnect()
 
 #Now, the downgrade
@@ -308,6 +387,17 @@ r = c.Find("parent_os/os")
 VerifyProps(r, os_knobs)
 VerifySnapshot(r, snap_os)
 CheckCaps(r, False)
+
+r = c.Find("rt_parent")
+VerifyProps(r, rt_parent_knobs)
+VerifySnapshot(r, snap_rt_parent)
+CheckCaps(r, False)
+
+r = c.Find("rt_parent/rt_app")
+VerifyProps(r, rt_app_knobs)
+VerifySnapshot(r, snap_rt_app)
+CheckCaps(r, False)
+assert legacy_rt_settings == DumpLegacyRt(r)
 
 c.disconnect()
 
