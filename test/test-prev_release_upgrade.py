@@ -148,8 +148,8 @@ print "Package successfully downloaded"
 
 subprocess.check_call([portod, "stop"])
 
-downloads = download.split()
-pktname = downloads[2] + "_" + downloads[3] + "_amd64.deb"
+downloads = download.split('\n')[0].split()
+pktname = downloads[-4] + "_" + downloads[-3] + "_amd64.deb"
 
 os.mkdir("old")
 subprocess.check_call(["dpkg", "-x", pktname, "old"])
