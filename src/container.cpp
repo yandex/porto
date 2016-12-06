@@ -494,43 +494,44 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         if (error)
             goto err;
 
-        TCgroup cpuCg;
-
         /* Kernel without group rt forbids moving RT tasks in to cpu cgroup */
-        if (ct->Task.Pid && !CpuSubsystem.HasRtGroup) {
+        if (ct->Task.Pid && (!CpuSubsystem.HasRtGroup || CpuSubsystem.HasSmart)) {
             auto cpuCg = ct->GetCgroup(CpuSubsystem);
             TCgroup cg;
             bool smart;
 
             if (!CpuSubsystem.TaskCgroup(ct->Task.Pid, cg) && cg != cpuCg) {
+                auto freezerCg = ct->GetCgroup(FreezerSubsystem);
 
                 /* Disable smart if we're moving tasks into another cgroup */
-                if (CpuSubsystem.HasSmart && !cg.GetBool("cpu.smart", smart) && smart)
+                if (CpuSubsystem.HasSmart && !cg.GetBool("cpu.smart", smart) && smart) {
                     cg.SetBool("cpu.smart", false);
+                } else if (!CpuSubsystem.HasRtGroup) {
+                    std::vector<pid_t> prev, pids;
+                    struct sched_param param;
+                    param.sched_priority = 0;
+                    bool retry;
 
-                auto freezerCg = ct->GetCgroup(FreezerSubsystem);
-                std::vector<pid_t> prev, pids;
-                struct sched_param param;
-                param.sched_priority = 0;
-                bool retry;
+                    /* Disable RT for all task in freezer cgroup */
+                    do {
+                        error = freezerCg.GetTasks(pids);
+                        retry = false;
+                        for (auto pid: pids) {
+                            if (std::find(prev.begin(), prev.end(), pid) == prev.end() &&
+                                    sched_getscheduler(pid) == SCHED_RR &&
+                                    !sched_setscheduler(pid, SCHED_OTHER, &param))
+                                retry = true;
+                        }
+                        prev = pids;
+                    } while (retry);
+                }
 
-                /* Disable RT for all task in freezer cgroup */
-                do {
-                    error = freezerCg.GetTasks(pids);
-                    retry = false;
-                    for (auto pid: pids) {
-                        if (std::find(prev.begin(), prev.end(), pid) == prev.end() &&
-                                sched_getscheduler(pid) == SCHED_RR &&
-                                !sched_setscheduler(pid, SCHED_OTHER, &param))
-                            retry = true;
-                    }
-                    prev = pids;
-                } while (retry);
-
-                /* Move tasks into correct cpu cgroup */
-                error = cpuCg.AttachAll(freezerCg);
-                if (error)
-                    L_WRN() << "Cannot move to corrent cpu cgroup: " << error << std::endl;
+                /* Move tasks into correct cpu cgroup before enabling RT */
+                if (!CpuSubsystem.HasRtGroup && ct->SchedPolicy == SCHED_RR) {
+                    error = cpuCg.AttachAll(freezerCg);
+                    if (error)
+                        L_WRN() << "Cannot move to corrent cpu cgroup: " << error << std::endl;
+                }
             }
         }
 
