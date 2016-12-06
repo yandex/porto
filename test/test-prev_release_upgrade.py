@@ -99,7 +99,7 @@ def SnapshotProps(r):
               #"capabilities", #FIXME enable later, os: "<set1>" -> "<set2>" ,
                                #app: "" -> "<not empty>"
               "command", "cpu_guarantee", "cpu_limit", "cpu_policy",
-              "cwd", "devices", "dirty_limit", "enable_porto", "env",
+              "cwd", "devices", "enable_porto", "env",
               "group", "hostname",
               # "io_limit", "io_ops_limit", FIXME "0" -> ""
               "io_policy", "ip",
@@ -192,7 +192,6 @@ app_knobs = [
     ("cpu_limit", "1c"),
     ("private", "parent_app"),
     ("respawn", False),
-    ("dirty_limit", "131072000"),
     ("cpu_policy", "normal"),
     ("memory_guarantee", "16384000"),
     ("command", "sleep 20"),
