@@ -541,9 +541,7 @@ TError TTaskEnv::Start() {
     return TError::Success();
 
 kill_all:
-    L_ACT() << "Kill partialy constructed container: " << error << std::endl;
-    for (auto &cg : Cgroups)
-        (void)cg.KillAll(SIGKILL);
+    L() << "Task start failed: " << error << std::endl;
     if (task.Pid) {
         task.Kill(SIGKILL);
         task.Wait();

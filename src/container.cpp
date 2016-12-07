@@ -1647,6 +1647,7 @@ TError TContainer::Start() {
     CurrentClient->LockedContainer->UpgradeLock();
 
     if (error) {
+        (void)Terminate(0);
         SetState(EContainerState::Stopped);
         FreeResources();
         return error;
