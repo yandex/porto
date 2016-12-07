@@ -639,6 +639,27 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiFailure(api.Start("parent"), EError::InvalidState);
     ExpectApiSuccess(api.Destroy("parent"));
 
+    Say() << "Make sure that dead child does not kill parent and siblings" << std::endl;
+
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.Create("a/b"));
+    ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start("a/b"));
+    ExpectApiSuccess(api.GetData("a", "state", state));
+    ExpectEq(state, "meta");
+    ExpectApiSuccess(api.GetData("a/b", "state", state));
+    ExpectEq(state, "running");
+    ExpectApiSuccess(api.Create("a/c"));
+    ExpectApiSuccess(api.SetProperty("a/c", "command", "__invalid_command__"));
+    ExpectApiFailure(api.Start("a/c"), EError::InvalidValue);
+    ExpectApiSuccess(api.GetData("a", "state", state));
+    ExpectEq(state, "meta");
+    ExpectApiSuccess(api.GetData("a/b", "state", state));
+    ExpectEq(state, "running");
+    ExpectApiSuccess(api.GetData("a/c", "state", state));
+    ExpectEq(state, "stopped");
+    ExpectApiSuccess(api.Destroy("a"));
+
     ShouldHaveOnlyRoot(api);
 }
 
