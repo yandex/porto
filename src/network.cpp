@@ -807,22 +807,22 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
         if (cls) {
             stat[dev.Name] = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
             rtnl_class_put(cls);
-        } else
-            L_WRN() << "Cannot find tc class " << handle << " at " << dev.GetDesc() << std::endl;
 
-        /* HFSC statistics isn't hierarchical */
-        if (!strcmp(rtnl_tc_get_kind(TC_CAST(cls)), "hfsc")) {
-            std::vector<uint32_t> handles({handle});
-            for (int i = 0; i < (int)handles.size(); i++) {
-                for (auto obj = nl_cache_get_first(cache); obj;
-                          obj = nl_cache_get_next(obj)) {
-                    if (rtnl_tc_get_parent(TC_CAST(obj)) == handles[i]) {
-                        stat[dev.Name] += rtnl_tc_get_stat(TC_CAST(obj), rtnlStat);
-                        handles.push_back(rtnl_tc_get_handle(TC_CAST(obj)));
+            /* HFSC statistics isn't hierarchical */
+            if (!strcmp(rtnl_tc_get_kind(TC_CAST(cls)), "hfsc")) {
+                std::vector<uint32_t> handles({handle});
+                for (int i = 0; i < (int)handles.size(); i++) {
+                    for (auto obj = nl_cache_get_first(cache); obj;
+                            obj = nl_cache_get_next(obj)) {
+                        if (rtnl_tc_get_parent(TC_CAST(obj)) == handles[i]) {
+                            stat[dev.Name] += rtnl_tc_get_stat(TC_CAST(obj), rtnlStat);
+                            handles.push_back(rtnl_tc_get_handle(TC_CAST(obj)));
+                        }
                     }
                 }
             }
-        }
+        } else
+            L_WRN() << "Cannot find tc class " << handle << " at " << dev.GetDesc() << std::endl;
 
         nl_cache_free(cache);
     }
