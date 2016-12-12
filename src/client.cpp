@@ -209,6 +209,8 @@ TError TClient::LoadGroups() {
 
             for (auto g : groupsStr) {
                 int group;
+                if (g.empty())
+                    continue;
                 error = StringToInt(g, group);
                 if (error)
                     return error;
