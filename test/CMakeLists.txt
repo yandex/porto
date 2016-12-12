@@ -96,7 +96,7 @@ add_test(NAME clear
 
 add_test(NAME fuzzer
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
-         --timeout 300 --progress 32 2000
+         --timeout 300 --progress 32 2000 --kill_probability 0.15
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME stats
