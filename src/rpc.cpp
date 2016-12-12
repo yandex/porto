@@ -917,7 +917,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (!tarball.DirName().CanWrite(CurrentClient->Cred))
         return TError(EError::Permission, "client has no write access to tarball directory");
 
-    auto volume = TVolume::Find(req.volume());
+    auto volume = TVolume::Find(CurrentClient->ResolvePath(req.volume()));
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
 
