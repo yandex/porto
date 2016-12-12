@@ -844,6 +844,10 @@ static void UpdateQueueSize(std::map<int,int> &exited) {
 static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveStatus) {
     while (true) {
         siginfo_t info = { 0 };
+
+        if (waitpid(slavePid, &slaveStatus, WNOHANG) == slavePid)
+            return -1;
+
         if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
             break;
 
