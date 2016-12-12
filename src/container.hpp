@@ -75,6 +75,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError PrepareTask(struct TTaskEnv *TaskEnv,
                        struct TNetCfg *NetCfg);
+    TError StartOne();
 
     void ScheduleRespawn();
     TError Respawn();

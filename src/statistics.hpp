@@ -12,6 +12,7 @@ struct TStatistics {
     std::atomic<uint64_t> QueuedEvents;
     std::atomic<uint64_t> ContainersCreated;
     std::atomic<uint64_t> ContainersStarted;
+    std::atomic<uint64_t> ContainersFailedStart;
     std::atomic<uint64_t> ContainersOOM;
     std::atomic<uint64_t> RemoveDead;
     std::atomic<int> SlaveTimeoutMs;

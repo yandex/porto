@@ -324,19 +324,12 @@ noinline TError DestroyContainer(const rpc::TContainerDestroyRequest &req,
     return ct->Destroy();
 }
 
-noinline TError StartContainer(const rpc::TContainerStartRequest &req,
-                               rpc::TContainerResponse &rsp) {
+static noinline TError StartContainer(const rpc::TContainerStartRequest &req,
+                                      rpc::TContainerResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     TError error = CurrentClient->WriteContainer(req.name(), ct);
     if (error)
         return error;
-
-    for (auto p = ct->Parent; p && p->State == EContainerState::Stopped; p = p->Parent) {
-        error = CurrentClient->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);
-        if (error)
-            return error;
-    }
-
     return ct->Start();
 }
 

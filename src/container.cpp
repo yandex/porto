@@ -1516,6 +1516,12 @@ TError TContainer::StartTask() {
 TError TContainer::Start() {
     TError error;
 
+    for (auto p = Parent; p && p->State == EContainerState::Stopped; p = p->Parent) {
+        error = CurrentClient->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);
+        if (error)
+            return error;
+    }
+
     if (State != EContainerState::Stopped)
         return TError(EError::InvalidState, "Cannot start, container is not stopped: " + Name);
 
@@ -1627,6 +1633,16 @@ TError TContainer::Start() {
     if (Parent && Parent->AccessLevel < EAccessLevel::ChildOnly &&
                   Parent->AccessLevel < AccessLevel)
         AccessLevel = Parent->AccessLevel;
+
+    error = StartOne();
+    if (error)
+        Statistics->ContainersFailedStart++;
+
+    return error;
+}
+
+TError TContainer::StartOne() {
+    TError error;
 
     L_ACT() << "Start " << Name << std::endl;
 
