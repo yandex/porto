@@ -942,7 +942,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
         error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
         if (error) {
-            if (error.GetErrno() != EINVAL)
+            if (error.GetErrno() != EINVAL && error.GetErrno() != EBUSY)
                 L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
             return error;
         }
