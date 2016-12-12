@@ -135,4 +135,6 @@ for k in knobs:
         print "portoctl get {} result:\n <{}> \n != <{}> \n".format(k, value, knobs[k])
         raise e
 
+c.Destroy("test")
+
 subprocess.check_call([portod, "--verbose", "--discard", "reload"])
