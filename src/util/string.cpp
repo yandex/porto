@@ -176,40 +176,99 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
     return TError::Success();
 }
 
-void SplitEscapedString(const std::string &str, std::vector<std::string> &list, char sep) {
+void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
+                        char sep_inner, char sep_outer) {
     stringstream ss;
+
+    tuples.push_back({});
+
     auto i = str.begin();
 
-    do {
-        if (i == str.end() || *i == sep) {
-            /* legacy kludge: trim spaces and skip empty strings */
+    while (true) {
+        if (*i == sep_inner || (sep_outer && *i == sep_outer) || i == str.end()) {
             auto s = StringTrim(ss.str());
             if (s.size())
-                list.push_back(s);
+                tuples.back().push_back(s);
+
             ss.str("");
-        } else if (*i == '\\' && *(i + 1) == sep) {
-            ss << sep;
+
+            if (i == str.end())
+                break;
+
+            if ((sep_outer && *i == sep_outer) && tuples.back().size())
+                tuples.push_back({});
+
+        } else if (*i == '\\' && ((i + 1) != str.end()) &&
+                   ((*(i + 1) == '\\') || *(i + 1) == sep_inner ||
+                   (sep_outer && *(i + 1) == sep_outer))) {
+
+            ss << *(i + 1);
             i++;
         } else {
+            /* Backslash without escape goes into string */
             ss << *i;
         }
-    } while (i++ != str.end());
+
+        ++i;
+    }
+
+    if (!tuples.back().size())
+        tuples.pop_back();
 }
 
-std::string MergeEscapeStrings(const std::vector<std::string> &list, char sep) {
-    std::stringstream ss;
-    bool first = true;
-    auto ssp = std::string(1, sep);
-    auto rep = "\\" + ssp;
 
-    for (auto &str : list) {
-        if (!first)
-            ss << ssp;
-        first = false;
-        ss << StringReplaceAll(str, ssp, rep);
+void SplitEscapedString(const std::string &str, TTuple &tuple, char sep) {
+    std::vector<std::vector<std::string>> tuples;
+
+    SplitEscapedString(str, tuples, sep, 0);
+
+    if (tuples.size())
+        tuple = tuples.front();
+}
+
+std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
+    auto ssp_inner = std::string(1, sep_inner);
+    auto rep_inner = "\\" + ssp_inner;
+    auto spp_outer = std::string(1, sep_outer);
+    auto rep_outer = "\\" + spp_outer;
+    std::stringstream ss;
+    bool first_outer = true;
+
+    for (auto &tuple : tuples) {
+        if (tuple.size()) {
+            bool first_inner = true;
+
+            if (!first_outer)
+                ss << spp_outer;
+
+            first_outer = false;
+
+            for (auto &str : tuple) {
+                if (!first_inner)
+                    ss << ssp_inner;
+
+                first_inner = false;
+
+                std::string escaped = StringReplaceAll(str, "\\", "\\\\");
+                escaped = StringReplaceAll(escaped, ssp_inner, rep_inner);
+
+                if (sep_outer)
+                    escaped = StringReplaceAll(escaped, spp_outer, rep_outer);
+
+                ss << escaped;
+            }
+        }
+
+        if (!sep_outer)
+            break;
     }
 
     return ss.str();
+}
+
+std::string MergeEscapeStrings(const TTuple &tuple, char sep) {
+    TMultiTuple tuples = { tuple };
+    return MergeEscapeStrings(tuples, sep, 0);
 }
 
 std::string StringTrim(const std::string& s, const std::string &what) {

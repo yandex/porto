@@ -117,17 +117,17 @@ public:
     int VirtMode;
     bool BindDns;
     bool Isolate;
-    std::vector<std::string> NetProp;
+    TMultiTuple NetProp;
     std::string Hostname;
-    std::vector<std::string> EnvCfg;
+    TTuple EnvCfg;
     std::vector<TBindMount> BindMounts;
-    std::vector<std::string> IpList;
+    TMultiTuple IpList;
     TCapabilities CapAmbient;   /* get at start */
     TCapabilities CapAllowed;   /* can set as ambient */
     TCapabilities CapLimit;     /* can get by suid */
-    std::vector<std::string> DefaultGw;
-    std::vector<std::string> ResolvConf;
-    std::vector<std::string> Devices;
+    TMultiTuple DefaultGw;
+    TTuple ResolvConf;
+    TMultiTuple Devices;
 
     time_t RealCreationTime;
     time_t RealStartTime = 0;

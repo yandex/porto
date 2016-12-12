@@ -4,17 +4,13 @@ extern "C" {
 #include <sys/stat.h>
 }
 
-TError TDevice::Parse(const std::string &cfg) {
-    std::vector<std::string> opt;
+TError TDevice::Parse(TTuple &opt) {
     struct stat st;
     TError error;
 
-    error = SplitString(cfg, ' ', opt, 6);
-    if (error)
-        return error;
-
     if (opt.size() < 2)
-        return TError(EError::InvalidValue, "Invalid device config: " + cfg);
+        return TError(EError::InvalidValue, "Invalid device config: " +
+                      MergeEscapeStrings(opt, ' '));
 
     Name = opt[0];
     Path = TPath(Name);

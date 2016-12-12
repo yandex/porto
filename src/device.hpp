@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "util/string.hpp"
 #include "util/path.hpp"
 #include "util/cred.hpp"
 
@@ -17,7 +18,7 @@ struct TDevice {
     bool Wildcard;
     bool Privileged;
 
-    TError Parse(const std::string &cfg);
+    TError Parse(TTuple &opt);
     std::string Format() const;
     std::string CgroupRule(bool allow) const;
     TError Permitted(const TCred &cred) const;

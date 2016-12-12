@@ -8,6 +8,8 @@
 
 typedef std::map<std::string, uint64_t> TUintMap;
 typedef std::map<std::string, std::string> TStringMap;
+typedef std::vector<std::string> TTuple;
+typedef std::vector<TTuple> TMultiTuple;
 
 TError StringToUint64(const std::string &string, uint64_t &value);
 TError StringToInt64(const std::string &str, int64_t &value);
@@ -20,8 +22,13 @@ std::string BoolToString(bool value);
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
 
-std::string MergeEscapeStrings(const std::vector<std::string> &list, char sep);
-void SplitEscapedString(const std::string &str, std::vector<std::string> &list, char sep);
+std::string MergeEscapeStrings(const TMultiTuple &tuples,
+                               char sep_inner, char sep_outer);
+std::string MergeEscapeStrings(const TTuple &tuple, char sep);
+
+void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
+                        char sep_inner, char sep_outer);
+void SplitEscapedString(const std::string &str, TTuple &tuple, char sep);
 
 std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 bool StringOnlyDigits(const std::string &s);

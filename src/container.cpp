@@ -290,7 +290,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     Isolate = true;
     BindDns = true;
     VirtMode = VIRT_MODE_APP;
-    NetProp = { "inherited" };
+    NetProp = { { "inherited" } };
     Hostname = "";
     CapAmbient = NoCapabilities;
     CapAllowed = NoCapabilities;
@@ -1139,15 +1139,15 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     for (auto &cfg: Devices) {
         error = device.Parse(cfg);
         if (error)
-            return TError(error, "device: " + cfg);
+            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
 
         error = device.Permitted(OwnerCred);
         if (error)
-            return TError(error, "device: " + cfg);
+            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
 
         error = DevicesSubsystem.ApplyDevice(cg, device);
         if (error)
-            return TError(error, "device: " + cfg);
+            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
 
         devices.push_back(device);
     }
@@ -1235,13 +1235,8 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     if (error)
         return error;
 
-    if (NetCfg.SaveIp) {
-        std::vector<std::string> lines;
-        error = NetCfg.FormatIp(lines);
-        if (error)
-            return error;
-        IpList = lines;
-    }
+    if (NetCfg.SaveIp)
+        NetCfg.FormatIp(IpList);
 
     Net = NetCfg.Net;
 
@@ -1585,7 +1580,7 @@ TError TContainer::Start() {
             BindDns = false;
 
         if (!HasProp(EProperty::NET))
-            NetProp = { "none" };
+            NetProp = { { "none" } };
     }
 
     /* Non-isolated container inherits policy from parent */
@@ -1772,9 +1767,8 @@ void TContainer::FreeResources() {
         if (!error)
             error = NetCfg.DestroyNetwork();
         if (NetCfg.SaveIp) {
-            std::vector<std::string> lines;
-            if (!NetCfg.FormatIp(lines))
-                IpList = lines;
+            TMultiTuple ip_settings;
+            NetCfg.FormatIp(IpList);
         }
         if (error)
             L_ERR() << "Cannot free network resources: " << error << std::endl;

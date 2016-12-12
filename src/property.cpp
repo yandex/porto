@@ -976,8 +976,8 @@ TError TNet::Set(const std::string &net_desc) {
     if (error)
         return error;
 
-    std::vector<std::string> new_net_desc;
-    SplitEscapedString(net_desc, new_net_desc, ';');
+    TMultiTuple new_net_desc;
+    SplitEscapedString(net_desc, new_net_desc, ' ', ';');
 
     TNetCfg cfg;
     error = cfg.ParseNet(new_net_desc);
@@ -997,7 +997,7 @@ TError TNet::Set(const std::string &net_desc) {
 }
 
 TError TNet::Get(std::string &value) {
-    value = MergeEscapeStrings(CurrentContainer->NetProp, ';');
+    value = MergeEscapeStrings(CurrentContainer->NetProp, ' ', ';');
     return TError::Success();
 }
 
@@ -1164,7 +1164,7 @@ TError TEnvProperty::Set(const std::string &env_val) {
     if (error)
         return error;
 
-    std::vector<std::string> envs;
+    TTuple envs;
     SplitEscapedString(env_val, envs, ';');
 
     TEnv env;
@@ -1229,31 +1229,31 @@ TError TBind::Set(const std::string &bind_str) {
     if (error)
         return error;
 
-    std::vector<std::string> binds;
-    SplitEscapedString(bind_str, binds, ';');
+    TMultiTuple binds;
+    SplitEscapedString(bind_str, binds, ' ', ';');
 
     std::vector<TBindMount> bindMounts;
 
-    for (auto &line : binds) {
-        std::vector<std::string> tok;
+    for (auto &bind : binds) {
         TBindMount bm;
 
-        SplitEscapedString(line, tok, ' ');
-        if (tok.size() != 2 && tok.size() != 3)
-            return TError(EError::InvalidValue, "Invalid bind in: " + line);
+        if (bind.size() != 2 && bind.size() != 3)
+            return TError(EError::InvalidValue, "Invalid bind in: " +
+                          MergeEscapeStrings(bind, ' '));
 
-        bm.Source = tok[0];
-        bm.Dest = tok[1];
+        bm.Source = bind[0];
+        bm.Dest = bind[1];
         bm.ReadOnly = false;
         bm.ReadWrite = false;
 
-        if (tok.size() == 3) {
-            if (tok[2] == "ro")
+        if (bind.size() == 3) {
+            if (bind[2] == "ro")
                 bm.ReadOnly = true;
-            else if (tok[2] == "rw")
+            else if (bind[2] == "rw")
                 bm.ReadWrite = true;
             else
-                return TError(EError::InvalidValue, "Invalid bind type in: " + line);
+                return TError(EError::InvalidValue, "Invalid bind type in: " +
+                              MergeEscapeStrings(bind, ' '));
         }
 
         bindMounts.push_back(bm);
@@ -1266,11 +1266,16 @@ TError TBind::Set(const std::string &bind_str) {
 }
 
 TError TBind::Get(std::string &value) {
-    std::vector<std::string> list;
-    for (const auto &bm : CurrentContainer->BindMounts)
-        list.push_back(bm.Source.ToString() + " " + bm.Dest.ToString() +
-                       (bm.ReadOnly ? " ro" : bm.ReadWrite ? " rw" : ""));
-    value = MergeEscapeStrings(list, ';');
+    TMultiTuple tuples;
+    for (const auto &bm : CurrentContainer->BindMounts) {
+        tuples.push_back({ bm.Source.ToString(), bm.Dest.ToString() });
+
+        if (bm.ReadOnly)
+            tuples.back().push_back("ro");
+        else if (bm.ReadWrite)
+            tuples.back().push_back("rw");
+    }
+    value = MergeEscapeStrings(tuples, ' ', ';');
     return TError::Success();
 }
 
@@ -1287,8 +1292,8 @@ TError TIp::Set(const std::string &ipaddr) {
     if (error)
         return error;
 
-    std::vector<std::string> ipaddrs;
-    SplitEscapedString(ipaddr, ipaddrs, ';');
+    TMultiTuple ipaddrs;
+    SplitEscapedString(ipaddr, ipaddrs, ' ', ';');
 
     TNetCfg cfg;
     error = cfg.ParseIp(ipaddrs);
@@ -1302,7 +1307,7 @@ TError TIp::Set(const std::string &ipaddr) {
 }
 
 TError TIp::Get(std::string &value) {
-    value = MergeEscapeStrings(CurrentContainer->IpList, ';');
+    value = MergeEscapeStrings(CurrentContainer->IpList, ' ', ';');
     return TError::Success();
 }
 
@@ -1320,8 +1325,8 @@ TError TDefaultGw::Set(const std::string &gw) {
         return error;
 
     TNetCfg cfg;
-    std::vector<std::string> gws;
-    SplitEscapedString(gw, gws, ';');
+    TMultiTuple gws;
+    SplitEscapedString(gw, gws, ' ', ';');
 
     error = cfg.ParseGw(gws);
     if (error)
@@ -1334,7 +1339,7 @@ TError TDefaultGw::Set(const std::string &gw) {
 }
 
 TError TDefaultGw::Get(std::string &value) {
-    value = MergeEscapeStrings(CurrentContainer->DefaultGw, ';');
+    value = MergeEscapeStrings(CurrentContainer->DefaultGw, ' ', ';');
     return TError::Success();
 }
 
@@ -1352,7 +1357,7 @@ TError TResolvConf::Set(const std::string &conf_str) {
     if (error)
         return error;
 
-    std::vector<std::string> conf;
+    TTuple conf;
     SplitEscapedString(conf_str, conf, ';');
 
     CurrentContainer->ResolvConf = conf;
@@ -1373,7 +1378,7 @@ public:
                                    "<device> [r][w][m][-] [name] [mode] "
                                    "[user] [group]; ...") {}
     TError Get(std::string &value) {
-        value = MergeEscapeStrings(CurrentContainer->Devices, ';');
+        value = MergeEscapeStrings(CurrentContainer->Devices, ' ', ';');
         return TError::Success();
     }
     TError Set(const std::string &dev) {
@@ -1381,9 +1386,9 @@ public:
         if (error)
             return error;
 
-        std::vector<std::string> dev_list;
+        TMultiTuple dev_list;
 
-        SplitEscapedString(dev, dev_list, ';');
+        SplitEscapedString(dev, dev_list, ' ', ';');
         CurrentContainer->Devices = dev_list;
         CurrentContainer->SetProp(EProperty::DEVICES);
 

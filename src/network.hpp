@@ -185,10 +185,10 @@ struct TNetCfg {
     TNamespaceFd NetNs;
 
     void Reset();
-    TError ParseNet(std::vector<std::string> lines);
-    TError ParseIp(std::vector<std::string> lines);
-    TError FormatIp(std::vector<std::string> &lines);
-    TError ParseGw(std::vector<std::string> lines);
+    TError ParseNet(TMultiTuple &net_settings);
+    TError ParseIp(TMultiTuple &ip_settings);
+    void FormatIp(TMultiTuple &ip_settings);
+    TError ParseGw(TMultiTuple &gw_settings);
     std::string GenerateHw(const std::string &name);
     TError ConfigureVeth(TVethNetCfg &veth);
     TError ConfigureL3(TL3NetCfg &l3);

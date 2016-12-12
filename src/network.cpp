@@ -960,22 +960,21 @@ void TNetCfg::Reset() {
     NetCtName = "";
 }
 
-TError TNetCfg::ParseNet(std::vector<std::string> lines) {
+TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
     bool none = false;
     int idx = 0;
 
     Reset();
 
-    if (lines.size() == 0)
+    if (net_settings.size() == 0)
         return TError(EError::InvalidValue, "Configuration is not specified");
 
-    for (auto &line : lines) {
-        std::vector<std::string> settings;
+    for (auto &settings : net_settings) {
         TError error;
 
-        SplitEscapedString(line, settings, ' ');
         if (settings.size() == 0)
-            return TError(EError::InvalidValue, "Invalid net in: " + line);
+            return TError(EError::InvalidValue, "Invalid net in: " +
+                          MergeEscapeStrings(settings, 0));
 
         std::string type = StringTrim(settings[0]);
 
@@ -989,16 +988,20 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             Inherited = true;
         } else if (type == "steal" || type == "host" /* legacy */) {
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid net in: " + line);
+                return TError(EError::InvalidValue, "Invalid net in: " +
+                              MergeEscapeStrings(settings, 0));
+
             Steal.push_back(StringTrim(settings[1]));
         } else if (type == "container") {
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid net in: " + line);
+                return TError(EError::InvalidValue, "Invalid net in: " +
+                              MergeEscapeStrings(settings, 0));
             NewNetNs = false;
             NetCtName = StringTrim(settings[1]);
         } else if (type == "macvlan") {
             if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
+                return TError(EError::InvalidValue, "Invalid macvlan in: " +
+                              MergeEscapeStrings(settings, 0));
 
             std::string master = StringTrim(settings[1]);
             std::string name = StringTrim(settings[2]);
@@ -1037,7 +1040,8 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             MacVlan.push_back(mvlan);
         } else if (type == "ipvlan") {
             if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid ipvlan in: " + line);
+                return TError(EError::InvalidValue, "Invalid ipvlan in: " +
+                              MergeEscapeStrings(settings, 0));
 
             std::string master = StringTrim(settings[1]);
             std::string name = StringTrim(settings[2]);
@@ -1067,7 +1071,9 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             IpVlan.push_back(ipvlan);
         } else if (type == "veth") {
             if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid veth in: " + line);
+                return TError(EError::InvalidValue, "Invalid veth in: " +
+                              MergeEscapeStrings(settings, ' '));
+
             std::string name = StringTrim(settings[1]);
             std::string bridge = StringTrim(settings[2]);
             std::string hw = "";
@@ -1124,7 +1130,8 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
 
         } else if (type == "MTU") {
             if (settings.size() != 3)
-                return TError(EError::InvalidValue, "Invalid MTU in: " + line);
+                return TError(EError::InvalidValue, "Invalid MTU in: " +
+                              MergeEscapeStrings(settings, 0));
 
             int mtu;
             TError error = StringToInt(settings[2], mtu);
@@ -1163,11 +1170,13 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
 
         } else if (type == "autoconf") {
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid autoconf in: " + line);
+                return TError(EError::InvalidValue, "Invalid autoconf in: " +
+                              MergeEscapeStrings(settings, 0));
             Autoconf.push_back(StringTrim(settings[1]));
         } else if (type == "netns") {
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid netns in: " + line);
+                return TError(EError::InvalidValue, "Invalid netns in: " +
+                              MergeEscapeStrings(settings, 0));
             std::string name = StringTrim(settings[1]);
             TPath path("/var/run/netns/" + name);
             if (!path.Exists())
@@ -1188,15 +1197,14 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
     return TError::Success();
 }
 
-TError TNetCfg::ParseIp(std::vector<std::string> lines) {
+TError TNetCfg::ParseIp(TMultiTuple &ip_settings) {
     IpVec.clear();
-    for (auto &line : lines) {
-        std::vector<std::string> settings;
+    for (auto &settings : ip_settings) {
         TError error;
 
-        SplitEscapedString(line, settings, ' ');
         if (settings.size() != 2)
-            return TError(EError::InvalidValue, "Invalid ip address/prefix in: " + line);
+            return TError(EError::InvalidValue, "Invalid ip address/prefix in: " +
+                          MergeEscapeStrings(settings, ' '));
 
         TIpVec ip;
         ip.Iface = settings[0];
@@ -1216,21 +1224,19 @@ TError TNetCfg::ParseIp(std::vector<std::string> lines) {
     return TError::Success();
 }
 
-TError TNetCfg::FormatIp(std::vector<std::string> &lines) {
+void TNetCfg::FormatIp(TMultiTuple &ip_settings) {
     for (auto &ip: IpVec)
-        lines.push_back(ip.Iface + " " + ip.Addr.Format());
-    return TError::Success();
+        ip_settings.push_back({ ip.Iface , ip.Addr.Format() });
 }
 
-TError TNetCfg::ParseGw(std::vector<std::string> lines) {
+TError TNetCfg::ParseGw(TMultiTuple &gw_settings) {
     GwVec.clear();
-    for (auto &line : lines) {
-        std::vector<std::string> settings;
+    for (auto &settings : gw_settings) {
         TError error;
 
-        SplitEscapedString(line, settings, ' ');
         if (settings.size() != 2)
-            return TError(EError::InvalidValue, "Invalid gateway address/prefix in: " + line);
+            return TError(EError::InvalidValue, "Invalid gateway address/prefix in: " +
+                          MergeEscapeStrings(settings, ' '));
 
         TGwVec gw;
         gw.Iface = settings[0];
