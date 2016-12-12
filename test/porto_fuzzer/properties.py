@@ -87,7 +87,10 @@ def Private():
     return ("private", get_random_str(256))
 
 def EnablePorto():
-    return ("enable_porto", select_by_weight( [(1, "true"), (9, "false")] ) )
+    return ("enable_porto", select_by_weight( [(2, "true"),
+                                               (4, "false"),
+                                               (2, "read-only"),
+                                               (2, "child-only")] ))
 
 def MemoryLimit():
     total = psutil.virtual_memory().total

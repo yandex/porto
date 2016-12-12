@@ -58,7 +58,11 @@ def cleanup_fuzzer():
 
     containers = conn.List()
     while len(containers) > 0 :
-        conn.Destroy(containers[0])
+        try:
+            conn.Destroy(containers[0])
+        except porto.exceptions.ContainerDoesNotExist:
+            pass
+
         containers = conn.List()
 
     volumes = conn.ListVolumes()
@@ -141,6 +145,23 @@ def get_portod_pid():
         master = None
 
     return (master, slave)
+
+def check_errors_present(conn, hdr):
+    try:
+        assert conn.GetProperty("/", "porto_stat[errors]") == "0"
+    except AssertionError as e:
+        print "{}portod logged some error, terminating".format(hdr)
+        raise e
+
+def check_warns_present(conn, old):
+    value = conn.GetProperty("/", "porto_stat[warnings]")
+
+    try:
+        assert value == old
+    except AssertionError as e:
+        print "portod emitted some warnings, see log for details"
+
+    return value
 
 def check_portod_pid_valid(master, slave):
     try:
