@@ -120,8 +120,8 @@ def container_action(conn):
                 (150, container.SetProperty),
                 (40, container.Start),
                 (30, container.Stop),
-                (15, container.Pause),
-                (15, container.Resume),
+#                (15, container.Pause),
+#                (15, container.Resume),
                 (15, container.Wait),
                 (25, container.Kill)
         ] )(conn, select_container(conn))

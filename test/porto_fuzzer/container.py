@@ -64,7 +64,7 @@ def SetProperty(conn,dest):
             [
             (200, properties.Command),
             (10, properties.Isolate),
-            (20, properties.Respawn),
+#            (20, properties.Respawn),
             (15, properties.MaxRespawns),
             (10, properties.Weak),
             (20, properties.AgingTime),
