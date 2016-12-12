@@ -141,8 +141,10 @@ TError ImportLayer(const std::string &name, const TPath &place,
         if (error)
             return error;
     } else {
+        /* first layer should not have whiteouts */
         if (merge)
-            return TError(EError::LayerNotFound, "Layer for merge not found");
+            merge = false;
+
         error = layer_tmp.Mkdir(0755);
         if (error)
             return error;
