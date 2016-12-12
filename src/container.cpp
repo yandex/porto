@@ -468,6 +468,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         goto err;
 
     ct->Id = id;
+    ct->RootPath = parent->RootPath / ct->Root;
 
     /* SyncState might stop container, take lock for it */
     error = SystemClient.LockContainer(ct);
