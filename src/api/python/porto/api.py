@@ -199,6 +199,10 @@ class _RPC(object):
         self._connect()
 
     @_set_locked
+    def try_connect(self):
+        self._connect()
+
+    @_set_locked
     def disconnect(self):
         if self.sock is not None:
             self.sock.close()
@@ -324,6 +328,9 @@ class Connection(object):
 
     def connect(self):
         self.rpc.connect()
+
+    def TryConnect(self):
+        self.rpc.try_connect()
 
     def disconnect(self):
         self.rpc.disconnect()
