@@ -824,13 +824,16 @@ static int SlaveMain() {
     return code;
 }
 
-static void DeliverPidStatus(int fd, int pid, int status, size_t queued) {
+static TError DeliverPidStatus(int fd, int pid, int status, size_t queued) {
     L_EVT() << "Deliver " << pid << " status " << status << " (" << queued << " queued)" << std::endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
-        L_ERR() << "write(pid): " << strerror(errno) << std::endl;
+        return TError(EError::Unknown, "write(pid): ", errno);
+
     if (write(fd, &status, sizeof(status)) < 0)
-        L_ERR() << "write(status): " << strerror(errno) << std::endl;
+        return TError(EError::Unknown, "write(status): ", errno);
+
+    return TError::Success();
 }
 
 static void Reap(int pid) {
@@ -873,7 +876,9 @@ static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveS
             break;
 
         exited[info.si_pid] = status;
-        DeliverPidStatus(fd, info.si_pid, status, exited.size());
+        TError error = DeliverPidStatus(fd, info.si_pid, status, exited.size());
+        if (error)
+            L_WRN() << "Fail to deliver pid status to slave: " << error << std::endl;
     }
 
     UpdateQueueSize(exited);
@@ -989,7 +994,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
     Statistics->Spawned++;
 
     for (auto &pair : exited)
-        DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
+        (void)DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
     UpdateQueueSize(exited);
 
