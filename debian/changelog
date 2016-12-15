@@ -1,3 +1,21 @@
+yandex-porto (3.1.8) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * python/api: add "non-blocking" TryConnect method
+  * test: check if we can use dirty_limit
+  * test/porto_fuzzer: do not use killer by default for now
+
+  [ Konstantin Khlebnikov ]
+  * portod: synchronize freezer and state in both directions
+
+  [ Maxim Samoylov ]
+  * portod: don't be so afraid of pid delivery fail
+  * volume: remove invalid volumes after node restore
+  * volume: let Destroy clean everything after Build fail
+  * test/porto_fuzzer: teach fuzzer trigger master reexec
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 15 Dec 2016 13:01:51 +0300
+
 yandex-porto (3.1.7) unstable; urgency=low
 
   [ Maxim Samoylov ]
