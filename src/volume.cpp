@@ -1932,6 +1932,8 @@ void TVolume::RestoreAll(void) {
 
     nodes.sort();
 
+    std::list<std::shared_ptr<TVolume>> broken_volumes;
+
     for (auto &node : nodes) {
         if (!node.Name.size())
             continue;
@@ -1941,6 +1943,7 @@ void TVolume::RestoreAll(void) {
         L_ACT() << "Restore volume: " << node.Path << std::endl;
         error = volume->Restore(node);
         if (error) {
+            /* Apparently, we cannot trust node contents, remove right away */
             L_WRN() << "Corrupted volume " << node.Path << " removed: " << error << std::endl;
             (void)volume->Destroy();
             continue;
@@ -1968,25 +1971,33 @@ void TVolume::RestoreAll(void) {
 
         error = volume->Save();
         if (error) {
-            (void)volume->Destroy();
-
+            broken_volumes.push_back(volume);
             continue;
         }
 
         if (!volume->Containers.size()) {
             L_WRN() << "Volume " << volume->Path << " has no containers" << std::endl;
-            (void)volume->Destroy();
+            broken_volumes.push_back(volume);
             continue;
         }
 
         error = volume->CheckDependencies();
         if (error) {
             L_WRN() << "Volume " << volume->Path << " has broken dependcies: " << error << std::endl;
-            (void)volume->Destroy();
+            broken_volumes.push_back(volume);
             continue;
         }
 
         L() << "Volume " << volume->Path << " restored" << std::endl;
+    }
+
+    L_ACT() << "Remove broken volumes..." << std::endl;
+
+    for (auto &volume : broken_volumes) {
+        if (volume->IsDying)
+            continue;
+
+        (void)volume->Destroy();
     }
 
     TPath volumes = place / config().volumes().volume_dir();
