@@ -2422,8 +2422,8 @@ void TContainer::SyncState() {
         State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
 
     if (FreezerSubsystem.IsFrozen(freezerCg)) {
-        if (State == EContainerState::Running || State == EContainerState::Meta)
-            State = EContainerState::Paused;
+        if (State != EContainerState::Paused)
+            FreezerSubsystem.Thaw(freezerCg);
     } else if (State == EContainerState::Paused)
         State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
 
