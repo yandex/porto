@@ -17,6 +17,7 @@ import multiprocessing
 import argparse
 import subprocess
 import signal
+import functools
 
 def fuzzer_killer(prob, timeout=180, verbose=False):
 
@@ -25,6 +26,7 @@ def fuzzer_killer(prob, timeout=180, verbose=False):
 
     #Exit with an error if portod spawns errors after restore
 
+    random.seed(time.time() + os.getpid())
     conn=porto.Connection(timeout=timeout)
     conn.connect()
 
@@ -34,10 +36,17 @@ def fuzzer_killer(prob, timeout=180, verbose=False):
         while True:
             if random.random() < prob:
                 conn.disconnect()
-                signal = 9
-                os.kill(get_portod_pid()[1], signal)
 
-                print "Killer: killed portod-slave with {}".format(signal)
+                select_by_weight(
+                    [
+                        (1, functools.partial(os.kill, get_portod_pid()[1], signal.SIGKILL)),
+                        (1, functools.partial(os.kill, get_portod_pid()[0], signal.SIGHUP))
+                    ]
+                )()
+
+                time.sleep(1)
+
+                print "Killer: portod-slave killed"
 
                 conn.connect()
                 check_errors_present(conn, "Killer: ")
