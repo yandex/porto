@@ -1281,27 +1281,27 @@ TError TVolume::Build() {
 
     TError error = internal.Mkdir(0755);
     if (error)
-        goto err_internal;
+        return error;
 
     if (!HaveStorage()) {
         error = storage.Mkdir(0755);
         if (error)
-            goto err_storage;
+            return error;
     }
 
     if (IsAutoPath) {
         error = path.Mkdir(0755);
         if (error)
-            goto err_path;
+            return error;
     }
 
     error = Backend->Build();
     if (error)
-        goto err_build;
+        return error;
 
     error = Backend->Save();
     if (error)
-        goto err_save;
+        return error;
 
     if (HaveLayers() && BackendType != "overlay") {
         L_ACT() << "Merge layers into volume: " << path << std::endl;
@@ -1314,11 +1314,11 @@ TError TVolume::Build() {
 
                 error = pin.OpenDir(name);
                 if (error)
-                    goto err_merge;
+                    return error;
 
                 if (CreatorRoot.InnerPath(pin.RealPath()).IsEmpty()) {
                     error = TError(EError::Permission, "Layer path outside root: " + name);
-                    goto err_merge;
+                    return error;
                 }
 
                 temp = GetInternal("temp");
@@ -1329,7 +1329,7 @@ TError TVolume::Build() {
                     error = temp.Remount(MS_PRIVATE);
                 if (error) {
                     (void)temp.Rmdir();
-                    goto err_merge;
+                    return error;
                 }
 
                 pin.Close();
@@ -1346,12 +1346,12 @@ TError TVolume::Build() {
                 error = CopyRecursive(layer, path);
             }
             if (error)
-                goto err_merge;
+                return error;
         }
 
         error = SanitizeLayer(path, true);
         if (error)
-            goto err_merge;
+            return error;
 
         error = path.Chown(VolumeOwner);
         if (error)
@@ -1365,21 +1365,6 @@ TError TVolume::Build() {
     IsReady = true;
 
     return Save();
-
-err_merge:
-err_save:
-    (void)Backend->Destroy();
-err_build:
-    if (IsAutoPath) {
-        (void)path.RemoveAll();
-    }
-err_path:
-    if (!HaveStorage())
-        (void)storage.RemoveAll();
-err_storage:
-    (void)internal.RemoveAll();
-err_internal:
-    return error;
 }
 
 TError TVolume::Clear() {
