@@ -51,7 +51,6 @@ knobs = {
     "cwd" : "/var/log/../../home",
     "devices" : "/dev/loop0 rwm newdev0 rw porto-alice porto-alice;"\
                 "/dev/loop1 - newdev1 ro porto-bobo porto-bob",
-    "dirty_limit" : "67108864",
     "enable_porto" : "child-only",
     "env" : "A1=123;A2=321;B=D",
     "group" : "porto-bob",
@@ -92,6 +91,9 @@ knobs = {
     "virt_mode" : "os",
     "weak" : False
 }
+
+if os.access("/sys/fs/cgroup/memory/memory.dirty_limit_in_bytes", os.F_OK):
+    knobs["dirty_limit"] = "67108864"
 
 SetProps(r, knobs)
 VerifyProperties(r, knobs)
