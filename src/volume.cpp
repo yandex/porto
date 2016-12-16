@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <condition_variable>
 
+#include <gsl/gsl_util>
+
 #include "volume.hpp"
 #include "layer.hpp"
 #include "container.hpp"
@@ -426,20 +428,29 @@ public:
         if (error)
             return error;
 
+        // further remove file in case of errors
+        auto _ = gsl::finally([&]() {
+            if (error) {
+                TError error2 = path.Unlink();
+                if (error2)
+                    L_ERR() << "Cannot cleanup loop image: " << error2 << std::endl;
+            }
+        });
+
         if (fchown(image.Fd, cred.Uid, cred.Gid)) {
             error = TError(EError::Unknown, errno, "chown(" + path.ToString() + ")");
-            goto remove_file;
+            return error;
         }
 
         if (ftruncate(image.Fd, size)) {
             error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
-            goto remove_file;
+            return error;
         }
 
         if (guarantee && fallocate(image.Fd, FALLOC_FL_KEEP_SIZE, 0, guarantee)) {
             error = TError(EError::ResourceNotAvailable, errno,
                            "cannot fallocate guarantee " + std::to_string(guarantee));
-            goto remove_file;
+            return error;
         }
 
         image.Close();
@@ -447,15 +458,9 @@ public:
         error = RunCommand({ "mkfs.ext4", "-F", "-m", "0", "-E", "nodiscard",
                              "-O", "^has_journal", path.ToString()}, path.DirName());
         if (error)
-            goto remove_file;
+            return error;
 
         return TError::Success();
-
-remove_file:
-        TError error2 = path.Unlink();
-        if (error2)
-            L_ERR() << "Cannot cleanup loop image: " << error2 << std::endl;
-        return error;
     }
 
     static TError ResizeImage(const TPath &image, off_t current, off_t target) {
