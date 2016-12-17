@@ -830,6 +830,8 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
               ValueFlags::Multiplier, 1E9);
     AddCommon(1, "system: ", "cpu_usage_system", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
               ValueFlags::Multiplier, 1E9);
+    AddCommon(1, "wait: ", "cpu_wait", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
+              ValueFlags::Multiplier, 1E9);
 
     if (LoadConfig() != -1)
         return;
@@ -840,10 +842,12 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
               /* CPU */
               "policy: cpu_policy",
               "cpu%: cpu_usage'% 1e9",
-              "cpu: cpu_usage 1e9s",
+              "sys%: cpu_usage_system'% 1e9",
+              "wait%: cpu_wait'% 1e9",
 
               /* Memory */
               "memory: memory_usage b",
+              "anon: anon_usage b",
               "limit: memory_limit_total b",
               "guarantee: memory_guarantee_total b",
 

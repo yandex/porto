@@ -2720,6 +2720,27 @@ TError TCpuSystem::Get(std::string &value) {
     return error;
 }
 
+class TCpuWait : public TProperty {
+public:
+    TCpuWait() : TProperty(D_CPU_WAIT, EProperty::NONE,
+                             "CPU time without execution [nanoseconds] (ro)") {
+        IsReadOnly = true;
+    }
+    void Init(void) {
+        IsSupported = CpuacctSubsystem.RootCgroup().Has("cpuacct.wait");
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        auto cg = CurrentContainer->GetCgroup(CpuacctSubsystem);
+        error = cg.Get("cpuacct.wait", value);
+        if (!error)
+            value = StringTrim(value);
+        return error;
+    }
+} static CpuWait;
+
 class TNetClassId : public TProperty {
 public:
     TNetClassId() : TProperty(D_NET_CLASS_ID, EProperty::NONE,
