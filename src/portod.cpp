@@ -425,6 +425,7 @@ static int SlaveRpc() {
                     if (!error) {
                         error = client->IdentifyClient(false);
                         if (!error) {
+                            client->ClientContainer->ContainerRequests++;
                             Statistics->RequestsQueued++;
                             worker.Push(req);
                         }

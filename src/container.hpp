@@ -179,6 +179,7 @@ public:
     std::string Private;
     EAccessLevel AccessLevel;
     std::atomic<int> ClientsCount;
+    std::atomic<uint64_t> ContainerRequests;
 
     bool IsWeak = false;
     bool OomIsFatal = true;

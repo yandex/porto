@@ -3019,6 +3019,7 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["container_clients"] = CurrentContainer->ClientsCount;
     m["container_oom"] = CurrentContainer->OomEvents;
+    m["container_requests"] = CurrentContainer->ContainerRequests;
 
     m["requests_queued"] = Statistics->RequestsQueued;
     m["requests_completed"] = Statistics->RequestsCompleted;

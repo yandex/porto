@@ -265,7 +265,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     FirstName(!parent ? "" : parent->IsRoot() ? name : name.substr(parent->Name.length() + 1)),
     Level(parent ? parent->Level + 1 : 0),
     Stdin(0), Stdout(1), Stderr(2),
-    ClientsCount(0)
+    ClientsCount(0), ContainerRequests(0)
 {
     Statistics->ContainersCount++;
     RealCreationTime = time(nullptr);
