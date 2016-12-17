@@ -25,36 +25,6 @@ static double ParseValue(const std::string &value, bool map) {
     return ret + ParseNumber(value.substr(start_v));
 };
 
-static std::string PrintNumber(double number, int base,
-                               bool seconds, bool percents,
-                               double multiplier) {
-    number /= multiplier;
-
-    if (percents) {
-        return StringFormat("%.1lf%%", 100 * number);
-    } else if (seconds) {
-        double seconds = number;
-        double minutes = std::floor(seconds / 60);
-        seconds -= minutes * 60;
-
-        return StringFormat("%4.lf:%2.2lf", minutes, seconds);
-    } else {
-        char s = 0;
-        if (number > base * base * base) {
-            number /= base * base * base;
-            s = 'G';
-        } else if (number > base * base) {
-            number /= base * base;
-            s = 'M';
-        } else if (number > base) {
-            number /= base;
-            s = 'k';
-        }
-
-        return StringFormat("%.1lf%c", number, s);
-    }
-};
-
 static double DfDt(double curr, double prev,double gone_ms) {
     return 1000.0 * (curr - prev) / gone_ms;
 };
@@ -363,11 +333,17 @@ void TPortoValue::Process(unsigned long gone) {
         AsNumber = PartOf(AsNumber, root_number);
     }
 
-    int base = (Flags & ValueFlags::Bytes) ? 1024 : 1000;
-    bool seconds = Flags & ValueFlags::Seconds;
-    bool percents = Flags & ValueFlags::Percents;
-    double multiplier = (Flags & ValueFlags::Multiplier) ? Multiplier : 1;
-    AsString = PrintNumber(AsNumber, base, seconds, percents, multiplier);
+    if (Flags & ValueFlags::Multiplier)
+        AsNumber /= Multiplier;
+
+    if (Flags & ValueFlags::Percents)
+        AsString = StringFormat("%.1f", AsNumber * 100);
+    else if (Flags & ValueFlags::Seconds)
+        AsString = StringFormatDuration(AsNumber * 1000);
+    else if (Flags & ValueFlags::Bytes)
+        AsString = StringFormatSize(AsNumber);
+    else
+        AsString = StringFormat("%g", AsNumber);
 }
 std::string TPortoValue::GetValue() const {
     return AsString;

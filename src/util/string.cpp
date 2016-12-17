@@ -149,6 +149,19 @@ std::string StringFormatSize(uint64_t value)
     return StringFormat("%g%c", (double)value / (1ull<<(10*i)), size_unit[i]);
 }
 
+/* 10.123s or H:MM:SS or Dd H:MM */
+std::string StringFormatDuration(uint64_t msec) {
+    if (msec < 60000)
+        return StringFormat("%gs", msec / 1000.);
+    int seconds = msec / 1000 % 60;
+    int minutes = msec / (60*1000) % 60;
+    int hours = msec / (60*60*1000) % 24;
+    int days = msec / (24*60*60*1000);
+    if (!days)
+        return StringFormat("%d:%02d:%02d", hours, minutes, seconds);
+    return StringFormat("%dd %2d:%02d", days, hours, minutes);
+}
+
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields) {
     if (!maxFields)
         return TError(EError::Unknown, string(__func__) + ": invalid argument");

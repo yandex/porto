@@ -48,6 +48,7 @@ std::string StringFormat(const char *format, ...)
                          __attribute__ ((format (printf, 1, 2)));
 
 std::string StringFormatSize(uint64_t value);
+std::string StringFormatDuration(uint64_t msec);
 
 TError StringToValue(const std::string &str, double &value, std::string &unit);
 TError StringToSize(const std::string &str, uint64_t &size);
