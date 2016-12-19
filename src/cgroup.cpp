@@ -640,6 +640,10 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         int64_t period, runtime;
         int cores = GetNumCores();
 
+        error = cg.SetInt64("cpu.rt_runtime_us", -1);
+        if (error)
+            return error;
+
         if (limit >= cores) {
             period = 1000000;   /* 1s */
             runtime = -1;
@@ -648,11 +652,11 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             runtime = limit * period / cores;
         }
 
-        error = cg.Set("cpu.rt_runtime_us", std::to_string(runtime));
+        error = cg.SetInt64("cpu.rt_period_us", period);
         if (error)
             return error;
 
-        error = cg.Set("cpu.rt_period_us", std::to_string(period));
+        error = cg.SetInt64("cpu.rt_runtime_us", runtime);
         if (error)
             return error;
     }
