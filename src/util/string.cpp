@@ -10,55 +10,57 @@ extern "C" {
 #include <fnmatch.h>
 }
 
-using std::string;
-using std::istringstream;
-using std::stringstream;
-
 TError StringToUint64(const std::string &str, uint64_t &value) {
-    try {
-        value = stoull(str);
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
-    }
+    const char *ptr = str.c_str();
+    char *end;
 
+    errno = 0;
+    value = strtoull(ptr, &end, 10);
+    if (errno || end == ptr)
+        return TError(EError::InvalidValue, errno, "Bad uint64 value: " + str);
+    while (isspace(*end))
+        end++;
+    if (*end)
+        return TError(EError::InvalidValue, "Bad uint64 value: " + str);
     return TError::Success();
 }
 
 TError StringToInt64(const std::string &str, int64_t &value) {
-    try {
-        value = stoll(str);
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
-    }
+    const char *ptr = str.c_str();
+    char *end;
 
+    errno = 0;
+    value = strtoll(ptr, &end, 10);
+    if (errno || end == ptr)
+        return TError(EError::InvalidValue, errno, "Bad int64 value: " + str);
+    while (isspace(*end))
+        end++;
+    if (*end)
+        return TError(EError::InvalidValue, "Bad int64 value: " + str);
     return TError::Success();
 }
 
 TError StringToInt(const std::string &str, int &value) {
-    try {
-        value = stoi(str);
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
-    }
-
+    int64_t val;
+    if (StringToInt64(str, val) || val < INT32_MIN || val > INT32_MAX)
+        return TError(EError::InvalidValue, "Bad int value: " + str);
+    value = val;
     return TError::Success();
 }
 
 TError StringToOct(const std::string &str, unsigned &value) {
-    try {
-        value = stoul(str, nullptr, 8);
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
-    }
-    return TError::Success();
-}
+    const char *ptr = str.c_str();
+    char *end;
 
-TError StringToDouble(const std::string &str, double &value) {
-    try {
-        value = stof(str);
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad double value " + str);
-    }
+    errno = 0;
+    uint64_t val = strtoull(ptr, &end, 8);
+    if (errno || end == ptr || val > UINT32_MAX)
+        return TError(EError::InvalidValue, errno, "Bad oct value: " + str);
+    while (isspace(*end))
+        end++;
+    if (*end)
+        return TError(EError::InvalidValue, "Bad oct value: " + str);
+    value = val;
     return TError::Success();
 }
 
@@ -68,7 +70,7 @@ TError StringToBool(const std::string &str, bool &value) {
     else if (str == "false")
         value = false;
     else
-        return TError(EError::Unknown, string(__func__) + ": Bad boolean value " + str);
+        return TError(EError::Unknown, "Bad boolean value: " + str);
     return TError::Success();
 }
 
@@ -80,14 +82,15 @@ TError StringToValue(const std::string &str, double &value, std::string &unit) {
     const char *ptr = str.c_str();
     char *end;
 
+    errno = 0;
     value = strtod(ptr, &end);
-    if (end == ptr)
-        return TError(EError::InvalidValue, "Bad value: " + str);
+    if (errno || end == ptr)
+        return TError(EError::InvalidValue, errno, "Bad value: " + str);
 
-    while (isblank(*end))
+    while (isspace(*end))
         end++;
     size_t len = strlen(end);
-    while (len && isblank(end[len-1]))
+    while (len && isspace(end[len-1]))
         len--;
     unit = std::string(end, len);
     return TError::Success();
@@ -97,6 +100,7 @@ static char size_unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 0};
 
 TError StringToSize(const std::string &str, uint64_t &size) {
     std::string unit;
+    uint64_t mult = 1;
     double value;
     TError error;
 
@@ -104,16 +108,17 @@ TError StringToSize(const std::string &str, uint64_t &size) {
     if (error)
         return error;
 
-    if (!unit[0]) {
-        size = value;
+    if (value < 0)
+        return TError(EError::InvalidValue, "Negative: " + str);
+
+    if (!unit[0])
         goto ok;
-    }
 
     for (int i = 0; size_unit[i]; i++) {
         if (unit[0] == size_unit[i] ||
             unit[0] == tolower(size_unit[i])) {
 
-            size = value * (1ull << (10 * i));
+            mult = 1ull << (10 * i);
 
             /* allow K Kb kB KiB */
             switch (unit[1]) {
@@ -136,6 +141,10 @@ TError StringToSize(const std::string &str, uint64_t &size) {
     return TError(EError::InvalidValue, "Bad value unit: " + unit);
 
 ok:
+    if (value * mult > UINT64_MAX)
+        return TError(EError::InvalidValue, "Too big: " + str);
+
+    size = value * mult;
     return TError::Success();
 }
 
@@ -164,15 +173,15 @@ std::string StringFormatDuration(uint64_t msec) {
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields) {
     if (!maxFields)
-        return TError(EError::Unknown, string(__func__) + ": invalid argument");
+        return TError(EError::Unknown, "SplitString: invalid argument");
 
     try {
-        istringstream ss(s);
-        string tok;
+        std::istringstream ss(s);
+        std::string tok;
 
         while(std::getline(ss, tok, sep)) {
             if (!--maxFields) {
-                string rem;
+                std::string rem;
                 std::getline(ss, rem);
                 if (rem.length()) {
                     tok += sep;
@@ -183,7 +192,7 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
             tokens.push_back(tok);
         }
     } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Can't split string");
+        return TError(EError::Unknown, "SplitString: Can't split string");
     }
 
     return TError::Success();
@@ -191,7 +200,7 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
 
 void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
                         char sep_inner, char sep_outer) {
-    stringstream ss;
+    std::stringstream ss;
 
     tuples.push_back({});
 
@@ -288,7 +297,7 @@ std::string StringTrim(const std::string& s, const std::string &what) {
     std::size_t first = s.find_first_not_of(what);
     std::size_t last  = s.find_last_not_of(what);
 
-    if (first == string::npos || last == string::npos)
+    if (first == std::string::npos || last == std::string::npos)
         return "";
 
     return s.substr(first, last - first + 1);
