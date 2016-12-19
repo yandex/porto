@@ -551,7 +551,7 @@ void TCpuSubsystem::InitializeSubsystem() {
                  cg.Has("cpu.cfs_reserve_shares");
 
     if (HasQuota && cg.GetUint64("cpu.cfs_period_us", BasePeriod))
-        BasePeriod = 100000;
+        BasePeriod = 100000;    /* 100ms */
 
     HasSmart = cg.Has("cpu.smart");
 
@@ -575,7 +575,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
     if (HasQuota) {
         int64_t quota = std::ceil(limit * BasePeriod);
 
-        if (quota < 1000)
+        if (quota < 1000) /* 1ms */
             quota = 1000;
 
         if (limit >= GetNumCores())
@@ -650,6 +650,9 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         } else {
             period = 100000;    /* 100ms */
             runtime = limit * period / cores;
+
+            if (runtime < 1000)  /* 1ms */
+                runtime = 1000;
         }
 
         error = cg.SetInt64("cpu.rt_period_us", period);
