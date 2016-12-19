@@ -34,7 +34,7 @@ TError CheckPlace(const TPath &place, bool init) {
     if (!place.IsAbsolute() || !place.IsNormal())
         return TError(EError::InvalidValue, "place path must be normalized");
 
-    TPath volumes = place / config().volumes().volume_dir();
+    TPath volumes = place / PORTO_VOLUMES;
     if (init && !volumes.IsDirectoryStrict()) {
         (void)volumes.Unlink();
         error = volumes.MkdirAll(0755);
@@ -49,7 +49,7 @@ TError CheckPlace(const TPath &place, bool init) {
     if ((st.st_mode & 0777) != 0755)
         volumes.Chmod(0755);
 
-    TPath layers = place / config().volumes().layers_dir();
+    TPath layers = place / PORTO_LAYERS;
     if (init && !layers.IsDirectoryStrict()) {
         (void)layers.Unlink();
         error = layers.MkdirAll(0700);
@@ -115,7 +115,7 @@ bool LayerInUse(const std::string &name, const TPath &place) {
 
 TError ImportLayer(const std::string &name, const TPath &place,
                    const TPath &tarball, bool merge) {
-    TPath layers = place / config().volumes().layers_dir();
+    TPath layers = place / PORTO_LAYERS;
     TPath layer = layers / name;
     TPath layer_tmp = layers / LAYER_IMPORT_PREFIX + name;
     TError error;
@@ -189,7 +189,7 @@ err:
 }
 
 TError RemoveLayer(const std::string &name, const TPath &place) {
-    TPath layers = place / config().volumes().layers_dir();
+    TPath layers = place / PORTO_LAYERS;
     TPath layer = layers / name, layer_tmp;
     TError error;
 

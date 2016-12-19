@@ -875,7 +875,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     if (error)
         return error;
 
-    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
     error = CheckPlace(place);
     if (error)
         return error;
@@ -950,7 +950,7 @@ noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
     if (error)
         return error;
 
-    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
     error = CheckPlace(place);
     if (error)
         return error;
@@ -960,8 +960,8 @@ noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
 
 noinline TError ListLayers(const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
-    TPath place(req.has_place() ? req.place() : config().volumes().default_place());
-    TPath layers_dir = place / config().volumes().layers_dir();
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
+    TPath layers_dir = place / PORTO_LAYERS;
     std::vector<std::string> layers;
 
     TError error = layers_dir.ReadDirectory(layers);

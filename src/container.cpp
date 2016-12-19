@@ -602,7 +602,7 @@ EContainerState TContainer::ParseState(const std::string &name) {
 
 /* Working directory in host namespace */
 TPath TContainer::WorkPath() const {
-    return TPath(config().container().tmp_dir()) / Name;
+    return TPath(PORTO_WORKDIR) / Name;
 }
 
 std::string TContainer::GetCwd() const {
@@ -1807,7 +1807,7 @@ void TContainer::FreeResources() {
         LoopDev = -1;
         SetProp(EProperty::LOOP_DEV);
 
-        TPath tmp(config().container().tmp_dir() + "/" + std::to_string(Id));
+        TPath tmp = TPath(PORTO_WORKDIR) / std::to_string(Id);
         if (tmp.Exists()) {
             error = tmp.RemoveAll();
             if (error)

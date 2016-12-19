@@ -205,7 +205,7 @@ public:
             return false;
 
         if (!tested) {
-            TProjectQuota quota(config().volumes().default_place() + "/" + config().volumes().volume_dir());
+            TProjectQuota quota = TPath(PORTO_PLACE) / PORTO_VOLUMES;
             supported = quota.Supported();
             if (supported)
                 L_SYS() << "Project quota is supported: " << quota.Path << std::endl;
@@ -644,7 +644,7 @@ public:
                     goto err;
                 }
             } else
-                path = Volume->Place / config().volumes().layers_dir() / name;
+                path = Volume->Place / PORTO_LAYERS / name;
 
             std::string layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
             temp = Volume->GetInternal(layer_id);
@@ -930,7 +930,7 @@ TError TVolume::OpenBackend() {
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(std::string type) const {
 
-    TPath base = Place / config().volumes().volume_dir() / Id;
+    TPath base = Place / PORTO_VOLUMES / Id;
     if (type.size())
         return base / type;
     else
@@ -966,7 +966,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
         return TError::Success();
 
     if (!HaveStorage())
-        storage = Place / config().volumes().volume_dir();
+        storage = Place / PORTO_VOLUMES;
     else
         storage = GetStorage();
 
@@ -1080,7 +1080,7 @@ TError TVolume::CheckDependencies() {
     for (auto &l : Layers) {
         TPath layer(l);
         if (!layer.IsAbsolute())
-            layer = Place / config().volumes().layers_dir() / l;
+            layer = Place / PORTO_LAYERS / l;
         if (!error)
             error = DependsOn(layer);
     }
@@ -1117,7 +1117,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         Place = cfg.at(V_PLACE);
         CustomPlace = true;
     } else {
-        Place = config().volumes().default_place();
+        Place = PORTO_PLACE;
         CustomPlace = false;
     }
 
@@ -1142,7 +1142,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
             Path = GetInternal("volume");
         } else {
             /* /chroot/porto/volume_<id> */
-            TPath porto_path = container.RootPath / config().container().chroot_porto_dir();
+            TPath porto_path = container.RootPath / PORTO_CHROOT_VOLUMES;
             if (!porto_path.Exists()) {
                 error = porto_path.Mkdir(0755);
                 if (error)
@@ -1224,7 +1224,7 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
             error = ValidateLayerName(l);
             if (error)
                 return error;
-            layer = Place / config().volumes().layers_dir() / layer;
+            layer = Place / PORTO_LAYERS / layer;
         }
         if (!layer.Exists())
             return TError(EError::LayerNotFound, "Layer not found");
@@ -1342,7 +1342,7 @@ TError TVolume::Build() {
                 (void)temp.UmountAll();
                 (void)temp.Rmdir();
             } else {
-                TPath layer = Place / config().volumes().layers_dir() / name;
+                TPath layer = Place / PORTO_LAYERS / name;
                 error = CopyRecursive(layer, path);
             }
             if (error)
@@ -1744,7 +1744,7 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (!node.Has(V_ID))
         return TError(EError::InvalidValue, "No volume id stored");
 
-    Place = config().volumes().default_place();
+    Place = PORTO_PLACE;
     CustomPlace = false;
 
     TError error = ApplyConfig(node.Data);
@@ -1893,7 +1893,7 @@ void TVolume::RestoreAll(void) {
     std::list<TKeyValue> nodes;
     TError error;
 
-    TPath place(config().volumes().default_place());
+    TPath place(PORTO_PLACE);
     error = CheckPlace(place, true);
     if (error)
         L_ERR() << "Cannot prepare place: " << error << std::endl;
@@ -1985,7 +1985,7 @@ void TVolume::RestoreAll(void) {
         (void)volume->Destroy();
     }
 
-    TPath volumes = place / config().volumes().volume_dir();
+    TPath volumes = place / PORTO_VOLUMES;
 
     L_ACT() << "Remove stale volumes..." << std::endl;
 

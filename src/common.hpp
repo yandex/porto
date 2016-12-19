@@ -77,6 +77,19 @@ constexpr const char *PORTO_SLAVE_PIDFILE = "/run/portod.pid";
 constexpr const char *PORTOD_MASTER_NAME = "portod";
 constexpr const char *PORTOD_SLAVE_NAME = "portod-slave";
 
+constexpr const char *PORTO_MASTER_LOG = "/var/log/portoloop.log";
+constexpr const char *PORTO_SLAVE_LOG = "/var/log/portod.log";
+
+constexpr const char *PORTO_CONTAINERS_KV = "/run/porto/kvs";
+constexpr const char *PORTO_VOLUMES_KV = "/run/porto/pkvs";
+
+constexpr const char *PORTO_WORKDIR = "/place/porto";
+constexpr const char *PORTO_PLACE = "/place";
+
+constexpr const char *PORTO_VOLUMES = "porto_volumes";
+constexpr const char *PORTO_LAYERS = "porto_layers";
+constexpr const char *PORTO_CHROOT_VOLUMES = "porto";
+
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_ID_MAX = 16384;

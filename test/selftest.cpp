@@ -148,7 +148,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "command", v));
     ExpectEq(v, string(""));
     ExpectApiSuccess(api.GetProperty(name, "cwd", v));
-    ExpectEq(v, config().container().tmp_dir() + "/" + name);
+    ExpectEq(v, std::string(PORTO_WORKDIR) + "/" + name);
     ExpectApiSuccess(api.GetProperty(name, "root", v));
     ExpectEq(v, "/");
     ExpectApiSuccess(api.GetProperty(name, "user", v));
@@ -1461,7 +1461,7 @@ static void TestCwdProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     cwd = GetCwd(pid);
 
-    string prefix = config().container().tmp_dir();
+    string prefix = PORTO_WORKDIR;
 
     ExpectNeq(cwd, portodCwd);
     ExpectEq(cwd, prefix + "/" + name);
@@ -1826,7 +1826,7 @@ static void TestRootProperty(Porto::Connection &api) {
 
     Say() << "Make sure /dev /sys /proc are not mounted when root is not isolated " << std::endl;
 
-    cwd = config().container().tmp_dir() + "/" + name;
+    cwd = std::string(PORTO_WORKDIR) + "/" + name;
 
     TPath f(cwd);
     AsRoot(api);
@@ -4626,9 +4626,9 @@ static void InitErrorCounters(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
     StringToInt(v, expectedWarns);
 
-    loggedRespawns = WordCount(config().master_log().path(), "SYS Spawned") - expectedRespawns;
-    loggedErrors = WordCount(config().slave_log().path(), "ERR ") - expectedErrors;
-    loggedWarns = WordCount(config().slave_log().path(), "WRN ") - expectedWarns;
+    loggedRespawns = WordCount(PORTO_MASTER_LOG, "SYS Spawned") - expectedRespawns;
+    loggedErrors = WordCount(PORTO_SLAVE_LOG, "ERR ") - expectedErrors;
+    loggedWarns = WordCount(PORTO_SLAVE_LOG, "WRN ") - expectedWarns;
 }
 
 static void CheckErrorCounters(Porto::Connection &api) {
@@ -5079,7 +5079,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.CreateVolume(a, prop_limited));
     ExpectApiSuccess(api.CreateVolume(b, prop_unlimit));
 
-    TPath volume(config().volumes().default_place() + "/" + config().volumes().volume_dir() + "/leftover_volume");
+    TPath volume = TPath(PORTO_PLACE) / PORTO_VOLUMES / "leftover_volume";
     AsRoot(api);
     volume.RemoveAll();
     ExpectSuccess(volume.Mkdir(0755));
@@ -5259,9 +5259,9 @@ static void TestStdoutLimit(Porto::Connection &api) {
 static void TestStats(Porto::Connection &api) {
     AsRoot(api);
 
-    int respawns = WordCount(config().master_log().path(), "SYS Spawned");
-    int errors = WordCount(config().slave_log().path(), "ERR ");
-    int warns = WordCount(config().slave_log().path(), "WRN ");
+    int respawns = WordCount(PORTO_MASTER_LOG, "SYS Spawned");
+    int errors = WordCount(PORTO_SLAVE_LOG, "ERR ");
+    int warns = WordCount(PORTO_SLAVE_LOG, "WRN ");
 
     if (respawns != loggedRespawns + expectedRespawns)
         throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));
@@ -5320,7 +5320,7 @@ void TruncateLogs(Porto::Connection &api) {
     AsRoot(api);
 
     // Truncate slave log
-    TPath slaveLog(config().slave_log().path());
+    TPath slaveLog(PORTO_SLAVE_LOG);
     ExpectSuccess(slaveLog.Unlink());
 
     int pid = ReadPid(PORTO_SLAVE_PIDFILE);
@@ -5328,7 +5328,7 @@ void TruncateLogs(Porto::Connection &api) {
         throw string("Can't send SIGUSR1 to slave");
 
     // Truncate master log
-    TPath masterLog(config().master_log().path());
+    TPath masterLog(PORTO_MASTER_LOG);
     ExpectSuccess(masterLog.Unlink());
 
     pid = ReadPid(PORTO_MASTER_PIDFILE);

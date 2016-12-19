@@ -60,7 +60,7 @@ message TCfg {
 	}
 
 	message TKeyvalCfg {
-		optional TFileCfg file = 1;
+		optional TFileCfg file = 1 [deprecated=true];
 		optional string size = 2 [deprecated=true];
 	}
 
@@ -70,7 +70,7 @@ message TCfg {
 		optional uint32 freezer_wait_timeout_s = 3;
 		optional uint64 memory_guarantee_reserve = 4;
 		optional uint64 log_rotate_ms = 5;
-		optional string sysfs_root = 6;
+		optional string sysfs_root = 6 [deprecated=true];
 		optional uint64 memory_limit = 7;
 		optional uint32 workers = 8;
 		optional uint64 max_msg_len = 9;
@@ -87,7 +87,7 @@ message TCfg {
 
 	message TContainerCfg {
 		optional uint32 max_log_size = 1 [deprecated=true];
-		optional string tmp_dir = 2;
+		optional string tmp_dir = 2 [deprecated=true];
 		optional uint32 default_aging_time_s = 3;
 		optional uint32 respawn_delay_ms = 4;
 		optional uint64 stdout_limit = 5;
@@ -98,7 +98,7 @@ message TCfg {
 		optional uint32 max_total = 11;
 		optional uint32 batch_io_weight = 12;
 		optional uint32 empty_wait_timeout_ms = 13;
-		optional string chroot_porto_dir = 14;
+		optional string chroot_porto_dir = 14 [deprecated=true];
 		optional bool scoped_unlock = 15 [deprecated=true];
 		optional uint32 start_timeout_ms = 16;
 		optional bool enable_smart = 17;
@@ -127,23 +127,23 @@ message TCfg {
 	}
 
 	message TVolumesCfg {
-		optional TKeyvalCfg keyval = 1;
-		optional string volume_dir = 2;
+		optional TKeyvalCfg keyval = 1 [deprecated=true];
+		optional string volume_dir = 2 [deprecated=true];
 		optional bool enabled = 5 [deprecated=true];
-		optional string layers_dir = 6;
+		optional string layers_dir = 6 [deprecated=true];
 		optional bool enable_quota = 7;
-		optional string default_place = 8;
+		optional string default_place = 8 [deprecated=true];
 		optional uint64 max_total = 9;
 	}
 
 	optional TNetworkCfg network = 1;
 	optional TFileCfg master_pid = 2 [deprecated=true];
 	optional TFileCfg slave_pid = 3 [deprecated=true];
-	optional TFileCfg master_log = 4;
-	optional TFileCfg slave_log = 5;
+	optional TFileCfg master_log = 4 [deprecated=true];
+	optional TFileCfg slave_log = 5 [deprecated=true];
 	optional TRpcSockCfg rpc_sock = 6 [deprecated=true];
 	optional TLogCfg log = 7;
-	optional TKeyvalCfg keyval = 8;
+	optional TKeyvalCfg keyval = 8 [deprecated=true];
 	optional TDaemonCfg daemon = 9;
 	optional TContainerCfg container = 10;
 	optional TPrivilegesCfg privileges = 11;

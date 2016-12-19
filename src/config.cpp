@@ -15,15 +15,7 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().Clear();
 
-    config().mutable_slave_log()->set_path("/var/log/portod.log");
-    config().mutable_slave_log()->set_perm(0644);
-
-    config().mutable_master_log()->set_path("/var/log/portoloop.log");
-    config().mutable_master_log()->set_perm(0644);
-
     config().mutable_log()->set_verbose(false);
-
-    config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
 
     config().set_keyvalue_limit(1 << 20);
     config().set_keyvalue_size(32 << 20);
@@ -34,7 +26,6 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
     config().mutable_daemon()->set_log_rotate_ms(1000);
-    config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
     config().mutable_daemon()->set_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
     config().mutable_daemon()->set_workers(32);
@@ -44,8 +35,6 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_portod_start_timeout(60);
     config().mutable_daemon()->set_merge_memory_blkio_controllers(false);
 
-    config().mutable_container()->set_tmp_dir("/place/porto");
-    config().mutable_container()->set_chroot_porto_dir("porto");
     config().mutable_container()->set_default_aging_time_s(60 * 60 * 24);
     config().mutable_container()->set_respawn_delay_ms(1000);
 
@@ -76,11 +65,6 @@ void TConfig::LoadDefaults() {
 
     config().mutable_container()->set_default_ulimit("core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M");
 
-    config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
-
-    config().mutable_volumes()->set_default_place("/place");
-    config().mutable_volumes()->set_volume_dir("porto_volumes");
-    config().mutable_volumes()->set_layers_dir("porto_layers");
     config().mutable_volumes()->set_enable_quota(true);
     config().mutable_volumes()->set_max_total(3000);
 

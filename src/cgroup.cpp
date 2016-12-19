@@ -998,7 +998,7 @@ std::vector<TSubsystem *> Hierarchies;
 
 
 TError InitializeCgroups() {
-    TPath root(config().daemon().sysfs_root());
+    TPath root("/sys/fs/cgroup");
     std::list<TMount> mounts;
     TMount mount;
     TError error;

@@ -73,10 +73,8 @@ static void AllocStatistics() {
 }
 
 static void DaemonOpenLog(bool master) {
-    const auto &log = master ? config().master_log() : config().slave_log();
-
     TLogger::CloseLog();
-    TLogger::OpenLog(stdlog, log.path(), log.perm());
+    TLogger::OpenLog(stdlog, master ? PORTO_MASTER_LOG : PORTO_SLAVE_LOG, 0644);
 }
 
 static void DaemonPrepare(bool master) {
@@ -625,7 +623,7 @@ again:
 }
 
 static void CleanupTempdir() {
-    TPath temp(config().container().tmp_dir());
+    TPath temp(PORTO_WORKDIR);
     std::vector<std::string> list;
     TError error;
 
@@ -725,12 +723,12 @@ static int SlaveMain() {
     TNetwork::InitializeConfig();
     InitContainerProperties();
 
-    ContainersKV = TPath(config().keyval().file().path());
+    ContainersKV = TPath(PORTO_CONTAINERS_KV);
     error = TKeyValue::Mount(ContainersKV);
     if (error)
         FatalError("Cannot mount containers keyvalue", error);
 
-    VolumesKV = TPath(config().volumes().keyval().file().path());
+    VolumesKV = TPath(PORTO_VOLUMES_KV);
     error = TKeyValue::Mount(VolumesKV);
     if (error)
         FatalError("Cannot mount volumes keyvalue", error);
@@ -742,7 +740,7 @@ static int SlaveMain() {
     if (error)
         FatalError("Cannot initialize epoll", error);
 
-    TPath tmp_dir(config().container().tmp_dir());
+    TPath tmp_dir(PORTO_WORKDIR);
     if (!tmp_dir.IsDirectoryFollow()) {
         (void)tmp_dir.Unlink();
         error = tmp_dir.MkdirAll(0755);
@@ -1207,8 +1205,8 @@ static int MasterMain() {
 
 static void KvDump() {
     TLogger::OpenLog(true, "", 0);
-    TKeyValue::DumpAll(TPath(config().keyval().file().path()));
-    TKeyValue::DumpAll(TPath(config().volumes().keyval().file().path()));
+    TKeyValue::DumpAll(PORTO_CONTAINERS_KV);
+    TKeyValue::DumpAll(PORTO_VOLUMES_KV);
 }
 
 static void PrintVersion() {
