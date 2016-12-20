@@ -1852,7 +1852,7 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
     if (cfg.count(V_CONTAINERS)) {
         std::vector<std::string> list;
 
-        if (!CurrentClient) {
+        if (!CL) {
             volume->Destroy();
             return TError(EError::Unknown, "not client?");
         }
@@ -1860,7 +1860,7 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
         SplitEscapedString(cfg.at(V_CONTAINERS), list, ';');
         for (auto &name: list) {
             std::shared_ptr<TContainer> ct;
-            error = CurrentClient->WriteContainer(name, ct, true);
+            error = CL->WriteContainer(name, ct, true);
             if (!error)
                 error = volume->LinkContainer(*ct);
             if (error) {

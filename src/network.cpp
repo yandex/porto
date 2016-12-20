@@ -1579,8 +1579,8 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        if (CurrentClient) {
-            error = CurrentClient->CanControl(*target);
+        if (CL) {
+            error = CL->CanControl(*target);
             if (error)
                 return TError(error, "net container " + NetCtName);
         }

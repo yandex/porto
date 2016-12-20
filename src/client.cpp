@@ -24,7 +24,7 @@ extern "C" {
 };
 
 TClient SystemClient("<system>");
-__thread TClient *CurrentClient = nullptr;
+__thread TClient *CL = nullptr;
 
 TClient::TClient() : TEpollSource(-1) {
     ConnectionTime = GetCurrentTimeMs();
@@ -100,14 +100,14 @@ void TClient::CloseConnection() {
 
 void TClient::StartRequest() {
     RequestStartMs = GetCurrentTimeMs();
-    PORTO_ASSERT(CurrentClient == nullptr);
-    CurrentClient = this;
+    PORTO_ASSERT(CL == nullptr);
+    CL = this;
 }
 
 void TClient::FinishRequest() {
     ReleaseContainer();
-    PORTO_ASSERT(CurrentClient == this);
-    CurrentClient = nullptr;
+    PORTO_ASSERT(CL == this);
+    CL = nullptr;
 }
 
 uint64_t TClient::GetRequestTimeMs() {

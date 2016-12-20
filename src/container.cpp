@@ -363,7 +363,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
         error = parent->LockRead(lock);
         if (error)
             return error;
-        error = CurrentClient->CanControl(*parent, true);
+        error = CL->CanControl(*parent, true);
         if (error)
             goto err;
     } else if (name != ROOT_CONTAINER)
@@ -388,7 +388,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (error)
         goto err;
 
-    ct->OwnerCred = CurrentClient->Cred;
+    ct->OwnerCred = CL->Cred;
     error = ct->OwnerCred.LoadGroups(ct->OwnerCred.User());
     if (error)
         goto err;
@@ -400,10 +400,10 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
      * For sub-containers of client container use its task credentials.
      * This is safe because new container will have the same restrictions.
      */
-    if (ct->IsChildOf(*CurrentClient->ClientContainer))
-        ct->TaskCred = CurrentClient->TaskCred;
+    if (ct->IsChildOf(*CL->ClientContainer))
+        ct->TaskCred = CL->TaskCred;
     else
-        ct->TaskCred = CurrentClient->Cred;
+        ct->TaskCred = CL->Cred;
 
     ct->SetProp(EProperty::USER);
     ct->SetProp(EProperty::GROUP);
@@ -1325,7 +1325,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     TError error;
 
     taskEnv->CT = shared_from_this();
-    taskEnv->Client = CurrentClient;
+    taskEnv->Client = CL;
 
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
@@ -1481,7 +1481,7 @@ TError TContainer::StartTask() {
     }
 
     /* NetNsCapabilities must be isoalted from host net-namespace */
-    if (Net == HostNetwork && !CurrentClient->IsSuperUser()) {
+    if (Net == HostNetwork && !CL->IsSuperUser()) {
         if (CapAmbient.Permitted & NetNsCapabilities.Permitted)
             return TError(EError::Permission, "Capabilities require net isolation: " +
                                                NetNsCapabilities.Format());
@@ -1513,7 +1513,7 @@ TError TContainer::Start() {
     TError error;
 
     for (auto p = Parent; p && p->State == EContainerState::Stopped; p = p->Parent) {
-        error = CurrentClient->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);
+        error = CL->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);
         if (error)
             return error;
     }
@@ -1610,13 +1610,13 @@ TError TContainer::Start() {
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
     if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
-            !CurrentClient->IsSuperUser() && !IsolatedFromHost())
+            !CL->IsSuperUser() && !IsolatedFromHost())
         return TError(EError::Permission, "Capabilities require pid isolation: " +
                                           PidNsCapabilities.Format());
 
     /* MemCgCapabilities requires memory limit */
     if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&
-            !CurrentClient->IsSuperUser()) {
+            !CL->IsSuperUser()) {
         bool limited = false;
         for (auto p = Parent; p; p = p->Parent)
             limited = limited || p->MemLimit;
@@ -1652,11 +1652,11 @@ TError TContainer::StartOne() {
     if (error)
         return error;
 
-    CurrentClient->LockedContainer->DowngradeLock();
+    CL->LockedContainer->DowngradeLock();
 
     error = StartTask();
 
-    CurrentClient->LockedContainer->UpgradeLock();
+    CL->LockedContainer->UpgradeLock();
 
     if (error) {
         (void)Terminate(0);
@@ -2163,12 +2163,12 @@ TError TContainer::GetProperty(const std::string &origProperty, std::string &val
     if (!prop->IsSupported)
         return TError(EError::NotSupported, "Not supported: " + property);
 
-    CurrentContainer = const_cast<TContainer *>(this);
+    CT = const_cast<TContainer *>(this);
     if (idx.length())
         error = prop->GetIndexed(idx, value);
     else
         error = prop->Get(value);
-    CurrentContainer = nullptr;
+    CT = nullptr;
 
     return error;
 }
@@ -2195,7 +2195,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
     if (!prop->IsSupported)
         return TError(EError::NotSupported, property + " is not supported");
 
-    CurrentContainer = this;
+    CT = this;
 
     std::string oldValue;
     error = prop->Get(oldValue);
@@ -2217,7 +2217,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
         }
     }
 
-    CurrentContainer = nullptr;
+    CT = nullptr;
 
     if (!error)
         error = Save();
@@ -2264,7 +2264,7 @@ TError TContainer::Save(void) {
     node.Set(P_RAW_ID, std::to_string(Id));
     node.Set(P_RAW_NAME, Name);
 
-    CurrentContainer = this;
+    CT = this;
 
     for (auto knob : ContainerProperties) {
         std::string value;
@@ -2280,7 +2280,7 @@ TError TContainer::Save(void) {
         node.Set(knob.first, value);
     }
 
-    CurrentContainer = nullptr;
+    CT = nullptr;
 
     if (error)
         return error;
@@ -2292,9 +2292,9 @@ TError TContainer::Load(const TKeyValue &node) {
     EContainerState state = EContainerState::Destroyed;
     TError error;
 
-    CurrentContainer = this;
+    CT = this;
 
-    OwnerCred = CurrentClient->Cred;
+    OwnerCred = CL->Cred;
 
     for (auto &kv: node.Data) {
         std::string key = kv.first;
@@ -2354,7 +2354,7 @@ TError TContainer::Load(const TKeyValue &node) {
         RealStartTime = time(nullptr) - (now - StartTime) / 1000;
     }
 
-    CurrentContainer = nullptr;
+    CT = nullptr;
 
     return error;
 }

@@ -217,5 +217,5 @@ public:
 void InitContainerProperties(void);
 
 class TContainer;
-extern __thread TContainer *CurrentContainer;
+extern __thread TContainer *CT;
 extern std::map<std::string, TProperty*> ContainerProperties;

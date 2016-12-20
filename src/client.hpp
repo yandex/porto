@@ -92,4 +92,4 @@ private:
 };
 
 extern TClient SystemClient;
-extern __thread TClient *CurrentClient;
+extern __thread TClient *CL;
