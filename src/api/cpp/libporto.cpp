@@ -528,7 +528,8 @@ int Connection::TuneVolume(const std::string &path,
 
 int Connection::ImportLayer(const std::string &layer,
                             const std::string &tarball, bool merge,
-                            const std::string &place) {
+                            const std::string &place,
+                            const std::string &private_value) {
     auto req = Impl->Req.mutable_importlayer();
 
     req->set_layer(layer);
@@ -536,6 +537,8 @@ int Connection::ImportLayer(const std::string &layer,
     req->set_merge(merge);
     if (place.size())
         req->set_place(place);
+    if (private_value.size())
+        req->set_private_value(private_value);
     return Impl->Rpc();
 }
 
@@ -567,6 +570,31 @@ int Connection::ListLayers(std::vector<std::string> &layers, const std::string &
         layers.assign(std::begin(list), std::end(list));
     }
     return ret;
+}
+
+int Connection::GetLayerPrivate(std::string &private_value,
+                                const std::string &layer,
+                                const std::string &place) {
+    auto req = Impl->Req.mutable_getlayerprivate();
+    req->set_layer(layer);
+    if (place.size())
+        req->set_place(place);
+    int ret = Impl->Rpc();
+    if (!ret) {
+        private_value = Impl->Rsp.layer_private().private_value();
+    }
+    return ret;
+}
+
+int Connection::SetLayerPrivate(const std::string &private_value,
+                                const std::string &layer,
+                                const std::string &place) {
+    auto req = Impl->Req.mutable_setlayerprivate();
+    req->set_layer(layer);
+    req->set_private_value(private_value);
+    if (place.size())
+        req->set_place(place);
+    return Impl->Rpc();
 }
 
 int Connection::ConvertPath(const std::string &path, const std::string &src,

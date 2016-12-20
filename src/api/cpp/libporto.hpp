@@ -96,11 +96,18 @@ public:
                    const std::map<std::string, std::string> &config);
 
     int ImportLayer(const std::string &layer, const std::string &tarball,
-                    bool merge = false, const std::string &place = "");
+                    bool merge = false, const std::string &place = "",
+                    const std::string &private_value = "");
+
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer, const std::string &place = "");
     int ListLayers(std::vector<std::string> &layers,
                    const std::string &place = "");
+
+    int GetLayerPrivate(std::string &private_value, const std::string &layer,
+                        const std::string &place = "");
+    int SetLayerPrivate(const std::string &private_value, const std::string &layer,
+                        const std::string &place = "");
 
     int ConvertPath(const std::string &path, const std::string &src,
                     const std::string &dest, std::string &res);

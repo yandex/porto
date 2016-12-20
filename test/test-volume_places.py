@@ -57,9 +57,14 @@ v.Export(DIR + "/tmp_ubuntu_precise.tar")
 c.ImportLayer("place-ubuntu-precise", DIR + "/tmp_ubuntu_precise.tar", place=PLACE_DIR)
 assert Catch(c.FindLayer, "place-ubuntu-precise") == porto.exceptions.LayerNotFound
 
-# Check MergeLayer
 l = c.FindLayer("place-ubuntu-precise", place=PLACE_DIR)
-l.Merge(DIR + "/file_layer.tar")
+
+assert l.GetPrivate() == ""
+l.SetPrivate("XXXX")
+assert l.GetPrivate() == "XXXX"
+
+l.Merge(DIR + "/file_layer.tar", private_value="YYYY")
+assert l.GetPrivate() == "YYYY"
 
 os.unlink(DIR + "/tmp_ubuntu_precise.tar")
 v.Unlink("/")
@@ -105,6 +110,7 @@ c.RemoveLayer("place-ubuntu-precise", place=PLACE_DIR)
 
 assert len(os.listdir(PLACE_DIR + "/porto_volumes")) == 0
 assert len(c.ListLayers(place=PLACE_DIR)) == 0
+assert len(os.listdir(PLACE_DIR + "/porto_layers")) == 0
 
 shutil.rmtree(DIR)
 shutil.rmtree(PLACE_DIR)

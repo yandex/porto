@@ -1842,15 +1842,17 @@ public:
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
-        "[-P <place>] -I|-M|-R|-L|-F|-E <layer> [tarball]",
+        "[-P <place>] [-S <value_string>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball]",
         "Manage overlayfs layers in internal storage",
         "    -P <place>               optional path to place\n"
+        "    -S <value_string>        store layer private value while importing or separately\n"
         "    -I <layer> <tarball>     import layer from tarball\n"
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer> [layer...]    remove layer from storage\n"
         "    -F                       remove all unused layes\n"
         "    -L                       list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
+        "    -G                       retrieve layer stored private value\n"
         ) {}
 
     bool import = false;
@@ -1859,7 +1861,10 @@ public:
     bool list   = false;
     bool export_ = false;
     bool flush = false;
+    bool get_private = false;
+    bool set_private = false;
     std::string place;
+    std::string private_value;
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
@@ -1871,6 +1876,8 @@ public:
             { 'F', false, [&](const char *arg) { flush  = true; } },
             { 'L', false, [&](const char *arg) { list   = true; } },
             { 'E', false, [&](const char *arg) { export_= true; } },
+            { 'G', false, [&](const char *arg) { get_private = true; } },
+            { 'S', true, [&](const char *arg) { set_private = true; private_value = arg; } },
         });
 
         std::string path;
@@ -1880,7 +1887,7 @@ public:
         if (import) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], path, false, place);
+            ret = Api->ImportLayer(args[0], path, false, place, private_value);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {
@@ -1892,7 +1899,7 @@ public:
         } else if (merge) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], path, true, place);
+            ret = Api->ImportLayer(args[0], path, true, place, private_value);
             if (ret)
                 PrintError("Can't merge layer");
         } else if (remove) {
@@ -1923,6 +1930,17 @@ public:
                 for (const auto &l: layers)
                     std::cout << l << std::endl;
             }
+        } else if (get_private) {
+            ret = Api->GetLayerPrivate(private_value, args[0], place);
+
+            if (ret)
+                PrintError("Can't get layer private value");
+            else
+                std::cout << private_value << std::endl;
+        } else if (set_private) {
+            ret = Api->SetLayerPrivate(private_value, args[0], place);
+            if (ret)
+                PrintError("Can't set layer private value");
         } else {
             PrintUsage();
             return EXIT_FAILURE;

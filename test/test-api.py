@@ -120,6 +120,15 @@ l = c.ImportLayer(layer_name, tarball_path)
 assert l.name == layer_name
 assert c.FindLayer(layer_name).name == layer_name
 
+assert l.GetPrivate() == ""
+l.SetPrivate("123654")
+assert l.GetPrivate() == "123654"
+l.SetPrivate("AbC")
+assert l.GetPrivate() == "AbC"
+
+assert Catch(c.GetLayerPrivate, "my1980") == porto.exceptions.LayerNotFound
+assert Catch(c.SetLayerPrivate, "my1980", "my1980") == porto.exceptions.LayerNotFound
+
 assert Catch(c.CreateVolume, volume_path) == porto.exceptions.InvalidValue
 os.mkdir(volume_path)
 w = c.CreateVolume(volume_path, layers=[layer_name])

@@ -17,7 +17,8 @@ static unsigned LayerRemoveCounter = 0;
 bool LayerIsJunk(const std::string &name) {
     return StringStartsWith(name, LAYER_TMP_PREFIX) ||
            StringStartsWith(name, LAYER_IMPORT_PREFIX) ||
-           StringStartsWith(name, LAYER_REMOVE_PREFIX);
+           StringStartsWith(name, LAYER_REMOVE_PREFIX) ||
+           StringStartsWith(name, LAYER_PRIVATE_PREFIX);
 }
 
 static std::list<TPath> ActivePaths;
@@ -78,6 +79,22 @@ TError CheckPlace(const TPath &place, bool init) {
         auto lock = LockVolumes();
         if (PathIsActive(path))
             continue;
+
+        if (path.IsRegularStrict()) {
+            if (StringStartsWith(layer, LAYER_PRIVATE_PREFIX)) {
+                std::string name = layer.substr(std::string(LAYER_PRIVATE_PREFIX).size());
+                std::string importing = LAYER_IMPORT_PREFIX + name;
+
+                if ((layers / name).Exists() || (layers / importing).Exists())
+                    continue;
+            }
+
+            /* Cleanup random files if any */
+            path.Unlink();
+
+            continue;
+        }
+
         lock.unlock();
 
         error = ClearRecursive(path);
@@ -114,10 +131,13 @@ bool LayerInUse(const std::string &name, const TPath &place) {
 }
 
 TError ImportLayer(const std::string &name, const TPath &place,
-                   const TPath &tarball, bool merge) {
+                   const TPath &tarball, bool merge,
+                   const std::string private_value) {
     TPath layers = place / PORTO_LAYERS;
     TPath layer = layers / name;
     TPath layer_tmp = layers / LAYER_IMPORT_PREFIX + name;
+    TPath layer_private = layers / LAYER_PRIVATE_PREFIX + name;
+    TFile private_file;
     TError error;
 
     error = ValidateLayerName(name);
@@ -161,6 +181,18 @@ TError ImportLayer(const std::string &name, const TPath &place,
     if (error)
         goto err;
 
+    if (!merge || !layer_private.Exists())
+        error = private_file.CreateNew(layer_private, 0600);
+    else
+        error = private_file.OpenTrunc(layer_private);
+
+    if (error)
+        goto err;
+
+    error = private_file.WriteAll(private_value);
+    if (error)
+        goto err;
+
     volumes_lock.lock();
     error = layer_tmp.Rename(layer);
     if (!error)
@@ -191,6 +223,7 @@ err:
 TError RemoveLayer(const std::string &name, const TPath &place) {
     TPath layers = place / PORTO_LAYERS;
     TPath layer = layers / name, layer_tmp;
+    TPath layer_private = layers / LAYER_PRIVATE_PREFIX + name;
     TError error;
 
     error = ValidateLayerName(name);
@@ -204,6 +237,12 @@ TError RemoveLayer(const std::string &name, const TPath &place) {
 
     if (LayerInUse(name, place))
         return TError(EError::Busy, "Layer " + name + "in use");
+
+    if (layer_private.Exists()) {
+        error = layer_private.Unlink();
+        if (error)
+            L_WRN() << "Cannot remove layer private: " << error << std::endl;
+    }
 
     layer_tmp = layers / LAYER_REMOVE_PREFIX + std::to_string(LayerRemoveCounter++);
     error = layer.Rename(layer_tmp);
@@ -228,6 +267,75 @@ TError RemoveLayer(const std::string &name, const TPath &place) {
     volumes_lock.unlock();
 
     return error;
+
+}
+
+TError GetLayerPrivate(const std::string &name, const TPath &place,
+                       std::string &private_value) {
+    TPath layers = place / PORTO_LAYERS;
+    TPath layer_private = layers / LAYER_PRIVATE_PREFIX + name;
+    TPath layer = layers / name;
+    TFile private_file;
+    TError error;
+
+    private_value = "";
+
+    auto lock = LockVolumes();
+
+    if (layer.Exists()) {
+        if (!layer_private.Exists())
+            return TError::Success();
+
+        error = private_file.OpenRead(layer_private);
+        if (error)
+            return error;
+    } else {
+
+        return TError(EError::LayerNotFound, "Layer " + name + " not found");
+    }
+
+    lock.unlock();
+
+    error = private_file.ReadAll(private_value, 4096);
+    if (error)
+        return error;
+
+    return TError::Success();
+}
+
+TError SetLayerPrivate(const std::string &name, const TPath &place,
+                       const std::string private_value) {
+    TPath layers = place / PORTO_LAYERS;
+    TPath layer_private = layers / LAYER_PRIVATE_PREFIX + name;
+    TPath layer = layers / name;
+    TFile private_file;
+    TError error;
+
+    auto lock = LockVolumes();
+    if (layer.Exists()) {
+        if (!layer_private.Exists()) {
+
+            error = private_file.CreateNew(layer_private, 0600);
+        } else {
+
+            error = private_file.OpenTrunc(layer_private);
+        }
+    } else {
+
+        return TError(EError::LayerNotFound, "Layer " + name + " not found");
+    }
+
+    lock.unlock();
+
+    if (error)
+        return error;
+
+    error = private_file.WriteAll(private_value);
+    if (error)
+        return error;
+
+    return TError::Success();
+
 }
 
 TError SanitizeLayer(TPath layer, bool merge) {

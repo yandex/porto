@@ -267,11 +267,17 @@ class Layer(object):
     def __str__(self):
         return 'Layer `{}` at {}'.format(self.name, self.place or "(default)")
 
-    def Merge(self, tarball):
-        self.conn.MergeLayer(self.name, tarball, place=self.place)
+    def Merge(self, tarball, private_value=None):
+        self.conn.MergeLayer(self.name, tarball, place=self.place, private_value=private_value)
 
     def Remove(self):
         self.conn.RemoveLayer(self.name, place=self.place)
+
+    def GetPrivate(self):
+        return self.conn.GetLayerPrivate(self.name, place=self.place)
+
+    def SetPrivate(self, private_value):
+        return self.conn.SetLayerPrivate(self.name, private_value, place=self.place)
 
 
 class Volume(object):
@@ -564,23 +570,28 @@ class Connection(object):
             prop.name, prop.value = name, value
         self.rpc.call(request, self.rpc.timeout)
 
-    def ImportLayer(self, layer, tarball, place=None):
+    def ImportLayer(self, layer, tarball, place=None, private_value=None):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
         request.importLayer.merge = False
         if place is not None:
             request.importLayer.place = place
+        if private_value is not None:
+            request.importLayer.private_value = private_value
+
         self.rpc.call(request, self.rpc.timeout)
         return Layer(self, layer, place)
 
-    def MergeLayer(self, layer, tarball, place=None):
+    def MergeLayer(self, layer, tarball, place=None, private_value=None):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
         request.importLayer.merge = True
         if place is not None:
             request.importLayer.place = place
+        if private_value is not None:
+            request.importLayer.private_value = private_value
         self.rpc.call(request, self.rpc.timeout)
         return Layer(self, layer, place)
 
@@ -594,6 +605,22 @@ class Connection(object):
         request.removeLayer.layer = layer
         if place is not None:
             request.removeLayer.place = place
+        self.rpc.call(request, self.rpc.timeout)
+
+    def GetLayerPrivate(self, layer, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.getlayerprivate.layer = layer
+        if place is not None:
+            request.getlayerprivate.place = place
+        return self.rpc.call(request, self.rpc.timeout).layer_private.private_value
+
+    def SetLayerPrivate(self, layer, private_value, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.setlayerprivate.layer = layer
+        request.setlayerprivate.private_value = private_value
+
+        if place is not None:
+            request.setlayerprivate.place = place
         self.rpc.call(request, self.rpc.timeout)
 
     def ExportLayer(self, volume, tarball):

@@ -233,7 +233,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_listvolumeproperties() ||
         req.has_listvolumes() ||
         req.has_listlayers() ||
-        req.has_convertpath();
+        req.has_convertpath() ||
+        req.has_getlayerprivate();
 }
 
 static bool ValidRequest(const rpc::TContainerRequest &req) {
@@ -266,7 +267,9 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_removelayer() +
         req.has_listlayers() +
         req.has_convertpath() +
-        req.has_attachprocess() == 1;
+        req.has_attachprocess() +
+        req.has_getlayerprivate() +
+        req.has_setlayerprivate() == 1;
 }
 
 static void SendReply(TClient &client, rpc::TContainerResponse &response, bool log) {
@@ -896,7 +899,41 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     if (!tarball.CanRead(CL->Cred))
         return TError(EError::Permission, "client has not read access to tarball");
 
-    return ImportLayer(req.layer(), place, tarball, req.merge());
+    std::string layer_private;
+
+    return ImportLayer(req.layer(), place, tarball, req.merge(),
+                       req.has_private_value() ? req.private_value() : "" );
+}
+
+noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
+                                rpc::TContainerResponse &rsp) {
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
+    TError error = CheckPlace(place);
+    if (error)
+        return error;
+
+    std::string private_value;
+
+    error = GetLayerPrivate(req.layer(), place, private_value);
+    if (error)
+        return error;
+
+    rsp.mutable_layer_private()->set_private_value(private_value);
+
+    return TError::Success();
+}
+
+noinline TError SetLayerPrivate(const rpc::TLayerSetPrivateRequest &req) {
+    TError error = CheckPortoWriteAccess();
+    if (error)
+        return error;
+
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
+    error = CheckPlace(place);
+    if (error)
+        return error;
+
+    return SetLayerPrivate(req.layer(), place, req.private_value());
 }
 
 noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
@@ -1119,6 +1156,10 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             error = ConvertPath(req.convertpath(), rsp);
         else if (req.has_attachprocess())
             error = AttachProcess(req.attachprocess());
+        else if (req.has_getlayerprivate())
+            error = GetLayerPrivate(req.getlayerprivate(), rsp);
+        else if (req.has_setlayerprivate())
+            error = SetLayerPrivate(req.setlayerprivate());
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {
