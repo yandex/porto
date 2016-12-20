@@ -609,11 +609,10 @@ public:
     TError Build() override {
         TPath storage = Volume->GetStorage();
         TProjectQuota quota(storage);
-        TPath upper = storage / "upper";
-        TPath work = storage / "work";
         TError error;
         std::stringstream lower;
         int layer_idx = 0;
+        TFile upperFd, workFd;
 
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
@@ -663,36 +662,47 @@ public:
             lower << layer_id;
         }
 
-        if (!upper.Exists()) {
-            error = upper.Mkdir(0755);
+        if (!Volume->StorageFd.HasAccessAt("upper", Volume->VolumeOwner, TPath::E)) {
+            error = Volume->StorageFd.MkdirAt("upper", 0755);
             if (error)
                 goto err;
         }
 
-        error = upper.Chown(Volume->VolumeOwner);
+        error = upperFd.WalkStrict(Volume->StorageFd, "upper");
         if (error)
             goto err;
 
-        error = upper.Chmod(Volume->VolumePerms);
+        error = upperFd.Chown(Volume->VolumeOwner);
         if (error)
             goto err;
 
-        if (!work.Exists()) {
-            error = work.Mkdir(0755);
+        error = upperFd.Chmod(Volume->VolumePerms);
+        if (error)
+            goto err;
+
+        if (!Volume->StorageFd.HasAccessAt("work", Volume->VolumeOwner, TPath::E)) {
+            error = Volume->StorageFd.MkdirAt("work", 0755);
             if (error)
                 goto err;
-        } else
-            work.ClearDirectory();
+        }
+
+        error = workFd.WalkStrict(Volume->StorageFd, "work");
+        if (error)
+            goto err;
+
+        error = workFd.ClearDirectory();
+        if (error)
+            goto err;
 
         error = Volume->GetInternal("").Chdir();
         if (error)
             goto err;
 
         error = Volume->Path.Mount("overlay", "overlay",
-                                        Volume->GetMountFlags(),
-                                        { "lowerdir=" + lower.str(),
-                                          "upperdir=" + upper.ToString(),
-                                          "workdir=" + work.ToString() });
+                                   Volume->GetMountFlags(),
+                                   { "lowerdir=" + lower.str(),
+                                     "upperdir=" + upperFd.ProcPath().ToString(),
+                                     "workdir=" + workFd.ProcPath().ToString() });
 
         if (error && error.GetErrno() == EINVAL && Volume->Layers.size() >= 500)
             error = TError(EError::InvalidValue, "Too many layers, kernel limits is 499 plus 1 for upper");
@@ -739,11 +749,18 @@ err:
                 L_ERR() << "Can't clear overlay storage: " << error2 << std::endl;
                 (void)(storage / "upper").RemoveAll();
             }
-        }
+        } else {
+            TFile storageFd, workFd;
 
-        TPath work = storage / "work";
-        if (work.Exists())
-            (void)work.RemoveAll();
+            error = storageFd.OpenDir(storage);
+            if (!error && storageFd.HasAccess(Volume->VolumeOwner, TPath::W)) {
+                error = workFd.WalkStrict(storageFd, "work");
+                if (!error) {
+                    (void)workFd.ClearDirectory();
+                    (void)storageFd.RmdirAt("work");
+                }
+            }
+        }
 
         if (Volume->HaveQuota() && quota.Exists()) {
             L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
@@ -1181,13 +1198,23 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
 
         if (!path.Exists())
             return TError(EError::InvalidValue, "Storage path does not exist");
-        if (!path.IsDirectoryFollow()) {
-            if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop"))
-                StorageFile = path;
+
+        if (path.IsDirectoryFollow()) {
+            error = StorageFd.OpenDir(path);
+            if (error)
+                return error;
+        } else if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop")) {
+            StorageFile = path;
+            if (IsReadOnly)
+                error = StorageFd.OpenRead(path);
             else
-                return TError(EError::InvalidValue, "Storage path must be a directory");
-        }
-        if (!path.CanWrite(cred))
+                error = StorageFd.OpenReadWrite(path);
+            if (error)
+                return error;
+        } else
+            return TError(EError::InvalidValue, "Storage path must be a directory");
+
+        if (!StorageFd.HasAccess(cred, TPath::W))
             return TError(EError::Permission, "Storage path usage not permitted");
 
         for (auto &it: Volumes) {
@@ -1272,7 +1299,6 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
 
 TError TVolume::Build() {
     auto lock = ScopedLock();
-    TPath storage = GetStorage();
     TPath path = Path;
     TPath internal = GetInternal("");
 
@@ -1283,8 +1309,12 @@ TError TVolume::Build() {
     if (error)
         return error;
 
+    TPath storage = GetStorage();
     if (!HaveStorage()) {
         error = storage.Mkdir(0755);
+        if (error)
+            return error;
+        error = StorageFd.OpenDir(storage);
         if (error)
             return error;
     }
@@ -1479,6 +1509,7 @@ TError TVolume::DestroyOne() {
 
     (void)Path.UmountNested(); /* Re-check everything was disposed */
 
+    StorageFd.Close();
     if (!HaveStorage() && storage.Exists()) {
         error = ClearRecursive(storage);
         if (error)
@@ -1884,6 +1915,7 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
         return error;
     }
 
+    volume->StorageFd.Close();
     VolumesCv.notify_all();
 
     return TError::Success();
@@ -2025,9 +2057,6 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
     TError error;
 
     for (auto &prop : cfg) {
-
-        L_ACT() << "Volume restoring : " << prop.first << " : " << prop.second << std::endl;
-
         if (prop.first == V_PATH) {
             Path = prop.second;
 

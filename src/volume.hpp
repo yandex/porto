@@ -67,8 +67,11 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
 public:
     TPath Path;
     bool IsAutoPath = false;
+
     std::string Storage;
     TPath StorageFile;
+    TFile StorageFd;
+
     std::string BackendType;
     std::string Creator;
     std::string Id;

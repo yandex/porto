@@ -114,6 +114,7 @@ public:
     bool Exists() const;
 
     enum Access {
+        E   = 000, /* Exists */
         X   = 001,
         W   = 002,
         R   = 004,
@@ -220,6 +221,7 @@ public:
     TError OpenTrunc(const TPath &path);
     TError OpenAppend(const TPath &path);
     TError OpenDir(const TPath &path);
+    TError OpenDirStrict(const TPath &path);
     TError CreateTemp(const TPath &path);
     TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
@@ -252,6 +254,7 @@ public:
     TError ChmodAt(const TPath &path, mode_t mode) const;
     TError WalkFollow(const TFile &dir, const TPath &path);
     TError WalkStrict(const TFile &dir, const TPath &path);
+    TError ClearDirectory() const;
     TError Stat(struct stat &st) const;
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;
     bool HasAccess(const TCred &cred, enum TPath::Access mask) const;

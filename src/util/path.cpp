@@ -491,22 +491,28 @@ TError TPath::Rmdir() const {
  * Works only on one filesystem and aborts if sees mountpint.
  */
 TError TPath::ClearDirectory() const {
+    TFile dir;
+    TError error = dir.OpenDirStrict(*this);
+    if (error)
+        return error;
+    return dir.ClearDirectory();
+}
+
+/* FIXME speedup and simplify */
+TError TFile::ClearDirectory() const {
     int top_fd, dir_fd, sub_fd;
     DIR *top = NULL, *dir;
     struct dirent *de;
     struct stat top_st, st;
     TError error = TError::Success();
 
-    L_ACT() << "clear directory " << Path << std::endl;
-
-    top_fd = open(Path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC |
-                                O_NOFOLLOW | O_NOATIME);
-    if (top_fd < 0)
-        return TError(EError::Unknown, errno, "ClearDirectory open(" + Path + ")");
+    top_fd = fcntl(Fd, F_DUPFD_CLOEXEC, 2);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(Fd));
 
     if (fstat(top_fd, &top_st)) {
         close(top_fd);
-        return TError(EError::Unknown, errno, "ClearDirectory fstat(" + Path + ")");
+        return TError(EError::Unknown, errno, "ClearDirectory fstat()");
     }
 
     dir_fd = top_fd;
@@ -517,7 +523,7 @@ deeper:
         close(dir_fd);
         if (dir_fd != top_fd)
             closedir(top);
-        return TError(EError::Unknown, errno, "ClearDirectory fdopendir(" + Path + "/.../)");
+        return TError(EError::Unknown, errno, "ClearDirectory fdopendir()");
     }
 
 restart:
@@ -528,13 +534,12 @@ restart:
         if (fstatat(dir_fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW)) {
             if (errno == ENOENT)
                 continue;
-            error = TError(EError::Unknown, errno, "ClearDirectory fstatat(" +
-                                          Path + "/.../" + de->d_name + ")");
+            error = TError(EError::Unknown, errno, "ClearDirectory fstatat(" + std::string(de->d_name) + ")");
             break;
         }
 
         if (st.st_dev != top_st.st_dev) {
-            error = TError(EError::Unknown, EXDEV, "ClearDirectory found mountpoint in " + Path);
+            error = TError(EError::Unknown, EXDEV, "ClearDirectory found mountpoint");
             break;
         }
 
@@ -565,8 +570,7 @@ restart:
         }
 
         if (!S_ISDIR(st.st_mode) || (errno != ENOTEMPTY && errno != EEXIST)) {
-            error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" +
-                           Path + "/.../" + de->d_name + ")");
+            error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" + std::string(de->d_name) + ")");
             break;
         }
 
@@ -585,8 +589,7 @@ restart:
         if (errno == ENOENT)
             continue;
 
-        error = TError(EError::Unknown, errno, "ClearDirectory openat(" +
-                       Path + "/.../" + de->d_name + ")");
+        error = TError(EError::Unknown, errno, "ClearDirectory openat(" + std::string(de->d_name) + ")");
         break;
     }
 
@@ -598,7 +601,7 @@ restart:
             dir = top;
             dir_fd = top_fd;
             if (Verbose)
-                L_ACT() << "clear directory: restart " << Path << std::endl;
+                L_ACT() << "clear directory: restart" << std::endl;
             goto restart; /* Restart from top directory */
         }
         closedir(top); /* closes top_fd */
@@ -1061,6 +1064,10 @@ TError TFile::OpenDir(const TPath &path) {
     return Open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOCTTY);
 }
 
+TError TFile::OpenDirStrict(const TPath &path) {
+    return Open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOCTTY | O_NOFOLLOW);
+}
+
 #ifndef O_TMPFILE
 #define O_TMPFILE (O_DIRECTORY | 020000000)
 #endif
@@ -1217,7 +1224,7 @@ int TFile::GetMountId(void) const {
 TError TFile::Dup(const TFile &other) {
     if (&other != this) {
         Close();
-        SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC);
+        SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC, 2);
         if (Fd < 0)
             return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(other.Fd));
     }
