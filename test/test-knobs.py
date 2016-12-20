@@ -31,7 +31,6 @@ def VerifyProperties(r, knobs):
 
 knobs = {
     "aging_time" : "3600",
-    "anon_limit" : "134217728",
     "bind" : "/var/log /newvar;/home /home ro",
     "bind_dns" : True,
     "capabilities" : "CHOWN;DAC_OVERRIDE;DAC_READ_SEARCH;FOWNER;FSETID;KILL;"\
@@ -61,7 +60,6 @@ knobs = {
     "ip" : "eth0 1.1.1.1/32",
     "isolate" : True,
     "max_respawns" : "5",
-    "memory_guarantee" : "33554432",
     "memory_limit" : "268435456",
     "net" : "inherited",
     "net_guarantee" : "default: 0",
@@ -71,7 +69,6 @@ knobs = {
     "owner_user" : "root",
     "porto_namespace" : "/porto",
     "private" : "123;321321   2323cv",
-    "recharge_on_pgfault" : True,
     "resolv_conf" : "nameserver 1.1.1.1",
     "respawn" : False,
     "root" : "/var/log/../../",
@@ -91,6 +88,15 @@ knobs = {
     "virt_mode" : "os",
     "weak" : False
 }
+
+if os.access("/sys/fs/cgroup/memory/memory.recharge_on_pgfault", os.F_OK):
+    knobs["recharge_on_pgfault"] = True
+
+if os.access("/sys/fs/cgroup/memory/memory.low_limit_in_bytes", os.F_OK):
+    knobs["memory_guarantee"] = "33554432"
+
+if os.access("/sys/fs/cgroup/memory/portod/memory.anon.limit", os.F_OK):
+    knobs["anon_limit"] = "134217728"
 
 if os.access("/sys/fs/cgroup/memory/memory.dirty_limit_in_bytes", os.F_OK):
     knobs["dirty_limit"] = "67108864"
