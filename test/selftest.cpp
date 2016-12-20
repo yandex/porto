@@ -1228,8 +1228,6 @@ static void TestContainerNamespaces(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty("c/d", "absolute_namespace", val));
     ExpectEq(val, "/porto/simple-prefix-second-prefix-");
 
-    AsRoot(api);
-    ExpectApiSuccess(api.SetProperty("c/d", "user", "root"));
     ExpectApiSuccess(api.Start("c/d"));
     WaitContainer(api, "c/d");
 
@@ -1398,8 +1396,18 @@ static void TestUserGroupProperty(Porto::Connection &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
-    ExpectApiFailure(api.SetProperty(name, "user", Bob.User()), EError::Permission);
-    ExpectApiFailure(api.SetProperty(name, "group", Bob.Group()), EError::Permission);
+    ExpectApiSuccess(api.SetProperty(name, "user", "root"));
+    ExpectApiFailure(api.Start(name), EError::Permission);
+
+    ExpectApiSuccess(api.SetProperty(name, "user", Bob.User()));
+    ExpectApiFailure(api.Start(name), EError::Permission);
+
+    ExpectApiSuccess(api.SetProperty(name, "user", Alice.User()));
+
+    ExpectApiSuccess(api.SetProperty(name, "group", Bob.Group()));
+    ExpectApiFailure(api.Start(name), EError::Permission);
+    ExpectApiSuccess(api.SetProperty(name, "group", Alice.Group()));
+
     ExpectApiFailure(api.SetProperty(name, "owner_user", Bob.User()), EError::Permission);
     ExpectApiFailure(api.SetProperty(name, "owner_group", Bob.Group()), EError::Permission);
 
@@ -3628,6 +3636,7 @@ static void TestVirtModeProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Create(name));
     ExpectApiFailure(api.SetProperty(name, "virt_mode", "invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
+    ExpectApiSuccess(api.SetProperty(name, "memory_limit", "1G"));
 
     Say() << "Check credentials and default roolback" << std::endl;
 
@@ -4034,9 +4043,14 @@ static void TestPermissions(Porto::Connection &api) {
     AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectApiFailure(api.SetProperty(name, "user", Bob.User()), EError::Permission);
-    ExpectApiFailure(api.SetProperty(name, "group", Bob.Group()), EError::Permission);
+    ExpectApiSuccess(api.SetProperty(name, "user", Bob.User()));
+    ExpectApiSuccess(api.SetProperty(name, "group", Bob.Group()));
+    ExpectApiFailure(api.Start(name), EError::Permission);
+
     ExpectApiSuccess(api.GetProperty(name, "command", s));
+
+    ExpectApiSuccess(api.SetProperty(name, "user", Alice.User()));
+    ExpectApiSuccess(api.SetProperty(name, "group", Alice.Group()));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", s));
 

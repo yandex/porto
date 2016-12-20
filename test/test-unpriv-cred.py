@@ -38,10 +38,9 @@ c.connect()
 r = c.Create("test")
 assert r.GetProperty("user") == "porto-bob"
 assert r.GetProperty("group") == "porto-bob"
-assert Catch(r.SetProperty, "group", "porto-charlie") == porto.exceptions.PermissionError
-r.SetProperty("user", "porto-charlie")
-assert r.GetProperty("group") == "porto-bob"
 r.SetProperty("group", "porto-charlie")
+assert Catch(r.Start) == porto.exceptions.PermissionError
+r.SetProperty("user", "porto-charlie")
 r.SetProperty("command", "ls")
 r.Start()
 assert r.Wait() == "test"
@@ -59,7 +58,8 @@ c.connect()
 r = c.Create("test")
 assert r.GetProperty("user") == "porto-alice"
 assert r.GetProperty("group") == "porto-alice"
-assert Catch(r.SetProperty, "group", "porto-david") == porto.exceptions.PermissionError
+r.SetProperty("group", "porto-david")
+assert Catch(r.Start) == porto.exceptions.PermissionError
 r.SetProperty("user", "porto-david")
 r.SetProperty("group", "porto-david")
 r.SetProperty("command", "ls")
@@ -93,7 +93,8 @@ c = porto.Connection()
 c.connect()
 r = c.Create("test")
 r.SetProperty("command", "ls")
-assert Catch(r.SetProperty, "user", "porto-bob") == porto.exceptions.PermissionError
+r.SetProperty("user", "porto-bob")
+assert Catch(r.Start) == porto.exceptions.PermissionError
 r.Destroy()
 print "%s OK!" %(Case)
 SwitchRoot()
@@ -105,7 +106,8 @@ c = porto.Connection()
 c.connect()
 r = c.Create("test")
 r.SetProperty("user", "porto-charlie")
-assert Catch(r.SetProperty, "group", "porto-alice") == porto.exceptions.PermissionError
+r.SetProperty("group", "porto-alice")
+assert Catch(r.Start) == porto.exceptions.PermissionError
 print "%s OK!" %(Case)
 r.Destroy()
 SwitchRoot()

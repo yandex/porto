@@ -479,40 +479,24 @@ public:
         if (error)
             return error;
 
-        TCred newCred;
-        gid_t oldGid = CT->TaskCred.Gid;
-        error = newCred.Load(username);
+        TCred cred;
+        error = cred.Load(username);
+        if (error) {
+            cred.Gid = CT->TaskCred.Gid;
+            error = UserId(username, cred.Uid);
+            if (error)
+                return error;
+        } else if (CT->HasProp(EProperty::GROUP))
+            cred.Gid = CT->TaskCred.Gid;
 
-        /* allow any numeric id if client can change uid/gid */
-        if (error && CL->CanSetUidGid()) {
-            newCred.Gid = oldGid;
-            error = UserId(username, newCred.Uid);
-        }
-
-        if (error)
-            return error;
-
-        if (newCred.Uid == CT->TaskCred.Uid)
-            return TError::Success();
-
-        /* try to preserve current group if possible */
-        if (newCred.IsMemberOf(oldGid) ||
-                CL->Cred.IsMemberOf(oldGid) ||
-                CL->IsSuperUser())
-            newCred.Gid = oldGid;
-
-        error = CL->CanControl(newCred);
-
-        /* allow any user in sub-container if client can change uid/gid */
-        if (error && CL->CanSetUidGid() &&
-                CT->IsChildOf(*CL->ClientContainer))
-            error = TError::Success();
-
-        if (error)
-            return error;
-
-        CT->TaskCred = newCred;
+        CT->TaskCred = cred;
         CT->SetProp(EProperty::USER);
+        return TError::Success();
+    }
+
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS)
+            CT->TaskCred.Uid = RootUser;
         return TError::Success();
     }
 } static User;
@@ -536,22 +520,14 @@ public:
         if (error)
             return error;
 
-        if (!CT->TaskCred.IsMemberOf(newGid) &&
-                !CL->Cred.IsMemberOf(newGid) &&
-                !CL->IsSuperUser())
-            error = TError(EError::Permission, "Desired group : " + groupname +
-                           " isn't in current user supplementary group list");
-
-        /* allow any group in sub-container if client can change uid/gid */
-        if (error && CL->CanSetUidGid() &&
-                CT->IsChildOf(*CL->ClientContainer))
-            error = TError::Success();
-
-        if (error)
-            return error;
-
         CT->TaskCred.Gid = newGid;
         CT->SetProp(EProperty::GROUP);
+        return TError::Success();
+    }
+
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS)
+            CT->TaskCred.Gid = RootGroup;
         return TError::Success();
     }
 } static Group;

@@ -1291,11 +1291,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     env.SetEnv("HOME", GetCwd());
-
-    if (VirtMode == VIRT_MODE_OS)
-        env.SetEnv("USER", "root");
-    else
-        env.SetEnv("USER", TaskCred.User());
+    env.SetEnv("USER", TaskCred.User());
 
     env.SetEnv("container", "lxc");
 
@@ -1344,14 +1340,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 
     taskEnv->Mnt.OwnerCred = OwnerCred;
 
-    if (VirtMode == VIRT_MODE_OS) {
-        taskEnv->Cred = TCred(0, 0);
-    } else {
-        taskEnv->Cred = TaskCred;
-        error = taskEnv->Cred.LoadGroups(TaskCred.User());
-        if (error)
-            return error;
-    }
+    taskEnv->Cred = TaskCred;
 
     error = GetEnvironment(taskEnv->Env);
     if (error)
@@ -1542,6 +1531,11 @@ TError TContainer::Start() {
             return TError(EError::InvalidState, "Parent container is frozen");
     }
 
+    /* Extra check */
+    error = CL->CanControl(OwnerCred);
+    if (error)
+        return error;
+
     /* Normalize root path */
     if (Parent) {
         TPath path(Root);
@@ -1565,31 +1559,69 @@ TError TContainer::Start() {
             return error;
     }
 
-    if (VirtMode == VIRT_MODE_OS) {
-        if (!IsolatedFromHost())
-            return TError(EError::Permission, "virt_mode=os must be isolated from host");
-        if (!Isolate && OwnerCred.Uid != Parent->OwnerCred.Uid)
-            return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
-        if (RootPath.IsRoot() && !OwnerCred.IsRootUser())
-            return TError(EError::Permission, "virt_mode=os without chroot only for real root");
+    error = TaskCred.LoadGroups(TaskCred.User());
+    if (error)
+        return error;
+
+    /* Check target task credentials */
+    error = CL->CanControl(TaskCred);
+    if (!error && !OwnerCred.IsMemberOf(TaskCred.Gid) && !CL->IsSuperUser()) {
+        TCred cred;
+        cred.Load(TaskCred.User());
+        if (!cred.IsMemberOf(TaskCred.Gid))
+            error = TError(EError::Permission, "Cannot control group " + TaskCred.Group());
     }
 
+    /*
+     * Allow any user:group in chroot
+     * FIXME: non-racy chroot validation is impossible for now
+     */
+    if (error && !RootPath.IsRoot())
+        error = TError::Success();
+
+    /* Allow any user:group in sub-container if client can change uid/gid */
+    if (error && CL->CanSetUidGid() && IsChildOf(*CL->ClientContainer))
+        error = TError::Success();
+
+    if (error)
+        return error;
+
+    TCapabilities cap = CapAmbient;
+
+    /* Root user has all allowed capabilities */
+    if (TaskCred.IsRootUser())
+        cap = CapLimit;
+
+    /* Host root user has everything for free */
+    if (OwnerCred.IsRootUser())
+        cap = NoCapabilities;
+
+    /* Even without capabilities user=root require chroot */
+    if (RootPath.IsRoot() && TaskCred.IsRootUser() && !OwnerCred.IsRootUser())
+        return TError(EError::Permission, "user=root without chroot");
+
+    /* Capabilities except AppMode require chroot too */
+    if (RootPath.IsRoot() && (cap.Permitted & ~AppModeCapabilities.Permitted))
+        return TError(EError::Permission, "Capabilities require chroot");
+
     /*  PidNsCapabilities must be isolated from host pid-namespace */
-    if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
-            !CL->IsSuperUser() && !IsolatedFromHost())
-        return TError(EError::Permission, "Capabilities require pid isolation: " +
-                                          PidNsCapabilities.Format());
+    if (!IsolatedFromHost() && (cap.Permitted & PidNsCapabilities.Permitted))
+        return TError(EError::Permission, "Capabilities require pid isolation");
 
     /* MemCgCapabilities requires memory limit */
-    if (!MemLimit && (CapAmbient.Permitted & MemCgCapabilities.Permitted) &&
-            !CL->IsSuperUser()) {
+    if (!MemLimit && (cap.Permitted & MemCgCapabilities.Permitted)) {
         bool limited = false;
         for (auto p = Parent; p; p = p->Parent)
             limited = limited || p->MemLimit;
-        if (!limited)
-            return TError(EError::Permission, "Capabilities require memory limit: " +
-                          MemCgCapabilities.Format());
+        if (!limited && !HasProp(EProperty::CAPABILITIES) &&
+                !HasProp(EProperty::CAPABILITIES_AMBIENT)) {
+            L() << "No memory limit set, remove related capabilities" << std::endl;
+            CapLimit.Permitted &= ~MemCgCapabilities.Permitted;
+        } else if (!limited)
+            return TError(EError::Permission, "Capabilities require memory limit");
     }
+
+    SanitizeCapabilities();
 
     error = StartOne();
     if (error)

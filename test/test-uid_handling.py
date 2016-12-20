@@ -25,8 +25,6 @@ r.SetProperty("virt_mode", "os")
 r.SetProperty("root", v.path)
 r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=porto-bob")
-r.SetProperty("stdout_path", "stdout.txt")
-r.SetProperty("stderr_path", "stderr.txt")
 r.Start()
 assert r.Wait() == "test"
 
@@ -56,10 +54,15 @@ r.Start()
 assert r.Wait() == "test"
 
 assert r.GetProperty("exit_status") == "256"
-assert re.search("Permission", r.GetProperty("stderr")) is not None
 r.Stop()
+r.Destroy()
 
 #Check virt_mode == app now
+
+r = c.Create("test")
+v.Link(r.name)
+r.SetProperty("root", v.path)
+r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
 
 r.SetProperty("virt_mode", "app")
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\"")
@@ -78,8 +81,12 @@ r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" use
 r.Start()
 assert r.Wait() == "test"
 
-assert r.GetProperty("exit_status") == "256"
-assert re.search("Permission", r.GetProperty("stderr")) is not None
+r2 = c.Find("test/a")
+assert r2.Wait() == "test/a"
+assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-bob"
+assert r2.GetProperty("owner_user") == "porto-alice"
+assert r2.GetProperty("user") == "porto-bob"
+r2.Destroy()
 
 r.Stop()
 r.SetProperty("user", "porto-charlie")
