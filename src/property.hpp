@@ -212,6 +212,8 @@ public:
 
     virtual TError GetToSave(std::string &value);
     virtual TError SetFromRestore(const std::string &value);
+
+    virtual TError Start(void);
 };
 
 void InitContainerProperties(void);

@@ -1553,6 +1553,18 @@ TError TContainer::Start() {
         RootPath = Parent->RootPath / path;
     }
 
+    if (Parent) {
+        CT = this;
+        for (auto &knob: ContainerProperties) {
+            error = knob.second->Start();
+            if (error)
+                break;
+        }
+        CT = nullptr;
+        if (error)
+            return error;
+    }
+
     if (VirtMode == VIRT_MODE_OS) {
         if (!IsolatedFromHost())
             return TError(EError::Permission, "virt_mode=os must be isolated from host");
@@ -1561,52 +1573,6 @@ TError TContainer::Start() {
         if (RootPath.IsRoot() && !OwnerCred.IsRootUser())
             return TError(EError::Permission, "virt_mode=os without chroot only for real root");
     }
-
-    /* virt_mode=os overrides some defaults */
-    if (VirtMode == VIRT_MODE_OS) {
-        if (!HasProp(EProperty::CWD))
-            Cwd = "/";
-
-        if (!HasProp(EProperty::COMMAND))
-            Command = "/sbin/init";
-
-        if (!HasProp(EProperty::STDOUT))
-            Stdout.SetOutside("/dev/null");
-
-        if (!HasProp(EProperty::STDERR))
-            Stderr.SetOutside("/dev/null");
-
-        if (!HasProp(EProperty::BIND_DNS))
-            BindDns = false;
-
-        if (!HasProp(EProperty::NET))
-            NetProp = { { "none" } };
-    }
-
-    /* Non-isolated container inherits policy from parent */
-    if (!Isolate && Parent) {
-        if (!HasProp(EProperty::CPU_POLICY)) {
-            CpuPolicy = Parent->CpuPolicy;
-            SchedPolicy = Parent->SchedPolicy;
-            SchedPrio = Parent->SchedPrio;
-            SchedNice = Parent->SchedNice;
-        }
-
-        if (!HasProp(EProperty::IO_POLICY))
-            IoPolicy = Parent->IoPolicy;
-
-        if (!HasProp(EProperty::RECHARGE_ON_PGFAULT))
-            RechargeOnPgfault = Parent->RechargeOnPgfault;
-
-        if (!HasProp(EProperty::NET_PRIO))
-            NetPriority = Parent->NetPriority;
-
-        if (!HasProp(EProperty::UMASK))
-            Umask = Parent->Umask;
-    }
-
-    /* apply parent limits for capabilities */
-    SanitizeCapabilities();
 
     /*  PidNsCapabilities must be isolated from host pid-namespace */
     if (!Isolate && (CapAmbient.Permitted & PidNsCapabilities.Permitted) &&
@@ -1624,11 +1590,6 @@ TError TContainer::Start() {
             return TError(EError::Permission, "Capabilities require memory limit: " +
                           MemCgCapabilities.Format());
     }
-
-    /* Propogate lower access levels into child */
-    if (Parent && Parent->AccessLevel < EAccessLevel::ChildOnly &&
-                  Parent->AccessLevel < AccessLevel)
-        AccessLevel = Parent->AccessLevel;
 
     error = StartOne();
     if (error)

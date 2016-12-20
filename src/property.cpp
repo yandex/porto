@@ -99,6 +99,10 @@ TError TProperty::WantControllers(uint64_t controllers) const {
     return TError::Success();
 }
 
+TError TProperty::Start(void) {
+    return TError::Success();
+}
+
 class TCapLimit : public TProperty {
 public:
     TCapLimit() : TProperty(P_CAPABILITIES, EProperty::CAPABILITIES,
@@ -179,6 +183,10 @@ public:
         else
             caps.Permitted = CT->CapLimit.Permitted & ~caps.Permitted;
         return CommitLimit(caps);
+    }
+    TError Start(void) {
+        CT->SanitizeCapabilities();
+        return TError::Success();
     }
 } static Capabilities;
 
@@ -282,6 +290,11 @@ public:
         CT->SetProp(EProperty::CWD);
         return TError::Success();
     }
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::CWD))
+            CT->Cwd = "/";
+        return TError::Success();
+    }
 } static Cwd;
 
 class TUlimit : public TProperty {
@@ -352,6 +365,16 @@ public:
     TError Get(std::string &value);
     TCpuPolicy() : TProperty(P_CPU_POLICY, EProperty::CPU_POLICY,
             "CPU policy: rt, high, normal, batch, idle (dynamic)") {}
+    TError Start(void) {
+        auto parent = CT->Parent;
+        if (!CT->Isolate && !CT->HasProp(EProperty::CPU_POLICY)) {
+            CT->CpuPolicy = parent->CpuPolicy;
+            CT->SchedPolicy = parent->SchedPolicy;
+            CT->SchedPrio = parent->SchedPrio;
+            CT->SchedNice = parent->SchedNice;
+        }
+        return TError::Success();
+    }
 } static CpuPolicy;
 
 TError TCpuPolicy::Set(const std::string &policy) {
@@ -408,6 +431,11 @@ public:
                             "IO policy: normal | batch (dynamic)") {}
     void Init(void) {
         IsSupported = BlkioSubsystem.HasWeight;
+    }
+    TError Start(void) {
+        if (!CT->Isolate && !CT->HasProp(EProperty::IO_POLICY))
+            CT->IoPolicy = CT->Parent->IoPolicy;
+        return TError::Success();
     }
 } static IoPolicy;
 
@@ -675,6 +703,11 @@ public:
         CT->SetProp(EProperty::COMMAND);
         return TError::Success();
     }
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::COMMAND))
+            CT->Command = "/sbin/init";
+        return TError::Success();
+    }
 } static Command;
 
 class TVirtMode : public TProperty {
@@ -756,6 +789,11 @@ public:
         }
         return error;
     }
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::STDOUT))
+            CT->Stdout.SetOutside("/dev/null");
+        return TError::Success();
+    }
 } static StdoutPath;
 
 class TStderrPath : public TProperty {
@@ -773,6 +811,11 @@ public:
             CT->SetProp(EProperty::STDERR);
         }
         return error;
+    }
+    TError Start(void) {
+         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::STDERR))
+            CT->Stderr.SetOutside("/dev/null");
+         return TError::Success();
     }
 } static StderrPath;
 
@@ -892,6 +935,11 @@ public:
         CT->SetProp(EProperty::BIND_DNS);
         return TError::Success();
     }
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::BIND_DNS))
+            CT->BindDns = false;
+        return TError::Success();
+    }
 } static BindDns;
 
 
@@ -969,6 +1017,11 @@ public:
  "MTU <name> <mtu> | "
  "autoconf <name> (SLAAC) | "
  "netns <name>") {}
+    TError Start(void) {
+        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET))
+            CT->NetProp = { { "none" } };
+        return TError::Success();
+    }
 } static Net;
 
 TError TNet::Set(const std::string &net_desc) {
@@ -1047,6 +1100,11 @@ public:
         if (error)
             return error;
         CT->SetProp(EProperty::UMASK);
+        return TError::Success();
+    }
+    TError Start(void) {
+        if (!CT->Isolate && !CT->HasProp(EProperty::UMASK))
+            CT->Umask = CT->Parent->Umask;
         return TError::Success();
     }
 } static Umask;
@@ -1702,6 +1760,11 @@ public:
     void Init(void) {
         IsSupported = MemorySubsystem.SupportRechargeOnPgfault();
     }
+    TError Start(void) {
+        if (!CT->Isolate && !CT->HasProp(EProperty::RECHARGE_ON_PGFAULT))
+            CT->RechargeOnPgfault = CT->Parent->RechargeOnPgfault;
+        return TError::Success();
+    }
 } static RechargeOnPgfault;
 
 TError TRechargeOnPgfault::Set(const std::string &recharge) {
@@ -2077,6 +2140,11 @@ public:
     TError GetIndexed(const std::string &index, std::string &value);
     TNetPriority()  : TProperty(P_NET_PRIO, EProperty::NET_PRIO,
             "Container network priority: <interface>|default: 0-7;... (dynamic)") {}
+    TError Start(void) {
+        if (!CT->Isolate && !CT->HasProp(EProperty::NET_PRIO))
+            CT->NetPriority = CT->Parent->NetPriority;
+        return TError::Success();
+    }
 } static NetPriority;
 
 TError TNetPriority::Set(const std::string &prio) {
@@ -2311,6 +2379,13 @@ public:
 
         CT->AccessLevel = level;
         CT->SetProp(EProperty::ENABLE_PORTO);
+        return TError::Success();
+    }
+    TError Start(void) {
+        auto parent = CT->Parent;
+        if (parent->AccessLevel < EAccessLevel::ChildOnly &&
+                parent->AccessLevel < CT->AccessLevel)
+            CT->AccessLevel = parent->AccessLevel;
         return TError::Success();
     }
 } static EnablePorto;
