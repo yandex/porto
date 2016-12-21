@@ -1,3 +1,28 @@
+yandex-porto (3.1.9) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * portotop: print days in duration fields
+  * porto: add per-container request counter
+  * cgroup: add knob cpu_wait
+  * cgroup: turn off rt limit before any change
+  * cgroup: enforce minimum 1ms per 100ms cpu limit for rt
+  * util/string: perform strict string to numeric conversion
+  * config: deprecate all path options
+  * porto: shorten CurrentContainer and CurrentClient to CT and CL
+  * property: add hook into container start
+  * porto: allow containers with any user:group in chroot
+  * test/knobs: fix for vanilla kernels
+
+  [ Maxim Samoylov ]
+  * layer: store private string associated with layer
+  * test: cleanup volume_places leftovers on failure
+  * test: add cpu_limit test
+
+  [ Konstantin Khlebnikov ]
+  * volume: verify overlay storage layout
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 21 Dec 2016 15:38:40 +0300
+
 yandex-porto (3.1.8) unstable; urgency=low
 
   [ Maxim Samoylov ]
