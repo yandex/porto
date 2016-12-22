@@ -27,7 +27,7 @@ extern "C" {
 
 void TTaskEnv::ReportPid(pid_t pid) {
     TError error = Sock.SendPid(pid);
-    if (error) {
+    if (error && error.GetErrno() != ENOMEM) {
         L_ERR() << error << std::endl;
         Abort(error);
     }
@@ -46,12 +46,12 @@ void TTaskEnv::Abort(const TError &error) {
 
     for (int stage = ReportStage; stage < 2; stage++) {
         error2 = Sock.SendPid(getpid());
-        if (error2)
+        if (error2 && error2.GetErrno() != ENOMEM)
             L_ERR() << error2 << std::endl;
     }
 
     error2 = Sock.SendError(error);
-    if (error2)
+    if (error2 && error2.GetErrno() != ENOMEM)
         L_ERR() << error2 << std::endl;
 
     _exit(EXIT_FAILURE);
