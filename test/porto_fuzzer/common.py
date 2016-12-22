@@ -4,6 +4,7 @@ import porto
 import string
 import sys
 import os
+import re
 import random
 import subprocess
 import tarfile
@@ -148,18 +149,35 @@ def get_portod_pid():
 
 def check_errors_present(conn, hdr):
     try:
-        assert conn.GetProperty("/", "porto_stat[errors]") == "0"
-    except AssertionError as e:
-        print "{}portod logged some error, terminating".format(hdr)
+        value = conn.GetProperty("/", "porto_stat[errors]")
+    except BaseException as e:
+        print "{}failed to check portod error count: {}\n".format(hdr, e),
         raise e
 
+    try:
+        assert value == "0"
+    except AssertionError as e:
+        try:
+            ival = int(value)
+            assert ival > 0
+            print "{}portod logged some error, terminating\n".format(hdr),
+        except:
+            print "{}portod returned invalid response: {}"\
+                  "instead of error count\n".format(hdr, value),
+
+        raise AssertionError("errors \"{}\" != 0".format(value))
+
 def check_warns_present(conn, old):
-    value = conn.GetProperty("/", "porto_stat[warnings]")
+    try:
+        value = conn.GetProperty("/", "porto_stat[warnings]")
+    except BaseException as e:
+        print "{}failed to check portod warning count: {}\n".format(hdr, e),
+        return old
 
     try:
         assert value == old
     except AssertionError as e:
-        print "portod emitted some warnings, see log for details"
+        print "portod emitted some warnings, see log for details\n",
 
     return value
 
@@ -213,3 +231,64 @@ def print_stacktrace(pid):
         "-ex", "set confirm off", "-ex", "quit",
         "-q", "-p", str(pid)
     ])
+
+def find_last_log_lines(filename, num, OFFSET=1048576, tag_re="ERR",
+                        date_re="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}",
+                        process_re="portod(-slave|-worker[0-9]+|-spawn-c|-spawn-p)?\[[0-9]+\]:"):
+    re_obj = re.compile("{} {} {}".format(date_re, process_re, tag_re))
+
+    result = []
+
+    f = open(filename, "r")
+    size = os.lseek(f.fileno(), 0, os.SEEK_END)
+    running = True
+    pos = size
+
+    while pos and (num == 0 or len(result) < num):
+        if pos > OFFSET:
+            pos -= OFFSET
+        else:
+            pos = 0
+
+        os.lseek(f.fileno(), pos, os.SEEK_SET)
+        ss = f.read(OFFSET)
+        ll = ss.splitlines()
+
+        if len(ll) > 1 and len(ll[0]) > 0 and pos > 0:
+            pos += len(ll[0]) + 1
+
+        for l in ll[:0:-1]:
+            m = re_obj.search(l)
+            if m:
+                result.insert(0, l[m.start():])
+                if len(result) >= num:
+                    break
+
+    return result
+
+def grep_portod_tag(tag_re, num):
+    result = find_last_log_lines("/var/log/portod.log", num, tag_re=tag_re)
+
+    if num == 0 or len(result) != num:
+        result += find_last_log_lines("/var/log/portoloop.log", num - len(result), tag_re=tag_re)
+
+    if len(result) < num:
+        print "Some {} lines were missing, found {} instead of {}".format(tag_re, len(result), num)
+
+    if len(result) > num:
+        print "Unexpected {} were found {} instead of {}, forgot to clean up?".format(tag_re, len(result), num)
+
+    return result
+
+def print_logged_errors():
+    try:
+        e = int(porto.Connection(timeout=30).GetProperty("/", "porto_stat[errors]"))
+    except:
+        return
+
+    msgs = grep_portod_tag("ERR", e if e > 0 else 0)
+
+    if len(msgs) > 0:
+        print "Found {} errors logged by porto:".format(str(e) if e > 0 else "")
+        for m in msgs:
+            print m
