@@ -1,7 +1,7 @@
 #!/bin/sh -x
 
 for g in porto porto-containers ; do
-	getent $g || groupadd $g
+	getent group $g || groupadd $g
 done
 
 for u in porto-alice porto-bob; do
