@@ -1,3 +1,18 @@
+yandex-porto (3.1.10) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * test/porto_fuzzer: improve error reporting
+  * task: silence start L_ERR() when short on memory
+
+  [ Konstantin Khlebnikov ]
+  * scripts/prepare_test: fix getent
+  * fuzzer: cleanup layers
+  * layers: add protobuf-compiler
+  * portoctl/build: inherit script environment from launcher
+  * portoctl/build: flag StartOS must override property virt_mode
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 26 Dec 2016 17:48:12 +0300
+
 yandex-porto (3.1.9) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
