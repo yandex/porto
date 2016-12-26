@@ -2087,6 +2087,7 @@ public:
             bootstrap.ForwardStreams = true;
             bootstrap.WaitExit = true;
             bootstrap.StartOS = true;
+            bootstrap.Environment = launcher.Environment;
 
             std::string script_text;
             error = bootstrap_script.ReadAll(script_text);
@@ -2155,6 +2156,7 @@ public:
             executor.Container = launcher.Container + "/script";
             executor.ForwardStreams = true;
             executor.WaitExit = true;
+            executor.Environment = launcher.Environment;
 
             executor.SetProperty("stdin_path", "/dev/null");
             executor.SetProperty("isolate", "false");
