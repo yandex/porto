@@ -361,9 +361,6 @@ public:
 
     TError ApplyConfig() {
 
-        if (StartOS && Api->SetProperty(Container, "virt_mode", "os"))
-            goto err;
-
         if (ForwardTerminal) {
             std::string tty = "/dev/fd/" + std::to_string(SlavePty);
             if (Api->SetProperty(Container, "stdin_path", tty) ||
@@ -388,6 +385,9 @@ public:
             if (Api->SetProperty(Container, prop.first, prop.second))
                 goto err;
         }
+
+        if (Api->SetProperty(Container, "virt_mode", StartOS ? "os" : "app"))
+            goto err;
 
         if (Api->SetProperty(Container, "env", MergeEscapeStrings(Environment, ';')))
             goto err;
