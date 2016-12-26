@@ -4,4 +4,6 @@ apt-get install -y libssl-dev libncurses5-dev
 
 apt-get install -y python-pip
 
+apt-get install -y protobuf-compiler
+
 pip install protobuf
