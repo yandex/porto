@@ -106,6 +106,22 @@ TError CheckPlace(const TPath &place, bool init) {
             L_WRN() << "cannot delete junk layer: " << path << " : " << error << std::endl;
     }
 
+    TPath storage = place / PORTO_STORAGE;
+    if (init && !storage.IsDirectoryStrict()) {
+        (void)storage.Unlink();
+        error = storage.MkdirAll(0700);
+        if (error)
+            return error;
+    }
+
+    error = storage.StatStrict(st);
+    if (error || !S_ISDIR(st.st_mode))
+        return TError(EError::InvalidValue, "in storage " + storage.ToString() + " must be directory");
+    if (st.st_uid != RootUser || st.st_gid != PortoGroup)
+        storage.Chown(RootUser, PortoGroup);
+    if ((st.st_mode & 0777) != 0700)
+        storage.Chmod(0700);
+
     return TError::Success();
 }
 

@@ -185,6 +185,9 @@ message TContainerRequest {
 	optional TLayerGetPrivateRequest getlayerprivate = 114;
 	optional TLayerSetPrivateRequest setlayerprivate = 115;
 
+    optional TStorageListRequest listStorage = 116;
+    optional TStorageRemoveRequest removeStorage = 117;
+
 	optional TConvertPathRequest convertPath = 200;
 	optional TAttachProcessRequest attachProcess = 201;
 }
@@ -269,6 +272,7 @@ message TContainerResponse {
 	optional TLayerListResponse layers = 14;
 	optional TConvertPathResponse convertPath = 15;
     optional TLayerGetPrivateResponse layer_private = 16;
+    optional TStorageListResponse storageList = 17;
 }
 
 // VolumeAPI
@@ -374,4 +378,26 @@ message TLayerListResponse {
 
 message TLayerGetPrivateResponse {
 	optional string private_value = 1;
+}
+
+message TStorageDescription {
+	required string name = 1;
+	required string owner_user = 2;
+	required string owner_group = 3;
+	required uint64 last_usage = 4;
+	required string private_value = 5;
+}
+
+message TStorageListRequest {
+	optional string name = 1;
+	optional string place = 2;
+}
+
+message TStorageListResponse {
+	repeated TStorageDescription storages = 1;
+}
+
+message TStorageRemoveRequest {
+	required string name = 1;
+	optional string place = 2;
 }

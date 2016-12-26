@@ -48,6 +48,7 @@ def Test():
     assert Catch(c.CreateVolume, path=None,
                  place=PLACE_DIR) == porto.exceptions.InvalidValue
     os.mkdir(PLACE_DIR + "/porto_layers")
+    os.mkdir(PLACE_DIR + "/porto_storage")
     os.mkdir(DIR + "/a")
 
     #Finally, checking functions

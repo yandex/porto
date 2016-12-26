@@ -95,6 +95,8 @@ public:
     bool CustomPlace = false;
     TPath Place;
 
+    bool RemoveStorageOnDestroy = false;
+
     TVolume() {
         Statistics->VolumesCount++;
     }
@@ -133,6 +135,11 @@ public:
     TError UnlinkContainer(TContainer &container);
 
     TPath GetStorage(void) const;
+
+    bool IsInternalPersistent(void) const {
+        return Storage.size() && TPath(Storage).IsSimple();
+    }
+
     TPath GetInternal(std::string type) const;
     unsigned long GetMountFlags(void) const;
 

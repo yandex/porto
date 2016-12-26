@@ -14,6 +14,7 @@
 #include "kvalue.hpp"
 #include "helpers.hpp"
 #include "client.hpp"
+#include "storage.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -959,8 +960,14 @@ TPath TVolume::GetInternal(std::string type) const {
 }
 
 TPath TVolume::GetStorage(void) const {
-    if (HaveStorage())
+    if (HaveStorage()) {
+        TPath res = TPath(Storage);
+        if (res.IsSimple())
+            return Place / PORTO_STORAGE / res;
+
         return TPath(Storage);
+    }
+
     return GetInternal(BackendType);
 }
 
@@ -1191,41 +1198,51 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
     /* Verify storage path */
     if (HaveStorage() && backend != "rbd" && backend != "tmpfs") {
         auto path = GetStorage();
-        if (!path.IsAbsolute())
-            return TError(EError::InvalidValue, "Storage path must be absolute");
-        if (!path.IsNormal())
-            return TError(EError::InvalidValue, "Storage path must be normalized");
+        if (!IsInternalPersistent() || path.Exists()) {
+            if (!path.IsAbsolute())
+                return TError(EError::InvalidValue, "Storage path must be absolute");
+            if (!path.IsNormal())
+                return TError(EError::InvalidValue, "Storage path must be normalized");
 
-        /* Convert path to host-based */
-        path = container.RootPath / Storage;
-        Storage = path.ToString();
+            if (!IsInternalPersistent()) {
+                /* Convert path to host-based */
+                path = container.RootPath / Storage;
+                Storage = path.ToString();
+            }
 
-        if (!path.Exists())
-            return TError(EError::InvalidValue, "Storage path does not exist");
+            if (!path.Exists())
+                return TError(EError::InvalidValue, "Storage path does not exist");
 
-        if (path.IsDirectoryFollow()) {
-            error = StorageFd.OpenDir(path);
-            if (error)
-                return error;
-        } else if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop")) {
-            StorageFile = path;
-            if (IsReadOnly)
-                error = StorageFd.OpenRead(path);
-            else
-                error = StorageFd.OpenReadWrite(path);
-            if (error)
-                return error;
-        } else
-            return TError(EError::InvalidValue, "Storage path must be a directory");
+            if (path.IsDirectoryFollow()) {
+                error = StorageFd.OpenDir(path);
+                if (error)
+                    return error;
+            } else if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop")) {
+                StorageFile = path;
+                if (IsReadOnly)
+                    error = StorageFd.OpenRead(path);
+                else
+                    error = StorageFd.OpenReadWrite(path);
+                if (error)
+                    return error;
+            } else
+                return TError(EError::InvalidValue, "Storage path must be a directory");
 
-        if (!StorageFd.HasAccess(cred, TPath::W))
-            return TError(EError::Permission, "Storage path usage not permitted");
+            if (!StorageFd.HasAccess(cred, TPath::W))
+                return TError(EError::Permission, "Storage path usage not permitted");
+        } else {
+            RemoveStorageOnDestroy = true;
+        }
 
         for (auto &it: Volumes) {
             auto other = it.second;
             if (Storage != other->Storage || (IsReadOnly && other->IsReadOnly) ||
                     (backend == "bind" && other->BackendType == backend))
                 continue;
+
+            if (Storage == other->Storage && Place != other->Place)
+                continue;
+
             return TError(EError::Busy, "Storage already used by volume " + other->Path.ToString());
         }
     }
@@ -1319,6 +1336,34 @@ TError TVolume::Build() {
         if (error)
             return error;
         error = StorageFd.OpenDir(storage);
+        if (error)
+            return error;
+    }
+
+    if (IsInternalPersistent()) {
+        if (RemoveStorageOnDestroy) {
+            error = storage.Mkdir(0755);
+            if (error)
+                return error;
+
+            error = storage.Chown(VolumeOwner);
+            if (error)
+                return error;
+
+            error = StorageFd.OpenDir(storage);
+            if (error)
+                return error;
+        }
+
+        if (!Private.size()) {
+            error = GetStoragePrivate(Storage, Place, Private);
+            if (error)
+                return error;
+        } else {
+            SetStoragePrivate(Storage, Place, Private);
+        }
+
+        error = StorageFd.Touch();
         if (error)
             return error;
     }
@@ -1513,17 +1558,17 @@ TError TVolume::DestroyOne() {
 
     (void)Path.UmountNested(); /* Re-check everything was disposed */
 
-    StorageFd.Close();
-    if (!HaveStorage() && storage.Exists()) {
-        error = ClearRecursive(storage);
+    if (IsInternalPersistent()) {
+        error = storage.Touch();
         if (error)
-            L_ERR() << "Cannot clear storage: " << error << std::endl;
-        error = storage.RemoveAll();
-        if (error) {
-            L_ERR() << "Can't remove storage: " << error << std::endl;
-            if (!ret)
-                ret = error;
-        }
+            L_WRN() << "Cannot touch storage: " << error << std::endl;
+    }
+
+    StorageFd.Close();
+    if ((!HaveStorage() || RemoveStorageOnDestroy) && storage.Exists()) {
+        error = ClearStorage(storage);
+        if (error)
+            ret = error;
     }
 
     if (IsAutoPath && Path.Exists()) {
@@ -1708,7 +1753,7 @@ TStringMap TVolume::DumpState(const TPath &root) {
 
     auto lock = LockVolumes();
 
-    if (Storage.empty() || BackendType == "rbd")
+    if (Storage.empty() || BackendType == "rbd" || IsInternalPersistent())
         ret[V_STORAGE] = Storage;
     else
         ret[V_STORAGE] = root.InnerPath(Storage).ToString();
@@ -1923,6 +1968,7 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
         return error;
     }
 
+    volume->RemoveStorageOnDestroy = false;
     volume->StorageFd.Close();
     VolumesCv.notify_all();
 

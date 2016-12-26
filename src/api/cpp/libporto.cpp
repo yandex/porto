@@ -612,6 +612,40 @@ int Connection::SetLayerPrivate(const std::string &private_value,
     return Impl->Rpc();
 }
 
+int Connection::ListStorage(std::vector<Storage> &storages,
+                            const std::string &place) {
+    auto req = Impl->Req.mutable_liststorage();
+    if (place.size())
+        req->set_place(place);
+    int ret = Impl->Rpc();
+    if (!ret) {
+        const auto &list = Impl->Rsp.storagelist().storages();
+
+        storages.resize(list.size());
+        int i = 0;
+
+        for (const auto &s : list) {
+            storages[i].Name = s.name();
+            storages[i].PrivateValue = s.private_value();
+            storages[i].OwnerUser = s.owner_user();
+            storages[i].OwnerGroup = s.owner_group();
+            storages[i].LastUsage = s.last_usage();
+            i++;
+        }
+    }
+    return ret;
+}
+
+int Connection::RemoveStorage(const std::string &name,
+                              const std::string &place) {
+    auto req = Impl->Req.mutable_removestorage();
+
+    req->set_name(name);
+    if (place.size())
+        req->set_place(place);
+    return Impl->Rpc();
+}
+
 int Connection::ConvertPath(const std::string &path, const std::string &src,
                            const std::string &dest, std::string &res) {
     auto req = Impl->Req.mutable_convertpath();

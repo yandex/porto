@@ -14,6 +14,11 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "portod.hpp"
+#include "storage.hpp"
+
+extern "C" {
+#include <sys/stat.h>
+}
 
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
     if (Verbose)
@@ -234,7 +239,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_listvolumes() ||
         req.has_listlayers() ||
         req.has_convertpath() ||
-        req.has_getlayerprivate();
+        req.has_getlayerprivate() ||
+        req.has_liststorage();
 }
 
 static bool ValidRequest(const rpc::TContainerRequest &req) {
@@ -269,7 +275,9 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_convertpath() +
         req.has_attachprocess() +
         req.has_getlayerprivate() +
-        req.has_setlayerprivate() == 1;
+        req.has_setlayerprivate() +
+        req.has_liststorage() +
+        req.has_removestorage() == 1;
 }
 
 static void SendReply(TClient &client, rpc::TContainerResponse &response, bool log) {
@@ -1104,6 +1112,69 @@ undo:
     return error;
 }
 
+noinline void FillStorageDescription(rpc::TStorageDescription *desc,
+                                     std::string name,
+                                     TPath &place) {
+    TPath storage = place / PORTO_STORAGE / name;
+    desc->set_name(name);
+
+    std::string private_value;
+    if (GetStoragePrivate(name, place, private_value))
+        private_value = "";
+    desc->set_private_value(private_value);
+
+    struct stat st;
+    if (!storage.StatStrict(st)) {
+        desc->set_owner_user(UserName(st.st_uid));
+        desc->set_owner_group(GroupName(st.st_gid));
+        desc->set_last_usage(time(NULL) - st.st_mtime);
+    } else {
+        desc->set_owner_user("");
+        desc->set_owner_group("");
+        desc->set_last_usage(0);
+    }
+}
+
+noinline TError ListStorage(const rpc::TStorageListRequest &req,
+                            rpc::TContainerResponse &rsp) {
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
+    TPath storage_dir = place / PORTO_STORAGE;
+    std::vector<std::string> storage;
+
+    if (req.has_name()) {
+        TPath storage = storage_dir / req.name();
+
+        if (!storage.Exists())
+            return TError(EError::InvalidValue, "Storage path does not exists");
+
+        auto desc = rsp.mutable_storagelist()->add_storages();
+        FillStorageDescription(desc, req.name(), place);
+    }
+
+    TError error = storage_dir.ListSubdirs(storage);
+    if (!error) {
+        for (auto &st: storage) {
+            auto desc = rsp.mutable_storagelist()->add_storages();
+            FillStorageDescription(desc, st, place);
+        }
+    }
+
+    return error;
+}
+
+noinline TError RemoveStorage(const rpc::TStorageRemoveRequest &req) {
+    TError error = CheckPortoWriteAccess();
+    if (error)
+        return error;
+
+    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
+    error = CheckPlace(place);
+    if (error)
+        return error;
+
+    return RemoveStorage(req.name(), place);
+}
+
 void HandleRpcRequest(const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
@@ -1185,6 +1256,10 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             error = GetLayerPrivate(req.getlayerprivate(), rsp);
         else if (req.has_setlayerprivate())
             error = SetLayerPrivate(req.setlayerprivate());
+        else if (req.has_liststorage())
+            error = ListStorage(req.liststorage(), rsp);
+        else if (req.has_removestorage())
+            error = RemoveStorage(req.removestorage());
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

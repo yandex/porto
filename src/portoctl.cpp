@@ -1846,6 +1846,86 @@ public:
     }
 };
 
+class TStorageCmd final : public ICmd {
+public:
+    TStorageCmd(Porto::Connection *api) : ICmd(api, "storage", 0,
+        "[-P <place>] -L|-R|-F <storage>",
+        "Manage internal persistent volume storage",
+        "    -P <place>               optional path to place\n"
+        "    -L                       list existing storages\n"
+        "    -R <storage>             remove storage\n"
+        "    -F [days]                remove all unused for [days]\n"
+        ) {}
+
+    int ret = EXIT_SUCCESS;
+    bool list = false;
+    bool remove = false;
+    bool flush = false;
+    std::string place;
+
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetOpts({
+            { 'P', true,  [&](const char *arg) { place = arg;   } },
+            { 'R', false, [&](const char *arg) { remove = true; } },
+            { 'L', false, [&](const char *arg) { list = true;   } },
+            { 'F', false, [&](const char *arg) { flush = true;   } },
+        });
+
+        std::string storage;
+        if (remove) {
+            if (args.size() < 1)
+                return EXIT_FAILURE;
+
+            ret = Api->RemoveStorage(args[0], place);
+            if (ret)
+                PrintError("Cannot remove storage");
+        } else if (flush) {
+            uint64_t age = 0;
+            if (args.size() >= 1) {
+                if (StringToUint64(args[0], age))
+                    return EXIT_FAILURE;
+                age *= 60*60*24;
+            }
+            std::vector<Porto::Storage> storage;
+            ret = Api->ListStorage(storage, place);
+            if (ret) {
+                PrintError("Cannot list storage paths");
+                return EXIT_FAILURE;
+            }
+            for (const auto &s: storage) {
+                if (s.LastUsage < age)
+                    continue;
+                std::cout << "remove " << s.Name << std::endl;
+                (void)Api->RemoveStorage(s.Name, place);
+            }
+        } else if (list) {
+            std::vector<Porto::Storage> storage;
+            ret = Api->ListStorage(storage, place);
+            if (ret) {
+                PrintError("Cannot list storage paths");
+            } else {
+                for (const auto &s: storage) {
+                    std::cout << s.Name << std::endl;
+
+                    std::cout << "  " << std::left << std::setw(20) << "Owner: "
+                              << s.OwnerUser << ":" << s.OwnerGroup << std::endl;
+
+                    std::cout << "  " << std::left << std::setw(20) << "Last usage: "
+                              << StringFormatDuration(s.LastUsage * 1000) << " ago" << std::endl;
+
+                    std::cout << "  " << std::left << std::setw(20) << "Private: "
+                              << s.PrivateValue << std::endl << std::endl;
+                }
+            }
+        } else {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        return ret;
+    }
+};
+
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
@@ -2353,6 +2433,7 @@ int main(int argc, char *argv[]) {
 
     handler.RegisterCommand<TLayerCmd>();
     handler.RegisterCommand<TBuildCmd>();
+    handler.RegisterCommand<TStorageCmd>();
 
     handler.RegisterCommand<TConvertPathCmd>();
     handler.RegisterCommand<TAttachCmd>();

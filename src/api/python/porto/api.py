@@ -289,6 +289,31 @@ class Layer(object):
     def SetPrivate(self, private_value):
         return self.conn.SetLayerPrivate(self.name, private_value, place=self.place)
 
+class Storage(object):
+    def __init__(self, conn, name, place):
+        self.conn = conn
+        self.name = name
+        self.place = place
+
+    def __str__(self):
+        return 'Storage `{}`'.format(self.name)
+
+    def GetProperties(self):
+        result = {}
+        p = self.conn._ListStorage(name=self.name,place=self.place)[0]
+        result["name"] = p.name
+        result["private_value"] = p.private_value
+        result["owner_user"] = p.owner_user
+        result["owner_group"] = p.owner_group
+        result["last_usage"] = p.last_usage
+
+        return result
+
+    def GetProperty(self, name):
+        return self.GetProperties()[name]
+
+    def RemoveStorage(self):
+        return self.conn.RemoveStorage(self.name, self.place)
 
 class Volume(object):
     def __init__(self, conn, path):
@@ -656,6 +681,25 @@ class Connection(object):
         if response.layers and response.layers[0].name == layer:
             return Layer(self, layer, place, response.layers[0])
         return Layer(self, layer, place)
+
+    def _ListStorage(self, name=None, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.listStorage.CopyFrom(rpc_pb2.TStorageListRequest())
+        if name is not None:
+            request.listStorage.name = name
+        if place is not None:
+            request.listStorage.place = place
+        return self.rpc.call(request, self.rpc.timeout).storageList.storages
+
+    def ListStorage(self, name=None, place=None):
+        return [Storage(self, s.name, place) for s in self._ListStorage(name, place)]
+
+    def RemoveStorage(self, name, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.removeStorage.name = name
+        if place is not None:
+            request.removeStorage.place = place
+        self.rpc.call(request, self.rpc.timeout)
 
     def ConvertPath(self, path, source, destination):
         request = rpc_pb2.TContainerRequest()
