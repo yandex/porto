@@ -71,6 +71,10 @@ def cleanup_fuzzer():
         conn.UnlinkVolume(volumes[0].path, "/")
         volumes = conn.ListVolumes()
 
+    for layer in conn.ListLayers():
+        if len(layer.name) == LAYERNAME_LIMIT:
+            layer.Remove()
+
     if (os.path.ismount(FUZZER_MNT)):
         subprocess.check_call(["umount", FUZZER_MNT])
 
