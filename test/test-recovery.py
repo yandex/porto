@@ -8,6 +8,7 @@ import time
 import subprocess
 import psutil
 import shutil
+import traceback
 from test_common import *
 
 def SwitchRoot():
@@ -118,9 +119,14 @@ def RespawnTicks(r):
     assert tick != 2
 
 
-def TestRecovery(c):
+def TestRecovery():
     #Former selftest.cpp TestRecovery()
     print "Make sure we can restore stopped child when parent is dead"
+
+    if os.getuid() == 0:
+        DropPrivileges()
+
+    c = porto.Connection(timeout=30)
 
     parent = c.Create("parent")
     parent.SetProperty("command", "sleep 1")
@@ -410,8 +416,13 @@ def TestRecovery(c):
     c = porto.Connection(timeout=30)
 
 #Former selftest.cpp TestWaitRecovery()
-def TestWaitRecovery(c):
+def TestWaitRecovery():
     print "Check wait for restored container"
+
+    if os.getuid() == 0:
+        DropPrivileges()
+
+    c = porto.Connection(timeout=30)
 
     aaa = c.Create("aaa")
     aaa.SetProperty("command", "sleep 3")
@@ -443,10 +454,14 @@ def TestWaitRecovery(c):
     aaa.Destroy()
 
 #Former selftest.cpp TestVolumeRecovery
-def TestVolumeRecovery(c):
+def TestVolumeRecovery():
     print "Make sure porto removes leftover volumes"
 
-    SwitchRoot()
+    if os.getpid() != 0:
+        SwitchRoot()
+
+    c = porto.Connection(timeout=30)
+
     try:
         shutil.rmtree("/tmp/volume_c")
     except OSError:
@@ -469,6 +484,8 @@ def TestVolumeRecovery(c):
     KillPid(GetSlavePid(), signal.SIGKILL)
     c.connect()
 
+    time.sleep(0.5)
+
     assert not os.path.exists("/place/porto_volumes/leftover_volume")
 
     print "Make sure porto preserves mounted loop/overlayfs"
@@ -488,10 +505,12 @@ def TestVolumeRecovery(c):
 
     os.rmdir("/tmp/volume_c")
 
-def TestTCCleanup(c):
+def TestTCCleanup():
     print "Make sure stale tc classes to be cleaned up"
 
     SwitchRoot()
+
+    c = porto.Connection(timeout=30)
 
     c.connect()
 
@@ -559,14 +578,180 @@ def TestTCCleanup(c):
 
     c.Destroy("a")
 
+def TestPersistentStorage():
+    print "Verifying volume persistent storage behavior"
+
+    if os.getuid() == 0:
+        DropPrivileges()
+
+    c = porto.Connection(timeout=30)
+
+    r = c.Create("test")
+    base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
+    assert len(c.ListStorage()) == 1
+
+    r.SetProperty("root", base.path)
+    r.SetProperty("command", "bash -c \'echo 123 > 123.txt\'")
+    r.Start()
+    r.Wait()
+    assert r.GetProperty("exit_status") == "0"
+
+    SwitchRoot()
+    subprocess.check_call([portod, "restart"])
+    DropPrivileges()
+
+    assert len(c.ListStorage()) == 1
+    r = c.Create("test")
+    base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
+
+    r.SetProperty("root", base.path)
+    r.SetProperty("command", "cat 123.txt")
+    r.Start()
+    r.Wait()
+    assert r.GetProperty("exit_status") == "0"
+    assert r.GetProperty("stdout") == "123\n"
+    r.Stop()
+
+    os.mkdir(base.path + "/loop")
+    loop = c.CreateVolume(base.path + "/loop", backend="loop", storage="test-persistent-loop", space_limit="1G")
+    assert len(c.ListStorage()) == 2
+
+    r.SetProperty("command", "bash -c \'echo 789 > /loop/loop.txt\'")
+    r.Start()
+    r.Wait()
+    r.GetProperty("exit_status") == "0"
+
+    SwitchRoot()
+    subprocess.check_call([portod, "restart"])
+    DropPrivileges()
+
+    assert len(c.ListStorage()) == 2
+    r = c.Create("test")
+    base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
+    loop = c.CreateVolume(base.path + "/loop", backend="loop", storage="test-persistent-loop", space_limit="1G")
+    r.SetProperty("root", base.path)
+    r.SetProperty("command", "cat /loop/loop.txt")
+    r.Start()
+    r.Wait()
+    assert r.GetProperty("exit_status") == "0"
+    assert r.GetProperty("stdout") == "789\n"
+    r.Stop()
+
+    assert Catch(c.RemoveStorage, "test-persistent-loop") == porto.exceptions.Busy
+    loop.Unlink()
+    c.RemoveStorage("test-persistent-loop")
+    assert len(c.ListStorage()) == 1
+
+    os.mkdir(base.path + "/native")
+    native = c.CreateVolume(base.path + "/native", backend="native", storage="test-persistent-native")
+    assert len(c.ListStorage()) == 2
+
+    r.SetProperty("command", "bash -c \'echo abcde > /native/abcde.txt\'")
+    r.Start()
+    r.Wait()
+    assert r.GetProperty("exit_status") == "0"
+
+    SwitchRoot()
+    subprocess.check_call([portod, "restart"])
+    DropPrivileges()
+    assert len(c.ListStorage()) == 2
+
+    r = c.Create("test")
+    base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
+    native = c.CreateVolume(base.path + "/native", backend="native", storage="test-persistent-native")
+    assert len(c.ListStorage()) == 2
+
+    r.SetProperty("root", base.path)
+    r.SetProperty("command", "cat /native/abcde.txt")
+    r.Start()
+    r.Wait()
+    assert r.GetProperty("exit_status") == "0"
+    assert r.GetProperty("stdout") == "abcde\n"
+    r.Destroy()
+
+    base.Unlink()
+    c.RemoveStorage("test-persistent-base")
+    c.RemoveStorage("test-persistent-native")
+
+    os.mkdir("/tmp/test-recover-place")
+    os.mkdir("/tmp/test-recover-place/porto_layers")
+    os.mkdir("/tmp/test-recover-place/porto_volumes")
+    os.mkdir("/tmp/test-recover-place/porto_storage")
+
+    v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native", private="some_private_value")
+    assert len(c.ListStorage(place="/tmp/test-recover-place")) == 1
+    f = open(v.path + "/test.txt", "w")
+    f.write("testtesttest")
+    f.close()
+
+    SwitchRoot()
+    subprocess.check_call([portod, "restart"])
+    DropPrivileges()
+
+    v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native")
+    assert len(c.ListStorage(place="/tmp/test-recover-place")) == 1
+    s = c.ListStorage(place="/tmp/test-recover-place")[0]
+    assert s.GetProperty("private_value") == "some_private_value"
+    f = open(v.path + "/test.txt", "r").read() == "testtesttest\n"
+
+    v.Unlink()
+    c.RemoveStorage("test", place="/tmp/test-recover-place")
+
+    assert len(c.ListStorage(place="/tmp/test-recover-place")) == 0
+    assert len(c.ListStorage()) == 0
+
+
+
 subprocess.check_call([portod, "--verbose", "reload"])
+ret = 0
 
-DropPrivileges()
+try:
+    TestRecovery()
+    TestWaitRecovery()
+    TestVolumeRecovery()
+    TestTCCleanup()
+    TestPersistentStorage()
+except BaseException as e:
+    print traceback.format_exc()
+    ret = 1
 
+SwitchRoot()
 c = porto.Connection(timeout=30)
-TestRecovery(c)
-TestWaitRecovery(c)
-TestVolumeRecovery(c)
-TestTCCleanup(c)
+
+for r in c.ListContainers():
+    try:
+        r.Destroy()
+    except:
+        pass
+
+for v in c.ListVolumes():
+    try:
+        v.Unlink()
+    except:
+        pass
+
+for s in c.ListStorage():
+    try:
+        s.RemoveStorage()
+    except:
+        pass
+
+if os.path.exists("/tmp/test-recover-place"):
+    for s in c.ListStorage(place="/tmp/test-recover-place"):
+        try:
+            s.RemoveStorage()
+        except:
+            pass
+
+if os.path.exists("/tmp/volume_c"):
+    shutil.rmtree("/tmp/volume_c")
+
+if os.path.exists("/place/porto_volumes/leftover_volume"):
+    shutil.rmtree("/place/porto_volumes/leftover_volume")
+
+if os.path.exists("/tmp/test-recover-place"):
+    shutil.rmtree("/tmp/test-recover-place")
 
 subprocess.check_call([portod, "--verbose", "--discard", "reload"])
+
+sys.exit(ret)
