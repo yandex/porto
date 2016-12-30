@@ -149,14 +149,21 @@ public:
     }
 
     TError ImportLayers() {
-        std::vector<std::string> known;
+        std::vector<Porto::Layer> known;
         TError error;
 
         if (Api->ListLayers(known, Place))
             return GetLastError();
 
         for (auto &layer : Layers) {
-            if (std::find(known.begin(), known.end(), layer) != known.end()) {
+            bool found = false;
+            for (auto &l: known) {
+                if (l.Name == layer) {
+                    found = true;
+                    break;
+                }
+            }
+            if (found) {
                 VolumeLayers.push_back(layer);
                 continue;
             }
@@ -1842,23 +1849,25 @@ public:
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
-        "[-P <place>] [-S <value_string>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball]",
+        "[-P <place>] [-S <private>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball]",
         "Manage overlayfs layers in internal storage",
         "    -P <place>               optional path to place\n"
-        "    -S <value_string>        store layer private value while importing or separately\n"
+        "    -S <private>             store layer private value while importing or separately\n"
         "    -I <layer> <tarball>     import layer from tarball\n"
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer> [layer...]    remove layer from storage\n"
-        "    -F                       remove all unused layes\n"
+        "    -F [days]                remove all unused layers (unused for [days])\n"
         "    -L                       list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
-        "    -G                       retrieve layer stored private value\n"
+        "    -G <layer>               retrieve layer stored private value\n"
+        "    -v                       be verbose\n"
         ) {}
 
     bool import = false;
     bool merge  = false;
     bool remove = false;
     bool list   = false;
+    bool verbose = false;
     bool export_ = false;
     bool flush = false;
     bool get_private = false;
@@ -1878,6 +1887,7 @@ public:
             { 'E', false, [&](const char *arg) { export_= true; } },
             { 'G', false, [&](const char *arg) { get_private = true; } },
             { 'S', true, [&](const char *arg) { set_private = true; private_value = arg; } },
+            { 'v', false, [&](const char *arg) { verbose = true; } },
         });
 
         std::string path;
@@ -1912,25 +1922,48 @@ public:
                     PrintError("Can't remove layer");
             }
         } else if (flush) {
-            std::vector<std::string> layers;
+            uint64_t age = 0;
+            if (args.size() >= 1) {
+                if (StringToUint64(args[0], age))
+                    return EXIT_FAILURE;
+                age *= 60*60*24;
+            }
+            std::vector<Porto::Layer> layers;
             ret = Api->ListLayers(layers, place);
             if (ret) {
                 PrintError("Can't list layers");
                 return EXIT_FAILURE;
             } else {
-                for (const auto &l: layers)
-                    (void)Api->RemoveLayer(l, place);
+                for (const auto &l: layers) {
+                    if (l.LastUsage < age)
+                        continue;
+                    if (verbose)
+                        std::cout << "remove " << l.Name << std::endl;
+                    (void)Api->RemoveLayer(l.Name, place);
+                }
             }
         } else if (list) {
-            std::vector<std::string> layers;
+            std::vector<Porto::Layer> layers;
             ret = Api->ListLayers(layers, place);
             if (ret) {
                 PrintError("Can't list layers");
             } else {
-                for (const auto &l: layers)
-                    std::cout << l << std::endl;
+                for (const auto &l: layers) {
+                    std::cout << l.Name << std::endl;
+                    if (!verbose)
+                        continue;
+                    if (l.OwnerUser.size())
+                        std::cout << "\towner\t" << l.OwnerUser << ":" << l.OwnerGroup << std::endl;
+                    if (l.LastUsage)
+                        std::cout << "\tused\t" << StringFormatDuration(l.LastUsage * 1000) << " ago" << std::endl;
+                    if (l.PrivateValue.size())
+                        std::cout << "\tprivate\t" << l.PrivateValue << std::endl;
+                    std::cout << std::endl;
+                }
             }
         } else if (get_private) {
+            if (args.size() < 1)
+                return EXIT_FAILURE;
             ret = Api->GetLayerPrivate(private_value, args[0], place);
 
             if (ret)
@@ -1938,6 +1971,8 @@ public:
             else
                 std::cout << private_value << std::endl;
         } else if (set_private) {
+            if (args.size() < 1)
+                return EXIT_FAILURE;
             ret = Api->SetLayerPrivate(private_value, args[0], place);
             if (ret)
                 PrintError("Can't set layer private value");

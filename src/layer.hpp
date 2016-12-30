@@ -9,9 +9,13 @@ constexpr const char *LAYER_PRIVATE_PREFIX = "_private_";
 
 extern TError CheckPlace(const TPath &place, bool init = false);
 extern bool LayerInUse(const std::string &name, const TPath &place);
+extern TError LayerOwner(const std::string &name, const TPath &place, TCred &owner);
+extern uint64_t LayerLastUsage(const std::string &name, const TPath &place);
 extern bool LayerIsJunk(const std::string &name);
 extern TError ImportLayer(const std::string &name, const TPath &place,
-			  const TPath &tarball, bool merge, const std::string private_value);
+			  const TPath &tarball, bool merge,
+			  const std::string private_value,
+			  const TCred &owner);
 extern TError RemoveLayer(const std::string &name, const TPath &place);
 extern TError GetLayerPrivate(const std::string &name, const TPath &place,
                               std::string &private_value);

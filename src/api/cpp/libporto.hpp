@@ -18,6 +18,14 @@ struct Volume {
     std::vector<std::string> Containers;
 };
 
+struct Layer {
+    std::string Name;
+    std::string OwnerUser;
+    std::string OwnerGroup;
+    std::string PrivateValue;
+    uint64_t LastUsage;
+};
+
 struct GetResponse {
     std::string Value;
     int Error;
@@ -101,7 +109,7 @@ public:
 
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer, const std::string &place = "");
-    int ListLayers(std::vector<std::string> &layers,
+    int ListLayers(std::vector<Layer> &layers,
                    const std::string &place = "");
 
     int GetLayerPrivate(std::string &private_value, const std::string &layer,

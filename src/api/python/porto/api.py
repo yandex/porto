@@ -259,10 +259,20 @@ class Container(object):
 
 
 class Layer(object):
-    def __init__(self, conn, name, place=None):
+    def __init__(self, conn, name, place=None, desc=None):
         self.conn = conn
         self.name = name
         self.place = place
+        if desc is None:
+            self.owner_user = ""
+            self.owner_group = ""
+            self.last_usage = None
+            self.private_value = None
+        else:
+            self.owner_user = desc.owner_user
+            self.owner_group = desc.owner_group
+            self.last_usage = desc.last_usage
+            self.private_value = desc.private_value
 
     def __str__(self):
         return 'Layer `{}` at {}'.format(self.name, self.place or "(default)")
@@ -595,11 +605,6 @@ class Connection(object):
         self.rpc.call(request, self.rpc.timeout)
         return Layer(self, layer, place)
 
-    def FindLayer(self, layer, place=None):
-        if layer not in self._ListLayers(place):
-            raise exceptions.LayerNotFound("layer `%s` not found" % layer)
-        return Layer(self, layer, place)
-
     def RemoveLayer(self, layer, place=None):
         request = rpc_pb2.TContainerRequest()
         request.removeLayer.layer = layer
@@ -629,15 +634,28 @@ class Connection(object):
         request.exportLayer.tarball = tarball
         self.rpc.call(request, self.rpc.timeout)
 
-    def _ListLayers(self, place=None):
+    def _ListLayers(self, place=None, pattern=None):
         request = rpc_pb2.TContainerRequest()
         request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
         if place is not None:
             request.listLayers.place = place
-        return self.rpc.call(request, self.rpc.timeout).layers.layer
+        if pattern is not None:
+            request.listLayers.pattern = pattern
+        return self.rpc.call(request, self.rpc.timeout).layers
 
     def ListLayers(self, place=None):
-        return [Layer(self, l) for l in self._ListLayers(place)]
+        response = self._ListLayers(place)
+        if response.layers:
+            return [Layer(self, l.name, place, l) for l in response.layers]
+        return [Layer(self, l, place) for l in response.layer]
+
+    def FindLayer(self, layer, place=None):
+        response = self._ListLayers(place, layer)
+        if layer not in response.layer:
+            raise exceptions.LayerNotFound("layer `%s` not found" % layer)
+        if response.layers and response.layers[0].name == layer:
+            return Layer(self, layer, place, response.layers[0])
+        return Layer(self, layer, place)
 
     def ConvertPath(self, path, source, destination):
         request = rpc_pb2.TContainerRequest()

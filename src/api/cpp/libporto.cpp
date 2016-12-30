@@ -560,14 +560,29 @@ int Connection::RemoveLayer(const std::string &layer, const std::string &place) 
     return Impl->Rpc();
 }
 
-int Connection::ListLayers(std::vector<std::string> &layers, const std::string &place) {
+int Connection::ListLayers(std::vector<Layer> &layers, const std::string &place) {
     auto req = Impl->Req.mutable_listlayers();
     if (place.size())
         req->set_place(place);
     int ret = Impl->Rpc();
     if (!ret) {
-        const auto &list = Impl->Rsp.layers().layer();
-        layers.assign(std::begin(list), std::end(list));
+        if (Impl->Rsp.layers().layers().size()) {
+            for (auto &layer: Impl->Rsp.layers().layers()) {
+                Layer l;
+                l.Name = layer.name();
+                l.OwnerUser = layer.owner_user();
+                l.OwnerGroup = layer.owner_group();
+                l.PrivateValue = layer.private_value();
+                l.LastUsage = layer.last_usage();
+                layers.push_back(l);
+            }
+        } else {
+            for (auto &layer: Impl->Rsp.layers().layer()) {
+                Layer l;
+                l.Name = layer;
+                layers.push_back(l);
+            }
+        }
     }
     return ret;
 }

@@ -11,6 +11,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <libgen.h>
@@ -731,6 +732,12 @@ TError TPath::Chattr(unsigned add_flags, unsigned del_flags) const {
     return TError::Success();
 }
 
+TError TPath::Touch() const {
+    if (utimes(c_str(), NULL))
+        return TError(EError::Unknown, errno, "utimes " + Path);
+    return TError::Success();
+}
+
 #ifndef MS_LAZYTIME
 # define MS_LAZYTIME    (1<<25)
 #endif
@@ -1312,6 +1319,12 @@ TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchmodat(Fd, path.c_str(), mode, AT_SYMLINK_NOFOLLOW))
         return TError(EError::Success, errno, "Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
+    return TError::Success();
+}
+
+TError TFile::Touch() const {
+    if (futimes(Fd, NULL))
+        return TError(EError::Unknown, errno, "futimes");
     return TError::Success();
 }
 

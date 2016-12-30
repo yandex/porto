@@ -130,9 +130,34 @@ bool LayerInUse(const std::string &name, const TPath &place) {
     return false;
 }
 
+TError LayerOwner(const std::string &name, const TPath &place, TCred &owner) {
+    TPath private_file = place / PORTO_LAYERS / LAYER_PRIVATE_PREFIX + name;
+
+    if (private_file.Exists()) {
+        struct stat st;
+        TError error = private_file.StatStrict(st);
+        if (error)
+            return error;
+        owner = TCred(st.st_uid, st.st_gid);
+    } else
+        owner = TCred(NoUser, NoGroup);
+
+    return TError::Success();
+}
+
+uint64_t LayerLastUsage(const std::string &name, const TPath &place) {
+    struct stat st;
+    if (!(place / PORTO_LAYERS / LAYER_PRIVATE_PREFIX + name).StatStrict(st))
+        return time(NULL) - st.st_mtime;
+    else if (!(place / PORTO_LAYERS / name).StatStrict(st))
+        return time(NULL) - st.st_mtime;
+    return 0;
+}
+
 TError ImportLayer(const std::string &name, const TPath &place,
                    const TPath &tarball, bool merge,
-                   const std::string private_value) {
+                   const std::string private_value,
+                   const TCred &owner) {
     TPath layers = place / PORTO_LAYERS;
     TPath layer = layers / name;
     TPath layer_tmp = layers / LAYER_IMPORT_PREFIX + name;
@@ -190,6 +215,10 @@ TError ImportLayer(const std::string &name, const TPath &place,
         goto err;
 
     error = private_file.WriteAll(private_value);
+    if (error)
+        goto err;
+
+    error = private_file.Chown(owner);
     if (error)
         goto err;
 

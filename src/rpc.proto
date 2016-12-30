@@ -345,6 +345,7 @@ message TLayerRemoveRequest {
 
 message TLayerListRequest {
 	optional string place = 1;
+	optional string pattern = 2;
 }
 
 message TLayerGetPrivateRequest {
@@ -358,8 +359,17 @@ message TLayerSetPrivateRequest {
 	required string private_value = 3;
 }
 
+message TLayerDescription {
+	required string name = 1;
+	required string owner_user = 2;
+	required string owner_group = 3;
+	required uint64 last_usage = 4;
+	required string private_value = 5;
+}
+
 message TLayerListResponse {
 	repeated string layer = 1;
+	repeated TLayerDescription layers = 2;
 }
 
 message TLayerGetPrivateResponse {

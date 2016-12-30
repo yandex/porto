@@ -163,7 +163,7 @@ public:
     TError Truncate(off_t size) const;
     TError RotateLog(off_t max_disk_usage, off_t &loss) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
-
+    TError Touch() const;
 
     static const TFlagsNames MountFlags;
     static const TFlagsNames UmountFlags;
@@ -252,6 +252,7 @@ public:
         return ChownAt(path, cred.Uid, cred.Gid);
     }
     TError ChmodAt(const TPath &path, mode_t mode) const;
+    TError Touch() const;
     TError WalkFollow(const TFile &dir, const TPath &path);
     TError WalkStrict(const TFile &dir, const TPath &path);
     TError ClearDirectory() const;

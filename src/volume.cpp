@@ -642,8 +642,12 @@ public:
                     error = TError(EError::Permission, "Layer path not permitted: " + name);
                     goto err;
                 }
-            } else
+            } else {
                 path = Volume->Place / PORTO_LAYERS / name;
+                TPath private_file = Volume->Place / PORTO_LAYERS / LAYER_PRIVATE_PREFIX + name;
+                if (private_file.Touch())
+                    (void)path.Touch();
+            }
 
             std::string layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
             temp = Volume->GetInternal(layer_id);
@@ -1557,6 +1561,10 @@ TError TVolume::DestroyOne() {
             error = RemoveLayer(layer, Place);
             if (error && error.GetError() != EError::Busy)
                 L_ERR() << "Cannot remove layer: " << error << std::endl;
+        } else if (layer[0] != '/') {
+            TPath private_file = Place / PORTO_LAYERS / LAYER_PRIVATE_PREFIX + layer;
+            if (private_file.Touch())
+                (void)(Place / PORTO_LAYERS / layer).Touch();
         }
     }
 

@@ -902,7 +902,8 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     std::string layer_private;
 
     return ImportLayer(req.layer(), place, tarball, req.merge(),
-                       req.has_private_value() ? req.private_value() : "" );
+                       req.has_private_value() ? req.private_value() : "",
+                       CL->Cred);
 }
 
 noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
@@ -1001,12 +1002,36 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     TPath layers_dir = place / PORTO_LAYERS;
     std::vector<std::string> layers;
 
-    TError error = layers_dir.ReadDirectory(layers);
+    TError error = layers_dir.ListSubdirs(layers);
     if (!error) {
         auto list = rsp.mutable_layers();
         for (auto &layer: layers) {
-            if (!LayerIsJunk(layer))
-                list->add_layer(layer);
+            if (LayerIsJunk(layer))
+                continue;
+
+            if (req.has_pattern() && !StringMatch(layer, req.pattern()))
+                continue;
+
+            list->add_layer(layer);
+
+            auto desc = list->add_layers();
+            desc->set_name(layer);
+
+            std::string private_value;
+            if (GetLayerPrivate(layer, place, private_value))
+                private_value = "";
+            desc->set_private_value(private_value);
+
+            desc->set_last_usage(LayerLastUsage(layer, place));
+
+            TCred owner;
+            if (!LayerOwner(layer, place, owner) && owner.Uid != NoUser) {
+                desc->set_owner_user(owner.User());
+                desc->set_owner_group(owner.Group());
+            } else {
+                desc->set_owner_user("");
+                desc->set_owner_group("");
+            }
         }
     }
     return error;
