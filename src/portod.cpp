@@ -1555,7 +1555,11 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    config.Load();
+    TError error = config.Load();
+    if (error) {
+        std::cerr << "failed to load config" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     if (cmd == "" || cmd == "daemon")
         return PortodMain();

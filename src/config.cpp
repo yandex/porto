@@ -103,7 +103,9 @@ bool TConfig::LoadFile(const std::string &path) {
     return true;
 }
 
-void TConfig::Load() {
+TError TConfig::Load() {
+    TError error;
+
     LoadDefaults();
 
     if (!LoadFile("/etc/portod.conf"))
@@ -111,8 +113,15 @@ void TConfig::Load() {
 
     Verbose |= config().log().verbose();
 
-    InitCred();
+    error = InitCred();
+    if (error) {
+        L_ERR() << "Failed initialize credentials" << std::endl;
+        return error;
+    }
+
     InitCapabilities();
+
+    return error;
 }
 
 int TConfig::Test(const std::string &path) {

@@ -14,7 +14,7 @@ TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups
 TError GroupId(const std::string &group, gid_t &gid);
 std::string GroupName(gid_t gid);
 
-void InitCred();
+TError InitCred();
 
 constexpr uid_t RootUser = (uid_t)0;
 constexpr gid_t RootGroup = (gid_t)0;
