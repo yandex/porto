@@ -560,10 +560,14 @@ int Connection::RemoveLayer(const std::string &layer, const std::string &place) 
     return Impl->Rpc();
 }
 
-int Connection::ListLayers(std::vector<Layer> &layers, const std::string &place) {
+int Connection::ListLayers(std::vector<Layer> &layers,
+                           const std::string &place,
+                           const std::string &mask) {
     auto req = Impl->Req.mutable_listlayers();
     if (place.size())
         req->set_place(place);
+    if (mask.size())
+        req->set_mask(mask);
     int ret = Impl->Rpc();
     if (!ret) {
         if (Impl->Rsp.layers().layers().size()) {
@@ -613,10 +617,13 @@ int Connection::SetLayerPrivate(const std::string &private_value,
 }
 
 int Connection::ListStorage(std::vector<Storage> &storages,
-                            const std::string &place) {
+                            const std::string &place,
+                            const std::string &mask) {
     auto req = Impl->Req.mutable_liststorage();
     if (place.size())
         req->set_place(place);
+    if (mask.size())
+        req->set_mask(mask);
     int ret = Impl->Rpc();
     if (!ret) {
         const auto &list = Impl->Rsp.storagelist().storages();

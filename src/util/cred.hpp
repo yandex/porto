@@ -50,6 +50,8 @@ struct TCred {
 
     bool IsRootUser() const { return Uid == RootUser; }
 
+    bool IsUnknown() const { return Uid == NoUser && Gid == NoGroup; }
+
     bool IsMemberOf(gid_t group) const;
 
     std::string ToString() const {

@@ -87,6 +87,9 @@ std::string UserName(uid_t uid) {
     struct passwd pwd, *ptr;
     std::vector<char> buf(PwdBufSize, '\0');
 
+    if (uid == NoUser)
+        return "";
+
     while (getpwuid_r(uid, &pwd, buf.data(), buf.size(), &ptr)) {
         if (errno != ERANGE)
             return std::to_string(uid);
@@ -130,6 +133,9 @@ TError GroupId(const std::string &group, gid_t &gid) {
 std::string GroupName(gid_t gid) {
     struct group grp, *ptr;
     std::vector<char> buf(GrpBufSize, '\0');
+
+    if (gid == NoGroup)
+        return "";
 
     while (getgrgid_r(gid, &grp, buf.data(), buf.size(), &ptr)) {
         if (errno != ERANGE)

@@ -31,7 +31,7 @@ def VerifyProperties(r, knobs):
 
 knobs = {
     "aging_time" : "3600",
-    "bind" : "/var/log /newvar;/home /home ro",
+    "bind" : "/var/log /newvar rw;/home /home ro",
     "bind_dns" : True,
     "capabilities" : "CHOWN;DAC_OVERRIDE;DAC_READ_SEARCH;FOWNER;FSETID;KILL;"\
                      "SETGID;SETUID;SETPCAP;LINUX_IMMUTABLE;NET_BIND_SERVICE;"\

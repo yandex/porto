@@ -96,8 +96,12 @@ TError TStdStream::OpenOutside(const TContainer &container,
 
         /* check permissions agains our copy */
         path = StringFormat("/proc/self/fd/%u", Stream);
-        if (!path.HasAccess(client.TaskCred, Stream ? TPath::W : TPath::R) &&
-                !path.HasAccess(client.Cred, Stream ? TPath::W : TPath::R))
+        struct stat st;
+        error = path.StatFollow(st);
+        if (error)
+            return error;
+        if (!TFile::Access(st, client.TaskCred, Stream ? TFile::W : TFile::R) &&
+                !TFile::Access(st, client.Cred, Stream ? TFile::W : TFile::R))
             return TError(EError::Permission,
                     "Not enough permissions for redirect: " + Path.ToString());
     } else if (Outside)

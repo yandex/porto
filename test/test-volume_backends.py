@@ -259,7 +259,6 @@ def backend_tmpfs(c):
     for path in [None, TMPDIR]:
         args["space_limit"] = "1M"
         check_readonly(c, path, **args)
-        check_place(c, path, **args)
         check_mounted(c, path, **args)
         check_destroy_linked_non_root(c, path, **args)
         check_tune_space_limit(c, path, **args)
@@ -284,7 +283,6 @@ def backend_quota(c):
     check_mounted(c, TMPDIR, **args)
     assert Catch(check_readonly, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
 
-    check_place(c, TMPDIR, **args)
     check_destroy_linked_non_root(c, TMPDIR, **args)
 
     assert Catch(check_tune_space_limit, c, TMPDIR, **args) == AssertionError

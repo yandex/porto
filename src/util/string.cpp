@@ -202,6 +202,7 @@ void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
                         char sep_inner, char sep_outer) {
     std::stringstream ss;
 
+    tuples.clear();
     tuples.push_back({});
 
     auto i = str.begin();
@@ -246,6 +247,8 @@ void SplitEscapedString(const std::string &str, TTuple &tuple, char sep) {
 
     if (tuples.size())
         tuple = tuples.front();
+    else
+        tuple.clear();
 }
 
 std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
@@ -334,6 +337,8 @@ bool StringEndsWith(const std::string &str, const std::string &sfx) {
 }
 
 bool StringMatch(const std::string &str, const std::string &pattern) {
+    if (pattern == "***")
+        return true;
     return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
 }
 

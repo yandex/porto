@@ -5,6 +5,7 @@
 
 
 extern "C" {
+#include <sys/fcntl.h>
 #include <sys/stat.h>
 #include <linux/kdev_t.h>
 }
@@ -29,78 +30,104 @@ static std::vector<TPath> SystemPaths = {
 bool IsSystemPath(const TPath &path) {
     TPath normal = path.NormalPath();
 
-    return normal.IsRoot() || normal.IsInside(SystemPaths);
+    if (normal.IsRoot())
+        return true;
+
+    if (normal == "/home")
+        return true;
+
+    for (auto &sys: SystemPaths)
+        if (normal.IsInside(sys))
+            return true;
+
+    return false;
 }
 
 TError TMountNamespace::MountBinds() {
     for (const auto &bm : BindMounts) {
-        bool ro = bm.ReadOnly;
-        TPath src, dest;
+        TPath source, target;
+        TFile src, dst;
+        bool directory;
         TError error;
 
         if (bm.Source.IsAbsolute())
-            src = bm.Source;
+            source = bm.Source;
         else
-            src = ParentCwd / bm.Source;
+            source = ParentCwd / bm.Source;
 
-        if (bm.Dest.IsAbsolute())
-            dest = Root / bm.Dest;
+        if (bm.Target.IsAbsolute())
+            target = Root / bm.Target;
         else
-            dest = Root / Cwd / bm.Dest;
+            target = Root / Cwd / bm.Target;
 
-        if (!StringStartsWith(dest.RealPath().ToString(), Root.ToString()))
-            return TError(EError::InvalidValue, "Bind mount target " + dest.ToString() +
-                    " outside of container root " + Root.ToString());
+        error = src.OpenPath(source);
+        if (error)
+            return error;
 
-        if (!src.Exists())
-            return TError(EError::InvalidValue, "Bind mount source does not exist " + src.ToString());
+        directory = source.IsDirectoryFollow();
 
-        /*
-         * ReadOnly  -> ro
-         * ReadWrite -> rw
-         * neither   -> rw if have write permissions
-         */
-        if (!src.HasAccess(OwnerCred, ro ? TPath::RU : TPath::RWU)) {
-            bool sysPath = IsSystemPath(src);
+        if (!bm.ReadOnly || (directory && IsSystemPath(source)))
+            error = src.WriteAccess(BindCred);
+        else
+            error = src.ReadAccess(BindCred);
+        if (error)
+            return error;
 
-            if (config().privileges().enforce_bind_permissions() || sysPath) {
-                if (!sysPath && !ro && !bm.ReadWrite && src.HasAccess(OwnerCred, TPath::RU))
-                    ro = true;
-                else
-                    return TError(EError::Permission, "User " + OwnerCred.ToString() +
-                            " have not enough permissions for bind mount source " + src.ToString());
-            } else
-                L_WRN() << Container << ": User " << OwnerCred.ToString() <<
-                    " have not enough permissions for bind mount source " + src.ToString() << std::endl;
-        }
+        if (!target.Exists()) {
+            TPath base = target.DirName();
+            std::list<std::string> dirs;
+            TFile dir;
 
-        if (!dest.HasAccess(OwnerCred, TPath::WUP)) {
-            if (config().privileges().enforce_bind_permissions() ||
-                    IsSystemPath(dest))
-                return TError(EError::Permission, "User " + OwnerCred.ToString() +
-                        " have no write permissions for bind mount target " + dest.ToString());
-            else
-                L_WRN() << Container << ": User " << OwnerCred.ToString() <<
-                    " have no write permissions for bind mount target " + dest.ToString() << std::endl;
-        }
+            while (!base.Exists()) {
+                dirs.push_front(base.BaseName());
+                base = base.DirName();
+            }
 
-        if (dest.Exists()) {
-            if (src.IsDirectoryFollow() != dest.IsDirectoryFollow())
-                return TError(EError::InvalidProperty,
-                        "Bind mount source and target must be both file or directory");
-        } else {
-            if (src.IsDirectoryFollow())
-                error = dest.MkdirAll(0755);
-            else
-                error = dest.CreateAll(0600);
-            if (!error)
-                error = dest.Chown(OwnerCred);
+            error = dir.OpenDir(base);
             if (error)
                 return error;
-        }
 
-        // Drop nosuid,noexec,nodev
-        error = dest.BindRemount(src, ro ? MS_RDONLY : 0);
+            if (Root.IsRoot())
+                error = dir.WriteAccess(BindCred);
+            else if (!dir.RealPath().IsInside(Root))
+                error = TError(EError::InvalidValue, "Bind mount target " +
+                               target.ToString() + " out of chroot");
+
+            for (auto &name: dirs) {
+                if (!error)
+                    error = dir.MkdirAt(name, 0755);
+                if (!error)
+                    error = dir.WalkStrict(dir, name);
+            }
+            if (error)
+                return error;
+
+            if (directory) {
+                error = dir.MkdirAt(target.BaseName(), 0755);
+                if (!error)
+                    error = dst.OpenDir(target);
+            } else
+                error = dst.OpenAt(dir, target.BaseName(), O_CREAT | O_WRONLY | O_CLOEXEC, 0644);
+        } else {
+            if (directory)
+                error = dst.OpenDir(target);
+            else
+                error = dst.OpenRead(target);
+            if (!error && Root.IsRoot() && IsSystemPath(target))
+                error = dst.WriteAccess(BindCred);
+        }
+        if (error)
+            return error;
+
+        if (!Root.IsRoot() && !dst.RealPath().IsInside(Root))
+            return TError(EError::InvalidValue, "Bind mount target " +
+                          target.ToString() + " out of chroot");
+
+        error = dst.ProcPath().Bind(src.ProcPath());
+        if (error)
+            return error;
+
+        error = target.Remount(MS_REMOUNT | MS_BIND | (bm.ReadOnly ? MS_RDONLY : 0));
         if (error)
             return error;
     }

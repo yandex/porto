@@ -39,6 +39,9 @@ public:
     TError CanControl(const TCred &cred);
     TError CanControl(const TContainer &ct, bool child = false);
 
+    TError ReadAccess(const TFile &file);
+    TError WriteAccess(const TFile &file);
+
     TError AcceptConnection(int listenFd);
     void CloseConnection();
 
@@ -63,6 +66,8 @@ public:
 
     TPath ComposePath(const TPath &path);
     TPath ResolvePath(const TPath &path);
+    TPath DefaultPlace();
+    TError CanControlPlace(const TPath &place);
 
     friend std::ostream& operator<<(std::ostream& stream, TClient& client);
 

@@ -123,6 +123,7 @@ public:
             SplitEscapedString(val, Layers, ';');
         } else if (key == "place") {
             Place = val;
+            Properties.emplace_back(key, val);
         } else
             Properties.emplace_back(key, val);
 
@@ -1896,7 +1897,9 @@ public:
                 if (s.LastUsage < age)
                     continue;
                 std::cout << "remove " << s.Name << std::endl;
-                (void)Api->RemoveStorage(s.Name, place);
+                ret = Api->RemoveStorage(s.Name, place);
+                if (ret)
+                    PrintError("Cannot remove storage");
             }
         } else if (list) {
             std::vector<Porto::Storage> storage;
@@ -1906,15 +1909,13 @@ public:
             } else {
                 for (const auto &s: storage) {
                     std::cout << s.Name << std::endl;
-
-                    std::cout << "  " << std::left << std::setw(20) << "Owner: "
-                              << s.OwnerUser << ":" << s.OwnerGroup << std::endl;
-
-                    std::cout << "  " << std::left << std::setw(20) << "Last usage: "
-                              << StringFormatDuration(s.LastUsage * 1000) << " ago" << std::endl;
-
-                    std::cout << "  " << std::left << std::setw(20) << "Private: "
-                              << s.PrivateValue << std::endl << std::endl;
+                    if (s.OwnerUser.size())
+                        std::cout << "\towner\t" << s.OwnerUser << ":" << s.OwnerGroup << std::endl;
+                    if (s.LastUsage)
+                        std::cout << "\tusage\t" << StringFormatDuration(s.LastUsage * 1000) << " ago" << std::endl;
+                    if (s.PrivateValue.size())
+                        std::cout << "\tprivate\t" << s.PrivateValue << std::endl;
+                    std::cout << std::endl;
                 }
             }
         } else {
@@ -2019,7 +2020,9 @@ public:
                         continue;
                     if (verbose)
                         std::cout << "remove " << l.Name << std::endl;
-                    (void)Api->RemoveLayer(l.Name, place);
+                    ret = Api->RemoveLayer(l.Name, place);
+                    if (ret)
+                        PrintError("Cannot remove layer");
                 }
             }
         } else if (list) {

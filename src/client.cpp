@@ -5,6 +5,7 @@
 #include "rpc.hpp"
 #include "client.hpp"
 #include "container.hpp"
+#include "volume.hpp"
 #include "property.hpp"
 #include "statistics.hpp"
 #include "config.hpp"
@@ -334,6 +335,19 @@ TPath TClient::ResolvePath(const TPath &path) {
     return ClientContainer->RootPath / path;
 }
 
+TPath TClient::DefaultPlace() {
+    if (ClientContainer->Place.size())
+        return ClientContainer->Place[0];
+    return PORTO_PLACE;
+}
+
+TError TClient::CanControlPlace(const TPath &place) {
+    for (auto &mask: ClientContainer->Place)
+        if (StringMatch(place.ToString(), mask))
+            return TError::Success();
+    return TError(EError::Permission, "You are not permitted to use place " + place.ToString());
+}
+
 bool TClient::IsSuperUser(void) const {
     return AccessLevel >= EAccessLevel::SuperUser;
 }
@@ -350,7 +364,7 @@ TError TClient::CanControl(const TCred &other) {
     if (AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "No write access at all");
 
-    if (IsSuperUser() || Cred.Uid == other.Uid)
+    if (IsSuperUser() || Cred.Uid == other.Uid || other.IsUnknown())
         return TError::Success();
 
     /* Everybody can control users from group porto-containers */
@@ -364,8 +378,7 @@ TError TClient::CanControl(const TCred &other) {
     if (other.IsMemberOf(UserCtGroup))
         return TError::Success();
 
-    return TError(EError::Permission, "User " + Cred.ToString() +
-                                      " cannot control " + other.ToString());
+    return TError(EError::Permission, Cred.ToString() + " cannot control " + other.ToString());
 }
 
 TError TClient::CanControl(const TContainer &ct, bool child) {
@@ -395,6 +408,54 @@ TError TClient::CanControl(const TContainer &ct, bool child) {
         return TError::Success();
 
     return TError(EError::Permission, "Not a child container: " + ct.Name);
+}
+
+TError TClient::ReadAccess(const TFile &file) {
+    TError error = file.ReadAccess(TaskCred);
+
+    /* Without chroot read access to file is enough */
+    if (!error && ClientContainer->RootPath.IsRoot())
+        return error;
+
+    /* Check that real path is inside chroot */
+    TPath path = file.RealPath();
+    if (!path.IsInside(ClientContainer->RootPath))
+        return TError(EError::Permission, "Path out of chroot " + path.ToString());
+
+    /* Volume owner also gains full control inside */
+    if (error) {
+        auto volume = TVolume::Locate(path);
+        if (volume && CanControl(volume->VolumeOwner))
+            error = TError::Success();
+    }
+
+    return error;
+}
+
+TError TClient::WriteAccess(const TFile &file) {
+    TError error = file.WriteAccess(TaskCred);
+
+    /* Without chroot write access to file is enough */
+    if (!error && ClientContainer->RootPath.IsRoot())
+        return error;
+
+    /* Check that real path is inside chroot */
+    TPath path = file.RealPath();
+    if (!path.IsInside(ClientContainer->RootPath))
+        return TError(EError::Permission, "Path out of chroot " + path.ToString());
+
+    /* Inside chroot everybody gain root access but fs might be read-only */
+    if (error && ClientContainer->RootPath.IsRoot())
+        error = file.WriteAccess(TCred(RootUser, RootGroup));
+
+    /* Also volume owner gains full access inside */
+    if (error) {
+        auto volume = TVolume::Locate(path);
+        if (volume && CanControl(volume->VolumeOwner))
+            error = TError::Success();
+    }
+
+    return error;
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {

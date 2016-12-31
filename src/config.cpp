@@ -82,9 +82,6 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_autoconf_timeout_s(120);
     config().mutable_network()->set_proxy_ndp(true);
     config().mutable_network()->set_watchdog_ms(60000);
-
-    // FIXME set to true and deprecate this option
-    config().mutable_privileges()->set_enforce_bind_permissions(false);
 }
 
 bool TConfig::LoadFile(const std::string &path) {

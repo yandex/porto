@@ -303,6 +303,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     else
         NsName = "";
 
+    if (IsRoot())
+        Place = { PORTO_PLACE, "***" };
+    else
+        Place = Parent->Place;
+
     CpuPolicy = "normal";
 
     SchedPolicy = SCHED_OTHER;
@@ -1338,7 +1343,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 
     taskEnv->Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
 
-    taskEnv->Mnt.OwnerCred = OwnerCred;
+    taskEnv->Mnt.BindCred = Parent->RootPath.IsRoot() ? CL->TaskCred : TCred(RootUser, RootGroup);
 
     taskEnv->Cred = TaskCred;
 
@@ -1623,6 +1628,21 @@ TError TContainer::Start() {
 
     SanitizeCapabilities();
 
+    /* Enforce place restictions */
+    if (HasProp(EProperty::PLACE) && Parent) {
+        for (auto &place: Place) {
+            bool allowed = false;
+            for (auto &pp: Parent->Place)
+                allowed |= StringMatch(place, pp);
+            if (!allowed)
+                return TError(EError::Permission, "Place " + place + " is not allowed by parent container");
+        }
+    } else if (Parent) {
+        Place = Parent->Place;
+        if (Root != "/")
+            Place = {PORTO_PLACE};
+    }
+
     error = StartOne();
     if (error)
         Statistics->ContainersFailedStart++;
@@ -1723,10 +1743,9 @@ TError TContainer::PrepareResources() {
         cfg[V_BACKEND] = "loop";
         cfg[V_STORAGE] = RootPath.ToString();
         cfg[V_READ_ONLY] = BoolToString(RootRo);
+        cfg[V_CONTAINERS] = ROOT_PORTO_NAMESPACE + Name;
 
-        RootPath = Parent->RootPath;
-
-        error = TVolume::Create(TPath(), cfg, *this, TaskCred, RootVolume);
+        error = TVolume::Create(cfg, RootVolume);
         if (error) {
             L_ERR() << "Cannot create root volume: " << error << std::endl;
             FreeResources();
@@ -2835,7 +2854,7 @@ void TContainerWaiter::AddWildcard(std::shared_ptr<TContainerWaiter> &waiter) {
 
 bool TContainerWaiter::MatchWildcard(const std::string &name) {
     for (const auto &wildcard: Wildcards)
-        if (wildcard == "***" || StringMatch(name, wildcard))
+        if (StringMatch(name, wildcard))
             return true;
     return false;
 }

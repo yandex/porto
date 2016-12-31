@@ -19,10 +19,13 @@ constexpr const char *V_CONTAINERS = "containers";
 constexpr const char *V_LOOP_DEV = "_loop_dev";
 constexpr const char *V_AUTO_PATH = "_auto_path";
 
+constexpr const char *V_OWNER_USER = "owner_user";
+constexpr const char *V_OWNER_GROUP = "owner_group";
+constexpr const char *V_CREATOR = "creator";
+
 constexpr const char *V_USER = "user";
 constexpr const char *V_GROUP = "group";
 constexpr const char *V_PERMISSIONS = "permissions";
-constexpr const char *V_CREATOR = "creator";
 
 constexpr const char *V_STORAGE = "storage";
 constexpr const char *V_LAYERS = "layers";
@@ -53,7 +56,6 @@ public:
     virtual TError Build(void) =0;
     virtual TError Destroy(void) =0;
     virtual TError StatFS(TStatFS &result) =0;
-    virtual TError Clear(void);
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
 };
 
@@ -66,36 +68,42 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
 
 public:
     TPath Path;
+    TPath InternalPath;
     bool IsAutoPath = false;
 
+    TPath Place = PORTO_PLACE;
+    bool CustomPlace = false;
+
     std::string Storage;
-    TPath StorageFile;
-    TFile StorageFd;
+    TPath StoragePath;
+    TFile StorageFd; /* during build */
+    bool KeepStorage = false;
 
     std::string BackendType;
-    std::string Creator;
     std::string Id;
     bool IsReady = false;
     bool IsDying = false;
-    std::string Private;
-    std::vector<std::string> Containers;
+
     int LoopDev = -1;
     bool IsReadOnly = false;
+
     std::vector<std::string> Layers;
+    std::vector<std::string> Containers;
+
     uint64_t SpaceLimit = 0;
     uint64_t SpaceGuarantee = 0;
     uint64_t InodeLimit = 0;
     uint64_t InodeGuarantee = 0;
+
     TCred VolumeOwner;
-    TCred CreatorCred;
-    TPath CreatorRoot;
-    unsigned VolumePerms = 0775;
+
+    TCred VolumeCred;
+    unsigned VolumePerms = 0;
+
+    std::string Creator;
+    std::string Private;
+
     std::set<std::shared_ptr<TVolume>> Nested;
-
-    bool CustomPlace = false;
-    TPath Place;
-
-    bool RemoveStorageOnDestroy = false;
 
     TVolume() {
         Statistics->VolumesCount++;
@@ -104,23 +112,21 @@ public:
         Statistics->VolumesCount--;
     }
 
-    static TError Create(const TPath &path, const TStringMap &cfg,
-                         TContainer &container, const TCred &cred,
+    static TError Create(const TStringMap &cfg,
                          std::shared_ptr<TVolume> &volume);
 
     static std::shared_ptr<TVolume> Find(const TPath &path);
     static TError Find(const TPath &path, std::shared_ptr<TVolume> &volume);
+    static std::shared_ptr<TVolume> Locate(const TPath &path);
 
-    TError Configure(const TPath &path, const TStringMap &cfg,
-                     const TContainer &container, const TCred &cred);
+    TError Configure(const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
-    TStringMap DumpState(const TPath &root);
+    TStringMap DumpConfig(const TPath &root);
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
 
     TError Build(void);
-    TError Clear(void);
 
     static void DestroyAll();
     TError DestroyOne();
@@ -134,13 +140,7 @@ public:
     TError LinkContainer(TContainer &container);
     TError UnlinkContainer(TContainer &container);
 
-    TPath GetStorage(void) const;
-
-    bool IsInternalPersistent(void) const {
-        return Storage.size() && TPath(Storage).IsSimple();
-    }
-
-    TPath GetInternal(std::string type) const;
+    TPath GetInternal(const std::string &type) const;
     unsigned long GetMountFlags(void) const;
 
     TError Tune(const TStringMap &cfg);
@@ -152,7 +152,19 @@ public:
     }
 
     bool HaveStorage(void) const {
-        return Storage.size();
+        return !Storage.empty();
+    }
+
+    /* User provides directory for storage */
+    bool UserStorage(void) const {
+        return Storage[0] == '/';
+    }
+
+    /* They do not keep data in StoragePath */
+    bool RemoteStorage(void) const {
+        return BackendType == "rbd" ||
+               BackendType == "tmpfs" ||
+               BackendType == "quota";
     }
 
     bool HaveLayers(void) const {

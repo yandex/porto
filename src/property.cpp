@@ -954,8 +954,7 @@ class TRoot : public TProperty {
 public:
     TError Set(const std::string &root);
     TError Get(std::string &value);
-    TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container root directory"
-                        "(container will be chrooted into ths directory)") {}
+    TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container chroot") {}
 } static Root;
 
 TError TRoot::Get(std::string &value) {
@@ -1253,9 +1252,7 @@ class TBind : public TProperty {
 public:
     TError Set(const std::string &bind_str);
     TError Get(std::string &value);
-    TBind() : TProperty(P_BIND, EProperty::BIND,
-                        "Share host directories with container: "
-                        "<host_path> <container_path> [ro|rw]; ...") {}
+    TBind() : TProperty(P_BIND, EProperty::BIND, "Bind mounts: <source> <target> [ro|rw];...") {}
 } static Bind;
 
 TError TBind::Set(const std::string &bind_str) {
@@ -1276,18 +1273,14 @@ TError TBind::Set(const std::string &bind_str) {
                           MergeEscapeStrings(bind, ' '));
 
         bm.Source = bind[0];
-        bm.Dest = bind[1];
+        bm.Target = bind[1];
         bm.ReadOnly = false;
-        bm.ReadWrite = false;
 
         if (bind.size() == 3) {
             if (bind[2] == "ro")
                 bm.ReadOnly = true;
-            else if (bind[2] == "rw")
-                bm.ReadWrite = true;
-            else
-                return TError(EError::InvalidValue, "Invalid bind type in: " +
-                              MergeEscapeStrings(bind, ' '));
+            else if (bind[2] != "rw")
+                return TError(EError::InvalidValue, "Invalid bind type: " + bind[2]);
         }
 
         bindMounts.push_back(bm);
@@ -1301,14 +1294,9 @@ TError TBind::Set(const std::string &bind_str) {
 
 TError TBind::Get(std::string &value) {
     TMultiTuple tuples;
-    for (const auto &bm : CT->BindMounts) {
-        tuples.push_back({ bm.Source.ToString(), bm.Dest.ToString() });
-
-        if (bm.ReadOnly)
-            tuples.back().push_back("ro");
-        else if (bm.ReadWrite)
-            tuples.back().push_back("rw");
-    }
+    for (const auto &bm : CT->BindMounts)
+        tuples.push_back({ bm.Source.ToString(), bm.Target.ToString(),
+                           bm.ReadOnly ? "ro" : "rw" });
     value = MergeEscapeStrings(tuples, ' ', ';');
     return TError::Success();
 }
@@ -1555,6 +1543,24 @@ public:
         return TError::Success();
     }
 } static PortoNamespace;
+
+class TPlaceProperty : public TProperty {
+public:
+    TPlaceProperty() : TProperty(P_PLACE, EProperty::PLACE,
+        "Places for volumes and layers: [default][;allowed...]") {}
+    TError Get(std::string &value) {
+        value = MergeEscapeStrings(CT->Place, ';');
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        SplitEscapedString(value, CT->Place, ';');
+        CT->SetProp(EProperty::PLACE);
+        return TError::Success();
+    }
+} static PlaceProperty;
 
 class TMemoryLimit : public TProperty {
 public:

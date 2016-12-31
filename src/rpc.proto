@@ -185,8 +185,10 @@ message TContainerRequest {
 	optional TLayerGetPrivateRequest getlayerprivate = 114;
 	optional TLayerSetPrivateRequest setlayerprivate = 115;
 
-    optional TStorageListRequest listStorage = 116;
-    optional TStorageRemoveRequest removeStorage = 117;
+	optional TStorageListRequest listStorage = 116;
+	optional TStorageRemoveRequest removeStorage = 117;
+	optional TStorageImportRequest importStorage = 118;
+	optional TStorageExportRequest exportStorage = 119;
 
 	optional TConvertPathRequest convertPath = 200;
 	optional TAttachProcessRequest attachProcess = 201;
@@ -271,8 +273,8 @@ message TContainerResponse {
 	optional TVolumeDescription volume = 13;
 	optional TLayerListResponse layers = 14;
 	optional TConvertPathResponse convertPath = 15;
-    optional TLayerGetPrivateResponse layer_private = 16;
-    optional TStorageListResponse storageList = 17;
+	optional TLayerGetPrivateResponse layer_private = 16;
+	optional TStorageListResponse storageList = 17;
 }
 
 // VolumeAPI
@@ -340,6 +342,8 @@ message TLayerImportRequest {
 message TLayerExportRequest {
 	required string volume = 1;
 	required string tarball = 2;
+	optional string layer = 3;
+	optional string place = 4;
 }
 
 message TLayerRemoveRequest {
@@ -349,7 +353,7 @@ message TLayerRemoveRequest {
 
 message TLayerListRequest {
 	optional string place = 1;
-	optional string pattern = 2;
+	optional string mask = 2;
 }
 
 message TLayerGetPrivateRequest {
@@ -389,8 +393,8 @@ message TStorageDescription {
 }
 
 message TStorageListRequest {
-	optional string name = 1;
-	optional string place = 2;
+	optional string place = 1;
+	optional string mask = 2;
 }
 
 message TStorageListResponse {
@@ -400,4 +404,17 @@ message TStorageListResponse {
 message TStorageRemoveRequest {
 	required string name = 1;
 	optional string place = 2;
+}
+
+message TStorageImportRequest {
+	required string name = 1;
+	required string tarball = 2;
+	optional string place = 3;
+	optional string private_value = 5;
+}
+
+message TStorageExportRequest {
+	required string name = 1;
+	required string tarball = 2;
+	optional string place = 3;
 }

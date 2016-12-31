@@ -300,7 +300,7 @@ class Storage(object):
 
     def GetProperties(self):
         result = {}
-        p = self.conn._ListStorage(name=self.name,place=self.place)[0]
+        p = self.conn._ListStorage(self.place, self.name)[0]
         result["name"] = p.name
         result["private_value"] = p.private_value
         result["owner_user"] = p.owner_user
@@ -659,17 +659,25 @@ class Connection(object):
         request.exportLayer.tarball = tarball
         self.rpc.call(request, self.rpc.timeout)
 
-    def _ListLayers(self, place=None, pattern=None):
+    def ReExportLayer(self, layer, tarball, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.exportLayer.layer = layer
+        request.exportLayer.tarball = tarball
+        if place is not None:
+            request.exportLayer.place = place
+        self.rpc.call(request, self.rpc.timeout)
+
+    def _ListLayers(self, place=None, mask=None):
         request = rpc_pb2.TContainerRequest()
         request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
         if place is not None:
             request.listLayers.place = place
-        if pattern is not None:
-            request.listLayers.pattern = pattern
+        if mask is not None:
+            request.listLayers.mask = mask
         return self.rpc.call(request, self.rpc.timeout).layers
 
-    def ListLayers(self, place=None):
-        response = self._ListLayers(place)
+    def ListLayers(self, place=None, mask=None):
+        response = self._ListLayers(place, mask)
         if response.layers:
             return [Layer(self, l.name, place, l) for l in response.layers]
         return [Layer(self, l, place) for l in response.layer]
@@ -682,23 +690,42 @@ class Connection(object):
             return Layer(self, layer, place, response.layers[0])
         return Layer(self, layer, place)
 
-    def _ListStorage(self, name=None, place=None):
+    def _ListStorage(self, place=None, mask=None):
         request = rpc_pb2.TContainerRequest()
         request.listStorage.CopyFrom(rpc_pb2.TStorageListRequest())
-        if name is not None:
-            request.listStorage.name = name
         if place is not None:
             request.listStorage.place = place
+        if mask is not None:
+            request.listStorage.mask = mask
         return self.rpc.call(request, self.rpc.timeout).storageList.storages
 
-    def ListStorage(self, name=None, place=None):
-        return [Storage(self, s.name, place) for s in self._ListStorage(name, place)]
+    def ListStorage(self, place=None, mask=None):
+        return [Storage(self, s.name, place) for s in self._ListStorage(place, mask)]
 
     def RemoveStorage(self, name, place=None):
         request = rpc_pb2.TContainerRequest()
         request.removeStorage.name = name
         if place is not None:
             request.removeStorage.place = place
+        self.rpc.call(request, self.rpc.timeout)
+
+    def ImportStorage(self, name, tarball, place=None, private_value=None):
+        request = rpc_pb2.TContainerRequest()
+        request.importStorage.layer = layer
+        request.importStorage.tarball = tarball
+        if place is not None:
+            request.importStorage.place = place
+        if private_value is not None:
+            request.importStorage.private_value = private_value
+        self.rpc.call(request, self.rpc.timeout)
+        return Storage(self, name, place)
+
+    def ExportStorage(self, name, tarball, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.exportStorage.volume = volume
+        request.exportStorage.tarball = tarball
+        if place is not None:
+            request.exportStorage.place = place
         self.rpc.call(request, self.rpc.timeout)
 
     def ConvertPath(self, path, source, destination):

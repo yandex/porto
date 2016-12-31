@@ -146,10 +146,15 @@ std::string TDevice::CgroupRule(bool allow) const {
 }
 
 TError TDevice::Permitted(const TCred &cred) const {
-    if (Read && !Path.CanRead(cred))
+    struct stat st;
+    TError error = Path.StatFollow(st);
+    if (error)
+        return error;
+
+    if (Read && !TFile::Access(st, cred, TFile::R))
         return TError(EError::Permission, "No read access");
 
-    if (Write && !Path.CanWrite(cred))
+    if (Write && !TFile::Access(st, cred, TFile::W))
         return TError(EError::Permission, "No write access");
 
     if (Privileged && !cred.IsRootUser())

@@ -3,7 +3,7 @@
 #include <condition_variable>
 
 #include "volume.hpp"
-#include "layer.hpp"
+#include "storage.hpp"
 #include "container.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -14,7 +14,7 @@
 #include "kvalue.hpp"
 #include "helpers.hpp"
 #include "client.hpp"
-#include "storage.hpp"
+#include "filesystem.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -36,10 +36,6 @@ static std::condition_variable VolumesCv;
 
 TError TVolumeBackend::Configure() {
     return TError::Success();
-}
-
-TError TVolumeBackend::Clear() {
-    return Volume->Path.ClearDirectory();
 }
 
 TError TVolumeBackend::Save() {
@@ -68,33 +64,16 @@ public:
     }
 
     TError Build() override {
-        TPath storage = Volume->GetStorage();
-
-        TError error = storage.Chown(Volume->VolumeOwner);
-        if (error)
-            return error;
-
-        error = storage.Chmod(Volume->VolumePerms);
-        if (error)
-            return error;
-
-        return Volume->Path.BindRemount(storage, Volume->GetMountFlags());
-    }
-
-    TError Clear() override {
-        return Volume->GetStorage().ClearDirectory();
+        return Volume->InternalPath.BindRemount(Volume->StoragePath,
+                                        Volume->GetMountFlags());
     }
 
     TError Destroy() override {
-        TPath path = Volume->Path;
-        TError error = path.UmountAll();
-        if (error)
-            L_ERR() << "Can't umount volume: " << error << std::endl;
-        return error;
+        return Volume->InternalPath.UmountAll();
     }
 
     TError StatFS(TStatFS &result) override {
-        return Volume->Path.StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -118,15 +97,16 @@ public:
     }
 
     TError Build() override {
-        return Volume->Path.BindRemount(Volume->GetStorage(), Volume->GetMountFlags());
+        return Volume->InternalPath.BindRemount(Volume->StoragePath,
+                                                Volume->GetMountFlags());
     }
 
     TError Destroy() override {
-        return Volume->Path.UmountAll();
+        return Volume->InternalPath.UmountAll();
     }
 
     TError StatFS(TStatFS &result) override {
-        return Volume->Path.StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -147,50 +127,38 @@ public:
     }
 
     TError Build() override {
-        std::vector<std::string> mount_options = {
-            "uid=" + std::to_string(Volume->VolumeOwner.Uid),
-            "gid=" + std::to_string(Volume->VolumeOwner.Gid),
-            "mode=" + StringFormat("%#o", Volume->VolumePerms),
-        };
+        std::vector<std::string> opts;
 
         if (Volume->SpaceLimit)
-            mount_options.emplace_back("size=" + std::to_string(Volume->SpaceLimit));
+            opts.emplace_back("size=" + std::to_string(Volume->SpaceLimit));
 
         if (Volume->InodeLimit)
-            mount_options.emplace_back("nr_inodes=" + std::to_string(Volume->InodeLimit));
+            opts.emplace_back("nr_inodes=" + std::to_string(Volume->InodeLimit));
 
-        return Volume->Path.Mount("porto:" + Volume->Id, "tmpfs",
-                                  Volume->GetMountFlags(), mount_options);
+        return Volume->InternalPath.Mount("porto:" + Volume->Id, "tmpfs",
+                                          Volume->GetMountFlags(), opts);
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        std::vector<std::string> mount_options = {
-            "uid=" + std::to_string(Volume->VolumeOwner.Uid),
-            "gid=" + std::to_string(Volume->VolumeOwner.Gid),
-            "mode=" + StringFormat("%#o", Volume->VolumePerms),
-        };
+        std::vector<std::string> opts;
 
         if (space_limit)
-            mount_options.emplace_back("size=" + std::to_string(space_limit));
+            opts.emplace_back("size=" + std::to_string(space_limit));
 
         if (inode_limit)
-            mount_options.emplace_back("nr_inodes=" + std::to_string(inode_limit));
+            opts.emplace_back("nr_inodes=" + std::to_string(inode_limit));
 
-        return Volume->Path.Mount("porto:" + Volume->Id, "tmpfs",
-                                  Volume->GetMountFlags() | MS_REMOUNT,
-                                  mount_options);
+        return Volume->InternalPath.Mount("porto:" + Volume->Id, "tmpfs",
+                                          Volume->GetMountFlags() | MS_REMOUNT,
+                                          opts);
     }
 
     TError Destroy() override {
-        TPath path = Volume->Path;
-        TError error = path.UmountAll();
-        if (error)
-            L_ERR() << "Can't umount volume: " << error << std::endl;
-        return error;
+        return Volume->InternalPath.UmountAll();
     }
 
     TError StatFS(TStatFS &result) override {
-        return Volume->Path.StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -235,12 +203,16 @@ public:
         if (Volume->HaveLayers())
             return TError(EError::InvalidProperty, "Quota backed doesn't support layers");
 
+        /* All data is stored right here */
+        Volume->InternalPath = Volume->Path;
+        Volume->StoragePath = Volume->Path;
+        Volume->KeepStorage = true;
+
         return TError::Success();
     }
 
     TError Build() override {
-        TPath path = Volume->Path;
-        TProjectQuota quota(path);
+        TProjectQuota quota(Volume->Path);
         TError error;
 
         quota.SpaceLimit = Volume->SpaceLimit;
@@ -250,20 +222,12 @@ public:
         return quota.Create();
     }
 
-    TError Clear() override {
-        return TError(EError::NotSupported, "Quota backend cannot be cleared");
-    }
-
     TError Destroy() override {
         TProjectQuota quota(Volume->Path);
         TError error;
 
         L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
-        error = quota.Destroy();
-        if (error)
-            L_ERR() << "Can't destroy quota: " << error << std::endl;
-
-        return error;
+        return quota.Destroy();
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
@@ -298,8 +262,7 @@ public:
     }
 
     TError Build() override {
-        TPath storage = Volume->GetStorage();
-        TProjectQuota quota(storage);
+        TProjectQuota quota(Volume->StoragePath);
         TError error;
 
         if (Volume->HaveQuota()) {
@@ -312,42 +275,24 @@ public:
                 return error;
         }
 
-        error = storage.Chown(Volume->VolumeOwner);
-        if (error)
-            return error;
-
-        error = storage.Chmod(Volume->VolumePerms);
-        if (error)
-            return error;
-
-        return Volume->Path.BindRemount(storage, Volume->GetMountFlags());
-    }
-
-    TError Clear() override {
-        return Volume->GetStorage().ClearDirectory();
+        return Volume->InternalPath.BindRemount(Volume->StoragePath,
+                                                Volume->GetMountFlags());
     }
 
     TError Destroy() override {
-        TProjectQuota quota(Volume->GetStorage());
-        TPath path = Volume->Path;
-        TError error;
-
-        error = path.UmountAll();
-        if (error)
-            L_ERR() << "Can't umount volume: " << error << std::endl;
+        TProjectQuota quota(Volume->StoragePath);
+        TError error = Volume->InternalPath.UmountAll();
 
         if (Volume->HaveQuota() && quota.Exists()) {
             L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
-            error = quota.Destroy();
-            if (error)
-                L_ERR() << "Can't destroy quota: " << error << std::endl;
+            TError error2 = quota.Destroy();
         }
 
         return error;
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        TProjectQuota quota(Volume->GetStorage());
+        TProjectQuota quota(Volume->StoragePath);
 
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
@@ -361,8 +306,8 @@ public:
 
     TError StatFS(TStatFS &result) override {
         if (Volume->HaveQuota())
-            return TProjectQuota(Volume->GetStorage()).StatFS(result);
-        return Volume->Path.StatFS(result);
+            return TProjectQuota(Volume->StoragePath).StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -373,12 +318,16 @@ class TVolumeLoopBackend : public TVolumeBackend {
 
 public:
 
+    TPath Image(const TPath &storage) {
+        if (storage.IsRegularFollow())
+            return storage;
+        return storage / "loop.img";
+    }
+
     TError Configure() override {
+        TPath image = Image(Volume->StoragePath);
 
-        if (Volume->StorageFile.IsEmpty())
-            Volume->StorageFile = Volume->GetStorage() / "loop.img";
-
-        if (!Volume->StorageFile.Exists() && !Volume->SpaceLimit)
+        if (!image.Exists() && !Volume->SpaceLimit)
             return TError(EError::InvalidProperty,
                           "loop backend requires space_limit");
 
@@ -388,7 +337,7 @@ public:
                 auto other = it.second;
                 if (other->BackendType != "loop" ||
                         (other->IsReadOnly && Volume->IsReadOnly) ||
-                        !other->StorageFile.IsSameInode(Volume->StorageFile))
+                        !image.IsSameInode(Image(other->StoragePath)))
                     continue;
                 return TError(EError::Busy, "Storage already used by volume " + other->Path.ToString());
             }
@@ -412,25 +361,16 @@ public:
     TError Restore() override {
         LoopDev = Volume->LoopDev;
 
-        Volume->StorageFile = Volume->GetStorage();
-        if (Volume->StorageFile.IsDirectoryFollow())
-            Volume->StorageFile = Volume->StorageFile / "loop.img";
-
         return TError::Success();
     }
 
-    static TError MakeImage(const TPath &path, const TCred &cred, off_t size, off_t guarantee) {
+    static TError MakeImage(const TPath &path, off_t size, off_t guarantee) {
         TError error;
         TFile image;
 
         error = image.CreateNew(path, 0644);
         if (error)
             return error;
-
-        if (fchown(image.Fd, cred.Uid, cred.Gid)) {
-            error = TError(EError::Unknown, errno, "chown(" + path.ToString() + ")");
-            goto remove_file;
-        }
 
         if (ftruncate(image.Fd, size)) {
             error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
@@ -455,7 +395,7 @@ public:
 remove_file:
         TError error2 = path.Unlink();
         if (error2)
-            L_ERR() << "Cannot cleanup loop image: " << error2 << std::endl;
+            L_WRN() << "Cannot cleanup loop image: " << error2 << std::endl;
         return error;
     }
 
@@ -479,16 +419,14 @@ remove_file:
     }
 
     TError Build() override {
-        TPath path = Volume->Path;
-        TPath image = Volume->StorageFile;
+        TPath image = Image(Volume->StoragePath);
         TError error;
 
         if (!image.Exists()) {
             L_ACT() << "Allocate loop image with size " << Volume->SpaceLimit
                     << " guarantee " << Volume->SpaceGuarantee << std::endl;
 
-            error = MakeImage(image, Volume->VolumeOwner,
-                              Volume->SpaceLimit, Volume->SpaceGuarantee);
+            error = MakeImage(image, Volume->SpaceLimit, Volume->SpaceGuarantee);
             if (error)
                 return error;
 
@@ -513,24 +451,13 @@ remove_file:
         if (error)
             return error;
 
-        error = path.Mount(GetLoopDevice(), "ext4", Volume->GetMountFlags(), {});
+        error = Volume->InternalPath.Mount(GetLoopDevice(), "ext4",
+                                           Volume->GetMountFlags(), {});
         if (error)
             goto free_loop;
 
-        if (!Volume->IsReadOnly) {
-            error = path.Chown(Volume->VolumeOwner);
-            if (error)
-                goto umount_loop;
-
-            error = path.Chmod(Volume->VolumePerms);
-            if (error)
-                goto umount_loop;
-        }
-
         return TError::Success();
 
-umount_loop:
-        (void)path.UmountAll();
 free_loop:
         PutLoopDev(LoopDev);
         LoopDev = -1;
@@ -539,22 +466,17 @@ free_loop:
 
     TError Destroy() override {
         TPath loop = GetLoopDevice();
-        TPath path = Volume->Path;
 
         if (LoopDev < 0)
             return TError::Success();
 
         L_ACT() << "Destroy loop " << loop << std::endl;
-        TError error = path.UmountAll();
+        TError error = Volume->InternalPath.UmountAll();
         TError error2 = PutLoopDev(LoopDev);
         if (!error)
             error = error2;
         LoopDev = -1;
         return error;
-    }
-
-    TError Clear() override {
-        return Volume->Path.ClearDirectory();
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
@@ -563,12 +485,12 @@ free_loop:
         if (Volume->SpaceLimit < (512ul << 20))
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
-        return ResizeLoopDev(LoopDev, Volume->StorageFile,
+        return ResizeLoopDev(LoopDev, Image(Volume->StoragePath),
                              Volume->SpaceLimit, space_limit);
     }
 
     TError StatFS(TStatFS &result) override {
-        return Volume->Path.StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -608,8 +530,7 @@ public:
     }
 
     TError Build() override {
-        TPath storage = Volume->GetStorage();
-        TProjectQuota quota(storage);
+        TProjectQuota quota(Volume->StoragePath);
         TError error;
         std::stringstream lower;
         int layer_idx = 0;
@@ -634,20 +555,19 @@ public:
 
             if (name[0] == '/') {
                 error = pin.OpenDir(name);
-                if (Volume->CreatorRoot.InnerPath(pin.RealPath()).IsEmpty()) {
-                    error = TError(EError::Permission, "Layer path outside root: " + name);
+                if (error)
+                    goto err;
+                error = CL->WriteAccess(pin);
+                if (error) {
+                    error = TError(error, "Layer " + name);
                     goto err;
                 }
                 path = pin.ProcPath();
-                if (!path.CanWrite(Volume->CreatorCred)) {
-                    error = TError(EError::Permission, "Layer path not permitted: " + name);
-                    goto err;
-                }
             } else {
-                path = Volume->Place / PORTO_LAYERS / name;
-                TPath private_file = Volume->Place / PORTO_LAYERS / LAYER_PRIVATE_PREFIX + name;
-                if (private_file.Touch())
-                    (void)path.Touch();
+                TStorage layer(Volume->Place, PORTO_LAYERS, name);
+                /* Imported layers are available for everybody */
+                (void)layer.Touch();
+                path = layer.Path;
             }
 
             std::string layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
@@ -667,29 +587,13 @@ public:
             lower << layer_id;
         }
 
-        if (!Volume->StorageFd.HasAccessAt("upper", Volume->VolumeOwner, TPath::E)) {
-            error = Volume->StorageFd.MkdirAt("upper", 0755);
-            if (error)
-                goto err;
-        }
+        (void)Volume->StorageFd.MkdirAt("upper", 0755);
 
         error = upperFd.WalkStrict(Volume->StorageFd, "upper");
         if (error)
             goto err;
 
-        error = upperFd.Chown(Volume->VolumeOwner);
-        if (error)
-            goto err;
-
-        error = upperFd.Chmod(Volume->VolumePerms);
-        if (error)
-            goto err;
-
-        if (!Volume->StorageFd.HasAccessAt("work", Volume->VolumeOwner, TPath::E)) {
-            error = Volume->StorageFd.MkdirAt("work", 0755);
-            if (error)
-                goto err;
-        }
+        (void)Volume->StorageFd.MkdirAt("work", 0755);
 
         error = workFd.WalkStrict(Volume->StorageFd, "work");
         if (error)
@@ -703,7 +607,7 @@ public:
         if (error)
             goto err;
 
-        error = Volume->Path.Mount("overlay", "overlay",
+        error = Volume->InternalPath.Mount("overlay", "overlay",
                                    Volume->GetMountFlags(),
                                    { "lowerdir=" + lower.str(),
                                      "upperdir=" + upperFd.ProcPath().ToString(),
@@ -729,56 +633,22 @@ err:
         return error;
     }
 
-    TError Clear() override {
-        return (Volume->GetStorage() / "upper").ClearDirectory();
-    }
-
     TError Destroy() override {
-        TPath storage = Volume->GetStorage();
-        TProjectQuota quota(storage);
-        TPath path = Volume->Path;
-        TError error, error2;
-
-        error = path.UmountAll();
-        if (error)
-            L_ERR() << "Can't umount overlay: " << error << std::endl;
-
-        if (!Volume->HaveStorage()) {
-            error2 = ClearRecursive(storage);
-            if (error2)
-                L_ERR() << "Cannot clear overlay upper: " << error2 << std::endl;
-            error2 = storage.ClearDirectory();
-            if (error2) {
-                if (!error)
-                    error = error2;
-                L_ERR() << "Can't clear overlay storage: " << error2 << std::endl;
-                (void)(storage / "upper").RemoveAll();
-            }
-        } else {
-            TFile storageFd, workFd;
-
-            error = storageFd.OpenDir(storage);
-            if (!error && storageFd.HasAccess(Volume->VolumeOwner, TPath::W)) {
-                error = workFd.WalkStrict(storageFd, "work");
-                if (!error) {
-                    (void)workFd.ClearDirectory();
-                    (void)storageFd.RmdirAt("work");
-                }
-            }
-        }
+        TProjectQuota quota(Volume->StoragePath);
+        TError error = Volume->InternalPath.UmountAll();
 
         if (Volume->HaveQuota() && quota.Exists()) {
             L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
-            error = quota.Destroy();
-            if (error)
-                L_ERR() << "Can't destroy quota: " << error << std::endl;
+            TError error2 = quota.Destroy();
+            if (!error)
+                error = error2;
         }
 
         return error;
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        TProjectQuota quota(Volume->GetStorage());
+        TProjectQuota quota(Volume->StoragePath);
 
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
@@ -792,8 +662,8 @@ err:
 
     TError StatFS(TStatFS &result) override {
         if (Volume->HaveQuota())
-            return TProjectQuota(Volume->GetStorage()).StatFS(result);
-        return Volume->Path.StatFS(result);
+            return TProjectQuota(Volume->StoragePath).StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -826,7 +696,16 @@ public:
     TError MapDevice(std::string id, std::string pool, std::string image,
                      std::string &device) {
         L_ACT() << "Map rbd device " << id << "@" << pool << "/" << image << std::endl;
-        TError error = RunCommand({"rbd", "--id=" + id, "--pool=" + pool, "map", image}, "/", &device);
+        TError error;
+        TFile out;
+
+        error = out.CreateTemp("/tmp");
+        if (error)
+            return error;
+        error = RunCommand({"rbd", "--id=" + id, "--pool=" + pool, "map", image}, "/", TFile(), out);
+        if (error)
+            return error;
+        error = out.ReadAll(device, 1024);
         if (error)
             return error;
         device = StringTrim(device);
@@ -839,12 +718,11 @@ public:
     }
 
     TError Build() override {
-        TPath path = Volume->Path;
         std::string id, pool, image, device;
         std::vector<std::string> tok;
         TError error, error2;
 
-        SplitEscapedString(Volume->GetStorage().ToString(), tok, '@');
+        SplitEscapedString(Volume->Storage, tok, '@');
         if (tok.size() != 2)
             return TError(EError::InvalidValue, "Invalid rbd storage");
         id = tok[0];
@@ -871,7 +749,8 @@ public:
             return error;
         }
 
-        error = path.Mount(device, "ext4", Volume->GetMountFlags(), {});
+        error = Volume->InternalPath.Mount(device, "ext4",
+                                           Volume->GetMountFlags(), {});
         if (error)
             UnmapDevice(device);
         return error;
@@ -879,13 +758,12 @@ public:
 
     TError Destroy() override {
         std::string device = GetDevice();
-        TPath path = Volume->Path;
         TError error, error2;
 
         if (DeviceIndex < 0)
             return TError::Success();
 
-        error = path.UmountAll();
+        error = Volume->InternalPath.UmountAll();
         error2 = UnmapDevice(device);
         if (!error)
             error = error2;
@@ -893,16 +771,12 @@ public:
         return error;
     }
 
-    TError Clear() override {
-        return Volume->Path.ClearDirectory();
-    }
-
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         return TError(EError::NotSupported, "rbd backend doesn't suppport resize");
     }
 
     TError StatFS(TStatFS &result) override {
-        return Volume->Path.StatFS(result);
+        return Volume->InternalPath.StatFS(result);
     }
 };
 
@@ -922,6 +796,18 @@ TError TVolume::Find(const TPath &path, std::shared_ptr<TVolume> &volume) {
     if (volume)
         return TError::Success();
     return TError(EError::VolumeNotFound, "Volume " + path.ToString() + " not found");
+}
+
+/* FIXME could be implemented with single lookup */
+std::shared_ptr<TVolume> TVolume::Locate(const TPath &path) {
+    if (path.IsAbsolute()) {
+        for (auto p = path; !p.IsRoot(); p = p.DirName()) {
+            auto volume = Find(p);
+            if (volume)
+                return volume;
+        }
+    }
+    return nullptr;
 }
 
 TError TVolume::OpenBackend() {
@@ -950,25 +836,13 @@ TError TVolume::OpenBackend() {
 }
 
 /* /place/porto_volumes/<id>/<type> */
-TPath TVolume::GetInternal(std::string type) const {
+TPath TVolume::GetInternal(const std::string &type) const {
 
     TPath base = Place / PORTO_VOLUMES / Id;
     if (type.size())
         return base / type;
     else
         return base;
-}
-
-TPath TVolume::GetStorage(void) const {
-    if (HaveStorage()) {
-        TPath res = TPath(Storage);
-        if (res.IsSimple())
-            return Place / PORTO_STORAGE / res;
-
-        return TPath(Storage);
-    }
-
-    return GetInternal(BackendType);
 }
 
 unsigned long TVolume::GetMountFlags(void) const {
@@ -983,20 +857,18 @@ unsigned long TVolume::GetMountFlags(void) const {
 }
 
 TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee) const {
-    auto backend = BackendType;
     TStatFS current, total;
     TPath storage;
 
-    if (backend == "rbd" || backend == "tmpfs")
+    if (RemoteStorage() || (!space_guarantee && !inode_guarantee))
         return TError::Success();
 
-    if (!space_guarantee && !inode_guarantee)
-        return TError::Success();
-
-    if (!HaveStorage())
-        storage = Place / PORTO_VOLUMES;
+    if (UserStorage())
+        storage = StoragePath;
+    else if (HaveStorage())
+        storage = Place / PORTO_STORAGE;
     else
-        storage = GetStorage();
+        storage = Place / PORTO_VOLUMES;
 
     TError error = storage.StatFS(total);
     if (error)
@@ -1012,7 +884,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
                       std::to_string(current.SpaceUsage) + " used");
 
     if (total.InodeAvail + current.InodeUsage < inode_guarantee &&
-            backend != "loop")
+            BackendType != "loop")
         return TError(EError::NoSpace, "Not enough inodes for volume guarantee: " +
                       std::to_string(total.InodeAvail) + " available " +
                       std::to_string(current.InodeUsage) + " used");
@@ -1023,7 +895,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
     for (auto &it: Volumes) {
         auto volume = it.second;
         if (volume.get() == this ||
-                volume->GetStorage().GetDev() != storage.GetDev())
+                volume->StoragePath.GetDev() != storage.GetDev())
             continue;
 
         auto volume_backend = volume->BackendType;
@@ -1065,7 +937,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
                       std::to_string(space_claimed) + " claimed " +
                       std::to_string(space_guaranteed) + " guaranteed");
 
-    if (backend != "loop" &&
+    if (BackendType != "loop" &&
             total.InodeAvail + current.InodeUsage + inode_claimed <
             inode_guarantee + inode_guaranteed)
         return TError(EError::NoSpace, "Not enough inodes for volume guarantee: " +
@@ -1083,7 +955,7 @@ TError TVolume::DependsOn(const TPath &path) {
 
     for (auto it = Volumes.rbegin(); it != Volumes.rend(); ++it) {
         auto &vol = it->second;
-        if (!vol->Path.InnerPath(path).IsEmpty()) {
+        if (path.IsInside(vol->Path)) {
             if (!vol->IsReady || vol->IsDying)
                 return TError(EError::Busy, "Volume not ready: " + vol->Path.ToString());
             vol->Nested.insert(shared_from_this());
@@ -1097,13 +969,14 @@ TError TVolume::DependsOn(const TPath &path) {
 TError TVolume::CheckDependencies() {
     TError error;
 
-    error = DependsOn(Path.DirName());
+    if (!IsAutoPath)
+        error = DependsOn(Path);
 
     if (!error)
         error = DependsOn(Place);
 
     if (!error)
-        error = DependsOn(GetStorage());
+        error = DependsOn(StoragePath);
 
     for (auto &l : Layers) {
         TPath layer(l);
@@ -1114,6 +987,7 @@ TError TVolume::CheckDependencies() {
     }
 
     if (error) {
+        /* undo dependencies */
         for (auto &it : Volumes)
             it.second->Nested.erase(shared_from_this());
     }
@@ -1121,13 +995,13 @@ TError TVolume::CheckDependencies() {
     return error;
 }
 
-TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
-                          const TContainer &container, const TCred &cred) {
-    auto backend = cfg.count(V_BACKEND) ? cfg.at(V_BACKEND) : "";
+TError TVolume::Configure(const TStringMap &cfg) {
     TError error;
 
     /* Verify properties */
     for (auto &it: cfg) {
+        if (it.first == V_PATH)
+            continue;
         TVolumeProperty *prop = nullptr;
         for (auto &p: VolumeProperties) {
             if (p.Name == it.first) {
@@ -1141,36 +1015,59 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
             return TError(EError::InvalidProperty, "Read-only: " + it.first);
     }
 
-    if (cfg.count(V_PLACE)) {
-        Place = cfg.at(V_PLACE);
-        CustomPlace = true;
-    } else {
-        Place = PORTO_PLACE;
-        CustomPlace = false;
+    /* Default user:group */
+    VolumeOwner = CL->Cred;
+    Creator = CL->ClientContainer->Name + " " + CL->Cred.User() + " " + CL->Cred.Group();
+
+    /* Apply properties */
+    error = ApplyConfig(cfg);
+    if (error)
+        return error;
+
+    /* Verify credentials */
+    error = CL->CanControl(VolumeOwner);
+    if (error)
+        return error;
+
+    if (VolumeOwner.Gid != CL->Cred.Gid && !CL->IsSuperUser() &&
+            !CL->Cred.IsMemberOf(VolumeOwner.Gid))
+        return TError(EError::Permission, "Changing owner group is not permitted");
+
+    /* Autodetect volume backend */
+    if (BackendType == "") {
+        if ((HaveQuota() && !TVolumeNativeBackend::Supported()) ||
+                StoragePath.IsRegularFollow())
+            BackendType = "loop";
+        else if (HaveLayers() && TVolumeOverlayBackend::Supported())
+            BackendType = "overlay";
+        else if (TVolumeNativeBackend::Supported())
+            BackendType = "native";
+        else
+            BackendType = "plain";
     }
 
+    InternalPath = Place / PORTO_VOLUMES / Id / "volume";
+
     /* Verify volume path */
-    if (!path.IsEmpty()) {
-        if (!path.IsAbsolute())
+    if (!Path.IsEmpty()) {
+        if (!Path.IsAbsolute())
             return TError(EError::InvalidValue, "Volume path must be absolute");
-        if (!path.IsNormal())
+        if (!Path.IsNormal())
             return TError(EError::InvalidValue, "Volume path must be normalized");
-        if (!path.Exists())
+        Path = CL->ResolvePath(Path);
+        if (!Path.Exists())
             return TError(EError::InvalidValue, "Volume path does not exist");
-        if (!path.IsDirectoryStrict())
+        if (!Path.IsDirectoryStrict())
             return TError(EError::InvalidValue, "Volume path must be a directory");
-        if (!path.CanWrite(cred))
-            return TError(EError::Permission, "Volume path usage not permitted");
-
-        Path = path.ToString();
-
+        if (IsSystemPath(Path))
+            return TError(EError::InvalidValue, "Volume in system directory");
     } else {
-        if (container.RootPath.IsRoot()) {
+        if (CL->ClientContainer->RootPath.IsRoot()) {
             /* /place/porto_volumes/<id>/volume */
-            Path = GetInternal("volume");
+            Path = InternalPath;
         } else {
             /* /chroot/porto/volume_<id> */
-            TPath porto_path = container.RootPath / PORTO_CHROOT_VOLUMES;
+            TPath porto_path = CL->ResolvePath(PORTO_CHROOT_VOLUMES);
             if (!porto_path.Exists()) {
                 error = porto_path.Mkdir(0755);
                 if (error)
@@ -1181,79 +1078,34 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         IsAutoPath = true;
     }
 
-    /* Save original creator. Just for the record. */
-    Creator = container.Name + " " + cred.User() + " " + cred.Group();
+    /* Verify storage */
+    if (UserStorage()) {
+        if (!StoragePath.IsNormal())
+            return TError(EError::InvalidValue, "Storage path must be normalized");
+        StoragePath = CL->ResolvePath(StoragePath);
+        if (!StoragePath.Exists())
+            return TError(EError::InvalidValue, "Storage path does not exist");
+        if (IsSystemPath(StoragePath))
+            return TError(EError::InvalidValue, "Storage in system directory");
+        Storage = StoragePath.ToString();
+        KeepStorage = true;
+    } else if (!HaveStorage()) {
+        StoragePath = GetInternal(BackendType);
+    } else if (StoragePath.IsSimple()) {
+        TStorage storage(Place, PORTO_STORAGE, Storage);
+        StoragePath = storage.Path;
+        KeepStorage = storage.Exists();
+    } else
+        return TError(EError::InvalidValue, "Invalid storage format: " + Storage);
 
-    CreatorCred = cred;
-    CreatorRoot = container.RootPath;
-
-    /* Set default credentials to creator */
-    VolumeOwner = cred;
-
-    /* Apply properties */
-    error = ApplyConfig(cfg);
-    if (error)
-        return error;
-
-    /* Verify storage path */
-    if (HaveStorage() && backend != "rbd" && backend != "tmpfs") {
-        auto path = GetStorage();
-        if (!IsInternalPersistent() || path.Exists()) {
-            if (!path.IsAbsolute())
-                return TError(EError::InvalidValue, "Storage path must be absolute");
-            if (!path.IsNormal())
-                return TError(EError::InvalidValue, "Storage path must be normalized");
-
-            if (!IsInternalPersistent()) {
-                /* Convert path to host-based */
-                path = container.RootPath / Storage;
-                Storage = path.ToString();
-            }
-
-            if (!path.Exists())
-                return TError(EError::InvalidValue, "Storage path does not exist");
-
-            if (path.IsDirectoryFollow()) {
-                error = StorageFd.OpenDir(path);
-                if (error)
-                    return error;
-            } else if (path.IsRegularFollow() && (BackendType == "" || BackendType == "loop")) {
-                StorageFile = path;
-                if (IsReadOnly)
-                    error = StorageFd.OpenRead(path);
-                else
-                    error = StorageFd.OpenReadWrite(path);
-                if (error)
-                    return error;
-            } else
-                return TError(EError::InvalidValue, "Storage path must be a directory");
-
-            if (!StorageFd.HasAccess(cred, TPath::W))
-                return TError(EError::Permission, "Storage path usage not permitted");
-        } else {
-            RemoveStorageOnDestroy = true;
-        }
-
-        for (auto &it: Volumes) {
-            auto other = it.second;
-            if (Storage != other->Storage || (IsReadOnly && other->IsReadOnly) ||
-                    (backend == "bind" && other->BackendType == backend))
-                continue;
-
-            if (Storage == other->Storage && Place != other->Place)
-                continue;
-
-            return TError(EError::Busy, "Storage already used by volume " + other->Path.ToString());
-        }
+    for (auto &it: Volumes) {
+        auto other = it.second;
+        if (StoragePath == other->StoragePath && Place == other->Place &&
+                (!IsReadOnly || !other->IsReadOnly) &&
+                (BackendType != "bind" || other->BackendType != "bind"))
+            return TError(EError::Busy, "Storage already in use by volume " +
+                                        other->Path.ToString());
     }
-
-    /* Verify default credentials */
-    if (VolumeOwner.Uid != cred.Uid && !cred.IsRootUser())
-        return TError(EError::Permission, "Changing user is not permitted");
-
-    if (VolumeOwner.Gid != cred.Gid && !cred.IsRootUser() &&
-            !cred.IsMemberOf(VolumeOwner.Gid))
-        return TError(EError::Permission, "Changing group is not permitted");
 
     /* Verify and resolve layers */
     for (auto &l: Layers) {
@@ -1261,15 +1113,10 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
         if (!layer.IsNormal())
             return TError(EError::InvalidValue, "Layer path must be normalized");
         if (layer.IsAbsolute()) {
-            layer = container.RootPath / layer;
+            layer = CL->ResolvePath(layer);
             l = layer.ToString();
-            if (!layer.Exists())
-                return TError(EError::LayerNotFound, "Layer not found");
-            /* Racy. Permissions and isolation will be rechecked later */
-            if (!layer.CanWrite(cred))
-                return TError(EError::Permission, "Layer path not permitted: " + l);
         } else {
-            error = ValidateLayerName(l);
+            error = TStorage::CheckName(l);
             if (error)
                 return error;
             layer = Place / PORTO_LAYERS / layer;
@@ -1278,6 +1125,12 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
             return TError(EError::LayerNotFound, "Layer not found");
         if (!layer.IsDirectoryFollow())
             return TError(EError::InvalidValue, "Layer must be a directory");
+        /* Permissions will be cheked during build */
+    }
+
+    if (HaveLayers() && BackendType != "overlay") {
+        if (IsReadOnly)
+            return TError(EError::InvalidValue, "Cannot copy layers to read-only volume");
     }
 
     /* Verify guarantees */
@@ -1288,20 +1141,6 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
     if (cfg.count(V_INODE_LIMIT) && cfg.count(V_INODE_GUARANTEE) &&
             InodeLimit < InodeGuarantee)
         return TError(EError::InvalidValue, "Inode guarantree bigger than limit");
-
-    /* Autodetect volume backend */
-    if (!cfg.count(V_BACKEND)) {
-        if ((HaveQuota() && !TVolumeNativeBackend::Supported()) || !StorageFile.IsEmpty())
-            BackendType = "loop";
-        else if (HaveLayers() && TVolumeOverlayBackend::Supported())
-            BackendType = "overlay";
-        else if (TVolumeNativeBackend::Supported())
-            BackendType = "native";
-        else
-            BackendType = "plain";
-        if (error)
-            return error;
-    }
 
     error = OpenBackend();
     if (error)
@@ -1320,56 +1159,87 @@ TError TVolume::Configure(const TPath &path, const TStringMap &cfg,
 
 TError TVolume::Build() {
     auto lock = ScopedLock();
-    TPath path = Path;
-    TPath internal = GetInternal("");
+    TFile PathFd;
 
-    L_ACT() << "Build volume: " << path
+    L_ACT() << "Build volume: " << Path
             << " backend: " << BackendType << std::endl;
 
-    TError error = internal.Mkdir(0755);
+    TError error = GetInternal("").Mkdir(0755);
     if (error)
         return error;
 
-    TPath storage = GetStorage();
-    if (!HaveStorage()) {
-        error = storage.Mkdir(0755);
-        if (error)
-            return error;
-        error = StorageFd.OpenDir(storage);
+    /* Create and pin storage */
+    if (!UserStorage() && !RemoteStorage() && !StoragePath.Exists()) {
+        error = StoragePath.Mkdir(0755);
         if (error)
             return error;
     }
 
-    if (IsInternalPersistent()) {
-        if (RemoveStorageOnDestroy) {
-            error = storage.Mkdir(0755);
-            if (error)
-                return error;
+    /* loop allows file storage */
+    if (BackendType == "loop" && UserStorage() && StoragePath.IsRegularFollow()) {
+        if (IsReadOnly)
+            error = StorageFd.OpenRead(StoragePath);
+        else
+            error = StorageFd.OpenReadWrite(StoragePath);
+    } else if (!RemoteStorage())
+        error = StorageFd.OpenDir(StoragePath);
+    if (error)
+        return error;
 
-            error = storage.Chown(VolumeOwner);
-            if (error)
-                return error;
-
-            error = StorageFd.OpenDir(storage);
+    if (RemoteStorage()) {
+        /* Nothing to check */
+    } else if (UserStorage()) {
+        error = CL->WriteAccess(StorageFd);
+        if (error)
+            return error;
+    } else if (HaveStorage()) {
+        TStorage storage(Place, PORTO_STORAGE, Storage);
+        error = storage.Load();
+        if (error)
+            return error;
+        error = CL->CanControl(storage.Owner);
+        if (error)
+            return error;
+        if (storage.Owner.IsUnknown()) {
+            error = storage.SetOwner(VolumeOwner);
             if (error)
                 return error;
         }
-
-        if (!Private.size()) {
-            error = GetStoragePrivate(Storage, Place, Private);
-            if (error)
-                return error;
-        } else {
-            SetStoragePrivate(Storage, Place, Private);
-        }
-
-        error = StorageFd.Touch();
+        if (Private.empty())
+            Private = storage.Private;
+        else
+            error = storage.SetPrivate(Private);
+        if (error)
+            return error;
+        error = storage.Touch();
         if (error)
             return error;
     }
 
+    /* Create and pin volume path */
     if (IsAutoPath) {
-        error = path.Mkdir(0755);
+        error = Path.Mkdir(0755);
+        if (error)
+            return error;
+    }
+
+    error = PathFd.OpenDir(Path);
+    if (error)
+        return error;
+
+    TPath RealPath = PathFd.RealPath();
+    if (RealPath != Path)
+        return TError(EError::InvalidValue, "Volume real path differs: " +
+                      RealPath.ToString() + " != " + Path.ToString());
+
+    if (!IsAutoPath) {
+        error = CL->WriteAccess(PathFd);
+        if (error)
+            return error;
+    }
+
+    if (Path != InternalPath) {
+        error = InternalPath.Mkdir(0755);
         if (error)
             return error;
     }
@@ -1383,8 +1253,8 @@ TError TVolume::Build() {
         return error;
 
     if (HaveLayers() && BackendType != "overlay") {
-        L_ACT() << "Merge layers into volume: " << path << std::endl;
 
+        L_ACT() << "Merge layers into volume: " << Path << std::endl;
 
         for (auto &name : Layers) {
             if (name[0] == '/') {
@@ -1395,10 +1265,9 @@ TError TVolume::Build() {
                 if (error)
                     return error;
 
-                if (CreatorRoot.InnerPath(pin.RealPath()).IsEmpty()) {
-                    error = TError(EError::Permission, "Layer path outside root: " + name);
-                    return error;
-                }
+                error = CL->WriteAccess(pin);
+                if (error)
+                    return TError(error, "Layer " + name);
 
                 temp = GetInternal("temp");
                 error = temp.Mkdir(0700);
@@ -1411,45 +1280,65 @@ TError TVolume::Build() {
                     return error;
                 }
 
-                pin.Close();
-
-                if (!temp.CanWrite(CreatorCred))
-                    error = TError(EError::Permission, "Layer path not permitted: " + name);
-                else
-                    error = CopyRecursive(temp, path);
+                error = CopyRecursive(temp, InternalPath);
 
                 (void)temp.UmountAll();
                 (void)temp.Rmdir();
             } else {
-                TPath layer = Place / PORTO_LAYERS / name;
-                error = CopyRecursive(layer, path);
+                TStorage layer(Place, PORTO_LAYERS, name);
+                /* Imported layers are available for everybody */
+                error = CopyRecursive(layer.Path, InternalPath);
             }
             if (error)
                 return error;
         }
 
-        error = SanitizeLayer(path, true);
-        if (error)
-            return error;
-
-        error = path.Chown(VolumeOwner);
-        if (error)
-            return error;
-
-        error = path.Chmod(VolumePerms);
+        error = TStorage::SanitizeLayer(InternalPath, true);
         if (error)
             return error;
     }
 
+    /* Initialize cred and perms but do not change is user havn't asked */
+    if (!IsReadOnly) {
+        if (!KeepStorage || !VolumeCred.IsUnknown()) {
+            TCred cred = VolumeCred;
+            if (cred.Uid == NoUser)
+                cred.Uid = CL->TaskCred.Uid;
+            if (cred.Gid == NoGroup)
+                cred.Gid = CL->TaskCred.Gid;
+            error = InternalPath.Chown(cred);
+            if (error)
+                return error;
+        }
+        if (!KeepStorage || VolumePerms) {
+            error = InternalPath.Chmod(VolumePerms ?: 0775);
+            if (error)
+                return error;
+        }
+    }
+
+    /* Make sure than we saved this before publishing */
+    error = Save();
+    if (error)
+        return error;
+
+    /* And finally, publish volume in requested path */
+    if (Path != InternalPath) {
+        error = PathFd.ProcPath().Bind(InternalPath);
+        if (error)
+            return error;
+    }
+
+    PathFd.Close();
+    StorageFd.Close();
+
+    /* Keep storage only after successful build */
+    if (!KeepStorage && HaveStorage())
+        KeepStorage = true;
+
     IsReady = true;
 
     return Save();
-}
-
-TError TVolume::Clear() {
-    auto lock = ScopedLock();
-    L_ACT() << "Clear volume: " << Path << std::endl;
-    return Backend->Clear();
 }
 
 void TVolume::DestroyAll() {
@@ -1462,7 +1351,7 @@ void TVolume::DestroyAll() {
             continue;
         TError error = vol->Destroy();
         if (error)
-            L_ERR() << "Cannot destroy volume " << vol->Path  << " : " << error << std::endl;
+            L_WRN() << "Cannot destroy volume " << vol->Path  << " : " << error << std::endl;
     }
 }
 
@@ -1544,8 +1433,16 @@ TError TVolume::DestroyOne() {
     auto lock = ScopedLock();
 
     TPath internal = GetInternal("");
-    TPath storage = GetStorage();
     TError ret, error;
+
+    if (Path != InternalPath) {
+        error = Path.UmountNested();
+        if (error) {
+            L_ERR() << "Cannout umount volume: " << error << std::endl;
+            if (!ret)
+                ret = error;
+        }
+    }
 
     if (Backend) {
         error = Backend->Destroy();
@@ -1556,39 +1453,52 @@ TError TVolume::DestroyOne() {
         }
     }
 
-    (void)Path.UmountNested(); /* Re-check everything was disposed */
+    /* umount everything for sure */
+    error = internal.UmountNested();
+    if (error) {
+        L_ERR() << "Cannot umount internal: " << error << std::endl;
+        if (!ret)
+            ret = error;
+    }
 
-    if (IsInternalPersistent()) {
-        error = storage.Touch();
+    StorageFd.Close();
+
+    if (KeepStorage && !UserStorage() && !RemoteStorage()) {
+        error = TStorage(Place, PORTO_STORAGE, Storage).Touch();
         if (error)
             L_WRN() << "Cannot touch storage: " << error << std::endl;
     }
 
-    StorageFd.Close();
-    if ((!HaveStorage() || RemoveStorageOnDestroy) && storage.Exists()) {
-        error = ClearStorage(storage);
+    if (!KeepStorage && !RemoteStorage() && StoragePath.Exists()) {
+        error = ClearRecursive(StoragePath);
         if (error)
-            ret = error;
+            L_ERR() << "Cannot clear storage: " << error << std::endl;
+        error = StoragePath.ClearDirectory();
+        if (error) {
+            L_ERR() << "Cannot clear storage: " << error << std::endl;
+            if (!ret)
+                ret = error;
+        }
+        if (!UserStorage()) {
+            error = StoragePath.Rmdir();
+            if (!ret)
+                ret = error;
+        }
     }
 
     if (IsAutoPath && Path.Exists()) {
         error = Path.RemoveAll();
         if (error) {
-            L_ERR() << "Can't remove volume path: " << error << std::endl;
+            L_ERR() << "Cannot remove volume path: " << error << std::endl;
             if (!ret)
                 ret = error;
         }
     }
 
     if (internal.Exists()) {
-
-        error = internal.UmountNested();
-        if (error)
-            L_ERR() << "Cannot umount nested : " << error << std::endl;
-
         error = internal.RemoveAll();
         if (error) {
-            L_ERR() << "Can't remove internal: " << error << std::endl;
+            L_ERR() << "Cannot remove internal: " << error << std::endl;
             if (!ret)
                 ret = error;
         }
@@ -1602,15 +1512,13 @@ TError TVolume::DestroyOne() {
     lock.unlock();
 
     for (auto &layer: Layers) {
+        TStorage storage(Place, PORTO_LAYERS, layer);
         if (StringStartsWith(layer, "_weak_")) {
-            error = RemoveLayer(layer, Place);
+            error = storage.Remove();
             if (error && error.GetError() != EError::Busy)
                 L_ERR() << "Cannot remove layer: " << error << std::endl;
-        } else if (layer[0] != '/') {
-            TPath private_file = Place / PORTO_LAYERS / LAYER_PRIVATE_PREFIX + layer;
-            if (private_file.Touch())
-                (void)(Place / PORTO_LAYERS / layer).Touch();
-        }
+        } else if (layer[0] != '/')
+            (void)storage.Touch();
     }
 
     return ret;
@@ -1694,7 +1602,7 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
 
 TError TVolume::GetUpperLayer(TPath &upper) {
     if (BackendType == "overlay")
-        upper = GetStorage() / "upper";
+        upper = StoragePath / "upper";
     else
         upper = Path;
     return TError::Success();
@@ -1740,7 +1648,7 @@ TError TVolume::UnlinkContainer(TContainer &container) {
     return Save();
 }
 
-TStringMap TVolume::DumpState(const TPath &root) {
+TStringMap TVolume::DumpConfig(const TPath &root) {
     TStringMap ret;
     TStatFS stat;
 
@@ -1753,15 +1661,20 @@ TStringMap TVolume::DumpState(const TPath &root) {
 
     auto lock = LockVolumes();
 
-    if (Storage.empty() || BackendType == "rbd" || IsInternalPersistent())
-        ret[V_STORAGE] = Storage;
+    if (UserStorage() && !RemoteStorage())
+        ret[V_STORAGE] = root.InnerPath(StoragePath).ToString();
     else
-        ret[V_STORAGE] = root.InnerPath(Storage).ToString();
+        ret[V_STORAGE] = Storage;
 
     ret[V_BACKEND] = BackendType;
-    ret[V_USER] = VolumeOwner.User();
-    ret[V_GROUP] = VolumeOwner.Group();
-    ret[V_PERMISSIONS] = StringFormat("%#o", VolumePerms);
+    ret[V_OWNER_USER] = VolumeOwner.User();
+    ret[V_OWNER_GROUP] = VolumeOwner.Group();
+    if (VolumeCred.Uid != NoUser)
+        ret[V_USER] = VolumeCred.User();
+    if (VolumeCred.Gid != NoGroup)
+        ret[V_GROUP] = VolumeCred.Group();
+    if (VolumePerms)
+        ret[V_PERMISSIONS] = StringFormat("%#o", VolumePerms);
     ret[V_CREATOR] = Creator;
     ret[V_READY] = BoolToString(IsReady && !IsDying);
     ret[V_PRIVATE] = Private;
@@ -1803,9 +1716,14 @@ TError TVolume::Save() {
     node.Set(V_AUTO_PATH, BoolToString(IsAutoPath));
     node.Set(V_STORAGE, Storage);
     node.Set(V_BACKEND, BackendType);
-    node.Set(V_USER, VolumeOwner.User());
-    node.Set(V_GROUP, VolumeOwner.Group());
-    node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
+    node.Set(V_OWNER_USER, VolumeOwner.User());
+    node.Set(V_OWNER_GROUP, VolumeOwner.Group());
+    if (VolumeCred.Uid != NoUser)
+        node.Set(V_USER, VolumeCred.User());
+    if (VolumeCred.Gid != NoGroup)
+        node.Set(V_GROUP, VolumeCred.Group());
+    if (VolumePerms)
+        node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
     node.Set(V_CREATOR, Creator);
     node.Set(V_READY, BoolToString(IsReady));
     node.Set(V_PRIVATE, Private);
@@ -1828,12 +1746,25 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (!node.Has(V_ID))
         return TError(EError::InvalidValue, "No volume id stored");
 
-    Place = PORTO_PLACE;
-    CustomPlace = false;
-
     TError error = ApplyConfig(node.Data);
     if (error)
         return error;
+
+    InternalPath = Place / PORTO_VOLUMES / Id / "volume";
+
+    if (!node.Has(V_OWNER_USER)) {
+        TTuple tuple;
+        SplitEscapedString(Creator, tuple, ' ');
+        if (tuple.size() != 3 ||
+                UserId(tuple[1], VolumeOwner.Uid) ||
+                GroupId(tuple[2], VolumeOwner.Gid))
+            VolumeOwner = VolumeCred;
+    }
+
+    if (!HaveStorage())
+        StoragePath = GetInternal(BackendType);
+    else if (!UserStorage() && !RemoteStorage())
+        StoragePath = TStorage(Place, PORTO_STORAGE, Storage).Path;
 
     if (!IsReady)
         return TError(EError::Busy, "Volume not ready");
@@ -1854,8 +1785,10 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_PRIVATE,     "user-defined property", false },
-    { V_USER,        "user (default - creator)", false },
-    { V_GROUP,       "group (default - creator)", false },
+    { V_OWNER_USER,  "owner user (default - creator)", false },
+    { V_OWNER_GROUP, "owner group (default - creator)", false },
+    { V_USER,        "directory user (default - creator)", false },
+    { V_GROUP,       "directory group (default - creator)", false },
     { V_PERMISSIONS, "directory permissions (default - 0775)", false },
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", false },
@@ -1872,18 +1805,24 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_INODE_AVAILABLE,    "available disk inodes (ro)", true },
 };
 
-TError TVolume::Create(const TPath &path, const TStringMap &cfg,
-                       TContainer &container, const TCred &cred,
-                       std::shared_ptr<TVolume> &volume) {
+TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) {
     TError error;
 
+    if (!CL)
+        return TError(EError::Unknown, "no client");
+
     if (cfg.count(V_PLACE)) {
-        error = CheckPlace(cfg.at(V_PLACE));
+        error = CL->CanControlPlace(cfg.at(V_PLACE));
+        if (error)
+            return error;
+        error = TStorage::CheckPlace(cfg.at(V_PLACE));
+        if (error)
+            return error;
+    } else {
+        error = CL->CanControlPlace(PORTO_PLACE);
         if (error)
             return error;
     }
-
-    volume = std::make_shared<TVolume>();
 
     auto volumes_lock = LockVolumes();
 
@@ -1891,37 +1830,36 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
     if (Volumes.size() >= max)
         return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max));
 
-    if (!path.IsEmpty()) {
+    if (cfg.count(V_PATH)) {
+        TPath path(cfg.at(V_PATH));
+
         for (auto &it : Volumes) {
             auto &vol = it.second;
 
             if (vol->Path == path)
                 return TError(EError::VolumeAlreadyExists, "Volume already exists");
 
-            if (!path.InnerPath(vol->Path).IsEmpty())
+            if (vol->Path.IsInside(path))
                 return TError(EError::Busy, "Path overlaps with volume " + vol->Path.ToString());
 
-            if (!path.InnerPath(vol->Place).IsEmpty())
+            if (vol->Place.IsInside(path))
                 return TError(EError::Busy, "Path overlaps with place " + vol->Place.ToString());
 
-            TPath storage = vol->GetStorage();
-            if (!path.InnerPath(storage).IsEmpty() ||
-                    !storage.InnerPath(path).IsEmpty())
-                return TError(EError::Busy, "Path overlaps with storage " + storage.ToString());
+            if (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath))
+                return TError(EError::Busy, "Path overlaps with storage " + vol->StoragePath.ToString());
 
             for (auto &l: vol->Layers) {
                 TPath layer(l);
-                if (layer.IsAbsolute() &&
-                        (!path.InnerPath(layer).IsEmpty() ||
-                         !layer.InnerPath(path).IsEmpty()))
+                if (layer.IsAbsolute() && (layer.IsInside(path) || path.IsInside(layer)))
                     return TError(EError::Busy, "Path overlaps with layer " + l);
             }
         }
     }
 
+    volume = std::make_shared<TVolume>();
     volume->Id = std::to_string(NextId++);
 
-    error = volume->Configure(path, cfg, container, cred);
+    error = volume->Configure(cfg);
     if (error)
         return error;
 
@@ -1936,11 +1874,6 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
     if (cfg.count(V_CONTAINERS)) {
         std::vector<std::string> list;
 
-        if (!CL) {
-            volume->Destroy();
-            return TError(EError::Unknown, "not client?");
-        }
-
         SplitEscapedString(cfg.at(V_CONTAINERS), list, ';');
         for (auto &name: list) {
             std::shared_ptr<TContainer> ct;
@@ -1953,9 +1886,8 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
             }
         }
     } else {
-        error = volume->LinkContainer(container);
+        error = volume->LinkContainer(*CL->ClientContainer);
         if (error) {
-            L_WRN() << "Cannot link volume: " << error << std::endl;
             volume->Destroy();
             return error;
         }
@@ -1963,13 +1895,10 @@ TError TVolume::Create(const TPath &path, const TStringMap &cfg,
 
     error = volume->Build();
     if (error) {
-        L_WRN() << "Cannot build volume: " << error << std::endl;
-        volume->Destroy();
+        (void)volume->Destroy();
         return error;
     }
 
-    volume->RemoveStorageOnDestroy = false;
-    volume->StorageFd.Close();
     VolumesCv.notify_all();
 
     return TError::Success();
@@ -1980,7 +1909,7 @@ void TVolume::RestoreAll(void) {
     TError error;
 
     TPath place(PORTO_PLACE);
-    error = CheckPlace(place, true);
+    error = TStorage::CheckPlace(place);
     if (error)
         L_ERR() << "Cannot prepare place: " << error << std::endl;
 
@@ -2124,17 +2053,28 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_STORAGE) {
             Storage = prop.second;
+            StoragePath = Storage;
 
         } else if (prop.first == V_BACKEND) {
             BackendType = prop.second;
 
-        } else if (prop.first == V_USER) {
+        } else if (prop.first == V_OWNER_USER) {
             error = UserId(prop.second, VolumeOwner.Uid);
             if (error)
                 return error;
 
-        } else if (prop.first == V_GROUP) {
+        } else if (prop.first == V_OWNER_GROUP) {
             error = GroupId(prop.second, VolumeOwner.Gid);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_USER) {
+            error = UserId(prop.second, VolumeCred.Uid);
+            if (error)
+                return error;
+
+        } else if (prop.first == V_GROUP) {
+            error = GroupId(prop.second, VolumeCred.Gid);
             if (error)
                 return error;
 

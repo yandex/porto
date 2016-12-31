@@ -72,7 +72,8 @@ public:
     int WaitContainers(const std::vector<std::string> &containers,
                        std::string &name, int timeout);
 
-    int List(std::vector<std::string> &list, const std::string &mask = "");
+    int List(std::vector<std::string> &list,
+             const std::string &mask = "");
     int Plist(std::vector<Property> &list);
     int Dlist(std::vector<Property> &list);
 
@@ -118,14 +119,17 @@ public:
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer, const std::string &place = "");
     int ListLayers(std::vector<Layer> &layers,
-                   const std::string &place = "");
+                   const std::string &place = "",
+                   const std::string &mask = "");
 
     int GetLayerPrivate(std::string &private_value, const std::string &layer,
                         const std::string &place = "");
     int SetLayerPrivate(const std::string &private_value, const std::string &layer,
                         const std::string &place = "");
 
-    int ListStorage(std::vector<Storage> &storages, const std::string &place = "");
+    int ListStorage(std::vector<Storage> &storages,
+                    const std::string &place = "",
+                    const std::string &mask = "");
     int RemoveStorage(const std::string &name, const std::string &place = "");
 
     int ConvertPath(const std::string &path, const std::string &src,

@@ -190,6 +190,7 @@ public:
     TPath RootPath; /* path in host namespace, set at start */
     int LoopDev = -1; /* legacy */
     std::shared_ptr<TVolume> RootVolume;
+    std::vector<std::string> Place;
 
     TTask Task;
     pid_t TaskVPid;

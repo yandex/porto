@@ -233,23 +233,11 @@ def binds_escalation(v):
     r.SetProperty("bind", "/tmp/porto-tests/dir1 /tmp/porto-tests/mount1/mount2 rw")
     r.SetProperty("command", "dd if=/dev/zero of=/tmp/porto-tests/mount1/mount2/file bs=32 count=1") 
 
-    #We have warning about rights there, should be replaced with assert in the future
-    warn_ctr_old = int(c.Get(["/"],["porto_stat[warnings]"])["/"]["porto_stat[warnings]"])
-    r.Start()
-    r.Wait()
-    warn_ctr = int(c.Get(["/"],["porto_stat[warnings]"])["/"]["porto_stat[warnings]"])
+    assert Catch(r.Start) == porto.exceptions.PermissionError
 
-    assert warn_ctr == warn_ctr_old + 1
-
-    r.Stop()
     r.SetProperty("bind", "/tmp/porto-tests/dir-bob /tmp/porto-tests/mount1/mount2 rw")
 
-    #We have warning about rights there, should be replaced with assert in the future
-    warn_ctr_old = int(c.Get(["/"],["porto_stat[warnings]"])["/"]["porto_stat[warnings]"])
-    r.Start()
-    r.Wait()
-    warn_ctr = int(c.Get(["/"],["porto_stat[warnings]"])["/"]["porto_stat[warnings]"])
-    assert warn_ctr == warn_ctr_old + 1
+    assert Catch(r.Start) == porto.exceptions.PermissionError
 
     c.Destroy("test")
     SwitchRoot()

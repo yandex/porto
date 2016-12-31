@@ -19,6 +19,7 @@ constexpr const char *P_OWNER_USER = "owner_user";
 constexpr const char *P_OWNER_GROUP = "owner_group";
 constexpr const char *P_ENV = "env";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
+constexpr const char *P_PLACE = "place";
 constexpr const char *P_ROOT = "root";
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
 constexpr const char *P_CWD = "cwd";
@@ -127,6 +128,7 @@ enum class EProperty {
     OWNER_GROUP,
     ENV,
     PORTO_NAMESPACE,
+    PLACE,
     ROOT,
     ROOT_RDONLY,
     CWD,

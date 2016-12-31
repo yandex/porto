@@ -89,14 +89,6 @@ TLogBuf::TLogBuf(const size_t size) {
 }
 
 void TLogBuf::Open(const TPath &path, const unsigned int mode) {
-    if (!path.DirName().CanWrite(TCred::Current())) {
-        logBufFd = open("/dev/kmsg", O_WRONLY | O_APPEND | O_CLOEXEC);
-        if (logBufFd < 0)
-            logBufFd = STDERR_FILENO;
-
-        return;
-    }
-
     struct stat st;
     if (!path.StatFollow(st) && (st.st_mode & 0777) != mode)
         (void)path.Chmod(mode);

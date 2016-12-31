@@ -9,19 +9,14 @@
 
 struct TBindMount {
     TPath Source;
-    TPath Dest;
+    TPath Target;
     bool ReadOnly = false;
-    bool ReadWrite = false;
-
-    TBindMount() {}
-    TBindMount(TPath source, TPath dest, bool ro):
-        Source(source), Dest(dest), ReadOnly(ro), ReadWrite(!ro) {}
 };
 
 struct TMountNamespace {
 public:
     std::string Container; /* for logging and errors */
-    TCred OwnerCred;
+    TCred BindCred;
     TPath Cwd;
     TPath ParentCwd;
     TPath Root; /* path in ParentNs.Mnt */

@@ -6,7 +6,6 @@
 #include "property.hpp"
 #include "container.hpp"
 #include "volume.hpp"
-#include "layer.hpp"
 #include "event.hpp"
 #include "protobuf.hpp"
 #include "helpers.hpp"
@@ -277,7 +276,9 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_getlayerprivate() +
         req.has_setlayerprivate() +
         req.has_liststorage() +
-        req.has_removestorage() == 1;
+        req.has_removestorage() +
+        req.has_importstorage() +
+        req.has_exportstorage()  == 1;
 }
 
 static void SendReply(TClient &client, rpc::TContainerResponse &response, bool log) {
@@ -381,9 +382,8 @@ noinline TError ListContainers(const rpc::TContainerListRequest &req,
     for (auto &it: Containers) {
         auto &ct = it.second;
         std::string name;
-        if (ct->IsRoot() || CL->ComposeName(ct->Name, name))
-            continue;
-        if (mask != "***" && !StringMatch(name, mask))
+        if (ct->IsRoot() || CL->ComposeName(ct->Name, name) ||
+                !StringMatch(name, mask))
             continue;
         rsp.mutable_list()->add_name(name);
     }
@@ -504,7 +504,7 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
             if (masks.empty())
                 names.push_back(name);
             for (auto &mask: masks) {
-                if (mask == "***" || StringMatch(name, mask)) {
+                if (StringMatch(name, mask)) {
                     names.push_back(name);
                     break;
                 }
@@ -721,10 +721,9 @@ noinline TError ListVolumeProperties(const rpc::TVolumePropertyListRequest &req,
 }
 
 noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
-                                    TPath container_root, TPath volume_path,
                                     std::shared_ptr<TVolume> volume) {
-    desc->set_path(volume_path.ToString());
-    for (auto kv: volume->DumpState(container_root)) {
+    desc->set_path(CL->ComposePath(volume->Path).ToString());
+    for (auto kv: volume->DumpConfig(CL->ClientContainer->RootPath)) {
         auto p = desc->add_properties();
         p->set_name(kv.first);
         p->set_value(kv.second);
@@ -738,32 +737,23 @@ noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
 
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp) {
-    std::shared_ptr<TContainer> ct;
-    TError error = CL->WriteContainer(SELF_CONTAINER, ct, true);
-    if (error)
-        return error;
-
-    /* FIXME unlock between create and build */
-    CL->ReleaseContainer();
-
     TStringMap cfg;
+
     for (auto p: req.properties())
         cfg[p.name()] = p.value();
 
-    TPath volume_path;
     if (req.has_path() && !req.path().empty())
-        volume_path =  ct->RootPath / req.path();
+        cfg[V_PATH] = req.path();
+
+    if (!cfg.count(V_PLACE) && CL->DefaultPlace() != PORTO_PLACE)
+        cfg[V_PLACE] = CL->DefaultPlace().ToString();
 
     std::shared_ptr<TVolume> volume;
-    error = TVolume::Create(volume_path, cfg, *ct,
-                            CL->TaskCred, volume);
+    TError error = TVolume::Create(cfg, volume);
     if (error)
         return error;
 
-    volume_path = ct->RootPath.InnerPath(volume->Path, true);
-    FillVolumeDescription(rsp.mutable_volume(), ct->RootPath,
-                          volume_path, volume);
-
+    FillVolumeDescription(rsp.mutable_volume(), volume);
     return TError::Success();
 }
 
@@ -840,25 +830,22 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
 
 noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
                             rpc::TContainerResponse &rsp) {
-    TPath container_root = CL->ResolvePath("/");
     TError error;
 
     if (req.has_path() && !req.path().empty()) {
-        TPath volume_path = container_root / req.path();
         std::shared_ptr<TVolume> volume;
 
-        error = TVolume::Find(volume_path, volume);
+        error = TVolume::Find(CL->ResolvePath(req.path()), volume);
         if (error)
             return error;
 
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        volume_path = container_root.InnerPath(volume->Path, true);
-        FillVolumeDescription(desc, container_root, volume_path, volume);
+        FillVolumeDescription(desc, volume);
         return TError::Success();
     }
 
     auto volumes_lock = LockVolumes();
-    std::list<std::pair<TPath, std::shared_ptr<TVolume>>> list;
+    std::list<std::shared_ptr<TVolume>> list;
     for (auto &it : Volumes) {
         auto volume = it.second;
 
@@ -867,15 +854,14 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
                     req.container()) == volume->Containers.end())
             continue;
 
-        TPath path = container_root.InnerPath(volume->Path, true);
-        if (!path.IsEmpty())
-            list.push_back(std::make_pair(path, volume));
+        if (!CL->ComposePath(volume->Path).IsEmpty())
+            list.push_back(volume);
     }
     volumes_lock.unlock();
 
-    for (auto &it: list) {
+    for (auto &volume: list) {
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, container_root, it.first, it.second);
+        FillVolumeDescription(desc, volume);
     }
 
     return TError::Success();
@@ -886,50 +872,25 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     if (error)
         return error;
 
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    error = CheckPlace(place);
-    if (error)
-        return error;
+    TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
+                   PORTO_LAYERS, req.layer());
 
-    TPath tarball(req.tarball());
+    if (req.has_private_value())
+        layer.Private = req.private_value();
 
-    if (!tarball.IsAbsolute())
-        return TError(EError::InvalidValue, "tarball path must be absolute");
+    layer.Owner = CL->Cred;
 
-    tarball = CL->ResolvePath(tarball);
-
-    if (!tarball.Exists())
-        return TError(EError::InvalidValue, "tarball not found");
-
-    if (!tarball.IsRegularFollow())
-        return TError(EError::InvalidValue, "tarball not a file");
-
-    if (!tarball.CanRead(CL->Cred))
-        return TError(EError::Permission, "client has not read access to tarball");
-
-    std::string layer_private;
-
-    return ImportLayer(req.layer(), place, tarball, req.merge(),
-                       req.has_private_value() ? req.private_value() : "",
-                       CL->Cred);
+    return layer.ImportTarball(CL->ResolvePath(req.tarball()), req.merge());
 }
 
 noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
                                 rpc::TContainerResponse &rsp) {
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    TError error = CheckPlace(place);
-    if (error)
-        return error;
-
-    std::string private_value;
-
-    error = GetLayerPrivate(req.layer(), place, private_value);
-    if (error)
-        return error;
-
-    rsp.mutable_layer_private()->set_private_value(private_value);
-
-    return TError::Success();
+    TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
+                   PORTO_LAYERS, req.layer());
+    TError error = layer.Load();
+    if (!error)
+        rsp.mutable_layer_private()->set_private_value(layer.Private);
+    return error;
 }
 
 noinline TError SetLayerPrivate(const rpc::TLayerSetPrivateRequest &req) {
@@ -937,12 +898,18 @@ noinline TError SetLayerPrivate(const rpc::TLayerSetPrivateRequest &req) {
     if (error)
         return error;
 
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    error = CheckPlace(place);
+    TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
+                   PORTO_LAYERS, req.layer());
+    error = CL->CanControlPlace(layer.Place);
     if (error)
         return error;
-
-    return SetLayerPrivate(req.layer(), place, req.private_value());
+    error = layer.Load();
+    if (error)
+        return error;
+    error = CL->CanControl(layer.Owner);
+    if (error)
+        return error;
+    return layer.SetPrivate(req.private_value());
 }
 
 noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
@@ -950,18 +917,24 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (error)
         return error;
 
-    TPath tarball(req.tarball());
+    if (req.has_layer()) {
+        TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
+                       PORTO_LAYERS, req.layer());
 
-    if (!tarball.IsAbsolute())
-        return TError(EError::InvalidValue, "tarball path must be absolute");
+        error = CL->CanControlPlace(layer.Place);
+        if (error)
+            return error;
 
-    tarball =  CL->ResolvePath(tarball);
+        error = layer.Load();
+        if (error)
+            return error;
 
-    if (tarball.Exists())
-        return TError(EError::InvalidValue, "tarball already exists");
+        error = CL->CanControl(layer.Owner);
+        if (error)
+            return error;
 
-    if (!tarball.DirName().CanWrite(CL->Cred))
-        return TError(EError::Permission, "client has no write access to tarball directory");
+        return layer.ExportTarball(CL->ResolvePath(req.tarball()));
+    }
 
     auto volume = TVolume::Find(CL->ResolvePath(req.volume()));
     if (!volume)
@@ -976,19 +949,8 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (error)
         return error;
 
-    error = PackTarball(tarball, upper);
-    if (error) {
-        (void)tarball.Unlink();
-        return error;
-    }
-
-    error = tarball.Chown(CL->Cred);
-    if (error) {
-        (void)tarball.Unlink();
-        return error;
-    }
-
-    return TError::Success();
+    TStorage layer(upper, "overlay");
+    return layer.ExportTarball(CL->ResolvePath(req.tarball()));
 }
 
 noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
@@ -996,52 +958,41 @@ noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
     if (error)
         return error;
 
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    error = CheckPlace(place);
+    TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
+                   PORTO_LAYERS, req.layer());
+    error = CL->CanControlPlace(layer.Place);
     if (error)
         return error;
-
-    return RemoveLayer(req.layer(), place);
+    error = layer.Load();
+    if (error)
+        return error;
+    error = CL->CanControl(layer.Owner);
+    if (error)
+        return error;
+    return layer.Remove();
 }
 
 noinline TError ListLayers(const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    TPath layers_dir = place / PORTO_LAYERS;
-    std::vector<std::string> layers;
-
-    TError error = layers_dir.ListSubdirs(layers);
-    if (!error) {
-        auto list = rsp.mutable_layers();
-        for (auto &layer: layers) {
-            if (LayerIsJunk(layer))
-                continue;
-
-            if (req.has_pattern() && !StringMatch(layer, req.pattern()))
-                continue;
-
-            list->add_layer(layer);
-
-            auto desc = list->add_layers();
-            desc->set_name(layer);
-
-            std::string private_value;
-            if (GetLayerPrivate(layer, place, private_value))
-                private_value = "";
-            desc->set_private_value(private_value);
-
-            desc->set_last_usage(LayerLastUsage(layer, place));
-
-            TCred owner;
-            if (!LayerOwner(layer, place, owner) && owner.Uid != NoUser) {
-                desc->set_owner_user(owner.User());
-                desc->set_owner_group(owner.Group());
-            } else {
-                desc->set_owner_user("");
-                desc->set_owner_group("");
-            }
-        }
+    std::list<TStorage> layers;
+    TError error = TStorage::List(req.has_place() ? req.place() : CL->DefaultPlace(),
+                                  PORTO_LAYERS, layers);
+    if (error)
+        return error;
+    auto list = rsp.mutable_layers();
+    for (auto &layer: layers) {
+        if (req.has_mask() && !StringMatch(layer.Name, req.mask()))
+            continue;
+        list->add_layer(layer.Name);
+        (void)layer.Load();
+        auto desc = list->add_layers();
+        desc->set_name(layer.Name);
+        desc->set_owner_user(layer.Owner.User());
+        desc->set_owner_group(layer.Owner.Group());
+        desc->set_private_value(layer.Private);
+        desc->set_last_usage(layer.LastUsage());
     }
+
     return error;
 }
 
@@ -1112,51 +1063,26 @@ undo:
     return error;
 }
 
-noinline void FillStorageDescription(rpc::TStorageDescription *desc,
-                                     std::string name,
-                                     TPath &place) {
-    TPath storage = place / PORTO_STORAGE / name;
-    desc->set_name(name);
-
-    std::string private_value;
-    if (GetStoragePrivate(name, place, private_value))
-        private_value = "";
-    desc->set_private_value(private_value);
-
-    struct stat st;
-    if (!storage.StatStrict(st)) {
-        desc->set_owner_user(UserName(st.st_uid));
-        desc->set_owner_group(GroupName(st.st_gid));
-        desc->set_last_usage(time(NULL) - st.st_mtime);
-    } else {
-        desc->set_owner_user("");
-        desc->set_owner_group("");
-        desc->set_last_usage(0);
-    }
-}
-
 noinline TError ListStorage(const rpc::TStorageListRequest &req,
                             rpc::TContainerResponse &rsp) {
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    TPath storage_dir = place / PORTO_STORAGE;
-    std::vector<std::string> storage;
+    std::list<TStorage> storages;
+    TError error = TStorage::List(req.has_place() ? req.place() : CL->DefaultPlace(),
+                                  PORTO_STORAGE, storages);
+    if (error)
+        return error;
 
-    if (req.has_name()) {
-        TPath storage = storage_dir / req.name();
-
-        if (!storage.Exists())
-            return TError(EError::InvalidValue, "Storage path does not exists");
-
-        auto desc = rsp.mutable_storagelist()->add_storages();
-        FillStorageDescription(desc, req.name(), place);
-    }
-
-    TError error = storage_dir.ListSubdirs(storage);
-    if (!error) {
-        for (auto &st: storage) {
-            auto desc = rsp.mutable_storagelist()->add_storages();
-            FillStorageDescription(desc, st, place);
-        }
+    auto list = rsp.mutable_storagelist();
+    for (auto &storage: storages) {
+        if (req.has_mask() && !StringMatch(storage.Name, req.mask()))
+            continue;
+        if (storage.Load())
+            continue;
+        auto desc = list->add_storages();
+        desc->set_name(storage.Name);
+        desc->set_owner_user(storage.Owner.User());
+        desc->set_owner_group(storage.Owner.Group());
+        desc->set_private_value(storage.Private);
+        desc->set_last_usage(storage.LastUsage());
     }
 
     return error;
@@ -1167,12 +1093,55 @@ noinline TError RemoveStorage(const rpc::TStorageRemoveRequest &req) {
     if (error)
         return error;
 
-    TPath place(req.has_place() ? req.place() : PORTO_PLACE);
-    error = CheckPlace(place);
+    TStorage storage(req.has_place() ? req.place() : CL->DefaultPlace(),
+                     PORTO_STORAGE, req.name());
+    error = CL->CanControlPlace(storage.Place);
+    if (error)
+        return error;
+    error = storage.Load();
+    if (error)
+        return error;
+    error = CL->CanControl(storage.Owner);
+    if (error)
+        return error;
+    return storage.Remove();
+}
+
+noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
+    TError error = CheckPortoWriteAccess();
     if (error)
         return error;
 
-    return RemoveStorage(req.name(), place);
+    TStorage storage(req.has_place() ? req.place() : CL->DefaultPlace(),
+                     PORTO_STORAGE, req.name());
+    storage.Owner = CL->Cred;
+    if (req.has_private_value())
+        storage.Private = req.private_value();
+
+    return storage.ImportTarball(CL->ResolvePath(req.tarball()));
+}
+
+noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
+    TError error = CheckPortoWriteAccess();
+    if (error)
+        return error;
+
+    TStorage storage(req.has_place() ? req.place() : CL->DefaultPlace(),
+                     PORTO_STORAGE, req.name());
+
+    error = CL->CanControlPlace(storage.Place);
+    if (error)
+        return error;
+
+    error = storage.Load();
+    if (error)
+        return error;
+
+    error = CL->CanControl(storage.Owner);
+    if (error)
+        return error;
+
+    return storage.ExportTarball(CL->ResolvePath(req.tarball()));
 }
 
 void HandleRpcRequest(const rpc::TContainerRequest &req,
@@ -1260,6 +1229,10 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             error = ListStorage(req.liststorage(), rsp);
         else if (req.has_removestorage())
             error = RemoveStorage(req.removestorage());
+        else if (req.has_importstorage())
+            error = ImportStorage(req.importstorage());
+        else if (req.has_exportstorage())
+            error = ExportStorage(req.exportstorage());
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

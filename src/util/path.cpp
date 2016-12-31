@@ -10,6 +10,7 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <fcntl.h>
@@ -26,6 +27,20 @@ extern "C" {
 #ifndef FALLOC_FL_COLLAPSE_RANGE
 #define FALLOC_FL_COLLAPSE_RANGE        0x08
 #endif
+
+void TStatFS::Init(const struct statfs &st) {
+    SpaceUsage = (uint64_t)(st.f_blocks - st.f_bfree) * st.f_bsize;
+    SpaceAvail = (uint64_t)st.f_bavail * st.f_bsize;
+    InodeUsage = st.f_files - st.f_ffree;
+    InodeAvail = st.f_ffree;
+    ReadOnly   = st.f_flags & ST_RDONLY;
+    Secure     = (st.f_flags & (ST_NODEV|ST_NOSUID|ST_NOEXEC)) > ST_NODEV;
+}
+
+void TStatFS::Reset() {
+    SpaceUsage = SpaceAvail = InodeUsage = InodeAvail = 0;
+    ReadOnly = Secure = false;
+}
 
 struct FileHandle {
     struct file_handle head;
@@ -120,44 +135,6 @@ unsigned int TPath::GetBlockDev() const {
 
 bool TPath::Exists() const {
     return access(Path.c_str(), F_OK) == 0;
-}
-
-bool TPath::HasAccess(const TCred &cred, enum Access mask) const {
-    struct stat st;
-
-    if (!cred.Uid && !access(c_str(), mask & TPath::RWX))
-        return true;
-
-    if (stat(c_str(), &st)) {
-        if (!(mask & TPath::P) || errno != ENOENT)
-            return false;
-        TPath dir = DirName();
-        while (stat(dir.c_str(), &st)) {
-            if (errno != ENOENT)
-                return false;
-            if (dir.Path.size() <= 1)
-                return false;
-            dir = dir.DirName();
-        }
-    }
-
-    return HasAccess(st, cred, mask);
-}
-
-bool TPath::HasAccess(const struct stat &st, const TCred &cred, enum Access mask) {
-    int mode;
-
-    if ((mask & TPath::U) && cred.Uid == st.st_uid)
-        return true;
-
-    if (cred.Uid == st.st_uid)
-        mode = st.st_mode >> 6;
-    else if (cred.IsMemberOf(st.st_gid))
-        mode = st.st_mode >> 3;
-    else
-        mode = st.st_mode;
-
-    return (mode & mask & TPath::RWX) == (mask & TPath::RWX);
 }
 
 std::string TPath::ToString() const {
@@ -389,25 +366,15 @@ TPath TPath::InnerPath(const TPath &path, bool absolute) const {
         return TPath(path.Path.substr(len + 1));
 }
 
-bool TPath::IsInside(const std::vector<TPath> paths) const {
-    for (auto &path: paths) {
-        if (!path.InnerPath(*this).IsEmpty())
-            return true;
-    }
-    return false;
+bool TPath::IsInside(const TPath &base) const {
+    return !base.InnerPath(*this).IsEmpty();
 }
 
 TError TPath::StatFS(TStatFS &result) const {
-    struct statvfs st;
-
-    int ret = statvfs(Path.c_str(), &st);
-    if (ret)
-        return TError(EError::Unknown, errno, "statvfs(" + Path + ")");
-
-    result.SpaceUsage = (uint64_t)(st.f_blocks - st.f_bfree) * st.f_bsize;
-    result.SpaceAvail = (uint64_t)(st.f_bavail) * st.f_bsize;
-    result.InodeUsage = st.f_files - st.f_ffree;
-    result.InodeAvail = st.f_favail;
+    struct statfs st;
+    if (statfs(Path.c_str(), &st))
+        return TError(EError::Unknown, errno, "statfs(" + Path + ")");
+    result.Init(st);
     return TError::Success();
 }
 
@@ -844,7 +811,7 @@ TError TPath::UmountAll() const {
     L_ACT() << "umount all " << Path << std::endl;
     while (1) {
         if (umount2(c_str(), UMOUNT_NOFOLLOW)) {
-            if (errno == EINVAL)
+            if (errno == EINVAL || errno == ENOENT)
                 return TError::Success(); /* not a mountpoint */
             if (errno == EBUSY)
                 umount2(c_str(), UMOUNT_NOFOLLOW | MNT_DETACH);
@@ -863,11 +830,11 @@ TError TPath::UmountNested() const {
         return error;
 
     for (auto it = mounts.rbegin(); it != mounts.rend(); ++it) {
-        if (InnerPath(it->Target).IsEmpty())
-            continue;
-        error = it->Target.UmountAll();
-        if (error)
-            break;
+        if (it->Target.IsInside(*this)) {
+            error = it->Target.UmountAll();
+            if (error)
+                break;
+        }
     }
 
     return error;
@@ -998,8 +965,8 @@ TError TPath::FindMount(TMount &mount) const {
         TPath source(mnt->mnt_fsname);
         TPath target(mnt->mnt_dir);
 
-        if (!target.InnerPath(normal).IsEmpty() &&
-                (target.GetDev() == device || source.GetBlockDev() == device)) {
+        if (normal.IsInside(target) && (target.GetDev() == device ||
+                                        source.GetBlockDev() == device)) {
             mount.Source = source;
             mount.Target = target;
             mount.Type = mnt->mnt_type;
@@ -1075,6 +1042,10 @@ TError TFile::OpenDirStrict(const TPath &path) {
     return Open(path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOCTTY | O_NOFOLLOW);
 }
 
+TError TFile::OpenPath(const TPath &path) {
+    return Open(path, O_PATH | O_CLOEXEC);
+}
+
 #ifndef O_TMPFILE
 #define O_TMPFILE (O_DIRECTORY | 020000000)
 #endif
@@ -1136,30 +1107,6 @@ TPath TFile::ProcPath(void) const {
     if (Fd < 0)
         return TPath();
     return TPath("/proc/self/fd/" + std::to_string(Fd));
-}
-
-TError TFile::ReadTail(std::string &text, off_t max) {
-    off_t old_pos = lseek(Fd, 0, SEEK_CUR);
-    size_t size = old_pos > max ? old_pos - max : old_pos;
-
-    if (old_pos < 0 || lseek(Fd, -size, SEEK_CUR) < 0)
-        return TError(EError::Unknown, errno, "lseek");
-
-    text.resize(size);
-
-    size_t off = 0;
-    ssize_t ret;
-
-    do {
-        ret = read(Fd, &text[off], size - off);
-
-        off += ret;
-    } while (ret > 0 && off > size);
-
-    if (ret < 0)
-        return TError(EError::Unknown, errno, "read");
-
-    return TError::Success();
 }
 
 TError TFile::ReadAll(std::string &text, size_t max) const {
@@ -1238,23 +1185,13 @@ TError TFile::Dup(const TFile &other) {
     return TError::Success();
 }
 
-TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags) {
-    if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
-    Close();
-    SetFd = openat(dir.Fd, path.c_str(), flags);
-    if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open " + std::to_string(dir.Fd) + " @ " + path.Path);
-    return TError::Success();
-}
-
-TError TFile::CreateAt(const TFile &dir, const TPath &path, int flags, int mode) {
+TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags, int mode) {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     Close();
     SetFd = openat(dir.Fd, path.c_str(), flags, mode);
     if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot create " + std::to_string(dir.Fd) + " @ " + path.Path);
+        return TError(EError::Unknown, errno, "Cannot open " + std::to_string(dir.Fd) + " @ " + path.Path);
     return TError::Success();
 }
 
@@ -1262,7 +1199,7 @@ TError TFile::MkdirAt(const TPath &path, int mode) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (mkdirat(Fd, path.c_str(), mode))
-        return TError(EError::Success, errno, "Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
+        return TError(EError::Unknown, errno, "Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
     return TError::Success();
 }
 
@@ -1270,7 +1207,7 @@ TError TFile::UnlinkAt(const TPath &path) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (unlinkat(Fd, path.c_str(), 0))
-        return TError(EError::Success, errno, "Cannot unlink " + std::to_string(Fd) + " @ " + path.Path);
+        return TError(EError::Unknown, errno, "Cannot unlink " + std::to_string(Fd) + " @ " + path.Path);
     return TError::Success();
 }
 
@@ -1278,7 +1215,7 @@ TError TFile::RmdirAt(const TPath &path) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (unlinkat(Fd, path.c_str(), AT_REMOVEDIR))
-        return TError(EError::Success, errno, "Cannot rmdir " + std::to_string(Fd) + " @ " + path.Path);
+        return TError(EError::Unknown, errno, "Cannot rmdir " + std::to_string(Fd) + " @ " + path.Path);
     return TError::Success();
 }
 
@@ -1288,7 +1225,7 @@ TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
     if (newpath.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + newpath.Path);
     if (renameat(Fd, oldpath.c_str(), Fd, newpath.c_str()))
-        return TError(EError::Success, errno, "Cannot rename " +
+        return TError(EError::Unknown, errno, "Cannot rename " +
                 std::to_string(Fd) + " @ " + oldpath.Path + " to " +
                 std::to_string(Fd) + " @ " + newpath.Path);
     return TError::Success();
@@ -1296,13 +1233,13 @@ TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
 
 TError TFile::Chown(uid_t uid, gid_t gid) const {
     if (fchown(Fd, uid, gid))
-        return TError(EError::Success, errno, "Cannot chown " + std::to_string(Fd));
+        return TError(EError::Unknown, errno, "Cannot chown " + std::to_string(Fd));
     return TError::Success();
 }
 
 TError TFile::Chmod(mode_t mode) const {
     if (fchmod(Fd, mode))
-        return TError(EError::Success, errno, "Cannot chmod " + std::to_string(Fd));
+        return TError(EError::Unknown, errno, "Cannot chmod " + std::to_string(Fd));
     return TError::Success();
 }
 
@@ -1310,7 +1247,7 @@ TError TFile::ChownAt(const TPath &path, uid_t uid, gid_t gid) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchownat(Fd, path.c_str(), uid, gid, AT_SYMLINK_NOFOLLOW))
-        return TError(EError::Success, errno, "Cannot chown " + std::to_string(Fd) + " @ " + path.Path);
+        return TError(EError::Unknown, errno, "Cannot chown " + std::to_string(Fd) + " @ " + path.Path);
     return TError::Success();
 }
 
@@ -1318,7 +1255,7 @@ TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchmodat(Fd, path.c_str(), mode, AT_SYMLINK_NOFOLLOW))
-        return TError(EError::Success, errno, "Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
+        return TError(EError::Unknown, errno, "Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
     return TError::Success();
 }
 
@@ -1377,16 +1314,44 @@ TError TFile::StatAt(const TPath &path, bool follow, struct stat &st) const {
     return TError::Success();
 }
 
-bool TFile::HasAccess(const TCred &cred, enum TPath::Access mask) const {
-    struct stat st;
-    if (fstat(Fd, &st))
-        return false;
-    return TPath::HasAccess(st, cred, mask);
+TError TFile::StatFS(TStatFS &result) const {
+    struct statfs st;
+    if (fstatfs(Fd, &st))
+        return TError(EError::Unknown, errno, "statfs");
+    result.Init(st);
+    return TError::Success();
 }
 
-bool TFile::HasAccessAt(const TPath &path, const TCred &cred, enum TPath::Access mask) const {
+bool TFile::Access(const struct stat &st, const TCred &cred, enum AccessMode mode) {
+    unsigned mask = mode;
+    if (cred.Uid == st.st_uid)
+        mask <<= 6;
+    else if (cred.IsMemberOf(st.st_gid))
+        mask <<= 3;
+    return cred.IsRootUser() || (st.st_mode & mask) == mask;
+}
+
+TError TFile::ReadAccess(const TCred &cred) const {
     struct stat st;
-    if (path.IsAbsolute() || fstatat(Fd, path.c_str(), &st, 0))
-        return false;
-    return TPath::HasAccess(st, cred, mask);
+    TError error = Stat(st);
+    if (error)
+        return error;
+    if (Access(st, cred, TFile::R))
+        return TError::Success();
+    return TError(EError::Permission, cred.ToString() + " has no read access to " + RealPath().ToString());
+}
+
+TError TFile::WriteAccess(const TCred &cred) const {
+    struct statfs fs;
+    if (fstatfs(Fd, &fs))
+        return TError(EError::Unknown, errno, "fstatfs");
+    if (fs.f_flags & ST_RDONLY)
+        return TError(EError::Permission, "read only: " + RealPath().ToString());
+    struct stat st;
+    TError error = Stat(st);
+    if (error)
+        return error;
+    if (Access(st, cred, TFile::W))
+        return TError::Success();
+    return TError(EError::Permission, cred.ToString() + " has no write access to " + RealPath().ToString());
 }

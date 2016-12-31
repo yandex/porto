@@ -17,10 +17,11 @@ struct TStatFS {
     uint64_t SpaceAvail;
     uint64_t InodeUsage;
     uint64_t InodeAvail;
+    bool ReadOnly;
+    bool Secure; /* nodev and noexec or nosuid  */
 
-    void Reset() {
-        SpaceUsage = SpaceAvail = InodeUsage = InodeAvail = 0;
-    }
+    void Init(const struct statfs &st);
+    void Reset();
 };
 
 struct TMount;
@@ -46,6 +47,8 @@ public:
     bool IsEmpty() const { return Path.empty(); }
 
     bool IsNormal() const { return Path == NormalPath().Path; }
+
+    bool IsInside(const TPath &base) const;
 
     bool IsDotDot() const {
         return Path[0] == '.' && Path[1] == '.' &&
@@ -93,7 +96,6 @@ public:
     TPath AbsolutePath() const;
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
-    bool IsInside(const std::vector<TPath> paths) const;
 
     TError StatStrict(struct stat &st) const;
     TError StatFollow(struct stat &st) const;
@@ -112,25 +114,6 @@ public:
     int64_t SinceModificationMs() const;
     std::string ToString() const;
     bool Exists() const;
-
-    enum Access {
-        E   = 000, /* Exists */
-        X   = 001,
-        W   = 002,
-        R   = 004,
-        RW  = 006,
-        RWX = 007,
-        U   = 010,  /* owner user */
-        WU  = 012,
-        RU  = 014,
-        RWU = 016, /* (read and write) or owner user */
-        P   = 020, /* if not exits -> check parent directory */
-        WUP = 032, /* write or owner or at parent */
-    };
-    static bool HasAccess(const struct stat &st, const TCred &cred, enum Access mask);
-    bool HasAccess(const TCred &cred, enum Access mask) const;
-    bool CanRead(const TCred &cred) const { return HasAccess(cred, R); }
-    bool CanWrite(const TCred &cred) const { return HasAccess(cred, W); }
 
     TError Chdir() const;
     TError Chroot() const;
@@ -222,6 +205,7 @@ public:
     TError OpenAppend(const TPath &path);
     TError OpenDir(const TPath &path);
     TError OpenDirStrict(const TPath &path);
+    TError OpenPath(const TPath &path);
     TError CreateTemp(const TPath &path);
     TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
@@ -231,13 +215,11 @@ public:
     TPath RealPath(void) const;
     TPath ProcPath(void) const;
     TError ReadAll(std::string &text, size_t max) const;
-    TError ReadTail(std::string &text, off_t max);
     TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
     int GetMountId(void) const;
     TError Dup(const TFile &other);
-    TError OpenAt(const TFile &dir, const TPath &path, int flags);
-    TError CreateAt(const TFile &dir, const TPath &path, int flags, int mode);
+    TError OpenAt(const TFile &dir, const TPath &path, int flags, int mode);
     TError MkdirAt(const TPath &path, int mode) const;
     TError UnlinkAt(const TPath &path) const;
     TError RmdirAt(const TPath &path) const;
@@ -258,6 +240,15 @@ public:
     TError ClearDirectory() const;
     TError Stat(struct stat &st) const;
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;
-    bool HasAccess(const TCred &cred, enum TPath::Access mask) const;
-    bool HasAccessAt(const TPath &path, const TCred &cred, enum TPath::Access mask) const;
+    TError StatFS(TStatFS &result) const;
+
+    enum AccessMode {
+        E   = 000, /* Exists */
+        X   = 001,
+        W   = 002,
+        R   = 004,
+    };
+    static bool Access(const struct stat &st, const TCred &cred, enum AccessMode mode);
+    TError ReadAccess(const TCred &cred) const;
+    TError WriteAccess(const TCred &cred) const;
 };
