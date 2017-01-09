@@ -1050,13 +1050,13 @@ TError TFile::OpenPath(const TPath &path) {
 #define O_TMPFILE (O_DIRECTORY | 020000000)
 #endif
 
-TError TFile::CreateTemp(const TPath &path) {
+TError TFile::CreateTemp(const TPath &path, int flags) {
     if (Fd >= 0)
         close(Fd);
-    SetFd = open(path.c_str(), O_RDWR | O_TMPFILE | O_CLOEXEC, 0600);
+    SetFd = open(path.c_str(), O_RDWR | O_TMPFILE | O_CLOEXEC | flags, 0600);
     if (Fd < 0) {
         std::string temp = path.ToString() + "/porto.XXXXXX";
-        SetFd = mkostemp(&temp[0], O_CLOEXEC);
+        SetFd = mkostemp(&temp[0], O_CLOEXEC | flags);
         if (Fd < 0)
             return TError(EError::Unknown, errno, "Cannot create temporary " + temp);
         if (unlink(temp.c_str()))

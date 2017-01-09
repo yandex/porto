@@ -22,7 +22,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     if (!command.size())
         return TError(EError::Unknown, "External command is empty");
 
-    error = err.CreateTemp("/tmp");
+    error = err.CreateTemp("/tmp", O_APPEND);
     if (error)
         return error;
 
@@ -41,9 +41,12 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
         error = task.Wait();
         if (error) {
             std::string msg;
-            if (!err.ReadAll(msg, 1024))
+            if (!err.ReadAll(msg, 2048))
                 error = TError(error, msg);
         }
+        struct stat st;
+        if (!err.Stat(st) && st.st_size > 2048)
+            L_WRN() << "Helper " << cmdline << " generated " << st.st_size << " bytes in stderr" << std::endl;
         return error;
     }
 
@@ -54,11 +57,14 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     SetDieOnParentExit(SIGKILL);
 
     TFile::CloseAll({in.Fd, out.Fd, err.Fd});
+
     if ((in.Fd >= 0 ? dup2(in.Fd, STDIN_FILENO) : open("/dev/null", O_RDONLY)) != STDIN_FILENO)
         _exit(EXIT_FAILURE);
-    if ((out.Fd >= 0 ? dup2(out.Fd, STDOUT_FILENO) : open("/dev/null", O_WRONLY)) != STDOUT_FILENO)
+
+    if (dup2(out.Fd >= 0 ? out.Fd : err.Fd, STDOUT_FILENO) != STDOUT_FILENO)
         _exit(EXIT_FAILURE);
-    if ((err.Fd >= 0 ? dup2(err.Fd, STDERR_FILENO) : open("/dev/null", O_WRONLY)) != STDERR_FILENO)
+
+    if (dup2(err.Fd, STDERR_FILENO) != STDERR_FILENO)
         _exit(EXIT_FAILURE);
 
     /* Remount everything except CWD Read-Only */

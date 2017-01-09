@@ -206,7 +206,7 @@ public:
     TError OpenDir(const TPath &path);
     TError OpenDirStrict(const TPath &path);
     TError OpenPath(const TPath &path);
-    TError CreateTemp(const TPath &path);
+    TError CreateTemp(const TPath &path, int flags = 0);
     TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
     TError CreateTrunc(const TPath &path, int mode);
