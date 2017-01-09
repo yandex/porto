@@ -637,14 +637,20 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
     }
 
     if (HasRtGroup) {
-        int64_t period, runtime;
+        int64_t root_runtime, root_period, period, runtime;
         int cores = GetNumCores();
+
+        if (RootCgroup().GetInt64("cpu.rt_period_us", root_period))
+            root_period = 1000000;
+
+        if (RootCgroup().GetInt64("cpu.rt_runtime_us", root_runtime))
+            root_runtime = 950000;
 
         error = cg.SetInt64("cpu.rt_runtime_us", -1);
         if (error)
             return error;
 
-        if (limit >= cores) {
+        if (limit >= cores || limit / cores * root_period > root_runtime) {
             period = 1000000;   /* 1s */
             runtime = -1;
         } else {
