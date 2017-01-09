@@ -422,9 +422,6 @@ TError TTaskEnv::Start() {
             Abort(error);
 
         if (TripleFork) {
-            error = TUnixSocket::SocketPair(MasterSock2, Sock2);
-            if (error)
-                Abort(error);
             /*
              * Enter into pid-namespace. fork() hangs in libc if child pid
              * collide with parent pid outside. vfork() has no such problem.
@@ -435,6 +432,10 @@ TError TTaskEnv::Start() {
 
             if (forkPid)
                 _exit(EXIT_SUCCESS);
+
+            error = TUnixSocket::SocketPair(MasterSock2, Sock2);
+            if (error)
+                Abort(error);
 
             /* Report WPid */
             ReportPid(GetTid());
