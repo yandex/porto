@@ -1,3 +1,20 @@
+yandex-porto (3.2.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * layers: keep owner and last usage
+
+  [ Maxim Samoylov ]
+  * volume: add internal persistent storage
+  * test: check internal persistent storage work
+
+  [ Konstantin Khlebnikov ]
+  * filesystem: cleanup and rework permissions checks
+  * task: create second socket pair in third process
+  * cgroup: disable rt limit if it is bigger than root rt limit
+  * helpers: redirect stdout to stderr if no output set
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 10 Jan 2017 12:36:39 +0300
+
 yandex-porto (3.1.10) unstable; urgency=low
 
   [ Maxim Samoylov ]
