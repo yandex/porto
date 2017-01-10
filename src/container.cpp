@@ -90,8 +90,8 @@ TError TContainer::ValidName(const std::string &name) {
                 /* Ok */
                 break;
             default:
-                return TError(EError::InvalidValue, "forbidden character '" +
-                                name.substr(i, 1) + "' in container name");
+                return TError(EError::InvalidValue, "forbidden character " +
+                              StringFormat("%#x", (unsigned char)name[i]));
         }
     }
 

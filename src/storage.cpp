@@ -133,8 +133,8 @@ TError TStorage::CheckPlace(const TPath &place) {
 TError TStorage::CheckName(const std::string &name) {
     auto pos = name.find_first_not_of(PORTO_NAME_CHARS);
     if (pos != std::string::npos)
-        return TError(EError::InvalidValue,
-                "forbidden character '" + name.substr(pos, 1) + "' in " + name);
+        return TError(EError::InvalidValue, "forbidden character " +
+                      StringFormat("%#x", (unsigned char)name[pos]));
     if (name == "." || name == ".."||
             StringStartsWith(name, LAYER_TMP) ||
             StringStartsWith(name, IMPORT_PREFIX) ||
