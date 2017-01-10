@@ -218,7 +218,7 @@ void InitCred() {
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error) {
         L_WRN() << "Cannot find group porto: " << error << std::endl;
-        PortoGroup = NoGroup;
+        PortoGroup = RootGroup;
     }
 
     if (GroupId(PORTO_CT_GROUP_NAME, PortoCtGroup))
