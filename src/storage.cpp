@@ -12,6 +12,7 @@
 extern "C" {
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 }
 
 static const char LAYER_TMP[] = "_tmp_";
@@ -253,8 +254,26 @@ TError TStorage::Touch() {
     return error;
 }
 
-/* tar cannot guess compression for std streams */
-static std::string TarCompression(const TPath &tarball) {
+static std::string TarCompression(const TPath &tarball, const TFile &file, const std::string &compress) {
+    if (compress != "") {
+        if (compress == "txz" || compress == "tar.xz")
+            return "--xz";
+        if (compress == "tgz" || compress == "tar.gz")
+            return "--gzip";
+        if (compress == "tar")
+            return "--no-auto-compress";
+        return "--no-auto-compress";
+    }
+
+    /* tar cannot guess compression for std streams */
+    char magic[8];
+    if (file.Fd >= 0 && pread(file.Fd, magic, sizeof(magic), 0) == sizeof(magic)) {
+        if (!strncmp(magic, "\xFD" "7zXZ\x00", 6))
+            return "--xz";
+        if (!strncmp(magic, "\x1F\x8B\x08", 3))
+            return "--gzip";
+    }
+
     std::string name = tarball.BaseName();
     if (StringEndsWith(name, ".xz") || StringEndsWith(name, ".txz"))
         return "--xz";
@@ -263,7 +282,7 @@ static std::string TarCompression(const TPath &tarball) {
     return "--no-auto-compress"; /* i.e. no compression */
 }
 
-TError TStorage::ImportTarball(const TPath &tarball, bool merge) {
+TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress, bool merge) {
     TPath temp = TempPath(IMPORT_PREFIX);
     TError error;
     TFile tar;
@@ -341,7 +360,7 @@ TError TStorage::ImportTarball(const TPath &tarball, bool merge) {
                          /* "--xattrs",
                             "--xattrs-include=security.capability",
                             "--xattrs-include=trusted.overlay.*", */
-                         TarCompression(tarball),
+                         TarCompression(tarball, tar, compress),
                          "--extract",
                          "-C", temp.ToString() },
                          temp, tar, TFile());
@@ -392,7 +411,7 @@ err:
     return error;
 }
 
-TError TStorage::ExportTarball(const TPath &tarball) {
+TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress) {
     TFile dir, tar;
     TError error;
 
@@ -432,7 +451,7 @@ TError TStorage::ExportTarball(const TPath &tarball) {
                         /* "--xattrs", */
                         "--sparse",
                         "--transform", "s:^./::",
-                        TarCompression(tarball),
+                        TarCompression(tarball, TFile(), compress),
                         "--create",
                         "-C", Path.ToString(), "." },
                         Path, TFile(), tar);

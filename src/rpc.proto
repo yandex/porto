@@ -337,6 +337,7 @@ message TLayerImportRequest {
 	required bool merge = 3;
 	optional string place = 4;
 	optional string private_value = 5;
+	optional string compress = 6;
 }
 
 message TLayerExportRequest {
@@ -344,6 +345,7 @@ message TLayerExportRequest {
 	required string tarball = 2;
 	optional string layer = 3;
 	optional string place = 4;
+	optional string compress = 5;
 }
 
 message TLayerRemoveRequest {
@@ -411,10 +413,12 @@ message TStorageImportRequest {
 	required string tarball = 2;
 	optional string place = 3;
 	optional string private_value = 5;
+	optional string compress = 6;
 }
 
 message TStorageExportRequest {
 	required string name = 1;
 	required string tarball = 2;
 	optional string place = 3;
+	optional string compress = 4;
 }

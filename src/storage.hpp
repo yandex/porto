@@ -25,8 +25,8 @@ public:
     static TError SanitizeLayer(const TPath &layer, bool merge);
     static TError List(const TPath &place, const std::string &type,
                        std::list<TStorage> &list);
-    TError ImportTarball(const TPath &tarball, bool merge = false);
-    TError ExportTarball(const TPath &tarball);
+    TError ImportTarball(const TPath &tarball, const std::string &compress = "", bool merge = false);
+    TError ExportTarball(const TPath &tarball, const std::string &compress = "");
     bool Exists();
     uint64_t LastUsage();
     TError Load();
