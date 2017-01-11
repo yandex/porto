@@ -3,6 +3,8 @@ import os
 import pwd
 import grp
 import time
+import platform
+import re
 
 def Catch(func, *args, **kwargs):
     try:
@@ -74,6 +76,33 @@ def KillPid(pid, signal):
         raise BaseException("Too long waited for portod to stop")
     except OSError:
         pass
+
+def GetMeminfo(tag):
+    meminfo = open("/proc/meminfo", "r").readlines()
+    for m in meminfo:
+        if m.find(tag) >= 0:
+            return int(m.split()[1]) * 1024
+
+def get_kernel_maj_min():
+    kver = re.match("([0-9])\.([0-9])", platform.uname()[2]).groups()
+    return (int(kver[0]), int(kver[1]))
+
+def DumpContainerState(r, keys):
+    print "name : \"{}\"".format(r.name)
+
+    for k in keys:
+        try:
+            value = r.GetProperty(k)
+            try:
+                value = value.rstrip()
+            except:
+                pass
+        except:
+            value = "n/a"
+
+        print "{} : \"{}\"".format(k, value)
+
+    print ""
 
 portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 portobin = os.getcwd()

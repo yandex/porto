@@ -15,6 +15,8 @@ add_executable(cpu_limit cpu_limit.cpp)
 
 target_link_libraries(cpu_limit pthread rt crypto)
 
+add_executable(mem_limit mem_limit.cpp)
+
 add_test(NAME cleanup_logs
          COMMAND rm -f /var/log/portod.log
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -103,6 +105,10 @@ add_test(NAME cpu_limit
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-cpu_limit.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME mem_limit
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-mem_limit.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME fuzzer
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
          --timeout 300 --progress 32 2000
@@ -119,6 +125,6 @@ add_test(NAME portod_stop
 set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
                      unpriv-cred prev_release_upgrade uid_handling knobs clear
-                     cpu_limit fuzzer stats
+                     cpu_limit mem_limit fuzzer stats
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)
