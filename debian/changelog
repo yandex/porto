@@ -1,3 +1,11 @@
+yandex-porto (3.2.1) unstable; urgency=low
+
+  * cred: use root group if group porto isn't found
+  * porto: report forbidden character in codes
+  * storage: guess tarball compressing by magic and allow override in rpc
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 11 Jan 2017 15:09:38 +0300
+
 yandex-porto (3.2.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
