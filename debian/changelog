@@ -1,3 +1,15 @@
+yandex-porto (3.2.2) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * test: verify memory limits are hold
+
+  [ Konstantin Khlebnikov ]
+  * volume: keep persistent storage after upgrade
+  * volume: depend on path parent directory
+  * client: suppress warning if client disconnects before reply
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 12 Jan 2017 15:28:38 +0300
+
 yandex-porto (3.2.1) unstable; urgency=low
 
   * cred: use root group if group porto isn't found
