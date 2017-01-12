@@ -970,7 +970,7 @@ TError TVolume::CheckDependencies() {
     TError error;
 
     if (!IsAutoPath)
-        error = DependsOn(Path);
+        error = DependsOn(Path.DirName());
 
     if (!error)
         error = DependsOn(Place);
