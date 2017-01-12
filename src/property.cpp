@@ -1654,7 +1654,7 @@ public:
                               "Dirty file cache limit [bytes] "
                               "(dynamic)" ) {}
     void Init(void) {
-        IsSupported = MemorySubsystem.SupportDirtyLimit();
+        IsHidden = !MemorySubsystem.SupportDirtyLimit();
     }
 } static DirtyLimit;
 
