@@ -523,6 +523,9 @@ TError TClient::SendResponse(bool first) {
     else if (len == 0) {
         if (!first)
             return TError(EError::Unknown, "send return zero");
+    } else if (errno == EPIPE) {
+        L() << "Client disconnected: " << *this << std::endl;
+        return TError::Success();
     } else if (errno != EAGAIN && errno != EWOULDBLOCK)
         return TError(EError::Unknown, errno, "send response failed");
 
