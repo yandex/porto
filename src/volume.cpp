@@ -1091,6 +1091,7 @@ TError TVolume::Configure(const TStringMap &cfg) {
         KeepStorage = true;
     } else if (!HaveStorage()) {
         StoragePath = GetInternal(BackendType);
+        KeepStorage = false;
     } else if (StoragePath.IsSimple()) {
         TStorage storage(Place, PORTO_STORAGE, Storage);
         StoragePath = storage.Path;
@@ -1470,6 +1471,7 @@ TError TVolume::DestroyOne() {
     }
 
     if (!KeepStorage && !RemoteStorage() && StoragePath.Exists()) {
+        /* File image storage for backend=loop always persistent. */
         error = ClearRecursive(StoragePath);
         if (error)
             L_ERR() << "Cannot clear storage: " << error << std::endl;
@@ -2054,6 +2056,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
         } else if (prop.first == V_STORAGE) {
             Storage = prop.second;
             StoragePath = Storage;
+            KeepStorage = HaveStorage();
 
         } else if (prop.first == V_BACKEND) {
             BackendType = prop.second;
