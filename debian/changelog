@@ -1,3 +1,9 @@
+yandex-porto (3.2.3) unstable; urgency=low
+
+  * property: ignore dirty_limit setup if not supported by kernel
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 12 Jan 2017 22:47:03 +0300
+
 yandex-porto (3.2.2) unstable; urgency=low
 
   [ Maxim Samoylov ]
