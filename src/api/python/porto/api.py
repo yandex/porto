@@ -344,10 +344,10 @@ class Volume(object):
             container = container.name
         self.conn.LinkVolume(self.path, container)
 
-    def Unlink(self, container=None):
+    def Unlink(self, container=None, strict=None):
         if isinstance(container, Container):
             container = container.name
-        self.conn.UnlinkVolume(self.path, container)
+        self.conn.UnlinkVolume(self.path, container, strict)
 
     def Tune(self, **properties):
         self.conn.TuneVolume(self.path, **properties)
@@ -554,11 +554,13 @@ class Connection(object):
         self._ListVolumes(path=path)
         return Volume(self, path)
 
-    def UnlinkVolume(self, path, container=None):
+    def UnlinkVolume(self, path, container=None, strict=None):
         request = rpc_pb2.TContainerRequest()
         request.unlinkVolume.path = path
         if container:
             request.unlinkVolume.container = container
+        if strict is not None:
+            request.unlinkVolume.strict = strict;
         self.rpc.call(request, self.rpc.timeout)
 
     def LinkVolume(self, path, container):

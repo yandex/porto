@@ -470,12 +470,15 @@ int Connection::LinkVolume(const std::string &path, const std::string &container
     return Impl->Rpc();
 }
 
-int Connection::UnlinkVolume(const std::string &path, const std::string &container) {
+int Connection::UnlinkVolume(const std::string &path,
+                             const std::string &container, bool strict) {
     auto req = Impl->Req.mutable_unlinkvolume();
 
     req->set_path(path);
     if (!container.empty())
         req->set_container(container);
+    if (strict)
+        req->set_strict(strict);
 
     return Impl->Rpc();
 }

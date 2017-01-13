@@ -803,6 +803,7 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req,
 
 noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
                              rpc::TContainerResponse &rsp) {
+    bool strict = req.has_strict() && req.strict();
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.has_container() ?
                                 req.container() : SELF_CONTAINER, ct, true);
@@ -818,12 +819,19 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
     if (error)
         return error;
 
-    error = volume->UnlinkContainer(*ct);
+    error = volume->UnlinkContainer(*ct, strict);
+    if (error)
+        return error;
 
     CL->ReleaseContainer();
 
-    if (!error && volume->IsDying)
-        volume->Destroy();
+    if (volume->IsDying)
+        error = volume->Destroy(strict);
+
+    if (error && strict) {
+        volume->IsDying = false;
+        (void)volume->LinkContainer(*ct);
+    }
 
     return error;
 }

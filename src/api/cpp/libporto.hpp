@@ -103,7 +103,7 @@ public:
     int LinkVolume(const std::string &path,
             const std::string &container = std::string());
     int UnlinkVolume(const std::string &path,
-            const std::string &container = std::string());
+                     const std::string &container = "", bool strict = false);
     int ListVolumes(const std::string &path, const std::string &container,
                     std::vector<Volume> &volumes);
     int ListVolumes(std::vector<Volume> &volumes) {

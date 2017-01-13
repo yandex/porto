@@ -1356,7 +1356,7 @@ void TVolume::DestroyAll() {
     }
 }
 
-TError TVolume::Destroy() {
+TError TVolume::Destroy(bool strict) {
     TError error, ret;
 
     std::list<std::shared_ptr<TVolume>> plan;
@@ -1376,6 +1376,8 @@ TError TVolume::Destroy() {
         v->IsDying = true;
 
         for (auto &nested : v->Nested) {
+            if (strict)
+                return TError(EError::Busy, "Volume "  + v->Path.ToString() + " depends on this");
             if (nested == cycle) {
                 L_WRN() << "Cyclic dependencies for "
                         << cycle->Path << " detected" << std::endl;
@@ -1392,7 +1394,10 @@ TError TVolume::Destroy() {
 
     for (auto &volume : plan) {
         volumes_lock.unlock();
-        error = volume->DestroyOne();
+        error = volume->DestroyOne(strict);
+
+        if (error && strict)
+            return error;
 
         if (error && !ret)
             ret = error;
@@ -1427,7 +1432,7 @@ TError TVolume::Destroy() {
     return ret;
 }
 
-TError TVolume::DestroyOne() {
+TError TVolume::DestroyOne(bool strict) {
     L_ACT() << "Destroy volume: " << Path
             << " backend: " << BackendType << std::endl;
 
@@ -1435,6 +1440,12 @@ TError TVolume::DestroyOne() {
 
     TPath internal = GetInternal("");
     TError ret, error;
+
+    if (strict && BackendType != "quota") {
+        error = Path.Umount(UMOUNT_NOFOLLOW);
+        if (error)
+            return error;
+    }
 
     if (Path != InternalPath) {
         error = Path.UmountNested();
@@ -1630,13 +1641,16 @@ TError TVolume::LinkContainer(TContainer &container) {
     return error;
 }
 
-TError TVolume::UnlinkContainer(TContainer &container) {
+TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     auto volumes_lock = LockVolumes();
 
     auto it = std::find(container.Volumes.begin(),
                         container.Volumes.end(), shared_from_this());
-    if (it == container.Volumes.end())
+    if (it == container.Volumes.end() && !Containers.empty())
         return TError(EError::VolumeNotLinked, "Container is not linked");
+
+    if (strict && Containers.size() > 1)
+        return TError(EError::Busy, "More than one linked container");
 
     if (IsDying)
         return TError(EError::Busy, "Volume is dying");

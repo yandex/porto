@@ -220,7 +220,7 @@ public:
         if (Container != "") {
             if (Api->LinkVolume(Volume.Path, Container))
                 return GetLastError();
-            if (Api->UnlinkVolume(Volume.Path, ""))
+            if (Api->UnlinkVolume(Volume.Path))
                 return GetLastError();
             VolumeLinked = false;
         }
@@ -482,7 +482,7 @@ err:
         }
 
         if (VolumeLinked) {
-            if (Api->UnlinkVolume(Volume.Path, ""))
+            if (Api->UnlinkVolume(Volume.Path))
                 std::cerr << "Cannot unlink volume " << Volume.Path << " : " << GetLastError() << std::endl;
             VolumeLinked = false;
         }
@@ -1652,16 +1652,19 @@ public:
 class TUnlinkVolumeCmd final : public ICmd {
 public:
     TUnlinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vunlink", 1,
-                    "[-A] <path> [container]",
+                    "[-A] [-S] <path> [container]",
                     "unlink volume from container",
                     "    -A        unlink from all containers\n"
+                    "    -S        struct nlink with non-lazy umount\n"
                     "default container - current\n"
                     "removing last link deletes volume\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool all = false;
+        bool strict = false;
         const auto &args = env->GetOpts({
             { 'A', false, [&](const char *arg) { all = true; } },
+            { 'S', false, [&](const char *arg) { strict = true; } },
         });
         const auto path = TPath(args[0]).RealPath().ToString();
         std::vector<Porto::Volume> vol;
@@ -1682,7 +1685,7 @@ public:
                 }
             }
         } else {
-            ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : "");
+            ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : "", strict);
             if (ret)
                 PrintError("Cannot unlink volume");
         }

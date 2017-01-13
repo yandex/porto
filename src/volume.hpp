@@ -129,8 +129,8 @@ public:
     TError Build(void);
 
     static void DestroyAll();
-    TError DestroyOne();
-    TError Destroy();
+    TError DestroyOne(bool strict = false);
+    TError Destroy(bool strict = false);
 
     TError Save(void);
     TError Restore(const TKeyValue &node);
@@ -138,7 +138,7 @@ public:
     static void RestoreAll(void);
 
     TError LinkContainer(TContainer &container);
-    TError UnlinkContainer(TContainer &container);
+    TError UnlinkContainer(TContainer &container, bool strict = false);
 
     TPath GetInternal(const std::string &type) const;
     unsigned long GetMountFlags(void) const;

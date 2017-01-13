@@ -801,10 +801,14 @@ TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
 TError TPath::Umount(unsigned long flags) const {
     L_ACT() << "umount " << Path << " "
             << UmountFlagsToString(flags) << std::endl;
-    if (umount2(Path.c_str(), flags))
-        return TError(EError::Unknown, errno, "umount2(" + Path + ", " +
-                                        UmountFlagsToString(flags) +  ")");
-    return TError::Success();
+    if (!umount2(Path.c_str(), flags))
+        return TError::Success();
+    if (errno == EBUSY)
+        return TError(EError::Busy, "Mount is busy: " + Path);
+    if (errno == EINVAL || errno == ENOENT)
+        return TError(EError::InvalidValue, "Not a mount: " + Path);
+    return TError(EError::Unknown, errno, "umount2(" + Path + ", " +
+                  UmountFlagsToString(flags) +  ")");
 }
 
 TError TPath::UmountAll() const {
