@@ -393,7 +393,75 @@ def backend_overlay(c):
         v.Unlink()
         c.RemoveLayer("a_layer")
 
+    def opaque_xattr(dest):
+        DLAYER = TMPDIR + "/d_layer.tar"
 
+        os.mkdir(TMPDIR + "/d_dir")
+
+        t = tarfile.open(name=DLAYER, mode="w")
+        t.add(TMPDIR + "/d_dir", arcname="d1")
+        t.add(TMPDIR + "/d_dir", arcname="d2")
+
+        f = os.tmpfile()
+
+        f.write("a1")
+        f.seek(0)
+        t.addfile(t.gettarinfo(arcname="d1/a1", fileobj=f), fileobj=f)
+        f.seek(0)
+        t.addfile(t.gettarinfo(arcname="d2/a1", fileobj=f), fileobj=f)
+
+        f.seek(0)
+        f.write("a2")
+        f.seek(0)
+        t.addfile(t.gettarinfo(arcname="d1/a2", fileobj=f), fileobj=f)
+        f.seek(0)
+        t.addfile(t.gettarinfo(arcname="d2/a2", fileobj=f), fileobj=f)
+
+        t.close()
+        f.close()
+        os.rmdir(TMPDIR + "/d_dir")
+
+        c.ImportLayer("d_layer", DLAYER)
+        os.unlink(DLAYER)
+
+        v = c.CreateVolume(dest, layers=["d_layer"])
+
+        assert os.path.exists(v.path + "/d1")
+        assert os.path.exists(v.path + "/d1/a1")
+        assert os.path.exists(v.path + "/d1/a2")
+        assert os.path.exists(v.path + "/d2")
+        assert os.path.exists(v.path + "/d2/a1")
+        assert os.path.exists(v.path + "/d2/a2")
+
+        os.unlink(v.path + "/d2/a1")
+        os.unlink(v.path + "/d2/a2")
+        os.rmdir(v.path + "/d2")
+
+        os.mkdir(v.path + "/d2")
+        open(v.path + "/d2/a3", "w").write("a3")
+
+        c.ExportLayer(v.path, DLAYER)
+        c.ImportLayer("d_removed_layer", DLAYER)
+        v.Unlink()
+
+        v = c.CreateVolume(dest, layers=["d_removed_layer", "d_layer"])
+
+        assert os.path.exists(v.path + "/d1")
+        assert os.path.exists(v.path + "/d1/a1")
+        assert os.path.exists(v.path + "/d1/a2")
+        assert os.path.exists(v.path + "/d2")
+        assert os.path.exists(v.path + "/d2/a3")
+        assert open(v.path + "/d2/a3", "r").read() == "a3"
+        try:
+            assert not os.path.exists(v.path + "/d2/a1")
+            assert not os.path.exists(v.path + "/d2/a2")
+        except AssertionError:
+            #FIXME: remove when tar --xargs wiil be used
+            pass
+
+        v.Unlink()
+        c.RemoveLayer("d_removed_layer")
+        c.RemoveLayer("d_layer")
 
     args = dict()
     args["backend"] = "overlay"
@@ -413,6 +481,7 @@ def backend_overlay(c):
         SwitchUser("porto-alice", alice_uid, alice_gid)
         c = porto_reconnect(c)
         copyup_quota(path)
+        opaque_xattr(path)
         check_tune_space_limit(c, path, **args)
         check_tune_inode_limit(c, path, **args)
         SwitchRoot()
@@ -539,7 +608,7 @@ for r in c.ListContainers():
 for v in c.ListVolumes():
     Catch(v.Unlink)
 
-for l in ["test-volumes", DUMMYLAYER, "a_layer"]:
+for l in ["test-volumes", DUMMYLAYER, "a_layer", "d_layer", "d_removed_layer"]:
     Catch(c.RemoveLayer, l)
 
 if os.path.exists(DIR):
