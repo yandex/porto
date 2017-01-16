@@ -8,12 +8,14 @@ import struct
 import shutil
 import tarfile
 import subprocess
+import traceback
 
 import porto
 from test_common import *
 
 DIR="/tmp/test-volumes"
 PLACE="/place/porto_volumes"
+DUMMYLAYER = DIR + "/test_layer.tar"
 c = None
 
 def porto_reconnect(c):
@@ -347,6 +349,52 @@ def backend_native(c):
     os.rmdir(TMPDIR)
 
 def backend_overlay(c):
+    def copyup_quota(dest):
+        ALAYER = TMPDIR + "/a_layer.tar"
+
+        f1 = os.tmpfile()
+        fzero = open("/dev/zero", "rb")
+        f1.write("1" * (32 * 1048576))
+        size1 = os.fstat(f1.fileno()).st_size
+        f1.seek(0)
+
+        f2 = os.tmpfile()
+        f2.write("2" * (32 * 1048576))
+        size2 = os.fstat(f2.fileno()).st_size
+        f2.seek(0)
+
+        t = tarfile.open(name=ALAYER, mode="w")
+        t.addfile(t.gettarinfo(arcname="a1", fileobj=f1), fileobj = f1)
+        t.addfile(t.gettarinfo(arcname="a2", fileobj=f2), fileobj = f2)
+        t.close()
+        f1.close()
+        f2.close()
+
+        c.ImportLayer("a_layer", ALAYER)
+        os.unlink(ALAYER)
+        space_limit = (size1 + size2) * 3 / 4
+        v = c.CreateVolume(dest, layers=["a_layer"], space_limit=str(space_limit))
+        r = c.Create("a")
+        r.SetProperty("command", "bash -c \'echo 123 >> {}/a1\'".format(v.path))
+        r.Start()
+        r.Wait()
+        assert r.GetProperty("exit_status") == "0"
+        assert int(v.GetProperty("space_used")) <= int(v.GetProperty("space_limit"))
+
+        r.Stop()
+        r.SetProperty("command", "bash -c \'echo 456 >> {}/a2 || true\'".format(v.path))
+        r.Start()
+        r.Wait()
+        assert r.GetProperty("exit_status") == "0"
+        assert int(v.GetProperty("space_used")) <= int(v.GetProperty("space_limit"))
+        assert os.statvfs(v.path).f_bfree != 0
+
+        r.Destroy()
+        v.Unlink()
+        c.RemoveLayer("a_layer")
+
+
+
     args = dict()
     args["backend"] = "overlay"
     args["layers"] = ["test-volumes"]
@@ -357,7 +405,6 @@ def backend_overlay(c):
     os.chown(TMPDIR, alice_uid, alice_gid)
 
     for path in [None, TMPDIR]:
-
         check_readonly(c, path, **args)
         check_place(c, path, **args)
         check_mounted(c, path, **args)
@@ -365,6 +412,7 @@ def backend_overlay(c):
 
         SwitchUser("porto-alice", alice_uid, alice_gid)
         c = porto_reconnect(c)
+        copyup_quota(path)
         check_tune_space_limit(c, path, **args)
         check_tune_inode_limit(c, path, **args)
         SwitchRoot()
@@ -431,29 +479,70 @@ Catch(shutil.rmtree, DIR)
 os.mkdir(DIR)
 
 c = porto_reconnect(c)
-assert len(os.listdir(PLACE)) == 0
-assert len(c.ListVolumes()) == 0
 
-DUMMYLAYER = DIR + "/test_layer.tar"
-open(DIR + "/test_file.txt", "w").write("1234567890")
-t = tarfile.open(name=DUMMYLAYER, mode="w")
-t.add(DIR + "/test_file.txt", arcname="test_file.txt")
-t.close()
-os.remove(DIR + "/test_file.txt")
+def TestBody(c):
+    assert len(os.listdir(PLACE)) == 0
+    assert len(c.ListVolumes()) == 0
 
-Catch(c.RemoveLayer, "test-volumes")
-c.ImportLayer("test-volumes", DUMMYLAYER)
-os.unlink(DUMMYLAYER)
+    open(DIR + "/test_file.txt", "w").write("1234567890")
+    t = tarfile.open(name=DUMMYLAYER, mode="w")
+    t.add(DIR + "/test_file.txt", arcname="test_file.txt")
+    t.close()
+    os.remove(DIR + "/test_file.txt")
 
-backend_plain(c)
-backend_bind(c)
-backend_tmpfs(c)
-backend_quota(c)
-backend_native(c)
-backend_overlay(c)
-backend_loop(c)
+    Catch(c.RemoveLayer, "test-volumes")
+    c.ImportLayer("test-volumes", DUMMYLAYER)
+    os.unlink(DUMMYLAYER)
 
-c.RemoveLayer("test-volumes")
-assert len(c.ListVolumes()) == 0
-assert len(os.listdir(PLACE)) == 0
-os.rmdir(DIR)
+    backend_plain(c)
+    backend_bind(c)
+    backend_tmpfs(c)
+    backend_quota(c)
+    backend_native(c)
+    backend_overlay(c)
+    backend_loop(c)
+
+    c.RemoveLayer("test-volumes")
+    assert len(c.ListVolumes()) == 0
+    assert len(os.listdir(PLACE)) == 0
+
+ret = 0
+
+try:
+    TestBody(c)
+
+except BaseException as e:
+    print traceback.format_exc()
+    ret = 1
+
+SwitchRoot()
+c = porto_reconnect(c)
+
+if ret > 0:
+    print "Dumping test state:\n"
+
+    for r in c.ListContainers():
+        print "name : \"{}\"".format(r.name)
+        DumpObjectState(r, [ "command", "exit_status", "stdout", "stderr" ])
+
+    for v in c.ListVolumes():
+        print "path : \"{}\"".format(v.path)
+        DumpObjectState(v, [ "backend", "place",
+                             "space_limit", "space_guarantee", "space_used",
+                             "inode_limit", "inode_guarantee", "inode_used",
+                             "creator", "owner_user", "owner_group",
+                             "storage" ])
+
+for r in c.ListContainers():
+    Catch(r.Destroy)
+
+for v in c.ListVolumes():
+    Catch(v.Unlink)
+
+for l in ["test-volumes", DUMMYLAYER, "a_layer"]:
+    Catch(c.RemoveLayer, l)
+
+if os.path.exists(DIR):
+    Catch(shutil.rmtree, DIR)
+
+sys.exit(ret)

@@ -87,9 +87,7 @@ def get_kernel_maj_min():
     kver = re.match("([0-9])\.([0-9])", platform.uname()[2]).groups()
     return (int(kver[0]), int(kver[1]))
 
-def DumpContainerState(r, keys):
-    print "name : \"{}\"".format(r.name)
-
+def DumpObjectState(r, keys):
     for k in keys:
         try:
             value = r.GetProperty(k)

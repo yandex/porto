@@ -286,7 +286,8 @@ c = porto.Connection(timeout=30)
 if ret > 0:
     print "Dumping containers state:\n"
     for r in c.ListContainers():
-        DumpContainerState(r, ["command", "memory_limit", "anon_limit", "state",
+        print "name : \"{}\"".format(r.name)
+        DumpObjectState(r, ["command", "memory_limit", "anon_limit", "state",
                                "exit_status", "oom_killed", "stdout",
                                "memory.max_usage_in_bytes", "memory.anon.max_usage",
                                "root", "cwd", "bind", "user", "group", "capabilities",
