@@ -40,9 +40,10 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     if (task.Pid) {
         error = task.Wait();
         if (error) {
-            std::string msg;
-            if (!err.ReadAll(msg, 2048))
-                error = TError(error, msg);
+            char buf[2048];
+            ssize_t len = pread(err.Fd, buf, sizeof(buf), 0);
+            if (len > 0)
+                error = TError(error, std::string(buf, len));
         }
         struct stat st;
         if (!err.Stat(st) && st.st_size > 2048)

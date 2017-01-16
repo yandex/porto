@@ -385,7 +385,7 @@ public:
 
         image.Close();
 
-        error = RunCommand({ "mkfs.ext4", "-F", "-m", "0", "-E", "nodiscard",
+        error = RunCommand({ "mkfs.ext4", "-q", "-F", "-m", "0", "-E", "nodiscard",
                              "-O", "^has_journal", path.ToString()}, path.DirName());
         if (error)
             goto remove_file;
