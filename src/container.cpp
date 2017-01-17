@@ -1901,23 +1901,16 @@ TError TContainer::Terminate(uint64_t deadline) {
             return error;
     }
 
-    for (int pass = 0; pass < 3; pass++) {
-        if (cg.IsEmpty())
-            return TError::Success();
-        error = cg.KillAll(SIGKILL);
-        if (error)
-            return error;
-    }
+    if (cg.IsEmpty())
+        return TError::Success();
 
-    error = FreezerSubsystem.Freeze(cg);
+    error = cg.KillAll(SIGKILL);
     if (error)
         return error;
-    error = cg.KillAll(SIGKILL);
-    if (!FreezerSubsystem.Thaw(cg) && !error) {
-        while (!cg.IsEmpty() && !WaitDeadline(deadline));
-    }
 
-    return error;
+    while (!cg.IsEmpty() && !WaitDeadline(deadline));
+
+    return TError::Success();
 }
 
 void TContainer::ForgetPid() {

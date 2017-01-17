@@ -36,6 +36,7 @@ public:
     TCgroup Cgroup(const std::string &name) const;
 
     TError TaskCgroup(pid_t pid, TCgroup &cgroup) const;
+    bool IsEnabled(const TCgroup &cgroup) const;
 };
 
 class TCgroup {
@@ -199,12 +200,12 @@ class TFreezerSubsystem : public TSubsystem {
 public:
     TFreezerSubsystem() : TSubsystem(CGROUP_FREEZER, "freezer") {}
 
-    TError WaitState(TCgroup &cg, const std::string &state) const;
-    TError Freeze(TCgroup &cg) const;
-    TError Thaw(TCgroup &cg, bool wait = true) const;
-    bool IsFrozen(TCgroup &cg) const;
-    bool IsSelfFreezing(TCgroup &cg) const;
-    bool IsParentFreezing(TCgroup &cg) const;
+    TError WaitState(const TCgroup &cg, const std::string &state) const;
+    TError Freeze(const TCgroup &cg, bool wait = true) const;
+    TError Thaw(const TCgroup &cg, bool wait = true) const;
+    bool IsFrozen(const TCgroup &cg) const;
+    bool IsSelfFreezing(const TCgroup &cg) const;
+    bool IsParentFreezing(const TCgroup &cg) const;
 };
 
 class TCpuSubsystem : public TSubsystem {

@@ -22,7 +22,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_daemon()->set_max_clients(1000);
     config().mutable_daemon()->set_max_clients_in_container(500);
-    config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
+    config().mutable_daemon()->set_cgroup_remove_timeout_s(300);
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
     config().mutable_daemon()->set_log_rotate_ms(1000);

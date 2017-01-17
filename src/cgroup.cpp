@@ -86,8 +86,12 @@ TError TCgroup::Remove() const {
         } while (!WaitDeadline(deadline));
     }
 
-    if (error && (error.GetErrno() != ENOENT || Exists()))
-        L_ERR() << "Cannot remove cgroup " << *this << " : " << error << std::endl;
+    if (error && (error.GetErrno() != ENOENT || Exists())) {
+        std::vector<pid_t> tasks;
+        GetTasks(tasks);
+        L_ERR() << "Cannot remove cgroup " << *this << " : " << error
+                << ", " << tasks.size() << " tasks inside" << std::endl;
+    }
 
     return error;
 }
@@ -294,27 +298,47 @@ bool TCgroup::IsEmpty() const {
 }
 
 TError TCgroup::KillAll(int signal) const {
-    std::vector<pid_t> tasks;
-    TError error;
+    std::vector<pid_t> tasks, killed;
+    TError error, error2;
+    bool retry;
+    bool frozen = false;
+    int iteration = 0;
 
     L_ACT() << "KillAll " << signal << " " << *this << std::endl;
 
     if (IsRoot())
         return TError(EError::Permission, "Bad idea");
 
-    error = GetTasks(tasks);
-    if (!error) {
-        for (const auto &pid : tasks) {
-            if (kill(pid, signal) && errno != ESRCH) {
-                error = TError(EError::Unknown, errno, StringFormat("kill(%d, %d)", pid, signal));
-                L_ERR() << "Cannot kill process " << pid << " : " << error << std::endl;
+    do {
+        if (++iteration > 10 && !frozen && FreezerSubsystem.IsEnabled(*this) &&
+                !FreezerSubsystem.IsFrozen(*this)) {
+            error = FreezerSubsystem.Freeze(*this, false);
+            if (error)
+                L_ERR() << "Cannot freeze cgroup for killing " << *this << " : " << error << std::endl;
+            else
+                frozen = true;
+        }
+        error = GetTasks(tasks);
+        if (error)
+            break;
+        retry = false;
+        for (auto pid: tasks) {
+            if (std::find(killed.begin(), killed.end(), pid) == killed.end()) {
+                if (kill(pid, signal) && errno != ESRCH && !error) {
+                    error = TError(EError::Unknown, errno, "kill");
+                    L_ERR() << "Cannot kill process " << pid << " : " << error << std::endl;
+                }
+                retry = true;
             }
         }
-    }
+        killed = tasks;
+    } while (retry);
+
+    if (frozen)
+        (void)FreezerSubsystem.Thaw(*this, false);
 
     return error;
 }
-
 
 TCgroup TSubsystem::RootCgroup() const {
     return TCgroup(this, "/");
@@ -357,6 +381,10 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
 
     return TError(EError::Unknown, errno, "Cannot find " + Type +
                     " cgroup for process " + std::to_string(pid));
+}
+
+bool TSubsystem::IsEnabled(const TCgroup &cgroup) const {
+    return cgroup.Subsystem && (cgroup.Subsystem->Controllers & Kind);
 }
 
 // Memory
@@ -484,7 +512,7 @@ uint64_t TMemorySubsystem::GetOomEvents(TCgroup &cg) {
 }
 
 // Freezer
-TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const {
+TError TFreezerSubsystem::WaitState(const TCgroup &cg, const std::string &state) const {
     uint64_t deadline = GetCurrentTimeMs() + config().daemon().freezer_wait_timeout_s() * 1000;
     std::string cur;
     TError error;
@@ -498,9 +526,9 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const
     return TError(EError::Unknown, "Freezer " + cg.Name + " timeout waiting " + state);
 }
 
-TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
+TError TFreezerSubsystem::Freeze(const TCgroup &cg, bool wait) const {
     TError error = cg.Set("freezer.state", "FROZEN");
-    if (error)
+    if (error || !wait)
         return error;
     error = WaitState(cg, "FROZEN");
     if (error)
@@ -508,7 +536,7 @@ TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
     return error;
 }
 
-TError TFreezerSubsystem::Thaw(TCgroup &cg, bool wait) const {
+TError TFreezerSubsystem::Thaw(const TCgroup &cg, bool wait) const {
     TError error = cg.Set("freezer.state", "THAWED");
     if (error || !wait)
         return error;
@@ -517,17 +545,17 @@ TError TFreezerSubsystem::Thaw(TCgroup &cg, bool wait) const {
     return WaitState(cg, "THAWED");
 }
 
-bool TFreezerSubsystem::IsFrozen(TCgroup &cg) const {
+bool TFreezerSubsystem::IsFrozen(const TCgroup &cg) const {
     std::string state;
     return !cg.Get("freezer.state", state) && StringTrim(state) != "THAWED";
 }
 
-bool TFreezerSubsystem::IsSelfFreezing(TCgroup &cg) const {
+bool TFreezerSubsystem::IsSelfFreezing(const TCgroup &cg) const {
     bool val;
     return !cg.GetBool("freezer.self_freezing", val) && val;
 }
 
-bool TFreezerSubsystem::IsParentFreezing(TCgroup &cg) const {
+bool TFreezerSubsystem::IsParentFreezing(const TCgroup &cg) const {
     bool val;
     return !cg.GetBool("freezer.parent_freezing", val) && val;
 }

@@ -604,7 +604,7 @@ again:
                 continue;
 
             if (!cg->IsEmpty())
-                (void)cg->KillAll(9);
+                (void)cg->KillAll(SIGKILL);
 
             if (hy == &FreezerSubsystem && FreezerSubsystem.IsFrozen(*cg)) {
                 (void)FreezerSubsystem.Thaw(*cg, false);
