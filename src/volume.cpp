@@ -426,6 +426,7 @@ remove_file:
             L_ACT() << "Allocate loop image with size " << Volume->SpaceLimit
                     << " guarantee " << Volume->SpaceGuarantee << std::endl;
 
+            Volume->KeepStorage = false; /* New storage */
             error = MakeImage(image, Volume->SpaceLimit, Volume->SpaceGuarantee);
             if (error)
                 return error;
@@ -587,7 +588,9 @@ public:
             lower << layer_id;
         }
 
-        (void)Volume->StorageFd.MkdirAt("upper", 0755);
+        error = Volume->StorageFd.MkdirAt("upper", 0755);
+        if (!error)
+            Volume->KeepStorage = false; /* New storage */
 
         error = upperFd.WalkStrict(Volume->StorageFd, "upper");
         if (error)
