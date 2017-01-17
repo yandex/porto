@@ -1,3 +1,20 @@
+yandex-porto (3.2.4) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * volume: add strict unlink with non-lazy umount
+
+  [ Maxim Samoylov ]
+  * helpers: fix helper stderr printing
+  * test: check quota consistency on overlay copy-up
+  * test: check overlay opaque xattr test
+
+  [ Konstantin Khlebnikov ]
+  * test: warn if opaque xattr is lost
+  * volume: initialize permissions for new loop and overlay in user storage
+  * cgroup: kill and remove cgroups harder
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 17 Jan 2017 14:41:58 +0300
+
 yandex-porto (3.2.3) unstable; urgency=low
 
   * property: ignore dirty_limit setup if not supported by kernel
