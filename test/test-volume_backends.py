@@ -457,6 +457,7 @@ def backend_overlay(c):
             assert not os.path.exists(v.path + "/d2/a2")
         except AssertionError:
             #FIXME: remove when tar --xargs wiil be used
+            print "Directory opaqueness is lost as expected"
             pass
 
         v.Unlink()
