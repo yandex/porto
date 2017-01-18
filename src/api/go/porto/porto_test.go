@@ -345,6 +345,23 @@ func TestListLayers(t *testing.T) {
 	t.FailNow()
 }
 
+func TestListLayers2(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+	layers, err := conn.ListLayers2("", "")
+	FailOnError(t, conn, err)
+	for i := range layers {
+		if layers[i].Name == testLayer &&
+		   layers[i].PrivateValue == "456" &&
+		   layers[i].LastUsage < 10 {
+
+			return
+		}
+	}
+	t.Error("Porto doesn't list previously imported layer as object")
+	t.FailNow()
+}
+
 func TestRemoveLayer(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()

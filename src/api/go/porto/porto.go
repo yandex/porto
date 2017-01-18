@@ -86,6 +86,14 @@ type TStorageDescription struct {
 	PrivateValue string
 }
 
+type TLayerDescription struct {
+	Name string
+	OwnerUser string
+	OwnerGroup string
+	LastUsage uint64
+	PrivateValue string
+}
+
 type TPortoGetResponse struct {
 	Value    string
 	Error    int
@@ -153,7 +161,7 @@ type API interface {
 	RemoveLayer(layer string) error
 	RemoveLayer2(layer string, place string) error
 	ListLayers() ([]string, error)
-	ListLayers2(place string, mask string) ([]string, error)
+	ListLayers2(place string, mask string) ([]TLayerDescription, error)
 
 	GetLayerPrivate(layer string, place string) (string, error)
 	SetLayerPrivate(layer string, place string, privateValue string)  error
@@ -709,10 +717,19 @@ func (conn *portoConnection) RemoveLayer2(layer string, place string) error {
 }
 
 func (conn *portoConnection) ListLayers() ([]string, error) {
-	return conn.ListLayers2("", "")
+	req := &rpc.TContainerRequest{
+		ListLayers: &rpc.TLayerListRequest{},
+	}
+
+	resp, err := conn.performRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.GetLayers().GetLayer(), nil
 }
 
-func (conn *portoConnection) ListLayers2(place string, mask string) ([]string, error) {
+func (conn *portoConnection) ListLayers2(place string, mask string) (ret []TLayerDescription, err error) {
 	req := &rpc.TContainerRequest{
 		ListLayers: &rpc.TLayerListRequest{},
 	}
@@ -730,7 +747,19 @@ func (conn *portoConnection) ListLayers2(place string, mask string) ([]string, e
 		return nil, err
 	}
 
-	return resp.GetLayers().GetLayer(), nil
+	for _, layer := range resp.GetLayers().GetLayers() {
+		var desc TLayerDescription
+
+		desc.Name = layer.GetName()
+		desc.OwnerUser = layer.GetOwnerUser()
+		desc.OwnerGroup = layer.GetOwnerGroup()
+		desc.LastUsage = layer.GetLastUsage()
+		desc.PrivateValue = layer.GetPrivateValue()
+
+		ret = append(ret, desc)
+	}
+
+	return ret, nil
 }
 
 func (conn *portoConnection) GetLayerPrivate(layer string, place string) (string, error) {
