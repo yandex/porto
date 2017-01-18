@@ -897,7 +897,10 @@ noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
                                 rpc::TContainerResponse &rsp) {
     TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
                    PORTO_LAYERS, req.layer());
-    TError error = layer.Load();
+    TError error = CL->CanControlPlace(layer.Place);
+    if (error)
+        return error;
+    error = layer.Load();
     if (!error)
         rsp.mutable_layer_private()->set_private_value(layer.Private);
     return error;
@@ -986,11 +989,16 @@ noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
 
 noinline TError ListLayers(const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
-    std::list<TStorage> layers;
-    TError error = TStorage::List(req.has_place() ? req.place() : CL->DefaultPlace(),
-                                  PORTO_LAYERS, layers);
+    TPath place = req.has_place() ? req.place() : CL->DefaultPlace();
+    TError error = CL->CanControlPlace(place);
     if (error)
         return error;
+
+    std::list<TStorage> layers;
+    error = TStorage::List(place, PORTO_LAYERS, layers);
+    if (error)
+        return error;
+
     auto list = rsp.mutable_layers();
     for (auto &layer: layers) {
         if (req.has_mask() && !StringMatch(layer.Name, req.mask()))
@@ -1077,9 +1085,13 @@ undo:
 
 noinline TError ListStorage(const rpc::TStorageListRequest &req,
                             rpc::TContainerResponse &rsp) {
+    TPath place = req.has_place() ? req.place() : CL->DefaultPlace();
+    TError error = CL->CanControlPlace(place);
+    if (error)
+        return error;
+
     std::list<TStorage> storages;
-    TError error = TStorage::List(req.has_place() ? req.place() : CL->DefaultPlace(),
-                                  PORTO_STORAGE, storages);
+    error = TStorage::List(place, PORTO_STORAGE, storages);
     if (error)
         return error;
 
