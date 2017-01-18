@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
+	"strings"
 
 	"rpc"
 )
@@ -47,6 +48,8 @@ const testContainer string = "golang_testContainer"
 const testVolume string = "/tmp/golang_testVolume"
 const testLayer string = "golang_testLayer"
 const testTarball = "/tmp/" + testLayer + ".tgz"
+const testStorage string = "go_abcde"
+const testPlace string = "/tmp/golang_place"
 
 func TestGetVersion(t *testing.T) {
 	conn := ConnectToPorto(t)
@@ -312,6 +315,22 @@ func TestImportLayer(t *testing.T) {
 		conn.ImportLayer(testLayer, testTarball, false))
 }
 
+func TestLayerPrivate(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+
+	FailOnError(t, conn, conn.SetLayerPrivate(testLayer, "", "456"))
+	private, err := conn.GetLayerPrivate(testLayer, "")
+	FailOnError(t, conn, err)
+
+	if private == "456" {
+		return
+	}
+
+	t.Error("Can't get/set new layer private")
+	t.FailNow()
+}
+
 func TestListLayers(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()
@@ -352,4 +371,85 @@ func TestSendRecvData(t *testing.T) {
 	if !bytes.Equal(data, result) {
 		t.Fatalf("result is not the same as input")
 	}
+}
+
+func TestCreateStorage(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+
+	config := make(map[string]string)
+	config["backend"] = "native"
+	config["storage"] = testStorage
+	config["private"] = "12345"
+
+	volume, err := conn.CreateVolume("", config)
+	FailOnError(t, conn, err)
+	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", false))
+}
+
+func TestListStorage(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+
+	storages, err := conn.ListStorage("", "")
+	FailOnError(t, conn, err)
+
+	for i := range storages {
+		if storages[i].Name == testStorage &&
+			storages[i].PrivateValue == "12345" {
+
+			return
+		}
+	}
+
+	t.Error("Failed listing storages")
+	t.FailNow()
+}
+
+func TestRemoveStorage(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+	FailOnError(t, conn, conn.RemoveStorage(testStorage, ""))
+}
+
+func TestPlace(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+
+	os.RemoveAll(testPlace)
+	os.Mkdir(testPlace, 0755)
+	os.Mkdir(testPlace + "/porto_volumes", 0755)
+	os.Mkdir(testPlace + "/porto_layers", 0755)
+	os.Mkdir(testPlace + "/porto_storage", 0755)
+
+	config := make(map[string]string)
+	config["private"] = "golang test volume"
+	config["place"] = testPlace
+	config["storage"] = "abcd"
+
+	volume, err := conn.CreateVolume("", config)
+	FailOnError(t, conn, err)
+
+	if !strings.Contains(volume.Path, testPlace) {
+		t.Error("Volume does not use desired place")
+		t.FailNow()
+	}
+
+	_, err = os.Stat(volume.Path)
+	FailOnError(t, conn, err)
+
+	storages, err := conn.ListStorage(testPlace, "")
+	FailOnError(t, conn, err)
+
+	if len(storages) == 0 || storages[0].Name != "abcd" {
+		t.Error("Storage failed to be created in place")
+		t.FailNow()
+	}
+
+	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", false))
+	FailOnError(t, conn, conn.RemoveStorage("abcd", testPlace))
+	FailOnError(t, conn, os.Remove(testPlace + "/porto_volumes"))
+	FailOnError(t, conn, os.Remove(testPlace + "/porto_layers"))
+	FailOnError(t, conn, os.Remove(testPlace + "/porto_storage"))
+	FailOnError(t, conn, os.Remove(testPlace))
 }
