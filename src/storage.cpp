@@ -195,12 +195,13 @@ TPath TStorage::TempPath(const std::string &kind) {
 }
 
 TError TStorage::Load() {
-    TPath priv = TempPath(PRIVATE_PREFIX);
     struct stat st;
     TError error;
+    TFile priv;
 
-    error = priv.StatStrict(st);
-    if (error) {
+    error = priv.Open(TempPath(PRIVATE_PREFIX),
+                      O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW);
+    if (error || priv.Stat(st)) {
         if (error.GetErrno() != ENOENT)
             return error;
         error = Path.StatStrict(st);
