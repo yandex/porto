@@ -1,3 +1,23 @@
+yandex-porto (3.2.5) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * api/go: sync porto go api
+  * api/go: tests for introduced wrappers
+  * api/go: change src/api/go directory layout
+
+  [ Konstantin Khlebnikov ]
+  * client: always load supplementary groups
+  * storage: do not follow symlinks for reading private value
+  * storage: require access to place for listing operations too
+
+  [ Maxim Samoylov ]
+  * api/go: list layers as objects
+
+  [ Konstantin Khlebnikov ]
+  * test: add go_api
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 18 Jan 2017 17:56:46 +0300
+
 yandex-porto (3.2.4) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
