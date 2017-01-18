@@ -26,6 +26,7 @@ It has these top-level messages:
 	TConvertPathRequest
 	TContainerGetRequest
 	TContainerWaitRequest
+	TAttachProcessRequest
 	TContainerRequest
 	TContainerListResponse
 	TContainerGetPropertyResponse
@@ -52,7 +53,17 @@ It has these top-level messages:
 	TLayerExportRequest
 	TLayerRemoveRequest
 	TLayerListRequest
+	TLayerGetPrivateRequest
+	TLayerSetPrivateRequest
+	TLayerDescription
 	TLayerListResponse
+	TLayerGetPrivateResponse
+	TStorageDescription
+	TStorageListRequest
+	TStorageListResponse
+	TStorageRemoveRequest
+	TStorageImportRequest
+	TStorageExportRequest
 */
 package rpc
 
@@ -209,12 +220,20 @@ func (m *TContainerDestroyRequest) GetName() string {
 }
 
 type TContainerListRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Mask             *string `protobuf:"bytes,1,opt,name=mask" json:"mask,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *TContainerListRequest) Reset()         { *m = TContainerListRequest{} }
 func (m *TContainerListRequest) String() string { return proto.CompactTextString(m) }
 func (*TContainerListRequest) ProtoMessage()    {}
+
+func (m *TContainerListRequest) GetMask() string {
+	if m != nil && m.Mask != nil {
+		return *m.Mask
+	}
+	return ""
+}
 
 type TContainerGetPropertyRequest struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
@@ -313,7 +332,9 @@ func (m *TContainerStartRequest) GetName() string {
 }
 
 type TContainerStopRequest struct {
-	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Name *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	// Timeout between SIGTERM and SIGKILL, default 30s
+	TimeoutMs        *uint32 `protobuf:"varint,2,opt,name=timeout_ms" json:"timeout_ms,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -326,6 +347,13 @@ func (m *TContainerStopRequest) GetName() string {
 		return *m.Name
 	}
 	return ""
+}
+
+func (m *TContainerStopRequest) GetTimeoutMs() uint32 {
+	if m != nil && m.TimeoutMs != nil {
+		return *m.TimeoutMs
+	}
+	return 0
 }
 
 type TContainerPauseRequest struct {
@@ -447,8 +475,10 @@ type TContainerGetRequest struct {
 	// list of containers
 	Name []string `protobuf:"bytes,1,rep,name=name" json:"name,omitempty"`
 	// list of properties/data
-	Variable         []string `protobuf:"bytes,2,rep,name=variable" json:"variable,omitempty"`
-	XXX_unrecognized []byte   `json:"-"`
+	Variable []string `protobuf:"bytes,2,rep,name=variable" json:"variable,omitempty"`
+	// do not wait busy containers
+	Nonblock         *bool  `protobuf:"varint,3,opt,name=nonblock" json:"nonblock,omitempty"`
+	XXX_unrecognized []byte `json:"-"`
 }
 
 func (m *TContainerGetRequest) Reset()         { *m = TContainerGetRequest{} }
@@ -467,6 +497,13 @@ func (m *TContainerGetRequest) GetVariable() []string {
 		return m.Variable
 	}
 	return nil
+}
+
+func (m *TContainerGetRequest) GetNonblock() bool {
+	if m != nil && m.Nonblock != nil {
+		return *m.Nonblock
+	}
+	return false
 }
 
 // Wait while container(s) is/are in running state
@@ -494,6 +531,39 @@ func (m *TContainerWaitRequest) GetTimeout() uint32 {
 		return *m.Timeout
 	}
 	return 0
+}
+
+// Move process into container
+type TAttachProcessRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Pid              *uint32 `protobuf:"varint,2,req,name=pid" json:"pid,omitempty"`
+	Comm             *string `protobuf:"bytes,3,req,name=comm" json:"comm,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TAttachProcessRequest) Reset()         { *m = TAttachProcessRequest{} }
+func (m *TAttachProcessRequest) String() string { return proto.CompactTextString(m) }
+func (*TAttachProcessRequest) ProtoMessage()    {}
+
+func (m *TAttachProcessRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TAttachProcessRequest) GetPid() uint32 {
+	if m != nil && m.Pid != nil {
+		return *m.Pid
+	}
+	return 0
+}
+
+func (m *TAttachProcessRequest) GetComm() string {
+	if m != nil && m.Comm != nil {
+		return *m.Comm
+	}
+	return ""
 }
 
 type TContainerRequest struct {
@@ -524,7 +594,14 @@ type TContainerRequest struct {
 	RemoveLayer          *TLayerRemoveRequest           `protobuf:"bytes,111,opt,name=removeLayer" json:"removeLayer,omitempty"`
 	ListLayers           *TLayerListRequest             `protobuf:"bytes,112,opt,name=listLayers" json:"listLayers,omitempty"`
 	ExportLayer          *TLayerExportRequest           `protobuf:"bytes,113,opt,name=exportLayer" json:"exportLayer,omitempty"`
+	Getlayerprivate      *TLayerGetPrivateRequest       `protobuf:"bytes,114,opt,name=getlayerprivate" json:"getlayerprivate,omitempty"`
+	Setlayerprivate      *TLayerSetPrivateRequest       `protobuf:"bytes,115,opt,name=setlayerprivate" json:"setlayerprivate,omitempty"`
+	ListStorage          *TStorageListRequest           `protobuf:"bytes,116,opt,name=listStorage" json:"listStorage,omitempty"`
+	RemoveStorage        *TStorageRemoveRequest         `protobuf:"bytes,117,opt,name=removeStorage" json:"removeStorage,omitempty"`
+	ImportStorage        *TStorageImportRequest         `protobuf:"bytes,118,opt,name=importStorage" json:"importStorage,omitempty"`
+	ExportStorage        *TStorageExportRequest         `protobuf:"bytes,119,opt,name=exportStorage" json:"exportStorage,omitempty"`
 	ConvertPath          *TConvertPathRequest           `protobuf:"bytes,200,opt,name=convertPath" json:"convertPath,omitempty"`
+	AttachProcess        *TAttachProcessRequest         `protobuf:"bytes,201,opt,name=attachProcess" json:"attachProcess,omitempty"`
 	XXX_unrecognized     []byte                         `json:"-"`
 }
 
@@ -721,9 +798,58 @@ func (m *TContainerRequest) GetExportLayer() *TLayerExportRequest {
 	return nil
 }
 
+func (m *TContainerRequest) GetGetlayerprivate() *TLayerGetPrivateRequest {
+	if m != nil {
+		return m.Getlayerprivate
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetSetlayerprivate() *TLayerSetPrivateRequest {
+	if m != nil {
+		return m.Setlayerprivate
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetListStorage() *TStorageListRequest {
+	if m != nil {
+		return m.ListStorage
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetRemoveStorage() *TStorageRemoveRequest {
+	if m != nil {
+		return m.RemoveStorage
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetImportStorage() *TStorageImportRequest {
+	if m != nil {
+		return m.ImportStorage
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetExportStorage() *TStorageExportRequest {
+	if m != nil {
+		return m.ExportStorage
+	}
+	return nil
+}
+
 func (m *TContainerRequest) GetConvertPath() *TConvertPathRequest {
 	if m != nil {
 		return m.ConvertPath
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetAttachProcess() *TAttachProcessRequest {
+	if m != nil {
+		return m.AttachProcess
 	}
 	return nil
 }
@@ -1029,6 +1155,8 @@ type TContainerResponse struct {
 	Volume             *TVolumeDescription             `protobuf:"bytes,13,opt,name=volume" json:"volume,omitempty"`
 	Layers             *TLayerListResponse             `protobuf:"bytes,14,opt,name=layers" json:"layers,omitempty"`
 	ConvertPath        *TConvertPathResponse           `protobuf:"bytes,15,opt,name=convertPath" json:"convertPath,omitempty"`
+	LayerPrivate       *TLayerGetPrivateResponse       `protobuf:"bytes,16,opt,name=layer_private" json:"layer_private,omitempty"`
+	StorageList        *TStorageListResponse           `protobuf:"bytes,17,opt,name=storageList" json:"storageList,omitempty"`
 	XXX_unrecognized   []byte                          `json:"-"`
 }
 
@@ -1137,6 +1265,20 @@ func (m *TContainerResponse) GetLayers() *TLayerListResponse {
 func (m *TContainerResponse) GetConvertPath() *TConvertPathResponse {
 	if m != nil {
 		return m.ConvertPath
+	}
+	return nil
+}
+
+func (m *TContainerResponse) GetLayerPrivate() *TLayerGetPrivateResponse {
+	if m != nil {
+		return m.LayerPrivate
+	}
+	return nil
+}
+
+func (m *TContainerResponse) GetStorageList() *TStorageListResponse {
+	if m != nil {
+		return m.StorageList
 	}
 	return nil
 }
@@ -1296,6 +1438,7 @@ func (m *TVolumeLinkRequest) GetContainer() string {
 type TVolumeUnlinkRequest struct {
 	Path             *string `protobuf:"bytes,1,req,name=path" json:"path,omitempty"`
 	Container        *string `protobuf:"bytes,2,opt,name=container" json:"container,omitempty"`
+	Strict           *bool   `protobuf:"varint,3,opt,name=strict" json:"strict,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -1315,6 +1458,13 @@ func (m *TVolumeUnlinkRequest) GetContainer() string {
 		return *m.Container
 	}
 	return ""
+}
+
+func (m *TVolumeUnlinkRequest) GetStrict() bool {
+	if m != nil && m.Strict != nil {
+		return *m.Strict
+	}
+	return false
 }
 
 type TVolumeListRequest struct {
@@ -1385,6 +1535,9 @@ type TLayerImportRequest struct {
 	Layer            *string `protobuf:"bytes,1,req,name=layer" json:"layer,omitempty"`
 	Tarball          *string `protobuf:"bytes,2,req,name=tarball" json:"tarball,omitempty"`
 	Merge            *bool   `protobuf:"varint,3,req,name=merge" json:"merge,omitempty"`
+	Place            *string `protobuf:"bytes,4,opt,name=place" json:"place,omitempty"`
+	PrivateValue     *string `protobuf:"bytes,5,opt,name=private_value" json:"private_value,omitempty"`
+	Compress         *string `protobuf:"bytes,6,opt,name=compress" json:"compress,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -1413,9 +1566,33 @@ func (m *TLayerImportRequest) GetMerge() bool {
 	return false
 }
 
+func (m *TLayerImportRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TLayerImportRequest) GetPrivateValue() string {
+	if m != nil && m.PrivateValue != nil {
+		return *m.PrivateValue
+	}
+	return ""
+}
+
+func (m *TLayerImportRequest) GetCompress() string {
+	if m != nil && m.Compress != nil {
+		return *m.Compress
+	}
+	return ""
+}
+
 type TLayerExportRequest struct {
 	Volume           *string `protobuf:"bytes,1,req,name=volume" json:"volume,omitempty"`
 	Tarball          *string `protobuf:"bytes,2,req,name=tarball" json:"tarball,omitempty"`
+	Layer            *string `protobuf:"bytes,3,opt,name=layer" json:"layer,omitempty"`
+	Place            *string `protobuf:"bytes,4,opt,name=place" json:"place,omitempty"`
+	Compress         *string `protobuf:"bytes,5,opt,name=compress" json:"compress,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -1437,8 +1614,30 @@ func (m *TLayerExportRequest) GetTarball() string {
 	return ""
 }
 
+func (m *TLayerExportRequest) GetLayer() string {
+	if m != nil && m.Layer != nil {
+		return *m.Layer
+	}
+	return ""
+}
+
+func (m *TLayerExportRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TLayerExportRequest) GetCompress() string {
+	if m != nil && m.Compress != nil {
+		return *m.Compress
+	}
+	return ""
+}
+
 type TLayerRemoveRequest struct {
 	Layer            *string `protobuf:"bytes,1,req,name=layer" json:"layer,omitempty"`
+	Place            *string `protobuf:"bytes,2,opt,name=place" json:"place,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -1453,17 +1652,145 @@ func (m *TLayerRemoveRequest) GetLayer() string {
 	return ""
 }
 
+func (m *TLayerRemoveRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
 type TLayerListRequest struct {
-	XXX_unrecognized []byte `json:"-"`
+	Place            *string `protobuf:"bytes,1,opt,name=place" json:"place,omitempty"`
+	Mask             *string `protobuf:"bytes,2,opt,name=mask" json:"mask,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
 }
 
 func (m *TLayerListRequest) Reset()         { *m = TLayerListRequest{} }
 func (m *TLayerListRequest) String() string { return proto.CompactTextString(m) }
 func (*TLayerListRequest) ProtoMessage()    {}
 
+func (m *TLayerListRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TLayerListRequest) GetMask() string {
+	if m != nil && m.Mask != nil {
+		return *m.Mask
+	}
+	return ""
+}
+
+type TLayerGetPrivateRequest struct {
+	Layer            *string `protobuf:"bytes,1,req,name=layer" json:"layer,omitempty"`
+	Place            *string `protobuf:"bytes,2,opt,name=place" json:"place,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TLayerGetPrivateRequest) Reset()         { *m = TLayerGetPrivateRequest{} }
+func (m *TLayerGetPrivateRequest) String() string { return proto.CompactTextString(m) }
+func (*TLayerGetPrivateRequest) ProtoMessage()    {}
+
+func (m *TLayerGetPrivateRequest) GetLayer() string {
+	if m != nil && m.Layer != nil {
+		return *m.Layer
+	}
+	return ""
+}
+
+func (m *TLayerGetPrivateRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+type TLayerSetPrivateRequest struct {
+	Layer            *string `protobuf:"bytes,1,req,name=layer" json:"layer,omitempty"`
+	Place            *string `protobuf:"bytes,2,opt,name=place" json:"place,omitempty"`
+	PrivateValue     *string `protobuf:"bytes,3,req,name=private_value" json:"private_value,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TLayerSetPrivateRequest) Reset()         { *m = TLayerSetPrivateRequest{} }
+func (m *TLayerSetPrivateRequest) String() string { return proto.CompactTextString(m) }
+func (*TLayerSetPrivateRequest) ProtoMessage()    {}
+
+func (m *TLayerSetPrivateRequest) GetLayer() string {
+	if m != nil && m.Layer != nil {
+		return *m.Layer
+	}
+	return ""
+}
+
+func (m *TLayerSetPrivateRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TLayerSetPrivateRequest) GetPrivateValue() string {
+	if m != nil && m.PrivateValue != nil {
+		return *m.PrivateValue
+	}
+	return ""
+}
+
+type TLayerDescription struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	OwnerUser        *string `protobuf:"bytes,2,req,name=owner_user" json:"owner_user,omitempty"`
+	OwnerGroup       *string `protobuf:"bytes,3,req,name=owner_group" json:"owner_group,omitempty"`
+	LastUsage        *uint64 `protobuf:"varint,4,req,name=last_usage" json:"last_usage,omitempty"`
+	PrivateValue     *string `protobuf:"bytes,5,req,name=private_value" json:"private_value,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TLayerDescription) Reset()         { *m = TLayerDescription{} }
+func (m *TLayerDescription) String() string { return proto.CompactTextString(m) }
+func (*TLayerDescription) ProtoMessage()    {}
+
+func (m *TLayerDescription) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TLayerDescription) GetOwnerUser() string {
+	if m != nil && m.OwnerUser != nil {
+		return *m.OwnerUser
+	}
+	return ""
+}
+
+func (m *TLayerDescription) GetOwnerGroup() string {
+	if m != nil && m.OwnerGroup != nil {
+		return *m.OwnerGroup
+	}
+	return ""
+}
+
+func (m *TLayerDescription) GetLastUsage() uint64 {
+	if m != nil && m.LastUsage != nil {
+		return *m.LastUsage
+	}
+	return 0
+}
+
+func (m *TLayerDescription) GetPrivateValue() string {
+	if m != nil && m.PrivateValue != nil {
+		return *m.PrivateValue
+	}
+	return ""
+}
+
 type TLayerListResponse struct {
-	Layer            []string `protobuf:"bytes,1,rep,name=layer" json:"layer,omitempty"`
-	XXX_unrecognized []byte   `json:"-"`
+	Layer            []string             `protobuf:"bytes,1,rep,name=layer" json:"layer,omitempty"`
+	Layers           []*TLayerDescription `protobuf:"bytes,2,rep,name=layers" json:"layers,omitempty"`
+	XXX_unrecognized []byte               `json:"-"`
 }
 
 func (m *TLayerListResponse) Reset()         { *m = TLayerListResponse{} }
@@ -1475,6 +1802,229 @@ func (m *TLayerListResponse) GetLayer() []string {
 		return m.Layer
 	}
 	return nil
+}
+
+func (m *TLayerListResponse) GetLayers() []*TLayerDescription {
+	if m != nil {
+		return m.Layers
+	}
+	return nil
+}
+
+type TLayerGetPrivateResponse struct {
+	PrivateValue     *string `protobuf:"bytes,1,opt,name=private_value" json:"private_value,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TLayerGetPrivateResponse) Reset()         { *m = TLayerGetPrivateResponse{} }
+func (m *TLayerGetPrivateResponse) String() string { return proto.CompactTextString(m) }
+func (*TLayerGetPrivateResponse) ProtoMessage()    {}
+
+func (m *TLayerGetPrivateResponse) GetPrivateValue() string {
+	if m != nil && m.PrivateValue != nil {
+		return *m.PrivateValue
+	}
+	return ""
+}
+
+type TStorageDescription struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	OwnerUser        *string `protobuf:"bytes,2,req,name=owner_user" json:"owner_user,omitempty"`
+	OwnerGroup       *string `protobuf:"bytes,3,req,name=owner_group" json:"owner_group,omitempty"`
+	LastUsage        *uint64 `protobuf:"varint,4,req,name=last_usage" json:"last_usage,omitempty"`
+	PrivateValue     *string `protobuf:"bytes,5,req,name=private_value" json:"private_value,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TStorageDescription) Reset()         { *m = TStorageDescription{} }
+func (m *TStorageDescription) String() string { return proto.CompactTextString(m) }
+func (*TStorageDescription) ProtoMessage()    {}
+
+func (m *TStorageDescription) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TStorageDescription) GetOwnerUser() string {
+	if m != nil && m.OwnerUser != nil {
+		return *m.OwnerUser
+	}
+	return ""
+}
+
+func (m *TStorageDescription) GetOwnerGroup() string {
+	if m != nil && m.OwnerGroup != nil {
+		return *m.OwnerGroup
+	}
+	return ""
+}
+
+func (m *TStorageDescription) GetLastUsage() uint64 {
+	if m != nil && m.LastUsage != nil {
+		return *m.LastUsage
+	}
+	return 0
+}
+
+func (m *TStorageDescription) GetPrivateValue() string {
+	if m != nil && m.PrivateValue != nil {
+		return *m.PrivateValue
+	}
+	return ""
+}
+
+type TStorageListRequest struct {
+	Place            *string `protobuf:"bytes,1,opt,name=place" json:"place,omitempty"`
+	Mask             *string `protobuf:"bytes,2,opt,name=mask" json:"mask,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TStorageListRequest) Reset()         { *m = TStorageListRequest{} }
+func (m *TStorageListRequest) String() string { return proto.CompactTextString(m) }
+func (*TStorageListRequest) ProtoMessage()    {}
+
+func (m *TStorageListRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TStorageListRequest) GetMask() string {
+	if m != nil && m.Mask != nil {
+		return *m.Mask
+	}
+	return ""
+}
+
+type TStorageListResponse struct {
+	Storages         []*TStorageDescription `protobuf:"bytes,1,rep,name=storages" json:"storages,omitempty"`
+	XXX_unrecognized []byte                 `json:"-"`
+}
+
+func (m *TStorageListResponse) Reset()         { *m = TStorageListResponse{} }
+func (m *TStorageListResponse) String() string { return proto.CompactTextString(m) }
+func (*TStorageListResponse) ProtoMessage()    {}
+
+func (m *TStorageListResponse) GetStorages() []*TStorageDescription {
+	if m != nil {
+		return m.Storages
+	}
+	return nil
+}
+
+type TStorageRemoveRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Place            *string `protobuf:"bytes,2,opt,name=place" json:"place,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TStorageRemoveRequest) Reset()         { *m = TStorageRemoveRequest{} }
+func (m *TStorageRemoveRequest) String() string { return proto.CompactTextString(m) }
+func (*TStorageRemoveRequest) ProtoMessage()    {}
+
+func (m *TStorageRemoveRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TStorageRemoveRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+type TStorageImportRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Tarball          *string `protobuf:"bytes,2,req,name=tarball" json:"tarball,omitempty"`
+	Place            *string `protobuf:"bytes,3,opt,name=place" json:"place,omitempty"`
+	PrivateValue     *string `protobuf:"bytes,5,opt,name=private_value" json:"private_value,omitempty"`
+	Compress         *string `protobuf:"bytes,6,opt,name=compress" json:"compress,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TStorageImportRequest) Reset()         { *m = TStorageImportRequest{} }
+func (m *TStorageImportRequest) String() string { return proto.CompactTextString(m) }
+func (*TStorageImportRequest) ProtoMessage()    {}
+
+func (m *TStorageImportRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TStorageImportRequest) GetTarball() string {
+	if m != nil && m.Tarball != nil {
+		return *m.Tarball
+	}
+	return ""
+}
+
+func (m *TStorageImportRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TStorageImportRequest) GetPrivateValue() string {
+	if m != nil && m.PrivateValue != nil {
+		return *m.PrivateValue
+	}
+	return ""
+}
+
+func (m *TStorageImportRequest) GetCompress() string {
+	if m != nil && m.Compress != nil {
+		return *m.Compress
+	}
+	return ""
+}
+
+type TStorageExportRequest struct {
+	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
+	Tarball          *string `protobuf:"bytes,2,req,name=tarball" json:"tarball,omitempty"`
+	Place            *string `protobuf:"bytes,3,opt,name=place" json:"place,omitempty"`
+	Compress         *string `protobuf:"bytes,4,opt,name=compress" json:"compress,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TStorageExportRequest) Reset()         { *m = TStorageExportRequest{} }
+func (m *TStorageExportRequest) String() string { return proto.CompactTextString(m) }
+func (*TStorageExportRequest) ProtoMessage()    {}
+
+func (m *TStorageExportRequest) GetName() string {
+	if m != nil && m.Name != nil {
+		return *m.Name
+	}
+	return ""
+}
+
+func (m *TStorageExportRequest) GetTarball() string {
+	if m != nil && m.Tarball != nil {
+		return *m.Tarball
+	}
+	return ""
+}
+
+func (m *TStorageExportRequest) GetPlace() string {
+	if m != nil && m.Place != nil {
+		return *m.Place
+	}
+	return ""
+}
+
+func (m *TStorageExportRequest) GetCompress() string {
+	if m != nil && m.Compress != nil {
+		return *m.Compress
+	}
+	return ""
 }
 
 func init() {

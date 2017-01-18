@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"testing"
 
-	"./rpc"
+	"rpc"
 )
 
 func FailOnError(t *testing.T, conn API, err error) {

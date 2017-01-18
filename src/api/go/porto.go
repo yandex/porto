@@ -1,4 +1,4 @@
-//go:generate protoc -I ../.. ../../rpc.proto --go_out=rpc
+//go:generate protoc -I ../.. ../../rpc.proto --go_out=vendor/rpc
 
 package porto
 
@@ -13,7 +13,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"./rpc"
+	"rpc"
 )
 
 const portoSocket = "/run/portod.socket"
@@ -78,6 +78,14 @@ type TVolumeDescription struct {
 	Containers []string
 }
 
+type TStorageDescription struct {
+	Name         string
+	OwnerUser    string
+	OwnerGroup   string
+	LastUsage    uint64
+	PrivateValue string
+}
+
 type TPortoGetResponse struct {
 	Value    string
 	Error    int
@@ -107,6 +115,7 @@ type API interface {
 
 	Start(name string) error
 	Stop(name string) error
+	Stop2(name string, timeout time.Duration) error
 	Kill(name string, sig syscall.Signal) error
 	Pause(name string) error
 	Resume(name string) error
@@ -114,10 +123,13 @@ type API interface {
 	Wait(containers []string, timeout time.Duration) (string, error)
 
 	List() ([]string, error)
+	List1(mask string) ([]string, error)
 	Plist() ([]TProperty, error)
 	Dlist() ([]TData, error)
 
 	Get(containers []string, variables []string) (map[string]map[string]TPortoGetResponse, error)
+	Get3(containers []string, variables []string, nonblock bool) (
+		map[string]map[string]TPortoGetResponse, error)
 
 	GetProperty(name string, property string) (string, error)
 	SetProperty(name string, property string, value string) error
@@ -130,15 +142,27 @@ type API interface {
 	TuneVolume(path string, config map[string]string) error
 	LinkVolume(path string, container string) error
 	UnlinkVolume(path string, container string) error
+	UnlinkVolume3(path string, container string, strict bool) error
 	ListVolumes(path string, container string) ([]TVolumeDescription, error)
 
 	// LayerAPI
 	ImportLayer(layer string, tarball string, merge bool) error
+	ImportLayer4(layer string, tarball string, merge bool,
+				place string, privateValue string) error
 	ExportLayer(volume string, tarball string) error
 	RemoveLayer(layer string) error
+	RemoveLayer2(layer string, place string) error
 	ListLayers() ([]string, error)
+	ListLayers2(place string, mask string) ([]string, error)
+
+	GetLayerPrivate(layer string, place string) (string, error)
+	SetLayerPrivate(layer string, place string, privateValue string)  error
+
+	ListStorage(place string, mask string) ([]TStorageDescription, error)
+	RemoveStorage(name string, place string) error
 
 	ConvertPath(path string, src string, dest string) (string, error)
+	AttachProcess(name string, pid uint32, comm string) error
 
 	Close() error
 }
@@ -268,11 +292,25 @@ func (conn *portoConnection) Start(name string) error {
 }
 
 func (conn *portoConnection) Stop(name string) error {
+	return conn.Stop2(name, -1)
+}
+
+func (conn *portoConnection) Stop2(name string, timeout time.Duration) error {
 	req := &rpc.TContainerRequest{
 		Stop: &rpc.TContainerStopRequest{
 			Name: &name,
 		},
 	}
+
+	if timeout >= 0 {
+		if timeout/time.Millisecond > math.MaxUint32 {
+			return fmt.Errorf("timeout must be less than %d ms", math.MaxUint32)
+		}
+
+		timeoutms := uint32(timeout / time.Millisecond)
+		req.Stop.TimeoutMs = &timeoutms
+	}
+
 	_, err := conn.performRequest(req)
 	return err
 }
@@ -335,9 +373,18 @@ func (conn *portoConnection) Wait(containers []string, timeout time.Duration) (s
 }
 
 func (conn *portoConnection) List() ([]string, error) {
+	return conn.List1("")
+}
+
+func (conn *portoConnection) List1(mask string) ([]string, error) {
 	req := &rpc.TContainerRequest{
-		List: new(rpc.TContainerListRequest),
+		List: &rpc.TContainerListRequest{},
 	}
+
+	if mask != "" {
+		req.List.Mask = &mask
+	}
+
 	resp, err := conn.performRequest(req)
 	if err != nil {
 		return nil, err
@@ -382,11 +429,16 @@ func (conn *portoConnection) Dlist() (ret []TData, err error) {
 }
 
 func (conn *portoConnection) Get(containers []string, variables []string) (ret map[string]map[string]TPortoGetResponse, err error) {
+	return conn.Get3(containers, variables, false)
+}
+
+func (conn *portoConnection) Get3(containers []string, variables []string, nonblock bool) (ret map[string]map[string]TPortoGetResponse, err error) {
 	ret = make(map[string]map[string]TPortoGetResponse)
 	req := &rpc.TContainerRequest{
 		Get: &rpc.TContainerGetRequest{
 			Name:     containers,
 			Variable: variables,
+			Nonblock: &nonblock,
 		},
 	}
 
@@ -492,9 +544,12 @@ func (conn *portoConnection) CreateVolume(path string, config map[string]string)
 
 	req := &rpc.TContainerRequest{
 		CreateVolume: &rpc.TVolumeCreateRequest{
-			Path:       &path,
 			Properties: properties,
 		},
+	}
+
+	if path != "" {
+		req.CreateVolume.Path = &path
 	}
 
 	resp, err := conn.performRequest(req)
@@ -545,10 +600,15 @@ func (conn *portoConnection) LinkVolume(path string, container string) error {
 }
 
 func (conn *portoConnection) UnlinkVolume(path string, container string) error {
+	return conn.UnlinkVolume3(path, container, false)
+}
+
+func (conn *portoConnection) UnlinkVolume3(path string, container string, strict bool) error {
 	req := &rpc.TContainerRequest{
 		UnlinkVolume: &rpc.TVolumeUnlinkRequest{
 			Path:      &path,
 			Container: &container,
+			Strict:    &strict,
 		},
 	}
 	if container == "" {
@@ -596,12 +656,24 @@ func (conn *portoConnection) ListVolumes(path string, container string) (ret []T
 
 // LayerAPI
 func (conn *portoConnection) ImportLayer(layer string, tarball string, merge bool) error {
+	return conn.ImportLayer4(layer, tarball, merge, "", "")
+}
+
+func (conn *portoConnection) ImportLayer4(layer string, tarball string, merge bool,
+										 place string, privateValue string) error {
 	req := &rpc.TContainerRequest{
 		ImportLayer: &rpc.TLayerImportRequest{
-			Layer:   &layer,
-			Tarball: &tarball,
-			Merge:   &merge},
+			Layer:        &layer,
+			Tarball:      &tarball,
+			Merge:        &merge,
+			PrivateValue: &privateValue,
+		},
 	}
+
+	if place != "" {
+		req.ImportLayer.Place = &place
+	}
+
 	_, err := conn.performRequest(req)
 	return err
 }
@@ -618,18 +690,39 @@ func (conn *portoConnection) ExportLayer(volume string, tarball string) error {
 }
 
 func (conn *portoConnection) RemoveLayer(layer string) error {
+	return conn.RemoveLayer2(layer, "")
+}
+
+func (conn *portoConnection) RemoveLayer2(layer string, place string) error {
 	req := &rpc.TContainerRequest{
 		RemoveLayer: &rpc.TLayerRemoveRequest{
 			Layer: &layer,
 		},
 	}
+
+	if place != "" {
+		req.RemoveLayer.Place = &place
+	}
+
 	_, err := conn.performRequest(req)
 	return err
 }
 
 func (conn *portoConnection) ListLayers() ([]string, error) {
+	return conn.ListLayers2("", "")
+}
+
+func (conn *portoConnection) ListLayers2(place string, mask string) ([]string, error) {
 	req := &rpc.TContainerRequest{
 		ListLayers: &rpc.TLayerListRequest{},
+	}
+
+	if place != "" {
+		req.ListLayers.Place = &place
+	}
+
+	if mask != "" {
+		req.ListLayers.Mask = &mask
 	}
 
 	resp, err := conn.performRequest(req)
@@ -638,6 +731,90 @@ func (conn *portoConnection) ListLayers() ([]string, error) {
 	}
 
 	return resp.GetLayers().GetLayer(), nil
+}
+
+func (conn *portoConnection) GetLayerPrivate(layer string, place string) (string, error) {
+	req := &rpc.TContainerRequest{
+		Getlayerprivate: &rpc.TLayerGetPrivateRequest{
+			Layer: &layer,
+		},
+	}
+
+	if place != "" {
+		req.Getlayerprivate.Place = &place
+	}
+
+	resp, err := conn.performRequest(req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.GetLayerPrivate().GetPrivateValue(), nil
+}
+
+func (conn *portoConnection) SetLayerPrivate(layer string, place string,
+											 privateValue string) error {
+	req := &rpc.TContainerRequest{
+		Setlayerprivate: &rpc.TLayerSetPrivateRequest{
+			Layer:        &layer,
+			PrivateValue: &privateValue,
+		},
+	}
+
+	if place != "" {
+		req.Setlayerprivate.Place = &place
+	}
+
+	_, err := conn.performRequest(req)
+	return err
+}
+
+func (conn *portoConnection) ListStorage(place string, mask string) (ret []TStorageDescription, err error) {
+	req := &rpc.TContainerRequest{
+		ListStorage: &rpc.TStorageListRequest{},
+	}
+
+	if place != "" {
+		req.ListStorage.Place = &place
+	}
+
+	if mask != "" {
+		req.ListStorage.Mask = &mask
+	}
+
+	resp, err := conn.performRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, storage := range resp.GetStorageList().GetStorages() {
+		var desc TStorageDescription
+
+		desc.Name = storage.GetName()
+		desc.OwnerUser = storage.GetOwnerUser()
+		desc.OwnerGroup = storage.GetOwnerGroup()
+		desc.LastUsage = storage.GetLastUsage()
+		desc.PrivateValue = storage.GetPrivateValue()
+
+		ret = append(ret, desc)
+	}
+
+	return ret, nil
+}
+
+func (conn *portoConnection) RemoveStorage(name string, place string) error {
+	req := &rpc.TContainerRequest{
+		RemoveStorage: &rpc.TStorageRemoveRequest{
+			Name:  &name,
+		},
+	}
+
+	if place != "" {
+		req.RemoveStorage.Place = &place
+	}
+
+	_, err := conn.performRequest(req)
+	return err
 }
 
 func (conn *portoConnection) ConvertPath(path string, src string, dest string) (string, error) {
@@ -655,4 +832,17 @@ func (conn *portoConnection) ConvertPath(path string, src string, dest string) (
 	}
 
 	return resp.GetConvertPath().GetPath(), nil
+}
+
+func (conn *portoConnection) AttachProcess(name string, pid uint32, comm string) error {
+	req := &rpc.TContainerRequest{
+		AttachProcess: &rpc.TAttachProcessRequest{
+			Name: &name,
+			Pid:  &pid,
+			Comm: &comm,
+		},
+	}
+
+	_, err := conn.performRequest(req)
+	return err
 }
