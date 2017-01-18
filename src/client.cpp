@@ -171,16 +171,13 @@ TError TClient::IdentifyClient(bool initial) {
     Comm = GetTaskName(Pid);
 
     if (ct->IsRoot()) {
-        Cred.Uid = cr.uid;
-        Cred.Gid = cr.gid;
-        error = LoadGroups();
-        if (error && error.GetErrno() != ENOENT)
-            L_WRN() << "Cannot load supplementary group list" << Pid
-                    << " : " << error << std::endl;
+        Cred = TaskCred;
     } else {
         /* requests from containers are executed in behalf of their owners */
         Cred = ct->OwnerCred;
     }
+
+    (void)Cred.LoadGroups(Cred.User());
 
     if (Cred.IsRootUser()) {
         if (AccessLevel == EAccessLevel::Normal)
@@ -189,38 +186,6 @@ TError TClient::IdentifyClient(bool initial) {
         if (AccessLevel >= EAccessLevel::ReadOnly)
             AccessLevel = EAccessLevel::ReadOnly;
     }
-
-    return TError::Success();
-}
-
-TError TClient::LoadGroups() {
-    std::vector<std::string> lines;
-    TError error = TPath("/proc/" + std::to_string(Pid) + "/status").ReadLines(lines);
-    if (error)
-        return error;
-
-    Cred.Groups.clear();
-    for (auto &l : lines)
-        if (l.compare(0, 8, "Groups:\t") == 0) {
-            std::vector<std::string> groupsStr;
-
-            error = SplitString(l.substr(8), ' ', groupsStr);
-            if (error)
-                return error;
-
-            for (auto g : groupsStr) {
-                int group;
-                if (g.empty())
-                    continue;
-                error = StringToInt(g, group);
-                if (error)
-                    return error;
-
-                Cred.Groups.push_back(group);
-            }
-
-            break;
-        }
 
     return TError::Success();
 }

@@ -163,18 +163,19 @@ TCred TCred::Current() {
 }
 
 TError TCred::LoadGroups(const std::string &user) {
-    if (FindGroups(user, Gid, Groups)) {
-        L_ERR() << "Cannot load groups for " << user << std::endl;
+    TError error = FindGroups(user, Gid, Groups);
+    if (error) {
+        L() << "Cannot load groups for " << user << std::endl;
         Groups.resize(1);
         Groups[0] = Gid;
     }
-    return TError::Success();
+    return error;
 }
 
 TError TCred::Load(const std::string &user) {
     TError error = FindUser(user, Uid, Gid);
     if (!error)
-        error = LoadGroups(user);
+        (void)LoadGroups(user);
     return error;
 }
 

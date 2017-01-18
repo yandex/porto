@@ -87,8 +87,6 @@ private:
     uint64_t RequestStartMs = 0;
     bool Processing = false;
 
-    TError LoadGroups();
-
     bool FullLog = true;
 
     uint64_t Length = 0;

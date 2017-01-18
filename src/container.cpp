@@ -394,10 +394,6 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
         goto err;
 
     ct->OwnerCred = CL->Cred;
-    error = ct->OwnerCred.LoadGroups(ct->OwnerCred.User());
-    if (error)
-        goto err;
-
     ct->SetProp(EProperty::OWNER_USER);
     ct->SetProp(EProperty::OWNER_GROUP);
 
@@ -1564,9 +1560,7 @@ TError TContainer::Start() {
             return error;
     }
 
-    error = TaskCred.LoadGroups(TaskCred.User());
-    if (error)
-        return error;
+    (void)TaskCred.LoadGroups(TaskCred.User());
 
     /* Check target task credentials */
     error = CL->CanControl(TaskCred);
