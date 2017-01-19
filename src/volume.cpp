@@ -1096,6 +1096,9 @@ TError TVolume::Configure(const TStringMap &cfg) {
         StoragePath = GetInternal(BackendType);
         KeepStorage = false;
     } else if (StoragePath.IsSimple()) {
+        error = TStorage::CheckName(Storage);
+        if (error)
+            return error;
         TStorage storage(Place, PORTO_STORAGE, Storage);
         StoragePath = storage.Path;
         KeepStorage = storage.Exists();
@@ -1290,6 +1293,7 @@ TError TVolume::Build() {
                 (void)temp.Rmdir();
             } else {
                 TStorage layer(Place, PORTO_LAYERS, name);
+                (void)layer.Touch();
                 /* Imported layers are available for everybody */
                 error = CopyRecursive(layer.Path, InternalPath);
             }
@@ -1529,7 +1533,7 @@ TError TVolume::DestroyOne(bool strict) {
 
     for (auto &layer: Layers) {
         TStorage storage(Place, PORTO_LAYERS, layer);
-        if (StringStartsWith(layer, "_weak_")) {
+        if (StringStartsWith(layer, PORTO_WEAK_PREFIX)) {
             error = storage.Remove();
             if (error && error.GetError() != EError::Busy)
                 L_ERR() << "Cannot remove layer: " << error << std::endl;

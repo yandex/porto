@@ -942,10 +942,6 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
         if (error)
             return error;
 
-        error = CL->CanControl(layer.Owner);
-        if (error)
-            return error;
-
         return layer.ExportTarball(CL->ResolvePath(req.tarball()),
                                    req.has_compress() ? req.compress() : "");
     }
@@ -954,16 +950,12 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
 
-    error = CL->CanControl(volume->VolumeOwner);
+    TStorage layer(volume->Place, PORTO_VOLUMES, volume->Id);
+    layer.Owner = volume->VolumeOwner;
+    error = volume->GetUpperLayer(layer.Path);
     if (error)
         return error;
 
-    TPath upper;
-    error = volume->GetUpperLayer(upper);
-    if (error)
-        return error;
-
-    TStorage layer(upper, "overlay");
     return layer.ExportTarball(CL->ResolvePath(req.tarball()),
                                req.has_compress() ? req.compress() : "");
 }
@@ -975,15 +967,6 @@ noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
 
     TStorage layer(req.has_place() ? req.place() : CL->DefaultPlace(),
                    PORTO_LAYERS, req.layer());
-    error = CL->CanControlPlace(layer.Place);
-    if (error)
-        return error;
-    error = layer.Load();
-    if (error)
-        return error;
-    error = CL->CanControl(layer.Owner);
-    if (error)
-        return error;
     return layer.Remove();
 }
 
@@ -1119,15 +1102,6 @@ noinline TError RemoveStorage(const rpc::TStorageRemoveRequest &req) {
 
     TStorage storage(req.has_place() ? req.place() : CL->DefaultPlace(),
                      PORTO_STORAGE, req.name());
-    error = CL->CanControlPlace(storage.Place);
-    if (error)
-        return error;
-    error = storage.Load();
-    if (error)
-        return error;
-    error = CL->CanControl(storage.Owner);
-    if (error)
-        return error;
     return storage.Remove();
 }
 
@@ -1159,10 +1133,6 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
         return error;
 
     error = storage.Load();
-    if (error)
-        return error;
-
-    error = CL->CanControl(storage.Owner);
     if (error)
         return error;
 

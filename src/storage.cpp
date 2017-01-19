@@ -136,7 +136,7 @@ TError TStorage::CheckName(const std::string &name) {
     if (pos != std::string::npos)
         return TError(EError::InvalidValue, "forbidden character " +
                       StringFormat("%#x", (unsigned char)name[pos]));
-    if (name == "." || name == ".."||
+    if (name == "" || name == "." || name == ".."||
             StringStartsWith(name, LAYER_TMP) ||
             StringStartsWith(name, IMPORT_PREFIX) ||
             StringStartsWith(name, REMOVE_PREFIX) ||
@@ -198,6 +198,10 @@ TError TStorage::Load() {
     struct stat st;
     TError error;
     TFile priv;
+
+    error = CheckName(Name);
+    if (error)
+        return error;
 
     error = priv.Open(TempPath(PRIVATE_PREFIX),
                       O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW);
@@ -416,6 +420,14 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
     TFile dir, tar;
     TError error;
 
+    error = CheckName(Name);
+    if (error)
+        return error;
+
+    error = CL->CanControl(Owner);
+    if (error)
+        return error;
+
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
@@ -469,12 +481,24 @@ TError TStorage::Remove() {
     TPath temp;
     TError error;
 
+    error = CL->CanControlPlace(Place);
+    if (error && !StringStartsWith(Name, PORTO_WEAK_PREFIX))
+        return error;
+
     error = CheckName(Name);
     if (error)
         return error;
 
     error = CheckPlace(Place);
     if (error)
+        return error;
+
+    error = Load();
+    if (error)
+        return error;
+
+    error = CL->CanControl(Owner);
+    if (error && !StringStartsWith(Name, PORTO_WEAK_PREFIX))
         return error;
 
     auto lock = LockVolumes();

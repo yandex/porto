@@ -18,8 +18,6 @@ public:
              const std::string &name) :
         Path(place / type / name), Place(place), Type(type), Name(name) {}
 
-    TStorage(const TPath &path, const std::string &type) : Path(path), Type(type) {}
-
     static TError CheckName(const std::string &name);
     static TError CheckPlace(const TPath &place);
     static TError SanitizeLayer(const TPath &layer, bool merge);
