@@ -33,6 +33,15 @@ add_test(NAME python_api
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-api.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+if(EXISTS /usr/bin/go AND EXISTS /usr/share/gocode/src/github.com/golang/protobuf)
+add_test(NAME go_api
+         COMMAND go test -v api/go/porto
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(go_api
+                     PROPERTIES
+                     ENVIRONMENT GOPATH=${CMAKE_SOURCE_DIR}:/usr/share/gocode)
+endif()
+
 add_test(NAME recovery
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-recovery.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -128,12 +137,3 @@ set_tests_properties(python_api recovery security volume_backends volume_places
                      cpu_limit mem_limit fuzzer stats
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)
-
-if(EXISTS /usr/bin/go AND EXISTS /usr/share/gocode/src/github.com/golang/protobuf)
-add_test(NAME go_api
-         COMMAND go test -v api/go/porto
-         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_tests_properties(go_api
-                     PROPERTIES
-                     ENVIRONMENT GOPATH=${CMAKE_SOURCE_DIR}:/usr/share/gocode)
-endif()
