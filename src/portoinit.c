@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -40,6 +41,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
     }
 
+    prctl(PR_SET_DUMPABLE, 0);
     prctl(PR_SET_NAME, "portoinit");
 
     if (target >= 0) {
