@@ -18,25 +18,36 @@ PROJECT(yandex-porto)
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
 OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)
+OPTION(ENABLE_GCOV "Enables coverage" OFF)
 OPTION(USE_CLANG "Compile with clang" OFF)
 
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
 	set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -g")
-set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
-set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
-set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer --coverage")
-set(CMAKE_EXE_LINKER_FLAGS_DEBUG "--coverage")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -std=c++11 -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=c99 -g")
+
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer -gdwarf-4")
+set(CMAKE_C_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer -gdwarf-4")
+
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-set(CMAKE_INSTALL_PREFIX /usr)
+set(CMAKE_C_FLAGS_RELEASE "-O2")
+
+set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
+
+set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
 
 if(ENABLE_ASAN)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-common")
 	if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libasan")
 	endif()
+endif()
+
+if (ENABLE_GCOV)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 endif()
 
 if(USE_SYSTEM_LIBNL)
@@ -74,6 +85,8 @@ endif()
 enable_testing()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+set(CMAKE_INSTALL_PREFIX /usr)
 
 add_subdirectory(src)
 add_subdirectory(test)
