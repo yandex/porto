@@ -48,8 +48,6 @@ static int expectedRespawns;
 static int expectedErrors;
 static int expectedWarns;
 
-static bool needDaemonChecks;
-
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 

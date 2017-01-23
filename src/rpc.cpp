@@ -299,8 +299,7 @@ static TError CheckPortoWriteAccess() {
     return TError::Success();
 }
 
-static noinline TError CreateContainer(std::string reqName, bool weak,
-                                       rpc::TContainerResponse &rsp) {
+static noinline TError CreateContainer(std::string reqName, bool weak) {
     TError error = CheckPortoWriteAccess();
     if (error)
         return error;
@@ -327,8 +326,7 @@ static noinline TError CreateContainer(std::string reqName, bool weak,
     return error;
 }
 
-noinline TError DestroyContainer(const rpc::TContainerDestroyRequest &req,
-                                 rpc::TContainerResponse &rsp) {
+noinline TError DestroyContainer(const rpc::TContainerDestroyRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -336,8 +334,7 @@ noinline TError DestroyContainer(const rpc::TContainerDestroyRequest &req,
     return ct->Destroy();
 }
 
-static noinline TError StartContainer(const rpc::TContainerStartRequest &req,
-                                      rpc::TContainerResponse &rsp) {
+static noinline TError StartContainer(const rpc::TContainerStartRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -345,8 +342,7 @@ static noinline TError StartContainer(const rpc::TContainerStartRequest &req,
     return ct->Start();
 }
 
-noinline TError StopContainer(const rpc::TContainerStopRequest &req,
-                              rpc::TContainerResponse &rsp) {
+noinline TError StopContainer(const rpc::TContainerStopRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -356,8 +352,7 @@ noinline TError StopContainer(const rpc::TContainerStopRequest &req,
     return ct->Stop(timeout_ms);
 }
 
-noinline TError PauseContainer(const rpc::TContainerPauseRequest &req,
-                               rpc::TContainerResponse &rsp) {
+noinline TError PauseContainer(const rpc::TContainerPauseRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -366,8 +361,7 @@ noinline TError PauseContainer(const rpc::TContainerPauseRequest &req,
     return ct->Pause();
 }
 
-noinline TError ResumeContainer(const rpc::TContainerResumeRequest &req,
-                                rpc::TContainerResponse &rsp) {
+noinline TError ResumeContainer(const rpc::TContainerResumeRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -403,8 +397,7 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
     return error;
 }
 
-noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &req,
-                                     rpc::TContainerResponse &rsp) {
+noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &req) {
     std::string property = req.property();
     std::string value = req.value();
 
@@ -552,8 +545,7 @@ noinline TError ListData(rpc::TContainerResponse &rsp) {
     return TError::Success();
 }
 
-noinline TError Kill(const rpc::TContainerKillRequest &req,
-                     rpc::TContainerResponse &rsp) {
+noinline TError Kill(const rpc::TContainerKillRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (error)
@@ -708,8 +700,7 @@ noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
     return TError::Success();
 }
 
-noinline TError ListVolumeProperties(const rpc::TVolumePropertyListRequest &req,
-                                     rpc::TContainerResponse &rsp) {
+noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_volumepropertylist();
     for (auto &prop: VolumeProperties) {
         auto p = list->add_properties();
@@ -757,8 +748,7 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
     return TError::Success();
 }
 
-noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req,
-                           rpc::TContainerResponse &rsp) {
+noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
     TError error = CheckPortoWriteAccess();
     if (error)
         return error;
@@ -781,8 +771,7 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req,
     return volume->Tune(cfg);
 }
 
-noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req,
-                           rpc::TContainerResponse &rsp) {
+noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.has_container() ?
                                 req.container() : SELF_CONTAINER, ct, true);
@@ -801,8 +790,7 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req,
     return volume->LinkContainer(*ct);
 }
 
-noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req,
-                             rpc::TContainerResponse &rsp) {
+noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
     bool strict = req.has_strict() && req.strict();
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.has_container() ?
@@ -1160,51 +1148,51 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             L_ERR() << "Invalid request " << req.ShortDebugString() << " from " << *client << std::endl;
             error = TError(EError::InvalidMethod, "invalid request");
         } else if (req.has_create())
-            error = CreateContainer(req.create().name(), false, rsp);
+            error = CreateContainer(req.create().name(), false);
         else if (req.has_createweak())
-            error = CreateContainer(req.createweak().name(), true, rsp);
+            error = CreateContainer(req.createweak().name(), true);
         else if (req.has_destroy())
-            error = DestroyContainer(req.destroy(), rsp);
+            error = DestroyContainer(req.destroy());
         else if (req.has_list())
             error = ListContainers(req.list(), rsp);
         else if (req.has_getproperty())
             error = GetContainerProperty(req.getproperty(), rsp);
         else if (req.has_setproperty())
-            error = SetContainerProperty(req.setproperty(), rsp);
+            error = SetContainerProperty(req.setproperty());
         else if (req.has_getdata())
             error = GetContainerData(req.getdata(), rsp);
         else if (req.has_get())
             error = GetContainerCombined(req.get(), rsp);
         else if (req.has_start())
-            error = StartContainer(req.start(), rsp);
+            error = StartContainer(req.start());
         else if (req.has_stop())
-            error = StopContainer(req.stop(), rsp);
+            error = StopContainer(req.stop());
         else if (req.has_pause())
-            error = PauseContainer(req.pause(), rsp);
+            error = PauseContainer(req.pause());
         else if (req.has_resume())
-            error = ResumeContainer(req.resume(), rsp);
+            error = ResumeContainer(req.resume());
         else if (req.has_propertylist())
             error = ListProperty(rsp);
         else if (req.has_datalist())
             error = ListData(rsp);
         else if (req.has_kill())
-            error = Kill(req.kill(), rsp);
+            error = Kill(req.kill());
         else if (req.has_version())
             error = Version(rsp);
         else if (req.has_wait())
             error = Wait(req.wait(), rsp, client);
         else if (req.has_listvolumeproperties())
-            error = ListVolumeProperties(req.listvolumeproperties(), rsp);
+            error = ListVolumeProperties(rsp);
         else if (req.has_createvolume())
             error = CreateVolume(req.createvolume(), rsp);
         else if (req.has_linkvolume())
-            error = LinkVolume(req.linkvolume(), rsp);
+            error = LinkVolume(req.linkvolume());
         else if (req.has_unlinkvolume())
-            error = UnlinkVolume(req.unlinkvolume(), rsp);
+            error = UnlinkVolume(req.unlinkvolume());
         else if (req.has_listvolumes())
             error = ListVolumes(req.listvolumes(), rsp);
         else if (req.has_tunevolume())
-            error = TuneVolume(req.tunevolume(), rsp);
+            error = TuneVolume(req.tunevolume());
         else if (req.has_importlayer())
             error = ImportLayer(req.importlayer());
         else if (req.has_exportlayer())
