@@ -27,8 +27,9 @@ extern "C" {
 TClient SystemClient("<system>");
 __thread TClient *CL = nullptr;
 
-TClient::TClient() : TEpollSource(-1) {
+TClient::TClient(int fd) : TEpollSource(fd) {
     ConnectionTime = GetCurrentTimeMs();
+    ActivityTimeMs = ConnectionTime;
     Statistics->ClientsCount++;
 }
 
@@ -48,39 +49,12 @@ TClient::~TClient() {
     }
 }
 
-TError TClient::AcceptConnection(int listenFd) {
-    struct sockaddr_un peer_addr;
-    socklen_t peer_addr_size;
-    TError error;
-
-    peer_addr_size = sizeof(struct sockaddr_un);
-    Fd = accept4(listenFd, (struct sockaddr *) &peer_addr,
-                  &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
-    if (Fd < 0) {
-        error = TError(EError::Unknown, errno, "accept4()");
-        if (error.GetErrno() != EAGAIN)
-            L_WRN() << "Cannot accept client: " << error << std::endl;
-        return error;
-    }
-
-    error = IdentifyClient(true);
-    if (error) {
-        close(Fd);
-        Fd = -1;
-        return error;
-    }
-
-    if (Verbose)
-        L() << "Client connected: " << *this << std::endl;
-
-    return TError::Success();
-}
-
 void TClient::CloseConnection() {
     TScopedLock lock(Mutex);
 
     if (Fd >= 0) {
-        EpollLoop->RemoveSource(Fd);
+        if (InEpoll)
+            EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
         if (Verbose)
             L() << "Client disconnected: " << *this
@@ -101,6 +75,7 @@ void TClient::CloseConnection() {
 
 void TClient::StartRequest() {
     RequestStartMs = GetCurrentTimeMs();
+    ActivityTimeMs = RequestStartMs;
     PORTO_ASSERT(CL == nullptr);
     CL = this;
 }
@@ -154,11 +129,6 @@ TError TClient::IdentifyClient(bool initial) {
             ct->State != EContainerState::Starting &&
             ct->State != EContainerState::Meta)
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
-
-    if (ct->ClientsCount >= config().daemon().max_clients_in_container())
-        return TError(EError::ResourceNotAvailable,
-                "Count of clients from container " + ct->Name +
-                " has reached limit: " + std::to_string(ct->ClientsCount));
 
     if (ct->ClientsCount < 0)
         L_ERR() << "Client count underflow" << std::endl;
@@ -445,6 +415,8 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     else if (errno != EAGAIN && errno != EWOULDBLOCK)
         return TError(EError::Unknown, errno, "recv request failed");
 
+    ActivityTimeMs = GetCurrentTimeMs();
+
     if (Length && Offset < Length)
         return TError::Queued();
 
@@ -493,6 +465,8 @@ TError TClient::SendResponse(bool first) {
         return TError::Success();
     } else if (errno != EAGAIN && errno != EWOULDBLOCK)
         return TError(EError::Unknown, errno, "send response failed");
+
+    ActivityTimeMs = GetCurrentTimeMs();
 
     if (Offset >= Length) {
         Length = Offset = 0;

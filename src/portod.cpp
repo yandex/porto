@@ -265,11 +265,84 @@ retry:
     return 0;
 }
 
+static std::map<int, std::shared_ptr<TClient>> Clients;
+
+static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
+    uint64_t idle = config().daemon().client_idle_timeout() * 1000;
+    uint64_t now = GetCurrentTimeMs();
+    std::shared_ptr<TClient> victim;
+
+    for (auto &it: Clients) {
+        auto &client = it.second;
+
+        if (from && client->ClientContainer != from)
+            continue;
+
+        if (now - client->ActivityTimeMs > idle) {
+            victim = client;
+            idle = now - client->ActivityTimeMs;
+        }
+    }
+
+    if (!victim)
+        return TError(EError::ResourceNotAvailable,
+                      "All client slots are active: " +
+                      (from ? from->Name : "globally"));
+
+    L() << "Drop client " << *victim << " idle for " << idle << " ms" << std::endl;
+    Clients.erase(victim->Fd);
+    victim->CloseConnection();
+    return TError::Success();
+}
+
+static TError AcceptConnection(int listenFd) {
+    struct sockaddr_un peer_addr;
+    socklen_t peer_addr_size;
+    TError error;
+    int clientFd;
+
+    peer_addr_size = sizeof(struct sockaddr_un);
+    clientFd = accept4(listenFd, (struct sockaddr *) &peer_addr,
+                       &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
+    if (clientFd < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return TError::Success(); /* client already gone */
+        return TError(EError::Unknown, errno, "accept4()");
+    }
+
+    auto client = std::make_shared<TClient>(clientFd);
+    error = client->IdentifyClient(true);
+    if (error)
+        return error;
+
+    if (client->ClientContainer->ClientsCount >
+            config().daemon().max_clients_in_container()) {
+        error = DropIdleClient(client->ClientContainer);
+        if (error)
+            return error;
+    }
+
+    if (Statistics->ClientsCount > config().daemon().max_clients()) {
+        error = DropIdleClient();
+        if (error)
+            return error;
+    }
+
+    error = EpollLoop->AddSource(client);
+    if (error)
+        return error;
+
+    client->InEpoll = true; /* FIXME cleanup this cap */
+    Clients[client->Fd] = client;
+    if (Verbose)
+        L() << "Client connected: " << *client << std::endl;
+
+    return TError::Success();
+}
+
 static int SlaveRpc() {
     TRpcWorker worker(config().daemon().workers());
     int ret = 0;
-    std::map<int, std::shared_ptr<TClient>> clients;
-    bool accept_paused = false;
     TError error;
 
     auto AcceptSource = std::make_shared<TEpollSource>(PORTO_SK_FD);
@@ -312,17 +385,6 @@ static int SlaveRpc() {
     }
 
     while (true) {
-        if (accept_paused && clients.size() * 4 / 3 < config().daemon().max_clients()) {
-            L_WRN() << "Resume accepting connections" << std::endl;
-            error = EpollLoop->AddSource(AcceptSource);
-            if (error) {
-                L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
-                ret = EXIT_FAILURE;
-                goto exit;
-            }
-            accept_paused = false;
-        }
-
         error = EpollLoop->GetEvents(events, -1);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
@@ -381,21 +443,9 @@ static int SlaveRpc() {
                         break;
                 }
             } else if (source->Fd == PORTO_SK_FD) {
-                if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
-                    L_WRN() << "Pause accepting connections" << std::endl;
-                    EpollLoop->RemoveSource(AcceptSource->Fd);
-                    accept_paused = true;
-                    continue;
-                }
-
-                auto client = std::make_shared<TClient>();
-                error = client->AcceptConnection(PORTO_SK_FD);
-                if (!error)
-                    error = EpollLoop->AddSource(client);
-                if (!error)
-                    clients[client->Fd] = client;
+                error = AcceptConnection(source->Fd);
                 if (error)
-                    L() << "Drop client: " << error << std::endl;
+                    L() << "Cannot accept connection: " << error << std::endl;
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the
@@ -413,8 +463,8 @@ static int SlaveRpc() {
                     EventQueue->Add(0, e);
                 }
 
-            } else if (clients.find(source->Fd) != clients.end()) {
-                auto client = clients[source->Fd];
+            } else if (Clients.find(source->Fd) != Clients.end()) {
+                auto client = Clients[source->Fd];
 
                 if (ev.events & EPOLLIN) {
                     TRequest req {client};
@@ -435,7 +485,7 @@ static int SlaveRpc() {
 
                 if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) ||
                         (error && error.GetError() != EError::Queued)) {
-                    clients.erase(source->Fd);
+                    Clients.erase(source->Fd);
                     client->CloseConnection();
                 }
             } else {
@@ -449,9 +499,9 @@ exit:
     EventQueue->Stop();
     worker.Stop();
 
-    for (auto c : clients)
+    for (auto c : Clients)
         c.second->CloseConnection();
-    clients.clear();
+    Clients.clear();
 
     return ret;
 }

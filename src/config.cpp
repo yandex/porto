@@ -34,6 +34,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_portod_stop_timeout(30);
     config().mutable_daemon()->set_portod_start_timeout(60);
     config().mutable_daemon()->set_merge_memory_blkio_controllers(false);
+    config().mutable_daemon()->set_client_idle_timeout(60);
 
     config().mutable_container()->set_default_aging_time_s(60 * 60 * 24);
     config().mutable_container()->set_respawn_delay_ms(1000);

@@ -26,8 +26,10 @@ public:
     gid_t UserCtGroup = 0;
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;
+    uint64_t ActivityTimeMs = 0;
+    bool InEpoll = false;
 
-    TClient();
+    TClient(int fd);
     TClient(const std::string &special);
     ~TClient();
 
@@ -42,7 +44,6 @@ public:
     TError ReadAccess(const TFile &file);
     TError WriteAccess(const TFile &file);
 
-    TError AcceptConnection(int listenFd);
     void CloseConnection();
 
     void StartRequest();
