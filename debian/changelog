@@ -1,3 +1,16 @@
+yandex-porto (3.2.6) unstable; urgency=low
+
+  * test: move go_api upper
+  * storage: move permissions checks into operations
+  * porto: update compiler flags
+  * portoinit: disable core dumps
+  * rpc: remove unised arguments
+  * portod: drop idle client when new client hit connection limit
+  * client: client container could be null diring logging
+  * logging: print decoded commands in verbose mode
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 27 Jan 2017 18:12:55 +0300
+
 yandex-porto (3.2.5) unstable; urgency=low
 
   [ Maxim Samoylov ]
