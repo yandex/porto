@@ -88,7 +88,7 @@ private:
     uint64_t RequestStartMs = 0;
     bool Processing = false;
 
-    bool FullLog = true;
+    bool FirstLog = true;
 
     uint64_t Length = 0;
     uint64_t Offset = 0;

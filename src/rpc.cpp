@@ -1137,8 +1137,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     bool log = Verbose || !InfoRequest(req);
     if (log)
-        L_REQ() << RequestAsString(req) << " from " << *client
-                << " [" << client->ClientContainer->GetPortoNamespace() << "]" << std::endl;
+        L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
 
     rsp.set_error(EError::Unknown);
 

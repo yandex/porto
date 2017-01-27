@@ -312,6 +312,8 @@ static TError AcceptConnection(int listenFd) {
 
     auto client = std::make_shared<TClient>(clientFd);
     error = client->IdentifyClient(true);
+    if (Verbose)
+        L() << "Client connected: " << *client << std::endl;
     if (error)
         return error;
 
@@ -332,10 +334,8 @@ static TError AcceptConnection(int listenFd) {
     if (error)
         return error;
 
-    client->InEpoll = true; /* FIXME cleanup this cap */
+    client->InEpoll = true; /* FIXME cleanup this crap */
     Clients[client->Fd] = client;
-    if (Verbose)
-        L() << "Client connected: " << *client << std::endl;
 
     return TError::Success();
 }

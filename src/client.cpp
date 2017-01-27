@@ -22,7 +22,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-};
+}
 
 TClient SystemClient("<system>");
 __thread TClient *CL = nullptr;
@@ -111,6 +111,9 @@ TError TClient::IdentifyClient(bool initial) {
     TaskCred.Gid = cr.gid;
     Pid = cr.pid;
 
+    Cred = TaskCred;
+    Comm = GetTaskName(Pid);
+
     error = TContainer::FindTaskContainer(Pid, ct);
     if (error && error.GetErrno() != ENOENT)
         L_WRN() << "Cannot identify container of pid " << Pid
@@ -138,14 +141,9 @@ TError TClient::IdentifyClient(bool initial) {
     ClientContainer = ct;
     ct->ClientsCount++;
 
-    Comm = GetTaskName(Pid);
-
-    if (ct->IsRoot()) {
-        Cred = TaskCred;
-    } else {
-        /* requests from containers are executed in behalf of their owners */
+    /* requests from containers are executed in behalf of their owners */
+    if (!ct->IsRoot())
         Cred = ct->OwnerCred;
-    }
 
     (void)Cred.LoadGroups(Cred.User());
 
@@ -498,12 +496,21 @@ TError TClient::QueueResponse(rpc::TContainerResponse &response) {
 }
 
 std::ostream& operator<<(std::ostream& stream, TClient& client) {
-    if (client.FullLog) {
-        client.FullLog = false;
-        stream << client.Fd << ":" <<  client.Comm << "(" << client.Pid << ") "
-               << client.Cred << " " << client.ClientContainer->Name;
-    } else {
-        stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
+    stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
+
+    if (client.FirstLog) {
+        client.FirstLog = false;
+        stream << " " << client.TaskCred;
+        if (client.Cred.Uid != client.TaskCred.Uid ||
+                client.Cred.Gid != client.TaskCred.Gid)
+            stream << " owner " << client.Cred;
+        if (client.ClientContainer) {
+            stream << " from " << client.ClientContainer->Name;
+            auto ns = client.ClientContainer->GetPortoNamespace();
+            if (ns != "")
+                stream << " namespace " << ns;
+        }
     }
+
     return stream;
 }
