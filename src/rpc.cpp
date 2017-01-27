@@ -20,9 +20,6 @@ extern "C" {
 }
 
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
-    if (Verbose)
-        return req.ShortDebugString();
-
     if (req.has_create())
         return std::string("create ") + req.create().name();
     else if (req.has_createweak())
@@ -109,9 +106,6 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
 }
 
 static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
-    if (Verbose)
-        return resp.ShortDebugString();
-
     switch (resp.error()) {
     case EError::Success:
     {
@@ -224,7 +218,8 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     };
 }
 
-static bool InfoRequest(const rpc::TContainerRequest &req) {
+/* not logged in normal mode */
+static bool SilentRequest(const rpc::TContainerRequest &req) {
     return
         req.has_list() ||
         req.has_getproperty() ||
@@ -281,16 +276,19 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_exportstorage()  == 1;
 }
 
-static void SendReply(TClient &client, rpc::TContainerResponse &response, bool log) {
-    TError error = client.QueueResponse(response);
-    if (!error) {
-        if (log)
-            L_RSP() << ResponseAsString(response) << " to " << client
+static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent) {
+    if (!silent || Verbose)
+        L_RSP() << ResponseAsString(rsp) << " to " << client
                 << " (request took " << client.GetRequestTimeMs() << "ms)"
                 << std::endl;
-    } else {
-        L_WRN() << "Response error for " << client << " : " << error << std:: endl;
-    }
+
+    if (Verbose)
+        L_RSP() << rsp.ShortDebugString() << " to " << client << std::endl;
+
+    TError error = client.QueueResponse(rsp);
+    if (error)
+        L_WRN() << "Cannot send response for " << client
+                << " : " << error << std:: endl;
 }
 
 static TError CheckPortoWriteAccess() {
@@ -579,7 +577,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
         rpc::TContainerResponse response;
         response.set_error(error.GetError());
         response.mutable_wait()->set_name(name);
-        SendReply(*client, response, error || !name.empty());
+        SendReply(*client, response, !error && name.empty());
     };
 
     auto waiter = std::make_shared<TContainerWaiter>(client, fn);
@@ -1135,9 +1133,12 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     client->StartRequest();
 
-    bool log = Verbose || !InfoRequest(req);
-    if (log)
+    bool silent = SilentRequest(req);
+    if (!silent || Verbose)
         L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
+
+    if (Verbose)
+        L_REQ() << req.ShortDebugString() << " from " << *client << std::endl;
 
     rsp.set_error(EError::Unknown);
 
@@ -1237,6 +1238,11 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     if (error.GetError() != EError::Queued) {
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
-        SendReply(*client, rsp, log);
+
+        /* log failed silent requests */
+        if (silent && !Verbose && error)
+            L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
+
+        SendReply(*client, rsp, silent && !error);
     }
 }
