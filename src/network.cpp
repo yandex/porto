@@ -1574,16 +1574,18 @@ TError TNetCfg::PrepareNetwork() {
             TNetwork::AddNetwork(NetNs.GetInode(), Net);
         }
     } else if (NetCtName != "") {
+        if (!CL)
+            return TError(EError::Unknown, "No client for net container");
+
         std::shared_ptr<TContainer> target;
-        error = TContainer::Find(NetCtName, target);
+        auto lock = LockContainers();
+        error = CL->ResolveContainer(NetCtName, target);
         if (error)
             return error;
 
-        if (CL) {
-            error = CL->CanControl(*target);
-            if (error)
-                return TError(error, "net container " + NetCtName);
-        }
+        error = CL->CanControl(*target);
+        if (error)
+            return TError(error, "net container " + NetCtName);
 
         error = target->OpenNetns(NetNs);
         if (error)
