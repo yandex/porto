@@ -123,8 +123,9 @@ public:
     std::vector<TBindMount> BindMounts;
     TMultiTuple IpList;
     TCapabilities CapAmbient;   /* get at start */
-    TCapabilities CapAllowed;   /* can set as ambient */
+    TCapabilities CapAllowed;   /* can be set as ambient */
     TCapabilities CapLimit;     /* can get by suid */
+    TCapabilities CapBound;     /* can be set as limit */
     TMultiTuple DefaultGw;
     TTuple ResolvConf;
     TMultiTuple Devices;

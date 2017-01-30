@@ -295,6 +295,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     CapAmbient = NoCapabilities;
     CapAllowed = NoCapabilities;
     CapLimit = NoCapabilities;
+    CapBound = AllCapabilities;
 
     if (IsRoot())
         NsName = ROOT_PORTO_NAMESPACE;
@@ -1416,6 +1417,9 @@ void TContainer::SanitizeCapabilities() {
     for (auto p = Parent; p; p = p->Parent)
         limit.Permitted &= p->CapLimit.Permitted;
 
+    /* apply upper bound */
+    limit.Permitted &= CapBound.Permitted;
+
     /* update default bounding set */
     if (!HasProp(EProperty::CAPABILITIES))
         CapLimit = limit;
@@ -1461,6 +1465,16 @@ TError TContainer::StartTask() {
     if (error)
         return error;
 
+    if (Net == HostNetwork && !OwnerCred.IsRootUser() &&
+            (CapLimit.Permitted & NetNsCapabilities.Permitted) &&
+            (TaskCred.IsRootUser() || !RootPath.IsRoot())) {
+        if (HasProp(EProperty::CAPABILITIES))
+            return TError(EError::Permission, "Capabilities require isolated network");
+        L() << "Network is not isolated, capabilities are removed" << std::endl;
+        CapBound.Permitted &= ~NetNsCapabilities.Permitted;
+        SanitizeCapabilities();
+    }
+
     if (!IsRoot()) {
         /* After restart apply all set dynamic properties */
         memcpy(PropDirty, PropSet, sizeof(PropDirty));
@@ -1468,15 +1482,6 @@ TError TContainer::StartTask() {
         error = ApplyDynamicProperties();
         if (error)
             return error;
-    }
-
-    /* NetNsCapabilities must be isoalted from host net-namespace */
-    if (Net == HostNetwork && !CL->IsSuperUser()) {
-        if (CapAmbient.Permitted & NetNsCapabilities.Permitted)
-            return TError(EError::Permission, "Capabilities require net isolation: " +
-                                               NetNsCapabilities.Format());
-        if (VirtMode == VIRT_MODE_OS)
-            return TError(EError::Permission, "virt_mode=os must be isolated from host network");
     }
 
     /* Meta container without namespaces don't need task */
@@ -1562,6 +1567,14 @@ TError TContainer::Start() {
 
     (void)TaskCred.LoadGroups(TaskCred.User());
 
+    /* Setup bounding capabilities */
+    if (OwnerCred.IsRootUser())
+        CapBound = AllCapabilities;
+    else if (RootPath.IsRoot())
+        CapBound = SuidCapabilities;
+    else
+        CapBound = OsModeCapabilities;
+
     /* Check target task credentials */
     error = CL->CanControl(TaskCred);
     if (!error && !OwnerCred.IsMemberOf(TaskCred.Gid) && !CL->IsSuperUser()) {
@@ -1614,8 +1627,8 @@ TError TContainer::Start() {
             limited = limited || p->MemLimit;
         if (!limited && !HasProp(EProperty::CAPABILITIES) &&
                 !HasProp(EProperty::CAPABILITIES_AMBIENT)) {
-            L() << "No memory limit set, remove related capabilities" << std::endl;
-            CapLimit.Permitted &= ~MemCgCapabilities.Permitted;
+            L() << "No memory limit set, capabilities are removed" << std::endl;
+            CapBound.Permitted &= ~MemCgCapabilities.Permitted;
         } else if (!limited)
             return TError(EError::Permission, "Capabilities require memory limit");
     }
