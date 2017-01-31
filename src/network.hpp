@@ -115,6 +115,8 @@ public:
     static void InitializeConfig();
 
     static void RefreshNetworks();
+
+    static bool NamespaceSysctl(const std::string &key);
 };
 
 struct TMacVlanNetCfg {

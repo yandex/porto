@@ -50,6 +50,96 @@ static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
 
+static std::list<std::string> NetSysctls = {
+    "net.core.somaxconn",
+
+    "net.unix.max_dgram_qlen",
+
+    "net.ipv4.icmp_echo_ignore_all",
+    "net.ipv4.icmp_echo_ignore_broadcasts",
+    "net.ipv4.icmp_ignore_bogus_error_responses",
+    "net.ipv4.icmp_errors_use_inbound_ifaddr",
+    "net.ipv4.icmp_ratelimit",
+    "net.ipv4.icmp_ratemask",
+    "net.ipv4.ping_group_range",
+
+    "net.ipv4.tcp_ecn",
+    "net.ipv4.tcp_ecn_fallback",
+    "net.ipv4.ip_dynaddr",
+    "net.ipv4.ip_early_demux",
+    "net.ipv4.ip_default_ttl",
+
+    "net.ipv4.ip_local_port_range",
+    "net.ipv4.ip_local_reserved_ports",
+    "net.ipv4.ip_no_pmtu_disc",
+    "net.ipv4.ip_forward_use_pmtu",
+    "net.ipv4.ip_nonlocal_bind",
+    //"net.ipv4.fwmark_reflect",
+    //"net.ipv4.tcp_fwmark_accept",
+    "net.ipv4.tcp_mtu_probing",
+    "net.ipv4.tcp_base_mss",
+    "net.ipv4.tcp_probe_threshold",
+    "net.ipv4.tcp_probe_interval",
+
+    //"net.ipv4.igmp_link_local_mcast_reports",
+    //"net.ipv4.igmp_max_memberships",
+    //"net.ipv4.igmp_max_msf",
+    //"net.ipv4.igmp_qrv",
+
+    "net.ipv4.tcp_keepalive_time",
+    "net.ipv4.tcp_keepalive_probes",
+    "net.ipv4.tcp_keepalive_intvl",
+    "net.ipv4.tcp_syn_retries",
+    "net.ipv4.tcp_synack_retries",
+    "net.ipv4.tcp_syncookies",
+    "net.ipv4.tcp_reordering",
+    "net.ipv4.tcp_retries1",
+    "net.ipv4.tcp_retries2",
+    "net.ipv4.tcp_orphan_retries",
+    "net.ipv4.tcp_fin_timeout",
+    "net.ipv4.tcp_notsent_lowat",
+    "net.ipv4.tcp_tw_reuse",
+
+    "net.ipv6.bindv6only",
+    //"net.ipv6.anycast_src_echo_reply",
+    //"net.ipv6.flowlabel_consistency",
+    //"net.ipv6.auto_flowlabels",
+    //"net.ipv6.fwmark_reflect",
+    //"net.ipv6.idgen_retries",
+    //"net.ipv6.idgen_delay",
+    //"net.ipv6.flowlabel_state_ranges",
+    "net.ipv6.ip_nonlocal_bind",
+
+    "net.ipv6.icmp.ratelimit",
+
+    "net.ipv6.route.flush",
+    "net.ipv6.route.gc_thresh",
+    "net.ipv6.route.max_size",
+    "net.ipv6.route.gc_min_interval",
+    "net.ipv6.route.gc_timeout",
+    "net.ipv6.route.gc_interval",
+    "net.ipv6.route.gc_elasticity",
+    "net.ipv6.route.mtu_expires",
+    "net.ipv6.route.min_adv_mss",
+    "net.ipv6.route.gc_min_interval_ms",
+};
+
+bool TNetwork::NamespaceSysctl(const std::string &key) {
+    if (std::find(NetSysctls.begin(), NetSysctls.end(), key) != NetSysctls.end())
+        return true;
+    if (StringStartsWith(key, "net.ipv4.conf."))
+        return true;
+    if (StringStartsWith(key, "net.ipv6.conf."))
+        return true;
+    if (StringStartsWith(key, "net.ipv4.neigh.") &&
+            !StringStartsWith(key, "net.ipv4.neigh.default."))
+        return true;
+    if (StringStartsWith(key, "net.ipv6.neigh.") &&
+            !StringStartsWith(key, "net.ipv6.neigh.default."))
+        return true;
+    return false;
+}
+
 TNetworkDevice::TNetworkDevice(struct rtnl_link *link) {
     Name = rtnl_link_get_name(link);
     Type = rtnl_link_get_type(link) ?: "";
@@ -417,11 +507,6 @@ TError TNetwork::ConnectNew(TNamespaceFd &netns) {
         if (error)
             netns.Close();
     }
-
-    if (!error)
-        error = SetSysctl("net.ipv6.conf.all.accept_dad", "0");
-    if (!error)
-        error = SetSysctl("net.ipv6.conf.default.accept_dad", "0");
 
     TError error2 = my_netns.SetNs(CLONE_NEWNET);
     PORTO_ASSERT(!error2);

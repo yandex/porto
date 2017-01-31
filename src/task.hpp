@@ -24,6 +24,7 @@ struct TTaskEnv {
     std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;
     bool NewMountNs;
+    bool NewNetNs;
     std::vector<TCgroup> Cgroups;
     TCred Cred;
 
@@ -38,6 +39,7 @@ struct TTaskEnv {
     TError ChildApplyLimits();
     TError WriteResolvConf();
     TError SetHostname();
+    TError ApplySysctl();
 
     TError WaitAutoconf();
     TError ChildExec();

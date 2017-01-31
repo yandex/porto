@@ -6,6 +6,7 @@
 #include "task.hpp"
 #include "device.hpp"
 #include "config.hpp"
+#include "network.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/signal.hpp"
@@ -164,6 +165,45 @@ TError TTaskEnv::SetHostname() {
     return error;
 }
 
+TError TTaskEnv::ApplySysctl() {
+    TError error;
+
+    if (CT->Isolate) {
+        for (const auto &it: config().container().ipc_sysctl()) {
+            error = SetSysctl(it.key(), it.val());
+            if (error)
+                return error;
+        }
+    }
+
+    if (NewNetNs) {
+        for (const auto &it: config().container().net_sysctl()) {
+            error = SetSysctl(it.key(), it.val());
+            if (error)
+                return error;
+        }
+    }
+
+    for (const auto &it: CT->Sysctl) {
+        auto &key = it.first;
+
+        if (TNetwork::NamespaceSysctl(key)) {
+            if (!NewNetNs)
+                return TError(EError::Permission, "Sysctl " + key + " requires net isolation");
+        } else if (std::find(IpcSysctls.begin(), IpcSysctls.end(), key) != IpcSysctls.end()) {
+            if (!CT->Isolate)
+                return TError(EError::Permission, "Sysctl " + key + " requires ipc isolation");
+        } else
+            return TError(EError::Permission, "Sysctl " + key + " is not allowed");
+
+        error = SetSysctl(key, it.second);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 TError TTaskEnv::ConfigureChild() {
     TError error;
 
@@ -178,6 +218,16 @@ TError TTaskEnv::ConfigureChild() {
 
     if (NewMountNs) {
         error = Mnt.Setup();
+        if (error)
+            return error;
+    }
+
+    error = ApplySysctl();
+    if (error)
+        return error;
+
+    if (NewMountNs) {
+        error = Mnt.ProtectProc();
         if (error)
             return error;
     }

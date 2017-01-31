@@ -456,10 +456,6 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    error = ProtectProc();
-    if (error)
-        return error;
-
     if (config().container().enable_tracefs()) {
         error = MountTraceFs();
         if (error)

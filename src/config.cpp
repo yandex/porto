@@ -4,6 +4,7 @@
 #include "protobuf.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
+#include "util/namespace.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -11,6 +12,13 @@ extern "C" {
 }
 
 TConfig config;
+
+static void NetSysctl(const std::string &key, const std::string &val)
+{
+    auto sysctl = config().mutable_container()->add_net_sysctl();
+    sysctl->set_key(key);
+    sysctl->set_val(val);
+}
 
 void TConfig::LoadDefaults() {
     config().Clear();
@@ -83,6 +91,9 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_autoconf_timeout_s(120);
     config().mutable_network()->set_proxy_ndp(true);
     config().mutable_network()->set_watchdog_ms(60000);
+
+    NetSysctl("net.ipv6.conf.all.accept_dad", "0");
+    NetSysctl("net.ipv6.conf.default.accept_dad", "0");
 }
 
 bool TConfig::LoadFile(const std::string &path) {
@@ -101,6 +112,21 @@ bool TConfig::LoadFile(const std::string &path) {
     return true;
 }
 
+static void InitIpcSysctl() {
+    for (const auto &key: IpcSysctls) {
+        bool set = false;
+        for (const auto &it: config().container().ipc_sysctl())
+            set |= it.key() == key;
+        std::string val;
+        /* load default ipc sysctl from host config */
+        if (!set && !GetSysctl(key, val)) {
+            auto sysctl = config().mutable_container()->add_ipc_sysctl();
+            sysctl->set_key(key);
+            sysctl->set_val(val);
+        }
+    }
+}
+
 void TConfig::Load() {
     LoadDefaults();
 
@@ -111,6 +137,7 @@ void TConfig::Load() {
 
     InitCred();
     InitCapabilities();
+    InitIpcSysctl();
 }
 
 int TConfig::Test(const std::string &path) {

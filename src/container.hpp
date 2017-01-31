@@ -129,6 +129,7 @@ public:
     TMultiTuple DefaultGw;
     TTuple ResolvConf;
     TMultiTuple Devices;
+    TStringMap Sysctl;
 
     time_t RealCreationTime;
     time_t RealStartTime = 0;

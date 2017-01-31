@@ -68,6 +68,7 @@ constexpr const char *P_UMASK = "umask";
 constexpr const char *P_CONTROLLERS = "controllers";
 constexpr const char *P_OOM_IS_FATAL = "oom_is_fatal";
 constexpr const char *P_THREAD_LIMIT = "thread_limit";
+constexpr const char *P_SYSCTL = "sysctl";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
@@ -180,6 +181,7 @@ enum class EProperty {
     UMASK,
     CONTROLLERS,
     THREAD_LIMIT,
+    SYSCTL,
     NR_PROPERTIES,
 };
 

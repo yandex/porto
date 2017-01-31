@@ -514,8 +514,19 @@ TError TUnixSocket::SetRecvTimeout(int timeout_ms) const {
     return TError::Success();
 }
 
+TError GetSysctl(const std::string &name, std::string &value) {
+    std::string path = "/proc/sys/" + name;
+    /* all . -> / so abusing /../ is impossible */
+    std::replace(path.begin() + 10, path.end(), '.', '/');
+    TError error = TPath(path).ReadAll(value);
+    if (!error)
+        value = StringTrim(value);
+    return error;
+}
+
 TError SetSysctl(const std::string &name, const std::string &value) {
     std::string path = "/proc/sys/" + name;
+    /* all . -> / so abusing /../ is impossible */
     std::replace(path.begin() + 10, path.end(), '.', '/');
     L_ACT() << "Set sysctl " << name << " = " << value << std::endl;
     return TPath(path).WriteAll(value);

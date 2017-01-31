@@ -128,3 +128,22 @@ TError TNamespaceSnapshot::Enter() const {
         return error;
     return TError::Success();
 }
+
+std::list<std::string> IpcSysctls = {
+    "fs.mqueue.queues_max",
+    "fs.mqueue.msg_max",
+    "fs.mqueue.msgsize_max",
+    "fs.mqueue.msg_default",
+    "fs.mqueue.msgsize_default",
+
+    "kernel.shmmax",
+    "kernel.shmall",
+    "kernel.shmmni",
+    "kernel.shm_rmid_forced",
+
+    "kernel.msgmax",
+    "kernel.msgmni",
+    "kernel.msgmnb",
+
+    "kernel.sem",
+};

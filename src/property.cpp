@@ -3228,6 +3228,50 @@ public:
     }
 } static ThreadLimit;
 
+class TSysctlProperty : public TProperty {
+public:
+    TSysctlProperty() : TProperty(P_SYSCTL, EProperty::SYSCTL,
+                                  "sysctl: value;...") {}
+
+    TError Get(std::string &value) {
+        value = StringMapToString(CT->Sysctl);
+        return TError::Success();
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        auto it = CT->Sysctl.find(index);
+        if (it != CT->Sysctl.end())
+            value = it->second;
+        else
+            value = "";
+        return TError::Success();
+    }
+
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        TStringMap map;
+        error = StringToStringMap(value, map);
+        if (error)
+            return error;
+        CT->Sysctl = map;
+        CT->SetProp(EProperty::SYSCTL);
+        return TError::Success();
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        TError error;
+        if (value == "")
+            CT->Sysctl.erase(index);
+        else
+            CT->Sysctl[index] = value;
+        CT->SetProp(EProperty::SYSCTL);
+        return TError::Success();
+    }
+
+} static SysctlProperty;
+
 void InitContainerProperties(void) {
     for (auto prop: ContainerProperties)
         prop.second->Init();

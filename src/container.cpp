@@ -1376,8 +1376,10 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     if (NetCfg && NetCfg->NetNs.IsOpened())
         taskEnv->ParentNs.Net.EatFd(NetCfg->NetNs);
 
-    if (NetCfg)
+    if (NetCfg) {
         taskEnv->Autoconf = NetCfg->Autoconf;
+        taskEnv->NewNetNs = NetCfg->NewNetNs;
+    }
 
     if (IsMeta() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");

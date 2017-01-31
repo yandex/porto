@@ -41,3 +41,5 @@ public:
     TError Open(int pid);
     TError Enter() const;
 };
+
+extern std::list<std::string> IpcSysctls;
