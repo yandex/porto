@@ -2605,9 +2605,6 @@ TError TContainer::Respawn() {
 void TContainer::Event(const TEvent &event) {
     TError error;
 
-    if (Verbose)
-        L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
-
     auto lock = LockContainers();
     auto ct = event.Container.lock();
 
