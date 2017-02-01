@@ -180,6 +180,15 @@ struct TMount {
     std::string Type;
     std::string Options;
 
+    int MountId;
+    int ParentId;
+    dev_t Device;
+    TPath BindPath; /* path within filesystem */
+    uint64_t MntFlags;
+    std::vector<std::string> OptFields;
+
+    static std::string Demangle(const std::string &s);
+    TError ParseMountinfo(const std::string &line);
     bool HasOption(const std::string &option) const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {

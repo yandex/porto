@@ -711,6 +711,7 @@ TError TPath::Touch() const {
 
 const TFlagsNames TPath::MountFlags = {
     { MS_RDONLY,        "ro" },
+    { 0,                "rw" },
     { MS_NOSUID,        "nosuid" },
     { MS_NODEV,         "nodev" },
     { MS_NOEXEC,        "noexec" },
@@ -1000,6 +1001,81 @@ TError TPath::ListAllMounts(std::list<TMount> &list) {
         list.emplace_back(TMount{mnt->mnt_fsname, mnt->mnt_dir,
                                  mnt->mnt_type, mnt->mnt_opts});
     endmntent(file);
+    return TError::Success();
+}
+
+std::string TMount::Demangle(const std::string &s) {
+    std::string demangled;
+
+    for (unsigned int i = 0; i < s.size();) {
+        if (s[i] == '\\' && (i + 3 < s.size()) &&
+            ((s[i + 1] & ~7) == '0') &&
+            ((s[i + 2] & ~7) == '0') &&
+            ((s[i + 3] & ~7) == '0')) {
+
+            demangled.push_back(64 * (s[i + 1] & 7) + 8 * (s[i + 2] & 7) + (s[i + 3] & 7));
+            i += 4;
+
+        } else {
+            demangled.push_back(s[i]);
+            i++;
+        }
+    }
+
+    return demangled;
+}
+
+TError TMount::ParseMountinfo(const std::string &line) {
+    std::vector<std::string> tokens;
+    TError error;
+
+    error = SplitString(line, ' ', tokens, 7);
+    if (error || tokens.size() < 7)
+        return TError(error, "invalid mountinfo header");
+
+    error = StringToInt(tokens[0], MountId);
+    if (error)
+        return TError(error, "invalid mount id");
+
+    error = StringToInt(tokens[1], ParentId);
+    if (error)
+        return TError(error, "invalid parent id");
+
+    unsigned int maj, min;
+    if (sscanf(tokens[2].c_str(), "%u:%u", &maj, &min) != 2)
+        return TError(error, "invalid devno format");
+    Device = makedev(maj, min);
+
+    BindPath = TMount::Demangle(tokens[3]);
+    Target = TMount::Demangle(tokens[4]);
+
+    error = StringParseFlags(tokens[5], TPath::MountFlags, MntFlags, ',');
+    if (error)
+        return TError(error, "while parsing mountinfo flags");
+
+    std::string opt;
+    std::istringstream ss(tokens[6]);
+    ss.exceptions(std::ios_base::goodbit);
+
+    OptFields.clear();
+    while (std::getline(ss, opt, ' ') && (opt != "-"))
+        OptFields.push_back(opt);
+
+    if (opt != "-")
+        return TError(EError::Unknown, "optional delimiter not found");
+
+    if (!std::getline(ss, opt) || !opt.size())
+        return TError(EError::Unknown, "remainder missing");
+
+    tokens.clear();
+    error = SplitString(opt, ' ', tokens, 3);
+    if (error || tokens.size() < 3)
+        return TError(error, "invalid remainder format");
+
+    Type = TMount::Demangle(tokens[0]);
+    Source = TMount::Demangle(tokens[1]);
+    Options = TMount::Demangle(tokens[2]);
+
     return TError::Success();
 }
 

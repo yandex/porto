@@ -250,16 +250,31 @@ TError TProjectQuota::FindDevice() {
 	if (!Device.IsEmpty())
 		return TError::Success();
 
-	error = Path.FindMount(mount);
+	auto device = Path.GetDev();
+	if (!device)
+		return TError(EError::Unknown, "device not found: " + Path.ToString());
+
+	std::vector<std::string> lines;
+	error = TPath("/proc/self/mountinfo").ReadLines(lines, 1048576);
 	if (error)
 		return error;
 
-	if (mount.Type != "ext4")
-		return TError(EError::NotSupported, "Unsupported filesystem " + mount.Type);
+	/* find any writable non-bind mountpoint */
+	//FIXME check overmounted mountpoints, for example via GetMountId
+	for (auto &line : lines) {
+		if (!mount.ParseMountinfo(line) &&
+		    device == mount.Device &&
+		    mount.BindPath.IsRoot() &&
+		    !(mount.MntFlags & MS_RDONLY)) {
+			if (mount.Type != "ext4")
+				return TError(EError::NotSupported, "Unsupported filesystem " + mount.Type);
+			Device = mount.Source;
+			RootPath = mount.Target;
+			return TError::Success();
+		}
+	}
 
-	Device = mount.Source;
-	RootPath = mount.Target;
-	return TError::Success();
+	return TError(EError::Unknown, "mountpoint not found: " + Path.ToString());
 }
 
 bool TProjectQuota::Supported() {
