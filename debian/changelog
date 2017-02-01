@@ -1,3 +1,16 @@
+yandex-porto (3.2.7) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * network: resolve net=container ralative to the client
+  * network: remove network capabilities if not isolated from host
+  * porto: add property for tuning sysctl
+  * porto: silence too verbose event delivery
+
+  [ Maxim Samoylov ]
+  * util/quota: search /proc/self/mountinfo for quota mount point
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 01 Feb 2017 17:22:16 +0300
+
 yandex-porto (3.2.6) unstable; urgency=low
 
   * test: move go_api upper
