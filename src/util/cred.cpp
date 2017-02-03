@@ -405,9 +405,9 @@ TCapabilities PortoInitCapabilities;
 TCapabilities MemCgCapabilities;
 TCapabilities PidNsCapabilities;
 TCapabilities NetNsCapabilities;
-TCapabilities AppModeCapabilities;
-TCapabilities OsModeCapabilities;
-TCapabilities SuidCapabilities;
+TCapabilities HostCapAllowed;
+TCapabilities ChrootCapBound;
+TCapabilities HostCapBound;
 TCapabilities AllCapabilities;
 
 void InitCapabilities() {
@@ -425,26 +425,31 @@ void InitCapabilities() {
 
     AllCapabilities.Permitted = BIT(LastCapability + 1) - 1;
 
+    /* requires memory limit */
     MemCgCapabilities.Permitted =
         BIT(CAP_IPC_LOCK);
 
+    /* requires pid-namespace */
     PidNsCapabilities.Permitted =
         BIT(CAP_SYS_BOOT) |
         BIT(CAP_KILL) |
         BIT(CAP_SYS_PTRACE);
 
+    /* requires net-namespace */
     NetNsCapabilities.Permitted =
         BIT(CAP_NET_BIND_SERVICE) |
         BIT(CAP_NET_ADMIN) |
         BIT(CAP_NET_RAW);
 
-    AppModeCapabilities.Permitted =
+    /* possible ambient capabilities in host */
+    HostCapAllowed.Permitted =
         MemCgCapabilities.Permitted |
         PidNsCapabilities.Permitted |
         NetNsCapabilities.Permitted;
 
-    OsModeCapabilities.Permitted =
-        AppModeCapabilities.Permitted |
+    /* bounding set for chroot */
+    ChrootCapBound.Permitted =
+        HostCapAllowed.Permitted |
         BIT(CAP_CHOWN) |
         BIT(CAP_DAC_OVERRIDE) |
         BIT(CAP_FOWNER) |
@@ -455,8 +460,9 @@ void InitCapabilities() {
         BIT(CAP_MKNOD) |
         BIT(CAP_AUDIT_WRITE);
 
-    SuidCapabilities.Permitted =
-        OsModeCapabilities.Permitted |
+    /* bounding set for host */
+    HostCapBound.Permitted =
+        ChrootCapBound.Permitted |
         BIT(CAP_SETPCAP) |
         BIT(CAP_SETFCAP) |
         BIT(CAP_LINUX_IMMUTABLE) |

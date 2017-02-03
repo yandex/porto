@@ -300,11 +300,16 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
+    if (HasAmbientCapabilities)
+        L() << "Ambient capabilities: " << CT->CapAmbient << std::endl;
+
     error = CT->CapAmbient.ApplyAmbient();
     if (error)
         return error;
 
-    error = CT->CapLimit.ApplyLimit();
+    L() << "Capabilities: " << CT->CapBound << std::endl;
+
+    error = CT->CapBound.ApplyLimit();
     if (error)
         return error;
 

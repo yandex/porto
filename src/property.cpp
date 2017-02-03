@@ -119,30 +119,8 @@ public:
                           "Unsupported capability: " + limit.Format());
         }
 
-        TCapabilities bound;
-        if (CL->IsSuperUser())
-            bound = AllCapabilities;
-        else if (CT->VirtMode == VIRT_MODE_OS)
-            bound = OsModeCapabilities;
-        else
-            bound = SuidCapabilities;
-
-        /* host root user can allow any capabilities in its own containers */
-        if (!CL->IsSuperUser() || !CT->OwnerCred.IsRootUser()) {
-            for (auto p = CT->GetParent(); p; p = p->GetParent())
-                bound.Permitted &= p->CapLimit.Permitted;
-        }
-
-        if (limit.Permitted & ~bound.Permitted) {
-            limit.Permitted &= ~bound.Permitted;
-            return TError(EError::Permission,
-                          "Not allowed capability: " + limit.Format() +
-                          ", you can set only: " + bound.Format());
-        }
-
         CT->CapLimit = limit;
         CT->SetProp(EProperty::CAPABILITIES);
-        CT->SanitizeCapabilities();
         return TError::Success();
     }
 
@@ -184,10 +162,6 @@ public:
             caps.Permitted = CT->CapLimit.Permitted & ~caps.Permitted;
         return CommitLimit(caps);
     }
-    TError Start(void) {
-        CT->SanitizeCapabilities();
-        return TError::Success();
-    }
 } static Capabilities;
 
 class TCapAmbient : public TProperty {
@@ -210,28 +184,8 @@ public:
                           "Unsupported capability: " + ambient.Format());
         }
 
-        /* check allowed ambient capabilities */
-        TCapabilities limit = CT->CapAllowed;
-        if (ambient.Permitted & ~limit.Permitted &&
-                !CL->IsSuperUser()) {
-            ambient.Permitted &= ~limit.Permitted;
-            return TError(EError::Permission,
-                          "Not allowed capability: " + ambient.Format() +
-                          ", you can set only: " + limit.Format());
-        }
-
-        /* try to raise capabilities limit if required */
-        limit = CT->CapLimit;
-        if (ambient.Permitted & ~limit.Permitted) {
-            limit.Permitted |= ambient.Permitted;
-            error = Capabilities.CommitLimit(limit);
-            if (error)
-                return error;
-        }
-
         CT->CapAmbient = ambient;
         CT->SetProp(EProperty::CAPABILITIES_AMBIENT);
-        CT->SanitizeCapabilities();
         return TError::Success();
     }
 
@@ -708,7 +662,6 @@ TError TVirtMode::Set(const std::string &virt_mode) {
                       P_VIRT_MODE + ": " + virt_mode);
 
     CT->SetProp(EProperty::VIRT_MODE);
-    CT->SanitizeCapabilities();
 
     return TError::Success();
 }
@@ -993,8 +946,10 @@ public:
  "autoconf <name> (SLAAC) | "
  "netns <name>") {}
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET))
+        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET)) {
             CT->NetProp = { { "none" } };
+            CT->NetIsolate = true;
+        }
         return TError::Success();
     }
 } static Net;
@@ -1019,7 +974,7 @@ TError TNet::Set(const std::string &net_desc) {
     }
 
     CT->NetProp = new_net_desc; /* FIXME: Copy vector contents? */
-
+    CT->NetIsolate = cfg.NewNetNs;
     CT->SetProp(EProperty::NET);
     return TError::Success();
 }

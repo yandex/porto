@@ -295,7 +295,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     CapAmbient = NoCapabilities;
     CapAllowed = NoCapabilities;
     CapLimit = NoCapabilities;
-    CapBound = AllCapabilities;
+    CapBound = NoCapabilities;
 
     if (IsRoot())
         NsName = ROOT_PORTO_NAMESPACE;
@@ -753,13 +753,6 @@ std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
 
 std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
-}
-
-bool TContainer::IsolatedFromHost() const {
-    for (auto ct = this; ct; ct = ct->Parent.get())
-        if (ct->Isolate)
-            return true;
-    return false;
 }
 
 TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
@@ -1406,41 +1399,48 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 }
 
 void TContainer::SanitizeCapabilities() {
-    TCapabilities allowed, limit;
-
-    if (VirtMode == VIRT_MODE_OS) {
-        allowed = OsModeCapabilities;
-        limit = OsModeCapabilities;
-    } else {
-        allowed = AppModeCapabilities;
-        limit = SuidCapabilities;
-    }
-
-    for (auto p = Parent; p; p = p->Parent)
-        limit.Permitted &= p->CapLimit.Permitted;
-
-    /* apply upper bound */
-    limit.Permitted &= CapBound.Permitted;
-
-    /* update default bounding set */
-    if (!HasProp(EProperty::CAPABILITIES))
-        CapLimit = limit;
-
-    /* host root user can allow any capabilities in own containers */
     if (OwnerCred.IsRootUser()) {
-        allowed = AllCapabilities;
-        limit = AllCapabilities;
+        if (HasProp(EProperty::CAPABILITIES))
+            CapBound.Permitted = CapLimit.Permitted;
+        else
+            CapBound.Permitted = HostCapBound.Permitted;
+        CapAllowed.Permitted = CapBound.Permitted;
+    } else {
+        bool chroot = false;
+        bool pidns = false;
+        bool memcg = false;
+        bool netns = false;
+
+        CapBound = HostCapBound;
+
+        for (auto ct = this; ct; ct = ct->Parent.get()) {
+            chroot |= ct->Root != "/";
+            pidns |= ct->Isolate;
+            memcg |= ct->MemLimit;
+            netns |= ct->NetIsolate;
+
+            if (ct->HasProp(EProperty::CAPABILITIES))
+                CapBound.Permitted &= ct->CapLimit.Permitted;
+        }
+
+        TCapabilities remove;
+        if (!pidns)
+            remove.Permitted |= PidNsCapabilities.Permitted;
+        if (!memcg)
+            remove.Permitted |= MemCgCapabilities.Permitted;
+        if (!netns)
+            remove.Permitted |= NetNsCapabilities.Permitted;
+
+        if (chroot) {
+            CapBound.Permitted &= ChrootCapBound.Permitted & ~remove.Permitted;
+            CapAllowed.Permitted = CapBound.Permitted;
+        } else
+            CapAllowed.Permitted = HostCapAllowed.Permitted &
+                                   CapBound.Permitted & ~remove.Permitted;
     }
 
-    if (HasProp(EProperty::CAPABILITIES)) {
-        CapLimit.Permitted &= limit.Permitted;
-        limit.Permitted &= CapLimit.Permitted;
-    }
-
-    /* update ambient set */
-    allowed.Permitted &= limit.Permitted;
-    CapAllowed = allowed;
-    CapAmbient.Permitted &= allowed.Permitted;
+    if (!HasProp(EProperty::CAPABILITIES))
+        CapLimit.Permitted = CapBound.Permitted;
 }
 
 TStringMap TContainer::GetUlimit() const {
@@ -1466,16 +1466,6 @@ TError TContainer::StartTask() {
     error = PrepareNetwork(NetCfg);
     if (error)
         return error;
-
-    if (Net == HostNetwork && !OwnerCred.IsRootUser() &&
-            (CapLimit.Permitted & NetNsCapabilities.Permitted) &&
-            (TaskCred.IsRootUser() || !RootPath.IsRoot())) {
-        if (HasProp(EProperty::CAPABILITIES))
-            return TError(EError::Permission, "Capabilities require isolated network");
-        L() << "Network is not isolated, capabilities are removed" << std::endl;
-        CapBound.Permitted &= ~NetNsCapabilities.Permitted;
-        SanitizeCapabilities();
-    }
 
     if (!IsRoot()) {
         /* After restart apply all set dynamic properties */
@@ -1569,13 +1559,7 @@ TError TContainer::Start() {
 
     (void)TaskCred.LoadGroups(TaskCred.User());
 
-    /* Setup bounding capabilities */
-    if (OwnerCred.IsRootUser())
-        CapBound = AllCapabilities;
-    else if (RootPath.IsRoot())
-        CapBound = SuidCapabilities;
-    else
-        CapBound = OsModeCapabilities;
+    SanitizeCapabilities();
 
     /* Check target task credentials */
     error = CL->CanControl(TaskCred);
@@ -1600,42 +1584,13 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    TCapabilities cap = CapAmbient;
-
-    /* Root user has all allowed capabilities */
-    if (TaskCred.IsRootUser())
-        cap = CapLimit;
-
-    /* Host root user has everything for free */
-    if (OwnerCred.IsRootUser())
-        cap = NoCapabilities;
-
     /* Even without capabilities user=root require chroot */
     if (RootPath.IsRoot() && TaskCred.IsRootUser() && !OwnerCred.IsRootUser())
-        return TError(EError::Permission, "user=root without chroot");
+        return TError(EError::Permission, "user=root requires chroot");
 
-    /* Capabilities except AppMode require chroot too */
-    if (RootPath.IsRoot() && (cap.Permitted & ~AppModeCapabilities.Permitted))
-        return TError(EError::Permission, "Capabilities require chroot");
-
-    /*  PidNsCapabilities must be isolated from host pid-namespace */
-    if (!IsolatedFromHost() && (cap.Permitted & PidNsCapabilities.Permitted))
-        return TError(EError::Permission, "Capabilities require pid isolation");
-
-    /* MemCgCapabilities requires memory limit */
-    if (!MemLimit && (cap.Permitted & MemCgCapabilities.Permitted)) {
-        bool limited = false;
-        for (auto p = Parent; p; p = p->Parent)
-            limited = limited || p->MemLimit;
-        if (!limited && !HasProp(EProperty::CAPABILITIES) &&
-                !HasProp(EProperty::CAPABILITIES_AMBIENT)) {
-            L() << "No memory limit set, capabilities are removed" << std::endl;
-            CapBound.Permitted &= ~MemCgCapabilities.Permitted;
-        } else if (!limited)
-            return TError(EError::Permission, "Capabilities require memory limit");
-    }
-
-    SanitizeCapabilities();
+    if ((CapAmbient.Permitted & ~CapAllowed.Permitted) ||
+            (CapAmbient.Permitted & ~CapBound.Permitted))
+        return TError(EError::Permission, "Ambient capabilities out of bounds");
 
     /* Enforce place restictions */
     if (HasProp(EProperty::PLACE) && Parent) {

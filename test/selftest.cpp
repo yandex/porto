@@ -2503,8 +2503,6 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
 
     Say() << "Checking custom capabilities" << std::endl;
 
-    ExpectApiFailure(api.SetProperty(name, "capabilities", "SYS_RAWIO"), EError::Permission);
-
     ExpectApiSuccess(api.SetProperty(name, "capabilities", "CHOWN"));
 
     ExpectApiSuccess(api.Start(name));

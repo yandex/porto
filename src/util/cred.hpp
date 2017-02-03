@@ -66,7 +66,7 @@ struct TCred {
 void InitCapabilities();
 
 struct TCapabilities {
-    uint64_t Permitted;
+    uint64_t Permitted = 0;
 
     TError Parse(const std::string &str);
     std::string Format() const;
@@ -88,7 +88,7 @@ extern TCapabilities PortoInitCapabilities;
 extern TCapabilities MemCgCapabilities;
 extern TCapabilities PidNsCapabilities;
 extern TCapabilities NetNsCapabilities;
-extern TCapabilities AppModeCapabilities;
-extern TCapabilities OsModeCapabilities;
-extern TCapabilities SuidCapabilities;
+extern TCapabilities HostCapAllowed;
+extern TCapabilities ChrootCapBound;
+extern TCapabilities HostCapBound;
 extern TCapabilities AllCapabilities;

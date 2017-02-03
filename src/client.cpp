@@ -288,7 +288,7 @@ bool TClient::IsSuperUser(void) const {
 bool TClient::CanSetUidGid() const {
     /* loading capabilities by pid is racy, use container limits instead */
     if (TaskCred.IsRootUser())
-        return ClientContainer->CapLimit.HasSetUidGid();
+        return ClientContainer->CapBound.HasSetUidGid();
     return ClientContainer->CapAmbient.HasSetUidGid();
 }
 

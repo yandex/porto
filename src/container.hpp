@@ -117,6 +117,7 @@ public:
     int VirtMode;
     bool BindDns;
     bool Isolate;
+    bool NetIsolate = false;
     TMultiTuple NetProp;
     std::string Hostname;
     TTuple EnvCfg;
@@ -124,8 +125,8 @@ public:
     TMultiTuple IpList;
     TCapabilities CapAmbient;   /* get at start */
     TCapabilities CapAllowed;   /* can be set as ambient */
-    TCapabilities CapLimit;     /* can get by suid */
-    TCapabilities CapBound;     /* can be set as limit */
+    TCapabilities CapLimit;     /* upper limit */
+    TCapabilities CapBound;     /* actual bounding set */
     TMultiTuple DefaultGw;
     TTuple ResolvConf;
     TMultiTuple Devices;
@@ -255,7 +256,6 @@ public:
     void SanitizeCapabilities();
     uint64_t GetTotalMemGuarantee(bool locked = false) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
-    bool IsolatedFromHost() const;
 
     bool IsRoot() const { return !Level; }
     bool IsChildOf(const TContainer &ct) const;
