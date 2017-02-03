@@ -450,6 +450,8 @@ void InitCapabilities() {
     /* bounding set for chroot */
     ChrootCapBound.Permitted =
         HostCapAllowed.Permitted |
+        BIT(CAP_SETPCAP) |
+        BIT(CAP_SETFCAP) |
         BIT(CAP_CHOWN) |
         BIT(CAP_DAC_OVERRIDE) |
         BIT(CAP_FOWNER) |
@@ -463,8 +465,6 @@ void InitCapabilities() {
     /* bounding set for host */
     HostCapBound.Permitted =
         ChrootCapBound.Permitted |
-        BIT(CAP_SETPCAP) |
-        BIT(CAP_SETFCAP) |
         BIT(CAP_LINUX_IMMUTABLE) |
         BIT(CAP_SYS_ADMIN) |
         BIT(CAP_SYS_NICE) |

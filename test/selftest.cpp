@@ -3624,7 +3624,7 @@ static void TestVirtModeProperty(Porto::Connection &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "devices", "" },
-        { "capabilities", "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_BOOT;MKNOD;AUDIT_WRITE" },
+        { "capabilities", "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_BOOT;MKNOD;AUDIT_WRITE;SETFCAP" },
     };
     std::string s;
 
