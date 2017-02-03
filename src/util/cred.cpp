@@ -437,15 +437,15 @@ void InitCapabilities() {
 
     /* requires net-namespace */
     NetNsCapabilities.Permitted =
-        BIT(CAP_NET_BIND_SERVICE) |
-        BIT(CAP_NET_ADMIN) |
-        BIT(CAP_NET_RAW);
+        BIT(CAP_NET_ADMIN);
 
     /* possible ambient capabilities in host */
     HostCapAllowed.Permitted =
         MemCgCapabilities.Permitted |
         PidNsCapabilities.Permitted |
-        NetNsCapabilities.Permitted;
+        NetNsCapabilities.Permitted |
+        BIT(CAP_NET_BIND_SERVICE) | /* FIXME should require net-namespace */
+        BIT(CAP_NET_RAW);
 
     /* bounding set for chroot */
     ChrootCapBound.Permitted =
