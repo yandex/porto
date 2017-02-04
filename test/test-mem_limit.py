@@ -263,7 +263,7 @@ def LargeSimple(c, gap_size):
 def TestBody():
 
     if os.getuid() == 0:
-        DropPrivileges()
+        AsAlice()
 
     c = porto.Connection(timeout=30)
 
@@ -280,7 +280,7 @@ except BaseException as e:
     print traceback.format_exc()
     ret = 1
 
-SwitchRoot()
+AsRoot()
 c = porto.Connection(timeout=30)
 
 if ret > 0:

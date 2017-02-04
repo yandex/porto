@@ -6,6 +6,8 @@ import tarfile
 import shutil
 import time
 
+AsRoot()
+
 TMPDIR="/tmp/test_clear"
 LAYERS="/place/porto_layers"
 NAME="test-layer"
@@ -25,10 +27,6 @@ def CreateRecursive(path, k):
             new_path = path + "/" + str(i)
             os.mkdir(new_path)
             CreateRecursive(new_path, k + 1)
-
-
-if os.getuid() != 0:
-    SwitchRoot()
 
 c = porto.Connection(timeout=10)
 

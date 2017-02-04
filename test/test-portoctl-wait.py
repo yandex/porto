@@ -1,7 +1,7 @@
 import subprocess
 from test_common import *
 
-DropPrivileges()
+AsAlice()
 
 assert subprocess.call([portoctl, 'run', 'test-a', 'command=true']) == 0
 

@@ -5,7 +5,7 @@ import os
 import test_common
 from test_common import *
 
-DropPrivileges()
+AsAlice()
 
 c = porto.Connection()
 c.connect()

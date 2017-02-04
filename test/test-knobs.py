@@ -5,8 +5,7 @@ import subprocess
 import types
 from test_common import *
 
-if os.getuid() != 0:
-    SwitchRoot()
+AsAlice()
 
 c = porto.Connection(timeout=10)
 r = c.Create("test")

@@ -7,10 +7,7 @@ from test_common import *
 
 #TMPDIR="/tmp/test-uid_handling"
 
-if os.getuid() != 0:
-    SwitchRoot()
-
-SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+AsAlice()
 
 c = porto.Connection(timeout=30)
 
@@ -125,7 +122,7 @@ r.Destroy()
 #Check what if the owner will be root...
 
 c.disconnect()
-SwitchRoot()
+AsRoot()
 c.connect()
 
 #Usually porto-alice cannot run -W as porto-bob, but with owner_user == root solves everything

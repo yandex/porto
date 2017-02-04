@@ -2,7 +2,7 @@ import porto
 import test_common
 from test_common import *
 
-DropPrivileges()
+AsAlice()
 d = dict()
 c = porto.Connection()
 

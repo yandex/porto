@@ -11,7 +11,7 @@ import shutil
 import traceback
 from test_common import *
 
-def SwitchRoot():
+def AsRoot():
     os.setresuid(0,0,0)
 
 def ValidateDefaultProp(r):
@@ -124,7 +124,7 @@ def TestRecovery():
     print "Make sure we can restore stopped child when parent is dead"
 
     if os.getuid() == 0:
-        DropPrivileges()
+        AsAlice()
 
     c = porto.Connection(timeout=30)
 
@@ -137,10 +137,10 @@ def TestRecovery():
     child.Stop()
     parent.Wait(timeout=2000)
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetMasterPid(), signal.SIGKILL)
     subprocess.check_call([portod, "start"])
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     l = c.List()
@@ -156,10 +156,10 @@ def TestRecovery():
     r.SetProperty("command", "sleep 3")
     r.Start()
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetMasterPid(), signal.SIGKILL)
     subprocess.check_output([portod, "start"])
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     assert c.Wait(["a:b"]) == "a:b"
@@ -168,7 +168,7 @@ def TestRecovery():
     print "Make sure we don't kill containers when doing recovery"
 
     c.disconnect()
-    SwitchRoot()
+    AsRoot()
     c.connect()
 
     props = {"command" : "sleep 1000",\
@@ -200,7 +200,7 @@ def TestRecovery():
     c.Destroy("a:b")
 
     c.disconnect()
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     print "Make sure meta gets correct state upon recovery"
@@ -211,9 +211,9 @@ def TestRecovery():
     child.SetProperty("command", "sleep 1000")
     child.Start()
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     assert c.GetData("a", "state") == "meta"
@@ -228,9 +228,9 @@ def TestRecovery():
     child.SetProperty("command", "sleep 1000")
     child.Start()
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
     parent = c.Find("a")
     child = c.Find("a/b")
@@ -259,7 +259,7 @@ def TestRecovery():
     r.Start()
     pid = r.GetData("root_pid")
 
-    SwitchRoot()
+    AsRoot()
     open("/sys/fs/cgroup/memory/cgroup.procs","w").write(pid)
 
     for cg in open("/proc/" + pid + "/cgroup").readlines():
@@ -267,7 +267,7 @@ def TestRecovery():
             assert cg.split(":")[2].rstrip('\n') == "/"
 
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     pid = c.GetData("a_b", "root_pid")
@@ -296,9 +296,9 @@ def TestRecovery():
     assert r.GetData("exit_status") == "9"
     assert r.GetData("oom_killed")
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), 9)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     r = c.Find("a:b")
@@ -314,9 +314,9 @@ def TestRecovery():
     r.Start()
     r.Wait(timeout=10000)
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     r = c.Find("a:b")
@@ -329,9 +329,9 @@ def TestRecovery():
     ValidateDefaultProp(r)
     ValidateDefaultData(r)
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     r = c.Find("a:b")
@@ -353,9 +353,9 @@ def TestRecovery():
     r.Pause()
     assert GetState(r.GetData("root_pid")) != ""
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     assert GetState(r.GetData("root_pid")) != ""
@@ -380,9 +380,9 @@ def TestRecovery():
 
     RespawnTicks(r)
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c.connect()
 
     RespawnTicks(r)
@@ -401,9 +401,9 @@ def TestRecovery():
     #assert Catch(c.Create, "max_plus_one") == porto.exceptions.ResourceNotAvailable
 
     c.disconnect()
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
-    SwitchUser("porto-alice", *GetUidGidByUsername("porto-alice"))
+    AsAlice()
     c = porto.Connection(timeout=300)
 
     assert len(c.List()) == n
@@ -422,7 +422,7 @@ def TestWaitRecovery():
     print "Check wait for restored container"
 
     if os.getuid() == 0:
-        DropPrivileges()
+        AsAlice()
 
     c = porto.Connection(timeout=30)
 
@@ -430,7 +430,7 @@ def TestWaitRecovery():
     aaa.SetProperty("command", "sleep 3")
     aaa.Start()
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
     c.connect()
 
@@ -445,7 +445,7 @@ def TestWaitRecovery():
     aaa.SetProperty("command", "sleep 3")
     aaa.Start()
 
-    SwitchRoot()
+    AsRoot()
     KillPid(GetMasterPid(), signal.SIGKILL)
     subprocess.check_call([portod, "start"])
     c.connect()
@@ -460,7 +460,7 @@ def TestVolumeRecovery():
     print "Make sure porto removes leftover volumes"
 
     if os.getpid() != 0:
-        SwitchRoot()
+        AsRoot()
 
     c = porto.Connection(timeout=30)
 
@@ -510,7 +510,7 @@ def TestVolumeRecovery():
 def TestTCCleanup():
     print "Make sure stale tc classes to be cleaned up"
 
-    SwitchRoot()
+    AsRoot()
 
     c = porto.Connection(timeout=30)
 
@@ -584,7 +584,7 @@ def TestPersistentStorage():
     print "Verifying volume persistent storage behavior"
 
     if os.getuid() == 0:
-        DropPrivileges()
+        AsAlice()
 
     c = porto.Connection(timeout=30)
 
@@ -598,9 +598,9 @@ def TestPersistentStorage():
     r.Wait()
     assert r.GetProperty("exit_status") == "0"
 
-    SwitchRoot()
+    AsRoot()
     subprocess.check_call([portod, "restart"])
-    DropPrivileges()
+    AsAlice()
 
     assert len(c.ListStorage()) == 1
     r = c.Create("test")
@@ -623,9 +623,9 @@ def TestPersistentStorage():
     r.Wait()
     r.GetProperty("exit_status") == "0"
 
-    SwitchRoot()
+    AsRoot()
     subprocess.check_call([portod, "restart"])
-    DropPrivileges()
+    AsAlice()
 
     assert len(c.ListStorage()) == 2
     r = c.Create("test")
@@ -653,9 +653,9 @@ def TestPersistentStorage():
     r.Wait()
     assert r.GetProperty("exit_status") == "0"
 
-    SwitchRoot()
+    AsRoot()
     subprocess.check_call([portod, "restart"])
-    DropPrivileges()
+    AsAlice()
     assert len(c.ListStorage()) == 2
 
     r = c.Create("test")
@@ -686,9 +686,9 @@ def TestPersistentStorage():
     f.write("testtesttest")
     f.close()
 
-    SwitchRoot()
+    AsRoot()
     subprocess.check_call([portod, "restart"])
-    DropPrivileges()
+    AsAlice()
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native")
     assert len(c.ListStorage(place="/tmp/test-recover-place")) == 1
@@ -717,7 +717,7 @@ except BaseException as e:
     print traceback.format_exc()
     ret = 1
 
-SwitchRoot()
+AsRoot()
 c = porto.Connection(timeout=30)
 
 for r in c.ListContainers():

@@ -34,9 +34,6 @@ def run_streams(r):
 
 
 def std_streams_escalation():
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-    (bob_uid, bob_gid) = GetUidGidByUsername("porto-bob")
-
     Catch(os.remove,"/tmp/porto-tests/root-secret")
     Catch(os.remove,"/tmp/porto-tests/porto-alice-stdin")
 
@@ -45,7 +42,7 @@ def std_streams_escalation():
     os.fchmod(f.fileno(), 0600)
     f.close()
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
 
     f = open("/tmp/porto-tests/porto-alice-stdin", "w+")
     f.write("123456")
@@ -57,7 +54,7 @@ def std_streams_escalation():
     #run under user
     run_streams(r)
 
-    SwitchRoot()
+    AsRoot()
 
     c = porto.Connection()
     r = c.Find("test")
@@ -65,7 +62,7 @@ def std_streams_escalation():
     #run under root
     run_streams(r)
 
-    SwitchRoot()
+    AsRoot()
     c.Destroy("test")
     os.remove("/tmp/porto-tests/root-secret")
     os.remove("/tmp/porto-tests/porto-alice-stdin")
@@ -98,8 +95,6 @@ def ns_escape_container():
     sys.stdout.flush()
 
 def ns_escape(v):
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-
     try:
         os.remove("/tmp/porto-tests/root-secret")
     except:
@@ -110,7 +105,7 @@ def ns_escape(v):
     f.close()
     os.chmod("/tmp/porto-tests/root-secret", 0600)
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
 
     c = porto.Connection()
 
@@ -154,7 +149,7 @@ def ns_escape(v):
     assert output["parent"]["stdout"] == "OK\n"
     assert output["parent/child"]["stdout"] == "OK"
 
-    SwitchRoot()
+    AsRoot()
 
     c.Destroy("parent")
     os.unlink("/tmp/porto-tests/root-secret")
@@ -184,12 +179,9 @@ def append_passwd():
 
 
 def binds_escalation(v):
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-    (bob_uid, bob_gid) = GetUidGidByUsername("porto-bob")
-
     c = porto.Connection()
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
     c = porto.Connection()
     r = c.Create("bind_file")
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
@@ -212,7 +204,7 @@ def binds_escalation(v):
     assert Catch(r.Start) == porto.exceptions.PermissionError
 
     r.Destroy()
-    SwitchRoot()
+    AsRoot()
 
     os.mkdir("/tmp/porto-tests/dir1")
     os.chmod("/tmp/porto-tests/dir1", 0777)
@@ -222,7 +214,7 @@ def binds_escalation(v):
     os.chmod("/tmp/porto-tests/dir-bob", 0700)
     os.chown("/tmp/porto-tests/dir-bob", bob_uid, bob_gid)
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
 
     f = open("/tmp/porto-tests/dir1/file", "w+")
     f.write("123456")
@@ -240,7 +232,7 @@ def binds_escalation(v):
     assert Catch(r.Start) == porto.exceptions.PermissionError
 
     c.Destroy("test")
-    SwitchRoot()
+    AsRoot()
 
 #privilege escalation for requests from inside the porto container w virt_mode=="os"
 
@@ -250,11 +242,9 @@ def internal_escalation_container():
 
 
 def internal_escalation(v):
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-
     c = porto.Connection(timeout=120)
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
     c = porto.Connection()
     r = c.Create("test_cont1")
     r.SetProperty("virt_mode", "os")
@@ -270,7 +260,7 @@ def internal_escalation(v):
 
     r.Destroy()
     c.Destroy("test_cont2")
-    SwitchRoot()
+    AsRoot()
 
 #porto_namespace escape
 
@@ -280,9 +270,7 @@ def porto_namespace_escape_container():
 
 
 def porto_namespace_escape(v):
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
 
     c = porto.Connection()
     r = c.Create("test")
@@ -300,7 +288,7 @@ def porto_namespace_escape(v):
 
     r.Destroy()
 
-    SwitchRoot()
+    AsRoot()
 
 #layers privilege escalation/escape
 
@@ -356,11 +344,9 @@ def layer_escalation_volume_container():
 
 
 def layer_escalation(v):
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-
     c = porto.Connection(timeout=120)
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
     c = porto.Connection()
     r = c.Create("test")
     r.SetProperty("root", v.path)
@@ -378,13 +364,13 @@ def layer_escalation(v):
 
     r.Destroy()
 
-    SwitchRoot()
+    AsRoot()
 
     f = open("/tmp/porto-tests/good_file", "w")
     f.write("I am a duck")
     f.close()
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
     c = porto.Connection()
     r = c.Create("test")
 
@@ -403,7 +389,7 @@ def layer_escalation(v):
 
     r.Destroy()
 
-    SwitchRoot()
+    AsRoot()
 
 
 if len(sys.argv) > 1:
@@ -411,8 +397,7 @@ if len(sys.argv) > 1:
     exit(0)
 
 
-if os.getuid() != 0:
-    SwitchRoot()
+AsRoot()
 
 c = porto.Connection(timeout=120)
 

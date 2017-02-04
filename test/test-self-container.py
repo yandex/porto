@@ -2,7 +2,7 @@ import porto
 import subprocess
 from test_common import *
 
-DropPrivileges()
+AsAlice()
 conn = porto.Connection()
 assert conn.GetData('self', 'absolute_name') == "/"
 

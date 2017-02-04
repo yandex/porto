@@ -8,8 +8,7 @@ import traceback
 import porto
 from test_common import *
 
-if os.getuid() != 0:
-    SwitchRoot()
+AsRoot()
 
 c = porto.Connection(timeout=300)
 

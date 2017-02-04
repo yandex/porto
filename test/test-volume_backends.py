@@ -279,8 +279,6 @@ def backend_quota(c):
     assert Catch(check_mounted, c, None, **args) == porto.exceptions.InvalidProperty
     assert Catch(check_mounted, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
 
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
-
     args["space_limit"] = "1M"
     check_mounted(c, TMPDIR, **args)
     assert Catch(check_readonly, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
@@ -292,12 +290,12 @@ def backend_quota(c):
     os.remove(TMPDIR + "/file.zeroes")
 
     os.chown(TMPDIR, alice_uid, alice_gid)
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
     c = porto_reconnect(c)
 
     check_tune_space_limit(c, TMPDIR, **args)
 
-    SwitchRoot()
+    AsRoot()
     c = porto_reconnect(c)
 
     assert Catch(check_tune_inode_limit, c, TMPDIR, **args) == AssertionError
@@ -305,14 +303,14 @@ def backend_quota(c):
     for i in os.listdir(TMPDIR):
         os.remove(TMPDIR + "/" + i)
 
-    SwitchUser("porto-alice", alice_uid, alice_gid)
+    AsAlice()
     c = porto_reconnect(c)
 
     check_tune_inode_limit(c, TMPDIR, **args)
 
     assert Catch(check_layers, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
 
-    SwitchRoot()
+    AsRoot()
     c = porto_reconnect(c)
 
     args["space_limit"] = "1M"
@@ -329,7 +327,6 @@ def backend_native(c):
 
     TMPDIR = DIR + "/" + args["backend"]
     os.mkdir(TMPDIR)
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
     os.chown(TMPDIR, alice_uid, alice_gid)
 
     for path in [None, TMPDIR]:
@@ -338,11 +335,11 @@ def backend_native(c):
         check_mounted(c, path, **args)
         check_destroy_linked_non_root(c, path, **args)
 
-        SwitchUser("porto-alice", alice_uid, alice_gid)
+        AsAlice()
         c = porto_reconnect(c)
         check_tune_space_limit(c, path, **args)
         check_tune_inode_limit(c, path, **args)
-        SwitchRoot()
+        AsRoot()
         c = porto_reconnect(c)
         check_layers(c, path, **args)
 
@@ -470,7 +467,6 @@ def backend_overlay(c):
 
     TMPDIR = DIR + "/" + args["backend"]
     os.mkdir(TMPDIR)
-    (alice_uid, alice_gid) = GetUidGidByUsername("porto-alice")
     os.chown(TMPDIR, alice_uid, alice_gid)
 
     for path in [None, TMPDIR]:
@@ -479,13 +475,13 @@ def backend_overlay(c):
         check_mounted(c, path, **args)
         check_destroy_linked_non_root(c, path, **args)
 
-        SwitchUser("porto-alice", alice_uid, alice_gid)
+        AsAlice()
         c = porto_reconnect(c)
         copyup_quota(path)
         opaque_xattr(path)
         check_tune_space_limit(c, path, **args)
         check_tune_inode_limit(c, path, **args)
-        SwitchRoot()
+        AsRoot()
         c = porto_reconnect(c)
 
         (r,v) = check_layers(c, path, False, **args)
@@ -541,9 +537,7 @@ def backend_rbd():
     #Not implemented yet
     pass
 
-
-if os.getuid() != 0:
-    SwitchRoot()
+AsRoot()
 
 Catch(shutil.rmtree, DIR)
 os.mkdir(DIR)
@@ -585,7 +579,7 @@ except BaseException as e:
     print traceback.format_exc()
     ret = 1
 
-SwitchRoot()
+AsRoot()
 c = porto_reconnect(c)
 
 if ret > 0:

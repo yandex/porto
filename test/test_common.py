@@ -13,26 +13,41 @@ def Catch(func, *args, **kwargs):
         return sys.exc_info()[0]
     return None
 
+alice_uid=pwd.getpwnam("porto-alice").pw_uid
+alice_gid=grp.getgrnam("porto-alice").gr_gid
+
+bob_uid=pwd.getpwnam("porto-bob").pw_uid
+bob_gid=grp.getgrnam("porto-bob").gr_gid
+
+charlie_uid=pwd.getpwnam("porto-charlie").pw_uid
+charlie_gid=grp.getgrnam("porto-charlie").gr_gid
+
+david_uid=pwd.getpwnam("porto-david").pw_uid
+david_gid=grp.getgrnam("porto-david").gr_gid
+
+porto_gid=grp.getgrnam("porto").gr_gid
+
+def AsRoot():
+    os.setresgid(0, 0, 0)
+    os.setresuid(0, 0, 0)
+    os.setgroups([0])
+
 def SwitchUser(username, uid, gid):
-    os.initgroups(username, gid)
-    os.setresgid(gid,gid,0)
-    os.setresuid(uid,uid,0)
+    os.initgroups(username, uid)
+    os.setresgid(gid, gid, 0)
+    os.setresuid(uid, uid, 0)
 
-def SwitchRoot():
-    (ruid, euid, suid) = os.getresuid()
-    if suid == 0:
-        os.setuid(0)
-        os.setgid(0)
-    else:
-        raise Exception("Cannot switch on root user")
+def AsAlice():
+    SwitchUser("porto-alice", alice_uid, alice_gid)
 
-def DropPrivileges():
-    if os.getuid() == 0:
-        SwitchUser("porto-alice", pwd.getpwnam("porto-alice").pw_uid,
-                   grp.getgrnam("porto-alice").gr_gid)
+def AsBob():
+    SwitchUser("porto-bob", bob_uid, bob_gid)
 
-def GetUidGidByUsername(username):
-    return (pwd.getpwnam(username).pw_uid, grp.getgrnam(username).gr_gid)
+def AsCharlie():
+    SwitchUser("porto-charlie", charlie_uid, charlie_gid)
+
+def AsDavid():
+    SwitchUser("porto-david", david_uid, david_gid)
 
 def GetSlavePid():
     pid = int(open("/run/portod.pid").read())

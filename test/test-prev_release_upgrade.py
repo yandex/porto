@@ -5,8 +5,7 @@ import shutil
 import time
 from test_common import *
 
-if os.getuid() != 0:
-    SwitchRoot()
+AsRoot()
 
 TMPDIR = "/tmp/test-release-upgrade"
 PORTOD_PATH = "/run/portod"

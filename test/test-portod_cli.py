@@ -2,8 +2,7 @@ import os
 import subprocess
 from test_common import *
 
-if os.getuid() != 0:
-    SwitchRoot()
+AsRoot()
 
 TMPDIR = "/tmp/test-portod-cli"
 TMPDIR_BIN = TMPDIR + "/portod_patched"
