@@ -6,6 +6,8 @@ import tarfile
 import shutil
 import time
 
+from test_common import *
+
 AsRoot()
 
 TMPDIR="/tmp/test_clear"
