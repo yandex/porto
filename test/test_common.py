@@ -13,6 +13,13 @@ def Catch(func, *args, **kwargs):
         return sys.exc_info()[0]
     return None
 
+def ExpectEq(a, b):
+    assert a == b, "{} should be equal {}".format(a, b)
+
+def ExpectProp(ct, prop, val):
+    cur = ct.GetProperty(prop)
+    assert cur == val, "{} property {} should be {} not {}".format(ct, prop, val, cur)
+
 alice_uid=pwd.getpwnam("porto-alice").pw_uid
 alice_gid=grp.getgrnam("porto-alice").gr_gid
 

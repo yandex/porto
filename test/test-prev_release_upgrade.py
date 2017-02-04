@@ -48,29 +48,20 @@ def CheckCaps(r, new_porto):
                 "SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;SYS_NICE;SYS_RESOURCE;"\
                 "MKNOD;AUDIT_WRITE;SETFCAP"
 
-    os_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;"\
+    os_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"\
               "NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;"\
-              "SYS_PTRACE;SYS_BOOT;MKNOD;AUDIT_WRITE"
+              "SYS_PTRACE;SYS_BOOT;MKNOD;AUDIT_WRITE;SETFCAP"
 
-    legacy_os_caps = "AUDIT_CONTROL; AUDIT_READ; AUDIT_WRITE; BLOCK_SUSPEND; CHOWN; "\
-                     "DAC_OVERRIDE; DAC_READ_SEARCH; FOWNER; FSETID; IPC_LOCK; IPC_OWNER; "\
-                     "KILL; LEASE; LINUX_IMMUTABLE; MAC_ADMIN; MAC_OVERRIDE; MKNOD; "\
-                     "NET_ADMIN; NET_BIND_SERVICE; NET_BROADCAST; NET_RAW; SETFCAP; "\
-                     "SETGID; SETPCAP; SETUID; SYSLOG; SYS_ADMIN; SYS_BOOT; SYS_CHROOT; "\
-                     "SYS_MODULE; SYS_NICE; SYS_PACCT; SYS_PTRACE; SYS_RAWIO; SYS_RESOURCE; "\
-                     "SYS_TIME; SYS_TTY_CONFIG; WAKE_ALARM"
+    legacy_os_caps = "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_PTRACE; SYS_RESOURCE"
 
     if r.GetProperty("virt_mode") == "app":
         caps = app_caps if new_porto else ""
-        value = r.GetProperty("capabilities")
-        assert value == caps
-
     elif r.GetProperty("virt_mode") == "os":
         caps = os_caps if new_porto else legacy_os_caps
-        assert r.GetProperty("capabilities") == caps
-
     else:
         raise AssertionError("Found unexpected virt_mode value")
+
+    ExpectProp(r, "capabilities", caps)
 
 #FIXME: remove it in ther future
 def PropTrim(prop):
@@ -163,6 +154,8 @@ time.sleep(1)
 
 oldver = subprocess.check_output([portod, "--version"]).split()[6]
 
+AsAlice()
+
 c = porto.Connection(timeout=3)
 c.Create("test")
 c.SetProperty("test", "command", "sleep 5")
@@ -178,7 +171,6 @@ parent_knobs = [
     ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; "\
                "nofile: 100 200; nproc: 500 1000"),
     ("isolate", True),
-    ("user", "porto-alice"),
     ("env", "CONTAINER=porto;PARENT=1")
 ]
 
@@ -204,7 +196,6 @@ app_knobs = [
                ),
     ("io_limit", "300000"),
     ("isolate", False),
-    ("user", "porto-alice"),
     ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
 ]
 
@@ -227,6 +218,7 @@ os_knobs = [
     ("hostname", "shiny_os_container"),
     ("root_readonly", False),
     ("cpu_policy", "normal"),
+    ("memory_limit", "1024000000"),
     ("command", "/sbin/init"),
     ("env", "VIRT_MODE=os;BIND=;HOSTNAME=shiny_new_container;"\
             "ROOT_READONLY=false;CPU_POLICY=normal;COMMAND=/sbin/init;"\
@@ -249,7 +241,6 @@ rt_parent_knobs = [
     ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; "\
                "nofile: 100 200; nproc: 500 1000"),
     ("isolate", True),
-    ("user", "porto-alice"),
     ("env", "CONTAINER=porto;PARENT=1")
 ]
 
@@ -275,7 +266,6 @@ rt_app_knobs = [
                ),
     ("recharge_on_pgfault", True),
     ("isolate", False),
-    ("user", "porto-alice"),
     ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
 ]
 
@@ -288,6 +278,8 @@ legacy_rt_settings = DumpLegacyRt(r)
 
 c.disconnect()
 
+AsRoot()
+
 os.unlink(PORTOD_PATH)
 os.symlink(portod, PORTOD_PATH)
 subprocess.check_call([portod, "reload"])
@@ -295,6 +287,8 @@ time.sleep(1)
 
 assert subprocess.check_output([portod, "--version"]).split()[6] != oldver
 #That means we've upgraded successfully
+
+AsAlice()
 
 c = porto.Connection(timeout=3)
 c.Wait(["test"])
@@ -349,6 +343,8 @@ CheckRt(r)
 
 c.disconnect()
 
+AsRoot()
+
 #Now, the downgrade
 os.unlink(PORTOD_PATH)
 os.symlink(TMPDIR + "/old/usr/sbin/portod", PORTOD_PATH)
@@ -357,6 +353,8 @@ subprocess.check_call([portod, "reload"])
 time.sleep(1)
 
 assert subprocess.check_output([portod, "--version"]).split()[6] == oldver
+
+AsAlice()
 
 c = porto.Connection(timeout=3)
 
@@ -398,6 +396,8 @@ CheckCaps(r, False)
 assert legacy_rt_settings == DumpLegacyRt(r)
 
 c.disconnect()
+
+AsRoot()
 
 subprocess.check_call([portod, "--verbose", "--discard", "restart"])
 
