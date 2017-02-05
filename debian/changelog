@@ -1,3 +1,21 @@
+yandex-porto (3.2.8) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * api/python: fix typo in AttachProcess() handler #PORTO-178
+
+  [ Konstantin Khlebnikov ]
+  * test/test-recovery.py: reduce count 3000 -> 100 containers
+  * capabilities: cleanup propagation
+  * capabilities: allow CAP_SETPCAP and CAP_SETFCAP in chroot #PORTO-177
+  * capabilities: allow CAP_NET_RAW and CAP_NET_BIND_SERVICE in host network #PORTO-177
+  * test: cleanup user switching
+  * test/test-prev_release_upgrade.py: create containers by unprivileged user
+  * test: fixes
+  * test/test_common.py: catch exception if user/group not found
+  * test/test-knobs.py: run as root
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Sun, 05 Feb 2017 17:20:00 +0300
+
 yandex-porto (3.2.7) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
