@@ -20,19 +20,31 @@ def ExpectProp(ct, prop, val):
     cur = ct.GetProperty(prop)
     assert cur == val, "{} property {} should be {} not {}".format(ct, prop, val, cur)
 
-alice_uid=pwd.getpwnam("porto-alice").pw_uid
-alice_gid=grp.getgrnam("porto-alice").gr_gid
+def UserId(name):
+    try:
+        return pwd.getpwnam(name).pw_uid
+    except KeyError:
+        return None
 
-bob_uid=pwd.getpwnam("porto-bob").pw_uid
-bob_gid=grp.getgrnam("porto-bob").gr_gid
+def GroupId(name):
+    try:
+        return grp.getgrnam(name).gr_gid
+    except KeyError:
+        return None
 
-charlie_uid=pwd.getpwnam("porto-charlie").pw_uid
-charlie_gid=grp.getgrnam("porto-charlie").gr_gid
+alice_uid=UserId("porto-alice")
+alice_gid=GroupId("porto-alice")
 
-david_uid=pwd.getpwnam("porto-david").pw_uid
-david_gid=grp.getgrnam("porto-david").gr_gid
+bob_uid=UserId("porto-bob")
+bob_gid=GroupId("porto-bob")
 
-porto_gid=grp.getgrnam("porto").gr_gid
+charlie_uid=UserId("porto-charlie")
+charlie_gid=GroupId("porto-charlie")
+
+david_uid=UserId("porto-david")
+david_gid=GroupId("porto-david")
+
+porto_gid=GroupId("porto")
 
 def AsRoot():
     os.setresgid(0, 0, 0)
