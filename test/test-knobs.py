@@ -5,7 +5,7 @@ import subprocess
 import types
 from test_common import *
 
-AsAlice()
+AsRoot()
 
 c = porto.Connection(timeout=10)
 r = c.Create("test")
@@ -64,8 +64,8 @@ knobs = {
     "net_guarantee" : "default: 0",
     "net_limit" : "default: 0",
     "net_priority" : "default: 0" ,
-    "owner_group" : "root",
     "owner_user" : "root",
+    "owner_group" : "root",
     "porto_namespace" : "/porto",
     "private" : "123;321321   2323cv",
     "resolv_conf" : "nameserver 1.1.1.1",
