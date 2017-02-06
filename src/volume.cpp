@@ -211,6 +211,16 @@ public:
         return TError::Success();
     }
 
+    TError Restore() {
+
+        /* Restore configuration */
+        Volume->InternalPath = Volume->Path;
+        Volume->StoragePath = Volume->Path;
+        Volume->KeepStorage = true;
+
+        return TError::Success();
+    }
+
     TError Build() override {
         TProjectQuota quota(Volume->Path);
         TError error;
@@ -978,7 +988,7 @@ TError TVolume::CheckDependencies() {
     if (!error)
         error = DependsOn(Place);
 
-    if (!error)
+    if (!error && !RemoteStorage())
         error = DependsOn(StoragePath);
 
     for (auto &l : Layers) {
