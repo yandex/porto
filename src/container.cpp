@@ -1013,9 +1013,10 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (TestPropDirty(EProperty::CPU_POLICY) |
-            TestClearPropDirty(EProperty::CPU_LIMIT) |
-            TestClearPropDirty(EProperty::CPU_GUARANTEE)) {
+    if ((Controllers & CGROUP_CPU) &&
+            (TestPropDirty(EProperty::CPU_POLICY) |
+             TestClearPropDirty(EProperty::CPU_LIMIT) |
+             TestClearPropDirty(EProperty::CPU_GUARANTEE))) {
         auto cpucg = GetCgroup(CpuSubsystem);
         error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy,
                                           CpuGuarantee, CpuLimit);
