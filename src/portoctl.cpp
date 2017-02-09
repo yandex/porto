@@ -69,6 +69,8 @@ public:
     std::vector<std::pair<std::string, std::string>> Properties;
     std::vector<std::string> Environment;
 
+    std::string Private;
+
     Porto::Volume Volume;
     std::string SpaceLimit;
     std::string VolumeBackend;
@@ -116,13 +118,18 @@ public:
             NeedVolume = true;
         } else if (key == "backend") {
             VolumeBackend = val;
+            NeedVolume = true;
         } else if (key == "storage") {
+            NeedVolume = true;
             VolumeStorage = val;
         } else if (key == "layers") {
             NeedVolume = true;
             SplitEscapedString(val, Layers, ';');
         } else if (key == "place") {
             Place = val;
+            Properties.emplace_back(key, val);
+        } else if (key == "private") {
+            Private = val;
             Properties.emplace_back(key, val);
         } else
             Properties.emplace_back(key, val);
@@ -212,6 +219,9 @@ public:
 
         if (Place != "")
             config["place"] = Place;
+
+        if (Private != "")
+            config["private"] = Private;
 
         if (Api->CreateVolume("", config, Volume))
             return GetLastError();
