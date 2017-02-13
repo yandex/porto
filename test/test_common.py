@@ -20,6 +20,14 @@ def ExpectProp(ct, prop, val):
     cur = ct.GetProperty(prop)
     assert cur == val, "{} property {} should be {} not {}".format(ct, prop, val, cur)
 
+def ExpectPropGe(ct, prop, val):
+    cur = int(ct.GetProperty(prop))
+    assert cur >= val, "{} property {} should be at least {} not {}".format(ct, prop, val, cur)
+
+def ExpectPropLe(ct, prop, val):
+    cur = int(ct.GetProperty(prop))
+    assert cur <= val, "{} property {} should be at most {} not {}".format(ct, prop, val, cur)
+
 def UserId(name):
     try:
         return pwd.getpwnam(name).pw_uid
