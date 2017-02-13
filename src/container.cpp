@@ -538,6 +538,14 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
             }
         }
 
+        /* Disable memory guarantee in old cgroup */
+        if (ct->MemGuarantee) {
+            TCgroup memCg;
+            if (!MemorySubsystem.TaskCgroup(ct->Task.Pid, memCg) &&
+                    memCg != ct->GetCgroup(MemorySubsystem))
+                MemorySubsystem.SetGuarantee(memCg, 0);
+        }
+
         error = ct->ApplyDynamicProperties();
         if (error)
             goto err;
