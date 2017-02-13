@@ -1,3 +1,12 @@
+yandex-porto (3.2.10) unstable; urgency=low
+
+  * container: do not configire cpu cgroup if controller isn't enabled
+  * portoctl: set root volume/storage private in run/exec
+  * test: check memory recharge of page faults and mlock #PORTO-185
+  * cgroup: disable memory guarantee in old cgrpup during upgrade
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 13 Feb 2017 19:37:08 +0300
+
 yandex-porto (3.2.9) unstable; urgency=low
 
   [ Maxim Samoylov ]
