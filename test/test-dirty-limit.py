@@ -10,12 +10,17 @@ ct.SetProperty("cwd", vol.path)
 ct.SetProperty("command", "dd if=/dev/zero of=test conv=notrunc bs=1M count=100")
 ct.SetProperty("dirty_limit", "10M")
 
+if get_kernel_maj_min() > (3, 18):
+    dirty = "dirty"
+else:
+    dirty = "fs_dirty"
+
 def Run():
     ct.Start()
     ct.Wait(60000)
     ExpectProp(ct, "state", "dead")
     ExpectProp(ct, "exit_code", "0")
-    ExpectMemoryStatLe(ct, "dirty", 10 << 20)
+    ExpectMemoryStatLe(ct, dirty, 10 << 20)
     ExpectEq(os.path.getsize(vol.path + '/test'), 100 << 20)
     ct.Stop()
 
