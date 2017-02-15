@@ -28,6 +28,18 @@ def ExpectPropLe(ct, prop, val):
     cur = int(ct.GetProperty(prop))
     assert cur <= val, "{} property {} should be at most {} not {}".format(ct, prop, val, cur)
 
+def MemoryStat(ct, stat):
+    for line in ct.GetProperty("memory.stat").splitlines():
+        k, v = line.split()
+        if k == stat:
+            return int(v)
+    return None
+
+def ExpectMemoryStatLe(ct, stat, val):
+    cur = MemoryStat(ct, stat)
+    assert cur is not None, "{} memory.stat:{} not found".format(ct, stat)
+    assert cur <= val, "{} memory.stat:{} should be at most {} not {}".format(ct, stat, val, cur)
+
 def UserId(name):
     try:
         return pwd.getpwnam(name).pw_uid

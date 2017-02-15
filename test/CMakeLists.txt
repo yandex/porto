@@ -70,6 +70,10 @@ add_test(NAME mem_recharge
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-mem-recharge.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME dirty_limit
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-dirty-limit.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME portoctl-attach
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-attach.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -138,6 +142,6 @@ add_test(NAME portod_stop
 set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
                      unpriv-cred prev_release_upgrade uid_handling knobs clear
-                     cpu_limit mem_limit fuzzer stats mem_recharge
+                     cpu_limit mem_limit fuzzer stats mem_recharge dirty_limit
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)
