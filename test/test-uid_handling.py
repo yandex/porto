@@ -11,7 +11,8 @@ AsAlice()
 
 c = porto.Connection(timeout=30)
 
-r = c.Create("test")
+r = c.CreateWeakContainer("test")
+r.SetProperty("porto_namespace", "")
 
 v = c.CreateVolume(None, layers=["ubuntu-precise"])
 v.Link(r.name)
@@ -56,7 +57,9 @@ r.Destroy()
 
 #Check virt_mode == app now
 
-r = c.Create("test")
+r = c.CreateWeakContainer("test")
+r.SetProperty("porto_namespace", "")
+
 v.Link(r.name)
 r.SetProperty("root", v.path)
 r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
@@ -127,7 +130,9 @@ c.connect()
 
 #Usually porto-alice cannot run -W as porto-bob, but with owner_user == root solves everything
 
-r = c.Create("test")
+r = c.CreateWeakContainer("test")
+r.SetProperty("porto_namespace", "")
+
 r.SetProperty("root", v.path)
 r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=porto-bob")
