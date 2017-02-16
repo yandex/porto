@@ -195,7 +195,7 @@ TError TClient::ResolveName(const std::string &relative_name, std::string &name)
     } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
         name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
         if (!StringStartsWith(name, ns))
-            return TError(EError::Permission, "Absolute container name out of current namespace");
+            return TError(EError::Permission, "Absolute container name out of current namespace: " + relative_name);
     } else
         name = ns + relative_name;
 

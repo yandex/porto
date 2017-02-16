@@ -1009,7 +1009,10 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
     if (error)
         return error;
 
-    error = CL->WriteContainer(ROOT_PORTO_NAMESPACE + oldCt->Name, oldCt);
+    if (oldCt == CL->ClientContainer)
+        error = CL->WriteContainer(SELF_CONTAINER, oldCt, true);
+    else
+        error = CL->WriteContainer(ROOT_PORTO_NAMESPACE + oldCt->Name, oldCt);
     if (error)
         return error;
 
