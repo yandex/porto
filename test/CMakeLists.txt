@@ -17,6 +17,8 @@ target_link_libraries(cpu_limit pthread rt crypto)
 
 add_executable(mem_limit mem_limit.cpp)
 
+# head
+
 add_test(NAME cleanup_logs
          COMMAND rm -f /var/log/portod.log
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -25,9 +27,7 @@ add_test(NAME portod_start
          COMMAND ${CMAKE_BINARY_DIR}/portod --discard --verbose restart
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME selftest
-         COMMAND ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+# interface tests
 
 add_test(NAME python_api
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-api.py
@@ -42,21 +42,27 @@ set_tests_properties(go_api
                      ENVIRONMENT GOPATH=${CMAKE_SOURCE_DIR}:/usr/share/gocode)
 endif()
 
-add_test(NAME recovery
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-recovery.py
+add_test(NAME knobs
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-knobs.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME security
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-security.py
+add_test(NAME portoctl-exec
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-exec.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME volume_backends
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-volume_backends.py
+add_test(NAME portoctl-wait
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-wait.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME volume_places
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-volume_places.py
+add_test(NAME self-container
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-self-container.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_test(NAME portoctl-attach
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-attach.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# limits test
 
 add_test(NAME mem-overcommit
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-mem-overcommit.py
@@ -74,62 +80,80 @@ add_test(NAME dirty_limit
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-dirty-limit.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME portoctl-attach
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-attach.py
+add_test(NAME cpu_limit
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-cpu_limit.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME portoctl-exec
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-exec.py
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+# functional tests
 
-add_test(NAME portoctl-wait
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portoctl-wait.py
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-add_test(NAME portod_cli
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portod_cli.py
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-add_test(NAME self-container
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-self-container.py
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-add_test(NAME tc-rebuild
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-tc-rebuild.py
+add_test(NAME uid_handling
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-uid_handling.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME unpriv-cred
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-unpriv-cred.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME security
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-security.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_test(NAME tc-rebuild
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-tc-rebuild.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME prev_release_upgrade
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-prev_release_upgrade.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME uid_handling
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-uid_handling.py
+add_test(NAME portotest
+         COMMAND ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery leaks perf net_property
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME knobs
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-knobs.py
+add_test(NAME networking
+         COMMAND ${CMAKE_BINARY_DIR}/portotest net_property
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# slow tests
+
+add_test(NAME mem_limit
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-mem_limit.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_test(NAME volume_backends
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-volume_backends.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_test(NAME volume_places
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-volume_places.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_test(NAME portod_cli
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-portod_cli.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_test(NAME recovery
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-recovery.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME clear
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-clear.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME cpu_limit
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-cpu_limit.py
+add_test(NAME perf
+         COMMAND ${CMAKE_BINARY_DIR}/portotest perf
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME mem_limit
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-mem_limit.py
+add_test(NAME leaks
+         COMMAND ${CMAKE_BINARY_DIR}/portotest leaks
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME fuzzer
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
          --timeout 300 --progress 32 2000
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# tail
 
 add_test(NAME stats
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-stats.py
@@ -138,6 +162,8 @@ add_test(NAME stats
 add_test(NAME portod_stop
          COMMAND ${CMAKE_BINARY_DIR}/portod stop
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+# end
 
 set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
