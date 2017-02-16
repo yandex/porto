@@ -303,6 +303,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
         NsName = FirstName + "/";
     else
         NsName = "";
+    SetProp(EProperty::PORTO_NAMESPACE);
 
     if (IsRoot())
         Place = { PORTO_PLACE, "***" };
@@ -2318,6 +2319,9 @@ TError TContainer::Load(const TKeyValue &node) {
 
     if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
         OwnerCred = TaskCred;
+
+    if (!node.Has(P_PORTO_NAMESPACE))
+        NsName = "";
 
     SanitizeCapabilities();
 
