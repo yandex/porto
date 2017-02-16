@@ -247,6 +247,7 @@ def internal_escalation(v):
     AsAlice()
     c = porto.Connection()
     r = c.Create("test_cont1")
+    r.SetProperty("porto_namespace", "")
     r.SetProperty("virt_mode", "os")
     r.SetProperty("root", v.path)
     r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
