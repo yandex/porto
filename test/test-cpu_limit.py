@@ -23,7 +23,7 @@ def SetCommand(r, guarantee, limit, duration=DURATION, tnum=THREAD_NUM, interval
     r.SetProperty("command", cmd)
 
 def InitContainer(c, name, guarantee, limit, rt=False):
-    r = c.Create(name)
+    r = c.CreateWeakContainer(name)
 
     if (rt):
         r.SetProperty("cpu_policy", "rt")
@@ -182,13 +182,4 @@ def TestBody(c):
             WaitContainer(i)
 
 c = porto.Connection(timeout=30)
-
-try:
-    TestBody(c)
-
-except BaseException as e:
-    print traceback.format_exc()
-    for r in c.ListContainers():
-        r.Destroy()
-
-    sys.exit(1)
+TestBody(c)
