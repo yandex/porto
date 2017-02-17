@@ -27,7 +27,9 @@ private:
 
 enum class EAccessLevel {
     None,
+    ReadIsolate,
     ReadOnly,
+    Isolate,
     ChildOnly,
     Normal,
     SuperUser,

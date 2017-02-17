@@ -58,3 +58,24 @@ assert subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=',
 assert subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=test/',
                                 'command=' + portoctl + ' exec test porto_namespace= command=\"' + portoctl + ' find 1\"'],
                                 stdin=subprocess.PIPE, stderr=subprocess.PIPE) == 'test\n'
+
+# Isolate
+assert subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate',
+                                'command=' + portoctl + ' get self absolute_namespace'],
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE) == '/porto/test/\n'
+
+assert subprocess.check_output([portoctl, 'exec', 'test',
+                                'command=' + portoctl + ' exec self/test enable_porto=isolate command=\"' + portoctl + ' get self absolute_namespace\"'],
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE) == '/porto/test/test/\n'
+
+assert subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate',
+                                'command=' + portoctl + ' exec test command=\"' + portoctl + ' get self absolute_name\"'],
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE) == '/porto/test/test\n'
+
+assert subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate',
+                                'command=' + portoctl + ' exec self/test command=\"' + portoctl + ' get self absolute_name\"'],
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE) == '/porto/test/test\n'
+
+assert subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate',
+                                'command=' + portoctl + ' exec /porto/test/test command=\"' + portoctl + ' get self absolute_name\"'],
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE) == '/porto/test/test\n'

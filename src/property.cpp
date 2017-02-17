@@ -1484,7 +1484,7 @@ TError TRawDeathTime::Get(std::string &value) {
 class TPortoNamespace : public TProperty {
 public:
     TPortoNamespace() : TProperty(P_PORTO_NAMESPACE, EProperty::PORTO_NAMESPACE,
-            "Porto containers namespace (container name prefix)") {}
+            "Porto containers namespace (container name prefix) (deprecated, use enable_porto=isolate instead)") {}
     TError Get(std::string &value) {
         value = CT->NsName;
         return TError::Success();
@@ -2275,14 +2275,33 @@ TError TAgingTime::Get(std::string &value) {
 class TEnablePorto : public TProperty {
 public:
     TEnablePorto() : TProperty(P_ENABLE_PORTO, EProperty::ENABLE_PORTO,
-            "Proto access level: false | read-only | child-only | true (dynamic)") {}
+            "Proto access level: false (none) | read-isolate | read-only | isolate | child-only | true (full) (dynamic)") {}
+
+    static bool Compatible(EAccessLevel parent, EAccessLevel child) {
+        switch (parent) {
+            case EAccessLevel::None:
+                return child == EAccessLevel::None;
+            case EAccessLevel::ReadIsolate:
+            case EAccessLevel::ReadOnly:
+                return child <= EAccessLevel::ReadOnly;
+            default:
+                return true;
+        }
+    }
+
     TError Get(std::string &value) {
         switch (CT->AccessLevel) {
             case EAccessLevel::None:
                 value = "false";
                 break;
+            case EAccessLevel::ReadIsolate:
+                value = "read-isolate";
+                break;
             case EAccessLevel::ReadOnly:
                 value = "read-only";
+                break;
+            case EAccessLevel::Isolate:
+                value = "isolate";
                 break;
             case EAccessLevel::ChildOnly:
                 value = "child-only";
@@ -2293,25 +2312,29 @@ public:
         }
         return TError::Success();
     }
+
     TError Set(const std::string &value) {
         EAccessLevel level;
 
-        if (value == "false")
+        if (value == "false" || value == "none")
             level = EAccessLevel::None;
+        else if (value == "read-isolate")
+            level = EAccessLevel::ReadIsolate;
         else if (value == "read-only")
             level = EAccessLevel::ReadOnly;
+        else if (value == "isolate")
+            level = EAccessLevel::Isolate;
         else if (value == "child-only")
             level = EAccessLevel::ChildOnly;
-        else if (value == "true")
+        else if (value == "true" || value == "full")
             level = EAccessLevel::Normal;
         else
             return TError(EError::InvalidValue, "Unknown access level: " + value);
 
-        if (level > EAccessLevel::ChildOnly && !CL->IsSuperUser()) {
+        if (level > EAccessLevel::None) {
             for (auto p = CT->Parent; p; p = p->Parent)
-                if (p->AccessLevel < EAccessLevel::ChildOnly)
-                    return TError(EError::Permission,
-                            "Parent container has access lower than child");
+                if (!Compatible(p->AccessLevel, level))
+                    return TError(EError::Permission, "Parent container has lower access level");
         }
 
         CT->AccessLevel = level;
@@ -2320,8 +2343,7 @@ public:
     }
     TError Start(void) {
         auto parent = CT->Parent;
-        if (parent->AccessLevel < EAccessLevel::ChildOnly &&
-                parent->AccessLevel < CT->AccessLevel)
+        if (!Compatible(parent->AccessLevel, CT->AccessLevel))
             CT->AccessLevel = parent->AccessLevel;
         return TError::Success();
     }

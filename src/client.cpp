@@ -122,6 +122,8 @@ TError TClient::IdentifyClient(bool initial) {
         return error;
 
     AccessLevel = ct->AccessLevel;
+
+    /* Detect ChildOnly set for parent. */
     for (auto p = ct->Parent; p; p = p->Parent)
         AccessLevel = std::min(AccessLevel, p->AccessLevel);
 
@@ -151,7 +153,7 @@ TError TClient::IdentifyClient(bool initial) {
         if (AccessLevel == EAccessLevel::Normal)
             AccessLevel = EAccessLevel::SuperUser;
     } else if (!Cred.IsMemberOf(PortoGroup)) {
-        if (AccessLevel >= EAccessLevel::ReadOnly)
+        if (AccessLevel > EAccessLevel::ReadOnly)
             AccessLevel = EAccessLevel::ReadOnly;
     }
 
@@ -316,7 +318,7 @@ TError TClient::CanControl(const TCred &other) {
 
 TError TClient::CanControl(const TContainer &ct, bool child) {
 
-    if (AccessLevel < EAccessLevel::ChildOnly)
+    if (AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "No write access at all");
 
     if (!child && ct.IsRoot())
@@ -334,8 +336,11 @@ TError TClient::CanControl(const TContainer &ct, bool child) {
     auto base = ClientContainer;
     while (base && base->AccessLevel != EAccessLevel::ChildOnly)
         base = base->Parent;
-    if (!base)
+    if (!base) {
+        if (AccessLevel < EAccessLevel::ChildOnly)
+            return TError::Success();
         return TError(EError::Permission, "Base for child-only not found");
+    }
 
     if ((child && base.get() == &ct) || ct.IsChildOf(*base))
         return TError::Success();

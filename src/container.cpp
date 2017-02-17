@@ -341,8 +341,10 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     Private = "";
     AgingTime = config().container().default_aging_time_s() * 1000;
 
-    if (Parent && Parent->AccessLevel < EAccessLevel::ChildOnly)
-        AccessLevel = Parent->AccessLevel;
+    if (Parent && Parent->AccessLevel == EAccessLevel::None)
+        AccessLevel = EAccessLevel::None;
+    else if (Parent && Parent->AccessLevel <= EAccessLevel::ReadOnly)
+        AccessLevel = EAccessLevel::ReadOnly;
     else
         AccessLevel = EAccessLevel::Normal;
 }
@@ -2699,10 +2701,14 @@ void TContainer::Event(const TEvent &event) {
 }
 
 std::string TContainer::GetPortoNamespace() const {
-    if (Parent)
-        return Parent->GetPortoNamespace() + NsName;
-    else
-        return "";
+    std::string ns;
+    for (auto ct = this; ct && !ct->IsRoot() ; ct = ct->Parent.get()) {
+        if (ct->AccessLevel == EAccessLevel::Isolate ||
+                ct->AccessLevel == EAccessLevel::ReadIsolate)
+            return ct->Name + "/";
+        ns = ct->NsName + ns;
+    }
+    return ns;
 }
 
 void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
