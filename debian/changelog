@@ -1,3 +1,20 @@
+yandex-porto (3.3.0) unstable; urgency=low
+
+  * test: check dirty_limit
+  * test/test-dirty-limit.py: check fs_dirty for older kernels
+  * test/test-security.py: fix default porto namespace
+  * test/test-portoctl-attach.py: fix default porto namespace
+  * test/test-self-container.py: fix default porto namespace
+  * test/test-cpu_limit.py: use weak containers
+  * test/test-uid_handling.py: fix default porto namespace
+  * test/test-prev_release_upgrade.py: fix for default porto namespace
+  * tests: reorder by importance and speed
+  * porto: do not enable default porto namespace during restore
+  * porto: loose namespace restrictions for attaching tasks from current container
+  * porto: add mode enable_porto=isolate
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 17 Feb 2017 14:53:12 +0300
+
 yandex-porto (3.2.10) unstable; urgency=low
 
   * container: do not configire cpu cgroup if controller isn't enabled
