@@ -275,6 +275,9 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
     for (auto &it: Clients) {
         auto &client = it.second;
 
+        if (client->Processing)
+            continue;
+
         if (from && client->ClientContainer != from)
             continue;
 

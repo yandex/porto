@@ -27,6 +27,7 @@ public:
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;
     uint64_t ActivityTimeMs = 0;
+    bool Processing = false;
     bool InEpoll = false;
 
     TClient(int fd);
@@ -86,7 +87,6 @@ private:
     std::mutex Mutex;
     uint64_t ConnectionTime = 0;
     uint64_t RequestStartMs = 0;
-    bool Processing = false;
 
     bool FirstLog = true;
 
