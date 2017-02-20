@@ -122,10 +122,11 @@ TError TClient::IdentifyClient(bool initial) {
         return error;
 
     AccessLevel = ct->AccessLevel;
-
-    /* Detect ChildOnly set for parent. */
     for (auto p = ct->Parent; p; p = p->Parent)
         AccessLevel = std::min(AccessLevel, p->AccessLevel);
+
+    PortoNamespace = ct->GetPortoNamespace();
+    WriteNamespace = ct->GetPortoNamespace(true);
 
     if (AccessLevel == EAccessLevel::None)
         return TError(EError::Permission, "Porto disabled in container " + ct->Name);
@@ -161,45 +162,41 @@ TError TClient::IdentifyClient(bool initial) {
 }
 
 TError TClient::ComposeName(const std::string &name, std::string &relative_name) const {
-    std::string ns = ClientContainer->GetPortoNamespace();
-
     if (name == ROOT_CONTAINER) {
         relative_name = ROOT_CONTAINER;
         return TError::Success();
     }
 
-    if (ns == "") {
+    if (PortoNamespace == "") {
         relative_name = name;
         return TError::Success();
     }
 
-    if (!StringStartsWith(name, ns))
+    if (!StringStartsWith(name, PortoNamespace))
         return TError(EError::Permission,
-                "Cannot access container " + name + " from namespace " + ns);
+                "Cannot access container " + name + " from namespace " + PortoNamespace);
 
-    relative_name = name.substr(ns.length());
+    relative_name = name.substr(PortoNamespace.length());
     return TError::Success();
 }
 
 TError TClient::ResolveName(const std::string &relative_name, std::string &name) const {
-    std::string ns = ClientContainer->GetPortoNamespace();
-
     if (relative_name == ROOT_CONTAINER)
         name = ROOT_CONTAINER;
     else if (relative_name == SELF_CONTAINER)
         name = ClientContainer->Name;
     else if (relative_name == DOT_CONTAINER)
-        name = TContainer::ParentName(ns);
+        name = TContainer::ParentName(PortoNamespace);
     else if (StringStartsWith(relative_name, SELF_CONTAINER + std::string("/"))) {
         name = relative_name.substr(strlen(SELF_CONTAINER) + 1);
         if (!ClientContainer->IsRoot())
             name = ClientContainer->Name + "/" + name;
     } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
         name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
-        if (!StringStartsWith(name, ns))
+        if (!StringStartsWith(name, PortoNamespace))
             return TError(EError::Permission, "Absolute container name out of current namespace: " + relative_name);
     } else
-        name = ns + relative_name;
+        name = PortoNamespace + relative_name;
 
     return TError::Success();
 }
@@ -230,7 +227,7 @@ TError TClient::ReadContainer(const std::string &relative_name,
 TError TClient::WriteContainer(const std::string &relative_name,
                                std::shared_ptr<TContainer> &ct, bool child) {
     if (AccessLevel <= EAccessLevel::ReadOnly)
-        return TError(EError::Permission, "No write access at all");
+        return TError(EError::Permission, "Write access denied");
     auto lock = LockContainers();
     TError error = ResolveContainer(relative_name, ct);
     if (error)
@@ -297,7 +294,7 @@ bool TClient::CanSetUidGid() const {
 TError TClient::CanControl(const TCred &other) {
 
     if (AccessLevel <= EAccessLevel::ReadOnly)
-        return TError(EError::Permission, "No write access at all");
+        return TError(EError::Permission, "Write access denied");
 
     if (IsSuperUser() || Cred.Uid == other.Uid || other.IsUnknown())
         return TError::Success();
@@ -319,33 +316,28 @@ TError TClient::CanControl(const TCred &other) {
 TError TClient::CanControl(const TContainer &ct, bool child) {
 
     if (AccessLevel <= EAccessLevel::ReadOnly)
-        return TError(EError::Permission, "No write access at all");
+        return TError(EError::Permission, "Write access denied");
 
     if (!child && ct.IsRoot())
-        return TError(EError::Permission, "Root container is read-only");
+        return TError(EError::Permission, "Write access denied: root container is read-only");
 
-    if (!child || !ct.IsRoot()) {
+    /*
+     * Container must be in write namespace or be its base for new childs.
+     * Also allow write access to client subcontainers for self/... notation.
+     */
+    if (!StringStartsWith(ct.Name, WriteNamespace) &&
+            !(child && ct.Name == TContainer::ParentName(WriteNamespace)) &&
+            !(ct.IsChildOf(*ClientContainer) ||
+                child && &ct == &*ClientContainer))
+        return TError(EError::Permission, "Write access denied: container " + ct.Name + " out of scope");
+
+    if (!(child && ct.IsRoot())) {
         TError error = CanControl(ct.OwnerCred);
         if (error)
-            return error;
+            return TError(error, "Write access denied: container " + ct.Name);
     }
 
-    if (AccessLevel > EAccessLevel::ChildOnly)
-        return TError::Success();
-
-    auto base = ClientContainer;
-    while (base && base->AccessLevel != EAccessLevel::ChildOnly)
-        base = base->Parent;
-    if (!base) {
-        if (AccessLevel < EAccessLevel::ChildOnly)
-            return TError::Success();
-        return TError(EError::Permission, "Base for child-only not found");
-    }
-
-    if ((child && base.get() == &ct) || ct.IsChildOf(*base))
-        return TError::Success();
-
-    return TError(EError::Permission, "Not a child container: " + ct.Name);
+    return TError::Success();
 }
 
 TError TClient::ReadAccess(const TFile &file) {
@@ -511,9 +503,10 @@ std::ostream& operator<<(std::ostream& stream, TClient& client) {
             stream << " owner " << client.Cred;
         if (client.ClientContainer) {
             stream << " from " << client.ClientContainer->Name;
-            auto ns = client.ClientContainer->GetPortoNamespace();
-            if (ns != "")
-                stream << " namespace " << ns;
+            if (client.PortoNamespace != "")
+                stream << " namespace " << client.PortoNamespace;
+            if (client.WriteNamespace != client.PortoNamespace)
+                stream << " write-namespace " << client.WriteNamespace;
         }
     }
 

@@ -238,7 +238,7 @@ public:
         return true;
     }
 
-    std::string GetPortoNamespace() const;
+    std::string GetPortoNamespace(bool write = false) const;
 
     TError Lock(TScopedLock &lock, bool for_read = false, bool try_lock = false);
     TError LockRead(TScopedLock &lock, bool try_lock = false) {

@@ -2700,11 +2700,12 @@ void TContainer::Event(const TEvent &event) {
     }
 }
 
-std::string TContainer::GetPortoNamespace() const {
+std::string TContainer::GetPortoNamespace(bool write) const {
     std::string ns;
     for (auto ct = this; ct && !ct->IsRoot() ; ct = ct->Parent.get()) {
         if (ct->AccessLevel == EAccessLevel::Isolate ||
-                ct->AccessLevel == EAccessLevel::ReadIsolate)
+                ct->AccessLevel == EAccessLevel::ReadIsolate ||
+                (write && ct->AccessLevel == EAccessLevel::ChildOnly))
             return ct->Name + "/";
         ns = ct->NsName + ns;
     }

@@ -293,7 +293,7 @@ static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent
 
 static TError CheckPortoWriteAccess() {
     if (CL->AccessLevel <= EAccessLevel::ReadOnly)
-        return TError(EError::Permission, "No write access at all");
+        return TError(EError::Permission, "Write access denied");
     return TError::Success();
 }
 

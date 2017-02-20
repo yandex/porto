@@ -35,6 +35,8 @@ public:
     ~TClient();
 
     EAccessLevel AccessLevel = EAccessLevel::None;
+    std::string PortoNamespace;
+    std::string WriteNamespace;
 
     bool IsSuperUser(void) const;
 
