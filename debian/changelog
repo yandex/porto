@@ -1,3 +1,10 @@
+yandex-porto (3.3.1) unstable; urgency=low
+
+  * porto: do not drop active connections
+  * porto: carefully check namespace for write access
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 20 Feb 2017 16:47:53 +0300
+
 yandex-porto (3.3.0) unstable; urgency=low
 
   * test: check dirty_limit
