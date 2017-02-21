@@ -2706,7 +2706,7 @@ std::string TContainer::GetPortoNamespace(bool write) const {
         if (ct->AccessLevel == EAccessLevel::Isolate ||
                 ct->AccessLevel == EAccessLevel::ReadIsolate ||
                 (write && ct->AccessLevel == EAccessLevel::ChildOnly))
-            return ct->Name + "/";
+            return ct->Name + "/" + ns;
         ns = ct->NsName + ns;
     }
     return ns;
