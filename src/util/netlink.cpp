@@ -18,6 +18,7 @@ extern "C" {
 #include <netlink/route/class.h>
 #include <netlink/route/classifier.h>
 #include <netlink/route/cls/cgroup.h>
+#include <netlink/route/cls/u32.h>
 #include <netlink/route/qdisc.h>
 #include <netlink/route/qdisc/fifo.h>
 #include <netlink/route/qdisc/htb.h>
@@ -498,7 +499,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     uint32_t masterIdx;
     struct nl_msg *msg;
     struct nlattr *linkinfo, *infodata;
-    struct ifinfomsg ifi = { 0 };
+    struct ifinfomsg ifi = {};
     struct ether_addr *ea = nullptr;
     auto Name = GetName();
 
@@ -871,6 +872,7 @@ bool TNlQdisc::Check(const TNl &nl) {
     }
 
     nl.Dump("found", qdisc);
+
     if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) != Index)
         goto out;
 
@@ -1043,38 +1045,209 @@ out:
     return error;
 }
 
+
+TError TNlPoliceFilter::Create(const TNl &nl) {
+    uint32_t table[256];
+    uint32_t result = TC_ACT_OK;
+    TError error = TError::Success();
+    struct nlattr *u32, *u32_police;
+    struct tc_u32_sel sel = {};
+    struct tc_police parm = {};
+    struct nl_msg *msg;
+    struct tcmsg tchdr;
+    int ret;
+
+    memset(table, 0, sizeof(*table));
+
+    tchdr.tcm_family = AF_UNSPEC;
+    tchdr.tcm_ifindex = Index;
+    tchdr.tcm_handle = 0;
+    tchdr.tcm_parent = Parent;
+
+    /* FIXME: may be we should avoid drop ARP and ICMP(4/6) */
+
+    tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_ALL));
+
+    msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
+    if (!msg)
+        return TError(EError::Unknown, "Unable to add u32 filter: no memory");
+
+    ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to add u32: ") +
+                                        nl_geterror(ret));
+        goto free_msg;
+    }
+
+    ret = nla_put(msg, TCA_KIND, strlen(FilterType) + 1, FilterType);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to add u32: ") +
+                                        nl_geterror(ret));
+        goto free_msg;
+    }
+
+    u32 = nla_nest_start(msg, TCA_OPTIONS);
+
+    sel.flags = TC_U32_TERMINAL;
+    ret = nla_put(msg, TCA_U32_SEL, sizeof(sel), &sel);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to add u32 sel: ") +
+                                        nl_geterror(ret));
+        goto free_msg;
+    }
+
+
+    u32_police = nla_nest_start(msg, TCA_U32_POLICE);
+
+    if (!u32_police) {
+        error = TError(EError::Unknown, std::string("cannot create nested attrs: ") +
+                                        nl_geterror(ret));
+        goto free_msg;
+
+    }
+
+    parm.action = TC_ACT_SHOT;
+
+    parm.rate.mpu = 0;
+    parm.rate.overhead = 0;
+    parm.rate.cell_align = -1;
+    parm.rate.cell_log = 1;
+    parm.rate.linklayer = TC_LINKLAYER_ETHERNET;
+    parm.rate.rate = Rate;
+
+    if (PeakRate) {
+        parm.peakrate.mpu = 0;
+        parm.peakrate.overhead = 0;
+        parm.peakrate.cell_align = -1;
+        parm.peakrate.cell_log = 1;
+        parm.peakrate.linklayer = TC_LINKLAYER_ETHERNET;
+        parm.peakrate.rate = PeakRate;
+    }
+
+    parm.burst = (1000000000 >> 6) * (double)Burst / Rate; /* psched ticks */
+
+    parm.mtu = Mtu;
+
+    ret = nla_put(msg, TCA_POLICE_TBF, sizeof(parm), &parm);
+    if (ret < 0) {
+        error = TError(EError::Unknown,
+                       std::string("Unable to add policer: nla_put(TCA_POLICE_AVRATE): ") +
+                       nl_geterror(ret));
+        goto free_msg;
+    }
+
+    ret = nla_put(msg, TCA_POLICE_RATE, sizeof(table), table);
+    if (ret < 0) {
+        error = TError(EError::Unknown,
+                       std::string("Unable to add policer: nl_put(TCA_POLICE_RATE): ") +
+                       nl_geterror(ret));
+        goto free_msg;
+    }
+
+    if (PeakRate) {
+        ret = nla_put(msg, TCA_POLICE_PEAKRATE, sizeof(table), table);
+        if (ret < 0) {
+            error = TError(EError::Unknown,
+                           std::string("Unable to add policer: nl_put(TCA_POLICE_RATE): ") +
+                           nl_geterror(ret));
+            goto free_msg;
+        }
+    }
+
+    ret = nla_put(msg, TCA_POLICE_RESULT, sizeof(result), &result);
+
+    nla_nest_end(msg, u32_police);
+    nla_nest_end(msg, u32);
+
+    L() << "netlink " << Index << ": add u32 parent 0x" << Parent << std::dec << std::endl;
+
+    ret = nl_send_sync(nl.GetSock(), msg);
+    if (ret)
+        error = TError(EError::Unknown,
+                       std::string("Unable to add filter: nl_send_sync(): ") +
+                       nl_geterror(ret));
+
+    return error;
+
+free_msg:
+    nlmsg_free(msg);
+
+    return error;
+}
+
+TError TNlPoliceFilter::Delete(const TNl &nl) {
+    TError error = TError::Success();
+    struct tcmsg tchdr;
+    struct nl_msg *msg;
+    int ret;
+
+    tchdr.tcm_family = AF_UNSPEC;
+    tchdr.tcm_ifindex = Index;
+    tchdr.tcm_handle = 0;
+    tchdr.tcm_parent = Parent;
+    tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_IPV6));
+
+    msg = nlmsg_alloc_simple(RTM_DELTFILTER, 0);
+    if (!msg)
+        return TError(EError::Unknown, "Unable to del policer: no memory");
+
+    ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to del policer: ") +
+                                        nl_geterror(ret));
+        goto free_msg;
+    }
+
+    ret = nla_put(msg, TCA_OPTIONS, 0, NULL);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to del policer: ") +
+                                        nl_geterror(ret));
+        goto free_msg;
+    }
+
+    ret = nl_send_sync(nl.GetSock(), msg);
+    if (ret)
+        error = TError(EError::Unknown, std::string("Unable to del policer: ") +
+                                        nl_geterror(ret));
+    return error;
+
+free_msg:
+    nlmsg_free(msg);
+    return error;
+}
+
 TError TNlCgFilter::Create(const TNl &nl) {
     TError error = TError::Success();
     struct nl_msg *msg;
     int ret;
-	struct tcmsg tchdr;
+    struct tcmsg tchdr;
 
     tchdr.tcm_family = AF_UNSPEC;
     tchdr.tcm_ifindex = Index;
     tchdr.tcm_handle = Handle;
     tchdr.tcm_parent = Parent;
-	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_ALL));
+    tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_ALL));
 
-	msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
-	if (!msg)
+    msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
+    if (!msg)
         return TError(EError::Unknown, "Unable to add filter: no memory");
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
         error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
-		goto free_msg;
+        goto free_msg;
     }
 
     ret = nla_put(msg, TCA_KIND, strlen(FilterType) + 1, FilterType);
     if (ret < 0) {
         error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
-		goto free_msg;
+        goto free_msg;
     }
 
     ret = nla_put(msg, TCA_OPTIONS, 0, NULL);
     if (ret < 0) {
         error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
-		goto free_msg;
+        goto free_msg;
     }
 
     L() << "netlink " << Index

@@ -43,6 +43,7 @@ constexpr const char *P_IO_OPS_LIMIT = "io_ops_limit";
 constexpr const char *P_NET_GUARANTEE = "net_guarantee";
 constexpr const char *P_NET_LIMIT = "net_limit";
 constexpr const char *P_NET_PRIO = "net_priority";
+constexpr const char *P_NET_RX_LIMIT = "net_rx_limit";
 constexpr const char *P_RESPAWN = "respawn";
 constexpr const char *P_MAX_RESPAWNS = "max_respawns";
 constexpr const char *P_ISOLATE = "isolate";
@@ -182,6 +183,7 @@ enum class EProperty {
     CONTROLLERS,
     THREAD_LIMIT,
     SYSCTL,
+    NET_RX_LIMIT,
     NR_PROPERTIES,
 };
 

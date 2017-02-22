@@ -2069,6 +2069,60 @@ TError TNetLimit::GetIndexed(const std::string &index,
     return TError::Success();
 }
 
+class TNetRxLimit : public TProperty {
+public:
+    TNetRxLimit() : TProperty(P_NET_RX_LIMIT, EProperty::NET_RX_LIMIT,
+            "Maximum ingress bandwidth: <interface>|default: <Bps>;... (dynamic)") {}
+
+    TError Get(std::string &value) {
+        return UintMapToString(CT->NetRxLimit, value);
+    }
+
+    TError Set(const std::string &limit) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+
+        TUintMap new_limit;
+        error = StringToUintMap(limit, new_limit);
+        if (error)
+            return error;
+
+        if (CT->NetRxLimit != new_limit) {
+            CT->NetRxLimit = new_limit;
+            CT->SetProp(EProperty::NET_RX_LIMIT);
+        }
+
+        return TError::Success();
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (CT->NetRxLimit.find(index) == CT->NetRxLimit.end())
+            return TError(EError::InvalidValue, "invalid index " + index);
+
+        value = std::to_string(CT->NetRxLimit[index]);
+        return TError::Success();
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &limit) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+
+        uint64_t val;
+        error = StringToSize(limit, val);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid value " + limit);
+
+        if (CT->NetRxLimit[index] != val) {
+            CT->NetRxLimit[index] = val;
+            CT->SetProp(EProperty::NET_RX_LIMIT);
+        }
+
+        return TError::Success();
+    }
+} static NetRxLimit;
+
 class TNetPriority : public TProperty {
 public:
     TError Set(const std::string &prio);

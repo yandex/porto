@@ -8,6 +8,7 @@
 extern "C" {
 #include <arpa/inet.h>
 #include <linux/netlink.h>
+#include <linux/pkt_cls.h>
 }
 
 struct nl_sock;
@@ -175,5 +176,23 @@ public:
         Index(index), Parent(parent), Handle(handle) {}
     TError Create(const TNl &nl);
     bool Exists(const TNl &nl);
+    TError Delete(const TNl &nl);
+};
+
+class TNlPoliceFilter {
+public:
+    const char *FilterType = "u32";
+    int Index = 0;
+    int FilterPrio = 10;
+    uint32_t Parent = -1;
+    uint32_t Rate = 0;
+    uint32_t PeakRate = 0;
+    uint32_t Mtu = 65536;
+    uint32_t Burst = 65536;
+    uint32_t Action = TC_ACT_SHOT;
+
+    TNlPoliceFilter(int index, uint32_t parent, uint32_t handle) :
+        Index(index), Parent(parent) {}
+    TError Create(const TNl &nl);
     TError Delete(const TNl &nl);
 };

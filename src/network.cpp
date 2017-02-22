@@ -46,6 +46,8 @@ static TStringMap ContainerQdisc;
 static TUintMap ContainerQdiscLimit;
 static TUintMap ContainerQdiscQuantum;
 
+static TUintMap IngressBurst;
+
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
@@ -308,6 +310,9 @@ void TNetwork::InitializeConfig() {
         StringToUintMap(config().network().container_qdisc_limit(), ContainerQdiscLimit);
     if (config().network().has_container_qdisc_quantum())
         StringToUintMap(config().network().container_qdisc_quantum(), ContainerQdiscQuantum);
+
+    if (config().network().has_ingress_burst())
+        StringToUintMap(config().network().ingress_burst(), IngressBurst);
 }
 
 TError TNetwork::Destroy() {
@@ -323,7 +328,7 @@ TError TNetwork::Destroy() {
         TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
         error = qdisc.Delete(*Nl);
         if (error)
-            L_ERR() << "Cannot remove htb: " << error << std::endl;
+            L_ERR() << "Cannot remove root qdisc: " << error << std::endl;
     }
 
     return TError::Success();
@@ -350,6 +355,46 @@ void TNetwork::GetDeviceSpeed(TNetworkDevice &dev) const {
 
     dev.Ceil = dev.GetConfig(DeviceCeil, ceil);
     dev.Rate = dev.GetConfig(DeviceRate, rate);
+}
+
+
+TError TNetwork::CreateIngressQdisc(TUintMap &rate) {
+    TError error;
+
+    L() << "Setting up ingress qdisc" << std::endl;
+
+    for (auto &dev: Devices) {
+        if (!dev.Managed)
+            continue;
+
+        TNlQdisc ingress(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
+        (void)ingress.Delete(*Nl);
+
+        if (!dev.GetConfig(rate))
+            continue;
+
+        ingress.Kind = "ingress";
+
+        error = ingress.Create(*Nl);
+        if (error) {
+            L_WRN() << "Cannot create ingress qdisc: " << error << std::endl;
+            return error;
+        }
+
+        TNlPoliceFilter police(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
+        (void)police.Delete(*Nl);
+
+        police.Mtu = 65536; /* maximum GRO skb */
+        police.Rate = dev.GetConfig(rate);
+        police.Burst = dev.GetConfig(IngressBurst,
+                std::max(police.Mtu * 10, police.Rate / 10));
+
+        error = police.Create(*Nl);
+        if (error)
+            L_WRN() << "Can't create ingress filter: " << error << std::endl;
+    }
+
+    return error;
 }
 
 TError TNetwork::SetupQueue(TNetworkDevice &dev) {

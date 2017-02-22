@@ -173,6 +173,7 @@ public:
 
     TUintMap NetGuarantee;
     TUintMap NetLimit;
+    TUintMap NetRxLimit;
     TUintMap NetPriority;
 
     bool ToRespawn;
@@ -296,6 +297,7 @@ public:
 
     void ChooseTrafficClasses();
     TError UpdateTrafficClasses();
+    TError CreateIngressQdisc();
 
     bool MayRespawn();
     bool MayReceiveOom(int fd);

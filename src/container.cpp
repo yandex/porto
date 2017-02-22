@@ -1070,6 +1070,12 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
+    if (TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
+        error = CreateIngressQdisc();
+        if (error)
+            return error;
+    }
+
     if (TestClearPropDirty(EProperty::ULIMIT)) {
         for (auto &ct: Subtree()) {
             if (ct->State == EContainerState::Stopped ||
@@ -2777,6 +2783,14 @@ TError TContainer::UpdateTrafficClasses() {
     }
 
     return error;
+}
+
+TError TContainer::CreateIngressQdisc() {
+    if (!NetIsolate || Net == HostNetwork)
+        return TError(EError::InvalidValue, "Net rx limit requires isolated network");
+
+    auto net_lock = Net->ScopedLock();
+    return Net->CreateIngressQdisc(NetRxLimit);
 }
 
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
