@@ -41,7 +41,7 @@ public:
     void PrintAt(std::string str0, int x0, int y0, int w0, bool leftaligned = false,
                  int attr = 0);
     void Refresh();
-    void Clear();
+    void Erase();
     int Getch();
     void Save();
     void Restore();
@@ -82,12 +82,14 @@ public:
     void Unregister(const std::string &container, const std::string &variable);
     std::string GetValue(const std::string &container, const std::string &variable,
                          bool prev);
+    uint64_t GetDt();
     int Update(Porto::Connection &api);
 private:
     std::unordered_map<std::string, unsigned long> Containers;
     std::unordered_map<std::string, unsigned long> Variables;
     bool CacheSelector = false;
     std::map<std::string, std::map<std::string, Porto::GetResponse>> Cache[2];
+    uint64_t Time[2] = {0, 0};
 };
 
 namespace ValueFlags {
@@ -110,7 +112,7 @@ public:
     TPortoValue(TPortoValueCache &cache, TPortoContainer *container,
                 const std::string &variable, int flags, double multiplier = 1);
     ~TPortoValue();
-    void Process(unsigned long gone);
+    void Process();
     std::string GetValue() const;
     int GetLength() const;
     bool operator< (const TPortoValue &v);
@@ -141,13 +143,13 @@ public:
     TColumn(std::string title, TPortoValue var, bool left_aligned = false);
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
-    void Update(Porto::Connection &api, TPortoContainer* tree, int maxlevel);
+    void ClearCache();
+    void Update(TPortoContainer* tree, int maxlevel);
+    void Process();
     TPortoValue& At(TPortoContainer &row);
     void Highlight(bool enable);
-    void Process(unsigned long gone);
     int GetWidth();
     void SetWidth(int width);
-    void ClearCache();
 private:
     std::string Title;
     TPortoValue RootValue;
@@ -161,11 +163,14 @@ private:
 class TPortoTop {
 public:
     TPortoTop(Porto::Connection *api, std::string config);
+    void Update();
+    void Process();
+    void Sort();
     void Print(TConsoleScreen &screen);
 
     bool AddColumn(std::string desc);
+
     int RecreateColumns();
-    int Update(TConsoleScreen &screen);
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
     std::string SelectedContainer();
@@ -196,15 +201,12 @@ private:
     std::vector<std::vector<TCommonValue>> Common;
     std::unique_ptr<TPortoContainer> ContainerTree;
 
-    struct timespec LastUpdate = {0};
-
     int SelectedRow = 0;
     int SelectedColumn = 0;
     int FirstX = 0;
     int FirstRow = 0;
     int MaxRows = 0;
     int DisplayRows = 0;
-    int MaxLevel = -1; /* -1 -> set to MaxMaxLevel */
-    int MaxMaxLevel = 1;
+    int MaxLevel = 100;
 };
 

@@ -25,8 +25,10 @@ static double ParseValue(const std::string &value, bool map) {
     return ret + ParseNumber(value.substr(start_v));
 };
 
-static double DfDt(double curr, double prev,double gone_ms) {
-    return 1000.0 * (curr - prev) / gone_ms;
+static double DfDt(double curr, double prev, uint64_t dt) {
+    if (dt)
+        return 1000.0 * (curr - prev) / dt;
+    return 0;
 };
 
 static double PartOf(double value, double total) {
@@ -86,8 +88,8 @@ void TConsoleScreen::PrintAt(std::string str0, int x0, int y0, int w0, bool left
 void TConsoleScreen::Refresh() {
     refresh();
 }
-void TConsoleScreen::Clear() {
-    clear();
+void TConsoleScreen::Erase() {
+    erase();
 }
 int TConsoleScreen::Getch() {
     return wgetch(Wnd);
@@ -218,7 +220,7 @@ void TConsoleScreen::HelpDialog() {
          "enter - run top in container",
          "b - run bash in container",
          "space - pause",
-         "1,2,3,5,0 - set update time to 1s,2s,3s,5s and 10s",
+         "1,2,3,4,5,0 - set update time to 1s-5s and 10s",
          "q - quit",
          "h,? - help"};
     InfoDialog(help);
@@ -259,6 +261,10 @@ std::string TPortoValueCache::GetValue(const std::string &container,
     return Cache[CacheSelector ^ prev][container][variable].Value;
 }
 
+uint64_t TPortoValueCache::GetDt() {
+    return Time[CacheSelector] - Time[!CacheSelector];
+}
+
 int TPortoValueCache::Update(Porto::Connection &api) {
     std::vector<std::string> _containers;
     for (auto &iter : Containers)
@@ -271,6 +277,7 @@ int TPortoValueCache::Update(Porto::Connection &api) {
     CacheSelector = !CacheSelector;
     Cache[CacheSelector].clear();
     int ret = api.Get(_containers, _variables, Cache[CacheSelector]);
+    Time[CacheSelector] = GetCurrentTimeMs();
 
     return ret;
 }
@@ -305,7 +312,7 @@ TPortoValue::~TPortoValue() {
         Cache->Unregister(Container->GetName(), Variable);
 }
 
-void TPortoValue::Process(unsigned long gone) {
+void TPortoValue::Process() {
     if (Flags == ValueFlags::Container) {
         std::string name = Container->GetName();
         int level = Container->GetLevel();
@@ -319,8 +326,10 @@ void TPortoValue::Process(unsigned long gone) {
     }
 
     AsString = Cache->GetValue(Container->GetName(), Variable, false);
-    if (Flags == ValueFlags::Raw || AsString.length() == 0)
+    if (Flags == ValueFlags::Raw || AsString.length() == 0) {
+        AsNumber = -1;
         return;
+    }
 
     AsNumber = ParseValue(AsString, Flags & ValueFlags::Map);
 
@@ -328,7 +337,7 @@ void TPortoValue::Process(unsigned long gone) {
         std::string old = Cache->GetValue(Container->GetName(), Variable, true);
         if (old.length() == 0)
             old = AsString;
-        AsNumber = DfDt(AsNumber, ParseValue(old, Flags & ValueFlags::Map), gone);
+        AsNumber = DfDt(AsNumber, ParseValue(old, Flags & ValueFlags::Map), Cache->GetDt());
     }
 
     if (Flags & ValueFlags::PartOfRoot) {
@@ -341,7 +350,7 @@ void TPortoValue::Process(unsigned long gone) {
             std::string old = Cache->GetValue("/", Variable, true);
             if (old.length() == 0)
                 old = root_raw;
-            root_number = DfDt(root_number, ParseValue(old, Flags & ValueFlags::Map), gone);
+            root_number = DfDt(root_number, ParseValue(old, Flags & ValueFlags::Map), Cache->GetDt());
         }
 
         AsNumber = PartOf(AsNumber, root_number);
@@ -493,7 +502,7 @@ int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, b
     screen.PrintAt(p, x, y, Width, LeftAligned, selected ? A_REVERSE : 0);
     return Width;
 }
-void TColumn::Update(Porto::Connection &api, TPortoContainer* tree, int maxlevel) {
+void TColumn::Update(TPortoContainer* tree, int maxlevel) {
     tree->ForEach([&] (TPortoContainer &row) {
             TPortoValue val(RootValue, &row);
             Cache.insert(std::make_pair(row.GetName(), val));
@@ -505,9 +514,9 @@ TPortoValue& TColumn::At(TPortoContainer &row) {
 void TColumn::Highlight(bool enable) {
     Selected = enable;
 }
-void TColumn::Process(unsigned long gone) {
+void TColumn::Process() {
     for (auto &iter : Cache) {
-        iter.second.Process(gone);
+        iter.second.Process();
 
         int w = iter.second.GetLength();
         if (w > Width)
@@ -523,7 +532,6 @@ void TColumn::SetWidth(int width) {
 void TColumn::ClearCache() {
     Cache.clear();
 }
-
 void TPortoContainer::SortTree(TColumn &column) {
     Children.sort([&] (TPortoContainer *row1, TPortoContainer *row2) {
             return column.At(*row1) < column.At(*row2);
@@ -555,32 +563,75 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
     return y;
 }
 
+void TPortoTop::Update() {
+    for (auto &column : Columns)
+        column.ClearCache();
+    ContainerTree.reset(TPortoContainer::ContainerTree(*Api));
+    if (!ContainerTree)
+        return;
+    for (auto &column : Columns)
+        column.Update(ContainerTree.get(), MaxLevel);
+    Cache.Update(*Api);
+    Process();
+}
+
+void TPortoTop::Process() {
+    for (auto &column : Columns)
+        column.Process();
+    for (auto &line : Common)
+        for (auto &item : line)
+            item.GetValue().Process();
+    Sort();
+}
+
+void TPortoTop::Sort() {
+    if (ContainerTree)
+        ContainerTree->SortTree(Columns[SelectedColumn]);
+}
+
 void TPortoTop::Print(TConsoleScreen &screen) {
-    screen.Clear();
+
+    screen.Erase();
+
+    if (!ContainerTree)
+        return;
+
+    int width = 0;
+    for (auto &column : Columns)
+        width += column.GetWidth();
+
+    if (width > screen.Width()) {
+        int excess = width - screen.Width();
+        int current = Columns[0].GetWidth();
+        if (current > 30) {
+            current -= excess;
+            if (current < 30)
+                current = 30;
+        }
+        Columns[0].SetWidth(current);
+    }
 
     int at_row = 1 + PrintCommon(screen);
 
-    if (ContainerTree) {
-        MaxRows = 0;
-        ContainerTree->ForEach([&] (TPortoContainer &row) {
-                    MaxRows++;
-                }, MaxLevel);
-        DisplayRows = std::min(screen.Height() - at_row, MaxRows);
-        ChangeSelection(0, 0, screen);
+    MaxRows = 0;
+    ContainerTree->ForEach([&] (TPortoContainer &row) {
+                MaxRows++;
+        }, MaxLevel);
+    DisplayRows = std::min(screen.Height() - at_row, MaxRows);
+    ChangeSelection(0, 0, screen);
 
-        PrintTitle(at_row - 1, screen);
-        int y = 0;
-        ContainerTree->ForEach([&] (TPortoContainer &row) {
-                if (y >= FirstRow && y < MaxRows) {
-                    bool selected = y == FirstRow + SelectedRow;
-                    int x = FirstX;
-                    for (auto &c : Columns)
-                        x += 1 + c.Print(row, x, at_row + y - FirstRow, screen, selected);
-                }
-                y++;
-            }, MaxLevel);
-        screen.Refresh();
-    }
+    PrintTitle(at_row - 1, screen);
+    int y = 0;
+    ContainerTree->ForEach([&] (TPortoContainer &row) {
+            if (y >= FirstRow && y < MaxRows) {
+                bool selected = y == FirstRow + SelectedRow;
+                int x = FirstX;
+                for (auto &c : Columns)
+                    x += 1 + c.Print(row, x, at_row + y - FirstRow, screen, selected);
+            }
+            y++;
+        }, MaxLevel);
+    screen.Refresh();
 }
 void TPortoTop::AddColumn(const TColumn &c) {
     Columns.push_back(c);
@@ -650,55 +701,7 @@ bool TPortoTop::AddColumn(std::string desc) {
     Columns.push_back(TColumn(title, v));
     return true;
 }
-int TPortoTop::Update(TConsoleScreen &screen) {
-    struct timespec Now = {0};
-    clock_gettime(CLOCK_MONOTONIC, &Now);
-    unsigned long gone = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
-        (Now.tv_nsec - LastUpdate.tv_nsec) / 1000000;
-    LastUpdate = Now;
 
-    for (auto &column : Columns)
-        column.ClearCache();
-
-    ContainerTree.reset(TPortoContainer::ContainerTree(*Api));
-    if (ContainerTree) {
-        MaxMaxLevel = ContainerTree->GetMaxLevel();
-        if (MaxLevel == -1)
-            MaxLevel = MaxMaxLevel;
-
-        for (auto &column : Columns)
-            column.Update(*Api, ContainerTree.get(), MaxLevel);
-
-        int ret = Cache.Update(*Api);
-        if (ret)
-            return ret;
-
-        int width = 0;
-        for (auto &column : Columns) {
-            column.Process(gone);
-            width += column.GetWidth();
-        }
-
-        for (auto &line : Common)
-            for (auto &item : line)
-                item.GetValue().Process(gone);
-
-        if (width > screen.Width()) {
-            int excess = width - screen.Width();
-            int current = Columns[0].GetWidth();
-            if (current > 30) {
-                current -= excess;
-                if (current < 30)
-                    current = 30;
-            }
-            Columns[0].SetWidth(current);
-        }
-
-        ContainerTree->SortTree(Columns[SelectedColumn]);
-    }
-
-    return 0;
-}
 void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     SelectedRow += y;
     if (SelectedRow < 0) {
@@ -723,6 +726,9 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     }
     Columns[SelectedColumn].Highlight(true);
 
+    if (x)
+        Sort();
+
     if (x == 0 && y == 0) {
         int i = 0;
         int x = 0;
@@ -741,8 +747,13 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     }
 }
 void TPortoTop::Expand() {
-    if (++MaxLevel > MaxMaxLevel)
+    if (MaxLevel == 1)
+        MaxLevel = 2;
+    else if (MaxLevel == 2)
+        MaxLevel = 100;
+    else
         MaxLevel = 1;
+    Update();
 }
 int TPortoTop::StartStop() {
     std::string state;
@@ -915,6 +926,8 @@ int portotop(Porto::Connection *api, std::string config) {
 
     TPortoTop top(api, config);
 
+    top.Update();
+
     /* Main loop */
     TConsoleScreen screen;
     bool paused = false;
@@ -922,12 +935,13 @@ int portotop(Porto::Connection *api, std::string config) {
         if (exit_immediatly)
             break;
 
-        if (!paused && top.Update(screen))
-            break;
-
         top.Print(screen);
 
         switch (screen.Getch()) {
+        case ERR:
+            if (!paused)
+                top.Update();
+            break;
         case 'q':
         case 'Q':
             return EXIT_SUCCESS;
@@ -1044,6 +1058,9 @@ int portotop(Porto::Connection *api, std::string config) {
         case '3':
             screen.SetTimeout(3000);
             break;
+        case '4':
+            screen.SetTimeout(4000);
+            break;
         case '5':
             screen.SetTimeout(5000);
             break;
@@ -1051,7 +1068,6 @@ int portotop(Porto::Connection *api, std::string config) {
             screen.SetTimeout(10000);
             break;
         case 0:
-        case -1:
         case KEY_RESIZE:
         case KEY_MOUSE:
             break;
