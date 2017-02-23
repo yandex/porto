@@ -155,7 +155,12 @@ std::string StringFormatSize(uint64_t value)
     while (value >= (1ull<<(10*(i+1))) && size_unit[i+1])
         i++;
 
-    return StringFormat("%g%c", (double)value / (1ull<<(10*i)), size_unit[i]);
+    uint64_t div = 1ull << (10 * i);
+
+    if (value % div == 0)
+        return StringFormat("%llu%c", (unsigned long long)value / div, size_unit[i]);
+
+    return StringFormat("%.1f%c", (double)value / div, size_unit[i]);
 }
 
 /* 10.123s or H:MM:SS or Dd H:MM */
