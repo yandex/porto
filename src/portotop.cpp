@@ -297,10 +297,11 @@ void TPortoValue::Process(unsigned long gone) {
         std::string name = Container->GetName();
         int level = Container->GetLevel();
         if (level > 0) {
-            name = (Container->HasChildren() ? "+ " : "- ") +
+            name = std::string(level - 1, ' ') +
+                (Container->HasChildren() ? "+ " : "- ") +
                 name.substr(1 + name.rfind('/'));
-            AsString = std::string(2 * (level - 1), ' ') + name;
         }
+        AsString = name;
         return;
     }
 
@@ -371,7 +372,7 @@ TPortoValue& TCommonValue::GetValue() {
 }
 
 TPortoContainer::TPortoContainer(std::string container) : Container(container) {
-    if (Container == "/")
+    if (Container == "/" || Container == "self")
         Level = 0;
     else
         Level = 1 + std::count(container.begin(), container.end(), '/');
@@ -407,6 +408,10 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
     root = new TPortoContainer("/");
     prev = root;
 
+    auto self = new TPortoContainer("self");
+    self->Parent = root;
+    root->Children.push_back(self);
+
     for (auto &c : containers) {
         if (c == "/")
             continue;
@@ -431,13 +436,12 @@ std::string TPortoContainer::GetName() {
 int TPortoContainer::GetLevel() {
     return Level;
 }
-void TPortoContainer::ForEachChild(std::function<void (TPortoContainer&)> fn, int maxlevel,
-                               bool check_root) {
-    if ((Level || check_root) && Level <= maxlevel)
+void TPortoContainer::ForEach(std::function<void (TPortoContainer&)> fn, int maxlevel) {
+    if (Level <= maxlevel)
         fn(*this);
     if (Level < maxlevel)
         for (auto &c : Children)
-            c->ForEachChild(fn, maxlevel);
+            c->ForEach(fn, maxlevel);
 }
 int TPortoContainer::GetMaxLevel() {
     int level = Level;
@@ -446,17 +450,10 @@ int TPortoContainer::GetMaxLevel() {
             level = c->GetMaxLevel();
     return level;
 }
-int TPortoContainer::ChildrenCount(int max_level) {
-    int count = Level > 0 ? 1 : 0;
-    if (Level < max_level)
-        for (auto &c : Children)
-            count += c->ChildrenCount(max_level);
-    return count;
-}
 std::string TPortoContainer::ContainerAt(int n, int max_level) {
     TPortoContainer *ret = this;
     int i = 0;
-    ForEachChild([&] (TPortoContainer &row) {
+    ForEach([&] (TPortoContainer &row) {
             if (i++ == n)
                 ret = &row;
         }, max_level);
@@ -484,10 +481,10 @@ int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, b
     return Width;
 }
 void TColumn::Update(Porto::Connection &api, TPortoContainer* tree, int maxlevel) {
-    tree->ForEachChild([&] (TPortoContainer &row) {
+    tree->ForEach([&] (TPortoContainer &row) {
             TPortoValue val(RootValue, &row);
             Cache.insert(std::make_pair(row.GetName(), val));
-        }, maxlevel, true);
+        }, maxlevel);
 }
 TPortoValue& TColumn::At(TPortoContainer &row) {
     return Cache[row.GetName()];
@@ -551,13 +548,16 @@ void TPortoTop::Print(TConsoleScreen &screen) {
     int at_row = 1 + PrintCommon(screen);
 
     if (ContainerTree) {
-        MaxRows = ContainerTree->ChildrenCount(MaxLevel);
+        MaxRows = 0;
+        ContainerTree->ForEach([&] (TPortoContainer &row) {
+                    MaxRows++;
+                }, MaxLevel);
         DisplayRows = std::min(screen.Height() - at_row, MaxRows);
         ChangeSelection(0, 0, screen);
 
         PrintTitle(at_row - 1, screen);
         int y = 0;
-        ContainerTree->ForEachChild([&] (TPortoContainer &row) {
+        ContainerTree->ForEach([&] (TPortoContainer &row) {
                 if (y >= FirstRow && y < MaxRows) {
                     bool selected = y == FirstRow + SelectedRow;
                     int x = FirstX;
@@ -765,7 +765,8 @@ void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
 }
 
 int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
-    bool enter = (SelectedContainer() != "/");
+    auto container = SelectedContainer();
+    bool enter = (container != "/" && container != "self");
     int ret = -1;
 
     screen.Save();
@@ -777,7 +778,7 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     {
         if (enter)
             exit(execlp(program_invocation_name, program_invocation_name,
-                        "shell", SelectedContainer().c_str(), cmd.c_str(), nullptr));
+                        "shell", container.c_str(), cmd.c_str(), nullptr));
         else
             exit(execlp(cmd.c_str(), cmd.c_str(), nullptr));
         break;
@@ -819,19 +820,6 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
     AddCommon(0, "warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
     AddCommon(0, "uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
-
-    AddCommon(1, "Memory usage: ", "memory_usage", RootContainer, ValueFlags::Bytes);
-    AddCommon(1, "anon: ", "anon_usage", RootContainer, ValueFlags::Bytes);
-    AddCommon(1, "limit: ", "memory_limit_total", RootContainer, ValueFlags::Bytes);
-    AddCommon(1, "guarantee: ", "memory_guarantee_total", RootContainer, ValueFlags::Bytes);
-    AddCommon(1, "maj/s: ", "major_faults", RootContainer, ValueFlags::DfDt);
-
-    AddCommon(1, "CPU usage: ", "cpu_usage", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
-              ValueFlags::Multiplier, 1E9);
-    AddCommon(1, "system: ", "cpu_usage_system", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
-              ValueFlags::Multiplier, 1E9);
-    AddCommon(1, "wait: ", "cpu_wait", RootContainer, ValueFlags::DfDt | ValueFlags::Percents |
-              ValueFlags::Multiplier, 1E9);
 
     if (LoadConfig() != -1)
         return;

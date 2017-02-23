@@ -61,12 +61,10 @@ public:
     ~TPortoContainer();
     std::string GetName();
     int GetLevel();
-    void ForEachChild(std::function<void (TPortoContainer&)> fn, int maxlevel,
-                      bool check_root = false);
+    void ForEach(std::function<void (TPortoContainer&)> fn, int maxlevel);
     void SortTree(TColumn &column);
     int GetMaxLevel();
     bool HasChildren();
-    int ChildrenCount(int max_level);
     std::string ContainerAt(int n, int max_level);
     TPortoContainer* GetRoot() const;
 private:
