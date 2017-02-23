@@ -857,7 +857,8 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
               "write b/s: io_write[fs]' b",
 
               /* Network */
-              "net b/s: S(net_bytes) 'b",
+              "net tx: S(net_bytes) 'b",
+              "net rx: S(net_rx_bytes) 'b",
     };
     RecreateColumns();
 }
