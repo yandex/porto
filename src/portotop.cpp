@@ -103,6 +103,7 @@ void TConsoleScreen::Restore() {
 }
 int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &buttons) {
     int selected = 0;
+    bool done = false;
 
     int x0 = Width() / 2 - text.length() / 2;
     int y0 = Height() / 2 - 3;
@@ -112,9 +113,11 @@ int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &but
         w += b.length() + 1;
     int x00 = Width() / 2 - w / 2;
 
-    while (true) {
-        Clear();
+    WINDOW *win = newwin(5, std::max((int)text.length(), w) + 4, y0 - 1, std::min(x0, x00) - 2);
+    box(win, 0, 0);
+    wrefresh(win);
 
+    while (!done) {
         PrintAt(text, x0, y0, text.length(), false);
 
         int x = x00;
@@ -135,13 +138,16 @@ int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &but
                 selected = buttons.size() - 1;
             break;
         case '\n':
-            return selected;
+            done = true;
+            break;
         }
 
         Refresh();
     }
 
-    return -1;
+    delwin(win);
+
+    return selected;
 }
 void TConsoleScreen::ErrorDialog(Porto::Connection &api) {
     std::string message;
@@ -162,15 +168,19 @@ void TConsoleScreen::ErrorDialog(std::string message, int error) {
 }
 void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
     unsigned int w = 0;
+    unsigned int h = lines.size();
     for (auto &l : lines)
         if (l.length() > w)
             w = l.length();
     int x0 = Width() / 2 - w / 2;
-    int y0 = Height() / 2 - lines.size() / 2;
+    int y0 = Height() / 2 - h / 2;
+    bool done = false;
 
-    while (true) {
-        Clear();
+    WINDOW *win = newwin(h + 2, w + 4, y0 - 1, x0 - 2);
+    box(win, 0, 0);
+    wrefresh(win);
 
+    while (!done) {
         int n = 0;
         for (auto &l : lines) {
             PrintAt(l, x0, y0 + n, l.length(), false);
@@ -182,11 +192,14 @@ void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
         case -1:
             break;
         default:
-            return;
+            done = true;
+            break;
         }
 
         Refresh();
     }
+
+    delwin(win);
 }
 void TConsoleScreen::HelpDialog() {
     std::vector<std::string> help =
