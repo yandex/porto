@@ -1,3 +1,26 @@
+yandex-porto (3.3.2) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: append porto_namespace set inside enable_porto=isolate #PORTO-188
+
+  [ Maxim Samoylov ]
+  * network: ingress bandwidth limit
+
+  [ Konstantin Khlebnikov ]
+  * string: print only up to 1 digit after dicimal point for size values
+  * portotop: add net rx bytes
+  * portotop: add self and root containers
+  * portotop: add borders around dialogs
+  * portotop: update data only by periodically
+  * portotop: remember selected container
+  * portotop: sort states by importance
+  * portotop: show memory_limit/guarantee if total not supported
+  * portotop: print version
+  * portotop: destroy columns before containers
+  * portotop: adjust horizontal position
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 24 Feb 2017 17:39:20 +0300
+
 yandex-porto (3.3.1) unstable; urgency=low
 
   * porto: do not drop active connections
