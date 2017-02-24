@@ -615,16 +615,21 @@ void TPortoTop::Print(TConsoleScreen &screen) {
 
     MaxRows = 0;
     ContainerTree->ForEach([&] (TPortoContainer &row) {
-                MaxRows++;
+            if (row.GetName() == SelectedContainer)
+                SelectedRow = MaxRows;
+            MaxRows++;
         }, MaxLevel);
     DisplayRows = std::min(screen.Height() - at_row, MaxRows);
     ChangeSelection(0, 0, screen);
 
     PrintTitle(at_row - 1, screen);
     int y = 0;
+    SelectedContainer = "";
     ContainerTree->ForEach([&] (TPortoContainer &row) {
             if (y >= FirstRow && y < MaxRows) {
-                bool selected = y == FirstRow + SelectedRow;
+                bool selected = y == SelectedRow;
+                if (selected)
+                    SelectedContainer = row.GetName();
                 int x = FirstX;
                 for (auto &c : Columns)
                     x += 1 + c.Print(row, x, at_row + y - FirstRow, screen, selected);
@@ -704,18 +709,21 @@ bool TPortoTop::AddColumn(std::string desc) {
 
 void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     SelectedRow += y;
-    if (SelectedRow < 0) {
+
+    if (SelectedRow < 0)
         SelectedRow = 0;
-        FirstRow += y;
-        if (FirstRow < 0)
-            FirstRow = 0;
-    }
-    if (SelectedRow > DisplayRows - 1) {
-        SelectedRow = DisplayRows - 1;
-        FirstRow += y;
-        if (FirstRow > MaxRows - DisplayRows)
-            FirstRow = MaxRows - DisplayRows;
-    }
+
+    if (SelectedRow >= MaxRows)
+        SelectedRow = MaxRows - 1;
+
+    if (SelectedRow < FirstRow)
+        FirstRow = SelectedRow;
+
+    if (SelectedRow >= FirstRow + DisplayRows)
+        FirstRow = SelectedRow - DisplayRows + 1;
+
+    if (FirstRow + DisplayRows > MaxRows)
+        FirstRow = MaxRows - DisplayRows;
 
     Columns[SelectedColumn].Highlight(false);
     SelectedColumn += x;
@@ -728,6 +736,9 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
 
     if (x)
         Sort();
+
+    if (y)
+        SelectedContainer = "";
 
     if (x == 0 && y == 0) {
         int i = 0;
@@ -757,29 +768,29 @@ void TPortoTop::Expand() {
 }
 int TPortoTop::StartStop() {
     std::string state;
-    int ret = Api->GetData(SelectedContainer(), "state", state);
+    int ret = Api->GetData(SelectedContainer, "state", state);
     if (ret)
         return ret;
     if (state == "running" || state == "dead" || state == "meta")
-        return Api->Stop(SelectedContainer());
+        return Api->Stop(SelectedContainer);
     else
-        return Api->Start(SelectedContainer());
+        return Api->Start(SelectedContainer);
 }
 int TPortoTop::PauseResume() {
     std::string state;
-    int ret = Api->GetData(SelectedContainer(), "state", state);
+    int ret = Api->GetData(SelectedContainer, "state", state);
     if (ret)
         return ret;
     if (state == "paused")
-        return Api->Resume(SelectedContainer());
+        return Api->Resume(SelectedContainer);
     else
-        return Api->Pause(SelectedContainer());
+        return Api->Pause(SelectedContainer);
 }
 int TPortoTop::Kill(int signal) {
-    return Api->Kill(SelectedContainer(), signal);
+    return Api->Kill(SelectedContainer, signal);
 }
 int TPortoTop::Destroy() {
-    return Api->Destroy(SelectedContainer());
+    return Api->Destroy(SelectedContainer);
 }
 void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
     std::string s(program_invocation_name);
@@ -789,8 +800,7 @@ void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
 }
 
 int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
-    auto container = SelectedContainer();
-    bool enter = (container != "/" && container != "self");
+    bool enter = (SelectedContainer != "/" && SelectedContainer != "self");
     int ret = -1;
 
     screen.Save();
@@ -802,7 +812,7 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     {
         if (enter)
             exit(execlp(program_invocation_name, program_invocation_name,
-                        "shell", container.c_str(), cmd.c_str(), nullptr));
+                        "shell", SelectedContainer.c_str(), cmd.c_str(), nullptr));
         else
             exit(execlp(cmd.c_str(), cmd.c_str(), nullptr));
         break;
@@ -819,9 +829,6 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
         screen.Dialog(strerror(ret), {"Ok"});
 
     return ret;
-}
-std::string TPortoTop::SelectedContainer() {
-    return ContainerTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
 }
 void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var,
                           TPortoContainer &container, int flags, double multiplier) {
@@ -966,6 +973,12 @@ int portotop(Porto::Connection *api, std::string config) {
         case KEY_RIGHT:
             top.ChangeSelection(1, 0, screen);
             break;
+        case KEY_HOME:
+            top.ChangeSelection(-1000, 0, screen);
+            break;
+        case KEY_END:
+            top.ChangeSelection(1000, 0, screen);
+            break;
         case '\t':
             top.Expand();
             break;
@@ -974,14 +987,14 @@ int portotop(Porto::Connection *api, std::string config) {
             break;
         case 's':
         case 'S':
-            if (screen.Dialog("Start/stop container " + top.SelectedContainer(),
+            if (screen.Dialog("Start/stop container " + top.SelectedContainer,
                               {"No", "Yes"}) == 1)
                 if (top.StartStop())
                     screen.ErrorDialog(*api);
             break;
         case 'p':
         case 'P':
-            if (screen.Dialog("Pause/resume container " + top.SelectedContainer(),
+            if (screen.Dialog("Pause/resume container " + top.SelectedContainer,
                               {"No", "Yes"}) == 1)
                 if (top.PauseResume())
                     screen.ErrorDialog(*api);
@@ -989,7 +1002,7 @@ int portotop(Porto::Connection *api, std::string config) {
         case 'K':
         {
             int signal = -1;
-            switch (screen.Dialog("Kill container " + top.SelectedContainer(),
+            switch (screen.Dialog("Kill container " + top.SelectedContainer,
                                   {"Cancel", "SIGTERM", "SIGINT", "SIGKILL", "SIGHUP"})) {
             case 1:
                 signal = SIGTERM;
@@ -1011,7 +1024,7 @@ int portotop(Porto::Connection *api, std::string config) {
         }
         case 'd':
         case 'D':
-            if (screen.Dialog("Destroy container " + top.SelectedContainer(),
+            if (screen.Dialog("Destroy container " + top.SelectedContainer,
                               {"No", "Yes"}) == 1)
                 if (top.Destroy())
                     screen.ErrorDialog(*api);
@@ -1026,19 +1039,19 @@ int portotop(Porto::Connection *api, std::string config) {
         case 'g':
         case 'G':
             screen.Save();
-            top.LessPortoctl(top.SelectedContainer(), "");
+            top.LessPortoctl(top.SelectedContainer, "");
             screen.Restore();
             break;
         case 'o':
         case 'O':
             screen.Save();
-            top.LessPortoctl(top.SelectedContainer(), "stdout");
+            top.LessPortoctl(top.SelectedContainer, "stdout");
             screen.Restore();
             break;
         case 'e':
         case 'E':
             screen.Save();
-            top.LessPortoctl(top.SelectedContainer(), "stderr");
+            top.LessPortoctl(top.SelectedContainer, "stderr");
             screen.Restore();
             break;
         case 'l':

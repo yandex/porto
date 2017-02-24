@@ -173,7 +173,6 @@ public:
     int RecreateColumns();
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
-    std::string SelectedContainer();
     void Expand();
 
     int StartStop();
@@ -184,6 +183,7 @@ public:
     int RunCmdInContainer(TConsoleScreen &screen, std::string cmd);
     int SaveConfig();
     int LoadConfig();
+    std::string SelectedContainer;
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
