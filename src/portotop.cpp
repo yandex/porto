@@ -876,6 +876,12 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
     if (LoadConfig() != -1)
         return;
 
+    std::vector<Porto::Property> data;
+    api->Dlist(data);
+    bool mem_total = false;
+    for (auto &d: data)
+        mem_total |= d.Name == "memory_limit_total";
+
     Config = {"state: state",
               "time: time s",
 
@@ -888,18 +894,25 @@ TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
               /* Memory */
               "memory: memory_usage b",
               "anon: anon_usage b",
-              "limit: memory_limit_total b",
-              "guarantee: memory_guarantee_total b",
-
-              /* I/O */
-              "maj/s: major_faults'",
-              "read b/s: io_read[fs]' b",
-              "write b/s: io_write[fs]' b",
-
-              /* Network */
-              "net tx: S(net_bytes) 'b",
-              "net rx: S(net_rx_bytes) 'b",
     };
+
+    if (mem_total) {
+              Config.push_back("limit: memory_limit_total b");
+              Config.push_back("guarantee: memory_guarantee_total b");
+    } else {
+              Config.push_back("limit: memory_limit b");
+              Config.push_back("guarantee: memory_guarantee b");
+    }
+
+    /* I/O */
+    Config.push_back("maj/s: major_faults'");
+    Config.push_back("read b/s: io_read[fs]' b");
+    Config.push_back("write b/s: io_write[fs]' b");
+
+    /* Network */
+    Config.push_back("net tx: S(net_bytes) 'b");
+    Config.push_back("net rx: S(net_rx_bytes) 'b");
+
     RecreateColumns();
 }
 int TPortoTop::RecreateColumns() {
