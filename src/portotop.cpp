@@ -775,19 +775,21 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
 
     if (x == 0 && y == 0) {
         int i = 0;
-        int x = 0;
+        int x = FirstX;
         for (auto &c : Columns) {
-            if (i == SelectedColumn && FirstX + x <= 0) {
-                FirstX = x;
-                break;
+            if (i == SelectedColumn && x <= 0) {
+                FirstX -= x;
+                x = 0;
             }
             x += c.GetWidth() + 1;
             if (i == SelectedColumn && x > screen.Width()) {
-                FirstX = -x + screen.Width();
-                break;
+                FirstX -= x - screen.Width();
+                x = screen.Width();
             }
             i++;
         }
+        if (FirstX < 0 && x < screen.Width())
+            FirstX += std::min(screen.Width() - x, -FirstX);
     }
 }
 void TPortoTop::Expand() {
