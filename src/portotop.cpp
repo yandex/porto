@@ -1,6 +1,7 @@
 #include <unordered_map>
 
 #include "portotop.hpp"
+#include "version.hpp"
 
 static double ParseNumber(const std::string &str) {
     try {
@@ -205,7 +206,9 @@ void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
 }
 void TConsoleScreen::HelpDialog() {
     std::vector<std::string> help =
-        {"horizontal arrows - change sorting/scroll",
+        {std::string("portoctl top ") + PORTO_VERSION + " " + PORTO_REVISION,
+         "",
+         "horizontal arrows - change sorting/scroll",
          "vertical arrows / j,k - select container/scroll",
          "tab - expand subcontainers",
          "s - start/stop container",
@@ -278,6 +281,8 @@ int TPortoValueCache::Update(Porto::Connection &api) {
     Cache[CacheSelector].clear();
     int ret = api.Get(_containers, _variables, Cache[CacheSelector]);
     Time[CacheSelector] = GetCurrentTimeMs();
+
+    api.GetVersion(Version, Revision);
 
     return ret;
 }
@@ -574,6 +579,13 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
             p = item.GetValue().GetValue();
             screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
             x += p.length() + 1;
+        }
+        if (!y) {
+            std::string p = "ver: ";
+            screen.PrintAt(p, x, y, p.length());
+            x += p.length();
+            p = Cache.Version;
+            screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
         }
         y++;
         x = 0;

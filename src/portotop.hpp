@@ -84,6 +84,7 @@ public:
                          bool prev);
     uint64_t GetDt();
     int Update(Porto::Connection &api);
+    std::string Version, Revision;
 private:
     std::unordered_map<std::string, unsigned long> Containers;
     std::unordered_map<std::string, unsigned long> Variables;
