@@ -198,10 +198,10 @@ private:
     TPortoValueCache Cache;
     std::string ConfigFile;
     std::vector<std::string> Config;
-    std::vector<TColumn> Columns;
     TPortoContainer RootContainer;
     std::vector<std::vector<TCommonValue>> Common;
     std::unique_ptr<TPortoContainer> ContainerTree;
+    std::vector<TColumn> Columns;
 
     int SelectedRow = 0;
     int SelectedColumn = 0;
