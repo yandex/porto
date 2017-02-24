@@ -64,7 +64,7 @@ public:
     void ForEach(std::function<void (TPortoContainer&)> fn, int maxlevel);
     void SortTree(TColumn &column);
     int GetMaxLevel();
-    bool HasChildren();
+    int ChildrenCount();
     std::string ContainerAt(int n, int max_level);
     TPortoContainer* GetRoot() const;
 private:
@@ -102,6 +102,7 @@ namespace ValueFlags {
     static const int Bytes = 0x20;
     static const int Percents = 0x40;
     static const int Multiplier = 0x80;
+    static const int State = 0x100;
 };
 
 class TPortoValue {

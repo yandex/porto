@@ -318,7 +318,7 @@ void TPortoValue::Process() {
         int level = Container->GetLevel();
         if (level > 0) {
             name = std::string(level - 1, ' ') +
-                (Container->HasChildren() ? "+ " : "- ") +
+                (Container->ChildrenCount() ? "+ " : "- ") +
                 name.substr(1 + name.rfind('/'));
         }
         AsString = name;
@@ -326,6 +326,24 @@ void TPortoValue::Process() {
     }
 
     AsString = Cache->GetValue(Container->GetName(), Variable, false);
+
+    if (Flags == ValueFlags::State) {
+        AsNumber = 0;
+        if (AsString == "running")
+            AsNumber = 1000;
+        else if (AsString == "meta")
+            AsNumber = 500;
+        else if (AsString == "starting")
+            AsNumber = 300;
+        else if (AsString == "paused")
+            AsNumber = 200;
+        else if (AsString == "dead")
+            AsNumber = 100;
+        if (Container)
+            AsNumber += Container->ChildrenCount();
+        return;
+    }
+
     if (Flags == ValueFlags::Raw || AsString.length() == 0) {
         AsNumber = -1;
         return;
@@ -481,8 +499,8 @@ std::string TPortoContainer::ContainerAt(int n, int max_level) {
         }, max_level);
     return ret->GetName();
 }
-bool TPortoContainer::HasChildren() {
-    return Children.size() > 0;
+int TPortoContainer::ChildrenCount() {
+    return Children.size();
 }
 TPortoContainer* TPortoContainer::GetRoot() const {
     return Root;
@@ -649,6 +667,9 @@ bool TPortoTop::AddColumn(std::string desc) {
     off = desc.find(':');
     std::string title = desc.substr(0, off);
     desc = desc.substr(off + 2);
+
+    if (desc == "state")
+        flags = ValueFlags::State;
 
     if (desc.length() > 4 && desc[0] == 'S' && desc[1] == '(') {
         off = desc.find(')');
