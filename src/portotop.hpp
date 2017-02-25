@@ -42,6 +42,7 @@ public:
                  int attr = 0);
     void Refresh();
     void Erase();
+    void Clear();
     int Getch();
     void Save();
     void Restore();
@@ -164,7 +165,7 @@ private:
 
 class TPortoTop {
 public:
-    TPortoTop(Porto::Connection *api, std::string config);
+    TPortoTop(Porto::Connection *api, const std::vector<std::string> &args);
     void Update();
     void Process();
     void Sort();
@@ -183,9 +184,10 @@ public:
     int Destroy();
     void LessPortoctl(std::string container, std::string cmd);
     int RunCmdInContainer(TConsoleScreen &screen, std::string cmd);
-    int SaveConfig();
-    int LoadConfig();
     std::string SelectedContainer;
+
+    int Delay = 3000;
+    bool Paused = false;
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
@@ -196,7 +198,6 @@ private:
 
     Porto::Connection *Api;
     TPortoValueCache Cache;
-    std::string ConfigFile;
     std::vector<std::string> Config;
     TPortoContainer RootContainer;
     std::vector<std::vector<TCommonValue>> Common;

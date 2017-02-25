@@ -1468,17 +1468,14 @@ public:
     }
 };
 
-extern int portotop(Porto::Connection *api, std::string config);
+extern int portotop(Porto::Connection *api, const std::vector<std::string> &args);
 class TTopCmd final : public ICmd {
 public:
     TTopCmd(Porto::Connection *api) : ICmd(api, "top", 0, "[config]", "top-like tool for container monitoring and control") {}
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        if (args.empty())
-            return portotop(Api, "");
-        else
-            return portotop(Api, args[0]);
+        return portotop(Api, args);
     }
 };
 

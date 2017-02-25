@@ -51,7 +51,6 @@ TConsoleScreen::TConsoleScreen() {
     noecho();
     intrflush(stdscr, true);
     keypad(stdscr, true);
-    SetTimeout(3000);
     curs_set(0);
 }
 TConsoleScreen::~TConsoleScreen() {
@@ -91,6 +90,9 @@ void TConsoleScreen::Refresh() {
 }
 void TConsoleScreen::Erase() {
     erase();
+}
+void TConsoleScreen::Clear() {
+    clear();
 }
 int TConsoleScreen::Getch() {
     return wgetch(Wnd);
@@ -204,26 +206,30 @@ void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
 
     delwin(win);
 }
+
 void TConsoleScreen::HelpDialog() {
     std::vector<std::string> help =
         {std::string("portoctl top ") + PORTO_VERSION + " " + PORTO_REVISION,
          "",
-         "horizontal arrows - change sorting/scroll",
-         "vertical arrows / j,k - select container/scroll",
-         "tab - expand subcontainers",
-         "s - start/stop container",
-         "p - pause/resume container",
-         "K - kill container",
-         "d - destroy container",
-         "g - show container properties",
-         "o - show container stdout",
-         "e - show container stderr",
-         "w - save portotop config",
-         "l - load portotop config",
-         "enter - run top in container",
+         "left, right, home, end - change sorting/scroll",
+         "up, down, page up, page down - select container/scroll",
+         "tab - expand conteainers tree: first, second, all",
+         "",
+         "1-9,0 - set update delay to 1s-9s and 10s",
+         "space - pause/resume screen updates",
+         "u - update screen",
+         "",
+         "g - get properties",
+         "o - show stdout",
+         "e - show stderr",
+         "t - run top in container",
          "b - run bash in container",
-         "space - pause",
-         "1,2,3,4,5,0 - set update time to 1s-5s and 10s",
+         "",
+         "S - start/stop container",
+         "P - pause/resume container",
+         "K - kill container",
+         "D - destroy container",
+         "",
          "q - quit",
          "h,? - help"};
     InfoDialog(help);
@@ -581,11 +587,19 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
             x += p.length() + 1;
         }
         if (!y) {
-            std::string p = "ver: ";
+            std::string p = "Version: ";
             screen.PrintAt(p, x, y, p.length());
             x += p.length();
             p = Cache.Version;
             screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
+            x += p.length() + 1;
+
+            p = "Update: ";
+            screen.PrintAt(p, x, y, p.length());
+            x += p.length();
+            p = Paused ? "paused" : StringFormatDuration(Delay);
+            screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
+            x += p.length() + 1;
         }
         y++;
         x = 0;
@@ -871,24 +885,15 @@ void TPortoTop::AddCommon(int row, const std::string &title, const std::string &
     TPortoValue v(Cache, &container, var, flags, multiplier);
     Common[row].push_back(TCommonValue(title, v));
 }
-TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
-                                                           RootContainer("/") {
-    if (config.size() == 0)
-        ConfigFile = std::string(getenv("HOME")) + "/.portotop";
-    else
-        ConfigFile = config;
-
+TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &args) : Api(api), RootContainer("/") {
     AddCommon(0, "Containers running: ", "porto_stat[running]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "of ", "porto_stat[containers]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Volumes: ", "porto_stat[volumes]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "Porto clients: ", "porto_stat[clients]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Clients: ", "porto_stat[clients]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
-    AddCommon(0, "uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
-
-    if (LoadConfig() != -1)
-        return;
+    AddCommon(0, "Uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
 
     std::vector<Porto::Property> data;
     api->Dlist(data);
@@ -939,76 +944,49 @@ int TPortoTop::RecreateColumns() {
 
     return 0;
 }
-int TPortoTop::SaveConfig() {
-    std::ofstream out(ConfigFile);
-    if (out.is_open()) {
-        for (auto &s : Config)
-            out << s << std::endl;
-        return 0;
-    } else
-        return -1;
-}
-int TPortoTop::LoadConfig() {
-    int ret = 0;
-    Config.clear();
-    std::ifstream in(ConfigFile);
-
-    if (in.is_open()) {
-        for (std::string line; getline(in, line);)
-            if (line.size()) {
-                Config.push_back(line);
-                ret++;
-            }
-
-        RecreateColumns();
-
-        return ret;
-    }
-
-    return -1;
-}
 
 static bool exit_immediatly = false;
 void exit_handler(int unused) {
     exit_immediatly = true;
 }
 
-int portotop(Porto::Connection *api, std::string config) {
+int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
     Signal(SIGINT, exit_handler);
     Signal(SIGTERM, exit_handler);
     Signal(SIGTTOU, SIG_IGN);
     Signal(SIGTTIN, SIG_IGN);
 
-    TPortoTop top(api, config);
+    TPortoTop top(api, args);
 
     top.Update();
 
     /* Main loop */
     TConsoleScreen screen;
-    bool paused = false;
+
+    screen.SetTimeout(top.Delay);
+
     while (true) {
         if (exit_immediatly)
             break;
 
         top.Print(screen);
 
-        switch (screen.Getch()) {
+        int button = screen.Getch();
+        switch (button) {
         case ERR:
-            if (!paused)
+            if (!top.Paused)
                 top.Update();
             break;
         case 'q':
         case 'Q':
             return EXIT_SUCCESS;
             break;
-        case 'k':
         case KEY_UP:
             top.ChangeSelection(0, -1, screen);
             break;
         case KEY_PPAGE:
             top.ChangeSelection(0, -10, screen);
             break;
-        case 'j':
         case KEY_DOWN:
             top.ChangeSelection(0, 1, screen);
             break;
@@ -1031,21 +1009,25 @@ int portotop(Porto::Connection *api, std::string config) {
             top.Expand();
             break;
         case ' ':
-            paused = !paused;
+            top.Paused = !top.Paused;
             break;
-        case 's':
         case 'S':
             if (screen.Dialog("Start/stop container " + top.SelectedContainer,
-                              {"No", "Yes"}) == 1)
+                              {"No", "Yes"}) == 1) {
                 if (top.StartStop())
                     screen.ErrorDialog(*api);
+                else
+                    top.Update();
+            }
             break;
-        case 'p':
         case 'P':
             if (screen.Dialog("Pause/resume container " + top.SelectedContainer,
-                              {"No", "Yes"}) == 1)
+                              {"No", "Yes"}) == 1) {
                 if (top.PauseResume())
                     screen.ErrorDialog(*api);
+                else
+                    top.Update();
+            }
             break;
         case 'K':
         {
@@ -1065,68 +1047,57 @@ int portotop(Porto::Connection *api, std::string config) {
                 signal = SIGHUP;
                 break;
             }
-            if (signal > 0)
+            if (signal > 0) {
                 if (top.Kill(signal))
                     screen.ErrorDialog(*api);
+                else
+                    top.Update();
+            }
             break;
         }
-        case 'd':
         case 'D':
             if (screen.Dialog("Destroy container " + top.SelectedContainer,
-                              {"No", "Yes"}) == 1)
+                              {"No", "Yes"}) == 1) {
                 if (top.Destroy())
                     screen.ErrorDialog(*api);
+                else
+                    top.Update();
+            }
             break;
-        case '\n':
+        case 't':
             top.RunCmdInContainer(screen, "top");
             break;
         case 'b':
-        case 'B':
             top.RunCmdInContainer(screen, "bash");
             break;
         case 'g':
-        case 'G':
             screen.Save();
             top.LessPortoctl(top.SelectedContainer, "");
             screen.Restore();
             break;
         case 'o':
-        case 'O':
             screen.Save();
             top.LessPortoctl(top.SelectedContainer, "stdout");
             screen.Restore();
             break;
         case 'e':
-        case 'E':
             screen.Save();
             top.LessPortoctl(top.SelectedContainer, "stderr");
             screen.Restore();
             break;
-        case 'l':
-        case 'L':
-            screen.ErrorDialog("Can't load config", top.LoadConfig());
-            break;
-        case 'w':
-        case 'W':
-            screen.ErrorDialog("Can't save config", top.SaveConfig());
-            break;
-        case '1':
-            screen.SetTimeout(1000);
-            break;
-        case '2':
-            screen.SetTimeout(2000);
-            break;
-        case '3':
-            screen.SetTimeout(3000);
-            break;
-        case '4':
-            screen.SetTimeout(4000);
-            break;
-        case '5':
-            screen.SetTimeout(5000);
-            break;
         case '0':
-            screen.SetTimeout(10000);
+            top.Delay = 10000;
+            top.Paused = false;
+            screen.SetTimeout(top.Delay);
+            break;
+        case '1'...'9':
+            top.Delay = (button - '0') * 1000;
+            top.Paused = false;
+            screen.SetTimeout(top.Delay);
+            break;
+        case 'u':
+            top.Update();
+            screen.Clear();
             break;
         case 0:
         case KEY_RESIZE:
