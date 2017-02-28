@@ -109,6 +109,7 @@ public:
     TCred OwnerCred;
     TCred TaskCred;
     std::string Command;
+    std::string CoreCommand;
     std::string Cwd;
     TStdStream Stdin, Stdout, Stderr;
     std::string Root;

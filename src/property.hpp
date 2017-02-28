@@ -70,6 +70,7 @@ constexpr const char *P_CONTROLLERS = "controllers";
 constexpr const char *P_OOM_IS_FATAL = "oom_is_fatal";
 constexpr const char *P_THREAD_LIMIT = "thread_limit";
 constexpr const char *P_SYSCTL = "sysctl";
+constexpr const char *P_CORE_COMMAND = "core_command";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
@@ -184,6 +185,7 @@ enum class EProperty {
     THREAD_LIMIT,
     SYSCTL,
     NET_RX_LIMIT,
+    CORE_COMMAND,
     NR_PROPERTIES,
 };
 

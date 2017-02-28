@@ -92,6 +92,10 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_proxy_ndp(true);
     config().mutable_network()->set_watchdog_ms(60000);
 
+    config().mutable_core()->set_enable(false);
+    config().mutable_core()->set_timeout_s(600); /* 10min */
+    config().mutable_core()->set_space_limit_mb(1024); /* 1Gb */
+
     NetSysctl("net.ipv6.conf.all.accept_dad", "0");
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");
 }

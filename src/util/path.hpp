@@ -115,6 +115,8 @@ public:
     std::string ToString() const;
     bool Exists() const;
 
+    uint64_t DirectorySize() const;
+
     TError Chdir() const;
     TError Chroot() const;
     TError PivotRoot() const;

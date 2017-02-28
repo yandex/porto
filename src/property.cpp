@@ -640,6 +640,27 @@ public:
     }
 } static Command;
 
+class TCoreCommand : public TProperty {
+public:
+    TCoreCommand() : TProperty(P_CORE_COMMAND, EProperty::CORE_COMMAND,
+                           "Command for receiving core dump") {}
+    void Init(void) {
+        IsSupported = config().core().enable();
+    }
+    TError Get(std::string &command) {
+        command = CT->CoreCommand;
+        return TError::Success();
+    }
+    TError Set(const std::string &command) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        CT->CoreCommand = command;
+        CT->SetProp(EProperty::CORE_COMMAND);
+        return TError::Success();
+    }
+} static CoreCommand;
+
 class TVirtMode : public TProperty {
 public:
     TError Set(const std::string &virt_mode);

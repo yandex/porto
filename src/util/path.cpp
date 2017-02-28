@@ -638,6 +638,19 @@ int64_t TPath::SinceModificationMs() const {
            (int64_t)st.st_mtim.tv_sec * 1000 - st.st_mtim.tv_nsec / 1000000;
 }
 
+uint64_t TPath::DirectorySize() const {
+    std::vector<std::string> list;
+    if (ReadDirectory(list))
+        return 0;
+    uint64_t size = 0;
+    for (auto &file: list) {
+        struct stat st;
+        if (!(*this / file).StatStrict(st))
+            size += st.st_blocks * 512;
+    }
+    return size;
+}
+
 TError TPath::SetXAttr(const std::string name, const std::string value) const {
     if (syscall(SYS_setxattr, Path.c_str(), name.c_str(),
                 value.c_str(), value.length(), 0))
