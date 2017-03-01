@@ -2406,7 +2406,7 @@ public:
         else
             return TError(EError::InvalidValue, "Unknown access level: " + value);
 
-        if (level > EAccessLevel::None) {
+        if (level > EAccessLevel::None && !CL->IsSuperUser()) {
             for (auto p = CT->Parent; p; p = p->Parent)
                 if (!Compatible(p->AccessLevel, level))
                     return TError(EError::Permission, "Parent container has lower access level");
