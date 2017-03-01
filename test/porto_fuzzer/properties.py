@@ -242,3 +242,19 @@ def Root(conn):
     ] )
 
     return ("root" )
+
+def Ip():
+    return ("ip", select_by_weight( [
+            (1, ""),
+            (1, "kettle ::{};eth0 ::{}".format(randint(0, 65535), randint(0, 65535)))
+        ] )
+    )
+
+def Net():
+    return ("net", select_by_weight( [
+            (1, ""),
+            (1, "inherited"),
+            (1, "L3 kettle"),
+            (1, "macvlan eth0 eth0")
+        ] )
+    )

@@ -87,6 +87,8 @@ def SetProperty(conn,dest):
             (20, properties.OwnerGroup),
             (12, properties.Hostname),
             (20, properties.VirtMode),
+            (30, properties.Net),
+            (30, properties.Ip),
             (20, functools.partial(properties.Root, conn))
             ]
     )()
