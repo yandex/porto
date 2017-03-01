@@ -1460,8 +1460,19 @@ static int PortodMain() {
 
     AllocStatistics();
 
-    close(STDIN_FILENO);
-    PORTO_ASSERT(open("/dev/null", O_RDONLY) == STDIN_FILENO);
+    (void)close(STDIN_FILENO);
+    int null = open("/dev/null", O_RDWR);
+    PORTO_ASSERT(null == STDIN_FILENO);
+
+    if (!stdlog || fcntl(STDOUT_FILENO, F_GETFD) < 0) {
+        int ret = dup2(null, STDOUT_FILENO);
+        PORTO_ASSERT(ret == STDOUT_FILENO);
+    }
+
+    if (!stdlog || fcntl(STDERR_FILENO, F_GETFD) < 0) {
+        int ret = dup2(null, STDERR_FILENO);
+        PORTO_ASSERT(ret == STDERR_FILENO);
+    }
 
     try {
         if (slaveMode)
