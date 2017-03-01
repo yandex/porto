@@ -1442,6 +1442,21 @@ TError TVolume::Destroy(bool strict) {
                     container->Volumes.erase(vol_iter);
             }
         }
+
+        volumes_lock.unlock();
+
+        for (auto &layer: volume->Layers) {
+            TStorage storage(volume->Place, PORTO_LAYERS, layer);
+            if (StringStartsWith(layer, PORTO_WEAK_PREFIX)) {
+                error = storage.Remove();
+                if (error && error.GetError() != EError::Busy)
+                    L_ERR() << "Cannot remove weak layer " << layer
+                            << " : " << error << std::endl;
+            } else if (layer[0] != '/')
+                (void)storage.Touch();
+        }
+
+        volumes_lock.lock();
     }
 
     VolumesCv.notify_all();
@@ -1540,16 +1555,6 @@ TError TVolume::DestroyOne(bool strict) {
         ret = error;
 
     lock.unlock();
-
-    for (auto &layer: Layers) {
-        TStorage storage(Place, PORTO_LAYERS, layer);
-        if (StringStartsWith(layer, PORTO_WEAK_PREFIX)) {
-            error = storage.Remove();
-            if (error && error.GetError() != EError::Busy)
-                L_ERR() << "Cannot remove layer: " << error << std::endl;
-        } else if (layer[0] != '/')
-            (void)storage.Touch();
-    }
 
     return ret;
 }
@@ -2066,6 +2071,25 @@ void TVolume::RestoreAll(void) {
         error = dir.RemoveAll();
         if (error)
             L_ERR() << "Cannot remove directory " << dir << std::endl;
+    }
+
+    L_ACT() << "Remove stale weak layers..." << std::endl;
+
+    std::list<TStorage> layers;
+
+    error = TStorage::List(place, PORTO_LAYERS, layers);
+    if (!error) {
+        for (auto &layer : layers) {
+            if (StringStartsWith(layer.Name, PORTO_WEAK_PREFIX)) {
+
+                error = layer.Remove();
+                if (error && error.GetError() != EError::Busy)
+                    L_ERR() << "Cannot remove weak layer " << layer.Name
+                            << " : " << error << std::endl;
+            }
+        }
+    } else {
+        L_WRN() << "Layers listing failed : " << error << std::endl;
     }
 }
 

@@ -974,9 +974,10 @@ static int SlaveMain() {
 
         SystemClient.ReleaseContainer();
 
+        SystemClient.StartRequest();
         DestroyContainers(false);
-
         TVolume::DestroyAll();
+        SystemClient.FinishRequest();
 
         SystemClient.LockContainer(RootContainer);
 
