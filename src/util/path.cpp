@@ -474,7 +474,7 @@ TError TFile::ClearDirectory() const {
     struct stat top_st, st;
     TError error = TError::Success();
 
-    top_fd = fcntl(Fd, F_DUPFD_CLOEXEC, 2);
+    top_fd = fcntl(Fd, F_DUPFD_CLOEXEC, 3);
     if (Fd < 0)
         return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(Fd));
 
@@ -1271,7 +1271,7 @@ int TFile::GetMountId(void) const {
 TError TFile::Dup(const TFile &other) {
     if (&other != this) {
         Close();
-        SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC, 2);
+        SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC, 3);
         if (Fd < 0)
             return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(other.Fd));
     }
