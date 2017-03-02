@@ -493,10 +493,14 @@ TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, TFile &event) {
     if (error)
         return error;
 
+    PORTO_ASSERT(knob.Fd > 2);
+
     event.Close();
     event.SetFd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (event.Fd < 0)
         return TError(EError::Unknown, errno, "Cannot create eventfd");
+
+    PORTO_ASSERT(event.Fd > 2);
 
     error = cg.Set(EVENT_CONTROL, std::to_string(event.Fd) + " " + std::to_string(knob.Fd));
     if (error)

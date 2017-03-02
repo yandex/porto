@@ -1,4 +1,5 @@
 #include "namespace.hpp"
+#include "log.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -23,6 +24,7 @@ TError TNamespaceFd::Open(TPath path) {
     Fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
     if (Fd < 0)
         return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+    PORTO_ASSERT(Fd > 2);
     return TError::Success();
 }
 
@@ -32,7 +34,11 @@ TError TNamespaceFd::Open(pid_t pid, std::string type) {
 
 void TNamespaceFd::Close() {
     if (Fd >= 0) {
-        close(Fd);
+        PORTO_ASSERT(Fd > 2);
+
+        int ret = close(Fd);
+        PORTO_ASSERT(!ret);
+
         Fd = -1;
     }
 }

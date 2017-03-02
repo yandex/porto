@@ -1116,6 +1116,7 @@ void TContainer::ShutdownOom() {
     if (Source)
         EpollLoop->RemoveSource(Source->Fd);
     Source = nullptr;
+    PORTO_ASSERT(OomEvent.Fd < 0 || OomEvent.Fd > 2);
     OomEvent.Close();
 }
 
