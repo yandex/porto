@@ -174,6 +174,7 @@ struct TNetCfg {
     bool Inherited = false;
     bool NetUp = false;
     bool SaveIp = false;
+    bool L3Only = true;
     std::string Hostname;
     std::vector<std::string> Steal;
     std::vector<TMacVlanNetCfg> MacVlan;

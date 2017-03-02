@@ -1309,6 +1309,40 @@ TError TIp::Get(std::string &value) {
     return TError::Success();
 }
 
+class TIpLimit : public TProperty {
+public:
+    TIpLimit() : TProperty(P_IP_LIMIT, EProperty::IP_LIMIT,
+            "IP allowed for sub-containers: none|any|<ip>[/<mask>]; ...") {}
+    TError Get(std::string &value) {
+        value = MergeEscapeStrings(CT->IpLimit, ';');
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+
+        TTuple list;
+        SplitEscapedString(value, list, ';');
+
+        for (auto &str: list) {
+            if (str == "any" || str == "none")
+                continue;
+            TNlAddr addr;
+            error = addr.Parse(AF_UNSPEC, str);
+            if (error)
+                return error;
+            if (addr.Family() != AF_INET && addr.Family() != AF_INET6)
+                return TError(EError::InvalidValue, "wrong address");
+        }
+
+        CT->IpLimit = list;
+        CT->SetProp(EProperty::IP_LIMIT);
+
+        return TError::Success();
+    }
+} static IpLimit;
+
 class TDefaultGw : public TProperty {
 public:
     TError Set(const std::string &gw);

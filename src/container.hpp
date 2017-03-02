@@ -72,6 +72,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareCgroups();
     TError ConfigureDevices(std::vector<TDevice> &devices);
     TError ParseNetConfig(struct TNetCfg &NetCfg);
+    TError CheckIpLimit(struct TNetCfg &NetCfg);
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError PrepareTask(struct TTaskEnv *TaskEnv,
                        struct TNetCfg *NetCfg);
@@ -124,6 +125,7 @@ public:
     TTuple EnvCfg;
     std::vector<TBindMount> BindMounts;
     TMultiTuple IpList;
+    TTuple IpLimit;
     TCapabilities CapAmbient;   /* get at start */
     TCapabilities CapAllowed;   /* can be set as ambient */
     TCapabilities CapLimit;     /* upper limit */

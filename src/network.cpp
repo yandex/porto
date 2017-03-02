@@ -1081,6 +1081,7 @@ void TNetCfg::Reset() {
     /* default - create new empty netns */
     NewNetNs = true;
     Inherited = false;
+    L3Only = true;
     Steal.clear();
     MacVlan.clear();
     IpVlan.clear();
@@ -1121,12 +1122,14 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
                 return TError(EError::InvalidValue, "Invalid net in: " +
                               MergeEscapeStrings(settings, 0));
 
+            L3Only = false;
             Steal.push_back(StringTrim(settings[1]));
         } else if (type == "container") {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid net in: " +
                               MergeEscapeStrings(settings, 0));
             NewNetNs = false;
+            L3Only = false;
             NetCtName = StringTrim(settings[1]);
         } else if (type == "macvlan") {
             if (settings.size() < 3)
@@ -1167,6 +1170,7 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
             mvlan.Hw = hw;
             mvlan.Mtu = mtu;
 
+            L3Only = false;
             MacVlan.push_back(mvlan);
         } else if (type == "ipvlan") {
             if (settings.size() < 3)
@@ -1198,6 +1202,7 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
             ipvlan.Mode = mode;
             ipvlan.Mtu = mtu;
 
+            L3Only = false;
             IpVlan.push_back(ipvlan);
         } else if (type == "veth") {
             if (settings.size() < 3)
@@ -1230,6 +1235,7 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
             veth.Mtu = mtu;
             veth.Peer = "portove-" + std::to_string(Id) + "-" + std::to_string(idx++);
 
+            L3Only = false;
             Veth.push_back(veth);
 
         } else if (type == "L3") {
@@ -1312,6 +1318,7 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
             if (!path.Exists())
                 return TError(EError::InvalidValue, "net namespace not found: " + name);
             NewNetNs = false;
+            L3Only = false;
             NetNsName = name;
         } else {
             return TError(EError::InvalidValue, "Configuration is not specified");

@@ -58,6 +58,7 @@ constexpr const char *P_DEVICES = "devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr const char *P_CAPABILITIES_AMBIENT = "capabilities_ambient";
 constexpr const char *P_IP = "ip";
+constexpr const char *P_IP_LIMIT = "ip_limit";
 constexpr const char *P_DEFAULT_GW = "default_gw";
 constexpr const char *P_VIRT_MODE = "virt_mode";
 constexpr const char *P_AGING_TIME = "aging_time";
@@ -168,6 +169,7 @@ enum class EProperty {
     DEVICES,
     CAPABILITIES,
     IP,
+    IP_LIMIT,
     DEFAULT_GW,
     VIRT_MODE,
     AGING_TIME,

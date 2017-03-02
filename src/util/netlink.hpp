@@ -35,6 +35,7 @@ public:
     int Family() const;
     bool IsEmpty() const;
     bool IsHost() const;
+    bool IsMatch(const TNlAddr &addr) const;
 
     unsigned int Length() const;
     const void * Binary() const;

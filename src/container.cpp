@@ -1241,6 +1241,43 @@ TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     return TError::Success();
 }
 
+TError TContainer::CheckIpLimit(struct TNetCfg &NetCfg) {
+
+    if (NetCfg.IpVec.empty() && NetCfg.L3Only)
+        return TError::Success();
+
+    for (auto ct = Parent; ct; ct = ct->Parent) {
+
+        /* empty means no limit */
+        if (ct->IpLimit.empty() || ct->IpLimit.size() == 1 && ct->IpLimit[0] == "any")
+            continue;
+
+        if (ct->IpLimit.size() == 1 && ct->IpLimit[0] == "none")
+            return TError(EError::Permission, "Parent container " + ct->Name + " forbid ip changing");
+
+        if (!NetCfg.L3Only)
+            return TError(EError::Permission, "Parent container " + ct->Name + " allows only L3 network");
+
+        for (auto &v: NetCfg.IpVec) {
+            bool allow = false;
+            for (auto &str: ct->IpLimit) {
+                TNlAddr mask;
+                if (mask.Parse(AF_UNSPEC, str) || mask.Family() != v.Addr.Family())
+                    continue;
+                if (mask.IsMatch(v.Addr)) {
+                    allow = true;
+                    break;
+                }
+            }
+            if (!allow)
+                return TError(EError::Permission, "Parent container " + ct->Name +
+                                                  " forbid address: " + v.Addr.Format());
+        }
+    }
+
+    return TError::Success();
+}
+
 TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     TError error;
 
@@ -1478,6 +1515,10 @@ TError TContainer::StartTask() {
     TError error;
 
     error = ParseNetConfig(NetCfg);
+    if (error)
+        return error;
+
+    error = CheckIpLimit(NetCfg);
     if (error)
         return error;
 
