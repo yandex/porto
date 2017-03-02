@@ -1,3 +1,27 @@
+yandex-porto (3.4.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * portotop: remove config and duplicate buttons
+  * porto: core dump forwarding
+
+  [ Maxim Samoylov ]
+  * volume: try removing weak layers after volume unregister #PORTO-194
+  * property: override enable_porto hierarchy on restore #PORTO-195
+  * test/porto_fuzzer: use net and ip properties
+  * portod: always occupate std{in,out,err} on startup
+
+  [ Konstantin Khlebnikov ]
+  * porto: add property ip_limit #PORTO-196
+
+  [ Maxim Samoylov ]
+  * util/namespace, cgroup: assert special fds value #PORTO-191
+  * util: fix fcntl(F_DUPFD_CLOEXEC) parameter for sanity
+
+  [ Konstantin Khlebnikov ]
+  * porto: restore network for non-isolated meta container #PORTO-197
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 02 Mar 2017 17:32:52 +0300
+
 yandex-porto (3.3.2) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
