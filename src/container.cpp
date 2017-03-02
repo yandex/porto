@@ -490,7 +490,8 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
             L_WRN() << "Cannot restore network: " << error << std::endl;
             ct->Reap(false);
         }
-    }
+    } else if (ct->State == EContainerState::Meta && ct->Parent)
+        ct->Net = ct->Parent->Net;
 
     /* Restore cgroups only for running containers */
     if (ct->State != EContainerState::Stopped &&
