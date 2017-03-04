@@ -227,11 +227,13 @@ static int ForwardCore(pid_t pid, pid_t tid, pid_t vpid, pid_t vtid, int sig) {
     origin = origin.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
 
     Porto::Connection conn;
-    std::string core_command, user, group, cwd;
+    std::string core_command, user, group, cwd, owner_user, owner_group;
     if (conn.GetProperty(origin, P_CORE_COMMAND, core_command) ||
             core_command == "" ||
             conn.GetProperty(origin, P_USER, user) ||
             conn.GetProperty(origin, P_GROUP, group) ||
+            conn.GetProperty(origin, P_OWNER_USER, owner_user) ||
+            conn.GetProperty(origin, P_OWNER_GROUP, owner_group) ||
             conn.GetProperty(origin, P_CWD, cwd))
         return EXIT_FAILURE;
 
@@ -253,6 +255,8 @@ static int ForwardCore(pid_t pid, pid_t tid, pid_t vpid, pid_t vtid, int sig) {
             conn.SetProperty(core, P_COMMAND, core_command) ||
             conn.SetProperty(core, P_USER, user) ||
             conn.SetProperty(core, P_GROUP, group) ||
+            conn.SetProperty(core, P_OWNER_USER, owner_user) ||
+            conn.SetProperty(core, P_OWNER_GROUP, owner_group) ||
             conn.SetProperty(core, P_CWD, cwd) ||
             conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')) ||
             conn.Start(core))
