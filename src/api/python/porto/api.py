@@ -746,6 +746,13 @@ class Connection(object):
         request.attachProcess.comm = comm
         self.rpc.call(request, self.rpc.timeout)
 
+    def LocateProcess(self, pid, comm=""):
+        request = rpc_pb2.TContainerRequest()
+        request.locateProcess.pid = pid
+        request.locateProcess.comm = comm
+        name = self.rpc.call(request, self.rpc.timeout).locateProcess.name
+        return Container(self, name)
+
     def Version(self):
         request = rpc_pb2.TContainerRequest()
         request.version.CopyFrom(rpc_pb2.TVersionRequest())

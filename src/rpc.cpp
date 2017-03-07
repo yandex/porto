@@ -101,6 +101,9 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
         return "attach " + std::to_string(req.attachprocess().pid()) +
             " (" + req.attachprocess().comm() + ") to " +
             req.attachprocess().name();
+    else if (req.has_locateprocess())
+        return "locate " + std::to_string(req.locateprocess().pid()) +
+                " (" + req.locateprocess().comm() + ")";
     else
         return req.ShortDebugString();
 }
@@ -234,7 +237,8 @@ static bool SilentRequest(const rpc::TContainerRequest &req) {
         req.has_listlayers() ||
         req.has_convertpath() ||
         req.has_getlayerprivate() ||
-        req.has_liststorage();
+        req.has_liststorage() ||
+        req.has_locateprocess();
 }
 
 static bool ValidRequest(const rpc::TContainerRequest &req) {
@@ -273,7 +277,8 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_liststorage() +
         req.has_removestorage() +
         req.has_importstorage() +
-        req.has_exportstorage()  == 1;
+        req.has_exportstorage() +
+        req.has_locateprocess() == 1;
 }
 
 static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent) {
@@ -1057,6 +1062,33 @@ undo:
     return error;
 }
 
+noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
+                              rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    pid_t pid = req.pid();
+    std::string name;
+
+    if (pid <= 0 || TranslatePid(pid, CL->Pid, pid))
+        return TError(EError::InvalidValue, "wrong pid");
+
+    if (req.comm().size() && req.comm() != GetTaskName(pid))
+        return TError(EError::InvalidValue, "wrong comm");
+
+    if (TContainer::FindTaskContainer(pid, ct))
+        return TError(EError::InvalidValue, "task not found");
+
+    if (CL->ComposeName(ct->Name, name)) {
+        if (CL->ClientContainer == ct)
+            name = SELF_CONTAINER;
+        else
+            return TError(EError::Permission, "contianer is unreachable");
+    }
+
+    rsp.mutable_locateprocess()->set_name(name);
+
+    return TError::Success();
+}
+
 noinline TError ListStorage(const rpc::TStorageListRequest &req,
                             rpc::TContainerResponse &rsp) {
     TPath place = req.has_place() ? req.place() : CL->DefaultPlace();
@@ -1222,6 +1254,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             error = ImportStorage(req.importstorage());
         else if (req.has_exportstorage())
             error = ExportStorage(req.exportstorage());
+        else if (req.has_locateprocess())
+            error = LocateProcess(req.locateprocess(), rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

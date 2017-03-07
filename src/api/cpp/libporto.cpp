@@ -678,4 +678,19 @@ int Connection::AttachProcess(const std::string &name,
     return Impl->Rpc();
 }
 
+int Connection::LocateProcess(int pid, const std::string &comm,
+                              std::string &name) {
+    Impl->Req.mutable_locateprocess()->set_pid(pid);
+    Impl->Req.mutable_locateprocess()->set_comm(comm);
+
+    int ret = Impl->Rpc();
+
+    if (ret)
+        return ret;
+
+    name = Impl->Rsp.locateprocess().name();
+
+    return ret;
+}
+
 } /* namespace Porto */

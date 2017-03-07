@@ -137,6 +137,7 @@ public:
 
     int AttachProcess(const std::string &name,
                       int pid, const std::string &comm);
+    int LocateProcess(int pid, const std::string &comm, std::string &name);
 };
 
 } /* namespace Porto */

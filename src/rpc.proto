@@ -147,7 +147,13 @@ message TContainerWaitRequest {
 message TAttachProcessRequest {
 	required string name = 1;
 	required uint32 pid = 2;
-	required string comm = 3;
+	required string comm = 3; /* ignored if empty */
+}
+
+// Determine container by pid
+message TLocateProcessRequest {
+	required uint32 pid = 1;
+	required string comm = 2; /* ignored if empty */
 }
 
 message TContainerRequest {
@@ -192,6 +198,7 @@ message TContainerRequest {
 
 	optional TConvertPathRequest convertPath = 200;
 	optional TAttachProcessRequest attachProcess = 201;
+	optional TLocateProcessRequest locateProcess = 202;
 }
 
 message TContainerListResponse {
@@ -254,6 +261,10 @@ message TConvertPathResponse {
 	required string path = 1;
 }
 
+message TLocateProcessResponse {
+	required string name = 1;
+}
+
 message TContainerResponse {
 	required EError error = 1;
 	// Optional error message
@@ -275,6 +286,7 @@ message TContainerResponse {
 	optional TConvertPathResponse convertPath = 15;
 	optional TLayerGetPrivateResponse layer_private = 16;
 	optional TStorageListResponse storageList = 17;
+	optional TLocateProcessResponse locateProcess = 18;
 }
 
 // VolumeAPI

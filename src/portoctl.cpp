@@ -1259,43 +1259,31 @@ public:
 
 class TFindCmd final : public ICmd {
 public:
-    TFindCmd(Porto::Connection *api) : ICmd(api, "find", 1, "<pid>", "find container for given process id") {}
+    TFindCmd(Porto::Connection *api) : ICmd(api, "find", 1, "<pid> [comm]", "find container for given process id") {}
 
     int Execute(TCommandEnviroment *env) final override {
         int pid;
         const auto &args = env->GetArgs();
         TError error = StringToInt(args[0], pid);
+        std::string comm;
         if (error) {
             std::cerr << "Can't parse pid " << args[0] << std::endl;
             return EXIT_FAILURE;
         }
 
-        std::map<std::string, std::string> cgmap;
-        error = GetTaskCgroups(pid, cgmap);
-        if (error) {
-            std::cerr << "Can't read /proc/" << pid << "/cgroup, is process alive?" << std::endl;
-            return EXIT_FAILURE;
+        if (args.size() > 1)
+            comm = args[1];
+        else
+            comm = GetTaskName(pid);
+
+        std::string name;
+
+        int ret = Api->LocateProcess(pid, comm, name);
+
+        if (ret) {
+            PrintError("Cannot find container by pid");
+            return ret;
         }
-
-        if (cgmap.find("freezer") == cgmap.end()) {
-            std::cerr << "Process " << pid << " is not part of freezer cgroup" << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        auto freezer = cgmap["freezer"];
-        if (!StringStartsWith(freezer, PORTO_CGROUP_PREFIX)) {
-            std::cerr << "Process " << pid << " is not managed by porto" << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        std::string name = freezer;
-        std::replace(name.begin(), name.end(), '%', '/');
-        // name = ROOT_PORTO_NAMESPACE + name.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
-
-        std::string ns;
-        if (!Api->GetData("self", "absolute_namespace", ns) &&
-                StringStartsWith(name, ns))
-            name = name.substr(ns.length());
 
         Print(name);
 

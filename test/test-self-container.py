@@ -49,7 +49,7 @@ ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=',
 
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=test/',
                                 'command=' + portoctl + ' find 1'],
-                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), '/porto/test\n')
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'self\n')
 
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=',
                                 'command=' + portoctl + ' exec self/test porto_namespace= command=\"' + portoctl + ' find 1\"'],
