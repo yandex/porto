@@ -382,6 +382,8 @@ TError StringParseFlags(const std::string &str, const TFlagsNames &names,
     while (std::getline(ss, name, sep)) {
         bool found = false;
         name = StringTrim(name);
+        if (name.empty())
+            continue;
         for (auto &n: names) {
             if (n.second == name) {
                 result |= n.first;
@@ -390,7 +392,7 @@ TError StringParseFlags(const std::string &str, const TFlagsNames &names,
             }
         }
         if (!found)
-            return TError(EError::InvalidValue, "Unknown \"" + name + "\"");
+            return TError(EError::InvalidValue, "Unknown flag \"" + name + "\"");
     }
     return TError::Success();
 }
