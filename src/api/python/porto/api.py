@@ -289,6 +289,7 @@ class Layer(object):
     def SetPrivate(self, private_value):
         return self.conn.SetLayerPrivate(self.name, private_value, place=self.place)
 
+
 class Storage(object):
     def __init__(self, conn, name, place):
         self.conn = conn
@@ -314,6 +315,7 @@ class Storage(object):
 
     def RemoveStorage(self):
         return self.conn.RemoveStorage(self.name, self.place)
+
 
 class Volume(object):
     def __init__(self, conn, path):
@@ -560,7 +562,7 @@ class Connection(object):
         if container:
             request.unlinkVolume.container = container
         if strict is not None:
-            request.unlinkVolume.strict = strict;
+            request.unlinkVolume.strict = strict
         self.rpc.call(request, self.rpc.timeout)
 
     def LinkVolume(self, path, container):
@@ -713,7 +715,7 @@ class Connection(object):
 
     def ImportStorage(self, name, tarball, place=None, private_value=None):
         request = rpc_pb2.TContainerRequest()
-        request.importStorage.layer = layer
+        request.importStorage.layer = name
         request.importStorage.tarball = tarball
         if place is not None:
             request.importStorage.place = place
@@ -724,7 +726,7 @@ class Connection(object):
 
     def ExportStorage(self, name, tarball, place=None):
         request = rpc_pb2.TContainerRequest()
-        request.exportStorage.volume = volume
+        request.exportStorage.volume = name
         request.exportStorage.tarball = tarball
         if place is not None:
             request.exportStorage.place = place
