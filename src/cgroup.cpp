@@ -610,7 +610,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         if (quota < 1000) /* 1ms */
             quota = 1000;
 
-        if (limit >= GetNumCores())
+        if (limit <= 0 || limit >= GetNumCores())
             quota = -1;
 
         error = cg.Set("cpu.cfs_quota_us", std::to_string(quota));
@@ -682,7 +682,8 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         if (error)
             return error;
 
-        if (limit >= cores || limit / cores * root_period > root_runtime) {
+        if (limit <= 0 || limit >= cores ||
+                limit / cores * root_period > root_runtime) {
             period = 1000000;   /* 1s */
             runtime = -1;
         } else {
