@@ -715,7 +715,7 @@ class Connection(object):
 
     def ImportStorage(self, name, tarball, place=None, private_value=None):
         request = rpc_pb2.TContainerRequest()
-        request.importStorage.layer = name
+        request.importStorage.name = name
         request.importStorage.tarball = tarball
         if place is not None:
             request.importStorage.place = place
@@ -726,7 +726,7 @@ class Connection(object):
 
     def ExportStorage(self, name, tarball, place=None):
         request = rpc_pb2.TContainerRequest()
-        request.exportStorage.volume = name
+        request.exportStorage.name = name
         request.exportStorage.tarball = tarball
         if place is not None:
             request.exportStorage.place = place
