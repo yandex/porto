@@ -988,6 +988,7 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
 noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
     std::shared_ptr<TContainer> oldCt, newCt;
     pid_t pid = req.pid();
+    std::string comm;
     TError error;
 
     if (pid <= 0)
@@ -1000,9 +1001,10 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
     if (pid <= 0)
         return TError(EError::InvalidValue, "invalid pid");
 
+    comm = GetTaskName(pid);
+
     /* sanity check and protection against races */
-    auto comm = StringTrim(GetTaskName(pid));
-    if (StringTrim(req.comm()) != comm)
+    if (req.comm().size() && req.comm() != comm)
         return TError(EError::InvalidValue, "wrong task comm for pid");
 
     error = TContainer::FindTaskContainer(pid, oldCt);

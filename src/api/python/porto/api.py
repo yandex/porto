@@ -739,7 +739,7 @@ class Connection(object):
         request.convertPath.destination = destination
         return self.rpc.call(request, self.rpc.timeout).convertPath.path
 
-    def AttachProcess(self, name, pid, comm):
+    def AttachProcess(self, name, pid, comm=""):
         request = rpc_pb2.TContainerRequest()
         request.attachProcess.name = name
         request.attachProcess.pid = pid
