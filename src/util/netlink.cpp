@@ -14,6 +14,7 @@ extern "C" {
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_addrlabel.h>
+#include <linux/pkt_sched.h>
 #include <netinet/ether.h>
 #include <netlink/route/class.h>
 #include <netlink/route/classifier.h>
@@ -37,6 +38,10 @@ extern "C" {
 #include <netlink/route/route.h>
 #include <netlink/route/addr.h>
 }
+
+#ifndef TC_LINKLAYER_MASK
+# define TC_LINKLAYER_ETHERNET 1
+#endif
 
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
