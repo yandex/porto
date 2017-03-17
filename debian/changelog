@@ -1,3 +1,32 @@
+yandex-porto (3.5.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * coredump: copy container owner_user and owner_group #PORTO-199
+  * util/string: ignore empty flag names
+
+  [ Vsevolod Velichko ]
+  * api/python: fix broken storage operations
+
+  [ Konstantin Khlebnikov ]
+  * api/python: fix broken storage operations v2
+
+  [ Maxim Samoylov ]
+  * rpc: make AttachProcess() comm parameter optional
+  * cgroup: treat zero cpu limit as unlimited quota
+
+  [ Konstantin Khlebnikov ]
+  * porto: add mode enable_porto=self-isolate
+  * test: cleanup test-self-container.py
+
+  [ Maxim Samoylov ]
+  * rpc: add LocateProcess() handler #PORTO-200
+  * test: add test for LocateProcess() call
+
+  [ Konstantin Khlebnikov ]
+  * porto: fix inverted check of volume owner access
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 17 Mar 2017 19:50:54 +0300
+
 yandex-porto (3.4.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
