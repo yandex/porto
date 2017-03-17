@@ -360,7 +360,7 @@ TError TClient::ReadAccess(const TFile &file) {
     /* Volume owner also gains full control inside */
     if (error) {
         auto volume = TVolume::Locate(path);
-        if (volume && CanControl(volume->VolumeOwner))
+        if (volume && !CanControl(volume->VolumeOwner))
             error = TError::Success();
     }
 
@@ -386,7 +386,7 @@ TError TClient::WriteAccess(const TFile &file) {
     /* Also volume owner gains full access inside */
     if (error) {
         auto volume = TVolume::Locate(path);
-        if (volume && CanControl(volume->VolumeOwner))
+        if (volume && !CanControl(volume->VolumeOwner))
             error = TError::Success();
     }
 
