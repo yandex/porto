@@ -30,6 +30,7 @@ enum class EAccessLevel {
     ReadIsolate,
     ReadOnly,
     Isolate,
+    SelfIsolate, /* allows to change self limits */
     ChildOnly,
     Normal,
     SuperUser,

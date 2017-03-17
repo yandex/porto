@@ -2412,6 +2412,9 @@ public:
             case EAccessLevel::Isolate:
                 value = "isolate";
                 break;
+            case EAccessLevel::SelfIsolate:
+                value = "self-isolate";
+                break;
             case EAccessLevel::ChildOnly:
                 value = "child-only";
                 break;
@@ -2433,6 +2436,8 @@ public:
             level = EAccessLevel::ReadOnly;
         else if (value == "isolate")
             level = EAccessLevel::Isolate;
+        else if (value == "self-isolate")
+            level = EAccessLevel::SelfIsolate;
         else if (value == "child-only")
             level = EAccessLevel::ChildOnly;
         else if (value == "true" || value == "full")

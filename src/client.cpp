@@ -324,20 +324,25 @@ TError TClient::CanControl(const TContainer &ct, bool child) {
     /*
      * Container must be in write namespace or be its base for new childs.
      * Also allow write access to client subcontainers for self/... notation.
+     * Self-isolate allows write access to self.
      */
-    if (!StringStartsWith(ct.Name, WriteNamespace) &&
-            !(child && ct.Name == TContainer::ParentName(WriteNamespace)) &&
-            !(ct.IsChildOf(*ClientContainer) ||
-                child && &ct == &*ClientContainer))
-        return TError(EError::Permission, "Write access denied: container " + ct.Name + " out of scope");
+    if (StringStartsWith(ct.Name, WriteNamespace) ||
+        (child && ct.Name == TContainer::ParentName(WriteNamespace)) ||
+        ct.IsChildOf(*ClientContainer) ||
+        (&ct == &*ClientContainer &&
+         (child || ct.AccessLevel == EAccessLevel::SelfIsolate))) {
 
-    if (!(child && ct.IsRoot())) {
-        TError error = CanControl(ct.OwnerCred);
-        if (error)
-            return TError(error, "Write access denied: container " + ct.Name);
+        /* Everybody can create first level containers */
+        if (!(child && ct.IsRoot())) {
+            TError error = CanControl(ct.OwnerCred);
+            if (error)
+                return TError(error, "Write access denied: container " + ct.Name);
+        }
+
+        return TError::Success();
     }
 
-    return TError::Success();
+    return TError(EError::Permission, "Write access denied: container " + ct.Name + " out of scope");
 }
 
 TError TClient::ReadAccess(const TFile &file) {

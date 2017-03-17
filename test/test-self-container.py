@@ -79,3 +79,12 @@ assert subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate'
 assert subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate',
                                 'command=' + portoctl + ' exec /porto/test/test command=\"' + portoctl + ' get self absolute_name\"'],
                                 stdin=subprocess.PIPE, stderr=subprocess.PIPE) == '/porto/test/test\n'
+
+# Isolate/Self-isolate
+assert Catch(subprocess.check_output, [portoctl, 'exec', 'test', 'enable_porto=isolate',
+                                    'command=' + portoctl + ' set self private test'],
+                                    stdin=subprocess.PIPE, stderr=subprocess.PIPE) == subprocess.CalledProcessError
+
+assert Catch(subprocess.check_output, [portoctl, 'exec', 'test', 'enable_porto=self-isolate',
+                                    'command=' + portoctl + ' set self private test'],
+                                    stdin=subprocess.PIPE, stderr=subprocess.PIPE) == None
