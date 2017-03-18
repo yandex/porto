@@ -41,6 +41,7 @@ extern "C" {
 
 #ifndef TC_LINKLAYER_MASK
 # define TC_LINKLAYER_ETHERNET 1
+# define linklayer __reserved
 #endif
 
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
