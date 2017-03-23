@@ -510,3 +510,67 @@ TError StringToStringMap(const std::string &value, TStringMap &result) {
 int CompareVersions(const std::string &a, const std::string &b) {
     return strverscmp(a.c_str(), b.c_str());
 }
+
+/* first[-last], ... */
+TError TBitMap::Parse(const std::string &text) {
+    TMultiTuple tuple;
+    TError error;
+    int first, last;
+
+    bits.clear();
+    SplitEscapedString(text, tuple, '-', ',');
+    for (auto t: tuple) {
+        if (t.size() == 0)
+            continue;
+        if (t.size() > 2)
+            return TError(EError::InvalidValue, "wrong bitmap format");
+        error = StringToInt(t[0], first);
+        if (error || first < 0 || first > 65535)
+            return TError(EError::InvalidValue, "wrong bitmap format");
+        if (t.size() == 2) {
+            error = StringToInt(t[1], last);
+            if (error || last < first || last > 65535)
+                return TError(EError::InvalidValue, "wrong bitmap format");
+        } else
+            last = first;
+        if (bits.size() <= last)
+            bits.resize(last + 1, false);
+        std::fill(bits.begin() + first, bits.begin() + last + 1, true);
+    }
+
+    return TError::Success();
+}
+
+std::string TBitMap::Format() const {
+    bool prev = false, curr, sep = false, range = false;
+    std::stringstream ss;
+
+    for (unsigned i = 0; i <= bits.size(); i++, prev = curr) {
+        curr = Get(i);
+        if (prev == curr)
+            range = true;
+        else if (curr) {
+            if (sep)
+                ss << ",";
+            else
+                sep = true;
+            ss << i;
+            range = false;
+        } else if (range)
+            ss << "-" << i - 1;
+    }
+
+    return ss.str();
+}
+
+TError TBitMap::Load(const TPath &path) {
+    std::string text;
+    TError error = path.ReadAll(text, 4096);
+    if (error)
+        return error;
+    return Parse(text);
+}
+
+TError TBitMap::Save(const TPath &path) const {
+    return path.WriteAll(Format());
+}

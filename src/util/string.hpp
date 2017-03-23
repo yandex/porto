@@ -60,3 +60,55 @@ std::string StringMapToString(const TStringMap &map);
 TError StringToStringMap(const std::string &value, TStringMap &result);
 
 int CompareVersions(const std::string &a, const std::string &b);
+
+class TPath;
+
+class TBitMap {
+private:
+    std::vector<bool> bits;
+public:
+    TBitMap() {}
+    ~TBitMap() {}
+    TError Parse(const std::string &text);
+    std::string Format() const;
+    TError Load(const TPath &path);
+    TError Save(const TPath &path) const;
+
+    unsigned Size() const {
+        return bits.size();
+    }
+
+    unsigned Weight() const {
+        unsigned weight = 0;
+        for (auto bit: bits)
+            weight += bit;
+        return weight;
+    }
+
+    bool Get(unsigned index) const {
+        return index < Size() && bits[index];
+    }
+
+    void Set(unsigned index, bool val = true) {
+        if (index >= Size())
+            bits.resize(index + 1, false);
+        bits[index] = val;
+    }
+
+    void Set(const TBitMap &map, bool val = true) {
+        for (unsigned i = 0; i < map.Size(); i++)
+            if (map.Get(i))
+                Set(i, val);
+    }
+
+    void Clear() {
+        bits.clear();
+    }
+
+    bool IsSubsetOf(const TBitMap &map) const {
+        for (unsigned i = 0; i < Size(); i++)
+            if (Get(i) && !map.Get(i))
+                return false;
+        return true;
+    }
+};
