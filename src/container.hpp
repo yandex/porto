@@ -39,6 +39,15 @@ enum class EContainerState {
     Destroyed,
 };
 
+enum class ECpuSetType {
+    Inherit,
+    Reserve,
+    Threads,
+    Cores,
+    Node,
+    Absolute,
+};
+
 class TProperty;
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
@@ -81,6 +90,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void ScheduleRespawn();
     TError Respawn();
     TError PrepareResources();
+    void FreeRuntimeResources();
     void FreeResources();
 
     void Reap(bool oomKilled);
@@ -88,6 +98,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     void CleanupWaiters();
     void NotifyWaiters();
+
+    TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
+                       TBitMap &threads, TBitMap &cores);
+    TError DistributeCpus();
 
 public:
     const std::shared_ptr<TContainer> Parent;
@@ -168,7 +182,13 @@ public:
 
     double CpuLimit;
     double CpuGuarantee;
-    std::string CpuSet;
+
+    ECpuSetType CpuSetType = ECpuSetType::Inherit;
+    int CpuSetArg = 0;
+
+    TBitMap CpuAffinity;
+    TBitMap CpuVacant;
+    TBitMap CpuReserve;
 
     uint32_t ContainerTC;
     uint32_t ParentTC;

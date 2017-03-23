@@ -1873,9 +1873,28 @@ TError TCpuGuarantee::Get(std::string &value) {
 class TCpuSet : public TProperty {
 public:
     TCpuSet() : TProperty(P_CPU_SET, EProperty::CPU_SET,
-            "CPU set: [N|N-M,]... | node N (dynamic)") {}
+            "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N (dynamic)") {}
     TError Get(std::string &value) {
-        value = CT->CpuSet;
+        switch (CT->CpuSetType) {
+        case ECpuSetType::Inherit:
+            value = "";
+            break;
+        case ECpuSetType::Absolute:
+            value = CT->CpuAffinity.Format();
+            break;
+        case ECpuSetType::Node:
+            value = StringFormat("node %u", CT->CpuSetArg);
+            break;
+        case ECpuSetType::Reserve:
+            value = StringFormat("reserve %u", CT->CpuSetArg);
+            break;
+        case ECpuSetType::Threads:
+            value = StringFormat("threads %u", CT->CpuSetArg);
+            break;
+        case ECpuSetType::Cores:
+            value = StringFormat("cores %u", CT->CpuSetArg);
+            break;
+        }
         return TError::Success();
     }
     TError Set(const std::string &value) {
@@ -1885,13 +1904,63 @@ public:
         error = WantControllers(CGROUP_CPUSET);
         if (error)
             return error;
-        if (CT->CpuSet != value) {
-            CT->CpuSet = value;
+
+        TTuple cfg;
+        SplitEscapedString(value, cfg, ' ');
+
+        ECpuSetType type;
+        int arg = !CT->CpuSetArg;
+
+        if (cfg.size() == 0 || cfg[0] == "all") {
+            type = ECpuSetType::Inherit;
+        } else if (cfg.size() == 1) {
+            TBitMap map;
+            error = map.Parse(cfg[0]);
+            if (error)
+                return error;
+            type = ECpuSetType::Absolute;
+            CT->CpuAffinity.Clear();
+            CT->CpuAffinity.Set(map);
+        } else if (cfg.size() == 2) {
+            error = StringToInt(cfg[1], arg);
+            if (error)
+                return error;
+
+            if (cfg[0] == "node")
+                type = ECpuSetType::Node;
+            else if (cfg[0] == "threads")
+                type = ECpuSetType::Threads;
+            else if (cfg[0] == "cores")
+                type = ECpuSetType::Cores;
+            else if (cfg[0] == "reserve")
+                type = ECpuSetType::Reserve;
+            else
+                return TError(EError::InvalidValue, "wrong format");
+
+            if (arg < 0 || !arg && type != ECpuSetType::Node)
+             return TError(EError::InvalidValue, "wrong format");
+
+        } else
+            return TError(EError::InvalidValue, "wrong format");
+
+        if (CT->CpuSetType != type || CT->CpuSetArg != arg) {
+            CT->CpuSetType = type;
+            CT->CpuSetArg = arg;
             CT->SetProp(EProperty::CPU_SET);
         }
         return TError::Success();
     }
 } static CpuSet;
+
+class TCpuSetAffinity : public TProperty {
+public:
+    TCpuSetAffinity() : TProperty(D_CPU_SET_AFFINITY, EProperty::NONE,
+            "Resulting CPU affinity: [N,N-M,]... (ro)") {}
+    TError Get(std::string &value) {
+        value = CT->CpuAffinity.Format();
+        return TError::Success();
+    }
+} static CpuSetAffinity;
 
 class TIoLimit : public TProperty {
 public:

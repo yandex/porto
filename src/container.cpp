@@ -45,6 +45,12 @@ std::map<std::string, std::shared_ptr<TContainer>> Containers;
 TPath ContainersKV;
 TIdMap ContainerIdMap(1, CONTAINER_ID_MAX);
 
+static std::mutex CpuMutex;
+static std::vector<TBitMap> CoreThreads;
+
+static TBitMap NumaNodes;
+static std::vector<TBitMap> NodeThreads;
+
 TError TContainer::ValidName(const std::string &name) {
 
     if (name.length() == 0)
@@ -333,6 +339,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
 
     if (Parent && Parent->IsRoot() && PidsSubsystem.Supported)
         Controllers |= CGROUP_PIDS;
+
+    if (Parent && Parent->IsRoot() && CpusetSubsystem.Supported) {
+        Controllers |= CGROUP_CPUSET;
+        SetProp(EProperty::CPU_SET);
+    }
 
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
@@ -920,6 +931,201 @@ TError TContainer::ApplySchedPolicy() const {
     return TError::Success();
 }
 
+TError TContainer::ReserveCpus(unsigned nr_threads, unsigned nr_cores,
+                               TBitMap &threads, TBitMap &cores) {
+    bool try_thread = true;
+
+    threads.Clear();
+    cores.Clear();
+
+again:
+    for (unsigned cpu = 0; cpu < CpuVacant.Size(); cpu++) {
+        if (!CpuVacant.Get(cpu))
+            continue;
+
+        if (CoreThreads[cpu].IsSubsetOf(CpuVacant)) {
+            if (nr_cores) {
+                nr_cores--;
+                cores.Set(cpu);
+                threads.Set(CoreThreads[cpu]);
+                CpuVacant.Set(CoreThreads[cpu], false);
+            } else if (!try_thread) {
+                nr_threads--;
+                threads.Set(cpu);
+                CpuVacant.Set(cpu, false);
+                try_thread = true;
+            }
+        } else if (nr_threads) {
+            nr_threads--;
+            threads.Set(cpu);
+            CpuVacant.Set(cpu, false);
+        }
+
+        if (!nr_threads && !nr_cores)
+            break;
+    }
+
+    if (try_thread && nr_threads) {
+        try_thread = false;
+        goto again;
+    }
+
+    if (nr_threads || nr_cores || (IsRoot() && !CpuVacant.Weight())) {
+        CpuVacant.Set(threads);
+        threads.Clear();
+        cores.Clear();
+        return TError(EError::ResourceNotAvailable, "Not enough cpus in " + Name);
+    }
+
+    return TError::Success();
+}
+
+TError TContainer::DistributeCpus() {
+    auto lock = std::unique_lock<std::mutex>(CpuMutex);
+    TError error;
+
+    if (IsRoot()) {
+        error = CpuAffinity.Load("/sys/devices/system/cpu/online");
+        if (error)
+            return error;
+
+        CoreThreads.clear();
+        CoreThreads.resize(CpuAffinity.Size());
+
+        for (unsigned cpu = 0; cpu < CpuAffinity.Size(); cpu++) {
+            if (!CpuAffinity.Get(cpu))
+                continue;
+            error = CoreThreads[cpu].Load(StringFormat("/sys/devices/system/cpu/cpu%u/topology/thread_siblings_list", cpu));
+            if (error)
+                return error;
+        }
+
+        error = NumaNodes.Load("/sys/devices/system/node/online");
+        if (error)
+            return error;
+
+        NodeThreads.clear();
+        NodeThreads.resize(NumaNodes.Size());
+
+        for (unsigned node = 0; node < NumaNodes.Size(); node++) {
+            if (!NumaNodes.Get(node))
+                continue;
+            error = NodeThreads[node].Load(StringFormat("/sys/devices/system/node/node%u/cpulist", node));
+            if (error)
+                return error;
+        }
+    }
+
+    CpuVacant.Clear();
+    CpuVacant.Set(CpuAffinity);
+
+    static ECpuSetType order[] = {
+        ECpuSetType::Absolute,
+        ECpuSetType::Node,
+        ECpuSetType::Cores,
+        ECpuSetType::Threads,
+        ECpuSetType::Reserve,
+        ECpuSetType::Inherit,
+    };
+
+    auto subtree = Subtree();
+    subtree.reverse();
+
+    for (auto &parent: subtree) {
+        if (parent->Children.empty() ||
+                parent->State == EContainerState::Stopped ||
+                parent->State == EContainerState::Dead)
+            continue;
+
+        if (Verbose)
+            L() << "Distribute CPUs " << parent->CpuVacant.Format() << " in " << parent->Name << std::endl;
+
+        for (auto type: order) {
+            for (auto &ct: parent->Children) {
+                if (ct->CpuSetType != type ||
+                        ct->State == EContainerState::Stopped ||
+                        ct->State == EContainerState::Dead)
+                    continue;
+
+                ct->CpuVacant.Clear();
+                ct->CpuReserve.Clear();
+
+                switch (type) {
+                case ECpuSetType::Inherit:
+                    ct->CpuAffinity.Clear();
+                    ct->CpuAffinity.Set(parent->CpuVacant);
+                    break;
+                case ECpuSetType::Absolute:
+                    break;
+                case ECpuSetType::Node:
+                    if (!NumaNodes.Get(ct->CpuSetArg))
+                        return TError(EError::ResourceNotAvailable, "Numa node not found for " + ct->Name);
+                    ct->CpuAffinity.Clear();
+                    ct->CpuAffinity.Set(NodeThreads[ct->CpuSetArg]);
+                    break;
+                case ECpuSetType::Cores:
+                    error = parent->ReserveCpus(0, ct->CpuSetArg,
+                            ct->CpuReserve, ct->CpuAffinity);
+                    if (error)
+                        return error;
+                    break;
+                case ECpuSetType::Threads:
+                    error = parent->ReserveCpus(ct->CpuSetArg, 0,
+                            ct->CpuReserve, ct->CpuAffinity);
+                    if (error)
+                        return error;
+                    ct->CpuAffinity.Set(ct->CpuReserve);
+                    break;
+                case ECpuSetType::Reserve:
+                    error = parent->ReserveCpus(ct->CpuSetArg, 0,
+                            ct->CpuReserve, ct->CpuAffinity);
+                    if (error)
+                        return error;
+                    ct->CpuAffinity.Set(parent->CpuAffinity);
+                    break;
+                }
+
+                if (!ct->CpuAffinity.Weight() || !ct->CpuAffinity.IsSubsetOf(parent->CpuAffinity))
+                    return TError(EError::ResourceNotAvailable, "Not enough cpus for " + ct->Name);
+
+                if (ct->CpuReserve.Weight())
+                    L_ACT() << "Reserve CPUs " << ct->CpuReserve.Format() << " for " << ct->Name << std::endl;
+
+                if (Verbose)
+                    L() << "Assign CPUs " << ct->CpuAffinity.Format() << " for " << ct->Name << std::endl;
+
+                ct->CpuVacant.Set(ct->CpuAffinity);
+            }
+        }
+    }
+
+    for (auto &ct: subtree) {
+        if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
+                ct->State == EContainerState::Stopped ||
+                ct->State == EContainerState::Dead)
+            continue;
+
+        auto cg = ct->GetCgroup(CpusetSubsystem);
+
+        if (!cg.Exists())
+            continue;
+
+        error = CpusetSubsystem.SetCpus(cg, ct->CpuAffinity.Format());
+        if (error) {
+            L() << "Cannot set cpu affinity: "  << error << std::endl;
+            return error;
+        }
+
+        error = CpusetSubsystem.SetMems(cg, "");
+        if (error) {
+            L() << "Cannot set mem affinity: " << error << std::endl;
+            return error;
+        }
+    }
+
+    return TError::Success();
+}
+
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     auto blkcg = GetCgroup(BlkioSubsystem);
@@ -1047,18 +1253,10 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (TestClearPropDirty(EProperty::CPU_SET)) {
-        auto cg = GetCgroup(CpusetSubsystem);
-        error = CpusetSubsystem.SetCpus(cg, CpuSet);
-        if (error) {
-            L() << "Cannot set cpuset " << CpuSet << " : " << error << std::endl;
+    if (TestClearPropDirty(EProperty::CPU_SET) && Parent) {
+        error = Parent->DistributeCpus();
+        if (error)
             return error;
-        }
-        error = CpusetSubsystem.SetMems(cg, "");
-        if (error) {
-            L() << "Cannot set mems: " << error << std::endl;
-            return error;
-        }
     }
 
     if (TestClearPropDirty(EProperty::NET_PRIO) |
@@ -1172,6 +1370,14 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
 
 TError TContainer::PrepareCgroups() {
     TError error;
+
+    /* Create CPU set if some CPUs in parent are reserved */
+    if (!HasProp(EProperty::CPU_SET) && Parent &&
+            Parent->CpuAffinity.Weight() != Parent->CpuVacant.Weight()) {
+        Controllers |= CGROUP_CPUSET;
+        RequiredControllers |= CGROUP_CPUSET;
+        SetProp(EProperty::CPU_SET);
+    }
 
     for (auto hy: Hierarchies) {
         TCgroup cg = GetCgroup(*hy);
@@ -1588,6 +1794,10 @@ TError TContainer::Start() {
         auto cg = Parent->GetCgroup(FreezerSubsystem);
         if (FreezerSubsystem.IsFrozen(cg))
             return TError(EError::InvalidState, "Parent container is frozen");
+    } else {
+        error = DistributeCpus();
+        if (error)
+            return error;
     }
 
     /* Extra check */
@@ -1783,10 +1993,24 @@ TError TContainer::PrepareResources() {
     return TError::Success();
 }
 
-void TContainer::FreeResources() {
+/* Some resources are not required in dead state */
+void TContainer::FreeRuntimeResources() {
     TError error;
 
     ShutdownOom();
+
+    if (Parent && CpuReserve.Weight()) {
+        L_ACT() << "Release CPUs " << CpuReserve.Format() << " reserved for " << Name << std::endl;
+        error = Parent->DistributeCpus();
+        if (error)
+            L_ERR() << "Cannot redistribute CPUs: " << error << std::endl;
+    }
+}
+
+void TContainer::FreeResources() {
+    TError error;
+
+    FreeRuntimeResources();
 
     if (!IsRoot()) {
         for (auto hy: Hierarchies) {
@@ -2024,8 +2248,6 @@ void TContainer::Reap(bool oomKilled) {
     if (error)
         L_WRN() << "Cannot terminate container " << Name << " : " << error << std::endl;
 
-    ShutdownOom();
-
     DeathTime = GetCurrentTimeMs();
     SetProp(EProperty::DEATH_TIME);
 
@@ -2042,6 +2264,8 @@ void TContainer::Reap(bool oomKilled) {
     Stderr.Rotate(*this);
 
     SetState(EContainerState::Dead);
+
+    FreeRuntimeResources();
 
     error = Save();
     if (error)
