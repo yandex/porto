@@ -757,8 +757,8 @@ std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
     std::list<std::shared_ptr<TContainer>> subtree {shared_from_this()};
     auto lock = LockContainers();
     for (auto it = subtree.rbegin(); it != subtree.rend(); ++it) {
-        for (auto &child: (*it)->Children)
-            subtree.emplace_front(child);
+        for (auto child: (*it)->Children)
+            subtree.emplace(std::prev(it.base()), child);
     }
     return subtree;
 }
