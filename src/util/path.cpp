@@ -19,6 +19,7 @@ extern "C" {
 #include <linux/limits.h>
 #include <linux/falloc.h>
 #include <linux/fs.h>
+#include <linux/magic.h>
 #include <sys/syscall.h>
 #include <dirent.h>
 #include <mntent.h>
@@ -1440,6 +1441,8 @@ TError TFile::WriteAccess(const TCred &cred) const {
         return TError(EError::Unknown, errno, "fstatfs");
     if (fs.f_flags & ST_RDONLY)
         return TError(EError::Permission, "read only: " + RealPath().ToString());
+    if (fs.f_type == PROC_SUPER_MAGIC)
+        return TError(EError::Permission, "procfs is read only");
     struct stat st;
     TError error = Stat(st);
     if (error)
