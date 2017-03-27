@@ -26,6 +26,7 @@ static std::mutex NetworksMutex;
 
 static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
+static std::map<int, std::string> DeviceGroups;
 
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
@@ -150,6 +151,11 @@ TNetworkDevice::TNetworkDevice(struct rtnl_link *link) {
     Group = rtnl_link_get_group(link);
     MTU = rtnl_link_get_mtu(link);
 
+    if (DeviceGroups.count(Group))
+        GroupName = DeviceGroups[Group];
+    else
+        GroupName = std::to_string(Group);
+
     Rate = NET_MAX_RATE;
     Ceil = NET_MAX_RATE;
 
@@ -252,6 +258,7 @@ void TNetwork::InitializeConfig() {
         if (groupCfg.peek() != '#' && (groupCfg >> id >> name)) {
             L_SYS() << "Network device group: " << id << ":" << name << std::endl;
             groupMap[name] = id;
+            DeviceGroups[id] = name;
         }
         groupCfg.ignore(1 << 16, '\n');
     }
@@ -890,9 +897,11 @@ TError TNetwork::GetDeviceStat(ENetStat kind, TUintMap &stat) {
 
     for (auto &dev: Devices) {
         auto link = rtnl_link_get(cache, dev.Index);
-        if (link)
-            stat[dev.Name] = rtnl_link_get_stat(link, id);
-        else
+        if (link) {
+            auto val = rtnl_link_get_stat(link, id);
+            stat[dev.Name] = val;
+            stat["group " + dev.GroupName] += val;
+        } else
             L_WRN() << "Cannot find device " << dev.GetDesc() << std::endl;
         rtnl_link_put(link);
     }
@@ -935,7 +944,8 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
 
         cls = rtnl_class_get(cache, dev.Index, handle);
         if (cls) {
-            stat[dev.Name] = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
+            auto val = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
+
             rtnl_class_put(cls);
 
             /* HFSC statistics isn't hierarchical */
@@ -945,12 +955,15 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
                     for (auto obj = nl_cache_get_first(cache); obj;
                             obj = nl_cache_get_next(obj)) {
                         if (rtnl_tc_get_parent(TC_CAST(obj)) == handles[i]) {
-                            stat[dev.Name] += rtnl_tc_get_stat(TC_CAST(obj), rtnlStat);
+                            val += rtnl_tc_get_stat(TC_CAST(obj), rtnlStat);
                             handles.push_back(rtnl_tc_get_handle(TC_CAST(obj)));
                         }
                     }
                 }
             }
+
+            stat[dev.Name] = val;
+            stat["group " + dev.GroupName] += val;
         } else
             L_WRN() << "Cannot find tc class " << handle << " at " << dev.GetDesc() << std::endl;
 

@@ -11,6 +11,7 @@ expected_warnings = int(conn.GetData('/', 'porto_stat[warnings]'))
 
 # get managed links
 links = [l.split(':')[0].strip() for l in conn.GetData('/', 'net_bytes').split(';') if l]
+links = [l for l in links if not l.startswith('group ')]
 assert links
 
 def check_qdisc(link):

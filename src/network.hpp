@@ -35,6 +35,7 @@ public:
     int Index;
     int Link;
     int Group;
+    std::string GroupName;
     int MTU;
     uint64_t Rate, Ceil;
     bool Managed;
