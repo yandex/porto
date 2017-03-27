@@ -508,70 +508,6 @@ err:
     }
 };
 
-static string HumanNsec(const string &val) {
-    double n = stod(val);
-    string suf = "ns";
-    if (n > 1000) {
-        n /= 1000;
-        suf = "us";
-    }
-    if (n > 1000) {
-        n /= 1000;
-        suf = "ms";
-    }
-    if (n > 1000) {
-        n /= 1000;
-        suf = "s";
-    }
-
-    std::stringstream str;
-    str << n << suf;
-    return str.str();
-}
-
-static string HumanSec(const string &val) {
-    uint64_t n = stoull(val);
-    uint64_t h = 0, m = 0, s = n;
-
-    if (s > 60) {
-        m = s / 60;
-        s %= 60;
-    }
-
-    if (m > 60) {
-        h = m / 60;
-        m %= 60;
-    }
-
-    std::stringstream str;
-    if (h)
-        str << std::setfill('0') << std::setw(2) << h << ":";
-    str << std::setfill('0') << std::setw(2) << m << ":";
-    str << std::setfill('0') << std::setw(2) << s;
-    return str.str();
-}
-
-static string HumanSize(const string &val) {
-    double n = stod(val);
-    string suf = "";
-    if (n > 1024) {
-        n /= 1024;
-        suf = "K";
-    }
-    if (n > 1024) {
-        n /= 1024;
-        suf = "M";
-    }
-    if (n > 1024) {
-        n /= 1024;
-        suf = "G";
-    }
-
-    std::stringstream str;
-    str << n << suf;
-    return str.str();
-}
-
 static const std::string StripIdx(const std::string &name) {
     if (name.find('[') != std::string::npos)
         return std::string(name.c_str(), name.find('['));
@@ -592,7 +528,17 @@ static bool ValidProperty(const vector<Porto::Property> &plist, const string &na
 }
 
 static std::string HumanValue(const std::string &name, const std::string &val) {
-    if (val == "")
+    uint64_t num;
+
+    if (name == "stdout" || name == "stderr") {
+        if (val.size() > 4096)
+            return val.substr(0, 2048) + "\n... skip " +
+                std::to_string(val.size() - 4096) + " bytes ...\n" +
+                val.substr(val.size() - 2048);
+        return val;
+    }
+
+    if (val == "" || StringToUint64(val, num))
         return val;
 
     if (name == "memory_guarantee" ||
@@ -606,38 +552,16 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         name == "stdout_limit" ||
         name == "hugetlb_limit" ||
         name == "hugetlb_usage")
-        return HumanSize(val);
-
-    if (name == "stdout" || name == "stderr") {
-        if (val.size() > 4096)
-            return val.substr(0, 2048) + "\n... skip " +
-                std::to_string(val.size() - 4096) + " bytes ...\n" +
-                val.substr(val.size() - 2048);
-        return val;
-    }
+        return StringFormatSize(num);
 
     if (name == "time" || name == "aging_time")
-        return HumanSec(val);
+        return StringFormatDuration(num * 1000);
 
-    if (name == "cpu_usage" || name == "cpu_usage_system")
-        return HumanNsec(val);
+    if (name == "cpu_usage" || name == "cpu_usage_system" ||  name == "cpu_wait")
+        return StringFormatDuration(num / 1000000);
 
-    if (name == "exit_status") {
-        int status;
-        if (StringToInt(val, status))
-            return val;
-
-        string ret;
-
-        if (WIFEXITED(status))
-            ret = "Container exited with " + std::to_string(WEXITSTATUS(status));
-        else if (WIFSIGNALED(status))
-            ret = "Container killed by signal " + std::to_string(WTERMSIG(status));
-        else if (status == 0)
-            ret = "Success";
-
-        return ret;
-    }
+    if (name == "exit_status")
+        return FormatExitStatus(num);
 
     return val;
 }

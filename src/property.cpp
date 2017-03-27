@@ -2423,9 +2423,7 @@ public:
     TError Set(const std::string &time);
     TError Get(std::string &value);
     TAgingTime() : TProperty(P_AGING_TIME, EProperty::AGING_TIME,
-                             "After given number of seconds "
-                             "container in dead state is "
-                             "automatically removed (dynamic)") {}
+      "Remove dead containrs after [seconds] (dynamic)") {}
 } static AgingTime;
 
 TError TAgingTime::Set(const std::string &time) {
