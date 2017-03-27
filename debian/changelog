@@ -1,3 +1,25 @@
+yandex-porto (3.6.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * network: define TC_LINKLAYER_ETHERNET for older linux headers
+  * network: linklayer in struct tc_ratespec is __reserved in ancient linux headers
+  * porto: forbid write-access in permission checks for procfs
+  * container: walk subtree in dfs order
+  * util: add bitmap
+  * cpuset: exclusive cpu cores
+
+  [ Maxim Samoylov ]
+  * net: report net statistics for link groups too
+
+  [ Konstantin Khlebnikov ]
+  * network: network limits for devices in group
+  * network: do not use thread-unsafe ether_aton
+  * network: inherit device group from master device
+  * network: cache interface and traffic class statistics for 1s
+  * portoctl/get: cleanup human format
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 27 Mar 2017 19:46:27 +0300
+
 yandex-porto (3.5.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
