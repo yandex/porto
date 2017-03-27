@@ -92,6 +92,8 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_proxy_ndp(true);
     config().mutable_network()->set_watchdog_ms(60000);
 
+    config().mutable_network()->set_cache_statistics_ms(1000);
+
     config().mutable_core()->set_enable(false);
     config().mutable_core()->set_timeout_s(600); /* 10min */
     config().mutable_core()->set_space_limit_mb(1024); /* 1Gb */

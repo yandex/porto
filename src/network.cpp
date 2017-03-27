@@ -49,6 +49,8 @@ static TUintMap ContainerQdiscQuantum;
 
 static TUintMap IngressBurst;
 
+static uint64_t NetworkStatisticsCacheTimeout;
+
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
@@ -126,6 +128,33 @@ static std::list<std::string> NetSysctls = {
     "net.ipv6.route.min_adv_mss",
     "net.ipv6.route.gc_min_interval_ms",
 };
+
+void TNetlinkCache::Drop() {
+    nl_cache_free(Cache);
+    Cache = nullptr;
+}
+
+TNetlinkCache::~TNetlinkCache() {
+    Drop();
+}
+
+uint64_t TNetlinkCache::Age() {
+    return GetCurrentTimeMs() - FillingTime;
+}
+
+void TNetlinkCache::Fill(struct nl_cache *cache) {
+    nl_cache_free(Cache);
+    Cache = cache;
+    FillingTime = GetCurrentTimeMs();
+}
+
+TError TNetlinkCache::Refill(TNl &sock) {
+    int ret = nl_cache_refill(sock.GetSock(), Cache);
+    if (ret)
+        return sock.Error(ret, "cannot refill cache");
+    FillingTime = GetCurrentTimeMs();
+    return TError::Success();
+}
 
 bool TNetwork::NamespaceSysctl(const std::string &key) {
     if (std::find(NetSysctls.begin(), NetSysctls.end(), key) != NetSysctls.end())
@@ -324,6 +353,8 @@ void TNetwork::InitializeConfig() {
 
     if (config().network().has_ingress_burst())
         StringToUintMap(config().network().ingress_burst(), IngressBurst);
+
+    NetworkStatisticsCacheTimeout = config().network().cache_statistics_ms();
 }
 
 TError TNetwork::Destroy() {
@@ -660,6 +691,8 @@ TError TNetwork::RefreshDevices(bool force) {
         NewManagedDevices = true;
     }
 
+    DropCaches();
+
     return TError::Success();
 }
 
@@ -685,6 +718,38 @@ TError TNetwork::RefreshClasses() {
 
     L() << "done" << std::endl;
 
+    DropCaches();
+
+    return TError::Success();
+}
+
+void TNetwork::DropCaches() {
+    LinkCache.Drop();
+    ClassCache.clear();
+}
+
+TError TNetwork::GetLinkCache(struct nl_cache **cache) {
+    *cache = LinkCache.Cache;
+    if (!*cache || LinkCache.Age() > NetworkStatisticsCacheTimeout) {
+        int ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, cache);
+        if (ret < 0)
+            return Nl->Error(ret, "Cannot fill class cache");
+        LinkCache.Fill(*cache);
+    }
+    nl_cache_get(*cache);
+    return TError::Success();
+}
+
+TError TNetwork::GetClassCache(int index, struct nl_cache **cache) {
+    TNetlinkCache &slot = ClassCache[index];
+    *cache = slot.Cache;
+    if (!*cache || slot.Age() > NetworkStatisticsCacheTimeout) {
+        int ret = rtnl_class_alloc_cache(GetSock(), index, cache);
+        if (ret < 0)
+            return Nl->Error(ret, "Cannot fill class cache");
+        slot.Fill(*cache);
+    }
+    nl_cache_get(*cache);
     return TError::Success();
 }
 
@@ -899,9 +964,9 @@ TError TNetwork::GetDeviceStat(ENetStat kind, TUintMap &stat) {
             return TError(EError::Unknown, "Unsupported netlink statistics");
     }
 
-    int ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &cache);
-    if (ret < 0)
-        return Nl->Error(ret, "Cannot allocate link cache");
+    TError error = GetLinkCache(&cache);
+    if (error)
+        return error;
 
     for (auto &dev: Devices) {
         auto link = rtnl_link_get(cache, dev.Index);
@@ -920,6 +985,7 @@ TError TNetwork::GetDeviceStat(ENetStat kind, TUintMap &stat) {
 
 TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) {
     rtnl_tc_stat rtnlStat;
+    TError error;
 
     switch (kind) {
     case ENetStat::Packets:
@@ -945,10 +1011,9 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
         if (!dev.Managed || !dev.Prepared)
             continue;
 
-        /* TODO optimize this stuff */
-        int ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &cache);
-        if (ret < 0)
-            return Nl->Error(ret, "Cannot allocate class cache");
+        error = GetClassCache(dev.Index, &cache);
+        if (error)
+            return error;
 
         cls = rtnl_class_get(cache, dev.Index, handle);
         if (cls) {

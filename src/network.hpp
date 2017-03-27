@@ -49,11 +49,29 @@ public:
     std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
 };
 
+class TNetlinkCache {
+public:
+    uint64_t FillingTime = 0;
+    struct nl_cache *Cache = nullptr;
+    TNetlinkCache() {}
+    ~TNetlinkCache();
+    uint64_t Age();
+    void Drop();
+    void Fill(struct nl_cache *cache);
+    TError Refill(TNl &sock);
+};
+
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
                  public TLockable {
     std::shared_ptr<TNl> Nl;
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
+
+    TNetlinkCache LinkCache;
+    std::map<int, TNetlinkCache> ClassCache;
+    void DropCaches();
+    TError GetLinkCache(struct nl_cache **cache);
+    TError GetClassCache(int index, struct nl_cache **cache);
 
     unsigned IfaceName = 0;
 
