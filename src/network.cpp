@@ -181,7 +181,9 @@ uint64_t TNetworkDevice::GetConfig(const TUintMap &cfg, uint64_t def) const {
         if (StringMatch(Name, it.first))
             return it.second;
     }
-    auto it = cfg.find("default");
+    auto it = cfg.find("group " + GroupName);
+    if (it == cfg.end())
+        it = cfg.find("default");
     if (it != cfg.end())
         return it->second;
     return def;
@@ -192,7 +194,9 @@ std::string TNetworkDevice::GetConfig(const TStringMap &cfg, std::string def) co
         if (StringMatch(Name, it.first))
             return it.second;
     }
-    auto it = cfg.find("default");
+    auto it = cfg.find("group " + GroupName);
+    if (it == cfg.end())
+        it = cfg.find("default");
     if (it != cfg.end())
         return it->second;
     return def;
