@@ -100,7 +100,7 @@ public:
     TError GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat);
 
     TError GetGateAddress(std::vector<TNlAddr> addrs,
-                          TNlAddr &gate4, TNlAddr &gate6, int &mtu);
+                          TNlAddr &gate4, TNlAddr &gate6, int &mtu, int &group);
     TError AddAnnounce(const TNlAddr &addr, std::string master);
     TError DelAnnounce(const TNlAddr &addr);
 
@@ -161,6 +161,7 @@ struct TL3NetCfg {
     int Mtu;
     std::vector<TNlAddr> Addrs;
     bool Nat;
+    int Group = 0;
 };
 
 class TContainer;

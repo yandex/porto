@@ -689,7 +689,8 @@ TError TNetwork::RefreshClasses() {
 }
 
 TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
-                                TNlAddr &gate4, TNlAddr &gate6, int &mtu) {
+                                TNlAddr &gate4, TNlAddr &gate6,
+                                int &mtu, int &group) {
     struct nl_cache *cache, *lcache;
     int ret;
 
@@ -739,6 +740,9 @@ TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
 
                      if (mtu < 0 || link_mtu < mtu)
                          mtu = link_mtu;
+
+                     if (!group)
+                         group = rtnl_link_get_group(link);
 
                      rtnl_link_put(link);
                  }
@@ -1423,7 +1427,7 @@ TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
     if (hw.empty() && !Hostname.empty())
         hw = GenerateHw(veth.Name + veth.Peer);
 
-    error = peer.AddVeth(veth.Name, hw, veth.Mtu, NetNs.GetFd());
+    error = peer.AddVeth(veth.Name, hw, veth.Mtu, 0, NetNs.GetFd());
     if (error)
         return error;
 
@@ -1465,7 +1469,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         SaveIp = true;
     }
 
-    error = HostNetwork->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu);
+    error = HostNetwork->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu, l3.Group);
     if (error)
         return error;
 
@@ -1476,7 +1480,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
             return TError(EError::InvalidValue, "Ipv6 gateway not found");
     }
 
-    error = peer.AddVeth(l3.Name, "", l3.Mtu, NetNs.GetFd());
+    error = peer.AddVeth(l3.Name, "", l3.Mtu, l3.Group, NetNs.GetFd());
     if (error)
         return error;
 

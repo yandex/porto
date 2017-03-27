@@ -92,6 +92,7 @@ public:
     TError Load();
 
     int GetIndex() const;
+    int GetGroup() const;
     TNlAddr GetAddr() const;
     std::string GetName() const;
     std::string GetType() const;
@@ -110,7 +111,8 @@ public:
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int mtu);
-    TError AddVeth(const std::string &name, const std::string &hw, int mtu, int nsFd);
+    TError AddVeth(const std::string &name, const std::string &hw, int mtu,
+                   int group, int nsFd);
 
     static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);

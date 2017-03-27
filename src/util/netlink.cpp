@@ -272,6 +272,10 @@ int TNlLink::GetIndex() const {
     return rtnl_link_get_ifindex(Link);
 }
 
+int TNlLink::GetGroup() const {
+    return rtnl_link_get_group(Link);
+}
+
 TNlAddr TNlLink::GetAddr() const {
     return TNlAddr(rtnl_link_get_addr(Link));
 }
@@ -517,6 +521,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     if (error)
         return error;
     masterIdx = masterLink.GetIndex();
+    int masterGroup = masterLink.GetGroup();
 
     msg = nlmsg_alloc_simple(RTM_NEWLINK, NLM_F_CREATE);
     if (!msg)
@@ -546,6 +551,12 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
             error = TError(EError::Unknown, std::string("Unable to put IFLA_MTU: ") + nl_geterror(ret));
             goto free_msg;
         }
+    }
+
+    ret = nla_put(msg, IFLA_GROUP, sizeof(int), &masterGroup);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_GROUP: ") + nl_geterror(ret));
+        goto free_msg;
     }
 
     if (hw.length()) {
@@ -651,7 +662,7 @@ TError TNlLink::Enslave(const std::string &name) {
 
 TError TNlLink::AddVeth(const std::string &name,
                         const std::string &hw,
-                        int mtu, int nsFd) {
+                        int mtu, int group, int nsFd) {
     struct rtnl_link *veth, *peer;
     int ret;
 
@@ -663,6 +674,7 @@ TError TNlLink::AddVeth(const std::string &name,
 
     veth = rtnl_link_veth_get_peer(peer);
     rtnl_link_set_name(veth, name.c_str());
+    rtnl_link_set_group(veth, group);
 
     if (nsFd >= 0)
         rtnl_link_set_ns_fd(veth, nsFd);
