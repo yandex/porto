@@ -506,15 +506,11 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     struct nl_msg *msg;
     struct nlattr *linkinfo, *infodata;
     struct ifinfomsg ifi = {};
-    struct ether_addr *ea = nullptr;
+    struct ether_addr ea;
     auto Name = GetName();
 
-    if (hw.length()) {
-        // FIXME THREADS
-        ea = ether_aton(hw.c_str());
-        if (!ea)
-            return TError(EError::Unknown, "Invalid " + vlantype + " mac address " + hw);
-    }
+    if (hw.length() && !ether_aton_r(hw.c_str(), &ea))
+        return TError(EError::Unknown, "Invalid " + vlantype + " mac address " + hw);
 
     TNlLink masterLink(Nl, master);
     error = masterLink.Load();
@@ -552,8 +548,8 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
         }
     }
 
-    if (ea) {
-        struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
+    if (hw.length()) {
+        struct nl_addr *addr = nl_addr_build(AF_LLC, &ea, ETH_ALEN);
         ret = nla_put(msg, IFLA_ADDRESS, nl_addr_get_len(addr), nl_addr_get_binary_addr(addr));
         if (ret < 0) {
             error = TError(EError::Unknown, std::string("Unable to put IFLA_ADDRESS: ") + nl_geterror(ret));
@@ -714,7 +710,8 @@ bool TNlLink::ValidMacVlanType(const std::string &type) {
 }
 
 bool TNlLink::ValidMacAddr(const std::string &hw) {
-    return ether_aton(hw.c_str()) != nullptr;
+    struct ether_addr ea;
+    return ether_aton_r(hw.c_str(), &ea) != nullptr;
 }
 
 void TNl::DumpCache(struct nl_cache *cache) const {
