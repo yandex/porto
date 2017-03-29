@@ -1132,6 +1132,8 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
         }
     }
 
+    DropCaches();
+
     return result;
 }
 
@@ -1159,6 +1161,8 @@ TError TNetwork::DestroyTC(uint32_t handle, uint32_t leaf) {
                 result = error;
         }
     }
+
+    DropCaches();
 
     return result;
 }
