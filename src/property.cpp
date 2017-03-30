@@ -1919,8 +1919,12 @@ public:
             if (error)
                 return error;
             type = ECpuSetType::Absolute;
-            CT->CpuAffinity.Clear();
-            CT->CpuAffinity.Set(map);
+            if (!CT->CpuAffinity.IsEqual(map)) {
+                CT->CpuAffinity.Clear();
+                CT->CpuAffinity.Set(map);
+                CT->SetProp(EProperty::CPU_SET);
+                CT->SetProp(EProperty::CPU_SET_AFFINITY);
+            }
         } else if (cfg.size() == 2) {
             error = StringToInt(cfg[1], arg);
             if (error)
@@ -1948,6 +1952,7 @@ public:
             CT->CpuSetArg = arg;
             CT->SetProp(EProperty::CPU_SET);
         }
+
         return TError::Success();
     }
 } static CpuSet;

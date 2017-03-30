@@ -151,6 +151,7 @@ enum class EProperty {
     CPU_GUARANTEE,
     CPU_LIMIT,
     CPU_SET,
+    CPU_SET_AFFINITY,
     IO_POLICY,
     IO_LIMIT,
     IO_OPS_LIMIT,

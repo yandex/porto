@@ -340,10 +340,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if (Parent && Parent->IsRoot() && PidsSubsystem.Supported)
         Controllers |= CGROUP_PIDS;
 
-    if (Parent && Parent->IsRoot() && CpusetSubsystem.Supported) {
+    if (Level <= 1 && CpusetSubsystem.Supported)
         Controllers |= CGROUP_CPUSET;
-        SetProp(EProperty::CPU_SET);
-    }
 
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
@@ -1050,43 +1048,50 @@ TError TContainer::DistributeCpus() {
                 ct->CpuVacant.Clear();
                 ct->CpuReserve.Clear();
 
+                TBitMap affinity;
+
                 switch (type) {
                 case ECpuSetType::Inherit:
-                    ct->CpuAffinity.Clear();
-                    ct->CpuAffinity.Set(parent->CpuVacant);
+                    affinity.Set(parent->CpuVacant);
                     break;
                 case ECpuSetType::Absolute:
+                    affinity.Set(ct->CpuAffinity);
                     break;
                 case ECpuSetType::Node:
                     if (!NumaNodes.Get(ct->CpuSetArg))
                         return TError(EError::ResourceNotAvailable, "Numa node not found for " + ct->Name);
-                    ct->CpuAffinity.Clear();
-                    ct->CpuAffinity.Set(NodeThreads[ct->CpuSetArg]);
+                    affinity.Set(NodeThreads[ct->CpuSetArg]);
                     break;
                 case ECpuSetType::Cores:
                     error = parent->ReserveCpus(0, ct->CpuSetArg,
-                            ct->CpuReserve, ct->CpuAffinity);
+                                                ct->CpuReserve, affinity);
                     if (error)
                         return error;
                     break;
                 case ECpuSetType::Threads:
                     error = parent->ReserveCpus(ct->CpuSetArg, 0,
-                            ct->CpuReserve, ct->CpuAffinity);
+                                                ct->CpuReserve, affinity);
                     if (error)
                         return error;
-                    ct->CpuAffinity.Set(ct->CpuReserve);
+                    affinity.Set(ct->CpuReserve);
                     break;
                 case ECpuSetType::Reserve:
                     error = parent->ReserveCpus(ct->CpuSetArg, 0,
-                            ct->CpuReserve, ct->CpuAffinity);
+                                                ct->CpuReserve, affinity);
                     if (error)
                         return error;
-                    ct->CpuAffinity.Set(parent->CpuAffinity);
+                    affinity.Set(parent->CpuAffinity);
                     break;
                 }
 
-                if (!ct->CpuAffinity.Weight() || !ct->CpuAffinity.IsSubsetOf(parent->CpuAffinity))
+                if (!affinity.Weight() || !affinity.IsSubsetOf(parent->CpuAffinity))
                     return TError(EError::ResourceNotAvailable, "Not enough cpus for " + ct->Name);
+
+                if (!ct->CpuAffinity.IsEqual(affinity)) {
+                    ct->CpuAffinity.Clear();
+                    ct->CpuAffinity.Set(affinity);
+                    ct->SetProp(EProperty::CPU_SET_AFFINITY);
+                }
 
                 if (ct->CpuReserve.Weight())
                     L_ACT() << "Reserve CPUs " << ct->CpuReserve.Format() << " for " << ct->Name << std::endl;
@@ -1101,6 +1106,7 @@ TError TContainer::DistributeCpus() {
 
     for (auto &ct: subtree) {
         if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
+                !ct->TestClearPropDirty(EProperty::CPU_SET_AFFINITY) ||
                 ct->State == EContainerState::Stopped ||
                 ct->State == EContainerState::Dead)
             continue;
@@ -1371,12 +1377,20 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
 TError TContainer::PrepareCgroups() {
     TError error;
 
-    /* Create CPU set if some CPUs in parent are reserved */
-    if (!HasProp(EProperty::CPU_SET) && Parent &&
-            Parent->CpuAffinity.Weight() != Parent->CpuVacant.Weight()) {
-        Controllers |= CGROUP_CPUSET;
-        RequiredControllers |= CGROUP_CPUSET;
+    if (!HasProp(EProperty::CPU_SET) && Parent) {
+        /* Create CPU set if some CPUs in parent are reserved */
+        if (!Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
+            Controllers |= CGROUP_CPUSET;
+            RequiredControllers |= CGROUP_CPUSET;
+        } else {
+            CpuAffinity.Clear();
+            CpuAffinity.Set(Parent->CpuAffinity);
+        }
+    }
+
+    if (Controllers & CGROUP_CPUSET) {
         SetProp(EProperty::CPU_SET);
+        SetProp(EProperty::CPU_SET_AFFINITY);
     }
 
     for (auto hy: Hierarchies) {
@@ -2591,6 +2605,10 @@ TError TContainer::Load(const TKeyValue &node) {
 
     if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped)
         Controllers = RootContainer->Controllers;
+
+    if (Level == 1 && CpusetSubsystem.Supported &&
+            !(Controllers & CGROUP_CPUSET))
+        Controllers |= CGROUP_CPUSET;
 
     if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
         OwnerCred = TaskCred;

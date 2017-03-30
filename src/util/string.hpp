@@ -111,4 +111,11 @@ public:
                 return false;
         return true;
     }
+
+    bool IsEqual(const TBitMap &map) const {
+        for (unsigned i = 0; i < std::max(Size(), map.Size()); i++)
+            if (Get(i) != map.Get(i))
+                return false;
+        return true;
+    }
 };
