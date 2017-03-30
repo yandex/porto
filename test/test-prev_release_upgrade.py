@@ -7,6 +7,8 @@ from test_common import *
 
 AsRoot()
 
+BASE_VERSION="3.2.10"
+
 TMPDIR = "/tmp/test-release-upgrade"
 PORTOD_PATH = "/run/portod"
 
@@ -43,6 +45,7 @@ def CheckRt(r):
 
 #FIXME: remove it in the future, use capabilities from snapshot
 def CheckCaps(r, new_porto):
+    new_porto = True
     app_caps =  "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"\
                 "LINUX_IMMUTABLE;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;"\
                 "SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;SYS_NICE;SYS_RESOURCE;"\
@@ -90,7 +93,8 @@ def SnapshotProps(r):
                                #app: "" -> "<not empty>"
               "command", "cpu_guarantee", "cpu_limit", "cpu_policy",
               "cwd", "devices", "enable_porto", "env",
-              "group", "hostname",
+              #"group",
+              "hostname",
               # "io_limit", "io_ops_limit", FIXME "0" -> ""
               "io_policy", "ip",
               "isolate", "max_respawns", "memory_guarantee", "memory_limit", "net",
@@ -102,7 +106,8 @@ def SnapshotProps(r):
               #"stderr_path", #FIXME enable later, "/dev/null" -> ""
               #"stdout_path", #FIXME enable later, "/dev/null" -> ""
               "stdin_path", "stdout_limit", "ulimit",
-              "user", "virt_mode", "weak" ]
+              #"user", FIXME virt_mode=os
+              "virt_mode", "weak" ]
     d = dict()
     for p in props:
         d[p] = r.GetProperty(p)
@@ -116,19 +121,12 @@ def VerifySnapshot(r, props):
 
 #Check  working with older version
 
-print "Checking upgrade from the older version..."
+print "Checking upgrade from", BASE_VERSION
 
 cwd=os.path.abspath(os.getcwd())
 
 os.chdir(TMPDIR)
-try:
-    #FIXME: Remove 2.10 suffix later
-    download = subprocess.check_output(["apt-get", "download", "yandex-porto=2.10*"])
-except:
-    print "Cannot download old version of porto, skipping test..."
-    os.chdir(cwd)
-    os.rmdir(TMPDIR)
-    sys.exit(0)
+download = subprocess.check_output(["apt-get", "download", "yandex-porto=" + BASE_VERSION])
 
 print "Package successfully downloaded"
 
