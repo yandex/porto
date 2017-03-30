@@ -51,7 +51,7 @@ bool TCgroup::Exists() const {
     return Path().IsDirectoryStrict();
 }
 
-TError TCgroup::Create() const {
+TError TCgroup::Create() {
     TError error;
 
     if (Secondary())
@@ -61,6 +61,14 @@ TError TCgroup::Create() const {
     error = Path().Mkdir(0755);
     if (error)
         L_ERR() << "Cannot create cgroup " << *this << " : " << error << std::endl;
+
+    for (auto subsys: Subsystems) {
+        if (subsys->IsEnabled(*this)) {
+            error = subsys->InitializeCgroup(*this);
+            if (error)
+                return error;
+        }
+    }
 
     return error;
 }
@@ -775,6 +783,20 @@ TError TCpusetSubsystem::SetMems(TCgroup &cg, const std::string &mems) const {
         val = mems;
 
     return cg.Set("cpuset.mems", val);
+}
+
+TError TCpusetSubsystem::InitializeCgroup(TCgroup &cg) {
+    TError error;
+
+    error = SetCpus(cg, "");
+    if (error)
+        return error;
+
+    error = SetMems(cg, "");
+    if (error)
+        return error;
+
+    return TError::Success();
 }
 
 // Netcls

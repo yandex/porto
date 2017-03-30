@@ -32,6 +32,10 @@ public:
     TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
     virtual void InitializeSubsystem() { }
 
+    virtual TError InitializeCgroup(TCgroup &cgroup) {
+        return TError::Success();
+    }
+
     TCgroup RootCgroup() const;
     TCgroup Cgroup(const std::string &name) const;
 
@@ -76,7 +80,7 @@ public:
     bool IsRoot() const;
     bool Exists() const;
 
-    TError Create() const;
+    TError Create();
     TError Remove() const;
 
     TError KillAll(int signal) const;
@@ -233,6 +237,8 @@ public:
     void InitializeSubsystem() override {
         Supported = true;
     }
+
+    TError InitializeCgroup(TCgroup &cg) override;
 
     TError SetCpus(TCgroup &cg, const std::string &cpus) const;
     TError SetMems(TCgroup &cg, const std::string &mems) const;
