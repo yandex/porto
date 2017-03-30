@@ -5326,37 +5326,8 @@ static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("abc"));
 }
 
-void TruncateLogs(Porto::Connection &api) {
-    AsRoot(api);
-
-    // Truncate slave log
-    TPath slaveLog(PORTO_SLAVE_LOG);
-    ExpectSuccess(slaveLog.Unlink());
-
-    int pid = ReadPid(PORTO_SLAVE_PIDFILE);
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to slave");
-
-    // Truncate master log
-    TPath masterLog(PORTO_MASTER_LOG);
-    ExpectSuccess(masterLog.Unlink());
-
-    pid = ReadPid(PORTO_MASTER_PIDFILE);
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to master");
-
-    WaitPortod(api);
-
-    AsAlice(api);
-
-    loggedRespawns = -expectedRespawns;
-    loggedErrors = -expectedErrors;
-    loggedWarns = -expectedWarns;
-}
-
 int SelfTest(std::vector<std::string> args) {
     pair<string, std::function<void(Porto::Connection &)>> tests[] = {
-        { "truncate_logs", TruncateLogs },
         { "path", TestPath },
         { "idmap", TestIdmap },
         { "format", TestFormat },
