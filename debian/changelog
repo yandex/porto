@@ -1,3 +1,16 @@
+yandex-porto (3.6.1) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * network: drop tc cache after touching classes tree
+
+  [ Konstantin Khlebnikov ]
+  * cgroup: initialize new cpuset cgroups
+  * cgroup: update only changed cpu affinity
+  * test: remove truncate_logs
+  * test/upgrade: check upgrade from 3.2.10
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 30 Mar 2017 19:50:34 +0300
+
 yandex-porto (3.6.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
