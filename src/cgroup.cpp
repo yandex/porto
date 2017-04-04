@@ -488,7 +488,7 @@ TError TMemorySubsystem::SetIopsLimit(TCgroup &cg, uint64_t limit) {
 TError TMemorySubsystem::SetDirtyLimit(TCgroup &cg, uint64_t limit) {
     if (!SupportDirtyLimit())
         return TError::Success();
-    if (limit)
+    if (limit || !cg.Has(DIRTY_RATIO))
         return cg.SetUint64(DIRTY_LIMIT, limit);
     return cg.SetUint64(DIRTY_RATIO, 50);
 }
