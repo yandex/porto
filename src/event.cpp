@@ -5,10 +5,13 @@
 #include "util/unix.hpp"
 #include "util/worker.hpp"
 #include "container.hpp"
+#include "client.hpp"
 
 class TEventWorker : public TWorker<TEvent, std::priority_queue<TEvent>> {
 public:
-    TEventWorker(const size_t nr) : TWorker("portod-event", nr) {}
+    TEventWorker(const size_t nr) : TWorker("portod-event", nr), client("<event>") {}
+
+    TClient client;
 
     const TEvent &Top() override {
         return Queue.top();
@@ -35,7 +38,10 @@ public:
 
     bool Handle(const TEvent &event) override {
         if (event.DueMs <= GetCurrentTimeMs()) {
+            client.ClientContainer = RootContainer;
+            client.StartRequest();
             TContainer::Event(event);
+            client.FinishRequest();
             return true;
         }
 

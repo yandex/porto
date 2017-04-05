@@ -2854,11 +2854,10 @@ TError TContainer::Respawn() {
     RespawnCount++;
     SetProp(EProperty::RESPAWN_COUNT);
 
-    SystemClient.StartRequest();
-    SystemClient.LockedContainer = shared_from_this();
+    // FIXME
+    CL->LockedContainer = shared_from_this();
     error = Start();
-    SystemClient.LockedContainer = nullptr;
-    SystemClient.FinishRequest();
+    CL->LockedContainer = nullptr;
 
     return error;
 }
