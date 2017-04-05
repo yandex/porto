@@ -1,3 +1,10 @@
+yandex-porto (3.6.2) unstable; urgency=low
+
+  * cgroup: fix setting zero dirty limit
+  * porto: handle events by special client #PORTO-210
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 05 Apr 2017 13:33:38 +0300
+
 yandex-porto (3.6.1) unstable; urgency=low
 
   [ Maxim Samoylov ]
