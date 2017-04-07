@@ -31,7 +31,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     for (auto &arg : command)
         cmdline += arg + " ";
 
-    L_ACT() << "Call helper: " << cmdline << " in " << cwd << std::endl;
+    L_ACT("Call helper: {} in {}", cmdline, cwd);
 
     error = task.Fork();
     if (error)
@@ -47,13 +47,13 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
         }
         struct stat st;
         if (!err.Stat(st) && st.st_size > 2048)
-            L_WRN() << "Helper " << cmdline << " generated " << st.st_size << " bytes in stderr" << std::endl;
+            L_WRN("Helper {} generated {} bytes in stderr", cmdline, st.st_size);
         return error;
     }
 
     error = memcg.Attach(GetPid());
     if (error)
-        L_WRN() << "cannot attach to helper cgroup: " << error << std::endl;
+        L_WRN("Cannot attach to helper cgroup: {}", error);
 
     SetDieOnParentExit(SIGKILL);
 

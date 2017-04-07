@@ -95,13 +95,13 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
         }
 
         lock.unlock();
-        L_ACT() << "Remove junk: " << path << std::endl;
+        L_ACT("Remove junk: {}", path);
         error = ClearRecursive(path);
         if (error)
-            L_WRN() << "Cannot clear junk: " << path << ": " << error << std::endl;
+            L_WRN("Cannot clear junk: {}: {}", path, error);
         error = path.RemoveAll();
         if (error)
-            L_WRN() << "cannot delete junk: " << path << " : " << error << std::endl;
+            L_WRN("cannot delete junk: {}: {}", path, error);
     }
 
     return TError::Success();
@@ -405,7 +405,7 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
 err:
     TError error2 = temp.RemoveAll();
     if (error2)
-        L_WRN() << "Cannot cleanup layer: " << error2 << std::endl;
+        L_WRN("Cannot cleanup layer: {}", error2);
 
     lock.lock();
     ActivePaths.remove(temp);
@@ -511,7 +511,7 @@ TError TStorage::Remove() {
     if (temp.Exists()) {
         error = temp.Unlink();
         if (error)
-            L_WRN() << "Cannot remove private: " << error << std::endl;
+            L_WRN("Cannot remove private: {}", error);
     }
 
     temp = TempPath(REMOVE_PREFIX + std::to_string(RemoveCounter++));
@@ -526,11 +526,11 @@ TError TStorage::Remove() {
 
     error = ClearRecursive(temp);
     if (error)
-        L_WRN() << "Cannot clear layel: " << error << std::endl;
+        L_WRN("Cannot clear layel: {}", error);
 
     error = temp.RemoveAll();
     if (error)
-        L_WRN() << "Cannot remove layer: " << error << std::endl;
+        L_WRN("Cannot remove layer: {}", error);
 
     lock.lock();
     ActivePaths.remove(temp);

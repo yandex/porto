@@ -122,7 +122,7 @@ TLogBuf::int_type TLogBuf::overflow(int_type ch) {
     return traits_type::eof();
 }
 
-std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
+void TLogger::Log(std::string log_msg, ELogLevel level) {
     PrepareLog();
 
     static const std::string prefix[] = { "    ",
@@ -146,15 +146,18 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
     if (level == LOG_ERROR && Verbose)
         Stacktrace();
 
-    return (*logStream) << FormatTime(time(nullptr)) << " " << name << "[" << GetTid() << "]: " << prefix[level];
+    std::string msg = FormatTime(time(nullptr)) + " " + name + "[" + 
+                      std::to_string(GetTid()) + "]: " + prefix[level] + log_msg;
+
+    (*logStream) << msg << std::endl;
 }
 
 void porto_assert(const char *msg, size_t line, const char *file) {
-    L_ERR() << "Assertion failed: " << msg << " at " << file << ":" << line << std::endl;
+    L_ERR("Assertion failed: {} at {}:{}", msg, file, line);
     Crash();
 }
 
 void porto_runtime_error(const std::string &msg, size_t line, const char *file) {
-    L_ERR() << "Runtime error: " << msg << " at " << file << ":" << line << std::endl;
+    L_ERR("Runtime error: {} at {}:{}", msg, file, line);
     Crash();
 }

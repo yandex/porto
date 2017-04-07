@@ -57,8 +57,7 @@ void TClient::CloseConnection() {
             EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
         if (Verbose)
-            L() << "Client disconnected: " << *this
-                << " : " << ConnectionTime << " ms" <<  std::endl;
+            L("Client disconnected: {}: {} ms", *this, ConnectionTime);
         close(Fd);
         Fd = -1;
     }
@@ -113,8 +112,8 @@ TError TClient::IdentifyClient(bool initial) {
 
     error = TContainer::FindTaskContainer(Pid, ct);
     if (error && error.GetErrno() != ENOENT)
-        L_WRN() << "Cannot identify container of pid " << Pid
-                << " : " << error << std::endl;
+        L_WRN("Cannot identify container of pid {} : {}", Pid, error);
+
     if (error)
         return error;
 
@@ -134,7 +133,7 @@ TError TClient::IdentifyClient(bool initial) {
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 
     if (ct->ClientsCount < 0)
-        L_ERR() << "Client count underflow" << std::endl;
+        L_ERR("Client count underflow");
 
     if (ClientContainer)
         ClientContainer->ClientsCount--;
@@ -394,7 +393,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     TScopedLock lock(Mutex);
 
     if (Processing) {
-        L_WRN() << "Client request before response: " << *this << std::endl;
+        L_WRN("Client request before response: {}", *this);
         return TError::Success();
     }
 
@@ -458,7 +457,7 @@ TError TClient::SendResponse(bool first) {
         if (!first)
             return TError(EError::Unknown, "send return zero");
     } else if (errno == EPIPE) {
-        L() << "Client disconnected: " << *this << std::endl;
+        L("Client disconnected: {}", *this);
         return TError::Success();
     } else if (errno != EAGAIN && errno != EWOULDBLOCK)
         return TError(EError::Unknown, errno, "send response failed");
@@ -492,25 +491,4 @@ TError TClient::QueueResponse(rpc::TContainerResponse &response) {
         return TError(EError::Unknown, "cannot serialize response");
 
     return SendResponse(true);
-}
-
-std::ostream& operator<<(std::ostream& stream, TClient& client) {
-    stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
-
-    if (client.FirstLog) {
-        client.FirstLog = false;
-        stream << " " << client.TaskCred;
-        if (client.Cred.Uid != client.TaskCred.Uid ||
-                client.Cred.Gid != client.TaskCred.Gid)
-            stream << " owner " << client.Cred;
-        if (client.ClientContainer) {
-            stream << " from " << client.ClientContainer->Name;
-            if (client.PortoNamespace != "")
-                stream << " namespace " << client.PortoNamespace;
-            if (client.WriteNamespace != client.PortoNamespace)
-                stream << " write-namespace " << client.WriteNamespace;
-        }
-    }
-
-    return stream;
 }

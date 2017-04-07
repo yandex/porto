@@ -283,17 +283,15 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
 
 static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent) {
     if (!silent || Verbose)
-        L_RSP() << ResponseAsString(rsp) << " to " << client
-                << " (request took " << client.RequestTimeMs << "ms)"
-                << std::endl;
+        L_RSP("{} to {} (request took {} ms)",
+              ResponseAsString(rsp), client, client.RequestTimeMs);
 
     if (Verbose)
-        L_RSP() << rsp.ShortDebugString() << " to " << client << std::endl;
+        L_RSP("{} to {}", rsp.ShortDebugString(), client);
 
     TError error = client.QueueResponse(rsp);
     if (error)
-        L_WRN() << "Cannot send response for " << client
-                << " : " << error << std:: endl;
+        L_WRN("Cannot send response for {} : {}", client, error);
 }
 
 static TError CheckPortoWriteAccess() {
@@ -1042,8 +1040,8 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
         if (ct->Isolate)
             return TError(EError::InvalidState, "new container must be not isolated from current");
 
-    L_ACT() << "Attach process " << pid << " (" << comm << ") from "
-            << oldCt->Name << " to " << newCt->Name << std::endl;
+    L_ACT("Attach process {} ({}) from {} to {}", pid, comm,
+          oldCt->Name, newCt->Name);
 
     for (auto hy: Hierarchies) {
         auto cg = newCt->GetCgroup(*hy);
@@ -1172,17 +1170,17 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     bool silent = SilentRequest(req);
     if (!silent || Verbose)
-        L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
+        L_REQ("{} from {}", RequestAsString(req), *client);
 
     if (Verbose)
-        L_REQ() << req.ShortDebugString() << " from " << *client << std::endl;
+        L_REQ("{} from {}", req.ShortDebugString(), *client);
 
     rsp.set_error(EError::Unknown);
 
     TError error;
     try {
         if (!ValidRequest(req)) {
-            L_ERR() << "Invalid request " << req.ShortDebugString() << " from " << *client << std::endl;
+            L_ERR("Invalid request {} from {}", req.ShortDebugString(), *client);
             error = TError(EError::InvalidMethod, "invalid request");
         } else if (req.has_create())
             error = CreateContainer(req.create().name(), false);
@@ -1280,7 +1278,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
         /* log failed or slow silent requests */
         if (silent && !Verbose && (error || client->RequestTimeMs >= 1000)) {
-            L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
+            L_REQ("{} from {}", RequestAsString(req), *client);
             silent = false;
         }
 

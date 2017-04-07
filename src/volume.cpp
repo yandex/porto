@@ -177,9 +177,9 @@ public:
             TProjectQuota quota = TPath(PORTO_PLACE) / PORTO_VOLUMES;
             supported = quota.Supported();
             if (supported)
-                L_SYS() << "Project quota is supported: " << quota.Path << std::endl;
+                L_SYS("Project quota is supported: {}", quota.Path.c_str());
             else
-                L_SYS() << "Project quota not supported: " << quota.Path << std::endl;
+                L_SYS("Project quota not supported: {}", quota.Path.c_str());
             tested = true;
         }
 
@@ -227,8 +227,8 @@ public:
 
         quota.SpaceLimit = Volume->SpaceLimit;
         quota.InodeLimit = Volume->InodeLimit;
-        L_ACT() << "Creating project quota: " << quota.Path << " bytes: "
-                << quota.SpaceLimit << " inodes: " << quota.InodeLimit << std::endl;
+        L_ACT("Creating project quota: {} bytes: {} inodes: {}",
+              quota.Path, quota.SpaceLimit, quota.InodeLimit);
         return quota.Create();
     }
 
@@ -236,7 +236,7 @@ public:
         TProjectQuota quota(Volume->Path);
         TError error;
 
-        L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
+        L_ACT("Destroying project quota: {}", quota.Path);
         return quota.Destroy();
     }
 
@@ -245,7 +245,7 @@ public:
 
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
-        L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
+        L_ACT("Resizing project quota: {}", quota.Path);
         return quota.Resize();
     }
 
@@ -278,8 +278,8 @@ public:
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
             quota.InodeLimit = Volume->InodeLimit;
-            L_ACT() << "Creating project quota: " << quota.Path << " bytes: "
-                    << quota.SpaceLimit << " inodes: " << quota.InodeLimit << std::endl;
+            L_ACT("Creating project quota: {} bytes: {} inodes: {}",
+                  quota.Path, quota.SpaceLimit, quota.InodeLimit);
             error = quota.Create();
             if (error)
                 return error;
@@ -294,7 +294,7 @@ public:
         TError error = Volume->InternalPath.UmountAll();
 
         if (Volume->HaveQuota() && quota.Exists()) {
-            L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
+            L_ACT("Destroying project quota: {}", quota.Path);
             TError error2 = quota.Destroy();
         }
 
@@ -307,10 +307,10 @@ public:
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
         if (!Volume->HaveQuota()) {
-            L_ACT() << "Creating project quota: " << quota.Path << std::endl;
+            L_ACT("Creating project quota: {}", quota.Path);
             return quota.Create();
         }
-        L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
+        L_ACT("Resizing project quota: {}", quota.Path);
         return quota.Resize();
     }
 
@@ -405,7 +405,7 @@ public:
 remove_file:
         TError error2 = path.Unlink();
         if (error2)
-            L_WRN() << "Cannot cleanup loop image: " << error2 << std::endl;
+            L_WRN("Cannot cleanup loop image: {}", error2);
         return error;
     }
 
@@ -433,8 +433,8 @@ remove_file:
         TError error;
 
         if (!image.Exists()) {
-            L_ACT() << "Allocate loop image with size " << Volume->SpaceLimit
-                    << " guarantee " << Volume->SpaceGuarantee << std::endl;
+            L_ACT("Allocate loop image with size {} guarantee {}",
+                  Volume->SpaceLimit, Volume->SpaceGuarantee);
 
             Volume->KeepStorage = false; /* New storage */
             error = MakeImage(image, Volume->SpaceLimit, Volume->SpaceGuarantee);
@@ -481,7 +481,7 @@ free_loop:
         if (LoopDev < 0)
             return TError::Success();
 
-        L_ACT() << "Destroy loop " << loop << std::endl;
+        L_ACT("Destroy loop {}", loop);
         TError error = Volume->InternalPath.UmountAll();
         TError error2 = PutLoopDev(LoopDev);
         if (!error)
@@ -493,7 +493,7 @@ free_loop:
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         if (Volume->IsReadOnly)
             return TError(EError::Busy, "Volume is read-only");
-        if (Volume->SpaceLimit < (512ul << 20))
+        if (Volume->SpaceLimit < (512ul, 20))
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
         return ResizeLoopDev(LoopDev, Image(Volume->StoragePath),
@@ -516,11 +516,11 @@ public:
         if (!tested) {
             tested = true;
             if (!mount(NULL, "/", "overlay", MS_SILENT, NULL))
-                L_ERR() << "Unexpected success when testing for overlayfs" << std::endl;
+                L_ERR("Unexpected success when testing for overlayfs");
             if (errno == EINVAL)
                 supported = true;
             else if (errno != ENODEV)
-                L_ERR() << "Unexpected errno when testing for overlayfs " << errno << std::endl;
+                L_ERR("Unexpected errno when testing for overlayfs {}", errno);
         }
 
         return supported;
@@ -543,15 +543,15 @@ public:
     TError Build() override {
         TProjectQuota quota(Volume->StoragePath);
         TError error;
-        std::stringstream lower;
+        std::string lower;
         int layer_idx = 0;
         TFile upperFd, workFd;
 
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
             quota.InodeLimit = Volume->InodeLimit;
-            L_ACT() << "Creating project quota: " << quota.Path << " bytes: "
-                    << quota.SpaceLimit << " inodes: " << quota.InodeLimit << std::endl;
+            L_ACT("Creating project quota: {} bytes: {} inodes: {}",
+                  quota.Path, quota.SpaceLimit, quota.InodeLimit);
             error = quota.Create();
             if (error)
                   return error;
@@ -594,8 +594,8 @@ public:
             pin.Close();
 
             if (layer_idx > 1)
-                lower << ":";
-            lower << layer_id;
+                lower += ":";
+            lower += layer_id;
         }
 
         error = Volume->StorageFd.MkdirAt("upper", 0755);
@@ -622,7 +622,7 @@ public:
 
         error = Volume->InternalPath.Mount("overlay", "overlay",
                                    Volume->GetMountFlags(),
-                                   { "lowerdir=" + lower.str(),
+                                   { "lowerdir=" + lower,
                                      "upperdir=" + upperFd.ProcPath().ToString(),
                                      "workdir=" + workFd.ProcPath().ToString() });
 
@@ -651,7 +651,7 @@ err:
         TError error = Volume->InternalPath.UmountAll();
 
         if (Volume->HaveQuota() && quota.Exists()) {
-            L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
+            L_ACT("Destroying project quota: {}", quota.Path);
             TError error2 = quota.Destroy();
             if (!error)
                 error = error2;
@@ -666,10 +666,10 @@ err:
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
         if (!Volume->HaveQuota()) {
-            L_ACT() << "Creating project quota: " << quota.Path << std::endl;
+            L_ACT("Creating project quota: {}", quota.Path);
             return quota.Create();
         }
-        L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
+        L_ACT("Resizing project quota: {}", quota.Path);
         return quota.Resize();
     }
 
@@ -708,7 +708,7 @@ public:
 
     TError MapDevice(std::string id, std::string pool, std::string image,
                      std::string &device) {
-        L_ACT() << "Map rbd device " << id << "@" << pool << "/" << image << std::endl;
+        L_ACT("Map rbd device {}@{}/{}", id, pool, image);
         TError error;
         TFile out;
 
@@ -726,7 +726,7 @@ public:
     }
 
     TError UnmapDevice(std::string device) {
-        L_ACT() << "Unmap rbd device " << device << std::endl;
+        L_ACT("Unmap rbd device {}", device);
         return RunCommand({"rbd", "unmap", device}, "/");
     }
 
@@ -1178,8 +1178,7 @@ TError TVolume::Build() {
     auto lock = ScopedLock();
     TFile PathFd;
 
-    L_ACT() << "Build volume: " << Path
-            << " backend: " << BackendType << std::endl;
+    L_ACT("Build volume: {} backend: {}", Path, BackendType);
 
     TError error = GetInternal("").Mkdir(0755);
     if (error)
@@ -1271,7 +1270,7 @@ TError TVolume::Build() {
 
     if (HaveLayers() && BackendType != "overlay") {
 
-        L_ACT() << "Merge layers into volume: " << Path << std::endl;
+        L_ACT("Merge layers into volume: {}", Path);
 
         for (auto &name : Layers) {
             if (name[0] == '/') {
@@ -1369,7 +1368,7 @@ void TVolume::DestroyAll() {
             continue;
         TError error = vol->Destroy();
         if (error)
-            L_WRN() << "Cannot destroy volume " << vol->Path  << " : " << error << std::endl;
+            L_WRN("Cannot destroy volume {} : {}", vol->Path , error);
     }
 }
 
@@ -1396,8 +1395,7 @@ TError TVolume::Destroy(bool strict) {
             if (strict)
                 return TError(EError::Busy, "Volume "  + v->Path.ToString() + " depends on this");
             if (nested == cycle) {
-                L_WRN() << "Cyclic dependencies for "
-                        << cycle->Path << " detected" << std::endl;
+                L_WRN("Cyclic dependencies for {} detected", cycle->Path);
             } else {
                 auto it = std::find(plan.begin(), plan.end(), nested);
                 if (it == plan.end())
@@ -1427,8 +1425,7 @@ TError TVolume::Destroy(bool strict) {
         Volumes.erase(volume->Path);
 
         for (auto &name: volume->Containers) {
-            L_ACT()  << "Forced unlink volume " << volume->Path
-                     << " from " << name << std::endl;
+            L_ACT("Forced unlink volume {} from {}", volume->Path, name);
             volumes_lock.unlock();
             auto containers_lock = LockContainers();
             auto container = TContainer::Find(name);
@@ -1450,8 +1447,7 @@ TError TVolume::Destroy(bool strict) {
             if (StringStartsWith(layer, PORTO_WEAK_PREFIX)) {
                 error = storage.Remove();
                 if (error && error.GetError() != EError::Busy)
-                    L_ERR() << "Cannot remove weak layer " << layer
-                            << " : " << error << std::endl;
+                    L_ERR("Cannot remove weak layer {} : {}", layer, error);
             } else if (layer[0] != '/')
                 (void)storage.Touch();
         }
@@ -1465,8 +1461,7 @@ TError TVolume::Destroy(bool strict) {
 }
 
 TError TVolume::DestroyOne(bool strict) {
-    L_ACT() << "Destroy volume: " << Path
-            << " backend: " << BackendType << std::endl;
+    L_ACT("Destroy volume: {} backend: {}", Path, BackendType);
 
     auto lock = ScopedLock();
 
@@ -1482,7 +1477,7 @@ TError TVolume::DestroyOne(bool strict) {
     if (Path != InternalPath) {
         error = Path.UmountNested();
         if (error) {
-            L_ERR() << "Cannout umount volume: " << error << std::endl;
+            L_ERR("Cannout umount volume: {}", error);
             if (!ret)
                 ret = error;
         }
@@ -1491,7 +1486,7 @@ TError TVolume::DestroyOne(bool strict) {
     if (Backend) {
         error = Backend->Destroy();
         if (error) {
-            L_ERR() << "Can't destroy volume backend: " << error << std::endl;
+            L_ERR("Can't destroy volume backend: {}", error);
             if (!ret)
                 ret = error;
         }
@@ -1500,7 +1495,7 @@ TError TVolume::DestroyOne(bool strict) {
     /* umount everything for sure */
     error = internal.UmountNested();
     if (error) {
-        L_ERR() << "Cannot umount internal: " << error << std::endl;
+        L_ERR("Cannot umount internal: {}", error);
         if (!ret)
             ret = error;
     }
@@ -1510,17 +1505,17 @@ TError TVolume::DestroyOne(bool strict) {
     if (KeepStorage && !UserStorage() && !RemoteStorage()) {
         error = TStorage(Place, PORTO_STORAGE, Storage).Touch();
         if (error)
-            L_WRN() << "Cannot touch storage: " << error << std::endl;
+            L_WRN("Cannot touch storage: {}", error);
     }
 
     if (!KeepStorage && !RemoteStorage() && StoragePath.Exists()) {
         /* File image storage for backend=loop always persistent. */
         error = ClearRecursive(StoragePath);
         if (error)
-            L_ERR() << "Cannot clear storage: " << error << std::endl;
+            L_ERR("Cannot clear storage: {}", error);
         error = StoragePath.ClearDirectory();
         if (error) {
-            L_ERR() << "Cannot clear storage: " << error << std::endl;
+            L_ERR("Cannot clear storage: {}", error);
             if (!ret)
                 ret = error;
         }
@@ -1534,7 +1529,7 @@ TError TVolume::DestroyOne(bool strict) {
     if (IsAutoPath && Path.Exists()) {
         error = Path.RemoveAll();
         if (error) {
-            L_ERR() << "Cannot remove volume path: " << error << std::endl;
+            L_ERR("Cannot remove volume path: {}", error);
             if (!ret)
                 ret = error;
         }
@@ -1543,7 +1538,7 @@ TError TVolume::DestroyOne(bool strict) {
     if (internal.Exists()) {
         error = internal.RemoveAll();
         if (error) {
-            L_ERR() << "Cannot remove internal: " << error << std::endl;
+            L_ERR("Cannot remove internal: {}", error);
             if (!ret)
                 ret = error;
         }
@@ -1595,8 +1590,8 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
                 return error;
         }
 
-        L_ACT() << "Resize volume: " << Path << " to bytes: "
-                << spaceLimit << " inodes: " << inodeLimit << std::endl;
+        L_ACT("Resize volume: {} to bytes: {} inodes: {}",
+                Path, spaceLimit, inodeLimit);
 
         error = Backend->Resize(spaceLimit, inodeLimit);
         if (error)
@@ -1949,16 +1944,16 @@ void TVolume::RestoreAll(void) {
     TPath place(PORTO_PLACE);
     error = TStorage::CheckPlace(place);
     if (error)
-        L_ERR() << "Cannot prepare place: " << error << std::endl;
+        L_ERR("Cannot prepare place: {}", error);
 
     error = TKeyValue::ListAll(VolumesKV, nodes);
     if (error)
-        L_ERR() << "Cannot list nodes: " << error << std::endl;
+        L_ERR("Cannot list nodes: {}", error);
 
     for (auto &node : nodes) {
         error = node.Load();
         if (error) {
-            L_WRN() << "Cannot load " << node.Path << " removed: " << error << std::endl;
+            L_WRN("Cannot load {} removed: {}", node.Path, error);
             node.Path.Unlink();
             continue;
         }
@@ -1978,11 +1973,11 @@ void TVolume::RestoreAll(void) {
 
         auto volume = std::make_shared<TVolume>();
 
-        L_ACT() << "Restore volume: " << node.Path << std::endl;
+        L_ACT("Restore volume: {}", node.Path);
         error = volume->Restore(node);
         if (error) {
             /* Apparently, we cannot trust node contents, remove right away */
-            L_WRN() << "Corrupted volume " << node.Path << " removed: " << error << std::endl;
+            L_WRN("Corrupted volume {} removed: {}", node.Path, error);
             (void)volume->Destroy();
             continue;
         }
@@ -2002,7 +1997,7 @@ void TVolume::RestoreAll(void) {
             if (container)
                 container->Volumes.emplace_back(volume);
             else
-                L_WRN() << "Cannot find container " << name << std::endl;
+                L_WRN("Cannot find container {}", name);
         }
 
         containers_lock.unlock();
@@ -2014,22 +2009,22 @@ void TVolume::RestoreAll(void) {
         }
 
         if (!volume->Containers.size()) {
-            L_WRN() << "Volume " << volume->Path << " has no containers" << std::endl;
+            L_WRN("Volume {} has no containers", volume->Path);
             broken_volumes.push_back(volume);
             continue;
         }
 
         error = volume->CheckDependencies();
         if (error) {
-            L_WRN() << "Volume " << volume->Path << " has broken dependcies: " << error << std::endl;
+            L_WRN("Volume {} has broken dependcies: {}", volume->Path, error);
             broken_volumes.push_back(volume);
             continue;
         }
 
-        L() << "Volume " << volume->Path << " restored" << std::endl;
+        L("Volume {} restored", volume->Path);
     }
 
-    L_ACT() << "Remove broken volumes..." << std::endl;
+    L_ACT("Remove broken volumes...");
 
     for (auto &volume : broken_volumes) {
         if (volume->IsDying)
@@ -2040,12 +2035,12 @@ void TVolume::RestoreAll(void) {
 
     TPath volumes = place / PORTO_VOLUMES;
 
-    L_ACT() << "Remove stale volumes..." << std::endl;
+    L_ACT("Remove stale volumes...");
 
     std::vector<std::string> subdirs;
     error = volumes.ReadDirectory(subdirs);
     if (error)
-        L_ERR() << "Cannot list " << volumes << std::endl;
+        L_ERR("Cannot list {}", volumes);
 
     for (auto dir_name: subdirs) {
         bool used = false;
@@ -2062,18 +2057,18 @@ void TVolume::RestoreAll(void) {
 
         error = dir.UmountNested();
         if (error)
-            L_ERR() << "Cannot umount nested : " << error << std::endl;
+            L_ERR("Cannot umount nested : {}", error);
 
         error = ClearRecursive(dir);
         if (error)
-            L_ERR() << "Cannot clear directory " << dir << " : " << error << std::endl;
+            L_ERR("Cannot clear directory {}: {}", dir, error);
 
         error = dir.RemoveAll();
         if (error)
-            L_ERR() << "Cannot remove directory " << dir << std::endl;
+            L_ERR("Cannot remove directory {}", dir);
     }
 
-    L_ACT() << "Remove stale weak layers..." << std::endl;
+    L_ACT("Remove stale weak layers...");
 
     std::list<TStorage> layers;
 
@@ -2084,12 +2079,11 @@ void TVolume::RestoreAll(void) {
 
                 error = layer.Remove();
                 if (error && error.GetError() != EError::Busy)
-                    L_ERR() << "Cannot remove weak layer " << layer.Name
-                            << " : " << error << std::endl;
+                    L_ERR("Cannot remove weak layer {} : {}", layer.Name, error);
             }
         }
     } else {
-        L_WRN() << "Layers listing failed : " << error << std::endl;
+        L_WRN("Layers listing failed : {}", error);
     }
 }
 

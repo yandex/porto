@@ -21,7 +21,7 @@ extern "C" {
 // published under the WTFPL v2.0
 
 void Stacktrace() {
-    L_STK() << "Stacktrace:" << std::endl;
+    L_STK("Stacktrace:");
 
     unsigned int max_frames = 63;
     // storage array for stack trace address data
@@ -31,7 +31,7 @@ void Stacktrace() {
     int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
 
     if (addrlen == 0) {
-        L_STK() << "  <empty, possibly corrupt>\n" << std::endl;
+        L_STK("  <empty, possibly corrupt>\n");
         return;
     }
 
@@ -77,15 +77,14 @@ void Stacktrace() {
             char* ret = abi::__cxa_demangle(begin_name, funcname, &funcnamesize, &status);
             if (status == 0) {
                 funcname = ret; // use possibly realloc()-ed string
-                L_STK() << symbollist[i] << ": " << funcname << " " << begin_addr << std::endl;
+                L_STK("{}: {} {}", symbollist[i], funcname, begin_addr);
             } else {
                 // demangling failed. Output function name as a C function with no arguments.
-                L_STK() << symbollist[i] << ": " << begin_name << "()+"
-                        << begin_offset << " " << begin_addr << std::endl;
+                L_STK("{}: {}()+{} {}", symbollist[i], begin_name, begin_offset, begin_addr);
             }
         } else {
             // couldn't parse the line? print the whole line.
-            L_STK() << symbollist[i] << std::endl;
+            L_STK(symbollist[i]);
         }
     }
 
@@ -94,7 +93,7 @@ void Stacktrace() {
 }
 
 void Crash() {
-    L_ERR() << "Crashed" << std::endl;
+    L_ERR("Crashed");
     Stacktrace();
 
     /* that's all */
@@ -104,7 +103,7 @@ void Crash() {
 }
 
 void FatalSignal(int sig) {
-    L_ERR() << "Fatal signal: " << std::string(strsignal(sig)) << std::endl;
+    L_ERR("Fatal signal: {}", std::string(strsignal(sig)));
     Stacktrace();
 
     /* ok, die */
@@ -128,7 +127,7 @@ void ResetBlockedSignals() {
 
     sigemptyset(&sigMask);
     if (sigprocmask(SIG_SETMASK, &sigMask, NULL)) {
-        L_ERR() << "Cannot unblock signals" << std::endl;
+        L_ERR("Cannot unblock signals");
         Crash();
     }
 }
@@ -142,7 +141,7 @@ void Signal(int signum, void (*handler)(int)) {
 
     sa.sa_handler = handler;
     if (sigaction(signum, &sa, NULL)) {
-        L_ERR() << "Cannot set signal action" << std::endl;
+        L_ERR("Cannot set signal action");
         Crash();
     }
 }
@@ -159,13 +158,13 @@ int SignalFd() {
     sigaddset(&sigMask, SIGCHLD);
 
     if (sigprocmask(SIG_BLOCK, &sigMask, NULL)) {
-        L_ERR() << "Cannot block signals" << std::endl;
+        L_ERR("Cannot block signals");
         Crash();
     }
 
     int sigFd = signalfd(-1, &sigMask, SFD_NONBLOCK | SFD_CLOEXEC);
     if (sigFd < 0) {
-        L_ERR() << "Cannot create signalfd" << std::endl;
+        L_ERR("Cannot create signalfd");
         Crash();
     }
 

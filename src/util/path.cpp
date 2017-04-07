@@ -163,7 +163,7 @@ TError TPath::Chdir() const {
 }
 
 TError TPath::Chroot() const {
-    L_ACT() << "chroot " << Path << std::endl;
+    L_ACT("chroot {}", Path);
 
     if (chroot(Path.c_str()) < 0)
         return TError(EError::Unknown, errno, "chroot(" + Path + ")");
@@ -176,7 +176,7 @@ TError TPath::PivotRoot() const {
     TFile oldroot, newroot;
     TError error;
 
-    L_ACT() << "pivot root " << Path << std::endl;
+    L_ACT("pivot root {}", Path);
 
     error = oldroot.OpenDir("/");
     if (error)
@@ -513,7 +513,7 @@ restart:
         }
 
         if (Verbose)
-            L_ACT() << "clear directory: unlink " << de->d_name << std::endl;
+            L_ACT("clear directory: unlink {}", de->d_name);
         if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
             continue;
 
@@ -527,12 +527,11 @@ restart:
                 error = TFile::Chattr(sub_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
                 close(sub_fd);
                 if (error)
-                    L_ERR() << "Cannot change "  << de->d_name <<
-                        " attributes: " << error << std::endl;
+                    L_ERR("Cannot change {} attributes: {}" , de->d_name, error);
             }
             error = TFile::Chattr(dir_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
             if (error)
-                L_ERR() << "Cannot change directory attributes: " << error << std::endl;
+                L_ERR("Cannot change directory attributes: {}", error);
 
             if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
                 continue;
@@ -547,7 +546,7 @@ restart:
                                             O_NOFOLLOW | O_NOATIME);
         if (sub_fd >= 0) {
             if (Verbose)
-                L_ACT() << "clear directory: enter " << de->d_name << std::endl;
+                L_ACT("clear directory: enter {}", de->d_name);
             if (dir_fd != top_fd)
                 closedir(dir); /* closes dir_fd */
             else
@@ -570,7 +569,7 @@ restart:
             dir = top;
             dir_fd = top_fd;
             if (Verbose)
-                L_ACT() << "clear directory: restart" << std::endl;
+                L_ACT("clear directory: restart");
             goto restart; /* Restart from top directory */
         }
         closedir(top); /* closes top_fd */
@@ -773,8 +772,9 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
         return TError(EError::Unknown, E2BIG, "mount option too big: " +
                       std::to_string(data.length()));
 
-    L_ACT() << "mount -t " << type << " " << source << " " << Path
-            << " -o " << data <<  " " << MountFlagsToString(flags) << std::endl;
+    L_ACT("mount -t {} {} {} -o {} {}", type, source, Path,
+          data, MountFlagsToString(flags));
+
     if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() + ", " +
                       Path + ", " + type + ", " + MountFlagsToString(flags) + ", " + data + ")");
@@ -782,7 +782,7 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
 }
 
 TError TPath::Bind(const TPath &source) const {
-    L_ACT() << "bind mount " << Path << " " << source << " " << std::endl;
+    L_ACT("bind mount {} {}", Path, source);
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND, NULL))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() +
                 ", " + Path + ", , MS_BIND, )");
@@ -790,7 +790,7 @@ TError TPath::Bind(const TPath &source) const {
 }
 
 TError TPath::BindAll(const TPath &source) const {
-    L_ACT() << "bind mount all " << Path << " " << source << " " << std::endl;
+    L_ACT("bind mount all {} {}", Path, source);
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | MS_REC, NULL))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() +
                 ", " + Path + ", , MS_BIND | MS_REC, )");
@@ -798,8 +798,7 @@ TError TPath::BindAll(const TPath &source) const {
 }
 
 TError TPath::Remount(unsigned long flags) const {
-    L_ACT() << "remount " << Path << " "
-            << MountFlagsToString(flags) << std::endl;
+    L_ACT("remount {} {}", Path, MountFlagsToString(flags));
     if (mount(NULL, Path.c_str(), NULL, flags, NULL))
         return TError(EError::Unknown, errno, "mount(NULL, " + Path +
                       ", NULL, " + MountFlagsToString(flags) + ", NULL)");
@@ -814,8 +813,7 @@ TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
 }
 
 TError TPath::Umount(unsigned long flags) const {
-    L_ACT() << "umount " << Path << " "
-            << UmountFlagsToString(flags) << std::endl;
+    L_ACT("umount {} {}", Path, UmountFlagsToString(flags));
     if (!umount2(Path.c_str(), flags))
         return TError::Success();
     if (errno == EBUSY)
@@ -827,7 +825,7 @@ TError TPath::Umount(unsigned long flags) const {
 }
 
 TError TPath::UmountAll() const {
-    L_ACT() << "umount all " << Path << std::endl;
+    L_ACT("umount all {}", Path);
     while (1) {
         if (umount2(c_str(), UMOUNT_NOFOLLOW)) {
             if (errno == EINVAL || errno == ENOENT)
@@ -841,7 +839,7 @@ TError TPath::UmountAll() const {
 }
 
 TError TPath::UmountNested() const {
-    L_ACT() << "umount nested " << Path << std::endl;
+    L_ACT("umount nested {}", Path);
 
     std::list<TMount> mounts;
     TError error = ListAllMounts(mounts);

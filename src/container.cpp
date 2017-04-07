@@ -149,12 +149,15 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
 /* lock subtree for read or write */
 TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     if (Verbose)
-        L() << (try_lock ? "TryLock " : "Lock ")
-            << (for_read ? "read " : "write ") << Name << std::endl;
+        L("{} {} {}",
+          (try_lock ? "TryLock " : "Lock "),
+          (for_read ? "read " : "write "),
+          Name);
+
     while (1) {
         if (State == EContainerState::Destroyed) {
             if (Verbose)
-                L() << "Lock failed, container was destroyed: " << Name << std::endl;
+                L("Lock failed, container was destroyed: {}", Name);
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
         bool busy;
@@ -168,7 +171,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
             break;
         if (try_lock) {
             if (Verbose)
-                L() << "TryLock " << (for_read ? "read" : "write") << " Failed" << Name << std::endl;
+                L("TryLock {} Failed {}", (for_read ? "read" : "write"), Name);
             return TError(EError::Busy, "Container is busy: " + Name);
         }
         if (!for_read)
@@ -192,7 +195,7 @@ void TContainer::DowngradeLock() {
     PORTO_ASSERT(Locked == -1);
 
     if (Verbose)
-        L() << "Downgrading write to read " << Name << std::endl;
+        L("Downgrading write to read {}", Name);
 
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
         ct->SubtreeRead++;
@@ -207,7 +210,7 @@ void TContainer::UpgradeLock() {
     auto lock = LockContainers();
 
     if (Verbose)
-        L() << "Upgrading read back to write " << Name << std::endl;
+        L("Upgrading read back to write {}", Name);
 
     PendingWrite = true;
 
@@ -227,7 +230,7 @@ void TContainer::UpgradeLock() {
 
 void TContainer::Unlock(bool locked) {
     if (Verbose)
-        L() << "Unlock " << (Locked > 0 ? "read " : "write ") << Name << std::endl;
+        L("Unlock {} {}", (Locked > 0 ? "read " : "write "), Name);
     if (!locked)
         ContainersMutex.lock();
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
@@ -252,9 +255,9 @@ void TContainer::DumpLocks() {
     for (auto &it: Containers) {
         auto &ct = it.second;
         if (ct->Locked || ct->PendingWrite || ct->SubtreeRead || ct->SubtreeWrite)
-            L() << ct->Name << " Locked " << ct->Locked << " by " << ct->LastOwner
-                << " Read " << ct->SubtreeRead << " Write " << ct->SubtreeWrite
-                << (ct->PendingWrite ? " PendingWrite" : "") << std::endl;
+            L("{} Locked {} by {} Read {} Write {}{}", ct->Name, ct->Locked,
+                ct->LastOwner, ct->SubtreeRead, ct->SubtreeWrite,
+                (ct->PendingWrite ? " PendingWrite" : ""));
     }
 }
 
@@ -395,7 +398,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
         goto err;
     }
 
-    L_ACT() << "Create " << name << std::endl;
+    L_ACT("Create {}", name);
 
     ct = std::make_shared<TContainer>(parent, name);
 
@@ -454,7 +457,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         return error;
 
-    L_ACT() << "Restore container " << kv.Name << std::endl;
+    L_ACT("Restore container {}", kv.Name);
 
     auto lock = LockContainers();
 
@@ -493,7 +496,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (ct->Task.Pid) {
         error = ct->RestoreNetwork();
         if (error && !ct->WaitTask.IsZombie()) {
-            L_WRN() << "Cannot restore network: " << error << std::endl;
+            L_WRN("Cannot restore network: {}", error);
             ct->Reap(false);
         }
     } else if (ct->State == EContainerState::Meta && ct->Parent)
@@ -543,7 +546,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
                 if (!CpuSubsystem.HasRtGroup && ct->SchedPolicy == SCHED_RR) {
                     error = cpuCg.AttachAll(freezerCg);
                     if (error)
-                        L_WRN() << "Cannot move to corrent cpu cgroup: " << error << std::endl;
+                        L_WRN("Cannot move to corrent cpu cgroup: {}", error);
                 }
             }
         }
@@ -680,7 +683,7 @@ void TContainer::SetState(EContainerState next) {
     if (State == next)
         return;
 
-    L_ACT() << Name << ": change state " << StateName(State) << " -> " << StateName(next) << std::endl;
+    L_ACT("{} : change state {} -> {}", Name, StateName(State), StateName(next));
 
     auto lock = LockContainers();
     auto prev = State;
@@ -703,7 +706,7 @@ void TContainer::SetState(EContainerState next) {
 TError TContainer::Destroy() {
     TError error;
 
-    L_ACT() << "Destroy " << Name << std::endl;
+    L_ACT("Destroy {}", Name);
 
     if (State != EContainerState::Stopped) {
         error = Stop(0);
@@ -736,7 +739,7 @@ TError TContainer::Destroy() {
 
     error = ContainerIdMap.Put(Id);
     if (error)
-        L_WRN() << "Cannot put container id : " << error << std::endl;
+        L_WRN("Cannot put container id : {}", error);
 
     Containers.erase(Name);
     if (Parent)
@@ -746,7 +749,7 @@ TError TContainer::Destroy() {
     TPath path(ContainersKV / std::to_string(Id));
     error = path.Unlink();
     if (error)
-        L_ERR() << "Can't remove key-value node " << path << ": " << error << std::endl;
+        L_ERR("Can't remove key-value node {}: {}", path, error);
 
     return TError::Success();
 }
@@ -874,7 +877,7 @@ TError TContainer::ApplyUlimits() {
         map[res] = lim;
     }
 
-    L_ACT() << "Apply ulimits" << std::endl;
+    L_ACT("Apply ulimits");
     do {
         error = cg.GetTasks(pids);
         if (error)
@@ -939,7 +942,7 @@ TError TContainer::ApplySchedPolicy() const {
     std::vector<pid_t> prev, pids;
     bool retry;
 
-    L_ACT() << "Set " << cg << " scheduler policy " << CpuPolicy << std::endl;
+    L_ACT("Set {} scheduler policy {}", cg, CpuPolicy);
     do {
         error = cg.GetTasks(pids);
         retry = false;
@@ -1067,7 +1070,7 @@ TError TContainer::DistributeCpus() {
             continue;
 
         if (Verbose)
-            L() << "Distribute CPUs " << parent->CpuVacant.Format() << " in " << parent->Name << std::endl;
+            L("Distribute CPUs {} in {}", parent->CpuVacant.Format(), parent->Name);
 
         double vacantGuarantee = 0;
 
@@ -1127,12 +1130,12 @@ TError TContainer::DistributeCpus() {
                 }
 
                 if (ct->CpuReserve.Weight())
-                    L_ACT() << "Reserve CPUs " << ct->CpuReserve.Format() << " for " << ct->Name << std::endl;
+                    L_ACT("Reserve CPUs {} for {}", ct->CpuReserve.Format(), ct->Name);
                 else
                     vacantGuarantee += ct->CpuGuarantee;
 
                 if (Verbose)
-                    L() << "Assign CPUs " << ct->CpuAffinity.Format() << " for " << ct->Name << std::endl;
+                    L("Assign CPUs {} for {}", ct->CpuAffinity.Format(), ct->Name);
 
                 ct->CpuVacant.Set(ct->CpuAffinity);
             }
@@ -1141,7 +1144,7 @@ TError TContainer::DistributeCpus() {
         if (vacantGuarantee > parent->CpuVacant.Weight()) {
             if (!parent->CpuVacant.IsEqual(parent->CpuAffinity))
                 return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in " + parent->Name);
-            L() << "CPU guarantee overcommit in " << parent->Name << std::endl;
+            L("CPU guarantee overcommit in {}", parent->Name);
         }
     }
 
@@ -1159,13 +1162,13 @@ TError TContainer::DistributeCpus() {
 
         error = CpusetSubsystem.SetCpus(cg, ct->CpuAffinity.Format());
         if (error) {
-            L() << "Cannot set cpu affinity: "  << error << std::endl;
+            L("Cannot set cpu affinity: {}", error);
             return error;
         }
 
         error = CpusetSubsystem.SetMems(cg, "");
         if (error) {
-            L() << "Cannot set mem affinity: " << error << std::endl;
+            L("Cannot set mem affinity: {}", error);
             return error;
         }
     }
@@ -1182,7 +1185,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
         if (error) {
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_MEM_GUARANTEE, error);
             return error;
         }
     }
@@ -1194,7 +1197,7 @@ TError TContainer::ApplyDynamicProperties() {
                 return TError(EError::InvalidValue, std::to_string(MemLimit) + " is too low");
 
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_MEM_LIMIT, error);
             return error;
         }
     }
@@ -1203,7 +1206,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
         if (error) {
             if (error.GetErrno() != EINVAL && error.GetErrno() != EBUSY)
-                L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_ANON_LIMIT, error);
             return error;
         }
     }
@@ -1212,7 +1215,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.SetDirtyLimit(memcg, DirtyMemLimit);
         if (error) {
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_DIRTY_LIMIT, error);
             return error;
         }
     }
@@ -1221,7 +1224,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
         if (error) {
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_RECHARGE_ON_PGFAULT, error);
             return error;
         }
     }
@@ -1231,7 +1234,7 @@ TError TContainer::ApplyDynamicProperties() {
             error = MemorySubsystem.SetIoLimit(memcg, IoBpsLimit["fs"]);
             if (error) {
                 if (error.GetErrno() != EINVAL)
-                    L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+                    L_ERR("Can't set {}: {}", P_IO_LIMIT, error);
                 return error;
             }
         }
@@ -1245,7 +1248,7 @@ TError TContainer::ApplyDynamicProperties() {
             error = MemorySubsystem.SetIopsLimit(memcg, IoOpsLimit["fs"]);
             if (error) {
                 if (error.GetErrno() != EINVAL)
-                    L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
+                    L_ERR("Can't set {}: {}", P_IO_OPS_LIMIT, error);
                 return error;
             }
         }
@@ -1258,7 +1261,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
         if (error) {
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_IO_POLICY, error);
             return error;
         }
     }
@@ -1268,13 +1271,13 @@ TError TContainer::ApplyDynamicProperties() {
         error = HugetlbSubsystem.SetHugeLimit(cg, HugetlbLimit);
         if (error) {
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Cannot set " << P_HUGETLB_LIMIT << ": " << error << std::endl;
+                L_ERR("Can't set {}: {}", P_HUGETLB_LIMIT, error);
             return error;
         }
         if (HugetlbSubsystem.SupportGigaPages()) {
             error = HugetlbSubsystem.SetGigaLimit(cg, 0);
             if (error)
-                L_WRN() << "Cannot forbid 1GB pages: " << error << std::endl;
+                L_WRN("Cannot forbid 1GB pages: {}", error);
         }
     }
 
@@ -1288,7 +1291,7 @@ TError TContainer::ApplyDynamicProperties() {
                                           CpuGuarantee, CpuLimit);
         if (error) {
             if (error.GetErrno() != EINVAL)
-                L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+                L_ERR("Cannot set cpu policy: {}", error);
             return error;
         }
     }
@@ -1297,7 +1300,7 @@ TError TContainer::ApplyDynamicProperties() {
         TestClearPropDirty(EProperty::CPU_WEIGHT)) {
         error = ApplySchedPolicy();
         if (error) {
-            L_ERR() << "Cannot set scheduler policy: " << error << std::endl;
+            L_ERR("Cannot set scheduler policy: {}", error);
             return error;
         }
     }
@@ -1313,7 +1316,7 @@ TError TContainer::ApplyDynamicProperties() {
             TestClearPropDirty(EProperty::NET_GUARANTEE)) {
         error = UpdateTrafficClasses();
         if (error) {
-            L_ERR() << "Cannot update tc : " << error << std::endl;
+            L_ERR("Cannot update tc : {}", error);
             return error;
         }
     }
@@ -1331,7 +1334,7 @@ TError TContainer::ApplyDynamicProperties() {
                 continue;
             error = ct->ApplyUlimits();
             if (error) {
-                L_ERR() << "Cannot update ulimit: " << error << std::endl;
+                L_ERR("Cannot update ulimit: {}", error);
                 return error;
             }
         }
@@ -1341,7 +1344,7 @@ TError TContainer::ApplyDynamicProperties() {
         auto cg = GetCgroup(PidsSubsystem);
         error = PidsSubsystem.SetLimit(cg, ThreadLimit);
         if (error) {
-            L_ERR() << "Cannot set thread limit: " << error << std::endl;
+            L_ERR("Cannot set thread limit: {}", error);
             return error;
         }
     }
@@ -1459,7 +1462,7 @@ TError TContainer::PrepareCgroups() {
     if (!IsRoot() && (Controllers & CGROUP_MEMORY)) {
         error = PrepareOomMonitor();
         if (error) {
-            L_ERR() << "Can't prepare OOM monitoring: " << error << std::endl;
+            L_ERR("Can't prepare OOM monitoring: {}", error);
             return error;
         }
     }
@@ -1468,7 +1471,7 @@ TError TContainer::PrepareCgroups() {
         auto netcls = GetCgroup(NetclsSubsystem);
         error = netcls.Set("net_cls.classid", std::to_string(LeafTC));
         if (error) {
-            L_ERR() << "Can't set classid: " << error << std::endl;
+            L_ERR("Can't set classid: {}", error);
             return error;
         }
     }
@@ -1557,7 +1560,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
 
     error = UpdateTrafficClasses();
     if (error) {
-        L_ACT() << "Cleanup stale classes" << std::endl;
+        L_ACT("Cleanup stale classes");
 
         auto lock = Net->ScopedLock();
         Net->DestroyTC(ContainerTC, LeafTC);
@@ -1567,7 +1570,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         if (!error)
             return TError::Success();
 
-        L_ACT() << "Refresh network" << std::endl;
+        L_ACT("Refresh network");
 
         lock.lock();
         Net->DestroyTC(ContainerTC, LeafTC);
@@ -1581,7 +1584,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         if (!error)
             return TError::Success();
 
-        L_ACT() << "Recreate network" << std::endl;
+        L_ACT("Recreate network");
 
         lock.lock();
         Net->RefreshDevices(true);
@@ -1593,7 +1596,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
 
         error = UpdateTrafficClasses();
         if (error) {
-            L_ERR() << "Network recreation failed:" << error << std::endl;
+            L_ERR("Network recreation failed: {}", error);
             return error;
         }
     }
@@ -1670,7 +1673,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
 
     error = ConfigureDevices(taskEnv->Devices);
     if (error) {
-        L_ERR() << "Cannot configure devices: " << error << std::endl;
+        L_ERR("Cannot configure devices: {}", error);
         return error;
     }
 
@@ -1813,7 +1816,7 @@ TError TContainer::StartTask() {
     /* Always report OOM stuation if any */
     if (error && HasOomReceived()) {
         if (error)
-            L() << "Start error: " << error << std::endl;
+            L("Start error: {}", error);
         return TError(EError::InvalidValue, ENOMEM, "OOM, memory limit too low");
     }
 
@@ -1945,7 +1948,7 @@ TError TContainer::Start() {
 TError TContainer::StartOne() {
     TError error;
 
-    L_ACT() << "Start " << Name << std::endl;
+    L_ACT("Start {}", Name);
 
     SetState(EContainerState::Starting);
 
@@ -1975,18 +1978,18 @@ TError TContainer::StartOne() {
     else
         SetState(EContainerState::Running);
 
-    L() << Name << " started " << std::to_string(Task.Pid) << std::endl;
+    L("{} started {}", Name, std::to_string(Task.Pid));
 
     SetProp(EProperty::ROOT_PID);
 
     Statistics->ContainersStarted++;
     error = UpdateSoftLimit();
     if (error)
-        L_ERR() << "Can't update meta soft limit: " << error << std::endl;
+        L_ERR("Can't update meta soft limit: {}", error);
 
     error = Save();
     if (error) {
-        L_ERR() << "Cannot save state after start " << error << std::endl;
+        L_ERR("Cannot save state after start {}", error);
         (void)Reap(false);
     }
 
@@ -2013,9 +2016,9 @@ TError TContainer::PrepareResources() {
     error = PrepareWorkDir();
     if (error) {
         if (error.GetErrno() == ENOSPC)
-            L() << "Cannot create working dir: " << error << std::endl;
+            L("Cannot create working dir: {}", error);
         else
-            L_ERR() << "Cannot create working dir: " << error << std::endl;
+            L_ERR("Cannot create working dir: {}", error);
         FreeResources();
         return error;
     }
@@ -2024,7 +2027,7 @@ TError TContainer::PrepareResources() {
 
     error = PrepareCgroups();
     if (error) {
-        L_ERR() << "Can't prepare task cgroups: " << error << std::endl;
+        L_ERR("Can't prepare task cgroups: {}", error);
         FreeResources();
         return error;
     }
@@ -2039,7 +2042,7 @@ TError TContainer::PrepareResources() {
 
         error = TVolume::Create(cfg, RootVolume);
         if (error) {
-            L_ERR() << "Cannot create root volume: " << error << std::endl;
+            L_ERR("Cannot create root volume: {}", error);
             FreeResources();
             return error;
         }
@@ -2057,10 +2060,10 @@ void TContainer::FreeRuntimeResources() {
     ShutdownOom();
 
     if (Parent && CpuReserve.Weight()) {
-        L_ACT() << "Release CPUs " << CpuReserve.Format() << " reserved for " << Name << std::endl;
+        L_ACT("Release CPUs {} reserved for {}", CpuReserve.Format(), Name);
         error = Parent->DistributeCpus();
         if (error)
-            L_ERR() << "Cannot redistribute CPUs: " << error << std::endl;
+            L_ERR("Cannot redistribute CPUs: {}", error);
     }
 }
 
@@ -2089,20 +2092,20 @@ void TContainer::FreeResources() {
             NetCfg.FormatIp(IpList);
         }
         if (error)
-            L_ERR() << "Cannot free network resources: " << error << std::endl;
+            L_ERR("Cannot free network resources: {}", error);
 
         if (Controllers & CGROUP_NETCLS) {
             auto net_lock = Net->ScopedLock();
             error = Net->DestroyTC(ContainerTC, LeafTC);
             if (error)
-                L_ERR() << "Can't remove traffic class: " << error << std::endl;
+                L_ERR("Can't remove traffic class: {}", error);
             net_lock.unlock();
 
             if (Net != HostNetwork) {
                 net_lock = HostNetwork->ScopedLock();
                 error = HostNetwork->DestroyTC(ContainerTC, LeafTC);
                 if (error)
-                    L_ERR() << "Can't remove traffic class: " << error << std::endl;
+                    L_ERR("Can't remove traffic class: {}", error);
             }
         }
     }
@@ -2110,7 +2113,7 @@ void TContainer::FreeResources() {
     if (Net && IsRoot()) {
         error = Net->Destroy();
         if (error)
-            L_ERR() << "Cannot destroy network: " << error << std::endl;
+            L_ERR("Cannot destroy network: {}", error);
     }
     Net = nullptr;
 
@@ -2121,7 +2124,7 @@ void TContainer::FreeResources() {
     if (LoopDev >= 0) {
         error = PutLoopDev(LoopDev);
         if (error)
-            L_ERR() << "Can't put loop device " << LoopDev << ": " << error << std::endl;
+            L_ERR("Can't put loop device {}: {}", LoopDev, error);
         LoopDev = -1;
         SetProp(EProperty::LOOP_DEV);
 
@@ -2129,7 +2132,7 @@ void TContainer::FreeResources() {
         if (tmp.Exists()) {
             error = tmp.RemoveAll();
             if (error)
-                L_ERR() << "Can't remove " << tmp << ": " << error << std::endl;
+                L_ERR("Can't remove {}: {}", tmp, error);
         }
     }
 
@@ -2143,7 +2146,7 @@ void TContainer::FreeResources() {
     if (work_path.Exists()) {
         error = work_path.RemoveAll();
         if (error)
-            L_ERR() << "Cannot remove working dir: " << error << std::endl;
+            L_ERR("Cannot remove working dir: {}", error);
     }
 
     Stdout.Remove(*this);
@@ -2154,7 +2157,7 @@ TError TContainer::Kill(int sig) {
     if (State != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state ");
 
-    L_ACT() << "Kill " << Name << " pid " << Task.Pid << std::endl;
+    L_ACT("Kill {} pid {}", Name, Task.Pid);
     return Task.Kill(sig);
 }
 
@@ -2165,7 +2168,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (IsRoot())
         return TError(EError::Permission, "Cannot terminate root container");
 
-    L_ACT() << "Terminate tasks in " << Name << std::endl;
+    L_ACT("Terminate tasks in {}", Name);
 
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
@@ -2193,8 +2196,7 @@ TError TContainer::Terminate(uint64_t deadline) {
         if (sig) {
             error = Task.Kill(sig);
             if (!error) {
-                L_ACT() << "Wait task " << Task.Pid << " after signal "
-                        << sig << " in " << Name << std::endl;
+                L_ACT("Wait task {} after signal {} in {}", Task.Pid, sig, Name);
                 while (Task.Exists() && !Task.IsZombie() &&
                         !WaitDeadline(deadline));
             }
@@ -2251,12 +2253,12 @@ TError TContainer::Stop(uint64_t timeout) {
 
         error = ct->Terminate(deadline);
         if (error) {
-            L_ERR() << "Cannot terminate tasks in container: " << error << std::endl;
+            L_ERR("Cannot terminate tasks in container: {}", error);
             return error;
         }
 
         if (FreezerSubsystem.IsSelfFreezing(cg)) {
-            L_ACT() << "Thaw terminated paused container " << ct->Name << std::endl;
+            L_ACT("Thaw terminated paused container {}", ct->Name);
             error = FreezerSubsystem.Thaw(cg, false);
             if (error)
                 return error;
@@ -2269,7 +2271,7 @@ TError TContainer::Stop(uint64_t timeout) {
         if (ct->State == EContainerState::Stopped)
             continue;
 
-        L_ACT() << "Stop " << Name << std::endl;
+        L_ACT("Stop {}", Name);
 
         ct->ForgetPid();
 
@@ -2293,7 +2295,7 @@ TError TContainer::Stop(uint64_t timeout) {
 
     error = UpdateSoftLimit();
     if (error)
-        L_ERR() << "Can't update meta soft limit: " << error << std::endl;
+        L_ERR("Can't update meta soft limit: {}", error);
 
     return TError::Success();
 }
@@ -2303,7 +2305,7 @@ void TContainer::Reap(bool oomKilled) {
 
     error = Terminate(0);
     if (error)
-        L_WRN() << "Cannot terminate container " << Name << " : " << error << std::endl;
+        L_WRN("Cannot terminate container {} : {}", Name, error);
 
     DeathTime = GetCurrentTimeMs();
     SetProp(EProperty::DEATH_TIME);
@@ -2326,7 +2328,7 @@ void TContainer::Reap(bool oomKilled) {
 
     error = Save();
     if (error)
-        L_WRN() << "Cannot save container state after exit: " << error << std::endl;
+        L_WRN("Cannot save container state after exit: {}", error);
 
     if (MayRespawn())
         ScheduleRespawn();
@@ -2346,8 +2348,8 @@ void TContainer::Exit(int status, bool oomKilled) {
             WEXITSTATUS(status) > 128 && WEXITSTATUS(status) < 128 + SIGRTMIN)
         status = WEXITSTATUS(status) - 128;
 
-    L_EVT() << "Exit " << Name << " " << FormatExitStatus(status)
-            << (oomKilled ? " invoked by OOM" : "") << std::endl;
+    L_EVT("Exit {} {} {}", Name, FormatExitStatus(status),
+          (oomKilled ? " invoked by OOM" : ""));
 
     ExitStatus = status;
     SetProp(EProperty::EXIT_STATUS);
@@ -2355,7 +2357,7 @@ void TContainer::Exit(int status, bool oomKilled) {
     /* Detect memory shortage that happened in syscalls */
     auto cg = GetCgroup(MemorySubsystem);
     if (!oomKilled && MemorySubsystem.GetOomEvents(cg)) {
-        L() << "Container " << Name << " hit memory limit" << std::endl;
+        L("Container {} hit memory limit", Name);
         oomKilled = true;
     }
 
@@ -2384,7 +2386,7 @@ TError TContainer::Pause() {
             ct->SetState(EContainerState::Paused);
             error = ct->Save();
             if (error)
-                L_ERR() << "Cannot save state after pause: " << error << std::endl;
+                L_ERR("Cannot save state after pause: {}", error);
         }
     }
 
@@ -2414,7 +2416,7 @@ TError TContainer::Resume() {
             ct->SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
         error = ct->Save();
         if (error)
-            L_ERR() << "Cannot save state after resume: " << error << std::endl;
+            L_ERR("Cannot save state after resume: {}", error);
     }
 
     return TError::Success();
@@ -2625,14 +2627,14 @@ TError TContainer::Load(const TKeyValue &node) {
 
         auto it = ContainerProperties.find(key);
         if (it == ContainerProperties.end()) {
-            L_WRN() << "Unknown property: " << key << ", skipped" << std::endl;
+            L_WRN("Unknown property: {}, skipped", key);
             continue;
         }
         auto prop = it->second;
 
         error = prop->SetFromRestore(value);
         if (error) {
-            L_ERR() << "Cannot load " << key << ": " << error << std::endl;
+            L_ERR("Cannot load {} : {}", key, error);
             state = EContainerState::Dead;
             break;
         }
@@ -2726,11 +2728,11 @@ void TContainer::SyncState() {
     TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
     TError error;
 
-    L_ACT() << "Sync " << Name << " state " << StateName(State) << std::endl;
+    L_ACT("Sync {} state {}", Name, StateName(State));
 
     if (!freezerCg.Exists()) {
         if (State != EContainerState::Stopped)
-            L_WRN() << "Freezer not found" << std::endl;
+            L_WRN("Freezer not found");
         ForgetPid();
         State = EContainerState::Stopped;
         return;
@@ -2746,22 +2748,22 @@ void TContainer::SyncState() {
         State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
 
     if (State == EContainerState::Stopped) {
-        L() << "Found unexpected freezer" << std::endl;
+        L("Found unexpected freezer");
         Reap(false);
     } else if (State == EContainerState::Meta && !WaitTask.Pid && !Isolate) {
         /* meta container */
     } else if (!WaitTask.Exists()) {
         if (State != EContainerState::Dead)
-            L() << "Task no found" << std::endl;
+            L("Task no found");
         Reap(false);
     } else if (WaitTask.IsZombie()) {
-        L() << "Task is zombie" << std::endl;
+        L("Task is zombie");
         Task.Pid = 0;
     } else if (FreezerSubsystem.TaskCgroup(WaitTask.Pid, taskCg)) {
-        L() << "Cannot check freezer" << std::endl;
+        L("Cannot check freezer");
         Reap(false);
     } else if (taskCg != freezerCg) {
-        L() << "Task in wrong freezer" << std::endl;
+        L("Task in wrong freezer");
         if (WaitTask.GetPPid() == getppid()) {
             if (Task.Pid != WaitTask.Pid && Task.GetPPid() == WaitTask.Pid)
                 Task.Kill(SIGKILL);
@@ -2771,10 +2773,10 @@ void TContainer::SyncState() {
     } else {
         pid_t ppid = WaitTask.GetPPid();
         if (ppid != getppid()) {
-            L() << "Task reparented to " << ppid << " (" << GetTaskName(ppid) << "). Seize." << std::endl;
+            L("Task reparented to {} ({}). Seize.", ppid, GetTaskName(ppid));
             error = Seize();
             if (error) {
-                L() << "Cannot seize reparented task: " << error << std::endl;
+                L("Cannot seize reparented task: {}", error);
                 Reap(false);
             }
         }
@@ -2799,7 +2801,7 @@ void TContainer::SyncState() {
                 State = EContainerState::Paused;
             break;
         case EContainerState::Destroyed:
-            L_ERR() << "Destroyed parent?" << std::endl;
+            L_ERR("Destroyed parent?");
             break;
     }
 }
@@ -2921,7 +2923,7 @@ void TContainer::Event(const TEvent &event) {
                 if (ct->OomIsFatal) {
                     ct->Exit(SIGKILL, true);
                 } else {
-                    L_EVT() << "Non fatal OOM in " << ct->Name << std::endl;
+                    L_EVT("Non fatal OOM in {}", ct->Name);
                     ct->OomEvents++;
                     Statistics->ContainersOOM++;
                 }
@@ -2968,7 +2970,7 @@ void TContainer::Event(const TEvent &event) {
             AckExitStatus(event.Exit.Pid);
         else {
             if (!delivered)
-                L() << "Unknown zombie " << event.Exit.Pid << " " << event.Exit.Status << std::endl;
+                L("Unknown zombie {} {}", event.Exit.Pid, event.Exit.Status);
             (void)waitpid(event.Exit.Pid, NULL, 0);
         }
         break;

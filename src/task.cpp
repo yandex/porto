@@ -29,7 +29,7 @@ extern "C" {
 void TTaskEnv::ReportPid(pid_t pid) {
     TError error = Sock.SendPid(pid);
     if (error && error.GetErrno() != ENOMEM) {
-        L_ERR() << error << std::endl;
+        L_ERR("{}", error);
         Abort(error);
     }
     ReportStage++;
@@ -43,17 +43,17 @@ void TTaskEnv::Abort(const TError &error) {
      * stage1: RecvPid VPid
      * stage2: RecvError
      */
-    L() << "abort due to " << error << std::endl;
+    L("abort due to {}", error);
 
     for (int stage = ReportStage; stage < 2; stage++) {
         error2 = Sock.SendPid(getpid());
         if (error2 && error2.GetErrno() != ENOMEM)
-            L_ERR() << error2 << std::endl;
+            L_ERR("{}", error2);
     }
 
     error2 = Sock.SendError(error);
     if (error2 && error2.GetErrno() != ENOMEM)
-        L_ERR() << error2 << std::endl;
+        L_ERR("{}", error2);
 
     _exit(EXIT_FAILURE);
 }
@@ -106,11 +106,11 @@ TError TTaskEnv::ChildExec() {
     }
 
     if (Verbose) {
-        L() << "command=" << CT->Command << std::endl;
+        L("command={}", CT->Command);
         for (unsigned i = 0; result.we_wordv[i]; i++)
-            L() << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;
+            L("argv[{}]={}", i, result.we_wordv[i]);
         for (unsigned i = 0; envp[i]; i++)
-            L() << "environ[" << i << "]=" << envp[i] << std::endl;
+            L("environ[{}]={}", i, envp[i]);
     }
     SetDieOnParentExit(0);
     TFile::CloseAll({0, 1, 2, Sock.GetFd()});
@@ -301,13 +301,13 @@ TError TTaskEnv::ConfigureChild() {
         return error;
 
     if (HasAmbientCapabilities)
-        L() << "Ambient capabilities: " << CT->CapAmbient << std::endl;
+        L("Ambient capabilities: {}", CT->CapAmbient);
 
     error = CT->CapAmbient.ApplyAmbient();
     if (error)
         return error;
 
-    L() << "Capabilities: " << CT->CapBound << std::endl;
+    L("Capabilities: {}", CT->CapBound);
 
     error = CT->CapBound.ApplyLimit();
     if (error)
@@ -420,7 +420,7 @@ TError TTaskEnv::Start() {
     error = task.Fork();
     if (error) {
         Sock.Close();
-        L() << "Can't spawn child: " << error << std::endl;
+        L("Can't spawn child: {}", error);
         return error;
     }
 
@@ -586,7 +586,7 @@ TError TTaskEnv::Start() {
     /* Task was alive, even if it already died we'll get zombie */
     error = MasterSock.SendZero();
     if (error)
-        L() << "Task wakeup error: " << error << std::endl;
+        L("Task wakeup error: {}", error);
 
     /* Prefer reported error if any */
     error = MasterSock.RecvError();
@@ -601,7 +601,7 @@ TError TTaskEnv::Start() {
     return TError::Success();
 
 kill_all:
-    L() << "Task start failed: " << error << std::endl;
+    L("Task start failed: {}", error);
     if (task.Pid) {
         task.Kill(SIGKILL);
         task.Wait();

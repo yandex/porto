@@ -64,7 +64,7 @@ void TNl::Dump(const std::string &prefix, void *obj) const {
     };
     nl_object_dump(OBJ_CAST(obj), &dp);
 
-    L() << "netlink " << prefix << " " << ss.str();
+    L("netlink {} {}", prefix, ss.str());
 }
 
 TError TNl::Connect() {
@@ -194,7 +194,7 @@ TError TNl::AddrLabel(const TNlAddr &prefix, uint32_t label) {
     TError error;
     int ret;
 
-    L() << "netlink add addrlabel " << prefix.Format() << " " << label << std::endl;
+    L("netlink add addrlabel {} {}", prefix.Format(), label);
 
     memset(&al, 0, sizeof(al));
     al.ifal_family = prefix.Family();
@@ -450,7 +450,7 @@ TError TNlLink::WaitAddress(int timeout_s) {
     struct nl_cache *cache;
     int ret;
 
-    L() << "Wait for autoconf at " << GetDesc() << std::endl;
+    L("Wait for autoconf at {}", GetDesc());
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
     if (ret < 0)
@@ -468,8 +468,7 @@ TError TNlLink::WaitAddress(int timeout_s) {
                      (IFA_F_TENTATIVE | IFA_F_DEPRECATED)))
                 continue;
 
-            L() << "Got " << TNlAddr(rtnl_addr_get_local(addr)).Format()
-                << " at " << GetDesc() << std::endl;
+            L("Got {} at {}", TNlAddr(rtnl_addr_get_local(addr)).Format(), GetDesc());
 
             nl_cache_free(cache);
             return TError::Success();
@@ -607,8 +606,8 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     nla_nest_end(msg, infodata);
     nla_nest_end(msg, linkinfo);
 
-    L() << "netlink: add " << vlantype << " " << Name << " master " << master
-        << " type " << type << " hw " << hw << " mtu " << mtu << std::endl;
+    L("netlink: add {} {} master {} type {} hw {} mtu {}", vlantype, Name,  master,
+      type, hw, mtu);
 
     ret = nl_send_sync(GetSock(), msg);
     if (ret)
@@ -726,7 +725,7 @@ bool TNlLink::ValidMacAddr(const std::string &hw) {
     return ether_aton_r(hw.c_str(), &ea) != nullptr;
 }
 
-void TNl::DumpCache(struct nl_cache *cache) const {
+/*void TNl::DumpCache(struct nl_cache *cache) const {
 
     if (!Verbose)
         return;
@@ -742,7 +741,7 @@ void TNl::DumpCache(struct nl_cache *cache) const {
 
     str << "netlink cache: ";
     nl_cache_dump(cache, &dp);
-}
+}*/
 
 TError TNlClass::Load(const TNl &nl) {
     struct nl_cache *cache;
@@ -876,7 +875,7 @@ bool TNlQdisc::Check(const TNl &nl) {
 
     ret = rtnl_qdisc_alloc_cache(nl.GetSock(), &qdiscCache);
     if (ret < 0) {
-        L_ERR() <<  nl.Error(ret, "cannot alloc qdisc cache") << std::endl;
+        L_ERR("{}",  nl.Error(ret, "cannot alloc qdisc cache"));
         return false;
     }
 
@@ -1174,7 +1173,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     nla_nest_end(msg, u32_police);
     nla_nest_end(msg, u32);
 
-    L() << "netlink " << Index << ": add u32 parent 0x" << Parent << std::dec << std::endl;
+    L("netlink {}: add u32 parent 0x{:x}", Index, Parent);
 
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
@@ -1265,9 +1264,7 @@ TError TNlCgFilter::Create(const TNl &nl) {
         goto free_msg;
     }
 
-    L() << "netlink " << Index
-        << ": add tfilter id 0x" << std::hex << Handle
-        << " parent 0x" << Parent << std::dec  << std::endl;
+    L("netlink {}: add tfilter id 0x{:x} parent 0x{:x}", Index, Handle, Parent);
 
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
@@ -1290,11 +1287,11 @@ bool TNlCgFilter::Exists(const TNl &nl) {
 
     ret = rtnl_cls_alloc_cache(nl.GetSock(), Index, Parent, &clsCache);
     if (ret < 0) {
-        L_ERR() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
+        L_ERR("Can't allocate filter cache: {}", nl_geterror(ret));
         return false;
     }
 
-    nl.DumpCache(clsCache);
+//    nl.DumpCache(clsCache);
 
     struct CgFilterIter {
         uint32_t parent;

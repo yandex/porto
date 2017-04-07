@@ -4,13 +4,14 @@
 #include <mutex>
 #include <list>
 
+#include "container.hpp"
 #include "common.hpp"
 #include "epoll.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 
-class TContainer;
-class TContainerWaiter;
+#include "fmt/ostream.h"
+
 class TEpollLoop;
 
 namespace rpc {
@@ -72,7 +73,27 @@ public:
     TPath DefaultPlace();
     TError CanControlPlace(const TPath &place);
 
-    friend std::ostream& operator<<(std::ostream& stream, TClient& client);
+    template<typename ostream>
+    friend ostream& operator<<(ostream& stream, const TClient &client) {
+        stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
+
+        if (client.FirstLog) {
+            const_cast<TClient &>(client).FirstLog = false;
+            stream << " " << client.TaskCred;
+            if (client.Cred.Uid != client.TaskCred.Uid ||
+                    client.Cred.Gid != client.TaskCred.Gid)
+                stream << " owner " << client.Cred;
+            if (client.ClientContainer) {
+                stream << " from " << client.ClientContainer->Name;
+                if (client.PortoNamespace != "")
+                    stream << " namespace " << client.PortoNamespace;
+                if (client.WriteNamespace != client.PortoNamespace)
+                    stream << " write-namespace " << client.WriteNamespace;
+            }
+        }
+
+        return stream;
+    }
 
     std::shared_ptr<TContainerWaiter> Waiter;
 

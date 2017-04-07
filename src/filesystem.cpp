@@ -202,7 +202,7 @@ TError TMountNamespace::MountRun() {
 
         /* forbid other-writable directory without sticky bit */
         if ((mode & 01002) == 02) {
-            L() << "Other writable without sticky: " << current << std::endl;
+            L("Other writable without sticky: {}", current);
             mode &= ~02;
         }
 
@@ -441,7 +441,7 @@ TError TMountNamespace::Setup() {
         // also binds root recursively if needed
         error = Root.PivotRoot();
         if (error) {
-            L_WRN() << "Cannot pivot root, roll back to chroot: " << error << std::endl;
+            L_WRN("Cannot pivot root, roll back to chroot: {}", error);
             error = Root.Chroot();
             if (error)
                 return error;
@@ -459,7 +459,7 @@ TError TMountNamespace::Setup() {
     if (config().container().enable_tracefs()) {
         error = MountTraceFs();
         if (error)
-            L_WRN() << "Cannot mount tracefs " << error << std::endl;
+            L_WRN("Cannot mount tracefs: {}", error);
     }
 
     // remount as shared: subcontainers will get propgation from us

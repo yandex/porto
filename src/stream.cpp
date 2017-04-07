@@ -134,7 +134,7 @@ TError TStdStream::Remove(const TContainer &container) {
     if (error && error.GetErrno() == ENOENT)
         return TError::Success();
     if (error)
-        L_ERR() << "Cannot remove " << path << " : " << error << std::endl;
+        L_ERR("Cannot remove {}: {}", path, error);
     return error;
 }
 

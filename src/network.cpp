@@ -289,7 +289,7 @@ void TNetwork::InitializeConfig() {
 
     while (groupCfg >> std::ws) {
         if (groupCfg.peek() != '#' && (groupCfg >> id >> name)) {
-            L_SYS() << "Network device group: " << id << ":" << name << std::endl;
+            L_SYS("Network device group: {} : {}", id, name);
             groupMap[name] = id;
             DeviceGroups[id] = name;
         }
@@ -300,7 +300,7 @@ void TNetwork::InitializeConfig() {
     UnmanagedGroups.clear();
 
     for (auto device: config().network().unmanaged_device()) {
-        L_SYS() << "Unmanaged network device: " << device << std::endl;
+        L_SYS("Unmanaged network device: {}", device);
         UnmanagedDevices.push_back(device);
     }
 
@@ -310,11 +310,11 @@ void TNetwork::InitializeConfig() {
         if (groupMap.count(group)) {
             id = groupMap[group];
         } else if (StringToInt(group, id)) {
-            L_SYS() << "Unknown network device group: " << group << std::endl;
+            L_SYS("Unknown network device group: {}", group);
             continue;
         }
 
-        L_SYS() << "Unmanaged network device group: " << id << ":" << group << std::endl;
+        L_SYS("Unmanaged network device group: {} : {}", id, group);
         UnmanagedGroups.push_back(id);
     }
 
@@ -361,7 +361,7 @@ TError TNetwork::Destroy() {
     auto lock = ScopedLock();
     TError error;
 
-    L_ACT() << "Removing network..." << std::endl;
+    L_ACT("Removing network...");
 
     for (auto &dev: Devices) {
         if (!dev.Managed)
@@ -370,7 +370,7 @@ TError TNetwork::Destroy() {
         TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
         error = qdisc.Delete(*Nl);
         if (error)
-            L_ERR() << "Cannot remove root qdisc: " << error << std::endl;
+            L_ERR("Cannot remove root qdisc: {}", error);
     }
 
     return TError::Success();
@@ -403,7 +403,7 @@ void TNetwork::GetDeviceSpeed(TNetworkDevice &dev) const {
 TError TNetwork::CreateIngressQdisc(TUintMap &rate) {
     TError error;
 
-    L() << "Setting up ingress qdisc" << std::endl;
+    L("Setting up ingress qdisc");
 
     for (auto &dev: Devices) {
         if (!dev.Managed)
@@ -419,7 +419,7 @@ TError TNetwork::CreateIngressQdisc(TUintMap &rate) {
 
         error = ingress.Create(*Nl);
         if (error) {
-            L_WRN() << "Cannot create ingress qdisc: " << error << std::endl;
+            L_WRN("Cannot create ingress qdisc: {}", error);
             return error;
         }
 
@@ -433,7 +433,7 @@ TError TNetwork::CreateIngressQdisc(TUintMap &rate) {
 
         error = police.Create(*Nl);
         if (error)
-            L_WRN() << "Can't create ingress filter: " << error << std::endl;
+            L_WRN("Can't create ingress filter: {}", error);
     }
 
     return error;
@@ -470,7 +470,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
     //          +- 6:0 qdisc b (pfifo)
 
 
-    L() << "Setup queue for network device " << dev.GetDesc() << std::endl;
+    L("Setup queue for network device {}", dev.GetDesc());
 
     TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
     qdisc.Kind = dev.GetConfig(DeviceQdisc);
@@ -481,7 +481,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
         (void)qdisc.Delete(*Nl);
         error = qdisc.Create(*Nl);
         if (error) {
-            L_ERR() << "Cannot create root qdisc: " << error << std::endl;
+            L_ERR("Cannot create root qdisc: {}", error);
             return error;
         }
     }
@@ -491,7 +491,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
 
     error = filter.Create(*Nl);
     if (error) {
-        L_ERR() << "Can't create tc filter: " << error << std::endl;
+        L_ERR("Can't create tc filter: {}", error);
         return error;
     }
 
@@ -509,7 +509,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
 
     error = cls.Create(*Nl);
     if (error) {
-        L_ERR() << "Can't create root tclass: " << error << std::endl;
+        L_ERR("Can't create root tclass: {}", error);
         return error;
     }
 
@@ -520,7 +520,7 @@ TError TNetwork::SetupQueue(TNetworkDevice &dev) {
 
     error = cls.Create(*Nl);
     if (error) {
-        L_ERR() << "Can't create default tclass: " << error << std::endl;
+        L_ERR("Can't create default tclass: {}", error);
         return error;
     }
 
@@ -662,7 +662,7 @@ TError TNetwork::RefreshDevices(bool force) {
         if (!found) {
             Nl->Dump("New network device", link);
             if (!dev.Managed)
-                L() << "Unmanaged device " << dev.GetDesc() << std::endl;
+                L("Unmanaged device {}", dev.GetDesc());
             Devices.push_back(dev);
         }
     }
@@ -671,7 +671,7 @@ TError TNetwork::RefreshDevices(bool force) {
 
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
-            L() << "Delete network device " << dev->GetDesc() << std::endl;
+            L("Delete network device {}", dev->GetDesc());
             if (this == HostNetwork.get()) {
                 RootContainer->NetLimit.erase(dev->Name);
                 RootContainer->NetGuarantee.erase(dev->Name);
@@ -703,7 +703,7 @@ TError TNetwork::RefreshClasses() {
     /* Must be updated first, other containers are ordered */
     error = RootContainer->UpdateTrafficClasses();
     if (error)
-        L_ERR() << "Cannot refresh tc for / : " << error << std::endl;
+        L_ERR("Cannot refresh tc for / : {}", error);
 
     for (auto &it: Containers) {
         auto ct = it.second.get();
@@ -712,11 +712,11 @@ TError TNetwork::RefreshClasses() {
              ct->State == EContainerState::Meta)) {
             error = ct->UpdateTrafficClasses();
             if (error)
-                L_ERR() << "Cannot refresh tc for " << ct->Name << " : " << error << std::endl;
+                L_ERR("Cannot refresh tc for ", ct->Name, " : {}", error);
         }
     }
 
-    L() << "done" << std::endl;
+    L("done");
 
     DropCaches();
 
@@ -975,7 +975,7 @@ TError TNetwork::GetDeviceStat(ENetStat kind, TUintMap &stat) {
             stat[dev.Name] = val;
             stat["group " + dev.GroupName] += val;
         } else
-            L_WRN() << "Cannot find device " << dev.GetDesc() << std::endl;
+            L_WRN("Cannot find device {}", dev.GetDesc());
         rtnl_link_put(link);
     }
 
@@ -1038,7 +1038,7 @@ TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) 
             stat[dev.Name] = val;
             stat["group " + dev.GroupName] += val;
         } else
-            L_WRN() << "Cannot find tc class " << handle << " at " << dev.GetDesc() << std::endl;
+            L_WRN("Cannot find tc class {} at {}", handle, dev.GetDesc());
 
         nl_cache_free(cache);
     }
@@ -1080,7 +1080,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
             error = cls.Create(*Nl);
         }
         if (error) {
-            L_WRN() << "Cannot add tc class: " << error << std::endl;
+            L_WRN("Cannot add tc class: {}", error);
             MissingClasses++;
             if (!result)
                 result = error;
@@ -1112,7 +1112,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
 
             error = cls.Create(*Nl);
             if (error) {
-                L_WRN() << "Cannot add leaf tc class: " << error << std::endl;
+                L_WRN("Cannot add leaf tc class: {}", error);
                 MissingClasses++;
                 if (!result)
                     result = error;
@@ -1124,7 +1124,7 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
                 error = ctq.Create(*Nl);
             }
             if (error) {
-                L_WRN() << "Cannot add container tc qdisc: " << error << std::endl;
+                L_WRN("Cannot add container tc qdisc: {}", error);
                 MissingClasses++;
                 if (!result)
                     result = error;
@@ -1156,7 +1156,7 @@ TError TNetwork::DestroyTC(uint32_t handle, uint32_t leaf) {
         TNlClass cls(dev.Index, TC_H_UNSPEC, handle);
         error = cls.Delete(*Nl);
         if (error) {
-            L_WRN() << "Cannot del tc class: " << error << std::endl;
+            L_WRN("Cannot del tc class: {}", error);
             if (!result)
                 result = error;
         }
@@ -1833,14 +1833,13 @@ TError TNetCfg::DestroyNetwork() {
             for (auto &addr : l3.Addrs) {
                 error = HostNetwork->DelAnnounce(addr);
                 if (error)
-                    L_ERR() << "Cannot remove announce " << addr.Format()
-                        << " : " << error << std::endl;
+                    L_ERR("Cannot remove announce {} : {}", addr.Format(), error);
             }
         }
         if (l3.Nat) {
             error = HostNetwork->PutNatAddress(l3.Addrs);
             if (error)
-                L_ERR() << "Cannot put NAT address : " << error << std::endl;
+                L_ERR("Cannot put NAT address : {}", error);
 
             auto ip = IpVec.begin();
             while (ip != IpVec.end()) {

@@ -24,8 +24,7 @@ TError TEnv::SetEnv(const std::string &name, const std::string &value,
         if (!overwrite)
             return TError(EError::InvalidValue, "variable " + name + " already set");
         if (var.Locked && value != var.Value) {
-            L() << "Variable " << name << " locked to " << var.Value
-                << ", value " << value << " is ignored" << std::endl;
+            L("Variable {} locked to {}, value {} is ignored", name, var.Value, value);
             return TError::Success();
         }
         var.Value = value;
@@ -44,8 +43,7 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
         if (!overwrite && var.Set)
             return TError(EError::InvalidValue, "variable " + name + " already set");
         if (var.Locked && var.Set) {
-            L() << "Variable " << name << " locked to " << var.Value
-                << ", unset is ignored" << std::endl;
+            L("Variable {} locked to {}, unset is ignored", name, var.Value);
             return TError::Success();
         }
         var.Value = "";

@@ -80,16 +80,16 @@ public:
                 }
             }
         } catch (std::string s) {
-            L_ERR() << "EXCEPTION: " << s << std::endl;
+            L_ERR("EXCEPTION: {}", s);
             Crash();
         } catch (const char *s) {
-            L_ERR() << "EXCEPTION: " << s << std::endl;
+            L_ERR("EXCEPTION: {}", s);
             Crash();
         } catch (const std::exception &exc) {
-            L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
+            L_ERR("EXCEPTION: {}", exc.what());
             Crash();
         } catch (...) {
-            L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
+            L_ERR("EXCEPTION: uncaught exception!");
             Crash();
         }
     }

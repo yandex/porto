@@ -1830,7 +1830,7 @@ TError TCpuGuarantee::Set(const std::string &guarantee) {
         return error;
 
     if (new_guarantee > CT->Parent->CpuGuarantee)
-        L() << CT->Name << " cpu guarantee bigger than for parent" << std::endl;
+        L("{} cpu guarantee bigger than for parent", CT->Name);
 
     if (CT->CpuGuarantee != new_guarantee) {
         CT->CpuGuarantee = new_guarantee;
@@ -3272,7 +3272,7 @@ void TPortoStat::Populate(TUintMap &m) {
     auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
     TError error = MemorySubsystem.Usage(cg, usage);
     if (error)
-        L_ERR() << "Can't get memory usage of portod" << std::endl;
+        L_ERR("Can't get memory usage of portod");
     m["memory_usage_mb"] = usage / 1024 / 1024;
 
     m["epoll_sources"] = Statistics->EpollSources;

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <ostream>
+#include "fmt/ostream.h"
 
 #include "rpc.pb.h"
 
@@ -36,6 +37,12 @@ public:
     static const TError& Queued();
     static TError FromErrno(const std::string &description);
     friend std::ostream& operator<<(std::ostream& os, const TError& err);
+
+    template<typename ostream>
+    friend ostream& operator<<(ostream& os, const TError &err) {
+        os << err.GetErrorName() << " (" << err.GetMsg() << ")";
+        return os;
+    }
 
     TError Serialize(int fd) const;
     static bool Deserialize(int fd, TError &error);

@@ -67,7 +67,7 @@ TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
         Sources.resize(fd + 256);
 
     if (!Sources[fd].expired()) {
-        L_ERR() << "Duplicate epoll fd " << fd << std::endl;
+        L_ERR("Duplicate epoll fd {}", fd);
         return TError(EError::Unknown, "dublicate epoll fd");
     }
 
@@ -90,11 +90,11 @@ void TEpollLoop::RemoveSource(int fd) {
         Sources[fd].reset();
         Statistics->EpollSources--;
     } else
-        L_ERR() << "Invalid epoll fd " << fd << std::endl;
+        L_ERR("Invalid epoll fd {}", fd);
 
     if (epoll_ctl(EpollFd, EPOLL_CTL_DEL, fd, nullptr) < 0)
-        L_ERR() << "Cannot remove epoll " << fd << " : "
-                << TError(EError::Unknown, errno, "epoll_ctl") << std::endl;
+        L_ERR("Cannot remove epoll {} : {}", fd,
+              TError(EError::Unknown, errno, "epoll_ctl"));
 }
 
 TError TEpollLoop::ModifySourceEvents(int fd, uint32_t events) const {

@@ -44,7 +44,7 @@ bool TTask::Exists() const {
 TError TTask::Kill(int signal) const {
     if (!Pid)
         return TError(EError::Unknown, "Task is not running");
-    L_ACT() << "kill " << signal << " " << Pid << std::endl;
+    L_ACT("kill {} {}", signal, Pid);
     if (kill(Pid, signal))
         return TError(EError::Unknown, errno, "kill(" + std::to_string(Pid) + ")");
     return TError::Success();
@@ -269,7 +269,7 @@ int GetNumCores() {
     int ncores = sysconf(_SC_NPROCESSORS_CONF);
     if (ncores <= 0) {
         TError error(EError::Unknown, "Can't get number of CPU cores");
-        L_ERR() << error << std::endl;
+        L_ERR("{}", error);
         return 1;
     }
 
@@ -278,16 +278,16 @@ int GetNumCores() {
 
 void DumpMallocInfo() {
     struct mallinfo mi = mallinfo();
-    L() << "Total non-mapped bytes (arena):\t" << mi.arena << std::endl;
-    L() << "# of free chunks (ordblks):\t" << mi.ordblks << std::endl;
-    L() << "# of free fastbin blocks (smblks):\t" << mi.smblks << std::endl;
-    L() << "# of mapped regions (hblks):\t" << mi.hblks << std::endl;
-    L() << "Bytes in mapped regions (hblkhd):\t" << mi.hblkhd << std::endl;
-    L() << "Max. total allocated space (usmblks):\t" << mi.usmblks << std::endl;
-    L() << "Free bytes held in fastbins (fsmblks):\t" << mi.fsmblks << std::endl;
-    L() << "Total allocated space (uordblks):\t" << mi.uordblks << std::endl;
-    L() << "Total free space (fordblks):\t" << mi.fordblks << std::endl;
-    L() << "Topmost releasable block (keepcost):\t" << mi.keepcost << std::endl;
+    L("Total non-mapped bytes (arena):\t{}", mi.arena);
+    L("# of free chunks (ordblks):\t{}", mi.ordblks);
+    L("# of free fastbin blocks (smblks):\t{}", mi.smblks);
+    L("# of mapped regions (hblks):\t{}",  mi.hblks);
+    L("Bytes in mapped regions (hblkhd):\t{}",  mi.hblkhd);
+    L("Max. total allocated space (usmblks):\t{}",  mi.usmblks);
+    L("Free bytes held in fastbins (fsmblks):\t{}",  mi.fsmblks);
+    L("Total allocated space (uordblks):\t{}",  mi.uordblks);
+    L("Total free space (fordblks):\t{}",  mi.fordblks);
+    L("Topmost releasable block (keepcost):\t{}",  mi.keepcost);
 }
 
 void TUnixSocket::Close() {
@@ -528,7 +528,7 @@ TError SetSysctl(const std::string &name, const std::string &value) {
     std::string path = "/proc/sys/" + name;
     /* all . -> / so abusing /../ is impossible */
     std::replace(path.begin() + 10, path.end(), '.', '/');
-    L_ACT() << "Set sysctl " << name << " = " << value << std::endl;
+    L_ACT("Set sysctl {} = {}", name, value);
     return TPath(path).WriteAll(value);
 }
 
@@ -665,6 +665,21 @@ static void LocalTime(time_t time, struct tm &tm) {
     } else {
         tm = ForkLocalTime;
         time_t diff = tm.tm_sec + time - ForkTime;
+        tm.tm_sec = diff % 60;
+        diff = tm.tm_min + diff / 60;
+        tm.tm_min = diff % 60;
+        diff = tm.tm_hour + diff / 60;
+        tm.tm_hour = diff % 24;
+        tm.tm_mday += diff / 24;
+    }
+}
+
+void LocalTime(const time_t *time, struct tm &tm) {
+    if (!PostFork) {
+        localtime_r(time, &tm);
+    } else {
+        tm = ForkLocalTime;
+        time_t diff = tm.tm_sec + *time - ForkTime;
         tm.tm_sec = diff % 60;
         diff = tm.tm_min + diff / 60;
         tm.tm_min = diff % 60;

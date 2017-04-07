@@ -31,6 +31,7 @@ struct TTask {
 };
 
 std::string FormatTime(time_t t, const char *fmt = "%F %T");
+void LocalTime(const time_t *time, struct tm &tm);
 
 pid_t GetPid();
 pid_t GetPPid();

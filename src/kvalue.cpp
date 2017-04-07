@@ -135,25 +135,25 @@ void TKeyValue::DumpAll(const TPath &root) {
 
     error = root.ReadDirectory(names);
     if (error) {
-        L() << "ERROR " << error << std::endl;
+        L("ERROR {}", error);
         return;
     }
 
     for (auto &name : names) {
-        L() << name << std::endl;
+        L("{}", name);
         if (StringEndsWith(name, ".tmp")) {
-            L() << "SKIP" << std::endl;
+            L("SKIP");
             continue;
         }
 
         TKeyValue node(root / name);
         error = node.Load();
         if (error) {
-            L() << "ERROR " << error << std::endl;
+            L("ERROR {}", error);
             continue;
         }
 
         for (auto &kv: node.Data)
-            L() << " " << kv.first << " = " << kv.second << std::endl;
+            L("{} = {} ", kv.first, kv.second);
     }
 }

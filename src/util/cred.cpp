@@ -33,7 +33,7 @@ TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
             break;
         PwdBufSize *= 2;
         buf.resize(PwdBufSize);
-        L() << "Increase user buffer to " << PwdBufSize << std::endl;
+        L("Increase user buffer to {}", PwdBufSize);
     }
 
     if (err || !ptr)
@@ -73,7 +73,7 @@ TError UserId(const std::string &user, uid_t &uid) {
             return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
         PwdBufSize *= 2;
         buf.resize(PwdBufSize);
-        L() << "Increase user buffer to " << PwdBufSize << std::endl;
+        L("Increase user buffer to {}", PwdBufSize);
     }
 
     if (!ptr)
@@ -95,7 +95,7 @@ std::string UserName(uid_t uid) {
             return std::to_string(uid);
         PwdBufSize *= 2;
         buf.resize(PwdBufSize);
-        L() << "Increase user buffer to " << PwdBufSize << std::endl;
+        L("Increase user buffer to {}", PwdBufSize);
     }
     if (!ptr)
         return std::to_string(uid);
@@ -120,7 +120,7 @@ TError GroupId(const std::string &group, gid_t &gid) {
             return TError(EError::InvalidValue, errno, "Cannot find group: " + group);
         GrpBufSize *= 2;
         buf.resize(GrpBufSize);
-        L() << "Increase group buffer to " << GrpBufSize << std::endl;
+        L("Increase group buffer to {}", GrpBufSize);
     }
 
     if (!ptr)
@@ -142,7 +142,7 @@ std::string GroupName(gid_t gid) {
             return std::to_string(gid);
         GrpBufSize *= 2;
         buf.resize(GrpBufSize);
-        L() << "Increase group buffer to " << GrpBufSize << std::endl;
+        L("Increase group buffer to {}", GrpBufSize);
     }
     if (!ptr)
         return std::to_string(gid);
@@ -154,7 +154,7 @@ TCred TCred::Current() {
 
     cred.Groups.resize(getgroups(0, nullptr));
     if (getgroups(cred.Groups.size(), cred.Groups.data()) < 0) {
-        L_ERR() << "Cannot get supplementary groups for " << cred.Uid << std::endl;
+        L_ERR("Cannot get supplementary groups for {}", cred.Uid);
         cred.Groups.resize(1);
         cred.Groups[0] = cred.Gid;
     }
@@ -165,7 +165,7 @@ TCred TCred::Current() {
 TError TCred::LoadGroups(const std::string &user) {
     TError error = FindGroups(user, Gid, Groups);
     if (error) {
-        L() << "Cannot load groups for " << user << std::endl;
+        L("Cannot load groups for {}", user);
         Groups.resize(1);
         Groups[0] = Gid;
     }
@@ -218,7 +218,7 @@ void InitCred() {
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error) {
-        L_WRN() << "Cannot find group porto: " << error << std::endl;
+        L_WRN("Cannot find group porto: {}", error);
         PortoGroup = RootGroup;
     }
 
@@ -316,11 +316,11 @@ TError TCapabilities::Load(pid_t pid, int type) {
 
 void TCapabilities::Dump() {
     Load(0, 0);
-    L() << "Effective: " << Format() << std::endl;
+    L("Effective: {}", Format());
     Load(0, 1);
-    L() << "Permitted: " << Format() << std::endl;
+    L("Permitted: {}", Format());
     Load(0, 2);
-    L() << "Inheritable: " << Format() << std::endl;
+    L("Inheritable: {}", Format());
 }
 
 TError TCapabilities::Apply(int mask) const {
@@ -412,7 +412,7 @@ TCapabilities AllCapabilities;
 
 void InitCapabilities() {
     if (TPath("/proc/sys/kernel/cap_last_cap").ReadInt(LastCapability)) {
-        L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap" << std::endl;
+        L_WRN("Can't read /proc/sys/kernel/cap_last_cap");
         LastCapability = CAP_AUDIT_READ;
     }
 

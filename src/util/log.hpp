@@ -6,6 +6,7 @@
 #include <streambuf>
 
 #include "util/path.hpp"
+#include "fmt/format.h"
 
 #define PORTO_ASSERT(EXPR) do { if (!(EXPR)) porto_assert(#EXPR, __LINE__, __FILE__); } while (0)
 #define PORTO_RUNTIME_ERROR(MSG) porto_runtime_error((MSG), __LINE__, __FILE__)
@@ -31,18 +32,44 @@ public:
     static void CloseLog();
     static void DisableLog();
     static int GetFd();
-    static std::basic_ostream<char> &Log(ELogLevel level = LOG_NOTICE);
+    static void Log(std::string log_msg, ELogLevel level = LOG_NOTICE);
 };
 
-static inline std::basic_ostream<char> &L() { return TLogger::Log(LOG_NOTICE); }
-static inline std::basic_ostream<char> &L_WRN() { return TLogger::Log(LOG_WARN); }
-static inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
-static inline std::basic_ostream<char> &L_EVT() { return TLogger::Log(LOG_EVENT); }
-static inline std::basic_ostream<char> &L_ACT() { return TLogger::Log(LOG_ACTION); }
-static inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUEST); }
-static inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
-static inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }
-static inline std::basic_ostream<char> &L_STK() { return TLogger::Log(LOG_STACK); }
+template <typename... Args> inline void L(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_NOTICE);
+}
+
+template <typename... Args> inline void L_WRN(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_WARN);
+}
+
+template <typename... Args> inline void L_ERR(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_ERROR);
+}
+
+template <typename... Args> inline void L_EVT(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_EVENT);
+}
+
+template <typename... Args> inline void L_ACT(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_ACTION);
+}
+
+template <typename... Args> inline void L_REQ(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_REQUEST);
+}
+
+template <typename... Args> inline void L_RSP(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_RESPONSE);
+}
+
+template <typename... Args> inline void L_SYS(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_SYSTEM);
+}
+
+template <typename... Args> inline void L_STK(const char* fmt, const Args&... args) {
+    TLogger::Log(fmt::format(fmt, args...), LOG_STACK);
+}
 
 void porto_assert(const char *msg, size_t line, const char *file);
 void porto_runtime_error(const std::string &msg, size_t line, const char *file);

@@ -57,10 +57,10 @@ TError TCgroup::Create() {
     if (Secondary())
         return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
 
-    L_ACT() << "Create cgroup " << *this << std::endl;
+    L_ACT("Create cgroup {}", *this);
     error = Path().Mkdir(0755);
     if (error)
-        L_ERR() << "Cannot create cgroup " << *this << " : " << error << std::endl;
+        L_ERR("Cannot create cgroup {} : {}", *this, error);
 
     for (auto subsys: Subsystems) {
         if (subsys->IsEnabled(*this)) {
@@ -80,7 +80,7 @@ TError TCgroup::Remove() const {
     if (Secondary())
         return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
 
-    L_ACT() << "Remove cgroup " << *this << std::endl;
+    L_ACT("Remove cgroup {}", *this);
     error = Path().Rmdir();
 
     /* workaround for bad synchronization */
@@ -97,8 +97,8 @@ TError TCgroup::Remove() const {
     if (error && (error.GetErrno() != ENOENT || Exists())) {
         std::vector<pid_t> tasks;
         GetTasks(tasks);
-        L_ERR() << "Cannot remove cgroup " << *this << " : " << error
-                << ", " << tasks.size() << " tasks inside" << std::endl;
+        L_ERR("Cannot remove cgroup {} : {}, {} tasks inside",
+              *this, error, tasks.size());
     }
 
     return error;
@@ -119,7 +119,7 @@ TError TCgroup::Get(const std::string &knob, std::string &value) const {
 TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     if (!Subsystem)
         return TError(EError::Unknown, "Cannot set to null cgroup");
-    L_ACT() << "Set " << *this << " " << knob << " = " << value << std::endl;
+    L_ACT("Set {} {} = {}", *this, knob, value);
     return Knob(knob).WriteAll(value);
 }
 
@@ -183,10 +183,10 @@ TError TCgroup::Attach(pid_t pid) const {
     if (Secondary())
         return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
 
-    L_ACT() << "Attach process " << pid << " to " << *this << std::endl;
+    L_ACT("Attach process {} to {}", pid, *this);
     TError error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
     if (error)
-        L_ERR() << "Cannot attach process " << pid << " to " << *this << " : " << error << std::endl;
+        L_ERR("Cannot attach process {} to {} : {}", pid, *this, error);
 
     return error;
 }
@@ -195,7 +195,7 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
     if (Secondary())
         return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
 
-    L_ACT() << "Attach all processes from " << cg << " to " << *this << std::endl;
+    L_ACT("Attach all processes from {} to {}", cg, *this);
 
     std::vector<pid_t> pids, prev;
     bool retry;
@@ -248,8 +248,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
             TCgroup cgroup = cgroups[i];
             TError error2 = cgroup.Childs(cgroups);
             if (error2) {
-                L_ERR() << "Cannot dump childs of " << cgroup << " : "
-                        << error << std::endl;
+                L_ERR("Cannot dump childs of {} : {}", cgroup, error);
                 if (!error)
                     error = error2;
             }
@@ -312,7 +311,7 @@ TError TCgroup::KillAll(int signal) const {
     bool frozen = false;
     int iteration = 0;
 
-    L_ACT() << "KillAll " << signal << " " << *this << std::endl;
+    L_ACT("KillAll {} {}", signal, *this);
 
     if (IsRoot())
         return TError(EError::Permission, "Bad idea");
@@ -322,7 +321,7 @@ TError TCgroup::KillAll(int signal) const {
                 !FreezerSubsystem.IsFrozen(*this)) {
             error = FreezerSubsystem.Freeze(*this, false);
             if (error)
-                L_ERR() << "Cannot freeze cgroup for killing " << *this << " : " << error << std::endl;
+                L_ERR("Cannot freeze cgroup for killing {} : {}", *this, error);
             else
                 frozen = true;
         }
@@ -334,7 +333,7 @@ TError TCgroup::KillAll(int signal) const {
             if (std::find(killed.begin(), killed.end(), pid) == killed.end()) {
                 if (kill(pid, signal) && errno != ESRCH && !error) {
                     error = TError(EError::Unknown, errno, "kill");
-                    L_ERR() << "Cannot kill process " << pid << " : " << error << std::endl;
+                    L_ERR("Cannot kill process {} : {}", pid, error);
                 }
                 retry = true;
             }
@@ -598,17 +597,17 @@ void TCpuSubsystem::InitializeSubsystem() {
 
     HasSmart = cg.Has("cpu.smart");
 
-    L_SYS() << GetNumCores() << " cores" << std::endl;
+    L_SYS("{} cores", GetNumCores());
     if (HasShares)
-        L_SYS() << "base shares " << BaseShares << std::endl;
+        L_SYS("base shares {}", BaseShares);
     if (HasQuota)
-        L_SYS() << "quota period " << BasePeriod << std::endl;
+        L_SYS("quota period {}", BasePeriod);
     if (HasRtGroup)
-        L_SYS() << "support rt group" << std::endl;
+        L_SYS("support rt group");
     if (HasReserve)
-        L_SYS() << "support reserves" << std::endl;
+        L_SYS("support reserves");
     if (HasSmart)
-        L_SYS() << "support smart" << std::endl;
+        L_SYS("support smart");
 }
 
 TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
@@ -1087,27 +1086,27 @@ TError InitializeCgroups() {
 
     error = root.FindMount(mount);
     if (error) {
-        L_ERR() << "Cannot find cgroups root mount: " << error << std::endl;
+        L_ERR("Cannot find cgroups root mount: {}", error);
         return error;
     }
 
     if (mount.Target != root) {
         error = root.Mount("cgroup", "tmpfs", 0, {});
         if (error) {
-            L_ERR() << "Cannot mount cgroups root: " << error << std::endl;
+            L_ERR("Cannot mount cgroups root: {}", error);
             return error;
         }
     } else if (StringStartsWith(mount.Options, "ro,")) {
         error = root.Remount(MS_REMOUNT | MS_NODEV | MS_NOSUID | MS_NOEXEC);
         if (error) {
-            L_ERR() << "Cannot remount cgroups root: " << error << std::endl;
+            L_ERR("Cannot remount cgroups root: {}", error);
             return error;
         }
     }
 
     error = TPath::ListAllMounts(mounts);
     if (error) {
-        L_ERR() << "Can't create mount snapshot: " << error << std::endl;
+        L_ERR("Can't create mount snapshot: {}", error);
         return error;
     }
 
@@ -1115,7 +1114,7 @@ TError InitializeCgroups() {
         for (auto &mnt: mounts) {
             if (mnt.Type == "cgroup" && mnt.HasOption(subsys->Type)) {
                 subsys->Root = mnt.Target;
-                L() << "Found cgroup subsystem " << subsys->Type << " mounted at " << subsys->Root << std::endl;
+                L("Found cgroup subsystem {} mounted at {}", subsys->Type, subsys->Root);
                 break;
             }
         }
@@ -1134,7 +1133,7 @@ TError InitializeCgroups() {
             MemorySubsystem.Root = path;
             BlkioSubsystem.Root = path;
         } else {
-            L_ERR() << "Cannot merge memory and blkio " << error << std::endl;
+            L_ERR("Cannot merge memory and blkio {}", error);
             (void)path.Rmdir();
         }
     }
@@ -1146,11 +1145,11 @@ TError InitializeCgroups() {
         if (subsys->Root.IsEmpty()) {
             subsys->Root = root / subsys->Type;
 
-            L() << "Mount cgroup subsysm " << subsys->Type << " at " << subsys->Root << std::endl;
+            L("Mount cgroup subsysm {} at {}", subsys->Type, subsys->Root);
             if (!subsys->Root.Exists()) {
                 error = subsys->Root.Mkdir(0755);
                 if (error) {
-                    L_ERR() << "Cannot create cgroup mountpoint: " << error << std::endl;
+                    L_ERR("Cannot create cgroup mountpoint: {}", error);
                     return error;
                 }
             }
@@ -1159,31 +1158,31 @@ TError InitializeCgroups() {
             /* in kernels < 3.14 cgroup net_cls was in module cls_cgroup */
             if (error && subsys->Type == "net_cls") {
                 if (system("modprobe cls_cgroup"))
-                    L_ERR() << "Cannot load cls_cgroup" << std::endl;
+                    L_ERR("Cannot load cls_cgroup");
                 error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
             }
 
             /* hugetlb is optional yet */
             if (error && subsys->Type == "hugetlb") {
-                L() << "Seems not supported: " << error << std::endl;
+                L("Seems not supported: {}", error);
                 error = subsys->Root.Rmdir();
                 continue;
             }
 
             if (error && subsys->Type == "cpuset") {
-                L() << "Seems not supported: " << error << std::endl;
+                L("Seems not supported: {}", error);
                 error = subsys->Root.Rmdir();
                 continue;
             }
 
             if (error && subsys->Type == "pids") {
-                L() << "Seems not supported: " << error << std::endl;
+                L("Seems not supported: {}", error);
                 error = subsys->Root.Rmdir();
                 continue;
             }
 
             if (error) {
-                L_ERR() << "Cannot mount cgroup: " << error << std::endl;
+                L_ERR("Cannot mount cgroup: {}", error);
                 (void)subsys->Root.Rmdir();
                 return error;
             }
@@ -1195,8 +1194,7 @@ TError InitializeCgroups() {
         subsys->Controllers |= subsys->Kind;
         for (auto hy: Hierarchies) {
             if (subsys->Root == hy->Root) {
-                L() << "Cgroup subsystem " << subsys->Type
-                    << " bound to hierarchy " << hy->Type << std::endl;
+                L("Cgroup subsystem {} bound to hierarchy {}", subsys->Type, hy->Type);
                 subsys->Hierarchy = hy;
                 hy->Controllers |= subsys->Kind;
                 break;

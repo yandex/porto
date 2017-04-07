@@ -61,7 +61,7 @@ static bool slaveMode = false;
 static bool discardState = false;
 
 static void FatalError(const std::string &text, TError &error) {
-    L_ERR() << text << ": " << error << std::endl;
+    L_ERR("{}: {}", text, error);
     _exit(EXIT_FAILURE);
 }
 
@@ -95,13 +95,13 @@ static void DaemonPrepare(bool master) {
 
     DaemonOpenLog(master);
 
-    L_SYS() << std::string(80, '-') << std::endl;
-    L_SYS() << "Started " << PORTO_VERSION << " " << PORTO_REVISION << " " << GetPid() << std::endl;
-    L_SYS() << config().DebugString() << std::endl;
+    L_SYS("{}", std::string(80, '-'));
+    L_SYS("Started {} {} {}", PORTO_VERSION, PORTO_REVISION, GetPid());
+    L_SYS("{}", config().DebugString());
 }
 
 static void DaemonShutdown(bool master, int code) {
-    L_SYS() << "Stopped " << code << std::endl;
+    L_SYS("Stopped {}", code);
 
     TLogger::CloseLog();
 
@@ -167,14 +167,14 @@ static TError CreatePortoSocket() {
 
         if (!path.StatStrict(sk_stat) && S_ISSOCK(sk_stat.st_mode)) {
             time_t now = time(nullptr);
-            L_SYS() << "Reuse porto socket: "
-                    << "inode " << fd_stat.st_ino << ":" << sk_stat.st_ino
-                    << " age " << now - fd_stat.st_ctime << ":" << now - sk_stat.st_ctime
-                    << std::endl;
+            L_SYS("Reuse porto socket: inode {} : {} "
+                  "age {} : {}",
+                  fd_stat.st_ino, sk_stat.st_ino,
+                  now - fd_stat.st_ctime, now - sk_stat.st_ctime);
             return TError::Success();
         }
 
-        L_WRN() << "Unlinked porto socket. Recreating..." << std::endl;
+        L_WRN("Unlinked porto socket. Recreating...");
     }
 
     sock.SetFd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
@@ -348,10 +348,10 @@ void AckExitStatus(int pid) {
 
     int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
     if (ret == sizeof(pid)) {
-        L() << "Acknowledge exit status for " << std::to_string(pid) << std::endl;
+        L("Acknowledge exit status for {}", std::to_string(pid));
     } else {
         TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
-        L_ERR() << "Can't acknowledge exit status for " << pid << ": " << error << std::endl;
+        L_ERR("Can't acknowledge exit status for {}: {}", pid, error);
         Crash();
     }
 }
@@ -366,7 +366,7 @@ static int ReapSpawner(int fd) {
     while (nr--) {
         int ret = poll(fds, 1, 0);
         if (ret < 0) {
-            L_ERR() << "poll() error: " << strerror(errno) << std::endl;
+            L_ERR("poll() error: {}", strerror(errno));
             return ret;
         }
 
@@ -375,14 +375,14 @@ static int ReapSpawner(int fd) {
 
         int pid, status;
         if (read(fd, &pid, sizeof(pid)) < 0) {
-            L_ERR() << "read(pid): " << strerror(errno) << std::endl;
+            L_ERR("read(pid): {}", strerror(errno));
             return 0;
         }
 retry:
         if (read(fd, &status, sizeof(status)) < 0) {
             if (errno == EAGAIN)
                 goto retry;
-            L_ERR() << "read(status): " << strerror(errno) << std::endl;
+            L_ERR("read(status): {}", strerror(errno));
             return 0;
         }
 
@@ -422,7 +422,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
                       "All client slots are active: " +
                       (from ? from->Name : "globally"));
 
-    L() << "Drop client " << *victim << " idle for " << idle << " ms" << std::endl;
+    L("Drop client {} idle for {} ms", *victim, idle);
     Clients.erase(victim->Fd);
     victim->CloseConnection();
     return TError::Success();
@@ -446,7 +446,7 @@ static TError AcceptConnection(int listenFd) {
     auto client = std::make_shared<TClient>(clientFd);
     error = client->IdentifyClient(true);
     if (Verbose)
-        L() << "Client connected: " << *client << std::endl;
+        L("Client connected: {}", *client);
     if (error)
         return error;
 
@@ -481,14 +481,14 @@ static int SlaveRpc() {
     auto AcceptSource = std::make_shared<TEpollSource>(PORTO_SK_FD);
     error = EpollLoop->AddSource(AcceptSource);
     if (error) {
-        L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
+        L_ERR("Can't add RPC server fd to epoll: {}", error);
         return EXIT_FAILURE;
     }
 
     auto MasterSource = std::make_shared<TEpollSource>(REAP_EVT_FD);
     error = EpollLoop->AddSource(MasterSource);
     if (error && !failsafe) {
-        L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
+        L_ERR("Can't add master fd to epoll: {}", error);
         return EXIT_FAILURE;
     }
 
@@ -498,7 +498,7 @@ static int SlaveRpc() {
     auto sigSource = std::make_shared<TEpollSource>(sigFd);
     error = EpollLoop->AddSource(sigSource);
     if (error) {
-        L_ERR() << "Can't add sigSource to epoll: " << error << std::endl;
+        L_ERR("Can't add sigSource to epoll: {}", error);
         return EXIT_FAILURE;
     }
 
@@ -520,7 +520,7 @@ static int SlaveRpc() {
     while (true) {
         error = EpollLoop->GetEvents(events, -1);
         if (error) {
-            L_ERR() << "slave: epoll error " << error << std::endl;
+            L_ERR("slave: epoll error {}", error);
             ret = EXIT_FAILURE;
             goto exit;
         }
@@ -540,7 +540,7 @@ static int SlaveRpc() {
                 struct signalfd_siginfo sigInfo;
 
                 if (read(sigFd, &sigInfo, sizeof sigInfo) != sizeof sigInfo) {
-                    L_ERR() << "SignalFd read failed" << std::endl;
+                    L_ERR("SignalFd read failed");
                     continue;
                 }
 
@@ -553,7 +553,7 @@ static int SlaveRpc() {
                         ret = -SIGTERM;
                         goto exit;
                     case SIGHUP:
-                        L_EVT() << "Updating" << std::endl;
+                        L_EVT("Updating");
                         ret = -SIGHUP;
                         goto exit;
                     case SIGUSR1:
@@ -572,13 +572,13 @@ static int SlaveRpc() {
                         }
                         break;
                     default:
-                        L_WRN() << "Unexpected signal: " << sigInfo.ssi_signo << std::endl;
+                        L_WRN("Unexpected signal: {}", sigInfo.ssi_signo);
                         break;
                 }
             } else if (source->Fd == PORTO_SK_FD) {
                 error = AcceptConnection(source->Fd);
                 if (error)
-                    L() << "Cannot accept connection: " << error << std::endl;
+                    L("Cannot accept connection: {}", error);
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the
@@ -622,7 +622,7 @@ static int SlaveRpc() {
                     client->CloseConnection();
                 }
             } else {
-                L_WRN() << "Unknown event " << source->Fd << std::endl;
+                L_WRN("Unknown event {}", source->Fd);
                 EpollLoop->RemoveSource(source->Fd);
             }
         }
@@ -713,7 +713,7 @@ static void RestoreContainers() {
                 error = TError(EError::Unknown, "name not found");
         }
         if (error) {
-            L_ERR() << "Cannot load " << node->Path << ": " << error << std::endl;
+            L_ERR("Cannot load {}: {}", node->Path, error);
             (void)node->Path.Unlink();
             node = nodes.erase(node);
             continue;
@@ -732,7 +732,7 @@ static void RestoreContainers() {
         std::shared_ptr<TContainer> ct;
         error = TContainer::Restore(node, ct);
         if (error) {
-            L_ERR() << "Cannot restore " << node.Name << ": " << error << std::endl;
+            L_ERR("Cannot restore {}: {}", node.Name, error);
             Statistics->RestoreFailed++;
             node.Path.Unlink();
             continue;
@@ -756,8 +756,7 @@ again:
 
         error = hy->RootCgroup().ChildsAll(cgroups);
         if (error)
-            L_ERR() << "Cannot dump porto " << hy->Type << " cgroups : "
-                    << error << std::endl;
+            L_ERR("Cannot dump porto {} cgroups : {}", hy->Type, error);
 
         for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); ++cg) {
             if (!StringStartsWith(cg->Name, PORTO_CGROUP_PREFIX))
@@ -812,7 +811,7 @@ static void CleanupTempdir() {
 
     error = temp.ReadDirectory(list);
     if (error)
-        L_ERR() << "Cannot list temp dir: " << error << std::endl;
+        L_ERR("Cannot list temp dir: {}", error);
 
     for (auto &name: list) {
         auto it = Containers.find(name);
@@ -822,10 +821,10 @@ static void CleanupTempdir() {
         TPath path = temp / name;
         error = ClearRecursive(path);
         if (error)
-            L_WRN() << "Cannot clear " << path << ": " << error << std::endl;
+            L_WRN("Cannot clear {}: {}", path, error);
         error = path.RemoveAll();
         if (error)
-            L_WRN() << "Cannot remove " << path << ": " << error << std::endl;
+            L_WRN("Cannot remove {}: {}", path, error);
     }
 }
 
@@ -840,7 +839,7 @@ static void DestroyContainers(bool weak) {
             error = ct->Destroy();
 
         if (error)
-            L_ERR() << "Cannot destroy container " << ct->Name << ": " << error << std::endl;
+            L_ERR("Cannot destroy container {}: {}", ct->Name, error);
     }
 
     SystemClient.ReleaseContainer();
@@ -862,7 +861,7 @@ static int SlaveMain() {
 
     DaemonPrepare(false);
 
-    L_SYS() << "Previous version: " << PreviousVersion << std::endl;
+    L_SYS("Previous version: {}", PreviousVersion);
 
     error = TuneLimits();
     if (error)
@@ -873,18 +872,18 @@ static int SlaveMain() {
         FatalError("Cannot create porto socket", error);
 
     if (fcntl(PORTO_SK_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        L_ERR() << "Can't set close-on-exec flag on PORTO_SK_FD: " << strerror(errno) << std::endl;
+        L_ERR("Can't set close-on-exec flag on PORTO_SK_FD: {}", strerror(errno));
         return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        L_ERR() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << std::endl;
+        L_ERR("Can't set close-on-exec flag on REAP_EVT_FD: {}", strerror(errno));
         if (!failsafe)
             return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        L_ERR() << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << std::endl;
+        L_ERR("Can't set close-on-exec flag on REAP_ACK_FD: {}", strerror(errno));
         if (!failsafe)
             return EXIT_FAILURE;
     }
@@ -947,34 +946,34 @@ static int SlaveMain() {
 
     if (discardState) {
         discardState = false;
-        L() << "Discard state..." << std::endl;
+        L("Discard state...");
         DestroyContainers(false);
         TVolume::DestroyAll();
     }
 
     SystemClient.FinishRequest();
 
-    L() << "Remove cgroup leftovers..." << std::endl;
+    L("Remove cgroup leftovers...");
     CleanupCgroups();
 
-    L() << "Cleanup temp dir..." << std::endl;
+    L("Cleanup temp dir...");
     CleanupTempdir();
 
-    L() << "Done restoring" << std::endl;
+    L("Done restoring");
 
     int code = SlaveRpc();
-    L_SYS() << "Shutting down..." << std::endl;
+    L_SYS("Shutting down...");
 
     if (discardState) {
         discardState = false;
 
-        L() << "Discard state..." << std::endl;
+        L("Discard state...");
 
         SystemClient.LockContainer(RootContainer);
 
         error = RootContainer->Stop(0);
         if (error)
-            L_ERR() << "Failed to stop root container and its children " << error << std::endl;
+            L_ERR("Failed to stop root container and its children {}", error);
 
         SystemClient.ReleaseContainer();
 
@@ -987,7 +986,7 @@ static int SlaveMain() {
 
         error = RootContainer->Destroy();
         if (error)
-            L_ERR() << "Cannot destroy root container" << error << std::endl;
+            L_ERR("Cannot destroy root container{}", error);
 
         SystemClient.ReleaseContainer();
 
@@ -995,11 +994,11 @@ static int SlaveMain() {
 
         error = ContainersKV.UmountAll();
         if (error)
-            L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
+            L_ERR("Can't destroy key-value storage: {}", error);
 
         error = VolumesKV.UmountAll();
         if (error)
-            L_ERR() << "Can't destroy volume key-value storage: " << error << std::endl;
+            L_ERR("Can't destroy volume key-value storage: {}", error);
     }
 
     DaemonShutdown(false, code);
@@ -1008,7 +1007,7 @@ static int SlaveMain() {
 }
 
 static TError DeliverPidStatus(int fd, int pid, int status, size_t queued) {
-    L_EVT() << "Deliver " << pid << " status " << status << " (" << queued << " queued)" << std::endl;
+    L_EVT("Deliver {} status {} ({} queued)", pid, status, queued);
 
     if (write(fd, &pid, sizeof(pid)) < 0)
         return TError(EError::Unknown, "write(pid): ", errno);
@@ -1061,7 +1060,7 @@ static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveS
         exited[info.si_pid] = status;
         TError error = DeliverPidStatus(fd, info.si_pid, status, exited.size());
         if (error)
-            L_WRN() << "Fail to deliver pid status to slave: " << error << std::endl;
+            L_WRN("Fail to deliver pid status to slave: {}", error);
     }
 
     UpdateQueueSize(exited);
@@ -1078,12 +1077,11 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
             continue;
 
         if (exited.find(pid) == exited.end()) {
-            L_WRN() << "Got acknowledge for unknown pid " << pid << std::endl;
+            L_WRN("Got acknowledge for unknown pid {}", pid);
         } else {
             exited.erase(pid);
             Reap(pid);
-            L_EVT() << "Got acknowledge for " << pid << " (" << exited.size()
-                    << " queued" << std::endl;
+            L_EVT("Got acknowledge for {} ({} queued)", pid, exited.size());
         }
 
         nr++;
@@ -1094,13 +1092,13 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
 }
 
 static int UpgradeMaster() {
-    L_SYS() << "Updating" << std::endl;
+    L_SYS("Updating");
 
     if (kill(slavePid, SIGHUP) < 0) {
-        L_ERR() << "Cannot send SIGHUP to slave: " << strerror(errno) << std::endl;
+        L_ERR("Cannot send SIGHUP to slave: {}", strerror(errno));
     } else {
         if (waitpid(slavePid, NULL, 0) != slavePid)
-            L_ERR() << "Cannot wait for slave exit status: " << strerror(errno) << std::endl;
+            L_ERR("Cannot wait for slave exit status: {}", strerror(errno));
     }
 
     TLogger::CloseLog();
@@ -1136,12 +1134,12 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
     slavePid = 0;
 
     if (pipe2(evtfd, O_NONBLOCK | O_CLOEXEC) < 0) {
-        L_ERR() << "pipe(): " << strerror(errno) << std::endl;
+        L_ERR("pipe(): {}", strerror(errno));
         return EXIT_FAILURE;
     }
 
     if (pipe2(ackfd, O_NONBLOCK | O_CLOEXEC) < 0) {
-        L_ERR() << "pipe(): " << strerror(errno) << std::endl;
+        L_ERR("pipe(): {}", strerror(errno));
         return EXIT_FAILURE;
     }
 
@@ -1153,7 +1151,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
 
     slavePid = fork();
     if (slavePid < 0) {
-        L_ERR() << "fork(): " << strerror(errno) << std::endl;
+        L_ERR("fork(): {}", strerror(errno));
         ret = EXIT_FAILURE;
         goto exit;
     } else if (slavePid == 0) {
@@ -1173,7 +1171,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
     close(evtfd[0]);
     close(ackfd[1]);
 
-    L_SYS() << "Spawned slave " << slavePid << std::endl;
+    L_SYS("Spawned slave {}", slavePid);
     Statistics->Spawned++;
 
     for (auto &pair : exited)
@@ -1183,13 +1181,13 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
 
     error = loop->AddSource(AckSource);
     if (error) {
-        L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
+        L_ERR("Can't add ackfd[0] to epoll: {}", error);
         return EXIT_FAILURE;
     }
 
     error = loop->AddSource(sigSource);
     if (error) {
-        L_ERR() << "Can't add sigSource to epoll: " << error << std::endl;
+        L_ERR("Can't add sigSource to epoll: {}", error);
         return EXIT_FAILURE;
     }
 
@@ -1198,7 +1196,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
 
         error = loop->GetEvents(events, -1);
         if (error) {
-            L_ERR() << "master: epoll error " << error << std::endl;
+            L_ERR("master: epoll error {}", error);
             return EXIT_FAILURE;
         }
 
@@ -1211,9 +1209,9 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
             case SIGINT:
             case SIGTERM: {
                 if (kill(slavePid, s) < 0)
-                    L_ERR() << "Can't send " << s << " to slave" << std::endl;
+                    L_ERR("Can't send {} to slave", s);
 
-                L() << "Waiting for slave to exit..." << std::endl;
+                L("Waiting for slave to exit...");
                 uint64_t deadline = GetCurrentTimeMs() +
                                     config().daemon().portod_stop_timeout() * 1000;
                 do {
@@ -1230,9 +1228,9 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
             case SIGUSR2:
                 DumpMallocInfo();
 
-                L() << "Statuses:" << std::endl;
+                L("Statuses:");
                 for (auto pair : exited)
-                    L() << pair.first << "=" << pair.second << std::endl;
+                    L("{} = {}", pair.first, pair.second);
 
                 break;
             case SIGHUP:
@@ -1257,14 +1255,14 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
                     goto exit;
                 }
             } else {
-                L_WRN() << "Unknown event " << source->Fd << std::endl;
+                L_WRN("Unknown event {}", source->Fd);
                 loop->RemoveSource(source->Fd);
             }
         }
 
         int status;
         if (ReapDead(evtfd[1], exited, slavePid, status)) {
-            L_SYS() << "Slave exited with " << status << std::endl;
+            L_SYS("Slave exited with {}", status);
             ret = EXIT_SUCCESS;
             goto exit;
         }
@@ -1300,11 +1298,11 @@ static int MasterMain() {
     } else {
         if (PreviousVersion[0] == 'v')
             PreviousVersion = PreviousVersion.substr(1);
-        L_SYS() << "Previous version: " << PreviousVersion << std::endl;
+        L_SYS("Previous version: {}", PreviousVersion);
     }
 
     if (pathVer.WriteAll(PORTO_VERSION))
-        L_ERR() << "Can't update current version" << std::endl;
+        L_ERR("Can't update current version");
 
     TPath pathBin(PORTO_BINARY_PATH), prevBin;
     TPath procExe("/proc/self/exe"), thisBin;
@@ -1313,9 +1311,9 @@ static int MasterMain() {
         FatalError("Cannot read /proc/self/exe", error);
     (void)pathBin.ReadLink(prevBin);
 
-    L_SYS() << "Previous binary: " << prevBin << std::endl;
+    L_SYS("Previous binary: {}", prevBin);
 
-    L_SYS() << "Current binary: " << thisBin << std::endl;
+    L_SYS("Current binary: {}", thisBin);
 
     if (prevBin != thisBin) {
         (void)pathBin.Unlink();
@@ -1332,7 +1330,7 @@ static int MasterMain() {
     // We want propogate mounts into containers
     error = TPath("/").Remount(MS_SHARED | MS_REC);
     if (error) {
-        L_ERR() << "Can't remount / recursively as shared" << error << std::endl;
+        L_ERR("Can't remount / recursively as shared{}", error);
         return EXIT_FAILURE;
     }
 
@@ -1342,23 +1340,23 @@ static int MasterMain() {
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER)");
-        L_ERR() << "Can't set myself as a subreaper, make sure kernel version is at least 3.4: " << error << std::endl;
+        L_ERR("Can't set myself as a subreaper, make sure kernel version is at least 3.4: {}", error);
         return EXIT_FAILURE;
     }
 
     error = SetOomScoreAdj(-1000);
     if (error)
-        L_ERR() << "Can't adjust OOM score: " << error << std::endl;
+        L_ERR("Can't adjust OOM score: {}", error);
 
     error = CreatePortoSocket();
     if (error) {
-        L_ERR() << "Cannot create porto socket: " << error << std::endl;
+        L_ERR("Cannot create porto socket: {}", error);
         return EXIT_FAILURE;
     }
 
     error = SetupCorePattern(thisBin);
     if (error) {
-        L_ERR() << "Cannot setup core pattern: " << error << std::endl;
+        L_ERR("Cannot setup core pattern: {}", error);
         return EXIT_FAILURE;
     }
 
@@ -1369,7 +1367,7 @@ static int MasterMain() {
         uint64_t started = GetCurrentTimeMs();
         uint64_t next = started + config().container().respawn_delay_ms();
         code = SpawnSlave(ELoop, exited);
-        L() << "Returned " << code << std::endl;
+        L("Returned {}", code);
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
@@ -1386,11 +1384,11 @@ static int MasterMain() {
 
     error = RevertCorePattern();
     if (error)
-        L_ERR() << "Cannot revert core pattern: " << error << std::endl;
+        L_ERR("Cannot revert core pattern: {}", error);
 
     error = TPath(PORTO_SOCKET_PATH).Unlink();
     if (error)
-        L_ERR() << "Cannot unlink socket file: " << error << std::endl;
+        L_ERR("Cannot unlink socket file: {}", error);
 
     DaemonShutdown(true, code);
 
@@ -1484,16 +1482,16 @@ static int PortodMain() {
         else
             return MasterMain();
     } catch (std::string s) {
-        L_ERR() << "EXCEPTION: " << s << std::endl;
+        L_ERR("EXCEPTION: {}", s);
         Crash();
     } catch (const char *s) {
-        L_ERR() << "EXCEPTION: " << s << std::endl;
+        L_ERR("EXCEPTION: {}", s);
         Crash();
     } catch (const std::exception &exc) {
-        L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
+        L_ERR("EXCEPTION: {}", exc.what());
         Crash();
     } catch (...) {
-        L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
+        L_ERR("EXCEPTION: uncaught exception!");
         Crash();
     }
 
