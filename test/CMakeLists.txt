@@ -9,7 +9,7 @@ add_executable(portotest portotest.cpp test.cpp selftest.cpp stresstest.cpp
 	       ${porto_SOURCE_DIR}/protobuf.cpp)
 
 target_link_libraries(portotest version porto util config
-				pthread rt ${PB} ${LIBNL} ${LIBNL_ROUTE})
+				pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
 add_executable(cpu_limit cpu_limit.cpp)
 

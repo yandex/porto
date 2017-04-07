@@ -38,6 +38,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 add_subdirectory(api/cpp)
 add_subdirectory(util)
+add_subdirectory(fmt)
 
 include_directories(${libporto_SOURCE_DIR})
 
@@ -48,11 +49,11 @@ add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp
 		      epoll.cpp client.cpp stream.cpp protobuf.cpp helpers.cpp)
 target_link_libraries(portod version porto util config
 			     rpc_proto kv_proto
-			     pthread rt ${PB} ${LIBNL} ${LIBNL_ROUTE})
+			     pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
 add_executable(portoctl portoctl.cpp cli.cpp portotop.cpp)
 target_link_libraries(portoctl version porto util
-			       rt ${PB} ${CURSES_LIBRARIES})
+			       rt fmt ${PB} ${CURSES_LIBRARIES})
 
 add_executable(portoinit portoinit.c)
 target_link_libraries(portoinit version)
