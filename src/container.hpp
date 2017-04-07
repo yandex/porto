@@ -182,6 +182,7 @@ public:
 
     double CpuLimit;
     double CpuGuarantee;
+    double CpuWeight = 1;
 
     ECpuSetType CpuSetType = ECpuSetType::Inherit;
     int CpuSetArg = 0;
@@ -321,6 +322,8 @@ public:
     void ChooseTrafficClasses();
     TError UpdateTrafficClasses();
     TError CreateIngressQdisc();
+
+    void ChooseSchedPolicy();
 
     bool MayRespawn();
     bool MayReceiveOom(int fd);

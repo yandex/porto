@@ -219,7 +219,7 @@ public:
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;
     TError SetCpuLimit(TCgroup &cg, const std::string &policy,
-                        double guarantee, double limit);
+                       double weight, double guarantee, double limit);
 };
 
 class TCpuacctSubsystem : public TSubsystem {

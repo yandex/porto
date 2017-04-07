@@ -36,6 +36,7 @@ constexpr const char *P_RECHARGE_ON_PGFAULT = "recharge_on_pgfault";
 constexpr const char *P_CPU_POLICY = "cpu_policy";
 constexpr const char *P_CPU_GUARANTEE = "cpu_guarantee";
 constexpr const char *P_CPU_LIMIT = "cpu_limit";
+constexpr const char *P_CPU_WEIGHT = "cpu_weight";
 constexpr const char *P_CPU_SET = "cpu_set";
 constexpr const char *D_CPU_SET_AFFINITY  = "cpu_set_affinity";
 constexpr const char *P_IO_POLICY = "io_policy";
@@ -150,6 +151,7 @@ enum class EProperty {
     CPU_POLICY,
     CPU_GUARANTEE,
     CPU_LIMIT,
+    CPU_WEIGHT,
     CPU_SET,
     CPU_SET_AFFINITY,
     IO_POLICY,

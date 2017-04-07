@@ -317,10 +317,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
         Place = Parent->Place;
 
     CpuPolicy = "normal";
-
-    SchedPolicy = SCHED_OTHER;
-    SchedPrio = 0;
-    SchedNice = 0;
+    ChooseSchedPolicy();
 
     CpuLimit = GetNumCores();
     CpuGuarantee = IsRoot() ? GetNumCores() : 0;
@@ -899,6 +896,40 @@ TError TContainer::ApplyUlimits() {
     return TError::Success();
 }
 
+void TContainer::ChooseSchedPolicy() {
+    SchedPolicy = SCHED_OTHER;
+    SchedPrio = 0;
+    SchedNice = 0;
+
+    if (CpuPolicy == "rt") {
+        SchedNice = config().container().rt_nice();
+        if ((!CpuSubsystem.HasSmart || !config().container().enable_smart()) &&
+                config().container().rt_priority()) {
+            SchedPolicy = SCHED_RR;
+            SchedPrio = config().container().rt_priority();
+            /* x2 weight is +1 rt priority */
+            SchedPrio += std::log2(CpuWeight);
+            SchedPrio = std::max(SchedPrio, sched_get_priority_min(SCHED_RR));
+            SchedPrio = std::min(SchedPrio, sched_get_priority_max(SCHED_RR));
+        }
+    } else if (CpuPolicy == "high") {
+        SchedNice = config().container().high_nice();
+    } else if (CpuPolicy == "batch") {
+        SchedPolicy = SCHED_BATCH;
+    } else if (CpuPolicy == "idle") {
+        SchedPolicy = SCHED_IDLE;
+    } else if (CpuPolicy == "iso") {
+        SchedPolicy = 4;
+        SchedNice = config().container().high_nice();
+    }
+
+    if (SchedPolicy != SCHED_RR) {
+        /* -1 nice is a +10% cpu weight */
+        SchedNice -= std::log(CpuWeight) / std::log(1.1);
+        SchedNice = std::min(std::max(SchedNice, -20), 19);
+    }
+}
+
 TError TContainer::ApplySchedPolicy() const {
     auto cg = GetCgroup(FreezerSubsystem);
     struct sched_param param;
@@ -1249,10 +1280,11 @@ TError TContainer::ApplyDynamicProperties() {
 
     if ((Controllers & CGROUP_CPU) &&
             (TestPropDirty(EProperty::CPU_POLICY) |
+             TestPropDirty(EProperty::CPU_WEIGHT) |
              TestClearPropDirty(EProperty::CPU_LIMIT) |
              TestClearPropDirty(EProperty::CPU_GUARANTEE))) {
         auto cpucg = GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy,
+        error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy, CpuWeight,
                                           CpuGuarantee, CpuLimit);
         if (error) {
             if (error.GetErrno() != EINVAL)
@@ -1261,7 +1293,8 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (TestClearPropDirty(EProperty::CPU_POLICY)) {
+    if (TestClearPropDirty(EProperty::CPU_POLICY) ||
+        TestClearPropDirty(EProperty::CPU_WEIGHT)) {
         error = ApplySchedPolicy();
         if (error) {
             L_ERR() << "Cannot set scheduler policy: " << error << std::endl;

@@ -323,9 +323,7 @@ public:
         auto parent = CT->Parent;
         if (!CT->Isolate && !CT->HasProp(EProperty::CPU_POLICY)) {
             CT->CpuPolicy = parent->CpuPolicy;
-            CT->SchedPolicy = parent->SchedPolicy;
-            CT->SchedPrio = parent->SchedPrio;
-            CT->SchedNice = parent->SchedNice;
+            CT->ChooseSchedPolicy();
         }
         return TError::Success();
     }
@@ -343,29 +341,7 @@ TError TCpuPolicy::Set(const std::string &policy) {
     if (CT->CpuPolicy != policy) {
         CT->CpuPolicy = policy;
         CT->SetProp(EProperty::CPU_POLICY);
-
-        CT->SchedPolicy = SCHED_OTHER;
-        CT->SchedPrio = 0;
-        CT->SchedNice = 0;
-
-        if (policy == "rt") {
-            CT->SchedNice = config().container().rt_nice();
-            if ((!CpuSubsystem.HasSmart ||
-                 !config().container().enable_smart()) &&
-                    config().container().rt_priority()) {
-                CT->SchedPolicy = SCHED_RR;
-                CT->SchedPrio = config().container().rt_priority();
-            }
-        } else if (policy == "high") {
-            CT->SchedNice = config().container().high_nice();
-        } else if (policy == "batch") {
-            CT->SchedPolicy = SCHED_BATCH;
-        } else if (policy == "idle") {
-            CT->SchedPolicy = SCHED_IDLE;
-        } else if (policy == "iso") {
-            CT->SchedPolicy = 4;
-            CT->SchedNice = config().container().high_nice();
-        }
+        CT->ChooseSchedPolicy();
     }
 
     return TError::Success();
@@ -1869,6 +1845,38 @@ TError TCpuGuarantee::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TCpuWeight : public TProperty {
+public:
+    TCpuWeight() : TProperty(P_CPU_WEIGHT, EProperty::CPU_WEIGHT,
+                            "CPU weight 0.01..100, default is 1 (dynamic)") {}
+    TError Get(std::string &value) {
+        value = StringFormat("%lg", CT->CpuWeight);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+
+        double val;
+        std::string unit;
+        error = StringToValue(value, val, unit);
+        if (error)
+            return error;
+
+        if (val < 0.01 || val > 100 || unit.size())
+            return TError(EError::InvalidValue, "out of range");
+
+        if (CT->CpuWeight != val) {
+            CT->CpuWeight = val;
+            CT->SetProp(EProperty::CPU_WEIGHT);
+            CT->ChooseSchedPolicy();
+        }
+
+        return TError::Success();
+    }
+} static CpuWeight;
 
 class TCpuSet : public TProperty {
 public:

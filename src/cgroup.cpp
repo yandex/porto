@@ -612,7 +612,7 @@ void TCpuSubsystem::InitializeSubsystem() {
 }
 
 TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
-                                   double guarantee, double limit) {
+                                  double weight, double guarantee, double limit) {
     int max = GetNumCores();
     TError error;
 
@@ -639,6 +639,9 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
     if (HasReserve && config().container().enable_cpu_reserve()) {
         uint64_t reserve = std::floor(guarantee * BasePeriod);
         uint64_t shares = BaseShares, reserve_shares = BaseShares;
+
+        shares *= weight;
+        reserve_shares *= weight;
 
         if (policy == "rt") {
             shares *= 256;
@@ -672,6 +675,8 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
 
         /* default cpu_guarantee is 1c, shares < 1024 are broken */
         shares = std::max(shares, BaseShares);
+
+        shares *= weight;
 
         if (policy == "rt")
             shares *= 256;
