@@ -27,6 +27,7 @@ public:
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;
     uint64_t ActivityTimeMs = 0;
+    uint64_t RequestTimeMs = 0;
     bool Processing = false;
     bool InEpoll = false;
 
@@ -51,8 +52,6 @@ public:
 
     void StartRequest();
     void FinishRequest();
-
-    uint64_t GetRequestTimeMs();
 
     TError IdentifyClient(bool initial);
     TError ComposeName(const std::string &name, std::string &relative_name) const;
@@ -88,7 +87,6 @@ public:
 private:
     std::mutex Mutex;
     uint64_t ConnectionTime = 0;
-    uint64_t RequestStartMs = 0;
 
     bool FirstLog = true;
 

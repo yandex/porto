@@ -284,7 +284,7 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
 static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent) {
     if (!silent || Verbose)
         L_RSP() << ResponseAsString(rsp) << " to " << client
-                << " (request took " << client.GetRequestTimeMs() << "ms)"
+                << " (request took " << client.RequestTimeMs << "ms)"
                 << std::endl;
 
     if (Verbose)
@@ -1278,9 +1278,11 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
 
-        /* log failed silent requests */
-        if (silent && !Verbose && error)
+        /* log failed or slow silent requests */
+        if (silent && !Verbose && (error || client->RequestTimeMs >= 1000)) {
             L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
+            silent = false;
+        }
 
         SendReply(*client, rsp, silent && !error);
     }

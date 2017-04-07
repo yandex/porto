@@ -74,20 +74,17 @@ void TClient::CloseConnection() {
 }
 
 void TClient::StartRequest() {
-    RequestStartMs = GetCurrentTimeMs();
-    ActivityTimeMs = RequestStartMs;
+    RequestTimeMs = GetCurrentTimeMs();
+    ActivityTimeMs = RequestTimeMs;
     PORTO_ASSERT(CL == nullptr);
     CL = this;
 }
 
 void TClient::FinishRequest() {
+    RequestTimeMs = GetCurrentTimeMs() - RequestTimeMs;
     ReleaseContainer();
     PORTO_ASSERT(CL == this);
     CL = nullptr;
-}
-
-uint64_t TClient::GetRequestTimeMs() {
-    return GetCurrentTimeMs() - RequestStartMs;
 }
 
 TError TClient::IdentifyClient(bool initial) {

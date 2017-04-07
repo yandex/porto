@@ -139,7 +139,7 @@ public:
         Statistics->RequestsCompleted++;
         Statistics->RequestsQueued--;
 
-        auto time = request.Client->GetRequestTimeMs();
+        auto time = request.Client->RequestTimeMs;
         if (time > 1000)
             Statistics->RequestsLonger1s++;
         if (time > 3000)
