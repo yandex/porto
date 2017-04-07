@@ -6,7 +6,6 @@
 #include "signal.hpp"
 #include "unix.hpp"
 #include "string.hpp"
-#include "log.hpp"
 #include "test.hpp"
 #include "netlink.hpp"
 
@@ -66,8 +65,6 @@ int main(int argc, char *argv[])
 
     // in case client closes pipe we are writing to in the protobuf code
     Signal(SIGPIPE, SIG_IGN);
-
-    TLogger::DisableLog();
 
     umask(0);
 

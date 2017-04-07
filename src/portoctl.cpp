@@ -11,7 +11,6 @@
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
-#include "util/log.hpp"
 #include "util/cred.hpp"
 
 extern "C" {
@@ -634,7 +633,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        PORTO_ASSERT(args.size() >= static_cast<size_t>(NeedArgs));
         string val = args[2];
         for (size_t i = 3; i < args.size(); ++i) {
             val += " ";
@@ -750,7 +748,6 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         int sig = SIGTERM;
         const auto &args = env->GetArgs();
-        PORTO_ASSERT(!args.empty());
         if (args.size() >= 2) {
             const string &sigName = args[1];
 
@@ -2374,8 +2371,6 @@ int main(int argc, char *argv[]) {
 
     handler.RegisterCommand<TConvertPathCmd>();
     handler.RegisterCommand<TAttachCmd>();
-
-    TLogger::DisableLog();
 
     int ret = handler.HandleCommand(argc, argv);
     if (ret < 0) {

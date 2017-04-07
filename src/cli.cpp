@@ -5,7 +5,6 @@
 
 #include "cli.hpp"
 #include "version.hpp"
-#include "util/log.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 
@@ -226,7 +225,6 @@ int TCommandHandler::TryExec(const std::string &commandName,
     }
 
     ICmd *cmd = it->second.get();
-    PORTO_ASSERT(cmd);
     if (!cmd->ValidArgs(commandArgs)) {
         Usage(cmd->GetName().c_str());
         return EXIT_FAILURE;
@@ -248,7 +246,6 @@ TCommandHandler::~TCommandHandler() {
 }
 
 void TCommandHandler::RegisterCommand(std::unique_ptr<ICmd> cmd) {
-    PORTO_ASSERT(cmd);
     Commands[cmd->GetName()] = std::move(cmd);
 }
 
@@ -305,7 +302,6 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
 
 void TCommandHandler::Usage(const char *command) {
     ICmd *cmd = Commands["help"].get();
-    PORTO_ASSERT(cmd);
 
     std::vector<std::string> args;
     if (command)
