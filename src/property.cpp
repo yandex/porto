@@ -2661,6 +2661,33 @@ public:
     }
 } static OomIsFatal;
 
+class TOomScoreAdj : public TProperty {
+public:
+    TOomScoreAdj() : TProperty(P_OOM_SCORE_ADJ, EProperty::OOM_SCORE_ADJ,
+                               "OOM score adjustment: -1000..1000") {
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        int val;
+        error = StringToInt(value, val);
+        if (error)
+            return error;
+        if (val < -1000 || val > 1000)
+            return TError(EError::InvalidValue, "out of range");
+        if (CT->OomScoreAdj != val) {
+            CT->OomScoreAdj = val;
+            CT->SetProp(EProperty::OOM_SCORE_ADJ);
+        }
+        return TError::Success();
+    }
+    TError Get(std::string &value) {
+        value = StringFormat("%d", CT->OomScoreAdj);
+        return TError::Success();
+    }
+} static OomScoreAdj;
+
 class TParent : public TProperty {
 public:
     TError Get(std::string &value);

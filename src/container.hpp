@@ -211,6 +211,7 @@ public:
 
     bool IsWeak = false;
     bool OomIsFatal = true;
+    int OomScoreAdj = 0;
     unsigned OomEvents = 0;
     bool OomKilled = false;
     int ExitStatus = 0;

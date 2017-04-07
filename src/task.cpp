@@ -450,6 +450,10 @@ TError TTaskEnv::Start() {
                 Abort(error);
         }
 
+        error = TPath("/proc/self/oom_score_adj").WriteAll(std::to_string(CT->OomScoreAdj));
+        if (error && CT->OomScoreAdj)
+            Abort(error);
+
         if (setpriority(PRIO_PROCESS, 0, CT->SchedNice))
             Abort(TError(EError::Unknown, errno, "setpriority"));
 

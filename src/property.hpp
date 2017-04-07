@@ -71,6 +71,7 @@ constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 constexpr const char *P_UMASK = "umask";
 constexpr const char *P_CONTROLLERS = "controllers";
 constexpr const char *P_OOM_IS_FATAL = "oom_is_fatal";
+constexpr const char *P_OOM_SCORE_ADJ = "oom_score_adj";
 constexpr const char *P_THREAD_LIMIT = "thread_limit";
 constexpr const char *P_SYSCTL = "sysctl";
 constexpr const char *P_CORE_COMMAND = "core_command";
@@ -183,6 +184,7 @@ enum class EProperty {
     STATE,
     OOM_KILLED,
     OOM_IS_FATAL,
+    OOM_SCORE_ADJ,
     RESPAWN_COUNT,
     EXIT_STATUS,
     CAPABILITIES_AMBIENT,
