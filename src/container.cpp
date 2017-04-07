@@ -1038,6 +1038,8 @@ TError TContainer::DistributeCpus() {
         if (Verbose)
             L() << "Distribute CPUs " << parent->CpuVacant.Format() << " in " << parent->Name << std::endl;
 
+        double vacantGuarantee = 0;
+
         for (auto type: order) {
             for (auto &ct: parent->Children) {
                 if (ct->CpuSetType != type ||
@@ -1095,12 +1097,20 @@ TError TContainer::DistributeCpus() {
 
                 if (ct->CpuReserve.Weight())
                     L_ACT() << "Reserve CPUs " << ct->CpuReserve.Format() << " for " << ct->Name << std::endl;
+                else
+                    vacantGuarantee += ct->CpuGuarantee;
 
                 if (Verbose)
                     L() << "Assign CPUs " << ct->CpuAffinity.Format() << " for " << ct->Name << std::endl;
 
                 ct->CpuVacant.Set(ct->CpuAffinity);
             }
+        }
+
+        if (vacantGuarantee > parent->CpuVacant.Weight()) {
+            if (!parent->CpuVacant.IsEqual(parent->CpuAffinity))
+                return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in " + parent->Name);
+            L() << "CPU guarantee overcommit in " << parent->Name << std::endl;
         }
     }
 
