@@ -1271,7 +1271,14 @@ public:
 
 class TListCmd final : public ICmd {
 public:
-    TListCmd(Porto::Connection *api) : ICmd(api, "list", 0, "[-1] [-f] [-t] [pattern]", "list created containers") {}
+    TListCmd(Porto::Connection *api) : ICmd(api, "list", 0,
+            "[-1] [-f] [-r] [-t] [pattern]",
+            "list containers\n"
+            "    -1        only names\n"
+            "    -f        forest\n"
+            "    -r        only running\n"
+            "    -t        only toplevel\n"
+            ) {}
 
     size_t CountChar(const std::string &s, const char ch) {
         size_t count = 0;
@@ -1293,10 +1300,12 @@ public:
         bool details = true;
         bool forest = false;
         bool toplevel = false;
+        bool running = false;
         const auto &args = env->GetOpts({
             { '1', false, [&](const char *arg) { details = false; } },
             { 'f', false, [&](const char *arg) { forest = true; } },
             { 't', false, [&](const char *arg) { toplevel = true; } },
+            { 'r', false, [&](const char *arg) { running = true; } },
         });
         std::string mask = args.size() ? args[0] : "";
 
@@ -1349,6 +1358,9 @@ public:
                 continue;
 
             if (toplevel && CountChar(c, '/'))
+                continue;
+
+            if (running && state.Value != "running")
                 continue;
 
             if (details)
