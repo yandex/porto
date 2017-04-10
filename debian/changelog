@@ -1,3 +1,14 @@
+yandex-porto (3.6.3) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * cpu: forbid cpu reservation if cpu guarantee needs them all
+  * cpu: ignore cpu guarantee bigger than machine
+
+  [ Maxim Samoylov ]
+  * container: add missing cpu affinity lock
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 10 Apr 2017 19:46:39 +0300
+
 yandex-porto (3.6.2) unstable; urgency=low
 
   * cgroup: fix setting zero dirty limit
