@@ -1883,6 +1883,8 @@ public:
     TCpuSet() : TProperty(P_CPU_SET, EProperty::CPU_SET,
             "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N (dynamic)") {}
     TError Get(std::string &value) {
+        auto lock = LockCpuAffinity();
+
         switch (CT->CpuSetType) {
         case ECpuSetType::Inherit:
             value = "";
@@ -1915,6 +1917,8 @@ public:
 
         TTuple cfg;
         SplitEscapedString(value, cfg, ' ');
+
+        auto lock = LockCpuAffinity();
 
         ECpuSetType type;
         int arg = !CT->CpuSetArg;
@@ -1970,6 +1974,7 @@ public:
     TCpuSetAffinity() : TProperty(D_CPU_SET_AFFINITY, EProperty::NONE,
             "Resulting CPU affinity: [N,N-M,]... (ro)") {}
     TError Get(std::string &value) {
+        auto lock = LockCpuAffinity();
         value = CT->CpuAffinity.Format();
         return TError::Success();
     }

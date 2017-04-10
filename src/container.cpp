@@ -45,7 +45,7 @@ std::map<std::string, std::shared_ptr<TContainer>> Containers;
 TPath ContainersKV;
 TIdMap ContainerIdMap(1, CONTAINER_ID_MAX);
 
-static std::mutex CpuMutex;
+std::mutex CpuAffinityMutex;
 static std::vector<TBitMap> CoreThreads;
 
 static TBitMap NumaNodes;
@@ -1013,7 +1013,7 @@ again:
 }
 
 TError TContainer::DistributeCpus() {
-    auto lock = std::unique_lock<std::mutex>(CpuMutex);
+    auto lock = LockCpuAffinity();
     TError error;
 
     if (IsRoot()) {
@@ -1424,6 +1424,8 @@ TError TContainer::PrepareCgroups() {
     TError error;
 
     if (!HasProp(EProperty::CPU_SET) && Parent) {
+        auto lock = LockCpuAffinity();
+
         /* Create CPU set if some CPUs in parent are reserved */
         if (!Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
             Controllers |= CGROUP_CPUSET;
@@ -2060,7 +2062,7 @@ void TContainer::FreeRuntimeResources() {
     ShutdownOom();
 
     if (Parent && CpuReserve.Weight()) {
-        L_ACT("Release CPUs {} reserved for {}", CpuReserve.Format(), Name);
+        L_ACT("Release CPUs reserved for {}", Name);
         error = Parent->DistributeCpus();
         if (error)
             L_ERR("Cannot redistribute CPUs: {}", error);
