@@ -215,7 +215,7 @@ public:
 class TCpuSubsystem : public TSubsystem {
 public:
     bool HasShares, HasQuota, HasSmart, HasReserve, HasRtGroup;
-    uint64_t BasePeriod, BaseShares;
+    uint64_t BasePeriod, BaseShares, MinShares, MaxShares;
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;
     TError SetCpuLimit(TCgroup &cg, const std::string &policy,

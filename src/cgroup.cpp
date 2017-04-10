@@ -580,6 +580,9 @@ void TCpuSubsystem::InitializeSubsystem() {
     if (HasShares && cg.GetUint64("cpu.shares", BaseShares))
         BaseShares = 1024;
 
+    MinShares = 2; /* kernel limit MIN_SHARES */
+    MaxShares = 1024 * 256; /* kernel limit MAX_SHARES */
+
     HasQuota = cg.Has("cpu.cfs_quota_us") &&
                cg.Has("cpu.cfs_period_us");
 
@@ -610,6 +613,7 @@ void TCpuSubsystem::InitializeSubsystem() {
 
 TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
                                    double guarantee, double limit) {
+    int max = GetNumCores();
     TError error;
 
     if (HasQuota) {
@@ -618,13 +622,19 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         if (quota < 1000) /* 1ms */
             quota = 1000;
 
-        if (limit <= 0 || limit >= GetNumCores())
+        if (limit <= 0 || limit >= max)
             quota = -1;
 
         error = cg.Set("cpu.cfs_quota_us", std::to_string(quota));
         if (error)
             return error;
     }
+
+    if (guarantee < 0)
+        guarantee = 0;
+
+    if (guarantee > max)
+        guarantee = max;
 
     if (HasReserve && config().container().enable_cpu_reserve()) {
         uint64_t reserve = std::floor(guarantee * BasePeriod);
@@ -642,6 +652,9 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             shares /= 16;
         }
 
+        shares = std::min(std::max(shares, MinShares), MaxShares);
+        reserve_shares = std::min(std::max(reserve_shares, MinShares), MaxShares);
+
         error = cg.SetUint64("cpu.shares", shares);
         if (error)
             return error;
@@ -655,7 +668,10 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             return error;
 
     } else if (HasShares) {
-        uint64_t shares = std::floor((guarantee + 1) * BaseShares);
+        uint64_t shares = std::floor(guarantee * BaseShares);
+
+        /* default cpu_guarantee is 1c, shares < 1024 are broken */
+        shares = std::max(shares, BaseShares);
 
         if (policy == "rt")
             shares *= 256;
@@ -663,6 +679,8 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             shares *= 16;
         else if (policy == "idle")
             shares /= 16;
+
+        shares = std::min(std::max(shares, MinShares), MaxShares);
 
         error = cg.SetUint64("cpu.shares", shares);
         if (error)
@@ -678,7 +696,6 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
 
     if (HasRtGroup) {
         int64_t root_runtime, root_period, period, runtime;
-        int cores = GetNumCores();
 
         if (RootCgroup().GetInt64("cpu.rt_period_us", root_period))
             root_period = 1000000;
@@ -690,14 +707,13 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         if (error)
             return error;
 
-        if (limit <= 0 || limit >= cores ||
-                limit / cores * root_period > root_runtime) {
-            period = 1000000;   /* 1s */
+        period = 100000;    /* 100ms */
+
+        if (limit <= 0 || limit >= max ||
+                limit / max * root_period > root_runtime) {
             runtime = -1;
         } else {
-            period = 100000;    /* 100ms */
-            runtime = limit * period / cores;
-
+            runtime = limit * period / max;
             if (runtime < 1000)  /* 1ms */
                 runtime = 1000;
         }
