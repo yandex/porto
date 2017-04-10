@@ -183,9 +183,9 @@ public:
     double CpuLimit;
     double CpuGuarantee;
 
+    /* Under CpuAffinityMutex */
     ECpuSetType CpuSetType = ECpuSetType::Inherit;
     int CpuSetArg = 0;
-
     TBitMap CpuAffinity;
     TBitMap CpuVacant;
     TBitMap CpuReserve;
@@ -372,4 +372,10 @@ extern TIdMap ContainerIdMap;
 
 static inline std::unique_lock<std::mutex> LockContainers() {
     return std::unique_lock<std::mutex>(ContainersMutex);
+}
+
+extern std::mutex CpuAffinityMutex;
+
+static inline std::unique_lock<std::mutex> LockCpuAffinity() {
+    return std::unique_lock<std::mutex>(CpuAffinityMutex);
 }
