@@ -1,3 +1,28 @@
+yandex-porto (3.7.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * cpu: forbid cpu reservation if cpu guarantee needs them all
+  * cpu: ignore cpu guarantee bigger than machine
+  * cpu: add property cpu_weight for scaling cpu shares, nice and priority
+  * property: add oom_score_adj
+  * portoctl: add option -r to command list: show only running
+  * porto: always log requests longer than 1 second
+
+  [ Maxim Samoylov ]
+  * portotest,portoctl: get rid of log.hpp include
+
+  [ Konstantin Khlebnikov ]
+  * porto: bundle library fmt 3.0.1
+
+  [ Maxim Samoylov ]
+  * porto: use fmt for log messages formatting
+  * container: add missing cpu affinity lock
+
+  [ Konstantin Khlebnikov ]
+  * network: reuse L3 namespaces with identical addresses
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 17 Apr 2017 20:19:19 +0300
+
 yandex-porto (3.6.2) unstable; urgency=low
 
   * cgroup: fix setting zero dirty limit
