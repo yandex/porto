@@ -45,6 +45,7 @@ message TCfg {
 		repeated TAddrLabel addrlabel = 31;
 		optional uint32 watchdog_ms = 32;
 		optional uint32 cache_statistics_ms = 35;
+		optional bool l3_migration_hack = 36;
 	}
 
 	message TFileCfg {

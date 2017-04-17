@@ -2084,10 +2084,11 @@ void TContainer::FreeResources() {
     }
 
     if (Net) {
+        auto net_lock = Net->ScopedLock();
         struct TNetCfg NetCfg;
 
         error = ParseNetConfig(NetCfg);
-        if (!error)
+        if (!--Net->Owners && !error)
             error = NetCfg.DestroyNetwork();
         if (NetCfg.SaveIp) {
             TMultiTuple ip_settings;
@@ -2096,8 +2097,7 @@ void TContainer::FreeResources() {
         if (error)
             L_ERR("Cannot free network resources: {}", error);
 
-        if (Controllers & CGROUP_NETCLS) {
-            auto net_lock = Net->ScopedLock();
+        if ((Controllers & CGROUP_NETCLS) && !Net->Owners) {
             error = Net->DestroyTC(ContainerTC, LeafTC);
             if (error)
                 L_ERR("Can't remove traffic class: {}", error);

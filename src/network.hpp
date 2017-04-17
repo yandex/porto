@@ -95,6 +95,7 @@ public:
     TNlAddr NatBaseV4;
     TNlAddr NatBaseV6;
     TIdMap NatBitmap;
+    unsigned Owners = 1;
 
     TNetwork();
     ~TNetwork();
