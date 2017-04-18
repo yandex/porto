@@ -1430,9 +1430,12 @@ TError TContainer::PrepareCgroups() {
         if (!Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
             Controllers |= CGROUP_CPUSET;
             RequiredControllers |= CGROUP_CPUSET;
+            L("Enable cpuset for {} because parent has reserved cpus", Name);
         } else {
             CpuAffinity.Clear();
             CpuAffinity.Set(Parent->CpuAffinity);
+            CpuVacant.Clear();
+            CpuVacant.Set(Parent->CpuAffinity);
         }
     }
 
