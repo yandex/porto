@@ -1,3 +1,14 @@
+yandex-porto (3.7.2) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * container: set default vacant cpus
+  * network: fix shared l3 namespace counters
+
+  [ Maxim Samoylov ]
+  * volume: drop nested umounts while destructing volume
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 18 Apr 2017 22:05:00 +0300
+
 yandex-porto (3.7.1) unstable; urgency=low
 
   * network: compare parsed ip addresses for detecting l3 migration
