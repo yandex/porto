@@ -1475,7 +1475,7 @@ TError TVolume::DestroyOne(bool strict) {
     }
 
     if (Path != InternalPath) {
-        error = Path.UmountNested();
+        error = Path.UmountAll();
         if (error) {
             L_ERR("Cannout umount volume: {}", error);
             if (!ret)
@@ -1492,8 +1492,7 @@ TError TVolume::DestroyOne(bool strict) {
         }
     }
 
-    /* umount everything for sure */
-    error = internal.UmountNested();
+    error = internal.UmountAll();
     if (error) {
         L_ERR("Cannot umount internal: {}", error);
         if (!ret)
