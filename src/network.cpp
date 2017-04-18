@@ -1740,17 +1740,19 @@ TError TNetCfg::PrepareNetwork() {
 
     if (NewNetNs && L3Only && config().network().l3_migration_hack() &&
             L3lan.size() && L3lan[0].Addrs.size()) {
-        auto addr = L3lan[0].Addrs[0].Format();
         auto lock = LockContainers();
 
         for (auto &it: Containers) {
             auto &ct = it.second;
             if (!ct->Net || ct->IpList.empty())
                 continue;
+
             for (auto cfg: ct->IpList) {
-                if (cfg.size() == 2 && cfg[1] == addr &&
+                TNlAddr addr;
+                if (cfg.size() == 2 && !addr.Parse(AF_UNSPEC, cfg[1]) &&
+                        addr.IsMatch(L3lan[0].Addrs[0]) &&
                         !ct->OpenNetns(NetNs)) {
-                    L_ACT("Reuse L3 addr {} network {}", addr, ct->Name);
+                    L_ACT("Reuse L3 addr {} network {}", addr.Format(), ct->Name);
                     Net = ct->Net;
                     lock.unlock();
                     auto net_lock = Net->ScopedLock();
