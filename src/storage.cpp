@@ -78,10 +78,15 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
             continue;
 
         auto lock = LockVolumes();
-        if (PathIsActive(path))
-            continue;
 
-        if (path.IsRegularStrict()) {
+        TFile dirent;
+        if (!dirent.OpenDir(path)) {
+            if (PathIsActive(dirent.RealPath()))
+                continue;
+
+            path = dirent.RealPath();
+
+        } else if (path.IsRegularStrict()) {
             if (type != PORTO_VOLUMES && StringStartsWith(name, PRIVATE_PREFIX)) {
                 std::string tail = name.substr(std::string(PRIVATE_PREFIX).size());
                 if ((base / tail).IsDirectoryStrict() ||
@@ -323,7 +328,9 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
 
     auto lock = LockVolumes();
 
-    while (PathIsActive(temp)) {
+    TFile import_dir;
+
+    while (!import_dir.OpenDir(temp) && PathIsActive(import_dir.RealPath())) {
         if (merge)
             return TError(EError::Busy, Name + " is importing right now");
         StorageCv.wait(lock);
@@ -355,6 +362,9 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
         if (error)
             return error;
     }
+
+    import_dir.OpenDir(temp);
+    temp = import_dir.RealPath();
 
     ActivePaths.push_back(temp);
     lock.unlock();
@@ -514,10 +524,17 @@ TError TStorage::Remove() {
             L_WRN("Cannot remove private: {}", error);
     }
 
+    TFile temp_dir;
     temp = TempPath(REMOVE_PREFIX + std::to_string(RemoveCounter++));
+
     error = Path.Rename(temp);
-    if (!error)
-        ActivePaths.push_back(temp);
+    if (!error) {
+        error = temp_dir.OpenDir(temp);
+        if (!error) {
+            temp = temp_dir.RealPath();
+            ActivePaths.push_back(temp);
+        }
+    }
 
     lock.unlock();
 
