@@ -81,7 +81,7 @@ public:
     bool Exists() const;
 
     TError Create();
-    TError Remove() const;
+    TError Remove();
 
     TError KillAll(int signal) const;
 
@@ -117,6 +117,7 @@ public:
     TError SetBool(const std::string &knob, bool value) const;
 
     TError GetUintMap(const std::string &knob, TUintMap &value) const;
+    TError SetSuffix(const std::string suffix);
 };
 
 class TMemorySubsystem : public TSubsystem {

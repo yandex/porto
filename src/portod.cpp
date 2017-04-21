@@ -785,9 +785,6 @@ again:
             if (found)
                 continue;
 
-            if (!cg->IsEmpty())
-                (void)cg->KillAll(SIGKILL);
-
             if (hy == &FreezerSubsystem && FreezerSubsystem.IsFrozen(*cg)) {
                 (void)FreezerSubsystem.Thaw(*cg, false);
                 if (FreezerSubsystem.IsParentFreezing(*cg)) {

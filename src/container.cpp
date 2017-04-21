@@ -2221,8 +2221,6 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (error)
         return error;
 
-    while (!cg.IsEmpty() && !WaitDeadline(deadline));
-
     return TError::Success();
 }
 
