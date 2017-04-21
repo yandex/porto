@@ -1150,6 +1150,27 @@ TError TContainer::DistributeCpus() {
 
     for (auto &ct: subtree) {
         if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
+                !ct->TestPropDirty(EProperty::CPU_SET_AFFINITY) ||
+                ct->State == EContainerState::Stopped ||
+                ct->State == EContainerState::Dead)
+            continue;
+
+        auto cg = ct->GetCgroup(CpusetSubsystem);
+
+        if (!cg.Exists())
+            continue;
+
+        error = CpusetSubsystem.SetCpus(cg, CpuAffinity.Format());
+        if (error) {
+            L("Cannot set cpu affinity: {}", error);
+            return error;
+        }
+    }
+
+    subtree.reverse();
+
+    for (auto &ct: subtree) {
+        if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
                 !ct->TestClearPropDirty(EProperty::CPU_SET_AFFINITY) ||
                 ct->State == EContainerState::Stopped ||
                 ct->State == EContainerState::Dead)
