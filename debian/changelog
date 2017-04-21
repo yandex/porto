@@ -1,3 +1,14 @@
+yandex-porto (3.7.3) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * storage: track real names of active paths
+  * cgroup: perform active wait for empty cgroup on remove
+
+  [ Konstantin Khlebnikov ]
+  * cpuset: two-phase cpu affinity commit
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 21 Apr 2017 13:20:53 +0300
+
 yandex-porto (3.7.2) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
