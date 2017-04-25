@@ -172,6 +172,14 @@ TError TDevice::Makedev() const {
         return error;
 
     if (!Wildcard) {
+        struct stat st;
+
+        if (!path.StatFollow(st)) {
+            if (st.st_mode == Mode && st.st_uid == User && st.st_gid == Group)
+                return TError::Success();
+            return TError(EError::Busy, "Different device node already exists: " + Name);
+        }
+
         error = path.Mknod(Mode, Device);
         if (error)
             return error;
