@@ -1416,7 +1416,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     if (IsRoot() || !(Controllers & CGROUP_DEVICES))
         return TError::Success();
 
-    if (Parent->IsRoot() && HasProp(EProperty::DEVICES)) {
+    if (Parent->IsRoot()) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
             return error;
