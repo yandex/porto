@@ -77,6 +77,9 @@ TError TKeyValue::Save() {
     if (!error)
         error = tmpPath.Rename(Path);
 
+    if (error)
+        (void)tmpPath.Unlink();
+
     return error;
 }
 
