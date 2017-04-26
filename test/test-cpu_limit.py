@@ -1,185 +1,232 @@
 import porto
-import multiprocessing
-import sys
 import os
-import time
-import traceback
+import multiprocessing
+import types
 
-#consider some difference between rt and normal scheduler
-EPS = 0.3
-RT_EPS = 0.3
+NAME = os.path.basename(__file__)
+
+def CT_NAME(suffix):
+    global NAME
+    return NAME + "-" + suffix
+
+EPS = 0.95
+TEST_LIM_SHARE = 0.75 #of the whole machine
 
 DURATION = 1000 #ms
 CPUNR = multiprocessing.cpu_count()
-THREAD_NUM = CPUNR
-INTERVAL = 1000 #ms
 HAS_RT_LIMIT = os.access("/sys/fs/cgroup/cpu/cpu.rt_runtime_us", os.F_OK)
+TEST_CORES_SHARE = CPUNR * TEST_LIM_SHARE
 
-print "Using EPS {} for normal, EPS {} for RT, run duration {} ms".format(EPS, RT_EPS, DURATION)
+print "Available cores: {}, using EPS {}, run duration {} ms".format(CPUNR, EPS, DURATION)
 
-def SetCommand(r, guarantee, limit, duration=DURATION, tnum=THREAD_NUM, interval=INTERVAL):
-    global DURATION
-    cmd = "./cpu_limit {} {} {}c {}c {}".format(tnum, duration, guarantee, limit, interval)
-    r.SetProperty("command", cmd)
-
-def InitContainer(c, name, guarantee, limit, rt=False):
-    r = c.CreateWeakContainer(name)
-
+def PrepareCpuContainer(ct, guarantee, limit, rt = False):
     if (rt):
-        r.SetProperty("cpu_policy", "rt")
-        eps = RT_EPS
+        ct.SetProperty("cpu_policy", "rt")
     else:
-        r.SetProperty("cpu_policy", "normal")
-        eps = EPS
+        ct.SetProperty("cpu_policy", "normal")
 
     if (limit != 0.0):
-        assert limit + eps < float(CPUNR)
-        r.SetProperty("cpu_limit", "{}c".format(limit))
+        ct.SetProperty("cpu_limit", "{}c".format(limit))
 
     if (guarantee != 0.0):
-        assert guarantee > eps
-        r.SetProperty("cpu_guarantee", "{}c".format(guarantee))
+        ct.SetProperty("cpu_guarantee", "{}c".format(guarantee))
 
-    r.SetProperty("cwd", os.getcwd())
+    ct.SetProperty("cwd", os.getcwd())
+    ct.SetProperty("command", "bash -c \'read; stress -c {} -t {}\'"\
+                              .format(CPUNR, DURATION / 1000))
+    ct.Limit = limit
+    ct.Guarantee = guarantee
+    ct.Eps = EPS
 
-    SetCommand(r, guarantee - eps if guarantee != 0.0 else 0.0,
-                  limit + eps if limit != 0.0 else 0.0)
-    return r
+    #Adjust EPS for low limits
+    if limit:
+        ct.Eps = min(limit * 0.75, ct.Eps)
+    elif guarantee:
+        ct.Eps = min(guarantee * 0.75, ct.Eps)
 
-def WaitContainer(r):
-    r.Wait()
+    (ct.fd1, ct.fd2) = os.pipe()
+    ct.SetProperty("stdin_path", "/dev/fd/{}".format(ct.fd1))
 
-    print "{} : {}".format(r.name, r.GetProperty("stdout"))
+    ct.Start()
 
-    assert r.GetProperty("exit_status") == "0"
+    return ct
 
-    r.Destroy()
+def CheckCpuContainer(ct):
+    assert ct.Wait(DURATION * 2) == ct.name, "container running time twice exceeded "\
+                                             "expected duration {}".format(DURATION)
 
+    usage = int(ct.GetProperty("cpuacct.usage")) / (10.0 ** 9) / (DURATION / 1000)
 
-def SingleContainer(c, name, guarantee, limit, rt = False):
-    r = InitContainer(c, name, guarantee, limit, rt)
-    r.Start()
-    WaitContainer(r)
-    pass
+    print "{} : cpuacct usage: {}".format(ct.name, usage)
 
-def MultipleEven(c, prefix, n, guarantee=True, limit=True, rt = False):
-    r = []
+    assert ct.GetProperty("exit_status") == "0", "stress returned non-zero, stderr: {}"\
+                                                .format(ct.GetProperty("stderr"))
+    if ct.Limit != 0.0:
+        assert usage < (ct.Limit + ct.Eps), "usage {} should be at most {}"\
+                                          .format(usage, ct.Limit + ct.Eps)
+    if ct.Guarantee != 0.0:
+        assert usage > (ct.Guarantee - ct.Eps), "usage {} should be at least {}"\
+                                              .format(usage, ct.Guarantee - ct.Eps)
+    ct.Destroy()
+
+    return usage
+
+def KickCpuContainer(ct):
+    os.close(ct.fd1)
+    os.close(ct.fd2)
+    return ct
+
+def RunOneCpuContainer(ct):
+    ct.Kick()
+    ct.Check()
+    return ct
+
+def AllocContainer(conn, suffix):
+    ct = conn.CreateWeakContainer(CT_NAME(suffix))
+    ct.Prepare = types.MethodType(PrepareCpuContainer, ct)
+    ct.Check = types.MethodType(CheckCpuContainer, ct)
+    ct.Kick = types.MethodType(KickCpuContainer, ct)
+    ct.RunOne = types.MethodType(RunOneCpuContainer, ct)
+    return ct
+
+def SplitLimit(conn, prefix, total, n, rt = False):
+    conts = []
     for i in range(0, n):
-        r += [InitContainer(c, "{}_{}".format(prefix, i),
-                            float(CPUNR) / n if guarantee else 0.0,
-                            float(CPUNR) / n if limit else 0.0,
-                            rt)]
+        ct = conn.AllocContainer("{}_{}".format(prefix, i))
+        conts += [ct.Prepare(0.0, total / n, rt)]
 
-    for i in r:
-        i.Start()
+    for ct in conts:
+        ct.Kick()
 
-    for i in r:
-        WaitContainer(i)
+    for ct in conts:
+        ct.Check()
 
-def TestBody(c):
-    print "Checking normal simple one-core limit"
+conn = porto.Connection(timeout=30)
+conn.AllocContainer = types.MethodType(AllocContainer, conn)
 
-    limit = 1.0
-    guarantee = 0.0
+print "\nSet 1c limit for single container:"
 
-    SingleContainer(c, "normal_one_core", 0.0, 1.0)
+conn.AllocContainer("normal_one_core").Prepare(0.0, 1.0).RunOne()
+
+if CPUNR > 1:
+    print "\nSet 1.5c limit for single container:"
+    conn.AllocContainer("normal_one_and_half_core").Prepare(0.0, 1.5).RunOne()
+
+if CPUNR > 2:
+    print "\nSet {}c (CPUNR - 1) limit for single container:".format(CPUNR - 1)
+    ct = conn.AllocContainer("normal_minus_one_core").Prepare(0.0, float(CPUNR) - 1.0).RunOne()
+
+if HAS_RT_LIMIT:
+    print "\nSet 1c limit for single rt container:"
+    ct = conn.AllocContainer("rt_one_core").Prepare(0.0, 1.0, rt=True).RunOne()
 
     if CPUNR > 1:
-        print "Checking normal 1.5 core limit"
-        SingleContainer(c, "normal_one_and_half_core", 0.0, 1.5)
+        print "\nSet 1.5c limit for single rt container:"
+        ct = conn.AllocContainer("rt_one_and_half_core").Prepare(0.0, 1.5, rt=True).RunOne()
 
     if CPUNR > 2:
-        print "Checking normal {} - 1 core limit".format(CPUNR)
-        SingleContainer(c, "normal_minus_one_core", 0.0, float(CPUNR) - 1.0)
+        print "\nSet {}c (CPUNR - 1) limit for single rt container:".format(CPUNR - 1)
+        ct = conn.AllocContainer("rt_minus_one_core").Prepare(0.0, float(CPUNR) - 1.0, rt=True)
+        ct.RunOne()
 
+if CPUNR > 1:
+    print "\nSet {}c guarantee for 1 of 2 containers:".format(CPUNR * 2 / 3)
+    ct1 = conn.AllocContainer("normal_half_0").Prepare(0.0, 0.0)
+    ct2 = conn.AllocContainer("normal_half_guaranteed").Prepare(CPUNR * 2 / 3, 0.0)
+
+    ct1.Kick(); ct2.Kick()
+    ct1.Check(); ct2.Check()
+
+    print "\nSplit {}c limit equally btwn 2 containers:".format(TEST_CORES_SHARE)
+    SplitLimit(conn, "normal_half", TEST_CORES_SHARE, 2, rt = False)
 
     if HAS_RT_LIMIT:
-        print "Realtime cpu limit present"
-        print "Checking rt simple one-core limit"
-        SingleContainer(c, "rt_one_core", 0.0, 1.0, rt=True)
+        print "\nSplit {}c limit equally btwn 2 rt containers:"\
+              .format(TEST_CORES_SHARE)
+        SplitLimit(conn, "rt_half", TEST_CORES_SHARE, 2, rt = True)
 
-        if CPUNR > 1:
-            print "Checking rt 1.5 core limit"
-            SingleContainer(c, "rt_one_and_half_core", 0.0, 1.5, rt=True)
+if CPUNR > 2:
+    print "\nSet {}c guarantee for 1 of 3 containers:".format(CPUNR / 2)
 
-        if CPUNR > 2:
-            print "Checking rt {} - 1 core limit".format(CPUNR)
-            SingleContainer(c, "rt_minus_one_core", 0.0, float(CPUNR) - 1.0, rt=True)
+    conts = []
+    conts += [conn.AllocContainer("normal_third_1").Prepare(0.0, 0.0)]
+    conts += [conn.AllocContainer("normal_third_2").Prepare(0.0, 0.0)]
+    conts += [conn.AllocContainer("normal_third_guaranteed").Prepare(CPUNR / 2, 0.0)]
 
-    if CPUNR > 1:
-        print "Checking normal even guarantee with 2 containers"
-        MultipleEven(c, "normal_half", 2, guarantee = True, limit=False, rt = False)
+    for ct in conts:
+        ct.Kick()
 
-        print "Checking normal even limit with 2 containers"
-        MultipleEven(c, "normal_half", 2, guarantee = False, limit=True, rt = False)
+    for ct in conts:
+        ct.Check()
 
-        if HAS_RT_LIMIT:
-            print "Checking rt even limits with 2 containers"
-            MultipleEven(c, "rt_half", 2, guarantee = False, limit=True, rt = True)
+    print "\nSplit {}c limit equally btwn 3 containers:".format(TEST_CORES_SHARE)
+    SplitLimit(conn, "normal_third", TEST_CORES_SHARE, 3, rt = False)
 
-    if CPUNR > 2:
-        print "Checking normal even guarantee with 3 containers"
-        MultipleEven(c, "normal_third", 3, guarantee = True, limit=False, rt = False)
+    if HAS_RT_LIMIT:
+        print "\nSplit {}c limit equally btwn 3 rt containers:"\
+              .format(TEST_CORES_SHARE)
+        SplitLimit(conn, "rt_third", TEST_CORES_SHARE, 3, rt = True)
 
-        print "Checking normal even limit with 3 containers"
-        MultipleEven(c, "normal_third", 3, guarantee = False, limit=True, rt = False)
-
-        if HAS_RT_LIMIT:
-            print "Checking rt even limits with 3 containers"
-            MultipleEven(c, "rt_third", 3, guarantee = False, limit=True, rt = True)
-
-    if CPUNR > 3:
-        print "Checking normal even guarantee with 4 containers"
-        MultipleEven(c, "normal_fourth", 4, guarantee = True, limit=False, rt = False)
-
-        print "Checking normal even limit with 4 containers"
-        MultipleEven(c, "normal_fourth", 4, guarantee = False, limit=True, rt = False)
-
-        if HAS_RT_LIMIT:
-            print "Checking rt even limits with 4 containers"
-            MultipleEven(c, "rt_fourth", 4, guarantee = False, limit=True, rt = True)
-
-    print "Checking normal 3x0.3c limit"
-    r = []
+    print "\nSet 0.3c limit for 3 containers:"
+    conts = []
     for i in range(0, 3):
-        r += [InitContainer(c, "one_third_{}".format(i),
-                            0.0, 0.33)]
-    for i in r:
-        i.Start()
+        conts += [conn.AllocContainer("one_third_{}".format(i)).Prepare(0.0, 0.33)]
 
-    for i in r:
-        WaitContainer(i)
+    for ct in conts:
+        ct.Kick()
+
+    for ct in conts:
+        ct.Check()
+
+if CPUNR > 3:
+    print "\nSet {}c guarantee for 1 of 4 containers:".format(CPUNR / 2)
+
+    conts = []
+    conts += [conn.AllocContainer("normal_quarter_0").Prepare(0.0, 0.0)]
+    conts += [conn.AllocContainer("normal_quarter_1").Prepare(0.0, 0.0)]
+    conts += [conn.AllocContainer("normal_quarter_2").Prepare(0.0, 0.0)]
+    conts += [conn.AllocContainer("normal_quarter_guaranteed").Prepare(CPUNR / 2, 0.0)]
+
+    for ct in conts:
+        ct.Kick()
+
+    for ct in conts:
+        ct.Check()
+
+    print "\nSplit {}c limit equally btwn 4 containers:".format(TEST_CORES_SHARE)
+    SplitLimit(conn, "normal_quarter", TEST_CORES_SHARE, 4, rt = False)
+
+    if HAS_RT_LIMIT:
+        print "\nSplit {}c limit equally btwn 4 rt containers:"\
+              .format(TEST_CORES_SHARE)
+        SplitLimit(conn, "rt_quarter", TEST_CORES_SHARE, 4, rt = True)
 
     if CPUNR > 3 and HAS_RT_LIMIT:
-        print "Checking normal 3x1c guarantee and rt 1c limit"
-        r = []
+        print "\nSet 1c guarantee for 3 containers and 1c limit for rt container:"
+        conts = []
         for i in range(0, 3):
-            r += [InitContainer(c, "one_third_{}".format(i),
-                                1.0, 0.0)]
+            conts += [conn.AllocContainer("one_third_{}".format(i)).Prepare(1.0, 0.0)]
 
-        r += [InitContainer(c, "rt_guy", 1.0, 1.0, rt=True)]
-        for i in r:
-            i.Start()
+        conts += [conn.AllocContainer("rt_guy").Prepare(0.0, 1.0, rt=True)]
 
-        for i in r:
-            WaitContainer(i)
+        for ct in conts:
+            ct.Kick()
+
+        for ct in conts:
+            ct.Check()
 
     if CPUNR > 7 and HAS_RT_LIMIT:
-        print "Checking normal 3x1.5c guarantee/limit and rt 2x1c limit"
-        r = []
+        print "\nSet 1c guarantee and 1.5c limit for 3 containers and 1c limit for 2 rt containers:"
+        conts = []
+
         for i in range(0, 3):
-            r += [InitContainer(c, "one_third_{}".format(i),
-                                1.5, 1.5)]
+            conts += [conn.AllocContainer("one_third_{}".format(i)).Prepare(1.0, 1.5)]
 
         for i in range(0, 2):
-            r += [InitContainer(c, "rt_guy_{}".format(i),
-                                1.0, 1.0)]
+            conts += [conn.AllocContainer("rt_guy_{}".format(i))\
+                                          .Prepare(0.0, 1.0, rt = True)]
+        for ct in conts:
+            ct.Kick()
 
-        for i in r:
-            i.Start()
-
-        for i in r:
-            WaitContainer(i)
-
-c = porto.Connection(timeout=30)
-TestBody(c)
+        for ct in conts:
+            ct.Check()

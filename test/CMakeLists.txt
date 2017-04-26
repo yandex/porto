@@ -11,10 +11,6 @@ add_executable(portotest portotest.cpp test.cpp selftest.cpp stresstest.cpp
 target_link_libraries(portotest version porto util config
 				pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
-add_executable(cpu_limit cpu_limit.cpp)
-
-target_link_libraries(cpu_limit pthread rt crypto)
-
 add_executable(mem_limit mem_limit.cpp)
 
 # head
