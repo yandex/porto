@@ -274,7 +274,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     FirstName(!parent ? "" : parent->IsRoot() ? name : name.substr(parent->Name.length() + 1)),
     Level(parent ? parent->Level + 1 : 0),
     Stdin(0), Stdout(1), Stderr(2),
-    ClientsCount(0), ContainerRequests(0)
+    ClientsCount(0), ContainerRequests(0), OomEvents(0)
 {
     Statistics->ContainersCount++;
     RealCreationTime = time(nullptr);
@@ -1840,7 +1840,7 @@ TError TContainer::StartTask() {
     error = TaskEnv.Start();
 
     /* Always report OOM stuation if any */
-    if (error && HasOomReceived()) {
+    if (error && RecvOomEvents()) {
         if (error)
             L("Start error: {}", error);
         return TError(EError::InvalidValue, ENOMEM, "OOM, memory limit too low");
@@ -2335,8 +2335,6 @@ void TContainer::Reap(bool oomKilled) {
     SetProp(EProperty::DEATH_TIME);
 
     if (oomKilled) {
-        OomEvents++;
-        Statistics->ContainersOOM++;
         OomKilled = oomKilled;
         SetProp(EProperty::OOM_KILLED);
     }
@@ -2364,7 +2362,7 @@ void TContainer::Exit(int status, bool oomKilled) {
         return;
 
     /* SIGKILL could be delivered earlier than OOM event */
-    if (!oomKilled && HasOomReceived())
+    if (!oomKilled && RecvOomEvents())
         oomKilled = true;
 
     /* Detect fatal signals: portoinit cannot kill itself */
@@ -2373,14 +2371,14 @@ void TContainer::Exit(int status, bool oomKilled) {
         status = WEXITSTATUS(status) - 128;
 
     L_EVT("Exit {} {} {}", Name, FormatExitStatus(status),
-          (oomKilled ? " invoked by OOM" : ""));
+          (oomKilled ? "invoked by OOM" : ""));
 
     ExitStatus = status;
     SetProp(EProperty::EXIT_STATUS);
 
     /* Detect memory shortage that happened in syscalls */
     auto cg = GetCgroup(MemorySubsystem);
-    if (!oomKilled && MemorySubsystem.GetOomEvents(cg)) {
+    if (!oomKilled && OomIsFatal && MemorySubsystem.GetOomEvents(cg)) {
         L("Container {} hit memory limit", Name);
         oomKilled = true;
     }
@@ -2888,24 +2886,19 @@ bool TContainer::MayRespawn() {
     return MaxRespawns < 0 || RespawnCount < (uint64_t)MaxRespawns;
 }
 
-bool TContainer::MayReceiveOom(int fd) {
-    if (OomEvent.Fd != fd)
-        return false;
-
-    if (!Task.Pid)
-        return false;
-
-    if (State == EContainerState::Dead)
-        return false;
-
-    return true;
-}
-
-// Works only once
-bool TContainer::HasOomReceived() {
+bool TContainer::RecvOomEvents() {
     uint64_t val;
 
-    return read(OomEvent.Fd, &val, sizeof(val)) == sizeof(val) && val != 0;
+    if (OomEvent.Fd >= 0 &&
+            read(OomEvent.Fd, &val, sizeof(val)) == sizeof(val) &&
+            val) {
+        OomEvents += val;
+        Statistics->ContainersOOM += val;
+        L_EVT("OOM in {}", Name);
+        return true;
+    }
+
+    return false;
 }
 
 void TContainer::ScheduleRespawn() {
@@ -2944,13 +2937,8 @@ void TContainer::Event(const TEvent &event) {
             error = ct->Lock(lock);
             lock.unlock();
             if (!error) {
-                if (ct->OomIsFatal) {
+                if (ct->OomIsFatal)
                     ct->Exit(SIGKILL, true);
-                } else {
-                    L_EVT("Non fatal OOM in {}", ct->Name);
-                    ct->OomEvents++;
-                    Statistics->ContainersOOM++;
-                }
                 ct->Unlock();
             }
         }

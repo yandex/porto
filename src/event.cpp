@@ -64,7 +64,7 @@ std::string TEvent::GetMsg() const {
         case EEventType::Respawn:
             return "respawn";
         case EEventType::OOM:
-            return "OOM killed with fd " + std::to_string(OOM.Fd);
+            return "OOM";
         case EEventType::WaitTimeout:
             return "wait timeout";
         case EEventType::DestroyAgedContainer:

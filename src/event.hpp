@@ -33,10 +33,6 @@ public:
     } Exit;
 
     struct {
-        int Fd;
-    } OOM;
-
-    struct {
         std::weak_ptr<TContainerWaiter> Waiter;
     } WaitTimeout;
 

@@ -587,12 +587,12 @@ static int SlaveRpc() {
             } else if (source->Flags & EPOLL_EVENT_OOM) {
                 auto container = source->Container.lock();
 
-                // we don't want any repeated events from OOM fd
-                EpollLoop->StopInput(source->Fd);
-
-                if (container) {
+                if (!container) {
+                    L_WRN("Container not found for OOM fd {}", source->Fd);
+                    EpollLoop->StopInput(source->Fd);
+                } else if (container->RecvOomEvents() && container->OomIsFatal) {
+                    EpollLoop->StopInput(source->Fd);
                     TEvent e(EEventType::OOM, container);
-                    e.OOM.Fd = source->Fd;
                     EventQueue->Add(0, e);
                 }
 

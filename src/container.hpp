@@ -212,9 +212,11 @@ public:
     bool IsWeak = false;
     bool OomIsFatal = true;
     int OomScoreAdj = 0;
-    unsigned OomEvents = 0;
+    std::atomic<uint64_t> OomEvents;
     bool OomKilled = false;
     int ExitStatus = 0;
+
+    bool RecvOomEvents();
 
     TPath RootPath; /* path in host namespace, set at start */
     int LoopDev = -1; /* legacy */
@@ -327,8 +329,6 @@ public:
     void ChooseSchedPolicy();
 
     bool MayRespawn();
-    bool MayReceiveOom(int fd);
-    bool HasOomReceived();
 
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> Volumes;

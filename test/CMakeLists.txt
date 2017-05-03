@@ -114,6 +114,10 @@ add_test(NAME locate-process
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-locate-process.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME oom_non_fatal
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-oom_non_fatal.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # slow tests
 
 add_test(NAME mem_limit
@@ -169,6 +173,6 @@ set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
                      unpriv-cred prev_release_upgrade uid_handling knobs clear
                      cpu_limit mem_limit fuzzer stats mem_recharge dirty_limit
-                     locate-process
+                     locate-process oom_non_fatal
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)
