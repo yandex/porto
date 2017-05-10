@@ -5250,6 +5250,8 @@ static void TestStdoutLimit(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
 
+    usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
+
     TPath stdoutPath(cwd + "/" + v);
     ExpectSuccess(stdoutPath.StatFollow(st));
     ExpectLessEq(st.st_size, limit);
