@@ -1,3 +1,17 @@
+yandex-porto (3.7.5) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * kvalue: remove tmp file after failed store attempt
+  * test: cpu_limit overhaul
+  * portod: process oom eventfd when oom_is_fatal disabled
+  * selftest: add missing wait for stdout rotation
+
+  [ Konstantin Khlebnikov ]
+  * container: fix race in DistributeCpus
+  * container: handle relative cwd
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 15 May 2017 15:19:53 +0300
+
 yandex-porto (3.7.4) unstable; urgency=low
 
   * devices: always apply default permissions for first level containers
