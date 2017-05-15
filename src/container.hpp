@@ -289,6 +289,7 @@ public:
     bool IsChildOf(const TContainer &ct) const;
 
     std::list<std::shared_ptr<TContainer>> Subtree();
+    std::list<std::shared_ptr<TContainer>> Childs();
 
     std::shared_ptr<TContainer> GetParent() const;
     TError OpenNetns(TNamespaceFd &netns) const;

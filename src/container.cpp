@@ -762,6 +762,7 @@ bool TContainer::IsChildOf(const TContainer &ct) const {
     return false;
 }
 
+/* Builds list with container and all sub-containers in DFS order. */
 std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
     std::list<std::shared_ptr<TContainer>> subtree {shared_from_this()};
     auto lock = LockContainers();
@@ -770,6 +771,13 @@ std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
             subtree.emplace(std::prev(it.base()), child);
     }
     return subtree;
+}
+
+/* Builds list of childs at this moment. */
+std::list<std::shared_ptr<TContainer>> TContainer::Childs() {
+    auto lock = LockContainers();
+    auto childs(Children);
+    return childs;
 }
 
 std::shared_ptr<TContainer> TContainer::GetParent() const {
@@ -1064,9 +1072,12 @@ TError TContainer::DistributeCpus() {
     subtree.reverse();
 
     for (auto &parent: subtree) {
-        if (parent->Children.empty() ||
-                parent->State == EContainerState::Stopped ||
+        if (parent->State == EContainerState::Stopped ||
                 parent->State == EContainerState::Dead)
+            continue;
+
+        auto childs = parent->Childs();
+        if (childs.empty())
             continue;
 
         if (Verbose)
@@ -1075,7 +1086,7 @@ TError TContainer::DistributeCpus() {
         double vacantGuarantee = 0;
 
         for (auto type: order) {
-            for (auto &ct: parent->Children) {
+            for (auto &ct: childs) {
                 if (ct->CpuSetType != type ||
                         ct->State == EContainerState::Stopped ||
                         ct->State == EContainerState::Dead)
