@@ -233,7 +233,7 @@ class TCwd : public TProperty {
 public:
     TCwd() : TProperty(P_CWD, EProperty::CWD, "Container working directory") {}
     TError Get(std::string &value) {
-        value = CT->GetCwd();
+        value = CT->GetCwd().ToString();
         return TError::Success();
     }
     TError Set(const std::string &cwd) {

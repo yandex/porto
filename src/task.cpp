@@ -246,7 +246,7 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
-    error = Mnt.Cwd.Chdir();
+    error = Mnt.ChildCwd.Chdir();
     if (error)
         return error;
 

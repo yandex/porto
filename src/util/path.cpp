@@ -152,6 +152,8 @@ TPath TPath::AddComponent(const TPath &component) const {
     }
     if (IsRoot())
         return TPath("/" + component.Path);
+    if (component.IsEmpty())
+        return TPath(Path);
     return TPath(Path + "/" + component.Path);
 }
 

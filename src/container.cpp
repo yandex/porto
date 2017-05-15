@@ -282,10 +282,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
 
-    if (IsRoot())
-        Cwd = "/";
-    else
-        Cwd = WorkPath().ToString();
 
     Stdin.SetOutside("/dev/null");
     Stdout.SetOutside("stdout");
@@ -625,17 +621,24 @@ EContainerState TContainer::ParseState(const std::string &name) {
 
 /* Working directory in host namespace */
 TPath TContainer::WorkPath() const {
+    if (IsRoot())
+        return TPath("/");
     return TPath(PORTO_WORKDIR) / Name;
 }
 
-std::string TContainer::GetCwd() const {
+TPath TContainer::GetCwd() const {
+    TPath cwd;
+
     for (auto ct = shared_from_this(); ct; ct = ct->Parent) {
-        if (ct->HasProp(EProperty::CWD))
-            return ct->Cwd;
+        if (!ct->Cwd.IsEmpty())
+            cwd = ct->Cwd / cwd;
+        if (cwd.IsAbsolute())
+            return cwd;
         if (ct->Root != "/")
-            return "/";
+            return TPath("/") / cwd;
     }
-    return Cwd;
+
+    return WorkPath();
 }
 
 TError TContainer::GetNetStat(ENetStat kind, TUintMap &stat) {
@@ -1645,7 +1648,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     env.ClearEnv();
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    env.SetEnv("HOME", GetCwd());
+    env.SetEnv("HOME", GetCwd().ToString());
     env.SetEnv("USER", TaskCred.User());
 
     env.SetEnv("container", "lxc");
@@ -1681,7 +1684,7 @@ TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
-    taskEnv->Mnt.Cwd = GetCwd();
+    taskEnv->Mnt.ChildCwd = GetCwd();
     taskEnv->Mnt.ParentCwd = Parent->GetCwd();
 
     if (RootVolume)

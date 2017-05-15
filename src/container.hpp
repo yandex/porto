@@ -125,7 +125,7 @@ public:
     TCred TaskCred;
     std::string Command;
     std::string CoreCommand;
-    std::string Cwd;
+    TPath Cwd;
     TStdStream Stdin, Stdout, Stderr;
     std::string Root;
     bool RootRo;
@@ -229,7 +229,7 @@ public:
     TTask SeizeTask;
     std::shared_ptr<TNetwork> Net;
 
-    std::string GetCwd() const;
+    TPath GetCwd() const;
     TPath WorkPath() const;
 
     bool IsMeta() const {

@@ -58,7 +58,7 @@ TError TMountNamespace::MountBinds() {
         if (bm.Target.IsAbsolute())
             target = Root / bm.Target;
         else
-            target = Root / Cwd / bm.Target;
+            target = Root / ChildCwd / bm.Target;
 
         error = src.OpenPath(source);
         if (error)

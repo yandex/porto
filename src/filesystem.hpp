@@ -17,7 +17,7 @@ struct TMountNamespace {
 public:
     std::string Container; /* for logging and errors */
     TCred BindCred;
-    TPath Cwd;
+    TPath ChildCwd;
     TPath ParentCwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRo;
