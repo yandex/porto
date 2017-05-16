@@ -918,42 +918,18 @@ TError TPath::WritePrivate(const std::string &text) const {
 }
 
 TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
-    char *line = nullptr;
-    size_t line_len = 0;
-    size_t size = 0;
-    ssize_t len;
-    struct stat st;
-    FILE *file;
-    TError error;
+    std::string text, line;
 
-    file = fopen(Path.c_str(), "r");
-    if (!file)
-        return TError(EError::Unknown, errno, "Cannot open for read: " + Path);
+    TError error = ReadAll(text, max);
+    if (error)
+        return error;
 
-    if (fstat(fileno(file), &st) < 0) {
-        error = TError(EError::Unknown, errno, "stat(" + Path + ")");
-        goto out;
-    }
+    std::stringstream ss(text);
 
-    if (st.st_size > (off_t)max) {
-        error = TError(EError::Unknown, "File too large: " + Path);
-        goto out;
-    }
+    while (std::getline(ss, line))
+        lines.push_back(line);
 
-    while ((len = getline(&line, &line_len, file)) >= 0) {
-        size += len;
-        if (size > max) {
-            error = TError(EError::Unknown, "File too large: " + Path);
-            goto out;
-        }
-        lines.push_back(std::string(line, len - 1));
-    }
-
-out:
-    fclose(file);
-    free(line);
-
-    return error;
+    return TError::Success();
 }
 
 TError TPath::ReadInt(int &value) const {
