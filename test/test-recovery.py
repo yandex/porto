@@ -15,8 +15,8 @@ def AsRoot():
     os.setresuid(0,0,0)
 
 def ValidateDefaultProp(r):
-    assert Catch(r.GetProperty, "command[1]") == porto.exceptions.InvalidValue
-    assert Catch(r.SetProperty, "command[1]", "ls") == porto.exceptions.InvalidValue
+    ExpectException(r.GetProperty, porto.exceptions.InvalidValue, "command[1]")
+    ExpectException(r.SetProperty, porto.exceptions.InvalidValue, "command[1]", "ls")
 
     ref = {\
             "command" : "", "cwd" : "/place/porto/" + r.name, "root" : "/",\
@@ -58,11 +58,11 @@ def ValidateDefaultProp(r):
             pass
 
 def ValidateDefaultData(r):
-    assert Catch(r.GetData, "__invalid_data__") == porto.exceptions.InvalidProperty
+    ExpectException(r.GetData, porto.exceptions.InvalidProperty, "__invalid_data__")
 
     ref = { "state" : "stopped", "max_respawns" : "-1", "parent" : "/" }
     for d in ref:
-        assert r.GetData(d) == ref[d]
+        ExpectProp(r, d, ref[d])
 
     for d in ["exit_status", "root_pid", "stdout", "stderr", "cpu_usage",\
               "memory_usage", "minor_faults", "major_faults", "max_rss",\
@@ -76,10 +76,11 @@ def ValidateDefaultData(r):
     r.GetData("respawn_count")
 
 def ValidateRunningData(r):
-    assert Catch(r.GetData, "__invalid_data__") == porto.exceptions.InvalidProperty
+    ExpectException(r.GetData, porto.exceptions.InvalidProperty, "__invalid_data__")
 
     pid = r.GetData("root_pid")
-    assert pid != "" and pid != "-1" and pid != "0"
+    assert pid != "" and pid != "-1" and pid != "0",\
+           "{} pid should be valid, not {}".format(r, pid)
 
     ref = { "state" : "running", "respawn_count" : "0", "parent" : "/" }
     for d in ref:
@@ -87,8 +88,8 @@ def ValidateRunningData(r):
             raise AssertionError("Default data {} has invalid value {} != {}".format(
                                  p, value, ref[p]))
 
-    assert Catch(r.GetData, "exit_status") == porto.exceptions.InvalidState
-    assert Catch(r.GetData, "oom_killed") == porto.exceptions.InvalidState
+    ExpectException(r.GetData, porto.exceptions.InvalidState, "exit_status")
+    ExpectException(r.GetData, porto.exceptions.InvalidState, "oom_killed")
 
     for d in ["io_read", "io_write", "io_ops", "stdout", "stderr", "cpu_usage",\
               "memory_usage"]:
@@ -97,11 +98,11 @@ def ValidateRunningData(r):
         except porto.exceptions.NotSupported:
             pass
 
-    assert int(r.GetData("minor_faults")) > 0
-    assert int(r.GetData("major_faults")) >= 0
+    ExpectPropGe(r, "minor_faults", 1)
+    ExpectPropGe(r, "major_faults", 0)
 
     try:
-        assert int(r.GetData("max_rss")) >= 0
+        ExpectPropGe(r, "max_rss", 0)
     except porto.exceptions.NotSupported:
         pass
 
@@ -116,7 +117,7 @@ def RespawnTicks(r):
             old = new
     #Suppose that respawn will likely tick at least 2 times in 5s
     #otherwise there is some issues there
-    assert tick != 2
+    ExpectNe(tick , 2)
 
 
 def TestRecovery():
@@ -144,9 +145,9 @@ def TestRecovery():
     c.connect()
 
     l = c.List()
-    assert len(l) == 2
-    assert l[0] == "parent"
-    assert l[1] == "parent/child"
+    ExpectEq(len(l), 2)
+    ExpectEq(l[0], "parent")
+    ExpectEq(l[1], "parent/child")
 
     c.Destroy("parent")
 
@@ -162,7 +163,7 @@ def TestRecovery():
     AsAlice()
     c.connect()
 
-    assert c.Wait(["a:b"]) == "a:b"
+    ExpectEq(c.Wait(["a:b"]), "a:b")
     c.Destroy("a:b")
 
     print "Make sure we don't kill containers when doing recovery"
@@ -182,20 +183,21 @@ def TestRecovery():
     r.Start()
     r.SetProperty("private", "ISS-AGENT")
     pid = int(r.GetData("root_pid"))
-    assert IsRunning(pid)
-    assert not IsZombie(pid)
+
+    Expect(IsRunning(pid))
+    Expect(not IsZombie(pid))
 
     KillPid(GetSlavePid(), signal.SIGKILL)
     c.connect()
 
-    c.GetData("a:b", "state") == "running"
-    c.GetData("a:b", "root_pid") == str(pid)
+    ExpectProp(r, "state", "running")
+    ExpectProp(r, "root_pid", str(pid))
 
-    assert IsRunning(pid)
-    assert not IsZombie(pid)
+    Expect(IsRunning(pid))
+    Expect(not IsZombie(pid))
 
     for p in props:
-        assert c.GetProperty("a:b", p) == props[p]
+        ExpectProp(r, p, props[p])
 
     c.Destroy("a:b")
 
@@ -216,8 +218,8 @@ def TestRecovery():
     AsAlice()
     c.connect()
 
-    assert c.GetData("a", "state") == "meta"
-    c.Destroy("a")
+    ExpectProp(parent, "state", "meta")
+    parent.Destroy()
 
     print "Make sure hierarchical recovery works"
     #Still as alice
@@ -236,18 +238,18 @@ def TestRecovery():
     child = c.Find("a/b")
 
     conts = c.List()
-    assert len(conts) == 2
-    assert conts[0] == "a"
-    assert conts[1] == "a/b"
-    assert parent.GetData("state") == "meta"
+    ExpectEq(len(conts), 2)
+    ExpectEq(conts[0], "a")
+    ExpectEq(conts[1], "a/b")
+    ExpectProp(parent, "state", "meta")
 
     try:
         parent.SetProperty("recharge_on_pgfault", "true")
     except porto.exceptions.NotSupported:
         pass
 
-    assert Catch(parent.SetProperty, "env", "a=b") == porto.exceptions.InvalidState
-    assert child.GetData("state") == "running"
+    ExpectException(parent.SetProperty, porto.exceptions.InvalidState, "env", "a=b")
+    ExpectProp(child, "state", "running")
 
     parent.Destroy()
 
@@ -264,7 +266,7 @@ def TestRecovery():
 
     for cg in open("/proc/" + pid + "/cgroup").readlines():
         if cg.find("memory") >= 0:
-            assert cg.split(":")[2].rstrip('\n') == "/"
+            ExpectEq(cg.split(":")[2].rstrip('\n'), "/")
 
     KillPid(GetSlavePid(), signal.SIGKILL)
     AsAlice()
@@ -278,9 +280,9 @@ def TestRecovery():
         for i in subsys.split(','):
             cgs[i] = path.rstrip('\n')
 
-    assert cgs["freezer"] == "/porto/a_b"
+    ExpectEq(cgs["freezer"], "/porto/a_b")
     for i in ["memory","cpu","cpuacct","devices"]:
-        assert cgs[i] == "/porto%a_b"
+        ExpectEq(cgs[i], "/porto%a_b")
 
     c.Destroy("a_b")
 
@@ -293,8 +295,8 @@ def TestRecovery():
     r.Start()
     r.Wait(timeout=60000)
 
-    assert r.GetData("exit_status") == "9"
-    assert r.GetData("oom_killed")
+    ExpectPropNe(r, "exit_status", "0")
+    ExpectProp(r, "oom_killed", True)
 
     AsRoot()
     KillPid(GetSlavePid(), 9)
@@ -303,8 +305,8 @@ def TestRecovery():
 
     r = c.Find("a:b")
 
-    assert r.GetData("exit_status") == "9"
-    assert r.GetData("oom_killed")
+    ExpectPropNe(r, "exit_status", "0")
+    ExpectProp(r, "oom_killed", True)
 
     r.Stop()
     r.SetProperty("command", "false")
@@ -335,7 +337,7 @@ def TestRecovery():
     c.connect()
 
     r = c.Find("a:b")
-    assert r.GetData("state") == "stopped"
+    ExpectProp(r, "state", "stopped")
 
     ValidateDefaultProp(r)
     ValidateDefaultData(r)
@@ -348,27 +350,27 @@ def TestRecovery():
 
     ValidateRunningData(r)
     state = GetState(r.GetData("root_pid"))
-    assert state == "S" or state == "R"
+    Expect(state == "S" or state == "R")
 
     r.Pause()
-    assert GetState(r.GetData("root_pid")) != ""
+    ExpectNe(GetState(r.GetData("root_pid")), "")
 
     AsRoot()
     KillPid(GetSlavePid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
-    assert GetState(r.GetData("root_pid")) != ""
+    ExpectNe(GetState(r.GetData("root_pid")), "")
 
     r.Resume()
 
     ValidateRunningData(r)
     state = GetState(r.GetData("root_pid"))
-    assert state == "S" or state == "R"
+    Expect(state == "S" or state == "R")
 
     time.sleep(1.0)
 
-    assert r.GetData("time") != "0"
+    ExpectPropNe(r, "time", "0")
     r.Destroy()
 
     print "Make sure respawn_count ticks after recovery"
@@ -397,8 +399,8 @@ def TestRecovery():
         r.SetProperty("command", "sleep 1000")
         r.Start()
 
-    assert len(c.List()) == n
-    #assert Catch(c.Create, "max_plus_one") == porto.exceptions.ResourceNotAvailable
+    ExpectEq(len(c.List()), n)
+    #ExpectException(c.Create, porto.exceptions.ResourceNotAvailable, "max_plus_one")
 
     c.disconnect()
     AsRoot()
@@ -406,7 +408,7 @@ def TestRecovery():
     AsAlice()
     c = porto.Connection(timeout=300)
 
-    assert len(c.List()) == n
+    ExpectEq(len(c.List()), n)
 
     for i in range(0, n):
         c.Kill("recover" + str(i), 9)
@@ -435,8 +437,8 @@ def TestWaitRecovery():
     c.connect()
 
     aaa = c.Find("aaa")
-    assert aaa.Wait(timeout=3000) == "aaa"
-    assert aaa.GetData("state") == "dead"
+    ExpectEq(aaa.Wait(timeout=3000), "aaa")
+    ExpectProp(aaa, "state", "dead")
 
     aaa.Stop()
 
@@ -451,8 +453,8 @@ def TestWaitRecovery():
     c.connect()
 
     aaa = c.Find("aaa")
-    assert aaa.Wait(timeout=3000) == "aaa"
-    assert aaa.GetData("state") == "dead"
+    ExpectEq(aaa.Wait(timeout=3000), "aaa")
+    ExpectProp(aaa, "state", "dead")
     aaa.Destroy()
 
 #Former selftest.cpp TestVolumeRecovery
@@ -471,7 +473,7 @@ def TestVolumeRecovery():
 
     os.mkdir("/tmp/volume_c", 0755)
 
-    assert len(c.ListVolumes()) == 0
+    ExpectEq(len(c.ListVolumes()), 0)
 
     limited = c.CreateVolume("/tmp/volume_c", space_limit="100m", inode_limit="1000")
     unlimited = c.CreateVolume()
@@ -488,22 +490,22 @@ def TestVolumeRecovery():
 
     time.sleep(0.5)
 
-    assert not os.path.exists("/place/porto_volumes/leftover_volume")
+    Expect(not os.path.exists("/place/porto_volumes/leftover_volume"))
 
     print "Make sure porto preserves mounted loop/overlayfs"
 
-    assert len(c.ListVolumes()) == 2
+    ExpectEq(len(c.ListVolumes()), 2)
 
     mounts = [mount.split()[4] for mount in open("/proc/self/mountinfo", "r").readlines()]
-    assert limited.path in mounts
-    assert unlimited.path in mounts
+    Expect(limited.path in mounts)
+    Expect(unlimited.path in mounts)
 
     limited.Unlink()
     unlimited.Unlink()
 
     mounts = [mount.split()[4] for mount in open("/proc/self/mountinfo", "r").readlines()]
-    assert not limited.path in mounts
-    assert not unlimited.path in mounts
+    Expect(not limited.path in mounts)
+    Expect(not unlimited.path in mounts)
 
     os.rmdir("/tmp/volume_c")
 
@@ -544,8 +546,8 @@ def TestTCCleanup():
     c.Destroy("a")
     c.Destroy("b")
 
-    assert c.GetProperty("/", "porto_stat[errors]") == "0"
-    assert c.GetProperty("/", "porto_stat[warnings]") == "0"
+    ExpectEq(c.GetProperty("/", "porto_stat[errors]"), "0")
+    ExpectEq(c.GetProperty("/", "porto_stat[warnings]"), "0")
 
     c.disconnect()
     subprocess.check_call([portod, "--discard", "restart"])
@@ -570,13 +572,13 @@ def TestTCCleanup():
 
     c.connect()
 
-    assert c.Find("a").name == "a"
-    assert c.Find("a/b").name == "a/b"
-    assert c.Find("a/b/c").name == "a/b/c"
-    assert c.Find("a/b/c/d").name == "a/b/c/d"
+    ExpectEq(c.Find("a").name, "a")
+    ExpectEq(c.Find("a/b").name, "a/b")
+    ExpectEq(c.Find("a/b/c").name, "a/b/c")
+    ExpectEq(c.Find("a/b/c/d").name, "a/b/c/d")
 
-    assert c.GetProperty("/", "porto_stat[errors]") == "0"
-    assert c.GetProperty("/", "porto_stat[warnings]") == "0"
+    ExpectEq(c.GetProperty("/", "porto_stat[errors]"), "0")
+    ExpectEq(c.GetProperty("/", "porto_stat[warnings]"), "0")
 
     c.Destroy("a")
 
@@ -590,19 +592,19 @@ def TestPersistentStorage():
 
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
-    assert len(c.ListStorage()) == 1
+    ExpectEq(len(c.ListStorage()), 1)
 
     r.SetProperty("root", base.path)
     r.SetProperty("command", "bash -c \'echo 123 > 123.txt\'")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
+    ExpectProp(r, "exit_status", "0")
 
     AsRoot()
     subprocess.check_call([portod, "restart"])
     AsAlice()
 
-    assert len(c.ListStorage()) == 1
+    ExpectEq(len(c.ListStorage()), 1)
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
 
@@ -610,13 +612,13 @@ def TestPersistentStorage():
     r.SetProperty("command", "cat 123.txt")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
-    assert r.GetProperty("stdout") == "123\n"
+    ExpectProp(r, "exit_status", "0")
+    ExpectProp(r, "stdout", "123\n")
     r.Stop()
 
     os.mkdir(base.path + "/loop")
     loop = c.CreateVolume(base.path + "/loop", backend="loop", storage="test-persistent-loop", space_limit="1G")
-    assert len(c.ListStorage()) == 2
+    ExpectEq(len(c.ListStorage()), 2)
 
     r.SetProperty("command", "bash -c \'echo 789 > /loop/loop.txt\'")
     r.Start()
@@ -627,7 +629,7 @@ def TestPersistentStorage():
     subprocess.check_call([portod, "restart"])
     AsAlice()
 
-    assert len(c.ListStorage()) == 2
+    ExpectEq(len(c.ListStorage()), 2)
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
     loop = c.CreateVolume(base.path + "/loop", backend="loop", storage="test-persistent-loop", space_limit="1G")
@@ -635,40 +637,40 @@ def TestPersistentStorage():
     r.SetProperty("command", "cat /loop/loop.txt")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
-    assert r.GetProperty("stdout") == "789\n"
+    ExpectProp(r, "exit_status", "0")
+    ExpectProp(r, "stdout", "789\n")
     r.Stop()
 
-    assert Catch(c.RemoveStorage, "test-persistent-loop") == porto.exceptions.Busy
+    ExpectException(c.RemoveStorage, porto.exceptions.Busy, "test-persistent-loop")
     loop.Unlink()
     c.RemoveStorage("test-persistent-loop")
-    assert len(c.ListStorage()) == 1
+    ExpectEq(len(c.ListStorage()), 1)
 
     os.mkdir(base.path + "/native")
     native = c.CreateVolume(base.path + "/native", backend="native", storage="test-persistent-native")
-    assert len(c.ListStorage()) == 2
+    ExpectEq(len(c.ListStorage()), 2)
 
     r.SetProperty("command", "bash -c \'echo abcde > /native/abcde.txt\'")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
+    ExpectProp(r, "exit_status", "0")
 
     AsRoot()
     subprocess.check_call([portod, "restart"])
     AsAlice()
-    assert len(c.ListStorage()) == 2
+    ExpectEq(len(c.ListStorage()), 2)
 
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
     native = c.CreateVolume(base.path + "/native", backend="native", storage="test-persistent-native")
-    assert len(c.ListStorage()) == 2
+    ExpectEq(len(c.ListStorage()), 2)
 
     r.SetProperty("root", base.path)
     r.SetProperty("command", "cat /native/abcde.txt")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
-    assert r.GetProperty("stdout") == "abcde\n"
+    ExpectProp(r, "exit_status", "0")
+    ExpectProp(r, "stdout", "abcde\n")
     r.Destroy()
 
     base.Unlink()
@@ -681,7 +683,7 @@ def TestPersistentStorage():
     os.mkdir("/tmp/test-recover-place/porto_storage")
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native", private="some_private_value")
-    assert len(c.ListStorage(place="/tmp/test-recover-place")) == 1
+    ExpectEq(len(c.ListStorage(place="/tmp/test-recover-place")), 1)
     f = open(v.path + "/test.txt", "w")
     f.write("testtesttest")
     f.close()
@@ -691,16 +693,16 @@ def TestPersistentStorage():
     AsAlice()
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native")
-    assert len(c.ListStorage(place="/tmp/test-recover-place")) == 1
+    ExpectEq(len(c.ListStorage(place="/tmp/test-recover-place")), 1)
     s = c.ListStorage(place="/tmp/test-recover-place")[0]
-    assert s.GetProperty("private_value") == "some_private_value"
+    ExpectProp(s, "private_value", "some_private_value")
     f = open(v.path + "/test.txt", "r").read() == "testtesttest\n"
 
     v.Unlink()
     c.RemoveStorage("test", place="/tmp/test-recover-place")
 
-    assert len(c.ListStorage(place="/tmp/test-recover-place")) == 0
-    assert len(c.ListStorage()) == 0
+    ExpectEq(len(c.ListStorage(place="/tmp/test-recover-place")), 0)
+    ExpectEq(len(c.ListStorage()), 0)
 
 
 

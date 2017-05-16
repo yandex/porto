@@ -13,12 +13,22 @@ def Catch(func, *args, **kwargs):
         return sys.exc_info()[0]
     return None
 
+def Expect(a):
+    assert a, "condition does not hold"
+
 def ExpectEq(a, b):
     assert a == b, "{} should be equal {}".format(a, b)
+
+def ExpectNe(a, b):
+    assert a != b, "{} should not be equal{}".format(a, b)
 
 def ExpectProp(ct, prop, val):
     cur = ct.GetProperty(prop)
     assert cur == val, "{} property {} should be {} not {}".format(ct, prop, val, cur)
+
+def ExpectPropNe(ct, prop, val):
+    cur = ct.GetProperty(prop)
+    assert cur != val, "{} property {} value {} should be not equal to {}".format(ct, prop, val, cur)
 
 def ExpectPropGe(ct, prop, val):
     cur = int(ct.GetProperty(prop))
@@ -27,6 +37,10 @@ def ExpectPropGe(ct, prop, val):
 def ExpectPropLe(ct, prop, val):
     cur = int(ct.GetProperty(prop))
     assert cur <= val, "{} property {} should be at most {} not {}".format(ct, prop, val, cur)
+
+def ExpectException(func, exc, *args):
+    tmp = Catch(func, *args)
+    assert tmp == exc, "method {} should throw {} not {}".format(ct, func, exc, tmp)
 
 def MemoryStat(ct, stat):
     for line in ct.GetProperty("memory.stat").splitlines():
