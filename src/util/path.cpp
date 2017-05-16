@@ -22,7 +22,6 @@ extern "C" {
 #include <linux/magic.h>
 #include <sys/syscall.h>
 #include <dirent.h>
-#include <mntent.h>
 }
 
 #ifndef FALLOC_FL_COLLAPSE_RANGE
@@ -941,36 +940,33 @@ TError TPath::ReadInt(int &value) const {
 }
 
 TError TPath::FindMount(TMount &mount) const {
-    std::string mounts = "/proc/self/mounts";
-    struct mntent* mnt, mntbuf;
-    char buf[4096];
-    FILE *file;
+    std::vector<std::string> lines;
+
+    TError error = TPath("/proc/self/mountinfo").ReadLines(lines, 16 * 1048576);
+    if (error)
+        return error;
 
     auto device = GetDev();
     if (!device)
         return TError(EError::Unknown, "device not found: " + Path);
 
-    file = setmntent(mounts.c_str(), "r");
-    if (!file)
-        return TError(EError::Unknown, errno, "setmntent " + mounts );
-
     TPath normal = NormalPath();
     bool found = false;
-    while ((mnt = getmntent_r(file, &mntbuf, buf, sizeof buf))) {
-        TPath source(mnt->mnt_fsname);
-        TPath target(mnt->mnt_dir);
 
-        if (normal.IsInside(target) && (target.GetDev() == device ||
-                                        source.GetBlockDev() == device)) {
-            mount.Source = source;
-            mount.Target = target;
-            mount.Type = mnt->mnt_type;
-            mount.Options = mnt->mnt_opts;
+    for (auto &line : lines) {
+        TMount mnt;
+
+        error = mnt.ParseMountinfo(line);
+        if (error)
+            return error;
+
+        if (normal.IsInside(mnt.Target) && (mnt.Target.GetDev() == device ||
+                                            mnt.Source.GetBlockDev() == device)) {
+            mount = mnt;
             found = true;
             /* get last matching mountpoint */
         }
     }
-    endmntent(file);
 
     if (!found)
         return TError(EError::Unknown, "mountpoint not found: " + Path);
@@ -979,18 +975,22 @@ TError TPath::FindMount(TMount &mount) const {
 }
 
 TError TPath::ListAllMounts(std::list<TMount> &list) {
-    std::string mounts = "/proc/self/mounts";
-    struct mntent* mnt, mntbuf;
-    char buf[4096];
-    FILE* file;
+    std::vector<std::string> lines;
 
-    file = setmntent(mounts.c_str(), "r");
-    if (!file)
-        return TError(EError::Unknown, errno, "setmntent(" + mounts + ")");
-    while ((mnt = getmntent_r(file, &mntbuf, buf, sizeof buf)))
-        list.emplace_back(TMount{mnt->mnt_fsname, mnt->mnt_dir,
-                                 mnt->mnt_type, mnt->mnt_opts});
-    endmntent(file);
+    TError error = TPath("/proc/self/mountinfo").ReadLines(lines, 16 * 1048576);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        TMount mount;
+
+        error = mount.ParseMountinfo(line);
+        if (error)
+            return error;
+
+        list.push_back(mount);
+    }
+
     return TError::Success();
 }
 
