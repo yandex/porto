@@ -1068,8 +1068,7 @@ TError TMount::ParseMountinfo(const std::string &line) {
         return TError(error, "while parsing mountinfo flags");
 
     std::string opt;
-    std::istringstream ss(tokens[6]);
-    ss.exceptions(std::ios_base::goodbit);
+    std::stringstream ss(tokens[6]);
 
     OptFields.clear();
     while (std::getline(ss, opt, ' ') && (opt != "-"))
