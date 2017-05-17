@@ -187,6 +187,7 @@ public:
     std::string SelectedContainer;
 
     int Delay = 3000;
+    int FirstDelay = 300;
     bool Paused = false;
 
 private:

@@ -963,7 +963,9 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
     /* Main loop */
     TConsoleScreen screen;
 
-    screen.SetTimeout(top.Delay);
+    bool first = true;
+
+    screen.SetTimeout(top.FirstDelay);
 
     while (true) {
         if (exit_immediatly)
@@ -1108,6 +1110,11 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
         default:
             screen.HelpDialog();
             break;
+        }
+
+        if (first) {
+            first = false;
+            screen.SetTimeout(top.Delay);
         }
     }
 
