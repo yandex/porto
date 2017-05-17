@@ -1270,11 +1270,17 @@ class TListCmd final : public ICmd {
 public:
     TListCmd(Porto::Connection *api) : ICmd(api, "list", 0,
             "[-1] [-f] [-r] [-t] [pattern]",
-            "list containers\n"
+            "list containers",
             "    -1        only names\n"
             "    -f        forest\n"
             "    -r        only running\n"
             "    -t        only toplevel\n"
+            "\n"
+            "patterns:\n"
+            " \"***\"        all containres\n"
+            " \"*\"          all first level\n"
+            " \"foo*/bar*\"  all matching\n"
+            "\n"
             ) {}
 
     size_t CountChar(const std::string &s, const char ch) {
