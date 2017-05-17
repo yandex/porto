@@ -2019,13 +2019,14 @@ public:
     int Execute(TCommandEnviroment *environment) final override {
         TLauncher launcher(Api);
         TLauncher bootstrap(Api);
+        TLauncher chroot(Api);
         TError error;
 
         launcher.Container = "portoctl-build-" + std::to_string(GetPid());
+        launcher.SetProperty("isolate", "false");
         launcher.SetProperty("net", "NAT");
         launcher.WeakContainer = true;
         launcher.NeedVolume = true;
-        launcher.StartContainer = false;
         launcher.ChrootVolume = false;
         launcher.StartOS = true;
 
@@ -2108,8 +2109,8 @@ public:
             loopImage = loopStorage / "loop.img";
         }
 
-        /* do not start os for bootstrap */
-        bool StartOS = launcher.StartOS;
+        /* Start os in chroot container */
+        chroot.StartOS = launcher.StartOS;
         launcher.StartOS = false;
 
         std::string volume;
@@ -2176,17 +2177,17 @@ public:
             }
 
             bootstrap.Cleanup();
-
-            if (launcher.StopContainer())
-                goto err;
         }
 
-        launcher.ChrootVolume = true;
-        launcher.StartOS = StartOS;
+        chroot.Container = launcher.Container + "/chroot";
+        chroot.Environment = launcher.Environment;
+        chroot.SetProperty("root", volume);
+        chroot.SetProperty("isolate", "true");
+        chroot.SetProperty("net", "inherited");
 
-        error = launcher.ApplyConfig();
+        error = chroot.Launch();
         if (error) {
-            std::cout << "Cannot configure launcher: " << error << std::endl;
+            std::cerr << "Cannot start chroot container: " << error << std::endl;
             goto err;
         }
 
@@ -2202,7 +2203,7 @@ public:
                 goto err;
             }
 
-            executor.Container = launcher.Container + "/script";
+            executor.Container = chroot.Container + "/script";
             executor.ForwardStreams = true;
             executor.WaitExit = true;
             executor.Environment = launcher.Environment;
