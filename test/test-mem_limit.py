@@ -1,309 +1,194 @@
-import porto
-import functools
-import traceback
-import random
-import time
-import sys
-import os
+#!/usr/bin/python
 
+import porto
+import os
+import types
 from test_common import *
 
+SIZE = 2048 * 1048576
 EPS = 16 * 1048576
 
-def a_little_less(size):
-    return size - EPS
-
-EXCESS = 5.0 / 4.0
-
-def large_enough(size):
-    return size * EXCESS
-
 (kmaj, kmin) = get_kernel_maj_min()
-
 OLD_KERNEL = kmaj < 4 or (kmaj == 4 and kmin < 3)
-HAS_ANON_LIMIT = os.access("/sys/fs/cgroup/memory/portod/memory.anon.limit", os.F_OK)
-CONTAINER_MEMORY = 2048 * 1048576
-GAP = 1024 * 1048576
-
-if not HAS_ANON_LIMIT:
-    print "No anon_limit found, skipping anon limit tests!"
-
-class Allocation:
-    def __init__(self, c, name, parent = None):
-        self.container = c.Create(name)
-
-        if parent is None:
-            self.root_volume = c.CreateVolume(None, layers=["ubuntu-precise"], space_limit="2G")
-            root_path = self.root_volume.path
-            self.container.SetProperty("root", root_path)
-            self.container.SetProperty("bind", "{}/mem_limit /mem_limit ro;"\
-                                               .format(os.getcwd()))
-        else:
-            root_path = parent.root_volume.path
-
-        tmp_path = "/tmp_bin_{}".format(name)
-        os.mkdir(root_path + tmp_path)
-
-        self.container.SetProperty("cwd", tmp_path)
-        self.container.SetProperty("ulimit", "memlock: 0 0")
-
-        if OLD_KERNEL:
-            self.container.SetProperty("user", "root")
-            self.container.SetProperty("group", "root")
-            self.container.SetProperty("capabilities", "IPC_LOCK;DAC_OVERRIDE")
-        else:
-            self.container.SetProperty("capabilities", "IPC_LOCK")
-            self.container.SetProperty("capabilities_ambient", "IPC_LOCK")
-
-    def Setup(self, limit, anon_limit, file_size, anon_size):
-        self.container.SetProperty("memory_limit", limit)
-
-        if HAS_ANON_LIMIT:
-            self.container.SetProperty("anon_limit", anon_limit)
-
-        create = ""
-        access = ""
-
-        if file_size > 0:
-            create += "{} {} ".format("file", int(file_size))
-        if anon_size > 0:
-            create += "{} {} ".format("anon", int(anon_size))
 
-        if file_size > 0:
-            access += "{} {} ".format("access_fork", "0")
-        if anon_size > 0:
-            access += "{} {} ".format("access", "1" if file_size > 0 else "0")
+DURATION = 60000 #ms
+
+NAME = os.path.basename(__file__)
+
+def CT_NAME(suffix):
+    global NAME
+    return NAME + "-" + suffix
+
+def Prepare(ct, anon=0, total=0, use_anon=0, use_file=0, meta=False, to_wait=False):
+
+    if OLD_KERNEL:
+        ct.SetProperty("user", "root")
+        ct.SetProperty("group", "root")
+        ct.SetProperty("capabilities", "IPC_LOCK;DAC_OVERRIDE")
+    else:
+        ct.SetProperty("capabilities", "IPC_LOCK")
+        ct.SetProperty("capabilities_ambient", "IPC_LOCK")
+
+    ct.UseAnon = use_anon
+    ct.UseFile = use_file
+    ct.Meta = meta
+
+    if total > 0:
+        ct.SetProperty("memory_limit", total + EPS)
+        ct.Total = total + EPS
+    else:
+        ct.SetProperty("memory_limit", 0)
+
+    if anon > 0:
+        ct.SetProperty("anon_limit", anon + EPS)
+        ct.Anon = anon + EPS
+        ct.Total = max(ct.Total, ct.Anon)
+    else:
+        ct.SetProperty("anon_limit", 0)
+
+    if not meta:
+        ct.Vol = ct.conn.CreateVolume(None, [], space_limit=str(SIZE))
+        ct.Vol.Link(ct.name)
+        ct.Vol.Unlink("/")
+        ct.SetProperty("command", "{}/mem_touch {} {} {}/test.mapped{}"\
+                       .format(os.getcwd(), use_anon, use_file, ct.Vol.path,\
+                               " wait" if to_wait else ""))
+    return ct
+
+def CheckOOM(ct, expect_oom):
+    assert ct.Wait(DURATION * 2) == ct.name, "container runtime twice exceeded"\
+                                             " expected duration {}".format(DURATION)
+
+    print "{} max total usage: {}, anon usage: {}".format(ct,
+           ct.GetProperty("memory.max_usage_in_bytes").rstrip(),\
+           ct.GetProperty("memory.anon.max_usage").rstrip())
+
+    if expect_oom:
+        ExpectProp(ct, "oom_killed", True)
+    else:
+        ExpectProp(ct, "exit_status", "0")
+        if ct.Anon > 0:
+            ExpectPropLe(ct, "memory.anon.max_usage", ct.Anon)
+        if ct.Total > 0:
+            ExpectPropLe(ct, "memory.max_usage_in_bytes", ct.Total)
+
+    ct.Stop()
+    if ct.Vol is not None:
+        ct.Vol.Unlink(ct.name)
+
+def WaitUsage(ct):
+    wait_duration = 0
+
+    if ct.UseAnon == 0 and ct.UseFile == 0:
+        return
+
+    while True:
+        if ct.UseAnon > 0 and\
+           int(ct.GetProperty("memory.anon.max_usage")) >= ct.UseAnon:
+            break
+
+        if ct.UseFile > 0 and\
+           int(ct.GetProperty("memory.max_usage_in_bytes")) >= ct.UseFile:
+            break
+
+        assert ct.Wait(500) == "", "container {} died prior to achieving desired usage file: {} anon: {}"\
+                                   .format(ct.name, ct.UseAnon, ct.UseFile)
+        wait_duration += 500
+        assert wait_duration < 2 * DURATION, "container wait twice exceeded "\
+                                             "expected duration {}".format(DURATION)
+
+def CheckAlive(ct):
+    if ct.Meta:
+        ExpectProp(ct, "state", "meta")
+    else:
+        ExpectProp(ct, "state", "running")
+
+    ct.Stop()
+    if ct.Vol is not None:
+        ct.Vol.Unlink(ct.name)
+
+def StartIt(ct):
+    ct.conn.Start(ct.name)
+    return ct
+
+def Alloc(conn, suffix):
+    ct = conn.CreateWeakContainer(CT_NAME(suffix))
+    ct.Prepare = types.MethodType(Prepare, ct)
+    ct.CheckOOM = types.MethodType(CheckOOM, ct)
+    ct.CheckAlive = types.MethodType(CheckAlive, ct)
+    ct.WaitUsage = types.MethodType(WaitUsage, ct)
+    ct.Start = types.MethodType(StartIt, ct)
+    ct.Total = 0
+    ct.Anon = 0
+    ct.UseAnon = 0
+    ct.UseFile = 0
+    ct.Meta = False
+    ct.Vol = None
+    return ct
 
-        if file_size > 0 or anon_size > 0:
-            self.container.SetProperty("command", "/mem_limit %s" %(create + access))
+conn = porto.Connection(timeout=30)
+conn.Alloc = types.MethodType(Alloc, conn)
 
-        return self.container
+print "\nMemory limit test, SIZE: {}, EPS: {}\n".format(SIZE, EPS)
 
-def ParentAlive(r, parent, checker):
-    status = parent.GetProperty("state")
-    assert status == "running" or status == "meta"
-    checker(r)
+print "\nCheck limit can be achieved\n"
 
-def IsOk(r):
-    assert r.GetProperty("exit_status") == "0"
+conn.Alloc("achieve_anon").Prepare(anon=SIZE, total=0, use_anon=SIZE, use_file=0)\
+                          .Start()\
+                          .CheckOOM(False)
 
-def IsOOM(r):
-    assert r.GetProperty("oom_killed") == True
+conn.Alloc("achieve_file").Prepare(anon=0, total=SIZE, use_anon=0, use_file=SIZE)\
+                          .Start()\
+                          .CheckOOM(False)
 
-def CheckSingle(a, checker, *args):
-    r = a.Setup(*args)
-    r.Start()
-    r.Wait()
-    checker(r)
-    r.Stop()
+conn.Alloc("achieve_mixed").Prepare(anon=SIZE / 3, total=SIZE,\
+                                    use_anon=SIZE / 3, use_file=2 * SIZE / 3)\
+                           .Start()\
+                           .CheckOOM(False)
 
-def Simple(c, size):
-    a = Allocation(c, "simple")
+print "\nCheck OOM triggering\n"
 
-    print "Checking single container limits"
+conn.Alloc("oom_file").Prepare(anon=0, total=SIZE, use_anon=0, use_file=SIZE * 2)\
+                      .Start()\
+                      .CheckOOM(True)
 
-    print "Checking limits achievable..."
-    CheckSingle(a, IsOk, size, size / 3, a_little_less(int(size * 0.66)),
-                                   a_little_less(int(size * 0.33)))
-    CheckSingle(a, IsOk, size, (size / 3) * 2 , a_little_less(int(size * 0.33)),
-                                          a_little_less(int(size * 0.66)))
+conn.Alloc("oom_anon").Prepare(anon=SIZE, total=0, use_anon=SIZE * 2, use_file=0)\
+                      .Start()\
+                      .CheckOOM(True)
 
-    print "Checking limit exceeding results in OOM..."
-    CheckSingle(a, IsOOM, size, size / 2, large_enough(size / 2),
-                                   a_little_less(size / 2))
-    CheckSingle(a, IsOOM, size, size / 2, a_little_less(size / 2),
-                                   large_enough(size / 2))
+conn.Alloc("oom_anon_with_file").Prepare(anon=SIZE / 2, total=SIZE,\
+                                         use_anon=SIZE, use_file=SIZE / 2)\
+                                .Start()\
+                                .CheckOOM(True)
 
-    if HAS_ANON_LIMIT:
-        print "Checking anon limit exceeding results in OOM..."
-        CheckSingle(a, IsOOM, size, size / 2, 0, large_enough(size / 2))
+print "\nCheck hierarchical\n"
 
-    a.container.Destroy()
+ct = conn.Alloc("meta").Prepare(anon=SIZE / 2, total=SIZE, meta=True)
 
-def CheckLoop(allocations, checkers, settings):
-    num = len(allocations)
+ct1 = conn.Alloc("meta/ct1").Prepare(to_wait=True, anon=SIZE / 4, total=SIZE / 2,\
+                                use_anon = SIZE / 4, use_file = SIZE / 4)
 
-    for i in range(0, num):
-        allocations[i].Setup(*settings[i])
+ct2 = conn.Alloc("meta/ct2").Prepare(to_wait=True, anon=SIZE / 4, total=SIZE / 2,\
+                                use_anon = SIZE / 4, use_file = SIZE / 4)
 
-    for a in allocations:
-        a.container.Start()
+#every container lives in its limits
 
-    for i in range(0, num):
-        r = allocations[i].container
-        r.Wait()
-        checkers[i](r)
+ct1.Start(); ct2.Start()
+ct1.WaitUsage(); ct2.WaitUsage()
+ct2.CheckAlive(); ct1.CheckAlive(); ct.CheckAlive()
 
-    for a in allocations:
-        a.container.Stop()
+#oom isolated in ct2
 
-def Full(c, size, gap_size):
-    def CheckByMask(mask):
-        settings = []
-        checkers = []
+ct1.Prepare(to_wait=True, use_anon = SIZE / 4, use_file = SIZE / 4)
+ct2.Prepare(anon=SIZE / 5, use_anon=SIZE / 4)
+ct1.Start(); ct1.WaitUsage();
+ct2.Start();
+ct2.CheckOOM(True); ct1.CheckAlive(); ct.CheckAlive()
 
-        for i in range(0, len(allocations)):
-            if i % 3 == 0:
-                settings += [(size, size / 2, a_little_less(size / 2), a_little_less(size / 2))]
-                checkers += [IsOk]
-            elif i % 3 == 1:
-                settings += [(size, size / 2, large_enough(size / 2), a_little_less(size / 2))]
-                checkers += [IsOOM]
-            else:
-                settings += [(size, size / 2, a_little_less(size / 2), large_enough(size / 2))]
-                checkers += [IsOOM]
+#oom in ct2 kills ct and ct1
 
-        CheckLoop(allocations, checkers, settings)
-
-    mem_free = GetMeminfo("MemFree:")
-
-    mem_alloc = mem_free - gap_size if mem_free * 0.1 < gap_size \
-                else int(mem_free * 0.9)
-
-    N = (mem_alloc / size) + 1
-    size = mem_alloc / N
-
-    allocations = []
-
-    for i in range(0, N):
-        allocations += [ Allocation(c, "even%d" %(i)) ]
-
-    print "Checking flat container hierarchy limits"
-
-    print "Checking all achievable..."
-    CheckByMask([0] * N)
-
-    print "Checking all excess by file..."
-    CheckByMask([1] * N)
-
-    print "Checking all excess by anon..."
-    CheckByMask([2] * N)
-
-    print "Checking patterns..."
-    CheckByMask([0] * (N / 2) + [1] * (N / 2 + N % 2))
-    CheckByMask([i % 3 for i in range(0, N)])
-
-    for i in range(0, 3):
-        CheckByMask([random.randint(0, 3) for i in range(0, N)])
-
-def Hierarchical(c, size):
-    def Meta():
-        a = Allocation(c, "meta_parent")
-        IsOkOk = functools.partial(ParentAlive, parent=a.container, checker=IsOk)
-        IsOkOOM = functools.partial(ParentAlive, parent=a.container, checker=IsOOM)
-
-        a.Setup(size, size / 2, 0, 0)
-        a1 = Allocation(c, "meta_parent/c1", a)
-        a2 = Allocation(c, "meta_parent/c2", a)
-
-        CheckLoop([a1, a2], [ IsOkOk ] * 2, [(size / 2, size / 4,
-                                              a_little_less(size / 4),
-                                              a_little_less(size / 4))] * 2)
-
-        CheckLoop([a1, a2], [ IsOkOk, IsOkOOM ],
-                  [(size / 2, size / 4, a_little_less(size / 4), a_little_less(size / 4)),
-                  (size / 2, size / 4, large_enough(size / 2), 0)])
-
-        if HAS_ANON_LIMIT:
-            CheckLoop([a1, a2], [ IsOkOk, IsOkOOM ],
-                      [(size / 2, size / 4, a_little_less(size / 4), a_little_less(size / 4)),
-                      (size / 2, size / 4, 0, large_enough(size / 4))])
-
-    def Real():
-        a = Allocation(c, "real_parent")
-        IsOkOk = functools.partial(ParentAlive, parent=a.container, checker=IsOk)
-        IsOkOOM = functools.partial(ParentAlive, parent=a.container, checker=IsOOM)
-
-        a.Setup(size, size / 2, size / 6, size / 6)
-        command_str = a.container.GetProperty("command")
-        a.container.SetProperty("command", command_str + " sleep 1000")
-
-        a1 = Allocation(c, "real_parent/c1", a)
-        a2 = Allocation(c, "real_parent/c2", a)
-
-        CheckLoop([a1, a2], [ IsOkOk ] * 2, [(size / 3, size / 6,
-                                              a_little_less(size / 6),
-                                              a_little_less(size / 6))] * 2)
-
-        CheckLoop([a1, a2], [ IsOkOk, IsOkOOM ] * 2,
-                  [(size / 3, size / 6, a_little_less(size / 6), a_little_less(size / 6)),
-                  (size / 3, size / 6, large_enough(size / 3), 0)])
-
-        if HAS_ANON_LIMIT:
-            CheckLoop([a1, a2], [ IsOkOk, IsOkOOM ] * 2,
-                      [(size / 3, size / 6, a_little_less(size / 6), a_little_less(size / 6)),
-                      (size / 3, size / 6, 0, large_enough(size / 6))])
-
-    print "Checking hierarhical limits"
-    print "Checking with meta parent..."
-    Meta()
-    print "Checking with workload parent..."
-    Real()
-
-def LargeSimple(c, gap_size):
-    a = Allocation(c, "large_simple")
-    mem_free = GetMeminfo("MemFree:")
-
-    mem_alloc = mem_free - gap_size if mem_free * 0.1 < gap_size \
-                else int(mem_free * 0.9)
-
-    size = mem_alloc
-
-    print "Checking large memory_limit for container"
-    print "Checking limit achievable..."
-    CheckSingle(a, IsOk, size, 0, 0, a_little_less(size))
-
-    print "Checking limit excessing results in OOM..."
-    CheckSingle(a, IsOOM, size, 0, 0, size + gap_size * 0.5)
-
-    if HAS_ANON_LIMIT:
-        print "Checking anon limit excessing results in OOM..."
-        CheckSingle(a, IsOOM, size, size / 8 * 7, 0, size + gap_size * 0.5)
-
-def TestBody():
-
-    if os.getuid() == 0:
-        AsAlice()
-
-    c = porto.Connection(timeout=30)
-
-    Simple(c, CONTAINER_MEMORY)
-    LargeSimple(c, GAP)
-    Full(c, CONTAINER_MEMORY, GAP)
-    Hierarchical(c, CONTAINER_MEMORY)
-
-ret = 0
-
-try:
-    TestBody()
-except BaseException as e:
-    print traceback.format_exc()
-    ret = 1
-
-AsRoot()
-c = porto.Connection(timeout=30)
-
-if ret > 0:
-    print "Dumping containers state:\n"
-    for r in c.ListContainers():
-        print "name : \"{}\"".format(r.name)
-        DumpObjectState(r, ["command", "memory_limit", "anon_limit", "state",
-                               "exit_status", "oom_killed", "stdout",
-                               "memory.max_usage_in_bytes", "memory.anon.max_usage",
-                               "root", "cwd", "bind", "user", "group", "capabilities",
-                               "ulimit"])
-
-
-for r in c.ListContainers():
-    try:
-        r.Destroy()
-    except:
-        pass
-
-for v in c.ListVolumes():
-    try:
-        v.Unlink()
-    except:
-        pass
-
-sys.exit(ret)
+ct1.Prepare(to_wait=True, use_anon = SIZE / 4, use_file = SIZE / 4)
+ct2.Prepare(use_anon=SIZE)
+ct1.Start(); ct1.WaitUsage();
+ct2.Start()
+ct2.CheckOOM(True); ct1.CheckOOM(True); ct.CheckOOM(True)
