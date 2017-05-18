@@ -862,29 +862,34 @@ TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) con
 TError TBlkioSubsystem::ResolveDisk(const std::string &key, std::string &disk) const {
     TError error;
     dev_t dev;
-    unsigned tmp;
+    int tmp = 0;
 
-    if (sscanf(key.c_str(), "%*d:*d%n", &tmp) == 2 && tmp == key.size()) {
+    if (sscanf(key.c_str(), "%*d:%*d%n", &tmp) == 0 && (unsigned)tmp == key.size()) {
         disk = key;
-        return TError::Success();
+    } else {
+        if (key[0] == '/')
+            dev = TPath(key).GetDev();
+        else
+            dev = TPath("/dev/" + key).GetBlockDev();
+
+        if (!dev)
+            return TError(EError::InvalidValue, "Disk not found: " + key);
+
+        disk = StringFormat("%d:%d", major(dev), minor(dev));
     }
 
-    if (key[0] == '/')
-        dev = TPath(key).GetDev();
-    else
-        dev = TPath("/dev/" + key).GetBlockDev();
+    TPath diskDev("/sys/dev/block/" + disk);
 
-    if (!dev)
-        return TError(EError::InvalidValue, "Disk not found: " + key);
-
-    disk = StringFormat("%d:%d", major(dev), minor(dev));
+    if (!diskDev.Exists())
+        return TError(EError::InvalidValue, "Disk not found:  " + diskDev.ToString());
 
     /* convert partition to disk */
-    TPath diskDev("/sys/dev/block/" + disk + "/../dev");
+    diskDev = diskDev / TPath("../dev");
     if (diskDev.IsRegularStrict() && !diskDev.ReadAll(disk)) {
         disk = StringTrim(disk);
-        if (sscanf(disk.c_str(), "%*d:*d%n", &tmp) != 2 || tmp != disk.size())
-            TError(EError::InvalidValue, "Unexpected disk format: " + disk);
+        tmp = 0;
+        if (sscanf(disk.c_str(), "%*d:%*d%n", &tmp) != 0 || (unsigned)tmp != disk.size())
+            return TError(EError::InvalidValue, "Unexpected disk format: " + disk);
     }
 
     return TError::Success();
