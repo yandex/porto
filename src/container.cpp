@@ -1997,8 +1997,10 @@ TError TContainer::StartOne() {
     SetProp(EProperty::START_TIME);
 
     error = PrepareResources();
-    if (error)
+    if (error) {
+        SetState(EContainerState::Stopped);
         return error;
+    }
 
     CL->LockedContainer->DowngradeLock();
 
@@ -2055,7 +2057,7 @@ TError TContainer::PrepareResources() {
 
     error = PrepareWorkDir();
     if (error) {
-        if (error.GetErrno() == ENOSPC)
+        if (error.GetErrno() == ENOSPC || error.GetErrno() == EROFS)
             L("Cannot create working dir: {}", error);
         else
             L_ERR("Cannot create working dir: {}", error);
