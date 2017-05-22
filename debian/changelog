@@ -1,3 +1,16 @@
+yandex-porto (3.7.7) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * container: do not treat ro container place on start as tragedy #PORTO-238
+
+  [ Konstantin Khlebnikov ]
+  * porto: prioritize default_porto_namespace in config during upgrade
+
+  [ Maxim Samoylov ]
+  * container: get rid of PrepareWorkDir()
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 22 May 2017 12:56:10 +0300
+
 yandex-porto (3.7.6) unstable; urgency=low
 
   [ Maxim Samoylov ]
