@@ -74,7 +74,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplyUlimits();
     TError ApplySchedPolicy() const;
     TError ApplyDynamicProperties();
-    TError PrepareWorkDir();
     TError RestoreNetwork();
     TError PrepareOomMonitor();
     void ShutdownOom();

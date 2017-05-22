@@ -2038,31 +2038,28 @@ TError TContainer::StartOne() {
     return error;
 }
 
-TError TContainer::PrepareWorkDir() {
-    if (IsRoot())
-        return TError::Success();
-
-    TPath work = WorkPath();
-    if (work.Exists())
-        return TError::Success(); /* FIXME kludge for restore */
-
-    TError error = work.Mkdir(0755);
-    if (!error)
-        error = work.Chown(TaskCred);
-    return error;
-}
-
 TError TContainer::PrepareResources() {
     TError error;
 
-    error = PrepareWorkDir();
-    if (error) {
-        if (error.GetErrno() == ENOSPC || error.GetErrno() == EROFS)
-            L("Cannot create working dir: {}", error);
-        else
-            L_ERR("Cannot create working dir: {}", error);
-        FreeResources();
-        return error;
+    if (!IsRoot()) {
+        TPath work = WorkPath();
+
+        error = work.Mkdir(0755);
+        if (!error) {
+            error = work.Chown(TaskCred);
+
+            if (error)
+                (void)work.Rmdir();
+        }
+
+        if (error) {
+            if (error.GetErrno() == ENOSPC || error.GetErrno() == EROFS)
+                L("Cannot create working dir: {}", error);
+            else
+                L_ERR("Cannot create working dir: {}", error);
+
+            return error;
+        }
     }
 
     ChooseTrafficClasses();
