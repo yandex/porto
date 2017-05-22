@@ -2696,9 +2696,6 @@ TError TContainer::Load(const TKeyValue &node) {
     if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
         OwnerCred = TaskCred;
 
-    if (!node.Has(P_PORTO_NAMESPACE))
-        NsName = "";
-
     SanitizeCapabilities();
 
     if (state == EContainerState::Running) {
