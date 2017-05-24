@@ -720,7 +720,12 @@ noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
         p->set_name(kv.first);
         p->set_value(kv.second);
     }
-    for (auto &name: volume->Containers) {
+
+    auto volumes_lock = LockVolumes();
+    auto vol_containers(volume->Containers);
+    volumes_lock.unlock();
+
+    for (auto &name: vol_containers) {
         std::string relative;
         if (!CL->ComposeName(name, relative))
             desc->add_containers(relative);
