@@ -80,7 +80,7 @@ TError TTaskEnv::ChildExec() {
             NULL,
         };
         SetDieOnParentExit(0);
-        TFile::CloseAll({PortoInit.Fd});
+        TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), TLogger::GetFd()});
         fexecve(PortoInit.Fd, (char *const *)args, envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
                       std::to_string(PortoInit.Fd) +  ", portoinit)");
@@ -113,7 +113,7 @@ TError TTaskEnv::ChildExec() {
             L("environ[{}]={}", i, envp[i]);
     }
     SetDieOnParentExit(0);
-    TFile::CloseAll({0, 1, 2, Sock.GetFd()});
+    TFile::CloseAll({0, 1, 2, Sock.GetFd(), TLogger::GetFd()});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
     return TError(EError::InvalidValue, errno, std::string("execvpe(") +
@@ -275,7 +275,7 @@ TError TTaskEnv::ConfigureChild() {
             if (error)
                 return error;
 
-            TFile::CloseAll({PortoInit.Fd});
+            TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), TLogger::GetFd()});
             fexecve(PortoInit.Fd, (char *const *)argv, envp);
             return TError(EError::Unknown, errno, "fexecve()");
         }
