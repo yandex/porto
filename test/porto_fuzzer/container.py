@@ -9,6 +9,8 @@ import functools
 
 VERBOSE=True
 
+WaitCache = []
+
 def set_active(is_active):
     properties.ACTIVE = is_active
 
@@ -52,11 +54,16 @@ def Resume(conn,dest):
 
 def Wait(conn,dest):
     global RUN_TIME_LIMIT
+    global WaitCache
     
-    if VERBOSE:
-        print "Waiting container: " + dest
-    conn.Wait(dest, randint(1, RUN_TIME_LIMIT))
+    WaitCache += [dest]
 
+    if randint(0, 4) > 0:
+        if VERBOSE:
+            print "Waiting containers: {}".format(WaitCache)
+
+        conn.Wait(WaitCache, randint(1, RUN_TIME_LIMIT))
+        WaitCache = []
 
 def SetProperty(conn,dest):
 
