@@ -5,9 +5,6 @@ find var/cache/apt -iname '*.bin' -delete
 
 find tmp -mindepth 1 -delete
 
-rm -f etc/resolv.conf
-: > etc/resolv.conf
-
 rm -f etc/hostname
 : > etc/hostname
 

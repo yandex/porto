@@ -12,6 +12,8 @@ L=$(dirname $(dirname $0))/layers
 rm -f bootstrap.$COMPRESS
 sudo $PORTOCTL build -o bootstrap.$COMPRESS \
 	-B $L/bootstrap_ubuntu_xenial.sh \
+	-S $L/common-dns.sh \
+	-S $L/common-hosts.sh \
 	-S $L/base_ubuntu_xenial.sh \
 	-S $L/common-debootstrap.sh net="$NET"
 
@@ -21,6 +23,8 @@ $PORTOCTL layer -I bootstrap bootstrap.$COMPRESS
 rm -f ubuntu-precise.$COMPRESS
 $PORTOCTL build -l bootstrap -o ubuntu-precise.$COMPRESS \
 	-B $L/bootstrap_ubuntu_precise.sh \
+	-S $L/common-dns.sh \
+	-S $L/common-hosts.sh \
 	-S $L/base_ubuntu_precise.sh \
 	-S $L/common-misc.sh \
 	-S $L/common-openssh.sh \
@@ -33,6 +37,8 @@ $PORTOCTL layer -I ubuntu-precise ubuntu-precise.$COMPRESS
 rm -f ubuntu-xenial.$COMPRESS
 $PORTOCTL build -l bootstrap -o ubuntu-xenial.$COMPRESS \
 	-B $L/bootstrap_ubuntu_xenial.sh \
+	-S $L/common-dns.sh \
+	-S $L/common-hosts.sh \
 	-S $L/base_ubuntu_xenial.sh \
 	-S $L/common-misc.sh \
 	-S $L/common-openssh.sh \
@@ -45,6 +51,8 @@ $PORTOCTL layer -I ubuntu-xenial ubuntu-xenial.$COMPRESS
 rm -f debian-jessie.$COMPRESS
 $PORTOCTL build -l bootstrap -o debian-jessie.$COMPRESS \
 	-B $L/bootstrap_debian_jessie.sh \
+	-S $L/common-dns.sh \
+	-S $L/common-hosts.sh \
 	-S $L/base_debian_jessie.sh \
 	-S $L/common-misc.sh \
 	-S $L/common-openssh.sh \
@@ -57,6 +65,8 @@ $PORTOCTL layer -I debian-jessie debian-jessie.$COMPRESS
 rm -f debian-stretch.$COMPRESS
 $PORTOCTL build -l bootstrap -o debian-stretch.$COMPRESS \
 	-B $L/bootstrap_debian_stretch.sh \
+	-S $L/common-dns.sh \
+	-S $L/common-hosts.sh \
 	-S $L/base_debian_stretch.sh \
 	-S $L/common-misc.sh \
 	-S $L/common-openssh.sh \
