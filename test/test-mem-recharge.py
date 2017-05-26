@@ -22,7 +22,7 @@ file(vol.path + "/test", 'w').truncate(size + delta)
 
 def Run(ct):
     ct.Start()
-    ct.Wait(1000)
+    ct.Wait(60000)
     ExpectProp(ct, "state", "dead")
     ExpectProp(ct, "exit_code", "0")
 
