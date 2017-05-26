@@ -82,6 +82,7 @@ def volume_action(conn):
     except (
             porto.exceptions.VolumeNotFound,
             porto.exceptions.ContainerDoesNotExist,
+            porto.exceptions.PermissionError,
             porto.exceptions.VolumeAlreadyExists,
             porto.exceptions.VolumeAlreadyLinked,
             porto.exceptions.VolumeNotLinked,
