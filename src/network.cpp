@@ -13,6 +13,8 @@
 
 extern "C" {
 #include <linux/if.h>
+#include <netinet/ip6.h>
+#include <netinet/ether.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 #include <netlink/route/tc.h>
@@ -1177,6 +1179,7 @@ void TNetCfg::Reset() {
     IpVlan.clear();
     Veth.clear();
     L3lan.clear();
+    IpIp6.clear();
     NetNsName = "";
     NetCtName = "";
 }
@@ -1342,6 +1345,38 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
 
             L3lan.push_back(l3);
 
+        } else if (type == "ipip6") {
+            TIpIp6NetCfg ipip6;
+
+            if (settings.size() != 4)
+                return TError(EError::InvalidValue, "Invalid ipip6 in: " +
+                              MergeEscapeStrings(settings, ' '));
+
+            ipip6.Name = StringTrim(settings[1]);
+
+            if (ipip6.Name == "ip6tnl0")
+                return TError(EError::InvalidValue,
+                              "Cannot modify default fallback tunnel");
+
+            error = ipip6.Remote.Parse(AF_INET6, settings[2]);
+            if (error)
+                return error;
+
+            error = ipip6.Local.Parse(AF_INET6, settings[3]);
+            if (error)
+                return error;
+
+            /* As in net/ipv6/ip6_tunnel.c,
+               we do not set IP6_TNL_F_IGN_ENCAP_LIMIT */
+
+            ipip6.Mtu = ETH_DATA_LEN - sizeof(struct ip6_hdr) - 8;
+
+            ipip6.Ttl = config().network().ipip6_ttl();
+            ipip6.EncapLimit = config().network().ipip6_encap_limit();
+            ipip6.DefaultRoute = false;
+
+            IpIp6.push_back(ipip6);
+
         } else if (type == "NAT") {
             TL3NetCfg nat;
 
@@ -1392,6 +1427,13 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
                 }
             }
 
+            for (auto &link: IpIp6) {
+                if (link.Name == settings[1]) {
+                    link.Mtu = mtu;
+                    return TError::Success();
+                }
+            }
+
             return TError(EError::InvalidValue, "Link not found: " + settings[1]);
 
         } else if (type == "autoconf") {
@@ -1416,7 +1458,8 @@ TError TNetCfg::ParseNet(TMultiTuple &net_settings) {
     }
 
     int single = none + Inherited;
-    int mixed = Steal.size() + MacVlan.size() + IpVlan.size() + Veth.size() + L3lan.size();
+    int mixed = Steal.size() + MacVlan.size() + IpVlan.size() + Veth.size() +
+                L3lan.size() + IpIp6.size();
 
     if (single > 1 || (single == 1 && mixed))
         return TError(EError::InvalidValue, "none/host/inherited can't be mixed with other types");
@@ -1446,6 +1489,11 @@ TError TNetCfg::ParseIp(TMultiTuple &ip_settings) {
                     return TError(EError::InvalidValue, "Invalid ip prefix for L3 network");
                 l3.Addrs.push_back(ip.Addr);
             }
+        }
+
+        for (auto &ipip6: IpIp6) {
+            if (ipip6.Name == ip.Iface)
+                ipip6.DefaultRoute = ip.Addr.IsHost();
         }
     }
     return TError::Success();
@@ -1670,6 +1718,19 @@ TError TNetCfg::ConfigureInterfaces() {
         links.emplace_back(l3.Name);
     }
 
+    for (auto &ipip6: IpIp6) {
+        TNlLink link(Net->GetNl(), ipip6.Name);
+
+        error = link.AddIp6Tnl(ipip6.Name, ipip6.Remote, ipip6.Local,
+                               IPPROTO_IPIP, ipip6.Mtu, ipip6.EncapLimit,
+                               ipip6.Ttl);
+
+        if (error)
+            return error;
+
+        links.emplace_back(ipip6.Name);
+    }
+
     TNlLink loopback(target_nl, "lo");
     error = loopback.Load();
     if (error)
@@ -1729,6 +1790,23 @@ TError TNetCfg::ConfigureInterfaces() {
                 if (error)
                     return error;
             }
+        }
+
+    }
+
+    for (auto &ipip6: IpIp6) {
+        if (ipip6.DefaultRoute) {
+            TNlLink link(target_nl, ipip6.Name);
+            error = link.Load();
+            if (error)
+                return error;
+
+            TNlAddr addr;
+            addr.Parse(AF_INET, "default");
+
+            error = link.AddDirectRoute(addr);
+            if (error)
+                return error;
         }
     }
 

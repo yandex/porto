@@ -113,6 +113,9 @@ public:
                       int mtu);
     TError AddVeth(const std::string &name, const std::string &hw, int mtu,
                    int group, int nsFd);
+    TError AddIp6Tnl(const std::string &name,
+                     const TNlAddr &remote, const TNlAddr &local,
+                     int type, int mtu, int encap_limit, int ttl);
 
     static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);

@@ -183,6 +183,16 @@ struct TL3NetCfg {
     int Group = 0;
 };
 
+struct TIpIp6NetCfg {
+    std::string Name;
+    TNlAddr Local;
+    TNlAddr Remote;
+    int EncapLimit;
+    int Ttl;
+    int Mtu;
+    bool DefaultRoute;
+};
+
 class TContainer;
 
 struct TNetCfg {
@@ -202,6 +212,7 @@ struct TNetCfg {
     std::vector<TIpVlanNetCfg> IpVlan;
     std::vector<TVethNetCfg> Veth;
     std::vector<TL3NetCfg> L3lan;
+    std::vector<TIpIp6NetCfg> IpIp6;
     std::string NetNsName;
     std::string NetCtName;
     std::vector<TGwVec> GwVec;

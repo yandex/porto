@@ -37,6 +37,12 @@ extern "C" {
 
 #include <netlink/route/route.h>
 #include <netlink/route/addr.h>
+
+/* FIXME: kludge for libnl3-3.2.27, remove this and
+   above one after upgrade to > 3.2.29 or libnl3 drop */
+#define _cplusplus __cplusplus
+#include <netlink/route/link/ip6tnl.h>
+#undef _cplusplus
 }
 
 #ifndef TC_LINKLAYER_MASK
@@ -706,6 +712,42 @@ TError TNlLink::AddVeth(const std::string &name,
     rtnl_link_put(peer);
 
     return Load();
+}
+
+TError TNlLink::AddIp6Tnl(const std::string &name,
+                          const TNlAddr &remote, const TNlAddr &local,
+                          int type, int mtu, int encap_limit, int ttl) {
+
+    rtnl_link_set_type(Link, "ip6tnl");
+
+    rtnl_link_ip6_tnl_set_proto(Link, type);
+    rtnl_link_ip6_tnl_set_remote(Link, (struct in6_addr *)remote.Binary());
+    rtnl_link_ip6_tnl_set_local(Link, (struct in6_addr *)local.Binary());
+    rtnl_link_ip6_tnl_set_encaplimit(Link, encap_limit);
+    rtnl_link_ip6_tnl_set_ttl(Link, ttl);
+    rtnl_link_set_mtu(Link, mtu);
+
+    Dump("add", Link);
+
+    int ret = rtnl_link_add(GetSock(), Link, NLM_F_CREATE | NLM_F_EXCL);
+
+    if (ret)
+        return Error(ret, "Cannot add ip6tnl " + name);
+
+    this->Load();
+
+    auto link_mtu = rtnl_link_alloc();
+    rtnl_link_set_name(link_mtu, name.c_str());
+    rtnl_link_set_mtu(link_mtu, mtu);
+
+    ret = rtnl_link_change(GetSock(), Link, link_mtu, 0);
+
+    rtnl_link_put(link_mtu);
+
+    if (ret)
+        return Error(ret, "Cannot set ip6tnl mtu " + name);
+
+    return TError::Success();
 }
 
 bool TNlLink::ValidIpVlanMode(const std::string &mode) {
