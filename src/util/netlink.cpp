@@ -363,7 +363,7 @@ TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
     }
 
     nh = rtnl_route_nh_alloc();
-    if (!route) {
+    if (!nh) {
         rtnl_route_put(route);
         return TError(EError::Unknown, "Cannot allocate next hop");
     }
