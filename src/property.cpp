@@ -939,6 +939,7 @@ public:
  "veth <name> <bridge> [mtu] [hw] | "
  "L3 <name> [master] | "
  "NAT [name] | "
+ "ipip6 <name> <remote> <local> | "
  "MTU <name> <mtu> | "
  "autoconf <name> (SLAAC) | "
  "netns <name>") {}
