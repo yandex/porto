@@ -1493,7 +1493,7 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
-    if ((Controllers & CGROUP_MEMORY) && Parent && Parent->IsRoot()) {
+    if (Controllers & CGROUP_MEMORY) {
         error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
