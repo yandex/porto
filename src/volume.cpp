@@ -1508,20 +1508,29 @@ TError TVolume::DestroyOne(bool strict) {
     }
 
     if (!KeepStorage && !RemoteStorage() && StoragePath.Exists()) {
-        /* File image storage for backend=loop always persistent. */
-        error = ClearRecursive(StoragePath);
-        if (error)
-            L_ERR("Cannot clear storage: {}", error);
-        error = StoragePath.ClearDirectory();
-        if (error) {
-            L_ERR("Cannot clear storage: {}", error);
-            if (!ret)
-                ret = error;
-        }
         if (!UserStorage()) {
-            error = StoragePath.Rmdir();
-            if (!ret)
-                ret = error;
+            error = RemoveRecursive(StoragePath);
+            if (error) {
+                L_ERR("Cannot remove storage: {}", error);
+
+                error = StoragePath.RemoveAll();
+                if (error) {
+                    L_ERR("Cannot clear storage: {}", error);
+                    if (!ret)
+                        ret = error;
+                }
+            }
+        } else {
+            /* File image storage for backend=loop always persistent. */
+            error = ClearRecursive(StoragePath);
+            if (error)
+                L_ERR("Cannot clear storage: {}", error);
+            error = StoragePath.ClearDirectory();
+            if (error) {
+                L_ERR("Cannot clear storage: {}", error);
+                if (!ret)
+                    ret = error;
+            }
         }
     }
 
@@ -2058,13 +2067,14 @@ void TVolume::RestoreAll(void) {
         if (error)
             L_ERR("Cannot umount nested : {}", error);
 
-        error = ClearRecursive(dir);
-        if (error)
-            L_ERR("Cannot clear directory {}: {}", dir, error);
+        error = RemoveRecursive(dir);
+        if (error) {
+            L_ERR("Cannot remove directory {}: {}", dir, error);
 
-        error = dir.RemoveAll();
-        if (error)
-            L_ERR("Cannot remove directory {}", dir);
+            error = dir.RemoveAll();
+            if (error)
+                L_ERR("Cannot delete directory {}", dir);
+        }
     }
 
     L_ACT("Remove stale weak layers...");

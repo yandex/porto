@@ -816,12 +816,14 @@ static void CleanupTempdir() {
                 it->second->State != EContainerState::Stopped)
             continue;
         TPath path = temp / name;
-        error = ClearRecursive(path);
-        if (error)
-            L_WRN("Cannot clear {}: {}", path, error);
-        error = path.RemoveAll();
-        if (error)
+        error = RemoveRecursive(path);
+        if (error) {
             L_WRN("Cannot remove {}: {}", path, error);
+
+            error = path.RemoveAll();
+            if (error)
+                L_WRN("Cannot delete {}: {}", path, error);
+        }
     }
 }
 

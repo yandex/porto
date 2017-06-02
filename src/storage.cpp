@@ -101,12 +101,14 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
 
         lock.unlock();
         L_ACT("Remove junk: {}", path);
-        error = ClearRecursive(path);
-        if (error)
-            L_WRN("Cannot clear junk: {}: {}", path, error);
-        error = path.RemoveAll();
-        if (error)
-            L_WRN("cannot delete junk: {}: {}", path, error);
+        error = RemoveRecursive(path);
+        if (error) {
+            L_WRN("Cannot remove junk: {}: {}", path, error);
+
+            error = path.RemoveAll();
+            if (error)
+                L_WRN("cannot delete junk: {}: {}", path, error);
+        }
     }
 
     return TError::Success();
@@ -541,13 +543,14 @@ TError TStorage::Remove() {
     if (error)
         return error;
 
-    error = ClearRecursive(temp);
-    if (error)
-        L_WRN("Cannot clear layel: {}", error);
-
-    error = temp.RemoveAll();
-    if (error)
+    error = RemoveRecursive(temp);
+    if (error) {
         L_WRN("Cannot remove layer: {}", error);
+
+        error = temp.RemoveAll();
+        if (error)
+            L_WRN("Cannot delete layer: {}", error);
+    }
 
     lock.lock();
     ActivePaths.remove(temp);

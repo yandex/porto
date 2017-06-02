@@ -101,6 +101,11 @@ TError ClearRecursive(const TPath &path) {
     return RunCommand({ "find", ".", "-xdev", "-mindepth", "1", "-delete"}, path);
 }
 
+TError RemoveRecursive(const TPath &path) {
+   return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()},
+                      path.NormalPath().DirName());
+}
+
 TError ResizeLoopDev(int loopNr, const TPath &image, off_t current, off_t target) {
     auto path = "/dev/loop" + std::to_string(loopNr);
     auto size = std::to_string(target >> 10) + "K";
