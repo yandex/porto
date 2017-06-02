@@ -1,3 +1,30 @@
+yandex-porto (3.8.0) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * rpc: traverse volume containers safely
+  * test: wait up to 1 minute in mem-recharge
+  * test/porto_fuzzer: allow wait for multiple containers
+  * test/porto_fuzzer: mind that PermissionError can occur on volume operation
+
+  [ Konstantin Khlebnikov ]
+  * layers: add common resolv.conf and hosts
+
+  [ Maxim Samoylov ]
+  * util/netlink: fix typo in TNlLink::AddDirectRoute()
+  * network: add ipip6 net option #PORTO-239
+
+  [ Konstantin Khlebnikov ]
+  * property: document ipip6 interface
+  * porto: fix disabling memory controller for first level containers
+  * portoctl get: make env human readable
+  * porto: enable memory.use_hierarchy for all cgroups unconditionally
+
+  [ Maxim Samoylov ]
+  * helpers: use rm -rf instead of find -delete where possible
+  * test: test porto performance scalability and regression
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 02 Jun 2017 15:53:31 +0300
+
 yandex-porto (3.7.7) unstable; urgency=low
 
   [ Maxim Samoylov ]
