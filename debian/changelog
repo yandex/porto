@@ -1,3 +1,9 @@
+yandex-porto (3.8.1) unstable; urgency=low
+
+  * porto: do not set memory.use_hierarchy for root cgroup
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 02 Jun 2017 17:09:43 +0300
+
 yandex-porto (3.8.0) unstable; urgency=low
 
   [ Maxim Samoylov ]
