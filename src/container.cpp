@@ -1493,13 +1493,11 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
-    if (Controllers & CGROUP_MEMORY) {
+    if (!IsRoot() && (Controllers & CGROUP_MEMORY)) {
         error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
-    }
 
-    if (!IsRoot() && (Controllers & CGROUP_MEMORY)) {
         error = PrepareOomMonitor();
         if (error) {
             L_ERR("Can't prepare OOM monitoring: {}", error);
