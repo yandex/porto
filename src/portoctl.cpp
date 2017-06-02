@@ -537,6 +537,9 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         return val;
     }
 
+    if (name == "env")
+        return StringReplaceAll(val, ";", ";\n      ");
+
     if (val == "" || StringToUint64(val, num))
         return val;
 
