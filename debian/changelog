@@ -1,3 +1,17 @@
+yandex-porto (3.8.2) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * path: enhance pivoting root to non-mnt directory #PORTO-243
+  * filesystem: verify chroot directory existence
+
+  [ Konstantin Khlebnikov ]
+  * network: init virtualized sysctls with host values
+  * network: fix misprint
+  * network: default net.unix.max_dgram_qlen is 10 systemd set it to 512
+  * log: remove duplicate \n
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 05 Jun 2017 17:39:30 +0300
+
 yandex-porto (3.8.1) unstable; urgency=low
 
   * porto: do not set memory.use_hierarchy for root cgroup
