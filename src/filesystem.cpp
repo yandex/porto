@@ -258,6 +258,9 @@ TError TMountNamespace::MountTraceFs() {
 TError TMountNamespace::SetupRoot() {
     TError error;
 
+    if (!Root.Exists())
+        return TError(EError::InvalidValue, "Root path does not exist");
+
     struct {
         std::string target;
         std::string type;
