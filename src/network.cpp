@@ -60,7 +60,7 @@ static inline std::unique_lock<std::mutex> LockNetworks() {
 static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.core.somaxconn", "128" },
 
-    { "net.unix.max_dgram_qlen", "512" },
+    { "net.unix.max_dgram_qlen", "10" },
 
     { "net.ipv4.icmp_echo_ignore_all", "0" },
     { "net.ipv4.icmp_echo_ignore_broadcasts", "1" },
