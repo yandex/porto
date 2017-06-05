@@ -179,8 +179,12 @@ TError TTaskEnv::ApplySysctl() {
     if (NewNetNs) {
         for (const auto &it: config().container().net_sysctl()) {
             error = SetSysctl(it.key(), it.val());
-            if (error)
-                return error;
+            if (error) {
+                if (error.GetErrno() == ENOENT)
+                    L("Sysctl {} is not virtualized", it.key());
+                else
+                    return error;
+            }
         }
     }
 

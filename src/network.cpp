@@ -57,57 +57,57 @@ static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
 }
 
-static std::list<std::string> NetSysctls = {
-    "net.core.somaxconn",
+static std::list<std::pair<std::string, std::string>> NetSysctls = {
+    { "net.core.somaxconn", "128" },
 
-    "net.unix.max_dgram_qlen",
+    { "net.unix.max_dgram_qlen", "512" },
 
-    "net.ipv4.icmp_echo_ignore_all",
-    "net.ipv4.icmp_echo_ignore_broadcasts",
-    "net.ipv4.icmp_ignore_bogus_error_responses",
-    "net.ipv4.icmp_errors_use_inbound_ifaddr",
-    "net.ipv4.icmp_ratelimit",
-    "net.ipv4.icmp_ratemask",
-    "net.ipv4.ping_group_range",
+    { "net.ipv4.icmp_echo_ignore_all", "0" },
+    { "net.ipv4.icmp_echo_ignore_broadcasts", "1" },
+    { "net.ipv4.icmp_ignore_bogus_error_responses", "1" },
+    { "net.ipv4.icmp_errors_use_inbound_ifaddr", "0" },
+    { "net.ipv4.icmp_ratelimit", "1000" },
+    { "net.ipv4.icmp_ratemask", "6168" },
+    { "net.ipv4.ping_group_range", "1\t0" },
 
-    "net.ipv4.tcp_ecn",
-    "net.ipv4.tcp_ecn_fallback",
-    "net.ipv4.ip_dynaddr",
-    "net.ipv4.ip_early_demux",
-    "net.ipv4.ip_default_ttl",
+    { "net.ipv4.tcp_ecn", "2" },
+    { "net.ipv4.tcp_ecn_fallback", "1" },
+    { "net.ipv4.ip_dynaddr", "0" },
+    { "net.ipv4.ip_early_demux", "1" },
+    { "net.ipv4.ip_default_ttl", "64" },
 
-    "net.ipv4.ip_local_port_range",
-    "net.ipv4.ip_local_reserved_ports",
-    "net.ipv4.ip_no_pmtu_disc",
-    "net.ipv4.ip_forward_use_pmtu",
-    "net.ipv4.ip_nonlocal_bind",
+    { "net.ipv4.ip_local_port_range", "32768\t60999" },
+    { "net.ipv4.ip_local_reserved_ports", "" },
+    { "net.ipv4.ip_no_pmtu_disc", "0" },
+    { "net.ipv4.ip_forward_use_pmtu", "0" },
+    { "net.ipv4.ip_nonlocal_bind", "0" },
     //"net.ipv4.fwmark_reflect",
     //"net.ipv4.tcp_fwmark_accept",
-    "net.ipv4.tcp_mtu_probing",
-    "net.ipv4.tcp_base_mss",
-    "net.ipv4.tcp_probe_threshold",
-    "net.ipv4.tcp_probe_interval",
+    { "net.ipv4.tcp_mtu_probing", "0" },
+    { "net.ipv4.tcp_base_mss", "1024" },
+    { "net.ipv4.tcp_probe_threshold", "8" },
+    { "net.ipv4.tcp_probe_interval", "600" },
 
     //"net.ipv4.igmp_link_local_mcast_reports",
     //"net.ipv4.igmp_max_memberships",
     //"net.ipv4.igmp_max_msf",
     //"net.ipv4.igmp_qrv",
 
-    "net.ipv4.tcp_keepalive_time",
-    "net.ipv4.tcp_keepalive_probes",
-    "net.ipv4.tcp_keepalive_intvl",
-    "net.ipv4.tcp_syn_retries",
-    "net.ipv4.tcp_synack_retries",
-    "net.ipv4.tcp_syncookies",
-    "net.ipv4.tcp_reordering",
-    "net.ipv4.tcp_retries1",
-    "net.ipv4.tcp_retries2",
-    "net.ipv4.tcp_orphan_retries",
-    "net.ipv4.tcp_fin_timeout",
-    "net.ipv4.tcp_notsent_lowat",
-    "net.ipv4.tcp_tw_reuse",
+    { "net.ipv4.tcp_keepalive_time", "7200" },
+    { "net.ipv4.tcp_keepalive_probes", "9" },
+    { "net.ipv4.tcp_keepalive_intvl", "75" },
+    { "net.ipv4.tcp_syn_retries", "6" },
+    { "net.ipv4.tcp_synack_retries", "5" },
+    { "net.ipv4.tcp_syncookies", "1" },
+    { "net.ipv4.tcp_reordering", "3" },
+    { "net.ipv4.tcp_retries1", "3" },
+    { "net.ipv4.tcp_retries2", "15" },
+    { "net.ipv4.tcp_orphan_retries", "0" },
+    { "net.ipv4.tcp_fin_timeout", "60" },
+    { "net.ipv4.tcp_notsent_lowat", "-1" },
+    { "net.ipv4.tcp_tw_reuse", "0" },
 
-    "net.ipv6.bindv6only",
+    { "net.ipv6.bindv6only", "0" },
     //"net.ipv6.anycast_src_echo_reply",
     //"net.ipv6.flowlabel_consistency",
     //"net.ipv6.auto_flowlabels",
@@ -115,20 +115,19 @@ static std::list<std::string> NetSysctls = {
     //"net.ipv6.idgen_retries",
     //"net.ipv6.idgen_delay",
     //"net.ipv6.flowlabel_state_ranges",
-    "net.ipv6.ip_nonlocal_bind",
+    { "net.ipv6.ip_nonlocal_bind", "0" },
 
-    "net.ipv6.icmp.ratelimit",
+    { "net.ipv6.icmp.ratelimit", "1000" },
 
-    "net.ipv6.route.flush",
-    "net.ipv6.route.gc_thresh",
-    "net.ipv6.route.max_size",
-    "net.ipv6.route.gc_min_interval",
-    "net.ipv6.route.gc_timeout",
-    "net.ipv6.route.gc_interval",
-    "net.ipv6.route.gc_elasticity",
-    "net.ipv6.route.mtu_expires",
-    "net.ipv6.route.min_adv_mss",
-    "net.ipv6.route.gc_min_interval_ms",
+    { "net.ipv6.route.gc_thresh", "1024" },
+    { "net.ipv6.route.max_size", "4096" },
+    { "net.ipv6.route.gc_min_interval", "0" },
+    { "net.ipv6.route.gc_timeout", "60" },
+    { "net.ipv6.route.gc_interval", "30" },
+    { "net.ipv6.route.gc_elasticity", "9" },
+    { "net.ipv6.route.mtu_expires", "600" },
+    { "net.ipv6.route.min_adv_mss", "1220" },
+    { "net.ipv6.route.gc_min_interval_ms", "500" },
 };
 
 void TNetlinkCache::Drop() {
@@ -159,8 +158,10 @@ TError TNetlinkCache::Refill(TNl &sock) {
 }
 
 bool TNetwork::NamespaceSysctl(const std::string &key) {
-    if (std::find(NetSysctls.begin(), NetSysctls.end(), key) != NetSysctls.end())
-        return true;
+    for (auto &pair: NetSysctls) {
+        if (pair.first == key)
+            return true;
+    }
     if (StringStartsWith(key, "net.ipv4.conf."))
         return true;
     if (StringStartsWith(key, "net.ipv6.conf."))
@@ -357,6 +358,22 @@ void TNetwork::InitializeConfig() {
         StringToUintMap(config().network().ingress_burst(), IngressBurst);
 
     NetworkStatisticsCacheTimeout = config().network().cache_statistics_ms();
+
+    /* Load default net sysctl from host config */
+    for (const auto &p: NetSysctls) {
+        auto &key = p.first;
+        auto &def = p.second;
+        bool set = false;
+        for (const auto &it: config().container().net_sysctl())
+            set |= it.key() == key;
+        std::string val;
+        if (!set && !GetSysctl(key, val) && val != def) {
+            L("Init sysctl {} = {} (default is {})", key, val, def);
+            auto sysctl = config().mutable_container()->add_ipc_sysctl();
+            sysctl->set_key(key);
+            sysctl->set_val(val);
+        }
+    }
 }
 
 TError TNetwork::Destroy() {
