@@ -187,8 +187,8 @@ TError TPath::PivotRoot() const {
     if (error)
         return error;
 
-    /* old and new root must be at different mounts */
-    if (oldroot.GetMountId() == newroot.GetMountId()) {
+    /* new root must be a different mount */
+    if (newroot.GetMountId() == newroot.GetMountId("..")) {
         error = BindAll(*this);
         if (error)
             return error;
@@ -1236,10 +1236,11 @@ TError TFile::Chattr(int fd, unsigned add_flags, unsigned del_flags) {
     return TError::Success();
 }
 
-int TFile::GetMountId(void) const {
+int TFile::GetMountId(const TPath relative) const {
     FileHandle fh;
     int mnt;
-    if (name_to_handle_at(Fd, "", &fh.head, &mnt, AT_EMPTY_PATH))
+    if (name_to_handle_at(Fd, relative.ToString().c_str(),
+                          &fh.head, &mnt, AT_EMPTY_PATH))
         return -1;
     return mnt;
 }
