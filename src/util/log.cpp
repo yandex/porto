@@ -146,10 +146,13 @@ void TLogger::Log(std::string log_msg, ELogLevel level) {
     if (level == LOG_ERROR && Verbose)
         Stacktrace();
 
-    std::string msg = FormatTime(time(nullptr)) + " " + name + "[" + 
-                      std::to_string(GetTid()) + "]: " + prefix[level] + log_msg;
+    std::string msg = FormatTime(time(nullptr)) + " " +
+        name + "[" + std::to_string(GetTid()) + "]: " +
+        prefix[level] + log_msg +
+        (log_msg.back() == '\n' ? "" : "\n");
 
-    (*logStream) << msg << std::endl;
+    (*logStream) << msg;
+    logStream->flush();
 }
 
 void porto_assert(const char *msg, size_t line, const char *file) {
