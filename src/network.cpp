@@ -369,7 +369,7 @@ void TNetwork::InitializeConfig() {
         std::string val;
         if (!set && !GetSysctl(key, val) && val != def) {
             L("Init sysctl {} = {} (default is {})", key, val, def);
-            auto sysctl = config().mutable_container()->add_ipc_sysctl();
+            auto sysctl = config().mutable_container()->add_net_sysctl();
             sysctl->set_key(key);
             sysctl->set_val(val);
         }
