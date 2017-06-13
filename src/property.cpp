@@ -62,19 +62,25 @@ TError TProperty::SetFromRestore(const std::string &value) {
 
 TError TProperty::IsAliveAndStopped(void) {
     if (CT->State != EContainerState::Stopped)
-        return TError(EError::InvalidState, "Cannot change property for not stopped container");
+        return TError(EError::InvalidState,
+                      "Cannot change property " + Name +
+                      " for not stopped container, current state: " +
+                      TContainer::StateName(CT->State));
+
     return TError::Success();
 }
 
 TError TProperty::IsAlive(void) {
     if (CT->State == EContainerState::Dead)
-        return TError(EError::InvalidState, "Cannot change property while in the dead state");
+        return TError(EError::InvalidState, "Cannot change property " + Name +
+                      " while in the dead state");
     return TError::Success();
 }
 
 TError TProperty::IsDead(void) {
     if (CT->State != EContainerState::Dead)
-        return TError(EError::InvalidState, "Available only in dead state: " + Name);
+        return TError(EError::InvalidState, "Available only in dead state: " + Name +
+                      ", current state: " + TContainer::StateName(CT->State));
     return TError::Success();
 }
 
