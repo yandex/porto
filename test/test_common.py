@@ -22,6 +22,9 @@ def ExpectEq(a, b):
 def ExpectNe(a, b):
     assert a != b, "{} should not be equal{}".format(a, b)
 
+def ExpectLe(a, b, descr=""):
+    assert a <= b, "{}{} should be less or equal {}".format(descr, a, b)
+
 def ExpectProp(ct, prop, val):
     cur = ct.GetProperty(prop)
     assert cur == val, "{} property {} should be {} not {}".format(ct, prop, val, cur)

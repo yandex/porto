@@ -152,6 +152,10 @@ add_test(NAME leaks
          COMMAND ${CMAKE_BINARY_DIR}/portotest leaks
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+add_test(NAME perf_regression
+         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-performance.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME fuzzer
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
          --timeout 300 --progress 32 2000
@@ -173,6 +177,6 @@ set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
                      unpriv-cred prev_release_upgrade uid_handling knobs clear
                      cpu_limit mem_limit fuzzer stats mem_recharge dirty_limit
-                     locate-process oom_non_fatal
+                     locate-process oom_non_fatal perf_regression
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)

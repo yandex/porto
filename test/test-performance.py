@@ -7,7 +7,10 @@ import time
 import multiprocessing
 from test_common import *
 
+EPS = 0.5
+DEADLINE = 5.0
 NAME = os.path.basename(__file__)
+CPUNR = multiprocessing.cpu_count()
 
 def CT_NAME(suffix):
     global NAME
@@ -37,7 +40,7 @@ def measure_time(fn):
 
 #==================== Executors ============================
 
-class StressExecutor(object):
+class Executor(object):
     def __init__(self, *args, **kwargs):
         self.Name = kwargs.get("name")
         self.ExecTime = kwargs.get("exec_time")
@@ -116,23 +119,13 @@ class StressExecutor(object):
         return (spawn_ret, destroy_ret)
 
 
+    HasChroot = False
+    HasNet = False
+    Type = "single"
 
-#================= Backends =======================
-
-class Simple(object):
     @staticmethod
     def ToString():
         return "simple container"
-
-    @measure_time
-    def Setup(self, name):
-        ct = self.Conn.CreateWeakContainer(name)
-        ct.SetProperty("memory_limit", "1G")
-        ct.SetProperty("cpu_limit", "2c")
-        ct.SetProperty("command", "bash -c \'/bin/sleep {}\'"\
-                       .format(self.ExecTime))
-        ct.Start()
-        return ct
 
     @measure_time
     def Get(self, ct):
@@ -151,60 +144,124 @@ class Simple(object):
         (wait_time, _) = self._Wait(ct)
         return (get_time + wait_time, None)
 
-class Chroot(Simple):
     @measure_time
     def Setup(self, name):
         ct = self.Conn.CreateWeakContainer(name)
+
+        if self.Type == "meta":
+            child = self.Conn.CreateWeakContainer(name + "/hook")
+        elif self.Type == "slot":
+            meta = self.Conn.CreateWeakContainer(name + "/meta")
+            child = self.Conn.CreateWeakContainer(name + "/meta/hook")
+        elif self.Type == "single":
+            child = ct
+        else:
+            raise AssertionError("invalid test type")
+
         ct.SetProperty("memory_limit", "1G")
         ct.SetProperty("cpu_limit", "2c")
         ct.SetProperty("command", "bash -c \'/bin/sleep {} && sync\'"\
                        .format(self.ExecTime))
 
-        v = self.Conn.CreateVolume(None, layers=["ubuntu-precise"])
-        v.Link(ct.name)
-        v.Unlink("/")
+        if self.HasNet:
+            ct.SetProperty("ip", "ip ::{:x}".format(self.Seed))
+            self.Seed += 1
+            ct.SetProperty("net", "L3 door")
 
-        ct.SetProperty("root", v.path)
-        ct.Start()
-        return ct
+        if self.HasChroot:
+            v = self.Conn.CreateVolume(None, layers=["ubuntu-precise"])
+            v.Link(ct.name)
+            v.Unlink("/")
+            ct.SetProperty("root", v.path)
 
-class NetChroot(Simple):
-    @measure_time
-    def Setup(self, name):
-        ct = self.Conn.CreateWeakContainer(name)
-        ct.SetProperty("memory_limit", "1G")
-        ct.SetProperty("cpu_limit", "2c")
-        ct.SetProperty("command", "bash -c \'/bin/sleep {} && sync\'"\
-                       .format(self.ExecTime))
-
-        ct.SetProperty("ip", "ip ::{:x}".format(self.Seed))
-        self.Seed += 1
-        ct.SetProperty("net", "L3 door")
-
-        v = self.Conn.CreateVolume(None, layers=["ubuntu-precise"])
-        v.Link(ct.name)
-        v.Unlink("/")
-
-        ct.SetProperty("root", v.path)
-        ct.Start()
+        child.Start()
         return ct
 
 #================= Runners ======================
 
-class SimpleStressExecutor(Simple, StressExecutor):
+class SimpleExecutor(Executor):
     @staticmethod
     def ToString():
         return "simple stress executor"
 
-class ChrootStressExecutor(Chroot, StressExecutor):
+class ChrootExecutor(Executor):
     @staticmethod
     def ToString():
         return "chroot stress executor"
 
-class NetChrootStressExecutor(NetChroot, StressExecutor):
+    def __init__(self, *args, **kwargs):
+        super(ChrootExecutor, self).__init__(*args, **kwargs)
+        self.HasChroot = True
+
+class NetChrootExecutor(Executor):
     @staticmethod
     def ToString():
         return "net + chroot stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(NetChrootExecutor, self).__init__(*args, **kwargs)
+        self.HasChroot = True
+        self.HasNet = True
+
+class MetaExecutor(Executor):
+    @staticmethod
+    def ToString():
+        return "meta simple stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(MetaExecutor, self).__init__(*args, **kwargs)
+        self.Type = "meta"
+
+class SlotExecutor(Executor):
+    @staticmethod
+    def ToString():
+        return "slot simple stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(SlotExecutor, self).__init__(*args, **kwargs)
+        self.Type = "slot"
+
+class MetaChrootExecutor(Executor):
+    @staticmethod
+    def ToString():
+        return "meta chroot stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(MetaChrootExecutor, self).__init__(*args, **kwargs)
+        self.Type = "meta"
+        self.HasChroot = True
+
+class SlotChrootExecutor(Executor):
+    @staticmethod
+    def ToString():
+        return "slot chroot stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(SlotChrootExecutor, self).__init__(*args, **kwargs)
+        self.Type = "slot"
+        self.HasChroot = True
+
+class MetaNetChrootExecutor(Executor):
+    @staticmethod
+    def ToString():
+        return "meta net chroot stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(MetaNetChrootExecutor, self).__init__(*args, **kwargs)
+        self.Type = "meta"
+        self.HasChroot = True
+        self.HasNet = True
+
+class SlotNetChrootExecutor(Executor):
+    @staticmethod
+    def ToString():
+        return "slot net chroot stress executor"
+
+    def __init__(self, *args, **kwargs):
+        super(SlotNetChrootExecutor, self).__init__(*args, **kwargs)
+        self.Type = "slot"
+        self.HasChroot = True
+        self.HasNet = True
 
 #================== Loop =======================================
 
@@ -245,30 +302,82 @@ def Check(conn_num, ctor, *args, **kwargs):
 
     return ctor.PostProcess([p.Ret for p in procs], *args, **kwargs)
 
+def PrintFormatted(name, stats):
+    print "{:>8}, {:4}, {:5}, {:10.6f}, {:10.6f}, "\
+          "{:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}".format(name, *stats)
+
 if __name__ == '__main__':
     resource.setrlimit(resource.RLIMIT_NOFILE, (32768, 32768))
 
     legend = "{:>8}, {:>4}, {:>5}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}"\
              .format("type", "num", "spwn", "avg", "min", "q50", "q90", "q99", "max")
 
-    for ex in [SimpleStressExecutor, ChrootStressExecutor, NetChrootStressExecutor]:
-        print "\nExecutor: {}\n".format(ex.ToString())
-        print "Connection scaling:\n"
+    print "Connection scaling:\n"
+
+    ex = SimpleExecutor
+    print "\nExecutor: {}".format(ex.ToString())
+    print legend
+
+    (s, d) = Check(1, ex, exec_time=300, to_spawn=32)
+    PrintFormatted("spawn", s)
+    PrintFormatted("destroy", d)
+
+    ExpectLe(s[4], 1.0, "simple single container creation q50 above 1 s ")
+    ExpectLe(d[4], 1.0, "simple single container destroy q50 above 1 s ")
+
+
+    for (coef, ex) in [(3, ChrootExecutor), (6, MetaChrootExecutor)]:
+
+        print "\nExecutor: {}".format(ex.ToString())
         print legend
 
-        for conn_num in [4, 16, 32, 48, 64, 96, 128]:
-            (s, d) = Check(conn_num, ex, exec_time=10000, to_spawn=32)
+        (s, d) = Check(1, ex, exec_time=300, to_spawn=16)
+        PrintFormatted("spawn", s)
+        PrintFormatted("destroy", d)
 
-            print "{:>8}, {:4}, {:5}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}".format("spawn", *s)
-            print "{:>8}, {:4}, {:5}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}".format("destroy", *d)
+        ExpectLe(s[4], DEADLINE, "q50 create time above {} s ".format(DEADLINE))
+        ExpectLe(d[4], DEADLINE, "q50 destroy time above {} s ".format(DEADLINE))
 
-        print "\nContainer regression\n"
+        simple_avg_create = s[2]
+        simple_avg_destroy = d[2]
+
+        for conn_num in [4, 8, 16]:
+            (s, d) = Check(conn_num, ex, exec_time=300, to_spawn=16)
+
+            PrintFormatted("spawn", s)
+            PrintFormatted("destroy", d)
+
+            coef *= conn_num
+
+            ExpectLe(s[4], DEADLINE, "q50 create time above {} s ".format(DEADLINE))
+            ExpectLe(d[4], DEADLINE, "q50 destroy time above {} s ".format(DEADLINE))
+            ExpectLe(s[4], coef * simple_avg_create, "q50 create time above linear ")
+            ExpectLe(d[4], coef * simple_avg_destroy, "q50 create time above linear ")
+
+    print "\nContainer regression\n"
+
+    for ex in [MetaNetChrootExecutor]:
+
+        print "\nExecutor: {}".format(ex.ToString())
         print legend
 
-        for to_spawn in [64, 128, 256, 512]:
-            (s, d) = Check(4, ex, exec_time=10000, to_spawn=to_spawn)
+        prev_avg = (0.0, 0.0)
+        regression_create = True
+        regression_destroy = True
 
-            print "{:>8}, {:4}, {:5}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}".format("spawn", *s)
-            print "{:>8}, {:4}, {:5}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}, {:10.6f}".format("destroy", *d)
+        for to_spawn in [10, 20, 40, 60]:
+            (s, d) = Check(1, ex, exec_time=300, to_spawn=to_spawn)
 
+            PrintFormatted("spawn", s)
+            PrintFormatted("destroy", d)
 
+            ExpectLe(s[4], DEADLINE, "q50 create time above {} s ".format(DEADLINE))
+            ExpectLe(d[4], DEADLINE, "q50 destroy time above {} s ".format(DEADLINE))
+
+            regression_create &= s[4] > (prev_avg[0] + EPS)
+            regression_destroy &= d[4] > (prev_avg[1] + EPS)
+
+            prev_avg = (s[4], d[4])
+
+        Expect(not regression_create)
+        Expect(not regression_destroy)
