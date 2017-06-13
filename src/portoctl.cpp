@@ -1042,6 +1042,25 @@ public:
             }
         }
 
+        bool command_found = false;
+        for (auto &kv : launcher.Properties) {
+            if (kv.first == "command") {
+                command_found = true;
+
+                if (StringTrim(kv.second).empty()) {
+                    std::cerr << "Exec with empty command is not supported"
+                              << std::endl;
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+
+        if (!command_found) {
+            std::cerr << "Meta container exec is not supported, "
+                         "please supply command property" << std::endl;
+            return EXIT_FAILURE;
+        }
+
         error = launcher.Launch();
         if (error) {
             std::cerr << "Cannot start container: " << error << std::endl;
