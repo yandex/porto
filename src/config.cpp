@@ -73,6 +73,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
     config().mutable_container()->set_default_ulimit("core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M");
+    config().mutable_container()->set_default_thread_limit(10000);
 
     config().mutable_volumes()->set_enable_quota(true);
     config().mutable_volumes()->set_max_total(3000);

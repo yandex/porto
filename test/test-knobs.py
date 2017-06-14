@@ -41,7 +41,7 @@ knobs = {
                      "SETFCAP;MAC_OVERRIDE;MAC_ADMIN;SYSLOG;WAKE_ALARM;"\
                      "BLOCK_SUSPEND;AUDIT_READ",
     "command" : "bash -c \'echo $(sleep) | xargs -I%sdf echo %sdf\'",
-    "controllers" : "freezer;memory;cpu;cpuacct;net_cls;blkio;devices;hugetlb;cpuset",
+    #"controllers" : "freezer;memory;cpu;cpuacct;net_cls;blkio;devices;hugetlb;cpuset",
     "cpu_guarantee" : "0.756c",
     "cpu_limit" : "0.9c",
     "cpu_policy" : "normal",

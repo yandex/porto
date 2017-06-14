@@ -676,6 +676,20 @@ static TError CreateRootContainer() {
     if (error)
         return error;
 
+    if (!RootContainer->Ulimit.count("nproc")) {
+        uint64_t pids, threads, lim;
+        std::string str;
+
+        if (!GetSysctl("kernel.pid_max", str) &&
+                !StringToUint64(str, pids) &&
+                !GetSysctl("kernel.threads-max", str) &&
+                !StringToUint64(str, threads)) {
+            lim = std::min(pids, threads) / 2;
+            L_SYS("Default nproc ulimit: {}", lim);
+            RootContainer->Ulimit["nproc"] = fmt::format("{} {}", lim, lim);
+        }
+    }
+
     error = SystemClient.LockContainer(RootContainer);
     if (error)
         return error;

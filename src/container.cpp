@@ -333,8 +333,14 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
     if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
         Controllers |= CGROUP_HUGETLB;
 
-    if (Parent && Parent->IsRoot() && PidsSubsystem.Supported)
+    if (Parent && Parent->IsRoot() && PidsSubsystem.Supported) {
         Controllers |= CGROUP_PIDS;
+
+        if (config().container().default_thread_limit()) {
+            ThreadLimit = config().container().default_thread_limit();
+            SetProp(EProperty::THREAD_LIMIT);
+        }
+    }
 
     if (Level <= 1 && CpusetSubsystem.Supported)
         Controllers |= CGROUP_CPUSET;
