@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include "task.hpp"
+#include "container.hpp"
 #include "device.hpp"
 #include "config.hpp"
 #include "network.hpp"
@@ -176,7 +177,7 @@ TError TTaskEnv::ApplySysctl() {
         }
     }
 
-    if (NewNetNs) {
+    if (CT->NetIsolate) {
         for (const auto &it: config().container().net_sysctl()) {
             error = SetSysctl(it.key(), it.val());
             if (error) {
@@ -192,7 +193,7 @@ TError TTaskEnv::ApplySysctl() {
         auto &key = it.first;
 
         if (TNetwork::NamespaceSysctl(key)) {
-            if (!NewNetNs)
+            if (!CT->NetIsolate)
                 return TError(EError::Permission, "Sysctl " + key + " requires net isolation");
         } else if (std::find(IpcSysctls.begin(), IpcSysctls.end(), key) != IpcSysctls.end()) {
             if (!CT->Isolate)
@@ -482,8 +483,33 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
-        /* Enter parent namespaces */
-        error = ParentNs.Enter();
+        /* Enter namespaces */
+
+        error = IpcFd.SetNs(CLONE_NEWIPC);
+        if (error)
+            Abort(error);
+
+        error = UtsFd.SetNs(CLONE_NEWUTS);
+        if (error)
+            Abort(error);
+
+        error = NetFd.SetNs(CLONE_NEWNET);
+        if (error)
+            Abort(error);
+
+        error = PidFd.SetNs(CLONE_NEWPID);
+        if (error)
+            Abort(error);
+
+        error = MntFd.SetNs(CLONE_NEWNS);
+        if (error)
+            Abort(error);
+
+        error = RootFd.Chroot();
+        if (error)
+            Abort(error);
+
+        error = CwdFd.Chdir();
         if (error)
             Abort(error);
 

@@ -392,7 +392,8 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
     if (!error) {
         std::string value;
 
-        ct->RefillCachedData(req.has_sync() ? req.sync() : false);
+        if (req.has_sync() && req.sync())
+            ct->SyncProperty(req.property());
 
         error = ct->GetProperty(req.property(), value);
         if (!error)
@@ -440,7 +441,8 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
     if (!error) {
         std::string value;
 
-        ct->RefillCachedData(req.has_sync() ? req.sync() : false);
+        if (req.has_sync() && req.sync())
+            ct->SyncProperty(req.data());
 
         error = ct->GetProperty(req.data(), value);
         if (!error)
@@ -520,7 +522,8 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
     if (error)
         return error;
 
-    RootContainer->RefillCachedData(req.has_sync() ? req.sync() : false);
+    if (req.has_sync() && req.sync())
+        TContainer::SyncPropertiesAll();
 
     for (auto &name: names)
         FillGetResponse(req, *get, name);

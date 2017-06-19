@@ -197,8 +197,7 @@ public:
     uint32_t Burst = 65536;
     uint32_t Action = TC_ACT_SHOT;
 
-    TNlPoliceFilter(int index, uint32_t parent, uint32_t handle) :
-        Index(index), Parent(parent) {}
+    TNlPoliceFilter(int index, uint32_t parent) : Index(index), Parent(parent) {}
     TError Create(const TNl &nl);
     TError Delete(const TNl &nl);
 };

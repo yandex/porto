@@ -961,6 +961,7 @@ public:
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET)) {
             CT->NetProp = { { "none" } };
             CT->NetIsolate = true;
+            CT->NetInherit = false;
         }
         return TError::Success();
     }
@@ -974,19 +975,20 @@ TError TNet::Set(const std::string &net_desc) {
     TMultiTuple new_net_desc;
     SplitEscapedString(net_desc, new_net_desc, ' ', ';');
 
-    TNetCfg cfg;
-    error = cfg.ParseNet(new_net_desc);
+    TNetEnv NetEnv;
+    error = NetEnv.ParseNet(new_net_desc);
     if (error)
         return error;
 
-    if (!cfg.Inherited) {
+    if (!NetEnv.NetInherit) {
         error = WantControllers(CGROUP_NETCLS);
         if (error)
             return error;
     }
 
     CT->NetProp = new_net_desc; /* FIXME: Copy vector contents? */
-    CT->NetIsolate = cfg.NewNetNs;
+    CT->NetIsolate = NetEnv.NetIsolate;
+    CT->NetInherit = NetEnv.NetInherit;
     CT->SetProp(EProperty::NET);
     return TError::Success();
 }
@@ -1284,8 +1286,8 @@ TError TIp::Set(const std::string &ipaddr) {
     TMultiTuple ipaddrs;
     SplitEscapedString(ipaddr, ipaddrs, ' ', ';');
 
-    TNetCfg cfg;
-    error = cfg.ParseIp(ipaddrs);
+    TNetEnv NetEnv;
+    error = NetEnv.ParseIp(ipaddrs);
     if (error)
         return error;
 
@@ -1347,11 +1349,11 @@ TError TDefaultGw::Set(const std::string &gw) {
     if (error)
         return error;
 
-    TNetCfg cfg;
+    TNetEnv NetEnv;
     TMultiTuple gws;
     SplitEscapedString(gw, gws, ' ', ';');
 
-    error = cfg.ParseGw(gws);
+    error = NetEnv.ParseGw(gws);
     if (error)
         return error;
 
@@ -2090,291 +2092,6 @@ public:
     }
 } static IoOpsLimit;
 
-class TNetGuarantee : public TProperty {
-public:
-    TError Set(const std::string &guarantee);
-    TError Get(std::string &value);
-    TError SetIndexed(const std::string &index, const std::string &guarantee);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetGuarantee() : TProperty(P_NET_GUARANTEE, EProperty::NET_GUARANTEE,
-            "Guaranteed network bandwidth: <interface>|default: <Bps>;... (dynamic)") {}
-} static NetGuarantee;
-
-TError TNetGuarantee::Set(const std::string &guarantee) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_NETCLS);
-    if (error)
-        return error;
-
-    TUintMap new_guarantee;
-    error = StringToUintMap(guarantee, new_guarantee);
-    if (error)
-        return error;
-
-    if (CT->NetGuarantee != new_guarantee) {
-        CT->SetProp(EProperty::NET_GUARANTEE);
-        auto lock = CT->LockNetState();
-        CT->NetGuarantee = new_guarantee;
-    }
-
-    return TError::Success();
-}
-
-TError TNetGuarantee::Get(std::string &value) {
-    return UintMapToString(CT->NetGuarantee, value);
-}
-
-TError TNetGuarantee::SetIndexed(const std::string &index,
-                                          const std::string &guarantee) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    uint64_t val;
-    error = StringToSize(guarantee, val);
-    if (error)
-        return TError(EError::InvalidValue, "Invalid value " + guarantee);
-
-    if (CT->NetGuarantee[index] != val) {
-        CT->SetProp(EProperty::NET_GUARANTEE);
-        auto lock = CT->LockNetState();
-        CT->NetGuarantee[index] = val;
-    }
-
-    return TError::Success();
-}
-
-TError TNetGuarantee::GetIndexed(const std::string &index,
-                                          std::string &value) {
-
-    if (CT->NetGuarantee.find(index) ==
-        CT->NetGuarantee.end())
-
-        return TError(EError::InvalidValue, "invalid index " + index);
-
-    value = std::to_string(CT->NetGuarantee[index]);
-
-    return TError::Success();
-}
-
-class TNetLimit : public TProperty {
-public:
-    TError Set(const std::string &limit);
-    TError Get(std::string &value);
-    TError SetIndexed(const std::string &index, const std::string &limit);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetLimit() : TProperty(P_NET_LIMIT, EProperty::NET_LIMIT,
-            "Maximum network bandwidth: <interface>|default: <Bps>;... (dynamic)") {}
-} static NetLimit;
-
-TError TNetLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_NETCLS);
-    if (error)
-        return error;
-
-    TUintMap new_limit;
-    error = StringToUintMap(limit, new_limit);
-    if (error)
-        return error;
-
-    if (CT->NetLimit != new_limit) {
-        CT->SetProp(EProperty::NET_LIMIT);
-        auto lock = CT->LockNetState();
-        CT->NetLimit = new_limit;
-    }
-
-    return TError::Success();
-}
-
-TError TNetLimit::Get(std::string &value) {
-    return UintMapToString(CT->NetLimit, value);
-}
-
-TError TNetLimit::SetIndexed(const std::string &index,
-                                      const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    uint64_t val;
-    error = StringToSize(limit, val);
-    if (error)
-        return TError(EError::InvalidValue, "Invalid value " + limit);
-
-    if (CT->NetLimit[index] != val) {
-        CT->SetProp(EProperty::NET_LIMIT);
-        auto lock = CT->LockNetState();
-        CT->NetLimit[index] = val;
-    }
-
-    return TError::Success();
-}
-
-TError TNetLimit::GetIndexed(const std::string &index,
-                                      std::string &value) {
-
-    if (CT->NetLimit.find(index) ==
-        CT->NetLimit.end())
-
-        return TError(EError::InvalidValue, "invalid index " + index);
-
-    value = std::to_string(CT->NetLimit[index]);
-
-    return TError::Success();
-}
-
-class TNetRxLimit : public TProperty {
-public:
-    TNetRxLimit() : TProperty(P_NET_RX_LIMIT, EProperty::NET_RX_LIMIT,
-            "Maximum ingress bandwidth: <interface>|default: <Bps>;... (dynamic)") {}
-
-    TError Get(std::string &value) {
-        return UintMapToString(CT->NetRxLimit, value);
-    }
-
-    TError Set(const std::string &limit) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
-        TUintMap new_limit;
-        error = StringToUintMap(limit, new_limit);
-        if (error)
-            return error;
-
-        if ((!CT->NetIsolate || CT->Net == HostNetwork) &&
-            new_limit.size())
-
-            return TError(EError::InvalidValue,
-                          "Net rx limit requires isolated network");
-
-        if (CT->NetRxLimit != new_limit) {
-            CT->SetProp(EProperty::NET_RX_LIMIT);
-            auto lock = CT->LockNetState();
-            CT->NetRxLimit = new_limit;
-        }
-
-        return TError::Success();
-    }
-
-    TError GetIndexed(const std::string &index, std::string &value) {
-        if (CT->NetRxLimit.find(index) == CT->NetRxLimit.end())
-            return TError(EError::InvalidValue, "invalid index " + index);
-
-        value = std::to_string(CT->NetRxLimit[index]);
-        return TError::Success();
-    }
-
-    TError SetIndexed(const std::string &index, const std::string &limit) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
-        uint64_t val;
-        error = StringToSize(limit, val);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid value " + limit);
-
-        if (CT->NetRxLimit[index] != val) {
-            CT->SetProp(EProperty::NET_RX_LIMIT);
-            auto lock = CT->LockNetState();
-            CT->NetRxLimit[index] = val;
-        }
-
-        return TError::Success();
-    }
-} static NetRxLimit;
-
-class TNetPriority : public TProperty {
-public:
-    TError Set(const std::string &prio);
-    TError Get(std::string &value);
-    TError SetIndexed(const std::string &index, const std::string &prio);
-    TError GetIndexed(const std::string &index, std::string &value);
-    TNetPriority()  : TProperty(P_NET_PRIO, EProperty::NET_PRIO,
-            "Container network priority: <interface>|default: 0-7;... (dynamic)") {}
-    TError Start(void) {
-        if (!CT->Isolate && !CT->HasProp(EProperty::NET_PRIO))
-            CT->NetPriority = CT->Parent->NetPriority;
-        return TError::Success();
-    }
-} static NetPriority;
-
-TError TNetPriority::Set(const std::string &prio) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_NETCLS);
-    if (error)
-        return error;
-
-    TUintMap new_prio;
-    error = StringToUintMap(prio, new_prio);
-    if (error)
-        return error;
-
-    for (auto &kv : new_prio) {
-        if (kv.second > 7)
-            return TError(EError::InvalidValue, "invalid value");
-    }
-
-    if (CT->NetPriority != new_prio) {
-        CT->SetProp(EProperty::NET_PRIO);
-        auto lock = CT->LockNetState();
-        CT->NetPriority = new_prio;
-    }
-
-    return TError::Success();
-}
-
-TError TNetPriority::Get(std::string &value) {
-    return UintMapToString(CT->NetPriority, value);
-}
-
-TError TNetPriority::SetIndexed(const std::string &index,
-                                      const std::string &prio) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    uint64_t val;
-    error = StringToSize(prio, val);
-    if (error)
-        return TError(EError::InvalidValue, "Invalid value " + prio);
-
-    if (val > 7)
-        return TError(EError::InvalidValue, "invalid value");
-
-    if (CT->NetPriority[index] != val) {
-        CT->SetProp(EProperty::NET_PRIO);
-        auto lock = CT->LockNetState();
-        CT->NetPriority[index] = val;
-    }
-
-    return TError::Success();
-}
-
-TError TNetPriority::GetIndexed(const std::string &index,
-                                      std::string &value) {
-
-    if (CT->NetPriority.find(index) ==
-        CT->NetPriority.end())
-
-        return TError(EError::InvalidValue, "invalid index " + index);
-
-    value = std::to_string(CT->NetPriority[index]);
-
-    return TError::Success();
-}
-
 class TRespawn : public TProperty {
 public:
     TError Set(const std::string &respawn);
@@ -3039,9 +2756,9 @@ public:
     TError Get(std::string &value) {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
-        uint32_t id = CT->ContainerTC;
+        uint32_t id = CT->NetClass.Leaf;
         auto str = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
-        auto lock = CT->Net->ScopedLock();
+        auto lock = CT->Net->LockNet();
         TStringMap map;
         for (auto &dev: CT->Net->Devices)
             if (dev.Managed)
@@ -3052,8 +2769,8 @@ public:
     TError GetIndexed(const std::string &index, std::string &value) {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
-        uint32_t id = CT->ContainerTC;
-        auto lock = CT->Net->ScopedLock();
+        uint32_t id = CT->NetClass.Leaf;
+        auto lock = CT->Net->LockNet();
         for (auto &dev: CT->Net->Devices) {
             if (dev.Managed && dev.Name == index) {
                 value = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
@@ -3064,12 +2781,99 @@ public:
     }
 } NetClassId;
 
-class TNetStat : public TProperty {
+class TNetProperty : public TProperty {
+    TUintMap TNetClass:: *Member;
 public:
-    uint64_t TNetStats:: *Member;
+    TNetProperty(std::string name, TUintMap TNetClass:: *member, EProperty prop, std::string desc) :
+        TProperty(name, prop, desc), Member(member)
+    {
+        if (prop == EProperty::NET_PRIO)
+            IsHidden = true;
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
 
-    TNetStat(std::string name, uint64_t TNetStats:: *member, std::string desc) :
-            TProperty(name, EProperty::NONE, desc) {
+        error = WantControllers(CGROUP_NETCLS);
+        if (error)
+            return error;
+
+        TUintMap map;
+        error = StringToUintMap(value, map);
+        if (error)
+            return error;
+
+        auto &cur = CT->NetClass.*Member;
+        if (cur != map) {
+            CT->SetProp(Prop);
+            auto lock = CT->LockNetState();
+            cur = map;
+        }
+
+        return TError::Success();
+    }
+
+    TError Get(std::string &value) {
+        return UintMapToString(CT->NetClass.*Member, value);
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+
+        uint64_t val;
+        error = StringToSize(value, val);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid value " + value);
+
+        auto &cur = CT->NetClass.*Member;
+        if (cur[index] != val) {
+            CT->SetProp(Prop);
+            auto lock = CT->LockNetState();
+            cur[index] = val;
+        }
+
+        return TError::Success();
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        auto lock = CT->LockNetState();
+        auto &cur = CT->NetClass.*Member;
+        auto it = cur.find(index);
+        if (it == cur.end())
+            return TError(EError::InvalidValue, "invalid index " + index);
+        value = std::to_string(it->second);
+        return TError::Success();
+    }
+
+    TError Start(void) {
+        if (Prop == EProperty::NET_RX_LIMIT &&
+                !CT->NetIsolate && CT->NetClass.RxLimit.size())
+            return TError(EError::InvalidValue, "Net rx limit requires isolated network");
+        return TError::Success();
+    }
+};
+
+TNetProperty NetGuarantee(P_NET_GUARANTEE, &TNetClass::Rate, EProperty::NET_GUARANTEE,
+        "Guaranteed network bandwidth: <interface>|default: <Bps>;... (dynamic)");
+
+TNetProperty NetLimit(P_NET_LIMIT, &TNetClass::Limit, EProperty::NET_LIMIT,
+        "Maximum network bandwidth: <interface>|default: <Bps>;... (dynamic)");
+
+TNetProperty NetRxLimit(P_NET_RX_LIMIT, &TNetClass::RxLimit, EProperty::NET_RX_LIMIT,
+        "Maximum ingress bandwidth: <interface>|default: <Bps>;... (dynamic)");
+
+TNetProperty NetPriority(P_NET_PRIO, &TNetClass::Prio, EProperty::NET_PRIO,
+        "Container network priority: <interface>|default: 0-7;... (dynamic)");
+
+class TNetStatProperty : public TProperty {
+public:
+    uint64_t TNetStat:: *Member;
+
+    TNetStatProperty(std::string name, uint64_t TNetStat:: *member,
+                     std::string desc) : TProperty(name, EProperty::NONE, desc) {
         Member = member;
         IsReadOnly = true;
     }
@@ -3079,13 +2883,10 @@ public:
         if (error)
             return error;
 
-        auto lock = CT->LockNetState();
-        if (!CT->Net)
-            return TError(EError::NotSupported, "Network statistics is not available");
-
         TUintMap stat;
 
-        for (auto &it : CT->NetStats)
+        auto lock = CT->LockNetState();
+        for (auto &it : CT->NetClass.Fold->Stat)
             stat[it.first] = &it.second->*Member;
 
         return UintMapToString(stat, value);
@@ -3097,45 +2898,37 @@ public:
             return error;
 
         auto lock = CT->LockNetState();
-        if (!CT->Net)
-            return TError(EError::NotSupported, "Network statistics is not available");
-
-        TUintMap stat;
-
-        for (auto &it : CT->NetStats)
-            stat[it.first] = &it.second->*Member;
-
-        if (stat.find(index) == stat.end())
+        auto it = CT->NetClass.Fold->Stat.find(index);
+        if (it == CT->NetClass.Fold->Stat.end())
             return TError(EError::InvalidValue, "network device " + index + " not found");
-
-        value = std::to_string(stat[index]);
+        value = std::to_string(it->second.*Member);
 
         return TError::Success();
     }
 };
 
-TNetStat NetBytes(D_NET_BYTES, &TNetStats::Bytes,
-                  "tx bytes: <interface>: <bytes>;... (ro)");
-TNetStat NetPackets(D_NET_PACKETS, &TNetStats::Packets,
-                    "tx packets: <interface>: <packets>;... (ro)");
-TNetStat NetDrops(D_NET_DROPS, &TNetStats::Drops,
-                  "tx drops: <interface>: <packets>;... (ro)");
-TNetStat NetOverlimits(D_NET_OVERLIMITS, &TNetStats::Overlimits,
-                       "tx overlimits: <interface>: <packets>;... (ro)");
+TNetStatProperty NetBytes(D_NET_BYTES, &TNetStat::Bytes,
+        "tx bytes: <interface>: <bytes>;... (ro)");
+TNetStatProperty NetPackets(D_NET_PACKETS, &TNetStat::Packets,
+        "tx packets: <interface>: <packets>;... (ro)");
+TNetStatProperty NetDrops(D_NET_DROPS, &TNetStat::Drops,
+        "tx drops: <interface>: <packets>;... (ro)");
+TNetStatProperty NetOverlimits(D_NET_OVERLIMITS, &TNetStat::Overlimits,
+        "tx overlimits: <interface>: <packets>;... (ro)");
 
-TNetStat NetRxBytes(D_NET_RX_BYTES, &TNetStats::RxBytes,
-                    "device rx bytes: <interface>: <bytes>;... (ro)");
-TNetStat NetRxPackets(D_NET_RX_PACKETS, &TNetStats::RxPackets,
-                      "device rx packets: <interface>: <packets>;... (ro)");
-TNetStat NetRxDrops(D_NET_RX_DROPS, &TNetStats::RxDrops,
-                    "device rx drops: <interface>: <packets>;... (ro)");
+TNetStatProperty NetRxBytes(D_NET_RX_BYTES, &TNetStat::RxBytes,
+        "device rx bytes: <interface>: <bytes>;... (ro)");
+TNetStatProperty NetRxPackets(D_NET_RX_PACKETS, &TNetStat::RxPackets,
+        "device rx packets: <interface>: <packets>;... (ro)");
+TNetStatProperty NetRxDrops(D_NET_RX_DROPS, &TNetStat::RxDrops,
+        "device rx drops: <interface>: <packets>;... (ro)");
 
-TNetStat NetTxBytes(D_NET_TX_BYTES, &TNetStats::TxBytes,
-                    "device tx bytes: <interface>: <bytes>;... (ro)");
-TNetStat NetTxPackets(D_NET_TX_PACKETS, &TNetStats::TxPackets,
-                      "device tx packets: <interface>: <packets>;... (ro)");
-TNetStat NetTxDrops(D_NET_TX_DROPS, &TNetStats::TxDrops,
-                    "device tx drops: <interface>: <packets>;... (ro)");
+TNetStatProperty NetTxBytes(D_NET_TX_BYTES, &TNetStat::TxBytes,
+        "device tx bytes: <interface>: <bytes>;... (ro)");
+TNetStatProperty NetTxPackets(D_NET_TX_PACKETS, &TNetStat::TxPackets,
+        "device tx packets: <interface>: <packets>;... (ro)");
+TNetStatProperty NetTxDrops(D_NET_TX_DROPS, &TNetStat::TxDrops,
+        "device tx drops: <interface>: <packets>;... (ro)");
 
 class TIoStat : public TProperty {
 public:

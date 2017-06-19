@@ -11,6 +11,7 @@
 #include "util/locks.hpp"
 #include "util/log.hpp"
 #include "util/idmap.hpp"
+#include "task.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
 #include "property.hpp"
@@ -20,9 +21,6 @@ class TEpollSource;
 class TCgroup;
 class TSubsystem;
 class TEvent;
-enum class ENetStat;
-class TNetwork;
-class TNamespaceFd;
 class TContainerWaiter;
 class TClient;
 class TVolume;
@@ -77,16 +75,11 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplySchedPolicy() const;
     TError ApplyIoPolicy() const;
     TError ApplyDynamicProperties();
-    TError RestoreNetwork();
     TError PrepareOomMonitor();
     void ShutdownOom();
     TError PrepareCgroups();
     TError ConfigureDevices(std::vector<TDevice> &devices);
-    TError ParseNetConfig(struct TNetCfg &NetCfg);
-    TError CheckIpLimit(struct TNetCfg &NetCfg);
-    TError PrepareNetwork(struct TNetCfg &NetCfg);
-    TError PrepareTask(struct TTaskEnv *TaskEnv,
-                       struct TNetCfg *NetCfg);
+    TError PrepareTask(TTaskEnv &TaskEnv);
     TError StartOne();
 
     void ScheduleRespawn();
@@ -135,8 +128,11 @@ public:
     int VirtMode;
     bool BindDns;
     bool Isolate;
-    bool NetIsolate = false;
+
     TMultiTuple NetProp;
+    bool NetIsolate;            /* Create new network namespace */
+    bool NetInherit;            /* Use parent network namespace */
+
     std::string Hostname;
     TTuple EnvCfg;
     std::vector<TBindMount> BindMounts;
@@ -195,15 +191,6 @@ public:
     TBitMap CpuVacant;
     TBitMap CpuReserve;
 
-    uint32_t ContainerTC;
-    uint32_t ParentTC;
-    uint32_t LeafTC;
-
-    TUintMap NetGuarantee;
-    TUintMap NetLimit;
-    TUintMap NetRxLimit;
-    TUintMap NetPriority;
-
     bool ToRespawn;
     int MaxRespawns;
     uint64_t RespawnCount;
@@ -232,22 +219,18 @@ public:
     TTask WaitTask;
     TTask SeizeTask;
 
-    std::mutex NetStateMutex;
-    TError NetState = TError::Queued();
+    /* Protected with container lock */
     std::shared_ptr<TNetwork> Net;
-    std::condition_variable NetCv;
 
-    std::map<std::string, TNetStats> NetStats;
-    uint64_t NetStatsRefreshTime = 0lu;
-    inline void RefillCachedData(bool force = false) {
-        NetWorker.RefreshStats(shared_from_this(), force);
-    }
-
+    /* Container must be locked to stabilize Net pointer */
     inline std::unique_lock<std::mutex> LockNetState() {
-        return std::unique_lock<std::mutex>(NetStateMutex);
+        if (Net)
+            return Net->LockNetState();
+        return std::unique_lock<std::mutex>();
     }
 
-    TError RefreshNet(TScopedLock &lock);
+    /* Protected with NetStateMutex and container lock */
+    TNetClass NetClass;
 
     TPath GetCwd() const;
     TPath WorkPath() const;
@@ -313,7 +296,6 @@ public:
     std::list<std::shared_ptr<TContainer>> Childs();
 
     std::shared_ptr<TContainer> GetParent() const;
-    TError OpenNetns(TNamespaceFd &netns) const;
 
     TError GetPidFor(pid_t pidns, pid_t &pid) const;
 
@@ -325,6 +307,10 @@ public:
     TError Terminate(uint64_t deadline);
     TError Kill(int sig);
     TError Destroy();
+
+    /* Refresh cached counters */
+    void SyncProperty(const std::string &name);
+    static void SyncPropertiesAll();
 
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
@@ -341,8 +327,6 @@ public:
     std::shared_ptr<TContainer> FindRunningParent() const;
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
-
-    void ChooseTrafficClasses();
 
     void ChooseSchedPolicy();
 

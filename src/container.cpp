@@ -308,7 +308,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     Isolate = true;
     BindDns = true;
     VirtMode = VIRT_MODE_APP;
+
     NetProp = { { "inherited" } };
+    NetIsolate = false;
+    NetInherit = true;
+
     Hostname = "";
     CapAmbient = NoCapabilities;
     CapAllowed = NoCapabilities;
@@ -360,7 +364,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     if (Level <= 1 && CpusetSubsystem.Supported)
         Controllers |= CGROUP_CPUSET;
 
-    NetPriority["default"] = NET_DEFAULT_PRIO;
+    NetClass.Prio["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
     RespawnCount = 0;
@@ -376,7 +380,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 }
 
 TContainer::~TContainer() {
-    // so call them explicitly in Tcontainer::Destroy()
     PORTO_ASSERT(Net == nullptr);
     Statistics->ContainersCount--;
 }
@@ -509,15 +512,15 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
     ct->SyncState();
 
-    error = ct->RestoreNetwork();
-    if (error && !ct->WaitTask.IsZombie()) {
-        L_WRN("Cannot restore network: {}", error);
-        ct->Reap(false);
-    }
+    TNetwork::InitClass(*ct);
 
     /* Restore cgroups only for running containers */
     if (ct->State != EContainerState::Stopped &&
             ct->State != EContainerState::Dead) {
+
+        error = TNetwork::RestoreNetwork(*ct);
+        if (error)
+            goto err;
 
         error = ct->PrepareCgroups();
         if (error)
@@ -593,7 +596,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     return TError::Success();
 
 err:
-    ct->Net = nullptr;
+    TNetwork::StopNetwork(*ct);
     lock.lock();
     SystemClient.ReleaseContainer(true);
     ct->Unregister();
@@ -744,11 +747,6 @@ TError TContainer::Destroy() {
             volume->Destroy();
     }
 
-    if (Net) {
-        auto lock = Net->ScopedLock();
-        Net = nullptr;
-    }
-
     auto lock = LockContainers();
 
     Unregister();
@@ -769,7 +767,7 @@ bool TContainer::IsChildOf(const TContainer &ct) const {
     return false;
 }
 
-/* Builds list with container and all sub-containers in DFS order. */
+/* Subtree in DFS post-order: childs first */
 std::list<std::shared_ptr<TContainer>> TContainer::Subtree() {
     std::list<std::shared_ptr<TContainer>> subtree {shared_from_this()};
     auto lock = LockContainers();
@@ -792,17 +790,18 @@ std::shared_ptr<TContainer> TContainer::GetParent() const {
 }
 
 TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
+    ino_t inode = TNamespaceFd::PidInode(pidns, "ns/pid");
     TError error;
 
     if (IsRoot()) {
         pid = 1;
     } else if (!Task.Pid) {
         error = TError(EError::InvalidState, "container isn't running");
-    } else if (InPidNamespace(pidns, getpid())) {
+    } else if (TNamespaceFd::PidInode(getpid(), "ns/pid") == inode) {
         pid = Task.Pid;
-    } else if (WaitTask.Pid != Task.Pid && InPidNamespace(pidns, WaitTask.Pid)) {
+    } else if (WaitTask.Pid != Task.Pid && TNamespaceFd::PidInode(WaitTask.Pid, "ns/pid") == inode) {
         pid = TaskVPid;
-    } else if (InPidNamespace(pidns, Task.Pid)) {
+    } else if (TNamespaceFd::PidInode(Task.Pid, "ns/pid") == inode) {
         if (!Isolate)
             pid = TaskVPid;
         else if (VirtMode == VIRT_MODE_OS || IsMeta())
@@ -815,14 +814,6 @@ TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
             error = TError(EError::Permission, "pid is unreachable");
     }
     return error;
-}
-
-TError TContainer::OpenNetns(TNamespaceFd &netns) const {
-    if (Task.Pid)
-        return netns.Open(Task.Pid, "ns/net");
-    if (Net == HostNetwork)
-        return netns.Open(GetTid(), "ns/net");
-    return TError(EError::InvalidValue, "Cannot open netns: container not running");
 }
 
 uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
@@ -1383,17 +1374,13 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestClearPropDirty(EProperty::NET_PRIO) |
         TestClearPropDirty(EProperty::NET_LIMIT) |
-        TestClearPropDirty(EProperty::NET_GUARANTEE)) {
-
-        error = NetWorker.RefreshNetwork(shared_from_this());
-        if (error)
-            return error;
-    }
-
-    if (TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
-        error = NetWorker.RefreshNetwork(shared_from_this());
-        if (error)
-            return error;
+        TestClearPropDirty(EProperty::NET_GUARANTEE) |
+        TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
+        if (Net) {
+            error = Net->SetupClasses(NetClass);
+            if (error)
+                return error;
+        }
     }
 
     if (TestClearPropDirty(EProperty::ULIMIT)) {
@@ -1541,7 +1528,7 @@ TError TContainer::PrepareCgroups() {
 
     if (Controllers & CGROUP_NETCLS) {
         auto netcls = GetCgroup(NetclsSubsystem);
-        error = netcls.Set("net_cls.classid", std::to_string(LeafTC));
+        error = netcls.Set("net_cls.classid", std::to_string(NetClass.Leaf));
         if (error) {
             L_ERR("Can't set classid: {}", error);
             return error;
@@ -1549,98 +1536,6 @@ TError TContainer::PrepareCgroups() {
     }
 
     return TError::Success();
-}
-
-TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
-    TError error;
-
-    NetCfg.Parent = Parent;
-    NetCfg.Id = Id;
-    NetCfg.Hostname = Hostname;
-    NetCfg.NetUp = VirtMode != VIRT_MODE_OS;
-    NetCfg.OwnerCred = OwnerCred;
-
-    error = NetCfg.ParseNet(NetProp);
-    if (error)
-        return error;
-
-    error = NetCfg.ParseIp(IpList);
-    if (error)
-        return error;
-
-    error = NetCfg.ParseGw(DefaultGw);
-    if (error)
-        return error;
-
-    if (Parent)
-        NetCfg.ParentNet = Parent->Net;
-
-    if (Net)
-        NetCfg.Net = Net;
-
-    return TError::Success();
-}
-
-TError TContainer::CheckIpLimit(struct TNetCfg &NetCfg) {
-
-    if (NetCfg.IpVec.empty() && NetCfg.L3Only)
-        return TError::Success();
-
-    for (auto ct = Parent; ct; ct = ct->Parent) {
-
-        /* empty means no limit */
-        if (ct->IpLimit.empty() || ct->IpLimit.size() == 1 && ct->IpLimit[0] == "any")
-            continue;
-
-        if (ct->IpLimit.size() == 1 && ct->IpLimit[0] == "none")
-            return TError(EError::Permission, "Parent container " + ct->Name + " forbid ip changing");
-
-        if (!NetCfg.L3Only)
-            return TError(EError::Permission, "Parent container " + ct->Name + " allows only L3 network");
-
-        for (auto &v: NetCfg.IpVec) {
-            bool allow = false;
-            for (auto &str: ct->IpLimit) {
-                TNlAddr mask;
-                if (mask.Parse(AF_UNSPEC, str) || mask.Family() != v.Addr.Family())
-                    continue;
-                if (mask.IsMatch(v.Addr)) {
-                    allow = true;
-                    break;
-                }
-            }
-            if (!allow)
-                return TError(EError::Permission, "Parent container " + ct->Name +
-                                                  " forbid address: " + v.Addr.Format());
-        }
-    }
-
-    return TError::Success();
-}
-
-TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
-    TError error;
-
-    error = NetCfg.PrepareNetwork();
-    if (error)
-        return error;
-
-    if (NetCfg.SaveIp)
-        NetCfg.FormatIp(IpList);
-
-    if (NetRxLimit.size() && (!NetIsolate || NetCfg.Net == HostNetwork))
-        return TError(EError::InvalidValue,
-                      "Net rx limit requires isolated network");
-
-    auto lock = LockNetState();
-    Net = NetCfg.Net;
-
-    for (auto &dev : Net->Devices)
-        NetStats[dev.Name] = TNetStats();
-
-    lock.unlock();
-
-    return NetWorker.RefreshNetwork(shared_from_this());
 }
 
 TError TContainer::GetEnvironment(TEnv &env) {
@@ -1672,90 +1567,106 @@ TError TContainer::GetEnvironment(TEnv &env) {
     return TError::Success();
 }
 
-TError TContainer::PrepareTask(struct TTaskEnv *taskEnv,
-                               struct TNetCfg *NetCfg) {
+TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     auto parent = FindRunningParent();
     TError error;
 
-    taskEnv->CT = shared_from_this();
-    taskEnv->Client = CL;
+    TaskEnv.CT = shared_from_this();
+    TaskEnv.Client = CL;
 
     for (auto hy: Hierarchies)
-        taskEnv->Cgroups.push_back(GetCgroup(*hy));
+        TaskEnv.Cgroups.push_back(GetCgroup(*hy));
 
-    taskEnv->Mnt.ChildCwd = GetCwd();
-    taskEnv->Mnt.ParentCwd = Parent->GetCwd();
+    TaskEnv.Mnt.ChildCwd = GetCwd();
+    TaskEnv.Mnt.ParentCwd = Parent->GetCwd();
 
     if (RootVolume)
-        taskEnv->Mnt.Root = Parent->RootPath.InnerPath(RootVolume->Path);
+        TaskEnv.Mnt.Root = Parent->RootPath.InnerPath(RootVolume->Path);
     else
-        taskEnv->Mnt.Root = Root;
+        TaskEnv.Mnt.Root = Root;
 
-    taskEnv->Mnt.RootRo = RootRo;
+    TaskEnv.Mnt.RootRo = RootRo;
 
-    taskEnv->Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
+    TaskEnv.Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
 
-    taskEnv->Mnt.BindCred = Parent->RootPath.IsRoot() ? CL->TaskCred : TCred(RootUser, RootGroup);
+    TaskEnv.Mnt.BindCred = Parent->RootPath.IsRoot() ? CL->TaskCred : TCred(RootUser, RootGroup);
 
-    taskEnv->Cred = TaskCred;
+    TaskEnv.Cred = TaskCred;
 
-    error = GetEnvironment(taskEnv->Env);
+    error = GetEnvironment(TaskEnv.Env);
     if (error)
         return error;
 
-    taskEnv->TripleFork = false;
-    taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) && !IsMeta();
+    TaskEnv.TripleFork = false;
+    TaskEnv.QuadroFork = (VirtMode == VIRT_MODE_APP) && !IsMeta();
 
-    taskEnv->Mnt.BindMounts = BindMounts;
-    taskEnv->Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
-    taskEnv->Mnt.BindResolvConf = BindDns && ResolvConf.empty();
+    TaskEnv.Mnt.BindMounts = BindMounts;
+    TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
+    TaskEnv.Mnt.BindResolvConf = BindDns && ResolvConf.empty();
 
-    error = ConfigureDevices(taskEnv->Devices);
+    error = ConfigureDevices(TaskEnv.Devices);
     if (error) {
         L_ERR("Cannot configure devices: {}", error);
         return error;
     }
 
     if (parent) {
-        pid_t parent_pid = parent->Task.Pid;
+        pid_t pid = parent->Task.Pid;
 
-        error = taskEnv->ParentNs.Open(parent_pid);
+        error = TaskEnv.IpcFd.Open(pid, "ns/ipc");
+        if (error)
+            return error;
+
+        error = TaskEnv.UtsFd.Open(pid, "ns/uts");
+        if (error)
+            return error;
+
+        if (NetInherit) {
+            error = TaskEnv.NetFd.Open(pid, "ns/net");
+            if (error)
+                return error;
+        }
+
+        error = TaskEnv.PidFd.Open(pid, "ns/pid");
+        if (error)
+            return error;
+
+        error = TaskEnv.MntFd.Open(pid, "ns/mnt");
+        if (error)
+            return error;
+
+        error = TaskEnv.RootFd.Open(pid, "root");
+        if (error)
+            return error;
+
+        error = TaskEnv.CwdFd.Open(pid, "cwd");
         if (error)
             return error;
 
         /* one more fork for creating nested pid-namespace */
-        if (Isolate && !InPidNamespace(parent_pid, getpid()))
-            taskEnv->TripleFork = true;
+        if (Isolate && TaskEnv.PidFd.Inode() != TNamespaceFd::PidInode(getpid(), "ns/pid"))
+            TaskEnv.TripleFork = true;
     }
 
-    if (NetCfg && NetCfg->NetNs.IsOpened())
-        taskEnv->ParentNs.Net.EatFd(NetCfg->NetNs);
-
-    if (NetCfg) {
-        taskEnv->Autoconf = NetCfg->Autoconf;
-        taskEnv->NewNetNs = NetCfg->NewNetNs;
-    }
-
-    if (IsMeta() || taskEnv->TripleFork || taskEnv->QuadroFork) {
+    if (IsMeta() || TaskEnv.TripleFork || TaskEnv.QuadroFork) {
         TPath exe("/proc/self/exe");
         TPath path;
         TError error = exe.ReadLink(path);
         if (error)
             return error;
         path = path.DirName() / "portoinit";
-        error = taskEnv->PortoInit.OpenRead(path);
+        error = TaskEnv.PortoInit.OpenRead(path);
         if (error)
             return error;
     }
 
     // Create new mount namespaces if we have to make any changes
-    taskEnv->NewMountNs = Isolate || Parent->IsRoot() ||
-                          taskEnv->Mnt.BindMounts.size() ||
+    TaskEnv.NewMountNs = Isolate || Parent->IsRoot() ||
+                          TaskEnv.Mnt.BindMounts.size() ||
                           Hostname.size() ||
                           ResolvConf.size() ||
-                          !taskEnv->Mnt.Root.IsRoot() ||
-                          taskEnv->Mnt.RootRo ||
-                          !NetCfg->Inherited;
+                          !TaskEnv.Mnt.Root.IsRoot() ||
+                          TaskEnv.Mnt.RootRo;
 
     return TError::Success();
 }
@@ -1817,19 +1728,10 @@ TStringMap TContainer::GetUlimit() const {
 }
 
 TError TContainer::StartTask() {
-    struct TTaskEnv TaskEnv;
-    struct TNetCfg NetCfg;
+    TTaskEnv TaskEnv;
     TError error;
 
-    error = ParseNetConfig(NetCfg);
-    if (error)
-        return error;
-
-    error = CheckIpLimit(NetCfg);
-    if (error)
-        return error;
-
-    error = PrepareNetwork(NetCfg);
+    error = TNetwork::StartNetwork(*this, TaskEnv);
     if (error)
         return error;
 
@@ -1843,10 +1745,10 @@ TError TContainer::StartTask() {
     }
 
     /* Meta container without namespaces don't need task */
-    if (IsMeta() && !Isolate && NetCfg.Inherited)
+    if (IsMeta() && !Isolate && NetInherit)
         return TError::Success();
 
-    error = PrepareTask(&TaskEnv, &NetCfg);
+    error = PrepareTask(TaskEnv);
     if (error)
         return error;
 
@@ -2059,7 +1961,7 @@ TError TContainer::PrepareResources() {
         }
     }
 
-    ChooseTrafficClasses();
+    TNetwork::InitClass(*this);
 
     error = PrepareCgroups();
     if (error) {
@@ -2108,61 +2010,17 @@ void TContainer::FreeResources() {
 
     FreeRuntimeResources();
 
-    if (!IsRoot()) {
-        for (auto hy: Hierarchies) {
-            if (Controllers & hy->Controllers) {
-                auto cg = GetCgroup(*hy);
-                (void)cg.Remove(); //Logged inside
-            }
-        }
-    }
-
-    /* Prevent watchdog from re-creating our tcs */
-    auto settings_lock = LockNetState();
-    auto net = Net;
-    Net = nullptr;
-    NetState = TError::Queued();
-    NetStats.clear();
-    NetStatsRefreshTime = 0lu;
-    settings_lock.unlock();
-
-    if (net) {
-        auto net_lock = net->ScopedLock();
-        struct TNetCfg NetCfg;
-
-        error = ParseNetConfig(NetCfg);
-        if (!error && NetCfg.NewNetNs && !--net->Owners)
-            error = NetCfg.DestroyNetwork();
-        if (NetCfg.SaveIp) {
-            TMultiTuple ip_settings;
-            NetCfg.FormatIp(IpList);
-        }
-        if (error)
-            L_ERR("Cannot free network resources: {}", error);
-
-        if ((Controllers & CGROUP_NETCLS) && (!NetCfg.NewNetNs || !net->Owners)) {
-            error = net->DestroyTC(ContainerTC, LeafTC);
-            if (error)
-                L_ERR("Can't remove traffic class: {}", error);
-            net_lock.unlock();
-
-            if (net != HostNetwork) {
-                net_lock = HostNetwork->ScopedLock();
-                error = HostNetwork->DestroyTC(ContainerTC, LeafTC);
-                if (error)
-                    L_ERR("Can't remove traffic class: {}", error);
-            }
-        }
-    }
-
-    if (net && IsRoot()) {
-        error = net->Destroy();
-        if (error)
-            L_ERR("Cannot destroy network: {}", error);
-    }
+    TNetwork::StopNetwork(*this);
 
     if (IsRoot())
         return;
+
+    for (auto hy: Hierarchies) {
+        if (Controllers & hy->Controllers) {
+            auto cg = GetCgroup(*hy);
+            (void)cg.Remove(); //Logged inside
+        }
+    }
 
     /* Legacy non-volume root on loop device */
     if (LoopDev >= 0) {
@@ -2462,6 +2320,15 @@ TError TContainer::Resume() {
     return TError::Success();
 }
 
+void TContainer::SyncProperty(const std::string &name) {
+    if (StringStartsWith(name, "net_") && Net)
+        Net->SyncStat();
+}
+
+void TContainer::SyncPropertiesAll() {
+    TNetwork::SyncAllStat();
+}
+
 /* return true if index specified for property */
 static bool ParsePropertyName(std::string &name, std::string &idx) {
     if (name.size() && name.back() == ']') {
@@ -2576,56 +2443,6 @@ TError TContainer::SetProperty(const std::string &origProperty,
         error = Save();
 
     return error;
-}
-
-TError TContainer::RestoreNetwork() {
-    TNamespaceFd netns;
-    TError error;
-
-    auto lock = LockNetState();
-
-    if (Task.Pid) {
-        error = OpenNetns(netns);
-        if (error)
-            return error;
-
-        Net = TNetwork::GetNetwork(netns.GetInode());
-
-        /* Create a new one */
-        if (!Net) {
-            Net = std::make_shared<TNetwork>();
-            PORTO_ASSERT(Net);
-
-            error = Net->ConnectNetns(netns);
-            if (error)
-                return error;
-
-            TNetwork::AddNetwork(netns.GetInode(), Net);
-        }
-    } else if (State == EContainerState::Meta && Parent) {
-        Net = Parent->Net;
-    } else {
-        /* No restore required */
-        return TError::Success();
-    }
-
-    ChooseTrafficClasses();
-
-    NetState = TError::Queued();
-
-    for (auto &dev : Net->Devices)
-        NetStats[dev.Name] = TNetStats();
-
-    /* Net worker cannot see container yet,
-       so we shouldn't reapply following dynamic
-       props, otherwise we'll stuck indefinetely */
-
-    TestClearPropDirty(EProperty::NET_PRIO);
-    TestClearPropDirty(EProperty::NET_LIMIT);
-    TestClearPropDirty(EProperty::NET_GUARANTEE);
-    TestClearPropDirty(EProperty::NET_RX_LIMIT);
-
-    return TError::Success();
 }
 
 TError TContainer::Save(void) {
@@ -3110,22 +2927,6 @@ void TContainer::CleanupWaiters() {
             continue;
         }
         iter++;
-    }
-}
-
-void TContainer::ChooseTrafficClasses() {
-    if (IsRoot()) {
-        ContainerTC = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        ParentTC = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
-        LeafTC = TcHandle(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
-    } else if (Controllers & CGROUP_NETCLS) {
-        ContainerTC = TcHandle(ROOT_TC_MAJOR, Id);
-        ParentTC = Parent->ContainerTC;
-        LeafTC = TcHandle(ROOT_TC_MAJOR, Id + CONTAINER_ID_MAX);
-    } else {
-        ContainerTC = Parent->ContainerTC;
-        ParentTC = Parent->ParentTC;
-        LeafTC = Parent->LeafTC;
     }
 }
 

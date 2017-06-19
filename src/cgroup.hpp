@@ -33,6 +33,7 @@ public:
     virtual void InitializeSubsystem() { }
 
     virtual TError InitializeCgroup(TCgroup &cgroup) {
+        (void)cgroup;
         return TError::Success();
     }
 

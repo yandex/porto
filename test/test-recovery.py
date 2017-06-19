@@ -23,7 +23,7 @@ def ValidateDefaultProp(r):
             "user" : "porto-alice", "group" : "porto-alice", "env" : "",\
             "memory_limit" : "0", "cpu_policy" : "normal",\
             "cpu_limit" : str(psutil.cpu_count()) + "c",\
-            "cpu_guarantee" : "0c", "net_priority[default]" : "3", "net" : "inherited",\
+            "cpu_guarantee" : "0c", "net" : "inherited",\
             "respawn" : False, "memory_limit" : "0", "stdin_path" : "/dev/null",\
             "stdout_path" : "stdout", "stderr_path" : "stderr", "ulimit" : "",\
             "hostname" : "", "bind_dns" : True, "devices" : "",\

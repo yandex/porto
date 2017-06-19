@@ -176,9 +176,6 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
         ExpectEq(v, "");
     }
 
-    ExpectApiSuccess(api.GetProperty(name, "net_priority[default]", v));
-    ExpectEq(v, "3");
-
     ExpectApiSuccess(api.GetProperty(name, "net", v));
     ExpectEq(v, "inherited");
 
@@ -2965,7 +2962,9 @@ static void TestRoot(Porto::Connection &api) {
         */
         properties.push_back("net_guarantee");
         properties.push_back("net_limit");
+        /*
         properties.push_back("net_priority");
+        */
     }
 
     vector<string> data = {
@@ -3499,10 +3498,6 @@ static void TestLimits(Porto::Connection &api) {
     for (auto &link : links) {
         ExpectApiSuccess(api.SetProperty(name, "net_guarantee[" + link->GetName() + "]", std::to_string(netGuarantee + i)));
         ExpectApiSuccess(api.SetProperty(name, "net_limit[" + link->GetName() + "]", std::to_string(netCeil + i)));
-        ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetName() + "]", "-2"), EError::InvalidValue);
-        ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetName() + "]", "8"), EError::InvalidValue);
-        ExpectApiSuccess(api.SetProperty(name, "net_priority[" + link->GetName() + "]", "0"));
-        ExpectApiSuccess(api.SetProperty(name, "net_priority[" + link->GetName() + "]", std::to_string(netPrio + i)));
         i++;
     }
     ExpectApiSuccess(api.Start(name));
@@ -3517,8 +3512,6 @@ static void TestLimits(Porto::Connection &api) {
         for (auto &link : links) {
             TNlClass tclass(link->GetIndex(), -1, handle);
             ExpectSuccess(tclass.Load(*link->GetNl()));
-            if (tclass.Kind == "htb")
-                ExpectEq(tclass.Prio, netPrio + i);
             ExpectEq(tclass.Rate, netGuarantee + i);
             ExpectEq(tclass.Ceil, netCeil + i);
 
@@ -3541,17 +3534,17 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.SetProperty(name, "net_guarantee", guarantee));
         ExpectApiSuccess(api.GetProperty(name, "net_guarantee", v));
         ExpectEq(StringTrim(guarantee, " ;"), v);
-
-        Say() << "Make sure we have a cap for stdout_limit property" << std::endl;
-
-        ExpectApiFailure(api.SetProperty(name, "stdout_limit",
-                         std::to_string(config().container().stdout_limit_max() + 1)),
-                         EError::Permission);
-
-        Say() << "Make sure we have a cap for private property" << std::endl;
-        std::string tooLong = std::string(config().container().private_max() + 1, 'a');
-        ExpectApiFailure(api.SetProperty(name, "private", tooLong), EError::InvalidValue);
     }
+
+    Say() << "Make sure we have a cap for stdout_limit property" << std::endl;
+
+    ExpectApiFailure(api.SetProperty(name, "stdout_limit",
+                     std::to_string(config().container().stdout_limit_max() + 1)),
+                     EError::Permission);
+
+    Say() << "Make sure we have a cap for private property" << std::endl;
+    std::string tooLong = std::string(config().container().private_max() + 1, 'a');
+    ExpectApiFailure(api.SetProperty(name, "private", tooLong), EError::InvalidValue);
 
     ExpectApiSuccess(api.Destroy(name));
 }

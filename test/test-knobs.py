@@ -63,7 +63,6 @@ knobs = {
     "net" : "inherited",
     "net_guarantee" : "default: 0",
     "net_limit" : "default: 0",
-    "net_priority" : "default: 0" ,
     "owner_user" : "root",
     "owner_group" : "root",
     "porto_namespace" : "/porto",

@@ -101,7 +101,8 @@ def SnapshotProps(r):
               "isolate", "max_respawns", "memory_guarantee", "memory_limit", "net",
               #"net_guarantee", #FIXME enable later, "default:0" -> ""
               #"net_limit", #FIXME enable later, "default:0" -> ""
-              "net_priority", "porto_namespace",
+              # "net_priority",
+              "porto_namespace",
               "private", "recharge_on_pgfault",
               "resolv_conf", "respawn", "root", "root_readonly",
               #"stderr_path", #FIXME enable later, "/dev/null" -> ""

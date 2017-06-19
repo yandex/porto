@@ -1,41 +1,73 @@
 #pragma once
 
 #include <memory>
+#include <atomic>
 #include <string>
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 #include <condition_variable>
 
 #include "common.hpp"
 #include "util/netlink.hpp"
-#include "util/locks.hpp"
 #include "util/namespace.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 
-extern "C" {
-#include <netlink/route/link.h>
-#include <netlink/route/tc.h>
-}
-
 class TContainer;
+struct TTaskEnv;
 
-struct TNetStats {
+struct TNetStat {
+    /* Class TX */
     uint64_t Packets = 0lu;
     uint64_t Bytes = 0lu;
     uint64_t Drops = 0lu;
     uint64_t Overlimits = 0lu;
 
+    /* Device RX */
     uint64_t RxPackets = 0lu;
     uint64_t RxBytes = 0lu;
     uint64_t RxDrops = 0lu;
 
+    /* Device TX */
     uint64_t TxPackets = 0lu;
     uint64_t TxBytes = 0lu;
     uint64_t TxDrops = 0lu;
+
+    void operator+=(const TNetStat &a) {
+        Packets += a.Packets;
+        Bytes += a.Bytes;
+        Drops += a.Drops;
+        Overlimits += a.Overlimits;
+
+        RxPackets += a.RxPackets;
+        RxBytes += a.RxBytes;
+        RxDrops += a.RxDrops;
+
+        TxPackets += a.TxPackets;
+        TxBytes += a.TxBytes;
+        TxDrops += a.TxDrops;
+    }
 };
 
-class TNetworkDevice {
+struct TNetClass {
+    bool HostClass;
+    uint32_t HostParentHandle;
+    uint32_t ParentHandle;
+    uint32_t Handle;
+    uint32_t Leaf;
+    TUintMap Prio;
+    TUintMap Rate;
+    TUintMap Limit;
+    TUintMap RxLimit;
+
+    std::map<std::string, TNetStat> Stat;
+
+    TNetClass *Fold;
+    TNetClass *Parent;
+};
+
+class TNetDevice {
 public:
     std::string Name;
     std::string Type;
@@ -49,85 +81,146 @@ public:
     bool Prepared;
     bool Missing;
 
-    TNetStats Stats;
+    TNetStat Stat;
+    struct nl_cache *ClassCache;
 
-    TNetworkDevice(struct rtnl_link *);
+    TNetDevice(struct rtnl_link *);
 
     std::string GetDesc(void) const;
     uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0) const;
     std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
 };
 
-class TNetwork : public std::enable_shared_from_this<TNetwork>,
-                 public TNonCopyable,
-                 public TLockable {
+class TNetwork : public TNonCopyable {
+    friend struct TNetEnv;
+
+    static std::mutex NetworksMutex;
+
+    static inline std::unique_lock<std::mutex> LockNetworks() {
+        return std::unique_lock<std::mutex>(NetworksMutex);
+    }
+
+    /* Copy-on-write list of networks */
+    static std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> NetworksList;
+
+    static std::unordered_map<ino_t, std::shared_ptr<TNetwork>> NetworksIndex;
+    static void Register(std::shared_ptr<TNetwork> &net, ino_t inode);
+    void Unregister();
+
+    static inline std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> Networks() {
+        /* FIXME not in gcc-4.7 return std::atomic_load(&NetworksList); */
+        auto lock = LockNetworks();
+        return NetworksList;
+    }
+
+    /* Protects netink socket operaions and external state */
+    std::mutex NetMutex;
+
+    /* Protects internal state */
+    std::mutex NetStateMutex;
+
+    /* Containers, parent before childs. Protected with NetStateMutex. */
+    std::list<TNetClass *> NetClasses;
+
+    void InitStat(TNetClass &cls);
+    void RegisterClass(TNetClass &cls);
+    void UnregisterClass(TNetClass &cls);
+
+    unsigned NetUsers = 0;
+
+    ino_t NetInode = 0;
+
     std::shared_ptr<TNl> Nl;
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
 
-    unsigned IfaceName = 0;
+    unsigned IfaceSeq = 0;
+
+    std::condition_variable NetCv;
+
+    static std::atomic<int> GlobalStatGen;
+    std::atomic<int> StatGen;
+    std::atomic<uint64_t> StatTime;
+
+    TError TrySetupClasses(TNetClass &cls);
+
+    void SyncStatLocked();
+    TError RepairLocked();
+
+    /* Something went wrong, handled by Repair */
+    TError NetError;
 
 public:
-    std::vector<TNetworkDevice> Devices;
-
-    TError RefreshDevices(bool force = false);
-    uint64_t SumChildrenStat(struct nl_cache *cache, uint32_t handle,
-                             rtnl_tc_stat kind);
-    void RefreshStats(std::list<std::shared_ptr<TContainer>> &subtree);
-    TError RefreshClasses(std::list<std::shared_ptr<TContainer>> &subtree);
-
-    bool ManagedNamespace = false;
-    bool NewManagedDevices = false;
-    bool NeedRefresh = false;
-
-    int DeviceIndex(const std::string &name) {
-        for (auto dev: Devices)
-            if (dev.Name == name)
-                return dev.Index;
-        return 0;
-    }
-
-    TNlAddr NatBaseV4;
-    TNlAddr NatBaseV6;
-    TIdMap NatBitmap;
-    unsigned Owners = 1;
-
     TNetwork();
     ~TNetwork();
-    TError Connect();
-    TError ConnectNetns(TNamespaceFd &netns);
-    TError ConnectNew(TNamespaceFd &netns);
+
     std::shared_ptr<TNl> GetNl() { return Nl; };
 
-    TError Destroy();
+    std::string NetName;
 
-    void GetDeviceSpeed(TNetworkDevice &dev) const;
-    TError SetupQueue(TNetworkDevice &dev);
+    static TError New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net);
+    static TError Open(const TPath &path, TNamespaceFd &netns,
+                       std::shared_ptr<TNetwork> &net);
+    void Destroy();
 
-    TError DelTC(const TNetworkDevice &dev, uint32_t handle) const;
+    std::unique_lock<std::mutex> LockNet() {
+        return std::unique_lock<std::mutex>(NetMutex);
+    }
 
-    TError CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
-                    TUintMap &prio, TUintMap &rate, TUintMap &ceil);
-    TError DestroyTC(uint32_t handle, uint32_t leaf);
+    std::unique_lock<std::mutex> LockNetState() {
+        return std::unique_lock<std::mutex>(NetStateMutex);
+    }
+
+    /* Created and managed by us */
+    bool ManagedNamespace = false;
+
+    std::vector<TNetDevice> Devices;
+
+    TError SyncDevices(bool force = false);
+    std::string NewDeviceName(const std::string &prefix);
+    std::string MatchDevice(const std::string &pattern);
+    int DeviceIndex(const std::string &name);
+    void GetDeviceSpeed(TNetDevice &dev) const;
+
+    void FatalError(TError &error);
+    void StartRepair();
+    TError WaitRepair();
+
+    TError SetupQueue(TNetDevice &dev);
+
+    static void InitClass(TContainer &ct);
+
+    TError SetupClass(TNetDevice &dev, TNetClass &cls);
+    TError DeleteClass(TNetDevice &dev, TNetClass &cls);
+    TError SetupIngress(TNetDevice &dev, TNetClass &cls);
+
+    TError SetupClasses(TNetClass &cls);
+
+    void SyncStat();
+    static void SyncAllStat();
 
     TError GetGateAddress(std::vector<TNlAddr> addrs,
                           TNlAddr &gate4, TNlAddr &gate6, int &mtu, int &group);
     TError AddAnnounce(const TNlAddr &addr, std::string master);
     TError DelAnnounce(const TNlAddr &addr);
 
+    TNlAddr NatBaseV4;
+    TNlAddr NatBaseV6;
+    TIdMap NatBitmap;
+
     TError GetNatAddress(std::vector <TNlAddr> &addrs);
     TError PutNatAddress(const std::vector <TNlAddr> &addrs);
 
-    std::string NewDeviceName(const std::string &prefix);
-    std::string MatchDevice(const std::string &pattern);
-
-    TError CreateIngressQdisc(TUintMap &rate);
-
-    static void AddNetwork(ino_t inode, std::shared_ptr<TNetwork> &net);
-    static std::shared_ptr<TNetwork> GetNetwork(ino_t inode);
+    TError SetupAddrLabel();
 
     static void InitializeConfig();
 
     static bool NamespaceSysctl(const std::string &key);
+
+    static TError StartNetwork(TContainer &ct, TTaskEnv &task);
+    static void StopNetwork(TContainer &ct);
+    static TError RestoreNetwork(TContainer &ct);
+
+    static void NetWatchdog();
 };
 
 struct TMacVlanNetCfg {
@@ -159,7 +252,6 @@ struct TVethNetCfg {
     std::string Bridge;
     std::string Name;
     std::string Hw;
-    std::string Peer;
     int Mtu;
 };
 
@@ -182,19 +274,23 @@ struct TIpIp6NetCfg {
     bool DefaultRoute;
 };
 
-class TContainer;
+struct TNetEnv {
+    unsigned Id;
+    std::string Name;
 
-struct TNetCfg {
     std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TNetwork> ParentNet;
+
     std::shared_ptr<TNetwork> Net;
-    unsigned Id = 0;
-    TCred OwnerCred;
-    bool NewNetNs = false;
-    bool Inherited = false;
+    TNamespaceFd NetNs;
+
+    bool NetInherit = false;
+    bool NetIsolate = false;
+    bool L3Only = true;
+
     bool NetUp = false;
     bool SaveIp = false;
-    bool L3Only = true;
+
     std::string Hostname;
     std::vector<std::string> Steal;
     std::vector<TMacVlanNetCfg> MacVlan;
@@ -208,39 +304,20 @@ struct TNetCfg {
     std::vector<TIpVec> IpVec;
     std::vector<std::string> Autoconf;
 
-    TNamespaceFd NetNs;
-
-    void Reset();
+    TError Parse(TContainer &ct);
     TError ParseNet(TMultiTuple &net_settings);
     TError ParseIp(TMultiTuple &ip_settings);
     void FormatIp(TMultiTuple &ip_settings);
     TError ParseGw(TMultiTuple &gw_settings);
+
+    TError CheckIpLimit();
+
     std::string GenerateHw(const std::string &name);
     TError ConfigureVeth(TVethNetCfg &veth);
     TError ConfigureL3(TL3NetCfg &l3);
-    TError ConfigureInterfaces();
-    TError PrepareNetwork();
-    TError DestroyNetwork();
+    TError SetupInterfaces();
+
+    TError Open(TContainer &ct);
+
+    TError OpenNetwork();
 };
-
-extern std::shared_ptr<TNetwork> HostNetwork;
-constexpr const char PORTOD_NETWORKER_NAME[] = "portod-network";
-
-class TNetWorker {
-    bool WorkPending = false;
-    bool Shutdown = true;
-    std::thread Thread;
-    std::condition_variable Cv;
-    bool StatsNeeded = false;
-
-public:
-    void Start();
-    void Stop();
-    void Wake();
-    void Loop();
-
-    TError RefreshNetwork(std::shared_ptr<TContainer> ct);
-    void RefreshStats(std::shared_ptr<TContainer> ct, bool force);
-};
-
-extern TNetWorker NetWorker;

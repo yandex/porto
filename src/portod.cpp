@@ -947,7 +947,7 @@ static int SlaveMain() {
 
     RestoreContainers();
 
-    NetWorker.Wake();
+    TContainer::SyncPropertiesAll();
 
     TVolume::RestoreAll();
 
@@ -992,8 +992,6 @@ static int SlaveMain() {
         SystemClient.FinishRequest();
 
         SystemClient.LockContainer(RootContainer);
-
-        NetWorker.Stop();
 
         error = RootContainer->Destroy();
         if (error)
