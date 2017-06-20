@@ -806,3 +806,8 @@ TError ParseUlimit(const std::string &name, const std::string &value,
 
     return TError::Success();
 }
+
+int SetIoPrio(pid_t pid, int ioprio)
+{
+    return syscall(SYS_ioprio_set, 1, pid, ioprio);
+}

@@ -56,8 +56,6 @@ void TConfig::LoadDefaults() {
     // wait 30 seconds for container process to exit after SIGKILL
     config().mutable_container()->set_stop_timeout_ms(30 * 1000);
     config().mutable_container()->set_max_total(3000);
-    config().mutable_container()->set_batch_io_weight(10);
-    config().mutable_container()->set_normal_io_weight(500);
     config().mutable_container()->set_empty_wait_timeout_ms(5000);
     config().mutable_container()->set_enable_smart(false);
     config().mutable_container()->set_enable_cpu_reserve(true);

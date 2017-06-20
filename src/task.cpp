@@ -466,6 +466,9 @@ TError TTaskEnv::Start() {
         if (sched_setscheduler(0, CT->SchedPolicy, &param))
             Abort(TError(EError::Unknown, errno, "sched_setparm"));
 
+        if (SetIoPrio(0, CT->IoPrio))
+            Abort(TError(EError::Unknown, errno, "ioprio"));
+
         /* Default streams and redirections are outside */
         error = CT->Stdin.OpenOutside(*CT, *Client);
         if (error)

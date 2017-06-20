@@ -320,7 +320,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &na
 
     CpuLimit = GetNumCores();
     CpuGuarantee = IsRoot() ? GetNumCores() : 0;
-    IoPolicy = "normal";
+
+    IoPolicy = "";
+    IoPrio = 0;
 
     Controllers = RequiredControllers = CGROUP_FREEZER;
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
@@ -980,6 +982,30 @@ TError TContainer::ApplySchedPolicy() const {
     return TError::Success();
 }
 
+TError TContainer::ApplyIoPolicy() const {
+    auto cg = GetCgroup(FreezerSubsystem);
+    TError error;
+
+    std::vector<pid_t> prev, pids;
+    bool retry;
+
+    L_ACT("Set {} io policy {} ioprio {}", cg, IoPolicy, IoPrio);
+    do {
+        error = cg.GetTasks(pids);
+        retry = false;
+        for (auto pid: pids) {
+            if (std::find(prev.begin(), prev.end(), pid) != prev.end())
+                continue;
+            if (SetIoPrio(pid, IoPrio) && errno != ESRCH)
+                return TError(EError::Unknown, errno, "ioprio");
+            retry = true;
+        }
+        prev = pids;
+    } while (retry);
+
+    return TError::Success();
+}
+
 TError TContainer::ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                                TBitMap &threads, TBitMap &cores) {
     bool try_thread = true;
@@ -1299,10 +1325,17 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (TestClearPropDirty(EProperty::IO_POLICY)) {
-        error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
+        if (Controllers & CGROUP_BLKIO) {
+            error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
+            if (error) {
+                if (error.GetErrno() != EINVAL)
+                    L_ERR("Can't set {}: {}", P_IO_POLICY, error);
+                return error;
+            }
+        }
+        error = ApplyIoPolicy();
         if (error) {
-            if (error.GetErrno() != EINVAL)
-                L_ERR("Can't set {}: {}", P_IO_POLICY, error);
+            L_ERR("Cannot set io policy: {}", error);
             return error;
         }
     }

@@ -197,7 +197,7 @@ def IoOpsLimit():
     )
 
 def IoPolicy():
-    return ("io_policy", select_equal(["normal","rt","idle"]) )
+    return ("io_policy", select_equal(["","none","rt","high","normal","batch","idle"]) )
 
 def User():
     users = pwd.getpwall()

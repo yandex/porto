@@ -167,10 +167,8 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectEq(v, StringFormat("%dc", GetNumCores()));
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
     ExpectEq(v, "0c");
-    if (KernelSupports(KernelFeature::CFQ)) {
-        ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
-        ExpectEq(v, "normal");
-    }
+    ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
+    ExpectEq(v, "");
     if (KernelSupports(KernelFeature::FSIO)) {
         ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
         ExpectEq(v, "");
@@ -3443,24 +3441,17 @@ static void TestLimits(Porto::Connection &api) {
         TestCoresConvertion(api, name, "cpu_guarantee");
     }
 
-    if (KernelSupports(KernelFeature::CFQ)) {
-        Say() << "Check io_policy" << std::endl;
-        uint64_t weight;
+    Say() << "Check io_policy" << std::endl;
 
-        ExpectApiFailure(api.SetProperty(name, "io_policy", "invalid"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "io_policy", "invalid"), EError::InvalidValue);
 
-        ExpectApiSuccess(api.SetProperty(name, "io_policy", "normal"));
-        ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
-        ExpectEq(weight, config().container().normal_io_weight());
-        ExpectApiSuccess(api.Stop(name));
+    ExpectApiSuccess(api.SetProperty(name, "io_policy", "normal"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.Stop(name));
 
-        ExpectApiSuccess(api.SetProperty(name, "io_policy", "batch"));
-        ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
-        ExpectEq(weight, config().container().batch_io_weight());
-        ExpectApiSuccess(api.Stop(name));
-    }
+    ExpectApiSuccess(api.SetProperty(name, "io_policy", "batch"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.Stop(name));
 
     if (KernelSupports(KernelFeature::FSIO)) {
         Say() << "Check io_limit" << std::endl;

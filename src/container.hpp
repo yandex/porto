@@ -73,6 +73,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError ApplyUlimits();
     TError ApplySchedPolicy() const;
+    TError ApplyIoPolicy() const;
     TError ApplyDynamicProperties();
     TError RestoreNetwork();
     TError PrepareOomMonitor();
@@ -170,6 +171,8 @@ public:
     bool RechargeOnPgfault = false;
 
     std::string IoPolicy;
+    int IoPrio;
+
     TUintMap IoBpsLimit;
     TUintMap IoOpsLimit;
 

@@ -44,7 +44,7 @@ def ValidateDefaultProp(r):
 
     #Unsupported ones, we've already checked their existence in test_holder,
     #so let's just poke them
-    ref = { "memory_guarantee" : "0", "io_policy" : "normal", "io_limit" : "",\
+    ref = { "memory_guarantee" : "0", "io_limit" : "",\
             "io_ops_limit" : "", "memory_guarantee" : "0",\
             "recharge_on_pgfault" : False,  }
 

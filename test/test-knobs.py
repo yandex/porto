@@ -55,7 +55,7 @@ knobs = {
     "hostname" : "hostname.local",
     "io_limit" : "200000",
     "io_ops_limit" : "50000",
-    "io_policy" : "normal",
+    "io_policy" : "",
     "ip" : "eth0 1.1.1.1/32",
     "isolate" : True,
     "max_respawns" : "5",

@@ -1012,10 +1012,12 @@ TError TBlkioSubsystem::SetIoPolicy(TCgroup &cg, const std::string &policy) cons
         return TError::Success();
 
     uint64_t weight;
-    if (policy == "normal")
-        weight = config().container().normal_io_weight();
-    else if (policy == "batch")
-        weight = config().container().batch_io_weight();
+    if (policy == "rt" || policy == "high")
+        weight = 1000;
+    else if (policy == "" || policy == "none" || policy == "normal")
+        weight = 500;
+    else if (policy == "batch" || policy == "idle")
+        weight = 10;
     else
         return TError(EError::InvalidValue, "unknown policy: " + policy);
 

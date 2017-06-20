@@ -96,7 +96,8 @@ def SnapshotProps(r):
               #"group",
               "hostname",
               # "io_limit", "io_ops_limit", FIXME "0" -> ""
-              "io_policy", "ip",
+              # "io_policy",
+              "ip",
               "isolate", "max_respawns", "memory_guarantee", "memory_limit", "net",
               #"net_guarantee", #FIXME enable later, "default:0" -> ""
               #"net_limit", #FIXME enable later, "default:0" -> ""
@@ -184,7 +185,6 @@ app_knobs = [
     ("cwd", portosrc),
     ("net_limit", "default: 0"),
     ("cpu_guarantee", "0.01c"),
-    ("io_policy", "normal"),
     ("ulimit", "data: 16000000 32000000;memlock: 4096 4096;"\
                "nofile: 100 200;nproc: 500 1000"\
                ),
@@ -254,7 +254,6 @@ rt_app_knobs = [
     ("cwd", portosrc),
     ("net_limit", "default: 0"),
     ("cpu_guarantee", "4c"),
-    ("io_policy", "normal"),
     ("ulimit", "data: 16000000 32000000;memlock: 4096 4096;"\
                "nofile: 100 200;nproc: 500 1000"\
                ),

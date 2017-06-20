@@ -364,10 +364,7 @@ public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
     TIoPolicy() : TProperty(P_IO_POLICY, EProperty::IO_POLICY,
-                            "IO policy: normal | batch (dynamic)") {}
-    void Init(void) {
-        IsSupported = BlkioSubsystem.HasWeight;
-    }
+                            "IO policy: none | rt | high | normal | batch | idle (dynamic)") {}
     TError Start(void) {
         if (!CT->Isolate && !CT->HasProp(EProperty::IO_POLICY))
             CT->IoPolicy = CT->Parent->IoPolicy;
@@ -376,19 +373,30 @@ public:
 } static IoPolicy;
 
 TError TIoPolicy::Set(const std::string &policy) {
+    int ioprio;
+
     TError error = IsAlive();
     if (error)
         return error;
 
-    error = WantControllers(CGROUP_BLKIO);
-    if (error)
-        return error;
-
-    if (policy != "normal" && policy != "batch")
+    if (policy == "" || policy == "none")
+        ioprio = 0;
+    else if (policy == "rt")
+        ioprio = (1 << 13) | 4;
+    else if (policy == "high")
+        ioprio = 2 << 13;
+    else if (policy == "normal")
+        ioprio = (2 << 13) | 4;
+    else if (policy == "batch")
+        ioprio = (2 << 13) | 7;
+    else if (policy == "idle")
+        ioprio = 3 << 13;
+    else
         return TError(EError::InvalidValue, "invalid policy: " + policy);
 
     if (CT->IoPolicy != policy) {
         CT->IoPolicy = policy;
+        CT->IoPrio = ioprio;
         CT->SetProp(EProperty::IO_POLICY);
     }
 

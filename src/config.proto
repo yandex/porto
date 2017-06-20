@@ -103,7 +103,7 @@ message TCfg {
 		optional uint32 stop_timeout_ms = 9;
 		optional bool use_hierarchy = 10 [deprecated=true];
 		optional uint32 max_total = 11;
-		optional uint32 batch_io_weight = 12;
+		optional uint32 batch_io_weight = 12 [deprecated=true];
 		optional uint32 empty_wait_timeout_ms = 13;
 		optional string chroot_porto_dir = 14 [deprecated=true];
 		optional bool scoped_unlock = 15 [deprecated=true];
@@ -111,7 +111,7 @@ message TCfg {
 		optional bool enable_smart = 17;
 		optional bool default_porto_namespace = 18;
 		optional bool enable_tracefs = 19;
-		optional uint32 normal_io_weight = 20;
+		optional uint32 normal_io_weight = 20 [deprecated=true];
 		optional uint64 stdout_limit_max = 21;
 		optional uint32 devpts_max = 22;
 		optional uint64 dev_size = 23;
