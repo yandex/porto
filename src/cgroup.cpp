@@ -637,6 +637,12 @@ void TCpuSubsystem::InitializeSubsystem() {
         L_SYS("support smart");
 }
 
+TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
+    if (HasRtGroup)
+        (void)cg.SetInt64("cpu.rt_runtime_us", -1);
+    return TError::Success();
+}
+
 TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
                                   double weight, double guarantee, double limit) {
     int max = GetNumCores();

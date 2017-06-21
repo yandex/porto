@@ -219,6 +219,7 @@ public:
     uint64_t BasePeriod, BaseShares, MinShares, MaxShares;
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;
+    TError InitializeCgroup(TCgroup &cg) override;
     TError SetCpuLimit(TCgroup &cg, const std::string &policy,
                        double weight, double guarantee, double limit);
 };
