@@ -445,7 +445,7 @@ class Connection(object):
         request = rpc_pb2.TContainerRequest()
         request.get.name.extend(containers)
         request.get.variable.extend(variables)
-        request.set.sync(sync)
+        request.get.sync = sync
         if nonblock:
             request.get.nonblock = nonblock
         resp = self.rpc.call(request, self.rpc.timeout)
