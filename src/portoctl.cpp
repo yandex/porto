@@ -609,16 +609,16 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        bool force_data_refill = false;
+        bool sync = false;
 
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
-            { 'r', false, [&](const char *arg) { force_data_refill = true; } },
+            { 's', false, [&](const char *arg) { sync = true; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetProperty(args[0], args[i], value, force_data_refill);
+            int ret = Api->GetProperty(args[0], args[i], value, sync);
             if (ret) {
                 PrintError("Can't get property");
                 return ret;
@@ -659,16 +659,16 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        bool force_data_refill = false;
+        bool sync = false;
 
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
-            { 'r', false, [&](const char *arg) { force_data_refill = true; } },
+            { 's', false, [&](const char *arg) { sync = true; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetData(args[0], args[i], value, force_data_refill);
+            int ret = Api->GetData(args[0], args[i], value, sync);
             if (ret) {
                 PrintError("Can't get data");
                 return ret;

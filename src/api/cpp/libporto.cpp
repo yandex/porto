@@ -259,7 +259,7 @@ int Connection::Dlist(std::vector<Property> &list) {
 int Connection::Get(const std::vector<std::string> &name,
                    const std::vector<std::string> &variable,
                    std::map<std::string, std::map<std::string, GetResponse>> &result,
-                   bool nonblock, bool force_data_refill) {
+                   bool nonblock, bool sync) {
     auto get = Impl->Req.mutable_get();
 
     for (const auto &n : name)
@@ -269,7 +269,7 @@ int Connection::Get(const std::vector<std::string> &name,
     if (nonblock)
         get->set_nonblock(nonblock);
 
-    get->set_force_data_refill(force_data_refill);
+    get->set_sync(sync);
 
     int ret = Impl->Rpc();
     if (!ret) {
@@ -298,11 +298,11 @@ int Connection::Get(const std::vector<std::string> &name,
 }
 
 int Connection::GetProperty(const std::string &name, const std::string &property,
-                           std::string &value, bool force_data_refill) {
+                           std::string &value, bool sync) {
     auto* get_property = Impl->Req.mutable_getproperty();
     get_property->set_name(name);
     get_property->set_property(property);
-    get_property->set_force_data_refill(force_data_refill);
+    get_property->set_sync(sync);
 
     int ret = Impl->Rpc();
     if (!ret)
@@ -322,11 +322,11 @@ int Connection::SetProperty(const std::string &name, const std::string &property
 }
 
 int Connection::GetData(const std::string &name, const std::string &data,
-                       std::string &value, bool force_data_refill) {
+                       std::string &value, bool sync) {
     auto* get_data = Impl->Req.mutable_getdata();
     get_data->set_name(name);
     get_data->set_data(data);
-    get_data->set_force_data_refill(force_data_refill);
+    get_data->set_sync(sync);
 
     int ret = Impl->Rpc();
     if (!ret)

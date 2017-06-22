@@ -229,8 +229,8 @@ class Container(object):
     def Resume(self):
         self.conn.Resume(self.name)
 
-    def Get(self, variables, nonblock=False, force_data_refill=False):
-        return self.conn.Get([self.name], variables, nonblock, force_data_refill)[self.name]
+    def Get(self, variables, nonblock=False, sync=False):
+        return self.conn.Get([self.name], variables, nonblock, sync)[self.name]
 
     def Set(self, **kwargs):
         self.conn.Set(self.name, **kwargs)
@@ -238,15 +238,15 @@ class Container(object):
     def GetProperties(self):
         return self.Get(self.conn.Plist())
 
-    def GetProperty(self, property, force_data_refill=False):
+    def GetProperty(self, property, sync=False):
         # TODO make real property getters/setters
-        return self.conn.GetProperty(self.name, property, force_data_refill)
+        return self.conn.GetProperty(self.name, property, sync)
 
     def SetProperty(self, property, value):
         self.conn.SetProperty(self.name, property, value)
 
-    def GetData(self, data, force_data_refill=False):
-        return self.conn.GetData(self.name, data, force_data_refill)
+    def GetData(self, data, sync=False):
+        return self.conn.GetData(self.name, data, sync)
 
     def Wait(self, timeout=None):
         return self.conn.Wait([self.name], timeout)
@@ -441,11 +441,11 @@ class Connection(object):
         request.resume.name = name
         self.rpc.call(request, self.rpc.timeout)
 
-    def Get(self, containers, variables, nonblock=False, force_data_refill=False):
+    def Get(self, containers, variables, nonblock=False, sync=False):
         request = rpc_pb2.TContainerRequest()
         request.get.name.extend(containers)
         request.get.variable.extend(variables)
-        request.set.force_data_refill(force_data_refill)
+        request.set.sync(sync)
         if nonblock:
             request.get.nonblock = nonblock
         resp = self.rpc.call(request, self.rpc.timeout)
@@ -469,11 +469,11 @@ class Connection(object):
             res[container.name] = var
         return res
 
-    def GetProperty(self, name, property, force_data_refill=False):
+    def GetProperty(self, name, property, sync=False):
         request = rpc_pb2.TContainerRequest()
         request.getProperty.name = name
         request.getProperty.property = property
-        request.getProperty.force_data_refill = force_data_refill
+        request.getProperty.sync = sync
         res = self.rpc.call(request, self.rpc.timeout).getProperty.value
         if res == 'false':
             return False
@@ -501,11 +501,11 @@ class Connection(object):
         for name, value in kwargs.items():
             self.SetProperty(container, name, value)
 
-    def GetData(self, name, data, force_data_refill=False):
+    def GetData(self, name, data, sync=False):
         request = rpc_pb2.TContainerRequest()
         request.getData.name = name
         request.getData.data = data
-        request.getData.force_data_refill = force_data_refill
+        request.getData.sync = sync
         res = self.rpc.call(request, self.rpc.timeout).getData.value
         if res == 'false':
             return False
