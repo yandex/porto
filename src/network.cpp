@@ -380,7 +380,9 @@ TError TNetwork::CreateIngressQdisc(TUintMap &rate) {
 
         error = ingress.Create(*Nl);
         if (error) {
-            L_WRN("Cannot create ingress qdisc: {}", error);
+            if (error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+                L_WRN("Cannot create ingress qdisc: {}", error);
+
             return error;
         }
 
@@ -393,7 +395,7 @@ TError TNetwork::CreateIngressQdisc(TUintMap &rate) {
                 std::max(police.Mtu * 10, police.Rate / 10));
 
         error = police.Create(*Nl);
-        if (error)
+        if (error && error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
             L_WRN("Can't create ingress filter: {}", error);
     }
 
@@ -883,8 +885,11 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
             (void)cls.Delete(*Nl);
             error = cls.Create(*Nl);
         }
+
         if (error) {
-            L_WRN("Cannot add tc class: {}", error);
+            if (error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+                L_WRN("Cannot add tc class: {}", error);
+
             if (!result)
                 result = error;
         }
@@ -915,7 +920,9 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
 
             error = cls.Create(*Nl);
             if (error) {
-                L_WRN("Cannot add leaf tc class: {}", error);
+                if (error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+                    L_WRN("Cannot add leaf tc class: {}", error);
+
                 if (!result)
                     result = error;
             }
@@ -926,7 +933,9 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
                 error = ctq.Create(*Nl);
             }
             if (error) {
-                L_WRN("Cannot add container tc qdisc: {}", error);
+                if (error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+                    L_WRN("Cannot add container tc qdisc: {}", error);
+
                 if (!result)
                     result = error;
             }
@@ -955,7 +964,9 @@ TError TNetwork::DestroyTC(uint32_t handle, uint32_t leaf) {
         TNlClass cls(dev.Index, TC_H_UNSPEC, handle);
         error = cls.Delete(*Nl);
         if (error) {
-            L_WRN("Cannot del tc class: {}", error);
+            if (error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+                L_WRN("Cannot del tc class: {}", error);
+
             if (!result)
                 result = error;
         }
@@ -1774,8 +1785,11 @@ void TNetwork::RefreshStats(std::list<std::shared_ptr<TContainer>> &subtree) {
         int ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &cache);
 
         if (ret) {
-            L_WRN("Failed to retrieve net statistics for dev {} : {}",
-                  dev.Index, Nl->Error(ret, "Cannot fill class cache"));
+            TError err = Nl->Error(ret, "Cannot fill class cache");
+
+            if (err.GetErrno() != ENOENT && err.GetErrno() != ENODEV)
+                L_WRN("Failed to retrieve net statistics for dev {} : {}",
+                      dev.Index, err);
 
             NeedRefresh = true;
             continue;
@@ -1839,7 +1853,9 @@ void TNetwork::RefreshStats(std::list<std::shared_ptr<TContainer>> &subtree) {
             if (tc_stats[dev.Index].find(handle) != tc_stats[dev.Index].end()) {
                 ct_stats[dev.Name] = tc_stats[dev.Index][handle].Stats;
             } else {
-                L_WRN("Cannot find tc class {} at {}", handle, dev.GetDesc());
+                L("Cannot find tc class {} at {}",
+                  handle, dev.GetDesc());
+
                 NeedRefresh = true;
             }
 

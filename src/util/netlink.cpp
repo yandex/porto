@@ -54,8 +54,17 @@ uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
 
-TError TNl::Error(int nl_err, const std::string &desc) {
-    return TError(EError::Unknown, desc + ": " + std::string(nl_geterror(nl_err)));
+TError TNl::Error(int nl_err, const std::string &prefix) {
+    std::string desc = prefix + ": " + std::string(nl_geterror(nl_err));
+
+    switch (abs(nl_err)) {
+        case NLE_OBJ_NOTFOUND:
+            return TError(EError::Unknown, desc, ENOENT);
+        case NLE_NODEV:
+            return TError(EError::Unknown, desc, ENODEV);
+        default:
+            return TError(EError::Unknown, desc);
+    }
 }
 
 void TNl::Dump(const std::string &prefix, void *obj) const {
