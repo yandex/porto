@@ -2365,7 +2365,7 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'for i in {0..9}; do ping6 -c 1 -w 1 2a02:6b8::3 && break || sleep 1; done'"));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name, 60);
-    ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
+    ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s, true));
     ExpectNeq(s, "0");
 
     Say() << "Check net=veth" << std::endl;
@@ -2417,7 +2417,7 @@ static void TestNetProperty(Porto::Connection &api) {
 
     /* Wait until porto stop tracking portobr0  */
     std::string tmp;
-    while (!api.GetData("/", "net_bytes[portobr0]", tmp))
+    while (!api.GetData("/", "net_bytes[portobr0]", tmp, true))
         usleep(100000);
 
     AsRoot(api);
@@ -3088,7 +3088,7 @@ static void ExpectNonZeroLink(Porto::Connection &api, const std::string &name,
     string nonzero = "0";
     for (auto &link : links) {
         string v;
-        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
+        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v, true));
         if (v != "0" && v != "-1")
             nonzero = v;
     }
@@ -3100,8 +3100,8 @@ static void ExpectLessEqLink(Porto::Connection &api, const std::string &name,
     for (auto &link : links) {
         string v, rv;
         int64_t i, ri;
-        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData("/", data + "[" + link->GetName() + "]", rv));
+        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v, true));
+        ExpectApiSuccess(api.GetData("/", data + "[" + link->GetName() + "]", rv, true));
         ExpectSuccess(StringToInt64(v, i));
         ExpectSuccess(StringToInt64(rv, ri));
         ExpectLessEq(i, ri);
@@ -3112,7 +3112,7 @@ static void ExpectZeroLink(Porto::Connection &api, const std::string &name,
                            const std::string &data) {
     for (auto &link : links) {
         string v;
-        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
+        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v, true));
         ExpectEq(v, "0");
     }
 }

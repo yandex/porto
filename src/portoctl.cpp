@@ -605,17 +605,20 @@ public:
 
 class TGetPropertyCmd final : public ICmd {
 public:
-    TGetPropertyCmd(Porto::Connection *api) : ICmd(api, "pget", 2, "[-k] <container> <property> [property...]", "get raw container property") {}
+    TGetPropertyCmd(Porto::Connection *api) : ICmd(api, "pget", 2, "[-r] [-k] <container> <property> [property...]", "get raw container property") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
+        bool force_data_refill = false;
+
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
+            { 'r', false, [&](const char *arg) { force_data_refill = true; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetProperty(args[0], args[i], value);
+            int ret = Api->GetProperty(args[0], args[i], value, force_data_refill);
             if (ret) {
                 PrintError("Can't get property");
                 return ret;
@@ -652,17 +655,20 @@ public:
 
 class TGetDataCmd final : public ICmd {
 public:
-    TGetDataCmd(Porto::Connection *api) : ICmd(api, "dget", 2, "[-k] <container> <data> [data...]", "get raw container data") {}
+    TGetDataCmd(Porto::Connection *api) : ICmd(api, "dget", 2, "[-r] [-k] <container> <data> [data...]", "get raw container data") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
+        bool force_data_refill = false;
+
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
+            { 'r', false, [&](const char *arg) { force_data_refill = true; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetData(args[0], args[i], value);
+            int ret = Api->GetData(args[0], args[i], value, force_data_refill);
             if (ret) {
                 PrintError("Can't get data");
                 return ret;
@@ -856,7 +862,7 @@ public:
 
 class TGetCmd final : public ICmd {
 public:
-    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1, "[container|pattern]... [--] [variable]...", "get container property or data") {}
+    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1, "[-r] [container|pattern]... [--] [variable]...", "get container property or data") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = true;
@@ -864,11 +870,22 @@ public:
         bool printEmpty = false;
         bool printHuman = true;
         bool multiGet = false;
+        bool forceDataRefill = false;
         std::vector<std::string> list;
         std::vector<std::string> vars;
         int ret;
 
-        const auto &args = env->GetArgs();
+        auto args = env->GetArgs();
+
+        const auto &opts = env->GetOpts({
+            {'r', false, [&](const char *arg)
+                {
+                    forceDataRefill = true;
+                    args.erase(args.begin());
+                }
+            },
+        });
+
         int sep = -1;
         for (auto i = 0u; i < args.size(); i++) {
             if (args[i] == "--") {
@@ -918,7 +935,7 @@ public:
         }
 
         std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-        ret = Api->Get(list, vars, result);
+        ret = Api->Get(list, vars, result, false, forceDataRefill);
         if (ret) {
             PrintError("Can't get containers' data");
             return ret;

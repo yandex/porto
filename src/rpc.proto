@@ -72,6 +72,7 @@ message TContainerListRequest {
 message TContainerGetPropertyRequest {
 	required string name = 1;
 	required string property = 2;
+    optional bool force_data_refill = 3;
 }
 
 message TContainerSetPropertyRequest {
@@ -83,6 +84,7 @@ message TContainerSetPropertyRequest {
 message TContainerGetDataRequest {
 	required string name = 1;
 	required string data = 2;
+    optional bool force_data_refill = 3;
 }
 
 message TContainerStartRequest {
@@ -133,6 +135,7 @@ message TContainerGetRequest {
 	repeated string variable = 2;
 	// do not wait busy containers
 	optional bool nonblock = 3;
+    optional bool force_data_refill = 4;
 }
 
 // Wait while container(s) is/are in running state

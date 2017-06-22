@@ -80,15 +80,15 @@ public:
     int Get(const std::vector<std::string> &name,
             const std::vector<std::string> &variable,
             std::map<std::string, std::map<std::string, GetResponse>> &result,
-            bool nonblock = false);
+            bool nonblock = false, bool force_data_refill = false);
 
     int GetProperty(const std::string &name,
-            const std::string &property, std::string &value);
+            const std::string &property, std::string &value, bool force_data_refill = false);
     int SetProperty(const std::string &name,
             const std::string &property, std::string value);
 
     int GetData(const std::string &name,
-            const std::string &data, std::string &value);
+            const std::string &data, std::string &value, bool force_data_refill = false);
     int GetVersion(std::string &tag, std::string &revision);
 
     int Raw(const std::string &message, std::string &response);

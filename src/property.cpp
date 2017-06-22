@@ -3083,11 +3083,6 @@ public:
         if (!CT->Net)
             return TError(EError::NotSupported, "Network statistics is not available");
 
-        lock.unlock();
-
-        CT->RefreshNetStats();
-
-        lock.lock();
         TUintMap stat;
 
         for (auto &it : CT->NetStats)
@@ -3105,11 +3100,6 @@ public:
         if (!CT->Net)
             return TError(EError::NotSupported, "Network statistics is not available");
 
-        lock.unlock();
-
-        CT->RefreshNetStats();
-
-        lock.lock();
         TUintMap stat;
 
         for (auto &it : CT->NetStats)

@@ -285,7 +285,7 @@ int TPortoValueCache::Update(Porto::Connection &api) {
 
     CacheSelector = !CacheSelector;
     Cache[CacheSelector].clear();
-    int ret = api.Get(_containers, _variables, Cache[CacheSelector]);
+    int ret = api.Get(_containers, _variables, Cache[CacheSelector], false, true);
     Time[CacheSelector] = GetCurrentTimeMs();
 
     api.GetVersion(Version, Revision);

@@ -239,7 +239,7 @@ public:
 
     std::map<std::string, TNetStats> NetStats;
     uint64_t NetStatsRefreshTime = 0lu;
-    inline void RefreshNetStats(bool force = false) {
+    inline void RefillCachedData(bool force = false) {
         NetWorker.RefreshStats(shared_from_this(), force);
     }
 

@@ -391,6 +391,10 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
         std::string value;
+
+        ct->RefillCachedData(req.has_force_data_refill() ?
+                             req.force_data_refill() : false);
+
         error = ct->GetProperty(req.property(), value);
         if (!error)
             rsp.mutable_getproperty()->set_value(value);
@@ -436,6 +440,10 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
         std::string value;
+
+        ct->RefillCachedData(req.has_force_data_refill() ?
+                             req.force_data_refill() : false);
+
         error = ct->GetProperty(req.data(), value);
         if (!error)
             rsp.mutable_getdata()->set_value(value);
@@ -513,6 +521,9 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
     lock.unlock();
     if (error)
         return error;
+
+    RootContainer->RefillCachedData(req.has_force_data_refill() ?
+                                    req.force_data_refill() : false);
 
     for (auto &name: names)
         FillGetResponse(req, *get, name);
