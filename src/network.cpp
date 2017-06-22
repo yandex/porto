@@ -2072,10 +2072,13 @@ void TNetWorker::RefreshStats(std::shared_ptr<TContainer> ct, bool force) {
     auto start = GetCurrentTimeMs();
     auto ct_lock = ct->LockNetState();
 
-    if (!force && start < ct->NetStatsRefreshTime + NetworkRefreshPeriod)
+    if (!ct->Net ||
+        !force && start < ct->NetStatsRefreshTime + NetworkRefreshPeriod)
         return;
 
-    while (ct->NetStatsRefreshTime < start) {
+    while (ct->Net && ct->NetStatsRefreshTime < start) {
+        ct_lock.unlock();
+
         auto lock = LockNetworks();
         if (!StatsNeeded) {
             StatsNeeded = true;
@@ -2083,8 +2086,9 @@ void TNetWorker::RefreshStats(std::shared_ptr<TContainer> ct, bool force) {
             Cv.notify_all();
         }
 
-        ct_lock.unlock();
         Cv.wait(lock);
+        lock.unlock();
+
         ct_lock.lock();
     }
 }
