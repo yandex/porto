@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <atomic>
+#include <condition_variable>
 
 #include "util/unix.hpp"
 #include "util/locks.hpp"
@@ -13,6 +14,7 @@
 #include "stream.hpp"
 #include "cgroup.hpp"
 #include "property.hpp"
+#include "network.hpp"
 
 class TEpollSource;
 class TCgroup;
@@ -229,7 +231,23 @@ public:
     pid_t TaskVPid;
     TTask WaitTask;
     TTask SeizeTask;
+
+    std::mutex NetStateMutex;
+    TError NetState = TError::Queued();
     std::shared_ptr<TNetwork> Net;
+    std::condition_variable NetCv;
+
+    std::map<std::string, TNetStats> NetStats;
+    uint64_t NetStatsRefreshTime = 0lu;
+    inline void RefreshNetStats(bool force = false) {
+        NetWorker.RefreshStats(shared_from_this(), force);
+    }
+
+    inline std::unique_lock<std::mutex> LockNetState() {
+        return std::unique_lock<std::mutex>(NetStateMutex);
+    }
+
+    TError RefreshNet(TScopedLock &lock);
 
     TPath GetCwd() const;
     TPath WorkPath() const;
@@ -296,8 +314,6 @@ public:
     std::shared_ptr<TContainer> GetParent() const;
     TError OpenNetns(TNamespaceFd &netns) const;
 
-    TError GetNetStat(ENetStat kind, TUintMap &stat);
-
     TError GetPidFor(pid_t pidns, pid_t &pid) const;
 
     TError StartTask();
@@ -326,8 +342,6 @@ public:
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
     void ChooseTrafficClasses();
-    TError UpdateTrafficClasses();
-    TError CreateIngressQdisc();
 
     void ChooseSchedPolicy();
 

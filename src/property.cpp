@@ -2115,8 +2115,9 @@ TError TNetGuarantee::Set(const std::string &guarantee) {
         return error;
 
     if (CT->NetGuarantee != new_guarantee) {
-        CT->NetGuarantee = new_guarantee;
         CT->SetProp(EProperty::NET_GUARANTEE);
+        auto lock = CT->LockNetState();
+        CT->NetGuarantee = new_guarantee;
     }
 
     return TError::Success();
@@ -2138,8 +2139,9 @@ TError TNetGuarantee::SetIndexed(const std::string &index,
         return TError(EError::InvalidValue, "Invalid value " + guarantee);
 
     if (CT->NetGuarantee[index] != val) {
-        CT->NetGuarantee[index] = val;
         CT->SetProp(EProperty::NET_GUARANTEE);
+        auto lock = CT->LockNetState();
+        CT->NetGuarantee[index] = val;
     }
 
     return TError::Success();
@@ -2183,8 +2185,9 @@ TError TNetLimit::Set(const std::string &limit) {
         return error;
 
     if (CT->NetLimit != new_limit) {
-        CT->NetLimit = new_limit;
         CT->SetProp(EProperty::NET_LIMIT);
+        auto lock = CT->LockNetState();
+        CT->NetLimit = new_limit;
     }
 
     return TError::Success();
@@ -2206,8 +2209,9 @@ TError TNetLimit::SetIndexed(const std::string &index,
         return TError(EError::InvalidValue, "Invalid value " + limit);
 
     if (CT->NetLimit[index] != val) {
-        CT->NetLimit[index] = val;
         CT->SetProp(EProperty::NET_LIMIT);
+        auto lock = CT->LockNetState();
+        CT->NetLimit[index] = val;
     }
 
     return TError::Success();
@@ -2245,9 +2249,16 @@ public:
         if (error)
             return error;
 
+        if ((!CT->NetIsolate || CT->Net == HostNetwork) &&
+            new_limit.size())
+
+            return TError(EError::InvalidValue,
+                          "Net rx limit requires isolated network");
+
         if (CT->NetRxLimit != new_limit) {
-            CT->NetRxLimit = new_limit;
             CT->SetProp(EProperty::NET_RX_LIMIT);
+            auto lock = CT->LockNetState();
+            CT->NetRxLimit = new_limit;
         }
 
         return TError::Success();
@@ -2272,8 +2283,9 @@ public:
             return TError(EError::InvalidValue, "Invalid value " + limit);
 
         if (CT->NetRxLimit[index] != val) {
-            CT->NetRxLimit[index] = val;
             CT->SetProp(EProperty::NET_RX_LIMIT);
+            auto lock = CT->LockNetState();
+            CT->NetRxLimit[index] = val;
         }
 
         return TError::Success();
@@ -2315,8 +2327,9 @@ TError TNetPriority::Set(const std::string &prio) {
     }
 
     if (CT->NetPriority != new_prio) {
-        CT->NetPriority = new_prio;
         CT->SetProp(EProperty::NET_PRIO);
+        auto lock = CT->LockNetState();
+        CT->NetPriority = new_prio;
     }
 
     return TError::Success();
@@ -2341,8 +2354,9 @@ TError TNetPriority::SetIndexed(const std::string &index,
         return TError(EError::InvalidValue, "invalid value");
 
     if (CT->NetPriority[index] != val) {
-        CT->NetPriority[index] = val;
         CT->SetProp(EProperty::NET_PRIO);
+        auto lock = CT->LockNetState();
+        CT->NetPriority[index] = val;
     }
 
     return TError::Success();
@@ -3052,11 +3066,11 @@ public:
 
 class TNetStat : public TProperty {
 public:
-    ENetStat Kind;
+    uint64_t TNetStats:: *Member;
 
-    TNetStat(std::string name, ENetStat kind, std::string desc) :
+    TNetStat(std::string name, uint64_t TNetStats:: *member, std::string desc) :
             TProperty(name, EProperty::NONE, desc) {
-        Kind = kind;
+        Member = member;
         IsReadOnly = true;
     }
 
@@ -3064,10 +3078,21 @@ public:
         TError error = IsRunning();
         if (error)
             return error;
+
+        auto lock = CT->LockNetState();
+        if (!CT->Net)
+            return TError(EError::NotSupported, "Network statistics is not available");
+
+        lock.unlock();
+
+        CT->RefreshNetStats();
+
+        lock.lock();
         TUintMap stat;
-        error = CT->GetNetStat(Kind, stat);
-        if (error)
-            return error;
+
+        for (auto &it : CT->NetStats)
+            stat[it.first] = &it.second->*Member;
+
         return UintMapToString(stat, value);
     }
 
@@ -3075,29 +3100,52 @@ public:
         TError error = IsRunning();
         if (error)
             return error;
+
+        auto lock = CT->LockNetState();
+        if (!CT->Net)
+            return TError(EError::NotSupported, "Network statistics is not available");
+
+        lock.unlock();
+
+        CT->RefreshNetStats();
+
+        lock.lock();
         TUintMap stat;
-        error = CT->GetNetStat(Kind, stat);
-        if (error)
-            return error;
+
+        for (auto &it : CT->NetStats)
+            stat[it.first] = &it.second->*Member;
+
         if (stat.find(index) == stat.end())
-            return TError(EError::InvalidValue, "network device " + index + " no found");
+            return TError(EError::InvalidValue, "network device " + index + " not found");
+
         value = std::to_string(stat[index]);
+
         return TError::Success();
     }
 };
 
-TNetStat NetBytes(D_NET_BYTES, ENetStat::Bytes, "tx bytes: <interface>: <bytes>;... (ro)");
-TNetStat NetPackets(D_NET_PACKETS, ENetStat::Packets, "tx packets: <interface>: <packets>;... (ro)");
-TNetStat NetDrops(D_NET_DROPS, ENetStat::Drops, "tx drops: <interface>: <packets>;... (ro)");
-TNetStat NetOverlimits(D_NET_OVERLIMITS, ENetStat::Overlimits, "tx overlimits: <interface>: <packets>;... (ro)");
+TNetStat NetBytes(D_NET_BYTES, &TNetStats::Bytes,
+                  "tx bytes: <interface>: <bytes>;... (ro)");
+TNetStat NetPackets(D_NET_PACKETS, &TNetStats::Packets,
+                    "tx packets: <interface>: <packets>;... (ro)");
+TNetStat NetDrops(D_NET_DROPS, &TNetStats::Drops,
+                  "tx drops: <interface>: <packets>;... (ro)");
+TNetStat NetOverlimits(D_NET_OVERLIMITS, &TNetStats::Overlimits,
+                       "tx overlimits: <interface>: <packets>;... (ro)");
 
-TNetStat NetRxBytes(D_NET_RX_BYTES, ENetStat::RxBytes, "device rx bytes: <interface>: <bytes>;... (ro)");
-TNetStat NetRxPackets(D_NET_RX_PACKETS, ENetStat::RxPackets, "device rx packets: <interface>: <packets>;... (ro)");
-TNetStat NetRxDrops(D_NET_RX_DROPS, ENetStat::RxDrops, "device rx drops: <interface>: <packets>;... (ro)");
+TNetStat NetRxBytes(D_NET_RX_BYTES, &TNetStats::RxBytes,
+                    "device rx bytes: <interface>: <bytes>;... (ro)");
+TNetStat NetRxPackets(D_NET_RX_PACKETS, &TNetStats::RxPackets,
+                      "device rx packets: <interface>: <packets>;... (ro)");
+TNetStat NetRxDrops(D_NET_RX_DROPS, &TNetStats::RxDrops,
+                    "device rx drops: <interface>: <packets>;... (ro)");
 
-TNetStat NetTxBytes(D_NET_TX_BYTES, ENetStat::TxBytes, "device tx bytes: <interface>: <bytes>;... (ro)");
-TNetStat NetTxPackets(D_NET_TX_PACKETS, ENetStat::TxPackets, "device tx packets: <interface>: <packets>;... (ro)");
-TNetStat NetTxDrops(D_NET_TX_DROPS, ENetStat::TxDrops, "device tx drops: <interface>: <packets>;... (ro)");
+TNetStat NetTxBytes(D_NET_TX_BYTES, &TNetStats::TxBytes,
+                    "device tx bytes: <interface>: <bytes>;... (ro)");
+TNetStat NetTxPackets(D_NET_TX_PACKETS, &TNetStats::TxPackets,
+                      "device tx packets: <interface>: <packets>;... (ro)");
+TNetStat NetTxDrops(D_NET_TX_DROPS, &TNetStats::TxDrops,
+                    "device tx drops: <interface>: <packets>;... (ro)");
 
 class TIoStat : public TProperty {
 public:

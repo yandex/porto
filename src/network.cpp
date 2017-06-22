@@ -16,12 +16,11 @@ extern "C" {
 #include <netinet/ip6.h>
 #include <netinet/ether.h>
 #include <netlink/route/addr.h>
-#include <netlink/route/link.h>
-#include <netlink/route/tc.h>
 #include <netlink/route/class.h>
 #include <netlink/route/qdisc/htb.h>
 }
 
+TNetWorker NetWorker;
 std::shared_ptr<TNetwork> HostNetwork;
 static std::unordered_map<ino_t, std::weak_ptr<TNetwork>> Networks;
 static std::mutex NetworksMutex;
@@ -51,7 +50,7 @@ static TUintMap ContainerQdiscQuantum;
 
 static TUintMap IngressBurst;
 
-static uint64_t NetworkStatisticsCacheTimeout;
+static uint64_t NetworkRefreshPeriod;
 
 static inline std::unique_lock<std::mutex> LockNetworks() {
     return std::unique_lock<std::mutex>(NetworksMutex);
@@ -129,33 +128,6 @@ static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.ipv6.route.min_adv_mss", "1220" },
     { "net.ipv6.route.gc_min_interval_ms", "500" },
 };
-
-void TNetlinkCache::Drop() {
-    nl_cache_free(Cache);
-    Cache = nullptr;
-}
-
-TNetlinkCache::~TNetlinkCache() {
-    Drop();
-}
-
-uint64_t TNetlinkCache::Age() {
-    return GetCurrentTimeMs() - FillingTime;
-}
-
-void TNetlinkCache::Fill(struct nl_cache *cache) {
-    nl_cache_free(Cache);
-    Cache = cache;
-    FillingTime = GetCurrentTimeMs();
-}
-
-TError TNetlinkCache::Refill(TNl &sock) {
-    int ret = nl_cache_refill(sock.GetSock(), Cache);
-    if (ret)
-        return sock.Error(ret, "cannot refill cache");
-    FillingTime = GetCurrentTimeMs();
-    return TError::Success();
-}
 
 bool TNetwork::NamespaceSysctl(const std::string &key) {
     for (auto &pair: NetSysctls) {
@@ -254,36 +226,6 @@ std::shared_ptr<TNetwork> TNetwork::GetNetwork(ino_t inode) {
     return nullptr;
 }
 
-void TNetwork::RefreshNetworks() {
-    auto lock = LockNetworks();
-    for (auto &it: Networks) {
-        auto net = it.second.lock();
-        if (!net)
-            continue;
-
-        auto lock = net->ScopedLock();
-        net->RefreshDevices();
-        if (!net->NewManagedDevices)
-            continue;
-        net->NewManagedDevices = false;
-        net->MissingClasses = 0;
-        lock.unlock();
-
-        net->RefreshClasses();
-
-        if (!net->MissingClasses)
-            continue;
-
-        lock.lock();
-        net->RefreshDevices(true);
-        net->NewManagedDevices = false;
-        net->MissingClasses = 0;
-        lock.unlock();
-
-        net->RefreshClasses();
-    }
-}
-
 void TNetwork::InitializeConfig() {
     std::ifstream groupCfg("/etc/iproute2/group");
     int id;
@@ -357,7 +299,7 @@ void TNetwork::InitializeConfig() {
     if (config().network().has_ingress_burst())
         StringToUintMap(config().network().ingress_burst(), IngressBurst);
 
-    NetworkStatisticsCacheTimeout = config().network().cache_statistics_ms();
+    NetworkRefreshPeriod = config().network().watchdog_ms();
 
     /* Load default net sysctl from host config */
     for (const auto &p: NetSysctls) {
@@ -665,6 +607,14 @@ TError TNetwork::RefreshDevices(bool force) {
         if (ManagedNamespace)
             dev.Managed = true;
 
+        dev.Stats.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
+        dev.Stats.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
+        dev.Stats.RxDrops = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
+
+        dev.Stats.TxBytes = rtnl_link_get_stat(link, RTNL_LINK_TX_BYTES);
+        dev.Stats.TxPackets = rtnl_link_get_stat(link, RTNL_LINK_TX_PACKETS);
+        dev.Stats.TxDrops = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
+
         bool found = false;
         for (auto &d: Devices) {
             if (d.Name != dev.Name || d.Index != dev.Index)
@@ -675,7 +625,9 @@ TError TNetwork::RefreshDevices(bool force) {
                 Nl->Dump("Detected missing qdisc", link);
             else if (!force)
                 d.Prepared = true;
+
             found = true;
+            d.Stats = dev.Stats;
             break;
         }
         if (!found) {
@@ -710,65 +662,7 @@ TError TNetwork::RefreshDevices(bool force) {
         NewManagedDevices = true;
     }
 
-    DropCaches();
 
-    return TError::Success();
-}
-
-TError TNetwork::RefreshClasses() {
-    TError error;
-    auto lock = LockContainers();
-
-    /* Must be updated first, other containers are ordered */
-    error = RootContainer->UpdateTrafficClasses();
-    if (error)
-        L_ERR("Cannot refresh tc for / : {}", error);
-
-    for (auto &it: Containers) {
-        auto ct = it.second.get();
-        if (ct->Net.get() == this && !ct->IsRoot() &&
-            (ct->State == EContainerState::Running ||
-             ct->State == EContainerState::Meta)) {
-            error = ct->UpdateTrafficClasses();
-            if (error)
-                L_ERR("Cannot refresh tc for ", ct->Name, " : {}", error);
-        }
-    }
-
-    L("done");
-
-    DropCaches();
-
-    return TError::Success();
-}
-
-void TNetwork::DropCaches() {
-    LinkCache.Drop();
-    ClassCache.clear();
-}
-
-TError TNetwork::GetLinkCache(struct nl_cache **cache) {
-    *cache = LinkCache.Cache;
-    if (!*cache || LinkCache.Age() > NetworkStatisticsCacheTimeout) {
-        int ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, cache);
-        if (ret < 0)
-            return Nl->Error(ret, "Cannot fill class cache");
-        LinkCache.Fill(*cache);
-    }
-    nl_cache_get(*cache);
-    return TError::Success();
-}
-
-TError TNetwork::GetClassCache(int index, struct nl_cache **cache) {
-    TNetlinkCache &slot = ClassCache[index];
-    *cache = slot.Cache;
-    if (!*cache || slot.Age() > NetworkStatisticsCacheTimeout) {
-        int ret = rtnl_class_alloc_cache(GetSock(), index, cache);
-        if (ret < 0)
-            return Nl->Error(ret, "Cannot fill class cache");
-        slot.Fill(*cache);
-    }
-    nl_cache_get(*cache);
     return TError::Success();
 }
 
@@ -956,115 +850,6 @@ std::string TNetwork::MatchDevice(const std::string &pattern) {
     return pattern;
 }
 
-TError TNetwork::GetDeviceStat(ENetStat kind, TUintMap &stat) {
-    struct nl_cache *cache;
-    rtnl_link_stat_id_t id;
-
-    switch (kind) {
-        case ENetStat::RxBytes:
-            id = RTNL_LINK_RX_BYTES;
-            break;
-        case ENetStat::RxPackets:
-            id = RTNL_LINK_RX_PACKETS;
-            break;
-        case ENetStat::RxDrops:
-            id = RTNL_LINK_RX_DROPPED;
-            break;
-        case ENetStat::TxBytes:
-            id = RTNL_LINK_TX_BYTES;
-            break;
-        case ENetStat::TxPackets:
-            id = RTNL_LINK_TX_PACKETS;
-            break;
-        case ENetStat::TxDrops:
-            id = RTNL_LINK_TX_DROPPED;
-            break;
-        default:
-            return TError(EError::Unknown, "Unsupported netlink statistics");
-    }
-
-    TError error = GetLinkCache(&cache);
-    if (error)
-        return error;
-
-    for (auto &dev: Devices) {
-        auto link = rtnl_link_get(cache, dev.Index);
-        if (link) {
-            auto val = rtnl_link_get_stat(link, id);
-            stat[dev.Name] = val;
-            stat["group " + dev.GroupName] += val;
-        } else
-            L_WRN("Cannot find device {}", dev.GetDesc());
-        rtnl_link_put(link);
-    }
-
-    nl_cache_free(cache);
-    return TError::Success();
-}
-
-TError TNetwork::GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat) {
-    rtnl_tc_stat rtnlStat;
-    TError error;
-
-    switch (kind) {
-    case ENetStat::Packets:
-        rtnlStat = RTNL_TC_PACKETS;
-        break;
-    case ENetStat::Bytes:
-        rtnlStat = RTNL_TC_BYTES;
-        break;
-    case ENetStat::Drops:
-        rtnlStat = RTNL_TC_DROPS;
-        break;
-    case ENetStat::Overlimits:
-        rtnlStat = RTNL_TC_OVERLIMITS;
-        break;
-    default:
-        return GetDeviceStat(kind, stat);
-    }
-
-    for (auto &dev: Devices) {
-        struct nl_cache *cache;
-        struct rtnl_class *cls;
-
-        if (!dev.Managed || !dev.Prepared)
-            continue;
-
-        error = GetClassCache(dev.Index, &cache);
-        if (error)
-            return error;
-
-        cls = rtnl_class_get(cache, dev.Index, handle);
-        if (cls) {
-            auto val = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
-
-            rtnl_class_put(cls);
-
-            /* HFSC statistics isn't hierarchical */
-            if (!strcmp(rtnl_tc_get_kind(TC_CAST(cls)), "hfsc")) {
-                std::vector<uint32_t> handles({handle});
-                for (int i = 0; i < (int)handles.size(); i++) {
-                    for (auto obj = nl_cache_get_first(cache); obj;
-                            obj = nl_cache_get_next(obj)) {
-                        if (rtnl_tc_get_parent(TC_CAST(obj)) == handles[i]) {
-                            val += rtnl_tc_get_stat(TC_CAST(obj), rtnlStat);
-                            handles.push_back(rtnl_tc_get_handle(TC_CAST(obj)));
-                        }
-                    }
-                }
-            }
-
-            stat[dev.Name] = val;
-            stat["group " + dev.GroupName] += val;
-        } else
-            L_WRN("Cannot find tc class {} at {}", handle, dev.GetDesc());
-
-        nl_cache_free(cache);
-    }
-
-    return TError::Success();
-}
-
 TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
                           TUintMap &prio, TUintMap &rate, TUintMap &ceil) {
     TError error, result;
@@ -1100,7 +885,6 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
         }
         if (error) {
             L_WRN("Cannot add tc class: {}", error);
-            MissingClasses++;
             if (!result)
                 result = error;
         }
@@ -1132,7 +916,6 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
             error = cls.Create(*Nl);
             if (error) {
                 L_WRN("Cannot add leaf tc class: {}", error);
-                MissingClasses++;
                 if (!result)
                     result = error;
             }
@@ -1144,14 +927,11 @@ TError TNetwork::CreateTC(uint32_t handle, uint32_t parent, uint32_t leaf,
             }
             if (error) {
                 L_WRN("Cannot add container tc qdisc: {}", error);
-                MissingClasses++;
                 if (!result)
                     result = error;
             }
         }
     }
-
-    DropCaches();
 
     return result;
 }
@@ -1180,8 +960,6 @@ TError TNetwork::DestroyTC(uint32_t handle, uint32_t leaf) {
                 result = error;
         }
     }
-
-    DropCaches();
 
     return result;
 }
@@ -1881,9 +1659,6 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        HostNetwork = Net;
-        TNetwork::AddNetwork(NetNs.GetInode(), Net);
-
         error = Net->RefreshDevices();
         if (error)
             return error;
@@ -1895,6 +1670,10 @@ TError TNetCfg::PrepareNetwork() {
             Net->NatBaseV6.Parse(AF_INET6, config().network().nat_first_ipv6());
         if (config().network().has_nat_count())
             Net->NatBitmap.Resize(config().network().nat_count());
+
+        HostNetwork = Net;
+        TNetwork::AddNetwork(NetNs.GetInode(), Net);
+        NetWorker.Start();
     } else if (Inherited) {
         Net = Parent->Net;
         error = Parent->OpenNetns(NetNs);
@@ -1973,4 +1752,323 @@ TError TNetCfg::DestroyNetwork() {
     }
 
     return error;
+}
+
+struct TClsStats {
+    uint32_t Parent = 0;
+    TNetStats Stats;
+};
+
+typedef std::map<uint32_t, TClsStats> TDevClsStats;
+typedef std::map<int, TDevClsStats> TDevTcStats;
+
+void TNetwork::RefreshStats(std::list<std::shared_ptr<TContainer>> &subtree) {
+    TDevTcStats tc_stats;
+
+    for (auto &dev: Devices) {
+        if (!dev.Managed || !dev.Prepared)
+            continue;
+
+        struct nl_cache *cache;
+
+        int ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &cache);
+
+        if (ret) {
+            L_WRN("Failed to retrieve net statistics for dev {} : {}",
+                  dev.Index, Nl->Error(ret, "Cannot fill class cache"));
+
+            NeedRefresh = true;
+            continue;
+        }
+
+        TDevClsStats &dev_tc_stats = tc_stats[dev.Index];
+
+        for (auto obj = nl_cache_get_first(cache); obj;
+             obj = nl_cache_get_next(obj)) {
+
+            struct rtnl_class *cls = (struct rtnl_class *)obj;
+            auto parent = rtnl_tc_get_parent(TC_CAST(cls));
+            auto handle = rtnl_tc_get_handle(TC_CAST(cls));
+
+            dev_tc_stats[handle].Parent = parent;
+            TNetStats &s = dev_tc_stats[handle].Stats;
+
+            s.RxBytes = dev.Stats.RxBytes;
+            s.TxBytes = dev.Stats.TxBytes;
+            s.RxPackets = dev.Stats.RxPackets;
+            s.TxPackets = dev.Stats.TxPackets;
+            s.RxDrops = dev.Stats.RxDrops;
+            s.TxDrops = dev.Stats.TxDrops;
+
+            s.Packets += rtnl_tc_get_stat(TC_CAST(cls), RTNL_TC_PACKETS);
+            s.Bytes += rtnl_tc_get_stat(TC_CAST(cls), RTNL_TC_BYTES);
+            s.Drops += rtnl_tc_get_stat(TC_CAST(cls), RTNL_TC_DROPS);
+            s.Overlimits += rtnl_tc_get_stat(TC_CAST(cls), RTNL_TC_OVERLIMITS);
+
+            if (!strcmp(rtnl_tc_get_kind(TC_CAST(cls)), "hfsc")) {
+                while (parent) {
+                    TNetStats &p = dev_tc_stats[parent].Stats;
+
+                    p.Packets += s.Packets;
+                    p.Bytes += s.Bytes;
+                    p.Drops += s.Drops;
+                    p.Overlimits += s.Overlimits;
+
+                    parent = dev_tc_stats[parent].Parent;
+                }
+            }
+        }
+
+        nl_cache_free(cache);
+    }
+
+    auto refresh_time = GetCurrentTimeMs();
+
+    for (auto &ct : subtree) {
+        auto lock = ct->LockNetState();
+        auto handle = ct->ContainerTC;
+
+        if (ct->Net.get() != this || ct->NetState)
+            continue;
+
+        auto &ct_stats = ct->NetStats;
+
+        ct_stats.clear();
+
+        for (auto &dev : Devices) {
+            if (tc_stats[dev.Index].find(handle) != tc_stats[dev.Index].end()) {
+                ct_stats[dev.Name] = tc_stats[dev.Index][handle].Stats;
+            } else {
+                L_WRN("Cannot find tc class {} at {}", handle, dev.GetDesc());
+                NeedRefresh = true;
+            }
+
+            ct_stats["group " + dev.GroupName].RxBytes += ct_stats[dev.Name].RxBytes;
+            ct_stats["group " + dev.GroupName].RxPackets += ct_stats[dev.Name].RxPackets;
+            ct_stats["group " + dev.GroupName].RxDrops += ct_stats[dev.Name].RxDrops;
+
+            ct_stats["group " + dev.GroupName].TxBytes += ct_stats[dev.Name].TxBytes;
+            ct_stats["group " + dev.GroupName].TxPackets += ct_stats[dev.Name].TxPackets;
+            ct_stats["group " + dev.GroupName].TxDrops += ct_stats[dev.Name].TxDrops;
+
+            ct_stats["group " + dev.GroupName].Bytes += ct_stats[dev.Name].Bytes;
+            ct_stats["group " + dev.GroupName].Packets += ct_stats[dev.Name].Packets;
+            ct_stats["group " + dev.GroupName].Drops += ct_stats[dev.Name].Drops;
+            ct_stats["group " + dev.GroupName].Overlimits += ct_stats[dev.Name].Overlimits;
+        }
+
+        ct->NetStatsRefreshTime = refresh_time;
+    }
+}
+
+void TNetWorker::Start() {
+    Shutdown = false;
+    Thread = std::thread(&TNetWorker::Loop, this);
+}
+
+void TNetWorker::Stop() {
+    auto lock = LockNetworks();
+    Shutdown = true;
+    lock.unlock();
+
+    Cv.notify_all();
+
+    Thread.join();
+}
+
+void TNetWorker::Wake() {
+    auto lock = LockNetworks();
+
+    WorkPending = true;
+    lock.unlock();
+
+    Cv.notify_all();
+}
+
+TError TNetwork::RefreshClasses(std::list<std::shared_ptr<TContainer>> &subtree) {
+    TError ret;
+    int try_count = 0;
+
+    do {
+        ret = TError::Success();
+
+        for (auto &ct : subtree) {
+            auto lock = ct->LockNetState();
+            TUintMap prio = ct->NetPriority;
+            TUintMap limit = ct->NetLimit;
+            TUintMap rx_limit = ct->NetRxLimit;
+            TUintMap guarantee = ct->NetGuarantee;
+            uint32_t ct_tc = ct->ContainerTC;
+            uint32_t parent_tc = ct->ParentTC;
+            uint32_t leaf_tc = ct->LeafTC;
+            auto net = ct->Net;
+            auto state = ct->NetState;
+            lock.unlock();
+
+            if (!net || net.get() != this && HostNetwork.get() != this ||
+                !NeedRefresh && !state)
+                continue;
+
+            TError err = CreateTC(ct_tc, parent_tc, leaf_tc,
+                                  prio, guarantee, limit);
+
+            if (!err && this != HostNetwork.get() && rx_limit.size() > 0)
+                err = net->CreateIngressQdisc(rx_limit);
+
+            lock.lock();
+            if (net.get() == this || err)
+                ct->NetState = err;
+            lock.unlock();
+
+            if (err) {
+                L_ACT("Perform net {} reset", try_count ? "hard" : "soft");
+
+                RefreshDevices(try_count);
+                NewManagedDevices = false;
+                NeedRefresh = true;
+                ret = err;
+
+                break;
+            }
+        }
+    } while (ret && try_count++ < 2);
+
+    if (!ret)
+        NeedRefresh = false;
+
+    return ret;
+}
+
+void TNetWorker::Loop() {
+    SetProcessName(PORTOD_NETWORKER_NAME);
+    PORTO_ASSERT(RootContainer && HostNetwork);
+
+    uint64_t deadline = 0lu;
+    auto lock = LockNetworks();
+
+    while (!Shutdown) {
+        auto now = GetCurrentTimeMs();
+
+        while (!Shutdown && !WorkPending && now < deadline) {
+            Cv.wait_for(lock, std::chrono::milliseconds(deadline - now));
+            now = GetCurrentTimeMs();
+        }
+
+        auto nets = Networks;
+        auto work_pending = false;
+        auto stats_needed = StatsNeeded;
+
+        WorkPending = false;
+
+        lock.unlock();
+
+        auto ct_tree = RootContainer->Subtree();
+        ct_tree.reverse();
+
+        if (now >= deadline || stats_needed) {
+            for (auto &it : nets) {
+                auto net = it.second.lock();
+                if (!net)
+                    continue;
+
+                auto net_lock = net->ScopedLock();
+
+                net->RefreshDevices();
+                if (net->NewManagedDevices) {
+                    net->NewManagedDevices = false;
+                    net->NeedRefresh = true;
+                }
+            }
+        }
+
+        auto host_lock = HostNetwork->ScopedLock();
+
+        if (HostNetwork->RefreshClasses(ct_tree)) {
+            L("Failed to refresh host net, try next time");
+            work_pending = true;
+        }
+
+        for (auto &ct : ct_tree) {
+            auto lock = ct->LockNetState();
+
+            if (ct->Net == HostNetwork)
+                ct->NetCv.notify_all();
+        }
+
+        host_lock.unlock();
+
+        for (auto &it : nets) {
+            auto net = it.second.lock();
+            if (!net)
+                continue;
+
+            auto net_lock = net->ScopedLock();
+
+            if (net != HostNetwork) {
+                if (net->RefreshClasses(ct_tree)) {
+                    L("Failed to refresh host net, try next time");
+                    work_pending = true;
+                }
+
+                for (auto &ct : ct_tree) {
+                    auto lock = ct->LockNetState();
+
+                    if (ct->Net == net)
+                        ct->NetCv.notify_all();
+                }
+            }
+
+            if (stats_needed) {
+                net->RefreshStats(ct_tree);
+
+                lock.lock();
+                StatsNeeded = false;
+                lock.unlock();
+
+                Cv.notify_all();
+            }
+        }
+
+        deadline = GetCurrentTimeMs() + NetworkRefreshPeriod;
+
+        lock.lock();
+        WorkPending |= work_pending;
+    }
+}
+
+TError TNetWorker::RefreshNetwork(std::shared_ptr<TContainer> ct) {
+    auto lock = ct->LockNetState();
+
+    ct->NetState = TError::Queued();
+
+    NetWorker.Wake();
+
+    while (ct->NetState.GetError() == EError::Queued)
+        ct->NetCv.wait(lock);
+
+    if (ct->NetState)
+        return ct->NetState;
+
+    return TError::Success();
+}
+
+void TNetWorker::RefreshStats(std::shared_ptr<TContainer> ct, bool force) {
+    auto start = GetCurrentTimeMs();
+    auto ct_lock = ct->LockNetState();
+
+    if (!force && start < ct->NetStatsRefreshTime + NetworkRefreshPeriod)
+        return;
+
+    while (ct->NetStatsRefreshTime < start) {
+        auto lock = LockNetworks();
+        if (!StatsNeeded) {
+            StatsNeeded = true;
+            WorkPending = true;
+            Cv.notify_all();
+        }
+
+        ct_lock.unlock();
+        Cv.wait(lock);
+        ct_lock.lock();
+    }
 }

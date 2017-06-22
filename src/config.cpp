@@ -89,7 +89,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_network()->set_autoconf_timeout_s(120);
     config().mutable_network()->set_proxy_ndp(true);
-    config().mutable_network()->set_watchdog_ms(60000);
+    config().mutable_network()->set_watchdog_ms(1000);
 
     config().mutable_network()->set_cache_statistics_ms(1000);
 

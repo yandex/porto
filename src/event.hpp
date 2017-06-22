@@ -12,7 +12,6 @@ enum class EEventType {
     Exit,
     ChildExit,
     RotateLogs,
-    NetworkWatchdog,
     Respawn,
     OOM,
     WaitTimeout,

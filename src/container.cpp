@@ -497,14 +497,11 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
     SystemClient.ReleaseContainer();
 
-    if (ct->Task.Pid) {
-        error = ct->RestoreNetwork();
-        if (error && !ct->WaitTask.IsZombie()) {
-            L_WRN("Cannot restore network: {}", error);
-            ct->Reap(false);
-        }
-    } else if (ct->State == EContainerState::Meta && ct->Parent)
-        ct->Net = ct->Parent->Net;
+    error = ct->RestoreNetwork();
+    if (error && !ct->WaitTask.IsZombie()) {
+        L_WRN("Cannot restore network: {}", error);
+        ct->Reap(false);
+    }
 
     /* Restore cgroups only for running containers */
     if (ct->State != EContainerState::Stopped &&
@@ -647,14 +644,6 @@ TPath TContainer::GetCwd() const {
     }
 
     return WorkPath();
-}
-
-TError TContainer::GetNetStat(ENetStat kind, TUintMap &stat) {
-    if (Net) {
-        auto lock = Net->ScopedLock();
-        return Net->GetTrafficStat(ContainerTC, kind, stat);
-    } else
-        return TError(EError::NotSupported, "Network statistics is not available");
 }
 
 TError TContainer::UpdateSoftLimit() {
@@ -1386,17 +1375,16 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (TestClearPropDirty(EProperty::NET_PRIO) |
-            TestClearPropDirty(EProperty::NET_LIMIT) |
-            TestClearPropDirty(EProperty::NET_GUARANTEE)) {
-        error = UpdateTrafficClasses();
-        if (error) {
-            L_ERR("Cannot update tc : {}", error);
+        TestClearPropDirty(EProperty::NET_LIMIT) |
+        TestClearPropDirty(EProperty::NET_GUARANTEE)) {
+
+        error = NetWorker.RefreshNetwork(shared_from_this());
+        if (error)
             return error;
-        }
     }
 
     if (TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
-        error = CreateIngressQdisc();
+        error = NetWorker.RefreshNetwork(shared_from_this());
         if (error)
             return error;
     }
@@ -1633,52 +1621,19 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     if (NetCfg.SaveIp)
         NetCfg.FormatIp(IpList);
 
+    if (NetRxLimit.size() && (!NetIsolate || NetCfg.Net == HostNetwork))
+        return TError(EError::InvalidValue,
+                      "Net rx limit requires isolated network");
+
+    auto lock = LockNetState();
     Net = NetCfg.Net;
 
-    error = UpdateTrafficClasses();
-    if (error) {
-        L_ACT("Cleanup stale classes");
+    for (auto &dev : Net->Devices)
+        NetStats[dev.Name] = TNetStats();
 
-        auto lock = Net->ScopedLock();
-        Net->DestroyTC(ContainerTC, LeafTC);
-        lock.unlock();
+    lock.unlock();
 
-        error = UpdateTrafficClasses();
-        if (!error)
-            return TError::Success();
-
-        L_ACT("Refresh network");
-
-        lock.lock();
-        Net->DestroyTC(ContainerTC, LeafTC);
-        Net->RefreshDevices();
-        Net->NewManagedDevices = false;
-        lock.unlock();
-
-        Net->RefreshClasses();
-
-        error = UpdateTrafficClasses();
-        if (!error)
-            return TError::Success();
-
-        L_ACT("Recreate network");
-
-        lock.lock();
-        Net->RefreshDevices(true);
-        Net->NewManagedDevices = false;
-        Net->MissingClasses = 0;
-        lock.unlock();
-
-        Net->RefreshClasses();
-
-        error = UpdateTrafficClasses();
-        if (error) {
-            L_ERR("Network recreation failed: {}", error);
-            return error;
-        }
-    }
-
-    return TError::Success();
+    return NetWorker.RefreshNetwork(shared_from_this());
 }
 
 TError TContainer::GetEnvironment(TEnv &env) {
@@ -2157,12 +2112,21 @@ void TContainer::FreeResources() {
         }
     }
 
-    if (Net) {
-        auto net_lock = Net->ScopedLock();
+    /* Prevent watchdog from re-creating our tcs */
+    auto settings_lock = LockNetState();
+    auto net = Net;
+    Net = nullptr;
+    NetState = TError::Queued();
+    NetStats.clear();
+    NetStatsRefreshTime = 0lu;
+    settings_lock.unlock();
+
+    if (net) {
+        auto net_lock = net->ScopedLock();
         struct TNetCfg NetCfg;
 
         error = ParseNetConfig(NetCfg);
-        if (!error && NetCfg.NewNetNs && !--Net->Owners)
+        if (!error && NetCfg.NewNetNs && !--net->Owners)
             error = NetCfg.DestroyNetwork();
         if (NetCfg.SaveIp) {
             TMultiTuple ip_settings;
@@ -2171,13 +2135,13 @@ void TContainer::FreeResources() {
         if (error)
             L_ERR("Cannot free network resources: {}", error);
 
-        if ((Controllers & CGROUP_NETCLS) && (!NetCfg.NewNetNs || !Net->Owners)) {
-            error = Net->DestroyTC(ContainerTC, LeafTC);
+        if ((Controllers & CGROUP_NETCLS) && (!NetCfg.NewNetNs || !net->Owners)) {
+            error = net->DestroyTC(ContainerTC, LeafTC);
             if (error)
                 L_ERR("Can't remove traffic class: {}", error);
             net_lock.unlock();
 
-            if (Net != HostNetwork) {
+            if (net != HostNetwork) {
                 net_lock = HostNetwork->ScopedLock();
                 error = HostNetwork->DestroyTC(ContainerTC, LeafTC);
                 if (error)
@@ -2186,12 +2150,11 @@ void TContainer::FreeResources() {
         }
     }
 
-    if (Net && IsRoot()) {
-        error = Net->Destroy();
+    if (net && IsRoot()) {
+        error = net->Destroy();
         if (error)
             L_ERR("Cannot destroy network: {}", error);
     }
-    Net = nullptr;
 
     if (IsRoot())
         return;
@@ -2614,29 +2577,48 @@ TError TContainer::RestoreNetwork() {
     TNamespaceFd netns;
     TError error;
 
-    error = OpenNetns(netns);
-    if (error)
-        return error;
+    auto lock = LockNetState();
 
-    Net = TNetwork::GetNetwork(netns.GetInode());
-
-    /* Create a new one */
-    if (!Net) {
-        Net = std::make_shared<TNetwork>();
-        PORTO_ASSERT(Net);
-
-        error = Net->ConnectNetns(netns);
+    if (Task.Pid) {
+        error = OpenNetns(netns);
         if (error)
             return error;
 
-        TNetwork::AddNetwork(netns.GetInode(), Net);
+        Net = TNetwork::GetNetwork(netns.GetInode());
+
+        /* Create a new one */
+        if (!Net) {
+            Net = std::make_shared<TNetwork>();
+            PORTO_ASSERT(Net);
+
+            error = Net->ConnectNetns(netns);
+            if (error)
+                return error;
+
+            TNetwork::AddNetwork(netns.GetInode(), Net);
+        }
+    } else if (State == EContainerState::Meta && Parent) {
+        Net = Parent->Net;
+    } else {
+        /* No restore required */
+        return TError::Success();
     }
 
     ChooseTrafficClasses();
 
-    error = UpdateTrafficClasses();
-    if (error)
-        return error;
+    NetState = TError::Queued();
+
+    for (auto &dev : Net->Devices)
+        NetStats[dev.Name] = TNetStats();
+
+    /* Net worker cannot see container yet,
+       so we shouldn't reapply following dynamic
+       props, otherwise we'll stuck indefinetely */
+
+    TestClearPropDirty(EProperty::NET_PRIO);
+    TestClearPropDirty(EProperty::NET_LIMIT);
+    TestClearPropDirty(EProperty::NET_GUARANTEE);
+    TestClearPropDirty(EProperty::NET_RX_LIMIT);
 
     return TError::Success();
 }
@@ -3084,13 +3066,6 @@ void TContainer::Event(const TEvent &event) {
         }
         EventQueue->Add(config().daemon().log_rotate_ms(), event);
         break;
-
-    case EEventType::NetworkWatchdog:
-        lock.unlock();
-        TNetwork::RefreshNetworks();
-        EventQueue->Add(config().network().watchdog_ms(), event);
-        break;
-
     }
 }
 
@@ -3147,39 +3122,6 @@ void TContainer::ChooseTrafficClasses() {
         ParentTC = Parent->ParentTC;
         LeafTC = Parent->LeafTC;
     }
-}
-
-TError TContainer::UpdateTrafficClasses() {
-    TError error;
-
-    if (!(Controllers & CGROUP_NETCLS))
-        return TError::Success();
-
-    auto net_lock = HostNetwork->ScopedLock();
-    error = HostNetwork->CreateTC(ContainerTC, ParentTC, LeafTC,
-                                  NetPriority, NetGuarantee, NetLimit);
-    if (error)
-        return error;
-    net_lock.unlock();
-
-    if (Net && Net != HostNetwork) {
-        uint32_t parent = ParentTC;
-        if (Net != Parent->Net)
-            parent = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        auto net_lock = Net->ScopedLock();
-        error = Net->CreateTC(ContainerTC, parent, LeafTC,
-                              NetPriority, NetGuarantee, NetLimit);
-    }
-
-    return error;
-}
-
-TError TContainer::CreateIngressQdisc() {
-    if (!NetIsolate || Net == HostNetwork)
-        return TError(EError::InvalidValue, "Net rx limit requires isolated network");
-
-    auto net_lock = Net->ScopedLock();
-    return Net->CreateIngressQdisc(NetRxLimit);
 }
 
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,

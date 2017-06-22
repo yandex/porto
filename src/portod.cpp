@@ -512,11 +512,6 @@ static int SlaveRpc() {
         EventQueue->Add(config().daemon().log_rotate_ms(), ev);
     }
 
-    if (config().network().watchdog_ms()) {
-        TEvent ev(EEventType::NetworkWatchdog);
-        EventQueue->Add(config().network().watchdog_ms(), ev);
-    }
-
     while (true) {
         error = EpollLoop->GetEvents(events, -1);
         if (error) {
@@ -752,8 +747,6 @@ static void RestoreContainers() {
             continue;
         }
     }
-
-    TNetwork::RefreshNetworks();
 }
 
 static void CleanupCgroups() {
@@ -953,6 +946,8 @@ static int SlaveMain() {
 
     RestoreContainers();
 
+    NetWorker.Wake();
+
     TVolume::RestoreAll();
 
     DestroyContainers(true);
@@ -996,6 +991,8 @@ static int SlaveMain() {
         SystemClient.FinishRequest();
 
         SystemClient.LockContainer(RootContainer);
+
+        NetWorker.Stop();
 
         error = RootContainer->Destroy();
         if (error)

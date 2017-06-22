@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 #include <mutex>
+#include <thread>
+#include <condition_variable>
 
 #include "common.hpp"
 #include "util/netlink.hpp"
@@ -11,21 +13,26 @@
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 
+extern "C" {
+#include <netlink/route/link.h>
+#include <netlink/route/tc.h>
+}
+
 class TContainer;
 
-enum class ENetStat {
-    Packets,
-    Bytes,
-    Drops,
-    Overlimits,
+struct TNetStats {
+    uint64_t Packets = 0lu;
+    uint64_t Bytes = 0lu;
+    uint64_t Drops = 0lu;
+    uint64_t Overlimits = 0lu;
 
-    RxPackets,
-    RxBytes,
-    RxDrops,
+    uint64_t RxPackets = 0lu;
+    uint64_t RxBytes = 0lu;
+    uint64_t RxDrops = 0lu;
 
-    TxPackets,
-    TxBytes,
-    TxDrops,
+    uint64_t TxPackets = 0lu;
+    uint64_t TxBytes = 0lu;
+    uint64_t TxDrops = 0lu;
 };
 
 class TNetworkDevice {
@@ -42,23 +49,13 @@ public:
     bool Prepared;
     bool Missing;
 
+    TNetStats Stats;
+
     TNetworkDevice(struct rtnl_link *);
 
     std::string GetDesc(void) const;
     uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0) const;
     std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
-};
-
-class TNetlinkCache {
-public:
-    uint64_t FillingTime = 0;
-    struct nl_cache *Cache = nullptr;
-    TNetlinkCache() {}
-    ~TNetlinkCache();
-    uint64_t Age();
-    void Drop();
-    void Fill(struct nl_cache *cache);
-    TError Refill(TNl &sock);
 };
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
@@ -67,23 +64,20 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     std::shared_ptr<TNl> Nl;
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
 
-    TNetlinkCache LinkCache;
-    std::map<int, TNetlinkCache> ClassCache;
-    void DropCaches();
-    TError GetLinkCache(struct nl_cache **cache);
-    TError GetClassCache(int index, struct nl_cache **cache);
-
     unsigned IfaceName = 0;
 
 public:
     std::vector<TNetworkDevice> Devices;
 
     TError RefreshDevices(bool force = false);
-    TError RefreshClasses();
+    uint64_t SumChildrenStat(struct nl_cache *cache, uint32_t handle,
+                             rtnl_tc_stat kind);
+    void RefreshStats(std::list<std::shared_ptr<TContainer>> &subtree);
+    TError RefreshClasses(std::list<std::shared_ptr<TContainer>> &subtree);
 
     bool ManagedNamespace = false;
     bool NewManagedDevices = false;
-    unsigned MissingClasses = 0;
+    bool NeedRefresh = false;
 
     int DeviceIndex(const std::string &name) {
         for (auto dev: Devices)
@@ -115,9 +109,6 @@ public:
                     TUintMap &prio, TUintMap &rate, TUintMap &ceil);
     TError DestroyTC(uint32_t handle, uint32_t leaf);
 
-    TError GetDeviceStat(ENetStat kind, TUintMap &stat);
-    TError GetTrafficStat(uint32_t handle, ENetStat kind, TUintMap &stat);
-
     TError GetGateAddress(std::vector<TNlAddr> addrs,
                           TNlAddr &gate4, TNlAddr &gate6, int &mtu, int &group);
     TError AddAnnounce(const TNlAddr &addr, std::string master);
@@ -135,8 +126,6 @@ public:
     static std::shared_ptr<TNetwork> GetNetwork(ino_t inode);
 
     static void InitializeConfig();
-
-    static void RefreshNetworks();
 
     static bool NamespaceSysctl(const std::string &key);
 };
@@ -235,3 +224,23 @@ struct TNetCfg {
 };
 
 extern std::shared_ptr<TNetwork> HostNetwork;
+constexpr const char PORTOD_NETWORKER_NAME[] = "portod-network";
+
+class TNetWorker {
+    bool WorkPending = false;
+    bool Shutdown = true;
+    std::thread Thread;
+    std::condition_variable Cv;
+    bool StatsNeeded = false;
+
+public:
+    void Start();
+    void Stop();
+    void Wake();
+    void Loop();
+
+    TError RefreshNetwork(std::shared_ptr<TContainer> ct);
+    void RefreshStats(std::shared_ptr<TContainer> ct, bool force);
+};
+
+extern TNetWorker NetWorker;

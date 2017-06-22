@@ -59,8 +59,6 @@ std::string TEvent::GetMsg() const {
                 + " for pid " + std::to_string(Exit.Pid);
         case EEventType::RotateLogs:
             return "rotate logs";
-        case EEventType::NetworkWatchdog:
-            return "network watchdog";
         case EEventType::Respawn:
             return "respawn";
         case EEventType::OOM:

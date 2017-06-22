@@ -2415,6 +2415,11 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectEq(system("ip link delete portobr0"), 0);
     AsAlice(api);
 
+    /* Wait until porto stop tracking portobr0  */
+    std::string tmp;
+    while (!api.GetData("/", "net_bytes[portobr0]", tmp))
+        usleep(100000);
+
     AsRoot(api);
     if (KernelSupports(KernelFeature::IPVLAN)) {
         AsAlice(api);

@@ -25,7 +25,7 @@ for link in links:
     assert check_qdisc(link)
     del_qdisc(link)
     assert not check_qdisc(link)
-    expected_warnings += 2
+    expected_warnings += 1
 
 # start test container
 test = conn.Create('test')
@@ -39,5 +39,5 @@ test.Destroy()
 for link in links:
     assert check_qdisc(link)
 
-assert int(conn.GetData('/', 'porto_stat[errors]')) == expected_errors
-assert int(conn.GetData('/', 'porto_stat[warnings]')) == expected_warnings
+ExpectEq(int(conn.GetData('/', 'porto_stat[errors]')), expected_errors)
+ExpectEq(int(conn.GetData('/', 'porto_stat[warnings]')), expected_warnings)
