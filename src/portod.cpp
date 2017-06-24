@@ -662,6 +662,7 @@ static TError CreateRootContainer() {
     if (error)
         return error;
 
+    PORTO_ASSERT(RootContainer->Id == ROOT_CONTAINER_ID);
     PORTO_ASSERT(RootContainer->IsRoot());
 
     RootContainer->Isolate = false;

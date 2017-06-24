@@ -149,15 +149,15 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
 /* lock subtree for read or write */
 TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     if (Verbose)
-        L("{} {} {}",
-          (try_lock ? "TryLock " : "Lock "),
-          (for_read ? "read " : "write "),
-          Name);
+        L("{} {} {}:{}",
+          (try_lock ? "TryLock" : "Lock"),
+          (for_read ? "read" : "write"),
+          Id, Name);
 
     while (1) {
         if (State == EContainerState::Destroyed) {
             if (Verbose)
-                L("Lock failed, container was destroyed: {}", Name);
+                L("Lock failed, container {}:{} was destroyed", Id, Name);
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
         bool busy;
@@ -171,7 +171,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
             break;
         if (try_lock) {
             if (Verbose)
-                L("TryLock {} Failed {}", (for_read ? "read" : "write"), Name);
+                L("TryLock {} Failed {}:{}", (for_read ? "read" : "write"), Id, Name);
             return TError(EError::Busy, "Container is busy: " + Name);
         }
         if (!for_read)
@@ -195,7 +195,7 @@ void TContainer::DowngradeLock() {
     PORTO_ASSERT(Locked == -1);
 
     if (Verbose)
-        L("Downgrading write to read {}", Name);
+        L("Downgrading write to read {}:{}", Id, Name);
 
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
         ct->SubtreeRead++;
@@ -210,7 +210,7 @@ void TContainer::UpgradeLock() {
     auto lock = LockContainers();
 
     if (Verbose)
-        L("Upgrading read back to write {}", Name);
+        L("Upgrading read back to write {}:{}", Id, Name);
 
     PendingWrite = true;
 
@@ -230,7 +230,7 @@ void TContainer::UpgradeLock() {
 
 void TContainer::Unlock(bool locked) {
     if (Verbose)
-        L("Unlock {} {}", (Locked > 0 ? "read " : "write "), Name);
+        L("Unlock {} {}:{}", (Locked > 0 ? "read" : "write"), Id, Name);
     if (!locked)
         ContainersMutex.lock();
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
@@ -255,7 +255,7 @@ void TContainer::DumpLocks() {
     for (auto &it: Containers) {
         auto &ct = it.second;
         if (ct->Locked || ct->PendingWrite || ct->SubtreeRead || ct->SubtreeWrite)
-            L("{} Locked {} by {} Read {} Write {}{}", ct->Name, ct->Locked,
+            L("Container {}:{} Locked {} by {} Read {} Write {}{}", ct->Id, ct->Name, ct->Locked,
                 ct->LastOwner, ct->SubtreeRead, ct->SubtreeWrite,
                 (ct->PendingWrite ? " PendingWrite" : ""));
     }
@@ -269,8 +269,21 @@ void TContainer::Register() {
     Statistics->ContainersCreated++;
 }
 
-TContainer::TContainer(std::shared_ptr<TContainer> parent, const std::string &name) :
-    Parent(parent), Name(name),
+void TContainer::Unregister() {
+    PORTO_LOCKED(ContainersMutex);
+    Containers.erase(Name);
+    if (Parent)
+        Parent->Children.remove(shared_from_this());
+
+    TError error = ContainerIdMap.Put(Id);
+    if (error)
+        L_WRN("Cannot put container {}:{} id: {}", Id, Name, error);
+
+    State = EContainerState::Destroyed;
+}
+
+TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name) :
+    Parent(parent), Name(name), Id(id),
     FirstName(!parent ? "" : parent->IsRoot() ? name : name.substr(parent->Name.length() + 1)),
     Level(parent ? parent->Level + 1 : 0),
     Stdin(0), Stdout(1), Stderr(2),
@@ -371,6 +384,7 @@ TContainer::~TContainer() {
 TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &ct) {
     auto nrMax = config().container().max_total();
     TError error;
+    int id = -1;
 
     error = ValidName(name);
     if (error)
@@ -402,13 +416,13 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
         goto err;
     }
 
-    L_ACT("Create {}", name);
-
-    ct = std::make_shared<TContainer>(parent, name);
-
-    error = ContainerIdMap.Get(ct->Id);
+    error = ContainerIdMap.Get(id);
     if (error)
         goto err;
+
+    L_ACT("Create container {}:{}", id, name);
+
+    ct = std::make_shared<TContainer>(parent, id, name);
 
     ct->OwnerCred = CL->Cred;
     ct->SetProp(EProperty::OWNER_USER);
@@ -447,8 +461,8 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
 err:
     if (parent)
         parent->Unlock(true);
-    if (ct && ct->Id)
-        ContainerIdMap.Put(ct->Id);
+    if (id >= 0)
+        ContainerIdMap.Put(id);
     ct = nullptr;
     return error;
 }
@@ -461,7 +475,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         return error;
 
-    L_ACT("Restore container {}", kv.Name);
+    L_ACT("Restore container {}:{}", id, kv.Name);
 
     auto lock = LockContainers();
 
@@ -477,25 +491,23 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         return error;
 
-    ct = std::make_shared<TContainer>(parent, kv.Name);
+    ct = std::make_shared<TContainer>(parent, id, kv.Name);
+
+    ct->Register();
 
     lock.unlock();
+
+    error = SystemClient.LockContainer(ct);
+    if (error)
+        goto err;
 
     error = ct->Load(kv);
     if (error)
         goto err;
 
-    ct->Id = id;
     ct->RootPath = parent->RootPath / ct->Root;
 
-    /* SyncState might stop container, take lock for it */
-    error = SystemClient.LockContainer(ct);
-    if (error)
-        return error;
-
     ct->SyncState();
-
-    SystemClient.ReleaseContainer();
 
     error = ct->RestoreNetwork();
     if (error && !ct->WaitTask.IsZombie()) {
@@ -576,13 +588,15 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         goto err;
 
-    lock.lock();
-    ct->Register();
+    SystemClient.ReleaseContainer();
+
     return TError::Success();
 
 err:
     ct->Net = nullptr;
-    ContainerIdMap.Put(id);
+    lock.lock();
+    SystemClient.ReleaseContainer(true);
+    ct->Unregister();
     ct = nullptr;
     return error;
 }
@@ -683,7 +697,7 @@ void TContainer::SetState(EContainerState next) {
     if (State == next)
         return;
 
-    L_ACT("{} : change state {} -> {}", Name, StateName(State), StateName(next));
+    L_ACT("Change container {}:{} state {} -> {}", Id, Name, StateName(State), StateName(next));
 
     auto lock = LockContainers();
     auto prev = State;
@@ -706,7 +720,7 @@ void TContainer::SetState(EContainerState next) {
 TError TContainer::Destroy() {
     TError error;
 
-    L_ACT("Destroy {}", Name);
+    L_ACT("Destroy container {}:{}", Id, Name);
 
     if (State != EContainerState::Stopped) {
         error = Stop(0);
@@ -737,14 +751,7 @@ TError TContainer::Destroy() {
 
     auto lock = LockContainers();
 
-    error = ContainerIdMap.Put(Id);
-    if (error)
-        L_WRN("Cannot put container id : {}", error);
-
-    Containers.erase(Name);
-    if (Parent)
-        Parent->Children.remove(shared_from_this());
-    State = EContainerState::Destroyed;
+    Unregister();
 
     TPath path(ContainersKV / std::to_string(Id));
     error = path.Unlink();
@@ -1980,7 +1987,7 @@ TError TContainer::Start() {
 TError TContainer::StartOne() {
     TError error;
 
-    L_ACT("Start {}", Name);
+    L_ACT("Start container {}:{}", Id, Name);
 
     SetState(EContainerState::Starting);
 
@@ -2011,8 +2018,6 @@ TError TContainer::StartOne() {
         SetState(EContainerState::Meta);
     else
         SetState(EContainerState::Running);
-
-    L("{} started {}", Name, std::to_string(Task.Pid));
 
     SetProp(EProperty::ROOT_PID);
 
@@ -2091,7 +2096,7 @@ void TContainer::FreeRuntimeResources() {
     ShutdownOom();
 
     if (Parent && CpuReserve.Weight()) {
-        L_ACT("Release CPUs reserved for {}", Name);
+        L_ACT("Release CPUs reserved for {}:{}", Id, Name);
         error = Parent->DistributeCpus();
         if (error)
             L_ERR("Cannot redistribute CPUs: {}", error);
@@ -2196,7 +2201,7 @@ TError TContainer::Kill(int sig) {
     if (State != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state ");
 
-    L_ACT("Kill {} pid {}", Name, Task.Pid);
+    L_ACT("Kill task {} in container {}:{}", Task.Pid, Id, Name);
     return Task.Kill(sig);
 }
 
@@ -2207,7 +2212,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (IsRoot())
         return TError(EError::Permission, "Cannot terminate root container");
 
-    L_ACT("Terminate tasks in {}", Name);
+    L_ACT("Terminate tasks in container {}:{}", Id, Name);
 
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
@@ -2235,7 +2240,7 @@ TError TContainer::Terminate(uint64_t deadline) {
         if (sig) {
             error = Task.Kill(sig);
             if (!error) {
-                L_ACT("Wait task {} after signal {} in {}", Task.Pid, sig, Name);
+                L_ACT("Wait task {} after signal {} in {}:{}", Task.Pid, sig, Id, Name);
                 while (Task.Exists() && !Task.IsZombie() &&
                         !WaitDeadline(deadline));
             }
@@ -2290,12 +2295,12 @@ TError TContainer::Stop(uint64_t timeout) {
 
         error = ct->Terminate(deadline);
         if (error) {
-            L_ERR("Cannot terminate tasks in container: {}", error);
+            L_ERR("Cannot terminate tasks in container {}:{}: {}", ct->Id, ct->Name, error);
             return error;
         }
 
         if (FreezerSubsystem.IsSelfFreezing(cg)) {
-            L_ACT("Thaw terminated paused container {}", ct->Name);
+            L_ACT("Thaw terminated paused container {}:{}", ct->Id, ct->Name);
             error = FreezerSubsystem.Thaw(cg, false);
             if (error)
                 return error;
@@ -2308,7 +2313,7 @@ TError TContainer::Stop(uint64_t timeout) {
         if (ct->State == EContainerState::Stopped)
             continue;
 
-        L_ACT("Stop {}", Name);
+        L_ACT("Stop container {}:{}", Id, Name);
 
         ct->ForgetPid();
 
@@ -2779,7 +2784,7 @@ void TContainer::SyncState() {
     TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
     TError error;
 
-    L_ACT("Sync {} state {}", Name, StateName(State));
+    L_ACT("Sync container {}:{} state {}", Id, Name, StateName(State));
 
     if (!freezerCg.Exists()) {
         if (State != EContainerState::Stopped)

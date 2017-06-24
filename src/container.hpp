@@ -111,7 +111,7 @@ public:
     const std::string FirstName;
     const int Level; // 0 for root
 
-    int Id = 0;
+    int Id;
 
     /* protected with exclusive lock and ContainersMutex */
     EContainerState State = EContainerState::Stopped;
@@ -256,10 +256,11 @@ public:
         return Command.empty();
     }
 
-    TContainer(std::shared_ptr<TContainer> parent, const std::string &name);
+    TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name);
     ~TContainer();
 
     void Register();
+    void Unregister();
 
     bool HasProp(EProperty prop) const {
         return PropSet[(int)prop];

@@ -9,6 +9,7 @@
 class TIdMap : public TNonCopyable {
 private:
     int Base;
+    int Last = -1;
     std::vector<bool> Used;
 public:
     TIdMap(int base, int size) {
@@ -30,12 +31,15 @@ public:
     }
 
     TError Get(int &id) {
-        auto it = std::find(Used.begin(), Used.end(), false);
+        auto it = std::find(Used.begin() + Last + 1, Used.end(), false);
+        if (Last && it == Used.end())
+            it = std::find(Used.begin(), Used.end(), false);
         if (it == Used.end()) {
             id = -1;
             return TError(EError::ResourceNotAvailable, "Cannot allocate id");
         }
-        id = Base + (it - Used.begin());
+        Last = it - Used.begin();
+        id = Base + Last;
         *it = true;
         return TError::Success();
     }

@@ -2862,19 +2862,26 @@ static void TestPath(Porto::Connection &api) {
 }
 
 static void TestIdmap(Porto::Connection &api) {
-    TIdMap idmap(1, CONTAINER_ID_MAX);
+    TIdMap idmap(1, 99);
     int id;
 
-    for (int i = 1; i < 256; i++) {
+    for (int i = 1; i <= 99; i++) {
         ExpectSuccess(idmap.Get(id));
         ExpectEq(id, i);
     }
 
-    for (int i = 1; i < 256; i++)
-        idmap.Put(i);
+    ExpectEq(idmap.Get(id).GetError(), EError::ResourceNotAvailable);
+
+    for (int i = 1; i <= 99; i++)
+        ExpectSuccess(idmap.Put(i));
 
     ExpectSuccess(idmap.Get(id));
     ExpectEq(id, 1);
+
+    ExpectSuccess(idmap.Put(1));
+
+    ExpectSuccess(idmap.Get(id));
+    ExpectEq(id, 2);
 }
 
 static void TestFormat(Porto::Connection &api) {
