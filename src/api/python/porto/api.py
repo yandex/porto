@@ -60,13 +60,15 @@ _DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
 
 
 class _RPC(object):
-    def __init__(self, socket_path, timeout, socket_constructor, lock_constructor):
+    def __init__(self, socket_path, timeout, socket_constructor,
+                 lock_constructor, auto_reconnect):
         self.lock = lock_constructor()
         self.socket_path = socket_path
         self.timeout = timeout
         self.socket_constructor = socket_constructor
         self.sock = None
         self.deadline = None
+        self.auto_reconnect = auto_reconnect
 
     def _set_locked(fn):
         def _lock(*args, **kwargs):
@@ -93,7 +95,14 @@ class _RPC(object):
             while (self.deadline is None) or (time.time() < self.deadline):
                 try:
                     return fn(*args, **kwargs)
-                except:
+
+                except (exceptions.SocketError,
+                        exceptions.SocketTimeout,
+                        exceptions.UnknownError) as e:
+
+                    if (not self.auto_reconnect):
+                        raise e
+
                     time.sleep(0.05)
             raise exceptions.SocketTimeout("Got operation timeout")
         return _check
@@ -122,7 +131,8 @@ class _RPC(object):
         except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout on send")
         except socket.error as e:
-            self.sock = None
+            if (self.auto_reconnect):
+                self.sock = None
             raise exceptions.SocketError("Send error: {}".format(e))
 
     def _recvdata(self, count, flags=0):
@@ -139,7 +149,8 @@ class _RPC(object):
         except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout on receive")
         except socket.error as e:
-            self.sock = None
+            if (self.auto_reconnect):
+                self.sock = None
             raise exceptions.SocketError("Recv error: {}".format(e))
 
     @_check_deadline
@@ -363,11 +374,13 @@ class Connection(object):
                  socket_path='/run/portod.socket',
                  timeout=300,
                  socket_constructor=socket.socket,
-                 lock_constructor=threading.Lock):
+                 lock_constructor=threading.Lock,
+                 auto_reconnect=True):
         self.rpc = _RPC(socket_path=socket_path,
                         timeout=timeout,
                         socket_constructor=socket_constructor,
-                        lock_constructor=lock_constructor)
+                        lock_constructor=lock_constructor,
+                        auto_reconnect=auto_reconnect)
 
     def connect(self):
         self.rpc.connect()
