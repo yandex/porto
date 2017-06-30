@@ -103,7 +103,7 @@ add_test(NAME prev_release_upgrade
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME portotest
-         COMMAND ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery leaks perf net_property
+         COMMAND ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery leaks net_property
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME networking
@@ -144,15 +144,11 @@ add_test(NAME clear
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-clear.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME perf
-         COMMAND ${CMAKE_BINARY_DIR}/portotest perf
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
 add_test(NAME leaks
          COMMAND ${CMAKE_BINARY_DIR}/portotest leaks
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME perf_regression
+add_test(NAME perf
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-performance.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
@@ -177,6 +173,6 @@ set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
                      unpriv-cred prev_release_upgrade uid_handling knobs clear
                      cpu_limit mem_limit fuzzer stats mem_recharge dirty_limit
-                     locate-process oom_non_fatal perf_regression
+                     locate-process oom_non_fatal perf
                      PROPERTIES
                      ENVIRONMENT PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python)

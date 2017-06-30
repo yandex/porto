@@ -4359,59 +4359,6 @@ static void TestLeaks(Porto::Connection &api) {
     ExpectLessEq(nowMaster, expMaster);
 }
 
-static void TestPerf(Porto::Connection &api) {
-    std::string name, v;
-    uint64_t begin, ms;
-    const int nr = 1000;
-    const int createMs = 120;
-    const int getStateMs = 1;
-    const int destroyMs = 120;
-
-    begin = GetCurrentTimeMs();
-    for (int i = 0; i < nr; i++) {
-        name = "perf" + std::to_string(i);
-        ExpectApiSuccess(api.Create(name));
-        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-        ExpectApiSuccess(api.Start(name));
-    }
-    ms = GetCurrentTimeMs() - begin;
-    Say() << "Create " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < createMs * nr);
-
-    begin = GetCurrentTimeMs();
-    for (int i = 0; i < nr; i++) {
-        name = "perf" + std::to_string(i);
-        ExpectApiSuccess(api.GetData(name, "state", v));
-    }
-    ms = GetCurrentTimeMs() - begin;
-    Say() << "Get state " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < getStateMs * nr);
-
-    std::vector<std::string> containers;
-    std::vector<std::string> variables = { "state" };
-    std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-
-    for (int i = 0; i < nr; i++)
-        containers.push_back("perf" + std::to_string(i));
-
-    begin = GetCurrentTimeMs();
-    ExpectApiSuccess(api.Get(containers, variables, result));
-    ms = GetCurrentTimeMs() - begin;
-
-    Say() << "Combined get state " << nr << " took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < getStateMs * nr);
-    ExpectEq(result.size(), nr);
-
-    begin = GetCurrentTimeMs();
-    for (int i = 0; i < nr; i++) {
-        name = "perf" + std::to_string(i);
-        ExpectApiSuccess(api.Destroy(name));
-    }
-    ms = GetCurrentTimeMs() - begin;
-    Say() << "Destroy " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < destroyMs * nr);
-}
-
 static void CleanupVolume(Porto::Connection &api, const std::string &path) {
     AsRoot(api);
     TPath dir(path);
@@ -5377,7 +5324,6 @@ int SelfTest(std::vector<std::string> args) {
         { "daemon", TestDaemon },
         { "convert", TestConvertPath },
         { "leaks", TestLeaks },
-        { "perf", TestPerf },
 
         // the following tests will restart porto several times
         { "bad_client", TestBadClient },
