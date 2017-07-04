@@ -55,6 +55,11 @@ private:
     WINDOW *Wnd;
 };
 
+namespace PortoTreeTags {
+    static const uint64_t None = 0x0;
+    static const uint64_t Self = 0x1;
+};
+
 class TPortoContainer {
 public:
     TPortoContainer(std::string container);
@@ -68,6 +73,7 @@ public:
     int ChildrenCount();
     std::string ContainerAt(int n, int max_level);
     TPortoContainer* GetRoot() const;
+    uint64_t Tag = PortoTreeTags::None;
 private:
     TPortoContainer* GetParent(int level);
     TPortoContainer* Root = nullptr;

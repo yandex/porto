@@ -326,13 +326,22 @@ TPortoValue::~TPortoValue() {
 void TPortoValue::Process() {
     if (Flags == ValueFlags::Container) {
         std::string name = Container->GetName();
+        std::string tab = "", tag = "";
+
         int level = Container->GetLevel();
-        if (level > 0) {
-            name = std::string(level - 1, ' ') +
-                (Container->ChildrenCount() ? "+ " : "- ") +
-                name.substr(1 + name.rfind('/'));
-        }
-        AsString = name;
+
+        if (name != "/")
+            name = name.substr(1 + name.rfind('/'));
+
+        tab = std::string(level, ' ');
+
+        if (Container->Tag & PortoTreeTags::Self)
+            tag = "@ ";
+
+        else if (level)
+            tag = Container->ChildrenCount() ? "+ " : "- ";
+
+        AsString = tab + tag + name;
         return;
     }
 
@@ -423,10 +432,12 @@ TPortoValue& TCommonValue::GetValue() {
 }
 
 TPortoContainer::TPortoContainer(std::string container) : Container(container) {
-    if (Container == "/" || Container == "self")
+    if (Container == "/") {
         Level = 0;
-    else
-        Level = 1 + std::count(container.begin(), container.end(), '/');
+    } else {
+        auto unprefixed = container.substr(strlen(ROOT_PORTO_NAMESPACE));
+        Level = 1 + std::count(unprefixed.begin(), unprefixed.end(), '/');
+    }
 }
 TPortoContainer* TPortoContainer::GetParent(int level) {
     if (Parent) {
@@ -454,19 +465,52 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
     TPortoContainer *prev = nullptr;
     int level = 0;
 
+    std::string self_absolute_name;
+    ret = api.GetData("self", "absolute_name", self_absolute_name);
+    if (ret)
+        return nullptr;
+
+    std::string self_porto_ns;
+    ret = api.GetData("self", "absolute_namespace", self_porto_ns);
+    if (ret)
+        return nullptr;
+
+    for (auto &ct : containers)
+        ct = self_porto_ns + ct;
+
+    if (self_absolute_name != "/") {
+        auto parent = self_absolute_name;
+        int pos = parent.size();
+
+        do {
+            auto self_parent = parent.substr(0, pos);
+
+            if (self_parent != "/porto" &&
+                std::find(containers.begin(), containers.end(), self_parent)
+                          == containers.end()) {
+
+                containers.push_back(self_parent);
+            }
+
+            pos = pos ? parent.rfind("/", pos - 1) : std::string::npos;
+        } while (pos != std::string::npos && pos);
+    }
+
     std::sort(containers.begin(), containers.end());
 
     root = new TPortoContainer("/");
     prev = root;
-
-    auto self = new TPortoContainer("self");
-    self->Parent = root;
-    root->Children.push_back(self);
+    root->Tag = self_absolute_name == "/" ? PortoTreeTags::Self : PortoTreeTags::None;
 
     for (auto &c : containers) {
         if (c == "/")
             continue;
+
         curr = new TPortoContainer(c);
+
+        if (c == self_absolute_name)
+            curr->Tag |= PortoTreeTags::Self;
+
         level = curr->GetLevel();
         if (level > prev->GetLevel())
             curr->Parent = prev;
@@ -479,6 +523,7 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
         curr->Parent->Children.push_back(curr);
         prev = curr;
     }
+
     return root;
 }
 std::string TPortoContainer::GetName() {
