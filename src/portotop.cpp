@@ -704,6 +704,8 @@ void TPortoTop::Print(TConsoleScreen &screen) {
 
     MaxRows = 0;
     ContainerTree->ForEach([&] (TPortoContainer &row) {
+            if (SelectedContainer == "self" && (row.Tag & PortoTreeTags::Self))
+                SelectedContainer = row.GetName();
             if (row.GetName() == SelectedContainer)
                 SelectedRow = MaxRows;
             MaxRows++;
@@ -1002,6 +1004,8 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
     Signal(SIGTTIN, SIG_IGN);
 
     TPortoTop top(api, args);
+
+    top.SelectedContainer = "self";
 
     top.Update();
 
