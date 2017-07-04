@@ -97,7 +97,7 @@ constexpr const char *PORTO_CHROOT_VOLUMES = "porto";
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_ID_MAX = 16384;
-constexpr uint64_t CONTAINER_LEVEL_MAX = 7;
+constexpr uint64_t CONTAINER_LEVEL_MAX = 16;
 constexpr uint64_t RUN_SUBDIR_LIMIT = 100u;
 
 constexpr const char *PORTO_NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
