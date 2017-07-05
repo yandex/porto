@@ -187,22 +187,22 @@ TError TClient::ResolveName(const std::string &relative_name, std::string &name)
         name = relative_name.substr(strlen(SELF_CONTAINER) + 1);
         if (!ClientContainer->IsRoot())
             name = ClientContainer->Name + "/" + name;
-    } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE)) {
+    } else if (StringStartsWith(relative_name, ROOT_PORTO_NAMESPACE))
         name = relative_name.substr(strlen(ROOT_PORTO_NAMESPACE));
-
-        if (!StringStartsWith(name, PortoNamespace)) {
-
-            if (ClientContainer && StringStartsWith(ClientContainer->Name + "/", name + "/"))
-                return TError::Success();
-
-            return TError(EError::Permission,
-                          "Absolute container name out of current namespace: " +
-                          relative_name);
-        }
-    } else
+    else
         name = PortoNamespace + relative_name;
 
-    return TError::Success();
+    name = TPath(name).NormalPath().ToString();
+    if (name == ".")
+        name = ROOT_CONTAINER;
+
+    if (StringStartsWith(name, PortoNamespace) ||
+            StringStartsWith(name, ClientContainer->Name + "/") ||
+            StringStartsWith(ClientContainer->Name + "/", name + "/") ||
+            name == ROOT_CONTAINER)
+        return TError::Success();
+
+    return TError(EError::Permission, "container name out of namespace: " + relative_name);
 }
 
 TError TClient::ResolveContainer(const std::string &relative_name,
