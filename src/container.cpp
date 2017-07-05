@@ -335,8 +335,10 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     CpuPolicy = "normal";
     ChooseSchedPolicy();
 
-    CpuLimit = GetNumCores();
-    CpuGuarantee = IsRoot() ? GetNumCores() : 0;
+    if (IsRoot()) {
+        SetProp(EProperty::CPU_LIMIT);
+        SetProp(EProperty::MEM_LIMIT);
+    }
 
     IoPolicy = "";
     IoPrio = 0;
@@ -1506,6 +1508,11 @@ TError TContainer::PrepareCgroups() {
         if (!(Controllers & hy->Controllers))
             continue;
 
+        if ((Controllers & hy->Controllers) != hy->Controllers) {
+            Controllers |= hy->Controllers;
+            SetProp(EProperty::CONTROLLERS);
+        }
+
         if (cg.Exists())
             continue;
 
@@ -2344,6 +2351,53 @@ static bool ParsePropertyName(std::string &name, std::string &idx) {
     }
 
     return false;
+}
+
+TError TContainer::HasProperty(const std::string &property) const {
+    std::string name = property, index;
+    TError error;
+
+    if (!ParsePropertyName(name, index)) {
+        auto dot = name.find('.');
+        if (dot != std::string::npos) {
+            if (State == EContainerState::Stopped)
+                return TError(EError::InvalidState, "Not available in stopped state");
+            std::string type = property.substr(0, dot);
+            for (auto subsys: Subsystems) {
+                if (subsys->Type != type)
+                    continue;
+                if (subsys->Kind & Controllers)
+                    return TError::Success();
+                return TError(EError::NoValue, "Controllers is disabled");
+            }
+            return TError(EError::InvalidProperty, "Unknown controller");
+        }
+    }
+
+    auto it = ContainerProperties.find(name);
+    if (it == ContainerProperties.end())
+        return TError(EError::InvalidProperty, "Unknown property");
+
+    auto prop = it->second;
+
+    if (!prop->IsSupported)
+        return TError(EError::NotSupported, "Not supported");
+
+    if (prop->Prop != EProperty::NONE && !HasProp(prop->Prop))
+        return TError(EError::NoValue, "Property not set");
+
+    if (prop->RequireControllers) {
+        if (State == EContainerState::Stopped)
+            return TError(EError::InvalidState, "Not available in stopped state");
+        if (!(prop->RequireControllers & Controllers))
+            return TError(EError::NoValue, "Controllers is disabled");
+    }
+
+    CT = const_cast<TContainer *>(this);
+    error = prop->Has();
+    CT = nullptr;
+
+    return error;
 }
 
 TError TContainer::GetProperty(const std::string &origProperty, std::string &value) const {

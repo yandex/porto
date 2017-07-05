@@ -392,6 +392,12 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
     if (!error) {
         std::string value;
 
+        if (req.has_real() && req.real()) {
+            error = ct->HasProperty(req.property());
+            if (error)
+                return error;
+        }
+
         if (req.has_sync() && req.sync())
             ct->SyncProperty(req.property());
 
@@ -441,6 +447,12 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
     if (!error) {
         std::string value;
 
+        if (req.has_real() && req.real()) {
+            error = ct->HasProperty(req.data());
+            if (error)
+                return error;
+        }
+
         if (req.has_sync() && req.sync())
             ct->SyncProperty(req.data());
 
@@ -469,6 +481,8 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
         std::string value;
 
         TError error = containerError;
+        if (!error && req.has_real() && req.real())
+            error = ct->HasProperty(var);
         if (!error)
             error = ct->GetProperty(var, value);
 

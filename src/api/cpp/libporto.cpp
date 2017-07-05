@@ -259,17 +259,20 @@ int Connection::Dlist(std::vector<Property> &list) {
 int Connection::Get(const std::vector<std::string> &name,
                    const std::vector<std::string> &variable,
                    std::map<std::string, std::map<std::string, GetResponse>> &result,
-                   bool nonblock, bool sync) {
+                   int flags) {
     auto get = Impl->Req.mutable_get();
 
     for (const auto &n : name)
         get->add_name(n);
     for (const auto &v : variable)
         get->add_variable(v);
-    if (nonblock)
-        get->set_nonblock(nonblock);
 
-    get->set_sync(sync);
+    if (flags & GetFlags::NonBlock)
+        get->set_nonblock(true);
+    if (flags & GetFlags::Sync)
+        get->set_sync(true);
+    if (flags & GetFlags::Real)
+        get->set_real(true);
 
     int ret = Impl->Rpc();
     if (!ret) {
@@ -298,11 +301,14 @@ int Connection::Get(const std::vector<std::string> &name,
 }
 
 int Connection::GetProperty(const std::string &name, const std::string &property,
-                           std::string &value, bool sync) {
+                           std::string &value, int flags) {
     auto* get_property = Impl->Req.mutable_getproperty();
     get_property->set_name(name);
     get_property->set_property(property);
-    get_property->set_sync(sync);
+    if (flags & GetFlags::Sync)
+        get_property->set_sync(true);
+    if (flags & GetFlags::Real)
+        get_property->set_real(true);
 
     int ret = Impl->Rpc();
     if (!ret)
@@ -319,20 +325,6 @@ int Connection::SetProperty(const std::string &name, const std::string &property
     set_property->set_value(value);
 
     return Impl->Rpc();
-}
-
-int Connection::GetData(const std::string &name, const std::string &data,
-                       std::string &value, bool sync) {
-    auto* get_data = Impl->Req.mutable_getdata();
-    get_data->set_name(name);
-    get_data->set_data(data);
-    get_data->set_sync(sync);
-
-    int ret = Impl->Rpc();
-    if (!ret)
-        value.assign(Impl->Rsp.getdata().value());
-
-    return ret;
 }
 
 int Connection::GetVersion(std::string &tag, std::string &revision) {

@@ -249,7 +249,7 @@ public:
         if (result == "")
             return TError(EError::Busy, "Wait timeout");
 
-        if (Api->GetData(Container, "exit_status", result))
+        if (Api->GetProperty(Container, "exit_status", result))
             return GetLastError();
 
         error = StringToInt(result, status);
@@ -605,20 +605,22 @@ public:
 
 class TGetPropertyCmd final : public ICmd {
 public:
-    TGetPropertyCmd(Porto::Connection *api) : ICmd(api, "pget", 2, "[-s] [-k] <container> <property> [property...]", "get raw container property") {}
+    TGetPropertyCmd(Porto::Connection *api) : ICmd(api, "pget", 2,
+            "[-s] [-k] <container> <property> [property...]",
+            "get raw container property") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        bool sync = false;
+        int flags = 0;
 
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
-            { 's', false, [&](const char *arg) { sync = true; } },
+            { 's', false, [&](const char *arg) { flags |= Porto::GetFlags::Sync; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetProperty(args[0], args[i], value, sync);
+            int ret = Api->GetProperty(args[0], args[i], value, flags);
             if (ret) {
                 PrintError("Can't get property");
                 return ret;
@@ -655,20 +657,22 @@ public:
 
 class TGetDataCmd final : public ICmd {
 public:
-    TGetDataCmd(Porto::Connection *api) : ICmd(api, "dget", 2, "[-s] [-k] <container> <data> [data...]", "get raw container data") {}
+    TGetDataCmd(Porto::Connection *api) : ICmd(api, "dget", 2,
+            "[-s] [-k] <container> <property>...",
+            "get raw container property") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        bool sync = false;
+        int flags = 0;
 
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
-            { 's', false, [&](const char *arg) { sync = true; } },
+            { 's', false, [&](const char *arg) { flags |= Porto::GetFlags::Sync; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetData(args[0], args[i], value, sync);
+            int ret = Api->GetProperty(args[0], args[i], value, flags);
             if (ret) {
                 PrintError("Can't get data");
                 return ret;
@@ -862,7 +866,12 @@ public:
 
 class TGetCmd final : public ICmd {
 public:
-    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1, "[-s] [container|pattern]... [--] [variable]...", "get container property or data") {}
+    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1,
+            "[-n] [-s] [-r] [container|pattern]... [--] [property]...",
+            "get container properties",
+            "   -n   non-blocking\n"
+            "   -s   synchronize cached values\n"
+            "   -r   only real values\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = true;
@@ -870,14 +879,15 @@ public:
         bool printEmpty = false;
         bool printHuman = true;
         bool multiGet = false;
-        bool sync = false;
+        int flags = 0;
         std::vector<std::string> list;
         std::vector<std::string> vars;
         int ret;
 
         const auto &args = env->GetOpts({
-                {'s', false, [&](const char *arg) { sync = true; }
-            },
+                {'n', false, [&](const char *arg) { flags |= Porto::GetFlags::NonBlock; }},
+                {'s', false, [&](const char *arg) { flags |= Porto::GetFlags::Sync; }},
+                {'r', false, [&](const char *arg) { flags |= Porto::GetFlags::Real; }},
         });
 
         int sep = -1;
@@ -929,7 +939,7 @@ public:
         }
 
         std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-        ret = Api->Get(list, vars, result, false, sync);
+        ret = Api->Get(list, vars, result, flags);
         if (ret) {
             PrintError("Can't get containers' data");
             return ret;
@@ -1191,7 +1201,7 @@ public:
                 continue;
 
             string state;
-            ret = Api->GetData(c, "state", state);
+            ret = Api->GetProperty(c, "state", state);
             if (ret) {
                 PrintError("Can't get container state");
                 continue;
@@ -1490,7 +1500,7 @@ public:
 
         for (auto container : clist) {
             string state;
-            ret = Api->GetData(container, "state", state);
+            ret = Api->GetProperty(container, "state", state);
             if (ret) {
                 PrintError("Can't get container state");
                 return EXIT_FAILURE;
@@ -1502,7 +1512,7 @@ public:
             map<string, string> dataVal;
             for (auto data : showData) {
                 string val;
-                if (Api->GetData(container, data, val))
+                if (Api->GetProperty(container, data, val))
                     (void)Api->GetProperty(container, data, val);
                 dataVal[data] = val;
             }
@@ -2375,7 +2385,6 @@ public:
 int main(int argc, char *argv[]) {
     Porto::Connection api;
     TCommandHandler handler(api);
-
     handler.RegisterCommand<TCreateCmd>();
     handler.RegisterCommand<TDestroyCmd>();
     handler.RegisterCommand<TListCmd>();

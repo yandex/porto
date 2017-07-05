@@ -285,7 +285,8 @@ int TPortoValueCache::Update(Porto::Connection &api) {
 
     CacheSelector = !CacheSelector;
     Cache[CacheSelector].clear();
-    int ret = api.Get(_containers, _variables, Cache[CacheSelector], false, true);
+    int ret = api.Get(_containers, _variables, Cache[CacheSelector],
+                      Porto::GetFlags::Sync | Porto::GetFlags::Real);
     Time[CacheSelector] = GetCurrentTimeMs();
 
     api.GetVersion(Version, Revision);
@@ -466,12 +467,12 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
     int level = 0;
 
     std::string self_absolute_name;
-    ret = api.GetData("self", "absolute_name", self_absolute_name);
+    ret = api.GetProperty("self", "absolute_name", self_absolute_name);
     if (ret)
         return nullptr;
 
     std::string self_porto_ns;
-    ret = api.GetData("self", "absolute_namespace", self_porto_ns);
+    ret = api.GetProperty("self", "absolute_namespace", self_porto_ns);
     if (ret)
         return nullptr;
 
@@ -864,7 +865,7 @@ void TPortoTop::Expand() {
 }
 int TPortoTop::StartStop() {
     std::string state;
-    int ret = Api->GetData(SelectedContainer, "state", state);
+    int ret = Api->GetProperty(SelectedContainer, "state", state);
     if (ret)
         return ret;
     if (state == "running" || state == "dead" || state == "meta")
@@ -874,7 +875,7 @@ int TPortoTop::StartStop() {
 }
 int TPortoTop::PauseResume() {
     std::string state;
-    int ret = Api->GetData(SelectedContainer, "state", state);
+    int ret = Api->GetProperty(SelectedContainer, "state", state);
     if (ret)
         return ret;
     if (state == "paused")
@@ -942,43 +943,34 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
     AddCommon(0, "Uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
 
-    std::vector<Porto::Property> data;
-    api->Dlist(data);
-    bool mem_total = false;
-    for (auto &d: data)
-        mem_total |= d.Name == "memory_limit_total";
+    Config = {
+        "state: state",
+        "time: time s",
 
-    Config = {"state: state",
-              "time: time s",
+        /* CPU */
+        "policy: cpu_policy",
+        "cpu%: cpu_usage'% 1e9",
+        "sys%: cpu_usage_system'% 1e9",
+        "wait%: cpu_wait'% 1e9",
+        "limit: cpu_limit",
+        "g-e: cpu_guarantee",
 
-              /* CPU */
-              "policy: cpu_policy",
-              "cpu%: cpu_usage'% 1e9",
-              "sys%: cpu_usage_system'% 1e9",
-              "wait%: cpu_wait'% 1e9",
+        /* Memory */
+        "memory: memory_usage b",
+        "anon: anon_usage b",
+        "cache: cache_usage b",
+        "limit: memory_limit b",
+        "g-e: memory_guarantee b",
 
-              /* Memory */
-              "memory: memory_usage b",
-              "anon: anon_usage b",
-              "cache: cache_usage b",
+        /* I/O */
+        "maj/s: major_faults'",
+        "read b/s: io_read[fs]' b",
+        "write b/s: io_write[fs]' b",
+
+        /* Network */
+        "net tx: S(net_bytes) 'b",
+        "net rx: S(net_rx_bytes) 'b",
     };
-
-    if (mem_total) {
-              Config.push_back("limit: memory_limit_total b");
-              Config.push_back("guarantee: memory_guarantee_total b");
-    } else {
-              Config.push_back("limit: memory_limit b");
-              Config.push_back("guarantee: memory_guarantee b");
-    }
-
-    /* I/O */
-    Config.push_back("maj/s: major_faults'");
-    Config.push_back("read b/s: io_read[fs]' b");
-    Config.push_back("write b/s: io_write[fs]' b");
-
-    /* Network */
-    Config.push_back("net tx: S(net_bytes) 'b");
-    Config.push_back("net rx: S(net_rx_bytes) 'b");
 
     RecreateColumns();
 }

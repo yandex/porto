@@ -209,6 +209,7 @@ public:
     std::string Name;
     EProperty Prop;
     std::string Desc;
+    uint64_t RequireControllers = 0;
     bool IsSupported = true;
     bool IsReadOnly = false;
     bool IsHidden = false;
@@ -221,6 +222,7 @@ public:
 
     virtual void Init(void) {}
 
+    virtual TError Has();
     virtual TError Get(std::string &value) = 0;
     virtual TError Set(const std::string &value);
 

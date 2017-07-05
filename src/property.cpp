@@ -26,6 +26,10 @@ TProperty::TProperty(std::string name, EProperty prop, std::string desc) {
     ContainerProperties[name] = this;
 }
 
+TError TProperty::Has() {
+    return TError::Success();
+}
+
 TError TProperty::Set(const std::string &value) {
     if (IsReadOnly)
         return TError(EError::InvalidValue, "Read-only value: " + Name);
@@ -544,7 +548,10 @@ public:
     TError Get(std::string &value);
     TMemoryGuarantee() : TProperty(P_MEM_GUARANTEE, EProperty::MEM_GUARANTEE,
                                     "Guaranteed amount of memory "
-                                    "[bytes] (dynamic)") {}
+                                    "[bytes] (dynamic)")
+    {
+        RequireControllers = CGROUP_MEMORY;
+    }
     void Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
     }
@@ -1401,7 +1408,10 @@ public:
     TDevices() : TProperty(P_DEVICES, EProperty::DEVICES,
                                    "Devices that container can access: "
                                    "<device> [r][w][m][-] [name] [mode] "
-                                   "[user] [group]; ...") {}
+                                   "[user] [group]; ...")
+    {
+        RequireControllers = CGROUP_DEVICES;
+    }
     TError Get(std::string &value) {
         value = MergeEscapeStrings(CT->Devices, ' ', ';');
         return TError::Success();
@@ -1570,7 +1580,10 @@ public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
     TMemoryLimit() : TProperty(P_MEM_LIMIT, EProperty::MEM_LIMIT,
-                               "Memory hard limit [bytes] (dynamic)") {}
+                               "Memory hard limit [bytes] (dynamic)")
+    {
+        RequireControllers = CGROUP_MEMORY;
+    }
 } static MemoryLimit;
 
 TError TMemoryLimit::Set(const std::string &limit) {
@@ -1600,8 +1613,10 @@ TError TMemoryLimit::Set(const std::string &limit) {
 }
 
 TError TMemoryLimit::Get(std::string &value) {
-    value = std::to_string(CT->MemLimit);
-
+    if (CT->IsRoot())
+        value = std::to_string(GetTotalMemory());
+    else
+        value = std::to_string(CT->MemLimit);
     return TError::Success();
 }
 
@@ -1610,7 +1625,10 @@ public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
     TAnonLimit() : TProperty(P_ANON_LIMIT, EProperty::ANON_LIMIT,
-                             "Anonymous memory limit [bytes] (dynamic)") {}
+                             "Anonymous memory limit [bytes] (dynamic)")
+    {
+        RequireControllers = CGROUP_MEMORY;
+    }
     void Init(void) {
         IsSupported = MemorySubsystem.SupportAnonLimit();
     }
@@ -1655,7 +1673,10 @@ public:
     TError Get(std::string &value);
     TDirtyLimit() : TProperty(P_DIRTY_LIMIT, EProperty::DIRTY_LIMIT,
                               "Dirty file cache limit [bytes] "
-                              "(dynamic)" ) {}
+                              "(dynamic)" )
+    {
+        RequireControllers = CGROUP_MEMORY;
+    }
     void Init(void) {
         IsHidden = !MemorySubsystem.SupportDirtyLimit();
     }
@@ -1696,7 +1717,10 @@ TError TDirtyLimit::Get(std::string &value) {
 class THugetlbLimit : public TProperty {
 public:
     THugetlbLimit() : TProperty(P_HUGETLB_LIMIT, EProperty::HUGETLB_LIMIT,
-                                "Hugetlb memory limit [bytes] (dynamic)") {}
+                                "Hugetlb memory limit [bytes] (dynamic)")
+    {
+        RequireControllers = CGROUP_HUGETLB;
+    }
     void Init(void) {
         IsSupported = HugetlbSubsystem.Supported;
     }
@@ -1741,7 +1765,10 @@ public:
     TRechargeOnPgfault() : TProperty(P_RECHARGE_ON_PGFAULT,
                                      EProperty::RECHARGE_ON_PGFAULT,
                                      "Recharge memory on "
-                                     "page fault (dynamic)") {}
+                                     "page fault (dynamic)")
+    {
+        RequireControllers = CGROUP_MEMORY;
+    }
     void Init(void) {
         IsSupported = MemorySubsystem.SupportRechargeOnPgfault();
     }
@@ -1789,7 +1816,10 @@ public:
     TError Get(std::string &value);
     TCpuLimit() : TProperty(P_CPU_LIMIT, EProperty::CPU_LIMIT,
                             "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c "
-                            " [cores] (dynamic)") {}
+                            " [cores] (dynamic)")
+    {
+        RequireControllers = CGROUP_CPU;
+    }
 } static CpuLimit;
 
 TError TCpuLimit::Set(const std::string &limit) {
@@ -1818,8 +1848,10 @@ TError TCpuLimit::Set(const std::string &limit) {
 }
 
 TError TCpuLimit::Get(std::string &value) {
-    value = StringFormat("%lgc", CT->CpuLimit);
-
+    if (CT->IsRoot())
+        value = std::to_string(GetNumCores()) + "c";
+    else
+        value = StringFormat("%lgc", CT->CpuLimit);
     return TError::Success();
 }
 
@@ -1829,7 +1861,10 @@ public:
     TError Get(std::string &value);
     TCpuGuarantee() : TProperty(P_CPU_GUARANTEE, EProperty::CPU_GUARANTEE,
                                 "CPU guarantee: 0-100.0 [%] | "
-                                "0.0c-<CPUS>c [cores] (dynamic)") {}
+                                "0.0c-<CPUS>c [cores] (dynamic)")
+    {
+        RequireControllers = CGROUP_CPU;
+    }
 } static CpuGuarantee;
 
 TError TCpuGuarantee::Set(const std::string &guarantee) {
@@ -1898,7 +1933,10 @@ public:
 class TCpuSet : public TProperty {
 public:
     TCpuSet() : TProperty(P_CPU_SET, EProperty::CPU_SET,
-            "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N (dynamic)") {}
+            "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N (dynamic)")
+    {
+        RequireControllers = CGROUP_CPUSET;
+    }
     TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
 
@@ -2544,6 +2582,7 @@ public:
     TMemUsage() : TProperty(D_MEMORY_USAGE, EProperty::NONE,
                             "current memory usage [bytes] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
 } static MemUsage;
 
@@ -2566,6 +2605,7 @@ public:
     TAnonUsage() : TProperty(D_ANON_USAGE, EProperty::NONE,
                              "current anonymous memory usage [bytes] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
 } static AnonUsage;
 
@@ -2607,6 +2647,7 @@ public:
     THugetlbUsage() : TProperty(D_HUGETLB_USAGE, EProperty::NONE,
                              "current hugetlb memory usage [bytes] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_HUGETLB;
     }
     void Init(void) {
         IsSupported = HugetlbSubsystem.Supported;
@@ -2629,6 +2670,7 @@ public:
     TError Get(std::string &value);
     TMinorFaults() : TProperty(D_MINOR_FAULTS, EProperty::NONE, "minor page faults (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
 } static MinorFaults;
 
@@ -2653,6 +2695,7 @@ public:
     TError Get(std::string &value);
     TMajorFaults() : TProperty(D_MAJOR_FAULTS, EProperty::NONE, "major page faults (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
 } static MajorFaults;
 
@@ -2678,6 +2721,7 @@ public:
     TMaxRss() : TProperty(D_MAX_RSS, EProperty::NONE,
                           "peak anonymous memory usage [bytes] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
@@ -2708,6 +2752,7 @@ public:
     TError Get(std::string &value);
     TCpuUsage() : TProperty(D_CPU_USAGE, EProperty::NONE, "consumed CPU time [nanoseconds] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_CPUACCT;
     }
 } static CpuUsage;
 
@@ -2730,6 +2775,7 @@ public:
     TCpuSystem() : TProperty(D_CPU_SYSTEM, EProperty::NONE,
                              "consumed system CPU time [nanoseconds] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_CPUACCT;
     }
 } static CpuSystem;
 
@@ -2751,6 +2797,7 @@ public:
     TCpuWait() : TProperty(D_CPU_WAIT, EProperty::NONE,
                              "CPU time without execution [nanoseconds] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_CPUACCT;
     }
     void Init(void) {
         IsSupported = CpuacctSubsystem.RootCgroup().Has("cpuacct.wait");
@@ -2809,6 +2856,7 @@ public:
     {
         if (prop == EProperty::NET_PRIO)
             IsHidden = true;
+        RequireControllers = CGROUP_NETCLS;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -2898,6 +2946,21 @@ public:
         IsReadOnly = true;
     }
 
+    TError Has() {
+        if (Member == &TNetStat::Bytes || Member == &TNetStat::Packets ||
+                Member == &TNetStat::Drops || Member == &TNetStat::Overlimits) {
+            if (CT->State == EContainerState::Stopped)
+                return TError(EError::InvalidState, "Not available in stopped state");
+            if (!(CT->Controllers & CGROUP_NETCLS))
+                return TError(EError::ResourceNotAvailable, "RequireControllers is disabled");
+            return TError::Success();
+        }
+
+        if (!CT->NetInherit || CT->IsRoot())
+            return TError::Success();
+        return TError(EError::ResourceNotAvailable, "Shared network");
+    }
+
     TError Get(std::string &value) {
         TError error = IsRunning();
         if (error)
@@ -2954,6 +3017,7 @@ class TIoStat : public TProperty {
 public:
     TIoStat(std::string name, EProperty prop, std::string desc) : TProperty(name, prop, desc) {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY | CGROUP_BLKIO;
     }
     virtual TError GetMap(TUintMap &map) = 0;
     TError Get(std::string &value) {
@@ -3229,6 +3293,7 @@ class TProcessCount : public TProperty {
 public:
     TProcessCount() : TProperty(D_PROCESS_COUNT, EProperty::NONE, "Total process count (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_FREEZER;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -3251,6 +3316,7 @@ class TThreadCount : public TProperty {
 public:
     TThreadCount() : TProperty(D_THREAD_COUNT, EProperty::NONE, "Total thread count (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_FREEZER | CGROUP_PIDS;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -3277,6 +3343,7 @@ public:
     TThreadLimit() : TProperty(P_THREAD_LIMIT, EProperty::THREAD_LIMIT, "Limit pid usage (dynamic)") {}
     void Init() {
         IsSupported = PidsSubsystem.Supported;
+        RequireControllers = CGROUP_PIDS;
     }
     TError Get(std::string &value) {
         if (CT->HasProp(EProperty::THREAD_LIMIT))

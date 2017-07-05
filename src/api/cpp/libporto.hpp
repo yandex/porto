@@ -40,6 +40,12 @@ struct GetResponse {
     std::string ErrorMsg;
 };
 
+enum GetFlags {
+    NonBlock = 1,
+    Sync = 2,
+    Real = 4,
+};
+
 class Connection {
     class ConnectionImpl;
 
@@ -80,15 +86,18 @@ public:
     int Get(const std::vector<std::string> &name,
             const std::vector<std::string> &variable,
             std::map<std::string, std::map<std::string, GetResponse>> &result,
-            bool nonblock = false, bool sync = false);
+            int flags = 0);
 
     int GetProperty(const std::string &name,
-            const std::string &property, std::string &value, bool sync = false);
+            const std::string &property, std::string &value, int flags = 0);
     int SetProperty(const std::string &name,
             const std::string &property, std::string value);
 
-    int GetData(const std::string &name,
-            const std::string &data, std::string &value, bool sync = false);
+    int GetData(const std::string &name, const std::string &property,
+                std::string &value) {
+        return GetProperty(name, property, value);
+    }
+
     int GetVersion(std::string &tag, std::string &revision);
 
     int Raw(const std::string &message, std::string &response);

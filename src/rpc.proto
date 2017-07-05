@@ -53,6 +53,8 @@ enum EError {
 	LayerAlreadyExists = 18;
 	LayerNotFound = 19;
 
+	NoValue = 20;
+
 	// Reserved error code used by Porto internals. Can't be returned to a user.
 	Queued = 1000;
 }
@@ -74,6 +76,7 @@ message TContainerGetPropertyRequest {
 	required string property = 2;
 	// update cached counters
 	optional bool sync = 3;
+	optional bool real = 4;
 }
 
 message TContainerSetPropertyRequest {
@@ -87,6 +90,7 @@ message TContainerGetDataRequest {
 	required string data = 2;
 	// update cached counters
 	optional bool sync = 3;
+	optional bool real = 4;
 }
 
 message TContainerStartRequest {
@@ -139,6 +143,7 @@ message TContainerGetRequest {
 	optional bool nonblock = 3;
 	// update cached counters
 	optional bool sync = 4;
+	optional bool real = 5;
 }
 
 // Wait while container(s) is/are in running state

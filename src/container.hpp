@@ -180,8 +180,8 @@ public:
     int SchedPrio;
     int SchedNice;
 
-    double CpuLimit;
-    double CpuGuarantee;
+    double CpuLimit = 0;
+    double CpuGuarantee = 0;
     double CpuWeight = 1;
 
     /* Under CpuAffinityMutex */
@@ -312,6 +312,7 @@ public:
     void SyncProperty(const std::string &name);
     static void SyncPropertiesAll();
 
+    TError HasProperty(const std::string &property) const;
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
 
