@@ -214,6 +214,7 @@ void TConsoleScreen::HelpDialog() {
          "left, right, home, end - change sorting/scroll",
          "up, down, page up, page down - select container/scroll",
          "tab - expand conteainers tree: first, second, all",
+         "@ - go to self container",
          "",
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
@@ -1142,6 +1143,9 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
         case 'u':
             top.Update();
             screen.Clear();
+            break;
+        case '@':
+            top.SelectedContainer = "self";
             break;
         case 0:
         case KEY_RESIZE:
