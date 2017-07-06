@@ -475,6 +475,15 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
     return error;
 }
 
+TError TMemorySubsystem::GetCacheUsage(TCgroup &cg, uint64_t &usage) const {
+    TUintMap stat;
+    TError error = Statistics(cg, stat);
+    if (!error)
+        usage = stat["total_inactive_file"] +
+                stat["total_active_file"];
+    return error;
+}
+
 TError TMemorySubsystem::GetAnonUsage(TCgroup &cg, uint64_t &usage) const {
     if (cg.Has(ANON_USAGE))
         return cg.GetUint64(ANON_USAGE, usage);

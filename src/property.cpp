@@ -2582,6 +2582,26 @@ TError TAnonUsage::Get(std::string &value) {
     return error;
 }
 
+class TCacheUsage : public TProperty {
+public:
+    TCacheUsage() : TProperty(D_CACHE_USAGE, EProperty::NONE,
+                            "file cache usage [bytes] (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        uint64_t val;
+        error = MemorySubsystem.GetCacheUsage(cg, val);
+        if (!error)
+            value = std::to_string(val);
+        return error;
+    }
+} static CacheUsage;
+
 class THugetlbUsage : public TProperty {
 public:
     THugetlbUsage() : TProperty(D_HUGETLB_USAGE, EProperty::NONE,

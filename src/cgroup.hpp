@@ -190,6 +190,7 @@ public:
         return cg.SetBool(RECHARGE_ON_PAGE_FAULT, enable);
     }
 
+    TError GetCacheUsage(TCgroup &cg, uint64_t &usage) const;
     TError GetAnonUsage(TCgroup &cg, uint64_t &usage) const;
     bool SupportAnonLimit() const;
     TError SetAnonLimit(TCgroup &cg, uint64_t limit) const;

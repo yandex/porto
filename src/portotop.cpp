@@ -960,6 +960,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
               /* Memory */
               "memory: memory_usage b",
               "anon: anon_usage b",
+              "cache: cache_usage b",
     };
 
     if (mem_total) {
