@@ -396,18 +396,6 @@ static void TestHolder(Porto::Connection &api) {
     name = "/invalid";
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
-    name = "invalid/";
-    ExpectApiFailure(api.Create(name), EError::InvalidValue);
-
-    name = "i//nvalid";
-    ExpectApiFailure(api.Create(name), EError::InvalidValue);
-
-    name = "invalid//";
-    ExpectApiFailure(api.Create(name), EError::InvalidValue);
-
-    name = "invali//d";
-    ExpectApiFailure(api.Create(name), EError::InvalidValue);
-
     name = string(128, 'a');
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.Destroy(name));
