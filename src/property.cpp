@@ -1848,10 +1848,7 @@ TError TCpuLimit::Set(const std::string &limit) {
 }
 
 TError TCpuLimit::Get(std::string &value) {
-    if (CT->IsRoot())
-        value = std::to_string(GetNumCores()) + "c";
-    else
-        value = StringFormat("%lgc", CT->CpuLimit);
+    value = StringFormat("%lgc", CT->CpuLimit);
     return TError::Success();
 }
 

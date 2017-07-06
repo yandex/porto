@@ -335,6 +335,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     CpuPolicy = "normal";
     ChooseSchedPolicy();
 
+    CpuLimit = GetNumCores();
     if (IsRoot()) {
         SetProp(EProperty::CPU_LIMIT);
         SetProp(EProperty::MEM_LIMIT);
