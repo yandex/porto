@@ -16,6 +16,7 @@
 
 extern "C" {
 #include <ncurses.h>
+#include <menu.h>
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -51,6 +52,7 @@ public:
     void ErrorDialog(std::string message, int error);
     void InfoDialog(std::vector<std::string> lines);
     void HelpDialog();
+    void ColumnsMenu(std::vector<TColumn> &columns);
 private:
     WINDOW *Wnd;
 };
@@ -149,7 +151,8 @@ private:
 
 class TColumn {
 public:
-    TColumn(std::string title, TPortoValue var, bool left_aligned = false);
+    TColumn(std::string title, std::string desc,
+            TPortoValue var, bool left_aligned, bool hidden);
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
     void ClearCache();
@@ -159,8 +162,10 @@ public:
     void Highlight(bool enable);
     int GetWidth();
     void SetWidth(int width);
-private:
     std::string Title;
+    std::string Description;
+    bool Hidden = false;
+private:
     TPortoValue RootValue;
 
     int Width;
@@ -177,9 +182,8 @@ public:
     void Sort();
     void Print(TConsoleScreen &screen);
 
-    bool AddColumn(std::string desc);
-
-    int RecreateColumns();
+    bool AddColumn(std::string title, std::string signal, std::string desc,
+                   bool hidden = false);
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
     void Expand();
@@ -195,6 +199,7 @@ public:
     int Delay = 3000;
     int FirstDelay = 300;
     bool Paused = false;
+    std::vector<TColumn> Columns;
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
@@ -205,11 +210,9 @@ private:
 
     Porto::Connection *Api;
     TPortoValueCache Cache;
-    std::vector<std::string> Config;
     TPortoContainer RootContainer;
     std::vector<std::vector<TCommonValue>> Common;
     std::unique_ptr<TPortoContainer> ContainerTree;
-    std::vector<TColumn> Columns;
 
     int SelectedRow = 0;
     int SelectedColumn = 0;

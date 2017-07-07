@@ -53,7 +53,7 @@ target_link_libraries(portod version porto util config
 
 add_executable(portoctl portoctl.cpp cli.cpp portotop.cpp)
 target_link_libraries(portoctl version porto util
-			       rt fmt ${PB} ${CURSES_LIBRARIES})
+			       rt fmt ${PB} ${CURSES_LIBRARIES} menu)
 
 add_executable(portoinit portoinit.c)
 target_link_libraries(portoinit version)

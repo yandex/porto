@@ -219,6 +219,7 @@ void TConsoleScreen::HelpDialog() {
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
          "u - update screen",
+         "f - choose columns",
          "",
          "g - get properties",
          "o - show stdout",
@@ -235,6 +236,119 @@ void TConsoleScreen::HelpDialog() {
          "h,? - help"};
     InfoDialog(help);
 }
+
+void TConsoleScreen::ColumnsMenu(std::vector<TColumn> &columns) {
+    const int MENU_SPACING = 2;
+
+    const char CHECKED[] = " [*]  ";
+    const char UNCHECKED[] = " [ ]  ";
+    const int CHECKBOX_SIZE = strlen(CHECKED);
+
+    const int BOX_BORDER = 2;
+
+
+    int title_width = 0, desc_width = 0;
+
+    for (auto &col : columns) {
+        title_width = std::max(title_width, (int)col.Title.length());
+        desc_width = std::max(desc_width, (int)col.Description.length());
+    }
+
+    int menu_width = title_width + desc_width + MENU_SPACING;
+    int win_width = menu_width + BOX_BORDER + CHECKBOX_SIZE + MENU_SPACING;
+
+    const int menu_lines = std::min((int)columns.size(),
+                                    std::max(1, Height() - 6));
+
+    const int win_height = menu_lines + BOX_BORDER + 2 + 1;
+
+    int x0 = Width() / 2 - win_width / 2;
+    int y0 = Height() / 2 - win_height / 2;
+
+    WINDOW *win = newwin(win_height, win_width, y0, x0);
+
+    box(win, 0, 0);
+    wrefresh(win);
+
+    std::vector<ITEM *> items;
+
+    for (auto &col : columns) {
+        auto item = new_item(col.Title.c_str(), col.Description.c_str());
+        items.push_back(item);
+    }
+
+    items.push_back(NULL);
+
+    mvwprintw(win, 1, 2, "Select displayed columns:");
+
+    MENU *menu = new_menu(items.data());
+    WINDOW *sub = derwin(win, menu_lines, menu_width, 3, BOX_BORDER / 2 + CHECKBOX_SIZE);
+
+    set_menu_win(menu, win);
+    set_menu_sub(menu, sub);
+    set_menu_mark(menu, "");
+    set_menu_format(menu, menu_lines, 1);
+    set_menu_spacing(menu, MENU_SPACING, 0, 0);
+
+    post_menu(menu);
+
+    bool done = false, value = true;
+
+    while (!done) {
+        for (int i = 0; i < menu_lines; i++) {
+            bool hidden = columns[top_row(menu) + i].Hidden;
+            mvwprintw(win, 3 + i, 1, hidden ? UNCHECKED : CHECKED);
+        }
+
+        wrefresh(win);
+
+        switch(Getch()) {
+            case KEY_DOWN:
+                menu_driver(menu, REQ_DOWN_ITEM);
+                break;
+            case KEY_UP:
+                menu_driver(menu, REQ_UP_ITEM);
+                break;
+            case KEY_NPAGE:
+                menu_driver(menu, REQ_SCR_DPAGE);
+                break;
+            case KEY_PPAGE:
+                menu_driver(menu, REQ_SCR_UPAGE);
+                break;
+            case KEY_HOME:
+                menu_driver(menu, REQ_FIRST_ITEM);
+                break;
+            case KEY_END:
+                menu_driver(menu, REQ_LAST_ITEM);
+                break;
+            case 'f':
+            case 'q':
+            case 'Q':
+            case '\n':
+                done = true;
+                break;
+            case ' ':
+                {
+                    auto &value = columns[item_index(current_item(menu))].Hidden;
+                    value = !value;
+                }
+                break;
+        }
+    }
+
+    unpost_menu(menu);
+    free_menu(menu);
+
+    for (auto &item : items)
+        if (item)
+            free_item(item);
+
+    delwin(sub);
+    delwin(win);
+    Refresh();
+}
+
+///////////////////////////////////////////////////////
 
 void TPortoValueCache::Register(const std::string &container,
                                 const std::string &variable) {
@@ -564,8 +678,12 @@ TPortoContainer* TPortoContainer::GetRoot() const {
     return Root;
 }
 
-TColumn::TColumn(std::string title, TPortoValue var, bool left_aligned) :
-    Title(title), RootValue(var), LeftAligned(left_aligned) {
+TColumn::TColumn(std::string title, std::string desc,
+                 TPortoValue var, bool left_aligned, bool hidden) :
+
+    Title(title), Description(desc),
+    RootValue(var), LeftAligned(left_aligned), Hidden(hidden) {
+
     Width = title.length();
 }
 int TColumn::PrintTitle(int x, int y, TConsoleScreen &screen) {
@@ -619,7 +737,8 @@ void TPortoContainer::SortTree(TColumn &column) {
 void TPortoTop::PrintTitle(int y, TConsoleScreen &screen) {
     int x = FirstX;
     for (auto &c : Columns)
-        x += 1 + c.PrintTitle(x, y, screen);
+        if (!c.Hidden)
+            x += 1 + c.PrintTitle(x, y, screen);
 }
 int TPortoTop::PrintCommon(TConsoleScreen &screen) {
     int x = 0;
@@ -724,8 +843,11 @@ void TPortoTop::Print(TConsoleScreen &screen) {
                 if (selected)
                     SelectedContainer = row.GetName();
                 int x = FirstX;
-                for (auto &c : Columns)
-                    x += 1 + c.Print(row, x, at_row + y - FirstRow, screen, selected);
+                for (auto &c : Columns) {
+                    if (!c.Hidden)
+                        x += 1 + c.Print(row, x, at_row + y - FirstRow,
+                                         screen, selected);
+                }
             }
             y++;
         }, MaxLevel);
@@ -734,38 +856,36 @@ void TPortoTop::Print(TConsoleScreen &screen) {
 void TPortoTop::AddColumn(const TColumn &c) {
     Columns.push_back(c);
 }
-bool TPortoTop::AddColumn(std::string desc) {
+bool TPortoTop::AddColumn(std::string title, std::string signal,
+                          std::string desc, bool hidden) {
+
     int flags = ValueFlags::Raw;
     size_t off = 0;
     std::string data;
 
-    off = desc.find(':');
-    std::string title = desc.substr(0, off);
-    desc = desc.substr(off + 2);
-
-    if (desc == "state")
+    if (signal == "state")
         flags = ValueFlags::State;
 
-    if (desc.length() > 4 && desc[0] == 'S' && desc[1] == '(') {
-        off = desc.find(')');
-        data = desc.substr(2, off == std::string::npos ?
+    if (signal.length() > 4 && signal[0] == 'S' && signal[1] == '(') {
+        off = signal.find(')');
+        data = signal.substr(2, off == std::string::npos ?
                            std::string::npos : off - 2);
         flags |= ValueFlags::Map;
     } else {
-        off = desc.find('\'');
+        off = signal.find('\'');
         if (off == std::string::npos)
-            off = desc.find(' ');
+            off = signal.find(' ');
         if (off == std::string::npos)
-            off = desc.find('%');
+            off = signal.find('%');
 
-        data = desc.substr(0, off);
+        data = signal.substr(0, off);
     }
 
     double multiplier = 1;
 
     if (off != std::string::npos) {
-        for (; off < desc.length(); off++) {
-            switch (desc[off]) {
+        for (; off < signal.length(); off++) {
+            switch (signal[off]) {
             case 'b':
             case 'B':
                 flags |= ValueFlags::Bytes;
@@ -788,7 +908,7 @@ bool TPortoTop::AddColumn(std::string desc) {
             default:
                 try {
                     size_t tmp;
-                    multiplier = stod(desc.substr(off), &tmp);
+                    multiplier = stod(signal.substr(off), &tmp);
                     off += tmp - 1;
                     flags |= ValueFlags::Multiplier;
                 } catch (...) {
@@ -799,7 +919,7 @@ bool TPortoTop::AddColumn(std::string desc) {
     }
 
     TPortoValue v(Cache, &RootContainer, data, flags, multiplier);
-    Columns.push_back(TColumn(title, v));
+    Columns.push_back(TColumn(title, desc, v, false, hidden));
     return true;
 }
 
@@ -944,46 +1064,49 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
     AddCommon(0, "Uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
 
-    Config = {
-        "state: state",
-        "time: time s",
+    AddColumn(TColumn("container", "Container name",
+              TPortoValue(Cache, ContainerTree.get(), "", ValueFlags::Container), true, false));
 
-        /* CPU */
-        "policy: cpu_policy",
-        "cpu%: cpu_usage'% 1e9",
-        "sys%: cpu_usage_system'% 1e9",
-        "wait%: cpu_wait'% 1e9",
-        "limit: cpu_limit",
-        "g-e: cpu_guarantee",
+    AddColumn("state", "state", "Current state");
+    AddColumn("time", "time s", "Time elapsed since start or death");
 
-        /* Memory */
-        "memory: memory_usage b",
-        "anon: anon_usage b",
-        "cache: cache_usage b",
-        "limit: memory_limit b",
-        "g-e: memory_guarantee b",
+    /* CPU */
+    AddColumn("policy", "cpu_policy", "Cpu policy being used");
+    AddColumn("cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
+    AddColumn("limit", "cpu_limit", "Cpu limit in cores");
+    AddColumn("sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
+    AddColumn("wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
+    AddColumn("g-e", "cpu_guarantee", "Cpu guarantee in cores");
 
-        /* I/O */
-        "maj/s: major_faults'",
-        "read b/s: io_read[fs]' b",
-        "write b/s: io_write[fs]' b",
+    /* Memory */
+    AddColumn("memory", "memory_usage b", "Memory usage");
+    AddColumn("limit", "memory_limit b", "Memory limit");
+    AddColumn("g-e", "memory_guarantee b", "Memory guarantee");
+    AddColumn("anon", "anon_usage b", "Anonymous memory usage");
+    AddColumn("alim", "anon_limit b", "Anonymous memory limit");
+    AddColumn("cache", "cache_usage b", "Cache memory usage");
 
-        /* Network */
-        "net tx: S(net_bytes) 'b",
-        "net rx: S(net_rx_bytes) 'b",
-    };
+    AddColumn("threads", "thread_count", "Threads count");
+    AddColumn("oom", "porto_stat[container_oom]", "OOM count");
 
-    RecreateColumns();
-}
-int TPortoTop::RecreateColumns() {
-    Columns.clear();
-    AddColumn(TColumn("container", TPortoValue(Cache, ContainerTree.get(), "",
-                                               ValueFlags::Container), true));
+    /* I/O */
+    AddColumn("maj/s", "major_faults'", "Major page fault count");
+    AddColumn("read b/s", "io_read[fs]' b", "IO bytes read by fs");
+    AddColumn("write b/s", "io_write[fs]' b", "IO bytes written by fs");
+    AddColumn("iop/s", "io_ops[fs]'", "IO operations by fs");
 
-    for (auto &c : Config)
-        AddColumn(c);
+    /* Network */
+    AddColumn("net", "S(net_bytes) 'b", "Bytes transmitted by container");
+    AddColumn("pkt", "S(net_packets)'", "Packets transmitted by container");
+    AddColumn("drop", "S(net_drops)'", "Packets dropped by container");
 
-    return 0;
+    AddColumn("net rx", "S(net_rx_bytes) 'b", "Bytes received by interfaces");
+    AddColumn("pkt rx", "S(net_rx_packets)'", "Packets received by interfaces");
+    AddColumn("drop rx", "S(net_rx_drops)'", "Outcomming packets dropped by interfaces");
+
+    AddColumn("net tx", "S(net_tx_bytes) 'b", "Bytes transmitted by interfaces");
+    AddColumn("pkt tx", "S(net_tx_packets)'", "Packets transmitted by interfaces");
+    AddColumn("drop tx", "S(net_tx_drops)'", "Incomming packets dropped by interfaces");
 }
 
 static bool exit_immediatly = false;
@@ -1055,6 +1178,9 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
             break;
         case ' ':
             top.Paused = !top.Paused;
+            break;
+        case 'f':
+            screen.ColumnsMenu(top.Columns);
             break;
         case 'S':
             if (screen.Dialog("Start/stop container " + top.SelectedContainer,
