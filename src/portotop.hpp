@@ -62,25 +62,24 @@ namespace PortoTreeTags {
     static const uint64_t Self = 0x1;
 };
 
-class TPortoContainer {
+class TPortoContainer : public std::enable_shared_from_this<TPortoContainer> {
 public:
     TPortoContainer(std::string container);
-    static TPortoContainer* ContainerTree(Porto::Connection &api);
-    ~TPortoContainer();
+    static std::shared_ptr<TPortoContainer> ContainerTree(Porto::Connection &api);
     std::string GetName();
     int GetLevel();
-    void ForEach(std::function<void (TPortoContainer&)> fn, int maxlevel);
+    void ForEach(std::function<void (std::shared_ptr<TPortoContainer> &)> fn,
+                 int maxlevel);
     void SortTree(TColumn &column);
     int GetMaxLevel();
     int ChildrenCount();
     std::string ContainerAt(int n, int max_level);
-    TPortoContainer* GetRoot() const;
     uint64_t Tag = PortoTreeTags::None;
+    std::list<std::shared_ptr<TPortoContainer>> Children;
 private:
-    TPortoContainer* GetParent(int level);
-    TPortoContainer* Root = nullptr;
-    TPortoContainer* Parent = nullptr;
-    std::list<TPortoContainer*> Children;
+    std::shared_ptr<TPortoContainer> GetParent(int level);
+    std::weak_ptr<TPortoContainer> Root;
+    std::weak_ptr<TPortoContainer> Parent;
     std::string Container;
     int Level = 0;
 };
@@ -119,8 +118,9 @@ class TPortoValue {
 public:
     TPortoValue();
     TPortoValue(const TPortoValue &src);
-    TPortoValue(const TPortoValue &src, TPortoContainer *container);
-    TPortoValue(TPortoValueCache &cache, TPortoContainer *container,
+    TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container);
+    TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
+                std::shared_ptr<TPortoContainer> &container,
                 const std::string &variable, int flags, double multiplier = 1);
     ~TPortoValue();
     void Process();
@@ -128,8 +128,8 @@ public:
     int GetLength() const;
     bool operator< (const TPortoValue &v);
 private:
-    TPortoValueCache *Cache;
-    TPortoContainer *Container;
+    std::shared_ptr<TPortoValueCache> Cache;
+    std::shared_ptr<TPortoContainer> Container;
     std::string Variable; // property or data
 
     int Flags;
@@ -156,7 +156,7 @@ public:
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
     void ClearCache();
-    void Update(TPortoContainer* tree, int maxlevel);
+    void Update(std::shared_ptr<TPortoContainer> &tree, int maxlevel);
     void Process();
     TPortoValue& At(TPortoContainer &row);
     void Highlight(bool enable);
@@ -203,16 +203,17 @@ public:
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
-                   TPortoContainer &container, int flags, double multiplier = 1.0);
+                   std::shared_ptr<TPortoContainer> &container,
+                   int flags, double multiplier = 1.0);
     void AddColumn(const TColumn &c);
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
 
     Porto::Connection *Api;
-    TPortoValueCache Cache;
-    TPortoContainer RootContainer;
+    std::shared_ptr<TPortoValueCache> Cache;
+    std::shared_ptr<TPortoContainer> RootContainer;
     std::vector<std::vector<TCommonValue>> Common;
-    std::unique_ptr<TPortoContainer> ContainerTree;
+    std::shared_ptr<TPortoContainer> ContainerTree;
 
     int SelectedRow = 0;
     int SelectedColumn = 0;

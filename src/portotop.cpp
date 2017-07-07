@@ -419,16 +419,17 @@ TPortoValue::TPortoValue(const TPortoValue &src) :
         Cache->Register(Container->GetName(), Variable);
 }
 
-TPortoValue::TPortoValue(const TPortoValue &src, TPortoContainer *container) :
+TPortoValue::TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container) :
     Cache(src.Cache), Container(container), Variable(src.Variable), Flags(src.Flags),
     Multiplier(src.Multiplier) {
     if (Cache && Container)
         Cache->Register(Container->GetName(), Variable);
 }
 
-TPortoValue::TPortoValue(TPortoValueCache &cache, TPortoContainer *container,
-                             const std::string &variable, int flags, double multiplier) :
-    Cache(&cache), Container(container), Variable(variable), Flags(flags),
+TPortoValue::TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
+                         std::shared_ptr <TPortoContainer> &container,
+                         const std::string &variable, int flags, double multiplier) :
+    Cache(cache), Container(container), Variable(variable), Flags(flags),
     Multiplier(multiplier) {
     if (Cache && Container)
         Cache->Register(Container->GetName(), Variable);
@@ -437,6 +438,8 @@ TPortoValue::TPortoValue(TPortoValueCache &cache, TPortoContainer *container,
 TPortoValue::~TPortoValue() {
     if (Cache && Container)
         Cache->Unregister(Container->GetName(), Variable);
+
+    Container = nullptr;
 }
 
 void TPortoValue::Process() {
@@ -555,30 +558,26 @@ TPortoContainer::TPortoContainer(std::string container) : Container(container) {
         Level = 1 + std::count(unprefixed.begin(), unprefixed.end(), '/');
     }
 }
-TPortoContainer* TPortoContainer::GetParent(int level) {
-    if (Parent) {
-        if (Parent->GetLevel() == level)
-            return Parent;
+std::shared_ptr<TPortoContainer> TPortoContainer::GetParent(int level) {
+    auto parent = Parent.lock();
+    if (parent) {
+        if (parent->GetLevel() == level)
+            return parent;
         else
-            return Parent->GetParent(level);
+            return parent->GetParent(level);
     } else
         return nullptr;
 }
 
-TPortoContainer::~TPortoContainer() {
-    for (auto &c : Children)
-        delete c;
-}
-
-TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
+std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connection &api) {
     std::vector<std::string> containers;
     int ret = api.List(containers);
     if (ret)
         return nullptr;
 
-    TPortoContainer *root = nullptr;
-    TPortoContainer *curr = nullptr;
-    TPortoContainer *prev = nullptr;
+    std::shared_ptr<TPortoContainer> root = nullptr;
+    std::shared_ptr<TPortoContainer> curr = nullptr;
+    std::shared_ptr<TPortoContainer> prev = nullptr;
     int level = 0;
 
     std::string self_absolute_name;
@@ -614,7 +613,7 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
 
     std::sort(containers.begin(), containers.end());
 
-    root = new TPortoContainer("/");
+    root = std::make_shared<TPortoContainer>("/");
     prev = root;
     root->Tag = self_absolute_name == "/" ? PortoTreeTags::Self : PortoTreeTags::None;
 
@@ -622,7 +621,7 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
         if (c == "/")
             continue;
 
-        curr = new TPortoContainer(c);
+        curr = std::make_shared<TPortoContainer>(c);
 
         if (c == self_absolute_name)
             curr->Tag |= PortoTreeTags::Self;
@@ -636,7 +635,11 @@ TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
             curr->Parent = prev->GetParent(level - 1);
         curr->Root = root;
 
-        curr->Parent->Children.push_back(curr);
+        auto parent = curr->Parent.lock();
+        if (!parent)
+            return nullptr;
+
+        parent->Children.push_back(curr);
         prev = curr;
     }
 
@@ -648,9 +651,13 @@ std::string TPortoContainer::GetName() {
 int TPortoContainer::GetLevel() {
     return Level;
 }
-void TPortoContainer::ForEach(std::function<void (TPortoContainer&)> fn, int maxlevel) {
+void TPortoContainer::ForEach(std::function<void (
+                              std::shared_ptr<TPortoContainer> &)> fn, int maxlevel) {
+
+    auto self = shared_from_this();
+
     if (Level <= maxlevel)
-        fn(*this);
+        fn(self);
     if (Level < maxlevel)
         for (auto &c : Children)
             c->ForEach(fn, maxlevel);
@@ -663,20 +670,18 @@ int TPortoContainer::GetMaxLevel() {
     return level;
 }
 std::string TPortoContainer::ContainerAt(int n, int max_level) {
-    TPortoContainer *ret = this;
+    auto ret = shared_from_this();
     int i = 0;
-    ForEach([&] (TPortoContainer &row) {
+    ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
             if (i++ == n)
-                ret = &row;
+                ret = row;
         }, max_level);
     return ret->GetName();
 }
 int TPortoContainer::ChildrenCount() {
     return Children.size();
 }
-TPortoContainer* TPortoContainer::GetRoot() const {
-    return Root;
-}
+
 
 TColumn::TColumn(std::string title, std::string desc,
                  TPortoValue var, bool left_aligned, bool hidden) :
@@ -696,10 +701,10 @@ int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, b
     screen.PrintAt(p, x, y, Width, LeftAligned, selected ? A_REVERSE : 0);
     return Width;
 }
-void TColumn::Update(TPortoContainer* tree, int maxlevel) {
-    tree->ForEach([&] (TPortoContainer &row) {
-            TPortoValue val(RootValue, &row);
-            Cache.insert(std::make_pair(row.GetName(), val));
+void TColumn::Update(std::shared_ptr<TPortoContainer> &tree, int maxlevel) {
+    tree->ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
+            TPortoValue val(RootValue, row);
+            Cache.insert(std::make_pair(row->GetName(), val));
         }, maxlevel);
 }
 TPortoValue& TColumn::At(TPortoContainer &row) {
@@ -727,7 +732,8 @@ void TColumn::ClearCache() {
     Cache.clear();
 }
 void TPortoContainer::SortTree(TColumn &column) {
-    Children.sort([&] (TPortoContainer *row1, TPortoContainer *row2) {
+    Children.sort([&] (std::shared_ptr<TPortoContainer> &row1,
+                       std::shared_ptr<TPortoContainer> &row2) {
             return column.At(*row1) < column.At(*row2);
         });
     for (auto &c : Children)
@@ -756,7 +762,7 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
             std::string p = "Version: ";
             screen.PrintAt(p, x, y, p.length());
             x += p.length();
-            p = Cache.Version;
+            p = Cache->Version;
             screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
             x += p.length() + 1;
 
@@ -776,12 +782,12 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
 void TPortoTop::Update() {
     for (auto &column : Columns)
         column.ClearCache();
-    ContainerTree.reset(TPortoContainer::ContainerTree(*Api));
+    ContainerTree = TPortoContainer::ContainerTree(*Api);
     if (!ContainerTree)
         return;
     for (auto &column : Columns)
-        column.Update(ContainerTree.get(), MaxLevel);
-    Cache.Update(*Api);
+        column.Update(ContainerTree, MaxLevel);
+    Cache->Update(*Api);
     Process();
 }
 
@@ -824,10 +830,10 @@ void TPortoTop::Print(TConsoleScreen &screen) {
     int at_row = 1 + PrintCommon(screen);
 
     MaxRows = 0;
-    ContainerTree->ForEach([&] (TPortoContainer &row) {
-            if (SelectedContainer == "self" && (row.Tag & PortoTreeTags::Self))
-                SelectedContainer = row.GetName();
-            if (row.GetName() == SelectedContainer)
+    ContainerTree->ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
+            if (SelectedContainer == "self" && (row->Tag & PortoTreeTags::Self))
+                SelectedContainer = row->GetName();
+            if (row->GetName() == SelectedContainer)
                 SelectedRow = MaxRows;
             MaxRows++;
         }, MaxLevel);
@@ -837,15 +843,15 @@ void TPortoTop::Print(TConsoleScreen &screen) {
     PrintTitle(at_row - 1, screen);
     int y = 0;
     SelectedContainer = "";
-    ContainerTree->ForEach([&] (TPortoContainer &row) {
+    ContainerTree->ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
             if (y >= FirstRow && y < MaxRows) {
                 bool selected = y == SelectedRow;
                 if (selected)
-                    SelectedContainer = row.GetName();
+                    SelectedContainer = row->GetName();
                 int x = FirstX;
                 for (auto &c : Columns) {
                     if (!c.Hidden)
-                        x += 1 + c.Print(row, x, at_row + y - FirstRow,
+                        x += 1 + c.Print(*row, x, at_row + y - FirstRow,
                                          screen, selected);
                 }
             }
@@ -918,7 +924,7 @@ bool TPortoTop::AddColumn(std::string title, std::string signal,
         }
     }
 
-    TPortoValue v(Cache, &RootContainer, data, flags, multiplier);
+    TPortoValue v(Cache, RootContainer, data, flags, multiplier);
     Columns.push_back(TColumn(title, desc, v, false, hidden));
     return true;
 }
@@ -1049,12 +1055,17 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     return ret;
 }
 void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var,
-                          TPortoContainer &container, int flags, double multiplier) {
+                          std::shared_ptr<TPortoContainer> &container,
+                          int flags, double multiplier) {
     Common.resize(row + 1);
-    TPortoValue v(Cache, &container, var, flags, multiplier);
+    TPortoValue v(Cache, container, var, flags, multiplier);
     Common[row].push_back(TCommonValue(title, v));
 }
-TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &args) : Api(api), RootContainer("/") {
+TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &args) :
+    Api(api),
+    Cache(std::make_shared<TPortoValueCache>()),
+    RootContainer(std::make_shared<TPortoContainer>("/")) {
+
     AddCommon(0, "Containers running: ", "porto_stat[running]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "of ", "porto_stat[containers]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Volumes: ", "porto_stat[volumes]", RootContainer, ValueFlags::Raw);
@@ -1065,7 +1076,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "Uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
 
     AddColumn(TColumn("container", "Container name",
-              TPortoValue(Cache, ContainerTree.get(), "", ValueFlags::Container), true, false));
+              TPortoValue(Cache, ContainerTree, "", ValueFlags::Container), true, false));
 
     AddColumn("state", "state", "Current state");
     AddColumn("time", "time s", "Time elapsed since start or death");
