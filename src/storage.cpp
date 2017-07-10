@@ -1,6 +1,7 @@
 #include "storage.hpp"
 #include "volume.hpp"
 #include "helpers.hpp"
+#include "config.hpp"
 #include "filesystem.hpp"
 #include "client.hpp"
 #include <algorithm>
@@ -32,6 +33,33 @@ static bool PathIsActive(const TPath &path) {
 }
 
 static std::condition_variable StorageCv;
+
+static TUintMap PlaceLoad;
+static TUintMap PlaceLoadLimit;
+
+void TStorage::Init() {
+    if (StringToUintMap(config().volumes().place_load_limit(), PlaceLoadLimit))
+        PlaceLoadLimit = {{"default", 1}};
+}
+
+void TStorage::IncPlaceLoad(const TPath &place) {
+    auto lock = LockVolumes();
+    auto id = place.ToString();
+    if (!PlaceLoadLimit.count(id))
+        id = "default";
+    StorageCv.wait(lock, [&]{return PlaceLoad[id] < PlaceLoadLimit[id];});
+    PlaceLoad[id]++;
+}
+
+void TStorage::DecPlaceLoad(const TPath &place) {
+    auto lock = LockVolumes();
+    auto id = place.ToString();
+    if (!PlaceLoadLimit.count(id))
+        id = "default";
+    if (PlaceLoad[id]-- <= 1)
+        PlaceLoad.erase(id);
+    StorageCv.notify_all();
+}
 
 /* FIXME racy. rewrite with openat... etc */
 TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned perms) {
@@ -371,6 +399,8 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
     ActivePaths.push_back(temp);
     lock.unlock();
 
+    IncPlaceLoad(Place);
+
     error = RunCommand({ "tar",
                          "--numeric-owner",
                          "--preserve-permissions",
@@ -410,6 +440,8 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
     if (error)
         goto err;
 
+    DecPlaceLoad(Place);
+
     StorageCv.notify_all();
 
     return TError::Success();
@@ -418,6 +450,8 @@ err:
     TError error2 = temp.RemoveAll();
     if (error2)
         L_WRN("Cannot cleanup layer: {}", error2);
+
+    DecPlaceLoad(Place);
 
     lock.lock();
     ActivePaths.remove(temp);
@@ -465,6 +499,8 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
     if (error)
         return error;
 
+    IncPlaceLoad(Place);
+
     /*
      * FIXME tar in ubuntu precise knows nothing about xattrs,
      * maybe temporary convert opaque directories into aufs?
@@ -485,6 +521,8 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
         error = tar.Chown(CL->TaskCred);
     if (error)
         (void)dir.UnlinkAt(tarball.BaseName());
+
+    DecPlaceLoad(Place);
 
     return error;
 }
@@ -543,6 +581,8 @@ TError TStorage::Remove() {
     if (error)
         return error;
 
+    IncPlaceLoad(Place);
+
     error = RemoveRecursive(temp);
     if (error) {
         L_WRN("Cannot remove layer: {}", error);
@@ -551,6 +591,8 @@ TError TStorage::Remove() {
         if (error)
             L_WRN("Cannot delete layer: {}", error);
     }
+
+    DecPlaceLoad(Place);
 
     lock.lock();
     ActivePaths.remove(temp);

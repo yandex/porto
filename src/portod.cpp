@@ -16,6 +16,7 @@
 #include "epoll.hpp"
 #include "container.hpp"
 #include "volume.hpp"
+#include "storage.hpp"
 #include "helpers.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
@@ -911,6 +912,7 @@ static int SlaveMain() {
 
     TNetwork::InitializeConfig();
     InitContainerProperties();
+    TStorage::Init();
 
     ContainersKV = TPath(PORTO_CONTAINERS_KV);
     error = TKeyValue::Mount(ContainersKV);

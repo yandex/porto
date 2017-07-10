@@ -33,6 +33,10 @@ public:
     TError SetOwner(const TCred &owner);
     TError SetPrivate(const std::string &text);
 
+    static void Init();
+    static void IncPlaceLoad(const TPath &place);
+    static void DecPlaceLoad(const TPath &place);
+
 private:
     static TError Cleanup(const TPath &place, const std::string &type, unsigned perms);
     TPath TempPath(const std::string &kind);
