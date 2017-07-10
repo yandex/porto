@@ -1,3 +1,60 @@
+yandex-porto (3.9.0) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * task: fix fd closing prior to execve()
+  * portoctl: fix exec cmd interface #PORTO-112
+  * property: report more information on container state #PORTO-112
+  * test: include performance as main test
+
+  [ Konstantin Khlebnikov ]
+  * porto: set default thread_limit to 10000 for first level containers
+  * porto: set container ioprio by property io_policy
+  * cgroup: try to initialize cpu.rt_runtime_us = -1 for new cgroups
+
+  [ Maxim Samoylov ]
+  * net: rework net tc classes creation #PORTO-201
+  * property: allow forcing read of actual net stats
+
+  [ Konstantin Khlebnikov ]
+  * porto: rename force_data_refill -> sync
+
+  [ Maxim Samoylov ]
+  * net: do not throw WRN if object/device not found
+  * net: fix locking in NetWorker.RefreshStats()
+  * api/python: fixup typo
+
+  [ Konstantin Khlebnikov ]
+  * container: use next id instead of first and log it before name
+
+  [ Maxim Samoylov ]
+  * api/python: add option for disable auto-reconnect #PORTO-248
+
+  [ Konstantin Khlebnikov ]
+  * test: replace perf with python version
+  * network: refactor once again
+  * porto: set maximum level to 16
+
+  [ Maxim Samoylov ]
+  * portotop: always display parents of self container #PORTO-250
+
+  [ Konstantin Khlebnikov ]
+  * portotop: select self container initially
+  * porto: resolve "/../" in container path
+  * porto: container name normalizarion removes extra /
+  * porto: add property cache_usage
+  * portotop: show only real values
+  * portotop: @ - go to self container
+  * porto: set default cpu limit back to total cores
+
+  [ Maxim Samoylov ]
+  * portotop: menu for column selection
+  * portotop: fix legacy mess with memory management
+
+  [ Konstantin Khlebnikov ]
+  * storage: limit place load
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 10 Jul 2017 14:45:30 +0300
+
 yandex-porto (3.8.2) unstable; urgency=low
 
   [ Maxim Samoylov ]
