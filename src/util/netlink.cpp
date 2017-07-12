@@ -417,7 +417,7 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     }
 
     nh = rtnl_route_nh_alloc();
-    if (!route) {
+    if (!nh) {
         rtnl_route_put(route);
         return TError(EError::Unknown, "Unable to allocate next hop");
     }

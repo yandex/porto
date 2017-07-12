@@ -256,17 +256,16 @@ std::string GetState(const std::string &pid) {
 }
 
 uint64_t GetCap(const std::string &pid, const std::string &type) {
-    std::stringstream ss(GetStatusLine(pid, type + ":"));
+    auto status = GetStatusLine(pid, type + ":");
 
-    std::string name, val;
+    std::vector<std::string> fields;
 
-    ss>> name;
-    ss>> val;
+    if (!SplitString(status, ':', fields)) {
+        if (fields[0] == type)
+            return stoull(fields[1], nullptr, 16);
+    }
 
-    if (name != type + ":")
-        throw std::string("PARSING ERROR");
-
-    return stoull(val, nullptr, 16);
+    throw std::string("PARSING ERROR");
 }
 
 void GetUidGid(const std::string &pid, int &uid, int &gid) {

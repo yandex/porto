@@ -210,8 +210,12 @@ std::string GetTaskName(pid_t pid) {
     if (!processName) {
         char name[17];
 
+        memset(name, 0, sizeof(name));
+
+        /* prctl returns 16 bytes string */
+
         if (prctl(PR_GET_NAME, (void *)name) < 0)
-            strncpy(name, program_invocation_short_name, sizeof(name));
+            strncpy(name, program_invocation_short_name, sizeof(name) - 1);
 
         processName = new std::string(name);
     }

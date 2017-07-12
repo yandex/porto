@@ -24,7 +24,7 @@ public:
 };
 
 class TEpollLoop : public TLockable, public TNonCopyable {
-    int EpollFd;
+    int EpollFd = -1;
 
     size_t MaxEvents = 0;
     struct epoll_event *Events = nullptr;

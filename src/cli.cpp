@@ -36,10 +36,14 @@ void PrintAligned(const std::string &name, const std::string &desc,
         v.push_back(last);
 
     std::cout << "  " << std::left << std::setw(nameWidth) << name
-        << v[0] << std::endl;
-    for (size_t i = 1; i < v.size(); i++)
+              << v[0] << std::endl;
+    std::cout << std::resetiosflags(std::ios::adjustfield);
+
+    for (size_t i = 1; i < v.size(); i++) {
         std::cout << "  " << std::left << std::setw(nameWidth) << " "
-            << v[i] << std::endl;
+                  << v[i] << std::endl;
+        std::cout << std::resetiosflags(std::ios::adjustfield);
+    }
 }
 
 template <typename Collection, typename MapFunction>
@@ -163,8 +167,8 @@ const string &ICmd::GetHelp() const { return Help; }
 
 const string &ICmd::ErrorName(int err) {
     if (err == INT_MAX) {
-        static const string err = "portod unavailable";
-        return err;
+        static const string error = "portod unavailable";
+        return error;
     }
     return rpc::EError_Name(static_cast<rpc::EError>(err));
 }

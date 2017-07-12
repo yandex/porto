@@ -102,7 +102,11 @@ void TConsoleScreen::Save() {
     endwin();
 }
 void TConsoleScreen::Restore() {
-    tcsetpgrp(1, getpgrp());
+    pid_t pid = getpgrp();
+
+    if (pid >= 0)
+        tcsetpgrp(1, pid);
+
     reset_prog_mode();
     refresh();
 }
@@ -443,6 +447,11 @@ TPortoValue::~TPortoValue() {
 }
 
 void TPortoValue::Process() {
+    if (!Container) {
+        AsString = "";
+        return;
+    }
+
     if (Flags == ValueFlags::Container) {
         std::string name = Container->GetName();
         std::string tab = "", tag = "";
@@ -478,8 +487,9 @@ void TPortoValue::Process() {
             AsNumber = 200;
         else if (AsString == "dead")
             AsNumber = 100;
-        if (Container)
-            AsNumber += Container->ChildrenCount();
+
+        AsNumber += Container->ChildrenCount();
+
         return;
     }
 
@@ -758,6 +768,7 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
             screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
             x += p.length() + 1;
         }
+
         if (!y) {
             std::string p = "Version: ";
             screen.PrintAt(p, x, y, p.length());
@@ -771,8 +782,8 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
             x += p.length();
             p = Paused ? "paused" : StringFormatDuration(Delay);
             screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
-            x += p.length() + 1;
         }
+
         y++;
         x = 0;
     }
@@ -964,21 +975,21 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
 
     if (x == 0 && y == 0) {
         int i = 0;
-        int x = FirstX;
+        int _x = FirstX;
         for (auto &c : Columns) {
-            if (i == SelectedColumn && x <= 0) {
-                FirstX -= x;
-                x = 0;
+            if (i == SelectedColumn && _x <= 0) {
+                FirstX -= _x;
+                _x = 0;
             }
-            x += c.GetWidth() + 1;
-            if (i == SelectedColumn && x > screen.Width()) {
-                FirstX -= x - screen.Width();
-                x = screen.Width();
+            _x += c.GetWidth() + 1;
+            if (i == SelectedColumn && _x > screen.Width()) {
+                FirstX -= _x - screen.Width();
+                _x = screen.Width();
             }
             i++;
         }
-        if (FirstX < 0 && x < screen.Width())
-            FirstX += std::min(screen.Width() - x, -FirstX);
+        if (FirstX < 0 && _x < screen.Width())
+            FirstX += std::min(screen.Width() - _x, -FirstX);
     }
 }
 void TPortoTop::Expand() {

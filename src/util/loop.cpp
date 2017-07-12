@@ -52,7 +52,7 @@ again:
     }
 
     memset(&info, 0, sizeof(info));
-    strncpy((char *)info.lo_file_name, image.c_str(), LO_NAME_SIZE);
+    strncpy((char *)info.lo_file_name, image.c_str(), LO_NAME_SIZE - 1);
 
     if (ioctl(dev.Fd, LOOP_SET_STATUS64, &info) < 0) {
         error = TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");

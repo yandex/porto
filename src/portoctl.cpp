@@ -362,7 +362,8 @@ public:
                     break;
             }
 
-            kill(pid, SIGKILL);
+            if (kill(pid, SIGKILL))
+                std::cerr << "Cannot kill portoctl tty child : " << GetLastError() << std::endl;
         }
 
         /* restore state of outer terminal */
@@ -508,8 +509,9 @@ err:
 };
 
 static const std::string StripIdx(const std::string &name) {
-    if (name.find('[') != std::string::npos)
-        return std::string(name.c_str(), name.find('['));
+    auto idx = name.find('[');
+    if (idx != std::string::npos)
+        return std::string(name.c_str(), idx);
     else
         return name;
 }
@@ -1552,17 +1554,21 @@ public:
         }
 
         std::cout << std::left << std::setw(nameLen) << "container";
+        std::cout << std::resetiosflags(std::ios::adjustfield);
         for (size_t i = 0; i < showData.size(); i++)
             std::cout << std::right << std::setw(fieldLen[i]) << showData[i];
         std::cout << std::endl;
 
         for (auto &pair : containerData) {
             std::cout << std::left << std::setw(nameLen) << pair.first;
+            std::cout << std::resetiosflags(std::ios::adjustfield);
 
             for (size_t i = 0; i < showData.size(); i++) {
                 std::cout << std::right << std::setw(fieldLen[i]);
                 std::cout << HumanValue(showData[i], pair.second[showData[i]]);
+                std::cout << std::resetiosflags(std::ios::adjustfield);
             }
+
             std::cout << std::endl;
         }
 
@@ -1743,10 +1749,14 @@ public:
         for (auto name: v.Containers)
             std::cout << " " << name;
         std::cout << std::endl;
+        std::cout << std::resetiosflags(std::ios::adjustfield);
+
         for (auto kv: v.Properties) {
              std::cout << "  " << std::left << std::setw(20) << kv.first;
              if (kv.second.length())
                   std::cout << " " << kv.second;
+
+             std::cout << std::resetiosflags(std::ios::adjustfield);
              std::cout << std::endl;
         }
         std::cout << std::endl;

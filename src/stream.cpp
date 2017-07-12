@@ -54,8 +54,10 @@ retry:
         fd = open(path.c_str(), flags | O_CREAT | O_EXCL, 0660);
         if (fd < 0 && errno == EEXIST)
             goto retry;
-        if (fd >= 0 && fchown(fd, cred.Uid, cred.Gid))
+        if (fd >= 0 && fchown(fd, cred.Uid, cred.Gid)) {
+            close(fd);
             return TError(EError::Unknown, errno, "fchown " + path.ToString());
+        }
     }
     if (fd < 0)
         return TError(EError::InvalidValue, errno, "open " + path.ToString());
@@ -67,6 +69,8 @@ retry:
                           ", " + std::to_string(Stream) + ")");
         }
         close(fd);
+    } else {
+        Stream = fd;
     }
 
     return TError::Success();

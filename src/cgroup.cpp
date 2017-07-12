@@ -384,36 +384,38 @@ TCgroup TSubsystem::Cgroup(const std::string &name) const {
 }
 
 TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
-    FILE *file = fopen(("/proc/" + std::to_string(pid) + "/cgroup").c_str(), "r");
+    std::vector<std::string> lines;
+    auto cg_file = TPath("/proc/" + std::to_string(pid) + "/cgroup");
 
-    if (file) {
-        int id;
+    TError error = cg_file.ReadLines(lines);
+    if (error)
+        return error;
 
-        while (fscanf(file, "%d:", &id) == 1) {
-            bool found = false;
-            char *ss, *cg;
+    for (auto &line : lines) {
+        std::vector<std::string> fields;
+        bool found = false;
 
-            while (fscanf(file, "%m[^:,],", &ss) == 1) {
-                if (std::string(ss) == Type)
-                    found = true;
-                free(ss);
-            }
+        error = SplitString(line, ':', fields, 3);
+        if (error)
+            return error;
 
-            if (fscanf(file, ":%ms\n", &cg) == 1) {
-                if (found) {
-                    cgroup.Subsystem = this;
-                    cgroup.Name = std::string(cg);
-                    free(cg);
-                    fclose(file);
-                    return TError::Success();
-                }
-                free(cg);
-            }
+        std::vector<std::string> cgroups;
+        error = SplitString(fields[1], ',', cgroups);
+        if (error)
+            return error;
+
+        for (auto &cg : cgroups)
+            if (cg == Type)
+                found = true;
+
+        if (found) {
+            cgroup.Subsystem = this;
+            cgroup.Name = fields[2];
+            return TError::Success();
         }
-        fclose(file);
     }
 
-    return TError(EError::Unknown, errno, "Cannot find " + Type +
+    return TError(EError::Unknown, "Cannot find " + Type +
                     " cgroup for process " + std::to_string(pid));
 }
 
@@ -928,8 +930,8 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops
         if (error)
             return error;
 
-        for (auto &cg: list) {
-            error = cg.Knob(knob).ReadLines(lines);
+        for (auto &child_cg: list) {
+            error = child_cg.Knob(knob).ReadLines(lines);
             if (error)
                 return error;
         }

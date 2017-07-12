@@ -279,7 +279,9 @@ static int SaveCore(TPath core) {
         return EXIT_FAILURE;
 
     if (dup2(file.Fd, STDOUT_FILENO) == STDOUT_FILENO) {
-        fcntl(STDOUT_FILENO, F_SETFD, 0);
+        if (fcntl(STDOUT_FILENO, F_SETFD, 0) < 0)
+            return EXIT_FAILURE;
+
         std::string filter = "cat";
         if (StringEndsWith(core.ToString(), ".gz"))
             filter = "gzip";
@@ -375,12 +377,12 @@ static int ReapSpawner(int fd) {
             return 0;
 
         int pid, status;
-        if (read(fd, &pid, sizeof(pid)) < 0) {
+        if (read(fd, &pid, sizeof(pid)) != sizeof(pid)) {
             L_ERR("read(pid): {}", strerror(errno));
             return 0;
         }
 retry:
-        if (read(fd, &status, sizeof(status)) < 0) {
+        if (read(fd, &status, sizeof(status)) != sizeof(status)) {
             if (errno == EAGAIN)
                 goto retry;
             L_ERR("read(status): {}", strerror(errno));
@@ -1170,8 +1172,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
         close(ackfd[0]);
         TLogger::CloseLog();
         loop->Destroy();
-        dup2(evtfd[0], REAP_EVT_FD);
-        dup2(ackfd[1], REAP_ACK_FD);
+        (void)dup2(evtfd[0], REAP_EVT_FD);
+        (void)dup2(ackfd[1], REAP_ACK_FD);
         close(evtfd[0]);
         close(ackfd[1]);
         close(sigFd);

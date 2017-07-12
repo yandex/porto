@@ -600,12 +600,12 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
 
-    auto fn = [] (std::shared_ptr<TClient> client,
+    auto fn = [] (std::shared_ptr<TClient> waiting_client,
                   TError error, std::string name) {
         rpc::TContainerResponse response;
         response.set_error(error.GetError());
         response.mutable_wait()->set_name(name);
-        SendReply(*client, response, !error && name.empty());
+        SendReply(*waiting_client, response, !error && name.empty());
     };
 
     auto waiter = std::make_shared<TContainerWaiter>(client, fn);

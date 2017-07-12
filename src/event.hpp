@@ -27,8 +27,8 @@ public:
     std::weak_ptr<TContainer> Container;
 
     struct {
-        int Pid;
-        int Status;
+        int Pid = 0;
+        int Status = 0;
     } Exit;
 
     struct {

@@ -47,6 +47,7 @@ struct FileHandle {
     char data[MAX_HANDLE_SZ];
     FileHandle() {
         head.handle_bytes = MAX_HANDLE_SZ;
+        head.handle_type = 0;
     }
 };
 
@@ -477,7 +478,7 @@ TError TFile::ClearDirectory() const {
     TError error = TError::Success();
 
     top_fd = fcntl(Fd, F_DUPFD_CLOEXEC, 3);
-    if (Fd < 0)
+    if (top_fd < 0 || Fd < 0)
         return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(Fd));
 
     if (fstat(top_fd, &top_st)) {
@@ -675,8 +676,10 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     if (fd < 0)
         return TError(EError::Unknown, errno, "open(" + Path + ")");
 
-    if (fstat(fd, &st))
+    if (fstat(fd, &st)) {
+        close(fd);
         return TError(EError::Unknown, errno, "fstat(" + Path + ")");
+    }
 
     if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage) {
         loss = 0;

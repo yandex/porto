@@ -60,8 +60,14 @@ static int TestConnectivity() {
 
 int main(int argc, char *argv[])
 {
-    if (argc == 2 && !strcmp(argv[1], "connectivity"))
-        return TestConnectivity();
+    if (argc == 2 && !strcmp(argv[1], "connectivity")) {
+        try {
+            return TestConnectivity();
+        } catch (...) {
+            std::cerr << "Test connectivity failed" << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
 
     // in case client closes pipe we are writing to in the protobuf code
     Signal(SIGPIPE, SIG_IGN);

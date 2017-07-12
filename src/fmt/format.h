@@ -28,6 +28,8 @@
 #ifndef FMT_FORMAT_H_
 #define FMT_FORMAT_H_
 
+#define FMT_EXCEPTIONS 0
+
 #include <cassert>
 #include <clocale>
 #include <cmath>

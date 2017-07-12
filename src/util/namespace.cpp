@@ -45,8 +45,15 @@ TError TNamespaceFd::Chdir() const {
 }
 
 TError TNamespaceFd::Chroot() const {
-    if (Fd >= 0 && (fchdir(Fd) || chroot(".")))
-        return TError(EError::Unknown, errno, "Cannot change root");
+    if (Fd >= 0) {
+        int ret = fchdir(Fd);
+        if (!ret)
+            ret = chroot(".");
+
+        if (ret)
+            return TError(EError::Unknown, errno, "Cannot change root");
+    }
+
     return TError::Success();
 }
 

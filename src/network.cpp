@@ -314,8 +314,8 @@ void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
     if (Verbose)
         L("Register network {}", inode);
     auto newList = std::make_shared<std::list<std::shared_ptr<TNetwork>>>();
-    for (auto &net: *NetworksList)
-        newList->emplace_back(net);
+    for (auto &net_copy: *NetworksList)
+        newList->emplace_back(net_copy);
     newList->emplace_back(net);
     std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> constList(newList);
     // std::atomic_store(&NetworksList, constList);
@@ -1433,13 +1433,11 @@ void TNetwork::StopNetwork(TContainer &ct) {
             if (error)
                 L_ERR("Cannot put NAT address : {}", error);
 
-            auto ip = env.IpVec.begin();
-            while (ip != env.IpVec.end()) {
-                if (ip->Iface == l3.Name)
-                    ip = env.IpVec.erase(ip);
-                else
-                    ++ip;
-            }
+            env.IpVec.erase(std::remove_if(env.IpVec.begin(), env.IpVec.end(),
+                             [&l3](const TIpVec &ip)->bool {
+                                return ip.Iface == l3.Name;
+                             }), env.IpVec.end());
+
             env.SaveIp = true;
         }
     }

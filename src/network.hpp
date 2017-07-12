@@ -82,7 +82,7 @@ public:
     bool Missing;
 
     TNetStat Stat;
-    struct nl_cache *ClassCache;
+    struct nl_cache *ClassCache = nullptr;
 
     TNetDevice(struct rtnl_link *);
 

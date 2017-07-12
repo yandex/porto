@@ -5135,7 +5135,11 @@ static void TestBadClient(Porto::Connection &api) {
     string buf = "xyz";
     alarm(sec);
     ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
-    ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
+    int ret = write(fd, buf.c_str(), buf.length());
+
+    Expect(ret > 0);
+    size_t size = (size_t)ret;
+    ExpectEq(ret, buf.length());
 
     Porto::Connection api2;
     ExpectApiSuccess(api2.List(clist));

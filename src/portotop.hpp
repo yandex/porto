@@ -135,8 +135,8 @@ private:
     int Flags;
 
     std::string AsString;
-    double AsNumber;
-    double Multiplier;
+    double AsNumber = 0.0;
+    double Multiplier = 0.0;
 };
 
 class TCommonValue {

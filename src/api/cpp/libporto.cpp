@@ -26,7 +26,7 @@ public:
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
 
-    int LastError;
+    int LastError = 0;
     std::string LastErrorMsg;
 
     int Error(int err, const std::string &prefix) {
@@ -278,7 +278,6 @@ int Connection::Get(const std::vector<std::string> &name,
     if (!ret) {
          for (int i = 0; i < Impl->Rsp.get().list_size(); i++) {
              const auto &entry = Impl->Rsp.get().list(i);
-             const auto &name = entry.name();
 
              for (int j = 0; j < entry.keyval_size(); j++) {
                  auto keyval = entry.keyval(j);
@@ -292,7 +291,7 @@ int Connection::Get(const std::vector<std::string> &name,
                  if (keyval.has_value())
                      resp.Value = keyval.value();
 
-                 result[name][keyval.variable()] = resp;
+                 result[entry.name()][keyval.variable()] = resp;
              }
          }
     }

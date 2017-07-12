@@ -493,7 +493,7 @@ free_loop:
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         if (Volume->IsReadOnly)
             return TError(EError::Busy, "Volume is read-only");
-        if (Volume->SpaceLimit < (512ul, 20))
+        if (Volume->SpaceLimit < (512ul << 20))
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
         return ResizeLoopDev(LoopDev, Image(Volume->StoragePath),
@@ -1375,13 +1375,14 @@ void TVolume::DestroyAll() {
 TError TVolume::Destroy(bool strict) {
     TError error, ret;
 
-    std::list<std::shared_ptr<TVolume>> plan;
+    std::list<std::shared_ptr<TVolume>> plan = {shared_from_this()};
+    std::list<std::shared_ptr<TVolume>> work = {shared_from_this()};
 
     auto volumes_lock = LockVolumes();
 
     auto cycle = shared_from_this();
-    plan.push_back(shared_from_this());
-    for (auto it = plan.rbegin(); it != plan.rend(); ++it) {
+
+    for (auto it = work.begin(); it != work.end(); ++it) {
         auto &v = (*it);
 
         if (Path != v->Path) {
@@ -1397,12 +1398,16 @@ TError TVolume::Destroy(bool strict) {
             if (nested == cycle) {
                 L_WRN("Cyclic dependencies for {} detected", cycle->Path);
             } else {
-                auto it = std::find(plan.begin(), plan.end(), nested);
-                if (it == plan.end())
+                auto plan_idx = std::find(plan.begin(), plan.end(), nested);
+
+                if (plan_idx == plan.end())
                     cycle = nested;
                 else
-                    plan.erase(it);
+                    plan_idx = plan.erase(plan_idx);
+
                 plan.push_front(nested);
+
+                work.push_back(nested);
             }
         }
     }

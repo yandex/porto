@@ -23,8 +23,8 @@ extern const TFlagsNames ControllersName;
 
 class TSubsystem {
 public:
-    const uint64_t Kind;
-    uint64_t Controllers;
+    const uint64_t Kind = 0x0ull;
+    uint64_t Controllers = 0x0ull;
     const std::string Type;
     const TSubsystem *Hierarchy = nullptr;
     TPath Root;
@@ -46,7 +46,7 @@ public:
 
 class TCgroup {
 public:
-    const TSubsystem *Subsystem;
+    const TSubsystem *Subsystem = nullptr;
     std::string Name;
 
     TCgroup() { }
@@ -217,8 +217,17 @@ public:
 
 class TCpuSubsystem : public TSubsystem {
 public:
-    bool HasShares, HasQuota, HasSmart, HasReserve, HasRtGroup;
-    uint64_t BasePeriod, BaseShares, MinShares, MaxShares;
+    bool HasShares = false;
+    bool HasQuota = false;
+    bool HasSmart = false;
+    bool HasReserve = false;
+    bool HasRtGroup = false;
+
+    uint64_t BasePeriod = 0ull;
+    uint64_t BaseShares = 0ull;
+    uint64_t MinShares = 0ull;
+    uint64_t MaxShares = 0ull;
+
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     void InitializeSubsystem() override;
     TError InitializeCgroup(TCgroup &cg) override;
@@ -255,9 +264,9 @@ public:
 
 class TBlkioSubsystem : public TSubsystem {
 public:
-    bool HasWeight;
-    bool HasThrottler;
-    bool HasSaneBehavior;
+    bool HasWeight = false;
+    bool HasThrottler = false;
+    bool HasSaneBehavior = false;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
     void InitializeSubsystem() override {
         HasWeight = RootCgroup().Has("blkio.weight");
