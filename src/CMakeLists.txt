@@ -64,3 +64,17 @@ install(
 	RUNTIME DESTINATION sbin
 	LIBRARY DESTINATION lib
 )
+
+add_custom_command(
+	OUTPUT porto.8
+	DEPENDS ${CMAKE_SOURCE_DIR}/porto.md
+	COMMAND pandoc ${CMAKE_SOURCE_DIR}/porto.md -s -t man > ${CMAKE_CURRENT_BINARY_DIR}/porto.8
+	VERBATIM)
+
+add_custom_target(man ALL
+	DEPENDS porto.8)
+
+install(
+	FILES ${CMAKE_CURRENT_BINARY_DIR}/porto.8
+	DESTINATION share/man/man8
+)
