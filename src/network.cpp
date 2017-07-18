@@ -15,6 +15,7 @@ extern "C" {
 #include <linux/if.h>
 #include <netinet/ip6.h>
 #include <netinet/ether.h>
+#include <linux/if_tun.h>
 #include <netlink/route/link.h>
 #include <netlink/route/tc.h>
 #include <netlink/route/addr.h>
@@ -657,6 +658,10 @@ TError TNetwork::SyncDevices(bool force) {
              StringStartsWith(dev.Name, "L3-")))
             continue;
 
+        /* Ignore TUN/TAP */
+        if (dev.Type == "tun")
+            continue;
+
         /* In managed namespace we control all devices */
         if (ManagedNamespace)
             dev.Managed = true;
@@ -789,6 +794,9 @@ TError TNetwork::AddAnnounce(const TNlAddr &addr, std::string master) {
     struct nl_cache *cache;
     TError error;
     int ret;
+
+    if (!config().network().proxy_ndp())
+        return TError::Success();
 
     if (master != "") {
         int index = DeviceIndex(master);
@@ -1331,6 +1339,18 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
     if (env.SaveIp)
         env.FormatIp(ct.IpList);
 
+    if (env.Tap.size()) {
+        auto lock = env.Net->LockNet();
+        for (auto &tap: env.Tap) {
+            error = env.CreateTap(tap);
+            if (error) {
+                for (auto &tap: env.Tap)
+                    (void)env.DestroyTap(tap);
+                return error;
+            }
+        }
+    }
+
     ct.NetClass.HostClass = env.Net == HostNetwork;
 
     if ((ct.Controllers & CGROUP_NETCLS) && !ct.NetClass.HostClass) {
@@ -1406,6 +1426,17 @@ void TNetwork::StopNetwork(TContainer &ct) {
 
     PORTO_ASSERT(!ct.NetClass.Registered);
 
+    TNetEnv env;
+    (void)env.Parse(ct);
+    env.Net = net;
+
+    for (auto &tap : env.Tap) {
+        auto lock = HostNetwork->LockNet();
+        error = env.DestroyTap(tap);
+        if (error)
+            L_ERR("Cannot remove tap device {} : {}", tap.Name, error);
+    }
+
     if (!last)
         return;
 
@@ -1418,11 +1449,6 @@ void TNetwork::StopNetwork(TContainer &ct) {
         NetThreadCv.notify_all();
         NetThread.join();
     }
-
-    TNetEnv env;
-    error = env.Parse(ct);
-    if (error)
-        return;
 
     for (auto &l3 : env.L3lan) {
         auto lock = HostNetwork->LockNet();
@@ -1712,6 +1738,23 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
 
             NetIsolate = true;
 
+        } else if (type == "tap") {
+            TTapNetCfg tap;
+
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid tap in: " +
+                              MergeEscapeStrings(settings, ' '));
+
+            tap.Name = StringTrim(settings[1]);
+            tap.Uid = TaskCred.Uid;
+            tap.Gid = TaskCred.Gid;
+            tap.Mtu = -1;
+
+            Tap.push_back(tap);
+
+            /* Taps for host netns only */
+            NetInherit = true;
+
         } else if (type == "NAT") {
             TL3NetCfg nat;
 
@@ -1771,6 +1814,13 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
                 }
             }
 
+            for (auto &link: Tap) {
+                if (link.Name == settings[1]) {
+                    link.Mtu = mtu;
+                    return TError::Success();
+                }
+            }
+
             return TError(EError::InvalidValue, "Link not found: " + settings[1]);
 
         } else if (type == "autoconf") {
@@ -1798,7 +1848,7 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
                 L3lan.size() + IpIp6.size();
 
     if (single > 1 || (single == 1 && mixed))
-        return TError(EError::InvalidValue, "none/host/inherited can't be mixed with other types");
+        return TError(EError::InvalidValue, "none/host/inherited/taps can't be mixed with other types");
 
     return TError::Success();
 }
@@ -1855,6 +1905,20 @@ TError TNetEnv::ParseIp(TMultiTuple &ip_settings) {
         error = ip.Addr.Parse(AF_UNSPEC, settings[1]);
         if (error)
             return error;
+
+        bool is_tap = false;
+
+        for (auto &tap : Tap) {
+            if (tap.Name == ip.Iface) {
+                tap.Addrs.push_back(ip.Addr);
+                is_tap = true;
+                break;
+            }
+        }
+
+        if (is_tap)
+            continue;
+
         IpVec.push_back(ip);
 
         for (auto &l3: L3lan) {
@@ -2000,14 +2064,114 @@ TError TNetEnv::ConfigureL3(TL3NetCfg &l3) {
         if (error)
             return error;
 
-        if (config().network().proxy_ndp()) {
-            error = HostNetwork->AddAnnounce(addr, HostNetwork->MatchDevice(l3.Master));
-            if (error)
-                return error;
-        }
+        error = HostNetwork->AddAnnounce(addr, HostNetwork->MatchDevice(l3.Master));
+        if (error)
+            return error;
     }
 
     return TError::Success();
+}
+
+TError TNetEnv::CreateTap(TTapNetCfg &tap) {
+    TNlAddr gate4, gate6;
+    TError error;
+    int group;
+
+    if (Net != HostNetwork)
+        return TError(EError::NotSupported, "Tap only for host network");
+
+    error = Net->GetGateAddress(tap.Addrs, gate4, gate6, tap.Mtu, group);
+    if (error)
+        return error;
+
+    for (auto &addr : tap.Addrs) {
+        if (addr.Family() == AF_INET6 && gate6.IsEmpty())
+            return TError(EError::InvalidValue, "Ipv6 gateway not found");
+        if (addr.Family() == AF_INET && gate4.IsEmpty())
+            return TError(EError::InvalidValue, "Ipv4 gateway not found");
+    }
+
+    TFile tun;
+    error = tun.OpenReadWrite("/dev/net/tun");
+    if (error)
+        return error;
+
+    if (tap.Name.size() >= IFNAMSIZ)
+        return TError(EError::InvalidValue, "tun name too long, max " + std::to_string(IFNAMSIZ-1));
+
+    struct ifreq ifr;
+    memset(&ifr, 0, sizeof(struct ifreq));
+    strncpy(ifr.ifr_name, tap.Name.c_str(), IFNAMSIZ - 1);
+    ifr.ifr_flags = IFF_TAP;
+
+    if (ioctl(tun.Fd, TUNSETIFF, &ifr))
+        return TError(EError::Unknown, errno, "Cannot add tap device");
+
+    if (ioctl(tun.Fd, TUNSETOWNER, tap.Uid))
+        return TError(EError::Unknown, errno, "Cannot set tap owner uid");
+
+    if (ioctl(tun.Fd, TUNSETGROUP, tap.Gid))
+        return TError(EError::Unknown, errno, "Cannot set tap owner gid");
+
+    if (ioctl(tun.Fd, TUNSETPERSIST, 1))
+        return TError(EError::Unknown, errno, "Cannot set tap persist");
+
+    tun.Close();
+
+    auto Nl = Net->GetNl();
+
+    TNlLink tapdev(Nl, tap.Name);
+
+    error = tapdev.Load();
+    if (error)
+        return error;
+
+    error = tapdev.Up();
+    if (error)
+        return error;
+
+    if (tap.Mtu > 0) {
+        error = tapdev.SetMtu(tap.Mtu);
+        if (error)
+            return error;
+    }
+
+    for (auto &addr: tap.Addrs) {
+        error = tapdev.AddDirectRoute(addr);
+        if (error)
+            return error;
+
+        error = Net->AddAnnounce(addr, "");
+        if (error)
+            return error;
+    }
+
+    if (!gate6.IsEmpty()) {
+        error = Nl->ProxyNeighbour(tapdev.GetIndex(), gate6, true);
+        if (error)
+            return error;
+    }
+
+    if (!gate4.IsEmpty()) {
+        error = Nl->ProxyNeighbour(tapdev.GetIndex(), gate4, true);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+TError TNetEnv::DestroyTap(TTapNetCfg &tap) {
+    TNlLink tap_dev(Net->GetNl(), tap.Name);
+
+    for (auto &addr: tap.Addrs)
+       Net->DelAnnounce(addr);
+
+    TError error = tap_dev.Load();
+    if (!error)
+        error = tap_dev.Remove();
+
+    return error;
 }
 
 TError TNetEnv::SetupInterfaces() {
@@ -2174,6 +2338,7 @@ TError TNetEnv::Parse(TContainer &ct) {
     Parent = ct.Parent;
     Hostname = ct.Hostname;
     NetUp = ct.VirtMode != VIRT_MODE_OS;
+    TaskCred = ct.TaskCred;
 
     error = ParseNet(ct.NetProp);
     if (error)

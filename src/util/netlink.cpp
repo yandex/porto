@@ -745,16 +745,20 @@ TError TNlLink::AddIp6Tnl(const std::string &name,
 
     this->Load();
 
+    return SetMtu(mtu);
+}
+
+TError TNlLink::SetMtu(int mtu) {
     auto link_mtu = rtnl_link_alloc();
-    rtnl_link_set_name(link_mtu, name.c_str());
+    rtnl_link_set_name(link_mtu, rtnl_link_get_name(Link));
     rtnl_link_set_mtu(link_mtu, mtu);
 
-    ret = rtnl_link_change(GetSock(), Link, link_mtu, 0);
+    int ret = rtnl_link_change(GetSock(), Link, link_mtu, 0);
 
     rtnl_link_put(link_mtu);
 
     if (ret)
-        return Error(ret, "Cannot set ip6tnl mtu " + name);
+        return Error(ret, "Cannot set mtu for " + GetName());
 
     return TError::Success();
 }

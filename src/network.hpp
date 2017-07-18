@@ -276,9 +276,18 @@ struct TIpIp6NetCfg {
     bool DefaultRoute;
 };
 
+struct TTapNetCfg {
+    std::string Name;
+    uid_t Uid = NoUser;
+    gid_t Gid = NoGroup;
+    int Mtu = -1;
+    std::vector<TNlAddr> Addrs;
+};
+
 struct TNetEnv {
     unsigned Id;
     std::string Name;
+    TCred TaskCred;
 
     std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TNetwork> ParentNet;
@@ -300,6 +309,7 @@ struct TNetEnv {
     std::vector<TVethNetCfg> Veth;
     std::vector<TL3NetCfg> L3lan;
     std::vector<TIpIp6NetCfg> IpIp6;
+    std::vector<TTapNetCfg> Tap;
     std::string NetNsName;
     std::string NetCtName;
     std::vector<TGwVec> GwVec;
@@ -318,6 +328,9 @@ struct TNetEnv {
     TError ConfigureVeth(TVethNetCfg &veth);
     TError ConfigureL3(TL3NetCfg &l3);
     TError SetupInterfaces();
+
+    TError CreateTap(TTapNetCfg &tap);
+    TError DestroyTap(TTapNetCfg &tap);
 
     TError Open(TContainer &ct);
 

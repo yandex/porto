@@ -961,6 +961,7 @@ public:
  "L3 <name> [master] | "
  "NAT [name] | "
  "ipip6 <name> <remote> <local> | "
+ "tap <name> | "
  "MTU <name> <mtu> | "
  "autoconf <name> (SLAAC) | "
  "netns <name>") {}
