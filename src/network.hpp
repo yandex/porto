@@ -52,6 +52,8 @@ struct TNetStat {
 
 struct TNetClass {
     bool HostClass;
+    int Registered = 0;
+
     uint32_t HostParentHandle;
     uint32_t ParentHandle;
     uint32_t Handle;

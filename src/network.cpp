@@ -1081,12 +1081,15 @@ void TNetwork::RegisterClass(TNetClass &cls) {
         NetClasses.push_back(&cls);
     else
         NetClasses.insert(++pos, &cls);
+    cls.Registered++;
 }
 
 void TNetwork::UnregisterClass(TNetClass &cls) {
     auto pos = std::find(NetClasses.begin(), NetClasses.end(), &cls);
-    if (pos != NetClasses.end())
+    if (pos != NetClasses.end()) {
         NetClasses.erase(pos);
+        cls.Registered--;
+    }
 }
 
 void TNetwork::FatalError(TError &error) {
@@ -1400,6 +1403,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
                   HostNetwork->NetName, ct.Id, error);
         }
     }
+
+    PORTO_ASSERT(!ct.NetClass.Registered);
 
     if (!last)
         return;

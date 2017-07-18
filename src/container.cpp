@@ -384,6 +384,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 
 TContainer::~TContainer() {
     PORTO_ASSERT(Net == nullptr);
+    PORTO_ASSERT(!NetClass.Registered);
     Statistics->ContainersCount--;
 }
 
