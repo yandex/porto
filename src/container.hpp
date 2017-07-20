@@ -127,7 +127,7 @@ public:
     mode_t Umask;
     int VirtMode;
     bool BindDns;
-    bool Isolate;
+    bool Isolate;               /* New pid/ipc/utc/env namespace */
 
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */

@@ -329,14 +329,6 @@ public:
     TError Get(std::string &value);
     TCpuPolicy() : TProperty(P_CPU_POLICY, EProperty::CPU_POLICY,
             "CPU policy: rt, high, normal, batch, idle (dynamic)") {}
-    TError Start(void) {
-        auto parent = CT->Parent;
-        if (!CT->Isolate && !CT->HasProp(EProperty::CPU_POLICY)) {
-            CT->CpuPolicy = parent->CpuPolicy;
-            CT->ChooseSchedPolicy();
-        }
-        return TError::Success();
-    }
 } static CpuPolicy;
 
 TError TCpuPolicy::Set(const std::string &policy) {
@@ -369,11 +361,6 @@ public:
     TError Get(std::string &value);
     TIoPolicy() : TProperty(P_IO_POLICY, EProperty::IO_POLICY,
                             "IO policy: none | rt | high | normal | batch | idle (dynamic)") {}
-    TError Start(void) {
-        if (!CT->Isolate && !CT->HasProp(EProperty::IO_POLICY))
-            CT->IoPolicy = CT->Parent->IoPolicy;
-        return TError::Success();
-    }
 } static IoPolicy;
 
 TError TIoPolicy::Set(const std::string &policy) {
@@ -932,34 +919,27 @@ public:
 
 class TIsolate : public TProperty {
 public:
-    TError Set(const std::string &isolate_needed);
-    TError Get(std::string &value);
     TIsolate() : TProperty(P_ISOLATE, EProperty::ISOLATE,
-                           "Isolate container from parent") {}
+                           "New pid/ipc/utc/env namespace") {}
+    TError Get(std::string &value) {
+        value = BoolToString(CT->Isolate);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+
+        bool val;
+        error = StringToBool(value, val);
+        if (error)
+            return error;
+
+        CT->Isolate = val;
+        CT->SetProp(EProperty::ISOLATE);
+        return TError::Success();
+    }
 } static Isolate;
-
-TError TIsolate::Get(std::string &value) {
-    value = CT->Isolate ? "true" : "false";
-
-    return TError::Success();
-}
-
-TError TIsolate::Set(const std::string &isolate_needed) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    if (isolate_needed == "true")
-        CT->Isolate = true;
-    else if (isolate_needed == "false")
-        CT->Isolate = false;
-    else
-        return TError(EError::InvalidValue, "Invalid bool value");
-
-    CT->SetProp(EProperty::ISOLATE);
-
-    return TError::Success();
-}
 
 class TRoot : public TProperty {
 public:
@@ -1092,11 +1072,6 @@ public:
         if (error)
             return error;
         CT->SetProp(EProperty::UMASK);
-        return TError::Success();
-    }
-    TError Start(void) {
-        if (!CT->Isolate && !CT->HasProp(EProperty::UMASK))
-            CT->Umask = CT->Parent->Umask;
         return TError::Success();
     }
 } static Umask;
@@ -1812,11 +1787,6 @@ public:
     }
     void Init(void) {
         IsSupported = MemorySubsystem.SupportRechargeOnPgfault();
-    }
-    TError Start(void) {
-        if (!CT->Isolate && !CT->HasProp(EProperty::RECHARGE_ON_PGFAULT))
-            CT->RechargeOnPgfault = CT->Parent->RechargeOnPgfault;
-        return TError::Success();
     }
 } static RechargeOnPgfault;
 
