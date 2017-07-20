@@ -275,7 +275,7 @@ public:
             HasSaneBehavior = false;
     }
     TError GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops) const;
-    TError SetIoPolicy(TCgroup &cg, const std::string &policy) const;
+    TError SetIoWeight(TCgroup &cg, const std::string &policy, double weight) const;
     TError SetIoLimit(TCgroup &cg, const TUintMap &map, bool iops = false);
 
     TError DiskName(const std::string &disk, std::string &name) const;

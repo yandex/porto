@@ -40,6 +40,7 @@ constexpr const char *P_CPU_WEIGHT = "cpu_weight";
 constexpr const char *P_CPU_SET = "cpu_set";
 constexpr const char *D_CPU_SET_AFFINITY  = "cpu_set_affinity";
 constexpr const char *P_IO_POLICY = "io_policy";
+constexpr const char *P_IO_WEIGHT = "io_weight";
 constexpr const char *P_IO_LIMIT = "io_limit";
 constexpr const char *P_IO_OPS_LIMIT = "io_ops_limit";
 constexpr const char *P_NET_GUARANTEE = "net_guarantee";
@@ -157,6 +158,7 @@ enum class EProperty {
     CPU_SET,
     CPU_SET_AFFINITY,
     IO_POLICY,
+    IO_WEIGHT,
     IO_LIMIT,
     IO_OPS_LIMIT,
     NET_GUARANTEE,

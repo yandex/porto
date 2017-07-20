@@ -1315,15 +1315,19 @@ TError TContainer::ApplyDynamicProperties() {
             return error;
     }
 
-    if (TestClearPropDirty(EProperty::IO_POLICY)) {
+    if (TestClearPropDirty(EProperty::IO_WEIGHT) |
+            TestPropDirty(EProperty::IO_POLICY)) {
         if (Controllers & CGROUP_BLKIO) {
-            error = BlkioSubsystem.SetIoPolicy(blkcg, IoPolicy);
+            error = BlkioSubsystem.SetIoWeight(blkcg, IoPolicy, IoWeight);
             if (error) {
                 if (error.GetErrno() != EINVAL)
                     L_ERR("Can't set {}: {}", P_IO_POLICY, error);
                 return error;
             }
         }
+    }
+
+    if (TestClearPropDirty(EProperty::IO_POLICY)) {
         error = ApplyIoPolicy();
         if (error) {
             L_ERR("Cannot set io policy: {}", error);

@@ -170,6 +170,7 @@ public:
 
     std::string IoPolicy;
     int IoPrio;
+    double IoWeight = 1;
 
     TUintMap IoBpsLimit;
     TUintMap IoOpsLimit;

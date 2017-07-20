@@ -413,6 +413,46 @@ TError TIoPolicy::Get(std::string &value) {
     return TError::Success();
 }
 
+class TIoWeight : public TProperty {
+public:
+    TIoWeight() : TProperty(P_IO_WEIGHT, EProperty::IO_WEIGHT,
+                            "IO weight: 0.01..100, default is 1 (dynamic)") {
+        RequireControllers = CGROUP_BLKIO;
+    }
+    void Init(void) {
+        IsSupported = BlkioSubsystem.HasWeight;
+    }
+    TError Get(std::string &value) {
+        value = StringFormat("%lg", CT->IoWeight);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+
+        error = WantControllers(CGROUP_BLKIO);
+        if (error)
+            return error;
+
+        double val;
+        std::string unit;
+        error = StringToValue(value, val, unit);
+        if (error)
+            return error;
+
+        if (val < 0.01 || val > 100 || unit.size())
+            return TError(EError::InvalidValue, "out of range");
+
+        if (CT->IoWeight != val) {
+            CT->IoWeight = val;
+            CT->SetProp(EProperty::IO_WEIGHT);
+        }
+
+        return TError::Success();
+    }
+} static IoWeight;
+
 class TUser : public TProperty {
 public:
     TUser() : TProperty(P_USER, EProperty::USER, "Start command with given user") {}

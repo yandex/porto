@@ -1024,21 +1024,21 @@ TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TUintMap &map, bool iops) 
     return result;
 }
 
-TError TBlkioSubsystem::SetIoPolicy(TCgroup &cg, const std::string &policy) const {
+TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
+                                    double weight) const {
     if (!HasWeight)
         return TError::Success();
 
-    uint64_t weight;
     if (policy == "rt" || policy == "high")
-        weight = 1000;
+        weight *= 1000;
     else if (policy == "" || policy == "none" || policy == "normal")
-        weight = 500;
+        weight *= 500;
     else if (policy == "batch" || policy == "idle")
-        weight = 10;
+        weight *= 10;
     else
         return TError(EError::InvalidValue, "unknown policy: " + policy);
 
-    return cg.SetUint64("blkio.weight", weight);
+    return cg.SetUint64("blkio.weight", std::min(std::max(weight, 10.), 1000.));
 }
 
 // Devices
