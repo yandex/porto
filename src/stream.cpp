@@ -11,7 +11,7 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
-};
+}
 
 bool TStdStream::IsNull(void) const {
     return Path.IsEmpty() || Path.ToString() == "/dev/null";

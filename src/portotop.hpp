@@ -22,7 +22,7 @@ extern "C" {
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-};
+}
 
 class TColumn;
 class TPortoValueCache;
@@ -49,7 +49,6 @@ public:
     void Restore();
     int Dialog(std::string text, const std::vector<std::string> &buttons);
     void ErrorDialog(Porto::Connection &api);
-    void ErrorDialog(std::string message, int error);
     void InfoDialog(std::vector<std::string> lines);
     void HelpDialog();
     void ColumnsMenu(std::vector<TColumn> &columns);
@@ -60,7 +59,7 @@ private:
 namespace PortoTreeTags {
     static const uint64_t None = 0x0;
     static const uint64_t Self = 0x1;
-};
+}
 
 class TPortoContainer : public std::enable_shared_from_this<TPortoContainer> {
 public:
@@ -112,7 +111,7 @@ namespace ValueFlags {
     static const int Percents = 0x40;
     static const int Multiplier = 0x80;
     static const int State = 0x100;
-};
+}
 
 class TPortoValue {
 public:
@@ -150,9 +149,22 @@ private:
 };
 
 class TColumn {
+private:
+    TPortoValue RootValue;
+
+    int Width;
+    std::unordered_map<std::string, TPortoValue> Cache;
+    bool Selected = false;
+    bool LeftAligned;
+
 public:
     TColumn(std::string title, std::string desc,
             TPortoValue var, bool left_aligned, bool hidden);
+
+    bool Hidden;
+    std::string Title;
+    std::string Description;
+
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
     void ClearCache();
@@ -162,16 +174,6 @@ public:
     void Highlight(bool enable);
     int GetWidth();
     void SetWidth(int width);
-    std::string Title;
-    std::string Description;
-    bool Hidden = false;
-private:
-    TPortoValue RootValue;
-
-    int Width;
-    std::unordered_map<std::string, TPortoValue> Cache;
-    bool Selected = false;
-    bool LeftAligned = false;
 };
 
 class TPortoTop {

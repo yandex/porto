@@ -23,9 +23,8 @@ extern "C" {
 void Stacktrace() {
     L_STK("Stacktrace:");
 
-    unsigned int max_frames = 63;
     // storage array for stack trace address data
-    void* addrlist[max_frames+1];
+    void* addrlist[64];
 
     // retrieve current stack addresses
     int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));

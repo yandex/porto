@@ -598,7 +598,9 @@ static int SlaveRpc() {
                 auto client = Clients[source->Fd];
 
                 if (ev.events & EPOLLIN) {
-                    TRequest req {client};
+                    TRequest req;
+
+                    req.Client = client;
                     error = client->ReadRequest(req.Request);
 
                     if (!error) {
@@ -1041,10 +1043,12 @@ static void UpdateQueueSize(std::map<int,int> &exited) {
 
 static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveStatus) {
     while (true) {
-        siginfo_t info = { 0 };
+        siginfo_t info;
 
         if (waitpid(slavePid, &slaveStatus, WNOHANG) == slavePid)
             return -1;
+
+        info.si_pid = 0;
 
         if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
             break;

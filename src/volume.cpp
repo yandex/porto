@@ -46,7 +46,7 @@ TError TVolumeBackend::Restore() {
     return TError::Success();
 }
 
-TError TVolumeBackend::Resize(uint64_t space_limit, uint64_t inode_limit) {
+TError TVolumeBackend::Resize(uint64_t, uint64_t) {
     return TError(EError::NotSupported, "not implemented");
 }
 
@@ -496,6 +496,7 @@ free_loop:
         if (Volume->SpaceLimit < (512ul << 20))
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
+        (void)inode_limit;
         return ResizeLoopDev(LoopDev, Image(Volume->StoragePath),
                              Volume->SpaceLimit, space_limit);
     }
@@ -784,7 +785,7 @@ public:
         return error;
     }
 
-    TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+    TError Resize(uint64_t, uint64_t) override {
         return TError(EError::NotSupported, "rbd backend doesn't suppport resize");
     }
 

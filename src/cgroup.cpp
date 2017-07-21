@@ -879,9 +879,10 @@ TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) con
 TError TBlkioSubsystem::ResolveDisk(const std::string &key, std::string &disk) const {
     TError error;
     dev_t dev;
-    unsigned tmp;
+    int tmp;
 
-    if (sscanf(key.c_str(), "%*d:*d%n", &tmp) == 2 && tmp == key.size()) {
+    if (sscanf(key.c_str(), "%*d:*d%n", &tmp) == 2 &&
+            (unsigned)tmp == key.size()) {
         disk = key;
         return TError::Success();
     }
@@ -900,7 +901,8 @@ TError TBlkioSubsystem::ResolveDisk(const std::string &key, std::string &disk) c
     TPath diskDev("/sys/dev/block/" + disk + "/../dev");
     if (diskDev.IsRegularStrict() && !diskDev.ReadAll(disk)) {
         disk = StringTrim(disk);
-        if (sscanf(disk.c_str(), "%*d:*d%n", &tmp) != 2 || tmp != disk.size())
+        if (sscanf(disk.c_str(), "%*d:*d%n", &tmp) != 2 ||
+                (unsigned)tmp != disk.size())
             TError(EError::InvalidValue, "Unexpected disk format: " + disk);
     }
 

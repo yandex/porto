@@ -533,7 +533,7 @@ TError TBitMap::Parse(const std::string &text) {
                 return TError(EError::InvalidValue, "wrong bitmap format");
         } else
             last = first;
-        if (bits.size() <= last)
+        if ((int)bits.size() <= last)
             bits.resize(last + 1, false);
         std::fill(bits.begin() + first, bits.begin() + last + 1, true);
     }

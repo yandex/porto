@@ -35,7 +35,7 @@ using std::shared_ptr;
 
 static int ForwardPtyMaster;
 
-static void ForwardWinch(int sig) {
+static void ForwardWinch(int) {
     struct winsize winsize;
 
     /* Copy window size into master terminal */
@@ -45,7 +45,7 @@ static void ForwardWinch(int sig) {
 
 volatile int ChildDead;
 
-static void CatchChild(int sig) {
+static void CatchChild(int) {
     ChildDead = 1;
 }
 
@@ -616,8 +616,8 @@ public:
         int flags = 0;
 
         const auto &args = env->GetOpts({
-            { 'k', false, [&](const char *arg) { printKey = true; } },
-            { 's', false, [&](const char *arg) { flags |= Porto::GetFlags::Sync; } },
+            { 'k', false, [&](const char *) { printKey = true; } },
+            { 's', false, [&](const char *) { flags |= Porto::GetFlags::Sync; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
@@ -668,8 +668,8 @@ public:
         int flags = 0;
 
         const auto &args = env->GetOpts({
-            { 'k', false, [&](const char *arg) { printKey = true; } },
-            { 's', false, [&](const char *arg) { flags |= Porto::GetFlags::Sync; } },
+            { 'k', false, [&](const char *) { printKey = true; } },
+            { 's', false, [&](const char *) { flags |= Porto::GetFlags::Sync; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
@@ -887,9 +887,9 @@ public:
         int ret;
 
         const auto &args = env->GetOpts({
-                {'n', false, [&](const char *arg) { flags |= Porto::GetFlags::NonBlock; }},
-                {'s', false, [&](const char *arg) { flags |= Porto::GetFlags::Sync; }},
-                {'r', false, [&](const char *arg) { flags |= Porto::GetFlags::Real; }},
+                {'n', false, [&](const char *) { flags |= Porto::GetFlags::NonBlock; }},
+                {'s', false, [&](const char *) { flags |= Porto::GetFlags::Sync; }},
+                {'r', false, [&](const char *) { flags |= Porto::GetFlags::Real; }},
         });
 
         int sep = -1;
@@ -1008,7 +1008,7 @@ public:
                     launcher.NeedVolume = true;
                 }
             },
-            { 'W', false, [&](const char *arg) {
+            { 'W', false, [&](const char *) {
                     launcher.WaitExit = true;
                 }
             },
@@ -1051,8 +1051,8 @@ public:
         launcher.WaitExit = true;
 
         const auto &args = environment->GetOpts({
-            { 'C', false, [&](const char *arg) { launcher.WeakContainer = false; } },
-            { 'T', false, [&](const char *arg) { launcher.ForwardTerminal = false; } },
+            { 'C', false, [&](const char *) { launcher.WeakContainer = false; } },
+            { 'T', false, [&](const char *) { launcher.ForwardTerminal = false; } },
             { 'L', true, [&](const char *arg) { launcher.Layers.push_back(arg); launcher.NeedVolume = true; } },
         });
 
@@ -1190,7 +1190,7 @@ class TGcCmd final : public ICmd {
 public:
     TGcCmd(Porto::Connection *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
 
-    int Execute(TCommandEnviroment *env) final override {
+    int Execute(TCommandEnviroment *) final override {
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1350,10 +1350,10 @@ public:
         bool toplevel = false;
         bool running = false;
         const auto &args = env->GetOpts({
-            { '1', false, [&](const char *arg) { details = false; } },
-            { 'f', false, [&](const char *arg) { forest = true; } },
-            { 't', false, [&](const char *arg) { toplevel = true; } },
-            { 'r', false, [&](const char *arg) { running = true; } },
+            { '1', false, [&](const char *) { details = false; } },
+            { 'f', false, [&](const char *) { forest = true; } },
+            { 't', false, [&](const char *) { toplevel = true; } },
+            { 'r', false, [&](const char *) { running = true; } },
         });
         std::string mask = args.size() ? args[0] : "";
 
@@ -1646,8 +1646,8 @@ public:
         bool all = false;
         bool strict = false;
         const auto &args = env->GetOpts({
-            { 'A', false, [&](const char *arg) { all = true; } },
-            { 'S', false, [&](const char *arg) { strict = true; } },
+            { 'A', false, [&](const char *) { all = true; } },
+            { 'S', false, [&](const char *) { strict = true; } },
         });
         const auto path = TPath(args[0]).RealPath().ToString();
         std::vector<Porto::Volume> vol;
@@ -1764,9 +1764,9 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetOpts({
-            { '1', false, [&](const char *arg) { details = false; } },
-            { 'i', false, [&](const char *arg) { inodes = true; } },
-            { 'v', false, [&](const char *arg) { verbose = true; details = false; } },
+            { '1', false, [&](const char *) { details = false; } },
+            { 'i', false, [&](const char *) { inodes = true; } },
+            { 'v', false, [&](const char *) { verbose = true; details = false; } },
         });
 
         vector<Porto::Volume> vlist;
@@ -1857,9 +1857,9 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetOpts({
             { 'P', true,  [&](const char *arg) { place = arg;   } },
-            { 'R', false, [&](const char *arg) { remove = true; } },
-            { 'L', false, [&](const char *arg) { list = true;   } },
-            { 'F', false, [&](const char *arg) { flush = true;   } },
+            { 'R', false, [&](const char *) { remove = true; } },
+            { 'L', false, [&](const char *) { list = true;   } },
+            { 'F', false, [&](const char *) { flush = true;   } },
         });
 
         std::string storage;
@@ -1950,15 +1950,15 @@ public:
         int ret = EXIT_SUCCESS;
         const auto &args = env->GetOpts({
             { 'P', true,  [&](const char *arg) { place = arg;   } },
-            { 'I', false, [&](const char *arg) { import = true; } },
-            { 'M', false, [&](const char *arg) { merge  = true; } },
-            { 'R', false, [&](const char *arg) { remove = true; } },
-            { 'F', false, [&](const char *arg) { flush  = true; } },
-            { 'L', false, [&](const char *arg) { list   = true; } },
-            { 'E', false, [&](const char *arg) { export_= true; } },
-            { 'G', false, [&](const char *arg) { get_private = true; } },
+            { 'I', false, [&](const char *) { import = true; } },
+            { 'M', false, [&](const char *) { merge  = true; } },
+            { 'R', false, [&](const char *) { remove = true; } },
+            { 'F', false, [&](const char *) { flush  = true; } },
+            { 'L', false, [&](const char *) { list   = true; } },
+            { 'E', false, [&](const char *) { export_= true; } },
+            { 'G', false, [&](const char *) { get_private = true; } },
             { 'S', true, [&](const char *arg) { set_private = true; private_value = arg; } },
-            { 'v', false, [&](const char *arg) { verbose = true; } },
+            { 'v', false, [&](const char *) { verbose = true; } },
         });
 
         std::string path;
@@ -2104,8 +2104,8 @@ public:
             { 'O', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); } },
             { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
-            { 'k', false, [&](const char *arg) { launcher.WeakContainer = false; } },
-            { 'M', false, [&](const char *arg) { launcher.MergeLayers = true; } },
+            { 'k', false, [&](const char *) { launcher.WeakContainer = false; } },
+            { 'M', false, [&](const char *) { launcher.MergeLayers = true; } },
         });
 
         if (output.IsEmpty() && outputImage.IsEmpty()) {
@@ -2437,4 +2437,4 @@ int main(int argc, char *argv[]) {
     } else {
         return ret;
     }
-};
+}

@@ -24,13 +24,13 @@ static double ParseValue(const std::string &value, bool map) {
             ret += ParseNumber(value.substr(start_v, off - start_v));
     }
     return ret + ParseNumber(value.substr(start_v));
-};
+}
 
 static double DfDt(double curr, double prev, uint64_t dt) {
     if (dt)
         return 1000.0 * (curr - prev) / dt;
     return 0;
-};
+}
 
 static double PartOf(double value, double total) {
     return value / total;
@@ -169,12 +169,6 @@ void TConsoleScreen::ErrorDialog(Porto::Connection &api) {
     else
         Dialog("Unknown error occured (probably, simple you aren't root)", {"Ok"});
 }
-void TConsoleScreen::ErrorDialog(std::string message, int error) {
-    if (error != -1)
-        Dialog("Done", {"Ok"});
-    else
-        Dialog(strerror(errno), {"Ok"});
-}
 void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
     unsigned int w = 0;
     unsigned int h = lines.size();
@@ -296,7 +290,7 @@ void TConsoleScreen::ColumnsMenu(std::vector<TColumn> &columns) {
 
     post_menu(menu);
 
-    bool done = false, value = true;
+    bool done = false;
 
     while (!done) {
         for (int i = 0; i < menu_lines; i++) {
@@ -605,7 +599,7 @@ std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connectio
 
     if (self_absolute_name != "/") {
         auto parent = self_absolute_name;
-        int pos = parent.size();
+        auto pos = parent.size();
 
         do {
             auto self_parent = parent.substr(0, pos);
@@ -696,8 +690,8 @@ int TPortoContainer::ChildrenCount() {
 TColumn::TColumn(std::string title, std::string desc,
                  TPortoValue var, bool left_aligned, bool hidden) :
 
-    Title(title), Description(desc),
-    RootValue(var), LeftAligned(left_aligned), Hidden(hidden) {
+    RootValue(var), LeftAligned(left_aligned), Hidden(hidden),
+    Title(title), Description(desc) {
 
     Width = title.length();
 }
@@ -1077,6 +1071,8 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     Cache(std::make_shared<TPortoValueCache>()),
     RootContainer(std::make_shared<TPortoContainer>("/")) {
 
+    (void)args;
+
     AddCommon(0, "Containers running: ", "porto_stat[running]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "of ", "porto_stat[containers]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Volumes: ", "porto_stat[volumes]", RootContainer, ValueFlags::Raw);
@@ -1132,7 +1128,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
 }
 
 static bool exit_immediatly = false;
-void exit_handler(int unused) {
+void exit_handler(int) {
     exit_immediatly = true;
 }
 

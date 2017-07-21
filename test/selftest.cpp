@@ -1702,7 +1702,7 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.Destroy(name));
-};
+}
 
 unsigned long GetInode(const TPath &path) {
     struct stat st;
@@ -2749,7 +2749,7 @@ static void TestStateMachine(Porto::Connection &api) {
     AsAlice(api);
 }
 
-static void TestPath(Porto::Connection &api) {
+static void TestPath(Porto::Connection &) {
     vector<pair<string, string>> normalize = {
         { "",   "" },
         { ".",  "." },
@@ -2846,7 +2846,7 @@ static void TestPath(Porto::Connection &api) {
     }
 }
 
-static void TestIdmap(Porto::Connection &api) {
+static void TestIdmap(Porto::Connection &) {
     TIdMap idmap(1, 99);
     int id;
 
@@ -2869,7 +2869,7 @@ static void TestIdmap(Porto::Connection &api) {
     ExpectEq(id, 2);
 }
 
-static void TestFormat(Porto::Connection &api) {
+static void TestFormat(Porto::Connection &) {
     uint64_t v;
 
     ExpectEq(StringFormat("%s %d", "a", 1), "a 1");
@@ -3091,6 +3091,7 @@ static void ExpectNonZeroLink(Porto::Connection &api, const std::string &name,
 
 static void ExpectLessEqLink(Porto::Connection &api, const std::string &name,
                              const std::string &parent, const std::string &data) {
+    (void)parent;
     for (auto &link : links) {
         string v, rv;
         int64_t i, ri;
@@ -3480,7 +3481,7 @@ static void TestLimits(Porto::Connection &api) {
 
     Say() << "Check net_cls cgroup" << std::endl;
 
-    uint32_t netGuarantee = 100000, netCeil = 200000, netPrio = 4;
+    uint32_t netGuarantee = 100000, netCeil = 200000;
 
     uint32_t i = 0;
     for (auto &link : links) {
@@ -4996,7 +4997,7 @@ static void TestRecovery(Porto::Connection &api) {
     }
 }
 
-static void TestVolumeFiles(Porto::Connection &api, const std::string &path) {
+static void TestVolumeFiles(Porto::Connection &, const std::string &path) {
     vector<string> v;
 
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
@@ -5138,7 +5139,6 @@ static void TestBadClient(Porto::Connection &api) {
     int ret = write(fd, buf.c_str(), buf.length());
 
     Expect(ret > 0);
-    size_t size = (size_t)ret;
     ExpectEq(ret, buf.length());
 
     Porto::Connection api2;

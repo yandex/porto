@@ -100,11 +100,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
 public:
     const std::shared_ptr<TContainer> Parent;
+    const int Level; // 0 for root
+    const int Id;
     const std::string Name;
     const std::string FirstName;
-    const int Level; // 0 for root
-
-    int Id;
 
     /* protected with exclusive lock and ContainersMutex */
     EContainerState State = EContainerState::Stopped;

@@ -30,17 +30,17 @@ TError TProperty::Has() {
     return TError::Success();
 }
 
-TError TProperty::Set(const std::string &value) {
+TError TProperty::Set(const std::string &) {
     if (IsReadOnly)
         return TError(EError::InvalidValue, "Read-only value: " + Name);
     return TError(EError::NotSupported, "Not implemented: " + Name);
 }
 
-TError TProperty::GetIndexed(const std::string &index, std::string &value) {
+TError TProperty::GetIndexed(const std::string &, std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
-TError TProperty::SetIndexed(const std::string &index, const std::string &value) {
+TError TProperty::SetIndexed(const std::string &, const std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
@@ -2016,7 +2016,7 @@ public:
             else
                 return TError(EError::InvalidValue, "wrong format");
 
-            if (arg < 0 || !arg && type != ECpuSetType::Node)
+            if (arg < 0 || (!arg && type != ECpuSetType::Node))
              return TError(EError::InvalidValue, "wrong format");
 
         } else
@@ -3271,10 +3271,10 @@ TError TPortoStat::GetIndexed(const std::string &index,
 
 class TNetTos : public TProperty {
 public:
-    TError Set(const std::string &tos) {
+    TError Set(const std::string &) {
         return TError(EError::NotSupported, Name + " is not supported");
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &) {
         return TError(EError::NotSupported, "Not supported: " + Name);
     }
     TNetTos() : TProperty(P_NET_TOS, EProperty::NET_TOS, "IP TOS") {
