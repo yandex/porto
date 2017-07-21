@@ -305,7 +305,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     RootRo = false;
     Umask = 0002;
     Isolate = true;
-    BindDns = true;
+    BindDns = config().container().default_bind_dns();
     VirtMode = VIRT_MODE_APP;
 
     NetProp = { { "inherited" } };

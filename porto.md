@@ -427,9 +427,23 @@ Matching interfaces by name support masks '?' and '\*'.
 
 * **hostname**       - hostname inside container
 
-* **resolv\_conf**   - DNS resolver configuration: \<resolv.conf option\>;...
+    Inside container root /etc/hostname must be a regular file,
+    porto bind-mounts temporary file over it.
 
-* **bind\_dns**      - bind /etc/resolv.conf and /etc/hosts from host, deprected: use **resolv\_conf**
+* **resolv\_conf**   - DNS resolver configuration, syntax: \<resolv.conf option\>;...
+
+    Default value for containers with chroot could be set in portod.conf:
+```
+container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
+```
+
+    Inside container root /etc/resolv.conf must be a regular file,
+    porto bind-mounts temporary file over it.
+    Setting **resolv\_conf**="" keeps configuraion in chroot as is.
+
+* **bind\_dns**      - bind /etc/resolv.conf and /etc/hosts from host, default: false
+
+    Deprected, use **resolv\_conf**.
 
 * **sysctl**         - sysctl configuration, syntax: \<sysctl\>: \<value\>;...
 

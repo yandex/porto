@@ -123,6 +123,8 @@ message TCfg {
 		optional uint64 min_memory_limit = 31;
 		optional string default_ulimit = 32;
 		optional int64 default_thread_limit = 35;
+		optional string default_resolv_conf = 36;
+		optional bool default_bind_dns = 37; /* [deprecated=true] */
 
 		message TSysctl {
 			required string key = 1;

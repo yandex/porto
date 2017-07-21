@@ -892,8 +892,8 @@ public:
 class TBindDns : public TProperty {
 public:
     TBindDns() : TProperty(P_BIND_DNS, EProperty::BIND_DNS,
-                           "Bind /etc/resolv.conf and /etc/hosts"
-                           " from host into container root") {}
+                           "Bind /etc/resolv.conf and /etc/hosts from host"
+                           ", deprecated: use resolv_conf") {}
     TError Get(std::string &value) {
         value = BoolToString(CT->BindDns);
         return TError::Success();
@@ -915,7 +915,6 @@ public:
         return TError::Success();
     }
 } static BindDns;
-
 
 class TIsolate : public TProperty {
 public:
@@ -1393,31 +1392,29 @@ TError TDefaultGw::Get(std::string &value) {
 
 class TResolvConf : public TProperty {
 public:
-    TError Set(const std::string &conf);
-    TError Get(std::string &value);
     TResolvConf() : TProperty(P_RESOLV_CONF, EProperty::RESOLV_CONF,
                               "DNS resolver configuration: "
                               "<resolv.conf option>;...") {}
+    TError Get(std::string &value) {
+        value = MergeEscapeStrings(CT->ResolvConf, ';');
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        SplitEscapedString(value, CT->ResolvConf, ';');
+        CT->SetProp(EProperty::RESOLV_CONF);
+        return TError::Success();
+    }
+    TError Start(void) {
+        /* Set default resolv_conf for chroots */
+        if (CT->Root != "/" && !CT->HasProp(EProperty::RESOLV_CONF) && !CT->BindDns)
+            SplitEscapedString(config().container().default_resolv_conf(),
+                               CT->ResolvConf, ';');
+        return TError::Success();
+    }
 } static ResolvConf;
-
-TError TResolvConf::Set(const std::string &conf_str) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    TTuple conf;
-    SplitEscapedString(conf_str, conf, ';');
-
-    CT->ResolvConf = conf;
-    CT->SetProp(EProperty::RESOLV_CONF);
-
-    return TError::Success();
-}
-
-TError TResolvConf::Get(std::string &value) {
-    value = MergeEscapeStrings(CT->ResolvConf, ';');
-    return TError::Success();
-}
 
 class TDevices : public TProperty {
 public:
