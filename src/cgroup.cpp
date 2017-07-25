@@ -878,32 +878,35 @@ TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) con
 /* converts absolule path or disk or partition name into "major:minor" */
 TError TBlkioSubsystem::ResolveDisk(const std::string &key, std::string &disk) const {
     TError error;
-    dev_t dev;
-    int tmp;
+    int tmp = 0;
 
-    if (sscanf(key.c_str(), "%*d:*d%n", &tmp) == 2 &&
-            (unsigned)tmp == key.size()) {
+    if (!sscanf(key.c_str(), "%*d:%*d%n", &tmp) && (unsigned)tmp == key.size()) {
         disk = key;
-        return TError::Success();
+    } else {
+        dev_t dev;
+
+        if (key[0] == '/')
+            dev = TPath(key).GetDev();
+        else
+            dev = TPath("/dev/" + key).GetBlockDev();
+
+        if (!dev)
+            return TError(EError::InvalidValue, "Disk not found: " + key);
+
+        disk = StringFormat("%d:%d", major(dev), minor(dev));
     }
 
-    if (key[0] == '/')
-        dev = TPath(key).GetDev();
-    else
-        dev = TPath("/dev/" + key).GetBlockDev();
-
-    if (!dev)
-        return TError(EError::InvalidValue, "Disk not found: " + key);
-
-    disk = StringFormat("%d:%d", major(dev), minor(dev));
+    if (!TPath("/sys/dev/block/" + disk).Exists())
+        return TError(EError::InvalidValue, "Disk not found:  " + disk);
 
     /* convert partition to disk */
-    TPath diskDev("/sys/dev/block/" + disk + "/../dev");
-    if (diskDev.IsRegularStrict() && !diskDev.ReadAll(disk)) {
-        disk = StringTrim(disk);
-        if (sscanf(disk.c_str(), "%*d:*d%n", &tmp) != 2 ||
-                (unsigned)tmp != disk.size())
-            TError(EError::InvalidValue, "Unexpected disk format: " + disk);
+    if (TPath("/sys/dev/block/" + disk + "/partition").Exists()) {
+        TPath diskDev("/sys/dev/block/" + disk + "/../dev");
+        if (diskDev.IsRegularStrict() && !diskDev.ReadAll(disk)) {
+            disk = StringTrim(disk);
+            if (sscanf(disk.c_str(), "%*d:%*d%n", &tmp) || (unsigned)tmp != disk.size())
+                return TError(EError::InvalidValue, "Unexpected disk format: " + disk);
+        }
     }
 
     return TError::Success();
