@@ -294,33 +294,57 @@ TError TStorage::Touch() {
     return error;
 }
 
-static std::string TarCompression(const TPath &tarball, const TFile &file, const std::string &compress) {
+static TError TarCompression(const TPath &tarball, const TFile &file,
+        const std::string &compress, std::string &option) {
+    std::string name = tarball.BaseName();
+
     if (compress != "") {
         if (compress == "txz" || compress == "tar.xz")
-            return "--xz";
+            goto xz;
         if (compress == "tgz" || compress == "tar.gz")
-            return "--gzip";
+            goto gz;
         if (compress == "tar")
-            return "--no-auto-compress";
-        return "--no-auto-compress";
+            goto tar;
+        return TError(EError::InvalidValue, "Unknown tar compression: " + compress);
     }
 
     /* tar cannot guess compression for std streams */
-    char magic[8];
-    if (file.Fd >= 0 && pread(file.Fd, magic, sizeof(magic), 0) == sizeof(magic)) {
-        if (!strncmp(magic, "\xFD" "7zXZ\x00", 6))
-            return "--xz";
-        if (!strncmp(magic, "\x1F\x8B\x08", 3))
-            return "--gzip";
+    if (file.Fd >= 0) {
+        char magic[8];
+
+        if (pread(file.Fd, magic, sizeof(magic), 0) == sizeof(magic)) {
+            if (!strncmp(magic, "\xFD" "7zXZ\x00", 6))
+                goto xz;
+            if (!strncmp(magic, "\x1F\x8B\x08", 3))
+                goto gz;
+        }
+
+        if (pread(file.Fd, magic, sizeof(magic), 257) == sizeof(magic)) {
+            /* "ustar\000" or "ustar  \0" */
+            if (!strncmp(magic, "ustar", 5))
+                goto tar;
+        }
+
+        return TError(EError::InvalidValue, "Cannot detect tar compression by magic");
     }
 
-    std::string name = tarball.BaseName();
     if (StringEndsWith(name, ".xz") || StringEndsWith(name, ".txz"))
-        return "--xz";
+        goto xz;
+
     if (StringEndsWith(name, ".gz") || StringEndsWith(name, ".tgz"))
-        return "--gzip";
-    return "--no-auto-compress"; /* i.e. no compression */
+        goto gz;
+
+tar:
+    option = "--no-auto-compress";
+    return TError::Success();
+gz:
+    option = "--gzip";
+    return TError::Success();
+xz:
+    option = "--xz";
+    return TError::Success();
 }
+
 
 TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress, bool merge) {
     TPath temp = TempPath(IMPORT_PREFIX);
@@ -353,6 +377,11 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
         return error;
 
     error = CL->ReadAccess(tar);
+    if (error)
+        return error;
+
+    std::string compress_option;
+    error = TarCompression(tarball, tar, compress, compress_option);
     if (error)
         return error;
 
@@ -407,7 +436,7 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
                          /* "--xattrs",
                             "--xattrs-include=security.capability",
                             "--xattrs-include=trusted.overlay.*", */
-                         TarCompression(tarball, tar, compress),
+                         compress_option,
                          "--extract",
                          "-C", temp.ToString() },
                          temp, tar, TFile());
@@ -480,6 +509,11 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
 
+    std::string compress_option;
+    error = TarCompression(tarball, TFile(), compress, compress_option);
+    if (error)
+        return error;
+
     error = dir.OpenDir(tarball.DirName());
     if (error)
         return error;
@@ -512,7 +546,7 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
                         /* "--xattrs", */
                         "--sparse",
                         "--transform", "s:^./::",
-                        TarCompression(tarball, TFile(), compress),
+                        compress_option,
                         "--create",
                         "-C", Path.ToString(), "." },
                         Path, TFile(), tar);
