@@ -406,7 +406,7 @@ Matching interfaces by name support masks '?' and '\*'.
     - *none*                 - empty namespace, no network access (default for virt\_mode=os)
     - *L3* \<name\> \[master\]  - veth pair and ip routing from host
     - *NAT* \[name\]         - same as L3 but assign ip automatically
-    - tap \<name\>           - tap interface with L3 routing
+    - *tap* \<name\>         - tap interface with L3 routing
     - *ipip6* \<name\> \<remote\> \<local\> - ipv4-via-ipv6 tunnel
     - *MTU* \<name\> \<mtu\> - set MTU for device
     - *autoconf* \<name\>    - wait for IPv6 SLAAC configuration
@@ -528,7 +528,7 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **read\_only**    - true or false, default: false
 
-* **containers**    - initial container references, syntax: container;...  default: self
+* **containers**    - initial container references, syntax: container;...  default: "self"
 
 * **layers**        - layers, syntax: top-layer;...;bottom-layer
 
@@ -630,11 +630,48 @@ See **portoctl(8)** for details.
 
 /run/portod.socket
 
-    Porto API unix socket
+    Porto API unix socket.
+
+/run/portod  
+/run/portod.version
+
+    Symlink to currently running portod binary and it's version.
+
+/run/portoloop.pid  
+/run/portod.pid
+
+    Pid file for porto master and slave daemon.
+
+/run/porto/kvs  
+/run/porto/pkvs
+
+    Container and volumes key-value storage.
 
 /usr/share/doc/yandex-porto/rpc.proto.gz
 
-    Porto API protobuf
+    Porto API protobuf.
+
+/etc/portod.conf  
+/etc/defaults/portod.conf
+
+    Porto daemon configuration in protobuf text format.
+    Porto merges it with hardcoded defaults and prints into log when starts.
+
+/place/porto/*container*
+
+    Default current/working directories for containers.
+
+/place/porto\_volumes/*id*
+
+    Default place keeping volumes and their data.
+
+/place/porto\_layers/*layer*
+
+    Default place for keeping overlayfs layers.
+
+/place/porto\_storage/*storage*
+
+    Default place for persistent volume storages.
 
 # HOMEPAGE
 
