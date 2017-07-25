@@ -26,7 +26,7 @@ def ValidateDefaultProp(r):
             "cpu_guarantee" : "0c", "net" : "inherited",\
             "respawn" : False, "memory_limit" : "0", "stdin_path" : "/dev/null",\
             "stdout_path" : "stdout", "stderr_path" : "stderr", "ulimit" : "",\
-            "hostname" : "", "bind_dns" : True, "devices" : "",\
+            "hostname" : "", "devices" : "",\
             "capabilities" : "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;" +\
             "KILL;SETGID;SETUID;SETPCAP;LINUX_IMMUTABLE;NET_BIND_SERVICE;" +\
             "NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;" +\
