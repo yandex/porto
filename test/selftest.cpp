@@ -1803,8 +1803,8 @@ static void TestRootProperty(Porto::Connection &api) {
     std::vector<std::string> lines;
     ExpectSuccess(SplitString(v, '\n', lines));
     auto m = ParseMountinfo(lines);
-    ExpectNeq(m["/etc/resolv.conf"].flags.find("ro,"), string::npos);
-    ExpectNeq(m["/etc/hosts"].flags.find("ro,"), string::npos);
+    ExpectEq(m.count("/etc/resolv.conf"), 0);
+    ExpectEq(m.count("/etc/hosts"), 0);
     ExpectNeq(m["/sys"].flags.find("ro,"), string::npos);
     ExpectNeq(m["/proc/sys"].flags.find("ro,"), string::npos);
     ExpectNeq(m["/proc/sysrq-trigger"].flags.find("ro,"), string::npos);
