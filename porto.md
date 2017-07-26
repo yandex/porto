@@ -39,6 +39,9 @@ Porto requires Linux kernel 3.18 and optionally some offstream patches.
 Container name could contains only these charachers: 'a'..'z', 'A'..'Z', '0'..'9',
 '\_', '\-', '@', ':', '.'. Slash '/' separates nested container: "parent/child".
 
+Each container name component should not exceed 128 charachers, whole name is
+limited with 200 charachers. Also porto limits nesting with 16 levels.
+
 Container could be addressed using short name relative current porto
 namespaces: "name", or absolute name "/porto/name" which stays the
 same regardless of porto namespace.
@@ -131,13 +134,19 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **root\_pid** - main process pid
 
-* **stderr\[[offset\]\[:length\]]** - stderr text
-
-* **stderr\_offset** - offset of stored stderr
-
-* **stdout\[[offset\]\[:length\]]** - stdout text
+* **stdout\[[offset\]\[:length\]]** - stdout text, see **stdout\_path**
+    - stdout - get all available text
+    - stdout[:1000] - get only last 1000 bytes
+    - stdout[2000:] - get bytes starting from 2000 (text might be lost)
+    - stdout[2000:1000] - get 1000 bytes starting from 2000
 
 * **stdout\_offset** - offset of stored stdout
+
+* **stderr\[[offset\]\[:length\]]** - stderr text, see **stderr\_path**
+
+    Same as **stdout**.
+
+* **stderr\_offset** - offset of stored stderr
 
 * **time** - container running time in seconds
 
@@ -149,9 +158,9 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **absolute\_namespace** - full container namespace including parent namespaces
 
-* **controllers** - enabled cgroup controllers
+* **controllers** - enabled cgroup controllers, see [CGROUPS] below
 
-* **cgroups** - paths to cgroups, syntax: \<name\>: \<path\> (ro)
+* **cgroups** - paths to cgroups, syntax: \<name\>: \<path\>
 
 * **process\_count** - current process count
 
@@ -262,6 +271,10 @@ Write access to container requires any of these conditions:
 
     Porto mounts: /dev, /dev/pts, /dev/hugepages, /proc, /run, /sys, /sys/kernel/tracing.
 
+    Also porto recreates in /run directories strictire from underlying filesystem.
+
+    Porto creates in /dev nodes only for devices permitted by property **devices**.
+
     If container should have access to porto then /run/portod.socket is binded inside.
 
 * **root\_readonly** - remount everything read-only
@@ -273,13 +286,28 @@ Write access to container requires any of these conditions:
 
 * **stdout\_path** - stdout file, default: internal rotated storage
 
+    By default *stdout* and *stderr* are redirected into files created in
+    default **cwd**.
+
+    Periodically, when size of these files exceeds **stdout\_limit** head bytes
+    are removed using **fallocate(2)** FALLOC_FL_COLLAPSE_RANGE. Count of lost
+    bytes are show in **stdout\_offset**.
+
+    Path "/dev/fd/*fd*" redirects stream into file descriptor *fd* of
+    porto client task who starts container.
+
 * **stdout\_limit** - limits internal stdout/stderr storage, porto keeps tail bytes
 
 * **stderr\_path** - stderr file, default: internal rotated storage
 
+    Same as **stdout\_path**.
+
 * **stdin\_path** - stdin file; default: "/dev/null"
 
 * **place** - places allowed for volumes and layers, syntax: \[default\]\[;mask;...\], default: /place;\*\*\*
+
+Setting **bind**, **root**, **stdout\_path**, **stderr\_path** requires
+write permissions to the target or owning related volume.
 
 ## Memory
 
@@ -303,11 +331,11 @@ Write access to container requires any of these conditions:
     Allocations over limit reclaims cache or write anon pages into swap.
     On failure syscalls returns ENOMEM\EFAULT, page fault triggers OOM.
 
-* **memory\_guarantee\_total** -  hierarchical memory guarantee (ro)
+* **memory\_guarantee\_total** -  hierarchical memory guarantee
 
     Upper bound for guaranteed memory for sub-tree.
 
-* **memory\_limit\_total** - hierarchical memory limit (ro)
+* **memory\_limit\_total** - hierarchical memory limit
 
     Upper bound for memory usage for sub-tree.
 
@@ -365,7 +393,7 @@ Write access to container requires any of these conditions:
     - *threads* N   - only N exclusive CPUs
     - *cores* N     - only N exclusive SMT cores, one thread for each
 
-* **cpu\_set\_affinity** - resulting CPU affinity: \[N,N-M,\]... (ro)
+* **cpu\_set\_affinity** - resulting CPU affinity: \[N,N-M,\]...
 
 ## Disk IO
 
@@ -440,6 +468,7 @@ container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 
     Inside container root /etc/resolv.conf must be a regular file,
     porto bind-mounts temporary file over it.
+
     Setting **resolv\_conf**="" keeps configuraion in chroot as is.
 
 * **bind\_dns**      - bind /etc/resolv.conf and /etc/hosts from host, default: false
@@ -462,19 +491,19 @@ container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 
 * **net\_overlimits** - tc overlimits: \<interface\>: \<packets\>;...
 
-* **net\_packets**   - tc packets: \<interface\>: \<packets\>;... (ro)
+* **net\_packets**   - tc packets: \<interface\>: \<packets\>;...
 
-* **net\_rx\_bytes** - device rx bytes: \<interface\>: \<bytes\>;... (ro)
+* **net\_rx\_bytes** - device rx bytes: \<interface\>: \<bytes\>;...
 
-* **net\_rx\_drops** - device rx drops: \<interface\>: \<packets\>;... (ro)
+* **net\_rx\_drops** - device rx drops: \<interface\>: \<packets\>;...
 
-* **net\_rx\_packets** - device rx packets: \<interface\>: \<packets\>;... (ro)
+* **net\_rx\_packets** - device rx packets: \<interface\>: \<packets\>;...
 
-* **net\_tx\_bytes** - device tx bytes: \<interface\>: \<bytes\>;... (ro)
+* **net\_tx\_bytes** - device tx bytes: \<interface\>: \<bytes\>;...
 
-* **net\_tx\_drops** - device tx drops: \<interface\>: \<packets\>;... (ro)
+* **net\_tx\_drops** - device tx drops: \<interface\>: \<packets\>;...
 
-* **net\_tx\_packets** - device tx packets: \<interface\>: \<packets\>;... (ro)
+* **net\_tx\_packets** - device tx packets: \<interface\>: \<packets\>;...
 
 # CGROUPS
 
@@ -539,7 +568,7 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **permissions**   - directory permissions, default: 0775
 
-* **creator**       - container user group (ro)
+* **creator**       - container user group
 
 * **read\_only**    - true or false, default: false
 
@@ -570,13 +599,13 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **inode\_guarantee** - disk inode guarantee, default: 0
 
-* **space\_used**      - current disk space usage (ro)
+* **space\_used**      - current disk space usage
 
-* **inode\_used**      - current disk inode used (ro)
+* **inode\_used**      - current disk inode used
 
-* **space\_available** - available disk space (ro)
+* **space\_available** - available disk space
 
-* **inode\_available** - available disk inodes (ro)
+* **inode\_available** - available disk inodes
 
 ## Volume Layers
 
@@ -656,6 +685,10 @@ See **portoctl(8)** for details.
 /run/portod.pid
 
     Pid file for porto master and slave daemon.
+
+/var/log/portod.log
+
+    Porto daemon log file.
 
 /run/porto/kvs  
 /run/porto/pkvs
