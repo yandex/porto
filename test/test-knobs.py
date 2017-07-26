@@ -111,7 +111,7 @@ VerifyProperties(r, knobs)
 
 #FIXME: ipvlan modes can be unsupported; netns is likely unused - skip
 
-Net = [ "none", "inherited", "steal eth0", "container test", "macvlan eth0 eth0 bridge 1400 11:22:33:44:55:66", "ipvlan eth0 eth0", "veth veth0 veth1 1400 22:33:44:55:66:77", "L3 eth0 eth0", "NAT eth0", "veth veth0 veth1;MTU veth0 1400", "autoconf eth0" ]
+Net = [ "none", "inherited", "steal eth0", "container test", "macvlan eth0 eth0 bridge 1400 11:22:33:44:55:66", "ipvlan eth0 eth0", "veth veth0 veth1 1400 22:33:44:55:66:77", "L3 eth0 eth0", "NAT eth0", "veth veth0 veth1;MTU veth0 1400" ]
 
 for n in Net:
     SetProps(r, { "net" : n })

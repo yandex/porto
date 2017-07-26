@@ -1554,6 +1554,8 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
             NetInherit = true;
         } else if (type == "none") {
             NetIsolate = true;
+            if (net_settings.size() != 1)
+                return TError(EError::InvalidValue, "net=none must be the only option");
         } else if (type == "container") {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid " + line);
