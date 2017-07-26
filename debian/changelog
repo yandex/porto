@@ -1,3 +1,9 @@
+yandex-porto (3.8.3) unstable; urgency=low
+
+  * porto: check magic for uncompressed tarball
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 26 Jul 2017 11:35:00 +0300
+
 yandex-porto (3.8.2) unstable; urgency=low
 
   [ Maxim Samoylov ]
