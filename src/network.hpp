@@ -225,63 +225,28 @@ public:
     static void NetWatchdog();
 };
 
-struct TMacVlanNetCfg {
-    std::string Master;
+struct TNetDeviceConfig {
     std::string Name;
     std::string Type;
-    std::string Hw;
-    int Mtu;
-};
-
-struct TIpVlanNetCfg {
-    std::string Master;
-    std::string Name;
     std::string Mode;
-    int Mtu;
-};
-
-struct TIpVec {
-    std::string Iface;
-    TNlAddr Addr;
-};
-
-struct TGwVec {
-    std::string Iface;
-    TNlAddr Addr;
-};
-
-struct TVethNetCfg {
-    std::string Bridge;
-    std::string Name;
-    std::string Hw;
-    int Mtu;
-};
-
-struct TL3NetCfg {
-    std::string Name;
+    std::string Mac;
     std::string Master;
-    int Mtu;
-    std::vector<TNlAddr> Addrs;
-    bool Nat;
-    int Group = 0;
-};
-
-struct TIpIp6NetCfg {
-    std::string Name;
-    TNlAddr Local;
-    TNlAddr Remote;
-    int EncapLimit;
-    int Ttl;
-    int Mtu;
-    bool DefaultRoute;
-};
-
-struct TTapNetCfg {
-    std::string Name;
-    uid_t Uid = NoUser;
-    gid_t Gid = NoGroup;
     int Mtu = -1;
-    std::vector<TNlAddr> Addrs;
+    int Group = 0;
+    bool Autoconf = false;
+
+    std::vector<TNlAddr> Ip;
+    TNlAddr Gw;
+
+    struct {
+        TNlAddr Local;
+        TNlAddr Remote;
+    } IpIp6;
+
+    struct {
+        uid_t Uid = NoUser;
+        gid_t Gid = NoGroup;
+    } Tap;
 };
 
 struct TNetEnv {
@@ -303,18 +268,10 @@ struct TNetEnv {
     bool SaveIp = false;
 
     std::string Hostname;
-    std::vector<std::string> Steal;
-    std::vector<TMacVlanNetCfg> MacVlan;
-    std::vector<TIpVlanNetCfg> IpVlan;
-    std::vector<TVethNetCfg> Veth;
-    std::vector<TL3NetCfg> L3lan;
-    std::vector<TIpIp6NetCfg> IpIp6;
-    std::vector<TTapNetCfg> Tap;
     std::string NetNsName;
     std::string NetCtName;
-    std::vector<TGwVec> GwVec;
-    std::vector<TIpVec> IpVec;
-    std::vector<std::string> Autoconf;
+
+    std::vector<TNetDeviceConfig> Devices;
 
     TError Parse(TContainer &ct);
     TError ParseNet(TMultiTuple &net_settings);
@@ -325,14 +282,12 @@ struct TNetEnv {
     TError CheckIpLimit();
 
     std::string GenerateHw(const std::string &name);
-    TError ConfigureVeth(TVethNetCfg &veth);
-    TError ConfigureL3(TL3NetCfg &l3);
+    TError ConfigureL3(TNetDeviceConfig &dev);
     TError SetupInterfaces();
 
-    TError CreateTap(TTapNetCfg &tap);
-    TError DestroyTap(TTapNetCfg &tap);
+    TError CreateTap(TNetDeviceConfig &dev);
+    TError DestroyTap(TNetDeviceConfig &dev);
 
     TError Open(TContainer &ct);
-
     TError OpenNetwork();
 };

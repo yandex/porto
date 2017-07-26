@@ -1339,13 +1339,16 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
     if (env.SaveIp)
         env.FormatIp(ct.IpList);
 
-    if (env.Tap.size()) {
-        auto lock = env.Net->LockNet();
-        for (auto &tap: env.Tap) {
-            error = env.CreateTap(tap);
+    for (auto &dev: env.Devices) {
+        if (dev.Autoconf)
+            task.Autoconf.push_back(dev.Name);
+        if (dev.Type == "tap") {
+            auto lock = env.Net->LockNet();
+            error = env.CreateTap(dev);
             if (error) {
-                for (auto &tap: env.Tap)
-                    (void)env.DestroyTap(tap);
+                for (auto &dev: env.Devices)
+                    if (dev.Type == "tap")
+                        (void)env.DestroyTap(dev);
                 return error;
             }
         }
@@ -1368,7 +1371,6 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
     lock.unlock();
 
     task.NetFd = std::move(env.NetNs);
-    task.Autoconf = env.Autoconf;
 
     if (ct.Controllers & CGROUP_NETCLS) {
         error = ct.Net->SetupClasses(ct.NetClass);
@@ -1430,11 +1432,13 @@ void TNetwork::StopNetwork(TContainer &ct) {
     (void)env.Parse(ct);
     env.Net = net;
 
-    for (auto &tap : env.Tap) {
-        auto lock = HostNetwork->LockNet();
-        error = env.DestroyTap(tap);
+    for (auto &dev: env.Devices) {
+        if (dev.Type != "tap")
+            continue;
+        auto lock = net->LockNet();
+        error = env.DestroyTap(dev);
         if (error)
-            L_ERR("Cannot remove tap device {} : {}", tap.Name, error);
+            L_ERR("Cannot remove tap device {} : {}", dev.Name, error);
     }
 
     if (!last)
@@ -1450,28 +1454,28 @@ void TNetwork::StopNetwork(TContainer &ct) {
         NetThread.join();
     }
 
-    for (auto &l3 : env.L3lan) {
+    for (auto &dev : env.Devices) {
+        if (dev.Type != "L3")
+            continue;
         auto lock = HostNetwork->LockNet();
         if (config().network().proxy_ndp()) {
-            for (auto &addr : l3.Addrs) {
-                error = HostNetwork->DelAnnounce(addr);
+            for (auto &ip : dev.Ip) {
+                error = HostNetwork->DelAnnounce(ip);
                 if (error)
-                    L_ERR("Cannot remove announce {} : {}", addr.Format(), error);
+                    L_ERR("Cannot remove announce {} : {}", ip.Format(), error);
             }
         }
-        if (l3.Nat) {
-            error = HostNetwork->PutNatAddress(l3.Addrs);
+        if (dev.Mode == "NAT") {
+            error = HostNetwork->PutNatAddress(dev.Ip);
             if (error)
                 L_ERR("Cannot put NAT address : {}", error);
-
-            env.IpVec.erase(std::remove_if(env.IpVec.begin(), env.IpVec.end(),
-                             [&l3](const TIpVec &ip)->bool {
-                                return ip.Iface == l3.Name;
-                             }), env.IpVec.end());
-
+            dev.Ip.clear();
             env.SaveIp = true;
         }
     }
+
+    if (env.SaveIp)
+        env.FormatIp(ct.IpList);
 }
 
 TError TNetwork::RestoreNetwork(TContainer &ct) {
@@ -1527,8 +1531,8 @@ std::string TNetEnv::GenerateHw(const std::string &name) {
 }
 
 TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
-    bool none = false;
     int vethIdx = 0;
+    TError error;
 
     if (net_settings.size() == 0)
         return TError(EError::InvalidValue, "Configuration is not specified");
@@ -1538,323 +1542,213 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
     L3Only = true;
 
     for (auto &settings : net_settings) {
-        TError error;
+        TNetDeviceConfig dev;
 
-        if (settings.size() == 0)
-            return TError(EError::InvalidValue, "Invalid net in: " +
-                          MergeEscapeStrings(settings, 0));
+        if (!settings.size())
+            continue;
 
-        std::string type = StringTrim(settings[0]);
+        auto line = MergeEscapeStrings(settings, ' ');
+        auto type = StringTrim(settings[0]);
 
-        if (type == "host" && settings.size() == 1)
-            type = "inherited";
-
-        if (type == "none") {
-            none = true;
-            NetIsolate = true;
-        } else if (type == "inherited") {
+        if (type == "inherited" || (type == "host" && settings.size() == 1)) {
             NetInherit = true;
-        } else if (type == "steal" || type == "host" /* legacy */) {
-            if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid net in: " +
-                              MergeEscapeStrings(settings, 0));
-
+        } else if (type == "none") {
             NetIsolate = true;
-            L3Only = false;
-            Steal.push_back(StringTrim(settings[1]));
         } else if (type == "container") {
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid net in: " +
-                              MergeEscapeStrings(settings, 0));
+                return TError(EError::InvalidValue, "Invalid " + line);
             L3Only = false;
             NetCtName = StringTrim(settings[1]);
-        } else if (type == "macvlan") {
-            if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid macvlan in: " +
-                              MergeEscapeStrings(settings, 0));
-
-            std::string master = StringTrim(settings[1]);
-            std::string name = StringTrim(settings[2]);
-            std::string type = "bridge";
-            std::string hw = "";
-            int mtu = -1;
-
-            if (settings.size() > 3) {
-                type = StringTrim(settings[3]);
-                if (!TNlLink::ValidMacVlanType(type))
-                    return TError(EError::InvalidValue,
-                            "Invalid macvlan type " + type);
-            }
-
-            if (settings.size() > 4) {
-                TError error = StringToInt(settings[4], mtu);
-                if (error)
-                    return TError(EError::InvalidValue,
-                            "Invalid macvlan mtu " + settings[4]);
-            }
-
-            if (settings.size() > 5) {
-                hw = StringTrim(settings[5]);
-                if (!TNlLink::ValidMacAddr(hw))
-                    return TError(EError::InvalidValue,
-                            "Invalid macvlan address " + hw);
-            }
-
-            /* Legacy kludge */
-            if (hw.empty() && !Hostname.empty())
-                hw = GenerateHw(master + name);
-
-            TMacVlanNetCfg mvlan;
-            mvlan.Master = master;
-            mvlan.Name = name;
-            mvlan.Type = type;
-            mvlan.Hw = hw;
-            mvlan.Mtu = mtu;
-
-            NetIsolate = true;
-            L3Only = false;
-            MacVlan.push_back(mvlan);
-        } else if (type == "ipvlan") {
-            if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid ipvlan in: " +
-                              MergeEscapeStrings(settings, 0));
-
-            std::string master = StringTrim(settings[1]);
-            std::string name = StringTrim(settings[2]);
-            std::string mode = "l2";
-            int mtu = -1;
-
-            if (settings.size() > 3) {
-                mode = StringTrim(settings[3]);
-                if (!TNlLink::ValidIpVlanMode(mode))
-                    return TError(EError::InvalidValue,
-                            "Invalid ipvlan mode " + mode);
-            }
-
-            if (settings.size() > 4) {
-                TError error = StringToInt(settings[4], mtu);
-                if (error)
-                    return TError(EError::InvalidValue,
-                            "Invalid ipvlan mtu " + settings[4]);
-            }
-
-            TIpVlanNetCfg ipvlan;
-            ipvlan.Master = master;
-            ipvlan.Name = name;
-            ipvlan.Mode = mode;
-            ipvlan.Mtu = mtu;
-
-            NetIsolate = true;
-            L3Only = false;
-            IpVlan.push_back(ipvlan);
-        } else if (type == "veth") {
-            if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid veth in: " +
-                              MergeEscapeStrings(settings, ' '));
-
-            std::string name = StringTrim(settings[1]);
-            std::string bridge = StringTrim(settings[2]);
-            std::string hw = "";
-            int mtu = -1;
-
-            if (settings.size() > 3) {
-                TError error = StringToInt(settings[3], mtu);
-                if (error)
-                    return TError(EError::InvalidValue,
-                            "Invalid veth mtu " + settings[3]);
-            }
-
-            if (settings.size() > 4) {
-                hw = StringTrim(settings[4]);
-                if (!TNlLink::ValidMacAddr(hw))
-                    return TError(EError::InvalidValue,
-                            "Invalid veth address " + hw);
-            }
-
-            /* Legacy kludge */
-            if (hw.empty() && !Hostname.empty())
-                hw = GenerateHw(name + "portove-" + std::to_string(Id) +
-                                "-" + std::to_string(vethIdx));
-
-            TVethNetCfg veth;
-            veth.Bridge = bridge;
-            veth.Name = name;
-            veth.Hw = hw;
-            veth.Mtu = mtu;
-
-            vethIdx++;
-
-            NetIsolate = true;
-            L3Only = false;
-            Veth.push_back(veth);
-
-        } else if (type == "L3") {
-            TL3NetCfg l3;
-
-            l3.Name = "eth0";
-            l3.Nat = false;
-            if (settings.size() > 1)
-                l3.Name = StringTrim(settings[1]);
-
-            l3.Mtu = -1;
-            if (settings.size() > 2)
-                l3.Master = StringTrim(settings[2]);
-
-            L3lan.push_back(l3);
-
-            NetIsolate = true;
-
-        } else if (type == "ipip6") {
-            TIpIp6NetCfg ipip6;
-
-            if (settings.size() != 4)
-                return TError(EError::InvalidValue, "Invalid ipip6 in: " +
-                              MergeEscapeStrings(settings, ' '));
-
-            ipip6.Name = StringTrim(settings[1]);
-
-            if (ipip6.Name == "ip6tnl0")
-                return TError(EError::InvalidValue,
-                              "Cannot modify default fallback tunnel");
-
-            error = ipip6.Remote.Parse(AF_INET6, settings[2]);
-            if (error)
-                return error;
-
-            error = ipip6.Local.Parse(AF_INET6, settings[3]);
-            if (error)
-                return error;
-
-            /* As in net/ipv6/ip6_tunnel.c,
-               we do not set IP6_TNL_F_IGN_ENCAP_LIMIT */
-
-            ipip6.Mtu = ETH_DATA_LEN - sizeof(struct ip6_hdr) - 8;
-
-            ipip6.Ttl = config().network().ipip6_ttl();
-            ipip6.EncapLimit = config().network().ipip6_encap_limit();
-            ipip6.DefaultRoute = false;
-
-            IpIp6.push_back(ipip6);
-
-            NetIsolate = true;
-
-        } else if (type == "tap") {
-            TTapNetCfg tap;
-
-            if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid tap in: " +
-                              MergeEscapeStrings(settings, ' '));
-
-            tap.Name = StringTrim(settings[1]);
-            tap.Uid = TaskCred.Uid;
-            tap.Gid = TaskCred.Gid;
-            tap.Mtu = -1;
-
-            Tap.push_back(tap);
-
-            /* Taps for host netns only */
-            NetInherit = true;
-
-        } else if (type == "NAT") {
-            TL3NetCfg nat;
-
-            nat.Nat = true;
-            nat.Name = "eth0";
-            nat.Mtu = -1;
-
-            if (settings.size() > 1)
-                nat.Name = StringTrim(settings[1]);
-
-            L3lan.push_back(nat);
-
-            NetIsolate = true;
-
-        } else if (type == "MTU") {
-            if (settings.size() != 3)
-                return TError(EError::InvalidValue, "Invalid MTU in: " +
-                              MergeEscapeStrings(settings, 0));
-
-            int mtu;
-            TError error = StringToInt(settings[2], mtu);
-            if (error)
-                return error;
-
-            for (auto &link: L3lan) {
-                if (link.Name == settings[1]) {
-                    link.Mtu = mtu;
-                    return TError::Success();
-                }
-            }
-
-            for (auto &link: Veth) {
-                if (link.Name == settings[1]) {
-                    link.Mtu = mtu;
-                    return TError::Success();
-                }
-            }
-
-            for (auto &link: MacVlan) {
-                if (link.Name == settings[1]) {
-                    link.Mtu = mtu;
-                    return TError::Success();
-                }
-            }
-
-            for (auto &link: IpVlan) {
-                if (link.Name == settings[1]) {
-                    link.Mtu = mtu;
-                    return TError::Success();
-                }
-            }
-
-            for (auto &link: IpIp6) {
-                if (link.Name == settings[1]) {
-                    link.Mtu = mtu;
-                    return TError::Success();
-                }
-            }
-
-            for (auto &link: Tap) {
-                if (link.Name == settings[1]) {
-                    link.Mtu = mtu;
-                    return TError::Success();
-                }
-            }
-
-            return TError(EError::InvalidValue, "Link not found: " + settings[1]);
-
-        } else if (type == "autoconf") {
-            if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid autoconf in: " +
-                              MergeEscapeStrings(settings, 0));
-            Autoconf.push_back(StringTrim(settings[1]));
         } else if (type == "netns") {
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid netns in: " +
-                              MergeEscapeStrings(settings, 0));
+                return TError(EError::InvalidValue, "Invalid " + line);
             std::string name = StringTrim(settings[1]);
             TPath path("/var/run/netns/" + name);
             if (!path.Exists())
                 return TError(EError::InvalidValue, "net namespace not found: " + name);
             L3Only = false;
             NetNsName = name;
-        } else {
-            return TError(EError::InvalidValue, "Configuration is not specified");
+        } else if (type == "steal" || type == "host" /* legacy */) {
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid " + line);
+            dev.Type = "steal";
+            dev.Name = StringTrim(settings[1]);
+        } else if (type == "macvlan") {
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid " + line);
+
+            dev.Type = "macvlan";
+            dev.Name = StringTrim(settings[2]);
+            dev.Master = StringTrim(settings[1]);
+            dev.Mode = "bridge";
+
+            if (settings.size() > 3) {
+                dev.Mode = StringTrim(settings[3]);
+                if (!TNlLink::ValidMacVlanType(dev.Mode))
+                    return TError(EError::InvalidValue, "Invalid macvlan mode " + dev.Mode);
+            }
+
+            if (settings.size() > 4) {
+                error = StringToInt(settings[4], dev.Mtu);
+                if (error)
+                    return error;
+            }
+
+            if (settings.size() > 5) {
+                dev.Mac = StringTrim(settings[5]);
+                if (!TNlLink::ValidMacAddr(dev.Mac))
+                    return TError(EError::InvalidValue, "Invalid macvlan mac " + dev.Mac);
+            }
+
+            /* Legacy kludge */
+            if (dev.Mac.empty() && !Hostname.empty())
+                dev.Mac = GenerateHw(dev.Master + dev.Name);
+        } else if (type == "ipvlan") {
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid " + line);
+
+            dev.Type = "ipvlan";
+            dev.Name = StringTrim(settings[2]);
+            dev.Master = StringTrim(settings[1]);
+            dev.Mode = "l2";
+
+            if (settings.size() > 3) {
+                dev.Mode = StringTrim(settings[3]);
+                if (!TNlLink::ValidIpVlanMode(dev.Mode))
+                    return TError(EError::InvalidValue, "Invalid ipvlan mode " + dev.Mode);
+            }
+
+            if (settings.size() > 4) {
+                error = StringToInt(settings[4], dev.Mtu);
+                if (error)
+                    return error;
+            }
+        } else if (type == "veth") {
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid " + line);
+
+            dev.Type = "veth";
+            dev.Name = StringTrim(settings[1]);
+            dev.Master = StringTrim(settings[2]);
+
+            if (settings.size() > 3) {
+                error = StringToInt(settings[3], dev.Mtu);
+                if (error)
+                    return error;
+            }
+
+            if (settings.size() > 4) {
+                dev.Mac = StringTrim(settings[4]);
+                if (!TNlLink::ValidMacAddr(dev.Mac))
+                    return TError(EError::InvalidValue, "Invalid veth mac " + dev.Mac);
+            }
+
+            /* Legacy kludge */
+            if (dev.Mac.empty() && !Hostname.empty())
+                dev.Mac = GenerateHw(dev.Name + "portove-" + std::to_string(Id) +
+                                     "-" + std::to_string(vethIdx));
+            vethIdx++;
+        } else if (type == "L3") {
+            dev.Type = "L3";
+            dev.Name = "eth0";
+            if (settings.size() > 1)
+                dev.Name = StringTrim(settings[1]);
+            if (settings.size() > 2)
+                dev.Master = StringTrim(settings[2]);
+        } else if (type == "NAT") {
+            dev.Type = "L3";
+            dev.Mode = "NAT";
+            dev.Name = "eth0";
+            if (settings.size() > 1)
+                dev.Name = StringTrim(settings[1]);
+        } else if (type == "ipip6") {
+            if (settings.size() != 4)
+                return TError(EError::InvalidValue, "Invalid " + line);
+            dev.Name = StringTrim(settings[1]);
+            if (dev.Name == "ip6tnl0")
+                return TError(EError::InvalidValue,
+                              "Cannot modify default fallback tunnel");
+            error = dev.IpIp6.Remote.Parse(AF_INET6, settings[2]);
+            if (error)
+                return error;
+            error = dev.IpIp6.Local.Parse(AF_INET6, settings[3]);
+            if (error)
+                return error;
+            /* As in net/ipv6/ip6_tunnel.c we do not set IP6_TNL_F_IGN_ENCAP_LIMIT */
+            dev.Mtu = ETH_DATA_LEN - sizeof(struct ip6_hdr) - 8;
+        } else if (type == "tap") {
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid " + line);
+            dev.Type = "tap";
+            dev.Name = StringTrim(settings[1]);
+            dev.Tap.Uid = TaskCred.Uid;
+            dev.Tap.Gid = TaskCred.Gid;
+        } else if (type == "MTU") {
+            if (settings.size() != 3)
+                return TError(EError::InvalidValue, "Invalid " + line);
+            int mtu;
+            error = StringToInt(settings[2], mtu);
+            if (error)
+                return error;
+            bool found = false;
+            for (auto &dev: Devices) {
+                if (dev.Name == settings[1]) {
+                    dev.Mtu = mtu;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return TError(EError::InvalidValue, "Link not found: " + settings[1]);
+        } else if (type == "MAC") {
+            if (settings.size() != 3 || !TNlLink::ValidMacAddr(settings[2]))
+                return TError(EError::InvalidValue, "Invalid " + line);
+            bool found = false;
+            for (auto &dev: Devices) {
+                if (dev.Name == settings[1]) {
+                    dev.Mac = settings[2];
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return TError(EError::InvalidValue, "Link not found: " + settings[1]);
+        } else if (type == "autoconf") {
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid " + line);
+            bool found = false;
+            for (auto &dev: Devices) {
+                if (dev.Name == settings[1]) {
+                    dev.Autoconf = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+                return TError(EError::InvalidValue, "Link not found: " + settings[1]);
+        } else
+            return TError(EError::InvalidValue, "Unknown net option: " + type);
+
+        if (dev.Type != "") {
+            Devices.push_back(dev);
+            if (dev.Type != "L3" && dev.Type != "ipip6" && dev.Type != "tap")
+                L3Only = false;
+            if (dev.Type == "tap")
+                NetInherit = true;
+            else
+                NetIsolate = true;
         }
     }
 
-    int single = none + NetInherit;
-    int mixed = Steal.size() + MacVlan.size() + IpVlan.size() + Veth.size() +
-                L3lan.size() + IpIp6.size();
-
-    if (single > 1 || (single == 1 && mixed))
-        return TError(EError::InvalidValue, "none/host/inherited/taps can't be mixed with other types");
+    if (!!NetInherit + !!NetIsolate + !NetNsName.empty() + !NetCtName.empty() != 1)
+        return TError(EError::InvalidValue, "Uncertain network type");
 
     return TError::Success();
 }
 
 TError TNetEnv::CheckIpLimit() {
-    if (IpVec.empty() && L3Only)
+    /* no devices -> no ip changes */
+    if (Devices.empty())
         return TError::Success();
 
     for (auto ct = Parent; ct; ct = ct->Parent) {
@@ -1866,25 +1760,27 @@ TError TNetEnv::CheckIpLimit() {
             continue;
 
         if (ct->IpLimit.size() == 1 && ct->IpLimit[0] == "none")
-            return TError(EError::Permission, "Parent container " + ct->Name + " forbid ip changing");
+            return TError(EError::Permission, "Parent container " + ct->Name + " forbid IP changing");
 
         if (!L3Only)
             return TError(EError::Permission, "Parent container " + ct->Name + " allows only L3 network");
 
-        for (auto &v: IpVec) {
-            bool allow = false;
-            for (auto &str: ct->IpLimit) {
-                TNlAddr mask;
-                if (mask.Parse(AF_UNSPEC, str) || mask.Family() != v.Addr.Family())
-                    continue;
-                if (mask.IsMatch(v.Addr)) {
-                    allow = true;
-                    break;
+        for (auto &dev: Devices) {
+            for (auto &ip: dev.Ip) {
+                bool allow = false;
+                for (auto &str: ct->IpLimit) {
+                    TNlAddr mask;
+                    if (mask.Parse(AF_UNSPEC, str) || mask.Family() != ip.Family())
+                        continue;
+                    if (mask.IsMatch(ip)) {
+                        allow = true;
+                        break;
+                    }
                 }
+                if (!allow)
+                    return TError(EError::Permission, "Parent container " +
+                            ct->Name + " forbid address: " + ip.Format());
             }
-            if (!allow)
-                return TError(EError::Permission, "Parent container " + ct->Name +
-                                                  " forbid address: " + v.Addr.Format());
         }
     }
 
@@ -1892,100 +1788,47 @@ TError TNetEnv::CheckIpLimit() {
 }
 
 TError TNetEnv::ParseIp(TMultiTuple &ip_settings) {
-    IpVec.clear();
+    TError error;
+    TNlAddr ip;
+
     for (auto &settings : ip_settings) {
-        TError error;
-
         if (settings.size() != 2)
-            return TError(EError::InvalidValue, "Invalid ip address/prefix in: " +
-                          MergeEscapeStrings(settings, ' '));
-
-        TIpVec ip;
-        ip.Iface = settings[0];
-        error = ip.Addr.Parse(AF_UNSPEC, settings[1]);
+            return TError(EError::InvalidValue, "Invalid ip format");
+        error = ip.Parse(AF_UNSPEC, settings[1]);
         if (error)
             return error;
-
-        bool is_tap = false;
-
-        for (auto &tap : Tap) {
-            if (tap.Name == ip.Iface) {
-                tap.Addrs.push_back(ip.Addr);
-                is_tap = true;
-                break;
-            }
-        }
-
-        if (is_tap)
-            continue;
-
-        IpVec.push_back(ip);
-
-        for (auto &l3: L3lan) {
-            if (l3.Name == ip.Iface) {
-                if (!ip.Addr.IsHost())
-                    return TError(EError::InvalidValue, "Invalid ip prefix for L3 network");
-                l3.Addrs.push_back(ip.Addr);
-            }
-        }
-
-        for (auto &ipip6: IpIp6) {
-            if (ipip6.Name == ip.Iface)
-                ipip6.DefaultRoute = ip.Addr.IsHost();
-        }
+        for (auto &dev: Devices)
+            if (dev.Name == settings[0])
+                dev.Ip.push_back(ip);
     }
     return TError::Success();
 }
 
 void TNetEnv::FormatIp(TMultiTuple &ip_settings) {
     ip_settings.clear();
-    for (auto &ip: IpVec)
-        ip_settings.push_back({ ip.Iface , ip.Addr.Format() });
+    for (auto &dev: Devices)
+        for (auto &ip: dev.Ip)
+            ip_settings.push_back({ dev.Name , ip.Format() });
 }
 
 TError TNetEnv::ParseGw(TMultiTuple &gw_settings) {
-    GwVec.clear();
-    for (auto &settings : gw_settings) {
-        TError error;
-
-        if (settings.size() != 2)
-            return TError(EError::InvalidValue, "Invalid gateway address/prefix in: " +
-                          MergeEscapeStrings(settings, ' '));
-
-        TGwVec gw;
-        gw.Iface = settings[0];
-        error = gw.Addr.Parse(AF_UNSPEC, settings[1]);
-        if (error)
-            return error;
-        GwVec.push_back(gw);
-    }
-    return TError::Success();
-}
-
-TError TNetEnv::ConfigureVeth(TVethNetCfg &veth) {
-    auto parentNl = ParentNet->GetNl();
-    TNlLink peer(parentNl, ParentNet->NewDeviceName("portove-"));
     TError error;
+    TNlAddr ip;
 
-    error = peer.AddVeth(veth.Name, veth.Hw, veth.Mtu, 0, NetNs.GetFd());
-    if (error)
-        return error;
-
-    if (!veth.Bridge.empty()) {
-        TNlLink bridge(parentNl, veth.Bridge);
-        error = bridge.Load();
+    for (auto &settings : gw_settings) {
+        if (settings.size() != 2)
+            return TError(EError::InvalidValue, "Invalid gateway format");
+        error = ip.Parse(AF_UNSPEC, settings[1]);
         if (error)
             return error;
-
-        error = bridge.Enslave(peer.GetName());
-        if (error)
-            return error;
+        for (auto &dev: Devices)
+            if (dev.Name == settings[0])
+                dev.Gw = ip;
     }
-
     return TError::Success();
 }
 
-TError TNetEnv::ConfigureL3(TL3NetCfg &l3) {
+TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     auto lock = HostNetwork->LockNet();
     std::string peerName = HostNetwork->NewDeviceName("L3-");
     auto parentNl = HostNetwork->GetNl();
@@ -1994,37 +1837,29 @@ TError TNetEnv::ConfigureL3(TL3NetCfg &l3) {
     TNlAddr gate4, gate6;
     TError error;
 
-    if (l3.Nat && l3.Addrs.empty()) {
-        error = HostNetwork->GetNatAddress(l3.Addrs);
+    if (dev.Mode == "NAT" && dev.Ip.empty()) {
+        error = HostNetwork->GetNatAddress(dev.Ip);
         if (error)
             return error;
-
-        for (auto &addr: l3.Addrs) {
-            TIpVec ip;
-            ip.Iface = l3.Name;
-            ip.Addr = addr;
-            IpVec.push_back(ip);
-        }
-
         SaveIp = true;
     }
 
-    error = HostNetwork->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu, l3.Group);
+    error = HostNetwork->GetGateAddress(dev.Ip, gate4, gate6, dev.Mtu, dev.Group);
     if (error)
         return error;
 
-    for (auto &addr : l3.Addrs) {
-        if (addr.Family() == AF_INET && gate4.IsEmpty())
+    for (auto &ip : dev.Ip) {
+        if (ip.Family() == AF_INET && gate4.IsEmpty())
             return TError(EError::InvalidValue, "Ipv4 gateway not found");
-        if (addr.Family() == AF_INET6 && gate6.IsEmpty())
+        if (ip.Family() == AF_INET6 && gate6.IsEmpty())
             return TError(EError::InvalidValue, "Ipv6 gateway not found");
     }
 
-    error = peer.AddVeth(l3.Name, "", l3.Mtu, l3.Group, NetNs.GetFd());
+    error = peer.AddVeth(dev.Name, "", dev.Mtu, dev.Group, NetNs.GetFd());
     if (error)
         return error;
 
-    TNlLink link(Nl, l3.Name);
+    TNlLink link(Nl, dev.Name);
     error = link.Load();
     if (error)
         return error;
@@ -2059,12 +1894,11 @@ TError TNetEnv::ConfigureL3(TL3NetCfg &l3) {
             return error;
     }
 
-    for (auto &addr : l3.Addrs) {
-        error = peer.AddDirectRoute(addr);
+    for (auto &ip : dev.Ip) {
+        error = peer.AddDirectRoute(ip);
         if (error)
             return error;
-
-        error = HostNetwork->AddAnnounce(addr, HostNetwork->MatchDevice(l3.Master));
+        error = HostNetwork->AddAnnounce(ip, HostNetwork->MatchDevice(dev.Master));
         if (error)
             return error;
     }
@@ -2072,7 +1906,7 @@ TError TNetEnv::ConfigureL3(TL3NetCfg &l3) {
     return TError::Success();
 }
 
-TError TNetEnv::CreateTap(TTapNetCfg &tap) {
+TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
     TNlAddr gate4, gate6;
     TError error;
     int group;
@@ -2080,11 +1914,11 @@ TError TNetEnv::CreateTap(TTapNetCfg &tap) {
     if (Net != HostNetwork)
         return TError(EError::NotSupported, "Tap only for host network");
 
-    error = Net->GetGateAddress(tap.Addrs, gate4, gate6, tap.Mtu, group);
+    error = Net->GetGateAddress(dev.Ip, gate4, gate6, dev.Mtu, group);
     if (error)
         return error;
 
-    for (auto &addr : tap.Addrs) {
+    for (auto &addr : dev.Ip) {
         if (addr.Family() == AF_INET6 && gate6.IsEmpty())
             return TError(EError::InvalidValue, "Ipv6 gateway not found");
         if (addr.Family() == AF_INET && gate4.IsEmpty())
@@ -2096,21 +1930,21 @@ TError TNetEnv::CreateTap(TTapNetCfg &tap) {
     if (error)
         return error;
 
-    if (tap.Name.size() >= IFNAMSIZ)
+    if (dev.Name.size() >= IFNAMSIZ)
         return TError(EError::InvalidValue, "tun name too long, max " + std::to_string(IFNAMSIZ-1));
 
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(struct ifreq));
-    strncpy(ifr.ifr_name, tap.Name.c_str(), IFNAMSIZ - 1);
+    strncpy(ifr.ifr_name, dev.Name.c_str(), IFNAMSIZ - 1);
     ifr.ifr_flags = IFF_TAP;
 
     if (ioctl(tun.Fd, TUNSETIFF, &ifr))
         return TError(EError::Unknown, errno, "Cannot add tap device");
 
-    if (ioctl(tun.Fd, TUNSETOWNER, tap.Uid))
+    if (ioctl(tun.Fd, TUNSETOWNER, dev.Tap.Uid))
         return TError(EError::Unknown, errno, "Cannot set tap owner uid");
 
-    if (ioctl(tun.Fd, TUNSETGROUP, tap.Gid))
+    if (ioctl(tun.Fd, TUNSETGROUP, dev.Tap.Gid))
         return TError(EError::Unknown, errno, "Cannot set tap owner gid");
 
     if (ioctl(tun.Fd, TUNSETPERSIST, 1))
@@ -2120,7 +1954,7 @@ TError TNetEnv::CreateTap(TTapNetCfg &tap) {
 
     auto Nl = Net->GetNl();
 
-    TNlLink tapdev(Nl, tap.Name);
+    TNlLink tapdev(Nl, dev.Name);
 
     error = tapdev.Load();
     if (error)
@@ -2130,17 +1964,22 @@ TError TNetEnv::CreateTap(TTapNetCfg &tap) {
     if (error)
         return error;
 
-    if (tap.Mtu > 0) {
-        error = tapdev.SetMtu(tap.Mtu);
+    if (dev.Mtu > 0) {
+        error = tapdev.SetMtu(dev.Mtu);
         if (error)
             return error;
     }
 
-    for (auto &addr: tap.Addrs) {
+    if (!dev.Mac.empty()) {
+        error = tapdev.SetMacAddr(dev.Mac);
+        if (error)
+            return error;
+    }
+
+    for (auto &addr: dev.Ip) {
         error = tapdev.AddDirectRoute(addr);
         if (error)
             return error;
-
         error = Net->AddAnnounce(addr, "");
         if (error)
             return error;
@@ -2161,10 +2000,10 @@ TError TNetEnv::CreateTap(TTapNetCfg &tap) {
     return TError::Success();
 }
 
-TError TNetEnv::DestroyTap(TTapNetCfg &tap) {
+TError TNetEnv::DestroyTap(TNetDeviceConfig &tap) {
     TNlLink tap_dev(Net->GetNl(), tap.Name);
 
-    for (auto &addr: tap.Addrs)
+    for (auto &addr: tap.Ip)
        Net->DelAnnounce(addr);
 
     TError error = tap_dev.Load();
@@ -2175,79 +2014,80 @@ TError TNetEnv::DestroyTap(TTapNetCfg &tap) {
 }
 
 TError TNetEnv::SetupInterfaces() {
-    std::vector<std::string> links;
     auto parent_lock = ParentNet->LockNet();
     auto source_nl = ParentNet->GetNl();
     auto target_nl = Net->GetNl();
     TError error;
 
-    for (auto &dev : Steal) {
-        TNlLink link(source_nl, dev);
-        error = link.ChangeNs(dev, NetNs.GetFd());
-        if (error)
-            return error;
-        links.emplace_back(dev);
-    }
+    for (auto &dev : Devices) {
+        if (dev.Type == "steal") {
+            TNlLink link(source_nl, dev.Name);
+            error = link.ChangeNs(dev.Name, NetNs.GetFd());
+            if (error)
+                return error;
+        } else if (dev.Type == "ipvlan") {
+            std::string master = ParentNet->MatchDevice(dev.Master);
 
-    for (auto &ipvlan : IpVlan) {
-        std::string master = ParentNet->MatchDevice(ipvlan.Master);
-
-        TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
-        error = link.AddIpVlan(master, ipvlan.Mode, ipvlan.Mtu);
-        if (error)
-            return error;
-
-        error = link.ChangeNs(ipvlan.Name, NetNs.GetFd());
-        if (error) {
-            (void)link.Remove();
-            return error;
-        }
-        links.emplace_back(ipvlan.Name);
-    }
-
-    for (auto &mvlan : MacVlan) {
-        std::string master = ParentNet->MatchDevice(mvlan.Master);
-
-        TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
-        error = link.AddMacVlan(master, mvlan.Type, mvlan.Hw, mvlan.Mtu);
-        if (error)
+            TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
+            error = link.AddIpVlan(master, dev.Mode, dev.Mtu);
+            if (error)
                 return error;
 
-        error = link.ChangeNs(mvlan.Name, NetNs.GetFd());
-        if (error) {
-            (void)link.Remove();
-            return error;
-        }
-        links.emplace_back(mvlan.Name);
-    }
+            error = link.ChangeNs(dev.Name, NetNs.GetFd());
+            if (error) {
+                (void)link.Remove();
+                return error;
+            }
+        } else if (dev.Type == "macvlan") {
+            std::string master = ParentNet->MatchDevice(dev.Master);
 
-    for (auto &veth : Veth) {
-        error = ConfigureVeth(veth);
-        if (error)
-            return error;
-        links.emplace_back(veth.Name);
+            TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
+            error = link.AddMacVlan(master, dev.Mode, dev.Mac, dev.Mtu);
+            if (error)
+                return error;
+
+            error = link.ChangeNs(dev.Name, NetNs.GetFd());
+            if (error) {
+                (void)link.Remove();
+                return error;
+            }
+        } else if (dev.Type == "veth") {
+            TNlLink peer(source_nl, ParentNet->NewDeviceName("portove-"));
+
+            error = peer.AddVeth(dev.Name, dev.Mac, dev.Mtu, 0, NetNs.GetFd());
+            if (error)
+                return error;
+
+            if (!dev.Master.empty()) {
+                TNlLink bridge(source_nl, dev.Master);
+                error = bridge.Load();
+                if (error)
+                    return error;
+
+                error = bridge.Enslave(peer.GetName());
+                if (error)
+                    return error;
+            }
+        }
     }
 
     parent_lock.unlock();
 
-    for (auto &l3 : L3lan) {
-        error = ConfigureL3(l3);
-        if (error)
-            return error;
-        links.emplace_back(l3.Name);
-    }
+    for (auto &dev : Devices) {
+        if (dev.Type == "L3") {
+            error = ConfigureL3(dev);
+            if (error)
+                return error;
+        } else if (dev.Type == "ipipv6") {
+            TNlLink link(target_nl, dev.Name);
 
-    for (auto &ipip6: IpIp6) {
-        TNlLink link(Net->GetNl(), ipip6.Name);
-
-        error = link.AddIp6Tnl(ipip6.Name, ipip6.Remote, ipip6.Local,
-                               IPPROTO_IPIP, ipip6.Mtu, ipip6.EncapLimit,
-                               ipip6.Ttl);
-
-        if (error)
-            return error;
-
-        links.emplace_back(ipip6.Name);
+            error = link.AddIp6Tnl(dev.Name, dev.IpIp6.Remote, dev.IpIp6.Local,
+                                   IPPROTO_IPIP, dev.Mtu,
+                                   config().network().ipip6_encap_limit(),
+                                   config().network().ipip6_ttl());
+            if (error)
+                return error;
+        }
     }
 
     TNlLink loopback(target_nl, "lo");
@@ -2264,64 +2104,43 @@ TError TNetEnv::SetupInterfaces() {
     if (error)
         return error;
 
-    for (auto &name: links) {
-        if (!Net->DeviceIndex(name))
-            return TError(EError::Unknown, "network device " + name + " not found");
+    for (auto &dev: Devices) {
+        if (!Net->DeviceIndex(dev.Name))
+            return TError(EError::Unknown, "Network device " + dev.Name + " not found");
     }
 
-    for (auto &dev: Net->Devices) {
-        if (!NetUp) {
-            bool found = false;
-            for (auto &ip: IpVec)
-                if (ip.Iface == dev.Name)
-                    found = true;
-            for (auto &gw: GwVec)
-                if (gw.Iface == dev.Name)
-                    found = true;
-            for (auto &ac: Autoconf)
-                if (ac == dev.Name)
-                    found = true;
-            if (!found)
-                continue;
-        }
+    for (auto &dev: Devices) {
+        if (!NetUp && dev.Ip.empty() && dev.Gw.IsEmpty() && !dev.Autoconf)
+            continue;
 
         TNlLink link(target_nl, dev.Name);
         error = link.Load();
         if (error)
             return error;
+
         error = link.Up();
         if (error)
             return error;
 
-        for (auto &ip: IpVec) {
-            if (ip.Iface == dev.Name) {
-                error = link.AddAddress(ip.Addr);
-                if (error)
-                    return error;
-            }
-        }
-
-        for (auto &gw: GwVec) {
-            if (gw.Iface == dev.Name) {
-                error = link.SetDefaultGw(gw.Addr);
-                if (error)
-                    return error;
-            }
-        }
-
-    }
-
-    for (auto &ipip6: IpIp6) {
-        if (ipip6.DefaultRoute) {
-            TNlLink link(target_nl, ipip6.Name);
-            error = link.Load();
+        bool DefaultRoute = false;
+        for (auto &ip: dev.Ip) {
+            error = link.AddAddress(ip.Addr);
             if (error)
                 return error;
+            DefaultRoute |= ip.IsHost();
+        }
 
-            TNlAddr addr;
-            addr.Parse(AF_INET, "default");
+        if (!dev.Gw.IsEmpty()) {
+            error = link.SetDefaultGw(dev.Gw);
+            if (error)
+                return error;
+            DefaultRoute = false;
+        }
 
-            error = link.AddDirectRoute(addr);
+        if (dev.Type == "ipip6" && DefaultRoute) {
+            TNlAddr ip;
+            ip.Parse(AF_INET, "default");
+            error = link.AddDirectRoute(ip);
             if (error)
                 return error;
         }
@@ -2372,7 +2191,7 @@ TError TNetEnv::OpenNetwork() {
     TError error;
 
     if (NetIsolate && L3Only && config().network().l3_migration_hack() &&
-            L3lan.size() && L3lan[0].Addrs.size()) {
+            Devices.size() && Devices[0].Type == "L3" && Devices[0].Ip.size()) {
         auto lock = LockContainers();
 
         for (auto &it: Containers) {
@@ -2383,7 +2202,7 @@ TError TNetEnv::OpenNetwork() {
             for (auto cfg: ct->IpList) {
                 TNlAddr addr;
                 if (cfg.size() == 2 && !addr.Parse(AF_UNSPEC, cfg[1]) &&
-                        addr.IsMatch(L3lan[0].Addrs[0])) {
+                        addr.IsMatch(Devices[0].Ip[0])) {
                     L_ACT("Reuse L3 addr {} network {}", addr.Format(), ct->Name);
                     lock.unlock();
                     return Open(*ct);

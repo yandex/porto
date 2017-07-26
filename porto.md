@@ -401,7 +401,7 @@ Disk names are single words, like: "sda" or "md0",
 
 Matching interfaces by name support masks '?' and '\*'.
 
-* **net** - network namespace configuration
+* **net** - network namespace configuration, Syntax: \<option\> \[args\]...;...
     - *inherited*            - use parent container network namespace (default)
     - *none*                 - empty namespace, no network access (default for virt\_mode=os)
     - *L3* \<name\> \[master\]  - veth pair and ip routing from host
@@ -409,6 +409,7 @@ Matching interfaces by name support masks '?' and '\*'.
     - *tap* \<name\>         - tap interface with L3 routing
     - *ipip6* \<name\> \<remote\> \<local\> - ipv4-via-ipv6 tunnel
     - *MTU* \<name\> \<mtu\> - set MTU for device
+    - *MAC* \<name\> \<mac\> - set MAC for device
     - *autoconf* \<name\>    - wait for IPv6 SLAAC configuration
     - *container* \<name\>   - use namespace of this container
     - *netns* \<name\>       - use namespace created by **ip-netns(8)**

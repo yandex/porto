@@ -126,6 +126,7 @@ public:
     TError AddAddress(const TNlAddr &addr);
     TError WaitAddress(int timeout_s);
     TError SetMtu(int mtu);
+    TError SetMacAddr(const std::string &mac);
 
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };

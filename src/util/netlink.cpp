@@ -763,6 +763,25 @@ TError TNlLink::SetMtu(int mtu) {
     return TError::Success();
 }
 
+TError TNlLink::SetMacAddr(const std::string &mac) {
+    TNlAddr addr;
+    TError error = addr.Parse(AF_LLC, mac);
+    if (error)
+        return error;
+
+    auto link = rtnl_link_alloc();
+    rtnl_link_set_name(link, rtnl_link_get_name(Link));
+    rtnl_link_set_addr(link, addr.Addr);
+
+    int ret = rtnl_link_change(GetSock(), Link, link, 0);
+    rtnl_link_put(link);
+
+    if (ret)
+        return Error(ret, "Cannot set mac for " + GetName());
+
+    return TError::Success();
+}
+
 bool TNlLink::ValidIpVlanMode(const std::string &mode) {
 #ifdef IFLA_IPVLAN_MAX
     return ipvlanMode.find(mode) != ipvlanMode.end();

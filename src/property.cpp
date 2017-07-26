@@ -982,6 +982,7 @@ public:
  "ipip6 <name> <remote> <local> | "
  "tap <name> | "
  "MTU <name> <mtu> | "
+ "MAC <name> <mac> | "
  "autoconf <name> (SLAAC) | "
  "netns <name>") {}
     TError Start(void) {
