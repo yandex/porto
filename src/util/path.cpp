@@ -514,8 +514,6 @@ restart:
             break;
         }
 
-        if (Verbose)
-            L_ACT("clear directory: unlink {}", de->d_name);
         if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
             continue;
 
@@ -547,8 +545,6 @@ restart:
         sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC |
                                             O_NOFOLLOW | O_NOATIME);
         if (sub_fd >= 0) {
-            if (Verbose)
-                L_ACT("clear directory: enter {}", de->d_name);
             if (dir_fd != top_fd)
                 closedir(dir); /* closes dir_fd */
             else
@@ -570,8 +566,6 @@ restart:
             rewinddir(top);
             dir = top;
             dir_fd = top_fd;
-            if (Verbose)
-                L_ACT("clear directory: restart");
             goto restart; /* Restart from top directory */
         }
         closedir(top); /* closes top_fd */
