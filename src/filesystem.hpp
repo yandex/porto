@@ -11,14 +11,15 @@ struct TBindMount {
     TPath Source;
     TPath Target;
     bool ReadOnly = false;
+    bool ControlSource = false;
+    bool ControlTarget = false;
 };
 
 struct TMountNamespace {
 public:
     std::string Container; /* for logging and errors */
     TCred BindCred;
-    TPath ChildCwd;
-    TPath ParentCwd;
+    TPath Cwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRo;
     std::vector<TBindMount> BindMounts;

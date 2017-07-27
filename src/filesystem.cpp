@@ -45,20 +45,11 @@ bool IsSystemPath(const TPath &path) {
 
 TError TMountNamespace::MountBinds() {
     for (const auto &bm : BindMounts) {
-        TPath source, target;
+        auto &source = bm.Source;
+        auto &target = bm.Target;
         TFile src, dst;
         bool directory;
         TError error;
-
-        if (bm.Source.IsAbsolute())
-            source = bm.Source;
-        else
-            source = ParentCwd / bm.Source;
-
-        if (bm.Target.IsAbsolute())
-            target = Root / bm.Target;
-        else
-            target = Root / ChildCwd / bm.Target;
 
         error = src.OpenPath(source);
         if (error)
@@ -66,12 +57,14 @@ TError TMountNamespace::MountBinds() {
 
         directory = source.IsDirectoryFollow();
 
-        if (!bm.ReadOnly || (directory && IsSystemPath(source)))
-            error = src.WriteAccess(BindCred);
-        else
-            error = src.ReadAccess(BindCred);
-        if (error)
-            return TError(error, "Bindmount " + target.ToString());
+        if (!bm.ControlSource) {
+            if (!bm.ReadOnly || (directory && IsSystemPath(source)))
+                error = src.WriteAccess(BindCred);
+            else
+                error = src.ReadAccess(BindCred);
+            if (error)
+                return TError(error, "Bindmount " + target.ToString());
+        }
 
         if (!target.Exists()) {
             TPath base = target.DirName();
@@ -87,9 +80,10 @@ TError TMountNamespace::MountBinds() {
             if (error)
                 return error;
 
-            if (Root.IsRoot())
-                error = dir.WriteAccess(BindCred);
-            else if (!dir.RealPath().IsInside(Root))
+            if (Root.IsRoot()) {
+                if (!bm.ControlTarget)
+                    error = dir.WriteAccess(BindCred);
+            } else if (!dir.RealPath().IsInside(Root))
                 error = TError(EError::InvalidValue, "Bind mount target " +
                                target.ToString() + " out of chroot");
 
@@ -113,7 +107,8 @@ TError TMountNamespace::MountBinds() {
                 error = dst.OpenDir(target);
             else
                 error = dst.OpenRead(target);
-            if (!error && Root.IsRoot() && IsSystemPath(target))
+            if (!error && !bm.ControlTarget &&
+                    Root.IsRoot() && IsSystemPath(target))
                 error = dst.WriteAccess(BindCred);
         }
         if (error)

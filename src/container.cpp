@@ -1589,8 +1589,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     for (auto hy: Hierarchies)
         TaskEnv.Cgroups.push_back(GetCgroup(*hy));
 
-    TaskEnv.Mnt.ChildCwd = GetCwd();
-    TaskEnv.Mnt.ParentCwd = Parent->GetCwd();
+    TaskEnv.Mnt.Cwd = GetCwd();
 
     if (RootVolume)
         TaskEnv.Mnt.Root = Parent->RootPath.InnerPath(RootVolume->Path);
@@ -1613,6 +1612,24 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.QuadroFork = (VirtMode == VIRT_MODE_APP) && !IsMeta();
 
     TaskEnv.Mnt.BindMounts = BindMounts;
+
+    /* Resolve paths in parent namespace and check volume ownership */
+    for (auto &bm: TaskEnv.Mnt.BindMounts) {
+        if (!bm.Source.IsAbsolute())
+            bm.Source = Parent->GetCwd() / bm.Source;
+
+        auto src = TVolume::Locate(Parent->RootPath / bm.Source);
+        bm.ControlSource = src && !CL->CanControl(src->VolumeOwner);
+
+        if (bm.Target.IsAbsolute())
+            bm.Target = TaskEnv.Mnt.Root / bm.Target;
+        else
+            bm.Target = TaskEnv.Mnt.Root / TaskEnv.Mnt.Cwd / bm.Target;
+
+        auto dst = TVolume::Locate(Parent->RootPath / bm.Target);
+        bm.ControlTarget = dst && !CL->CanControl(dst->VolumeOwner);
+    }
+
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
     TaskEnv.Mnt.BindResolvConf = BindDns && ResolvConf.empty();
 
