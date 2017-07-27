@@ -16,10 +16,13 @@ extern "C" {
 #include <netinet/ip6.h>
 #include <netinet/ether.h>
 #include <linux/if_tun.h>
+#include <linux/neighbour.h>
+#include <netlink/cache.h>
 #include <netlink/route/link.h>
 #include <netlink/route/tc.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/class.h>
+#include <netlink/route/neighbour.h>
 #include <netlink/route/qdisc/htb.h>
 }
 
@@ -33,6 +36,7 @@ std::atomic<int> TNetwork::GlobalStatGen;
 static std::thread NetThread;
 static std::condition_variable NetThreadCv;
 static uint64_t NetWatchdogPeriod;
+static uint64_t NetProxyNeighbourPeriod;
 
 static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
@@ -283,6 +287,8 @@ void TNetwork::InitializeConfig() {
         StringToUintMap(config().network().ingress_burst(), IngressBurst);
 
     NetWatchdogPeriod = config().network().watchdog_ms();
+
+    NetProxyNeighbourPeriod = config().network().proxy_ndp_watchdog_ms();
 
     /* Load default net sysctl from host config */
     for (const auto &p: NetSysctls) {
@@ -790,19 +796,23 @@ TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
     return TError::Success();
 }
 
-TError TNetwork::AddAnnounce(const TNlAddr &addr, std::string master) {
+TError TNetwork::SetupProxyNeighbour(const std::vector <TNlAddr> &ips,
+                                     const std::string &master) {
     struct nl_cache *cache;
     TError error;
     int ret;
 
-    if (!config().network().proxy_ndp())
-        return TError::Success();
-
     if (master != "") {
-        int index = DeviceIndex(master);
-        if (index)
-            return Nl->ProxyNeighbour(index, addr, true);
-        return TError(EError::InvalidValue, "Master link not found: " + master);
+        for (auto &dev : Devices) {
+            if (StringMatch(dev.Name, master)) {
+                for (auto &ip: ips) {
+                    error = Nl->ProxyNeighbour(dev.Index, ip, true);
+                    if (error)
+                        goto err;
+                }
+            }
+        }
+        return TError::Success();
     }
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
@@ -810,40 +820,117 @@ TError TNetwork::AddAnnounce(const TNlAddr &addr, std::string master) {
         return Nl->Error(ret, "Cannot allocate addr cache");
 
     for (auto &dev : Devices) {
-        bool reachable = false;
+        for (auto &ip: ips) {
+            bool reachable = false;
 
-        for (auto obj = nl_cache_get_first(cache); obj;
-                obj = nl_cache_get_next(obj)) {
-            auto raddr = (struct rtnl_addr *)obj;
-            auto local = rtnl_addr_get_local(raddr);
+            for (auto obj = nl_cache_get_first(cache); obj;
+                    obj = nl_cache_get_next(obj)) {
+                auto raddr = (struct rtnl_addr *)obj;
+                auto local = rtnl_addr_get_local(raddr);
 
-            if (rtnl_addr_get_ifindex(raddr) == dev.Index &&
-                    local && nl_addr_cmp_prefix(local, addr.Addr) == 0) {
-                reachable = true;
-                break;
+                if (rtnl_addr_get_ifindex(raddr) == dev.Index &&
+                        local && nl_addr_cmp_prefix(local, ip.Addr) == 0) {
+                    reachable = true;
+                    break;
+                }
             }
-        }
 
-        /* Add proxy entry only if address is directly reachable */
-        if (reachable) {
-            error = Nl->ProxyNeighbour(dev.Index, addr, true);
-            if (error)
-                break;
+            /* Add proxy entry only if address is directly reachable */
+            if (reachable) {
+                error = Nl->ProxyNeighbour(dev.Index, ip, true);
+                if (error)
+                    goto err_addr;
+            }
         }
     }
 
+err_addr:
     nl_cache_free(cache);
+
+err:
+    if (error)
+        for (auto &dev: Devices)
+            for (auto &ip: ips)
+                Nl->ProxyNeighbour(dev.Index, ip, false);
 
     return error;
 }
 
-TError TNetwork::DelAnnounce(const TNlAddr &addr) {
+TError TNetwork::AddProxyNeightbour(const std::vector<TNlAddr> &ips,
+                                    const std::string &master) {
     TError error;
-
-    for (auto &dev: Devices)
-        error = Nl->ProxyNeighbour(dev.Index, addr, false);
-
+    if (config().network().proxy_ndp()) {
+        error = SetupProxyNeighbour(ips, master);
+        if (error)
+            return error;
+        for (auto ip: ips)
+            Neighbours.emplace_back(TNetProxyNeighbour{ip, master});
+    }
     return error;
+}
+
+void TNetwork::DelProxyNeightbour(const std::vector<TNlAddr> &ips) {
+    TError error;
+    if (config().network().proxy_ndp()) {
+        for (auto &ip: ips) {
+            for (auto &dev: Devices) {
+                error = Nl->ProxyNeighbour(dev.Index, ip, false);
+                if (error)
+                    L_ERR("Cannot remove proxy neighbour: {}", error);
+            }
+            Neighbours.remove_if([&](TNetProxyNeighbour &np) { return ip.IsEqual(np.Ip); });
+        }
+    }
+}
+
+void TNetwork::RepairProxyNeightbour() {
+    struct nl_cache *cache = nullptr;
+    struct nl_msg *msg = nullptr;
+    auto sk = GetSock();
+    TError error;
+    int ret;
+    struct ndmsg ndmsg = {};
+
+    if (Neighbours.empty())
+        return;
+
+    ndmsg.ndm_family = AF_UNSPEC;
+    ndmsg.ndm_flags = NTF_PROXY;
+
+    ret = nl_cache_alloc_name("route/neigh", &cache);
+    if (ret >= 0)
+        ret = nl_send_simple(sk, RTM_GETNEIGH, NLM_F_DUMP, &ndmsg, sizeof(ndmsg));
+    if (ret >= 0)
+        ret = nl_cache_pickup(sk, cache);
+    if (ret < 0) {
+        nl_cache_free(cache);
+        L_ERR("{}", Nl->Error(ret, "Cannot dump proxy neighbour"));
+        return;
+    }
+
+    for (auto &nb: Neighbours) {
+        bool found = false;
+
+        for (auto obj = nl_cache_get_first(cache); obj;
+                obj = nl_cache_get_next(obj)) {
+            auto neigh = (struct rtnl_neigh *)obj;
+            auto dst = rtnl_neigh_get_dst(neigh);
+
+            if (dst && !nl_addr_cmp(nb.Ip.Addr, dst) &&
+                    (rtnl_neigh_get_flags(neigh) & NTF_PROXY)) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            error = SetupProxyNeighbour({nb.Ip}, nb.Master);
+            if (error)
+                L_ERR("Cannot setup proxy neighbour: {}", error);
+        }
+    }
+
+    nl_cache_free(cache);
 }
 
 TError TNetwork::GetNatAddress(std::vector<TNlAddr> &addrs) {
@@ -1158,6 +1245,9 @@ TError TNetwork::RepairLocked() {
 }
 
 void TNetwork::NetWatchdog() {
+    auto LastProxyNeighbour = GetCurrentTimeMs();
+    TError error;
+
     SetProcessName("portod-network");
     while (HostNetwork) {
         auto nets = Networks();
@@ -1171,6 +1261,11 @@ void TNetwork::NetWatchdog() {
                 net->RepairLocked();
             if (net->NetError)
                 net->RepairLocked();
+        }
+        if (GetCurrentTimeMs() - LastProxyNeighbour >= NetProxyNeighbourPeriod) {
+            auto lock = HostNetwork->LockNet();
+            HostNetwork->RepairProxyNeightbour();
+            LastProxyNeighbour = GetCurrentTimeMs();
         }
         auto lock = LockNetworks();
         NetThreadCv.wait_for(lock, std::chrono::milliseconds(NetWatchdogPeriod/2));
@@ -1458,13 +1553,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
         if (dev.Type != "L3")
             continue;
         auto lock = HostNetwork->LockNet();
-        if (config().network().proxy_ndp()) {
-            for (auto &ip : dev.Ip) {
-                error = HostNetwork->DelAnnounce(ip);
-                if (error)
-                    L_ERR("Cannot remove announce {} : {}", ip.Format(), error);
-            }
-        }
+        HostNetwork->DelProxyNeightbour(dev.Ip);
         if (dev.Mode == "NAT") {
             error = HostNetwork->PutNatAddress(dev.Ip);
             if (error)
@@ -1482,6 +1571,7 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
     std::shared_ptr<TNetwork> net;
     TNamespaceFd netNs;
     TError error;
+    TNetEnv env;
 
     if (ct.NetInherit)
         net = ct.Parent->Net;
@@ -1494,6 +1584,19 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
         }
     } else
         return TError(EError::InvalidState, "Cannot restore network: task not found");
+
+    error = env.Parse(ct);
+    if (error)
+        return error;
+
+    for (auto &dev: env.Devices) {
+        if (dev.Type == "tap" || dev.Type == "L3") {
+            auto lock = HostNetwork->LockNet();
+            error = HostNetwork->AddProxyNeightbour(dev.Ip, dev.Master);
+            if (error)
+                return error;
+        }
+    }
 
     ct.NetClass.HostClass = net == HostNetwork;
 
@@ -1896,14 +1999,15 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
             return error;
     }
 
-    for (auto &ip : dev.Ip) {
+    for (auto &ip: dev.Ip) {
         error = peer.AddDirectRoute(ip);
         if (error)
             return error;
-        error = HostNetwork->AddAnnounce(ip, HostNetwork->MatchDevice(dev.Master));
-        if (error)
-            return error;
     }
+
+    error = HostNetwork->AddProxyNeightbour(dev.Ip, dev.Master);
+    if (error)
+        return error;
 
     return TError::Success();
 }
@@ -1978,14 +2082,15 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
             return error;
     }
 
-    for (auto &addr: dev.Ip) {
-        error = tapdev.AddDirectRoute(addr);
-        if (error)
-            return error;
-        error = Net->AddAnnounce(addr, "");
+    for (auto &ip: dev.Ip) {
+        error = tapdev.AddDirectRoute(ip);
         if (error)
             return error;
     }
+
+    error = Net->AddProxyNeightbour(dev.Ip, dev.Master);
+    if (error)
+        return error;
 
     if (!gate6.IsEmpty()) {
         error = Nl->ProxyNeighbour(tapdev.GetIndex(), gate6, true);
@@ -2005,8 +2110,7 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
 TError TNetEnv::DestroyTap(TNetDeviceConfig &tap) {
     TNlLink tap_dev(Net->GetNl(), tap.Name);
 
-    for (auto &addr: tap.Ip)
-       Net->DelAnnounce(addr);
+    Net->DelProxyNeightbour(tap.Ip);
 
     TError error = tap_dev.Load();
     if (!error)

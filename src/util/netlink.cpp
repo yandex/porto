@@ -90,6 +90,11 @@ TError TNl::Connect() {
     if (!Sock)
         return TError(EError::Unknown, "Cannot allocate netlink socket");
 
+    /*
+    nl_socket_modify_cb(Sock, NL_CB_MSG_IN, NL_CB_DEBUG, nullptr, nullptr);
+    nl_socket_modify_cb(Sock, NL_CB_MSG_OUT, NL_CB_DEBUG, nullptr, nullptr);
+    */
+
     ret = nl_connect(Sock, NETLINK_ROUTE);
     if (ret < 0) {
         nl_socket_free(Sock);
@@ -1516,4 +1521,8 @@ uint64_t TNlAddr::GetOffset(const TNlAddr &base) const {
 
 bool TNlAddr::IsMatch(const TNlAddr &addr) const {
     return Addr && addr.Addr && nl_addr_cmp_prefix(Addr, addr.Addr) == 0;
+}
+
+bool TNlAddr::IsEqual(const TNlAddr &addr) const {
+    return Addr && addr.Addr && nl_addr_cmp(Addr, addr.Addr) == 0;
 }

@@ -93,6 +93,11 @@ public:
     std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
 };
 
+struct TNetProxyNeighbour {
+    TNlAddr Ip;
+    std::string Master;
+};
+
 class TNetwork : public TNonCopyable {
     friend struct TNetEnv;
 
@@ -177,6 +182,8 @@ public:
 
     std::vector<TNetDevice> Devices;
 
+    std::list<TNetProxyNeighbour> Neighbours;
+
     TError SyncDevices(bool force = false);
     std::string NewDeviceName(const std::string &prefix);
     std::string MatchDevice(const std::string &pattern);
@@ -202,8 +209,14 @@ public:
 
     TError GetGateAddress(std::vector<TNlAddr> addrs,
                           TNlAddr &gate4, TNlAddr &gate6, int &mtu, int &group);
-    TError AddAnnounce(const TNlAddr &addr, std::string master);
-    TError DelAnnounce(const TNlAddr &addr);
+
+    TError SetupProxyNeighbour(const std::vector <TNlAddr> &ip,
+                               const std::string &master);
+
+    TError AddProxyNeightbour(const std::vector<TNlAddr> &ip,
+                              const std::string &master);
+    void DelProxyNeightbour(const std::vector<TNlAddr> &ip);
+    void RepairProxyNeightbour();
 
     TNlAddr NatBaseV4;
     TNlAddr NatBaseV6;
