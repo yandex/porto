@@ -686,10 +686,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         shares *= weight;
         reserve_shares *= weight;
 
-        if (policy == "rt") {
-            shares *= 256;
-            reserve = 0;
-        } else if (policy == "high" || policy == "iso") {
+        if (policy == "rt" || policy == "high" || policy == "iso") {
             shares *= 16;
             reserve_shares *= 256;
         } else if (policy == "normal" || policy == "batch") {
