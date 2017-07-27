@@ -36,6 +36,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_log_rotate_ms(1000);
     config().mutable_daemon()->set_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
+    config().mutable_daemon()->set_helpers_dirty_limit(256ull << 20);
     config().mutable_daemon()->set_workers(32);
     config().mutable_daemon()->set_max_msg_len(32 * 1024 * 1024);
     config().mutable_daemon()->set_event_workers(1);

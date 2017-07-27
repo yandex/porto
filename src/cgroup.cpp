@@ -1311,6 +1311,10 @@ TError InitializeDaemonCgroups() {
     if (error)
         return error;
 
+    error = MemorySubsystem.SetDirtyLimit(cg, config().daemon().helpers_dirty_limit());
+    if (error)
+        L_ERR("Cannot set portod-helpers dirty limit: {}", error);
+
     cg = FreezerSubsystem.Cgroup(PORTO_CGROUP_PREFIX);
     if (!cg.Exists()) {
         error = cg.Create();

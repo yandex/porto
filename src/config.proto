@@ -89,6 +89,7 @@ message TCfg {
 		optional int32 max_clients_in_container = 17;
 		optional bool merge_memory_blkio_controllers = 18;
 		optional uint64 client_idle_timeout = 19;
+		optional uint64 helpers_dirty_limit = 20;
 	}
 
 	message TContainerCfg {
