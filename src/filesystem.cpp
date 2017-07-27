@@ -71,7 +71,7 @@ TError TMountNamespace::MountBinds() {
         else
             error = src.ReadAccess(BindCred);
         if (error)
-            return error;
+            return TError(error, "Bindmount " + target.ToString());
 
         if (!target.Exists()) {
             TPath base = target.DirName();
@@ -100,7 +100,7 @@ TError TMountNamespace::MountBinds() {
                     error = dir.WalkStrict(dir, name);
             }
             if (error)
-                return error;
+                return TError(error, "Bindmount " + target.ToString());
 
             if (directory) {
                 error = dir.MkdirAt(target.BaseName(), 0755);
@@ -117,7 +117,7 @@ TError TMountNamespace::MountBinds() {
                 error = dst.WriteAccess(BindCred);
         }
         if (error)
-            return error;
+            return TError(error, "Bindmount " + target.ToString());
 
         if (!Root.IsRoot() && !dst.RealPath().IsInside(Root))
             return TError(EError::InvalidValue, "Bind mount target " +

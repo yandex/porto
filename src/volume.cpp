@@ -1041,7 +1041,7 @@ TError TVolume::Configure(const TStringMap &cfg) {
     /* Verify credentials */
     error = CL->CanControl(VolumeOwner);
     if (error)
-        return error;
+        return TError(error, "Volume " + Path.ToString());
 
     if (VolumeOwner.Gid != CL->Cred.Gid && !CL->IsSuperUser() &&
             !CL->Cred.IsMemberOf(VolumeOwner.Gid))
@@ -1208,7 +1208,7 @@ TError TVolume::Build() {
     } else if (UserStorage()) {
         error = CL->WriteAccess(StorageFd);
         if (error)
-            return error;
+            return TError(error, "Volume " + Path.ToString());
     } else if (HaveStorage()) {
         TStorage storage(Place, PORTO_STORAGE, Storage);
         error = storage.Load();
@@ -1216,7 +1216,7 @@ TError TVolume::Build() {
             return error;
         error = CL->CanControl(storage.Owner);
         if (error)
-            return error;
+            return TError(error, "Storage " + Storage);
         if (storage.Owner.IsUnknown()) {
             error = storage.SetOwner(VolumeOwner);
             if (error)
@@ -1252,7 +1252,7 @@ TError TVolume::Build() {
     if (!IsAutoPath) {
         error = CL->WriteAccess(PathFd);
         if (error)
-            return error;
+            return TError(error, "Volume " + Path.ToString());
     }
 
     if (Path != InternalPath) {

@@ -305,7 +305,7 @@ static TError TarCompression(const TPath &tarball, const TFile &file,
             goto gz;
         if (compress == "tar")
             goto tar;
-        return TError(EError::InvalidValue, "Unknown tar compression: " + compress);
+        return TError(EError::InvalidValue, "Unknown tar " + tarball.ToString() + " compression: " + compress);
     }
 
     /* tar cannot guess compression for std streams */
@@ -325,7 +325,7 @@ static TError TarCompression(const TPath &tarball, const TFile &file,
                 goto tar;
         }
 
-        return TError(EError::InvalidValue, "Cannot detect tar compression by magic");
+        return TError(EError::InvalidValue, "Cannot detect tar " + tarball.ToString() + " compression by magic");
     }
 
     if (StringEndsWith(name, ".xz") || StringEndsWith(name, ".txz"))
@@ -378,7 +378,7 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
 
     error = CL->ReadAccess(tar);
     if (error)
-        return error;
+        return TError(error, "Cannot import " + Name + " from " + tarball.ToString());
 
     std::string compress_option;
     error = TarCompression(tarball, tar, compress, compress_option);
@@ -402,7 +402,7 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
             return error;
         error = CL->CanControl(layer.Owner);
         if (error)
-            return error;
+            return TError(error, "Cannot merge " + Path.ToString());
     }
 
     if (Path.Exists()) {
@@ -501,7 +501,7 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
 
     error = CL->CanControl(Owner);
     if (error)
-        return error;
+        return TError(error, "Cannot export " + Path.ToString());
 
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
@@ -583,7 +583,7 @@ TError TStorage::Remove() {
 
     error = CL->CanControl(Owner);
     if (error && !StringStartsWith(Name, PORTO_WEAK_PREFIX))
-        return error;
+        return TError(error, "Cannot remove " + Path.ToString());
 
     auto lock = LockVolumes();
 
