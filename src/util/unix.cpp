@@ -231,11 +231,9 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) 
 
     std::vector<std::string> tokens;
     for (auto l : lines) {
-        tokens.clear();
-        error = SplitString(l, ':', tokens, 3);
-        if (error)
-            return error;
-        cgmap[tokens[1]] = tokens[2];
+        tokens = SplitString(l, ':', 3);
+        if (tokens.size() > 2)
+            cgmap[tokens[1]] = tokens[2];
     }
 
     return TError::Success();

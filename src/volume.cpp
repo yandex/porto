@@ -733,16 +733,14 @@ public:
 
     TError Build() override {
         std::string id, pool, image, device;
-        std::vector<std::string> tok;
         TError error, error2;
 
-        SplitEscapedString(Volume->Storage, tok, '@');
+        auto tok = SplitEscapedString(Volume->Storage, '@');
         if (tok.size() != 2)
             return TError(EError::InvalidValue, "Invalid rbd storage");
         id = tok[0];
         image = tok[1];
-        tok.clear();
-        SplitEscapedString(image, tok, '/');
+        tok = SplitEscapedString(image, '/');
         if (tok.size() != 2)
             return TError(EError::InvalidValue, "Invalid rbd storage");
         pool = tok[0];
@@ -1800,8 +1798,7 @@ TError TVolume::Restore(const TKeyValue &node) {
     InternalPath = Place / PORTO_VOLUMES / Id / "volume";
 
     if (!node.Has(V_OWNER_USER)) {
-        TTuple tuple;
-        SplitEscapedString(Creator, tuple, ' ');
+        auto tuple = SplitEscapedString(Creator, ' ');
         if (tuple.size() != 3 ||
                 UserId(tuple[1], VolumeOwner.Uid) ||
                 GroupId(tuple[2], VolumeOwner.Gid))
@@ -1919,10 +1916,7 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     volumes_lock.unlock();
 
     if (cfg.count(V_CONTAINERS)) {
-        std::vector<std::string> list;
-
-        SplitEscapedString(cfg.at(V_CONTAINERS), list, ';');
-        for (auto &name: list) {
+        for (auto &name: SplitEscapedString(cfg.at(V_CONTAINERS), ';')) {
             std::shared_ptr<TContainer> ct;
             error = CL->WriteContainer(name, ct, true);
             if (!error)
@@ -2165,7 +2159,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
             Private = prop.second;
 
         } else if (prop.first == V_RAW_CONTAINERS) {
-            SplitEscapedString(prop.second, Containers, ';');
+            Containers = SplitEscapedString(prop.second, ';');
 
         } else if (prop.first == V_CONTAINERS) {
 
@@ -2180,7 +2174,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
                 return error;
 
         } else if (prop.first == V_LAYERS) {
-            SplitEscapedString(prop.second, Layers, ';');
+            Layers = SplitEscapedString(prop.second, ';');
 
         } else if (prop.first == V_SPACE_LIMIT) {
             uint64_t limit;

@@ -392,18 +392,13 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
         return error;
 
     for (auto &line : lines) {
-        std::vector<std::string> fields;
+        auto fields = SplitString(line, ':', 3);
+        if (fields.size() < 2)
+            continue;
+
+        auto cgroups = SplitString(fields[1], ',');
+
         bool found = false;
-
-        error = SplitString(line, ':', fields, 3);
-        if (error)
-            return error;
-
-        std::vector<std::string> cgroups;
-        error = SplitString(fields[1], ',', cgroups);
-        if (error)
-            return error;
-
         for (auto &cg : cgroups)
             if (cg == Type)
                 found = true;
@@ -940,8 +935,8 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops
     }
 
     for (auto &line: lines) {
-        std::vector<std::string> word;
-        if (SplitString(line, ' ', word) || word.size() != 3)
+        auto word = SplitString(line, ' ');
+        if (word.size() != 3)
             continue;
 
         if (word[1] == "Read") {

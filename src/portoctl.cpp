@@ -109,8 +109,7 @@ public:
             StartOS = val == "os";
 
         if (key == "env") {
-            std::vector<std::string> list;
-            SplitEscapedString(val, list, ';');
+            auto list = SplitEscapedString(val, ';');
             Environment.insert(Environment.end(), list.begin(), list.end());
         } else if (key == "space_limit") {
             SpaceLimit = val;
@@ -123,7 +122,7 @@ public:
             VolumeStorage = val;
         } else if (key == "layers") {
             NeedVolume = true;
-            SplitEscapedString(val, Layers, ';');
+            Layers = SplitEscapedString(val, ';');
         } else if (key == "place") {
             Place = val;
             Properties.emplace_back(key, val);

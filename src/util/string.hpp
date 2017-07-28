@@ -19,15 +19,14 @@ TError StringToOct(const std::string &str, unsigned &value);
 TError StringToBool(const std::string &str, bool &value);
 std::string BoolToString(bool value);
 
-TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
+TTuple SplitString(const std::string &str, const char sep, int max = 0);
+
+TMultiTuple SplitEscapedString(const std::string &str, char sep_inner, char sep_outer);
+TTuple SplitEscapedString(const std::string &str, char sep);
 
 std::string MergeEscapeStrings(const TMultiTuple &tuples,
                                char sep_inner, char sep_outer);
 std::string MergeEscapeStrings(const TTuple &tuple, char sep);
-
-void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
-                        char sep_inner, char sep_outer);
-void SplitEscapedString(const std::string &str, TTuple &tuple, char sep);
 
 std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 bool StringOnlyDigits(const std::string &s);

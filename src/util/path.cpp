@@ -1013,11 +1013,10 @@ std::string TMount::Demangle(const std::string &s) {
 }
 
 TError TMount::ParseMountinfo(const std::string &line) {
-    std::vector<std::string> tokens;
+    auto tokens = SplitString(line, ' ', 7);
     TError error;
 
-    error = SplitString(line, ' ', tokens, 7);
-    if (error || tokens.size() < 7)
+    if (tokens.size() < 7)
         return TError(error, "invalid mountinfo header");
 
     error = StringToInt(tokens[0], MountId);
@@ -1053,9 +1052,8 @@ TError TMount::ParseMountinfo(const std::string &line) {
     if (!std::getline(ss, opt) || !opt.size())
         return TError(EError::Unknown, "remainder missing");
 
-    tokens.clear();
-    error = SplitString(opt, ' ', tokens, 3);
-    if (error || tokens.size() < 3)
+    tokens = SplitString(opt, ' ', 3);
+    if (tokens.size() < 3)
         return TError(error, "invalid remainder format");
 
     Type = TMount::Demangle(tokens[0]);

@@ -208,17 +208,11 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
     if (error)
         throw std::string("Can't get cgroups: " + error.GetMsg());
 
-    std::vector<std::string> tokens;
-    std::vector<std::string> subsys;
     for (auto l : lines) {
-        tokens.clear();
-        error = SplitString(l, ':', tokens, 3);
-        if (error)
-            throw std::string("Can't get cgroups: " + error.GetMsg());
-        subsys.clear();
-        SplitString(tokens[1], ',', subsys);
-        for (auto s : subsys)
-            cgmap[s] = tokens[2];
+        auto tokens = SplitString(l, ':', 3);
+        if (tokens.size() > 2)
+            for (auto s : SplitString(tokens[1], ','))
+                cgmap[s] = tokens[2];
     }
 
     return cgmap;
@@ -258,12 +252,9 @@ std::string GetState(const std::string &pid) {
 uint64_t GetCap(const std::string &pid, const std::string &type) {
     auto status = GetStatusLine(pid, type + ":");
 
-    std::vector<std::string> fields;
-
-    if (!SplitString(status, ':', fields)) {
-        if (fields[0] == type)
-            return stoull(fields[1], nullptr, 16);
-    }
+    auto fields = SplitString(status, ':');
+    if (fields[0] == type)
+        return stoull(fields[1], nullptr, 16);
 
     throw std::string("PARSING ERROR");
 }
@@ -452,10 +443,8 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     ExpectSuccess(Popen("ldd " + cmd, lines));
 
     for (auto &line : lines) {
-        vector<string> tokens;
-        TError error = SplitString(line, ' ', tokens);
-        if (error)
-            throw error.GetMsg();
+        auto tokens = SplitString(line, ' ');
+        TError error;
 
         TPath from;
         string name;
@@ -595,14 +584,9 @@ static bool HaveMaxRss() {
         return false;
 
     for (auto line : lines) {
-        std::vector<std::string> tokens;
-        error = SplitString(line, ' ', tokens);
-        if (error)
-            return false;
-
+        auto tokens = SplitString(line, ' ');
         if (tokens.size() != 2)
             continue;
-
         if (tokens[0] == "total_max_rss")
             return true;
     }
@@ -635,16 +619,12 @@ static bool IsCfqActive() {
         if ( (d.find(std::string("loop")) != std::string::npos) || (d.find(std::string("ram")) != std::string::npos) )
             continue;
         std::string data;
-        std::vector<std::string> tokens;
 
         TError error = TPath("/sys/block/" + d + "/queue/scheduler").ReadAll(data);
         if (error)
             throw error.GetMsg();
-        error = SplitString(data, ' ', tokens);
-        if (error)
-            throw error.GetMsg();
         bool cfqEnabled = false;
-        for (auto t : tokens) {
+        for (auto t : SplitString(data, ' ')) {
             if (t == std::string("[cfq]"))
                 cfqEnabled = true;
         }

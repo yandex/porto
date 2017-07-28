@@ -1000,8 +1000,7 @@ TError TNet::Set(const std::string &net_desc) {
     if (error)
         return error;
 
-    TMultiTuple new_net_desc;
-    SplitEscapedString(net_desc, new_net_desc, ' ', ';');
+    auto new_net_desc = SplitEscapedString(net_desc, ' ', ';');
 
     TNetEnv NetEnv;
     error = NetEnv.ParseNet(new_net_desc);
@@ -1189,8 +1188,7 @@ TError TEnvProperty::Set(const std::string &env_val) {
     if (error)
         return error;
 
-    TTuple envs;
-    SplitEscapedString(env_val, envs, ';');
+    auto envs = SplitEscapedString(env_val, ';');
 
     TEnv env;
     error =  env.Parse(envs, true);
@@ -1252,8 +1250,7 @@ TError TBind::Set(const std::string &bind_str) {
     if (error)
         return error;
 
-    TMultiTuple binds;
-    SplitEscapedString(bind_str, binds, ' ', ';');
+    auto binds = SplitEscapedString(bind_str, ' ', ';');
 
     std::vector<TBindMount> bindMounts;
 
@@ -1306,8 +1303,7 @@ TError TIp::Set(const std::string &ipaddr) {
     if (error)
         return error;
 
-    TMultiTuple ipaddrs;
-    SplitEscapedString(ipaddr, ipaddrs, ' ', ';');
+    auto ipaddrs = SplitEscapedString(ipaddr, ' ', ';');
 
     TNetEnv NetEnv;
     error = NetEnv.ParseIp(ipaddrs);
@@ -1338,8 +1334,7 @@ public:
         if (error)
             return error;
 
-        TTuple list;
-        SplitEscapedString(value, list, ';');
+        auto list = SplitEscapedString(value, ';');
 
         for (auto &str: list) {
             if (str == "any" || str == "none")
@@ -1373,8 +1368,7 @@ TError TDefaultGw::Set(const std::string &gw) {
         return error;
 
     TNetEnv NetEnv;
-    TMultiTuple gws;
-    SplitEscapedString(gw, gws, ' ', ';');
+    auto gws = SplitEscapedString(gw, ' ', ';');
 
     error = NetEnv.ParseGw(gws);
     if (error)
@@ -1404,15 +1398,14 @@ public:
         TError error = IsAliveAndStopped();
         if (error)
             return error;
-        SplitEscapedString(value, CT->ResolvConf, ';');
+        CT->ResolvConf = SplitEscapedString(value, ';');
         CT->SetProp(EProperty::RESOLV_CONF);
         return TError::Success();
     }
     TError Start(void) {
         /* Set default resolv_conf for chroots */
         if (CT->Root != "/" && !CT->HasProp(EProperty::RESOLV_CONF) && !CT->BindDns)
-            SplitEscapedString(config().container().default_resolv_conf(),
-                               CT->ResolvConf, ';');
+            CT->ResolvConf = SplitEscapedString(config().container().default_resolv_conf(), ';');
         return TError::Success();
     }
 } static ResolvConf;
@@ -1435,10 +1428,7 @@ public:
         if (error)
             return error;
 
-        TMultiTuple dev_list;
-
-        SplitEscapedString(dev, dev_list, ' ', ';');
-        CT->Devices = dev_list;
+        CT->Devices = SplitEscapedString(dev, ' ', ';');
         CT->SetProp(EProperty::DEVICES);
 
         return TError::Success();
@@ -1458,10 +1448,9 @@ public:
         return TError::Success();
     }
     TError SetFromRestore(const std::string &value) {
-        std::vector<std::string> val;
         TError error;
 
-        SplitEscapedString(value, val, ';');
+        auto val = SplitEscapedString(value, ';');
         if (val.size() > 0)
             error = StringToInt(val[0], CT->Task.Pid);
         else
@@ -1583,7 +1572,7 @@ public:
         TError error = IsAliveAndStopped();
         if (error)
             return error;
-        SplitEscapedString(value, CT->Place, ';');
+        CT->Place = SplitEscapedString(value, ';');
         CT->SetProp(EProperty::PLACE);
         return TError::Success();
     }
@@ -1976,8 +1965,7 @@ public:
         if (error)
             return error;
 
-        TTuple cfg;
-        SplitEscapedString(value, cfg, ' ');
+        auto cfg = SplitEscapedString(value, ' ');
 
         auto lock = LockCpuAffinity();
 

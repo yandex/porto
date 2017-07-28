@@ -176,38 +176,30 @@ std::string StringFormatDuration(uint64_t msec) {
     return StringFormat("%dd %2d:%02d", days, hours, minutes);
 }
 
-TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields) {
-    if (!maxFields)
-        return TError(EError::Unknown, "SplitString: invalid argument");
+TTuple SplitString(const std::string &str, const char sep, int max) {
+    std::vector<std::string> tokens;
+    std::istringstream ss(str);
+    std::string tok;
 
-    try {
-        std::istringstream ss(s);
-        std::string tok;
-
-        while(std::getline(ss, tok, sep)) {
-            if (!--maxFields) {
-                std::string rem;
-                std::getline(ss, rem);
-                if (rem.length()) {
-                    tok += sep;
-                    tok += rem;
-                }
+    while(std::getline(ss, tok, sep)) {
+        if (max && !--max) {
+            std::string rem;
+            std::getline(ss, rem);
+            if (rem.length()) {
+                tok += sep;
+                tok += rem;
             }
-
-            tokens.push_back(tok);
         }
-    } catch (...) {
-        return TError(EError::Unknown, "SplitString: Can't split string");
+        tokens.push_back(tok);
     }
 
-    return TError::Success();
+    return tokens;
 }
 
-void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
-                        char sep_inner, char sep_outer) {
+TMultiTuple SplitEscapedString(const std::string &str, char sep_inner, char sep_outer) {
     std::stringstream ss;
+    TMultiTuple tuples;
 
-    tuples.clear();
     tuples.push_back({});
 
     auto i = str.begin();
@@ -242,18 +234,15 @@ void SplitEscapedString(const std::string &str, TMultiTuple &tuples,
 
     if (!tuples.back().size())
         tuples.pop_back();
+
+    return tuples;
 }
 
-
-void SplitEscapedString(const std::string &str, TTuple &tuple, char sep) {
-    std::vector<std::vector<std::string>> tuples;
-
-    SplitEscapedString(str, tuples, sep, 0);
-
+TTuple SplitEscapedString(const std::string &str, char sep) {
+    auto tuples = SplitEscapedString(str, sep, 0);
     if (tuples.size())
-        tuple = tuples.front();
-    else
-        tuple.clear();
+        return tuples.front();
+    return TTuple();
 }
 
 std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
@@ -451,14 +440,10 @@ TError UintMapToString(const TUintMap &map, std::string &value) {
 }
 
 TError StringToUintMap(const std::string &value, TUintMap &result) {
-    std::vector<std::string> lines;
     TError error;
 
-    SplitEscapedString(value, lines, ';');
-    for (auto &line : lines) {
-        std::vector<std::string> nameval;
-
-        SplitEscapedString(line, nameval, ':');
+    for (auto &line : SplitEscapedString(value, ';')) {
+        auto nameval = SplitEscapedString(line, ':');
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid format");
 
@@ -488,14 +473,10 @@ std::string StringMapToString(const TStringMap &map) {
 }
 
 TError StringToStringMap(const std::string &value, TStringMap &result) {
-    std::vector<std::string> lines;
     TError error;
 
-    SplitEscapedString(value, lines, ';');
-    for (auto &line : lines) {
-        std::vector<std::string> nameval;
-
-        SplitEscapedString(line, nameval, ':');
+    for (auto &line : SplitEscapedString(value, ';')) {
+        auto nameval = SplitEscapedString(line, ':');
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid format");
 
@@ -513,13 +494,11 @@ int CompareVersions(const std::string &a, const std::string &b) {
 
 /* first[-last], ... */
 TError TBitMap::Parse(const std::string &text) {
-    TMultiTuple tuple;
     TError error;
     int first, last;
 
     bits.clear();
-    SplitEscapedString(text, tuple, '-', ',');
-    for (auto t: tuple) {
+    for (auto &t: SplitEscapedString(text, '-', ',')) {
         if (t.size() == 0)
             continue;
         if (t.size() > 2)

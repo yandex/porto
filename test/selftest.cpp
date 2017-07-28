@@ -104,13 +104,12 @@ static void ShouldHaveOnlyRoot(Porto::Connection &api) {
 
 static void TestDataMap(Porto::Connection &api, const std::string &name, const std::string &data, int zero) {
     std::string full;
-    vector<string> lines;
     int nr_nonzero = 0;
 
     Say() << "Test " << name << " data map " << data << " zero:" << zero << std::endl;
 
     ExpectApiSuccess(api.GetData(name, data, full));
-    ExpectSuccess(SplitString(full, ';', lines));
+    auto lines = SplitString(full, ';');
 
     if (!zero) {
         ExpectNeq(full, "");
@@ -119,9 +118,7 @@ static void TestDataMap(Porto::Connection &api, const std::string &name, const s
 
     for (auto line: lines) {
         string tmp;
-        vector<string> tokens;
-
-        ExpectSuccess(SplitString(line, ':', tokens));
+        auto tokens = SplitString(line, ':');
         ExpectApiSuccess(api.GetData(name, data + "[" + StringTrim(tokens[0]) + "]", tmp));
         ExpectEq(tmp, StringTrim(tokens[1]));
 
@@ -1597,11 +1594,7 @@ static map<string, TMountInfo> ParseMountinfo(std::vector<std::string> lines) {
     map<string, TMountInfo> m;
 
     for (auto &line : lines) {
-        vector<string> tok;
-        TError error = SplitString(line, ' ', tok);
-        if (error)
-            throw error.GetMsg();
-
+        auto tok = SplitString(line, ' ');
         if (tok.size() <= 5)
             throw string("Invalid mount: ") + line;
 
@@ -1688,8 +1681,7 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     auto v = StartWaitAndGetData(api, name, "stdout");
-    std::vector<std::string> lines;
-    ExpectSuccess(SplitString(v, '\n', lines));
+    auto lines = SplitString(v, '\n');
     auto m = ParseMountinfo(lines);
 
     if (m.count("/dev/hugepages"))
@@ -1776,10 +1768,7 @@ static void TestRootProperty(Porto::Connection &api) {
     vector<string> devs = { "null", "zero", "full", "urandom",
                             "random", "console", "tty", "stdin", "stdout",
                             "stderr", "ptmx", "pts", "shm", "fd" };
-    vector<string> tokens;
-    TError error = SplitString(v, '\n', tokens);
-    if (error)
-        throw error.GetMsg();
+    auto tokens = SplitString(v, '\n');
 
     if (std::find(tokens.begin(), tokens.end(), "hugepages") != tokens.end())
         devs.push_back("hugepages");
@@ -1800,8 +1789,7 @@ static void TestRootProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     v = StartWaitAndGetData(api, name, "stdout");
 
-    std::vector<std::string> lines;
-    ExpectSuccess(SplitString(v, '\n', lines));
+    auto lines = SplitString(v, '\n');
     auto m = ParseMountinfo(lines);
     ExpectEq(m.count("/etc/resolv.conf"), 0);
     ExpectEq(m.count("/etc/hosts"), 0);
@@ -1820,7 +1808,7 @@ static void TestRootProperty(Porto::Connection &api) {
     TPath f(cwd);
     AsRoot(api);
     if (f.Exists()) {
-        error = f.RemoveAll();
+        TError error = f.RemoveAll();
         if (error)
             throw error.GetMsg();
     }
@@ -2023,12 +2011,7 @@ static void TestHostnameProperty(Porto::Connection &api) {
 }
 
 static vector<string> StringToVec(const std::string &s) {
-    vector<string> lines;
-
-    TError error = SplitString(s, '\n', lines);
-    if (error)
-        throw error.GetMsg();
-    return lines;
+    return SplitString(s, '\n');
 }
 
 struct LinkInfo {
@@ -2041,25 +2024,18 @@ struct LinkInfo {
 static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
     map<string, LinkInfo> ret;
     for (auto &ipline : iplines) {
-        vector<string> lines;
-        TError error = SplitString(ipline, '\\', lines);
-        if (error)
-            throw error.GetMsg();
+        auto lines = SplitString(ipline, '\\');
         if (lines.size() < 2)
             throw "Invalid interface: " + ipline;
 
-        vector<string> tokens;
-        error = SplitString(lines[0], ':', tokens);
-        if (error)
-            throw error.GetMsg();
+        auto tokens = SplitString(lines[0], ':');
         if (tokens.size() < 2)
             throw "Invalid line 1: " + lines[0];
 
         string fulliface = StringTrim(tokens[1]);
         string flags = StringTrim(tokens[2]);
 
-        std::vector<std::string> flagsVec;
-        ExpectSuccess(SplitString(flags, ',', flagsVec));
+        auto flagsVec = SplitString(flags, ',');
 
         bool up = std::find(flagsVec.begin(), flagsVec.end(), "UP") != flagsVec.end() ||
             std::find(flagsVec.begin(), flagsVec.end(), "UP>") != flagsVec.end();
@@ -2080,17 +2056,11 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
             mtu = string(ipline, begin, end - begin);
         }
 
-        tokens.clear();
-        error = SplitString(fulliface, '@', tokens);
-        if (error)
-            throw error.GetMsg();
+        tokens = SplitString(fulliface, '@');
 
         string iface = StringTrim(tokens[0]);
 
-        tokens.clear();
-        error = SplitString(StringTrim(lines[1]), ' ', tokens);
-        if (error)
-            throw error.GetMsg();
+        tokens = SplitString(StringTrim(lines[1]), ' ');
         if (tokens.size() < 2)
             throw "Invalid line 2: " + lines[1];
 
@@ -3242,12 +3212,8 @@ static bool CanTestLimits() {
 
 static TUintMap ParseMap(const std::string &s) {
     TUintMap m;
-    std::vector<std::string> lines;
-    SplitEscapedString(s, lines, ';');
-    for (auto &line : lines) {
-        std::vector<std::string> nameval;
-
-        SplitEscapedString(line, nameval, ':');
+    for (auto &line : SplitEscapedString(s, ';')) {
+        auto nameval = SplitEscapedString(line, ':');
         ExpectEq(nameval.size(), 2);
 
         std::string key = StringTrim(nameval[0]);
