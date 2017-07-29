@@ -7,7 +7,7 @@ from test_common import *
 
 AsRoot()
 
-BASE_VERSION="3.2.10"
+BASE_VERSION="3.8.2"
 
 TMPDIR = "/tmp/test-release-upgrade"
 PORTOD_PATH = "/run/portod"
