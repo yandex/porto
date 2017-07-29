@@ -1,4 +1,6 @@
-rm -f etc/resolv.conf
+# recolv_conf binds etc/resolv.conf
+rm -f etc/resolv.conf || exit 0
+
 # https://dns.yandex.ru
 tee etc/resolv.conf <<EOF
 nameserver 77.88.8.8
