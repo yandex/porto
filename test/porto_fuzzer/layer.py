@@ -9,17 +9,23 @@ VERBOSE=True
 
 def Import(conn, layerstr):
     tar = select_by_weight([ (1, ""), (3, TAR1), (3, TAR2) ])
-    if VERBOSE:    
+    if VERBOSE:
         print "Importing layer {} from {}".format(layerstr, tar)
     place = select_by_weight([ (1, None), (1, VOL_PLACE)])
-    conn.ImportLayer(layerstr, tar, **{"place" : place,})
+    try:
+        conn.ImportLayer(layerstr, tar, **{"place" : place,})
+    except porto.exceptions.NoSpace:
+        pass
 
 def Merge(conn, layerstr):
     tar = select_by_weight([ (1, ""), (3, TAR1), (3, TAR2) ])
     if VERBOSE:
         print "Merging layer {} from {}".format(layerstr, tar)
     place = select_by_weight([ (1, None), (1, VOL_PLACE)])
-    conn.MergeLayer(layerstr, tar, **{"place" : place,})
+    try:
+        conn.MergeLayer(layerstr, tar, **{"place" : place,})
+    except porto.exceptions.NoSpace:
+        pass
 
 def Remove(conn, layerstr):
     if VERBOSE:
