@@ -5,32 +5,32 @@ Porto
 
 # OVERVIEW #
 
-Porto is a Linux container management system, developed by Yandex.
-The main goal of Porto is to create a convenient, reliable interface over several
-Linux kernel mechanism such as cgroups, namespaces, mounts, networking etc.
-Porto is intended to be used as a base for building large infrastructure projects.
-Porto provides a protobuf-based interface via an Unix socket. C++, Python and Go APIs are included.
-A command line tool (portoctl) for managing Porto-containers is also provided.
+Porto is a yet another Linux container management system, developed by Yandex.
+The main goal is providing single entry point for several Linux subsystems
+such as cgroups, namespaces, mounts, networking, etc.
 
-Porto has the following key-features:
-* **Container hierarchies:** you can manage nested groups of containers, limit their
-aggregate resource usage and share resources between containers in a flexible manner.
-* **Container namespaces:** you can run any container-management software inside a container
-without any modifications.
-* **Flexible isolation:** you can control which resources are isolated. You can easily integrate
-Porto into your existing infrastructure.
+Key Features:
+* **Nested virtualization**   - containers could be put into containers
+* **Unified access**          - containers could use porto service too
+* **Flexible configuration**  - all container parameters are optional
+* **Reliable service**        - porto upgrades without restarting containers
+
+Porto is intended to be a base for large infrastructure projects.
+Container management software build on top of porto could be transparently
+enclosed inside porto container.
+
+Porto provides a protobuf interface via an Unix socket.
+Command line tool (portoctl) and C++, Python and Go APIs are included.
 
 # BUILDING #
 
-Install required dependecies
-
 ```
-$ aptitude install  libncurses5-dev libprotobuf-dev protobuf-compiler libnl-3-dev  libnl-route-3-dev 
+$ dpkg-buildpackage -b
+$ sudo dpkg -i ../yandex-porto_*.deb
 ```
-
-Build and install
-
+or
 ```
+$ sudo apt-get install protobuf-compiler libprotobuf-dev libnl-3-dev libnl-route-3-dev libncurses5-dev
 $ cmake .
 $ make
 $ make install DESTDIR=/usr/local
@@ -38,33 +38,14 @@ $ make install DESTDIR=/usr/local
 
 # RUNNING #
 
-Porto requires only Linux kernel 3.4+, although some functionality requires
-newer kernels (for instance, 3.18+ for OverlayFs) or even offstream patches.
+Porto requires Linux kernel 3.18 and optionally some offstream patches.
 
 ```
-$ sudo portod &
-$ portoctl run my_container command='echo "Hello, world!"'
-$ portoctl wait my_container
-$ portoctl get my_container stdout
-$ portoctl get my_container exit_status
-$ portoctl destroy my_container
-```
-or
-```
-$ portoctl exec my_container command='echo "Hello, world!"'
+$ sudo groupadd porto
+$ sudo sudo adduser $USER porto
+$ sudo portod start
+$ portoctl exec hello command='echo "Hello, world!"'
 ```
 
 # DOCUMENTATION #
-* [Quick start](docs/quick.md)
-* [Concepts](docs/concepts.md)
-* [Containers](docs/containers.md)
-* [Container namespaces](docs/namespaces.md)
-* [Container properties and data](docs/properties.md)
-* [Managing physical resources](docs/limits.md)
-* [Filesystem isolation](docs/mounts.md)
-* [Volumes](docs/volumes.md)
-* [Networking](docs/networking.md)
-* [C++ API](src/api/cpp/libporto.hpp)
-* [Python API](src/api/python/porto/api.py)
-* [Go API](src/api/go/porto.go)
-* [How to contribute?](docs/devel.md)
+* [Porto manpage](porto.md)
