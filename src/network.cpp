@@ -885,7 +885,6 @@ void TNetwork::DelProxyNeightbour(const std::vector<TNlAddr> &ips) {
 
 void TNetwork::RepairProxyNeightbour() {
     struct nl_cache *cache = nullptr;
-    struct nl_msg *msg = nullptr;
     auto sk = GetSock();
     TError error;
     int ret;
