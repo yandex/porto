@@ -12,21 +12,22 @@ porto - linux container management system
 
 # DESCRIPTION
 
-Porto is a yet another linux container management system, developed by Yandex.
+Porto is a yet another Linux container management system, developed by Yandex.
 
 The main goal is providing single entry point for several Linux subsystems
 such as cgroups, namespaces, mounts, networking, etc.
+Porto is intended to be a base for large infrastructure projects.
 
 ## Key Features
-* **Nested virtualization**   - containers could be put into containers
-* **Unified access**          - containers could use porto service too
+* **Nested containers**       - containers could be put into containers
+* **Nested virtualizaion**    - containers could use porto service too
 * **Flexible configuration**  - all container parameters are optional
 * **Reliable service**        - porto upgrades without restarting containers
 
 Container management software build on top of porto could be transparently
 enclosed inside porto container.
 
-Porto provides a protobuf interface via an **unix(7)** socket /run/portod.socket.  
+Porto provides a protobuf interface via an unix socket /run/portod.socket.
 
 Command line tool **portoctl** and C++, Python and Go APIs are included.
 
@@ -116,6 +117,12 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **ulimit** - resource limits, syntax: \<type\>: \[soft\]|unlimited \<hard\>|unlimited; ... see **getrlimit(2)**
 
+   Default ulimits could be set in portod.conf:
+```
+container { default_ulimit: "type: soft hard;..." }
+```
+   Hardcoded default is "core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M".
+
 * **virt\_mode** - virtualization mode:
     - *app* - (default) start command as normal process
     - *os* - start command as init process
@@ -132,7 +139,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **respawn\_count** - how many times container has been respawned (using respawn property)
 
-* **root\_pid** - main process pid
+* **root\_pid** - main process pid in client pid namespace (could be unreachable)
 
 * **stdout\[[offset\]\[:length\]]** - stdout text, see **stdout\_path**
     - stdout - get all available text
@@ -168,9 +175,13 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **thread\_limit**  - limit for **thread\_count**
 
+    For first level containers default is 10000.
+
 * **private** - 4k text to describe container
 
 * **weak** - if true container will be destroyed when client disconnects
+
+    Contianer must be created by special API call, client could clear **weak** flag after that.
 
 * **respawn** - restart container after death
 
@@ -246,7 +257,7 @@ Requests from host are executed in behalf or client task uid:gid.
 Requests from containers are executed in behalf of container's
 **owner\_user**:**owner\_group**.
 
-All users have read-only access to all visible containers.
+By defaut all users have read-only access to all visible containers.
 Visibility is controlled via **enable\_porto** and **porto\_namespace**.
 
 Write access have root user and users from group "porto".
@@ -282,7 +293,8 @@ Write access to container requires any of these conditions:
 * **bind** - bind mounts: \<source\> \<target\> \[ro|rw\];...
 
     This option creates new mount namespace and binds directories and files
-    from parent container mount namespace.
+    from parent container mount namespace. Bind mounts are invisible from
+    host or parent container and cannot be used for volumes.
 
 * **stdout\_path** - stdout file, default: internal rotated storage
 
@@ -298,13 +310,18 @@ Write access to container requires any of these conditions:
 
 * **stdout\_limit** - limits internal stdout/stderr storage, porto keeps tail bytes
 
+    Default is 8Mb, value limited with 1Gb.
+
 * **stderr\_path** - stderr file, default: internal rotated storage
 
     Same as **stdout\_path**.
 
 * **stdin\_path** - stdin file; default: "/dev/null"
 
-* **place** - places allowed for volumes and layers, syntax: \[default\]\[;mask;...\], default: /place;\*\*\*
+* **place** - places allowed for volumes and layers, syntax: \[default\]\[;mask;...\]
+
+    Default is "/place;\*\*\*" (use /place by deafault, allow any other),
+    for container with chroot default is "/place".
 
 Setting **bind**, **root**, **stdout\_path**, **stderr\_path** requires
 write permissions to the target or owning related volume.
@@ -477,6 +494,25 @@ container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 
 * **sysctl**         - sysctl configuration, syntax: \<sysctl\>: \<value\>;...
 
+    Porto allows to set only virtualized sysctls from hardcoded white-list.
+
+    Default values for network and ipc sysctls are the same as in host and
+    could be overriden in portod.conf:
+```
+container {
+    ipc_sysctl {
+        key: "sysctl"
+        val: "value"
+    },
+    ...
+    net_sysctl {
+        key: "sysctl"
+        val: "value"
+    },
+    ...
+}
+```
+
 * **net\_guarantee** - minimum egress bandwidth: \<interface\>|default: \<Bps\>;...
 
 * **net\_limit**     - maximum egress bandwidth: \<interface\>|default: \<Bps\>;...
@@ -504,6 +540,45 @@ container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 * **net\_tx\_drops** - device tx drops: \<interface\>: \<packets\>;...
 
 * **net\_tx\_packets** - device tx packets: \<interface\>: \<packets\>;...
+
+L3 network connects host and container netns with veth pair and configures
+routing in both directions. Also it adds neighbour/arp proxy entries to
+interfaces with addresses from the same network, this way container becomes
+reachable from the outside. This requires sysctl configuration:
+```
+net.ipv4.conf.all.forwarding = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv6.conf.all.proxy_ndp = 1
+```
+
+NAT network also requires configuration in iptables and in portod.conf:
+```
+network {
+    nat_first_ipv4: "*ip*"
+    nat_first_ipv6: "*ip*"
+    nat_count: *count*
+}
+```
+
+In new network namespaces porto setup **ip-addrlabel(8)** from portod.conf:
+```
+network {
+        proxy_ndp: false
+        addrlabel {
+                prefix: "ip/mask"
+                label: number
+        },
+        ...
+```
+
+Porto setup **tc-hfsc(8)** scheduler for all interfaces except listed in
+portod.conf as unmanaeged:
+```
+network {
+    unmanaged_device: "name"
+    unmanaged_group: "group"
+}
+```
 
 # CGROUPS
 
