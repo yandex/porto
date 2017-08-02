@@ -153,6 +153,7 @@ message TCfg {
 		optional string default_place = 8 [deprecated=true];
 		optional uint64 max_total = 9;
 		optional string place_load_limit = 10;
+		optional bool direct_io_loop = 11;
 	}
 
 	message TCoreCfg {

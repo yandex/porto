@@ -75,6 +75,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_default_thread_limit(10000);
 
     config().mutable_volumes()->set_enable_quota(true);
+    config().mutable_volumes()->set_direct_io_loop(true);
     config().mutable_volumes()->set_max_total(3000);
     config().mutable_volumes()->set_place_load_limit("default: 2; /ssd: 4");
 
