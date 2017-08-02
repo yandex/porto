@@ -619,6 +619,7 @@ Like for container volume configuration is a set of key-value pairs.
     - *quota*     - project quota for volume path
     - *native*    - bind mount **storage** to volume path and setup project quota
     - *overlay*   - mount overlayfs and optional project quota for upper layer
+    - *squash*    - overlayfs and quota on top of squashfs image set in **layers**
     - *loop*      - create and mount ext4 image **storage**/loop.img or **storage** if this's file
     - *rbd*       - map and mount ext4 image from caph rbd **storage**="id@pool/image"
 
@@ -654,7 +655,9 @@ Like for container volume configuration is a set of key-value pairs.
     - */path*     - path to layer directory
     - *name*      - name of layer in internal storage, see [Volume Layers]
 
-    Backend overlayfs use layers directly, other copy data during construction.
+    Backend *overlay* use layers directly, other copy data during construction.
+
+    Backend *squash* expects here path to a single squashfs image.
 
 * **place**         - place for layers and default storage
 

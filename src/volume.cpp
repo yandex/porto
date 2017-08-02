@@ -1979,7 +1979,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
-    { V_BACKEND,     "plain|bind|tmpfs|quota|native|overlay|loop|rbd (default - autodetect)", false },
+    { V_BACKEND,     "plain|bind|tmpfs|quota|native|overlay|squash|loop|rbd (default - autodetect)", false },
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_PRIVATE,     "user-defined property", false },
