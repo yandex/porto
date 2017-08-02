@@ -176,7 +176,7 @@ public:
 
             auto path = TPath(layer).RealPath();
 
-            if (path.IsDirectoryFollow()) {
+            if (path.IsDirectoryFollow() || VolumeBackend == "squash") {
                 VolumeLayers.push_back(path.ToString());
             } else if (path.IsRegularFollow()) {
                 std::string id;

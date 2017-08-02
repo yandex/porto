@@ -732,6 +732,122 @@ err:
     }
 };
 
+/* TVolumeSquashBackend - loop + squashfs + overlayfs + quota */
+
+class TVolumeSquashBackend : public TVolumeBackend {
+public:
+
+    TError Configure() override {
+        if (!TVolumeOverlayBackend::Supported())
+            return TError(EError::NotSupported, "overlay not supported");
+
+        if (Volume->Layers.size() != 1)
+            return TError(EError::InvalidProperty, "Backend squash requires one image in layers");
+
+        if (!config().volumes().enable_quota() && Volume->HaveQuota())
+            return TError(EError::InvalidProperty, "project quota is disabled");
+
+        return TError::Success();
+    }
+
+    TError Build() override {
+        TProjectQuota quota(Volume->StoragePath);
+        TFile lowerFd, upperFd, workFd;
+        TError error;
+        TPath lower;
+
+        lower = Volume->GetInternal("lower");
+        error = lower.Mkdir(0755);
+        if (error)
+            return error;
+
+        error = lowerFd.OpenRead(Volume->Layers[0]);
+        if (error)
+            return error;
+
+        error = Volume->StorageFd.MkdirAt("upper", 0755);
+        if (!error)
+            Volume->KeepStorage = false; /* New storage */
+
+        error = upperFd.WalkStrict(Volume->StorageFd, "upper");
+        if (error)
+            return error;
+
+        (void)Volume->StorageFd.MkdirAt("work", 0755);
+
+        error = workFd.WalkStrict(Volume->StorageFd, "work");
+        if (error)
+            return error;
+
+        error = workFd.ClearDirectory();
+        if (error)
+            return error;
+
+        error = SetupLoopDev(lowerFd, Volume->Layers[0], Volume->Device);
+        if (error)
+            return error;
+
+        error = lower.Mount("/dev/loop" + std::to_string(Volume->Device),
+                            "squashfs", MS_RDONLY | MS_NODEV | MS_NOSUID, {});
+        if (error)
+            goto err;
+
+        if (Volume->HaveQuota()) {
+            quota.SpaceLimit = Volume->SpaceLimit;
+            quota.InodeLimit = Volume->InodeLimit;
+            L_ACT("Creating project quota: {} bytes: {} inodes: {}",
+                  quota.Path, quota.SpaceLimit, quota.InodeLimit);
+            error = quota.Create();
+            if (error)
+                  goto err;
+        }
+
+        error = Volume->InternalPath.Mount("overlay", "overlay",
+                                   Volume->GetMountFlags(),
+                                   { "lowerdir=" + lower.ToString(),
+                                     "upperdir=" + upperFd.ProcPath().ToString(),
+                                     "workdir=" + workFd.ProcPath().ToString() });
+        if (!error)
+            return error;
+
+err:
+        if (Volume->HaveQuota())
+            (void)quota.Destroy();
+        if (Volume->Device >= 0) {
+            lower.UmountAll();
+            PutLoopDev(Volume->Device);
+            Volume->Device = -1;
+        }
+        return error;
+    }
+
+    TError Destroy() override {
+        if (Volume->Device >= 0) {
+            Volume->InternalPath.UmountAll();
+            Volume->GetInternal("lower").UmountAll();
+            PutLoopDev(Volume->Device);
+            Volume->Device = -1;
+        }
+        return TError::Success();
+    }
+
+    TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        TProjectQuota quota(Volume->StoragePath);
+
+        quota.SpaceLimit = space_limit;
+        quota.InodeLimit = inode_limit;
+        if (!Volume->HaveQuota()) {
+            L_ACT("Creating project quota: {}", quota.Path);
+            return quota.Create();
+        }
+        L_ACT("Resizing project quota: {}", quota.Path);
+        return quota.Resize();
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->InternalPath.StatFS(result);
+    }
+};
 
 /* TVolumeRbdBackend - ext4 in ceph rados block device */
 
@@ -874,6 +990,8 @@ TError TVolume::OpenBackend() {
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeOverlayBackend());
     else if (BackendType == "loop")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLoopBackend());
+    else if (BackendType == "squash")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeSquashBackend());
     else if (BackendType == "rbd")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend());
     else
@@ -1176,12 +1294,12 @@ TError TVolume::Configure(const TStringMap &cfg) {
         }
         if (!layer.Exists())
             return TError(EError::LayerNotFound, "Layer not found");
-        if (!layer.IsDirectoryFollow())
+        if (!layer.IsDirectoryFollow() && BackendType != "squash")
             return TError(EError::InvalidValue, "Layer must be a directory");
         /* Permissions will be cheked during build */
     }
 
-    if (HaveLayers() && BackendType != "overlay") {
+    if (HaveLayers() && BackendType != "overlay" && BackendType != "squash") {
         if (IsReadOnly)
             return TError(EError::InvalidValue, "Cannot copy layers to read-only volume");
     }
@@ -1303,7 +1421,7 @@ TError TVolume::Build() {
     if (error)
         return error;
 
-    if (HaveLayers() && BackendType != "overlay") {
+    if (HaveLayers() && BackendType != "overlay" && BackendType != "squash") {
 
         L_ACT("Merge layers into volume: {}", Path);
 
