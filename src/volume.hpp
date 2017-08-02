@@ -84,7 +84,7 @@ public:
     bool IsReady = false;
     bool IsDying = false;
 
-    int LoopDev = -1;
+    int Device = -1;
     bool IsReadOnly = false;
 
     std::vector<std::string> Layers;
@@ -167,6 +167,11 @@ public:
                BackendType == "quota";
     }
 
+    /* Backend storage could be a regular file */
+    bool FileStorage(void) const {
+        return BackendType == "loop";
+    }
+
     bool HaveLayers(void) const {
         return !Layers.empty();
     }
@@ -196,3 +201,5 @@ extern TPath VolumesKV;
 static inline std::unique_lock<std::mutex> LockVolumes() {
     return std::unique_lock<std::mutex>(VolumesMutex);
 }
+
+extern TError PutLoopDev(const int loopNr); /* Legacy */

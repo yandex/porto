@@ -8,4 +8,3 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
 TError CopyRecursive(const TPath &src, const TPath &dst);
 TError ClearRecursive(const TPath &path);
 TError RemoveRecursive(const TPath &path);
-TError ResizeLoopDev(int loopNr, const TPath &image, off_t current, off_t target);

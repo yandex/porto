@@ -23,7 +23,6 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
-#include "util/loop.hpp"
 #include "client.hpp"
 #include "filesystem.hpp"
 

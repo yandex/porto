@@ -9,7 +9,6 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/quota.hpp"
-#include "util/loop.hpp"
 #include "config.hpp"
 #include "kvalue.hpp"
 #include "helpers.hpp"
@@ -19,10 +18,13 @@
 extern "C" {
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <sys/mount.h>
 #include <linux/falloc.h>
+#include <linux/kdev_t.h>
+#include <linux/loop.h>
 }
 
 TPath VolumesKV;
@@ -321,21 +323,74 @@ public:
     }
 };
 
+static TError SetupLoopDev(const TFile &file, const TPath &path, int &loopNr) {
+    static std::mutex BigLoopLock;
+    TFile ctl, dev;
+    struct loop_info64 info;
+    int nr, retry = 10;
+    TError error;
+
+    error = ctl.OpenReadWrite("/dev/loop-control");
+    if (error)
+        return error;
+
+    auto lock = std::unique_lock<std::mutex>(BigLoopLock);
+
+again:
+    nr = ioctl(ctl.Fd, LOOP_CTL_GET_FREE);
+    if (nr < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
+
+    error = dev.OpenReadWrite("/dev/loop" + std::to_string(nr));
+    if (error)
+        return error;
+
+    if (ioctl(dev.Fd, LOOP_SET_FD, file.Fd) < 0) {
+        if (errno == EBUSY) {
+            if (!ioctl(dev.Fd, LOOP_GET_STATUS64, &info) || errno == ENXIO) {
+                if (--retry > 0)
+                    goto again;
+            }
+        }
+        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
+    }
+
+    memset(&info, 0, sizeof(info));
+    strncpy((char *)info.lo_file_name, path.c_str(), LO_NAME_SIZE - 1);
+
+    if (ioctl(dev.Fd, LOOP_SET_STATUS64, &info) < 0) {
+        error = TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
+        (void)ioctl(dev.Fd, LOOP_CLR_FD, 0);
+        return error;
+    }
+
+    loopNr = nr;
+    return error;
+}
+
+TError PutLoopDev(const int loopNr) {
+    TFile loop;
+    TError error = loop.OpenReadWrite("/dev/loop" + std::to_string(loopNr));
+    if (!error && ioctl(loop.Fd, LOOP_CLR_FD, 0) < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
+    return error;
+}
+
 /* TVolumeLoopBackend - ext4 image + loop device */
 
 class TVolumeLoopBackend : public TVolumeBackend {
-    int LoopDev = -1;
+    static constexpr const char *AutoImage = "loop.img";
 
 public:
 
-    TPath Image(const TPath &storage) {
+    static TPath ImagePath(const TPath &storage) {
         if (storage.IsRegularFollow())
             return storage;
-        return storage / "loop.img";
+        return storage / AutoImage;
     }
 
     TError Configure() override {
-        TPath image = Image(Volume->StoragePath);
+        TPath image = ImagePath(Volume->StoragePath);
 
         if (!image.Exists() && !Volume->SpaceLimit)
             return TError(EError::InvalidProperty,
@@ -347,7 +402,7 @@ public:
                 auto other = it.second;
                 if (other->BackendType != "loop" ||
                         (other->IsReadOnly && Volume->IsReadOnly) ||
-                        !image.IsSameInode(Image(other->StoragePath)))
+                        !image.IsSameInode(ImagePath(other->StoragePath)))
                     continue;
                 return TError(EError::Busy, "Storage already used by volume " + other->Path.ToString());
             }
@@ -357,136 +412,128 @@ public:
     }
 
     TPath GetLoopDevice() {
-        if (LoopDev < 0)
+        if (Volume->Device < 0)
             return TPath();
-        return TPath("/dev/loop" + std::to_string(LoopDev));
+        return TPath("/dev/loop" + std::to_string(Volume->Device));
     }
 
-    TError Save() override {
-        Volume->LoopDev = LoopDev;
-
-        return TError::Success();
-    }
-
-    TError Restore() override {
-        LoopDev = Volume->LoopDev;
-
-        return TError::Success();
-    }
-
-    static TError MakeImage(const TPath &path, off_t size, off_t guarantee) {
+    static TError MakeImage(TFile &file, TPath &path, off_t size, off_t guarantee) {
         TError error;
-        TFile image;
 
-        error = image.CreateNew(path, 0644);
-        if (error)
-            return error;
+        L_ACT("Allocate loop image with size {} guarantee {}", size, guarantee);
 
-        if (ftruncate(image.Fd, size)) {
-            error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
-            goto remove_file;
-        }
+        if (ftruncate(file.Fd, size))
+            return TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
 
-        if (guarantee && fallocate(image.Fd, FALLOC_FL_KEEP_SIZE, 0, guarantee)) {
-            error = TError(EError::ResourceNotAvailable, errno,
+        if (guarantee && fallocate(file.Fd, FALLOC_FL_KEEP_SIZE, 0, guarantee))
+            return TError(EError::ResourceNotAvailable, errno,
                            "cannot fallocate guarantee " + std::to_string(guarantee));
-            goto remove_file;
-        }
 
-        image.Close();
-
-        error = RunCommand({ "mkfs.ext4", "-q", "-F", "-m", "0", "-E", "nodiscard",
-                             "-O", "^has_journal", path.ToString()}, path.DirName());
-        if (error)
-            goto remove_file;
-
-        return TError::Success();
-
-remove_file:
-        TError error2 = path.Unlink();
-        if (error2)
-            L_WRN("Cannot cleanup loop image: {}", error2);
-        return error;
+        return RunCommand({ "mkfs.ext4", "-q", "-F", "-m", "0", "-E", "nodiscard",
+                            "-O", "^has_journal", path.ToString()}, path.DirName());
     }
 
-    static TError ResizeImage(const TPath &image, off_t current, off_t target) {
+    static TError ResizeImage(const TFile &file, const TPath &path,
+                              off_t current, off_t target) {
         std::string size = std::to_string(target >> 10) + "K";
         TError error;
 
-        if (current < target) {
-            error = image.Truncate(target);
-            if (error)
-                return error;
-        }
+        if (current < target && ftruncate(file.Fd, target))
+            return TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
 
-        error = RunCommand({"resize2fs", "-f", image.ToString(), size},
-                           image.DirName().ToString());
+        error = RunCommand({"resize2fs", "-f", path.ToString(), size},
+                           path.DirName().ToString());
 
-        if (!error && current > target)
-            error = image.Truncate(target);
+        if (!error && current > target && ftruncate(file.Fd, target))
+            error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
 
         return error;
     }
 
-    TError Build() override {
-        TPath image = Image(Volume->StoragePath);
+    static TError ResizeLoopDev(int loopNr, const TPath &image, off_t current, off_t target) {
+        auto path = "/dev/loop" + std::to_string(loopNr);
+        auto size = std::to_string(target >> 10) + "K";
         TError error;
+        TFile dev;
 
-        if (!image.Exists()) {
-            L_ACT("Allocate loop image with size {} guarantee {}",
-                  Volume->SpaceLimit, Volume->SpaceGuarantee);
+        if (target < current)
+            return TError(EError::NotSupported, "Online shrink is not supported yet");
 
-            Volume->KeepStorage = false; /* New storage */
-            error = MakeImage(image, Volume->SpaceLimit, Volume->SpaceGuarantee);
-            if (error)
-                return error;
+        error = dev.OpenReadWrite(path);
+        if (error)
+            return error;
 
+        error = image.Truncate(target);
+        if (error)
+            return error;
+
+        if (ioctl(dev.Fd, LOOP_SET_CAPACITY, 0) < 0)
+            return TError(EError::Unknown, errno, "ioctl(LOOP_SET_CAPACITY)");
+
+        return RunCommand({"resize2fs", path, size}, "/");
+    }
+
+    TError Build() override {
+        TPath path = ImagePath(Volume->StoragePath);
+        struct stat st;
+        TError error;
+        TFile file;
+
+        if (!Volume->StorageFd.Stat(st) && S_ISREG(st.st_mode)) {
+            error = file.Dup(Volume->StorageFd);
+        } else if (!Volume->StorageFd.StatAt(AutoImage, true, st) && S_ISREG(st.st_mode)) {
+            error = file.OpenAt(Volume->StorageFd, AutoImage,
+                                (Volume->IsReadOnly ? O_RDONLY : O_RDWR) |
+                                O_CLOEXEC | O_NOCTTY, 0);
         } else {
-            struct stat st;
+            error = file.OpenAt(Volume->StorageFd, AutoImage,
+                                O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
+            if (!error) {
+                Volume->KeepStorage = false; /* New storage */
+                error = MakeImage(file, path, Volume->SpaceLimit, Volume->SpaceGuarantee);
+                if (error)
+                    Volume->StorageFd.UnlinkAt(AutoImage);
+            }
+            if (!error)
+                error = file.Stat(st);
+        }
+        if (error)
+            return error;
 
-            error = image.StatFollow(st);
+        if (!Volume->SpaceLimit) {
+            Volume->SpaceLimit = st.st_size;
+        } else if (!Volume->IsReadOnly && (uint64_t)st.st_size != Volume->SpaceLimit) {
+            error = ResizeImage(file, path, st.st_size, Volume->SpaceLimit);
             if (error)
                 return error;
-
-            if (!Volume->SpaceLimit) {
-                Volume->SpaceLimit = st.st_size;
-
-            } else if ((uint64_t)st.st_size != Volume->SpaceLimit) {
-                error = ResizeImage(image, st.st_size, Volume->SpaceLimit);
-                if (error)
-                    return error;
-            }
         }
 
-        error = SetupLoopDev(LoopDev, image, Volume->IsReadOnly);
+        error = SetupLoopDev(file, path, Volume->Device);
         if (error)
             return error;
 
         error = Volume->InternalPath.Mount(GetLoopDevice(), "ext4",
                                            Volume->GetMountFlags(), {});
-        if (error)
-            goto free_loop;
+        if (error) {
+            PutLoopDev(Volume->Device);
+            Volume->Device = -1;
+        }
 
-        return TError::Success();
-
-free_loop:
-        PutLoopDev(LoopDev);
-        LoopDev = -1;
         return error;
     }
 
     TError Destroy() override {
         TPath loop = GetLoopDevice();
 
-        if (LoopDev < 0)
+        if (Volume->Device < 0)
             return TError::Success();
 
         L_ACT("Destroy loop {}", loop);
         TError error = Volume->InternalPath.UmountAll();
-        TError error2 = PutLoopDev(LoopDev);
+        TError error2 = PutLoopDev(Volume->Device);
         if (!error)
             error = error2;
-        LoopDev = -1;
+        Volume->Device = -1;
         return error;
     }
 
@@ -497,7 +544,7 @@ free_loop:
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
         (void)inode_limit;
-        return ResizeLoopDev(LoopDev, Image(Volume->StoragePath),
+        return ResizeLoopDev(Volume->Device, ImagePath(Volume->StoragePath),
                              Volume->SpaceLimit, space_limit);
     }
 
@@ -685,26 +732,12 @@ err:
 /* TVolumeRbdBackend - ext4 in ceph rados block device */
 
 class TVolumeRbdBackend : public TVolumeBackend {
-    int DeviceIndex = -1;
-
 public:
 
     std::string GetDevice() {
-        if (DeviceIndex < 0)
+        if (Volume->Device < 0)
             return "";
-        return "/dev/rbd" + std::to_string(DeviceIndex);
-    }
-
-    TError Save() override {
-        Volume->LoopDev = DeviceIndex;
-
-        return TError::Success();
-    }
-
-    TError Restore() override {
-        DeviceIndex = Volume->LoopDev;
-
-        return TError::Success();
+        return "/dev/rbd" + std::to_string(Volume->Device);
     }
 
     TError MapDevice(std::string id, std::string pool, std::string image,
@@ -755,7 +788,7 @@ public:
             return TError(EError::InvalidValue, "not rbd device: " + device);
         }
 
-        error = StringToInt(device.substr(8), DeviceIndex);
+        error = StringToInt(device.substr(8), Volume->Device);
         if (error) {
             UnmapDevice(device);
             return error;
@@ -772,14 +805,14 @@ public:
         std::string device = GetDevice();
         TError error, error2;
 
-        if (DeviceIndex < 0)
+        if (Volume->Device < 0)
             return TError::Success();
 
         error = Volume->InternalPath.UmountAll();
         error2 = UnmapDevice(device);
         if (!error)
             error = error2;
-        DeviceIndex = -1;
+        Volume->Device = -1;
         return error;
     }
 
@@ -1190,8 +1223,7 @@ TError TVolume::Build() {
             return error;
     }
 
-    /* loop allows file storage */
-    if (BackendType == "loop" && UserStorage() && StoragePath.IsRegularFollow()) {
+    if (FileStorage() && UserStorage() && StoragePath.IsRegularFollow()) {
         if (IsReadOnly)
             error = StorageFd.OpenRead(StoragePath);
         else
@@ -1773,7 +1805,7 @@ TError TVolume::Save() {
     node.Set(V_READY, BoolToString(IsReady));
     node.Set(V_PRIVATE, Private);
     node.Set(V_RAW_CONTAINERS, MergeEscapeStrings(Containers, ';'));
-    node.Set(V_LOOP_DEV, std::to_string(LoopDev));
+    node.Set(V_LOOP_DEV, std::to_string(Device));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
     node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
     node.Set(V_SPACE_LIMIT, std::to_string(SpaceLimit));
@@ -2164,7 +2196,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
         } else if (prop.first == V_CONTAINERS) {
 
         } else if (prop.first == V_LOOP_DEV) {
-            error = StringToInt(prop.second, LoopDev);
+            error = StringToInt(prop.second, Device);
             if (error)
                 return error;
 

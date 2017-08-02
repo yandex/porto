@@ -11,7 +11,6 @@
 #include "util/netlink.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/loop.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 #include "protobuf.hpp"
@@ -3559,87 +3558,6 @@ static void TestUlimitProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestVirtModeProperty(Porto::Connection &api) {
-    std::string name = "lxc";
-
-    Say() << "Check that we can't start without loop" << std::endl;
-
-    std::map<std::string, std::string> expected = {
-        { "command", "/sbin/init" },
-        { "stdin_path", "/dev/null" },
-        { "stdout_path", "/dev/null" },
-        { "stderr_path", "/dev/null" },
-        { "net", "none" },
-        { "isolate", "true" },
-        { "bind_dns", "false" },
-        { "bind", "" },
-        { "cwd", "/" },
-        { "devices", "" },
-        { "capabilities", "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_BOOT;MKNOD;AUDIT_WRITE;SETFCAP" },
-    };
-    std::string s;
-
-    AsBob(api);
-    ExpectApiSuccess(api.Create(name));
-    ExpectApiFailure(api.SetProperty(name, "virt_mode", "invalid"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
-    ExpectApiSuccess(api.SetProperty(name, "memory_limit", "1G"));
-
-    Say() << "Check credentials and default roolback" << std::endl;
-
-    TPath tmpdir = "/tmp/portotest.dir";
-    TPath tmpimg = "/tmp/portotest.img";
-
-    std::string cmd = std::string("dd if=/dev/zero of=") + tmpimg.ToString() + " bs=1 count=1 seek=128M && mkfs.ext4 -F -F " + tmpimg.ToString();
-
-    ExpectEq(system(cmd.c_str()), 0);
-
-    tmpdir.RemoveAll();
-    ExpectSuccess(tmpdir.MkdirAll(0755));
-
-    int nr;
-    AsRoot(api);
-    TError error = SetupLoopDev(nr, tmpimg, false);
-    if (error)
-        throw error.GetMsg();
-    AsBob(api);
-
-    try {
-        AsRoot(api);
-        ExpectSuccess(tmpdir.Mount("/dev/loop" + std::to_string(nr), "ext4", 0, {}));
-        AsBob(api);
-
-        ExpectApiSuccess(api.SetProperty(name, "root", tmpimg.ToString()));
-
-        AsRoot(api);
-        BootstrapCommand("/usr/bin/id", tmpdir.ToString());
-        cmd = std::string("mkdir ") + tmpdir.ToString() + "/sbin";
-        ExpectEq(system(cmd.c_str()), 0);
-        cmd = std::string("mv ") + tmpdir.ToString() + "/id " + tmpdir.ToString() + "/sbin/init";
-        ExpectEq(system(cmd.c_str()), 0);
-        (void)tmpdir.Umount(0);
-        (void)PutLoopDev(nr);
-        AsBob(api);
-    } catch (...) {
-        AsRoot(api);
-        (void)tmpdir.Umount(0);
-        (void)PutLoopDev(nr);
-        ExpectApiSuccess(api.Destroy(name));
-        tmpdir.RemoveAll();
-        throw;
-    }
-
-    ExpectApiSuccess(api.Start(name));
-    WaitContainer(api, name);
-
-    for (auto kv : expected) {
-        ExpectApiSuccess(api.GetProperty(name, kv.first, s));
-        ExpectEq(s, kv.second);
-    }
-    ExpectApiSuccess(api.Destroy(name));
-    tmpdir.RemoveAll();
-}
-
 static void TestAlias(Porto::Connection &api) {
     if (!KernelSupports(KernelFeature::LOW_LIMIT))
         return;
@@ -5262,7 +5180,6 @@ int SelfTest(std::vector<std::string> args) {
         { "enable_porto_property", TestEnablePortoProperty },
         { "limits", TestLimits },
         { "ulimit_property", TestUlimitProperty },
-        { "virt_mode_property", TestVirtModeProperty },
         { "alias", TestAlias },
         { "dynamic", TestDynamic },
         { "permissions", TestPermissions },
