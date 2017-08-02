@@ -23,6 +23,10 @@ static void NetSysctl(const std::string &key, const std::string &val)
 void TConfig::LoadDefaults() {
     config().Clear();
 
+    std::string version;
+    if (!GetSysctl("kernel.osrelease", version))
+        config().set_linux_version(version);
+
     config().mutable_log()->set_verbose(false);
 
     config().set_keyvalue_limit(1 << 20);
@@ -75,7 +79,10 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_default_thread_limit(10000);
 
     config().mutable_volumes()->set_enable_quota(true);
-    config().mutable_volumes()->set_direct_io_loop(true);
+
+    if (CompareVersions(config().linux_version(), "4.4") >= 0)
+        config().mutable_volumes()->set_direct_io_loop(true);
+
     config().mutable_volumes()->set_max_total(3000);
     config().mutable_volumes()->set_place_load_limit("default: 2; /ssd: 4");
 

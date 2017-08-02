@@ -1468,6 +1468,11 @@ static bool SanityCheck() {
         return EXIT_FAILURE;
     }
 
+    if (CompareVersions(config().linux_version(), "3.18") < 0) {
+        std::cerr << "Require Linux >= 3.18\n";
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
 
