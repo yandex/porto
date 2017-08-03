@@ -1083,7 +1083,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "Uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
 
     AddColumn(TColumn("container", "Container name",
-              TPortoValue(Cache, ContainerTree, "", ValueFlags::Container), true, false));
+              TPortoValue(Cache, ContainerTree, "absolute_name", ValueFlags::Container), true, false));
 
     AddColumn("state", "state", "Current state");
     AddColumn("time", "time s", "Time elapsed since start or death");

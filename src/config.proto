@@ -63,6 +63,7 @@ message TCfg {
 
 	message TLogCfg {
 		optional bool verbose = 1;
+		optional bool debug = 2;
 	}
 
 	message TKeyvalCfg {

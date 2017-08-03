@@ -1121,7 +1121,9 @@ static int UpgradeMaster() {
     std::vector<const char *> args = {PORTO_BINARY_PATH};
     if (stdlog)
         args.push_back("--stdlog");
-    if (Verbose)
+    if (Debug)
+        args.push_back("--debug");
+    else if (Verbose)
         args.push_back("--verbose");
     args.push_back(nullptr);
 
@@ -1702,6 +1704,7 @@ static void Usage() {
         << "  --stdlog        print log into stdout" << std::endl
         << "  --norespawn     exit after failure" << std::endl
         << "  --verbose       verbose logging" << std::endl
+        << "  --debug         debug logging" << std::endl
         << "  --discard       discard state after start" << std::endl
         << std::endl
         << "Commands: " << std::endl
@@ -1739,6 +1742,8 @@ int main(int argc, char **argv) {
             stdlog = true;
         else if (arg == "--verbose")
             Verbose = true;
+        else if (arg == "--debug")
+            Verbose = Debug = true;
         else if (arg == "--norespawn")
             respawnSlave = false;
         else if (arg == "--slave")

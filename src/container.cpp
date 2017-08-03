@@ -148,7 +148,7 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
 
 /* lock subtree for read or write */
 TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
-    if (Verbose)
+    if (Debug)
         L("{} {} {}:{}",
           (try_lock ? "TryLock" : "Lock"),
           (for_read ? "read" : "write"),
@@ -156,7 +156,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
 
     while (1) {
         if (State == EContainerState::Destroyed) {
-            if (Verbose)
+            if (Debug)
                 L("Lock failed, container {}:{} was destroyed", Id, Name);
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
@@ -170,7 +170,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
         if (!busy)
             break;
         if (try_lock) {
-            if (Verbose)
+            if (Debug)
                 L("TryLock {} Failed {}:{}", (for_read ? "read" : "write"), Id, Name);
             return TError(EError::Busy, "Container is busy: " + Name);
         }
@@ -194,7 +194,7 @@ void TContainer::DowngradeLock() {
     auto lock = LockContainers();
     PORTO_ASSERT(Locked == -1);
 
-    if (Verbose)
+    if (Debug)
         L("Downgrading write to read {}:{}", Id, Name);
 
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
@@ -209,7 +209,7 @@ void TContainer::DowngradeLock() {
 void TContainer::UpgradeLock() {
     auto lock = LockContainers();
 
-    if (Verbose)
+    if (Debug)
         L("Upgrading read back to write {}:{}", Id, Name);
 
     PendingWrite = true;
@@ -229,7 +229,7 @@ void TContainer::UpgradeLock() {
 }
 
 void TContainer::Unlock(bool locked) {
-    if (Verbose)
+    if (Debug)
         L("Unlock {} {}:{}", (Locked > 0 ? "read" : "write"), Id, Name);
     if (!locked)
         ContainersMutex.lock();

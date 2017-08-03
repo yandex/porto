@@ -154,7 +154,8 @@ void TConfig::Load() {
     if (!LoadFile("/etc/portod.conf"))
         LoadFile("/etc/default/portod.conf");
 
-    Verbose |= config().log().verbose();
+    Debug |= config().log().debug();
+    Verbose |= Debug | config().log().verbose();
 
     InitCred();
     InitCapabilities();

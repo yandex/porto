@@ -1308,7 +1308,7 @@ void TNetwork::SyncStatLocked() {
     auto curTime = GetCurrentTimeMs();
     auto curGen = GlobalStatGen.load();
 
-    if (Verbose)
+    if (Debug)
         L("Sync network {} statistics generation {} after {} ms",
           NetName, (unsigned)curGen, curTime - StatTime);
 

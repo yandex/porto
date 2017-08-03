@@ -13,6 +13,7 @@
 #define PORTO_LOCKED(mutex) do { if (mutex.try_lock()) porto_assert(#mutex " not locked", __LINE__, __FILE__); } while(0)
 
 extern bool Verbose;
+extern bool Debug;
 
 enum ELogLevel {
     LOG_NOTICE = 0,

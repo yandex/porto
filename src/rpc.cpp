@@ -76,20 +76,20 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
 
         return ret;
     } else if (req.has_createvolume()) {
-        std::string ret = "volumeAPI: create " + req.createvolume().path();
+        std::string ret = "create volume " + req.createvolume().path();
         for (auto p: req.createvolume().properties())
             ret += " " + p.name() + "=" + p.value();
         return ret;
     } else if (req.has_linkvolume())
-        return "volumeAPI: link " + req.linkvolume().path() + " to " +
+        return "link volume " + req.linkvolume().path() + " to " +
                                     req.linkvolume().container();
     else if (req.has_unlinkvolume())
-        return "volumeAPI: unlink " + req.unlinkvolume().path() + " from " +
+        return "unlink volume " + req.unlinkvolume().path() + " from " +
                                       req.unlinkvolume().container();
     else if (req.has_listvolumes())
-        return "volumeAPI: list volumes";
+        return "list volumes";
     else if (req.has_tunevolume()) {
-        std::string ret = "volumeAPI: tune " + req.tunevolume().path();
+        std::string ret = "tune volume " + req.tunevolume().path();
         for (auto p: req.tunevolume().properties())
             ret += " " + p.name() + "=" + p.value();
         return ret;
@@ -109,116 +109,61 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
 }
 
 static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
-    switch (resp.error()) {
-    case EError::Success:
-    {
-        std::string ret;
+    std::string ret;
 
-        if (resp.has_list()) {
-            for (int i = 0; i < resp.list().name_size(); i++)
-                ret += resp.list().name(i) + " ";
-        } else if (resp.has_propertylist()) {
-            for (int i = 0; i < resp.propertylist().list_size(); i++)
-                ret += resp.propertylist().list(i).name()
-                    + " (" + resp.propertylist().list(i).desc() + ")";
-        } else if (resp.has_datalist()) {
-            for (int i = 0; i < resp.datalist().list_size(); i++)
-                ret += resp.datalist().list(i).name()
-                    + " (" + resp.datalist().list(i).desc() + ")";
-        } else if (resp.has_volumelist()) {
-            for (auto v: resp.volumelist().volumes())
-                ret += v.path() + " ";
-        } else if (resp.has_getproperty()) {
-            ret = resp.getproperty().value();
-        } else if (resp.has_getdata()) {
-            ret = resp.getdata().value();
-        } else if (resp.has_get()) {
-            for (int i = 0; i < resp.get().list_size(); i++) {
-                auto entry = resp.get().list(i);
+    if (resp.error()) {
+        ret = fmt::format("Error: {}:{}({})", resp.error(),
+                          rpc::EError_Name(resp.error()), resp.errormsg());
+    } else if (resp.has_list()) {
+        for (int i = 0; i < resp.list().name_size(); i++)
+            ret += resp.list().name(i) + " ";
+    } else if (resp.has_propertylist()) {
+        for (int i = 0; i < resp.propertylist().list_size(); i++)
+            ret += resp.propertylist().list(i).name()
+                + " (" + resp.propertylist().list(i).desc() + ")";
+    } else if (resp.has_datalist()) {
+        for (int i = 0; i < resp.datalist().list_size(); i++)
+            ret += resp.datalist().list(i).name()
+                + " (" + resp.datalist().list(i).desc() + ")";
+    } else if (resp.has_volumelist()) {
+        for (auto v: resp.volumelist().volumes())
+            ret += v.path() + " ";
+    } else if (resp.has_getproperty()) {
+        ret = resp.getproperty().value();
+    } else if (resp.has_getdata()) {
+        ret = resp.getdata().value();
+    } else if (resp.has_get()) {
+        for (int i = 0; i < resp.get().list_size(); i++) {
+            auto entry = resp.get().list(i);
 
-                if (ret.length())
-                    ret += "; ";
-                ret += entry.name() + ":";
+            if (ret.length())
+                ret += "; ";
+            ret += entry.name() + ":";
 
-                for (int j = 0; j < entry.keyval_size(); j++)
-                    if (entry.keyval(j).has_error())
-                        ret += " " + entry.keyval(j).variable() + "=" + std::to_string(entry.keyval(j).error()) + "?";
-                    else if (entry.keyval(j).has_value())
-                        ret += " " + entry.keyval(j).variable() + "=" + entry.keyval(j).value();
+            for (int j = 0; j < entry.keyval_size(); j++) {
+                auto &val = entry.keyval(j);
+                ret += " " + val.variable() + "=";
+                if (val.has_error())
+                    ret += fmt::format("{}:{}({})", val.error(),
+                                       rpc::EError_Name(val.error()),
+                                       val.errormsg());
+                else if (val.has_value())
+                    ret += val.value();
             }
-        } else if (resp.has_version()) {
-            ret = resp.version().tag() + " #" + resp.version().revision();
-        } else if (resp.has_wait()) {
-            if (resp.wait().name().empty())
-                ret = "Wait timeout";
-            else
-                ret = "Wait " + resp.wait().name();
-        } else if (resp.has_convertpath())
-            ret = resp.convertpath().path();
+        }
+    } else if (resp.has_version()) {
+        ret = resp.version().tag() + " #" + resp.version().revision();
+    } else if (resp.has_wait()) {
+        if (resp.wait().name().empty())
+            ret = "Wait timeout";
         else
-            ret = "Ok";
-        return ret;
-        break;
-    }
-    case EError::Unknown:
-        return "Error: Unknown (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidMethod:
-        return "Error: InvalidMethod (" + resp.errormsg() + ")";
-        break;
-    case EError::ContainerAlreadyExists:
-        return "Error: ContainerAlreadyExists (" + resp.errormsg() + ")";
-        break;
-    case EError::ContainerDoesNotExist:
-        return "Error: ContainerDoesNotExist (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidProperty:
-        return "Error: InvalidProperty (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidData:
-        return "Error: InvalidData (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidValue:
-        return "Error: InvalidValue (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidState:
-        return "Error: InvalidState (" + resp.errormsg() + ")";
-        break;
-    case EError::NotSupported:
-        return "Error: NotSupported (" + resp.errormsg() + ")";
-        break;
-    case EError::ResourceNotAvailable:
-        return "Error: ResourceNotAvailable (" + resp.errormsg() + ")";
-        break;
-    case EError::Permission:
-        return "Error: Permission (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeAlreadyExists:
-        return "Error: VolumeAlreadyExists (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeNotFound:
-        return "Error: VolumeNotFound (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeAlreadyLinked:
-        return "Error: VolumeAlreadyLinked (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeNotLinked:
-        return "Error: VolumeNotLinked (" + resp.errormsg() + ")";
-        break;
-    case EError::Busy:
-        return "Error: Busy (" + resp.errormsg() + ")";
-        break;
-    case EError::LayerAlreadyExists:
-        return "Error: LayerAlreadyExists (" + resp.errormsg() + ")";
-    case EError::LayerNotFound:
-        return "Error: LayerNotFound (" + resp.errormsg() + ")";
-    case EError::NoSpace:
-        return "Error: NoSpace (" + resp.errormsg() + ")";
-        break;
-    default:
-        return resp.ShortDebugString();
-        break;
-    };
+            ret = "Wait " + resp.wait().name();
+    } else if (resp.has_convertpath())
+        ret = resp.convertpath().path();
+    else
+        ret = "Ok";
+
+    return ret;
 }
 
 /* not logged in normal mode */
@@ -1181,7 +1126,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     if (!silent)
         L_REQ("{} from {}", RequestAsString(req), client->Id);
 
-    if (Verbose)
+    if (Debug)
         L_REQ("{} from {}", req.ShortDebugString(), client->Id);
 
     rsp.set_error(EError::Unknown);
@@ -1295,7 +1240,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             L_RSP("{} to {} (request took {} ms)",
                   ResponseAsString(rsp), client->Id, client->RequestTimeMs);
 
-        if (Verbose)
+        if (Debug)
             L_RSP("{} to {}", rsp.ShortDebugString(), client->Id);
 
         error = client->QueueResponse(rsp);
@@ -1314,7 +1259,7 @@ void SendWaitResponse(TClient &client, const std::string &name) {
         L_RSP("{} to {} (request took {} ms)", ResponseAsString(rsp),
                 client.Id, client.RequestTimeMs);
 
-    if (Verbose)
+    if (Debug)
         L_RSP("{} to {}", rsp.ShortDebugString(), client.Id);
 
     TError error = client.QueueResponse(rsp);

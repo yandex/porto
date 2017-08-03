@@ -14,6 +14,7 @@ extern "C" {
 }
 
 bool Verbose;
+bool Debug;
 
 TStatistics *Statistics = nullptr;
 
