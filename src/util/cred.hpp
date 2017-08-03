@@ -57,10 +57,6 @@ struct TCred {
     std::string ToString() const {
         return User() + ":" + Group();
     }
-
-    friend std::ostream& operator<<(std::ostream& os, const TCred& cred) {
-        return os << cred.ToString();
-    }
 };
 
 void InitCapabilities();

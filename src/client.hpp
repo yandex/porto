@@ -20,6 +20,7 @@ namespace rpc {
 
 class TClient : public TEpollSource {
 public:
+    std::string Id;
     TCred Cred;
     TCred TaskCred;
     pid_t Pid = 0;
@@ -73,27 +74,6 @@ public:
     TPath DefaultPlace();
     TError CanControlPlace(const TPath &place);
 
-    template<typename ostream>
-    friend ostream& operator<<(ostream& stream, const TClient &client) {
-        stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
-
-        if (client.FirstLog) {
-            const_cast<TClient &>(client).FirstLog = false;
-            stream << " " << client.TaskCred;
-            if (client.Cred.Uid != client.TaskCred.Uid ||
-                    client.Cred.Gid != client.TaskCred.Gid)
-                stream << " owner " << client.Cred;
-            if (client.ClientContainer) {
-                stream << " from " << client.ClientContainer->Name;
-                if (client.PortoNamespace != "")
-                    stream << " namespace " << client.PortoNamespace;
-                if (client.WriteNamespace != client.PortoNamespace)
-                    stream << " write-namespace " << client.WriteNamespace;
-            }
-        }
-
-        return stream;
-    }
 
     std::shared_ptr<TContainerWaiter> Waiter;
 
@@ -108,8 +88,6 @@ public:
 private:
     std::mutex Mutex;
     uint64_t ConnectionTime = 0;
-
-    bool FirstLog = true;
 
     uint64_t Length = 0;
     uint64_t Offset = 0;

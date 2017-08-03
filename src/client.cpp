@@ -57,7 +57,7 @@ void TClient::CloseConnection() {
             EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
         if (Verbose)
-            L("Client disconnected: {}: {} ms", *this, ConnectionTime);
+            L("Client disconnected: {}: {} ms", Id, ConnectionTime);
         close(Fd);
         Fd = -1;
     }
@@ -153,6 +153,14 @@ TError TClient::IdentifyClient(bool initial) {
         if (AccessLevel > EAccessLevel::ReadOnly)
             AccessLevel = EAccessLevel::ReadOnly;
     }
+
+    Id = fmt::format("{}:{}({}) {}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
+
+    if (Verbose)
+        L("Client connected: {} cred={} tcred={} access={} ns={} wns={}",
+                Id, Cred.ToString(), TaskCred.ToString(),
+                AccessLevel <= EAccessLevel::ReadOnly ? "ro" : "rw",
+                PortoNamespace, WriteNamespace);
 
     return TError::Success();
 }
@@ -401,7 +409,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     TScopedLock lock(Mutex);
 
     if (Processing) {
-        L_WRN("Client request before response: {}", *this);
+        L_WRN("Client request before response: {}", Id);
         return TError::Success();
     }
 
@@ -465,7 +473,7 @@ TError TClient::SendResponse(bool first) {
         if (!first)
             return TError(EError::Unknown, "send return zero");
     } else if (errno == EPIPE) {
-        L("Client disconnected: {}", *this);
+        L("Client disconnected: {}", Id);
         return TError::Success();
     } else if (errno != EAGAIN && errno != EWOULDBLOCK)
         return TError(EError::Unknown, errno, "send response failed");

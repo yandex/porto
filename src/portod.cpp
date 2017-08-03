@@ -425,7 +425,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
                       "All client slots are active: " +
                       (from ? from->Name : "globally"));
 
-    L("Drop client {} idle for {} ms", *victim, idle);
+    L("Drop client {} idle for {} ms", victim->Id, idle);
     Clients.erase(victim->Fd);
     victim->CloseConnection();
     return TError::Success();
@@ -448,8 +448,6 @@ static TError AcceptConnection(int listenFd) {
 
     auto client = std::make_shared<TClient>(clientFd);
     error = client->IdentifyClient(true);
-    if (Verbose)
-        L("Client connected: {}", *client);
     if (error)
         return error;
 

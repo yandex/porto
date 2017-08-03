@@ -284,14 +284,14 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
 static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent) {
     if (!silent || Verbose)
         L_RSP("{} to {} (request took {} ms)",
-              ResponseAsString(rsp), client, client.RequestTimeMs);
+              ResponseAsString(rsp), client.Id, client.RequestTimeMs);
 
     if (Verbose)
-        L_RSP("{} to {}", rsp.ShortDebugString(), client);
+        L_RSP("{} to {}", rsp.ShortDebugString(), client.Id);
 
     TError error = client.QueueResponse(rsp);
     if (error)
-        L_WRN("Cannot send response for {} : {}", client, error);
+        L_WRN("Cannot send response for {} : {}", client.Id, error);
 }
 
 static TError CheckPortoWriteAccess() {
@@ -1200,17 +1200,17 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     bool silent = SilentRequest(req);
     if (!silent || Verbose)
-        L_REQ("{} from {}", RequestAsString(req), *client);
+        L_REQ("{} from {}", RequestAsString(req), client->Id);
 
     if (Verbose)
-        L_REQ("{} from {}", req.ShortDebugString(), *client);
+        L_REQ("{} from {}", req.ShortDebugString(), client->Id);
 
     rsp.set_error(EError::Unknown);
 
     TError error;
     try {
         if (!ValidRequest(req)) {
-            L_ERR("Invalid request {} from {}", req.ShortDebugString(), *client);
+            L_ERR("Invalid request {} from {}", req.ShortDebugString(), client->Id);
             error = TError(EError::InvalidMethod, "invalid request");
         } else if (req.has_create())
             error = CreateContainer(req.create().name(), false);
@@ -1308,7 +1308,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
         /* log failed or slow silent requests */
         if (silent && !Verbose && (error || client->RequestTimeMs >= 1000)) {
-            L_REQ("{} from {}", RequestAsString(req), *client);
+            L_REQ("{} from {}", RequestAsString(req), client->Id);
             silent = false;
         }
 
