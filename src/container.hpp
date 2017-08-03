@@ -359,10 +359,8 @@ private:
     static std::mutex WildcardLock;
     static std::list<std::weak_ptr<TContainerWaiter>> WildcardWaiters;
     std::weak_ptr<TClient> Client;
-    std::function<void (std::shared_ptr<TClient>, TError, std::string)> Callback;
 public:
-    TContainerWaiter(std::shared_ptr<TClient> client,
-                     std::function<void (std::shared_ptr<TClient>, TError, std::string)> callback);
+    TContainerWaiter(std::shared_ptr<TClient> client);
     void WakeupWaiter(const TContainer *who, bool wildcard = false);
     static void WakeupWildcard(const TContainer *who);
     static void AddWildcard(std::shared_ptr<TContainerWaiter> &waiter);

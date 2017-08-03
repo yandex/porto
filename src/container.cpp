@@ -25,6 +25,7 @@
 #include "util/unix.hpp"
 #include "client.hpp"
 #include "filesystem.hpp"
+#include "rpc.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -3005,22 +3006,21 @@ void TContainer::CleanupWaiters() {
     }
 }
 
-TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
-                                   std::function<void (std::shared_ptr<TClient>,
-                                                       TError, std::string)> callback) :
-    Client(client), Callback(callback) {
-}
+TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client) : Client(client) { }
 
 void TContainerWaiter::WakeupWaiter(const TContainer *who, bool wildcard) {
     std::shared_ptr<TClient> client = Client.lock();
     if (client) {
         std::string name;
-        TError err;
-        if (who)
-            err = client->ComposeName(who->Name, name);
-        if (wildcard && (err || !MatchWildcard(name)))
+
+        if (who && client->ComposeName(who->Name, name))
             return;
-        Callback(client, err, name);
+
+        if (who && wildcard && !MatchWildcard(name))
+            return;
+
+        SendWaitResponse(*client, name);
+
         Client.reset();
         client->Waiter = nullptr;
     }

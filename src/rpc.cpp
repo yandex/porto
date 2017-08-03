@@ -281,19 +281,6 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_locateprocess() == 1;
 }
 
-static void SendReply(TClient &client, rpc::TContainerResponse &rsp, bool silent) {
-    if (!silent || Verbose)
-        L_RSP("{} to {} (request took {} ms)",
-              ResponseAsString(rsp), client.Id, client.RequestTimeMs);
-
-    if (Verbose)
-        L_RSP("{} to {}", rsp.ShortDebugString(), client.Id);
-
-    TError error = client.QueueResponse(rsp);
-    if (error)
-        L_WRN("Cannot send response for {} : {}", client.Id, error);
-}
-
 static TError CheckPortoWriteAccess() {
     if (CL->AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "Write access denied");
@@ -600,15 +587,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
 
-    auto fn = [] (std::shared_ptr<TClient> waiting_client,
-                  TError error, std::string name) {
-        rpc::TContainerResponse response;
-        response.set_error(error.GetError());
-        response.mutable_wait()->set_name(name);
-        SendReply(*waiting_client, response, !error && name.empty());
-    };
-
-    auto waiter = std::make_shared<TContainerWaiter>(client, fn);
+    auto waiter = std::make_shared<TContainerWaiter>(client);
 
     for (int i = 0; i < req.name_size(); i++) {
         std::string name = req.name(i);
@@ -1198,8 +1177,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     client->StartRequest();
 
-    bool silent = SilentRequest(req);
-    if (!silent || Verbose)
+    bool silent = !Verbose && SilentRequest(req);
+    if (!silent)
         L_REQ("{} from {}", RequestAsString(req), client->Id);
 
     if (Verbose)
@@ -1307,11 +1286,38 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         rsp.set_errormsg(error.GetMsg());
 
         /* log failed or slow silent requests */
-        if (silent && !Verbose && (error || client->RequestTimeMs >= 1000)) {
+        if (silent && (error || client->RequestTimeMs >= 1000)) {
             L_REQ("{} from {}", RequestAsString(req), client->Id);
             silent = false;
         }
 
-        SendReply(*client, rsp, silent && !error);
+        if (!silent)
+            L_RSP("{} to {} (request took {} ms)",
+                  ResponseAsString(rsp), client->Id, client->RequestTimeMs);
+
+        if (Verbose)
+            L_RSP("{} to {}", rsp.ShortDebugString(), client->Id);
+
+        error = client->QueueResponse(rsp);
+        if (error)
+            L_WRN("Cannot send response for {} : {}", client->Id, error);
     }
+}
+
+void SendWaitResponse(TClient &client, const std::string &name) {
+    rpc::TContainerResponse rsp;
+
+    rsp.set_error(EError::Success);
+    rsp.mutable_wait()->set_name(name);
+
+    if (!name.empty() || Verbose)
+        L_RSP("{} to {} (request took {} ms)", ResponseAsString(rsp),
+                client.Id, client.RequestTimeMs);
+
+    if (Verbose)
+        L_RSP("{} to {}", rsp.ShortDebugString(), client.Id);
+
+    TError error = client.QueueResponse(rsp);
+    if (error)
+        L_WRN("Cannot send response for {} : {}", client.Id, error);
 }
