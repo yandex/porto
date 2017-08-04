@@ -345,6 +345,17 @@ xz:
     return TError::Success();
 }
 
+static bool TarSupportsXattrs() {
+    static bool tested = false, result = false;
+    if (!tested) {
+        TFile null;
+        result = !null.OpenReadWrite("/dev/null") &&
+                 !RunCommand({ "tar", "--create", "--xattrs",
+                               "--files-from", "/dev/null"}, "/", null, null);
+        tested = true;
+    }
+    return result;
+}
 
 TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress, bool merge) {
     TPath temp = TempPath(IMPORT_PREFIX);
@@ -430,16 +441,20 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
 
     IncPlaceLoad(Place);
 
-    error = RunCommand({ "tar",
-                         "--numeric-owner",
-                         "--preserve-permissions",
-                         /* "--xattrs",
-                            "--xattrs-include=security.capability",
-                            "--xattrs-include=trusted.overlay.*", */
-                         compress_option,
-                         "--extract",
-                         "-C", temp.ToString() },
-                         temp, tar, TFile());
+    TTuple args = { "tar",
+                    "--numeric-owner",
+                    "--preserve-permissions",
+                    compress_option,
+                    "--extract",
+                    "-C", temp.ToString() };
+
+    if (TarSupportsXattrs())
+        args.insert(args.begin() + 3, {
+                "--xattrs",
+                "--xattrs-include=security.capability",
+                "--xattrs-include=trusted.overlay.*" });
+
+    error = RunCommand(args, temp, tar, TFile());
     if (error)
         goto err;
 
@@ -535,21 +550,20 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
 
     IncPlaceLoad(Place);
 
-    /*
-     * FIXME tar in ubuntu precise knows nothing about xattrs,
-     * maybe temporary convert opaque directories into aufs?
-     */
-    error = RunCommand({ "tar",
-                        "--one-file-system",
-                        "--numeric-owner",
-                        "--preserve-permissions",
-                        /* "--xattrs", */
-                        "--sparse",
-                        "--transform", "s:^./::",
-                        compress_option,
-                        "--create",
-                        "-C", Path.ToString(), "." },
-                        Path, TFile(), tar);
+    TTuple args = { "tar",
+                    "--one-file-system",
+                    "--numeric-owner",
+                    "--preserve-permissions",
+                    "--sparse",
+                    "--transform", "s:^./::",
+                    compress_option,
+                    "--create",
+                    "-C", Path.ToString(), "." };
+
+    if (TarSupportsXattrs())
+        args.insert(args.begin() + 4, "--xattrs");
+
+    error = RunCommand(args, Path, TFile(), tar);
 
     if (!error)
         error = tar.Chown(CL->TaskCred);
