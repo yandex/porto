@@ -1567,7 +1567,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     /* Inherit environment from containts in isolation domain */
     bool overwrite = true;
     for (auto ct = this; ct; ct = ct->Parent.get()) {
-        TError error = env.Parse(EnvCfg, overwrite);
+        TError error = env.Parse(ct->EnvCfg, overwrite);
         if (error && overwrite)
             return error;
         overwrite = false;
