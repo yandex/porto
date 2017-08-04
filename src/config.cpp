@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "config.hpp"
 #include "protobuf.hpp"
 #include "util/unix.hpp"
@@ -133,21 +131,6 @@ bool TConfig::LoadFile(const std::string &path) {
     return true;
 }
 
-static void InitIpcSysctl() {
-    for (const auto &key: IpcSysctls) {
-        bool set = false;
-        for (const auto &it: config().container().ipc_sysctl())
-            set |= it.key() == key;
-        std::string val;
-        /* load default ipc sysctl from host config */
-        if (!set && !GetSysctl(key, val)) {
-            auto sysctl = config().mutable_container()->add_ipc_sysctl();
-            sysctl->set_key(key);
-            sysctl->set_val(val);
-        }
-    }
-}
-
 void TConfig::Load() {
     LoadDefaults();
 
@@ -156,32 +139,6 @@ void TConfig::Load() {
 
     Debug |= config().log().debug();
     Verbose |= Debug | config().log().verbose();
-
-    InitCred();
-    InitCapabilities();
-    InitIpcSysctl();
-}
-
-int TConfig::Test(const std::string &path) {
-    TFile file;
-
-    if (access(path.c_str(), F_OK)) {
-        std::cerr << "Config " << path << " doesn't exist" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (file.OpenRead(path)) {
-        std::cerr << "Can't open " << path << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    google::protobuf::io::FileInputStream pist(file.Fd);
-
-    cfg::TCfg cfg;
-    if (!google::protobuf::TextFormat::Merge(&pist, &cfg))
-        return EXIT_FAILURE;
-
-    return EXIT_SUCCESS;
 }
 
 cfg::TCfg &TConfig::operator()() {

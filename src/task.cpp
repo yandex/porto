@@ -27,6 +27,40 @@ extern "C" {
 #include <net/if.h>
 }
 
+std::list<std::string> IpcSysctls = {
+    "fs.mqueue.queues_max",
+    "fs.mqueue.msg_max",
+    "fs.mqueue.msgsize_max",
+    "fs.mqueue.msg_default",
+    "fs.mqueue.msgsize_default",
+
+    "kernel.shmmax",
+    "kernel.shmall",
+    "kernel.shmmni",
+    "kernel.shm_rmid_forced",
+
+    "kernel.msgmax",
+    "kernel.msgmni",
+    "kernel.msgmnb",
+
+    "kernel.sem",
+};
+
+void InitIpcSysctl() {
+    for (const auto &key: IpcSysctls) {
+        bool set = false;
+        for (const auto &it: config().container().ipc_sysctl())
+            set |= it.key() == key;
+        std::string val;
+        /* load default ipc sysctl from host config */
+        if (!set && !GetSysctl(key, val)) {
+            auto sysctl = config().mutable_container()->add_ipc_sysctl();
+            sysctl->set_key(key);
+            sysctl->set_val(val);
+        }
+    }
+}
+
 void TTaskEnv::ReportPid(pid_t pid) {
     TError error = Sock.SendPid(pid);
     if (error && error.GetErrno() != ENOMEM) {
@@ -81,7 +115,7 @@ TError TTaskEnv::ChildExec() {
             NULL,
         };
         SetDieOnParentExit(0);
-        TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), TLogger::GetFd()});
+        TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), LogFile.Fd});
         fexecve(PortoInit.Fd, (char *const *)args, envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
                       std::to_string(PortoInit.Fd) +  ", portoinit)");
@@ -114,7 +148,7 @@ TError TTaskEnv::ChildExec() {
             L("environ[{}]={}", i, envp[i]);
     }
     SetDieOnParentExit(0);
-    TFile::CloseAll({0, 1, 2, Sock.GetFd(), TLogger::GetFd()});
+    TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
     return TError(EError::InvalidValue, errno, std::string("execvpe(") +
@@ -276,7 +310,7 @@ TError TTaskEnv::ConfigureChild() {
             if (error)
                 return error;
 
-            TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), TLogger::GetFd()});
+            TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), LogFile.Fd});
             fexecve(PortoInit.Fd, (char *const *)argv, envp);
             return TError(EError::Unknown, errno, "fexecve()");
         }

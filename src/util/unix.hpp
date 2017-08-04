@@ -92,9 +92,10 @@ class TPidFile {
 public:
     TPath Path;
     std::string Name;
+    std::string AltName;
     pid_t Pid = 0;
 
-    TPidFile(const std::string &path, const std::string &name): Path(path), Name(name) { }
+    TPidFile(const std::string &path, const std::string &name, const std::string &altname): Path(path), Name(name), AltName(altname) { }
     TError Load();
     bool Running();
     TError Save(pid_t pid);

@@ -17,7 +17,6 @@ class TConfig : public TNonCopyable {
 public:
     TConfig() {}
     void Load();
-    int Test(const std::string &path);
     cfg::TCfg &operator()();
 };
 

@@ -16,7 +16,7 @@ add_executable(mem_touch mem_touch.c)
 # head
 
 add_test(NAME cleanup_logs
-         COMMAND rm -f /var/log/portod.log /var/log/portoloop.log
+         COMMAND rm -f /var/log/portod.log
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME portod_start

@@ -1276,7 +1276,7 @@ TError InitializeDaemonCgroups() {
                 return error;
         }
 
-        // portod-slave
+        // portod
         error = cg.Attach(GetPid());
         if (error)
             return error;

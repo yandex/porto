@@ -105,14 +105,14 @@ def AsCharlie():
 def AsDavid():
     SwitchUser("porto-david", david_uid, david_gid)
 
-def GetSlavePid():
+def GetPortodPid():
     pid = int(open("/run/portod.pid").read())
-    open("/proc/" + str(pid) + "/status").readline().index("portod-slave")
+    open("/proc/" + str(pid) + "/status").readline().index("portod")
     return pid
 
 def GetMasterPid():
     pid = int(open("/run/portoloop.pid").read())
-    open("/proc/" + str(pid) + "/status").readline().index("portod")
+    open("/proc/" + str(pid) + "/status").readline().index("portod-master")
     return pid
 
 def GetState(pid):

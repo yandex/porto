@@ -3191,11 +3191,10 @@ void TPortoStat::Populate(TUintMap &m) {
     m["errors"] = Statistics->Errors;
     m["warnings"] = Statistics->Warns;
     m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;
-    m["slave_uptime"] = (GetCurrentTimeMs() - Statistics->SlaveStarted) / 1000;
+    m["porto_uptime"] = (GetCurrentTimeMs() - Statistics->PortoStarted) / 1000;
     m["queued_statuses"] = Statistics->QueuedStatuses;
     m["queued_events"] = Statistics->QueuedEvents;
     m["remove_dead"] = Statistics->RemoveDead;
-    m["slave_timeout_ms"] = Statistics->SlaveTimeoutMs;
     m["restore_failed"] = Statistics->RestoreFailed;
     uint64_t usage = 0;
     auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);

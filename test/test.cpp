@@ -387,6 +387,8 @@ TCred Bob;
 void InitUsersAndGroups() {
     TError error;
 
+    InitPortoCgroups();
+
     error = Nobody.Load("nobody");
     if (error)
         throw error.GetMsg();
@@ -505,11 +507,11 @@ void TestDaemon(Porto::Connection &api) {
     api.Close();
     sleep(1);
 
-    Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
-    pid = ReadPid(PORTO_SLAVE_PIDFILE);
+    Say() << "Make sure portod doesn't have zombies" << std::endl;
+    pid = ReadPid(PORTO_PIDFILE);
     ExpectEq(ChildrenNum(pid), 0);
 
-    Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
+    Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
 
     std::string path = ("/proc/" + std::to_string(pid) + "/fd");
 
@@ -554,7 +556,7 @@ void TestDaemon(Porto::Connection &api) {
      * 1 (stdout)
      * 130 (rpc socket)
      * 2 (stderr)
-     * 3 (portoloop.log)
+     * 3 (portod.log)
      * 4 (epoll)
      * 6 (event pipe)
      * 7 (ack pipe)
@@ -570,7 +572,7 @@ void TestDaemon(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
     Expect(v == std::to_string(0));
 
-    Say() << "Check portod-slave queue size" << std::endl;
+    Say() << "Check portod queue size" << std::endl;
     ExpectApiSuccess(api.GetData("/", "porto_stat[queued_events]", v));
     Expect(v != std::to_string(0)); // RotateLogs
 

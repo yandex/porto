@@ -187,7 +187,7 @@ def TestRecovery():
     Expect(IsRunning(pid))
     Expect(not IsZombie(pid))
 
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     c.connect()
 
     ExpectProp(r, "state", "running")
@@ -214,7 +214,7 @@ def TestRecovery():
     child.Start()
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
@@ -231,7 +231,7 @@ def TestRecovery():
     child.Start()
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
     parent = c.Find("a")
@@ -268,7 +268,7 @@ def TestRecovery():
         if cg.find("memory") >= 0:
             ExpectEq(cg.split(":")[2].rstrip('\n'), "/")
 
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
@@ -299,7 +299,7 @@ def TestRecovery():
     ExpectProp(r, "oom_killed", True)
 
     AsRoot()
-    KillPid(GetSlavePid(), 9)
+    KillPid(GetPortodPid(), 9)
     AsAlice()
     c.connect()
 
@@ -317,7 +317,7 @@ def TestRecovery():
     r.Wait(timeout=10000)
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
@@ -332,7 +332,7 @@ def TestRecovery():
     ValidateDefaultData(r)
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
@@ -356,7 +356,7 @@ def TestRecovery():
     ExpectNe(GetState(r.GetData("root_pid")), "")
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
@@ -383,7 +383,7 @@ def TestRecovery():
     RespawnTicks(r)
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c.connect()
 
@@ -404,7 +404,7 @@ def TestRecovery():
 
     c.disconnect()
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
     c = porto.Connection(timeout=300)
 
@@ -433,7 +433,7 @@ def TestWaitRecovery():
     aaa.Start()
 
     AsRoot()
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     c.connect()
 
     aaa = c.Find("aaa")
@@ -485,7 +485,7 @@ def TestVolumeRecovery():
 
     os.mkdir("/place/porto_volumes/leftover_volume", 0755)
 
-    KillPid(GetSlavePid(), signal.SIGKILL)
+    KillPid(GetPortodPid(), signal.SIGKILL)
     c.connect()
 
     time.sleep(0.5)

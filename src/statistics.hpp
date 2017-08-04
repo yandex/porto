@@ -7,7 +7,7 @@ struct TStatistics {
     std::atomic<uint64_t> Errors;
     std::atomic<uint64_t> Warns;
     std::atomic<uint64_t> MasterStarted;
-    std::atomic<uint64_t> SlaveStarted;
+    std::atomic<uint64_t> PortoStarted;
     std::atomic<uint64_t> QueuedStatuses;
     std::atomic<uint64_t> QueuedEvents;
     std::atomic<uint64_t> ContainersCreated;
@@ -15,7 +15,6 @@ struct TStatistics {
     std::atomic<uint64_t> ContainersFailedStart;
     std::atomic<uint64_t> ContainersOOM;
     std::atomic<uint64_t> RemoveDead;
-    std::atomic<int> SlaveTimeoutMs;
     std::atomic<uint64_t> LogRotateBytes;
     std::atomic<uint64_t> LogRotateErrors;
     std::atomic<uint64_t> RestoreFailed;

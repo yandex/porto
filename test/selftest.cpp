@@ -1437,7 +1437,7 @@ static void TestCwdProperty(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
-    (void)TPath(PORTO_SLAVE_PIDFILE).ReadAll(portodPid);
+    (void)TPath(PORTO_PIDFILE).ReadAll(portodPid);
     portodCwd = GetCwd(portodPid);
 
     Say() << "Check default working directory" << std::endl;
@@ -4069,7 +4069,7 @@ static void TestLeaks(Porto::Connection &api) {
     int perct = 64;
     uint64_t time;
 
-    ExpectSuccess(TPath(PORTO_SLAVE_PIDFILE).ReadAll(slavePid));
+    ExpectSuccess(TPath(PORTO_PIDFILE).ReadAll(slavePid));
     ExpectSuccess(TPath(PORTO_MASTER_PIDFILE).ReadAll(masterPid));
 
     int initSlave = GetVmRss(slavePid);
@@ -4452,9 +4452,9 @@ static void InitErrorCounters(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
     StringToInt(v, expectedWarns);
 
-    loggedRespawns = WordCount(PORTO_MASTER_LOG, "SYS Spawned") - expectedRespawns;
-    loggedErrors = WordCount(PORTO_SLAVE_LOG, "ERR ") - expectedErrors;
-    loggedWarns = WordCount(PORTO_SLAVE_LOG, "WRN ") - expectedWarns;
+    loggedRespawns = WordCount(PORTO_LOG, "SYS Spawned") - expectedRespawns;
+    loggedErrors = WordCount(PORTO_LOG, "ERR ") - expectedErrors;
+    loggedWarns = WordCount(PORTO_LOG, "WRN ") - expectedWarns;
 }
 
 static void CheckErrorCounters(Porto::Connection &api) {
@@ -4487,7 +4487,7 @@ static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
 }
 
 static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
-    int portodPid = ReadPid(PORTO_SLAVE_PIDFILE);
+    int portodPid = ReadPid(PORTO_PIDFILE);
     if (kill(portodPid, sig))
         throw "Can't send " + std::to_string(sig) + " to slave";
     WaitProcessExit(std::to_string(portodPid));
@@ -5090,9 +5090,9 @@ static void TestStdoutLimit(Porto::Connection &api) {
 static void TestStats(Porto::Connection &api) {
     AsRoot(api);
 
-    int respawns = WordCount(PORTO_MASTER_LOG, "SYS Spawned");
-    int errors = WordCount(PORTO_SLAVE_LOG, "ERR ");
-    int warns = WordCount(PORTO_SLAVE_LOG, "WRN ");
+    int respawns = WordCount(PORTO_LOG, "SYS Spawned");
+    int errors = WordCount(PORTO_LOG, "ERR ");
+    int warns = WordCount(PORTO_LOG, "WRN ");
 
     if (respawns != loggedRespawns + expectedRespawns)
         throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));

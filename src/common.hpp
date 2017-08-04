@@ -75,13 +75,12 @@ constexpr const char *PORTO_VERSION_FILE = "/run/portod.version";
 constexpr const char *PORTO_BINARY_PATH = "/run/portod";
 
 constexpr const char *PORTO_MASTER_PIDFILE = "/run/portoloop.pid";
-constexpr const char *PORTO_SLAVE_PIDFILE = "/run/portod.pid";
+constexpr const char *PORTO_PIDFILE = "/run/portod.pid";
 
-constexpr const char *PORTOD_MASTER_NAME = "portod";
-constexpr const char *PORTOD_SLAVE_NAME = "portod-slave";
+constexpr const char *PORTOD_MASTER_NAME = "portod-master";
+constexpr const char *PORTOD_NAME = "portod";
 
-constexpr const char *PORTO_MASTER_LOG = "/var/log/portoloop.log";
-constexpr const char *PORTO_SLAVE_LOG = "/var/log/portod.log";
+constexpr const char *PORTO_LOG = "/var/log/portod.log";
 
 constexpr const char *PORTO_CONTAINERS_KV = "/run/porto/kvs";
 constexpr const char *PORTO_VOLUMES_KV = "/run/porto/pkvs";

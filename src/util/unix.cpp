@@ -722,15 +722,18 @@ TError TPidFile::Load() {
     if (kill(pid, 0) && errno == ESRCH)
         return TError(EError::Unknown, errno, "Task not found");
     str = GetTaskName(pid);
-    if (str != Name)
+    if (str != Name && str != AltName)
         return TError(EError::Unknown, "Wrong task name: " + str + " expected: " + Name);
     Pid = pid;
     return TError::Success();
 }
 
 bool TPidFile::Running() {
-    if (Pid && (!kill(Pid, 0) || errno != ESRCH) && GetTaskName(Pid) == Name)
-        return true;
+    if (Pid && (!kill(Pid, 0) || errno != ESRCH)) {
+        std::string name = GetTaskName(Pid);
+        if (name == Name || name == AltName)
+            return true;
+    }
     Pid = 0;
     return false;
 }

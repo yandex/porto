@@ -11,16 +11,3 @@
 	endscript
 
 }
-
-/var/log/portoloop.log {
-	size 400M
-	missingok
-	rotate 7
-	compress
-	notifempty
-	nocreate
-
-	postrotate
-		[ -f /run/portoloop.pid ] && kill -USR1 `cat /run/portoloop.pid`
-	endscript
-}

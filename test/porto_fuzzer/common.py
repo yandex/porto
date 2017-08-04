@@ -187,8 +187,8 @@ def check_warns_present(conn, old):
 
 def check_portod_pid_valid(master, slave):
     try:
-        open("/proc/" + str(master) + "/status").readline().index("portod")
-        open("/proc/" + str(slave) + "/status").readline().index("portod-slave")
+        open("/proc/" + str(master) + "/status").readline().index("portod-master")
+        open("/proc/" + str(slave) + "/status").readline().index("portod")
         return True
 
     except BaseException as e:
@@ -272,9 +272,6 @@ def find_last_log_lines(filename, num, OFFSET=1048576, tag_re="ERR",
 
 def grep_portod_tag(tag_re, num):
     result = find_last_log_lines("/var/log/portod.log", num, tag_re=tag_re)
-
-    if num == 0 or len(result) != num:
-        result += find_last_log_lines("/var/log/portoloop.log", num - len(result), tag_re=tag_re)
 
     if len(result) < num:
         print "Some {} lines were missing, found {} instead of {}".format(tag_re, len(result), num)

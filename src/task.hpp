@@ -56,3 +56,6 @@ struct TTaskEnv {
     void ReportPid(pid_t pid);
     void Abort(const TError &error);
 };
+
+extern std::list<std::string> IpcSysctls;
+void InitIpcSysctl();

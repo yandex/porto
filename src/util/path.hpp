@@ -207,6 +207,7 @@ public:
         int SetFd;
     };
     TFile() : Fd(-1) { }
+    TFile(int fd) : Fd(fd) { }
     ~TFile() { Close(); }
     TError Open(const TPath &path, int flags);
     TError OpenRead(const TPath &path);

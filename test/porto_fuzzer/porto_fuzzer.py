@@ -48,7 +48,7 @@ def fuzzer_killer(prob, timeout=180, verbose=False):
 
                 time.sleep(1)
 
-                print "{} portod-slave killed\n".format(conn_name),
+                print "{} portod killed\n".format(conn_name),
 
                 conn.connect()
                 check_errors_present(conn, "{} ".format(conn_name))
@@ -226,7 +226,7 @@ except BaseException as e:
         print msg
         print "\nportod-master stacktrace:\n\n",
         print_stacktrace(pids[0])
-        print "\nportod-slave stacktrace:\n\n",
+        print "\nportod stacktrace:\n\n",
         print_stacktrace(pids[1])
         print msg
         print_logged_errors()

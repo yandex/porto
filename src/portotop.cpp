@@ -1080,7 +1080,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "Errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
-    AddCommon(0, "Uptime: ", "porto_stat[slave_uptime]", RootContainer, ValueFlags::Seconds);
+    AddCommon(0, "Uptime: ", "porto_stat[porto_uptime]", RootContainer, ValueFlags::Seconds);
 
     AddColumn(TColumn("container", "Container name",
               TPortoValue(Cache, ContainerTree, "absolute_name", ValueFlags::Container), true, false));

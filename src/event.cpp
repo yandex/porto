@@ -28,10 +28,8 @@ public:
             if (Top().DueMs <= now)
                 return;
             auto timeout = Top().DueMs - now;
-            Statistics->SlaveTimeoutMs = timeout;
             Cv.wait_for(lock, std::chrono::milliseconds(timeout));
         } else {
-            Statistics->SlaveTimeoutMs = 0;
             TWorker::Wait(lock);
         }
     }

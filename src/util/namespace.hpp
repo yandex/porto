@@ -28,5 +28,3 @@ public:
     ino_t Inode() const;
     static ino_t PidInode(pid_t pid, std::string type);
 };
-
-extern std::list<std::string> IpcSysctls;

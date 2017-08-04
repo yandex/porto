@@ -70,22 +70,3 @@ ino_t TNamespaceFd::PidInode(pid_t pid, std::string type) {
         return 0;
     return st.st_ino;
 }
-
-std::list<std::string> IpcSysctls = {
-    "fs.mqueue.queues_max",
-    "fs.mqueue.msg_max",
-    "fs.mqueue.msgsize_max",
-    "fs.mqueue.msg_default",
-    "fs.mqueue.msgsize_default",
-
-    "kernel.shmmax",
-    "kernel.shmall",
-    "kernel.shmmni",
-    "kernel.shm_rmid_forced",
-
-    "kernel.msgmax",
-    "kernel.msgmni",
-    "kernel.msgmnb",
-
-    "kernel.sem",
-};

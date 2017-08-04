@@ -213,7 +213,7 @@ TError TCred::Apply() const {
     return TError::Success();
 }
 
-void InitCred() {
+void InitPortoCgroups() {
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);

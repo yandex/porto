@@ -48,17 +48,15 @@ extern "C" {
 
 std::string PreviousVersion;
 
-TPidFile PortoMasterPid(PORTO_MASTER_PIDFILE, PORTOD_MASTER_NAME);
-TPidFile PortoSlavePid(PORTO_SLAVE_PIDFILE, PORTOD_SLAVE_NAME);
+static TPidFile MasterPidFile(PORTO_MASTER_PIDFILE, PORTOD_MASTER_NAME, "portod");
+static TPidFile PortodPidFile(PORTO_PIDFILE, PORTOD_NAME, "portod-slave");
 
 std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
-static pid_t slavePid;
-static bool stdlog = false;
-static bool failsafe = false;
-static bool respawnSlave = true;
-static bool slaveMode = false;
+static pid_t PortodPid;
+static bool StdLog = false;
+static bool respawnPortod = true;
 static bool discardState = false;
 
 static void FatalError(const std::string &text, TError &error) {
@@ -73,43 +71,13 @@ static void AllocStatistics() {
     PORTO_ASSERT(Statistics != nullptr);
 }
 
-static void DaemonOpenLog(bool master) {
-    TLogger::CloseLog();
-    TLogger::OpenLog(stdlog, master ? PORTO_MASTER_LOG : PORTO_SLAVE_LOG, 0644);
-}
-
-static void DaemonPrepare(bool master) {
-    TError error;
-
-    if (master) {
-        SetProcessName(PORTOD_MASTER_NAME);
-        error = PortoMasterPid.Save(getpid());
-    } else {
-        SetProcessName(PORTOD_SLAVE_NAME);
-        error = PortoSlavePid.Save(getpid());
-    }
-
-    if (error)
-        FatalError("Cannot save pid", error);
-
-    config.Load();
-
-    DaemonOpenLog(master);
-
-    L_SYS("{}", std::string(80, '-'));
-    L_SYS("Started {} {} {}", PORTO_VERSION, PORTO_REVISION, GetPid());
-    L_SYS("{}", config().DebugString());
-}
-
 static void DaemonShutdown(bool master, int code) {
     L_SYS("Stopped {}", code);
 
-    TLogger::CloseLog();
-
     if (master)
-        PortoMasterPid.Remove();
+        MasterPidFile.Remove();
     else
-        PortoSlavePid.Remove();
+        PortodPidFile.Remove();
 
     if (code < 0) {
         int sig = -code;
@@ -359,7 +327,7 @@ void AckExitStatus(int pid) {
     }
 }
 
-static int ReapSpawner(int fd) {
+static int RecvExitEvents(int fd) {
     struct pollfd fds[1];
     int nr = 1000;
 
@@ -474,7 +442,7 @@ static TError AcceptConnection(int listenFd) {
     return TError::Success();
 }
 
-static int SlaveRpc() {
+static int Rpc() {
     TRpcWorker worker(config().daemon().workers());
     int ret = 0;
     TError error;
@@ -488,7 +456,7 @@ static int SlaveRpc() {
 
     auto MasterSource = std::make_shared<TEpollSource>(REAP_EVT_FD);
     error = EpollLoop->AddSource(MasterSource);
-    if (error && !failsafe) {
+    if (error) {
         L_ERR("Can't add master fd to epoll: {}", error);
         return EXIT_FAILURE;
     }
@@ -516,16 +484,14 @@ static int SlaveRpc() {
     while (true) {
         error = EpollLoop->GetEvents(events, -1);
         if (error) {
-            L_ERR("slave: epoll error {}", error);
+            L_ERR("epoll error {}", error);
             ret = EXIT_FAILURE;
             goto exit;
         }
 
-        if (!failsafe) {
-            ret = ReapSpawner(REAP_EVT_FD);
-            if (ret)
-                goto exit;
-        }
+        ret = RecvExitEvents(REAP_EVT_FD);
+        if (ret)
+            goto exit;
 
         for (auto ev : events) {
             auto source = EpollLoop->GetSource(ev.data.fd);
@@ -553,7 +519,8 @@ static int SlaveRpc() {
                         ret = -SIGHUP;
                         goto exit;
                     case SIGUSR1:
-                        DaemonOpenLog(false);
+                        if (!StdLog)
+                            OpenLog(PORTO_LOG);
                         break;
                     case SIGUSR2:
                         DumpMallocInfo();
@@ -855,23 +822,32 @@ static void DestroyContainers(bool weak) {
     SystemClient.ReleaseContainer();
 }
 
-static int SlaveMain() {
+static int Portod() {
     TError error;
 
     SetDieOnParentExit(SIGKILL);
 
-    if (failsafe)
-        AllocStatistics();
-
-    Statistics->SlaveStarted = GetCurrentTimeMs();
+    Statistics->PortoStarted = GetCurrentTimeMs();
     Statistics->ContainersCount = 0;
     Statistics->ClientsCount = 0;
     Statistics->VolumesCount = 0;
     Statistics->RequestsQueued = 0;
 
-    DaemonPrepare(false);
+    SetProcessName(PORTOD_NAME);
 
-    L_SYS("Previous version: {}", PreviousVersion);
+    OpenLog(StdLog ? "" : PORTO_LOG);
+
+    error = PortodPidFile.Save(getpid());
+    if (error)
+        FatalError("Cannot save pid", error);
+
+    config.Load();
+    InitPortoCgroups();
+    InitCapabilities();
+    InitIpcSysctl();
+    TNetwork::InitializeConfig();
+
+    L_SYS("Portod config:\n{}", config().DebugString());
 
     error = TuneLimits();
     if (error)
@@ -888,14 +864,12 @@ static int SlaveMain() {
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
         L_ERR("Can't set close-on-exec flag on REAP_EVT_FD: {}", strerror(errno));
-        if (!failsafe)
-            return EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
         L_ERR("Can't set close-on-exec flag on REAP_ACK_FD: {}", strerror(errno));
-        if (!failsafe)
-            return EXIT_FAILURE;
+        return EXIT_FAILURE;
     }
 
     umask(0);
@@ -912,7 +886,6 @@ static int SlaveMain() {
     if (error)
         FatalError("Cannot initalize daemon cgroups", error);
 
-    TNetwork::InitializeConfig();
     InitContainerProperties();
     TStorage::Init();
 
@@ -925,6 +898,11 @@ static int SlaveMain() {
     error = TKeyValue::Mount(VolumesKV);
     if (error)
         FatalError("Cannot mount volumes keyvalue", error);
+
+    // We want propogate mounts into containers
+    error = TPath("/").Remount(MS_SHARED | MS_REC);
+    if (error)
+        FatalError("Can't remount / recursively as shared", error);
 
     EpollLoop = std::unique_ptr<TEpollLoop>(new TEpollLoop());
     EventQueue = std::unique_ptr<TEventQueue>(new TEventQueue());
@@ -974,7 +952,7 @@ static int SlaveMain() {
 
     L("Done restoring");
 
-    int code = SlaveRpc();
+    int code = Rpc();
     L_SYS("Shutting down...");
 
     if (discardState) {
@@ -1039,11 +1017,11 @@ static void UpdateQueueSize(std::map<int,int> &exited) {
     Statistics->QueuedStatuses = exited.size();
 }
 
-static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveStatus) {
+static int ReapDead(int fd, std::map<int,int> &exited, int &portodStatus) {
     while (true) {
         siginfo_t info;
 
-        if (waitpid(slavePid, &slaveStatus, WNOHANG) == slavePid)
+        if (waitpid(PortodPid, &portodStatus, WNOHANG) == PortodPid)
             return -1;
 
         info.si_pid = 0;
@@ -1063,8 +1041,8 @@ static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveS
             status = info.si_status << 8;
         }
 
-        if (info.si_pid == slavePid) {
-            slaveStatus = status;
+        if (info.si_pid == PortodPid) {
+            portodStatus = status;
             Reap(info.si_pid);
             return -1;
         }
@@ -1075,7 +1053,7 @@ static int ReapDead(int fd, std::map<int,int> &exited, int slavePid, int &slaveS
         exited[info.si_pid] = status;
         TError error = DeliverPidStatus(fd, info.si_pid, status, exited.size());
         if (error)
-            L_WRN("Fail to deliver pid status to slave: {}", error);
+            L_WRN("Fail to deliver pid status to porto: {}", error);
     }
 
     UpdateQueueSize(exited);
@@ -1109,17 +1087,15 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
 static int UpgradeMaster() {
     L_SYS("Updating");
 
-    if (kill(slavePid, SIGHUP) < 0) {
-        L_ERR("Cannot send SIGHUP to slave: {}", strerror(errno));
+    if (kill(PortodPid, SIGHUP) < 0) {
+        L_ERR("Cannot send SIGHUP to porto: {}", strerror(errno));
     } else {
-        if (waitpid(slavePid, NULL, 0) != slavePid)
-            L_ERR("Cannot wait for slave exit status: {}", strerror(errno));
+        if (waitpid(PortodPid, NULL, 0) != PortodPid)
+            L_ERR("Cannot wait for porto exit status: {}", strerror(errno));
     }
 
-    TLogger::CloseLog();
-
     std::vector<const char *> args = {PORTO_BINARY_PATH};
-    if (stdlog)
+    if (StdLog)
         args.push_back("--stdlog");
     if (Debug)
         args.push_back("--debug");
@@ -1142,13 +1118,13 @@ static int UpgradeMaster() {
     return EXIT_FAILURE;
 }
 
-static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exited) {
+static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
     TError error;
 
-    slavePid = 0;
+    PortodPid = 0;
 
     if (pipe2(evtfd, O_NONBLOCK | O_CLOEXEC) < 0) {
         L_ERR("pipe(): {}", strerror(errno));
@@ -1166,15 +1142,14 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
 
     auto sigSource = std::make_shared<TEpollSource>(sigFd);
 
-    slavePid = fork();
-    if (slavePid < 0) {
+    PortodPid = fork();
+    if (PortodPid < 0) {
         L_ERR("fork(): {}", strerror(errno));
         ret = EXIT_FAILURE;
         goto exit;
-    } else if (slavePid == 0) {
+    } else if (PortodPid == 0) {
         close(evtfd[1]);
         close(ackfd[0]);
-        TLogger::CloseLog();
         loop->Destroy();
         (void)dup2(evtfd[0], REAP_EVT_FD);
         (void)dup2(ackfd[1], REAP_ACK_FD);
@@ -1182,13 +1157,13 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
         close(ackfd[1]);
         close(sigFd);
 
-        _exit(SlaveMain());
+        _exit(Portod());
     }
 
     close(evtfd[0]);
     close(ackfd[1]);
 
-    L_SYS("Spawned slave {}", slavePid);
+    L_SYS("Spawned portod {}", PortodPid);
     Statistics->Spawned++;
 
     for (auto &pair : exited)
@@ -1225,14 +1200,14 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
             switch (s) {
             case SIGINT:
             case SIGTERM: {
-                if (kill(slavePid, s) < 0)
-                    L_ERR("Can't send {} to slave", s);
+                if (kill(PortodPid, s) < 0)
+                    L_ERR("Can't send {} to porto", s);
 
-                L("Waiting for slave to exit...");
+                L("Waiting for porto to exit...");
                 uint64_t deadline = GetCurrentTimeMs() +
                                     config().daemon().portod_stop_timeout() * 1000;
                 do {
-                    if (waitpid(slavePid, nullptr, WNOHANG) == slavePid)
+                    if (waitpid(PortodPid, nullptr, WNOHANG) == PortodPid)
                         break;
                 } while (!WaitDeadline(deadline, 1));
 
@@ -1240,7 +1215,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
                 goto exit;
             }
             case SIGUSR1:
-                DaemonOpenLog(true);
+                if (!StdLog)
+                    OpenLog(PORTO_LOG);
                 break;
             case SIGUSR2:
                 DumpMallocInfo();
@@ -1278,8 +1254,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exite
         }
 
         int status;
-        if (ReapDead(evtfd[1], exited, slavePid, status)) {
-            L_SYS("Slave exited with {}", status);
+        if (ReapDead(evtfd[1], exited, status)) {
+            L_SYS("Portod exited with {}", status);
             ret = EXIT_SUCCESS;
             goto exit;
         }
@@ -1300,12 +1276,18 @@ exit:
     return ret;
 }
 
-static int MasterMain() {
+static int PortodMaster() {
     TError error;
 
     Statistics->MasterStarted = GetCurrentTimeMs();
 
-    DaemonPrepare(true);
+    SetProcessName(PORTOD_MASTER_NAME);
+
+    OpenLog(StdLog ? "" : PORTO_LOG);
+
+    error = MasterPidFile.Save(getpid());
+    if (error)
+        FatalError("Cannot save pid", error);
 
     TPath pathVer(PORTO_VERSION_FILE);
 
@@ -1315,7 +1297,6 @@ static int MasterMain() {
     } else {
         if (PreviousVersion[0] == 'v')
             PreviousVersion = PreviousVersion.substr(1);
-        L_SYS("Previous version: {}", PreviousVersion);
     }
 
     if (pathVer.WriteAll(PORTO_VERSION))
@@ -1328,10 +1309,6 @@ static int MasterMain() {
         FatalError("Cannot read /proc/self/exe", error);
     (void)pathBin.ReadLink(prevBin);
 
-    L_SYS("Previous binary: {}", prevBin);
-
-    L_SYS("Current binary: {}", thisBin);
-
     if (prevBin != thisBin) {
         (void)pathBin.Unlink();
         error = pathBin.Symlink(thisBin);
@@ -1339,17 +1316,14 @@ static int MasterMain() {
             FatalError("Cannot update " + std::string(PORTO_BINARY_PATH), error);
     }
 
+    L_SYS("{}", std::string(80, '-'));
+    L_SYS("Started {} {} {} {}", PORTO_VERSION, PORTO_REVISION, GetPid(), thisBin);
+    L_SYS("Previous version: {} {}", PreviousVersion, prevBin);
+
     std::shared_ptr<TEpollLoop> ELoop = std::make_shared<TEpollLoop>();
     error = ELoop->Create();
     if (error)
         return EXIT_FAILURE;
-
-    // We want propogate mounts into containers
-    error = TPath("/").Remount(MS_SHARED | MS_REC);
-    if (error) {
-        L_ERR("Can't remount / recursively as shared{}", error);
-        return EXIT_FAILURE;
-    }
 
 #ifndef PR_SET_CHILD_SUBREAPER
 #define PR_SET_CHILD_SUBREAPER 36
@@ -1383,17 +1357,17 @@ static int MasterMain() {
     while (true) {
         uint64_t started = GetCurrentTimeMs();
         uint64_t next = started + config().container().respawn_delay_ms();
-        code = SpawnSlave(ELoop, exited);
+        code = SpawnPortod(ELoop, exited);
         L("Returned {}", code);
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
-        if (slavePid) {
-            (void)kill(slavePid, SIGKILL);
-            Reap(slavePid);
+        if (PortodPid) {
+            (void)kill(PortodPid, SIGKILL);
+            Reap(PortodPid);
         }
 
-        if (code < 0 || !respawnSlave)
+        if (code < 0 || !respawnPortod)
             break;
 
         PreviousVersion = PORTO_VERSION;
@@ -1413,7 +1387,6 @@ static int MasterMain() {
 }
 
 static void KvDump() {
-    TLogger::OpenLog(true, "", 0);
     TKeyValue::DumpAll(PORTO_CONTAINERS_KV);
     TKeyValue::DumpAll(PORTO_VOLUMES_KV);
 }
@@ -1422,8 +1395,8 @@ static void PrintVersion() {
     TPath thisBin, currBin;
 
     TPath("/proc/self/exe").ReadLink(thisBin);
-    if (PortoMasterPid.Load() || TPath("/proc/" +
-                std::to_string(PortoMasterPid.Pid) +"/exe").ReadLink(currBin))
+    if (MasterPidFile.Load() || TPath("/proc/" +
+                std::to_string(MasterPidFile.Pid) +"/exe").ReadLink(currBin))
         TPath(PORTO_BINARY_PATH).ReadLink(currBin);
 
     std::cout << "version: " << PORTO_VERSION << " " << PORTO_REVISION << " " << thisBin << std::endl;
@@ -1458,7 +1431,7 @@ static bool SanityCheck() {
         return EXIT_FAILURE;
     }
 
-    if (!PortoMasterPid.Load() && PortoMasterPid.Pid != getpid() && CheckPortoAlive()) {
+    if (!MasterPidFile.Load() && MasterPidFile.Pid != getpid() && CheckPortoAlive()) {
         std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
@@ -1488,21 +1461,18 @@ static int PortodMain() {
     int null = open("/dev/null", O_RDWR);
     PORTO_ASSERT(null == STDIN_FILENO);
 
-    if (!stdlog || fcntl(STDOUT_FILENO, F_GETFD) < 0) {
+    if (!StdLog || fcntl(STDOUT_FILENO, F_GETFD) < 0) {
         int ret = dup2(null, STDOUT_FILENO);
         PORTO_ASSERT(ret == STDOUT_FILENO);
     }
 
-    if (!stdlog || fcntl(STDERR_FILENO, F_GETFD) < 0) {
+    if (!StdLog || fcntl(STDERR_FILENO, F_GETFD) < 0) {
         int ret = dup2(null, STDERR_FILENO);
         PORTO_ASSERT(ret == STDERR_FILENO);
     }
 
     try {
-        if (slaveMode)
-            return SlaveMain();
-        else
-            return MasterMain();
+        return PortodMaster();
     } catch (std::string s) {
         L_ERR("EXCEPTION: {}", s);
         Crash();
@@ -1548,17 +1518,17 @@ static int StartPortod() {
 static int StopPortod() {
     TError error;
 
-    if (PortoMasterPid.Load()) {
+    if (MasterPidFile.Load()) {
         std::cerr << "portod already stopped" << std::endl;
         return EXIT_SUCCESS;
     }
 
-    pid_t pid = PortoMasterPid.Pid;
+    pid_t pid = MasterPidFile.Pid;
     if (CheckPortoAlive()) {
         if (!kill(pid, SIGINT)) {
             uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_stop_timeout() * 1000;
             do {
-                if (PortoMasterPid.Load() || PortoMasterPid.Pid != pid)
+                if (MasterPidFile.Load() || MasterPidFile.Pid != pid)
                     return EXIT_SUCCESS;
             } while (!WaitDeadline(deadline));
         } else if (errno != ESRCH) {
@@ -1572,29 +1542,29 @@ static int StopPortod() {
         std::cerr << "cannot kill portod: " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
-    error = PortoMasterPid.Remove();
+    error = MasterPidFile.Remove();
     if (error)
         std::cerr << "cannot remove pidfile: " << error << std::endl;
-    error = PortoSlavePid.Remove();
+    error = PortodPidFile.Remove();
     if (error)
         std::cerr << "cannot remove pidfile: " << error << std::endl;
     return EXIT_SUCCESS;
 }
 
 static int ReexecPortod() {
-    if (PortoMasterPid.Load() || PortoSlavePid.Load()) {
+    if (MasterPidFile.Load() || PortodPidFile.Load()) {
         std::cerr << "portod not running" << std::endl;
         return EXIT_FAILURE;
     }
 
-    if (kill(PortoMasterPid.Pid, SIGHUP)) {
+    if (kill(MasterPidFile.Pid, SIGHUP)) {
         std::cerr << "cannot send signal" << std::endl;
         return EXIT_FAILURE;
     }
 
     uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
     do {
-        if (!PortoSlavePid.Running() && CheckPortoAlive())
+        if (!PortodPidFile.Running() && CheckPortoAlive())
             return EXIT_SUCCESS;
     } while (!WaitDeadline(deadline));
 
@@ -1613,7 +1583,7 @@ int UpgradePortod() {
         return EXIT_FAILURE;
     }
 
-    error = PortoMasterPid.Load();
+    error = MasterPidFile.Load();
     if (error) {
         std::cerr << "portod not running" << std::endl;
         return EXIT_FAILURE;
@@ -1624,9 +1594,9 @@ int UpgradePortod() {
         return EXIT_FAILURE;
     }
 
-    error = PortoSlavePid.Load();
+    error = PortodPidFile.Load();
     if (error) {
-        std::cerr << "cannot find portod slave: " << error << std::endl;
+        std::cerr << "cannot find portod: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -1657,18 +1627,18 @@ int UpgradePortod() {
         }
     }
 
-    if (kill(PortoMasterPid.Pid, SIGHUP)) {
+    if (kill(MasterPidFile.Pid, SIGHUP)) {
         std::cerr << "online upgrade failed: " << strerror(errno) << std::endl;
         goto undo;
     }
 
     deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
     do {
-        if (!PortoMasterPid.Running() || !PortoSlavePid.Running())
+        if (!MasterPidFile.Running() || !PortodPidFile.Running())
             break;
     } while (!WaitDeadline(deadline));
 
-    error = PortoMasterPid.Load();
+    error = MasterPidFile.Load();
     if (error) {
         std::cerr << "online upgrade failed: " << error << std::endl;
         goto undo;
@@ -1739,17 +1709,13 @@ int main(int argc, char **argv) {
         }
 
         if (arg == "--stdlog")
-            stdlog = true;
+            StdLog = true;
         else if (arg == "--verbose")
             Verbose = true;
         else if (arg == "--debug")
             Verbose = Debug = true;
         else if (arg == "--norespawn")
-            respawnSlave = false;
-        else if (arg == "--slave")
-            slaveMode = true;
-        else if (arg == "--failsafe")
-            failsafe = true;
+            respawnPortod = false;
         else if (arg == "--discard")
             discardState = true;
         else {
@@ -1762,7 +1728,7 @@ int main(int argc, char **argv) {
     std::string cmd(argv[opt] ?: "");
 
     if (cmd == "status") {
-        if (!PortoMasterPid.Path.Exists()) {
+        if (!MasterPidFile.Path.Exists()) {
             std::cout << "stopped" << std::endl;
             return EXIT_FAILURE;
         } else if (CheckPortoAlive()) {
