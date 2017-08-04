@@ -305,6 +305,13 @@ void TNetwork::InitializeConfig() {
             sysctl->set_val(val);
         }
     }
+
+    if (config().container().default_resolv_conf().empty()) {
+        TTuple lines;
+
+        if (!TPath("/etc/resolv.conf").ReadLines(lines))
+            config().mutable_container()->set_default_resolv_conf(MergeEscapeStrings(lines, ';'));
+    }
 }
 
 TNetwork::TNetwork() : NatBitmap(0, 0) {
