@@ -178,6 +178,8 @@ void ICmd::Print(const std::string &val) {
 
     if (!val.length() || val[val.length() - 1] != '\n')
         std::cout << std::endl;
+    else
+        std::cout << std::flush;
 }
 
 void ICmd::PrintPair(const std::string &key, const std::string &val) {
