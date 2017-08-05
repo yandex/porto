@@ -1676,7 +1676,6 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
     ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
-    ExpectApiSuccess(api.SetProperty(name, "bind_dns", "false"));
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     auto v = StartWaitAndGetData(api, name, "stdout");
@@ -2888,7 +2887,6 @@ static void TestRoot(Porto::Connection &api) {
         "ulimit",
         "hostname",
         "root",
-        "bind_dns",
         "max_respawns",
         "bind",
         "root_readonly",
