@@ -296,20 +296,6 @@ TError TMountNamespace::SetupRoot() {
             return error;
     }
 
-    if (BindResolvConf) {
-        std::vector<std::string> files = { "/etc/hosts", "/etc/resolv.conf" };
-
-        for (auto &file : files) {
-            TPath path = Root / file;
-            error = path.CreateAll(0600);
-            if (error)
-                return error;
-            error = path.BindRemount(file, MS_RDONLY);
-            if (error)
-                return error;
-        }
-    }
-
     struct {
         const std::string path;
         mode_t mode;

@@ -1613,6 +1613,15 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Mnt.BindMounts = BindMounts;
 
+    /* legacy kludge */
+    if (BindDns && !TaskEnv.Mnt.Root.IsRoot()) {
+        TBindMount bm;
+        bm.Source = "/etc/hosts";
+        bm.Target = "/etc/hosts";
+        bm.ReadOnly = true;
+        TaskEnv.Mnt.BindMounts.push_back(bm);
+    }
+
     /* Resolve paths in parent namespace and check volume ownership */
     for (auto &bm: TaskEnv.Mnt.BindMounts) {
         if (!bm.Source.IsAbsolute())
@@ -1631,7 +1640,6 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     }
 
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
-    TaskEnv.Mnt.BindResolvConf = BindDns && ResolvConf.empty();
 
     error = ConfigureDevices(TaskEnv.Devices);
     if (error) {

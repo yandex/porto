@@ -892,8 +892,10 @@ public:
 class TBindDns : public TProperty {
 public:
     TBindDns() : TProperty(P_BIND_DNS, EProperty::BIND_DNS,
-                           "Bind /etc/resolv.conf and /etc/hosts from host"
-                           ", deprecated: use resolv_conf") {}
+                           "Bind /etc/hosts from parent, deprecated")
+    {
+        IsHidden = true;
+    }
     TError Get(std::string &value) {
         value = BoolToString(CT->BindDns);
         return TError::Success();
@@ -1404,7 +1406,7 @@ public:
     }
     TError Start(void) {
         /* Set default resolv_conf for chroots */
-        if (CT->Root != "/" && !CT->HasProp(EProperty::RESOLV_CONF) && !CT->BindDns)
+        if (CT->Root != "/" && !CT->HasProp(EProperty::RESOLV_CONF))
             CT->ResolvConf = SplitEscapedString(config().container().default_resolv_conf(), ';');
         return TError::Success();
     }

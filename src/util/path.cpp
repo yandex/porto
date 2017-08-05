@@ -432,25 +432,6 @@ TError TPath::MkdirTmp(const TPath &parent, const std::string &prefix, unsigned 
     return TError::Success();
 }
 
-TError TPath::CreateAll(unsigned int mode) const {
-    if (!Exists()) {
-        TPath dir = DirName();
-        TError error;
-
-        if (!dir.Exists()) {
-            error = dir.MkdirAll(0755);
-            if (error)
-                return error;
-        }
-
-        /* This fails for broken symlinks */
-        return Mkfile(mode);
-    } else if (IsDirectoryFollow())
-        return TError(EError::Unknown, "Is a directory: " + Path);
-
-    return TError::Success();
-}
-
 TError TPath::Rmdir() const {
     if (rmdir(Path.c_str()) < 0)
         return TError(EError::Unknown, errno, "rmdir(" + Path + ")");
@@ -890,7 +871,9 @@ TError TPath::WritePrivate(const std::string &text) const {
     TFile temp;
 
     if (!Exists()) {
-        error = Mkfile(0644);
+        error = DirName().MkdirAll(755);
+        if (!error)
+            error = Mkfile(0644);
         if (error)
             return error;
     } else if (!IsRegularStrict())

@@ -488,10 +488,6 @@ container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 
     Setting **resolv\_conf**="" keeps configuraion in chroot as is.
 
-* **bind\_dns**      - bind /etc/resolv.conf and /etc/hosts from host, default: false
-
-    Deprected, use **resolv\_conf**.
-
 * **sysctl**         - sysctl configuration, syntax: \<sysctl\>: \<value\>;...
 
     Porto allows to set only virtualized sysctls from hardcoded white-list.

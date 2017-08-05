@@ -1942,7 +1942,8 @@ static void TestHostnameProperty(Porto::Connection &api) {
 
     AsRoot(api);
     ExpectSuccess(path.Mount(name, "tmpfs", 0, {"size=32m"}));
-    ExpectSuccess(TPath(path + "/etc/hostname").CreateAll(0644));
+    ExpectSuccess(TPath(path + "/etc").Mkdir(0755));
+    ExpectSuccess(TPath(path + "/etc/hostname").Mkfile(0644));
     BootstrapCommand("/bin/hostname", path, false);
     BootstrapCommand("/bin/sleep", path, false);
     BootstrapCommand("/bin/cat", path, false);

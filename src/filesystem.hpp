@@ -24,7 +24,6 @@ public:
     bool RootRo;
     std::vector<TBindMount> BindMounts;
     bool BindPortoSock;
-    bool BindResolvConf;
     uint64_t RunSize;
 
     TError SetupRoot();
