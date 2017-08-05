@@ -1789,8 +1789,6 @@ static void TestRootProperty(Porto::Connection &api) {
 
     auto lines = SplitString(v, '\n');
     auto m = ParseMountinfo(lines);
-    ExpectEq(m.count("/etc/resolv.conf"), 0);
-    ExpectEq(m.count("/etc/hosts"), 0);
     ExpectNeq(m["/sys"].flags.find("ro,"), string::npos);
     ExpectNeq(m["/proc/sys"].flags.find("ro,"), string::npos);
     ExpectNeq(m["/proc/sysrq-trigger"].flags.find("ro,"), string::npos);
