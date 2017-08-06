@@ -338,6 +338,7 @@ void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
     NetworksIndex[inode] = net;
     net->NetInode = inode;
     net->StatTime = GetCurrentTimeMs();
+    net->StatGen =  GlobalStatGen.load();
 }
 
 void TNetwork::Unregister() {
