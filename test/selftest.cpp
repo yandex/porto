@@ -1661,6 +1661,8 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
         "/dev",
         "/dev/pts",
 
+        "/etc/resolv.conf",
+
         "/proc",
         "/run",
         "/sys",
