@@ -1393,21 +1393,25 @@ public:
                               "DNS resolver configuration: "
                               "<resolv.conf option>;...") {}
     TError Get(std::string &value) {
-        value = MergeEscapeStrings(CT->ResolvConf, ';');
+        value = CT->ResolvConf;
         return TError::Success();
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
         if (error)
             return error;
-        CT->ResolvConf = SplitEscapedString(value, ';');
+        CT->ResolvConf = value;
         CT->SetProp(EProperty::RESOLV_CONF);
         return TError::Success();
     }
     TError Start(void) {
         /* Set default resolv_conf for chroots */
-        if (CT->Root != "/" && !CT->HasProp(EProperty::RESOLV_CONF))
-            CT->ResolvConf = SplitEscapedString(config().container().default_resolv_conf(), ';');
+        if (!CT->HasProp(EProperty::RESOLV_CONF)) {
+            if (CT->Root != "/")
+                CT->ResolvConf = config().container().default_resolv_conf();
+            else
+                CT->ResolvConf = "";
+        }
         return TError::Success();
     }
 } static ResolvConf;

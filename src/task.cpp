@@ -177,14 +177,9 @@ TError TTaskEnv::ChildApplyLimits() {
 }
 
 TError TTaskEnv::WriteResolvConf() {
-    std::string cfg;
-
     if (!CT->ResolvConf.size())
         return TError::Success();
-
-    for (auto &line: CT->ResolvConf)
-        cfg += line + "\n";
-
+    std::string cfg = StringReplaceAll(CT->ResolvConf, ";", "\n");
     return TPath("/etc/resolv.conf").WritePrivate(cfg);
 }
 
