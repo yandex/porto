@@ -156,6 +156,7 @@ message TCfg {
 		optional uint64 max_total = 9;
 		optional string place_load_limit = 10;
 		optional bool direct_io_loop = 11;
+		optional string default_lvm_group = 12;
 	}
 
 	message TCoreCfg {

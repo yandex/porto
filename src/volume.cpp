@@ -137,7 +137,7 @@ public:
         if (Volume->InodeLimit)
             opts.emplace_back("nr_inodes=" + std::to_string(Volume->InodeLimit));
 
-        return Volume->InternalPath.Mount("porto:" + Volume->Id, "tmpfs",
+        return Volume->InternalPath.Mount("porto_tmpfs_" + Volume->Id, "tmpfs",
                                           Volume->GetMountFlags(), opts);
     }
 
@@ -150,7 +150,7 @@ public:
         if (inode_limit)
             opts.emplace_back("nr_inodes=" + std::to_string(inode_limit));
 
-        return Volume->InternalPath.Mount("porto:" + Volume->Id, "tmpfs",
+        return Volume->InternalPath.Mount("porto_tmpfs_" + Volume->Id, "tmpfs",
                                           Volume->GetMountFlags() | MS_REMOUNT,
                                           opts);
     }
@@ -946,6 +946,101 @@ public:
 };
 
 
+/* TVolumeLvmBackend - ext4 on LVM */
+
+class TVolumeLvmBackend : public TVolumeBackend {
+public:
+
+    bool Persistent() {
+        return Volume->Storage.find('/') != std::string::npos;
+    }
+
+    std::string GetName() {
+        auto sep = Volume->Storage.find('/');
+        if (sep == std::string::npos)
+            return "porto_lvm_" + Volume->Id;
+        return Volume->Storage.substr(sep + 1);
+    }
+
+    std::string GetGroup() {
+        if (!Volume->HaveStorage())
+            return config().volumes().default_lvm_group();
+        auto sep = Volume->Storage.find('/');
+        if (sep == std::string::npos)
+            return Volume->Storage;
+        return Volume->Storage.substr(0, sep);
+    }
+
+    std::string GetDevice() {
+        return "/dev/" + GetGroup() + "/" + GetName();
+    }
+
+    TError Configure() override {
+        if (!Volume->SpaceLimit && !Persistent())
+            return TError(EError::InvalidValue, "lvm space_limit not set");
+        if (GetGroup().empty())
+            return TError(EError::InvalidValue, "lvm volume group not set");
+        if (GetName().empty())
+            return TError(EError::InvalidValue, "lvm volume name not set");
+        if (Persistent() && StringStartsWith(GetName(), "porto_"))
+            return TError(EError::InvalidValue, "reserved lvm volume name");
+        return TError::Success();
+    }
+
+    TError Build() override {
+        TError error;
+        bool persistent = Persistent();
+        TPath device = GetDevice();
+
+        if (!device.Exists() || !persistent) {
+            Volume->KeepStorage = false; /* Do chown and chmod */
+
+            error = RunCommand({"lvm", "lvcreate", "--name", GetName(),
+                                "--size", std::to_string(Volume->SpaceLimit) + "B",
+                                GetGroup()}, "/");
+            if (error)
+                return error;
+
+            error = RunCommand({ "mkfs.ext4", "-q", "-m", "0",
+                                 "-O", std::string(persistent ? "" : "^") + "has_journal",
+                                 device.ToString()}, "/");
+            if (error)
+                persistent = false;
+        }
+
+        if (!error)
+            error = Volume->InternalPath.Mount(device, "ext4",
+                    Volume->GetMountFlags(),
+                    { persistent ? "barrier" : "nobarrier",
+                      "errors=continue" });
+
+        if (error && !persistent)
+            (void)RunCommand({"lvm", "lvremove", "--force", device.ToString()}, "/");
+
+        return error;
+    }
+
+    TError Destroy() override {
+        TError error = Volume->InternalPath.UmountAll();
+        if (!Persistent()) {
+            TError error2 = RunCommand({"lvm", "lvremove", "--force", GetDevice()}, "/");
+            if (!error)
+                error = error2;
+        }
+        return error;
+    }
+
+    TError Resize(uint64_t space_limit, uint64_t) override {
+        return RunCommand({"lvm", "lvresize", "--force", "--resizefs",
+                           "--size", std::to_string(space_limit) + "B",
+                           GetDevice()}, "/");
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->InternalPath.StatFS(result);
+    }
+};
+
 /* TVolume */
 
 std::shared_ptr<TVolume> TVolume::Find(const TPath &path) {
@@ -992,6 +1087,8 @@ TError TVolume::OpenBackend() {
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLoopBackend());
     else if (BackendType == "squash")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeSquashBackend());
+    else if (BackendType == "lvm")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLvmBackend());
     else if (BackendType == "rbd")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend());
     else
@@ -1065,10 +1162,8 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
                 volume->StoragePath.GetDev() != storage.GetDev())
             continue;
 
-        auto volume_backend = volume->BackendType;
-
-        /* rbd stored remotely, plain cannot provide usage */
-        if (volume_backend == "rbd" || volume_backend == "plain")
+        /* data stored remotely, plain cannot provide usage */
+        if (volume->RemoteStorage() || volume->BackendType == "plain")
             continue;
 
         TStatFS stat;
@@ -1087,7 +1182,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
         else
             space_claimed += volume_space_guarantee;
 
-        if (volume_backend != "loop") {
+        if (volume->BackendType != "loop") {
             inode_guaranteed += volume_inode_guarantee;
             if (stat.InodeUsage < volume_inode_guarantee)
                 inode_claimed += stat.InodeUsage;
@@ -1246,7 +1341,9 @@ TError TVolume::Configure(const TStringMap &cfg) {
     }
 
     /* Verify storage */
-    if (UserStorage()) {
+    if (RemoteStorage()) {
+        /* They use storage for own purpose */
+    } else if (UserStorage()) {
         if (!StoragePath.IsNormal())
             return TError(EError::InvalidValue, "Storage path must be normalized");
         StoragePath = CL->ResolvePath(StoragePath);
@@ -1269,13 +1366,17 @@ TError TVolume::Configure(const TStringMap &cfg) {
     } else
         return TError(EError::InvalidValue, "Invalid storage format: " + Storage);
 
-    for (auto &it: Volumes) {
-        auto other = it.second;
-        if (StoragePath == other->StoragePath && Place == other->Place &&
-                (!IsReadOnly || !other->IsReadOnly) &&
-                (BackendType != "bind" || other->BackendType != "bind"))
-            return TError(EError::Busy, "Storage already in use by volume " +
-                                        other->Path.ToString());
+    if (!RemoteStorage()) {
+        for (auto &it: Volumes) {
+            auto other = it.second;
+            if (!other->RemoteStorage() &&
+                    StoragePath == other->StoragePath &&
+                    Place == other->Place &&
+                    (!IsReadOnly || !other->IsReadOnly) &&
+                    (BackendType != "bind" || other->BackendType != "bind"))
+                return TError(EError::Busy, "Storage already in use by volume " +
+                        other->Path.ToString());
+        }
     }
 
     /* Verify and resolve layers */
@@ -1979,7 +2080,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
-    { V_BACKEND,     "plain|bind|tmpfs|quota|native|overlay|squash|loop|rbd (default - autodetect)", false },
+    { V_BACKEND,     "plain|bind|tmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_PRIVATE,     "user-defined property", false },

@@ -163,6 +163,7 @@ public:
     /* They do not keep data in StoragePath */
     bool RemoteStorage(void) const {
         return BackendType == "rbd" ||
+               BackendType == "lvm" ||
                BackendType == "tmpfs" ||
                BackendType == "quota";
     }
