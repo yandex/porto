@@ -618,7 +618,7 @@ Like for container volume configuration is a set of key-value pairs.
     - *squash*    - overlayfs and quota on top of squashfs image set in **layers**
     - *loop*      - create and mount ext4 image **storage**/loop.img or **storage** if this's file
     - *rbd*       - map and mount ext4 image from caph rbd **storage**="id@pool/image"
-    - *lvm*       - ext4 in **lvm(8)** **storage**="VG[/LV]"
+    - *lvm*       - ext4 in **lvm(8)** **storage**="\[Group\]\[/Name\]\[@Thin\]\[:Origin\]"
 
     Depending on chosen backend some properties becomes required of not-supported.
 

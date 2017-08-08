@@ -951,79 +951,108 @@ public:
 class TVolumeLvmBackend : public TVolumeBackend {
 public:
 
-    bool Persistent() {
-        return Volume->Storage.find('/') != std::string::npos;
-    }
-
-    std::string GetName() {
-        auto sep = Volume->Storage.find('/');
-        if (sep == std::string::npos)
-            return "porto_lvm_" + Volume->Id;
-        return Volume->Storage.substr(sep + 1);
-    }
-
-    std::string GetGroup() {
-        if (!Volume->HaveStorage())
-            return config().volumes().default_lvm_group();
-        auto sep = Volume->Storage.find('/');
-        if (sep == std::string::npos)
-            return Volume->Storage;
-        return Volume->Storage.substr(0, sep);
-    }
-
-    std::string GetDevice() {
-        return "/dev/" + GetGroup() + "/" + GetName();
-    }
+    bool Persistent;
+    std::string Group;
+    std::string Name;
+    std::string Thin;
+    std::string Origin;
+    std::string Device;
 
     TError Configure() override {
-        if (!Volume->SpaceLimit && !Persistent())
+        // storage=[Group][/Name][@Thin][:Origin]
+
+        auto col = Volume->Storage.find(':');
+        if (col != std::string::npos)
+            Origin = Volume->Storage.substr(col + 1);
+        auto at = Volume->Storage.find('@');
+        if (at != std::string::npos && at < col)
+            Thin = Volume->Storage.substr(at + 1, col - at - 1);
+        else
+            at = col;
+        auto sep = Volume->Storage.find('/');
+        if (sep != std::string::npos && sep < at)
+            Name = Volume->Storage.substr(sep + 1, at - sep - 1);
+        else
+            sep = at;
+        Group = Volume->Storage.substr(0, sep);
+
+        if (Group.empty())
+            Group = config().volumes().default_lvm_group();
+
+        Persistent = !Name.empty();
+        if (!Persistent)
+            Name = "porto_lvm_" + Volume->Id;
+
+        Device = "/dev/" + Group + "/" + Name;
+
+        if (!Volume->SpaceLimit && !Persistent && Origin.empty())
             return TError(EError::InvalidValue, "lvm space_limit not set");
-        if (GetGroup().empty())
+
+        if (Group.empty())
             return TError(EError::InvalidValue, "lvm volume group not set");
-        if (GetName().empty())
-            return TError(EError::InvalidValue, "lvm volume name not set");
-        if (Persistent() && StringStartsWith(GetName(), "porto_"))
+
+        if (Persistent && StringStartsWith(Name, "porto_"))
             return TError(EError::InvalidValue, "reserved lvm volume name");
+
+        if (StringStartsWith(Origin, "porto_"))
+            return TError(EError::InvalidValue, "origin is temporary volume");
+
         return TError::Success();
+    }
+
+    TError Restore() override {
+        return Configure();
     }
 
     TError Build() override {
         TError error;
-        bool persistent = Persistent();
-        TPath device = GetDevice();
 
-        if (!device.Exists() || !persistent) {
+        if (!TPath(Device).Exists() || !Persistent) {
             Volume->KeepStorage = false; /* Do chown and chmod */
 
-            error = RunCommand({"lvm", "lvcreate", "--name", GetName(),
-                                "--size", std::to_string(Volume->SpaceLimit) + "B",
-                                GetGroup()}, "/");
+            if (Origin.size()) {
+                error = RunCommand({"lvm", "lvcreate", "--name", Name,
+                                    "--snapshot", Group + "/" + Origin,
+                                    "--setactivationskip", "n"}, "/");
+                if (!error && Volume->SpaceLimit)
+                    error = Resize(Volume->SpaceLimit, Volume->InodeLimit);
+            } else if (Thin.size()) {
+                error = RunCommand({"lvm", "lvcreate", "--name", Name, "--thin",
+                                    "--virtualsize", std::to_string(Volume->SpaceLimit) + "B",
+                                    Group + "/" + Thin}, "/");
+            } else {
+                error = RunCommand({"lvm", "lvcreate", "--name", Name,
+                                    "--size", std::to_string(Volume->SpaceLimit) + "B",
+                                    Group}, "/");
+            }
             if (error)
                 return error;
 
-            error = RunCommand({ "mkfs.ext4", "-q", "-m", "0",
-                                 "-O", std::string(persistent ? "" : "^") + "has_journal",
-                                 device.ToString()}, "/");
-            if (error)
-                persistent = false;
+            if (Origin.empty()) {
+                error = RunCommand({ "mkfs.ext4", "-q", "-m", "0",
+                                     "-O", std::string(Persistent ? "" : "^") + "has_journal",
+                                     Device}, "/");
+                if (error)
+                    Persistent = false;
+            }
         }
 
         if (!error)
-            error = Volume->InternalPath.Mount(device, "ext4",
-                    Volume->GetMountFlags(),
-                    { persistent ? "barrier" : "nobarrier",
-                      "errors=continue" });
+            error = Volume->InternalPath.Mount(Device, "ext4",
+                                               Volume->GetMountFlags(),
+                                               { Persistent ? "barrier" : "nobarrier",
+                                                 "errors=continue" });
 
-        if (error && !persistent)
-            (void)RunCommand({"lvm", "lvremove", "--force", device.ToString()}, "/");
+        if (error && !Persistent)
+            (void)RunCommand({"lvm", "lvremove", "--force", Device }, "/");
 
         return error;
     }
 
     TError Destroy() override {
         TError error = Volume->InternalPath.UmountAll();
-        if (!Persistent()) {
-            TError error2 = RunCommand({"lvm", "lvremove", "--force", GetDevice()}, "/");
+        if (!Persistent) {
+            TError error2 = RunCommand({"lvm", "lvremove", "--force", Device}, "/");
             if (!error)
                 error = error2;
         }
@@ -1033,7 +1062,7 @@ public:
     TError Resize(uint64_t space_limit, uint64_t) override {
         return RunCommand({"lvm", "lvresize", "--force", "--resizefs",
                            "--size", std::to_string(space_limit) + "B",
-                           GetDevice()}, "/");
+                           Device}, "/");
     }
 
     TError StatFS(TStatFS &result) override {
