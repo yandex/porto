@@ -753,6 +753,10 @@ TError TNlLink::AddIp6Tnl(const std::string &name,
     return SetMtu(mtu);
 }
 
+int TNlLink::GetMtu() {
+    return rtnl_link_get_mtu(Link);
+}
+
 TError TNlLink::SetMtu(int mtu) {
     auto link_mtu = rtnl_link_alloc();
     rtnl_link_set_name(link_mtu, rtnl_link_get_name(Link));

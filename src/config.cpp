@@ -107,6 +107,8 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_ipip6_encap_limit(4);
     config().mutable_network()->set_ipip6_ttl(64);
 
+    config().mutable_network()->set_enable_ip6tnl0(true);
+
     config().mutable_core()->set_enable(false);
     config().mutable_core()->set_timeout_s(600); /* 10min */
     config().mutable_core()->set_space_limit_mb(1024); /* 1Gb */

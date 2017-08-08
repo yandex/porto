@@ -1651,6 +1651,13 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
     NetInherit = false;
     L3Only = true;
 
+    if (config().network().enable_ip6tnl0()) {
+        TNetDeviceConfig dev;
+        dev.Type = "ip6tnl0";
+        dev.Name = "ip6tnl0";
+        Devices.push_back(dev);
+    }
+
     for (auto &settings : net_settings) {
         TNetDeviceConfig dev;
 
@@ -2219,12 +2226,14 @@ TError TNetEnv::SetupInterfaces() {
         return error;
 
     for (auto &dev: Devices) {
-        if (!Net->DeviceIndex(dev.Name))
+        if (!Net->DeviceIndex(dev.Name) && dev.Type != "ip6tnl0")
             return TError(EError::Unknown, "Network device " + dev.Name + " not found");
     }
 
     for (auto &dev: Devices) {
-        if (!NetUp && dev.Ip.empty() && dev.Gw.IsEmpty() && !dev.Autoconf)
+        if ((!NetUp || dev.Type == "ip6tnl0") &&
+                dev.Ip.empty() && dev.Gw.IsEmpty() &&
+                !dev.Autoconf && dev.Mtu < 0)
             continue;
 
         TNlLink link(target_nl, dev.Name);
@@ -2232,9 +2241,17 @@ TError TNetEnv::SetupInterfaces() {
         if (error)
             return error;
 
-        error = link.Up();
-        if (error)
-            return error;
+        if (dev.Mtu > 0 && dev.Mtu != link.GetMtu()) {
+            error = link.SetMtu(dev.Mtu);
+            if (error)
+                return error;
+        }
+
+        if (NetUp || !dev.Ip.empty() || !dev.Gw.IsEmpty() || dev.Autoconf) {
+            error = link.Up();
+            if (error)
+                return error;
+        }
 
         bool DefaultRoute = false;
         for (auto &ip: dev.Ip) {

@@ -126,6 +126,7 @@ public:
     TError SetDefaultGw(const TNlAddr &addr);
     TError AddAddress(const TNlAddr &addr);
     TError WaitAddress(int timeout_s);
+    int GetMtu();
     TError SetMtu(int mtu);
     TError SetMacAddr(const std::string &mac);
 
