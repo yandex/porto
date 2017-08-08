@@ -1776,6 +1776,7 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
         } else if (type == "ipip6") {
             if (settings.size() != 4)
                 return TError(EError::InvalidValue, "Invalid " + line);
+            dev.Type = "ipip6";
             dev.Name = StringTrim(settings[1]);
             if (dev.Name == "ip6tnl0")
                 return TError(EError::InvalidValue,
@@ -2191,7 +2192,7 @@ TError TNetEnv::SetupInterfaces() {
             error = ConfigureL3(dev);
             if (error)
                 return error;
-        } else if (dev.Type == "ipipv6") {
+        } else if (dev.Type == "ipip6") {
             TNlLink link(target_nl, dev.Name);
 
             error = link.AddIp6Tnl(dev.Name, dev.IpIp6.Remote, dev.IpIp6.Local,
