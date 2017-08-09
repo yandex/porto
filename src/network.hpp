@@ -283,6 +283,7 @@ struct TNetEnv {
     std::string Hostname;
     std::string NetNsName;
     std::string NetCtName;
+    TMultiTuple IpRoute;
 
     std::vector<TNetDeviceConfig> Devices;
 
@@ -297,6 +298,7 @@ struct TNetEnv {
     std::string GenerateHw(const std::string &name);
     TError ConfigureL3(TNetDeviceConfig &dev);
     TError SetupInterfaces();
+    TError ApplyIpRoute();
 
     TError CreateTap(TNetDeviceConfig &dev);
     TError DestroyTap(TNetDeviceConfig &dev);

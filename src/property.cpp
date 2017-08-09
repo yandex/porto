@@ -986,6 +986,7 @@ public:
  "MTU <name> <mtu> | "
  "MAC <name> <mac> | "
  "autoconf <name> (SLAAC) | "
+ "ip <cmd> <args>... | "
  "netns <name>") {}
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET)) {

@@ -7,6 +7,7 @@
 #include "task.hpp"
 #include "config.hpp"
 #include "client.hpp"
+#include "helpers.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/crc32.hpp"
@@ -1846,6 +1847,12 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
             }
             if (!found)
                 return TError(EError::InvalidValue, "Link not found: " + settings[1]);
+        } else if (type == "ip") {
+            if (!config().network().enable_iproute())
+                return TError(EError::Permission, "iproute is disabled");
+            IpRoute.push_back(settings);
+            NetIsolate = true;
+            L3Only = false;
         } else
             return TError(EError::InvalidValue, "Unknown net option: " + type);
 
@@ -1867,8 +1874,8 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
 }
 
 TError TNetEnv::CheckIpLimit() {
-    /* no devices -> no ip changes */
-    if (Devices.empty())
+    /* no changes -> no limits */
+    if (NetInherit)
         return TError::Success();
 
     for (auto ct = Parent; ct; ct = ct->Parent) {
@@ -2280,6 +2287,30 @@ TError TNetEnv::SetupInterfaces() {
     return TError::Success();
 }
 
+TError TNetEnv::ApplyIpRoute() {
+    TNamespaceFd curNs;
+    TError error;
+
+    error = curNs.Open("/proc/thread-self/ns/net");
+    if (error)
+        return error;
+
+    error = NetNs.SetNs(CLONE_NEWNET);
+    if (error)
+        return error;
+
+    for (auto &cmd: IpRoute) {
+        error = RunCommand(cmd, "/");
+        if (error)
+            break;
+    }
+
+    TError error2 = curNs.SetNs(CLONE_NEWNET);
+    PORTO_ASSERT(!error2);
+
+    return error;
+}
+
 TError TNetEnv::Parse(TContainer &ct) {
     TError error;
 
@@ -2386,6 +2417,15 @@ TError TNetEnv::OpenNetwork() {
             lock.unlock();
             Net->Destroy();
             return error;
+        }
+
+        if (IpRoute.size()) {
+            error = ApplyIpRoute();
+            if (error) {
+                lock.unlock();
+                Net->Destroy();
+                return error;
+            }
         }
 
         return TError::Success();

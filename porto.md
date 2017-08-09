@@ -456,6 +456,7 @@ Matching interfaces by name support masks '?' and '\*'.
     - *MTU* \<name\> \<mtu\> - set MTU for device
     - *MAC* \<name\> \<mac\> - set MAC for device
     - *autoconf* \<name\>    - wait for IPv6 SLAAC configuration
+    - *ip* \<cmd\> \<args\>... - configure namespace with **ip(8)**
     - *container* \<name\>   - use namespace of this container
     - *netns* \<name\>       - use namespace created by **ip-netns(8)**
     - *steal* \<device\>     - steal device from parent container
