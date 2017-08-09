@@ -619,7 +619,7 @@ Like for container volume configuration is a set of key-value pairs.
     - *squash*    - overlayfs and quota on top of squashfs image set in **layers**
     - *loop*      - create and mount ext4 image **storage**/loop.img or **storage** if this's file
     - *rbd*       - map and mount ext4 image from caph rbd **storage**="id@pool/image"
-    - *lvm*       - ext4 in **lvm(8)** **storage**="\[Group\]\[/Name\]\[@Thin\]\[:Origin\]"
+    - *lvm*       - ext4 in **lvm(8)** **storage**="\[group\]\[/name\]\[@thin\]\[:origin\]"
 
     Depending on chosen backend some properties becomes required of not-supported.
 
@@ -627,6 +627,8 @@ Like for container volume configuration is a set of key-value pairs.
 
     - */path*     - path to directory to be used as storage
     - *name*      - name of internal persistent storage, see [Volume Storage]
+
+    Some backends (*rbd*, *lvm*) expects configuration in special format.
 
 * **ready**         - is construction complete
 
@@ -653,9 +655,11 @@ Like for container volume configuration is a set of key-value pairs.
     - */path*     - path to layer directory
     - *name*      - name of layer in internal storage, see [Volume Layers]
 
-    Backend *overlay* use layers directly, other copy data during construction.
+    Backend *overlay* use layers directly.
 
     Backend *squash* expects here path to a single squashfs image.
+
+    Other backends copy layers' files into volume during construction.
 
 * **place**         - place for layers and default storage
 
@@ -713,6 +717,22 @@ Porto provides internal volume storage similar to layers storage:
 data are stored in **place**/porto\_storage/**storage**.
 
 For details see **portoctl** command storage.
+
+## Backend LVM
+
+Backend *lvm* takes configuration from property **storage** in format: \[group\]\[/name\]\[@thin\]\[:origin\]".
+
+Default volume group could be set in portod.conf
+```
+volumes { default_lvm_group: "group" }
+```
+
+It "name" is set volume becomes persistent: porto keeps and reuse logical volume "group/name".
+User have to remove it using **lvremove(8)**.
+
+If "thin" is set them volume is allocated from precreated thin pool "group/thin".
+
+If "origin" is set then volume is created as thin snapshot of "group/origin" and belongs to the same pool.
 
 # EXAMPLES
 
