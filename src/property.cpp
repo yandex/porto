@@ -2028,7 +2028,9 @@ public:
 class TCpuSetAffinity : public TProperty {
 public:
     TCpuSetAffinity() : TProperty(D_CPU_SET_AFFINITY, EProperty::NONE,
-            "Resulting CPU affinity: [N,N-M,]... (ro)") {}
+            "Resulting CPU affinity: [N,N-M,]... (ro)") {
+        IsReadOnly = true;
+    }
     TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
         value = CT->CpuAffinity.Format();
@@ -2515,7 +2517,9 @@ TError TRespawnCount::Get(std::string &value) {
 
 class TRootPid : public TProperty {
 public:
-    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE, "root task pid (ro)") {}
+    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE, "root task pid (ro)") {
+        IsReadOnly = true;
+    }
     TError Get(std::string &value) {
         TError error = IsRunning();
         if (error)

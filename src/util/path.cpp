@@ -875,6 +875,8 @@ TError TPath::WriteAtomic(const std::string &text) const {
     if (!error) {
         error = file.WriteAll(text);
         if (!error)
+            error = file.Chmod(0644);
+        if (!error)
             error = temp.Rename(*this);
         if (error)
             (void)temp.Unlink();

@@ -93,6 +93,8 @@ constexpr const char *PORTO_LAYERS = "porto_layers";
 constexpr const char *PORTO_STORAGE = "porto_storage";
 constexpr const char *PORTO_CHROOT_VOLUMES = "porto";
 
+constexpr const char *PORTO_CONTAINERS = "/place/porto_containers";
+
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_ID_MAX = 16384;
