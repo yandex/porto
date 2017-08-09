@@ -866,9 +866,25 @@ TError TPath::WriteAll(const std::string &text) const {
     return TError::Success();
 }
 
+TError TPath::WriteAtomic(const std::string &text) const {
+    TError error;
+    TFile file;
+
+    TPath temp = Path + ".XXXXXX";
+    error = file.CreateTemporary(temp);
+    if (!error) {
+        error = file.WriteAll(text);
+        if (!error)
+            error = temp.Rename(*this);
+        if (error)
+            (void)temp.Unlink();
+    }
+    return error;
+}
+
 TError TPath::WritePrivate(const std::string &text) const {
     TError error;
-    TFile temp;
+    TFile file;
 
     if (!Exists()) {
         error = DirName().MkdirAll(755);
@@ -879,20 +895,19 @@ TError TPath::WritePrivate(const std::string &text) const {
     } else if (!IsRegularStrict())
         return TError(EError::InvalidValue, "non-regular file " + Path);
 
-    error = temp.CreateTemp("/run");
+    TPath temp = "/run/" + BaseName() + ".XXXXXX";
+    error = file.CreateTemporary(temp);
     if (error)
         return error;
 
-    if (fchmod(temp.Fd, 0644))
-        return TError(EError::Unknown, errno, "fchmod");
-
     error = temp.WriteAll(text);
-    if (error)
-        return TError(error, Path);
-
-    error = UmountAll();
     if (!error)
-        error = Bind(temp.ProcPath());
+        error = file.Chmod(0644);
+    if (!error)
+        error = UmountAll();
+    if (!error)
+        error = Bind(file.ProcPath());
+    (void)temp.Unlink();
     return error;
 }
 
@@ -1097,19 +1112,23 @@ TError TFile::OpenPath(const TPath &path) {
 #define O_TMPFILE (O_DIRECTORY | 020000000)
 #endif
 
-TError TFile::CreateTemp(const TPath &path, int flags) {
-    if (Fd >= 0)
-        close(Fd);
-    SetFd = open(path.c_str(), O_RDWR | O_TMPFILE | O_CLOEXEC | flags, 0600);
-    if (Fd < 0) {
-        std::string temp = path.ToString() + "/porto.XXXXXX";
-        SetFd = mkostemp(&temp[0], O_CLOEXEC | flags);
-        if (Fd < 0)
-            return TError(EError::Unknown, errno, "Cannot create temporary " + temp);
-        if (unlink(temp.c_str()))
-            return TError(EError::Unknown, errno, "Cannot unlink " + temp);
-    }
+TError TFile::CreateTemporary(TPath &temp, int flags) {
+    Close();
+    SetFd = mkostemp(&temp.Path[0], O_CLOEXEC | flags);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot create temporary " + temp.Path);
     return TError::Success();
+}
+
+TError TFile::CreateUnnamed(const TPath &dir, int flags) {
+    TError error = Create(dir, O_RDWR | O_TMPFILE | O_CLOEXEC | flags, 0600);
+    if (error) {
+        TPath temp = dir / "unnamed.XXXXXX";
+        error = CreateTemporary(temp, flags);
+        if (!error)
+            error = temp.Unlink();
+    }
+    return error;
 }
 
 TError TFile::Create(const TPath &path, int flags, int mode) {

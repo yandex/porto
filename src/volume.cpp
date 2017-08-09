@@ -866,7 +866,7 @@ public:
         TError error;
         TFile out;
 
-        error = out.CreateTemp("/tmp");
+        error = out.CreateUnnamed("/tmp");
         if (error)
             return error;
         error = RunCommand({"rbd", "--id=" + id, "--pool=" + pool, "map", image}, "/", TFile(), out);

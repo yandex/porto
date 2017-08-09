@@ -172,6 +172,7 @@ public:
     TError ReadInt(int &value) const;
 
     TError WriteAll(const std::string &text) const;
+    TError WriteAtomic(const std::string &text) const;
     TError WritePrivate(const std::string &text) const;
 };
 
@@ -217,7 +218,8 @@ public:
     TError OpenDir(const TPath &path);
     TError OpenDirStrict(const TPath &path);
     TError OpenPath(const TPath &path);
-    TError CreateTemp(const TPath &path, int flags = 0);
+    TError CreateTemporary(TPath &temp, int flags = 0);
+    TError CreateUnnamed(const TPath &dir, int flags = 0);
     TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
     TError CreateTrunc(const TPath &path, int mode);
