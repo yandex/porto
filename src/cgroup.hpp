@@ -273,7 +273,13 @@ public:
         if (RootCgroup().GetBool("cgroup.sane_behavior", HasSaneBehavior))
             HasSaneBehavior = false;
     }
-    TError GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops) const;
+    enum IoStat {
+        Read = 1,
+        Write = 2,
+        Iops = 4,
+        Time = 8,
+    };
+    TError GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const;
     TError SetIoWeight(TCgroup &cg, const std::string &policy, double weight) const;
     TError SetIoLimit(TCgroup &cg, const TUintMap &map, bool iops = false);
 

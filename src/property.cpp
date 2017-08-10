@@ -3064,10 +3064,10 @@ public:
 class TIoReadStat : public TIoStat {
 public:
     TIoReadStat() : TIoStat(D_IO_READ, EProperty::NONE,
-            "read from disk: <disk>: <bytes>;... (ro)") {}
+            "read from disk: <disk>|<path>|total: <bytes>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
-        BlkioSubsystem.GetIoStat(blkCg, map, 0, false);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Read, map);
 
         if (MemorySubsystem.SupportIoLimit()) {
             auto memCg = CT->GetCgroup(MemorySubsystem);
@@ -3083,10 +3083,10 @@ public:
 class TIoWriteStat : public TIoStat {
 public:
     TIoWriteStat() : TIoStat(D_IO_WRITE, EProperty::NONE,
-            "written to disk: <disk>: <bytes>;... (ro)") {}
+            "written to disk: <disk>|<path>|total: <bytes>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
-        BlkioSubsystem.GetIoStat(blkCg, map, 1, false);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Write, map);
 
         if (MemorySubsystem.SupportIoLimit()) {
             auto memCg = CT->GetCgroup(MemorySubsystem);
@@ -3102,10 +3102,10 @@ public:
 class TIoOpsStat : public TIoStat {
 public:
     TIoOpsStat() : TIoStat(D_IO_OPS, EProperty::NONE,
-            "io operations: <disk>: <ops>;... (ro)") {}
+            "io operations: <disk>|<path>|total: <ops>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
-        BlkioSubsystem.GetIoStat(blkCg, map, 2, true);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Iops, map);
 
         if (MemorySubsystem.SupportIoLimit()) {
             auto memCg = CT->GetCgroup(MemorySubsystem);
@@ -3117,6 +3117,17 @@ public:
         return TError::Success();
     }
 } static IoOpsStat;
+
+class TIoTimeStat : public TIoStat {
+public:
+    TIoTimeStat() : TIoStat(D_IO_TIME, EProperty::NONE,
+            "io time: <disk>|<path>|total: <nanoseconds>;... (ro)") {}
+    TError GetMap(TUintMap &map) {
+        auto blkCg = CT->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
+        return TError::Success();
+    }
+} static IoTimeStat;
 
 class TTime : public TProperty {
 public:

@@ -114,6 +114,7 @@ constexpr const char *D_NET_TX_DROPS = "net_tx_drops";
 constexpr const char *D_IO_READ = "io_read";
 constexpr const char *D_IO_WRITE = "io_write";
 constexpr const char *D_IO_OPS = "io_ops";
+constexpr const char *D_IO_TIME = "io_time";
 constexpr const char *D_TIME = "time";
 constexpr const char *D_CREATION_TIME = "creation_time";
 constexpr const char *D_START_TIME = "start_time";

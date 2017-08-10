@@ -1109,9 +1109,13 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
 
     /* I/O */
     AddColumn("maj/s", "major_faults'", "Major page fault count");
-    AddColumn("read b/s", "io_read[fs]' b", "IO bytes read by fs");
-    AddColumn("write b/s", "io_write[fs]' b", "IO bytes written by fs");
-    AddColumn("iop/s", "io_ops[fs]'", "IO operations by fs");
+    AddColumn("read b/s", "io_read[total]' b", "IO bytes read from disk");
+    AddColumn("write b/s", "io_write[total]' b", "IO bytes written to disk");
+    AddColumn("io op/s", "io_ops[total]'", "IO operations per second");
+    AddColumn("io load", "io_time[total]' 1e9", "Average disk queue depth");
+    AddColumn("fs read b/s", "io_read[fs]' b", "IO bytes read by fs");
+    AddColumn("fs write b/s", "io_write[fs]' b", "IO bytes written by fs");
+    AddColumn("fs iop/s", "io_ops[fs]'", "IO operations by fs");
 
     /* Network */
     AddColumn("net", "S(net_bytes) 'b", "Bytes transmitted by container");

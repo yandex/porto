@@ -903,23 +903,26 @@ TError TBlkioSubsystem::ResolveDisk(const std::string &key, std::string &disk) c
     return TError::Success();
 }
 
-TError TBlkioSubsystem::GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops) const {
+TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const {
     std::vector<std::string> lines;
     std::string knob, prev, name;
+    bool summ = false, hide = false;
     TError error;
 
-    /* get statistics from throttler if possible, it has couners for raids */
-    if (HasThrottler)
-        knob = iops ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";
+    if (stat & IoStat::Time)
+        knob = "blkio.io_service_time_recursive";
+    else if (HasThrottler)
+        /* get statistics from throttler if possible, it has couners for raids */
+        knob = (stat & IoStat::Iops) ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";
     else
-        knob = iops ? "blkio.io_serviced_recursive" : "blkio.io_service_bytes_recursive";
+        knob = (stat & IoStat::Iops) ? "blkio.io_serviced_recursive" : "blkio.io_service_bytes_recursive";
 
     error = cg.Knob(knob).ReadLines(lines);
     if (error)
         return error;
 
     /* in insane behavior throttler isn't hierarhical */
-    if (HasThrottler && !HasSaneBehavior) {
+    if (!(stat & IoStat::Time) && HasThrottler && !HasSaneBehavior) {
         std::vector<TCgroup> list;
 
         error = cg.ChildsAll(list);
@@ -933,16 +936,17 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops
         }
     }
 
+    uint64_t total = 0;
     for (auto &line: lines) {
         auto word = SplitString(line, ' ');
         if (word.size() != 3)
             continue;
 
         if (word[1] == "Read") {
-            if (dir == 1)
+            if (stat & IoStat::Write)
                 continue;
         } else if (word[1] == "Write") {
-            if (dir == 0)
+            if (stat & IoStat::Read)
                 continue;
         } else
             continue;
@@ -951,12 +955,22 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, TUintMap &map, int dir, bool iops
             if (DiskName(word[0], name))
                 continue;
             prev = word[0];
+            summ = StringStartsWith(name, "sd") ||
+                   StringStartsWith(name, "nvme");
+            hide = StringStartsWith(name, "ram");
         }
 
+        if (hide)
+            continue;
+
         uint64_t val;
-        if (!StringToUint64(word[2], val) && val)
+        if (!StringToUint64(word[2], val) && val) {
             map[name] += val;
+            if (summ)
+                total += val;
+        }
     }
+    map["total"] = total;
 
     return TError::Success();
 }
