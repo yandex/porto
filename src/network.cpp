@@ -583,15 +583,6 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
         }
     }
 
-    TNlCgFilter filter(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR), 1);
-    (void)filter.Delete(*Nl);
-
-    error = filter.Create(*Nl);
-    if (error) {
-        L_ERR("Can't create tc filter: {}", error);
-        return error;
-    }
-
     GetDeviceSpeed(dev);
 
     TNlClass cls;
@@ -618,6 +609,15 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     error = cls.Create(*Nl);
     if (error) {
         L_ERR("Can't create default tclass: {}", error);
+        return error;
+    }
+
+    TNlCgFilter filter(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR), 1);
+    (void)filter.Delete(*Nl);
+
+    error = filter.Create(*Nl);
+    if (error) {
+        L_ERR("Can't create tc filter: {}", error);
         return error;
     }
 

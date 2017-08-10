@@ -1353,7 +1353,7 @@ TError TNlCgFilter::Create(const TNl &nl) {
     if (ret)
         error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 
-    if (!Exists(nl))
+    if (!error && !Exists(nl))
         error = TError(EError::Unknown, "BUG: created filter doesn't exist");
 
     return error;
