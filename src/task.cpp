@@ -94,7 +94,6 @@ void TTaskEnv::Abort(const TError &error) {
 }
 
 static int ChildFn(void *arg) {
-    SetProcessName("portod-spawn-c");
     TTaskEnv *task = static_cast<TTaskEnv*>(arg);
     task->StartChild();
     return EXIT_FAILURE;
@@ -466,7 +465,7 @@ TError TTaskEnv::Start() {
 
         SetDieOnParentExit(SIGKILL);
 
-        SetProcessName("portod-spawn-p");
+        SetProcessName("portod-CT" + std::to_string(CT->Id));
 
         /* FIXME try to replace clone() with  unshare() */
 #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)

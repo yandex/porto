@@ -154,7 +154,7 @@ TError TClient::IdentifyClient(bool initial) {
             AccessLevel = EAccessLevel::ReadOnly;
     }
 
-    Id = fmt::format("{}:{}({}) {}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
+    Id = fmt::format("{}:{}({}) CT{}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
 
     if (Verbose)
         L("Client connected: {} cred={} tcred={} access={} ns={} wns={}",

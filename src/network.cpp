@@ -1508,8 +1508,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
                 continue;
             error = net->DeleteClass(dev, ct.NetClass);
             if (error)
-                L("Cannot delete network {} class {}: {}",
-                  net->NetName, ct.Id, error);
+                L("Cannot delete network {} class CT{}:{}: {}",
+                  net->NetName, ct.Id, ct.Name, error);
         }
     }
 
@@ -1524,8 +1524,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
                 continue;
             error = HostNetwork->DeleteClass(dev, ct.NetClass);
             if (error)
-                L("Cannot delete network {} class {}: {}",
-                  HostNetwork->NetName, ct.Id, error);
+                L("Cannot delete network {} class CT{}:{}: {}",
+                  HostNetwork->NetName, ct.Id, ct.Name, error);
         }
     }
 
