@@ -140,14 +140,20 @@ bool TCgroup::Has(const std::string &knob) const {
 TError TCgroup::Get(const std::string &knob, std::string &value) const {
     if (!Subsystem)
         return TError(EError::Unknown, "Cannot get from null cgroup");
-    return Knob(knob).ReadAll(value);
+    TError error = Knob(knob).ReadAll(value);
+    if (error)
+        error = TError(error, "Cannot get cgroup " + knob);
+    return error;
 }
 
 TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     if (!Subsystem)
         return TError(EError::Unknown, "Cannot set to null cgroup");
     L_ACT("Set {} {} = {}", *this, knob, value);
-    return Knob(knob).WriteAll(value);
+    TError error = Knob(knob).WriteAll(value);
+    if (error)
+        error = TError(error, "Cannot set cgroup " + knob + " = " + value);
+    return error;
 }
 
 TError TCgroup::GetInt64(const std::string &knob, int64_t &value) const {
@@ -640,7 +646,7 @@ void TCpuSubsystem::InitializeSubsystem() {
 }
 
 TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
-    if (HasRtGroup)
+    if (HasRtGroup && config().container().rt_priority())
         (void)cg.SetInt64("cpu.rt_runtime_us", -1);
     return TError::Success();
 }
@@ -723,7 +729,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             return error;
     }
 
-    if (HasRtGroup) {
+    if (HasRtGroup && config().container().rt_priority()) {
         int64_t root_runtime, root_period, period, runtime;
 
         if (RootCgroup().GetInt64("cpu.rt_period_us", root_period))
@@ -731,10 +737,8 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
 
         if (RootCgroup().GetInt64("cpu.rt_runtime_us", root_runtime))
             root_runtime = 950000;
-
-        error = cg.SetInt64("cpu.rt_runtime_us", -1);
-        if (error)
-            return error;
+        else if (root_runtime < 0)
+            root_runtime = root_period;
 
         period = 100000;    /* 100ms */
 
@@ -748,12 +752,18 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         }
 
         error = cg.SetInt64("cpu.rt_period_us", period);
-        if (error)
-            return error;
-
-        error = cg.SetInt64("cpu.rt_runtime_us", runtime);
-        if (error)
-            return error;
+        if (error) {
+            (void)cg.SetInt64("cpu.rt_runtime_us", runtime);
+            error = cg.SetInt64("cpu.rt_period_us", period);
+        }
+        if (!error)
+            error = cg.SetInt64("cpu.rt_runtime_us", runtime);
+        if (error) {
+            if (policy == "rt")
+                return TError(error, "Cannot setup rt cpu_limit");
+            L_WRN("Cannot setup rt cpu_limit: {}", error);
+            (void)cg.SetInt64("cpu.rt_runtime_us", 0);
+        }
     }
 
     return TError::Success();
