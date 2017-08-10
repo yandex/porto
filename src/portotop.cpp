@@ -217,6 +217,7 @@ void TConsoleScreen::HelpDialog() {
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
          "u - update screen",
+         "d - disable column"
          "f - choose columns",
          "",
          "g - get properties",
@@ -819,7 +820,8 @@ void TPortoTop::Print(TConsoleScreen &screen) {
 
     int width = 0;
     for (auto &column : Columns)
-        width += column.GetWidth();
+        if (!column.Hidden)
+            width += column.GetWidth();
 
     if (width > screen.Width()) {
         int excess = width - screen.Width();
@@ -959,6 +961,12 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     } else if (SelectedColumn > (int)Columns.size() - 1) {
         SelectedColumn = Columns.size() - 1;
     }
+    while (Columns[SelectedColumn].Hidden && x < 0 && SelectedColumn > 0)
+        SelectedColumn--;
+    while (Columns[SelectedColumn].Hidden && SelectedColumn < Columns.size() - 1)
+        SelectedColumn++;
+    while (Columns[SelectedColumn].Hidden && SelectedColumn > 0)
+        SelectedColumn--;
     Columns[SelectedColumn].Highlight(true);
 
     if (x)
@@ -975,7 +983,8 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
                 FirstX -= _x;
                 _x = 0;
             }
-            _x += c.GetWidth() + 1;
+            if (!c.Hidden)
+                _x += c.GetWidth() + 1;
             if (i == SelectedColumn && _x > screen.Width()) {
                 FirstX -= _x - screen.Width();
                 _x = screen.Width();
@@ -1203,6 +1212,9 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
             break;
         case 'f':
             screen.ColumnsMenu(top.Columns);
+            break;
+        case 'd':
+            top.Columns[top.SelectedColumn].Hidden ^= true;
             break;
         case 'S':
             if (screen.Dialog("Start/stop container " + top.SelectedContainer,

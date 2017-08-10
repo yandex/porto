@@ -202,6 +202,7 @@ public:
     int FirstDelay = 300;
     bool Paused = false;
     std::vector<TColumn> Columns;
+    int SelectedColumn = 0;
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
@@ -218,7 +219,6 @@ private:
     std::shared_ptr<TPortoContainer> ContainerTree;
 
     int SelectedRow = 0;
-    int SelectedColumn = 0;
     int FirstX = 0;
     int FirstRow = 0;
     int MaxRows = 0;
