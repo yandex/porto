@@ -650,8 +650,6 @@ void InitKernelFeatures() {
         HaveCgKnob("cpu", "cpu.cfs_period_us");
     kernel_features[static_cast<int>(KernelFeature::CFS_GROUPSCHED)] =
         HaveCgKnob("cpu", "cpu.shares");
-    kernel_features[static_cast<int>(KernelFeature::SMART)] =
-        HaveCgKnob("cpu", "cpu.smart");
     kernel_features[static_cast<int>(KernelFeature::FSIO)] =
         HaveCgKnob("memory", "memory.fs_bps_limit");
     kernel_features[static_cast<int>(KernelFeature::LOW_LIMIT)] =
@@ -663,8 +661,6 @@ void InitKernelFeatures() {
     kernel_features[static_cast<int>(KernelFeature::CFQ)] = IsCfqActive();
 
     std::cout << "Kernel features:" << std::endl;
-    std::cout << std::left << std::setw(30) << "  SMART" <<
-        (KernelSupports(KernelFeature::SMART) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  CFS_RESERVE" <<
         (KernelSupports(KernelFeature::CFS_RESERVE) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  CFS_BANDWIDTH" <<

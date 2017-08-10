@@ -83,7 +83,7 @@ void TEventQueue::Add(uint64_t timeoutMs, const TEvent &e) {
 }
 
 TEventQueue::TEventQueue() {
-    Worker = std::make_shared<TEventWorker>(config().daemon().event_workers());
+    Worker = std::make_shared<TEventWorker>(1);
 }
 
 void TEventQueue::Start() {

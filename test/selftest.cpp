@@ -475,12 +475,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("a", "state", v));
     ExpectEq(v, "meta");
     ExpectNeq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), customLimit);
-    if (config().container().all_controllers())
-        ExpectNeq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
     ExpectNeq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
     ExpectApiSuccess(api.Stop("a/b/c"));
-    if (config().container().all_controllers())
-        ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
     ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
 
     ExpectApiSuccess(api.Start("a/b/c"));
@@ -556,8 +552,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
     ExpectEq(state, "running");
     ExpectEq(CgExists("memory", "a"), true);
-    ExpectEq(CgExists("memory", "a/b"), config().container().all_controllers());
-    ExpectEq(CgExists("memory", "a/b/c"), config().container().all_controllers());
+    ExpectEq(CgExists("memory", "a/b"), false);
+    ExpectEq(CgExists("memory", "a/b/c"), false);
 
     ExpectApiSuccess(api.Stop("a/b"));
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
@@ -574,16 +570,11 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.Start("a/b"));
     ExpectApiSuccess(api.Start("a/b/c"));
     ExpectEq(CgExists("memory", "a"), true);
-    ExpectEq(CgExists("memory", "a/b"), config().container().all_controllers());
-    ExpectEq(CgExists("memory", "a/b/c"), config().container().all_controllers());
+    ExpectEq(CgExists("memory", "a/b"), false);
+    ExpectEq(CgExists("memory", "a/b/c"), false);
 
-    if (NetworkEnabled()) {
+    if (NetworkEnabled())
         ExpectTclass("a", true);
-        if (config().container().all_controllers()) {
-            ExpectTclass("a/b", true);
-            ExpectTclass("a/b/c", true);
-        }
-    }
 
     WaitContainer(api, "a/b");
     ExpectApiSuccess(api.GetData("a/b", "state", state));
@@ -591,8 +582,8 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
     ExpectEq(state, "dead");
     ExpectEq(CgExists("memory", "a"), true);
-    ExpectEq(CgExists("memory", "a/b"), config().container().all_controllers());
-    ExpectEq(CgExists("memory", "a/b/c"), config().container().all_controllers());
+    ExpectEq(CgExists("memory", "a/b"), false);
+    ExpectEq(CgExists("memory", "a/b/c"), false);
 
     ExpectApiSuccess(api.Destroy("a/b/c"));
     ExpectApiSuccess(api.Destroy("a/b"));
@@ -3202,9 +3193,6 @@ static bool CanTestLimits() {
     if (!KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         return false;
 
-    if (!KernelSupports(KernelFeature::SMART))
-        return false;
-
     return true;
 }
 
@@ -3321,24 +3309,9 @@ static void TestLimits(Porto::Connection &api) {
     }
 
     Say() << "Check cpu_policy" << std::endl;
-    string smart;
 
     ExpectApiFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "idle"));
-
-    if (KernelSupports(KernelFeature::SMART)) {
-        ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "rt"));
-        ExpectApiSuccess(api.Start(name));
-        smart = GetCgKnob("cpu", name, "cpu.smart");
-        ExpectEq(smart, "1");
-        ExpectApiSuccess(api.Stop(name));
-
-        ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
-        ExpectApiSuccess(api.Start(name));
-        smart = GetCgKnob("cpu", name, "cpu.smart");
-        ExpectEq(smart, "0");
-        ExpectApiSuccess(api.Stop(name));
-    }
 
     if (KernelSupports(KernelFeature::CFS_BANDWIDTH)) {
         Say() << "Check cpu_limit" << std::endl;
@@ -3562,8 +3535,6 @@ static void TestAlias(Porto::Connection &api) {
         return;
     if (!KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         return;
-    if (!KernelSupports(KernelFeature::SMART))
-        return;
 
     std::string name = "a", current, alias, real;
 
@@ -3581,9 +3552,6 @@ static void TestAlias(Porto::Connection &api) {
     ExpectEq(current, "0");
 
     current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
-    ExpectEq(current, "0");
-
-    current = GetCgKnob("cpu", name, "cpu.smart");
     ExpectEq(current, "0");
 
     Say() << "Check custom limits" << std::endl;

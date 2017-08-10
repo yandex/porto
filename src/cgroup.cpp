@@ -628,8 +628,6 @@ void TCpuSubsystem::InitializeSubsystem() {
     if (HasQuota && cg.GetUint64("cpu.cfs_period_us", BasePeriod))
         BasePeriod = 100000;    /* 100ms */
 
-    HasSmart = cg.Has("cpu.smart");
-
     L_SYS("{} cores", GetNumCores());
     if (HasShares)
         L_SYS("base shares {}", BaseShares);
@@ -639,8 +637,6 @@ void TCpuSubsystem::InitializeSubsystem() {
         L_SYS("support rt group");
     if (HasReserve)
         L_SYS("support reserves");
-    if (HasSmart)
-        L_SYS("support smart");
 }
 
 TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
@@ -723,13 +719,6 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         shares = std::min(std::max(shares, MinShares), MaxShares);
 
         error = cg.SetUint64("cpu.shares", shares);
-        if (error)
-            return error;
-    }
-
-    if (HasSmart) {
-        error = cg.SetUint64("cpu.smart", (policy == "rt" &&
-                    config().container().enable_smart()) ? 1 : 0);
         if (error)
             return error;
     }

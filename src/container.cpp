@@ -346,7 +346,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     Controllers = RequiredControllers = CGROUP_FREEZER;
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
         Controllers |= CGROUP_CPUACCT;
-    if (!Parent || Parent->IsRoot() || config().container().all_controllers())
+    if (!Parent || Parent->IsRoot())
         Controllers |= CGROUP_MEMORY | CGROUP_CPU | CGROUP_CPUACCT |
                        CGROUP_NETCLS | CGROUP_BLKIO | CGROUP_DEVICES;
     SetProp(EProperty::CONTROLLERS);
@@ -530,16 +530,16 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
             goto err;
 
         /* Kernel without group rt forbids moving RT tasks in to cpu cgroup */
-        if (ct->Task.Pid && (!CpuSubsystem.HasRtGroup || CpuSubsystem.HasSmart)) {
+        if (ct->Task.Pid && !CpuSubsystem.HasRtGroup) {
             auto cpuCg = ct->GetCgroup(CpuSubsystem);
             TCgroup cg;
-            bool smart;
 
             if (!CpuSubsystem.TaskCgroup(ct->Task.Pid, cg) && cg != cpuCg) {
                 auto freezerCg = ct->GetCgroup(FreezerSubsystem);
+                bool smart;
 
                 /* Disable smart if we're moving tasks into another cgroup */
-                if (CpuSubsystem.HasSmart && !cg.GetBool("cpu.smart", smart) && smart) {
+                if (!cg.GetBool("cpu.smart", smart) && smart) {
                     cg.SetBool("cpu.smart", false);
                 } else if (!CpuSubsystem.HasRtGroup) {
                     std::vector<pid_t> prev, pids;
@@ -915,8 +915,7 @@ void TContainer::ChooseSchedPolicy() {
 
     if (CpuPolicy == "rt") {
         SchedNice = config().container().rt_nice();
-        if ((!CpuSubsystem.HasSmart || !config().container().enable_smart()) &&
-                config().container().rt_priority()) {
+        if (config().container().rt_priority()) {
             SchedPolicy = SCHED_RR;
             SchedPrio = config().container().rt_priority();
             /* x2 weight is +1 rt priority */

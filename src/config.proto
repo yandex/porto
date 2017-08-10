@@ -85,7 +85,7 @@ message TCfg {
 		optional uint64 max_msg_len = 9;
 		optional bool blocking_read = 10 [deprecated=true];
 		optional bool blocking_write = 11 [deprecated=true];
-		optional uint32 event_workers = 12;
+		optional uint32 event_workers = 12 [deprecated=true];
 		optional bool debug = 13 [deprecated=true];
 		optional uint64 helpers_memory_limit = 14;
 		optional uint32 portod_stop_timeout = 15;
@@ -112,14 +112,14 @@ message TCfg {
 		optional string chroot_porto_dir = 14 [deprecated=true];
 		optional bool scoped_unlock = 15 [deprecated=true];
 		optional uint32 start_timeout_ms = 16;
-		optional bool enable_smart = 17;
-		optional bool default_porto_namespace = 18;
+		optional bool enable_smart = 17 [deprecated=true];
+		optional bool default_porto_namespace = 18; /* [deprecated=true] */
 		optional bool enable_tracefs = 19;
 		optional uint32 normal_io_weight = 20 [deprecated=true];
 		optional uint64 stdout_limit_max = 21;
 		optional uint32 devpts_max = 22;
 		optional uint64 dev_size = 23;
-		optional bool all_controllers = 24;
+		optional bool all_controllers = 24 [deprecated=true];
 		optional bool enable_hugetlb = 26;
 		optional int32 rt_priority = 27;
 		optional bool enable_cpu_reserve = 28;

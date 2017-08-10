@@ -26,6 +26,7 @@ void TConfig::LoadDefaults() {
         config().set_linux_version(version);
 
     config().mutable_log()->set_verbose(false);
+    config().mutable_log()->set_debug(false);
 
     config().set_keyvalue_limit(1 << 20);
     config().set_keyvalue_size(32 << 20);
@@ -41,7 +42,6 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_helpers_dirty_limit(256ull << 20);
     config().mutable_daemon()->set_workers(32);
     config().mutable_daemon()->set_max_msg_len(32 * 1024 * 1024);
-    config().mutable_daemon()->set_event_workers(1);
     config().mutable_daemon()->set_portod_stop_timeout(30);
     config().mutable_daemon()->set_portod_start_timeout(60);
     config().mutable_daemon()->set_merge_memory_blkio_controllers(false);
@@ -60,16 +60,13 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_stop_timeout_ms(30 * 1000);
     config().mutable_container()->set_max_total(3000);
     config().mutable_container()->set_empty_wait_timeout_ms(5000);
-    config().mutable_container()->set_enable_smart(false);
     config().mutable_container()->set_enable_cpu_reserve(true);
     config().mutable_container()->set_rt_priority(10);
     config().mutable_container()->set_rt_nice(-20);
     config().mutable_container()->set_high_nice(-10);
-    config().mutable_container()->set_default_porto_namespace(false);
     config().mutable_container()->set_enable_tracefs(true);
     config().mutable_container()->set_devpts_max(256);
     config().mutable_container()->set_dev_size(32 << 20);
-    config().mutable_container()->set_all_controllers(false);
     config().mutable_container()->set_enable_hugetlb(true);
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 

@@ -73,7 +73,6 @@ namespace test {
     int FuzzyTest(int threads, int iter);
 
     enum class KernelFeature {
-        SMART,
         LOW_LIMIT,
         RECHARGE_ON_PGFAULT,
         FSIO,

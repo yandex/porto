@@ -219,7 +219,6 @@ class TCpuSubsystem : public TSubsystem {
 public:
     bool HasShares = false;
     bool HasQuota = false;
-    bool HasSmart = false;
     bool HasReserve = false;
     bool HasRtGroup = false;
 
