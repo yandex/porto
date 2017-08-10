@@ -395,13 +395,16 @@ write permissions to the target or owning related volume.
 
     Syntax: 0.0..100.0 (in %) | \<cores\>c (in cores), default: 0 (unlimited)
 
+    Porto setup both CFS and RT cgroup limits.
+    RT cgroup limit is strictly non-overcommitable in mainline kernel.
+
 * **cpu\_policy**  - CPU scheduler policy, see **sched(7)**
     - *normal*   - SCHED\_OTHER (default)
-    - *high*     - SCHED\_OTHER(-10) (also increases cpu cgroup weight by 16 times)
-    - *rt*       - SCHED\_RR(10)
+    - *high*     - SCHED\_OTHER (nice = -10, increases cpu.shares by 16 times)
+    - *rt*       - SCHED\_RR    (nice = -20, priority = 10)
     - *batch*    - SCHED\_BATCH
-    - *idle*     - SCHED\_IDLE (also decreases cpu cgroup weight by 16 times)
-    - *iso*      - SCHED\_ISO (offstream kernel feature)
+    - *idle*     - SCHED\_IDLE  (also decreases cpu.shares by 16 times)
+    - *iso*      - SCHED\_ISO   (offstream kernel feature)
 
 * **cpu\_set** - CPU affinity
     - \[N|N-M,\]... - set CPU mask
