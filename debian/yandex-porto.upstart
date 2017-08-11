@@ -42,4 +42,15 @@ pre-start script
 	fi ; done
 end script
 
+post-start script
+    if [ -d "/place/porto_containers" ] ; then
+	timeout=360
+	for i in `seq $timeout`; do
+	    portoctl get / state >/dev/null 2>&1 && break
+	    sleep 1
+	done
+	portoctl load -P -S || true
+    fi
+end script
+
 exec portod

@@ -10,6 +10,11 @@ ExecStartPre=/bin/sh -c '[ ! -e /run/portoloop.pid ] && \
     rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || \
     /bin/true'
 ExecReload=/bin/kill -HUP $MAINPID
+ExecStartPost=/bin/sh -c 'if [ -d "/place/porto_containers" ] ; then \
+    for i in `seq 360`; do \
+        portoctl get / state >/dev/null 2>&1 && break; sleep 1; \
+    done; portoctl load -P -S || true; \
+fi'
 PIDFile=/run/portoloop.pid
 Restart=on-failure
 KillSignal=SIGINT
