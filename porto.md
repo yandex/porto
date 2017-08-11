@@ -417,8 +417,15 @@ write permissions to the target or owning related volume.
 
 ## Disk IO
 
-Disk names are single words, like: "sda" or "md0",
+Disk names are single words, like: "sda" or "md0".
+
 "fs" is a statistics and limits at filesystem level (offstream kernel feature).
+
+"hw" is a total statistics for all disks.
+
+Statistics and limits could be requested for filesystem path.
+Absolulte paths are resolved in host, paths starting with dot in chroot:
+**io\_read\[/\]**, **io\_read\[.\]**.
 
 * **io\_read** - bytes read from disk, syntax: \<disk\>: \<bytes\>;...
 
@@ -426,12 +433,12 @@ Disk names are single words, like: "sda" or "md0",
 
 * **io\_ops** - disk operations: \<disk\>: \<count\>;...
 
-* **io\_limit** - IO bandwidth limit, syntax: fs|\</path\>|\<disk\> \[r|w\]: \<bytes/s\>;...
+* **io\_limit** - IO bandwidth limit, syntax: fs|\<path\>|\<disk\> \[r|w\]: \<bytes/s\>;...
     - fs \[r|w\]: \<bytes\>     - filesystem level limit (offstream kernel feature)
-    - \</path\> \[r|w\]: \<bytes\>  - setup blkio limit for all disks below filesystem
+    - \<path\> \[r|w\]: \<bytes\> - setup blkio limit for disk used by this filesystem
     - \<disk\> \[r|w\]: \<bytes\> - setup blkio limit for disk
 
-* **io\_ops\_limit**  - IOPS limit: fs|\</path\>|\<disk\> \[r|w\]: \<iops\>;...
+* **io\_ops\_limit**  - IOPS limit: fs|\<path\>|\<disk\> \[r|w\]: \<iops\>;...
 
 * **io\_policy** IO scheduler policy, see **ioprio\_set(2)**
     - *none*    - set by **cpu\_policy**, blkio.weight = 500 (default)

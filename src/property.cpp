@@ -2098,7 +2098,7 @@ public:
 class TIoBpsLimit : public TIoLimit {
 public:
     TIoBpsLimit()  : TIoLimit(P_IO_LIMIT, EProperty::IO_LIMIT,
-            "IO bandwidth limit: fs|</path>|<disk> [r|w]: <bytes/s>;... (dynamic)") {}
+            "IO bandwidth limit: fs|<path>|<disk> [r|w]: <bytes/s>;... (dynamic)") {}
     TError Get(std::string &value) {
         return GetMap(CT->IoBpsLimit, value);
     }
@@ -2116,7 +2116,7 @@ public:
 class TIoOpsLimit : public TIoLimit {
 public:
     TIoOpsLimit()  : TIoLimit(P_IO_OPS_LIMIT, EProperty::IO_OPS_LIMIT,
-            "IOPS limit: fs|</path>|<disk> [r|w]: <iops>;... (dynamic)") {}
+            "IOPS limit: fs|<path>|<disk> [r|w]: <iops>;... (dynamic)") {}
     TError Get(std::string &value) {
         return GetMap(CT->IoOpsLimit, value);
     }
@@ -2628,6 +2628,7 @@ public:
     TCacheUsage() : TProperty(D_CACHE_USAGE, EProperty::NONE,
                             "file cache usage [bytes] (ro)") {
         IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
     TError Get(std::string &value) {
         TError error = IsRunning();
@@ -3048,7 +3049,8 @@ public:
         } else {
             std::string disk, name;
 
-            error = BlkioSubsystem.ResolveDisk(index, disk);
+            error = BlkioSubsystem.ResolveDisk(CL->ClientContainer->RootPath,
+                                               index, disk);
             if (error)
                 return error;
             error = BlkioSubsystem.DiskName(disk, name);
@@ -3064,7 +3066,7 @@ public:
 class TIoReadStat : public TIoStat {
 public:
     TIoReadStat() : TIoStat(D_IO_READ, EProperty::NONE,
-            "read from disk: <disk>|<path>|total: <bytes>;... (ro)") {}
+            "read from disk: fs|hw|<disk>|<path>: <bytes>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Read, map);
@@ -3083,7 +3085,7 @@ public:
 class TIoWriteStat : public TIoStat {
 public:
     TIoWriteStat() : TIoStat(D_IO_WRITE, EProperty::NONE,
-            "written to disk: <disk>|<path>|total: <bytes>;... (ro)") {}
+            "written to disk: fs|hw|<disk>|<path>: <bytes>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Write, map);
@@ -3102,7 +3104,7 @@ public:
 class TIoOpsStat : public TIoStat {
 public:
     TIoOpsStat() : TIoStat(D_IO_OPS, EProperty::NONE,
-            "io operations: <disk>|<path>|total: <ops>;... (ro)") {}
+            "io operations: fs|hw|<disk>|<path>: <ops>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Iops, map);
@@ -3121,7 +3123,7 @@ public:
 class TIoTimeStat : public TIoStat {
 public:
     TIoTimeStat() : TIoStat(D_IO_TIME, EProperty::NONE,
-            "io time: <disk>|<path>|total: <nanoseconds>;... (ro)") {}
+            "io time: hw|<disk>|<path>: <nanoseconds>;... (ro)") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);

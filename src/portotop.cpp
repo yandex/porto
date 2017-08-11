@@ -217,7 +217,7 @@ void TConsoleScreen::HelpDialog() {
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
          "u - update screen",
-         "d - disable column"
+         "d - disable column",
          "f - choose columns",
          "",
          "g - get properties",
@@ -1118,10 +1118,10 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
 
     /* I/O */
     AddColumn("maj/s", "major_faults'", "Major page fault count");
-    AddColumn("read b/s", "io_read[total]' b", "IO bytes read from disk");
-    AddColumn("write b/s", "io_write[total]' b", "IO bytes written to disk");
-    AddColumn("io op/s", "io_ops[total]'", "IO operations per second");
-    AddColumn("io load", "io_time[total]' 1e9", "Average disk queue depth");
+    AddColumn("read b/s", "io_read[hw]' b", "IO bytes read from disk");
+    AddColumn("write b/s", "io_write[hw]' b", "IO bytes written to disk");
+    AddColumn("io op/s", "io_ops[hw]'", "IO operations per second");
+    AddColumn("io load", "io_time[hw]' 1e9", "Average disk queue depth");
     AddColumn("fs read b/s", "io_read[fs]' b", "IO bytes read by fs");
     AddColumn("fs write b/s", "io_write[fs]' b", "IO bytes written by fs");
     AddColumn("fs iop/s", "io_ops[fs]'", "IO operations by fs");
