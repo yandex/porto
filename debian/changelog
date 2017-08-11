@@ -1,3 +1,103 @@
+yandex-porto (4.0.0) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * porto: tiny fixes to make static analyzers happier #PORTO-258
+
+  [ Konstantin Khlebnikov ]
+  * network: debug stale classes
+
+  [ Maxim Samoylov ]
+  * network: add net option tap
+
+  [ Konstantin Khlebnikov ]
+  * property: add io_weight
+  * porto: do not inherit cpu/io policy by isolate=false sub-containers
+  * debian: cleanup build dependencies
+  * porto: plug warnings
+  * porto: rewrite documentation
+  * porto: check magic for uncompressed tarball
+  * porto: update documentaion
+  * porto: deprecate bind_dns and disable by default #PORTO-170
+  * porto: fix dependencies for travis
+
+  [ Fedor Korotkiy ]
+  * Fix rpm build on fedora 25
+
+  [ ginta1337 ]
+  * porto: fix major:minor string format checks in ResolveDisk
+
+  [ Konstantin Khlebnikov ]
+  * tests: fix for bind_dns=false
+  * tests: fix for bind_dns=false
+  * network: cleanup device configuration
+  * network: fix net property validation
+  * test: cleanup /var/log/portoloop.log
+  * porto: set dirty_limit=256M for portod-helpers
+  * cgroup: configure cfs reserve for rt in the same way as for high
+  * util: remove verbose logging from ClearDirectory
+  * porto: more verbose permission errors description
+  * filesystem: consider volume ownership for bind-mounts
+  * network: recreate proxy neighbours every 60 seconds
+  * porto: update documentation
+  * util: cleanup SplitString
+  * test/fizzer: ignore NoSpace
+  * test/upgrade: check upgrade from 3.8.2
+  * porto: cleanup documentation
+  * layers: add build.sh
+  * network: fix warning
+  * porto: update documentation
+  * volume: refactor loop device
+  * volume: enable O_DIRECT for loop backend
+  * volume: add squash backend
+  * volume: use direct-io for loop starting from 4.4
+  * porto: document volume backend=squash
+
+  [ Maxim Samoylov ]
+  * client: always print identification info #PORTO-261
+
+  [ Konstantin Khlebnikov ]
+  * porto: cleanup wait response
+  * porto: add debug logging level
+
+  [ Maxim Samoylov ]
+  * container: fix typo in GetEnvironment()
+
+  [ Konstantin Khlebnikov ]
+  * porto: load default resolv_conf from host /etc/resolv.conf
+  * layers: preserve xattrs if tar supports them
+  * porto: refactor deamons and logging
+  * porto: turn bind_dns into alias for binding /etc/hosts
+  * test: remove bind_dns
+  * test: fix root_property
+  * portoctl: flush cout in print
+  * porto: reset default resolv_conf if container has no root
+  * test: fix root_readonly
+  * network: initialize statistic generation
+  * network: fix ipip6
+  * network: allow ip6tnl0 configuration
+
+  [ Maxim Samoylov ]
+  * test/porto_fuzzer: remount fuzzer_mnt tmpfs on each start
+
+  [ Konstantin Khlebnikov ]
+  * volume: lvm backend
+  * volume: add thin lvm backend
+  * network: add configuration via iproute in property net
+  * volume: document lvm backend
+  * network: setup qdisc filter after adding default class
+  * util/path: add WriteAtomic and fix WritePrivate
+  * porto: deprecate some config options
+  * cgroup: handle mainstream non-covercommitable rt cpu_limit
+  * porto: update cpu_limit documentation
+  * porto: always name container as CT<id> or CT<id>:<name>
+  * property: add io_time and total sum for all real disks
+  * portotop: disable column by 'd'
+  * property/io: resolve relative disk path in chroot, rename "total" -> "hw"
+  * portoctl: add save and load
+  * porto: load and start saved containers atomatically
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 11 Aug 2017 17:08:34 +0300
+
 yandex-porto (3.9.0) unstable; urgency=low
 
   [ Maxim Samoylov ]
