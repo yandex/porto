@@ -958,7 +958,8 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
                 continue;
             prev = word[0];
             summ = StringStartsWith(name, "sd") ||
-                   StringStartsWith(name, "nvme");
+                   StringStartsWith(name, "nvme") ||
+                   StringStartsWith(name, "vd");
             hide = StringStartsWith(name, "ram");
         }
 
