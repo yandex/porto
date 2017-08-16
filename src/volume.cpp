@@ -797,6 +797,14 @@ public:
         if (error)
             goto err;
 
+        /* shortcut for read-only volumes without extra layers */
+        if (Volume->IsReadOnly && Volume->Layers.size() == 1) {
+            error = Volume->InternalPath.BindRemount(lower, Volume->GetMountFlags());
+            if (error)
+                goto err;
+            return TError::Success();
+        }
+
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
             quota.InodeLimit = Volume->InodeLimit;
