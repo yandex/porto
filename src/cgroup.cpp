@@ -909,22 +909,24 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     std::vector<std::string> lines;
     std::string knob, prev, name;
     bool summ = false, hide = false;
+    bool recursive = true;
     TError error;
 
     if (stat & IoStat::Time)
         knob = "blkio.io_service_time_recursive";
-    else if (HasThrottler)
+    else if (HasThrottler && (HasSaneBehavior || !cg.IsRoot())) {
         /* get statistics from throttler if possible, it has couners for raids */
         knob = (stat & IoStat::Iops) ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";
-    else
+        /* throtter is recurisve only in sane behavior */
+        recursive = HasSaneBehavior;
+    } else
         knob = (stat & IoStat::Iops) ? "blkio.io_serviced_recursive" : "blkio.io_service_bytes_recursive";
 
     error = cg.Knob(knob).ReadLines(lines);
     if (error)
         return error;
 
-    /* in insane behavior throttler isn't hierarhical */
-    if (!(stat & IoStat::Time) && HasThrottler && !HasSaneBehavior) {
+    if (!recursive) {
         std::vector<TCgroup> list;
 
         error = cg.ChildsAll(list);
