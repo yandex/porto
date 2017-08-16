@@ -890,6 +890,13 @@ err:
             PutLoopDev(Volume->Device);
             Volume->Device = -1;
         }
+
+        TProjectQuota quota(Volume->StoragePath);
+        if (Volume->HaveQuota() && quota.Exists()) {
+            L_ACT("Destroying project quota: {}", quota.Path);
+            (void)quota.Destroy();
+        }
+
         return TError::Success();
     }
 
