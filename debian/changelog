@@ -1,3 +1,13 @@
+yandex-porto (4.0.1) unstable; urgency=low
+
+  * cgroup: sum statistics for virtio block deices into "hw"
+  * volume: several lower layers for backend squash
+  * cgroup: get host disk statistics from recursive counters
+  * volume: destroy quota in backend squash
+  * volume: add shortcut for read-only squash without extra layers
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 16 Aug 2017 20:13:55 +0300
+
 yandex-porto (4.0.0) unstable; urgency=low
 
   [ Maxim Samoylov ]
