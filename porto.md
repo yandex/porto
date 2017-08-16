@@ -667,7 +667,7 @@ Like for container volume configuration is a set of key-value pairs.
 
     Backend *overlay* use layers directly.
 
-    Backend *squash* expects here path to a single squashfs image.
+    Backend *squash* expects path to a squashfs image as top-layer.
 
     Other backends copy layers' files into volume during construction.
 

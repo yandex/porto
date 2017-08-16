@@ -741,8 +741,8 @@ public:
         if (!TVolumeOverlayBackend::Supported())
             return TError(EError::NotSupported, "overlay not supported");
 
-        if (Volume->Layers.size() != 1)
-            return TError(EError::InvalidProperty, "Backend squash requires one image in layers");
+        if (!Volume->HaveLayers())
+            return TError(EError::InvalidProperty, "Backend squash requires image");
 
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::InvalidProperty, "project quota is disabled");
@@ -753,8 +753,13 @@ public:
     TError Build() override {
         TProjectQuota quota(Volume->StoragePath);
         TFile lowerFd, upperFd, workFd;
+        std::string lowerdir;
+        int layer_idx = 0;
         TError error;
         TPath lower;
+
+        if (unshare(CLONE_FS))
+            return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
 
         lower = Volume->GetInternal("lower");
         error = lower.Mkdir(0755);
@@ -802,11 +807,68 @@ public:
                   goto err;
         }
 
+        error = Volume->GetInternal("").Chdir();
+        if (error)
+            goto err;
+
+        lowerdir = lower.ToString();
+
+        for (auto &name: Volume->Layers) {
+            TPath path, temp;
+            TFile pin;
+
+            if (name == Volume->Layers[0])
+                continue;
+
+            if (name[0] == '/') {
+                error = pin.OpenDir(name);
+                if (error)
+                    goto err;
+                error = CL->WriteAccess(pin);
+                if (error) {
+                    error = TError(error, "Layer " + name);
+                    goto err;
+                }
+                path = pin.ProcPath();
+            } else {
+                TStorage layer(Volume->Place, PORTO_LAYERS, name);
+                /* Imported layers are available for everybody */
+                (void)layer.Touch();
+                path = layer.Path;
+            }
+
+            std::string layer_id = "L" + std::to_string(Volume->Layers.size() -
+                                                        ++layer_idx - 1);
+            temp = Volume->GetInternal(layer_id);
+            error = temp.Mkdir(700);
+            if (!error)
+                error = temp.BindRemount(path, MS_RDONLY | MS_NODEV);
+            if (!error)
+                error = temp.Remount(MS_PRIVATE);
+            if (error)
+                goto err;
+
+            pin.Close();
+            lowerdir += ":" + layer_id;
+        }
+
         error = Volume->InternalPath.Mount("overlay", "overlay",
                                    Volume->GetMountFlags(),
-                                   { "lowerdir=" + lower.ToString(),
+                                   { "lowerdir=" + lowerdir,
                                      "upperdir=" + upperFd.ProcPath().ToString(),
                                      "workdir=" + workFd.ProcPath().ToString() });
+
+        if (error && error.GetErrno() == EINVAL && Volume->Layers.size() >= 500)
+            error = TError(EError::InvalidValue, "Too many layers, kernel limits is 499 plus 1 for upper");
+
+        while (layer_idx--) {
+            TPath temp = Volume->GetInternal("L" + std::to_string(layer_idx));
+            (void)temp.UmountAll();
+            (void)temp.Rmdir();
+        }
+
+        (void)TPath("/").Chdir();
+
         if (!error)
             return error;
 
@@ -1423,7 +1485,7 @@ TError TVolume::Configure(const TStringMap &cfg) {
             layer = Place / PORTO_LAYERS / layer;
         }
         if (!layer.Exists())
-            return TError(EError::LayerNotFound, "Layer not found");
+            return TError(EError::LayerNotFound, "Layer not found " + layer.ToString());
         if (!layer.IsDirectoryFollow() && BackendType != "squash")
             return TError(EError::InvalidValue, "Layer must be a directory");
         /* Permissions will be cheked during build */
