@@ -171,17 +171,9 @@ TNetDevice::TNetDevice(struct rtnl_link *link) {
     Rate = NET_MAX_RATE;
     Ceil = NET_MAX_RATE;
 
-    Managed = true;
+    Managed = false;
     Prepared = false;
     Missing = false;
-
-    for (auto &pattern: UnmanagedDevices)
-        if (StringMatch(Name, pattern))
-            Managed = false;
-
-    if (std::find(UnmanagedGroups.begin(), UnmanagedGroups.end(), Group) !=
-            UnmanagedGroups.end())
-        Managed = false;
 }
 
 std::string TNetDevice::GetDesc(void) const {
@@ -567,7 +559,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     //          +- 6:0 qdisc b (pfifo)
 
 
-    L("Setup queue for network device {}", dev.GetDesc());
+    L("Setup queue for network {} device {}", NetName, dev.GetDesc());
 
     TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
     qdisc.Kind = dev.GetConfig(DeviceQdisc);
@@ -677,9 +669,20 @@ TError TNetwork::SyncDevices(bool force) {
         if (dev.Type == "tun")
             continue;
 
-        /* In managed namespace we control all devices */
-        if (ManagedNamespace)
-            dev.Managed = true;
+        dev.Managed = true;
+
+        /* In managed namespace we control all devices */;
+        if (!ManagedNamespace) {
+            for (auto &pattern: UnmanagedDevices)
+                if (StringMatch(dev.Name, pattern))
+                    dev.Managed = false;
+            if (std::find(UnmanagedGroups.begin(),
+                          UnmanagedGroups.end(), dev.Group) != UnmanagedGroups.end())
+                dev.Managed = false;
+        }
+
+        if (dev.Type == "dummy")
+            dev.Managed = false;
 
         dev.Stat.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
         dev.Stat.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
@@ -718,7 +721,7 @@ TError TNetwork::SyncDevices(bool force) {
 
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
-            L("Delete network device {}", dev->GetDesc());
+            L("Forget network {} device {}", NetName, dev->GetDesc());
             if (this == HostNetwork.get()) {
                 RootContainer->NetClass.Limit.erase(dev->Name);
                 RootContainer->NetClass.Rate.erase(dev->Name);
