@@ -1346,8 +1346,11 @@ void TNetwork::SyncStatLocked() {
 
     auto state_lock = LockNetState();
 
-    for (auto cls: NetClasses)
+    for (auto cls: NetClasses) {
+        if (hostNet && !cls->HostClass)
+            continue;
         cls->Stat.clear();
+    }
 
     for (auto &dev: Devices) {
 
