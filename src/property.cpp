@@ -2882,6 +2882,10 @@ public:
         if (cur != map) {
             CT->SetProp(Prop);
             auto lock = CT->LockNetState();
+            /* Host network use same config, take lock if required */
+            std::unique_lock<std::mutex> hlock;
+            if (!CT->NetClass.HostClass && CT->NetClass.Registered)
+                hlock = RootContainer->LockNetState();
             cur = map;
         }
 
@@ -2906,6 +2910,10 @@ public:
         if (cur[index] != val) {
             CT->SetProp(Prop);
             auto lock = CT->LockNetState();
+            /* Host network use same config, take lock if required */
+            std::unique_lock<std::mutex> hlock;
+            if (!CT->NetClass.HostClass && CT->NetClass.Registered)
+                hlock = RootContainer->LockNetState();
             cur[index] = val;
         }
 
