@@ -556,14 +556,26 @@ reachable from the outside. This requires sysctl configuration:
 net.ipv4.conf.all.forwarding = 1
 net.ipv6.conf.all.forwarding = 1
 net.ipv6.conf.all.proxy_ndp = 1
+net.ipv6.conf.all.accept_ra = 2
 ```
 
-NAT network also requires configuration in iptables and in portod.conf:
+NAT requires configuration in iptables and in portod.conf:
 ```
 network {
     nat_first_ipv4: "*ip*"
     nat_first_ipv6: "*ip*"
     nat_count: *count*
+}
+```
+
+Example:
+```
+# iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -j MASQUERADE
+# ip6tables -t nat -A POSTROUTING -s fec0::42:0/120 -j MASQUERADE
+network {
+    nat_first_ipv4: "192.168.42.1"
+    nat_first_ipv6: "fec0::42:1"
+    nat_count: 255
 }
 ```
 
