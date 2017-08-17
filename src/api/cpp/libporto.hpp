@@ -125,7 +125,8 @@ public:
                     bool merge = false, const std::string &place = "",
                     const std::string &private_value = "");
 
-    int ExportLayer(const std::string &volume, const std::string &tarball);
+    int ExportLayer(const std::string &volume, const std::string &tarball,
+                    const std::string &compress = "");
     int RemoveLayer(const std::string &layer, const std::string &place = "");
     int ListLayers(std::vector<Layer> &layers,
                    const std::string &place = "",

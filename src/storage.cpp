@@ -294,10 +294,12 @@ TError TStorage::Touch() {
     return error;
 }
 
-static TError TarCompression(const TPath &tarball, const TFile &file,
-        const std::string &compress, std::string &option) {
+static TError Compression(const TPath &tarball, const TFile &file,
+                             const std::string &compress,
+                             std::string &format, std::string &option) {
     std::string name = tarball.BaseName();
 
+    format = "tar";
     if (compress != "") {
         if (compress == "txz" || compress == "tar.xz")
             goto xz;
@@ -305,6 +307,15 @@ static TError TarCompression(const TPath &tarball, const TFile &file,
             goto gz;
         if (compress == "tar")
             goto tar;
+        if (StringEndsWith(compress, "squashfs")) {
+            format = "squashfs";
+            option = "xz";
+            if (compress == "lzo.squashfs")
+                option = "lzo";
+            if (compress == "gzip.squashfs")
+                option = "gzip";
+            return TError::Success();
+        }
         return TError(EError::InvalidValue, "Unknown tar " + tarball.ToString() + " compression: " + compress);
     }
 
@@ -391,10 +402,13 @@ TError TStorage::ImportTarball(const TPath &tarball, const std::string &compress
     if (error)
         return TError(error, "Cannot import " + Name + " from " + tarball.ToString());
 
-    std::string compress_option;
-    error = TarCompression(tarball, tar, compress, compress_option);
+    std::string compress_format, compress_option;
+    error = Compression(tarball, tar, compress, compress_format, compress_option);
     if (error)
         return error;
+
+    if (compress_format != "tar")
+        return TError(EError::NotSupported, "Import supports only tar");
 
     auto lock = LockVolumes();
 
@@ -524,8 +538,8 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
 
-    std::string compress_option;
-    error = TarCompression(tarball, TFile(), compress, compress_option);
+    std::string compress_format, compress_option;
+    error = Compression(tarball, TFile(), compress, compress_format, compress_option);
     if (error)
         return error;
 
@@ -550,20 +564,31 @@ TError TStorage::ExportTarball(const TPath &tarball, const std::string &compress
 
     IncPlaceLoad(Place);
 
-    TTuple args = { "tar",
-                    "--one-file-system",
-                    "--numeric-owner",
-                    "--preserve-permissions",
-                    "--sparse",
-                    "--transform", "s:^./::",
-                    compress_option,
-                    "--create",
-                    "-C", Path.ToString(), "." };
+    if (compress_format == "tar") {
+        TTuple args = { "tar",
+                        "--one-file-system",
+                        "--numeric-owner",
+                        "--preserve-permissions",
+                        "--sparse",
+                        "--transform", "s:^./::",
+                        compress_option,
+                        "--create",
+                        "-C", Path.ToString(), "." };
 
-    if (TarSupportsXattrs())
-        args.insert(args.begin() + 4, "--xattrs");
+        if (TarSupportsXattrs())
+            args.insert(args.begin() + 4, "--xattrs");
 
-    error = RunCommand(args, Path, TFile(), tar);
+        error = RunCommand(args, Path, TFile(), tar);
+    } else if (compress_format == "squashfs") {
+        TTuple args = { "mksquashfs", Path.ToString(),
+                        tarball.BaseName(),
+                        "-noappend",
+                        "-comp", compress_option };
+
+        /* FIXME pass dir to fchdir */
+        error = RunCommand(args, tarball.DirName(), TFile());
+    } else
+        error = TError(EError::NotSupported, "Unsupported format " + compress_format);
 
     if (!error)
         error = tar.Chown(CL->TaskCred);

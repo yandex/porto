@@ -1929,6 +1929,7 @@ public:
         "    -F [days]                remove all unused layers (unused for [days])\n"
         "    -L                       list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
+        "    -Q <volume> <squashfs>   export upper layer into squashfs\n"
         "    -G <layer>               retrieve layer stored private value\n"
         "    -v                       be verbose\n"
         ) {}
@@ -1939,6 +1940,7 @@ public:
     bool list   = false;
     bool verbose = false;
     bool export_ = false;
+    bool squash = false;
     bool flush = false;
     bool get_private = false;
     bool set_private = false;
@@ -1955,6 +1957,7 @@ public:
             { 'F', false, [&](const char *) { flush  = true; } },
             { 'L', false, [&](const char *) { list   = true; } },
             { 'E', false, [&](const char *) { export_= true; } },
+            { 'Q', false, [&](const char *) { squash = true; } },
             { 'G', false, [&](const char *) { get_private = true; } },
             { 'S', true, [&](const char *arg) { set_private = true; private_value = arg; } },
             { 'v', false, [&](const char *) { verbose = true; } },
@@ -1974,6 +1977,12 @@ public:
             if (args.size() < 2)
                 return EXIT_FAILURE;
             ret = Api->ExportLayer(args[0], path);
+            if (ret)
+                PrintError("Can't export layer");
+        } else if (squash) {
+            if (args.size() < 2)
+                return EXIT_FAILURE;
+            ret = Api->ExportLayer(args[0], path, "squashfs");
             if (ret)
                 PrintError("Can't export layer");
         } else if (merge) {
@@ -2060,12 +2069,13 @@ public:
 class TBuildCmd final : public ICmd {
 public:
     TBuildCmd(Porto::Connection *api) : ICmd(api, "build", 0,
-            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-B bootstrap] [-S script]... [properties]...",
+            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-Q image.squashfs] [-B bootstrap] [-S script]... [properties]...",
             "build container image",
             "    -l layer|dir|tarball       layer for bootstrap, if empty run in host\n"
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
             "    -o layer.tar               save as overlayfs layer\n"
             "    -O image.img               save as filesystem image\n"
+            "    -Q image.squashfs          save as squashfs image\n"
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
             "    -M                         merge all layers together\n"
@@ -2090,6 +2100,7 @@ public:
 
         TPath output;
         TPath outputImage;
+        bool squash = false;
         TPath loopStorage, loopImage;
         std::vector<std::string> env;
         std::vector<std::string> layers;
@@ -2101,6 +2112,7 @@ public:
             { 'l', true, [&](const char *arg) { bootstrap.Layers.push_back(arg); bootstrap.NeedVolume = true; } },
             { 'o', true, [&](const char *arg) { output = TPath(arg).AbsolutePath(); } },
             { 'O', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); } },
+            { 'Q', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); squash = true; } },
             { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *) { launcher.WeakContainer = false; } },
@@ -2156,7 +2168,7 @@ public:
             }
         }
 
-        if (!outputImage.IsEmpty()) {
+        if (!outputImage.IsEmpty() && !squash) {
             error = loopStorage.MkdirTmp(outputImage.DirName(), "loop.", 0755);
             if (error) {
                 std::cerr << "Cannot create storage for loop: " << error << std::endl;
@@ -2303,10 +2315,19 @@ public:
             }
         }
 
+        if (squash) {
+            std::cout << "Exporting squashfs into " << outputImage.ToString() << std::endl;
+
+            if (Api->ExportLayer(volume, outputImage.ToString(), "squashfs")) {
+                std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
+                goto err;
+            }
+        }
+
         if (launcher.WeakContainer)
             launcher.Cleanup();
 
-        if (!outputImage.IsEmpty()) {
+        if (!outputImage.IsEmpty() && !squash) {
             std::cout << "Exporting image into " << outputImage.ToString() << std::endl;
 
             error = loopImage.Rename(outputImage);

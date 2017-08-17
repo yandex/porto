@@ -541,11 +541,14 @@ int Connection::ImportLayer(const std::string &layer,
 }
 
 int Connection::ExportLayer(const std::string &volume,
-                           const std::string &tarball) {
+                           const std::string &tarball,
+                           const std::string &compress) {
     auto req = Impl->Req.mutable_exportlayer();
 
     req->set_volume(volume);
     req->set_tarball(tarball);
+    if (compress.size())
+        req->set_compress(compress);
     return Impl->Rpc();
 }
 
