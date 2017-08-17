@@ -2242,15 +2242,14 @@ TError TNetEnv::SetupInterfaces() {
         return error;
 
     for (auto &dev: Devices) {
-        if (!Net->DeviceIndex(dev.Name) && dev.Type != "ip6tnl0")
-            return TError(EError::Unknown, "Network device " + dev.Name + " not found");
-    }
+        int index = Net->DeviceIndex(dev.Name);
 
-    for (auto &dev: Devices) {
-        if ((!NetUp || dev.Type == "ip6tnl0") &&
-                dev.Ip.empty() && dev.Gw.IsEmpty() &&
-                !dev.Autoconf && dev.Mtu < 0)
-            continue;
+        if (!index) {
+            if (dev.Type == "ip6tnl0" && dev.Ip.empty() &&
+                    dev.Gw.IsEmpty() && dev.Mtu < 0)
+                continue;
+            return TError(EError::Unknown, "Network device " + dev.Name + " not found");
+        }
 
         TNlLink link(target_nl, dev.Name);
         error = link.Load();
