@@ -1561,13 +1561,14 @@ void TNetwork::StopNetwork(TContainer &ct) {
         if (dev.Type != "L3")
             continue;
         auto lock = HostNetwork->LockNet();
-        HostNetwork->DelProxyNeightbour(dev.Ip);
         if (dev.Mode == "NAT") {
             error = HostNetwork->PutNatAddress(dev.Ip);
             if (error)
                 L_ERR("Cannot put NAT address : {}", error);
             dev.Ip.clear();
             env.SaveIp = true;
+        } else {
+            HostNetwork->DelProxyNeightbour(dev.Ip);
         }
     }
 
@@ -2027,9 +2028,11 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
             return error;
     }
 
-    error = HostNetwork->AddProxyNeightbour(dev.Ip, dev.Master);
-    if (error)
-        return error;
+    if (dev.Mode != "NAT") {
+        error = HostNetwork->AddProxyNeightbour(dev.Ip, dev.Master);
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
