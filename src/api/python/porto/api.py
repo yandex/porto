@@ -129,9 +129,11 @@ class _RPC(object):
         try:
             return self.sock.sendall(data, flags)
         except socket.timeout:
+            if self.auto_reconnect:
+                self.sock = None
             raise exceptions.SocketTimeout("Got timeout on send")
         except socket.error as e:
-            if (self.auto_reconnect):
+            if self.auto_reconnect:
                 self.sock = None
             raise exceptions.SocketError("Send error: {}".format(e))
 
@@ -147,9 +149,11 @@ class _RPC(object):
                 l += len(piece)
             return ''.join(buf)
         except socket.timeout:
+            if self.auto_reconnect:
+                self.sock = None
             raise exceptions.SocketTimeout("Got timeout on receive")
         except socket.error as e:
-            if (self.auto_reconnect):
+            if self.auto_reconnect:
                 self.sock = None
             raise exceptions.SocketError("Recv error: {}".format(e))
 
