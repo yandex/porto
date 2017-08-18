@@ -1,7 +1,9 @@
 #include "quota.hpp"
+#include "log.hpp"
 
 extern "C" {
 #include <linux/quota.h>
+#include <linux/dqblk_xfs.h>
 #include <sys/quota.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -88,13 +90,27 @@ TError TProjectQuota::InitProjectQuotaFile(TPath path) {
 }
 
 TError TProjectQuota::EnableProjectQuota() {
+	struct fs_quota_statv statv;
 	struct if_dqinfo dqinfo;
 	TError error;
 	int ret;
 
-	if (quotactl(QCMD(Q_GETINFO, PRJQUOTA),
-		     Device.c_str(), 0, (caddr_t)&dqinfo) == 0)
-		return TError::Success();
+	statv.qs_version = FS_QSTATV_VERSION1;
+	if (!quotactl(QCMD(Q_XGETQSTATV, PRJQUOTA), Device.c_str(),
+				0, (caddr_t)&statv)) {
+		if ((statv.qs_flags & FS_QUOTA_PDQ_ACCT) &&
+				(statv.qs_flags & FS_QUOTA_PDQ_ENFD))
+			return TError::Success();
+	}
+
+	if (!quotactl(QCMD(Q_GETINFO, PRJQUOTA), Device.c_str(),
+				0, (caddr_t)&dqinfo)) {
+		if (!(dqinfo.dqi_flags & DQF_SYS_FILE) ||
+		    !quotactl(QCMD(Q_QUOTAON, PRJQUOTA), Device.c_str(),
+			      0, NULL) || errno == EEXIST)
+			return TError::Success();
+		return TError(EError::NotSupported, errno, "Cannot enable quota");
+	}
 
 	ret = mount(NULL, RootPath.c_str(), NULL, MS_REMOUNT, "quota");
 	if (ret)
@@ -266,8 +282,9 @@ TError TProjectQuota::FindDevice() {
 		    device == mount.Device &&
 		    mount.BindPath.IsRoot() &&
 		    !(mount.MntFlags & MS_RDONLY)) {
-			if (mount.Type != "ext4")
+			if (mount.Type != "ext4" && mount.Type != "xfs")
 				return TError(EError::NotSupported, "Unsupported filesystem " + mount.Type);
+			Type = mount.Type;
 			Device = mount.Source;
 			RootPath = mount.Target;
 			return TError::Success();
@@ -301,7 +318,7 @@ TError TProjectQuota::Load() {
 
 	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
-		return TError(EError::Unknown, "Cannot get quota state");
+		return TError(EError::Unknown, errno, "Cannot get quota state");
 
 	SpaceLimit = quota.dqb_bhardlimit * QIF_DQBLKSIZE;
 	SpaceUsage = quota.dqb_curspace;
@@ -353,20 +370,31 @@ TError TProjectQuota::Create() {
 			return error;
 	}
 
-	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
-				ProjectId, (caddr_t)&quota))
-		return TError(EError::Unknown, "Cannot get quota state");
+	if (!quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
+				ProjectId, (caddr_t)&quota)) {
+		if (quota.dqb_curspace || quota.dqb_curinodes) {
+			L_WRN("Project quota {} for {} already in use", ProjectId, Path);
 
-	/* Reset quota counters */
+			/* Reset quota counters */
+			memset(&quota, 0, sizeof(quota));
+			quota.dqb_valid = QIF_ALL;
+			if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
+						ProjectId, (caddr_t)&quota))
+				L_WRN("Cannot reset quota {}: {}", ProjectId,
+						TError(EError::Unknown, errno, ""));
+		}
+	} else if (errno != ENOENT)
+		return TError(EError::Unknown, errno, "Cannot get quota state");
+
 	memset(&quota, 0, sizeof(quota));
 	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE +
 				!!(SpaceLimit % QIF_DQBLKSIZE);
 	quota.dqb_ihardlimit = InodeLimit;
-	quota.dqb_valid = QIF_ALL;
+	quota.dqb_valid = QIF_LIMITS;
 
 	if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
-		return TError(EError::Unknown, "Cannot set quota state");
+		return TError(EError::Unknown, errno, "Cannot set quota limits");
 
 	quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 
@@ -398,7 +426,8 @@ TError TProjectQuota::Resize() {
 
 	if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
-		return TError(EError::Unknown, "Cannot set quota state");
+		return TError(EError::Unknown, errno, "Cannot set quota limits");
+
 	quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 	return TError::Success();
 }
@@ -420,11 +449,13 @@ TError TProjectQuota::Destroy() {
 		return error;
 
 	memset(&quota, 0, sizeof(quota));
-	quota.dqb_valid = QIF_ALL;
+	quota.dqb_valid = (Type == "ext4") ? QIF_ALL : QIF_LIMITS;
 
 	if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
-		return TError(EError::Unknown, "Cannot set quota state");
+		L_WRN("Cannot destroy quota {}: {}", ProjectId,
+				TError(EError::Unknown, errno, ""));
+
 	quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 	return TError::Success();
 }

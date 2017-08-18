@@ -9,6 +9,7 @@ class TProjectQuota {
 
 	TPath Device;
 	TPath RootPath;
+	std::string Type;
 
 	TError FindProject();
 	TError FindDevice();
