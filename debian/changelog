@@ -1,3 +1,17 @@
+yandex-porto (4.0.2) unstable; urgency=low
+
+  * manpage: add example of NAT configuration
+  * network: do not setup proxy ndp for NAT
+  * network: do not setup qdisc for dummy devices
+  * network: do not touch statistics from other network namespace
+  * network: lock also host network state when changing class configuration
+  * network: always set ip6tnl0 up
+  * volume: add export layers into squashfs
+  * quota: add support for journalled ext4 and xfs quota
+  * quota: define DQF_SYS_FILE
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 18 Aug 2017 18:47:01 +0300
+
 yandex-porto (4.0.1) unstable; urgency=low
 
   * cgroup: sum statistics for virtio block deices into "hw"
