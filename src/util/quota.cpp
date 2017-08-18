@@ -17,6 +17,10 @@ extern "C" {
 #define PRJQUOTA 2
 #endif
 
+#ifndef DQF_SYS_FILE
+#define DQF_SYS_FILE	0x10000
+#endif
+
 struct fsxattr {
 	__u32		fsx_xflags;
 	__u32		fsx_extsize;
