@@ -37,11 +37,11 @@ Porto requires Linux kernel 3.18 and optionally some offstream patches.
 
 ## Name
 
-Container name could contains only these charachers: 'a'..'z', 'A'..'Z', '0'..'9',
+Container name could contains only these characters: 'a'..'z', 'A'..'Z', '0'..'9',
 '\_', '\-', '@', ':', '.'. Slash '/' separates nested container: "parent/child".
 
-Each container name component should not exceed 128 charachers, whole name is
-limited with 200 charachers. Also porto limits nesting with 16 levels.
+Each container name component should not exceed 128 characters, whole name is
+limited with 200 characters. Also porto limits nesting with 16 levels.
 
 Container could be addressed using short name relative current porto
 namespaces: "name", or absolute name "/porto/name" which stays the
@@ -320,7 +320,7 @@ Write access to container requires any of these conditions:
 
 * **place** - places allowed for volumes and layers, syntax: \[default\]\[;mask;...\]
 
-    Default is "/place;\*\*\*" (use /place by deafault, allow any other),
+    Default is "/place;\*\*\*" (use /place by default, allow any other),
     for container with chroot default is "/place".
 
 Setting **bind**, **root**, **stdout\_path**, **stderr\_path** requires
@@ -591,7 +591,7 @@ network {
 ```
 
 Porto setup **tc-hfsc(8)** scheduler for all interfaces except listed in
-portod.conf as unmanaeged:
+portod.conf as unmanaged:
 ```
 network {
     unmanaged_device: "name"
@@ -838,6 +838,10 @@ See **portoctl(8)** for details.
 /place/porto\_storage/*storage*
 
     Default place for persistent volume storages.
+
+/place/porto\_containers/*container*.CT
+
+    Container saved by **portoctl** and auto-started by porto service.
 
 # HOMEPAGE
 
