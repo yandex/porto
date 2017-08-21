@@ -509,7 +509,7 @@ public:
 
 class TOwnerUser : public TProperty {
 public:
- TOwnerUser() : TProperty(P_OWNER_USER, EProperty::OWNER_USER,
+    TOwnerUser() : TProperty(P_OWNER_USER, EProperty::OWNER_USER,
                           "Container owner user") {}
 
     TError Get(std::string &value) {
@@ -971,23 +971,23 @@ public:
     TError Set(const std::string &net_desc);
     TError Get(std::string &value);
     TNet() : TProperty(P_NET, EProperty::NET,
- "Container network settings: "
- "none | "
- "inherited (default) | "
- "steal <name> | "
- "container <name> | "
- "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
- "ipvlan <master> <name> [l2|l3] [mtu] | "
- "veth <name> <bridge> [mtu] [hw] | "
- "L3 <name> [master] | "
- "NAT [name] | "
- "ipip6 <name> <remote> <local> | "
- "tap <name> | "
- "MTU <name> <mtu> | "
- "MAC <name> <mac> | "
- "autoconf <name> (SLAAC) | "
- "ip <cmd> <args>... | "
- "netns <name>") {}
+            "Container network settings: "
+            "none | "
+            "inherited (default) | "
+            "steal <name> | "
+            "container <name> | "
+            "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
+            "ipvlan <master> <name> [l2|l3] [mtu] | "
+            "veth <name> <bridge> [mtu] [hw] | "
+            "L3 <name> [master] | "
+            "NAT [name] | "
+            "ipip6 <name> <remote> <local> | "
+            "tap <name> | "
+            "MTU <name> <mtu> | "
+            "MAC <name> <mac> | "
+            "autoconf <name> (SLAAC) | "
+            "ip <cmd> <args>... | "
+            "netns <name>") {}
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET)) {
             CT->NetProp = { { "none" } };

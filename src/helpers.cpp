@@ -102,6 +102,6 @@ TError ClearRecursive(const TPath &path) {
 }
 
 TError RemoveRecursive(const TPath &path) {
-   return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()},
+    return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()},
                       path.NormalPath().DirName());
 }
