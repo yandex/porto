@@ -87,7 +87,7 @@ class TNlLink : public TNonCopyable {
 
 public:
 
-    TNlLink(std::shared_ptr<TNl> sock, const std::string &name);
+    TNlLink(std::shared_ptr<TNl> sock, const std::string &name, int index = 0);
     TNlLink(std::shared_ptr<TNl> sock, struct rtnl_link *link);
     ~TNlLink();
     TError Load();

@@ -257,11 +257,13 @@ int TNl::GetFd() {
 }
 
 
-TNlLink::TNlLink(std::shared_ptr<TNl> sock, const std::string &name) {
+TNlLink::TNlLink(std::shared_ptr<TNl> sock, const std::string &name, int index) {
     Nl = sock;
     Link = rtnl_link_alloc();
     PORTO_ASSERT(Link);
     rtnl_link_set_name(Link, name.c_str());
+    if (index)
+        rtnl_link_set_ifindex(Link, index);
 }
 
 TNlLink::TNlLink(std::shared_ptr<TNl> sock, struct rtnl_link *link) {

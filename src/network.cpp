@@ -2244,14 +2244,19 @@ TError TNetEnv::SetupInterfaces() {
     for (auto &dev: Devices) {
         int index = Net->DeviceIndex(dev.Name);
 
-        if (!index) {
-            if (dev.Type == "ip6tnl0" && dev.Ip.empty() &&
-                    dev.Gw.IsEmpty() && dev.Mtu < 0)
+        if (!index && dev.Name == "ip6tnl0") {
+            if (dev.Mtu < 0 && dev.Ip.empty())
                 continue;
-            return TError(EError::Unknown, "Network device " + dev.Name + " not found");
+            struct ifreq ifr;
+            strncpy(ifr.ifr_name, dev.Name.c_str(), sizeof(ifr.ifr_name)-1);
+            if (!ioctl(nl_socket_get_fd(Net->GetSock()), SIOCGIFINDEX, &ifr))
+                index = ifr.ifr_ifindex;
         }
 
-        TNlLink link(target_nl, dev.Name);
+        if (!index)
+            return TError(EError::Unknown, "Network device " + dev.Name + " not found");
+
+        TNlLink link(target_nl, dev.Name, index);
         error = link.Load();
         if (error)
             return error;
