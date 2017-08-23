@@ -222,7 +222,6 @@ public:
     bool HasReserve = false;
     bool HasRtGroup = false;
 
-    uint64_t BasePeriod = 0ull;
     uint64_t BaseShares = 0ull;
     uint64_t MinShares = 0ull;
     uint64_t MaxShares = 0ull;
@@ -231,7 +230,8 @@ public:
     void InitializeSubsystem() override;
     TError InitializeCgroup(TCgroup &cg) override;
     TError SetCpuLimit(TCgroup &cg, const std::string &policy,
-                       double weight, double guarantee, double limit);
+                       double weight, uint64_t period,
+                       double guarantee, double limit);
 };
 
 class TCpuacctSubsystem : public TSubsystem {

@@ -73,6 +73,8 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_default_ulimit("core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M");
     config().mutable_container()->set_default_thread_limit(10000);
 
+    config().mutable_container()->set_cpu_period(100000000);    /* 100ms */
+
     config().mutable_volumes()->set_enable_quota(true);
 
     if (CompareVersions(config().linux_version(), "4.4") >= 0)

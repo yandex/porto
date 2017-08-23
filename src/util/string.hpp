@@ -50,6 +50,7 @@ std::string StringFormatDuration(uint64_t msec);
 
 TError StringToValue(const std::string &str, double &value, std::string &unit);
 TError StringToSize(const std::string &str, uint64_t &size);
+TError StringToNsec(const std::string &str, uint64_t &nsec);
 TError StringToCpuValue(const std::string &str, double &value);
 
 TError UintMapToString(const TUintMap &map, std::string &value);

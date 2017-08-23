@@ -176,6 +176,45 @@ std::string StringFormatDuration(uint64_t msec) {
     return StringFormat("%dd %2d:%02d", days, hours, minutes);
 }
 
+TError StringToNsec(const std::string &str, uint64_t &nsec) {
+    std::string unit;
+    uint64_t mult = 1;
+    double value;
+    TError error;
+
+    error = StringToValue(str, value, unit);
+    if (error)
+        return error;
+
+    if (value < 0)
+        return TError(EError::InvalidValue, "Negative: " + str);
+
+    if (!unit[0])
+        goto ok;
+
+    if (unit == "s" || unit == "sec")
+        mult = 1000000000;
+    else if (unit == "ms" || unit == "msec")
+        mult = 1000000;
+    else if (unit == "us" || unit == "usec")
+        mult = 1000;
+    else if (unit == "ns" || unit == "nsec")
+        mult = 1;
+    else if (unit == "ps" || unit == "psec")
+        mult = 0.001;
+    else if (unit == "fs" || unit == "fsec")
+        mult = 0.000001;
+    else
+        return TError(EError::InvalidValue, "Unknown unit: " + unit);
+
+ok:
+    if (value * mult > UINT64_MAX)
+        return TError(EError::InvalidValue, "Too big: " + str);
+
+    nsec = value * mult;
+    return TError::Success();
+}
+
 TTuple SplitString(const std::string &str, const char sep, int max) {
     std::vector<std::string> tokens;
     std::istringstream ss(str);

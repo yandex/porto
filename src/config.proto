@@ -130,6 +130,7 @@ message TCfg {
         optional int64 default_thread_limit = 35;
         optional string default_resolv_conf = 36;
         optional bool default_bind_dns = 37; /* [deprecated=true] */
+        optional uint64 cpu_period = 38;
 
         message TSysctl {
             required string key = 1;

@@ -631,14 +631,9 @@ void TCpuSubsystem::InitializeSubsystem() {
                  cg.Has("cpu.cfs_reserve_us") &&
                  cg.Has("cpu.cfs_reserve_shares");
 
-    if (HasQuota && cg.GetUint64("cpu.cfs_period_us", BasePeriod))
-        BasePeriod = 100000;    /* 100ms */
-
     L_SYS("{} cores", GetNumCores());
     if (HasShares)
         L_SYS("base shares {}", BaseShares);
-    if (HasQuota)
-        L_SYS("quota period {}", BasePeriod);
     if (HasRtGroup)
         L_SYS("support rt group");
     if (HasReserve)
@@ -652,18 +647,25 @@ TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
 }
 
 TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
-                                  double weight, double guarantee, double limit) {
+                                  double weight, uint64_t period,
+                                  double guarantee, double limit) {
     int max = GetNumCores();
     TError error;
 
+    period = period / 1000; /* ns -> us */
+
     if (HasQuota) {
-        int64_t quota = std::ceil(limit * BasePeriod);
+        int64_t quota = std::ceil(limit * period);
 
         if (quota < 1000) /* 1ms */
             quota = 1000;
 
         if (limit <= 0 || limit >= max)
             quota = -1;
+
+        error = cg.Set("cpu.cfs_period_us", std::to_string(period));
+        if (error)
+            return error;
 
         error = cg.Set("cpu.cfs_quota_us", std::to_string(quota));
         if (error)
@@ -677,7 +679,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         guarantee = max;
 
     if (HasReserve && config().container().enable_cpu_reserve()) {
-        uint64_t reserve = std::floor(guarantee * BasePeriod);
+        uint64_t reserve = std::floor(guarantee * period);
         uint64_t shares = BaseShares, reserve_shares = BaseShares;
 
         shares *= weight;
@@ -730,7 +732,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
     }
 
     if (HasRtGroup && config().container().rt_priority()) {
-        int64_t root_runtime, root_period, period, runtime;
+        int64_t root_runtime, root_period, runtime;
 
         if (RootCgroup().GetInt64("cpu.rt_period_us", root_period))
             root_period = 1000000;
@@ -739,8 +741,6 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             root_runtime = 950000;
         else if (root_runtime < 0)
             root_runtime = root_period;
-
-        period = 100000;    /* 100ms */
 
         if (limit <= 0 || limit >= max ||
                 limit / max * root_period > root_runtime) {

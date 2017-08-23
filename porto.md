@@ -398,6 +398,10 @@ write permissions to the target or owning related volume.
     Porto setup both CFS and RT cgroup limits.
     RT cgroup limit is strictly non-overcommitable in mainline kernel.
 
+* **cpu\_period** - CPU limit accounting period
+
+   Syntax: 1ms..1s, default: 100ms \[nanoseconds\]
+
 * **cpu\_policy**  - CPU scheduler policy, see **sched(7)**
     - *normal*   - SCHED\_OTHER (default)
     - *high*     - SCHED\_OTHER (nice = -10, increases cpu.shares by 16 times)

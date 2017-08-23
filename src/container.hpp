@@ -183,6 +183,7 @@ public:
     double CpuLimit = 0;
     double CpuGuarantee = 0;
     double CpuWeight = 1;
+    uint64_t CpuPeriod;
 
     /* Under CpuAffinityMutex */
     ECpuSetType CpuSetType = ECpuSetType::Inherit;

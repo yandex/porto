@@ -1900,6 +1900,38 @@ TError TCpuGuarantee::Get(std::string &value) {
     return TError::Success();
 }
 
+class TCpuPeriod : public TProperty {
+public:
+    TCpuPeriod() : TProperty(P_CPU_PERIOD, EProperty::CPU_PERIOD,
+            "CPU limit period: 1ms..1s, default: 100ms [nanoseconds] (dynamic)")
+    {
+        RequireControllers = CGROUP_CPU;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->CpuPeriod);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        error = WantControllers(CGROUP_CPU);
+        if (error)
+            return error;
+        uint64_t val;
+        error = StringToNsec(value, val);
+        if (error)
+            return error;
+        if (val < 1000000 || val > 1000000000)
+            return TError(EError::InvalidValue, "cpu period out of range");
+        if (CT->CpuPeriod != val) {
+            CT->CpuPeriod = val;
+            CT->SetProp(EProperty::CPU_PERIOD);
+        }
+        return TError::Success();
+    }
+} static CpuPeriod;
+
 class TCpuWeight : public TProperty {
 public:
     TCpuWeight() : TProperty(P_CPU_WEIGHT, EProperty::CPU_WEIGHT,

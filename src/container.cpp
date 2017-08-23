@@ -335,6 +335,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     ChooseSchedPolicy();
 
     CpuLimit = GetNumCores();
+    CpuPeriod = config().container().cpu_period();
+
     if (IsRoot()) {
         SetProp(EProperty::CPU_LIMIT);
         SetProp(EProperty::MEM_LIMIT);
@@ -1352,10 +1354,11 @@ TError TContainer::ApplyDynamicProperties() {
             (TestPropDirty(EProperty::CPU_POLICY) |
              TestPropDirty(EProperty::CPU_WEIGHT) |
              TestClearPropDirty(EProperty::CPU_LIMIT) |
+             TestClearPropDirty(EProperty::CPU_PERIOD) |
              TestClearPropDirty(EProperty::CPU_GUARANTEE))) {
         auto cpucg = GetCgroup(CpuSubsystem);
         error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy, CpuWeight,
-                                          CpuGuarantee, CpuLimit);
+                                         CpuPeriod, CpuGuarantee, CpuLimit);
         if (error) {
             if (error.GetErrno() != EINVAL)
                 L_ERR("Cannot set cpu policy: {}", error);
