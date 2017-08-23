@@ -1930,6 +1930,7 @@ public:
         "    -L                       list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
         "    -Q <volume> <squashfs>   export upper layer into squashfs\n"
+        "    -c compression           override compression\n"
         "    -G <layer>               retrieve layer stored private value\n"
         "    -v                       be verbose\n"
         ) {}
@@ -1946,6 +1947,7 @@ public:
     bool set_private = false;
     std::string place;
     std::string private_value;
+    std::string compression;
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
@@ -1960,8 +1962,12 @@ public:
             { 'Q', false, [&](const char *) { squash = true; } },
             { 'G', false, [&](const char *) { get_private = true; } },
             { 'S', true, [&](const char *arg) { set_private = true; private_value = arg; } },
+            { 'c', true, [&](const char *arg) { compression = arg; } },
             { 'v', false, [&](const char *) { verbose = true; } },
         });
+
+        if (squash && compression.empty())
+            compression = "squashfs";
 
         std::string path;
         if (args.size() >= 2)
@@ -1976,13 +1982,13 @@ public:
         } else if (export_) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ExportLayer(args[0], path);
+            ret = Api->ExportLayer(args[0], path, compression);
             if (ret)
                 PrintError("Can't export layer");
         } else if (squash) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ExportLayer(args[0], path, "squashfs");
+            ret = Api->ExportLayer(args[0], path, compression);
             if (ret)
                 PrintError("Can't export layer");
         } else if (merge) {
@@ -2076,6 +2082,7 @@ public:
             "    -o layer.tar               save as overlayfs layer\n"
             "    -O image.img               save as filesystem image\n"
             "    -Q image.squashfs          save as squashfs image\n"
+            "    -c compression             override compression\n"
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
             "    -M                         merge all layers together\n"
@@ -2101,6 +2108,7 @@ public:
         TPath output;
         TPath outputImage;
         bool squash = false;
+        std::string compression;
         TPath loopStorage, loopImage;
         std::vector<std::string> env;
         std::vector<std::string> layers;
@@ -2113,11 +2121,15 @@ public:
             { 'o', true, [&](const char *arg) { output = TPath(arg).AbsolutePath(); } },
             { 'O', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); } },
             { 'Q', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); squash = true; } },
+            { 'c', true, [&](const char *arg) { compression = arg; } },
             { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *) { launcher.WeakContainer = false; } },
             { 'M', false, [&](const char *) { launcher.MergeLayers = true; } },
         });
+
+        if (squash && compression.empty())
+            compression = "squashfs";
 
         if (output.IsEmpty() && outputImage.IsEmpty()) {
             std::cerr << "No output file specified" << std::endl;
@@ -2309,7 +2321,7 @@ public:
         if (!output.IsEmpty()) {
             std::cout << "Exporting layer into " << output.ToString() << std::endl;
 
-            if (Api->ExportLayer(volume, output.ToString())) {
+            if (Api->ExportLayer(volume, output.ToString(), compression)) {
                 std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
                 goto err;
             }
@@ -2318,7 +2330,7 @@ public:
         if (squash) {
             std::cout << "Exporting squashfs into " << outputImage.ToString() << std::endl;
 
-            if (Api->ExportLayer(volume, outputImage.ToString(), "squashfs")) {
+            if (Api->ExportLayer(volume, outputImage.ToString(), compression)) {
                 std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
                 goto err;
             }

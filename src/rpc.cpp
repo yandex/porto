@@ -831,7 +831,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
 
     layer.Owner = CL->Cred;
 
-    return layer.ImportTarball(CL->ResolvePath(req.tarball()),
+    return layer.ImportArchive(CL->ResolvePath(req.tarball()),
                                req.has_compress() ? req.compress() : "",
                                req.merge());
 }
@@ -885,7 +885,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
         if (error)
             return error;
 
-        return layer.ExportTarball(CL->ResolvePath(req.tarball()),
+        return layer.ExportArchive(CL->ResolvePath(req.tarball()),
                                    req.has_compress() ? req.compress() : "");
     }
 
@@ -899,7 +899,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (error)
         return error;
 
-    return layer.ExportTarball(CL->ResolvePath(req.tarball()),
+    return layer.ExportArchive(CL->ResolvePath(req.tarball()),
                                req.has_compress() ? req.compress() : "");
 }
 
@@ -1091,7 +1091,7 @@ noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
     if (req.has_private_value())
         storage.Private = req.private_value();
 
-    return storage.ImportTarball(CL->ResolvePath(req.tarball()),
+    return storage.ImportArchive(CL->ResolvePath(req.tarball()),
                                  req.has_compress() ? req.compress() : "");
 }
 
@@ -1111,7 +1111,7 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
     if (error)
         return error;
 
-    return storage.ExportTarball(CL->ResolvePath(req.tarball()),
+    return storage.ExportArchive(CL->ResolvePath(req.tarball()),
                                  req.has_compress() ? req.compress() : "");
 }
 

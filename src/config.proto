@@ -159,6 +159,7 @@ message TCfg {
         optional string place_load_limit = 10;
         optional bool direct_io_loop = 11;
         optional string default_lvm_group = 12;
+        optional string squashfs_compression = 13;
     }
 
     message TCoreCfg {

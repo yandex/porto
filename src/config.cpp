@@ -82,6 +82,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_volumes()->set_max_total(3000);
     config().mutable_volumes()->set_place_load_limit("default: 2; /ssd: 4");
+    config().mutable_volumes()->set_squashfs_compression("gzip");
 
     config().mutable_network()->set_device_qdisc("default: hfsc");
     config().mutable_network()->set_default_rate("default: 125000");    /* 1Mbit */
