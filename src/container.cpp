@@ -346,17 +346,25 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     IoPrio = 0;
 
     Controllers = RequiredControllers = CGROUP_FREEZER;
+
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
         Controllers |= CGROUP_CPUACCT;
-    if (!Parent || Parent->IsRoot())
+
+    if (Level <= 1) {
         Controllers |= CGROUP_MEMORY | CGROUP_CPU | CGROUP_CPUACCT |
-                       CGROUP_NETCLS | CGROUP_BLKIO | CGROUP_DEVICES;
-    SetProp(EProperty::CONTROLLERS);
+                       CGROUP_NETCLS | CGROUP_DEVICES;
 
-    if ((Controllers & CGROUP_MEMORY) && HugetlbSubsystem.Supported)
-        Controllers |= CGROUP_HUGETLB;
+        if (BlkioSubsystem.Supported)
+            Controllers |= CGROUP_BLKIO;
 
-    if (Parent && Parent->IsRoot() && PidsSubsystem.Supported) {
+        if (CpusetSubsystem.Supported)
+            Controllers |= CGROUP_CPUSET;
+
+        if (HugetlbSubsystem.Supported)
+            Controllers |= CGROUP_HUGETLB;
+    }
+
+    if (Level == 1 && PidsSubsystem.Supported) {
         Controllers |= CGROUP_PIDS;
 
         if (config().container().default_thread_limit()) {
@@ -365,8 +373,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
         }
     }
 
-    if (Level <= 1 && CpusetSubsystem.Supported)
-        Controllers |= CGROUP_CPUSET;
+    SetProp(EProperty::CONTROLLERS);
 
     NetClass.Prio["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
@@ -1509,6 +1516,21 @@ TError TContainer::PrepareCgroups() {
         SetProp(EProperty::CPU_SET_AFFINITY);
     }
 
+    if (VirtMode == VIRT_MODE_OS &&
+            config().container().detect_systemd() &&
+            SystemdSubsystem.Supported &&
+            !(Controllers & CGROUP_SYSTEMD) &&
+            !RootPath.IsRoot()) {
+        TPath cmd = RootPath / Command;
+        TPath dst;
+        if (!cmd.ReadLink(dst) && dst.BaseName() == "systemd") {
+            L("Enable systemd cgroup for {}", Name);
+            Controllers |= CGROUP_SYSTEMD;
+        }
+    }
+
+    auto missing = Controllers;
+
     for (auto hy: Hierarchies) {
         TCgroup cg = GetCgroup(*hy);
 
@@ -1520,12 +1542,22 @@ TError TContainer::PrepareCgroups() {
             SetProp(EProperty::CONTROLLERS);
         }
 
+        missing &= ~hy->Controllers;
+
         if (cg.Exists())
             continue;
 
         error = cg.Create();
         if (error)
             return error;
+    }
+
+    if (missing) {
+        std::string types;
+        for (auto subsys: Subsystems)
+            if (subsys->Kind & missing)
+                types += " " + subsys->Type;
+        return TError(EError::NotSupported, "Some cgroup controllers are not available:" + types);
     }
 
     if (!IsRoot() && (Controllers & CGROUP_MEMORY)) {
@@ -1603,6 +1635,9 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
 
     TaskEnv.Mnt.BindCred = Parent->RootPath.IsRoot() ? CL->TaskCred : TCred(RootUser, RootGroup);
+
+    if (Controllers & CGROUP_SYSTEMD)
+        TaskEnv.Mnt.Systemd = GetCgroup(SystemdSubsystem).Name;
 
     TaskEnv.Cred = TaskCred;
 
@@ -1705,7 +1740,8 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           Hostname.size() ||
                           ResolvConf.size() ||
                           !TaskEnv.Mnt.Root.IsRoot() ||
-                          TaskEnv.Mnt.RootRo;
+                          TaskEnv.Mnt.RootRo ||
+                          !TaskEnv.Mnt.Systemd.empty();
 
     return TError::Success();
 }
@@ -2790,9 +2826,17 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     if (subsystem.Controllers & CGROUP_FREEZER)
         return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Name);
 
+    if (subsystem.Controllers & CGROUP_SYSTEMD) {
+        if (Controllers & CGROUP_SYSTEMD)
+            return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" +
+                                    StringReplaceAll(Name, "/", "%"));
+        return subsystem.RootCgroup();
+    }
+
     std::string cg;
     for (auto ct = this; !ct->IsRoot(); ct = ct->Parent.get()) {
         auto enabled = ct->Controllers & subsystem.Controllers;
+
         if (!cg.empty())
             cg = (enabled ? "/" : "%") + cg;
         if (!cg.empty() || enabled)

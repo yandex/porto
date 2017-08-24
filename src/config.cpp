@@ -75,6 +75,9 @@ void TConfig::LoadDefaults() {
 
     config().mutable_container()->set_cpu_period(100000000);    /* 100ms */
 
+    config().mutable_container()->set_enable_systemd(true);
+    config().mutable_container()->set_detect_systemd(true);
+
     config().mutable_volumes()->set_enable_quota(true);
 
     if (CompareVersions(config().linux_version(), "4.4") >= 0)

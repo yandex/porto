@@ -25,12 +25,14 @@ public:
     std::vector<TBindMount> BindMounts;
     bool BindPortoSock;
     uint64_t RunSize;
+    std::string Systemd;
 
     TError SetupRoot();
     TError MountRun();
     TError MountBinds();
     TError ProtectProc();
     TError MountTraceFs();
+    TError MountSystemd();
 
     TError Setup();
 };

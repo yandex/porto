@@ -49,6 +49,20 @@ $PORTOCTL build -l bootstrap -o "$DST/ubuntu-xenial.$COMPRESS" \
 $PORTOCTL layer -R ubuntu-xenial || true
 $PORTOCTL layer -I ubuntu-xenial "$DST/ubuntu-xenial.$COMPRESS"
 
+rm -f "$DST/ubuntu-xenial-systemd.$COMPRESS"
+$PORTOCTL build -l bootstrap -o "$DST/ubuntu-xenial-systemd.$COMPRESS" \
+	-B bootstrap_ubuntu_xenial_systemd.sh \
+	-S common-dns.sh \
+	-S common-hosts.sh \
+	-S base_ubuntu_xenial_systemd.sh \
+	-S common-misc.sh \
+	-S common-openssh.sh \
+	-S common-devel.sh \
+	-S common-cleanup.sh net="$NET"
+
+$PORTOCTL layer -R ubuntu-xenial-systemd || true
+$PORTOCTL layer -I ubuntu-xenial-systemd "$DST/ubuntu-xenial-systemd.$COMPRESS"
+
 rm -f "$DST/debian-jessie.$COMPRESS"
 $PORTOCTL build -l bootstrap -o "$DST/debian-jessie.$COMPRESS" \
 	-B bootstrap_debian_jessie.sh \

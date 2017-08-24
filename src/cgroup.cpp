@@ -27,6 +27,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_HUGETLB,   "hugetlb" },
     { CGROUP_CPUSET,    "cpuset" },
     { CGROUP_PIDS,      "pids" },
+    { CGROUP_SYSTEMD,   "systemd" },
 };
 
 TPath TCgroup::Path() const {
@@ -63,7 +64,7 @@ TError TCgroup::Create() {
         L_ERR("Cannot create cgroup {} : {}", *this, error);
 
     for (auto subsys: Subsystems) {
-        if (subsys->IsEnabled(*this)) {
+        if (subsys->IsBound(*this)) {
             error = subsys->InitializeCgroup(*this);
             if (error)
                 return error;
@@ -94,6 +95,24 @@ TError TCgroup::SetSuffix(const std::string suffix) {
 
 
 TError TCgroup::Remove() {
+    if (Subsystem->Kind & CGROUP_SYSTEMD) {
+        std::vector<TCgroup> children;
+
+        TError error = ChildsAll(children);
+        if (error)
+            return error;
+
+        for (auto it = children.rbegin(); it != children.rend(); ++it) {
+            error = (*it).RemoveOne();
+            if (error)
+                return error;
+        }
+    }
+
+    return RemoveOne();
+}
+
+TError TCgroup::RemoveOne() {
     struct stat st;
     uint64_t count = 0;
     TError error;
@@ -103,6 +122,8 @@ TError TCgroup::Remove() {
 
     L_ACT("Remove cgroup {}", *this);
     error = Path().Rmdir();
+
+    //FIXME CLEANUP
 
     /* workaround for bad synchronization */
     if (error && error.GetErrno() == EBUSY &&
@@ -350,7 +371,7 @@ TError TCgroup::KillAll(int signal) const {
         return TError(EError::Permission, "Bad idea");
 
     do {
-        if (++iteration > 10 && !frozen && FreezerSubsystem.IsEnabled(*this) &&
+        if (++iteration > 10 && !frozen && FreezerSubsystem.IsBound(*this) &&
                 !FreezerSubsystem.IsFrozen(*this)) {
             error = FreezerSubsystem.Freeze(*this, false);
             if (error)
@@ -420,7 +441,7 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
                     " cgroup for process " + std::to_string(pid));
 }
 
-bool TSubsystem::IsEnabled(const TCgroup &cgroup) const {
+bool TSubsystem::IsBound(const TCgroup &cgroup) const {
     return cgroup.Subsystem && (cgroup.Subsystem->Controllers & Kind);
 }
 
@@ -1122,6 +1143,7 @@ TBlkioSubsystem     BlkioSubsystem;
 TDevicesSubsystem   DevicesSubsystem;
 THugetlbSubsystem   HugetlbSubsystem;
 TPidsSubsystem      PidsSubsystem;
+TSystemdSubsystem   SystemdSubsystem;
 
 std::vector<TSubsystem *> AllSubsystems = {
     &FreezerSubsystem,
@@ -1134,11 +1156,11 @@ std::vector<TSubsystem *> AllSubsystems = {
     &DevicesSubsystem,
     &HugetlbSubsystem,
     &PidsSubsystem,
+    &SystemdSubsystem,
 };
 
 std::vector<TSubsystem *> Subsystems;
 std::vector<TSubsystem *> Hierarchies;
-
 
 TError InitializeCgroups() {
     TPath root("/sys/fs/cgroup");
@@ -1174,7 +1196,7 @@ TError InitializeCgroups() {
 
     for (auto subsys: AllSubsystems) {
         for (auto &mnt: mounts) {
-            if (mnt.Type == "cgroup" && mnt.HasOption(subsys->Type)) {
+            if (mnt.Type == "cgroup" && mnt.HasOption(subsys->MntOption())) {
                 subsys->Root = mnt.Target;
                 L("Found cgroup subsystem {} mounted at {}", subsys->Type, subsys->Root);
                 break;
@@ -1201,13 +1223,16 @@ TError InitializeCgroups() {
     }
 
     for (auto subsys: AllSubsystems) {
-        if (subsys->Type == "hugetlb" && !config().container().enable_hugetlb())
+
+        if (subsys->IsDisabled()) {
+            L("Cgroup subsysem {} is disabled", subsys->Type);
             continue;
+        }
 
         if (subsys->Root.IsEmpty()) {
             subsys->Root = root / subsys->Type;
 
-            L("Mount cgroup subsysm {} at {}", subsys->Type, subsys->Root);
+            L("Mount cgroup subsysem {} at {}", subsys->Type, subsys->Root);
             if (!subsys->Root.Exists()) {
                 error = subsys->Root.Mkdir(0755);
                 if (error) {
@@ -1216,7 +1241,8 @@ TError InitializeCgroups() {
                 }
             }
 
-            error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
+            error = subsys->Root.Mount("cgroup", "cgroup", 0, { subsys->MntOption() });
+
             /* in kernels < 3.14 cgroup net_cls was in module cls_cgroup */
             if (error && subsys->Type == "net_cls") {
                 if (system("modprobe cls_cgroup"))
@@ -1224,21 +1250,8 @@ TError InitializeCgroups() {
                 error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
             }
 
-            /* hugetlb is optional yet */
-            if (error && subsys->Type == "hugetlb") {
-                L("Seems not supported: {}", error);
-                error = subsys->Root.Rmdir();
-                continue;
-            }
-
-            if (error && subsys->Type == "cpuset") {
-                L("Seems not supported: {}", error);
-                error = subsys->Root.Rmdir();
-                continue;
-            }
-
-            if (error && subsys->Type == "pids") {
-                L("Seems not supported: {}", error);
+            if (error && subsys->IsOptional()) {
+                L("Cgroup subsystem {} is not supported: {}", subsys->Type, error);
                 error = subsys->Root.Rmdir();
                 continue;
             }
@@ -1265,6 +1278,7 @@ TError InitializeCgroups() {
         if (subsys->Hierarchy == subsys)
             Hierarchies.push_back(subsys);
 
+        subsys->Supported = true;
         subsys->InitializeSubsystem();
     }
 

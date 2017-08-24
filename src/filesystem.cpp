@@ -250,6 +250,25 @@ TError TMountNamespace::MountTraceFs() {
     return TError::Success();
 }
 
+TError TMountNamespace::MountSystemd() {
+    TPath tmpfs = Root / "sys/fs/cgroup";
+    TPath systemd = tmpfs / "systemd";
+    TPath systemd_rw = systemd / Systemd;
+    TError error;
+
+    error = tmpfs.Mount("tmpfs", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME, {"mode=755"});
+    if (!error)
+        error = systemd.MkdirAll(0755);
+    if (!error)
+        error = tmpfs.Remount(MS_REMOUNT | MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME | MS_RDONLY);
+    if (!error)
+        systemd.Mount("cgroup", "cgroup", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, { "name=systemd" });
+    if (!error)
+        error = systemd_rw.BindRemount(systemd_rw, MS_NOSUID | MS_NOEXEC | MS_NODEV);
+
+    return error;
+}
+
 TError TMountNamespace::SetupRoot() {
     TError error;
 
@@ -430,6 +449,12 @@ TError TMountNamespace::Setup() {
 
     if (!Root.IsRoot()) {
         error = SetupRoot();
+        if (error)
+            return error;
+    }
+
+    if (!Systemd.empty()) {
+        error = MountSystemd();
         if (error)
             return error;
     }

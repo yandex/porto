@@ -207,7 +207,6 @@ constexpr const char *P_VIRT_MODE_APP = "app";
 constexpr const char *P_VIRT_MODE_OS = "os";
 constexpr int VIRT_MODE_APP = 0;
 constexpr int VIRT_MODE_OS = 1;
-constexpr const char *P_CMD_VIRT_MODE_OS = "/sbin/init";
 
 class TProperty {
 public:

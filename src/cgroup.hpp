@@ -3,6 +3,7 @@
 #include <string>
 
 #include "common.hpp"
+#include "config.hpp"
 #include "util/path.hpp"
 
 struct TDevice;
@@ -18,6 +19,7 @@ class TCgroup;
 #define CGROUP_HUGETLB  0x0080ull
 #define CGROUP_CPUSET   0x0100ull
 #define CGROUP_PIDS     0x0200ull
+#define CGROUP_SYSTEMD  0x1000ull
 
 extern const TFlagsNames ControllersName;
 
@@ -28,8 +30,12 @@ public:
     const std::string Type;
     const TSubsystem *Hierarchy = nullptr;
     TPath Root;
+    bool Supported = false;
 
     TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
+    virtual bool IsDisabled() { return false; }
+    virtual bool IsOptional() { return false; }
+    virtual std::string MntOption() { return Type; }
     virtual void InitializeSubsystem() { }
 
     virtual TError InitializeCgroup(TCgroup &cgroup) {
@@ -41,7 +47,7 @@ public:
     TCgroup Cgroup(const std::string &name) const;
 
     TError TaskCgroup(pid_t pid, TCgroup &cgroup) const;
-    bool IsEnabled(const TCgroup &cgroup) const;
+    bool IsBound(const TCgroup &cgroup) const;
 };
 
 class TCgroup {
@@ -83,6 +89,7 @@ public:
 
     TError Create();
     TError Remove();
+    TError RemoveOne();
 
     TError KillAll(int signal) const;
 
@@ -243,13 +250,8 @@ public:
 
 class TCpusetSubsystem : public TSubsystem {
 public:
-    TCpusetSubsystem() : TSubsystem(CGROUP_CPUSET, "cpuset") { }
-
-    bool Supported = false;
-    void InitializeSubsystem() override {
-        Supported = true;
-    }
-
+    TCpusetSubsystem() : TSubsystem(CGROUP_CPUSET, "cpuset") {}
+    bool IsOptional() override { return true; }
     TError InitializeCgroup(TCgroup &cg) override;
 
     TError SetCpus(TCgroup &cg, const std::string &cpus) const;
@@ -267,6 +269,7 @@ public:
     bool HasThrottler = false;
     bool HasSaneBehavior = false;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
+    bool IsOptional() override { return true; }
     void InitializeSubsystem() override {
         HasWeight = RootCgroup().Has("blkio.weight");
         HasThrottler = RootCgroup().Has("blkio.throttle.read_bps_device");
@@ -301,8 +304,8 @@ public:
     const std::string GIGA_USAGE = "hugetlb.1GB.usage_in_bytes";
     const std::string GIGA_LIMIT = "hugetlb.1GB.limit_in_bytes";
     THugetlbSubsystem() : TSubsystem(CGROUP_HUGETLB, "hugetlb") {}
-
-    bool Supported = false;
+    bool IsDisabled() override { return !config().container().enable_hugetlb(); }
+    bool IsOptional() override { return true; }
 
     /* for now supports only 2MB pages */
     void InitializeSubsystem() override {
@@ -328,13 +331,18 @@ public:
 
 class TPidsSubsystem : public TSubsystem {
 public:
-    TPidsSubsystem() : TSubsystem(CGROUP_PIDS, "pids") { }
-    bool Supported = false;
-    void InitializeSubsystem() override {
-        Supported = true;
-    }
+    TPidsSubsystem() : TSubsystem(CGROUP_PIDS, "pids") {}
+    bool IsOptional() override { return true; }
     TError GetUsage(TCgroup &cg, uint64_t &usage) const;
     TError SetLimit(TCgroup &cg, uint64_t limit) const;
+};
+
+class TSystemdSubsystem : public TSubsystem {
+public:
+    TSystemdSubsystem() : TSubsystem(CGROUP_SYSTEMD, "systemd") {}
+    bool IsDisabled() override { return !config().container().enable_systemd(); }
+    bool IsOptional() override { return true; }
+    std::string MntOption() override { return "name=" + Type; }
 };
 
 extern TMemorySubsystem     MemorySubsystem;
@@ -347,6 +355,7 @@ extern TBlkioSubsystem      BlkioSubsystem;
 extern TDevicesSubsystem    DevicesSubsystem;
 extern THugetlbSubsystem    HugetlbSubsystem;
 extern TPidsSubsystem       PidsSubsystem;
+extern TSystemdSubsystem    SystemdSubsystem;
 
 extern std::vector<TSubsystem *> AllSubsystems;
 extern std::vector<TSubsystem *> Subsystems;
