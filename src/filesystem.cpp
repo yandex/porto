@@ -302,6 +302,7 @@ TError TMountNamespace::SetupRoot() {
     } dirs[] = {
         { "/run/lock",  01777 },
         { "/run/shm",   01777 },
+        { "/dev/shm",   01777 },
     };
 
     for (auto &d : dirs) {
@@ -339,7 +340,6 @@ TError TMountNamespace::SetupRoot() {
         { "/dev/stdin", "/proc/self/fd/0" },
         { "/dev/stdout", "/proc/self/fd/1" },
         { "/dev/stderr", "/proc/self/fd/2" },
-        { "/dev/shm", "../run/shm" },
     };
 
     for (auto &s : symlinks) {
@@ -354,6 +354,24 @@ TError TMountNamespace::SetupRoot() {
         if (error)
             return error;
         error = path.Mount("hugetlbfs", "hugetlbfs", MS_NOSUID | MS_NODEV, { "mode=01777" });
+        if (error)
+            return error;
+    }
+
+    struct {
+        std::string dst;
+        std::string src;
+        unsigned long flags;
+    } binds[] = {
+        { "/run/lock", "/run/lock", MS_NOSUID | MS_NODEV | MS_NOEXEC },
+        { "/dev/shm", "/run/shm", MS_NOSUID | MS_NODEV | MS_STRICTATIME },
+    };
+
+    for (auto &b : binds) {
+        TPath dst = Root + b.dst;
+        TPath src = Root + b.src;
+
+        error = dst.BindRemount(src, b.flags);
         if (error)
             return error;
     }

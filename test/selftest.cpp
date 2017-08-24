@@ -1641,6 +1641,7 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
 
     Say() << "Make sure pivot_root works and we don't leak host mount points" << std::endl;
     std::set<std::string> expected = {
+        "/run/lock",
         // restricted proc
         "/proc/sysrq-trigger",
         "/proc/irq",
@@ -1651,6 +1652,7 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
         // dev
         "/dev",
         "/dev/pts",
+        "/dev/shm",
 
         "/etc/resolv.conf",
 
