@@ -688,6 +688,10 @@ TError TNetwork::SyncDevices(bool force) {
         if (dev.Type == "dummy")
             dev.Managed = false;
 
+        /* Fallback tunnel for rx only */
+        if (dev.Name == "ip6tnl0")
+            dev.Managed = false;
+
         dev.Stat.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
         dev.Stat.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
         dev.Stat.RxDrops = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
