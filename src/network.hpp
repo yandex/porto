@@ -229,6 +229,7 @@ public:
 
     static void InitializeConfig();
 
+    static bool NetworkSysctl(const std::string &key);
     static bool NamespaceSysctl(const std::string &key);
 
     static TError StartNetwork(TContainer &ct, TTaskEnv &task);
@@ -284,6 +285,7 @@ struct TNetEnv {
     std::string NetNsName;
     std::string NetCtName;
     TMultiTuple IpRoute;
+    TStringMap NetSysctl;
 
     std::vector<TNetDeviceConfig> Devices;
 
@@ -298,7 +300,7 @@ struct TNetEnv {
     std::string GenerateHw(const std::string &name);
     TError ConfigureL3(TNetDeviceConfig &dev);
     TError SetupInterfaces();
-    TError ApplyIpRoute();
+    TError ApplySysctl();
 
     TError CreateTap(TNetDeviceConfig &dev);
     TError DestroyTap(TNetDeviceConfig &dev);

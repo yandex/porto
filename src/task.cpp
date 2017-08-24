@@ -205,24 +205,13 @@ TError TTaskEnv::ApplySysctl() {
         }
     }
 
-    if (CT->NetIsolate) {
-        for (const auto &it: config().container().net_sysctl()) {
-            error = SetSysctl(it.key(), it.val());
-            if (error) {
-                if (error.GetErrno() == ENOENT)
-                    L("Sysctl {} is not virtualized", it.key());
-                else
-                    return error;
-            }
-        }
-    }
-
     for (const auto &it: CT->Sysctl) {
         auto &key = it.first;
 
-        if (TNetwork::NamespaceSysctl(key)) {
+        if (TNetwork::NetworkSysctl(key)) {
             if (!CT->NetIsolate)
                 return TError(EError::Permission, "Sysctl " + key + " requires net isolation");
+            continue; /* Set by TNetEnv */
         } else if (std::find(IpcSysctls.begin(), IpcSysctls.end(), key) != IpcSysctls.end()) {
             if (!CT->Isolate)
                 return TError(EError::Permission, "Sysctl " + key + " requires ipc isolation");

@@ -137,6 +137,10 @@ static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.ipv6.route.gc_min_interval_ms", "500" },
 };
 
+bool TNetwork::NetworkSysctl(const std::string &key) {
+    return StringStartsWith(key, "net.");
+}
+
 bool TNetwork::NamespaceSysctl(const std::string &key) {
     for (auto &pair: NetSysctls) {
         if (pair.first == key)
@@ -2300,7 +2304,7 @@ TError TNetEnv::SetupInterfaces() {
     return TError::Success();
 }
 
-TError TNetEnv::ApplyIpRoute() {
+TError TNetEnv::ApplySysctl() {
     TNamespaceFd curNs;
     TError error;
 
@@ -2312,12 +2316,36 @@ TError TNetEnv::ApplyIpRoute() {
     if (error)
         return error;
 
+    for (const auto &it: config().container().net_sysctl()) {
+        if (NetSysctl.count(it.key()))
+            continue;
+        error = SetSysctl(it.key(), it.val());
+        if (error) {
+            if (error.GetErrno() == ENOENT)
+                L("Sysctl {} is not virtualized", it.key());
+            else
+                goto err;
+        }
+    }
+
+    for (const auto &it: NetSysctl) {
+        if (!TNetwork::NamespaceSysctl(it.first)) {
+            error = TError(EError::Permission, "Sysctl " + it.first + " is not allowed");
+            goto err;
+        }
+        error = SetSysctl(it.first, it.second);
+        if (error)
+            goto err;
+    }
+
     for (auto &cmd: IpRoute) {
         error = RunCommand(cmd, "/");
         if (error)
-            break;
+            goto err;
     }
 
+    error = TError::Success();
+err:
     TError error2 = curNs.SetNs(CLONE_NEWNET);
     PORTO_ASSERT(!error2);
 
@@ -2345,6 +2373,11 @@ TError TNetEnv::Parse(TContainer &ct) {
     error = ParseGw(ct.DefaultGw);
     if (error)
         return error;
+
+    for (const auto &it: ct.Sysctl) {
+        if (TNetwork::NetworkSysctl(it.first))
+            NetSysctl[it.first] = it.second;
+    }
 
     if (Parent)
         ParentNet = Parent->Net;
@@ -2432,13 +2465,11 @@ TError TNetEnv::OpenNetwork() {
             return error;
         }
 
-        if (IpRoute.size()) {
-            error = ApplyIpRoute();
-            if (error) {
-                lock.unlock();
-                Net->Destroy();
-                return error;
-            }
+        error = ApplySysctl();
+        if (error) {
+            lock.unlock();
+            Net->Destroy();
+            return error;
         }
 
         return TError::Success();

@@ -555,7 +555,7 @@ container {
 L3 network connects host and container netns with veth pair and configures
 routing in both directions. Also it adds neighbour/arp proxy entries to
 interfaces with addresses from the same network, this way container becomes
-reachable from the outside. This requires sysctl configuration:
+reachable from the outside. This requires sysctl configuration in host:
 ```
 net.ipv4.conf.all.forwarding = 1
 net.ipv6.conf.all.forwarding = 1
