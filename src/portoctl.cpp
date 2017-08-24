@@ -1845,21 +1845,37 @@ public:
         "    -L                       list existing storages\n"
         "    -R <storage>             remove storage\n"
         "    -F [days]                remove all unused for [days]\n"
+        "    -S <private>             set private value\n"
+        "    -I <storage> <archive>   import storage from archive\n"
+        "    -E <storage> <archive>   export storage to archive\n"
+        "    -c <compression>         override compression\n"
         ) {}
 
     int ret = EXIT_SUCCESS;
     bool list = false;
     bool remove = false;
     bool flush = false;
+    bool import = false;
+    bool export_ = false;
     std::string place;
+    std::string private_;
+    std::string compression;
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetOpts({
             { 'P', true,  [&](const char *arg) { place = arg;   } },
+            { 'S', true,  [&](const char *arg) { private_ = arg;   } },
             { 'R', false, [&](const char *) { remove = true; } },
             { 'L', false, [&](const char *) { list = true;   } },
             { 'F', false, [&](const char *) { flush = true;   } },
+            { 'I', false, [&](const char *) { import = true;   } },
+            { 'E', false, [&](const char *) { export_ = true;   } },
+            { 'c', true, [&](const char * arg) { compression = arg; } },
         });
+
+        std::string archive;
+        if (args.size() >= 2)
+            archive = TPath(args[1]).AbsolutePath().ToString();
 
         std::string storage;
         if (remove) {
@@ -1907,6 +1923,18 @@ public:
                     std::cout << std::endl;
                 }
             }
+        } else if (import) {
+            if (args.size() < 2)
+                return EXIT_FAILURE;
+            ret = Api->ImportStorage(args[0], archive, place, compression, private_);
+            if (ret)
+                PrintError("Cannot import storage");
+        } else if (export_) {
+            if (args.size() < 2)
+                return EXIT_FAILURE;
+            ret = Api->ExportStorage(args[0], archive, place, compression);
+            if (ret)
+                PrintError("Cannot export storage");
         } else {
             PrintUsage();
             return EXIT_FAILURE;

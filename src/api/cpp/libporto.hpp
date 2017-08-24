@@ -141,6 +141,15 @@ public:
                     const std::string &place = "",
                     const std::string &mask = "");
     int RemoveStorage(const std::string &name, const std::string &place = "");
+    int ImportStorage(const std::string &name,
+                      const std::string &archive,
+                      const std::string &place = "",
+                      const std::string &compression = "",
+                      const std::string &private_value = "");
+    int ExportStorage(const std::string &name,
+                      const std::string &archive,
+                      const std::string &place = "",
+                      const std::string &compression = "");
 
     int ConvertPath(const std::string &path, const std::string &src,
                     const std::string &dest, std::string &res);

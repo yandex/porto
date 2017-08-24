@@ -654,6 +654,39 @@ int Connection::RemoveStorage(const std::string &name,
     return Impl->Rpc();
 }
 
+int Connection::ImportStorage(const std::string &name,
+                              const std::string &archive,
+                              const std::string &place,
+                              const std::string &compression,
+                              const std::string &private_value) {
+    auto req = Impl->Req.mutable_importstorage();
+
+    req->set_name(name);
+    req->set_tarball(archive);
+    if (place.size())
+        req->set_place(place);
+    if (compression.size())
+        req->set_compress(compression);
+    if (private_value.size())
+        req->set_private_value(private_value);
+    return Impl->Rpc();
+}
+
+int Connection::ExportStorage(const std::string &name,
+                              const std::string &archive,
+                              const std::string &place,
+                              const std::string &compression) {
+    auto req = Impl->Req.mutable_exportstorage();
+
+    req->set_name(name);
+    req->set_tarball(archive);
+    if (place.size())
+        req->set_place(place);
+    if (compression.size())
+        req->set_compress(compression);
+    return Impl->Rpc();
+}
+
 int Connection::ConvertPath(const std::string &path, const std::string &src,
                            const std::string &dest, std::string &res) {
     auto req = Impl->Req.mutable_convertpath();
