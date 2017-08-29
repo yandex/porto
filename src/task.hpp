@@ -36,6 +36,7 @@ struct TTaskEnv {
     bool NewMountNs;
     std::vector<TCgroup> Cgroups;
     TCred Cred;
+    uid_t LoginUid;
 
     TUnixSocket Sock, MasterSock;
     TUnixSocket Sock2, MasterSock2;

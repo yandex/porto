@@ -318,6 +318,10 @@ TError TTaskEnv::ConfigureChild() {
     } else
         ReportPid(GetPid());
 
+    error = TPath("/proc/self/loginuid").WriteAll(std::to_string(LoginUid));
+    if (error && error.GetErrno() != ENOENT)
+        L_WRN("Cannot set loginuid: {}", error);
+
     error = Cred.Apply();
     if (error)
         return error;

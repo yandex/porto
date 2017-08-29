@@ -1641,6 +1641,8 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Cred = TaskCred;
 
+    TaskEnv.LoginUid = (VirtMode == VIRT_MODE_APP) ? OwnerCred.Uid : -1;
+
     error = GetEnvironment(TaskEnv.Env);
     if (error)
         return error;
