@@ -1464,10 +1464,10 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     TDevice device;
     TError error;
 
-    if (IsRoot() || !(Controllers & CGROUP_DEVICES))
+    if (IsRoot())
         return TError::Success();
 
-    if (Parent->IsRoot()) {
+    if (Parent->IsRoot() && (Controllers & CGROUP_DEVICES)) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
             return error;
@@ -1487,6 +1487,28 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
             return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
 
         devices.push_back(device);
+    }
+
+    TMultiTuple extra = SplitEscapedString(config().container().extra_devices(), ' ', ';');
+    for (auto &cfg: extra) {
+        error = device.Parse(cfg);
+        if (error)
+            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+
+        bool found = false;
+        for (auto &dev: devices)
+            found |= dev.Name == device.Name;
+        if (found)
+            continue;
+
+        if (Level == 1) {
+            error = DevicesSubsystem.ApplyDevice(cg, device);
+            if (error)
+                return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+        }
+
+        if (!RootPath.IsRoot())
+            devices.push_back(device);
     }
 
     return TError::Success();

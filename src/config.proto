@@ -133,6 +133,7 @@ message TCfg {
         optional uint64 cpu_period = 38;
         optional bool enable_systemd = 39;
         optional bool detect_systemd = 40;
+        optional string extra_devices = 41;
 
         message TSysctl {
             required string key = 1;

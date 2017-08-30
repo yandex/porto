@@ -231,6 +231,11 @@ container { default_ulimit: "type: soft hard;..." }
     /dev/ptmx  
     /dev/pts/*  
 
+    Access to devices for all containers could be granted in portod.conf:
+```
+container { extra_devices: "<device> [rwm]... ;..." }
+```
+
 * **enable\_porto** - access to porto
     - *false* | *none* - no access
     - *read-isolate*   - read-only access, show only sub-containers
