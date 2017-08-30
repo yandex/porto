@@ -1,3 +1,26 @@
+yandex-porto (4.0.4) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * network: load ip6_tunnel if ip6tnl0 configured
+  * porto: add property cpu_period
+  * debian: add suggested packages
+  * porto: add importing layers from squashfs
+  * portoctl: add storage import and export
+  * network: setup sysctl via host proc
+  * network: do not setup qdisc for ip6tnl0
+
+  [ Maxim Samoylov ]
+  * filesystem: modify chroot environment mounts
+  * cgroup: add systemd cgroup type
+
+  [ Konstantin Khlebnikov ]
+  * porto: set loginuid in container
+  * porto: remove access to /dev/rtc0
+  * portod: add option for default extra devices into portod.conf
+  * porto: propogate cpu guarantee into parent containers
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 30 Aug 2017 17:05:06 +0300
+
 yandex-porto (4.0.3) unstable; urgency=low
 
   [ Maxim Samoylov ]
