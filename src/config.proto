@@ -134,6 +134,7 @@ message TCfg {
         optional bool enable_systemd = 39;
         optional bool detect_systemd = 40;
         optional string extra_devices = 41;
+        optional bool propogate_cpu_guarantee = 42;
 
         message TSysctl {
             required string key = 1;

@@ -74,6 +74,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_default_thread_limit(10000);
 
     config().mutable_container()->set_cpu_period(100000000);    /* 100ms */
+    config().mutable_container()->set_propogate_cpu_guarantee(true);
 
     config().mutable_container()->set_enable_systemd(true);
     config().mutable_container()->set_detect_systemd(true);

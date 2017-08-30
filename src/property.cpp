@@ -1883,9 +1883,6 @@ TError TCpuGuarantee::Set(const std::string &guarantee) {
     if (error)
         return error;
 
-    if (new_guarantee > CT->Parent->CpuGuarantee)
-        L("{} cpu guarantee bigger than for parent", CT->Name);
-
     if (CT->CpuGuarantee != new_guarantee) {
         CT->CpuGuarantee = new_guarantee;
         CT->SetProp(EProperty::CPU_GUARANTEE);
@@ -1899,6 +1896,16 @@ TError TCpuGuarantee::Get(std::string &value) {
 
     return TError::Success();
 }
+
+class TCpuGuaranteeTotal : public TProperty {
+public:
+    TCpuGuaranteeTotal() : TProperty(P_CPU_TOTAL_GUARANTEE, EProperty::NONE,
+                                "CPU total guarantee: <CPUS>c [cores] (ro)") { }
+    TError Get(std::string &value) {
+        value = StringFormat("%lgc", std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
+        return TError::Success();
+    }
+} static CpuGuaranteeTotal;
 
 class TCpuPeriod : public TProperty {
 public:
