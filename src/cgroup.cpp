@@ -1095,7 +1095,6 @@ TError TDevicesSubsystem::ApplyDefault(TCgroup &cg) {
         "c 5:0 rwm",     // /dev/tty
         "c 5:2 rw",     // /dev/ptmx
         "c 136:* rw",   // /dev/pts/*
-        "c 254:0 rm",   // /dev/rtc0         FIXME
     };
 
     for (auto &rule: rules) {
