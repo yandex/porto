@@ -2276,6 +2276,9 @@ TError TContainer::Stop(uint64_t timeout) {
     auto freezer = GetCgroup(FreezerSubsystem);
     TError error;
 
+    if (State == EContainerState::Stopped)
+        return TError::Success();
+
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
             return TError(EError::NotSupported, "Cannot stop without freezer");
