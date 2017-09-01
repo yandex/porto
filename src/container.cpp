@@ -676,32 +676,30 @@ TPath TContainer::GetCwd() const {
 }
 
 TError TContainer::UpdateSoftLimit() {
-    if (IsRoot())
+    if (!config().container().dead_memory_soft_limit())
         return TError::Success();
 
-    if (Parent)
-        Parent->UpdateSoftLimit();
+    auto lock = LockContainers();
+    TError error;
 
-    if (State == EContainerState::Meta) {
-        uint64_t defaultLimit;
+    for (auto ct = this; !ct->IsRoot(); ct = ct->Parent.get()) {
+        if (!(ct->Controllers & CGROUP_MEMORY))
+            continue;
 
-        auto rootCg = MemorySubsystem.RootCgroup();
-        TError error = MemorySubsystem.GetSoftLimit(rootCg, defaultLimit);
-        if (error)
-            return error;
+        int64_t lim = -1;
 
-        uint64_t limit = RunningChildren ? defaultLimit : 1 * 1024 * 1024;
-        uint64_t currentLimit;
+        /* Set memory soft limit for dead or hollow meta containers */
+        if (ct->State == EContainerState::Dead ||
+                (ct->State == EContainerState::Meta &&
+                 !ct->RunningChildren && !ct->StartingChildren))
+            lim = config().container().dead_memory_soft_limit();
 
-        auto cg = GetCgroup(MemorySubsystem);
-        error = MemorySubsystem.GetSoftLimit(cg, currentLimit);
-        if (error)
-            return error;
-
-        if (currentLimit != limit) {
-            error = MemorySubsystem.SetSoftLimit(cg, limit);
+        if (ct->MemSoftLimit != lim) {
+            auto cg = ct->GetCgroup(MemorySubsystem);
+            error = MemorySubsystem.SetSoftLimit(cg, lim);
             if (error)
                 return error;
+            ct->MemSoftLimit = lim;
         }
     }
 
@@ -717,6 +715,11 @@ void TContainer::SetState(EContainerState next) {
     auto lock = LockContainers();
     auto prev = State;
     State = next;
+
+    if (prev == EContainerState::Starting || next == EContainerState::Starting) {
+        for (auto p = Parent; p; p = p->Parent)
+            p->StartingChildren += next == EContainerState::Starting ? 1 : -1;
+    }
 
     if (prev == EContainerState::Running || next == EContainerState::Running) {
         for (auto p = Parent; p; p = p->Parent) {
@@ -1648,6 +1651,12 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
+    error = UpdateSoftLimit();
+    if (error) {
+        L_ERR("Cannot update memory soft limit: {}", error);
+        return error;
+    }
+
     return TError::Success();
 }
 
@@ -2068,9 +2077,6 @@ TError TContainer::StartOne() {
     SetProp(EProperty::ROOT_PID);
 
     Statistics->ContainersStarted++;
-    error = UpdateSoftLimit();
-    if (error)
-        L_ERR("Can't update meta soft limit: {}", error);
 
     error = Save();
     if (error) {
@@ -2140,6 +2146,10 @@ void TContainer::FreeRuntimeResources() {
     TError error;
 
     ShutdownOom();
+
+    error = UpdateSoftLimit();
+    if (error)
+        L_ERR("Cannot update memory soft limit: {}", error);
 
     if (Parent && CpuReserve.Weight()) {
         L_ACT("Release CPUs reserved for CT{}:{}", Id, Name);
@@ -2344,10 +2354,6 @@ TError TContainer::Stop(uint64_t timeout) {
         if (error)
             return error;
     }
-
-    error = UpdateSoftLimit();
-    if (error)
-        L_ERR("Can't update meta soft limit: {}", error);
 
     return TError::Success();
 }

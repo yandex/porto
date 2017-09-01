@@ -109,6 +109,7 @@ public:
     /* protected with exclusive lock and ContainersMutex */
     EContainerState State = EContainerState::Stopped;
     int RunningChildren = 0;
+    int StartingChildren = 0;
 
     /* protected with ContainersMutex */
     std::list<std::shared_ptr<TContainer>> Children;
@@ -161,6 +162,7 @@ public:
     uint64_t MemLimit = 0;
     uint64_t MemGuarantee = 0;
     uint64_t NewMemGuarantee = 0;
+    int64_t MemSoftLimit = 0;
     uint64_t AnonMemLimit = 0;
     uint64_t DirtyMemLimit = 0;
     int64_t HugetlbLimit = -1;

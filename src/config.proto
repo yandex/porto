@@ -135,6 +135,7 @@ message TCfg {
         optional bool detect_systemd = 40;
         optional string extra_devices = 41;
         optional bool propagate_cpu_guarantee = 42;
+        optional int64 dead_memory_soft_limit = 43;
 
         message TSysctl {
             required string key = 1;

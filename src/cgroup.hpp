@@ -157,12 +157,12 @@ public:
         return cg.GetUint64(USAGE, value);
     }
 
-    TError GetSoftLimit(TCgroup &cg, uint64_t &limit) const {
-        return cg.GetUint64(SOFT_LIMIT, limit);
+    TError GetSoftLimit(TCgroup &cg, int64_t &limit) const {
+        return cg.GetInt64(SOFT_LIMIT, limit);
     }
 
-    TError SetSoftLimit(TCgroup &cg, uint64_t limit) const {
-        return cg.SetUint64(SOFT_LIMIT, limit);
+    TError SetSoftLimit(TCgroup &cg, int64_t limit) const {
+        return cg.SetInt64(SOFT_LIMIT, limit);
     }
 
     bool SupportGuarantee() const {

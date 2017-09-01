@@ -3291,6 +3291,7 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["running"] = RootContainer->RunningChildren;
     m["running_children"] = CT->RunningChildren;
+    m["starting_children"] = CT->StartingChildren;
 
     m["volumes"] = Statistics->VolumesCount;
     m["clients"] = Statistics->ClientsCount;

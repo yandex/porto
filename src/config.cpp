@@ -70,6 +70,8 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_enable_hugetlb(true);
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
+    config().mutable_container()->set_dead_memory_soft_limit(1 << 20); /* 1Mb */
+
     config().mutable_container()->set_default_ulimit("core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M");
     config().mutable_container()->set_default_thread_limit(10000);
 
