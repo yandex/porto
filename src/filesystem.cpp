@@ -426,7 +426,7 @@ TError TMountNamespace::Setup() {
     TPath root("/"), proc("/proc"), sys("/sys");
     TError error;
 
-    // remount as slave to receive propogations from parent namespace
+    // remount as slave to receive propagations from parent namespace
     error = root.Remount(MS_SLAVE | MS_REC);
     if (error)
         return error;

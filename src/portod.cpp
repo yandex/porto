@@ -899,7 +899,7 @@ static int Portod() {
     if (error)
         FatalError("Cannot mount volumes keyvalue", error);
 
-    // We want propogate mounts into containers
+    // We want propagate mounts into containers
     error = TPath("/").Remount(MS_SHARED | MS_REC);
     if (error)
         FatalError("Can't remount / recursively as shared", error);

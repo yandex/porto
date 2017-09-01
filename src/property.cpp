@@ -1900,7 +1900,10 @@ TError TCpuGuarantee::Get(std::string &value) {
 class TCpuGuaranteeTotal : public TProperty {
 public:
     TCpuGuaranteeTotal() : TProperty(P_CPU_TOTAL_GUARANTEE, EProperty::NONE,
-                                "CPU total guarantee: <CPUS>c [cores] (ro)") { }
+                                     "CPU total guarantee: <CPUS>c [cores] (ro)")
+    {
+        IsReadOnly = true;
+    }
     TError Get(std::string &value) {
         value = StringFormat("%lgc", std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
         return TError::Success();

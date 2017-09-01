@@ -97,7 +97,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                        TBitMap &threads, TBitMap &cores);
     TError DistributeCpus();
-    TError PropogateCpuGuarantee();
+    TError PropagateCpuGuarantee();
 
 public:
     const std::shared_ptr<TContainer> Parent;

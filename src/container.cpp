@@ -1241,31 +1241,34 @@ TError TContainer::DistributeCpus() {
     return TError::Success();
 }
 
-TError TContainer::PropogateCpuGuarantee() {
+TError TContainer::PropagateCpuGuarantee() {
+    if (!config().container().propagate_cpu_guarantee())
+        return TError::Success();
+
     auto cpu_lock = LockCpuAffinity();
     TError error;
 
-    if (!config().container().propogate_cpu_guarantee())
-        return TError::Success();
-
     CpuGuaranteeSum = 0;
+
     auto ct_lock = LockContainers();
-    for (auto child: Children)
+    for (auto child: Children) {
         if (child->State == EContainerState::Running ||
                 child->State == EContainerState::Meta ||
                 child->State == EContainerState::Starting)
             CpuGuaranteeSum += std::max(child->CpuGuarantee,
                                         child->CpuGuaranteeSum);
+    }
     ct_lock.unlock();
 
     auto cur = std::max(CpuGuarantee, CpuGuaranteeSum);
     if (!IsRoot() && (Controllers & CGROUP_CPU) && cur != CpuGuaranteeCur) {
-        L_ACT("Propogate cpu guarantee {} {}c -> {}c", Name, CpuGuaranteeCur, cur);
+        L_ACT("Propagate cpu guarantee CT{}:{} {}c -> {}c",
+                Id, Name, CpuGuaranteeCur, cur);
         auto cpucg = GetCgroup(CpuSubsystem);
         error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy, CpuWeight,
                                          CpuPeriod, cur, CpuLimit);
         if (error) {
-            L_ERR("Cannot propogate cpu guarantee: {}", error);
+            L_ERR("Cannot propagate cpu guarantee: {}", error);
             return error;
         }
         CpuGuaranteeCur = cur;
@@ -1392,7 +1395,7 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestPropDirty(EProperty::CPU_GUARANTEE)) {
         for (auto parent = Parent; parent; parent = parent->Parent) {
-            error = parent->PropogateCpuGuarantee();
+            error = parent->PropagateCpuGuarantee();
             if (error)
                 return error;
         }
@@ -2144,6 +2147,11 @@ void TContainer::FreeRuntimeResources() {
         if (error)
             L_ERR("Cannot redistribute CPUs: {}", error);
     }
+
+    if (CpuGuarantee) {
+        for (auto parent = Parent; parent; parent = parent->Parent)
+            (void)parent->PropagateCpuGuarantee();
+    }
 }
 
 void TContainer::FreeResources() {
@@ -2336,9 +2344,6 @@ TError TContainer::Stop(uint64_t timeout) {
         if (error)
             return error;
     }
-
-    for (auto parent = Parent; parent; parent = parent->Parent)
-        (void)parent->PropogateCpuGuarantee();
 
     error = UpdateSoftLimit();
     if (error)
