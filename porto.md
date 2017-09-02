@@ -103,7 +103,11 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **command** - container command string
 
-    Environment variables $VAR are expanded using **wordexp(3)**
+    Environment variables $VAR are expanded using **wordexp(3)**.
+
+* **core\_command** - command for receiving core dumps
+
+    See [COREDUMPS] below.
 
 * **env** - environment of main container process, syntax: \<variable\>: \<value\>; ...
 
@@ -129,7 +133,7 @@ container { default_ulimit: "type: soft hard;..." }
 
 ## State
 
-* **state** - current state, see [Container States]
+* **state** - current state, see [States]
 
 * **exit\_code** - 0: success, 1..255: error code, -64..-1: termination signal, -99: OOM
 
@@ -341,6 +345,8 @@ write permissions to the target or owning related volume.
 
 * **hugetlb\_usage** - current hugetlb memory usage
 
+* **hugetlb\_limit** - hugetlb memory limit
+
 * **max\_rss** - peak anon memory usage (offstream kernel feature)
 
 * **memory\_guarantee** - guarantee for memory\_usage, default: 0
@@ -398,6 +404,11 @@ write permissions to the target or owning related volume.
     Increase cpu.shares accourding to required cpu power distribution.
     Offstream kernel patches provides more accurate control.
 
+* **cpu\_guarantee\_total** - effective CPU guarantee
+
+    Porto popagates CPU guarantee from childrents into parent containtes:
+    cpu\_guarantee\_total = max(cpu\_guarantee, sum cpu\_guarantee\_total for running childrens)
+
 * **cpu\_limit** - CPU usage limit
 
     Syntax: 0.0..100.0 (in %) | \<cores\>c (in cores), default: 0 (unlimited)
@@ -443,6 +454,8 @@ Absolulte paths are resolved in host, paths starting with dot in chroot:
 * **io\_write** - bytes written to disk, syntax: \<disk\>: \<bytes\>;...
 
 * **io\_ops** - disk operations: \<disk\>: \<count\>;...
+
+* **io\_time** - total io time: \<disk\>: \<nanoseconds\>;...
 
 * **io\_limit** - IO bandwidth limit, syntax: fs|\<path\>|\<disk\> \[r|w\]: \<bytes/s\>;...
     - fs \[r|w\]: \<bytes\>     - filesystem level limit (offstream kernel feature)
@@ -593,7 +606,6 @@ network {
 In new network namespaces porto setup **ip-addrlabel(8)** from portod.conf:
 ```
 network {
-        proxy_ndp: false
         addrlabel {
                 prefix: "ip/mask"
                 label: number
@@ -619,6 +631,9 @@ Controller "cpuacct" is enabled for all containers if it isn't bound with other 
 
 Controller "freezer" is used for management and enabled for all containers.
 
+Cgroup tree required for systemd is configured automatically for virt\_mode=os
+containers if /sbin/init is a symlink to systemd.
+
 Enabled controllers are show in property **controllers** and
 could be enabled by: **controllers\[name\]**=true.
 For now cgroups cannot be enabled for running container.
@@ -626,6 +641,38 @@ Resulting cgroup path show in property **cgroups\[name\]**.
 
 All cgroup knobs are exposed as read-only properties \<name\>.\<knob\>,
 for example **memory.status**.
+
+# COREDUMPS
+
+Portod might register itself as a core dump helper and forward cores into container if it has set core\_command.
+
+Variables set in evironment and substituted in core\_command:
+- CORE\_PID (pid inside container)
+- CORE\_TID (creshed thread id)
+- CORE\_SIG (signal)
+- CORE\_TASK\_NAME (comm for PID)
+- CORE\_THREAD\_NAME (comm for TID)
+- CORE\_CONTAINER
+
+Command executed in non-isolated sub-container and gets code at stdin.
+For example core\_command='tee core-${CORE_TASK_NAME}-${CORE_PID}-${CORE_SIG}'
+saves core into file in container.
+
+Required setup in portod.conf:
+```
+core {
+   enable: true
+   default_pattern: "/coredumps/%e.%p.%s"
+   space_limit_mb: 102400
+}
+```
+
+Default pattern is used for non-container cores or if core command isn't set.
+It might use '%' kernel core template defined in *core(5)*.
+If default\_pattern ends with '.gz' or '.xz' core will be compressed.
+
+Option space\_limit\_mb limits total size of default pattern directory,
+after exceeding new codes are discarded.
 
 # VOLUMES
 
