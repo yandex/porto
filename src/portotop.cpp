@@ -217,7 +217,9 @@ void TConsoleScreen::HelpDialog() {
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
          "u - update screen",
-         "d - disable column",
+         "",
+         "d, del - disable column",
+         "backspace - move column left",
          "f - choose columns",
          "",
          "g - get properties",
@@ -1213,8 +1215,17 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
         case 'f':
             screen.ColumnsMenu(top.Columns);
             break;
+        case KEY_DC:
         case 'd':
-            top.Columns[top.SelectedColumn].Hidden ^= true;
+            if (top.SelectedColumn > 0)
+                top.Columns[top.SelectedColumn].Hidden ^= true;
+            break;
+        case KEY_BACKSPACE:
+            if (top.SelectedColumn > 1) {
+                top.SelectedColumn--;
+                std::swap(top.Columns[top.SelectedColumn],
+                          top.Columns[top.SelectedColumn + 1]);
+            }
             break;
         case 'S':
             if (screen.Dialog("Start/stop container " + top.SelectedContainer,
