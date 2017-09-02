@@ -558,9 +558,15 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
             if (!error)
                 error = sock.RecvPid(pid, result);
         }
+
+        sock.Close();
+
         task.Wait();
         return error;
     }
+
+    sock.Close();
+
     error = ns.SetNs(CLONE_NEWPID);
     if (error)
         _exit(EXIT_FAILURE);
