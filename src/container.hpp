@@ -169,6 +169,7 @@ public:
     uint64_t ThreadLimit = 0;
 
     bool RechargeOnPgfault = false;
+    bool PressurizeOnDeath = false;
 
     std::string IoPolicy;
     int IoPrio;

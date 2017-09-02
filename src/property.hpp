@@ -33,6 +33,7 @@ constexpr const char *P_DIRTY_LIMIT = "dirty_limit";
 constexpr const char *P_ANON_LIMIT = "anon_limit";
 constexpr const char *P_HUGETLB_LIMIT = "hugetlb_limit";
 constexpr const char *P_RECHARGE_ON_PGFAULT = "recharge_on_pgfault";
+constexpr const char *P_PRESSURIZE_ON_DEATH = "pressurize_on_death";
 constexpr const char *P_CPU_POLICY = "cpu_policy";
 constexpr const char *P_CPU_GUARANTEE = "cpu_guarantee";
 constexpr const char *P_CPU_TOTAL_GUARANTEE = "cpu_guarantee_total";
@@ -154,6 +155,7 @@ enum class EProperty {
     ANON_LIMIT,
     HUGETLB_LIMIT,
     RECHARGE_ON_PGFAULT,
+    PRESSURIZE_ON_DEATH,
     CPU_POLICY,
     CPU_GUARANTEE,
     CPU_LIMIT,

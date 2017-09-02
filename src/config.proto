@@ -136,6 +136,7 @@ message TCfg {
         optional string extra_devices = 41;
         optional bool propagate_cpu_guarantee = 42;
         optional int64 dead_memory_soft_limit = 43;
+        optional bool pressurize_on_death = 44;
 
         message TSysctl {
             required string key = 1;

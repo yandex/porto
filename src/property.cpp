@@ -1815,6 +1815,30 @@ TError TRechargeOnPgfault::Get(std::string &value) {
     return TError::Success();
 }
 
+class TPressurizeOnDeath : public TProperty {
+public:
+    TPressurizeOnDeath() : TProperty(P_PRESSURIZE_ON_DEATH, EProperty::PRESSURIZE_ON_DEATH,
+                                     "After death set tiny soft memory limit (dynamic)") {
+        RequireControllers = CGROUP_MEMORY;
+    }
+    TError Get(std::string &value) {
+        value = BoolToString(CT->PressurizeOnDeath);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        bool val;
+        error = StringToBool(value, val);
+        if (!error && val != CT->PressurizeOnDeath) {
+            CT->PressurizeOnDeath = val;
+            CT->SetProp(EProperty::PRESSURIZE_ON_DEATH);
+        }
+        return error;
+    }
+} static PressurizeOnDeath;
+
 class TCpuLimit : public TProperty {
 public:
     TError Set(const std::string &limit);

@@ -345,6 +345,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     IoPolicy = "";
     IoPrio = 0;
 
+    PressurizeOnDeath = config().container().pressurize_on_death();
+
     Controllers = RequiredControllers = CGROUP_FREEZER;
 
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
@@ -676,9 +678,6 @@ TPath TContainer::GetCwd() const {
 }
 
 TError TContainer::UpdateSoftLimit() {
-    if (!config().container().dead_memory_soft_limit())
-        return TError::Success();
-
     auto lock = LockContainers();
     TError error;
 
@@ -689,9 +688,10 @@ TError TContainer::UpdateSoftLimit() {
         int64_t lim = -1;
 
         /* Set memory soft limit for dead or hollow meta containers */
-        if (ct->State == EContainerState::Dead ||
-                (ct->State == EContainerState::Meta &&
-                 !ct->RunningChildren && !ct->StartingChildren))
+        if (ct->PressurizeOnDeath &&
+                (ct->State == EContainerState::Dead ||
+                 (ct->State == EContainerState::Meta &&
+                  !ct->RunningChildren && !ct->StartingChildren)))
             lim = config().container().dead_memory_soft_limit();
 
         if (ct->MemSoftLimit != lim) {
@@ -1329,6 +1329,15 @@ TError TContainer::ApplyDynamicProperties() {
         if (error) {
             if (error.GetErrno() != EINVAL)
                 L_ERR("Can't set {}: {}", P_RECHARGE_ON_PGFAULT, error);
+            return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::PRESSURIZE_ON_DEATH)) {
+        error = UpdateSoftLimit();
+        if (error) {
+            if (error.GetErrno() != EINVAL)
+                L_ERR("Can't set {}: {}", P_PRESSURIZE_ON_DEATH, error);
             return error;
         }
     }
