@@ -1,3 +1,18 @@
+yandex-porto (4.0.5) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: stop for stopped container should do nothing
+  * porto: cleanup cpu guarantee propagation
+  * memory: disable meta container soft limit before starting child
+  * property: pressurize_on_death
+  * porto: update documentation
+  * portotop: move columns by backspace
+
+  [ Maxim Samoylov ]
+  * util/unix: fix TranslatePid()
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Sun, 03 Sep 2017 18:04:29 +0300
+
 yandex-porto (4.0.4) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
