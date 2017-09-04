@@ -373,7 +373,7 @@ write permissions to the target or owning related volume.
 
 * **recharge\_on\_pgfault** - if *true* immigrate cache on minor page fault, default: *false* (offstream kernel feature)
 
-* **pressurize\_on\_death** - if *true* set tiny soft memory limit for dead and hollow meta containers, default *true*
+* **pressurize\_on\_death** - if *true* set tiny soft memory limit for dead and hollow meta containers, default *false*
 
 * **oom\_is\_fatal** - kill all affected containers on OOM, default: *true*
 

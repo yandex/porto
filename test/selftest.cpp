@@ -477,7 +477,10 @@ static void TestHolder(Porto::Connection &api) {
     ExpectNeq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), customLimit);
     ExpectNeq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
     ExpectApiSuccess(api.Stop("a/b/c"));
-    ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
+    if (config().container().pressurize_on_death())
+        ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
+    else
+        ExpectNeq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
 
     ExpectApiSuccess(api.Start("a/b/c"));
     ExpectNeq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), customLimit);
