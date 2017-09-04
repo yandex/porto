@@ -488,7 +488,7 @@ def TestVolumeRecovery():
     KillPid(GetPortodPid(), signal.SIGKILL)
     c.connect()
 
-    time.sleep(0.5)
+    ExpectEq(len(c.ListVolumes()), 2)
 
     Expect(not os.path.exists("/place/porto_volumes/leftover_volume"))
 
