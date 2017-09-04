@@ -1033,7 +1033,7 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
         if (CL->ClientContainer == ct)
             name = SELF_CONTAINER;
         else
-            return TError(EError::Permission, "contianer is unreachable");
+            return TError(EError::Permission, "container is unreachable");
     }
 
     rsp.mutable_locateprocess()->set_name(name);

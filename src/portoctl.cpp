@@ -2499,7 +2499,7 @@ public:
 
             if (val.Error) {
                 if (val.Error != EError::NoValue) {
-                    PrintError("Cannot get contianer " + name + " property " + key);
+                    PrintError("Cannot get container " + name + " property " + key);
                     return -1;
                 }
                 if (key != "command")
