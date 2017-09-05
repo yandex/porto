@@ -4,6 +4,7 @@
 #include "util/path.hpp"
 #include "fmt/format.h"
 
+extern bool StdLog;
 extern bool Verbose;
 extern bool Debug;
 extern TFile LogFile;

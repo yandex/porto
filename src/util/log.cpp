@@ -11,8 +11,9 @@ extern "C" {
 #include <fcntl.h>
 }
 
-bool Verbose;
-bool Debug;
+bool StdLog = false;
+bool Verbose = false;
+bool Debug = false;
 
 TStatistics *Statistics = nullptr;
 
@@ -21,15 +22,18 @@ TFile LogFile(STDOUT_FILENO);
 void OpenLog(const TPath &path) {
     int fd;
 
-    if (path.IsEmpty()) {
-        fd = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 3);
+    if (StdLog) {
+        fd = STDOUT_FILENO;
     } else {
         struct stat st;
         fd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC |
                                 O_NOFOLLOW | O_NOCTTY, 0644);
-        if (!fstat(fd, &st) && (st.st_mode & 0777) != 0644)
+        if (fd >= 0 && !fstat(fd, &st) && (st.st_mode & 0777) != 0644)
             fchmod(fd, 0644);
     }
+
+    if (fd >= 0 && fd < 3)
+        fd = fcntl(fd, F_DUPFD_CLOEXEC, 3);
 
     if (fd > 2) {
         if (LogFile.Fd != STDOUT_FILENO)
@@ -65,6 +69,11 @@ void WriteLog(std::string log_msg, ELogLevel level) {
         GetTaskName() + "[" + std::to_string(GetTid()) + "]: " +
         prefix[level] + log_msg +
         (log_msg.back() == '\n' ? "" : "\n");
+
+    if (Statistics) {
+        Statistics->LogLines++;
+        Statistics->LogBytes += msg.size();
+    }
 
     LogFile.WriteAll(msg);
 

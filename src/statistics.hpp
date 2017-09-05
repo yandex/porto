@@ -15,6 +15,8 @@ struct TStatistics {
     std::atomic<uint64_t> ContainersFailedStart;
     std::atomic<uint64_t> ContainersOOM;
     std::atomic<uint64_t> RemoveDead;
+    std::atomic<uint64_t> LogLines;
+    std::atomic<uint64_t> LogBytes;
     std::atomic<uint64_t> LogRotateBytes;
     std::atomic<uint64_t> LogRotateErrors;
     std::atomic<uint64_t> RestoreFailed;

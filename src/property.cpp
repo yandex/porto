@@ -3291,6 +3291,9 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["epoll_sources"] = Statistics->EpollSources;
 
+    m["log_lines"] = Statistics->LogLines;
+    m["log_bytes"] = Statistics->LogBytes;
+
     m["log_rotate_bytes"] = Statistics->LogRotateBytes;
     m["log_rotate_errors"] = Statistics->LogRotateErrors;
 

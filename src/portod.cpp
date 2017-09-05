@@ -55,7 +55,6 @@ std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
 static pid_t PortodPid;
-static bool StdLog = false;
 static bool respawnPortod = true;
 static bool discardState = false;
 
@@ -519,8 +518,7 @@ static int Rpc() {
                         ret = -SIGHUP;
                         goto exit;
                     case SIGUSR1:
-                        if (!StdLog)
-                            OpenLog(PORTO_LOG);
+                        OpenLog(PORTO_LOG);
                         break;
                     case SIGUSR2:
                         DumpMallocInfo();
@@ -835,7 +833,7 @@ static int Portod() {
 
     SetProcessName(PORTOD_NAME);
 
-    OpenLog(StdLog ? "" : PORTO_LOG);
+    OpenLog(PORTO_LOG);
 
     error = PortodPidFile.Save(getpid());
     if (error)
@@ -1215,8 +1213,7 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
                 goto exit;
             }
             case SIGUSR1:
-                if (!StdLog)
-                    OpenLog(PORTO_LOG);
+                OpenLog(PORTO_LOG);
                 break;
             case SIGUSR2:
                 DumpMallocInfo();
@@ -1283,7 +1280,7 @@ static int PortodMaster() {
 
     SetProcessName(PORTOD_MASTER_NAME);
 
-    OpenLog(StdLog ? "" : PORTO_LOG);
+    OpenLog(PORTO_LOG);
 
     error = MasterPidFile.Save(getpid());
     if (error)
