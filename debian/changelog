@@ -1,3 +1,14 @@
+yandex-porto (4.0.6) unstable; urgency=low
+
+  * porto: disable pressurize_on_death by default
+  * contianer: fix misprint
+  * test/recovery: replace sleep with proper synchronization
+  * porto: make bind-mounts recursive
+  * test: remove testcase clear
+  * log: make sure fd is not stdout/stderr
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 05 Sep 2017 18:15:47 +0300
+
 yandex-porto (4.0.5) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
