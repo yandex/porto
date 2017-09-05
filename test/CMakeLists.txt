@@ -140,10 +140,6 @@ add_test(NAME recovery
          COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-recovery.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_test(NAME clear
-         COMMAND python -u ${CMAKE_SOURCE_DIR}/test/test-clear.py
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
 add_test(NAME leaks
          COMMAND ${CMAKE_BINARY_DIR}/portotest leaks
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -171,7 +167,7 @@ add_test(NAME portod_stop
 
 set_tests_properties(python_api recovery security volume_backends volume_places
                      mem-overcommit mem_limit_total self-container tc-rebuild
-                     unpriv-cred prev_release_upgrade uid_handling knobs clear
+                     unpriv-cred prev_release_upgrade uid_handling knobs
                      cpu_limit mem_limit fuzzer stats mem_recharge dirty_limit
                      locate-process oom_non_fatal perf
                      PROPERTIES
