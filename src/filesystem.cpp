@@ -118,11 +118,11 @@ TError TMountNamespace::MountBinds() {
             return TError(EError::InvalidValue, "Bind mount target " +
                           target.ToString() + " out of chroot");
 
-        error = dst.ProcPath().Bind(src.ProcPath());
+        error = dst.ProcPath().Bind(src.ProcPath(), MS_REC);
         if (error)
             return error;
 
-        error = target.Remount(MS_REMOUNT | MS_BIND | (bm.ReadOnly ? MS_RDONLY : 0));
+        error = target.Remount(MS_REMOUNT | MS_BIND | MS_REC | (bm.ReadOnly ? MS_RDONLY : 0));
         if (error)
             return error;
     }

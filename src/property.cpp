@@ -1030,34 +1030,22 @@ TError TNet::Get(std::string &value) {
 
 class TRootRo : public TProperty {
 public:
-    TError Set(const std::string &ro);
-    TError Get(std::string &value);
     TRootRo() : TProperty(P_ROOT_RDONLY, EProperty::ROOT_RDONLY,
                           "Mount root directory in read-only mode") {}
-} static RootRo;
-
-TError TRootRo::Set(const std::string &ro) {
-    TError error = IsAliveAndStopped();
-    if (error)
+    TError Get(std::string &value) {
+        value = BoolToString(CT->RootRo);
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        error = StringToBool(value, CT->RootRo);
+        if (!error)
+            CT->SetProp(EProperty::ROOT_RDONLY);
         return error;
-
-    if (ro == "true")
-        CT->RootRo = true;
-    else if (ro == "false")
-        CT->RootRo = false;
-    else
-        return TError(EError::InvalidValue, "Invalid bool value");
-
-    CT->SetProp(EProperty::ROOT_RDONLY);
-
-    return TError::Success();
-}
-
-TError TRootRo::Get(std::string &ro) {
-    ro = CT->RootRo ? "true" : "false";
-
-    return TError::Success();
-}
+    }
+} static RootRo;
 
 class TUmask : public TProperty {
 public:

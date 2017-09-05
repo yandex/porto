@@ -70,13 +70,12 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
 
     /* Remount everything except CWD Read-Only */
     if (!cwd.IsRoot()) {
-        std::list<TMount> mounts;
-        if (unshare(CLONE_NEWNS) || TPath("/").Remount(MS_PRIVATE | MS_REC) ||
-                TPath::ListAllMounts(mounts))
+        TPath root("/");
+        if (unshare(CLONE_NEWNS) ||
+                root.Remount(MS_PRIVATE | MS_REC) ||
+                root.Remount(MS_REMOUNT | MS_BIND | MS_REC | MS_RDONLY) ||
+                cwd.BindRemount(cwd, MS_REC))
             _exit(EXIT_FAILURE);
-        for (auto &mnt: mounts)
-            mnt.Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
-        cwd.BindRemount(cwd, 0);
     }
 
     if (cwd.Chdir())

@@ -190,7 +190,7 @@ TError TPath::PivotRoot() const {
 
     /* new root must be a different mount */
     if (newroot.GetMountId() == newroot.GetMountId("..")) {
-        error = BindAll(*this);
+        error = Bind(*this, MS_REC);
         if (error)
             return error;
         error = newroot.OpenDir(*this);
@@ -760,32 +760,42 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
     return TError::Success();
 }
 
-TError TPath::Bind(const TPath &source) const {
-    L_ACT("bind mount {} {}", Path, source);
-    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND, NULL))
+TError TPath::Bind(const TPath &source, unsigned long flags) const {
+    L_ACT("bind mount {} {} {}", MountFlagsToString(flags), Path, source);
+    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() +
-                ", " + Path + ", , MS_BIND, )");
-    return TError::Success();
-}
-
-TError TPath::BindAll(const TPath &source) const {
-    L_ACT("bind mount all {} {}", Path, source);
-    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | MS_REC, NULL))
-        return TError(EError::Unknown, errno, "mount(" + source.ToString() +
-                ", " + Path + ", , MS_BIND | MS_REC, )");
+                ", " + Path + ", " + MountFlagsToString(MS_BIND | flags) + ")");
     return TError::Success();
 }
 
 TError TPath::Remount(unsigned long flags) const {
     L_ACT("remount {} {}", Path, MountFlagsToString(flags));
+
     if (mount(NULL, Path.c_str(), NULL, flags, NULL))
         return TError(EError::Unknown, errno, "mount(NULL, " + Path +
                       ", NULL, " + MountFlagsToString(flags) + ", NULL)");
+
+    /* vfsmount remount isn't recursive in kernel */
+    if ((flags & MS_BIND) && (flags & MS_REC)) {
+        TPath normal = NormalPath();
+        std::list<TMount> mounts;
+        TError error = TPath::ListAllMounts(mounts);
+        if (error)
+            return error;
+        for (auto &mnt: mounts) {
+            if (mnt.Target.IsInside(normal) && mnt.Target != normal) {
+                error = mnt.Target.Remount(flags & ~MS_REC);
+                if (error)
+                    return error;
+            }
+        }
+    }
+
     return TError::Success();
 }
 
 TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
-    TError error = Bind(source);
+    TError error = Bind(source, flags & MS_REC);
     if (!error)
         error = Remount(MS_REMOUNT | MS_BIND | flags);
     return error;

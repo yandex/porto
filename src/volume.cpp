@@ -100,7 +100,7 @@ public:
 
     TError Build() override {
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
-                                                Volume->GetMountFlags());
+                                                Volume->GetMountFlags() | MS_REC);
     }
 
     TError Destroy() override {
@@ -1701,7 +1701,7 @@ TError TVolume::Build() {
 
     /* And finally, publish volume in requested path */
     if (Path != InternalPath) {
-        error = PathFd.ProcPath().Bind(InternalPath);
+        error = PathFd.ProcPath().Bind(InternalPath, MS_REC);
         if (error)
             return error;
     }
