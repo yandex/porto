@@ -93,7 +93,7 @@ Some properties are read-only or requires particular container state.
 Some properties have internal key-value structure in like \<key>\: \<value\>;...
 and provide access to individual values via **property\[key\]**
 
-Values which represent size in bytes could have floating-poing and 1024-based
+Values which represent size in bytes could have floating-point and 1024-based
 suffixes: B|K|M|G|T|P|E. Porto returns these values in bytes without suffixes.
 
 Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNAME:
@@ -446,7 +446,7 @@ Disk names are single words, like: "sda" or "md0".
 "hw" is a total statistics for all disks.
 
 Statistics and limits could be requested for filesystem path.
-Absolulte paths are resolved in host, paths starting with dot in chroot:
+Absolute paths are resolved in host, paths starting with dot in chroot:
 **io\_read\[/\]**, **io\_read\[.\]**.
 
 * **io\_read** - bytes read from disk, syntax: \<disk\>: \<bytes\>;...
@@ -466,15 +466,15 @@ Absolulte paths are resolved in host, paths starting with dot in chroot:
 
 * **io\_policy** IO scheduler policy, see **ioprio\_set(2)**
     - *none*    - set by **cpu\_policy**, blkio.weight = 500 (default)
-    - *normal*  - IOPRIO\_CLASS\_BE(4), blkio.weight = 500
+    - *rt*      - IOPRIO\_CLASS\_RT(4), blkio.weight = 1000 (highest)
     - *high*    - IOPRIO\_CLASS\_BE(0), blkio.weight = 1000
-    - *rt*      - IOPRIO\_CLASS\_RT(4), blkio.weight = 1000
+    - *normal*  - IOPRIO\_CLASS\_BE(4), blkio.weight = 500
     - *batch*   - IOPRIO\_CLASS\_BE(7), blkio.weight = 10
-    - *idle*    - IOPRIO\_CLASS\_IDLE, blkio.weight = 10
+    - *idle*    - IOPRIO\_CLASS\_IDLE, blkio.weight = 10 (lowest)
 
 * **io\_weight** IO weight, syntax: 0.01..100, default: 1
 
-    Multiplier for blkio.weight.
+    Additional multiplier for blkio.weight.
 
 ## Network
 
@@ -646,17 +646,24 @@ for example **memory.status**.
 
 Portod might register itself as a core dump helper and forward cores into container if it has set core\_command.
 
-Variables set in evironment and substituted in core\_command:
+Variables set in environment and substituted in core\_command:
+
 - CORE\_PID (pid inside container)
-- CORE\_TID (creshed thread id)
+- CORE\_TID (crashed thread id)
 - CORE\_SIG (signal)
 - CORE\_TASK\_NAME (comm for PID)
 - CORE\_THREAD\_NAME (comm for TID)
 - CORE\_CONTAINER
 
-Command executed in non-isolated sub-container and gets code at stdin.
-For example core\_command='tee core-${CORE_TASK_NAME}-${CORE_PID}-${CORE_SIG}'
-saves core into file in container.
+Command executed in non-isolated sub-container and gets core dump as stdin.
+
+For example core\_command='tee core-\$\{CORE\_TASK\_NAME\}-\$\{CORE\_PID\}-\$\{CORE\_SIG\}'
+saves core into file in container. Container ulimit\[core\] must be set > 1 or unlimited.
+
+Information in proc about crashed process and thread available too.
+Porto makes sure that sysctl kernel.core\_pipe\_limit isn't zero,
+otherwise crashed task could exit and dismantle pid namespace too early.
+
 
 Required setup in portod.conf:
 ```
@@ -672,7 +679,7 @@ It might use '%' kernel core template defined in *core(5)*.
 If default\_pattern ends with '.gz' or '.xz' core will be compressed.
 
 Option space\_limit\_mb limits total size of default pattern directory,
-after exceeding new codes are discarded.
+after exceeding new cores are discarded.
 
 # VOLUMES
 
@@ -827,7 +834,7 @@ $ portoctl run stress command='stress -c 4' cpu\_limit=2.5c
 $ portoctl destroy stress
 ```
 
-Create volume with automaic path and destroy:
+Create volume with automatic path and destroy:
 ```
 $ V=$(portoctl vcreate -A space_limit=1G)
 $ portoctl vunlink $V
