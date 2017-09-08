@@ -2285,8 +2285,7 @@ static void TestNetProperty(Porto::Connection &api) {
     Say() << "Check net=macvlan" << std::endl;
     TestXvlan(api, name, hostLink, link, "macvlan");
 
-    Say() << "Check net=macvlan statistics" << std::endl;
-    /*
+    /*Say() << "Check net=macvlan statistics" << std::endl;
     create macvlan on default interface and ping ya.ru
     string uniq = "123";
     string gw = System("ip -o route | grep default | cut -d' ' -f3");
@@ -2307,7 +2306,7 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
-    */
+
 
     // create macvlan on default interface and ping ya.ru
     string dev = System("ip -6 -o route get 2a02:6b8::3 | awk '{print $7}'");
@@ -2316,7 +2315,7 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name, 60);
     ExpectApiSuccess(api.GetProperty(name, "net_bytes[" + dev + "]", s, Porto::GetFlags::Sync));
-    ExpectNeq(s, "0");
+    ExpectNeq(s, "0");*/
 
     Say() << "Check net=veth" << std::endl;
     AsRoot(api);
