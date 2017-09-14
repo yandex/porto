@@ -20,6 +20,7 @@ constexpr const char *P_OWNER_GROUP = "owner_group";
 constexpr const char *P_ENV = "env";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_PLACE = "place";
+constexpr const char *P_PLACE_LIMIT = "place_limit";
 constexpr const char *P_ROOT = "root";
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
 constexpr const char *P_CWD = "cwd";
@@ -126,6 +127,7 @@ constexpr const char *D_MEM_TOTAL_LIMIT = "memory_limit_total";
 constexpr const char *D_CGROUPS = "cgroups";
 constexpr const char *D_PROCESS_COUNT = "process_count";
 constexpr const char *D_THREAD_COUNT = "thread_count";
+constexpr const char *D_PLACE_USAGE = "place_usage";
 
 enum class EProperty {
     NONE,
@@ -142,6 +144,7 @@ enum class EProperty {
     ENV,
     PORTO_NAMESPACE,
     PLACE,
+    PLACE_LIMIT,
     ROOT,
     ROOT_RDONLY,
     CWD,

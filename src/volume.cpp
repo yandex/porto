@@ -52,6 +52,10 @@ TError TVolumeBackend::Resize(uint64_t, uint64_t) {
     return TError(EError::NotSupported, "not implemented");
 }
 
+std::string TVolumeBackend::ClaimPlace() {
+    return Volume->UserStorage() ? "" : Volume->Place.ToString();
+}
+
 /* TVolumePlainBackend - bindmount */
 
 class TVolumePlainBackend : public TVolumeBackend {
@@ -68,6 +72,10 @@ public:
     TError Build() override {
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
                                         Volume->GetMountFlags());
+    }
+
+    std::string ClaimPlace() override {
+        return "";
     }
 
     TError Destroy() override {
@@ -101,6 +109,10 @@ public:
     TError Build() override {
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
                                                 Volume->GetMountFlags() | MS_REC);
+    }
+
+    std::string ClaimPlace() override {
+        return "";
     }
 
     TError Destroy() override {
@@ -153,6 +165,10 @@ public:
         return Volume->InternalPath.Mount("porto_tmpfs_" + Volume->Id, "tmpfs",
                                           Volume->GetMountFlags() | MS_REMOUNT,
                                           opts);
+    }
+
+    std::string ClaimPlace() override {
+        return "tmpfs";
     }
 
     TError Destroy() override {
@@ -232,6 +248,10 @@ public:
         L_ACT("Creating project quota: {} bytes: {} inodes: {}",
               quota.Path, quota.SpaceLimit, quota.InodeLimit);
         return quota.Create();
+    }
+
+    std::string ClaimPlace() override {
+        return "";
     }
 
     TError Destroy() override {
@@ -1017,6 +1037,10 @@ public:
         return TError(EError::NotSupported, "rbd backend doesn't suppport resize");
     }
 
+    std::string ClaimPlace() override {
+        return "rbd";
+    }
+
     TError StatFS(TStatFS &result) override {
         return Volume->InternalPath.StatFS(result);
     }
@@ -1140,6 +1164,10 @@ public:
         return RunCommand({"lvm", "lvresize", "--force", "--resizefs",
                            "--size", std::to_string(space_limit) + "B",
                            Device}, "/");
+    }
+
+    std::string ClaimPlace() override {
+        return "lvm " + Group;
     }
 
     TError StatFS(TStatFS &result) override {
@@ -1313,6 +1341,47 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
                       std::to_string(current.InodeUsage) + " used " +
                       std::to_string(inode_claimed) + " claimed " +
                       std::to_string(inode_guaranteed) + " guaranteed");
+
+    return TError::Success();
+}
+
+TError TVolume::ClaimPlace(uint64_t size) {
+
+    auto place = Backend->ClaimPlace();
+    if (place == "")
+        return TError::Success();
+
+    auto lock = LockVolumes();
+
+    if ((!size || size > ClaimedSpace) && !CL->IsInternalUser() && !IsDying) {
+        for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
+            uint64_t total_limit = ct->PlaceLimit.count("total") ?
+                                   ct->PlaceLimit.at("total") : UINT64_MAX;
+            uint64_t place_limit = ct->PlaceLimit.count(place) ?
+                                   ct->PlaceLimit.at(place) :
+                                   ct->PlaceLimit.count("default") ?
+                                   ct->PlaceLimit.at("default") : UINT64_MAX;
+            uint64_t total_usage = ct->PlaceUsage.count("total") ?
+                                   ct->PlaceUsage.at("total") : 0;
+            uint64_t place_usage = ct->PlaceUsage.count(place) ?
+                                   ct->PlaceUsage.at(place) : 0;
+
+            if ((total_limit != UINT64_MAX && size == 0) ||
+                    (place_limit != UINT64_MAX && size == 0) ||
+                    (total_usage - ClaimedSpace > UINT64_MAX - size) ||
+                    (total_limit < total_usage - ClaimedSpace + size) ||
+                    (place_usage - ClaimedSpace > UINT64_MAX - size) ||
+                    (place_limit < place_usage - ClaimedSpace + size))
+                return TError(EError::ResourceNotAvailable, "Not enough place limit in " + ct->Name);
+        }
+    }
+
+    for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
+        ct->PlaceUsage["total"] += size - ClaimedSpace;
+        ct->PlaceUsage[place] += size - ClaimedSpace;
+    }
+
+    ClaimedSpace = size;
 
     return TError::Success();
 }
@@ -1782,12 +1851,19 @@ TError TVolume::Destroy(bool strict) {
         if (error && !ret)
             ret = error;
 
+        error = volume->ClaimPlace(0);
+        if (error)
+            L_WRN("Cannot free claimed space: {}", error);
+
         volumes_lock.lock();
 
         for (auto &it : Volumes)
             it.second->Nested.erase(volume);
 
         Volumes.erase(volume->Path);
+
+        volume->VolumeOwnerContainer->OwnedVolumes.remove(volume);
+        volume->VolumeOwnerContainer = nullptr;
 
         for (auto &name: volume->Containers) {
             L_ACT("Forced unlink volume {} from {}", volume->Path, name);
@@ -1797,11 +1873,11 @@ TError TVolume::Destroy(bool strict) {
             containers_lock.unlock();
             volumes_lock.lock();
             if (container) {
-                auto vol_iter = std::find(container->Volumes.begin(),
-                                          container->Volumes.end(),
+                auto vol_iter = std::find(container->LinkedVolumes.begin(),
+                                          container->LinkedVolumes.end(),
                                           volume);
-                if (vol_iter != container->Volumes.end())
-                    container->Volumes.erase(vol_iter);
+                if (vol_iter != container->LinkedVolumes.end())
+                    container->LinkedVolumes.erase(vol_iter);
             }
         }
 
@@ -1963,12 +2039,24 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
                 return error;
         }
 
+        if (!spaceLimit || spaceLimit > SpaceLimit) {
+            error = ClaimPlace(spaceLimit);
+            if (error)
+                return error;
+        }
+
         L_ACT("Resize volume: {} to bytes: {} inodes: {}",
                 Path, spaceLimit, inodeLimit);
 
         error = Backend->Resize(spaceLimit, inodeLimit);
-        if (error)
+        if (error) {
+            if (!spaceLimit || spaceLimit > SpaceLimit)
+                ClaimPlace(SpaceLimit);
             return error;
+        }
+
+        if (spaceLimit && spaceLimit < SpaceLimit)
+            ClaimPlace(spaceLimit);
 
         auto volumes_lock = LockVolumes();
         SpaceLimit = spaceLimit;
@@ -2014,9 +2102,9 @@ TError TVolume::GetUpperLayer(TPath &upper) {
 TError TVolume::LinkContainer(TContainer &container) {
     auto volumes_lock = LockVolumes();
 
-    auto it = std::find(container.Volumes.begin(),
-                        container.Volumes.end(), shared_from_this());
-    if (it != container.Volumes.end())
+    auto it = std::find(container.LinkedVolumes.begin(),
+                        container.LinkedVolumes.end(), shared_from_this());
+    if (it != container.LinkedVolumes.end())
         return TError(EError::VolumeAlreadyLinked, "Already linked");
 
     if (IsDying)
@@ -2027,16 +2115,16 @@ TError TVolume::LinkContainer(TContainer &container) {
     if (error)
         Containers.pop_back();
     else
-        container.Volumes.emplace_back(shared_from_this());
+        container.LinkedVolumes.emplace_back(shared_from_this());
     return error;
 }
 
 TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     auto volumes_lock = LockVolumes();
 
-    auto it = std::find(container.Volumes.begin(),
-                        container.Volumes.end(), shared_from_this());
-    if (it == container.Volumes.end() && !Containers.empty())
+    auto it = std::find(container.LinkedVolumes.begin(),
+                        container.LinkedVolumes.end(), shared_from_this());
+    if (it == container.LinkedVolumes.end() && !Containers.empty())
         return TError(EError::VolumeNotLinked, "Container is not linked");
 
     if (strict && Containers.size() > 1)
@@ -2045,7 +2133,7 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     if (IsDying)
         return TError(EError::Busy, "Volume is dying");
 
-    container.Volumes.erase(it);
+    container.LinkedVolumes.erase(it);
     Containers.erase(std::remove(Containers.begin(), Containers.end(),
                                  container.Name), Containers.end());
     if (Containers.empty())
@@ -2073,6 +2161,10 @@ TStringMap TVolume::DumpConfig(const TPath &root) {
         ret[V_STORAGE] = Storage;
 
     ret[V_BACKEND] = BackendType;
+
+    if (!CL || CL->ComposeName(VolumeOwnerContainer->Name, ret[V_OWNER_CONTAINER]))
+        ret[V_OWNER_CONTAINER] = ROOT_PORTO_NAMESPACE + VolumeOwnerContainer->Name;
+
     ret[V_OWNER_USER] = VolumeOwner.User();
     ret[V_OWNER_GROUP] = VolumeOwner.Group();
     if (VolumeCred.Uid != NoUser)
@@ -2122,6 +2214,7 @@ TError TVolume::Save() {
     node.Set(V_AUTO_PATH, BoolToString(IsAutoPath));
     node.Set(V_STORAGE, Storage);
     node.Set(V_BACKEND, BackendType);
+    node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
     node.Set(V_OWNER_USER, VolumeOwner.User());
     node.Set(V_OWNER_GROUP, VolumeOwner.Group());
     if (VolumeCred.Uid != NoUser)
@@ -2158,13 +2251,23 @@ TError TVolume::Restore(const TKeyValue &node) {
 
     InternalPath = Place / PORTO_VOLUMES / Id / "volume";
 
+    auto creator = SplitEscapedString(Creator, ' ');
+
     if (!node.Has(V_OWNER_USER)) {
-        auto tuple = SplitEscapedString(Creator, ' ');
-        if (tuple.size() != 3 ||
-                UserId(tuple[1], VolumeOwner.Uid) ||
-                GroupId(tuple[2], VolumeOwner.Gid))
+        if (creator.size() != 3 ||
+                UserId(creator[1], VolumeOwner.Uid) ||
+                GroupId(creator[2], VolumeOwner.Gid))
             VolumeOwner = VolumeCred;
     }
+
+    error = CL->WriteContainer(node.Has(V_OWNER_CONTAINER) ?
+                               node.Get(V_OWNER_CONTAINER) : creator[0],
+                               VolumeOwnerContainer, true);
+    if (error) {
+        L_WRN("Cannot find volume owner: {}", error);
+        VolumeOwnerContainer = RootContainer;
+    }
+    VolumeOwnerContainer->OwnedVolumes.push_back(shared_from_this());
 
     if (!HaveStorage())
         StoragePath = GetInternal(BackendType);
@@ -2182,6 +2285,10 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (error)
         return error;
 
+    error = ClaimPlace(SpaceLimit);
+    if (error)
+        return error;
+
     return TError::Success();
 }
 
@@ -2190,6 +2297,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_PRIVATE,     "user-defined property", false },
+    { V_OWNER_CONTAINER, "owner container (default - creator)", false },
     { V_OWNER_USER,  "owner user (default - creator)", false },
     { V_OWNER_GROUP, "owner group (default - creator)", false },
     { V_USER,        "directory user (default - creator)", false },
@@ -2228,6 +2336,15 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         if (error)
             return error;
     }
+
+    std::shared_ptr<TContainer> owner;
+
+    if (cfg.count(V_OWNER_CONTAINER)) {
+        error = CL->WriteContainer(cfg.at(V_OWNER_CONTAINER), owner, true);
+        if (error)
+            return error;
+    } else
+        owner = CL->ClientContainer;
 
     auto volumes_lock = LockVolumes();
 
@@ -2274,7 +2391,16 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
     Volumes[volume->Path] = volume;
 
+    volume->VolumeOwnerContainer = owner;
+    owner->OwnedVolumes.push_back(volume);
+
     volumes_lock.unlock();
+
+    error = volume->ClaimPlace(volume->SpaceLimit);
+    if (error) {
+        volume->Destroy();
+        return error;
+    }
 
     if (cfg.count(V_CONTAINERS)) {
         for (auto &name: SplitEscapedString(cfg.at(V_CONTAINERS), ';')) {
@@ -2364,7 +2490,7 @@ void TVolume::RestoreAll(void) {
         for (auto &name: volume->Containers) {
             auto container = TContainer::Find(name);
             if (container)
-                container->Volumes.emplace_back(volume);
+                container->LinkedVolumes.emplace_back(volume);
             else
                 L_WRN("Cannot find container {}", name);
         }
@@ -2479,6 +2605,8 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_BACKEND) {
             BackendType = prop.second;
+
+        } else if (prop.first == V_OWNER_CONTAINER) {
 
         } else if (prop.first == V_OWNER_USER) {
             error = UserId(prop.second, VolumeOwner.Uid);

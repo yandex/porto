@@ -332,6 +332,14 @@ Write access to container requires any of these conditions:
     Default is "/place;\*\*\*" (use /place by default, allow any other),
     for container with chroot default is "/place".
 
+* **place\_limit** - limits sum of volume **space\_limit** owned by subtree
+
+    Format: total|default|\<place\>|tmpfs|lvm \<group\>|rbd: \<bytes\>;...
+
+* **place\_usage** - current sum of volume **space\_limit** owned by subtree
+
+    Format is same as for **place\_limit**.
+
 Setting **bind**, **root**, **stdout\_path**, **stderr\_path** requires
 write permissions to the target or owning related volume.
 
@@ -720,6 +728,10 @@ Like for container volume configuration is a set of key-value pairs.
 * **ready**         - is construction complete
 
 * **private**       - user-defined property, 4k text
+
+* **owner\_container** - owner container, default: creator
+
+    Used for tracking **place\_usage** and **place\_limit**.
 
 * **owner\_user**   - owner user, default: creator
 

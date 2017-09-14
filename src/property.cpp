@@ -4,6 +4,7 @@
 #include "cgroup.hpp"
 #include "client.hpp"
 #include "container.hpp"
+#include "volume.hpp"
 #include "network.hpp"
 #include "statistics.hpp"
 #include "util/log.hpp"
@@ -1572,6 +1573,65 @@ public:
         return TError::Success();
     }
 } static PlaceProperty;
+
+class TPlaceLimit : public TProperty {
+public:
+    TPlaceLimit() : TProperty(P_PLACE_LIMIT, EProperty::PLACE_LIMIT,
+            "Limits sum of volume space_limit: total|default|/place|tmpfs|lvm group|rbd: bytes;...") {}
+    TError Get(std::string &value) {
+        auto lock = LockVolumes();
+        return UintMapToString(CT->PlaceLimit, value);
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        auto lock = LockVolumes();
+        if (!CT->PlaceLimit.count(index))
+            return TError(EError::InvalidValue, "invalid index " + index);
+        value = std::to_string(CT->PlaceLimit.at(index));
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        TUintMap val;
+        error = StringToUintMap(value, val);
+        if (!error) {
+            auto lock = LockVolumes();
+            CT->PlaceLimit = val;
+            CT->SetProp(EProperty::PLACE_LIMIT);
+        }
+        return error;
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        auto lock = LockVolumes();
+        TUintMap val = CT->PlaceLimit;
+        TError error = StringToSize(value, val[index]);
+        if (!error) {
+            CT->PlaceLimit = val;
+            CT->SetProp(EProperty::PLACE_LIMIT);
+        }
+        return error;
+    }
+} static PlaceLimit;
+
+class TPlaceUsage : public TProperty {
+public:
+    TPlaceUsage() : TProperty(D_PLACE_USAGE, EProperty::NONE,
+            "Current sum of volume space_limit: total|/place|tmpfs|lvm group|rbd: bytes;... (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        auto lock = LockVolumes();
+        return UintMapToString(CT->PlaceUsage, value);
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        auto lock = LockVolumes();
+        if (!CT->PlaceUsage.count(index))
+            return TError(EError::InvalidValue, "invalid index " + index);
+        value = std::to_string(CT->PlaceUsage.at(index));
+        return TError::Success();
+    }
+} static PlaceUsage;
 
 class TMemoryLimit : public TProperty {
 public:

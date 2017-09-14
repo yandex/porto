@@ -43,6 +43,10 @@ public:
 
     bool IsSuperUser(void) const;
 
+    bool IsInternalUser(void) const {
+        return AccessLevel == EAccessLevel::Internal;
+    }
+
     bool CanSetUidGid() const;
     TError CanControl(const TCred &cred);
     TError CanControl(const TContainer &ct, bool child = false);

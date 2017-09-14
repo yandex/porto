@@ -756,10 +756,19 @@ TError TContainer::Destroy() {
         }
     }
 
-    while (!Volumes.empty()) {
-        std::shared_ptr<TVolume> volume = Volumes.back();
+    while (!LinkedVolumes.empty()) {
+        std::shared_ptr<TVolume> volume = LinkedVolumes.back();
         if (!volume->UnlinkContainer(*this) && volume->IsDying)
             volume->Destroy();
+    }
+
+    if (!OwnedVolumes.empty() && Parent) {
+        auto lock = LockVolumes();
+        for (auto &vol: OwnedVolumes) {
+            vol->VolumeOwnerContainer = Parent;
+            Parent->OwnedVolumes.push_back(vol);
+        }
+        OwnedVolumes.clear();
     }
 
     auto lock = LockContainers();

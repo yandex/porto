@@ -223,6 +223,10 @@ public:
     std::shared_ptr<TVolume> RootVolume;
     std::vector<std::string> Place;
 
+    /* Pritected with VolumesMutex */
+    TUintMap PlaceLimit;
+    TUintMap PlaceUsage;
+
     TTask Task;
     pid_t TaskVPid;
     TTask WaitTask;
@@ -343,7 +347,8 @@ public:
     bool MayRespawn();
 
     /* protected with VolumesLock */
-    std::list<std::shared_ptr<TVolume>> Volumes;
+    std::list<std::shared_ptr<TVolume>> LinkedVolumes;
+    std::list<std::shared_ptr<TVolume>> OwnedVolumes;
 
     TError GetEnvironment(TEnv &env);
 

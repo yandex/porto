@@ -19,6 +19,7 @@ constexpr const char *V_CONTAINERS = "containers";
 constexpr const char *V_LOOP_DEV = "_loop_dev";
 constexpr const char *V_AUTO_PATH = "_auto_path";
 
+constexpr const char *V_OWNER_CONTAINER = "owner_container";
 constexpr const char *V_OWNER_USER = "owner_user";
 constexpr const char *V_OWNER_GROUP = "owner_group";
 constexpr const char *V_CREATOR = "creator";
@@ -57,6 +58,7 @@ public:
     virtual TError Destroy(void) =0;
     virtual TError StatFS(TStatFS &result) =0;
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
+    virtual std::string ClaimPlace();
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
@@ -90,11 +92,13 @@ public:
     std::vector<std::string> Layers;
     std::vector<std::string> Containers;
 
+    uint64_t ClaimedSpace = 0;
     uint64_t SpaceLimit = 0;
     uint64_t SpaceGuarantee = 0;
     uint64_t InodeLimit = 0;
     uint64_t InodeGuarantee = 0;
 
+    std::shared_ptr<TContainer> VolumeOwnerContainer;
     TCred VolumeOwner;
 
     TCred VolumeCred;
@@ -139,6 +143,8 @@ public:
 
     TError LinkContainer(TContainer &container);
     TError UnlinkContainer(TContainer &container, bool strict = false);
+
+    TError ClaimPlace(uint64_t size);
 
     TPath GetInternal(const std::string &type) const;
     unsigned long GetMountFlags(void) const;
