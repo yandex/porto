@@ -2162,8 +2162,10 @@ TStringMap TVolume::DumpConfig(const TPath &root) {
 
     ret[V_BACKEND] = BackendType;
 
-    if (!CL || CL->ComposeName(VolumeOwnerContainer->Name, ret[V_OWNER_CONTAINER]))
-        ret[V_OWNER_CONTAINER] = ROOT_PORTO_NAMESPACE + VolumeOwnerContainer->Name;
+    if (VolumeOwnerContainer && CL) {
+        if (CL->ComposeName(VolumeOwnerContainer->Name, ret[V_OWNER_CONTAINER]))
+            ret[V_OWNER_CONTAINER] = ROOT_PORTO_NAMESPACE + VolumeOwnerContainer->Name;
+    }
 
     ret[V_OWNER_USER] = VolumeOwner.User();
     ret[V_OWNER_GROUP] = VolumeOwner.Group();
