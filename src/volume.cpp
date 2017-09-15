@@ -2216,7 +2216,20 @@ TError TVolume::Save() {
     node.Set(V_AUTO_PATH, BoolToString(IsAutoPath));
     node.Set(V_STORAGE, Storage);
     node.Set(V_BACKEND, BackendType);
-    node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
+
+    /*
+     * Older porto versions afraid volumes with unknown properties.
+     * Save owner container into first word in creator.
+     */
+    if (config().volumes().owner_container_migration_hack()) {
+        auto creator = SplitEscapedString(Creator, ' ');
+        creator[0] = VolumeOwnerContainer->Name;
+        node.Set(V_CREATOR, MergeEscapeStrings(creator, ' '));
+    } else {
+        node.Set(V_CREATOR, Creator);
+        node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
+    }
+
     node.Set(V_OWNER_USER, VolumeOwner.User());
     node.Set(V_OWNER_GROUP, VolumeOwner.Group());
     if (VolumeCred.Uid != NoUser)
@@ -2225,7 +2238,6 @@ TError TVolume::Save() {
         node.Set(V_GROUP, VolumeCred.Group());
     if (VolumePerms)
         node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
-    node.Set(V_CREATOR, Creator);
     node.Set(V_READY, BoolToString(IsReady));
     node.Set(V_PRIVATE, Private);
     node.Set(V_RAW_CONTAINERS, MergeEscapeStrings(Containers, ';'));
@@ -2700,13 +2712,11 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
             InodeGuarantee = guarantee;
 
         } else if (prop.first == V_PLACE) {
-
             Place = prop.second;
             CustomPlace = true;
 
-        } else {
-            return TError(EError::InvalidValue, "Invalid value name: " + prop.first);
-        }
+        } else
+            L_WRN("Skip unknown volume property {} = {}", prop.first, prop.second);
     }
 
     return TError::Success();
