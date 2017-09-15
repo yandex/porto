@@ -181,6 +181,8 @@ container { default_ulimit: "type: soft hard;..." }
 
     For first level containers default is 10000.
 
+* **parent** - parent container absolute name
+
 * **private** - 4k text to describe container
 
 * **weak** - if true container will be destroyed when client disconnects

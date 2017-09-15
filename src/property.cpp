@@ -1119,9 +1119,8 @@ public:
 
 class TCgroups : public TProperty {
 public:
-    TCgroups() : TProperty(D_CGROUPS, EProperty::NONE, "Cgroups") {
+    TCgroups() : TProperty(D_CGROUPS, EProperty::NONE, "cgroups (ro)") {
         IsReadOnly = true;
-        IsHidden = true;
     }
     TError Get(std::string &value) {
         TStringMap map;
@@ -2596,18 +2595,19 @@ public:
 
 class TParent : public TProperty {
 public:
-    TError Get(std::string &value);
-    TParent() : TProperty(D_PARENT, EProperty::NONE,
-                          "parent container name (ro) (deprecated)") {
+    TParent() : TProperty(D_PARENT, EProperty::NONE, "parent container absolute name (ro)") {
         IsReadOnly = true;
-        IsHidden = true;
+    }
+    TError Get(std::string &value) {
+        if (CT->Level == 0)
+            value = "";
+        else if (CT->Level == 1)
+            value = ROOT_CONTAINER;
+        else
+            value = ROOT_PORTO_NAMESPACE + CT->Parent->Name;
+        return TError::Success();
     }
 } static Parent;
-
-TError TParent::Get(std::string &value) {
-    value = TContainer::ParentName(CT->Name);
-    return TError::Success();
-}
 
 class TRespawnCount : public TProperty {
 public:
