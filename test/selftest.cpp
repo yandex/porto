@@ -957,7 +957,7 @@ static void TestNsCgTc(Porto::Connection &api) {
 
     string parent;
     ExpectApiSuccess(api.GetData(child, "parent", parent));
-    ExpectEq(parent, name);
+    ExpectEq(parent, "/porto/" + name);
 
     ExpectApiSuccess(api.Destroy(child));
     ExpectApiSuccess(api.Stop(name));
