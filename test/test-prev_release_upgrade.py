@@ -128,7 +128,7 @@ cwd=os.path.abspath(os.getcwd())
 
 os.chdir(TMPDIR)
 subprocess.call(["apt-get", "update"])
-download = subprocess.check_output(["apt-get", "download", "yandex-porto=" + BASE_VERSION])
+download = subprocess.check_output(["apt-get", "--force-yes", "download", "yandex-porto=" + BASE_VERSION])
 
 print "Package successfully downloaded"
 
