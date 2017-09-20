@@ -565,7 +565,7 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
         return error;
     }
 
-    sock.Close();
+    TFile::CloseAll({sk.GetFd(), ns.GetFd()});
 
     error = ns.SetNs(CLONE_NEWPID);
     if (error)
