@@ -1347,6 +1347,9 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
 
 TError TVolume::ClaimPlace(uint64_t size) {
 
+    if (!VolumeOwnerContainer || !Backend)
+        return TError(EError::Busy, "Volume has no backend or owner");
+
     auto place = Backend->ClaimPlace();
     if (place == "")
         return TError::Success();
@@ -2198,7 +2201,8 @@ TStringMap TVolume::DumpConfig(const TPath &root) {
     if (CustomPlace)
         ret[V_PLACE] = Place.ToString();
 
-    ret[V_PLACE_KEY] = Backend->ClaimPlace();
+    if (Backend)
+        ret[V_PLACE_KEY] = Backend->ClaimPlace();
 
     return ret;
 }
