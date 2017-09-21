@@ -1,3 +1,37 @@
+yandex-porto (4.0.7) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: update documentation
+
+  [ Maxim Samoylov ]
+  * test: disable selftest macvlan_statistics
+  * test: perform apt-get update prior to testing upgrade
+
+  [ Konstantin Khlebnikov ]
+  * volume: add per-container place space usage limit
+  * volume: fix race between DumpConfig and Destroy
+  * volume: temporary hack for backward migration
+  * porto: show and document some hidden properties
+  * test: fix test for parent property
+
+  [ Maxim Samoylov ]
+  * test: do not hesitate download unauthenticated stable package
+  * util/unix: close all fds except needed after fork in TranslatePid()
+
+  [ Konstantin Khlebnikov ]
+  * volume: add propery place_key
+  * config: increase default codedump space limit to 100Gb
+
+  [ Maxim Samoylov ]
+  * property: deny root_pid requests from other pid domain containers
+
+  [ Konstantin Khlebnikov ]
+  * porto: increase mountinfo limit to 64Mb
+  * porto: fix requesting root_pid from same container
+  * volume: half-baked volumes could have no backend
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 21 Sep 2017 17:56:39 +0300
+
 yandex-porto (4.0.6) unstable; urgency=low
 
   * porto: disable pressurize_on_death by default
