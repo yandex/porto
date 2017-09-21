@@ -819,7 +819,7 @@ bool TContainer::HasPidFor(const TContainer &ct) const {
     while (!ns->Isolate && ns->Parent)
         ns = ns->Parent.get();
 
-    return IsChildOf(*ns);
+    return ns == this || IsChildOf(*ns);
 }
 
 TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
