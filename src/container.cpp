@@ -813,6 +813,15 @@ std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
+bool TContainer::HasPidFor(const TContainer &ct) const {
+    auto ns = &ct;
+
+    while (!ns->Isolate && ns->Parent)
+        ns = ns->Parent.get();
+
+    return IsChildOf(*ns);
+}
+
 TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
     ino_t inode = TNamespaceFd::PidInode(pidns, "ns/pid");
     TError error;

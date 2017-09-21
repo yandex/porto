@@ -2638,6 +2638,10 @@ public:
         TError error = IsRunning();
         if (error)
             return error;
+
+        if (!CT->HasPidFor(*CL->ClientContainer))
+            return TError(EError::Permission, "pid is unreachable");
+
         pid_t pid;
         error = CT->GetPidFor(CL->Pid, pid);
         if (!error)

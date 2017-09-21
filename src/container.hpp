@@ -310,6 +310,7 @@ public:
 
     std::shared_ptr<TContainer> GetParent() const;
 
+    bool HasPidFor(const TContainer &ct) const;
     TError GetPidFor(pid_t pidns, pid_t &pid) const;
 
     TError StartTask();
