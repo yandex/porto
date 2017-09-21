@@ -43,6 +43,7 @@ constexpr const char *V_SPACE_AVAILABLE = "space_available";
 constexpr const char *V_INODE_AVAILABLE = "inode_available";
 
 constexpr const char *V_PLACE = "place";
+constexpr const char *V_PLACE_KEY = "place_key";
 
 class TVolume;
 class TContainer;

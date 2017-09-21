@@ -769,6 +769,15 @@ Like for container volume configuration is a set of key-value pairs.
 
     Default and possible paths are controller by container property **place**.
 
+* **place\_key**    - key for charging **place\_limit** for **owner\_container**
+
+    Key equal to **place** if backend keeps data in filesystem.
+
+    Key is empty if backend doesn't limit or own data.
+    Like plain, bind, quota, or if storage is provided by user.
+
+    Some backend use own keys: "tmpfs", "lvm \<group\>", "rbd".
+
 * **space\_limit**     - disk space limit, default: 0 - unlimited
 
 * **inode\_limit**     - disk inode limit, default: 0 - unlimited

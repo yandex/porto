@@ -2198,6 +2198,8 @@ TStringMap TVolume::DumpConfig(const TPath &root) {
     if (CustomPlace)
         ret[V_PLACE] = Place.ToString();
 
+    ret[V_PLACE_KEY] = Backend->ClaimPlace();
+
     return ret;
 }
 
@@ -2322,6 +2324,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_CONTAINERS,  "container;... - initial links, default - self", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
+    { V_PLACE_KEY,   "key for charging place_limit for owner_container (ro)", true },
     { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)", false },
     { V_INODE_LIMIT, "disk inode limit (dynamic, default zero - unlimited)", false },
     { V_SPACE_GUARANTEE,    "disk space guarantee (dynamic, default - zero)", false },
