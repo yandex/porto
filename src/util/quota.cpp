@@ -274,7 +274,7 @@ TError TProjectQuota::FindDevice() {
         return TError(EError::Unknown, "device not found: " + Path.ToString());
 
     std::vector<std::string> lines;
-    error = TPath("/proc/self/mountinfo").ReadLines(lines, 1048576);
+    error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
     if (error)
         return error;
 

@@ -175,6 +175,9 @@ public:
     TError WritePrivate(const std::string &text) const;
 };
 
+// FIXME replace with streaming someday
+constexpr const size_t MOUNT_INFO_LIMIT = 64 << 20;
+
 struct TMount {
     TPath Source;
     TPath Target;

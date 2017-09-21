@@ -949,7 +949,7 @@ TError TPath::ReadInt(int &value) const {
 TError TPath::FindMount(TMount &mount) const {
     std::vector<std::string> lines;
 
-    TError error = TPath("/proc/self/mountinfo").ReadLines(lines, 16 * 1048576);
+    TError error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
     if (error)
         return error;
 
@@ -984,7 +984,7 @@ TError TPath::FindMount(TMount &mount) const {
 TError TPath::ListAllMounts(std::list<TMount> &list) {
     std::vector<std::string> lines;
 
-    TError error = TPath("/proc/self/mountinfo").ReadLines(lines, 16 * 1048576);
+    TError error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
     if (error)
         return error;
 
