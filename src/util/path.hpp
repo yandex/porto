@@ -233,6 +233,7 @@ public:
     TPath RealPath(void) const;
     TPath ProcPath(void) const;
     TError ReadAll(std::string &text, size_t max) const;
+    TError Truncate(off_t size) const;
     TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
     int GetMountId(const TPath relative = TPath("")) const;

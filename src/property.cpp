@@ -1380,15 +1380,21 @@ class TResolvConf : public TProperty {
 public:
     TResolvConf() : TProperty(P_RESOLV_CONF, EProperty::RESOLV_CONF,
                               "DNS resolver configuration: "
-                              "<resolv.conf option>;...") {}
+                              "<resolv.conf option>;... (dynamic)") {}
     TError Get(std::string &value) {
-        value = CT->ResolvConf;
+        if (CT->IsRoot())
+            value = config().container().default_resolv_conf();
+        else
+            value = CT->ResolvConf;
         return TError::Success();
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
+        TError error = IsAlive();
         if (error)
             return error;
+        if (CT->State != EContainerState::Stopped &&
+                (!CT->ResolvConf.size() || !value.size()))
+            return TError(EError::InvalidState, "Cannot enable/disable resolv.conf overriding in runtime");
         CT->ResolvConf = value;
         CT->SetProp(EProperty::RESOLV_CONF);
         return TError::Success();

@@ -1220,6 +1220,12 @@ TError TFile::ReadAll(std::string &text, size_t max) const {
     return TError::Success();
 }
 
+TError TFile::Truncate(off_t size) const {
+    if (ftruncate(Fd, size))
+        return TError(EError::Unknown, errno, "ftruncate");
+    return TError::Success();
+}
+
 TError TFile::WriteAll(const std::string &text) const {
     size_t len = text.length(), off = 0;
     do {

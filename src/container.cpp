@@ -36,6 +36,8 @@ extern "C" {
 #include <sys/fsuid.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 }
 
 std::mutex ContainersMutex;
@@ -527,6 +529,9 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     ct->SyncState();
 
     TNetwork::InitClass(*ct);
+
+    /* Do not rewrite resolv.conf at restore */
+    ct->TestClearPropDirty(EProperty::RESOLV_CONF);
 
     /* Restore cgroups only for running containers */
     if (ct->State != EContainerState::Stopped &&
@@ -1025,6 +1030,30 @@ TError TContainer::ApplyIoPolicy() const {
     return TError::Success();
 }
 
+TError TContainer::ApplyResolvConf() const {
+    TError error;
+    TFile file;
+
+    if (!Task.Pid)
+        return TError(EError::InvalidState, "No container task pid");
+
+    error = file.Open("/proc/" + std::to_string(Task.Pid) + "/root/etc/resolv.conf",
+                      O_WRONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY);
+    if (error)
+        return error;
+
+    struct statfs st;
+    if (fstatfs(file.Fd, &st) || st.f_type != TMPFS_MAGIC)
+        return TError(EError::NotSupported, "resolv.conf not on tmpfs");
+
+    L_ACT("Apply resolv.conf for CT{}:{}", Id, Name);
+    std::string cfg = StringReplaceAll(CT->ResolvConf, ";", "\n");
+    error = file.Truncate(0);
+    if (!error)
+        error = file.WriteAll(cfg);
+    return error;
+}
+
 TError TContainer::ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                                TBitMap &threads, TBitMap &cores) {
     bool try_thread = true;
@@ -1496,6 +1525,14 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
+    if (TestClearPropDirty(EProperty::RESOLV_CONF)) {
+        error = ApplyResolvConf();
+        if (error) {
+            L_ERR("Cannot change /etc/resolv.conf contents: {}", error);
+            return error;
+        }
+    }
+
     return TError::Success();
 }
 
@@ -1920,6 +1957,9 @@ TError TContainer::StartTask() {
 
     /* After restart apply all set dynamic properties */
     memcpy(PropDirty, PropSet, sizeof(PropDirty));
+
+    /* Applied by starting task */
+    TestClearPropDirty(EProperty::RESOLV_CONF);
 
     error = ApplyDynamicProperties();
     if (error)

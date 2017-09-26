@@ -178,6 +178,7 @@ TError TTaskEnv::ChildApplyLimits() {
 TError TTaskEnv::WriteResolvConf() {
     if (!CT->ResolvConf.size())
         return TError::Success();
+    L_ACT("Write resolv.conf for CT{}:{}", CT->Id, CT->Name);
     std::string cfg = StringReplaceAll(CT->ResolvConf, ";", "\n");
     return TPath("/etc/resolv.conf").WritePrivate(cfg);
 }
