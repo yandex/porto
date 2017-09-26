@@ -1915,17 +1915,18 @@ TError TContainer::StartTask() {
     if (error)
         return error;
 
-    if (!IsRoot()) {
-        /* After restart apply all set dynamic properties */
-        memcpy(PropDirty, PropSet, sizeof(PropDirty));
+    if (IsRoot())
+        return TError::Success();
 
-        error = ApplyDynamicProperties();
-        if (error)
-            return error;
-    }
+    /* After restart apply all set dynamic properties */
+    memcpy(PropDirty, PropSet, sizeof(PropDirty));
+
+    error = ApplyDynamicProperties();
+    if (error)
+        return error;
 
     /* Meta container without namespaces don't need task */
-    if (IsMeta() && !Isolate && NetInherit)
+    if (IsMeta() && !Isolate && NetInherit && !TaskEnv.NewMountNs)
         return TError::Success();
 
     error = PrepareTask(TaskEnv);
