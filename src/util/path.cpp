@@ -1380,6 +1380,12 @@ TError TFile::WalkStrict(const TFile &dir, const TPath &path) {
     return error;
 }
 
+TError TFile::Chdir() const {
+    if (fchdir(Fd))
+        return TError(EError::Unknown, "fchdir");
+    return TError::Success();
+}
+
 TError TFile::Stat(struct stat &st) const {
     if (fstat(Fd, &st))
         return TError(EError::Unknown, "Cannot stat: " + std::to_string(Fd));

@@ -46,6 +46,8 @@ public:
 
     bool IsEmpty() const { return Path.empty(); }
 
+    explicit operator bool() const { return !Path.empty(); }
+
     bool IsNormal() const { return Path == NormalPath().Path; }
 
     bool IsInside(const TPath &base) const;
@@ -211,6 +213,7 @@ public:
     TFile() : Fd(-1) { }
     TFile(int fd) : Fd(fd) { }
     ~TFile() { Close(); }
+    explicit operator bool() const { return Fd >= 0; }
     TError Open(const TPath &path, int flags);
     TError OpenRead(const TPath &path);
     TError OpenWrite(const TPath &path);
@@ -252,6 +255,7 @@ public:
     TError Touch() const;
     TError WalkFollow(const TFile &dir, const TPath &path);
     TError WalkStrict(const TFile &dir, const TPath &path);
+    TError Chdir() const;
     TError ClearDirectory() const;
     TError Stat(struct stat &st) const;
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;

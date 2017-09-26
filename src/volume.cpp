@@ -441,7 +441,7 @@ public:
         return TPath("/dev/loop" + std::to_string(Volume->Device));
     }
 
-    static TError MakeImage(TFile &file, TPath &path, off_t size, off_t guarantee) {
+    static TError MakeImage(TFile &file, const TFile &dir, TPath &path, off_t size, off_t guarantee) {
         TError error;
 
         L_ACT("Allocate loop image with size {} guarantee {}", size, guarantee);
@@ -454,10 +454,10 @@ public:
                            "cannot fallocate guarantee " + std::to_string(guarantee));
 
         return RunCommand({ "mkfs.ext4", "-q", "-F", "-m", "0", "-E", "nodiscard",
-                            "-O", "^has_journal", path.ToString()}, path.DirName());
+                            "-O", "^has_journal", path.ToString()}, dir);
     }
 
-    static TError ResizeImage(const TFile &file, const TPath &path,
+    static TError ResizeImage(const TFile &file, const TFile &dir, const TPath &path,
                               off_t current, off_t target) {
         std::string size = std::to_string(target >> 10) + "K";
         TError error;
@@ -465,8 +465,7 @@ public:
         if (current < target && ftruncate(file.Fd, target))
             return TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
 
-        error = RunCommand({"resize2fs", "-f", path.ToString(), size},
-                           path.DirName().ToString());
+        error = RunCommand({"resize2fs", "-f", path.ToString(), size}, dir);
 
         if (!error && current > target && ftruncate(file.Fd, target))
             error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
@@ -494,7 +493,7 @@ public:
         if (ioctl(dev.Fd, LOOP_SET_CAPACITY, 0) < 0)
             return TError(EError::Unknown, errno, "ioctl(LOOP_SET_CAPACITY)");
 
-        return RunCommand({"resize2fs", path, size}, "/");
+        return RunCommand({"resize2fs", path, size});
     }
 
     TError Build() override {
@@ -502,9 +501,11 @@ public:
         struct stat st;
         TError error;
         TFile file;
+        bool file_storage = false;
 
         if (!Volume->StorageFd.Stat(st) && S_ISREG(st.st_mode)) {
             error = file.Dup(Volume->StorageFd);
+            file_storage = true;
         } else if (!Volume->StorageFd.StatAt(AutoImage, true, st) && S_ISREG(st.st_mode)) {
             error = file.OpenAt(Volume->StorageFd, AutoImage,
                                 (Volume->IsReadOnly ? O_RDONLY : O_RDWR) |
@@ -514,7 +515,7 @@ public:
                                 O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
             if (!error) {
                 Volume->KeepStorage = false; /* New storage */
-                error = MakeImage(file, path, Volume->SpaceLimit, Volume->SpaceGuarantee);
+                error = MakeImage(file, Volume->StorageFd, path, Volume->SpaceLimit, Volume->SpaceGuarantee);
                 if (error)
                     Volume->StorageFd.UnlinkAt(AutoImage);
             }
@@ -527,7 +528,8 @@ public:
         if (!Volume->SpaceLimit) {
             Volume->SpaceLimit = st.st_size;
         } else if (!Volume->IsReadOnly && (uint64_t)st.st_size != Volume->SpaceLimit) {
-            error = ResizeImage(file, path, st.st_size, Volume->SpaceLimit);
+            error = ResizeImage(file, file_storage ? TFile() : Volume->StorageFd,
+                                path, st.st_size, Volume->SpaceLimit);
             if (error)
                 return error;
         }
@@ -966,7 +968,7 @@ public:
         error = out.CreateUnnamed("/tmp");
         if (error)
             return error;
-        error = RunCommand({"rbd", "--id=" + id, "--pool=" + pool, "map", image}, "/", TFile(), out);
+        error = RunCommand({"rbd", "--id=" + id, "--pool=" + pool, "map", image}, TFile(), TFile(), out);
         if (error)
             return error;
         error = out.ReadAll(device, 1024);
@@ -978,7 +980,7 @@ public:
 
     TError UnmapDevice(std::string device) {
         L_ACT("Unmap rbd device {}", device);
-        return RunCommand({"rbd", "unmap", device}, "/");
+        return RunCommand({"rbd", "unmap", device});
     }
 
     TError Build() override {
@@ -1114,17 +1116,17 @@ public:
             if (Origin.size()) {
                 error = RunCommand({"lvm", "lvcreate", "--name", Name,
                                     "--snapshot", Group + "/" + Origin,
-                                    "--setactivationskip", "n"}, "/");
+                                    "--setactivationskip", "n"});
                 if (!error && Volume->SpaceLimit)
                     error = Resize(Volume->SpaceLimit, Volume->InodeLimit);
             } else if (Thin.size()) {
                 error = RunCommand({"lvm", "lvcreate", "--name", Name, "--thin",
                                     "--virtualsize", std::to_string(Volume->SpaceLimit) + "B",
-                                    Group + "/" + Thin}, "/");
+                                    Group + "/" + Thin});
             } else {
                 error = RunCommand({"lvm", "lvcreate", "--name", Name,
                                     "--size", std::to_string(Volume->SpaceLimit) + "B",
-                                    Group}, "/");
+                                    Group});
             }
             if (error)
                 return error;
@@ -1132,7 +1134,7 @@ public:
             if (Origin.empty()) {
                 error = RunCommand({ "mkfs.ext4", "-q", "-m", "0",
                                      "-O", std::string(Persistent ? "" : "^") + "has_journal",
-                                     Device}, "/");
+                                     Device});
                 if (error)
                     Persistent = false;
             }
@@ -1145,7 +1147,7 @@ public:
                                                  "errors=continue" });
 
         if (error && !Persistent)
-            (void)RunCommand({"lvm", "lvremove", "--force", Device }, "/");
+            (void)RunCommand({"lvm", "lvremove", "--force", Device });
 
         return error;
     }
@@ -1153,7 +1155,7 @@ public:
     TError Destroy() override {
         TError error = Volume->InternalPath.UmountAll();
         if (!Persistent) {
-            TError error2 = RunCommand({"lvm", "lvremove", "--force", Device}, "/");
+            TError error2 = RunCommand({"lvm", "lvremove", "--force", Device});
             if (!error)
                 error = error2;
         }
@@ -1163,7 +1165,7 @@ public:
     TError Resize(uint64_t space_limit, uint64_t) override {
         return RunCommand({"lvm", "lvresize", "--force", "--resizefs",
                            "--size", std::to_string(space_limit) + "B",
-                           Device}, "/");
+                           Device});
     }
 
     std::string ClaimPlace() override {

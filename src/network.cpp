@@ -2343,7 +2343,7 @@ TError TNetEnv::ApplySysctl() {
     }
 
     for (auto &cmd: IpRoute) {
-        error = RunCommand(cmd, "/");
+        error = RunCommand(cmd);
         if (error)
             goto err;
     }

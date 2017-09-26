@@ -368,7 +368,7 @@ static bool TarSupportsXattrs() {
         TFile null;
         result = !null.OpenReadWrite("/dev/null") &&
                  !RunCommand({ "tar", "--create", "--xattrs",
-                               "--files-from", "/dev/null"}, "/", null, null);
+                               "--files-from", "/dev/null"}, TFile(), null, null);
         tested = true;
     }
     return result;
@@ -463,8 +463,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
                         "--numeric-owner",
                         "--preserve-permissions",
                         compress_option,
-                        "--extract",
-                        "-C", temp.ToString() };
+                        "--extract" };
 
         if (TarSupportsXattrs())
             args.insert(args.begin() + 3, {
@@ -472,7 +471,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
                         "--xattrs-include=security.capability",
                         "--xattrs-include=trusted.overlay.*" });
 
-        error = RunCommand(args, temp, arc, TFile());
+        error = RunCommand(args, import_dir, arc, TFile());
     } else if (compress_format == "squashfs") {
         TTuple args = { "unsquashfs",
                         "-force",
@@ -481,7 +480,12 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
                         "-dest", temp.ToString(),
                         archive.ToString() };
 
-        error = RunCommand(args, temp.DirName());
+        TFile parent_dir;
+        error = parent_dir.WalkStrict(import_dir, "..");
+        if (error)
+            return error;
+
+        error = RunCommand(args, parent_dir);
     } else
         error = TError(EError::NotSupported, "Unsuported format " + compress_format);
 
@@ -594,15 +598,14 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
         if (TarSupportsXattrs())
             args.insert(args.begin() + 4, "--xattrs");
 
-        error = RunCommand(args, Path, TFile(), arc);
+        error = RunCommand(args, dir, TFile(), arc);
     } else if (compress_format == "squashfs") {
         TTuple args = { "mksquashfs", Path.ToString(),
                         archive.BaseName(),
                         "-noappend",
                         "-comp", compress_option };
 
-        /* FIXME pass dir to fchdir */
-        error = RunCommand(args, archive.DirName(), TFile());
+        error = RunCommand(args, dir, TFile());
     } else
         error = TError(EError::NotSupported, "Unsupported format " + compress_format);
 

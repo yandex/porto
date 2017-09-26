@@ -12,8 +12,8 @@ extern "C" {
 #include <linux/loop.h>
 }
 
-TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
-                  const TFile &in, const TFile &out) {
+TError RunCommand(const std::vector<std::string> &command,
+                  const TFile &dir, const TFile &in, const TFile &out) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
     TFile err;
@@ -31,7 +31,7 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     for (auto &arg : command)
         cmdline += arg + " ";
 
-    L_ACT("Call helper: {} in {}", cmdline, cwd);
+    L_ACT("Call helper: {} in {}", cmdline, dir.RealPath());
 
     error = task.Fork();
     if (error)
@@ -68,18 +68,22 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
     if (dup2(err.Fd, STDERR_FILENO) != STDERR_FILENO)
         _exit(EXIT_FAILURE);
 
-    /* Remount everything except CWD Read-Only */
-    if (!cwd.IsRoot()) {
-        TPath root("/");
+    TPath root("/");
+    TPath dot(".");
+
+    if (dir) {
+        /* Unshare and remount everything except CWD Read-Only */
         if (unshare(CLONE_NEWNS) ||
                 root.Remount(MS_PRIVATE | MS_REC) ||
                 root.Remount(MS_REMOUNT | MS_BIND | MS_REC | MS_RDONLY) ||
-                cwd.BindRemount(cwd, MS_REC))
+                dir.Chdir() ||
+                dot.BindRemount(dot, MS_REC) ||
+                dir.Chdir())
+            _exit(EXIT_FAILURE);
+    } else {
+        if (root.Chdir())
             _exit(EXIT_FAILURE);
     }
-
-    if (cwd.Chdir())
-        _exit(EXIT_FAILURE);
 
     const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
     for (size_t i = 0; i < command.size(); i++)
@@ -91,16 +95,36 @@ TError RunCommand(const std::vector<std::string> &command, const TPath &cwd,
 }
 
 TError CopyRecursive(const TPath &src, const TPath &dst) {
+    TError error;
+    TFile dir;
+
+    error = dir.OpenDir(dst);
+    if (error)
+        return error;
+
     return RunCommand({ "cp", "--archive", "--force",
                         "--one-file-system", "--no-target-directory",
-                        src.ToString(), "." }, dst);
+                        src.ToString(), "." }, dir);
 }
 
 TError ClearRecursive(const TPath &path) {
-    return RunCommand({ "find", ".", "-xdev", "-mindepth", "1", "-delete"}, path);
+    TError error;
+    TFile dir;
+
+    error = dir.OpenDir(path);
+    if (error)
+        return error;
+
+    return RunCommand({ "find", ".", "-xdev", "-mindepth", "1", "-delete"}, dir);
 }
 
 TError RemoveRecursive(const TPath &path) {
-    return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()},
-                      path.NormalPath().DirName());
+    TError error;
+    TFile dir;
+
+    error = dir.OpenDir(path.NormalPath().DirName());
+    if (error)
+        return error;
+
+    return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()}, dir);
 }
