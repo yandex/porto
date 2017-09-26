@@ -18,6 +18,7 @@ TError RunCommand(const std::vector<std::string> &command,
     TError error;
     TFile err;
     TTask task;
+    TPath path = dir.RealPath();
 
     if (!command.size())
         return TError(EError::Unknown, "External command is empty");
@@ -31,7 +32,7 @@ TError RunCommand(const std::vector<std::string> &command,
     for (auto &arg : command)
         cmdline += arg + " ";
 
-    L_ACT("Call helper: {} in {}", cmdline, dir.RealPath());
+    L_ACT("Call helper: {} in {}", cmdline, path);
 
     error = task.Fork();
     if (error)
@@ -57,7 +58,8 @@ TError RunCommand(const std::vector<std::string> &command,
 
     SetDieOnParentExit(SIGKILL);
 
-    TFile::CloseAll({in.Fd, out.Fd, err.Fd});
+    LogFile.Close();
+    TFile::CloseAll({dir.Fd, in.Fd, out.Fd, err.Fd});
 
     if ((in.Fd >= 0 ? dup2(in.Fd, STDIN_FILENO) : open("/dev/null", O_RDONLY)) != STDIN_FILENO)
         _exit(EXIT_FAILURE);
@@ -71,14 +73,15 @@ TError RunCommand(const std::vector<std::string> &command,
     TPath root("/");
     TPath dot(".");
 
-    if (dir) {
+    if (dir && !path.IsRoot()) {
         /* Unshare and remount everything except CWD Read-Only */
-        if (unshare(CLONE_NEWNS) ||
+        if (dir.Chdir() ||
+                unshare(CLONE_NEWNS) ||
                 root.Remount(MS_PRIVATE | MS_REC) ||
                 root.Remount(MS_REMOUNT | MS_BIND | MS_REC | MS_RDONLY) ||
-                dir.Chdir() ||
-                dot.BindRemount(dot, MS_REC) ||
-                dir.Chdir())
+                dot.Bind(dot, MS_REC) ||
+                TPath("../" + path.BaseName()).Chdir() ||
+                dot.Remount(MS_REMOUNT | MS_BIND | MS_REC))
             _exit(EXIT_FAILURE);
     } else {
         if (root.Chdir())

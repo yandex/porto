@@ -75,7 +75,8 @@ void WriteLog(std::string log_msg, ELogLevel level) {
         Statistics->LogBytes += msg.size();
     }
 
-    LogFile.WriteAll(msg);
+    if (LogFile)
+        LogFile.WriteAll(msg);
 
     if (level == LOG_ERROR && Verbose)
         Stacktrace();
