@@ -1426,7 +1426,7 @@ TError TVolume::DependsOn(const TPath &path) {
     for (auto it = Volumes.rbegin(); it != Volumes.rend(); ++it) {
         auto &vol = it->second;
         if (path.IsInside(vol->Path)) {
-            if (State != EVolumeState::Ready)
+            if (vol->State != EVolumeState::Ready)
                 return TError(EError::InvalidState, "Volume not ready: " + vol->Path.ToString());
             vol->Nested.insert(shared_from_this());
             break;
