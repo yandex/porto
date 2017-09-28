@@ -2186,7 +2186,7 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
 
     auto it = std::find(container.LinkedVolumes.begin(),
                         container.LinkedVolumes.end(), shared_from_this());
-    if (it == container.LinkedVolumes.end() && !Containers.empty())
+    if (it == container.LinkedVolumes.end())
         return TError(EError::VolumeNotLinked, "Container is not linked");
 
     if (strict && Containers.size() > 1)
