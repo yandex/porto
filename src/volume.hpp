@@ -11,6 +11,7 @@
 constexpr const char *V_PATH = "path";
 constexpr const char *V_BACKEND = "backend";
 constexpr const char *V_READY = "ready";
+constexpr const char *V_STATE = "state";
 constexpr const char *V_PRIVATE = "private";
 
 constexpr const char *V_ID = "_id";
@@ -49,6 +50,16 @@ class TVolume;
 class TContainer;
 class TKeyValue;
 
+enum class EVolumeState {
+    Initial,
+    Building,
+    Ready,
+    Unlinked,
+    ToDestroy,
+    Destroying,
+    Destroyed,
+};
+
 class TVolumeBackend {
 public:
     TVolume *Volume;
@@ -84,8 +95,10 @@ public:
 
     std::string BackendType;
     std::string Id;
-    bool IsReady = false;
-    bool IsDying = false;
+
+    EVolumeState State = EVolumeState::Initial;
+    static std::string StateName(EVolumeState state);
+    void SetState(EVolumeState state);
 
     int Device = -1;
     bool IsReadOnly = false;
@@ -144,6 +157,7 @@ public:
 
     TError LinkContainer(TContainer &container);
     TError UnlinkContainer(TContainer &container, bool strict = false);
+    static void UnlinkAllVolumes(TContainer &container);
 
     TError ClaimPlace(uint64_t size);
 

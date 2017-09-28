@@ -748,10 +748,14 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
 noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
     bool strict = req.has_strict() && req.strict();
     std::shared_ptr<TContainer> ct;
-    TError error = CL->WriteContainer(req.has_container() ?
-                                req.container() : SELF_CONTAINER, ct, true);
-    if (error)
-        return error;
+    TError error;
+
+    if (!req.has_container() || req.container() != "***") {
+        error = CL->WriteContainer(req.has_container() ? req.container() :
+                                    SELF_CONTAINER, ct, true);
+        if (error)
+            return error;
+    }
 
     TPath volume_path = CL->ResolvePath(req.path());
     std::shared_ptr<TVolume> volume;
@@ -762,18 +766,18 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
     if (error)
         return TError(error, "Cannot unlink volume " + volume->Path.ToString());
 
-    error = volume->UnlinkContainer(*ct, strict);
-    if (error)
-        return error;
+    if (ct) {
+        error = volume->UnlinkContainer(*ct, strict);
+        if (error)
+            return error;
+    }
 
     CL->ReleaseContainer();
 
-    if (volume->IsDying)
+    if (volume->State == EVolumeState::Unlinked || !ct) {
         error = volume->Destroy(strict);
-
-    if (error && strict) {
-        volume->IsDying = false;
-        (void)volume->LinkContainer(*ct);
+        if (error && strict && ct)
+            (void)volume->LinkContainer(*ct);
     }
 
     return error;

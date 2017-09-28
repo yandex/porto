@@ -1634,12 +1634,12 @@ public:
 class TUnlinkVolumeCmd final : public ICmd {
 public:
     TUnlinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vunlink", 1,
-                    "[-A] [-S] <path> [container]",
+                    "[-A] [-S] <path> [container|***]",
                     "unlink volume from container",
                     "    -A        unlink from all containers\n"
-                    "    -S        struct nlink with non-lazy umount\n"
-                    "default container - current\n"
-                    "removing last link deletes volume\n") {}
+                    "    -S        strict unlink with non-lazy umount\n"
+                    "default container - current, *** - unlink from all containers\n"
+                    "removing last link destroys volume\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool all = false;

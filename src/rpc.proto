@@ -337,8 +337,8 @@ message TVolumeLinkRequest {
 
 message TVolumeUnlinkRequest {
     required string path = 1;
-    optional string container = 2;
-    optional bool strict = 3;
+    optional string container = 2; // default - self, *** - all
+    optional bool strict = 3; // non-lazy umount
 }
 
 message TVolumeListRequest {

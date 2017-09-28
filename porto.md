@@ -701,7 +701,9 @@ You can either manually declare a volume path or delegate this task to porto.
 A volume can be linked to one or more containers, links act as reference
 counter: unlinked volume will be destroyed automatically. By default volume
 is linked to the container that created it: "self", "/" for host.
-Container can create new links and optionally unlink the volume from itself.
+
+By default volume unlink calls lazy **umount(2)** with flag MNT\_DETACH,
+strict unlink calls normal umount and fails if some files are opened.
 
 ## Volume Properties
 
@@ -729,6 +731,15 @@ Like for container volume configuration is a set of key-value pairs.
     Some backends (*rbd*, *lvm*) expects configuration in special format.
 
 * **ready**         - is construction complete
+
+* **state**         - volume state
+    - *initial*
+    - *building*
+    - *ready*
+    - *unlinked*
+    - *to-destroy*
+    - *destroying*
+    - *destroyed*
 
 * **private**       - user-defined property, 4k text
 
