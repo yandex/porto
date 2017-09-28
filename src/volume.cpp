@@ -1427,7 +1427,7 @@ TError TVolume::DependsOn(const TPath &path) {
         auto &vol = it->second;
         if (path.IsInside(vol->Path)) {
             if (vol->State != EVolumeState::Ready)
-                return TError(EError::InvalidState, "Volume not ready: " + vol->Path.ToString());
+                return TError(EError::VolumeNotReady, "Volume not ready: " + vol->Path.ToString());
             vol->Nested.insert(shared_from_this());
             break;
         }
@@ -2058,7 +2058,7 @@ TError TVolume::DestroyOne(bool strict) {
 TError TVolume::StatFS(TStatFS &result) const {
     if (State != EVolumeState::Ready && State != EVolumeState::Unlinked) {
         result.Reset();
-        return TError(EError::InvalidState, "Volume not ready: " + Path.ToString());
+        return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
     }
     return Backend->StatFS(result);
 }
@@ -2079,7 +2079,7 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
     auto lock = ScopedLock();
 
     if (State != EVolumeState::Ready)
-        return TError(EError::InvalidState, "Volume not ready: " + Path.ToString());
+        return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
 
     if (properties.count(V_SPACE_LIMIT) || properties.count(V_INODE_LIMIT)) {
         uint64_t spaceLimit = SpaceLimit, inodeLimit = InodeLimit;
@@ -2167,7 +2167,7 @@ TError TVolume::LinkContainer(TContainer &container) {
         SetState(EVolumeState::Ready);
 
     if (State != EVolumeState::Ready && State != EVolumeState::Building)
-        return TError(EError::InvalidState, "Volume not ready: " + Path.ToString());
+        return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
 
     Containers.push_back(container.Name);
     TError error = Save();
@@ -2374,7 +2374,7 @@ TError TVolume::Restore(const TKeyValue &node) {
         StoragePath = TStorage(Place, PORTO_STORAGE, Storage).Path;
 
     if (State != EVolumeState::Ready)
-        return TError(EError::InvalidState, "Volume not ready: " + Path.ToString());
+        return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
 
     error = OpenBackend();
     if (error)

@@ -86,6 +86,7 @@ def volume_action(conn):
             porto.exceptions.VolumeAlreadyExists,
             porto.exceptions.VolumeAlreadyLinked,
             porto.exceptions.VolumeNotLinked,
+            porto.exceptions.VolumeNotReady,
             porto.exceptions.InvalidValue,
             porto.exceptions.Busy,
             porto.exceptions.ResourceNotAvailable,

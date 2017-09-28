@@ -55,6 +55,8 @@ enum EError {
 
     NoValue = 20;
 
+    VolumeNotReady = 21;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }
