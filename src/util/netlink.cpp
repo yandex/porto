@@ -695,7 +695,6 @@ TError TNlLink::AddVeth(const std::string &name,
 
     veth = rtnl_link_veth_get_peer(peer);
     rtnl_link_set_name(veth, name.c_str());
-    rtnl_link_set_group(veth, group);
 
     if (nsFd >= 0)
         rtnl_link_set_ns_fd(veth, nsFd);
@@ -703,6 +702,11 @@ TError TNlLink::AddVeth(const std::string &name,
     if (mtu > 0) {
         rtnl_link_set_mtu(peer, mtu);
         rtnl_link_set_mtu(veth, mtu);
+    }
+
+    if (group)  {
+        rtnl_link_set_group(peer, group);
+        rtnl_link_set_group(veth, group);
     }
 
     if (!hw.empty()) {
@@ -770,6 +774,21 @@ TError TNlLink::SetMtu(int mtu) {
 
     if (ret)
         return Error(ret, "Cannot set mtu for " + GetName());
+
+    return TError::Success();
+}
+
+TError TNlLink::SetGroup(int group) {
+    auto link = rtnl_link_alloc();
+    rtnl_link_set_name(link, rtnl_link_get_name(Link));
+    rtnl_link_set_group(link, group);
+
+    int ret = rtnl_link_change(GetSock(), Link, link, 0);
+
+    rtnl_link_put(link);
+
+    if (ret)
+        return Error(ret, "Cannot set group for " + GetName());
 
     return TError::Success();
 }

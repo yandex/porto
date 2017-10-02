@@ -128,6 +128,7 @@ public:
     TError WaitAddress(int timeout_s);
     int GetMtu();
     TError SetMtu(int mtu);
+    TError SetGroup(int group);
     TError SetMacAddr(const std::string &mac);
 
     struct nl_sock *GetSock() const { return Nl->GetSock(); }

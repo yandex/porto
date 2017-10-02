@@ -42,6 +42,7 @@ static uint64_t NetProxyNeighbourPeriod;
 static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
 static std::map<int, std::string> DeviceGroups;
+static int VirtualDeviceGroup = 0;
 
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
@@ -216,12 +217,16 @@ void TNetwork::InitializeConfig() {
     std::string name;
     std::map<std::string, int> groupMap;
 
+    DeviceGroups[0] = "default";
+
     while (groupCfg >> std::ws) {
         if (groupCfg.peek() != '#' && (groupCfg >> id >> name)) {
             L_SYS("Network device group: {} : {}", id, name);
             groupMap[name] = id;
             DeviceGroups[id] = name;
         }
+        if (name == "virtual")
+            VirtualDeviceGroup = id;
         groupCfg.ignore(1 << 16, '\n');
     }
 
@@ -2021,12 +2026,16 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
             return TError(EError::InvalidValue, "Ipv6 gateway not found");
     }
 
-    error = peer.AddVeth(dev.Name, "", dev.Mtu, dev.Group, NetNs.GetFd());
+    error = peer.AddVeth(dev.Name, "", dev.Mtu, VirtualDeviceGroup, NetNs.GetFd());
     if (error)
         return error;
 
     TNlLink link(Nl, dev.Name);
     error = link.Load();
+    if (error)
+        return error;
+
+    error = link.SetGroup(VirtualDeviceGroup);
     if (error)
         return error;
 
@@ -2139,6 +2148,12 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
             return error;
     }
 
+    if (VirtualDeviceGroup) {
+        error = tapdev.SetGroup(VirtualDeviceGroup);
+        if (error)
+            return error;
+    }
+
     if (!dev.Mac.empty()) {
         error = tapdev.SetMacAddr(dev.Mac);
         if (error)
@@ -2227,7 +2242,8 @@ TError TNetEnv::SetupInterfaces() {
         } else if (dev.Type == "veth") {
             TNlLink peer(source_nl, ParentNet->NewDeviceName("portove-"));
 
-            error = peer.AddVeth(dev.Name, dev.Mac, dev.Mtu, 0, NetNs.GetFd());
+            error = peer.AddVeth(dev.Name, dev.Mac, dev.Mtu,
+                                 VirtualDeviceGroup, NetNs.GetFd());
             if (error)
                 return error;
 
