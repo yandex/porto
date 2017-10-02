@@ -2223,8 +2223,8 @@ void TVolume::UnlinkAllVolumes(TContainer &container) {
     }
 }
 
-TStringMap TVolume::DumpConfig(const TPath &root) {
-    TStringMap ret;
+void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {
+    TPath &root = CL->ClientContainer->RootPath;
     TStatFS stat;
 
     if (!StatFS(stat)) {
@@ -2243,10 +2243,11 @@ TStringMap TVolume::DumpConfig(const TPath &root) {
 
     ret[V_BACKEND] = BackendType;
 
-    if (VolumeOwnerContainer && CL) {
-        if (CL->ComposeName(VolumeOwnerContainer->Name, ret[V_OWNER_CONTAINER]))
-            ret[V_OWNER_CONTAINER] = ROOT_PORTO_NAMESPACE + VolumeOwnerContainer->Name;
-    }
+    for (auto &name: Containers)
+        links.push_back(CL->RelativeName(name));
+
+    if (VolumeOwnerContainer)
+        ret[V_OWNER_CONTAINER] = CL->RelativeName(VolumeOwnerContainer->Name);
 
     ret[V_OWNER_USER] = VolumeOwner.User();
     ret[V_OWNER_GROUP] = VolumeOwner.Group();
@@ -2282,8 +2283,6 @@ TStringMap TVolume::DumpConfig(const TPath &root) {
 
     if (Backend)
         ret[V_PLACE_KEY] = Backend->ClaimPlace();
-
-    return ret;
 }
 
 TError TVolume::Save() {

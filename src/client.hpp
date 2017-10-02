@@ -60,6 +60,7 @@ public:
     void FinishRequest();
 
     TError IdentifyClient(bool initial);
+    std::string RelativeName(const std::string &name) const;
     TError ComposeName(const std::string &name, std::string &relative_name) const;
     TError ResolveName(const std::string &relative_name, std::string &name) const;
 

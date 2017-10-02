@@ -661,24 +661,23 @@ noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
     return TError::Success();
 }
 
-noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
-                                    std::shared_ptr<TVolume> volume) {
-    desc->set_path(CL->ComposePath(volume->Path).ToString());
-    for (auto kv: volume->DumpConfig(CL->ClientContainer->RootPath)) {
+noinline static void
+FillVolumeDescription(rpc::TVolumeDescription *desc, const TVolume &volume) {
+
+    desc->set_path(CL->ComposePath(volume.Path).ToString());
+
+    TStringMap props;
+    TTuple links;
+    volume.DumpConfig(props, links);
+
+    for (auto &kv: props) {
         auto p = desc->add_properties();
         p->set_name(kv.first);
         p->set_value(kv.second);
     }
 
-    auto volumes_lock = LockVolumes();
-    auto vol_containers(volume->Containers);
-    volumes_lock.unlock();
-
-    for (auto &name: vol_containers) {
-        std::string relative;
-        if (!CL->ComposeName(name, relative))
-            desc->add_containers(relative);
-    }
+    for (auto &name: links)
+        desc->add_containers(name);
 }
 
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
@@ -699,7 +698,7 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
     if (error)
         return error;
 
-    FillVolumeDescription(rsp.mutable_volume(), volume);
+    FillVolumeDescription(rsp.mutable_volume(), *volume);
     return TError::Success();
 }
 
@@ -795,7 +794,7 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
             return error;
 
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, volume);
+        FillVolumeDescription(desc, *volume);
         return TError::Success();
     }
 
@@ -816,7 +815,7 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
 
     for (auto &volume: list) {
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, volume);
+        FillVolumeDescription(desc, *volume);
     }
 
     return TError::Success();

@@ -139,7 +139,7 @@ public:
 
     TError Configure(const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
-    TStringMap DumpConfig(const TPath &root);
+    void DumpConfig(TStringMap &props, TTuple &links) const;
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();

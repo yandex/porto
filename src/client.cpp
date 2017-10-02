@@ -165,6 +165,16 @@ TError TClient::IdentifyClient(bool initial) {
     return TError::Success();
 }
 
+std::string TClient::RelativeName(const std::string &name) const {
+    if (name == ROOT_CONTAINER)
+        return ROOT_CONTAINER;
+    if (PortoNamespace == "")
+        return name;
+    if (StringStartsWith(name, PortoNamespace))
+        return name.substr(PortoNamespace.length());
+    return ROOT_PORTO_NAMESPACE + name;
+}
+
 TError TClient::ComposeName(const std::string &name, std::string &relative_name) const {
     if (name == ROOT_CONTAINER) {
         relative_name = ROOT_CONTAINER;
