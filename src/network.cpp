@@ -638,6 +638,17 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     return TError::Success();
 }
 
+void TNetwork::SetDeviceOwner(const std::string &name, int owner) {
+    if (owner)
+        DeviceOwners[name] = owner;
+    else
+        DeviceOwners.erase(name);
+
+    for (auto &dev: Devices)
+        if (dev.Name == name)
+            dev.Owner = owner;
+}
+
 TError TNetwork::SyncDevices(bool force) {
     struct nl_cache *cache;
     TError error;
@@ -669,9 +680,8 @@ TError TNetwork::SyncDevices(bool force) {
              StringStartsWith(dev.Name, "L3-")))
             continue;
 
-        /* Ignore TUN/TAP */
-        if (dev.Type == "tun")
-            continue;
+        if (DeviceOwners.count(dev.Name))
+            dev.Owner = DeviceOwners.at(dev.Name);
 
         dev.Managed = true;
 
@@ -683,6 +693,13 @@ TError TNetwork::SyncDevices(bool force) {
             if (std::find(UnmanagedGroups.begin(),
                           UnmanagedGroups.end(), dev.Group) != UnmanagedGroups.end())
                 dev.Managed = false;
+        }
+
+        if (dev.Type == "tun") {
+            /* Ignore TUN/TAP without known owners */
+            if (!dev.Owner)
+                continue;
+            dev.Managed = false;
         }
 
         if (dev.Type == "dummy")
@@ -1161,6 +1178,7 @@ TError TNetwork::SetupClasses(TNetClass &cls) {
 
 void TNetwork::InitClass(TContainer &ct) {
     auto &cls = ct.NetClass;
+    cls.Owner = ct.Id;
     if (!ct.Parent) {
         cls.HostParentHandle = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
         cls.ParentHandle = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
@@ -1366,6 +1384,9 @@ void TNetwork::SyncStatLocked() {
             if (hostNet && !cls->HostClass)
                 continue;
 
+            if (dev.Owner && dev.Owner != cls->Owner)
+                continue;
+
             TNetStat &stat = cls->Stat[dev.Name];
 
             stat = dev.Stat;
@@ -1393,9 +1414,12 @@ void TNetwork::SyncStatLocked() {
             if (hostNet && !cls->HostClass)
                 continue;
 
+            if (dev.Owner && dev.Owner != cls->Owner)
+                continue;
+
             auto &stat = cls->Stat[dev.Name];
 
-            if (cls->Parent) {
+            if (cls->Parent && dev.Managed && !dev.Owner) {
                 auto &pstat = cls->Parent->Stat[dev.Name];
                 pstat.Packets += stat.Packets;
                 pstat.Bytes += stat.Bytes;
@@ -2143,6 +2167,8 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
             return error;
     }
 
+    Net->SetDeviceOwner(dev.Name, Id);
+
     return TError::Success();
 }
 
@@ -2154,6 +2180,8 @@ TError TNetEnv::DestroyTap(TNetDeviceConfig &tap) {
     TError error = tap_dev.Load();
     if (!error)
         error = tap_dev.Remove();
+
+    Net->SetDeviceOwner(tap.Name, 0);
 
     return error;
 }

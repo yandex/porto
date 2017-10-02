@@ -53,6 +53,7 @@ struct TNetStat {
 struct TNetClass {
     bool HostClass;
     int Registered = 0;
+    int Owner = 0;
 
     uint32_t HostParentHandle;
     uint32_t ParentHandle;
@@ -73,6 +74,7 @@ class TNetDevice {
 public:
     std::string Name;
     std::string Type;
+    int Owner = 0;
     int Index;
     int Link;
     int Group;
@@ -184,11 +186,14 @@ public:
 
     std::list<TNetProxyNeighbour> Neighbours;
 
+    std::map<std::string, int> DeviceOwners;
+
     TError SyncDevices(bool force = false);
     std::string NewDeviceName(const std::string &prefix);
     std::string MatchDevice(const std::string &pattern);
     int DeviceIndex(const std::string &name);
     void GetDeviceSpeed(TNetDevice &dev) const;
+    void SetDeviceOwner(const std::string &name, int owner);
 
     void FatalError(TError &error);
     void StartRepair();
