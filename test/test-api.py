@@ -187,4 +187,19 @@ if Catch(c.Find, container_name) != porto.exceptions.ContainerDoesNotExist:
     assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
 
 Catch(c.Destroy, container_name)
+
+c2 = porto.Connection(auto_reconnect=False)
+c2.connect()
+
+pid = os.fork()
+if pid:
+    _, status = os.waitpid(pid, 0)
+    assert status == 0
+else:
+    c.Version()
+    assert Catch(c2.Version) == porto.exceptions.SocketError
+    sys.exit(0)
+
+c2.disconnect()
+
 c.disconnect()

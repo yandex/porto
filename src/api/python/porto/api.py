@@ -67,8 +67,13 @@ class _RPC(object):
         self.timeout = timeout
         self.socket_constructor = socket_constructor
         self.sock = None
+        self.sock_pid = None
         self.deadline = None
         self.auto_reconnect = auto_reconnect
+
+    def _check_pid(self):
+        if self.sock_pid is not None and self.sock_pid != os.getpid():
+            raise exceptions.SocketError("Socket connected by pid {} current pid {}".format(self.sock_pid, os.getpid()))
 
     def _set_locked(fn):
         def _lock(*args, **kwargs):
@@ -119,14 +124,17 @@ class _RPC(object):
 
     def _connect(self):
         try:
-            self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM)
+            SOCK_CLOEXEC = 02000000
+            self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM | SOCK_CLOEXEC)
             self.sock.connect(self.socket_path)
+            self.sock_pid = os.getpid()
         except socket.error as e:
             self.sock = None
             raise exceptions.SocketError("Cannot connect to {}: {}".format(self.socket_path, e))
 
     def _senddata(self, data, flags=0):
         try:
+            self._check_pid()
             return self.sock.sendall(data, flags)
         except socket.timeout:
             if self.auto_reconnect:
@@ -142,6 +150,7 @@ class _RPC(object):
             buf = []
             l = 0
             while l < count:
+                self._check_pid()
                 piece = self.sock.recv(count - l, flags)
                 if len(piece) == 0:  # this means that socket is in invalid state
                     raise socket.error(socket.errno.ECONNRESET, os.strerror(socket.errno.ECONNRESET))
@@ -159,6 +168,14 @@ class _RPC(object):
 
     @_check_deadline
     def _send_hdr(self, hdr_data):
+
+        # reconnect after fork
+        if self.sock_pid is not None and self.sock_pid != os.getpid():
+            if self.auto_reconnect:
+                self.sock = None
+            else:
+                self._check_pid()
+
         if self.sock is None:
             self._connect()
 
