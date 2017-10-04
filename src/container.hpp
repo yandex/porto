@@ -99,6 +99,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
                        TBitMap &threads, TBitMap &cores);
     TError DistributeCpus();
     TError PropagateCpuGuarantee();
+    void PropagateCpuLimit();
 
 public:
     const std::shared_ptr<TContainer> Parent;
@@ -200,6 +201,7 @@ public:
     /* Under CpuAffinityMutex */
     double CpuGuaranteeSum = 0;
     double CpuGuaranteeCur = 0;
+    double CpuLimitSum = 0;
 
     bool ToRespawn;
     int MaxRespawns;

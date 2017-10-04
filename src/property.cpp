@@ -1916,6 +1916,9 @@ TError TCpuLimit::Set(const std::string &limit) {
     if (error)
         return error;
 
+    if (new_limit <= 0)
+        new_limit = GetNumCores();
+
     if (new_limit > CT->Parent->CpuLimit && !CL->IsSuperUser())
         return TError(EError::InvalidValue, "cpu limit bigger than for parent");
 
@@ -1931,6 +1934,20 @@ TError TCpuLimit::Get(std::string &value) {
     value = StringFormat("%lgc", CT->CpuLimit);
     return TError::Success();
 }
+
+class TCpuLimitTotal : public TProperty {
+public:
+    TCpuLimitTotal() : TProperty(P_CPU_TOTAL_LIMIT, EProperty::NONE,
+                                     "CPU total limit: <CPUS>c [cores] (ro)")
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        if (CT->CpuLimitSum)
+            value = StringFormat("%lgc", CT->CpuLimitSum);
+        return TError::Success();
+    }
+} static CpuLimitTotal;
 
 class TCpuGuarantee : public TProperty {
 public:
@@ -1980,7 +1997,8 @@ public:
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
-        value = StringFormat("%lgc", std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
+        if (CT->CpuGuarantee || CT->CpuGuaranteeSum)
+            value = StringFormat("%lgc", std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
         return TError::Success();
     }
 } static CpuGuaranteeTotal;

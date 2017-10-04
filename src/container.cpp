@@ -598,6 +598,8 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         if (error)
             goto err;
 
+        ct->PropagateCpuLimit();
+
         error = ct->SyncCgroups();
         if (error)
             goto err;
@@ -1332,6 +1334,37 @@ TError TContainer::PropagateCpuGuarantee() {
     return TError::Success();
 }
 
+void TContainer::PropagateCpuLimit() {
+    auto ct_lock = LockContainers();
+
+    for (auto ct = this; ct; ct = ct->Parent.get()) {
+        double sum = 0;
+
+        if (ct->State == EContainerState::Running ||
+                (ct->State == EContainerState::Starting && !ct->IsMeta()))
+            sum += ct->CpuLimit;
+
+        for (auto &child: ct->Children) {
+            if (child->State == EContainerState::Running ||
+                    child->State == EContainerState::Starting && !child->IsMeta())
+                sum += child->CpuLimit;
+            else if (child->State == EContainerState::Meta)
+                sum += std::min(child->CpuLimit, child->CpuLimitSum);
+        }
+
+        if (sum == ct->CpuLimitSum)
+            break;
+
+        if (Debug)
+            L("Propagate total cpu limit CT{}:{} {}c -> {}c",
+                    ct->Id, ct->Name, ct->CpuLimitSum, sum);
+
+        ct->CpuLimitSum = sum;
+    }
+
+    ct_lock.unlock();
+}
+
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     auto blkcg = GetCgroup(BlkioSubsystem);
@@ -1464,6 +1497,9 @@ TError TContainer::ApplyDynamicProperties() {
                 return error;
         }
     }
+
+    if (TestPropDirty(EProperty::CPU_LIMIT))
+        Parent->PropagateCpuLimit();
 
     if ((Controllers & CGROUP_CPU) &&
             (TestPropDirty(EProperty::CPU_POLICY) |
@@ -2215,6 +2251,8 @@ TError TContainer::PrepareResources() {
         RootPath = RootVolume->Path;
     }
 
+    PropagateCpuLimit();
+
     return TError::Success();
 }
 
@@ -2234,6 +2272,8 @@ void TContainer::FreeRuntimeResources() {
         if (error)
             L_ERR("Cannot redistribute CPUs: {}", error);
     }
+
+    PropagateCpuLimit();
 
     if (CpuGuarantee) {
         for (auto parent = Parent; parent; parent = parent->Parent)
@@ -2516,6 +2556,7 @@ TError TContainer::Pause() {
         if (ct->State == EContainerState::Running ||
                 ct->State == EContainerState::Meta) {
             ct->SetState(EContainerState::Paused);
+            ct->PropagateCpuLimit();
             error = ct->Save();
             if (error)
                 L_ERR("Cannot save state after pause: {}", error);
@@ -2544,8 +2585,10 @@ TError TContainer::Resume() {
         auto cg = ct->GetCgroup(FreezerSubsystem);
         if (FreezerSubsystem.IsSelfFreezing(cg))
             FreezerSubsystem.Thaw(cg, false);
-        if (ct->State == EContainerState::Paused)
+        if (ct->State == EContainerState::Paused) {
             ct->SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
+            ct->PropagateCpuLimit();
+        }
         error = ct->Save();
         if (error)
             L_ERR("Cannot save state after resume: {}", error);

@@ -419,12 +419,23 @@ write permissions to the target or owning related volume.
     Porto popagates CPU guarantee from childrents into parent containtes:
     cpu\_guarantee\_total = max(cpu\_guarantee, sum cpu\_guarantee\_total for running childrens)
 
+    For root container this shows total CPU guarantee.
+
 * **cpu\_limit** - CPU usage limit
 
     Syntax: 0.0..100.0 (in %) | \<cores\>c (in cores), default: 0 (unlimited)
 
     Porto setup both CFS and RT cgroup limits.
     RT cgroup limit is strictly non-overcommitable in mainline kernel.
+
+    For root container this shows total CPU count.
+
+* **cpu\_limit\_total** - total CPU limit
+
+    cpu\_limit\_total = sum min(cpu\_limit, cpu\_limit\_total) for running or
+    meta childrens plus contianer cpu\_limit if it's running.
+
+    For root contianer this shows total CPU commitment.
 
 * **cpu\_period** - CPU limit accounting period
 
