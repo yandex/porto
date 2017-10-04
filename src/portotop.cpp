@@ -211,6 +211,7 @@ void TConsoleScreen::HelpDialog() {
          "",
          "left, right, home, end - change sorting/scroll",
          "up, down, page up, page down - select container/scroll",
+         "<, > - scroll without chaning sorting",
          "tab - expand conteainers tree: first, second, all",
          "@ - go to self container",
          "",
@@ -825,16 +826,8 @@ void TPortoTop::Print(TConsoleScreen &screen) {
         if (!column.Hidden)
             width += column.GetWidth();
 
-    if (width > screen.Width()) {
-        int excess = width - screen.Width();
-        int current = Columns[0].GetWidth();
-        if (current > 30) {
-            current -= excess;
-            if (current < 30)
-                current = 30;
-        }
-        Columns[0].SetWidth(current);
-    }
+    if (Columns[0].GetWidth() > screen.Width() / 2)
+        Columns[0].SetWidth(screen.Width() / 2);
 
     int at_row = 1 + PrintCommon(screen);
 
@@ -847,7 +840,6 @@ void TPortoTop::Print(TConsoleScreen &screen) {
             MaxRows++;
         }, MaxLevel);
     DisplayRows = std::min(screen.Height() - at_row, MaxRows);
-    ChangeSelection(0, 0, screen);
 
     PrintTitle(at_row - 1, screen);
     int y = 0;
@@ -977,7 +969,7 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     if (y)
         SelectedContainer = "";
 
-    if (x == 0 && y == 0) {
+    if (x) {
         int i = 0;
         int _x = FirstX;
         for (auto &c : Columns) {
@@ -997,6 +989,14 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
             FirstX += std::min(screen.Width() - _x, -FirstX);
     }
 }
+
+void TPortoTop::ChangeView(int x, int y, TConsoleScreen &screen) {
+    FirstX += x;
+    if (FirstX > 0)
+        FirstX = 0;
+    FirstRow += y;
+}
+
 void TPortoTop::Expand() {
     if (MaxLevel == 1)
         MaxLevel = 2;
@@ -1093,53 +1093,67 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
     AddCommon(0, "Uptime: ", "porto_stat[porto_uptime]", RootContainer, ValueFlags::Seconds);
 
-    AddColumn(TColumn("container", "Container name",
+    AddColumn(TColumn("Container", "Container name",
               TPortoValue(Cache, ContainerTree, "absolute_name", ValueFlags::Container), true, false));
 
-    AddColumn("state", "state", "Current state");
-    AddColumn("time", "time s", "Time elapsed since start or death");
+    AddColumn("State", "state", "Current state");
+    AddColumn("Time", "time s", "Time elapsed since start or death");
 
     /* CPU */
-    AddColumn("policy", "cpu_policy", "Cpu policy being used");
-    AddColumn("cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
-    AddColumn("limit", "cpu_limit", "Cpu limit in cores");
-    AddColumn("sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
-    AddColumn("wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
-    AddColumn("g-e", "cpu_guarantee", "Cpu guarantee in cores");
+    AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
+    AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
+    AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
+
+    AddColumn("C pol", "cpu_policy", "Cpu scheduler policy");
+    AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores");
+    AddColumn("C lim", "cpu_limit", "Cpu limit in cores");
+
+    AddColumn("Ct lim", "cpu_limit_total", "Cpu total limit in cores");
+    AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores");
+
+    AddColumn("Threads", "thread_count", "Threads count");
 
     /* Memory */
-    AddColumn("memory", "memory_usage b", "Memory usage");
-    AddColumn("limit", "memory_limit b", "Memory limit");
-    AddColumn("g-e", "memory_guarantee b", "Memory guarantee");
-    AddColumn("anon", "anon_usage b", "Anonymous memory usage");
-    AddColumn("alim", "anon_limit b", "Anonymous memory limit");
-    AddColumn("cache", "cache_usage b", "Cache memory usage");
+    AddColumn("Memory", "memory_usage b", "Memory usage");
+    AddColumn("M g-e", "memory_guarantee b", "Memory guarantee");
+    AddColumn("M lim", "memory_limit b", "Memory limit");
 
-    AddColumn("threads", "thread_count", "Threads count");
-    AddColumn("oom", "porto_stat[container_oom]", "OOM count");
+    AddColumn("Anon", "anon_usage b", "Anonymous memory usage");
+    AddColumn("A lim", "anon_limit b", "Anonymous memory limit");
+
+    AddColumn("Cache", "cache_usage b", "Cache memory usage");
+
+    AddColumn("Mt lim", "memory_limit_total b", "Memory total limit");
+    AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee");
+
+    AddColumn("OOM", "porto_stat[container_oom]", "OOM count");
 
     /* I/O */
-    AddColumn("maj/s", "major_faults'", "Major page fault count");
-    AddColumn("read b/s", "io_read[hw]' b", "IO bytes read from disk");
-    AddColumn("write b/s", "io_write[hw]' b", "IO bytes written to disk");
-    AddColumn("io op/s", "io_ops[hw]'", "IO operations per second");
-    AddColumn("io load", "io_time[hw]' 1e9", "Average disk queue depth");
-    AddColumn("fs read b/s", "io_read[fs]' b", "IO bytes read by fs");
-    AddColumn("fs write b/s", "io_write[fs]' b", "IO bytes written by fs");
-    AddColumn("fs iop/s", "io_ops[fs]'", "IO operations by fs");
+    AddColumn("Maj/s", "major_faults'", "Major page fault count");
+    AddColumn("Min/s", "minor_faults'", "Minor page fault count");
+
+    AddColumn("IO load", "io_time[hw]' 1e9", "Average disk queue depth");
+
+    AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second");
+    AddColumn("IO Read b/s", "io_read[hw]' b", "IO bytes read from disk");
+    AddColumn("IO Write b/s", "io_write[hw]' b", "IO bytes written to disk");
+
+    AddColumn("FS op/s", "io_ops[fs]'", "IO operations by fs");
+    AddColumn("FS read b/s", "io_read[fs]' b", "IO bytes read by fs");
+    AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs");
 
     /* Network */
-    AddColumn("net", "S(net_bytes) 'b", "Bytes transmitted by container");
-    AddColumn("pkt", "S(net_packets)'", "Packets transmitted by container");
-    AddColumn("drop", "S(net_drops)'", "Packets dropped by container");
+    AddColumn("Net TC", "S(net_bytes) 'b", "Bytes transmitted by container");
+    AddColumn("Pkt TC", "S(net_packets)'", "Packets transmitted by container");
+    AddColumn("Drop TC", "S(net_drops)'", "Packets dropped by container");
 
-    AddColumn("net rx", "S(net_rx_bytes) 'b", "Bytes received by interfaces");
-    AddColumn("pkt rx", "S(net_rx_packets)'", "Packets received by interfaces");
-    AddColumn("drop rx", "S(net_rx_drops)'", "Outcomming packets dropped by interfaces");
+    AddColumn("Net RX", "S(net_rx_bytes) 'b", "Bytes received by interfaces");
+    AddColumn("Pkt RX", "S(net_rx_packets)'", "Packets received by interfaces");
+    AddColumn("Drop RX", "S(net_rx_drops)'", "Outcomming packets dropped by interfaces");
 
-    AddColumn("net tx", "S(net_tx_bytes) 'b", "Bytes transmitted by interfaces");
-    AddColumn("pkt tx", "S(net_tx_packets)'", "Packets transmitted by interfaces");
-    AddColumn("drop tx", "S(net_tx_drops)'", "Incomming packets dropped by interfaces");
+    AddColumn("Net TX", "S(net_tx_bytes) 'b", "Bytes transmitted by interfaces");
+    AddColumn("Pkt TX", "S(net_tx_packets)'", "Packets transmitted by interfaces");
+    AddColumn("Drop TX", "S(net_tx_drops)'", "Incomming packets dropped by interfaces");
 }
 
 static bool exit_immediatly = false;
@@ -1205,6 +1219,12 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
             break;
         case KEY_END:
             top.ChangeSelection(1000, 0, screen);
+            break;
+        case '<':
+            top.ChangeView(1, 0, screen);
+            break;
+        case '>':
+            top.ChangeView(-1, 0, screen);
             break;
         case '\t':
             top.Expand();

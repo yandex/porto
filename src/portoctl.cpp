@@ -550,6 +550,7 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         name == "memory_limit_total" ||
         name == "memory_guarantee_total" ||
         name == "anon_usage" ||
+        name == "cache_usage" ||
         name == "anon_limit" ||
         name == "max_rss" ||
         name == "stdout_limit" ||

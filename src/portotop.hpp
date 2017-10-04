@@ -188,6 +188,7 @@ public:
                    bool hidden = false);
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
+    void ChangeView(int x, int y, TConsoleScreen &screen);
     void Expand();
 
     int StartStop();
