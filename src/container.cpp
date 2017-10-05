@@ -851,7 +851,7 @@ TError TContainer::CheckMemGuarantee() const {
     if (usage + reserve > total)
         return TError(EError::ResourceNotAvailable,
                       "Memory guarantee overcommit by " +
-                      std::to_string(total - usage - reserve) + " bytes");
+                      std::to_string(usage + reserve - total) + " bytes");
 
     return TError::Success();
 }
