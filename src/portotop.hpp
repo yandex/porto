@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <list>
 #include <functional>
 #include <algorithm>
@@ -166,7 +167,7 @@ public:
     std::string Description;
 
     int PrintTitle(int x, int y, TConsoleScreen &screen);
-    int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
+    int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, int attr);
     void ClearCache();
     void Update(std::shared_ptr<TPortoContainer> &tree, int maxlevel);
     void Process();
@@ -186,6 +187,7 @@ public:
 
     bool AddColumn(std::string title, std::string signal, std::string desc,
                    bool hidden = false);
+    void MarkRow();
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
     void ChangeView(int x, int y, TConsoleScreen &screen);
@@ -225,5 +227,8 @@ private:
     int MaxRows = 0;
     int DisplayRows = 0;
     int MaxLevel = 100;
+
+    int NextColor = 1;
+    std::map<std::string, int> RowColor;
 };
 

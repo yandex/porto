@@ -46,6 +46,15 @@ int TConsoleScreen::Height() {
 
 TConsoleScreen::TConsoleScreen() {
     Wnd = initscr();
+    start_color();
+
+    init_pair(1, COLOR_BLACK, COLOR_RED);
+    init_pair(2, COLOR_BLACK, COLOR_GREEN);
+    init_pair(3, COLOR_BLACK, COLOR_BLUE);
+    init_pair(4, COLOR_BLACK, COLOR_YELLOW);
+    init_pair(5, COLOR_BLACK, COLOR_MAGENTA);
+    init_pair(6, COLOR_BLACK, COLOR_CYAN);
+
     clear();
     cbreak();
     noecho();
@@ -214,6 +223,7 @@ void TConsoleScreen::HelpDialog() {
          "<, > - scroll without chaning sorting",
          "tab - expand conteainers tree: first, second, all",
          "@ - go to self container",
+         "! - mark selected container",
          "",
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
@@ -704,9 +714,9 @@ int TColumn::PrintTitle(int x, int y, TConsoleScreen &screen) {
                    A_BOLD | (Selected ? A_STANDOUT : 0));
     return Width;
 }
-int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected) {
+int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, int attr) {
     std::string p = At(row).GetValue();
-    screen.PrintAt(p, x, y, Width, LeftAligned, selected ? A_REVERSE : 0);
+    screen.PrintAt(p, x, y, Width, LeftAligned, attr);
     return Width;
 }
 void TColumn::Update(std::shared_ptr<TPortoContainer> &tree, int maxlevel) {
@@ -850,16 +860,35 @@ void TPortoTop::Print(TConsoleScreen &screen) {
                 if (selected)
                     SelectedContainer = row->GetName();
                 int x = FirstX;
+
+                int attr = 0;
+                if (selected)
+                    attr |= A_REVERSE;
+                auto col = RowColor.find(row->GetName());
+                if (col != RowColor.end())
+                    attr |= COLOR_PAIR(col->second);
+
                 for (auto &c : Columns) {
                     if (!c.Hidden)
                         x += 1 + c.Print(*row, x, at_row + y - FirstRow,
-                                         screen, selected);
+                                         screen, attr);
                 }
             }
             y++;
         }, MaxLevel);
     screen.Refresh();
 }
+
+void TPortoTop::MarkRow() {
+    if (RowColor.count(SelectedContainer)) {
+        RowColor.erase(SelectedContainer);
+    } else {
+        RowColor[SelectedContainer] = NextColor;
+        if (++NextColor > 6)
+            NextColor = 1;
+    }
+}
+
 void TPortoTop::AddColumn(const TColumn &c) {
     Columns.push_back(c);
 }
@@ -1334,6 +1363,9 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
         case 'u':
             top.Update();
             screen.Clear();
+            break;
+        case '!':
+            top.MarkRow();
             break;
         case '@':
             top.SelectedContainer = "self";
