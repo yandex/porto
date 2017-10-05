@@ -601,14 +601,12 @@ TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
 
     CT->NewMemGuarantee = new_val;
 
-    uint64_t total = GetTotalMemory();
-    uint64_t usage = RootContainer->GetTotalMemGuarantee();
-    uint64_t reserve = config().daemon().memory_guarantee_reserve();
-
-    if (usage + reserve > total) {
-        CT->NewMemGuarantee = CT->MemGuarantee;
-        int64_t left = total - reserve - RootContainer->GetTotalMemGuarantee();
-        return TError(EError::ResourceNotAvailable, "Only " + std::to_string(left) + " bytes left");
+    if (CT->State != EContainerState::Stopped) {
+        error = CT->CheckMemGuarantee();
+        if (error) {
+            CT->NewMemGuarantee = CT->MemGuarantee;
+            return error;
+        }
     }
 
     if (CT->MemGuarantee != new_val) {
@@ -628,16 +626,16 @@ TError TMemoryGuarantee::Get(std::string &value) {
 class TMemTotalGuarantee : public TProperty {
 public:
     TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, EProperty::NONE,
-                                     "Total amount of memory "
-                                     "guaranteed for porto "
-                                     "containers") {
+            "Total memory guarantee for container hierarchy") {
         IsReadOnly = true;
     }
     void Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
     }
     TError Get(std::string &value) {
-        value = std::to_string(CT->GetTotalMemGuarantee());
+        auto val = CT->GetTotalMemGuarantee();
+        if (val)
+            value = std::to_string(val);
         return TError::Success();
     }
 } static MemTotalGuarantee;
@@ -3432,13 +3430,14 @@ public:
 class TMemTotalLimit : public TProperty {
 public:
     TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, EProperty::NONE,
-                                 "Total memory limit for container "
-                                 "in hierarchy") {
+            "Total memory limit for container hierarchy") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
-       value = std::to_string(CT->GetTotalMemLimit());
-       return TError::Success();
+        auto val = CT->GetTotalMemLimit();
+        if (val)
+            value = std::to_string(val);
+        return TError::Success();
     }
 } static MemTotalLimit;
 

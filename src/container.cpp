@@ -841,8 +841,25 @@ TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
     return error;
 }
 
+TError TContainer::CheckMemGuarantee() const {
+    uint64_t total = GetTotalMemory();
+    uint64_t usage = RootContainer->GetTotalMemGuarantee();
+    uint64_t reserve = config().daemon().memory_guarantee_reserve();
+
+    if (usage + reserve > total)
+        return TError(EError::ResourceNotAvailable,
+                      "Memory guarantee overcommit by " +
+                      std::to_string(total - usage - reserve) + " bytes");
+
+    return TError::Success();
+}
+
 uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
     uint64_t sum = 0lu;
+
+    /* Stopped container doesn't have memory guarantees */
+    if (State == EContainerState::Stopped)
+        return 0;
 
     // FIXME ugly
     if (!locked)
@@ -858,7 +875,6 @@ uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
 
     return sum;
 }
-
 uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     uint64_t lim = 0;
 
@@ -869,6 +885,8 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     /* Container without load limited with total limit of childrens */
     if (IsMeta() && VirtMode == VIRT_MODE_APP) {
         for (auto &child : Children) {
+            if (child->State == EContainerState::Stopped)
+                continue;
             auto child_lim = child->GetTotalMemLimit(this);
             if (!child_lim || child_lim > UINT64_MAX - lim) {
                 lim = 0;
@@ -2144,6 +2162,10 @@ TError TContainer::StartOne() {
 
 TError TContainer::PrepareResources() {
     TError error;
+
+    error = CheckMemGuarantee();
+    if (error)
+        return error;
 
     if (!IsRoot()) {
         TPath work = WorkPath();

@@ -300,6 +300,8 @@ public:
 
     TStringMap GetUlimit() const;
     void SanitizeCapabilities();
+
+    TError CheckMemGuarantee() const;
     uint64_t GetTotalMemGuarantee(bool locked = false) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
 
