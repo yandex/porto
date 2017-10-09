@@ -1,3 +1,39 @@
+yandex-porto (4.1.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * test: base version is 4.0.5
+  * helper: pass cwd by file descriprtor
+  * porto: start task in meta container with mount namespace
+
+  [ Maxim Samoylov ]
+  * property: make resolv_conf property dynamic
+
+  [ Konstantin Khlebnikov ]
+  * helper: fix building write protected mount namespace
+  * porto: document network interface groups
+  * volume: refactor state machine
+  * volume: remove buggy kludge from UnlinkContainer
+  * volume: fix dependency check
+  * volume: add error code VolumeNotReady
+  * api/python: add VolumeNotReady
+  * volume: show all container references
+
+  [ Maxim Samoylov ]
+  * api/python: avoid using opened porto socket in children #PORTO-310
+
+  [ Konstantin Khlebnikov ]
+  * porto: ignore memory guarantee and limit for stopped container
+  * property: add cpu_limit_total
+  * portotop: rename and reorder columns
+  * portotop: mark rows with '!'
+  * network: show statistics from tap interfaces at owner container
+  * network: use group "virtual" for L3, veth and tap devices
+  * porot: fix error message for memory guarantee overcommit
+  * test: fix mem-overcommit
+  * test: fix mem-limit-total
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 09 Oct 2017 11:16:01 +0300
+
 yandex-porto (4.0.7) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
