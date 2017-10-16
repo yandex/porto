@@ -28,7 +28,7 @@ TPath TStdStream::ResolveOutside(const TContainer &container) const {
     if (Outside) {
         if (Path.IsAbsolute())
             return Path;
-        return container.WorkPath() / Path;
+        return container.WorkDir() / Path;
     }
     if (Path.IsAbsolute())
         return container.RootPath / Path;

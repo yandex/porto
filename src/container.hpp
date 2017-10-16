@@ -85,6 +85,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     void ScheduleRespawn();
     TError Respawn();
+
     TError PrepareResources();
     void FreeRuntimeResources();
     void FreeResources();
@@ -249,7 +250,10 @@ public:
     TNetClass NetClass;
 
     TPath GetCwd() const;
-    TPath WorkPath() const;
+
+    TPath WorkDir() const;
+    TError CreateWorkDir() const;
+    void RemoveWorkDir() const;
 
     bool IsMeta() const {
         return Command.empty();

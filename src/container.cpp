@@ -612,12 +612,16 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         goto err;
 
+    if (ct->State == EContainerState::Stopped)
+        ct->RemoveWorkDir();
+
     SystemClient.ReleaseContainer();
 
     return TError::Success();
 
 err:
     TNetwork::StopNetwork(*ct);
+    ct->RemoveWorkDir();
     lock.lock();
     SystemClient.ReleaseContainer(true);
     ct->Unregister();
@@ -662,11 +666,53 @@ EContainerState TContainer::ParseState(const std::string &name) {
     return EContainerState::Destroyed;
 }
 
-/* Working directory in host namespace */
-TPath TContainer::WorkPath() const {
-    if (IsRoot())
-        return TPath("/");
+TPath TContainer::WorkDir() const {
     return TPath(PORTO_WORKDIR) / Name;
+}
+
+TError TContainer::CreateWorkDir() const {
+    if (IsRoot())
+        return TError::Success();
+
+    TPath path = WorkDir();
+    TError error;
+
+    if (path.Exists()) {
+        L("Remove stale working dir");
+        error = path.RemoveAll();
+        if (error)
+            L_ERR("Cannot remove working dir: {}", error);
+    }
+
+    error = path.Mkdir(0755);
+    if (!error) {
+        error = path.Chown(TaskCred);
+        if (error)
+            (void)path.Rmdir();
+    }
+
+    if (error) {
+        if (error.GetErrno() == ENOSPC || error.GetErrno() == EROFS)
+            L("Cannot create working dir: {}", error);
+        else
+            L_ERR("Cannot create working dir: {}", error);
+    }
+
+    return error;
+}
+
+void TContainer::RemoveWorkDir() const {
+    if (IsRoot())
+        return;
+
+    TPath path = WorkDir();
+    TError error;
+
+    if (path.Exists()) {
+        error = path.RemoveAll();
+        if (error)
+            L_ERR("Cannot remove working dir: {}", error);
+    }
 }
 
 TPath TContainer::GetCwd() const {
@@ -681,7 +727,10 @@ TPath TContainer::GetCwd() const {
             return TPath("/") / cwd;
     }
 
-    return WorkPath();
+    if (IsRoot())
+        return TPath("/");
+
+    return WorkDir();
 }
 
 TError TContainer::UpdateSoftLimit() {
@@ -2203,26 +2252,9 @@ TError TContainer::PrepareResources() {
     if (error)
         return error;
 
-    if (!IsRoot()) {
-        TPath work = WorkPath();
-
-        error = work.Mkdir(0755);
-        if (!error) {
-            error = work.Chown(TaskCred);
-
-            if (error)
-                (void)work.Rmdir();
-        }
-
-        if (error) {
-            if (error.GetErrno() == ENOSPC || error.GetErrno() == EROFS)
-                L("Cannot create working dir: {}", error);
-            else
-                L_ERR("Cannot create working dir: {}", error);
-
-            return error;
-        }
-    }
+    error = CreateWorkDir();
+    if (error)
+        return error;
 
     TNetwork::InitClass(*this);
 
@@ -2319,12 +2351,7 @@ void TContainer::FreeResources() {
         RootVolume = nullptr;
     }
 
-    TPath work_path = WorkPath();
-    if (work_path.Exists()) {
-        error = work_path.RemoveAll();
-        if (error)
-            L_ERR("Cannot remove working dir: {}", error);
-    }
+    RemoveWorkDir();
 
     Stdout.Remove(*this);
     Stderr.Remove(*this);
