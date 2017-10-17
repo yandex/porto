@@ -122,6 +122,7 @@ void TConfig::LoadDefaults() {
     config().mutable_core()->set_enable(false);
     config().mutable_core()->set_timeout_s(600); /* 10min */
     config().mutable_core()->set_space_limit_mb(102400); /* 100Gb */
+    config().mutable_core()->set_slot_space_limit_mb(10240); /* 10Gb */
 
     NetSysctl("net.ipv6.conf.all.accept_dad", "0");
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");

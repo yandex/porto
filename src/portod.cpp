@@ -18,6 +18,7 @@
 #include "volume.hpp"
 #include "storage.hpp"
 #include "helpers.hpp"
+#include "core.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
 #include "util/signal.hpp"
@@ -178,138 +179,6 @@ static TError CreatePortoSocket() {
         return TError(EError::Unknown, errno, "dup2()");
 
     return TError::Success();
-}
-
-static int ForwardCore(pid_t pid, pid_t tid, pid_t vpid, pid_t vtid, int sig) {
-    std::map<std::string, std::string> cgmap;
-    TError error;
-
-    error = GetTaskCgroups(pid, cgmap);
-    if (error || cgmap.find("freezer") == cgmap.end())
-        return EXIT_FAILURE;
-
-    auto origin = cgmap["freezer"];
-    if (!StringStartsWith(origin, std::string(PORTO_CGROUP_PREFIX) + "/"))
-        return EXIT_FAILURE;
-
-    origin = origin.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
-
-    Porto::Connection conn;
-    std::string core_command, user, group, cwd, owner_user, owner_group;
-    if (conn.GetProperty(origin, P_CORE_COMMAND, core_command) ||
-            core_command == "" ||
-            conn.GetProperty(origin, P_USER, user) ||
-            conn.GetProperty(origin, P_GROUP, group) ||
-            conn.GetProperty(origin, P_OWNER_USER, owner_user) ||
-            conn.GetProperty(origin, P_OWNER_GROUP, owner_group) ||
-            conn.GetProperty(origin, P_CWD, cwd))
-        return EXIT_FAILURE;
-
-    std::string core = origin + "/core-" + std::to_string(pid);
-    TMultiTuple env = {
-        {"CORE_PID", std::to_string(vpid)},
-        {"CORE_TID", std::to_string(vtid)},
-        {"CORE_SIG", std::to_string(sig)},
-        {"CORE_TASK_NAME", GetTaskName(pid)},
-        {"CORE_THREAD_NAME", GetTaskName(tid)},
-        {"CORE_CONTAINER", origin},
-    };
-
-    if (conn.CreateWeakContainer(core) ||
-            conn.SetProperty(core, P_ISOLATE, "false") ||
-            conn.SetProperty(core, P_STDIN_PATH, "/dev/fd/0") ||
-            conn.SetProperty(core, P_STDOUT_PATH, "/dev/null") ||
-            conn.SetProperty(core, P_STDERR_PATH, "/dev/null") ||
-            conn.SetProperty(core, P_COMMAND, core_command) ||
-            conn.SetProperty(core, P_USER, user) ||
-            conn.SetProperty(core, P_GROUP, group) ||
-            conn.SetProperty(core, P_OWNER_USER, owner_user) ||
-            conn.SetProperty(core, P_OWNER_GROUP, owner_group) ||
-            conn.SetProperty(core, P_CWD, cwd) ||
-            conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')) ||
-            conn.Start(core))
-        return EXIT_FAILURE;
-
-    std::string result;
-    conn.WaitContainers({core}, result, config().core().timeout_s());
-    conn.Destroy(core);
-    return EXIT_SUCCESS;
-}
-
-static int SaveCore(TPath core) {
-    if (core.DirName().DirectorySize() >
-            (config().core().space_limit_mb() << 20))
-        return EXIT_FAILURE;
-
-    TFile file;
-    if (file.CreateNew(core, 0444))
-        return EXIT_FAILURE;
-
-    if (dup2(file.Fd, STDOUT_FILENO) == STDOUT_FILENO) {
-        if (fcntl(STDOUT_FILENO, F_SETFD, 0) < 0)
-            return EXIT_FAILURE;
-
-        std::string filter = "cat";
-        if (StringEndsWith(core.ToString(), ".gz"))
-            filter = "gzip";
-        if (StringEndsWith(core.ToString(), ".xz"))
-            filter = "xz";
-        execlp(filter.c_str(), filter.c_str(), nullptr);
-    }
-
-    core.Unlink();
-    return EXIT_FAILURE;
-}
-
-static TError SetupCorePattern(const TPath &portod) {
-    std::string limit, pattern;
-    TError error;
-
-    if (!config().core().enable())
-        return TError::Success();
-
-    error = GetSysctl("kernel.core_pipe_limit", limit);
-    if (error)
-        return error;
-
-    /* wait for herlper exit - keep pidns alive */
-    if (limit == "0") {
-        error = SetSysctl("kernel.core_pipe_limit", "1024");
-        if (error)
-            return error;
-    }
-
-    pattern = "|" + portod.ToString() + " core " +
-        "%P %I %p %i %s %d %c " + config().core().default_pattern();
-    return SetSysctl("kernel.core_pattern", pattern);
-}
-
-static TError RevertCorePattern() {
-    if (!config().core().enable())
-        return TError::Success();
-
-    return SetSysctl("kernel.core_pattern", config().core().default_pattern());
-}
-
-static int PortoCore(const TTuple &args) {
-    if (args.size() < 7) {
-        std::cerr << "should be executed via sysctl kernel.core_pattern" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    int dumpable = std::stoi(args[5]);
-    uint64_t limit = std::stoull(args[6]);
-
-    if (limit && dumpable &&
-        !ForwardCore(std::stoi(args[0]), std::stoi(args[1]),
-                     std::stoi(args[2]), std::stoi(args[3]),
-                     std::stoi(args[4])))
-        return EXIT_SUCCESS;
-
-    if (limit && dumpable && args.size() == 8)
-        return SaveCore(args[7]);
-
-    return EXIT_SUCCESS;
 }
 
 void AckExitStatus(int pid) {
@@ -1356,7 +1225,7 @@ static int PortodMaster() {
         return EXIT_FAILURE;
     }
 
-    error = SetupCorePattern(thisBin);
+    error = TCore::Register(thisBin);
     if (error) {
         L_ERR("Cannot setup core pattern: {}", error);
         return EXIT_FAILURE;
@@ -1384,7 +1253,7 @@ static int PortodMaster() {
         PreviousVersion = PORTO_VERSION;
     }
 
-    error = RevertCorePattern();
+    error = TCore::Unregister();
     if (error)
         L_ERR("Cannot revert core pattern: {}", error);
 
@@ -1788,8 +1657,13 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    if (cmd == "core")
-        return PortoCore(TTuple(argv + opt + 1, argv + argc));
+    if (cmd == "core") {
+        TCore core;
+        TError error = core.Handle(TTuple(argv + opt + 1, argv + argc));
+        if (error)
+            return EXIT_FAILURE;
+        return EXIT_SUCCESS;
+    }
 
     std::cerr << "Unknown command: " << cmd << std::endl;
     Usage();

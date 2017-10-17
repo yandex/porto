@@ -694,6 +694,7 @@ core {
    enable: true
    default_pattern: "/coredumps/%e.%p.%s"
    space_limit_mb: 102400
+   slot_space_limit_mb: 10240
 }
 ```
 
@@ -703,6 +704,8 @@ If default\_pattern ends with '.gz' or '.xz' core will be compressed.
 
 Option space\_limit\_mb limits total size of default pattern directory,
 after exceeding new cores are discarded.
+
+Option slot\_space\_limit\_mb limits total size for each first-level container.
 
 # VOLUMES
 

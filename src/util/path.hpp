@@ -117,8 +117,6 @@ public:
     std::string ToString() const;
     bool Exists() const;
 
-    uint64_t DirectorySize() const;
-
     TError Chdir() const;
     TError Chroot() const;
     TError PivotRoot() const;
@@ -131,6 +129,7 @@ public:
 
     TError Chmod(const int mode) const;
     TError ReadLink(TPath &value) const;
+    TError Hardlink(const TPath &target) const;
     TError Symlink(const TPath &target) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
     TError Mkfile(unsigned int mode) const;
