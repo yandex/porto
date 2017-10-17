@@ -359,6 +359,7 @@ public:
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> LinkedVolumes;
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;
+    TTuple RequiredVolumes;
 
     TError GetEnvironment(TEnv &env);
 

@@ -1179,12 +1179,16 @@ public:
 
 /* TVolume */
 
-std::shared_ptr<TVolume> TVolume::Find(const TPath &path) {
-    auto volumes_lock = LockVolumes();
+std::shared_ptr<TVolume> TVolume::FindLocked(const TPath &path) {
     auto it = Volumes.find(path);
     if (it == Volumes.end())
         return nullptr;
     return it->second;
+}
+
+std::shared_ptr<TVolume> TVolume::Find(const TPath &path) {
+    auto volumes_lock = LockVolumes();
+    return TVolume::FindLocked(path);
 }
 
 TError TVolume::Find(const TPath &path, std::shared_ptr<TVolume> &volume) {
@@ -1841,6 +1845,8 @@ TError TVolume::Destroy(bool strict) {
 
     auto cycle = shared_from_this();
 
+    bool stop_containers = HasDependentContainer;
+
     for (auto it = work.begin(); it != work.end(); ++it) {
         auto &volume = (*it);
 
@@ -1868,11 +1874,38 @@ TError TVolume::Destroy(bool strict) {
                 else
                     plan_idx = plan.erase(plan_idx);
 
+                stop_containers |= nested->HasDependentContainer;
+
                 plan.push_front(nested);
 
                 work.push_back(nested);
             }
         }
+    }
+
+    if (stop_containers) {
+        volumes_lock.unlock();
+
+        for (auto &ct: RootContainer->Subtree()) {
+            if (ct->State == EContainerState::Stopped ||
+                    ct->State == EContainerState::Dead ||
+                    ct->RequiredVolumes.empty())
+                continue;
+            volumes_lock.lock();
+            error = TVolume::CheckRequired(ct->RequiredVolumes);
+            volumes_lock.unlock();
+            if (error) {
+                L_ACT("Stop CT{}:{} because {}", ct->Id, ct->Name, error);
+                error = CL->LockContainer(ct);
+                if (!error)
+                    error = ct->Stop(0);
+                if (error)
+                    L_WRN("Cannot stop: {}", error);
+                CL->ReleaseContainer();
+            }
+        }
+
+        volumes_lock.lock();
     }
 
     for (auto &volume : plan) {
@@ -2221,6 +2254,18 @@ void TVolume::UnlinkAllVolumes(TContainer &container) {
         }
         container.OwnedVolumes.clear();
     }
+}
+
+TError TVolume::CheckRequired(const TTuple &paths) {
+    for (auto &path: paths) {
+        auto vol = FindLocked(path);
+        if (!vol)
+            return TError(EError::VolumeNotFound, path);
+        if (vol->State != EVolumeState::Ready)
+            return TError(EError::VolumeNotReady, path);
+        vol->HasDependentContainer = true;
+    }
+    return TError::Success();
 }
 
 void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {

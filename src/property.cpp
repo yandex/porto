@@ -1636,6 +1636,78 @@ public:
     }
 } static PlaceUsage;
 
+class TVolumesList : public TProperty {
+    std::list<std::shared_ptr<TVolume>> TContainer:: *Member;
+public:
+    TVolumesList(std::string name,
+            std::list<std::shared_ptr<TVolume>> TContainer:: *member,
+            std::string desc) :
+        TProperty(name, EProperty::NONE, desc), Member(member)
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TTuple paths;
+
+        auto lock = LockVolumes();
+        for (auto &vol: CT->*Member) {
+            TPath path = CL->ComposePath(vol->Path);
+            if (!path)
+                path = "@" + vol->Path.ToString();
+            paths.push_back(path.ToString());
+        }
+
+        value = MergeEscapeStrings(paths, ';');
+        return TError::Success();
+    }
+};
+
+static TVolumesList OwnerVolumes(D_OWNED_VOLUMES, &TContainer::OwnedVolumes, "Owned volumes (ro)");
+static TVolumesList LinedVolumes(D_LINKED_VOLUMES, &TContainer::LinkedVolumes, "Linked volumes (ro)");
+
+class TRequiredVolumes : public TProperty {
+public:
+    TRequiredVolumes() :
+        TProperty(P_REQUIRED_VOLUMES, EProperty::REQUIRED_VOLUMES, "Required volumes") {}
+    TError Get(std::string &value) {
+        TTuple paths;
+
+        auto lock = LockVolumes();
+        for (auto &path: CT->RequiredVolumes) {
+            TPath p = CL->ComposePath(path);
+            if (!p)
+                p = "%" + path;
+            paths.push_back(p.ToString());
+        }
+
+        value = MergeEscapeStrings(paths, ';');
+        return TError::Success();
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+
+        TTuple paths = SplitEscapedString(value, ';');
+        for (auto &path: paths) {
+            if (path[0] == '%')
+                path = path.substr(1);
+            else
+                path = CL->ResolvePath(path).ToString();
+        }
+
+        auto lock = LockVolumes();
+        if (CT->State != EContainerState::Stopped) {
+            error = TVolume::CheckRequired(paths);
+            if (error)
+                return error;
+        }
+        CT->RequiredVolumes = paths;
+        CT->SetProp(EProperty::REQUIRED_VOLUMES);
+        return TError::Success();
+    }
+} static RequiredVolumes;
+
 class TMemoryLimit : public TProperty {
 public:
     TError Set(const std::string &limit);

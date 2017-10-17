@@ -343,6 +343,12 @@ Write access to container requires any of these conditions:
 
     Format is same as for **place\_limit**.
 
+* **volumes\_owned** - list of volumes charged into **place\_usage**
+
+* **volumes\_linked** - list of volumes linked to this container
+
+* **volumes\_required** - list of volumes reqired to start this container
+
 Setting **bind**, **root**, **stdout\_path**, **stderr\_path** requires
 write permissions to the target or owning related volume.
 

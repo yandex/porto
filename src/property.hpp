@@ -130,6 +130,10 @@ constexpr const char *D_PROCESS_COUNT = "process_count";
 constexpr const char *D_THREAD_COUNT = "thread_count";
 constexpr const char *D_PLACE_USAGE = "place_usage";
 
+constexpr const char *D_OWNED_VOLUMES = "volumes_owned";
+constexpr const char *D_LINKED_VOLUMES = "volumes_linked";
+constexpr const char *P_REQUIRED_VOLUMES = "volumes_required";
+
 enum class EProperty {
     NONE,
     ROOT_PID,
@@ -207,6 +211,7 @@ enum class EProperty {
     SYSCTL,
     NET_RX_LIMIT,
     CORE_COMMAND,
+    REQUIRED_VOLUMES,
     NR_PROPERTIES,
 };
 

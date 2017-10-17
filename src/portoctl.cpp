@@ -538,7 +538,10 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         return val;
     }
 
-    if (name == "env" || name == "cgroups")
+    if (name == "env" || name == "cgroups" ||
+            name == "volumes_owned" ||
+            name == "volumes_linked" ||
+            name == "volumes_required")
         return StringReplaceAll(val, ";", ";\n      ");
 
     if (val == "" || StringToUint64(val, num))

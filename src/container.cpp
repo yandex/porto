@@ -2255,6 +2255,13 @@ TError TContainer::PrepareResources() {
     if (error)
         return error;
 
+    if (RequiredVolumes.size()) {
+        auto lock = LockVolumes();
+        error = TVolume::CheckRequired(RequiredVolumes);
+        if (error)
+            return error;
+    }
+
     error = CreateWorkDir();
     if (error)
         return error;

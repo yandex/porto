@@ -103,6 +103,8 @@ public:
     int Device = -1;
     bool IsReadOnly = false;
 
+    bool HasDependentContainer = false;
+
     std::vector<std::string> Layers;
     std::vector<std::string> Containers;
 
@@ -114,7 +116,6 @@ public:
 
     std::shared_ptr<TContainer> VolumeOwnerContainer;
     TCred VolumeOwner;
-
     TCred VolumeCred;
     unsigned VolumePerms = 0;
 
@@ -133,6 +134,7 @@ public:
     static TError Create(const TStringMap &cfg,
                          std::shared_ptr<TVolume> &volume);
 
+    static std::shared_ptr<TVolume> FindLocked(const TPath &path);
     static std::shared_ptr<TVolume> Find(const TPath &path);
     static TError Find(const TPath &path, std::shared_ptr<TVolume> &volume);
     static std::shared_ptr<TVolume> Locate(const TPath &path);
@@ -158,6 +160,8 @@ public:
     TError LinkContainer(TContainer &container);
     TError UnlinkContainer(TContainer &container, bool strict = false);
     static void UnlinkAllVolumes(TContainer &container);
+
+    static TError CheckRequired(const TTuple &paths);
 
     TError ClaimPlace(uint64_t size);
 
