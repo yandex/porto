@@ -2448,9 +2448,12 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
     auto volumes_lock = LockVolumes();
 
-    auto max = config().volumes().max_total();
-    if (Volumes.size() >= max)
-        return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max));
+    auto max_vol = config().volumes().max_total();
+    if (CL->IsSuperUser())
+        max_vol += NR_SUPERUSER_VOLUMES;
+
+    if (Volumes.size() >= max_vol)
+        return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max_vol));
 
     if (cfg.count(V_PATH)) {
         TPath path(cfg.at(V_PATH));

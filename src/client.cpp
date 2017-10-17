@@ -30,7 +30,8 @@ __thread TClient *CL = nullptr;
 TClient::TClient(int fd) : TEpollSource(fd) {
     ConnectionTime = GetCurrentTimeMs();
     ActivityTimeMs = ConnectionTime;
-    Statistics->ClientsCount++;
+    if (fd >= 0)
+        Statistics->ClientsCount++;
 }
 
 TClient::TClient(const std::string &special) {
@@ -42,11 +43,6 @@ TClient::TClient(const std::string &special) {
 
 TClient::~TClient() {
     CloseConnection();
-    if (AccessLevel != EAccessLevel::Internal) {
-        Statistics->ClientsCount--;
-        if (ClientContainer)
-            ClientContainer->ClientsCount--;
-    }
 }
 
 void TClient::CloseConnection() {
@@ -60,6 +56,10 @@ void TClient::CloseConnection() {
             L("Client disconnected: {}: {} ms", Id, ConnectionTime);
         close(Fd);
         Fd = -1;
+
+        Statistics->ClientsCount--;
+        if (ClientContainer)
+            ClientContainer->ClientsCount--;
     }
 
     for (auto &weakCt: WeakContainers) {

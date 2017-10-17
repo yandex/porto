@@ -53,14 +53,14 @@ static std::vector<TBitMap> CoreThreads;
 static TBitMap NumaNodes;
 static std::vector<TBitMap> NodeThreads;
 
-TError TContainer::ValidName(const std::string &name) {
+TError TContainer::ValidName(const std::string &name, bool superuser) {
 
     if (name.length() == 0)
         return TError(EError::InvalidValue, "container path too short");
 
-    if (name.length() > CONTAINER_PATH_MAX)
-        return TError(EError::InvalidValue, "container path too long, limit is " +
-                                            std::to_string(CONTAINER_PATH_MAX));
+    int path_max = superuser ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
+    if (name.length() > path_max)
+        return TError(EError::InvalidValue, "container path too long, limit is " + std::to_string(path_max));
 
     if (name[0] == '/') {
         if (name == ROOT_CONTAINER)
@@ -401,11 +401,14 @@ TContainer::~TContainer() {
 }
 
 TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &ct) {
-    auto nrMax = config().container().max_total();
+    auto max_ct = config().container().max_total();
     TError error;
     int id = -1;
 
-    error = ValidName(name);
+    if (CL->IsSuperUser())
+        max_ct += NR_SUPERUSER_CONTAINERS;
+
+    error = ValidName(name, CL->IsSuperUser());
     if (error)
         return error;
 
@@ -429,9 +432,9 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
         goto err;
     }
 
-    if (Containers.size() >= nrMax + NR_SERVICE_CONTAINERS) {
+    if (Containers.size() >= max_ct + NR_SERVICE_CONTAINERS) {
         error = TError(EError::ResourceNotAvailable,
-                "number of containers reached limit: " + std::to_string(nrMax));
+                "number of containers reached limit: " + std::to_string(max_ct));
         goto err;
     }
 

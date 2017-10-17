@@ -418,14 +418,21 @@ static TError AcceptConnection(int listenFd) {
     if (error)
         return error;
 
-    if (client->ClientContainer->ClientsCount >
-            config().daemon().max_clients_in_container()) {
+    int max_clients = config().daemon().max_clients_in_container();
+    if (client->IsSuperUser())
+        max_clients += NR_SUPERUSER_CLIENTS;
+
+    if (client->ClientContainer->ClientsCount > max_clients) {
         error = DropIdleClient(client->ClientContainer);
         if (error)
             return error;
     }
 
-    if (Statistics->ClientsCount > config().daemon().max_clients()) {
+    max_clients = config().daemon().max_clients();
+    if (client->IsSuperUser())
+        max_clients += NR_SUPERUSER_CLIENTS;
+
+    if (Statistics->ClientsCount > max_clients) {
         error = DropIdleClient();
         if (error)
             return error;
@@ -607,11 +614,18 @@ static TError TuneLimits() {
 
     /*
      * two FDs for each container: OOM event and netlink
+     * ten for each thread
      * one for each client
      * plus some extra
      */
     int maxFd = config().container().max_total() * 2 +
-                config().daemon().max_clients() + 1000;
+                NR_SUPERUSER_CONTAINERS * 2 +
+                config().daemon().workers() * 10 +
+                config().daemon().max_clients() +
+                NR_SUPERUSER_CLIENTS +
+                1000;
+
+    L("Estimated file descriptor limit: {}", maxFd);
 
     rlim.rlim_max = maxFd;
     rlim.rlim_cur = maxFd;

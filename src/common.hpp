@@ -58,6 +58,10 @@ constexpr const char *SELF_CONTAINER = "self";
 
 constexpr int NR_SERVICE_CONTAINERS = 1;
 
+constexpr int NR_SUPERUSER_CLIENTS = 100;
+constexpr int NR_SUPERUSER_CONTAINERS = 100;
+constexpr int NR_SUPERUSER_VOLUMES = 100;
+
 constexpr const char *PORTO_DAEMON_CGROUP = "/portod";
 constexpr const char *PORTO_HELPERS_CGROUP = "/portod-helpers";
 
@@ -97,6 +101,7 @@ constexpr const char *PORTO_CONTAINERS = "/place/porto_containers";
 
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
+constexpr uint64_t CONTAINER_PATH_MAX_FOR_SUPERUSER = 220;
 constexpr uint64_t CONTAINER_ID_MAX = 16384;
 constexpr uint64_t CONTAINER_LEVEL_MAX = 16;
 constexpr uint64_t RUN_SUBDIR_LIMIT = 100u;

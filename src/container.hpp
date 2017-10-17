@@ -362,7 +362,7 @@ public:
 
     TError GetEnvironment(TEnv &env);
 
-    static TError ValidName(const std::string &name);
+    static TError ValidName(const std::string &name, bool superuser);
     static std::string ParentName(const std::string &name);
 
     static std::string StateName(EContainerState state);

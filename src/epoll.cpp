@@ -40,9 +40,9 @@ TEpollLoop::~TEpollLoop() {
 TError TEpollLoop::GetEvents(std::vector<struct epoll_event> &evts, int timeout) {
     evts.clear();
 
-    if (MaxEvents != config().daemon().max_clients()) {
+    if (MaxEvents != config().daemon().max_clients() + NR_SUPERUSER_CLIENTS) {
         delete[] Events;
-        MaxEvents = config().daemon().max_clients();
+        MaxEvents = config().daemon().max_clients() + NR_SUPERUSER_CLIENTS;
         Events = new struct epoll_event[MaxEvents];
     }
     PORTO_ASSERT(Events);

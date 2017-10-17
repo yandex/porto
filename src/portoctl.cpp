@@ -1131,6 +1131,7 @@ public:
             return EXIT_FAILURE;
         }
 
+        auto ct = args[0];
         if (args.size() > 1) {
             command = args[1];
             for (size_t i = 2; i < args.size(); ++i)
@@ -1142,10 +1143,24 @@ public:
         launcher.ForwardStreams = true;
         launcher.WaitExit = true;
 
-        launcher.Container = args[0] + "/shell-" + current_user + "-" + std::to_string(GetPid());
+        launcher.Container = ct + "/shell-" + current_user + "-" + std::to_string(GetPid());
+
+        int name_max = getuid() ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
+        if (launcher.Container.size() > name_max)
+            launcher.Container = ct + "/shell-"+ std::to_string(GetPid());
+
         launcher.SetProperty("command", command);
         launcher.SetProperty("isolate", "false");
-        launcher.Environment.push_back("debian_chroot=" + args[0]);
+        launcher.SetProperty("private", "portoctl shell by " + current_user);
+
+        if (ct.size() <= 50)
+            launcher.Environment.push_back("debian_chroot=" + ct);
+        else
+            launcher.Environment.push_back("debian_chroot=" +
+                    ct.substr(0, 24) + ".." + ct.substr(ct.size() - 24));
+
+        launcher.Environment.push_back("PORTO_SHELL_NAME=" + ct);
+        launcher.Environment.push_back("PORTO_SHELL_USER=" + current_user);
 
         if (user != "") {
             if (user == "root") {

@@ -40,8 +40,9 @@ Porto requires Linux kernel 3.18 and optionally some offstream patches.
 Container name could contains only these characters: 'a'..'z', 'A'..'Z', '0'..'9',
 '\_', '\-', '@', ':', '.'. Slash '/' separates nested container: "parent/child".
 
-Each container name component should not exceed 128 characters, whole name is
-limited with 200 characters. Also porto limits nesting with 16 levels.
+Each container name component should not exceed 128 characters.
+Whole name is limited with 200 characters and 220 for superuser.
+Also porto limits nesting with 16 levels.
 
 Container could be addressed using short name relative current porto
 namespaces: "name", or absolute name "/porto/name" which stays the
