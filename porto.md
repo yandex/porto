@@ -708,6 +708,11 @@ Default pattern is used for non-container cores or if core command isn't set.
 It might use '%' kernel core template defined in *core(5)*.
 If default\_pattern ends with '.gz' or '.xz' core will be compressed.
 
+Porto also creates hardlink in same directory with name:
+```
+${CORE_CONTAINER//\//%}%${CORE_TASK_NAME}.${CORE_PID}.S${CORE_SIG}.$(date +%Y%m%dT%H%M%S).core
+```
+
 Option space\_limit\_mb limits total size of default pattern directory,
 after exceeding new cores are discarded.
 

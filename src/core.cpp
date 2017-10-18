@@ -73,7 +73,7 @@ TError TCore::Handle(const TTuple &args) {
     }
 
     if ((error || !CoreCommand.size()) && DefaultPattern) {
-        L_ACT("Save core from container {}: {} {} signal {}",
+        L_ACT("Save core from container {}: {} pid {} signal {}",
                 Container, ProcessName, Pid, Signal);
 
         error = Save();
@@ -186,7 +186,7 @@ TError TCore::Save() {
                         Slot, SlotSize >> 20, config().core().slot_space_limit_mb()));
     }
 
-    std::string filter = "cat";
+    std::string filter = "";
     std::string format = ".core";
 
     if (StringEndsWith(DefaultPattern.ToString(), ".gz")) {
@@ -199,29 +199,103 @@ TError TCore::Save() {
         format = ".core.xz";
     }
 
-    Pattern = dir / StringReplaceAll(Container, "/", "%") + "%" +
-              ProcessName + "." + std::to_string(Pid) +
+    auto prefix = Container.size() ? StringReplaceAll(Container, "/", "%") + "%" : "";
+    Pattern = dir / ( prefix + ProcessName + "." + std::to_string(Pid) +
               ".S" + std::to_string(Signal) + "." +
-              FormatTime(time(nullptr), "%Y%m%dT%H%M%S") + format;
+              FormatTime(time(nullptr), "%Y%m%dT%H%M%S") + format);
 
     TFile file;
-    error = file.CreateNew(Pattern, 0444);
+    error = file.Create(Pattern, O_RDWR | O_CREAT | O_EXCL, 0440);
     if (error)
         return error;
 
-    (void)file.Chown(OwnerUid, OwnerGid);
+    error = file.Chown(OwnerUid, OwnerGid);
+    if (error)
+        L("Cannot chown core: {}", error);
 
     error = DefaultPattern.Hardlink(Pattern);
+    if (error) {
+        L("Cannot hardlink core to default pattern: {}", error);
+        DefaultPattern = "";
+    }
 
-    L("Dumping core into {}", Pattern);
+    L("Dumping core into {} ({})", Pattern, DefaultPattern.BaseName());
 
-    if (dup2(file.Fd, STDOUT_FILENO) == STDOUT_FILENO &&
-            fcntl(STDOUT_FILENO, F_SETFD, 0) == 0)
+    off_t size = 0;
+    off_t data = 0;
+
+    if (filter.size()) {
+        if (file.Fd != STDOUT_FILENO &&
+                dup2(file.Fd, STDOUT_FILENO) != STDOUT_FILENO)
+            return TError(EError::Unknown, errno, "dup2");
         execlp(filter.c_str(), filter.c_str(), nullptr);
+        error = TError(EError::Unknown, errno, "cannot execute filter " + filter);
+    } else {
+        uint64_t buf[512];
+        off_t sync_start = 0;
+        off_t sync_block = 1 << 20;
 
-    Pattern.Unlink();
-    if (!error)
-        DefaultPattern.Unlink();
+        error = TError::Success();
+        do {
+            size_t len = 0;
 
-    return TError(EError::Unknown, "cannot save core dump");
+            do {
+                ssize_t ret = read(STDIN_FILENO, (uint8_t*)buf + len, sizeof(buf) - len);
+                if (ret <= 0) {
+                    if (ret < 0)
+                        error = TError(EError::Unknown, errno, "read");
+                    break;
+                }
+                len += ret;
+            } while (len < sizeof(buf));
+
+            bool zero = true;
+            for (size_t i = 0; zero && i < sizeof(buf) / sizeof(buf[0]); i++)
+                zero = !buf[i];
+
+            if (zero && len == sizeof(buf)) {
+                size += len;
+                continue;
+            }
+
+            size_t off = 0;
+            while (off < len) {
+                ssize_t ret = pwrite(file.Fd, (uint8_t*)buf + off, len - off, size + off);
+                if (ret <= 0) {
+                    if (ret < 0)
+                        error = TError(EError::Unknown, errno, "write");
+                    break;
+                }
+                off += ret;
+            }
+            size += off;
+            data += off;
+
+            if (size > sync_start + sync_block * 2) {
+                (void)sync_file_range(file.Fd, sync_start, size - sync_start,
+                        SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE);
+                sync_start = size - sync_block;
+            }
+
+            if (off < len || !len)
+                break;
+
+        } while (1);
+
+        if (ftruncate(file.Fd, size))
+            L("Cannot truncate core dump");
+        fdatasync(file.Fd);
+    }
+
+    if (!error) {
+        L("Core dump {} ({}) written: {} data, {} holes, {} total",
+                Pattern, DefaultPattern.BaseName(), StringFormatSize(data),
+                StringFormatSize(size - data), StringFormatSize(size));
+    } else if (!data) {
+        Pattern.Unlink();
+        if (DefaultPattern)
+            DefaultPattern.Unlink();
+    }
+
+    return error;
 }

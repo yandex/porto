@@ -26,8 +26,8 @@ struct TCore {
 	std::string OwnerUser;
 	std::string OwnerGroup;
 
-	uid_t OwnerUid;
-	gid_t OwnerGid;
+	uid_t OwnerUid = -1;
+	gid_t OwnerGid = -1;
 	std::string Slot;
 
 	Porto::Connection Conn;
