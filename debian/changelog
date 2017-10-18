@@ -1,3 +1,13 @@
+yandex-porto (4.2.0) unstable; urgency=low
+
+  * porto: remove working directory where it should not exist
+  * porto: add reserves for superuser - host root user
+  * porto: add per-slot limit for total size of saved core dumps
+  * volumes: add container properties with backward relations
+  * core: filter out zero pages from core dump
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 18 Oct 2017 15:46:32 +0300
+
 yandex-porto (4.1.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
