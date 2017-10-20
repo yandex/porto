@@ -204,24 +204,35 @@ container { default_ulimit: "type: soft hard;..." }
     - *true*          - create new namespaces (default)
     - *false*         - use parent namespaces
 
-* **capabilities** - limit capabilities, syntax: CAP;... see **capabilities(7)**
+* **capabilities** - available capabilities, syntax: CAP;... see **capabilities(7)**
 
-    Also porto set bounding set depends on other limits:
+    Porto restricts capabilities depending on other properties:
 
-    Requires memory\_limit: IPC\_LOCK
+    Requires **memory\_limit**: IPC\_LOCK.
 
-    Requires isolation from host pid namespace: SYS\_BOOT, KILL, PTRACE
+    Requires **isolate**: SYS\_BOOT, KILL, PTRACE.
 
-    Requires net namespace: NET\_ADMIN
+    Requires **net**: NET\_ADMIN.
 
-    Could be set ambient in host: NET\_BIND\_SERVICE, NET\_RAW
+    Always available: NET\_BIND\_SERVICE, NET\_RAW
 
-    Available in chroot: SETPCAP, SETFCAP, CHOWN, DAC\_OVERRIDE, FOWNER, FSETID,
-    SETGID, SETUID, SYS\_CHROOT, MKNOD, AUDIT\_WRITE
+    Requires **root** (chroot): SETPCAP, SETFCAP, CHOWN, FOWNER,
+    DAC\_OVERRIDE, FSETID, SETGID, SETUID, SYS\_CHROOT, MKNOD, AUDIT\_WRITE.
 
-    Also available in host: LINUX\_IMMUTABLE, SYS\_ADMIN, SYS\_NICE, SYS\_RESOURCE
+    Requires no **root**, cannot be ambient, only for suid:
+    LINUX\_IMMUTABLE, SYS\_ADMIN, SYS\_NICE, SYS\_RESOURCE.
+
+    Without chroot all these capabilities are available. Capabilities which
+    meet requirements could be set as ambient and available within chroot.
+
+    Container inherits capabilities from parent and cannot surpass them.
+
+    Container owned by root by default have all these capabilities and
+    ignore any restrictions.
 
 * **capabilities\_ambient** - raise ambient capabilities, syntax: CAP;... see **capabilities(7)**
+
+    All tasks in container will have these capabilities.
 
     Requires Linux 4.3
 

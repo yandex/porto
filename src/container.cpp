@@ -2174,9 +2174,17 @@ TError TContainer::Start() {
     if (RootPath.IsRoot() && TaskCred.IsRootUser() && !OwnerCred.IsRootUser())
         return TError(EError::Permission, "user=root requires chroot");
 
-    if ((CapAmbient.Permitted & ~CapAllowed.Permitted) ||
-            (CapAmbient.Permitted & ~CapBound.Permitted))
-        return TError(EError::Permission, "Ambient capabilities out of bounds");
+    if (CapLimit.Permitted & ~CapBound.Permitted) {
+        TCapabilities cap = CapLimit;
+        cap.Permitted &= ~CapBound.Permitted;
+        return TError(EError::Permission, "Capabilities out of bounds: " + cap.Format());
+    }
+
+    if (CapAmbient.Permitted & ~CapAllowed.Permitted) {
+        TCapabilities cap = CapAmbient;
+        cap.Permitted &= ~CapAllowed.Permitted;
+        return TError(EError::Permission, "Ambient capabilities out of bounds: " + cap.Format());
+    }
 
     /* Enforce place restictions */
     if (HasProp(EProperty::PLACE) && Parent) {
