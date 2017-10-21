@@ -626,7 +626,7 @@ TError TMemoryGuarantee::Get(std::string &value) {
 class TMemTotalGuarantee : public TProperty {
 public:
     TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, EProperty::NONE,
-            "Total memory guarantee for container hierarchy") {
+            "Total memory guarantee for container hierarchy (ro)") {
         IsReadOnly = true;
     }
     void Init(void) {
@@ -666,7 +666,7 @@ public:
 class TCoreCommand : public TProperty {
 public:
     TCoreCommand() : TProperty(P_CORE_COMMAND, EProperty::CORE_COMMAND,
-                           "Command for receiving core dump") {}
+                           "Command for receiving core dump (dynamic)") {}
     void Init(void) {
         IsSupported = config().core().enable();
     }
@@ -675,7 +675,7 @@ public:
         return TError::Success();
     }
     TError Set(const std::string &command) {
-        TError error = IsAliveAndStopped();
+        TError error = IsAlive();
         if (error)
             return error;
         CT->CoreCommand = command;
@@ -1580,7 +1580,7 @@ public:
 class TPlaceLimit : public TProperty {
 public:
     TPlaceLimit() : TProperty(P_PLACE_LIMIT, EProperty::PLACE_LIMIT,
-            "Limits sum of volume space_limit: total|default|/place|tmpfs|lvm group|rbd: bytes;...") {}
+            "Limits sum of volume space_limit: total|default|/place|tmpfs|lvm group|rbd: bytes;... (dynamic)") {}
     TError Get(std::string &value) {
         auto lock = LockVolumes();
         return UintMapToString(CT->PlaceLimit, value);
@@ -1662,13 +1662,16 @@ public:
     }
 };
 
-static TVolumesList OwnerVolumes(D_OWNED_VOLUMES, &TContainer::OwnedVolumes, "Owned volumes (ro)");
-static TVolumesList LinedVolumes(D_LINKED_VOLUMES, &TContainer::LinkedVolumes, "Linked volumes (ro)");
+static TVolumesList OwnerVolumes(D_OWNED_VOLUMES, &TContainer::OwnedVolumes,
+                                 "Owned volumes: volume;... (ro)");
+static TVolumesList LinedVolumes(D_LINKED_VOLUMES, &TContainer::LinkedVolumes,
+                                 "Linked volumes: volume;... (ro)");
 
 class TRequiredVolumes : public TProperty {
 public:
     TRequiredVolumes() :
-        TProperty(P_REQUIRED_VOLUMES, EProperty::REQUIRED_VOLUMES, "Required volumes") {}
+        TProperty(P_REQUIRED_VOLUMES, EProperty::REQUIRED_VOLUMES,
+                 "Required volumes: volume;... (dynamic)") {}
     TError Get(std::string &value) {
         TTuple paths;
 
@@ -3520,7 +3523,7 @@ public:
 class TMemTotalLimit : public TProperty {
 public:
     TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, EProperty::NONE,
-            "Total memory limit for container hierarchy") {
+            "Total memory limit for container hierarchy (ro)") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
