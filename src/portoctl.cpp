@@ -528,6 +528,7 @@ static bool ValidProperty(const vector<Porto::Property> &plist, const string &na
 }
 
 static std::string HumanValue(const std::string &name, const std::string &val) {
+    TUintMap map;
     uint64_t num;
 
     if (name == "stdout" || name == "stderr") {
@@ -538,11 +539,67 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         return val;
     }
 
-    if (name == "env" || name == "cgroups" ||
+    if (name == "env" ||
+            name == "net" ||
+            name == "ip" ||
+            name == "default_gw" ||
+            name == "devices" ||
+            name == "bind" ||
+            name == "ulimit" ||
+            name == "cgroups" ||
+            name == "controllers" ||
+            name == "capabilities" ||
+            name == "capabilities_ambient" ||
+            name == "resolv_conf" ||
             name == "volumes_owned" ||
             name == "volumes_linked" ||
-            name == "volumes_required")
+            name == "volumes_required" ||
+            name == "net_drops" ||
+            name == "net_overlimits" ||
+            name == "net_packets" ||
+            name == "net_rx_drops" ||
+            name == "net_rx_packets" ||
+            name == "net_tx_drops" ||
+            name == "net_tx_packets" ||
+            name == "net_class_id" ||
+            name == "io_ops_limit" ||
+            name == "io_ops")
         return StringReplaceAll(val, ";", ";\n      ");
+
+    if (name == "net_limit" ||
+         name == "net_guarantee" ||
+         name == "net_bytes" ||
+         name == "net_rx_bytes" ||
+         name == "net_tx_bytes" ||
+         name == "place_usage" ||
+         name == "place_limit" ||
+         name == "io_limit" ||
+         name == "io_read" ||
+         name == "io_write") {
+        if (!StringToUintMap(val, map)) {
+            std::stringstream str;
+            for (auto kv : map) {
+                if (str.str().length())
+                    str << ";\n       ";
+                str << kv.first << ": " << StringFormatSize(kv.second);
+            }
+            return str.str();
+        } else
+            return StringReplaceAll(val, ";", ";\n      ");
+    }
+
+    if (name == "io_time") {
+        if (!StringToUintMap(val, map)) {
+            std::stringstream str;
+            for (auto kv : map) {
+                if (str.str().length())
+                    str << ";\n       ";
+                str << kv.first << ": " << StringFormatDuration(kv.second / 1000000);
+            }
+            return str.str();
+        } else
+            return StringReplaceAll(val, ";", ";\n      ");
+    }
 
     if (val == "" || StringToUint64(val, num))
         return val;
