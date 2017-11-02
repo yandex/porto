@@ -212,7 +212,7 @@ container { default_ulimit: "type: soft hard;..." }
 
     Requires **isolate**: SYS\_BOOT, KILL, PTRACE.
 
-    Requires **net**: NET\_ADMIN.
+    Requires **net** and no **ip\_limit**: NET\_ADMIN.
 
     Always available: NET\_BIND\_SERVICE, NET\_RAW
 

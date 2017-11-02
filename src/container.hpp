@@ -136,6 +136,7 @@ public:
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */
     bool NetInherit;            /* Use parent network namespace */
+    bool NetIpLimit;            /* Cannot use arbitrary IP */
 
     std::string Hostname;
     TTuple EnvCfg;

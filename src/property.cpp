@@ -1337,6 +1337,7 @@ public:
         }
 
         CT->IpLimit = list;
+        CT->NetIpLimit = !list.empty() && list[0] != "any";
         CT->SetProp(EProperty::IP_LIMIT);
 
         return TError::Success();

@@ -313,6 +313,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     NetProp = { { "inherited" } };
     NetIsolate = false;
     NetInherit = true;
+    NetIpLimit = false;
 
     Hostname = "";
     CapAmbient = NoCapabilities;
@@ -1993,6 +1994,7 @@ void TContainer::SanitizeCapabilities() {
         bool pidns = false;
         bool memcg = false;
         bool netns = false;
+        bool netip = false;
 
         CapBound = HostCapBound;
 
@@ -2001,6 +2003,7 @@ void TContainer::SanitizeCapabilities() {
             pidns |= ct->Isolate;
             memcg |= ct->MemLimit;
             netns |= ct->NetIsolate;
+            netip |= ct->NetIpLimit;
 
             if (ct->HasProp(EProperty::CAPABILITIES))
                 CapBound.Permitted &= ct->CapLimit.Permitted;
@@ -2011,7 +2014,7 @@ void TContainer::SanitizeCapabilities() {
             remove.Permitted |= PidNsCapabilities.Permitted;
         if (!memcg)
             remove.Permitted |= MemCgCapabilities.Permitted;
-        if (!netns)
+        if (!netns || netip)
             remove.Permitted |= NetNsCapabilities.Permitted;
 
         if (chroot) {
