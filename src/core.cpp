@@ -85,16 +85,20 @@ TError TCore::Handle(const TTuple &args) {
 }
 
 TError TCore::Identify() {
-    std::map<std::string, std::string> cgmap;
+    TStringMap cgmap;
     TError error;
 
     error = GetTaskCgroups(Pid, cgmap);
-    if (error || cgmap.find("freezer") == cgmap.end())
-        return TError(EError::Unknown, "freezer not found");
+    if (!error && !cgmap.count("freezer"))
+        error = TError(EError::Unknown, "freezer not found");
+    if (error) {
+        L_ERR("Cannot get freezer cgroup: {}", error);
+        return error;
+    }
 
     auto cg = cgmap["freezer"];
     if (!StringStartsWith(cg, std::string(PORTO_CGROUP_PREFIX) + "/"))
-        return TError(EError::InvalidState, "non-porto freezer");
+        return TError(EError::InvalidState, "not container");
 
     Container = cg.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
 
@@ -104,8 +108,14 @@ TError TCore::Identify() {
             Conn.GetProperty(Container, P_GROUP, Group) ||
             Conn.GetProperty(Container, P_OWNER_USER, OwnerUser) ||
             Conn.GetProperty(Container, P_OWNER_GROUP, OwnerGroup) ||
-            Conn.GetProperty(Container, P_CWD, Cwd))
-        return TError(EError::Unknown, "cannot dump container");
+            Conn.GetProperty(Container, P_CWD, Cwd)) {
+        int err;
+        std::string msg;
+        Conn.GetLastError(err, msg);
+        error = TError((EError)err, msg);
+        L_ERR("Cannot get container {} properties: {}", Container, error);
+        return error;
+    }
 
     Slot = Container.substr(0, Container.find('/'));
 
