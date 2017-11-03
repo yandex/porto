@@ -1,3 +1,15 @@
+yandex-porto (4.3.0) unstable; urgency=low
+
+  * porto: fail start if capabilities are out of bounds
+  * property: update dynamic/ro in descriptions
+  * portoctl: more human readable output for get
+  * core: log more errors
+  * porto: remove CAP_NET_ADMIN in chroot if ip_limit is set
+  * coredump: use prefix even if container is gone
+  * portoctl: exit with non-zero code for failed vlist and load
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 03 Nov 2017 17:17:40 +0300
+
 yandex-porto (4.2.0) unstable; urgency=low
 
   * porto: remove working directory where it should not exist
