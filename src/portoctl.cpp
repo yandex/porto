@@ -1865,6 +1865,8 @@ public:
           for (auto &v : vlist)
               ShowVolume(v);
         } else {
+            int errors = 0;
+
             for (const auto &arg : args) {
                 const auto path = TPath(arg).RealPath().ToString();
 
@@ -1872,11 +1874,15 @@ public:
                 int ret = Api->ListVolumes(path, "", vlist);
                 if (ret) {
                     PrintError(arg);
+                    errors++;
                     continue;
                 }
                 for (auto &v : vlist)
                     ShowVolume(v);
             }
+
+            if (errors)
+                return EXIT_FAILURE;
         }
 
         return EXIT_SUCCESS;
@@ -2693,6 +2699,7 @@ public:
             if (Api->Start(name)) {
                 PrintError("Cannot start container");
                 (void)Api->Destroy(name);
+                return -1;
             }
         }
 
