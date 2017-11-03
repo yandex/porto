@@ -28,6 +28,7 @@ struct TCore {
 
 	uid_t OwnerUid = -1;
 	gid_t OwnerGid = -1;
+	std::string Prefix;
 	std::string Slot;
 
 	Porto::Connection Conn;

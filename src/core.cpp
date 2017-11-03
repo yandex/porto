@@ -97,10 +97,14 @@ TError TCore::Identify() {
     }
 
     auto cg = cgmap["freezer"];
-    if (!StringStartsWith(cg, std::string(PORTO_CGROUP_PREFIX) + "/"))
+    if (!StringStartsWith(cg, std::string(PORTO_CGROUP_PREFIX) + "/")) {
+        Container = "/";
         return TError(EError::InvalidState, "not container");
+    }
 
     Container = cg.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
+    Slot = Container.substr(0, Container.find('/'));
+    Prefix = StringReplaceAll(Container, "/", "%") + "%";
 
     //FIXME ugly
     if (Conn.GetProperty(Container, P_CORE_COMMAND, CoreCommand) ||
@@ -116,8 +120,6 @@ TError TCore::Identify() {
         L_ERR("Cannot get container {} properties: {}", Container, error);
         return error;
     }
-
-    Slot = Container.substr(0, Container.find('/'));
 
     if (UserId(OwnerUser, OwnerUid))
         OwnerUid = -1;
@@ -209,8 +211,7 @@ TError TCore::Save() {
         format = ".core.xz";
     }
 
-    auto prefix = Container.size() ? StringReplaceAll(Container, "/", "%") + "%" : "";
-    Pattern = dir / ( prefix + ProcessName + "." + std::to_string(Pid) +
+    Pattern = dir / ( Prefix + ProcessName + "." + std::to_string(Pid) +
               ".S" + std::to_string(Signal) + "." +
               FormatTime(time(nullptr), "%Y%m%dT%H%M%S") + format);
 
