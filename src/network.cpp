@@ -1819,12 +1819,16 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
                 dev.Name = StringTrim(settings[1]);
             if (settings.size() > 2)
                 dev.Master = StringTrim(settings[2]);
+            if (config().network().l3_default_mtu() > 0)
+                dev.Mtu = config().network().l3_default_mtu();
         } else if (type == "NAT") {
             dev.Type = "L3";
             dev.Mode = "NAT";
             dev.Name = "eth0";
             if (settings.size() > 1)
                 dev.Name = StringTrim(settings[1]);
+            if (config().network().l3_default_mtu() > 0)
+                dev.Mtu = config().network().l3_default_mtu();
         } else if (type == "ipip6") {
             if (settings.size() != 4)
                 return TError(EError::InvalidValue, "Invalid " + line);

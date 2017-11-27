@@ -51,6 +51,7 @@ message TCfg {
         optional uint32 proxy_ndp_watchdog_ms = 39;
         optional bool enable_ip6tnl0 = 40;
         optional bool enable_iproute = 41;
+        optional uint32 l3_default_mtu = 42;
     }
 
     message TFileCfg {
