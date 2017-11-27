@@ -1,5 +1,6 @@
 #include "quota.hpp"
 #include "log.hpp"
+#include <mutex>
 
 extern "C" {
 #include <linux/quota.h>
@@ -57,6 +58,12 @@ struct v2_disk_dqinfo {
     __le32 dqi_free_entry;    /* Number of block with at least one free entry */
 };
 
+static std::mutex QuotaMutex;
+
+static inline std::unique_lock<std::mutex> LockQuota() {
+    return std::unique_lock<std::mutex>(QuotaMutex);
+}
+
 TError TProjectQuota::InitProjectQuotaFile(TPath path) {
     struct {
         struct v2_disk_dqheader header;
@@ -93,11 +100,15 @@ TError TProjectQuota::InitProjectQuotaFile(TPath path) {
     return TError(EError::Unknown, saved_errno, "Cannot write quota file");
 }
 
-TError TProjectQuota::EnableProjectQuota() {
+TError TProjectQuota::Enable() {
     struct fs_quota_statv statv;
     struct if_dqinfo dqinfo;
     TError error;
     int ret;
+
+    error = FindDevice();
+    if (error)
+        return error;
 
     statv.qs_version = FS_QSTATV_VERSION1;
     if (!quotactl(QCMD(Q_XGETQSTATV, PRJQUOTA), Device.c_str(),
@@ -106,6 +117,8 @@ TError TProjectQuota::EnableProjectQuota() {
                 (statv.qs_flags & FS_QUOTA_PDQ_ENFD))
             return TError::Success();
     }
+
+    auto lock = LockQuota();
 
     if (!quotactl(QCMD(Q_GETINFO, PRJQUOTA), Device.c_str(),
                   0, (caddr_t)&dqinfo)) {
@@ -297,10 +310,6 @@ TError TProjectQuota::FindDevice() {
     return TError(EError::Unknown, "mountpoint not found: " + Path.ToString());
 }
 
-bool TProjectQuota::Supported() {
-    return !FindDevice() && !EnableProjectQuota();
-}
-
 bool TProjectQuota::Exists() {
     uint32_t id;
 
@@ -343,11 +352,7 @@ TError TProjectQuota::Create() {
                 "Not a directory: " + Path.ToString());
     }
 
-    error = FindDevice();
-    if (error)
-        return error;
-
-    error = EnableProjectQuota();
+    error = Enable();
     if (error)
         return error;
 

@@ -13,7 +13,6 @@ class TProjectQuota {
 
     TError FindProject();
     TError FindDevice();
-    TError EnableProjectQuota();
 
     static TError InitProjectQuotaFile(TPath path);
     static TError GetProjectId(const TPath &path, uint32_t &id);
@@ -30,8 +29,8 @@ public:
     uint64_t InodeUsage = 0;
 
     TProjectQuota(const TPath &path) { Path = path; }
+    TError Enable();
 
-    bool Supported();
     bool Exists();
 
     TError Load();

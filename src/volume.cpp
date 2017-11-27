@@ -184,26 +184,6 @@ public:
 
 class TVolumeQuotaBackend : public TVolumeBackend {
 public:
-
-    static bool Supported() {
-        static bool supported = false, tested = false;
-
-        if (!config().volumes().enable_quota())
-            return false;
-
-        if (!tested) {
-            TProjectQuota quota = TPath(PORTO_PLACE) / PORTO_VOLUMES;
-            supported = quota.Supported();
-            if (supported)
-                L_SYS("Project quota is supported: {}", quota.Path.c_str());
-            else
-                L_SYS("Project quota not supported: {}", quota.Path.c_str());
-            tested = true;
-        }
-
-        return supported;
-    }
-
     TError Configure() override {
 
         if (Volume->IsAutoPath)
@@ -281,8 +261,23 @@ public:
 class TVolumeNativeBackend : public TVolumeBackend {
 public:
 
-    static bool Supported() {
-        return TVolumeQuotaBackend::Supported();
+    static bool Supported(const TPath &place) {
+        static bool printed = false;
+
+        if (!config().volumes().enable_quota())
+            return false;
+
+        TProjectQuota quota(place / PORTO_VOLUMES);
+        TError error = quota.Enable();
+        if (!printed) {
+            printed = true;
+            if (!error)
+                L_SYS("Project quota is supported: {}", quota.Path.c_str());
+            else
+                L_SYS("Project quota not supported: {} {}", quota.Path.c_str(), error);
+        }
+
+        return !error;
     }
 
     TError Configure() override {
@@ -1507,14 +1502,14 @@ TError TVolume::Configure(const TStringMap &cfg) {
             !CL->Cred.IsMemberOf(VolumeOwner.Gid))
         return TError(EError::Permission, "Changing owner group is not permitted");
 
-    /* Autodetect volume backend */
+    /* Autodetect volume backend, prefer native or overlay */
     if (BackendType == "") {
-        if ((HaveQuota() && !TVolumeNativeBackend::Supported()) ||
+        if ((HaveQuota() && !TVolumeNativeBackend::Supported(Place)) ||
                 StoragePath.IsRegularFollow())
             BackendType = "loop";
         else if (HaveLayers() && TVolumeOverlayBackend::Supported())
             BackendType = "overlay";
-        else if (TVolumeNativeBackend::Supported())
+        else if (TVolumeNativeBackend::Supported(Place))
             BackendType = "native";
         else
             BackendType = "plain";
