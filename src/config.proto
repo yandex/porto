@@ -176,6 +176,7 @@ message TCfg {
         optional string default_pattern = 3;
         optional uint64 space_limit_mb = 5;
         optional uint64 slot_space_limit_mb = 6;
+        optional uint64 sync_size = 7;
     }
 
     optional TNetworkCfg network = 1;

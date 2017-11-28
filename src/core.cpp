@@ -234,6 +234,7 @@ TError TCore::Save() {
 
     off_t size = 0;
     off_t data = 0;
+    uint64_t time_ms = GetCurrentTimeMs();
 
     if (filter.size()) {
         if (file.Fd != STDOUT_FILENO &&
@@ -244,7 +245,7 @@ TError TCore::Save() {
     } else {
         uint64_t buf[512];
         off_t sync_start = 0;
-        off_t sync_block = 1 << 20;
+        off_t sync_block = config().core().sync_size();
 
         error = TError::Success();
         do {
@@ -282,7 +283,7 @@ TError TCore::Save() {
             size += off;
             data += off;
 
-            if (size > sync_start + sync_block * 2) {
+            if (sync_block && size > sync_start + sync_block * 2) {
                 (void)sync_file_range(file.Fd, sync_start, size - sync_start,
                         SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WRITE);
                 sync_start = size - sync_block;
@@ -295,13 +296,17 @@ TError TCore::Save() {
 
         if (ftruncate(file.Fd, size))
             L("Cannot truncate core dump");
-        fdatasync(file.Fd);
+        if (sync_block)
+            fdatasync(file.Fd);
     }
 
     if (!error) {
-        L("Core dump {} ({}) written: {} data, {} holes, {} total",
+        time_ms = GetCurrentTimeMs() - time_ms;
+        time_ms = time_ms ?: 1;
+        L("Core dump {} ({}) written: {} data, {} holes, {} total, {}B/s",
                 Pattern, DefaultPattern.BaseName(), StringFormatSize(data),
-                StringFormatSize(size - data), StringFormatSize(size));
+                StringFormatSize(size - data), StringFormatSize(size),
+                StringFormatSize(data * 1000ull / time_ms));
     } else if (!data) {
         Pattern.Unlink();
         if (DefaultPattern)
