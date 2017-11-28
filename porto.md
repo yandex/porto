@@ -719,6 +719,11 @@ Default pattern is used for non-container cores or if core command isn't set.
 It might use '%' kernel core template defined in *core(5)*.
 If default\_pattern ends with '.gz' or '.xz' core will be compressed.
 
+File owner set according to **owner_user** and **owner_group**.
+
+For uncompressed format porto detects zero pages and turns them into file holes
+and flushes written data to disk every 4Mb (set by option core.sync_size).
+
 Porto also creates hardlink in same directory with name:
 ```
 ${CORE_CONTAINER//\//%}%${CORE_TASK_NAME}.${CORE_PID}.S${CORE_SIG}.$(date +%Y%m%dT%H%M%S).core
@@ -728,6 +733,8 @@ Option space\_limit\_mb limits total size of default pattern directory,
 after exceeding new cores are discarded.
 
 Option slot\_space\_limit\_mb limits total size for each first-level container.
+
+Porto never deletes old core dumps.
 
 # VOLUMES
 
