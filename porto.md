@@ -110,7 +110,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
     See [COREDUMPS] below.
 
-* **env** - environment of main container process, syntax: \<variable\>: \<value\>; ...
+* **env** - environment of main container process, syntax: \<variable\>=\<value\>; ...
 
     Container with **isolate**=false inherits environment variables from parent.
 
