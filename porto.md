@@ -142,6 +142,8 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **oom\_killed** - true, if container has been OOM killed
 
+* **core\_dumped** - true, if main process dumped core
+
 * **respawn\_count** - how many times container has been respawned (using respawn property)
 
 * **root\_pid** - main process pid in client pid namespace (could be unreachable)

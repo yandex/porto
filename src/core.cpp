@@ -62,9 +62,6 @@ TError TCore::Handle(const TTuple &args) {
     ProcessName = GetTaskName(Pid);
     ThreadName = GetTaskName(Tid);
 
-    if (!Ulimit || !Dumpable)
-        return TError::Success();
-
     OpenLog(PORTO_LOG);
     SetProcessName("portod-core");
 
@@ -79,6 +76,12 @@ TError TCore::Handle(const TTuple &args) {
     }
 
     error = Identify();
+
+    if (!Ulimit || !Dumpable) {
+        L_ACT("Ignore core dump from container {}: {} {} {}",
+                Container, ProcessName, Pid, Signal);
+        return TError::Success();
+    }
 
     if (!error && CoreCommand.size()) {
         L_ACT("Forward core from container {}: {} {} signal {}",

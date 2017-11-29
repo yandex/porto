@@ -262,8 +262,9 @@ TError SetOomScoreAdj(int value) {
 
 std::string FormatExitStatus(int status) {
     if (WIFSIGNALED(status))
-        return StringFormat("exit signal: %d (%s)", WTERMSIG(status),
-                            strsignal(WTERMSIG(status)));
+        return StringFormat("exit signal: %d (%s)%s", WTERMSIG(status),
+                            strsignal(WTERMSIG(status)),
+                            WCOREDUMP(status) ? " (Core dumped)": "");
     return StringFormat("exit code: %d", WEXITSTATUS(status));
 }
 

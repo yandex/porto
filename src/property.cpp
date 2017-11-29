@@ -15,6 +15,7 @@
 
 extern "C" {
 #include <sys/sysinfo.h>
+#include <sys/wait.h>
 }
 
 __thread TContainer *CT = nullptr;
@@ -2644,6 +2645,21 @@ public:
         return error;
     }
 } static OomKilled;
+
+class TCoreDumped : public TProperty {
+public:
+    TCoreDumped() : TProperty(D_CORE_DUMPED, EProperty::NONE,
+                             "main process dumped core (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TError error = IsDead();
+        if (!error)
+            value = BoolToString(WIFSIGNALED(CT->ExitStatus) &&
+                                 WCOREDUMP(CT->ExitStatus));
+        return error;
+    }
+} static CoreDumped;
 
 class TOomIsFatal : public TProperty {
 public:

@@ -83,6 +83,8 @@ int main(int argc, char *argv[]) {
                 if (WIFEXITED(status))
                     return WEXITSTATUS(status);
                 if (WIFSIGNALED(status)) {
+                    if (WCOREDUMP(status))
+                        return 128 + SIGRTMIN + WTERMSIG(status);
                     signal(WTERMSIG(status), SIG_DFL);
                     kill(getpid(), WTERMSIG(status));
                     return 128 + WTERMSIG(status);

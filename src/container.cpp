@@ -2564,9 +2564,10 @@ void TContainer::Exit(int status, bool oomKilled) {
         oomKilled = true;
 
     /* Detect fatal signals: portoinit cannot kill itself */
-    if (Isolate && VirtMode == VIRT_MODE_APP && WIFEXITED(status) &&
-            WEXITSTATUS(status) > 128 && WEXITSTATUS(status) < 128 + SIGRTMIN)
-        status = WEXITSTATUS(status) - 128;
+    if (WaitTask.Pid != Task.Pid && WIFEXITED(status) &&
+            WEXITSTATUS(status) > 128 &&
+            WEXITSTATUS(status) < 128 + SIGRTMIN * 2)
+        status = WEXITSTATUS(status) - ((WEXITSTATUS(status) > 128 + SIGRTMIN) ? SIGRTMIN : 128);
 
     L_EVT("Exit {} {} {}", Name, FormatExitStatus(status),
           (oomKilled ? "invoked by OOM" : ""));
