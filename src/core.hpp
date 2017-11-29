@@ -18,6 +18,9 @@ struct TCore {
 	std::string ProcessName;
 	std::string ThreadName;
 
+	TPath ExePath;
+	std::string ExeName;
+
 	std::string Container;
 	std::string CoreCommand;
 	std::string User;

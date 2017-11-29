@@ -26,7 +26,8 @@ TError TCore::Register(const TPath &portod) {
     }
 
     pattern = "|" + portod.ToString() + " core %P %I %p %i %s %d %c " +
-              StringReplaceAll(config().core().default_pattern(), " ", "__SPACE__");
+              StringReplaceAll(config().core().default_pattern(), " ", "__SPACE__") +
+              " %u %g";
     return SetSysctl("kernel.core_pattern", pattern);
 }
 
@@ -38,6 +39,7 @@ TError TCore::Unregister() {
 }
 
 TError TCore::Handle(const TTuple &args) {
+    TError error;
 
     if (args.size() < 7)
         return TError(EError::Unknown, "should be executed via sysctl kernel.core_pattern");
@@ -52,6 +54,11 @@ TError TCore::Handle(const TTuple &args) {
     if (args.size() > 7)
         DefaultPattern = StringReplaceAll(args[7], "__SPACE__", " ");
 
+    if (args.size() > 9) {
+        OwnerUid = std::stoi(args[8]);
+        OwnerGid = std::stoi(args[9]);
+    }
+
     ProcessName = GetTaskName(Pid);
     ThreadName = GetTaskName(Tid);
 
@@ -61,7 +68,16 @@ TError TCore::Handle(const TTuple &args) {
     OpenLog(PORTO_LOG);
     SetProcessName("portod-core");
 
-    TError error;
+    error = TPath("/proc/" + std::to_string(Pid) + "/exe").ReadLink(ExePath);
+    if (!error) {
+        ExeName = ExePath.BaseName();
+        if (StringEndsWith(ExeName, " (deleted)"))
+            ExeName = ExeName.substr(0, ExeName.size() - 10);
+    } else {
+        L("Cannot get exe file path: {}", error);
+        ExeName = ProcessName;
+    }
+
     error = Identify();
 
     if (!error && CoreCommand.size()) {
@@ -136,9 +152,12 @@ TError TCore::Forward() {
         {"CORE_PID", std::to_string(Vpid)},
         {"CORE_TID", std::to_string(Vtid)},
         {"CORE_SIG", std::to_string(Signal)},
-        {"CORE_TASK_NAME", GetTaskName(Pid)},
-        {"CORE_THREAD_NAME", GetTaskName(Tid)},
+        {"CORE_TASK_NAME", ProcessName},
+        {"CORE_THREAD_NAME", ThreadName},
+        {"CORE_EXE_NAME", ExeName},
         {"CORE_CONTAINER", Container},
+        {"CORE_OWNER_UID", std::to_string(OwnerUid)},
+        {"CORE_OWNER_GID", std::to_string(OwnerGid)},
     };
 
     if (Conn.CreateWeakContainer(core) ||

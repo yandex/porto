@@ -693,7 +693,10 @@ Variables set in environment and substituted in core\_command:
 - CORE\_SIG (signal)
 - CORE\_TASK\_NAME (comm for PID)
 - CORE\_THREAD\_NAME (comm for TID)
+- CORE\_EXE\_NAME (executable file)
 - CORE\_CONTAINER
+- CORE\_OWNER\_UID
+- CORE\_OWNER\_GID
 
 Command executed in non-isolated sub-container and gets core dump as stdin.
 
