@@ -1227,8 +1227,7 @@ std::string TVolume::StateName(EVolumeState state) {
 }
 
 void TVolume::SetState(EVolumeState state) {
-    if (Debug)
-        L("Change volume {} state {} -> {}", Path, StateName(State), StateName(state));
+    L_VERBOSE("Change volume {} state {} -> {}", Path, StateName(State), StateName(state));
     State = state;
     if (state == EVolumeState::Ready || state == EVolumeState::Destroyed)
         VolumesCv.notify_all();

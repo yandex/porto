@@ -221,7 +221,7 @@ void TNetwork::InitializeConfig() {
 
     while (groupCfg >> std::ws) {
         if (groupCfg.peek() != '#' && (groupCfg >> id >> name)) {
-            L_SYS("Network device group: {} : {}", id, name);
+            L_NET("Network device group: {} : {}", id, name);
             groupMap[name] = id;
             DeviceGroups[id] = name;
         }
@@ -234,7 +234,7 @@ void TNetwork::InitializeConfig() {
     UnmanagedGroups.clear();
 
     for (auto device: config().network().unmanaged_device()) {
-        L_SYS("Unmanaged network device: {}", device);
+        L_NET("Unmanaged network device: {}", device);
         UnmanagedDevices.push_back(device);
     }
 
@@ -244,11 +244,11 @@ void TNetwork::InitializeConfig() {
         if (groupMap.count(group)) {
             id = groupMap[group];
         } else if (StringToInt(group, id)) {
-            L_SYS("Unknown network device group: {}", group);
+            L_NET("Unknown network device group: {}", group);
             continue;
         }
 
-        L_SYS("Unmanaged network device group: {} : {}", id, group);
+        L_NET("Unmanaged network device group: {} : {}", id, group);
         UnmanagedGroups.push_back(id);
     }
 
@@ -301,7 +301,7 @@ void TNetwork::InitializeConfig() {
             set |= it.key() == key;
         std::string val;
         if (!set && !GetSysctl(key, val) && val != def) {
-            L("Init sysctl {} = {} (default is {})", key, val, def);
+            L_NET("Init sysctl {} = {} (default is {})", key, val, def);
             auto sysctl = config().mutable_container()->add_net_sysctl();
             sysctl->set_key(key);
             sysctl->set_val(val);
@@ -327,8 +327,7 @@ TNetwork::~TNetwork() {
 }
 
 void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
-    if (Verbose)
-        L("Register network {}", inode);
+    L_NET_VERBOSE("Register network {}", inode);
     auto newList = std::make_shared<std::list<std::shared_ptr<TNetwork>>>();
     for (auto &net_copy: *NetworksList)
         newList->emplace_back(net_copy);
@@ -344,8 +343,7 @@ void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
 }
 
 void TNetwork::Unregister() {
-    if (Verbose)
-        L("Unregister network {} {}", NetInode, NetName);
+    L_NET_VERBOSE("Unregister network {} {}", NetInode, NetName);
     auto newList = std::make_shared<std::list<std::shared_ptr<TNetwork>>>();
     for (auto &net: *NetworksList)
         if (net.get() != this)
@@ -452,7 +450,7 @@ void TNetwork::Destroy() {
         TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
         error = qdisc.Delete(*Nl);
         if (error)
-            L("Cannot remove root qdisc: {}", error);
+            L_NET("Cannot remove root qdisc: {}", error);
     }
 
     // TODO: destroy mac/ip-vlan here
@@ -568,7 +566,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     //          +- 6:0 qdisc b (pfifo)
 
 
-    L("Setup queue for network {} device {}", NetName, dev.GetDesc());
+    L_NET("Setup queue for network {} device {}", NetName, dev.GetDesc());
 
     TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
     qdisc.Kind = dev.GetConfig(DeviceQdisc);
@@ -729,7 +727,7 @@ TError TNetwork::SyncDevices(bool force) {
             d = dev;
             if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") !=
                     dev.GetConfig(DeviceQdisc)) {
-                L("Missing network {} qdisc at {}", NetName, d.GetDesc());
+                L_NET("Missing network {} qdisc at {}", NetName, d.GetDesc());
                 StartRepair();
             } else if (!force)
                 d.Prepared = true;
@@ -739,7 +737,7 @@ TError TNetwork::SyncDevices(bool force) {
             break;
         }
         if (!found) {
-            L("New network {} {}managed device {}", NetName,
+            L_NET("New network {} {}managed device {}", NetName,
                     dev.Managed ? "" : "un", dev.GetDesc());
             if (dev.Managed)
                 StartRepair();
@@ -751,7 +749,7 @@ TError TNetwork::SyncDevices(bool force) {
 
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
-            L("Forget network {} device {}", NetName, dev->GetDesc());
+            L_NET("Forget network {} device {}", NetName, dev->GetDesc());
             if (this == HostNetwork.get()) {
                 RootContainer->NetClass.Limit.erase(dev->Name);
                 RootContainer->NetClass.Rate.erase(dev->Name);
@@ -1162,8 +1160,7 @@ TError TNetwork::SetupClasses(TNetClass &cls) {
 
     error = TrySetupClasses(cls);
     if (error) {
-        if (Verbose)
-            L("Network {} class setup failed: {}", NetName, error);
+        L_NET_VERBOSE("Network {} class setup failed: {}", NetName, error);
         StartRepair();
         error = WaitRepair();
         if (error)
@@ -1315,8 +1312,8 @@ void TNetwork::NetWatchdog() {
 }
 
 void TNetwork::StartRepair() {
-    if (Verbose && !NetError)
-        L("Start network {} repair", NetName);
+    if (!NetError)
+        L_NET_VERBOSE("Start network {} repair", NetName);
     if (!NetError)
         NetError = TError::Queued();
     NetThreadCv.notify_all();
@@ -1351,8 +1348,7 @@ void TNetwork::SyncStatLocked() {
     auto curTime = GetCurrentTimeMs();
     auto curGen = GlobalStatGen.load();
 
-    if (Debug)
-        L("Sync network {} statistics generation {} after {} ms",
+    L_NET_VERBOSE("Sync network {} statistics generation {} after {} ms",
           NetName, (unsigned)curGen, curTime - StatTime);
 
     error = SyncDevices();
@@ -1369,7 +1365,7 @@ void TNetwork::SyncStatLocked() {
 
         int ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &dev.ClassCache);
         if (ret) {
-            L("Cannot dump network {} classes at {}", NetName, dev.GetDesc());
+            L_NET("Cannot dump network {} classes at {}", NetName, dev.GetDesc());
             StartRepair();
             continue;
         }
@@ -1401,7 +1397,7 @@ void TNetwork::SyncStatLocked() {
 
             struct rtnl_class *tc = rtnl_class_get(dev.ClassCache, dev.Index, cls->Leaf);
             if (!tc) {
-                L("Missing network {} class {} at {}", NetName, cls->Leaf, dev.GetDesc());
+                L_NET("Missing network {} class {} at {}", NetName, cls->Leaf, dev.GetDesc());
                 StartRepair();
                 continue;
             }
@@ -1551,7 +1547,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
                 continue;
             error = net->DeleteClass(dev, ct.NetClass);
             if (error)
-                L("Cannot delete network {} class CT{}:{}: {}",
+                L_NET("Cannot delete network {} class CT{}:{}: {}",
                   net->NetName, ct.Id, ct.Name, error);
         }
     }
@@ -1567,7 +1563,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
                 continue;
             error = HostNetwork->DeleteClass(dev, ct.NetClass);
             if (error)
-                L("Cannot delete network {} class CT{}:{}: {}",
+                L_NET("Cannot delete network {} class CT{}:{}: {}",
                   HostNetwork->NetName, ct.Id, ct.Name, error);
         }
     }
@@ -2374,7 +2370,7 @@ TError TNetEnv::ApplySysctl() {
         error = SetSysctl(it.key(), it.val());
         if (error) {
             if (error.GetErrno() == ENOENT)
-                L("Sysctl {} is not virtualized", it.key());
+                L_NET("Sysctl {} is not virtualized", it.key());
             else
                 goto err;
         }

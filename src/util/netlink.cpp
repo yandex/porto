@@ -78,8 +78,7 @@ void TNl::Dump(const std::string &prefix, void *obj) const {
             *ss << std::string(buf);
     };
     nl_object_dump(OBJ_CAST(obj), &dp);
-
-    L("netlink {} {}", prefix, ss.str());
+    L_NL("{} {}", prefix, StringReplaceAll(ss.str(), "\n", " "));
 }
 
 TError TNl::Connect() {
@@ -214,7 +213,7 @@ TError TNl::AddrLabel(const TNlAddr &prefix, uint32_t label) {
     TError error;
     int ret;
 
-    L("netlink add addrlabel {} {}", prefix.Format(), label);
+    L_NL("add addrlabel {} {}", prefix.Format(), label);
 
     memset(&al, 0, sizeof(al));
     al.ifal_family = prefix.Family();
@@ -472,7 +471,7 @@ TError TNlLink::WaitAddress(int timeout_s) {
     struct nl_cache *cache;
     int ret;
 
-    L("Wait for autoconf at {}", GetDesc());
+    L_NET("Wait for autoconf at {}", GetDesc());
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
     if (ret < 0)
@@ -490,7 +489,7 @@ TError TNlLink::WaitAddress(int timeout_s) {
                      (IFA_F_TENTATIVE | IFA_F_DEPRECATED)))
                 continue;
 
-            L("Got {} at {}", TNlAddr(rtnl_addr_get_local(addr)).Format(), GetDesc());
+            L_NET("Got {} at {}", TNlAddr(rtnl_addr_get_local(addr)).Format(), GetDesc());
 
             nl_cache_free(cache);
             return TError::Success();
@@ -628,7 +627,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     nla_nest_end(msg, infodata);
     nla_nest_end(msg, linkinfo);
 
-    L("netlink: add {} {} master {} type {} hw {} mtu {}", vlantype, Name,  master,
+    L_NL("add {} {} master {} type {} hw {} mtu {}", vlantype, Name,  master,
       type, hw, mtu);
 
     ret = nl_send_sync(GetSock(), msg);
@@ -840,7 +839,7 @@ bool TNlLink::ValidMacAddr(const std::string &hw) {
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
     dp.dp_type = NL_DUMP_DETAILS;
 
-    auto &str = L();
+    auto &str = L_NL();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
     str << "netlink cache: ";
@@ -1277,7 +1276,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     nla_nest_end(msg, u32_police);
     nla_nest_end(msg, u32);
 
-    L("netlink {}: add u32 parent 0x{:x}", Index, Parent);
+    L_NL("police {}: add u32 parent 0x{:x}", Index, Parent);
 
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
@@ -1368,7 +1367,7 @@ TError TNlCgFilter::Create(const TNl &nl) {
         goto free_msg;
     }
 
-    L("netlink {}: add tfilter id 0x{:x} parent 0x{:x}", Index, Handle, Parent);
+    L_NL("cg {}: add tfilter id 0x{:x} parent 0x{:x}", Index, Handle, Parent);
 
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)

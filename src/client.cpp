@@ -52,8 +52,7 @@ void TClient::CloseConnection() {
         if (InEpoll)
             EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
-        if (Verbose)
-            L("Client disconnected: {}: {} ms", Id, ConnectionTime);
+        L_VERBOSE("Client disconnected: {}: {} ms", Id, ConnectionTime);
         close(Fd);
         Fd = -1;
 
@@ -156,8 +155,7 @@ TError TClient::IdentifyClient(bool initial) {
 
     Id = fmt::format("{}:{}({}) CT{}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
 
-    if (Verbose)
-        L("Client connected: {} cred={} tcred={} access={} ns={} wns={}",
+    L_VERBOSE("Client connected: {} cred={} tcred={} access={} ns={} wns={}",
                 Id, Cred.ToString(), TaskCred.ToString(),
                 AccessLevel <= EAccessLevel::ReadOnly ? "ro" : "rw",
                 PortoNamespace, WriteNamespace);

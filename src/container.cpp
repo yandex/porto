@@ -150,16 +150,14 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
 
 /* lock subtree for read or write */
 TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
-    if (Debug)
-        L("{} {} CT{}:{}",
+    L_DBG("{} {} CT{}:{}",
           (try_lock ? "TryLock" : "Lock"),
           (for_read ? "read" : "write"),
           Id, Name);
 
     while (1) {
         if (State == EContainerState::Destroyed) {
-            if (Debug)
-                L("Lock failed, container CT{}:{} was destroyed", Id, Name);
+            L_DBG("Lock failed, container CT{}:{} was destroyed", Id, Name);
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
         bool busy;
@@ -172,8 +170,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
         if (!busy)
             break;
         if (try_lock) {
-            if (Debug)
-                L("TryLock {} Failed CT{}:{}", (for_read ? "read" : "write"), Id, Name);
+            L_DBG("TryLock {} Failed CT{}:{}", (for_read ? "read" : "write"), Id, Name);
             return TError(EError::Busy, "Container is busy: " + Name);
         }
         if (!for_read)
@@ -196,8 +193,7 @@ void TContainer::DowngradeLock() {
     auto lock = LockContainers();
     PORTO_ASSERT(Locked == -1);
 
-    if (Debug)
-        L("Downgrading write to read CT{}:{}", Id, Name);
+    L_DBG("Downgrading write to read CT{}:{}", Id, Name);
 
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
         ct->SubtreeRead++;
@@ -211,8 +207,7 @@ void TContainer::DowngradeLock() {
 void TContainer::UpgradeLock() {
     auto lock = LockContainers();
 
-    if (Debug)
-        L("Upgrading read back to write CT{}:{}", Id, Name);
+    L_DBG("Upgrading read back to write CT{}:{}", Id, Name);
 
     PendingWrite = true;
 
@@ -231,8 +226,7 @@ void TContainer::UpgradeLock() {
 }
 
 void TContainer::Unlock(bool locked) {
-    if (Debug)
-        L("Unlock {} CT{}:{}", (Locked > 0 ? "read" : "write"), Id, Name);
+    L_DBG("Unlock {} CT{}:{}", (Locked > 0 ? "read" : "write"), Id, Name);
     if (!locked)
         ContainersMutex.lock();
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
@@ -690,7 +684,7 @@ TError TContainer::CreateWorkDir() const {
     TPath name = FirstName;
 
     if (parent.ExistsAt(name)) {
-        L("Remove stale working dir");
+        L_ACT("Remove stale working dir");
         error = parent.RemoveAt(name);
         if (error)
             L_ERR("Cannot remove working dir: {}", error);
@@ -1233,8 +1227,7 @@ TError TContainer::DistributeCpus() {
         if (childs.empty())
             continue;
 
-        if (Verbose)
-            L("Distribute CPUs {} in {}", parent->CpuVacant.Format(), parent->Name);
+        L_VERBOSE("Distribute CPUs {} in {}", parent->CpuVacant.Format(), parent->Name);
 
         double vacantGuarantee = 0;
 
@@ -1298,8 +1291,7 @@ TError TContainer::DistributeCpus() {
                 else
                     vacantGuarantee += std::max(ct->CpuGuarantee, ct->CpuGuaranteeSum);
 
-                if (Verbose)
-                    L("Assign CPUs {} for {}", ct->CpuAffinity.Format(), ct->Name);
+                L_VERBOSE("Assign CPUs {} for {}", ct->CpuAffinity.Format(), ct->Name);
 
                 ct->CpuVacant.Set(ct->CpuAffinity);
             }
@@ -1418,8 +1410,7 @@ void TContainer::PropagateCpuLimit() {
         if (sum == ct->CpuLimitSum)
             break;
 
-        if (Debug)
-            L("Propagate total cpu limit CT{}:{} {}c -> {}c",
+        L_DBG("Propagate total cpu limit CT{}:{} {}c -> {}c",
                     ct->Id, ct->Name, ct->CpuLimitSum, sum);
 
         ct->CpuLimitSum = sum;

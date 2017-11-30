@@ -58,7 +58,7 @@ TError TCgroup::Create() {
     if (Secondary())
         return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
 
-    L_ACT("Create cgroup {}", *this);
+    L_CG("Create cgroup {}", *this);
     error = Path().Mkdir(0755);
     if (error)
         L_ERR("Cannot create cgroup {} : {}", *this, error);
@@ -120,7 +120,7 @@ TError TCgroup::RemoveOne() {
     if (Secondary())
         return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
 
-    L_ACT("Remove cgroup {}", *this);
+    L_CG("Remove cgroup {}", *this);
     error = Path().Rmdir();
 
     //FIXME CLEANUP
@@ -170,7 +170,7 @@ TError TCgroup::Get(const std::string &knob, std::string &value) const {
 TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     if (!Subsystem)
         return TError(EError::Unknown, "Cannot set to null cgroup");
-    L_ACT("Set {} {} = {}", *this, knob, value);
+    L_CG("Set {} {} = {}", *this, knob, value);
     TError error = Knob(knob).WriteAll(value);
     if (error)
         error = TError(error, "Cannot set cgroup " + knob + " = " + value);
@@ -237,7 +237,7 @@ TError TCgroup::Attach(pid_t pid) const {
     if (Secondary())
         return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
 
-    L_ACT("Attach process {} to {}", pid, *this);
+    L_CG("Attach process {} to {}", pid, *this);
     TError error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
     if (error)
         L_ERR("Cannot attach process {} to {} : {}", pid, *this, error);
@@ -249,7 +249,7 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
     if (Secondary())
         return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
 
-    L_ACT("Attach all processes from {} to {}", cg, *this);
+    L_CG("Attach all processes from {} to {}", cg, *this);
 
     std::vector<pid_t> pids, prev;
     bool retry;
@@ -365,7 +365,7 @@ TError TCgroup::KillAll(int signal) const {
     bool frozen = false;
     int iteration = 0;
 
-    L_ACT("KillAll {} {}", signal, *this);
+    L_CG("KillAll {} {}", signal, *this);
 
     if (IsRoot())
         return TError(EError::Permission, "Bad idea");
@@ -654,11 +654,11 @@ void TCpuSubsystem::InitializeSubsystem() {
 
     L_SYS("{} cores", GetNumCores());
     if (HasShares)
-        L_SYS("base shares {}", BaseShares);
+        L_CG("support shares {}", BaseShares);
     if (HasRtGroup)
-        L_SYS("support rt group");
+        L_CG("support rt group");
     if (HasReserve)
-        L_SYS("support reserves");
+        L_CG("support reserves");
 }
 
 TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
@@ -1197,7 +1197,7 @@ TError InitializeCgroups() {
         for (auto &mnt: mounts) {
             if (mnt.Type == "cgroup" && mnt.HasOption(subsys->MntOption())) {
                 subsys->Root = mnt.Target;
-                L("Found cgroup subsystem {} mounted at {}", subsys->Type, subsys->Root);
+                L_CG("Found cgroup subsystem {} mounted at {}", subsys->Type, subsys->Root);
                 break;
             }
         }
@@ -1216,7 +1216,7 @@ TError InitializeCgroups() {
             MemorySubsystem.Root = path;
             BlkioSubsystem.Root = path;
         } else {
-            L_ERR("Cannot merge memory and blkio {}", error);
+            L_CG("Cannot merge memory and blkio {}", error);
             (void)path.Rmdir();
         }
     }
@@ -1224,14 +1224,14 @@ TError InitializeCgroups() {
     for (auto subsys: AllSubsystems) {
 
         if (subsys->IsDisabled()) {
-            L("Cgroup subsysem {} is disabled", subsys->Type);
+            L_CG("Cgroup subsysem {} is disabled", subsys->Type);
             continue;
         }
 
         if (subsys->Root.IsEmpty()) {
             subsys->Root = root / subsys->Type;
 
-            L("Mount cgroup subsysem {} at {}", subsys->Type, subsys->Root);
+            L_CG("Mount cgroup subsysem {} at {}", subsys->Type, subsys->Root);
             if (!subsys->Root.Exists()) {
                 error = subsys->Root.Mkdir(0755);
                 if (error) {
@@ -1250,7 +1250,7 @@ TError InitializeCgroups() {
             }
 
             if (error && subsys->IsOptional()) {
-                L("Cgroup subsystem {} is not supported: {}", subsys->Type, error);
+                L_CG("Cgroup subsystem {} is not supported: {}", subsys->Type, error);
                 error = subsys->Root.Rmdir();
                 continue;
             }
@@ -1268,7 +1268,7 @@ TError InitializeCgroups() {
         subsys->Controllers |= subsys->Kind;
         for (auto hy: Hierarchies) {
             if (subsys->Root == hy->Root) {
-                L("Cgroup subsystem {} bound to hierarchy {}", subsys->Type, hy->Type);
+                L_CG("Cgroup subsystem {} bound to hierarchy {}", subsys->Type, hy->Type);
                 subsys->Hierarchy = hy;
                 hy->Controllers |= subsys->Kind;
                 break;

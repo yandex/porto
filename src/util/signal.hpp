@@ -5,9 +5,7 @@ extern "C" {
 #include <sys/signalfd.h>
 }
 
-void Stacktrace();
 void Crash();
-
 void FatalSignal(int sig);
 void CatchFatalSignals();
 void ResetBlockedSignals();

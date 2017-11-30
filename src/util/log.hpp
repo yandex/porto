@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "statistics.hpp"
 #include "util/path.hpp"
 #include "fmt/format.h"
 
@@ -9,57 +10,78 @@ extern bool Verbose;
 extern bool Debug;
 extern TFile LogFile;
 
-enum ELogLevel {
-    LOG_NOTICE = 0,
-    LOG_WARN = 1,
-    LOG_ERROR = 2,
-    LOG_EVENT = 3,
-    LOG_ACTION = 4,
-    LOG_REQUEST = 5,
-    LOG_RESPONSE = 6,
-    LOG_SYSTEM = 7,
-    LOG_STACK = 8,
-};
-
 void OpenLog(const TPath &path);
-void WriteLog(std::string log_msg, ELogLevel level);
+void WriteLog(const char *prefix, const std::string &log_msg);
+void Stacktrace();
+
+template <typename... Args> inline void L_DBG(const char* fmt, const Args&... args) {
+    if (Debug)
+        WriteLog("DBG", fmt::format(fmt, args...));
+}
+
+template <typename... Args> inline void L_VERBOSE(const char* fmt, const Args&... args) {
+    if (Verbose)
+        WriteLog("   ", fmt::format(fmt, args...));
+}
 
 template <typename... Args> inline void L(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_NOTICE);
+    WriteLog("   ", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_WRN(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_WARN);
+    if (Statistics)
+        Statistics->Warns++;
+    WriteLog("WRN", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_ERR(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_ERROR);
+    if (Statistics)
+        Statistics->Errors++;
+    WriteLog("ERR", fmt::format(fmt, args...));
+    if (Verbose)
+        Stacktrace();
 }
 
 template <typename... Args> inline void L_EVT(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_EVENT);
+    WriteLog("EVT", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_ACT(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_ACTION);
+    WriteLog("ACT", fmt::format(fmt, args...));
+}
+
+template <typename... Args> inline void L_CG(const char* fmt, const Args&... args) {
+    WriteLog("CG ", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_REQ(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_REQUEST);
+    WriteLog("REQ", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_RSP(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_RESPONSE);
+    WriteLog("RSP", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_SYS(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_SYSTEM);
+    WriteLog("SYS", fmt::format(fmt, args...));
 }
 
 template <typename... Args> inline void L_STK(const char* fmt, const Args&... args) {
-    WriteLog(fmt::format(fmt, args...), LOG_STACK);
+    WriteLog("STK", fmt::format(fmt, args...));
 }
 
+template <typename... Args> inline void L_NET(const char* fmt, const Args&... args) {
+    WriteLog("NET", fmt::format(fmt, args...));
+}
+
+template <typename... Args> inline void L_NET_VERBOSE(const char* fmt, const Args&... args) {
+    if (Verbose)
+        WriteLog("NET", fmt::format(fmt, args...));
+}
+
+template <typename... Args> inline void L_NL(const char* fmt, const Args&... args) {
+    WriteLog("NL ", fmt::format(fmt, args...));
+}
 
 void porto_assert(const char *msg, const char *file, size_t line);
 

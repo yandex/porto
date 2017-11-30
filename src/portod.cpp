@@ -185,10 +185,9 @@ void AckExitStatus(int pid) {
     if (!pid)
         return;
 
+    L_DBG("Acknowledge exit status for {}", pid);
     int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
-    if (ret == sizeof(pid)) {
-        L("Acknowledge exit status for {}", std::to_string(pid));
-    } else {
+    if (ret != sizeof(pid)) {
         TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
         L_ERR("Can't acknowledge exit status for {}: {}", pid, error);
         Crash();
@@ -261,7 +260,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
                       "All client slots are active: " +
                       (from ? from->Name : "globally"));
 
-    L("Drop client {} idle for {} ms", victim->Id, idle);
+    L_ACT("Drop client {} idle for {} ms", victim->Id, idle);
     Clients.erase(victim->Fd);
     victim->CloseConnection();
     return TError::Success();
@@ -494,7 +493,7 @@ static TError TuneLimits() {
                 NR_SUPERUSER_CLIENTS +
                 1000;
 
-    L("Estimated file descriptor limit: {}", maxFd);
+    L_SYS("Estimated portod file descriptor limit: {}", maxFd);
 
     rlim.rlim_max = maxFd;
     rlim.rlim_cur = maxFd;
@@ -818,20 +817,20 @@ static int Portod() {
 
     if (discardState) {
         discardState = false;
-        L("Discard state...");
+        L_ACT("Discard state...");
         DestroyContainers(false);
         TVolume::DestroyAll();
     }
 
     SystemClient.FinishRequest();
 
-    L("Remove cgroup leftovers...");
+    L_ACT("Remove cgroup leftovers...");
     CleanupCgroups();
 
-    L("Cleanup temp dir...");
+    L_ACT("Cleanup temp dir...");
     CleanupTempdir();
 
-    L("Done restoring");
+    L_SYS("Done restoring");
 
     int code = Rpc();
     L_SYS("Shutting down...");
@@ -839,7 +838,7 @@ static int Portod() {
     if (discardState) {
         discardState = false;
 
-        L("Discard state...");
+        L_ACT("Discard state...");
 
         SystemClient.LockContainer(RootContainer);
 
@@ -1084,7 +1083,7 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
                 if (kill(PortodPid, s) < 0)
                     L_ERR("Can't send {} to porto", s);
 
-                L("Waiting for porto to exit...");
+                L_SYS("Waiting for porto to exit...");
                 uint64_t deadline = GetCurrentTimeMs() +
                                     config().daemon().portod_stop_timeout() * 1000;
                 do {
@@ -1238,7 +1237,7 @@ static int PortodMaster() {
         uint64_t started = GetCurrentTimeMs();
         uint64_t next = started + config().container().respawn_delay_ms();
         code = SpawnPortod(ELoop, exited);
-        L("Returned {}", code);
+        L_SYS("Portod returned {}", code);
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
