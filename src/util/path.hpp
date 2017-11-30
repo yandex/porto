@@ -241,6 +241,7 @@ public:
     TError MkdirAt(const TPath &path, int mode) const;
     TError UnlinkAt(const TPath &path) const;
     TError RmdirAt(const TPath &path) const;
+    TError RemoveAt(const TPath &path) const;
     TError RenameAt(const TPath &oldpath, const TPath &newpath) const;
     TError Chown(uid_t uid, gid_t gid) const;
     TError Chown(const TCred &cred) const {
@@ -259,6 +260,8 @@ public:
     TError ClearDirectory() const;
     TError Stat(struct stat &st) const;
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;
+    bool ExistsAt(const TPath &path) const;
+
     TError StatFS(TStatFS &result) const;
 
     enum AccessMode {

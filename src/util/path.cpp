@@ -562,6 +562,21 @@ restart:
     return error;
 }
 
+TError TFile::RemoveAt(const TPath &path) const {
+    TError error;
+    TFile dir;
+
+    error = dir.OpenAt(*this, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOCTTY | O_NOFOLLOW, 0);
+    if (error) {
+        error = UnlinkAt(path);
+    } else {
+        error = dir.ClearDirectory();
+        if (!error)
+            error = RmdirAt(path);
+    }
+    return error;
+}
+
 TError TPath::RemoveAll() const {
     if (IsDirectoryStrict()) {
         TError error = ClearDirectory();
@@ -1397,6 +1412,11 @@ TError TFile::StatAt(const TPath &path, bool follow, struct stat &st) const {
                 (follow ? 0 : AT_SYMLINK_NOFOLLOW)))
         return TError(EError::Unknown, "Cannot stat: " + std::to_string(Fd) + " @ " + path.Path);
     return TError::Success();
+}
+
+bool TFile::ExistsAt(const TPath &path) const {
+    struct stat st;
+    return !StatAt(path, false, st);
 }
 
 TError TFile::StatFS(TStatFS &result) const {

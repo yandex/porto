@@ -678,21 +678,29 @@ TError TContainer::CreateWorkDir() const {
     if (IsRoot())
         return TError::Success();
 
-    TPath path = WorkDir();
+    TFile parent;
     TError error;
 
-    if (path.Exists()) {
+    error = parent.OpenDir(PORTO_WORKDIR);
+    if (!error && !Parent->IsRoot())
+        error = parent.WalkStrict(parent, Parent->Name);
+    if (error)
+        return error;
+
+    TPath name = FirstName;
+
+    if (parent.ExistsAt(name)) {
         L("Remove stale working dir");
-        error = path.RemoveAll();
+        error = parent.RemoveAt(name);
         if (error)
             L_ERR("Cannot remove working dir: {}", error);
     }
 
-    error = path.Mkdir(0755);
+    error = parent.MkdirAt(name, 0775);
     if (!error) {
-        error = path.Chown(TaskCred);
+        error = parent.ChownAt(name, TaskCred);
         if (error)
-            (void)path.Rmdir();
+            (void)parent.RemoveAt(name);
     }
 
     if (error) {
@@ -706,17 +714,19 @@ TError TContainer::CreateWorkDir() const {
 }
 
 void TContainer::RemoveWorkDir() const {
-    if (IsRoot())
+    if (IsRoot() || !WorkDir().Exists())
         return;
 
-    TPath path = WorkDir();
+    TFile parent;
     TError error;
 
-    if (path.Exists()) {
-        error = path.RemoveAll();
-        if (error)
-            L_ERR("Cannot remove working dir: {}", error);
-    }
+    error = parent.OpenDir(PORTO_WORKDIR);
+    if (!error && !Parent->IsRoot())
+        error = parent.WalkStrict(parent, Parent->Name);
+    if (!error)
+        error = parent.RemoveAt(FirstName);
+    if (error)
+        L_ERR("Cannot remove working dir: {}", error);
 }
 
 TPath TContainer::GetCwd() const {
