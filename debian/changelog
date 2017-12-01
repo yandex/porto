@@ -1,3 +1,17 @@
+yandex-porto (4.3.2) unstable; urgency=low
+
+  * porto: env format is key=val;...
+  * core: add option for sync size and increase up to 4Mb
+  * core: update documentation
+  * core: get also real uid:gid and executable file name
+  * core: note core dump in logged exit status
+  * container: fix races in PrepareWorkDir and RemoveWorkDir
+  * logging: add prefixes CG, NL, NET
+  * core: get cgroup from crashed thread
+  * core: replace process name with exe file name in new format
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 01 Dec 2017 15:44:18 +0300
+
 yandex-porto (4.3.1) unstable; urgency=low
 
   * volume: fix racy project quota enabling and checking
