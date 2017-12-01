@@ -727,11 +727,11 @@ If default\_pattern ends with '.gz' or '.xz' core will be compressed.
 File owner set according to **owner_user** and **owner_group**.
 
 For uncompressed format porto detects zero pages and turns them into file holes
-and flushes written data to disk every 4Mb (set by option core.sync_size).
+and flushes written data to disk every 4Mb (set by option core.sync\_size).
 
 Porto also creates hardlink in same directory with name:
 ```
-${CORE_CONTAINER//\//%}%${CORE_TASK_NAME}.${CORE_PID}.S${CORE_SIG}.$(date +%Y%m%dT%H%M%S).core
+${CORE_CONTAINER//\//%}%${CORE_EXE_NAME}.${CORE_PID}.S${CORE_SIG}.$(date +%Y%m%dT%H%M%S).core
 ```
 
 Option space\_limit\_mb limits total size of default pattern directory,

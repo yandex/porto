@@ -78,22 +78,22 @@ TError TCore::Handle(const TTuple &args) {
     error = Identify();
 
     if (!Ulimit || !Dumpable) {
-        L_ACT("Ignore core dump from container {}: {} {} {}",
-                Container, ProcessName, Pid, Signal);
+        L_ACT("Ignore core dump from container {} {} {}:{} thread {}:{} signal {}",
+                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
         return TError::Success();
     }
 
     if (!error && CoreCommand.size()) {
-        L_ACT("Forward core from container {}: {} {} signal {}",
-                Container, ProcessName, Pid, Signal);
+        L_ACT("Forward core from container {} {} {}:{} thread {}:{} signal {}",
+                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
         error = Forward();
         if (error)
             L("Cannot forward core from container {}: {}", Container, error);
     }
 
     if ((error || !CoreCommand.size()) && DefaultPattern) {
-        L_ACT("Save core from container {}: {} pid {} signal {}",
-                Container, ProcessName, Pid, Signal);
+        L_ACT("Save core from container {} {} {}:{} thread {}:{} signal {}",
+                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
 
         error = Save();
         if (error)
@@ -234,7 +234,7 @@ TError TCore::Save() {
         format = ".core.xz";
     }
 
-    Pattern = dir / ( Prefix + ProcessName + "." + std::to_string(Pid) +
+    Pattern = dir / ( Prefix + ExeName + "." + std::to_string(Pid) +
               ".S" + std::to_string(Signal) + "." +
               FormatTime(time(nullptr), "%Y%m%dT%H%M%S") + format);
 
