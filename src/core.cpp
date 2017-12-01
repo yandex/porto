@@ -65,7 +65,7 @@ TError TCore::Handle(const TTuple &args) {
     OpenLog(PORTO_LOG);
     SetProcessName("portod-core");
 
-    error = TPath("/proc/" + std::to_string(Pid) + "/exe").ReadLink(ExePath);
+    error = TPath("/proc/" + std::to_string(Tid) + "/exe").ReadLink(ExePath);
     if (!error) {
         ExeName = ExePath.BaseName();
         if (StringEndsWith(ExeName, " (deleted)"))
@@ -107,7 +107,8 @@ TError TCore::Identify() {
     TStringMap cgmap;
     TError error;
 
-    error = GetTaskCgroups(Pid, cgmap);
+    /* all threads except crashed are zombies */
+    error = GetTaskCgroups(Tid, cgmap);
     if (!error && !cgmap.count("freezer"))
         error = TError(EError::Unknown, "freezer not found");
     if (error) {
