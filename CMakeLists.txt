@@ -83,6 +83,7 @@ else()
 endif()
 
 enable_testing()
+add_custom_target(porto_test COMMAND ctest -V -T Test)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
