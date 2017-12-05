@@ -24,7 +24,7 @@ add_test(NAME cleanup_portod
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME cleanup_logs
-         COMMAND sudo rm -f /var/log/portod.*
+         COMMAND sudo sh -c "rm -f /var/log/portod.*"
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME portod_start
