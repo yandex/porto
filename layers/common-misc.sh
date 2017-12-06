@@ -1,7 +1,6 @@
 APT_GET="apt-get --yes --no-install-recommends"
 
 $APT_GET install \
-atop \
 bc \
 binutils \
 bsd-mailx \
