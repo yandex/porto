@@ -443,25 +443,28 @@ std::string StringFormat(const char *format, ...) {
     return result;
 }
 
-TError StringToCpuValue(const std::string &str, double &value) {
+TError StringToCpuPower(const std::string &str, uint64_t &power) {
     double val;
     std::string unit;
 
     TError error = StringToValue(str, val, unit);
     if (error || val < 0)
-        return TError(EError::InvalidValue, "Invalid cpu value " + str);
+        return TError(EError::InvalidValue, "Invalid cpu power value " + str);
 
     if (unit == "")
-        value = val / 100 * GetNumCores();
+        power = val * CPU_POWER_PER_SEC / 100 * GetNumCores();
     else if (unit == "c")
-        value = val;
+        power = val * CPU_POWER_PER_SEC;
+    else if (unit == "ns")
+        power = val;
     else
-        return TError(EError::InvalidValue, "Invalid cpu unit " + str);
-
-    if (value < 0)
-        return TError(EError::InvalidValue, "negative cpu count");
+        return TError(EError::InvalidValue, "Invalid cpu power unit " + str);
 
     return TError::Success();
+}
+
+std::string CpuPowerToString(uint64_t nsec) {
+    return fmt::format("{:g}c", (double)nsec / CPU_POWER_PER_SEC);
 }
 
 TError UintMapToString(const TUintMap &map, std::string &value) {

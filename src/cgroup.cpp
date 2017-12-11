@@ -667,21 +667,18 @@ TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
     return TError::Success();
 }
 
-TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
-                                  double weight, uint64_t period,
-                                  double guarantee, double limit) {
-    int max = GetNumCores();
+TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     TError error;
 
     period = period / 1000; /* ns -> us */
 
     if (HasQuota) {
-        int64_t quota = std::ceil(limit * period);
+        int64_t quota = std::ceil((double)limit * period / CPU_POWER_PER_SEC);
 
         if (quota < 1000) /* 1ms */
             quota = 1000;
 
-        if (limit <= 0 || limit >= max)
+        if (!limit)
             quota = -1;
 
         error = cg.Set("cpu.cfs_period_us", std::to_string(period));
@@ -692,15 +689,17 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         if (error)
             return error;
     }
+    return TError::Success();
+}
 
-    if (guarantee < 0)
-        guarantee = 0;
+TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
+        double weight, uint64_t period, uint64_t guarantee) {
+    TError error;
 
-    if (guarantee > max)
-        guarantee = max;
+    period = period / 1000; /* ns -> us */
 
     if (HasReserve && config().container().enable_cpu_reserve()) {
-        uint64_t reserve = std::floor(guarantee * period);
+        uint64_t reserve = std::floor((double)guarantee * period / CPU_POWER_PER_SEC);
         uint64_t shares = BaseShares, reserve_shares = BaseShares;
 
         shares *= weight;
@@ -731,7 +730,7 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             return error;
 
     } else if (HasShares) {
-        uint64_t shares = std::floor(guarantee * BaseShares);
+        uint64_t shares = std::floor((double)guarantee * BaseShares / CPU_POWER_PER_SEC);
 
         /* default cpu_guarantee is 1c, shares < 1024 are broken */
         shares = std::max(shares, BaseShares);
@@ -752,7 +751,16 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             return error;
     }
 
+    return TError::Success();
+}
+
+TError TCpuSubsystem::SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
+    TError error;
+
+    period = period / 1000; /* ns -> us */
+
     if (HasRtGroup && config().container().rt_priority()) {
+        uint64_t max = GetNumCores() * CPU_POWER_PER_SEC;
         int64_t root_runtime, root_period, runtime;
 
         if (RootCgroup().GetInt64("cpu.rt_period_us", root_period))
@@ -764,10 +772,10 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
             root_runtime = root_period;
 
         if (limit <= 0 || limit >= max ||
-                limit / max * root_period > root_runtime) {
+                (double)limit / max * root_period > root_runtime) {
             runtime = -1;
         } else {
-            runtime = limit * period / max;
+            runtime = (double)limit * period / max;
             if (runtime < 1000)  /* 1ms */
                 runtime = 1000;
         }
@@ -780,13 +788,10 @@ TError TCpuSubsystem::SetCpuLimit(TCgroup &cg, const std::string &policy,
         if (!error)
             error = cg.SetInt64("cpu.rt_runtime_us", runtime);
         if (error) {
-            if (policy == "rt")
-                return TError(error, "Cannot setup rt cpu_limit");
-            L_WRN("Cannot setup rt cpu_limit: {}", error);
             (void)cg.SetInt64("cpu.rt_runtime_us", 0);
+            return error;
         }
     }
-
     return TError::Success();
 }
 

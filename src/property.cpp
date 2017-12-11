@@ -1969,48 +1969,38 @@ public:
 
 class TCpuLimit : public TProperty {
 public:
-    TError Set(const std::string &limit);
-    TError Get(std::string &value);
     TCpuLimit() : TProperty(P_CPU_LIMIT, EProperty::CPU_LIMIT,
                             "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c "
                             " [cores] (dynamic)")
     {
         RequireControllers = CGROUP_CPU;
     }
-} static CpuLimit;
-
-TError TCpuLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_CPU);
-    if (error)
-        return error;
-
-    double new_limit;
-    error = StringToCpuValue(limit, new_limit);
-    if (error)
-        return error;
-
-    if (new_limit <= 0)
-        new_limit = GetNumCores();
-
-    if (new_limit > CT->Parent->CpuLimit && !CL->IsSuperUser())
-        return TError(EError::InvalidValue, "cpu limit bigger than for parent");
-
-    if (CT->CpuLimit != new_limit) {
-        CT->CpuLimit = new_limit;
-        CT->SetProp(EProperty::CPU_LIMIT);
+    TError Get(std::string &value) {
+        value = CpuPowerToString(CT->CpuLimit);
+        return TError::Success();
     }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
 
-    return TError::Success();
-}
+        error = WantControllers(CGROUP_CPU);
+        if (error)
+            return error;
 
-TError TCpuLimit::Get(std::string &value) {
-    value = StringFormat("%lgc", CT->CpuLimit);
-    return TError::Success();
-}
+        uint64_t limit;
+        error = StringToCpuPower(value, limit);
+        if (error)
+            return error;
+
+        if (CT->CpuLimit != limit) {
+            CT->CpuLimit = limit;
+            CT->SetProp(EProperty::CPU_LIMIT);
+        }
+
+        return TError::Success();
+    }
+} static CpuLimit;
 
 class TCpuLimitTotal : public TProperty {
 public:
@@ -2021,50 +2011,41 @@ public:
     }
     TError Get(std::string &value) {
         if (CT->CpuLimitSum)
-            value = StringFormat("%lgc", CT->CpuLimitSum);
+            value = CpuPowerToString(CT->CpuLimitSum);
         return TError::Success();
     }
 } static CpuLimitTotal;
 
 class TCpuGuarantee : public TProperty {
 public:
-    TError Set(const std::string &guarantee);
-    TError Get(std::string &value);
     TCpuGuarantee() : TProperty(P_CPU_GUARANTEE, EProperty::CPU_GUARANTEE,
                                 "CPU guarantee: 0-100.0 [%] | "
                                 "0.0c-<CPUS>c [cores] (dynamic)")
     {
         RequireControllers = CGROUP_CPU;
     }
-} static CpuGuarantee;
-
-TError TCpuGuarantee::Set(const std::string &guarantee) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_CPU);
-    if (error)
-        return error;
-
-    double new_guarantee;
-    error = StringToCpuValue(guarantee, new_guarantee);
-    if (error)
-        return error;
-
-    if (CT->CpuGuarantee != new_guarantee) {
-        CT->CpuGuarantee = new_guarantee;
-        CT->SetProp(EProperty::CPU_GUARANTEE);
+    TError Get(std::string &value) {
+        value = CpuPowerToString(CT->CpuGuarantee);
+        return TError::Success();
     }
-
-    return TError::Success();
-}
-
-TError TCpuGuarantee::Get(std::string &value) {
-    value = StringFormat("%lgc", CT->CpuGuarantee);
-
-    return TError::Success();
-}
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        error = WantControllers(CGROUP_CPU);
+        if (error)
+            return error;
+        uint64_t guarantee;
+        error = StringToCpuPower(value, guarantee);
+        if (error)
+            return error;
+        if (CT->CpuGuarantee != guarantee) {
+            CT->CpuGuarantee = guarantee;
+            CT->SetProp(EProperty::CPU_GUARANTEE);
+        }
+        return TError::Success();
+    }
+} static CpuGuarantee;
 
 class TCpuGuaranteeTotal : public TProperty {
 public:
@@ -2075,7 +2056,7 @@ public:
     }
     TError Get(std::string &value) {
         if (CT->CpuGuarantee || CT->CpuGuaranteeSum)
-            value = StringFormat("%lgc", std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
+            value = CpuPowerToString(std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
         return TError::Success();
     }
 } static CpuGuaranteeTotal;

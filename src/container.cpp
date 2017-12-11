@@ -331,10 +331,10 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     CpuPolicy = "normal";
     ChooseSchedPolicy();
 
-    CpuLimit = GetNumCores();
     CpuPeriod = config().container().cpu_period();
 
     if (IsRoot()) {
+        CpuLimit = GetNumCores() * CPU_POWER_PER_SEC;
         SetProp(EProperty::CPU_LIMIT);
         SetProp(EProperty::MEM_LIMIT);
     }
@@ -1229,7 +1229,7 @@ TError TContainer::DistributeCpus() {
 
         L_VERBOSE("Distribute CPUs {} in {}", parent->CpuVacant.Format(), parent->Name);
 
-        double vacantGuarantee = 0;
+        uint64_t vacantGuarantee = 0;
 
         for (auto type: order) {
             for (auto &ct: childs) {
@@ -1297,7 +1297,7 @@ TError TContainer::DistributeCpus() {
             }
         }
 
-        if (vacantGuarantee > parent->CpuVacant.Weight()) {
+        if (vacantGuarantee > parent->CpuVacant.Weight() * CPU_POWER_PER_SEC) {
             if (!parent->CpuVacant.IsEqual(parent->CpuAffinity))
                 return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in " + parent->Name);
             L("CPU guarantee overcommit in {}", parent->Name);
@@ -1353,34 +1353,30 @@ TError TContainer::DistributeCpus() {
     return TError::Success();
 }
 
-TError TContainer::PropagateCpuGuarantee() {
-    if (!config().container().propagate_cpu_guarantee())
-        return TError::Success();
-
+TError TContainer::ApplyCpuGuarantee() {
     auto cpu_lock = LockCpuAffinity();
     TError error;
 
-    CpuGuaranteeSum = 0;
-
-    auto ct_lock = LockContainers();
-    for (auto child: Children) {
-        if (child->State == EContainerState::Running ||
-                child->State == EContainerState::Meta ||
-                child->State == EContainerState::Starting)
-            CpuGuaranteeSum += std::max(child->CpuGuarantee,
-                                        child->CpuGuaranteeSum);
+    if (config().container().propagate_cpu_guarantee()) {
+        auto ct_lock = LockContainers();
+        CpuGuaranteeSum = 0;
+        for (auto child: Children) {
+            if (child->State == EContainerState::Running ||
+                    child->State == EContainerState::Meta ||
+                    child->State == EContainerState::Starting)
+                CpuGuaranteeSum += std::max(child->CpuGuarantee, child->CpuGuaranteeSum);
+        }
+        ct_lock.unlock();
     }
-    ct_lock.unlock();
 
     auto cur = std::max(CpuGuarantee, CpuGuaranteeSum);
     if (!IsRoot() && (Controllers & CGROUP_CPU) && cur != CpuGuaranteeCur) {
-        L_ACT("Propagate cpu guarantee CT{}:{} {}c -> {}c",
-                Id, Name, CpuGuaranteeCur, cur);
+        L_ACT("Set cpu guarantee CT{}:{} {} -> {}", Id, Name,
+                CpuPowerToString(CpuGuaranteeCur), CpuPowerToString(cur));
         auto cpucg = GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy, CpuWeight,
-                                         CpuPeriod, cur, CpuLimit);
+        error = CpuSubsystem.SetGuarantee(cpucg, CpuPolicy, CpuWeight, CpuPeriod, cur);
         if (error) {
-            L_ERR("Cannot propagate cpu guarantee: {}", error);
+            L_ERR("Cannot set cpu guarantee: {}", error);
             return error;
         }
         CpuGuaranteeCur = cur;
@@ -1390,34 +1386,100 @@ TError TContainer::PropagateCpuGuarantee() {
 }
 
 void TContainer::PropagateCpuLimit() {
+    uint64_t max = RootContainer->CpuLimit;
     auto ct_lock = LockContainers();
 
     for (auto ct = this; ct; ct = ct->Parent.get()) {
-        double sum = 0;
+        uint64_t sum = 0;
 
         if (ct->State == EContainerState::Running ||
                 (ct->State == EContainerState::Starting && !ct->IsMeta()))
-            sum += ct->CpuLimit;
+            sum += ct->CpuLimit ?: max;
 
         for (auto &child: ct->Children) {
             if (child->State == EContainerState::Running ||
                     child->State == EContainerState::Starting && !child->IsMeta())
-                sum += child->CpuLimit;
+                sum += child->CpuLimit ?: max;
             else if (child->State == EContainerState::Meta)
-                sum += std::min(child->CpuLimit, child->CpuLimitSum);
+                sum += std::min(child->CpuLimit ?: max, child->CpuLimitSum);
         }
 
         if (sum == ct->CpuLimitSum)
             break;
 
-        L_DBG("Propagate total cpu limit CT{}:{} {}c -> {}c",
-                    ct->Id, ct->Name, ct->CpuLimitSum, sum);
+        L_DBG("Propagate total cpu limit CT{}:{} {} -> {}", ct->Id, ct->Name,
+                CpuPowerToString(ct->CpuLimitSum), CpuPowerToString(sum));
 
         ct->CpuLimitSum = sum;
     }
 
     ct_lock.unlock();
 }
+
+TError TContainer::SetCpuLimit(uint64_t limit) {
+    auto cpucg = GetCgroup(CpuSubsystem);
+    TError error;
+
+    L_ACT("Set cpu limit CT{}:{} {} -> {}", Id, Name,
+            CpuPowerToString(CpuLimitCur), CpuPowerToString(limit));
+
+    error = CpuSubsystem.SetRtLimit(cpucg, CpuPeriod, limit);
+    if (error) {
+        if (CpuPolicy == "rt")
+            return error;
+        L_WRN("Cannot set rt cpu limit: {}", error);
+    }
+
+    error = CpuSubsystem.SetLimit(cpucg, CpuPeriod, limit);
+    if (error)
+        return error;
+
+    CpuLimitCur = limit;
+    return TError::Success();
+}
+
+TError TContainer::ApplyCpuLimit() {
+    uint64_t limit = CpuLimit;
+    TError error;
+
+    for (auto *p = Parent.get(); p; p = p->Parent.get()) {
+        if (p->CpuLimit && p->CpuLimit <= limit) {
+            L_ACT("Disable cpu limit {} for CT{}:{} parent CT{}:{} has lower limit {}",
+                 CpuPowerToString(limit), Id, Name,
+                 p->Id, p->Name, CpuPowerToString(p->CpuLimit));
+            limit = 0;
+            break;
+        }
+    }
+
+    auto subtree = Subtree();
+
+    if (limit && (limit < CpuLimitCur || !CpuLimitCur)) {
+        for (auto &ct: subtree)
+            if (ct.get() != this && ct->State != EContainerState::Stopped &&
+                    (ct->Controllers & CGROUP_CPU) && ct->CpuLimitCur > limit)
+                ct->SetCpuLimit(limit);
+    }
+
+    error = SetCpuLimit(limit);
+    if (error)
+        return error;
+
+    for (auto &ct: subtree) {
+        if (ct.get() != this && ct->State != EContainerState::Stopped &&
+                (ct->Controllers & CGROUP_CPU)) {
+            uint64_t limit = ct->CpuLimit;
+            for (auto *p = ct->Parent.get(); p && limit; p = p->Parent.get())
+                if (p->CpuLimit && p->CpuLimit <= limit)
+                    limit = 0;
+            if (limit != ct->CpuLimitCur)
+                ct->SetCpuLimit(limit);
+        }
+    }
+
+    return TError::Success();
+}
+
 
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
@@ -1544,11 +1606,15 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (TestPropDirty(EProperty::CPU_GUARANTEE)) {
-        for (auto parent = Parent; parent; parent = parent->Parent) {
-            error = parent->PropagateCpuGuarantee();
+    if ((Controllers & CGROUP_CPU) &&
+            (TestPropDirty(EProperty::CPU_PERIOD) |
+             TestClearPropDirty(EProperty::CPU_GUARANTEE))) {
+        for (auto ct = this; ct; ct = ct->Parent.get()) {
+            error = ct->ApplyCpuGuarantee();
             if (error)
                 return error;
+            if (!config().container().propagate_cpu_guarantee())
+                break;
         }
     }
 
@@ -1559,17 +1625,10 @@ TError TContainer::ApplyDynamicProperties() {
             (TestPropDirty(EProperty::CPU_POLICY) |
              TestPropDirty(EProperty::CPU_WEIGHT) |
              TestClearPropDirty(EProperty::CPU_LIMIT) |
-             TestClearPropDirty(EProperty::CPU_PERIOD) |
-             TestClearPropDirty(EProperty::CPU_GUARANTEE))) {
-        auto cpucg = GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetCpuLimit(cpucg, CpuPolicy, CpuWeight,
-                CpuPeriod, std::max(CpuGuarantee, CpuGuaranteeSum), CpuLimit);
-        if (error) {
-            if (error.GetErrno() != EINVAL)
-                L_ERR("Cannot set cpu policy: {}", error);
+             TestClearPropDirty(EProperty::CPU_PERIOD))) {
+        error = ApplyCpuLimit();
+        if (error)
             return error;
-        }
-        CpuGuaranteeCur = std::max(CpuGuarantee, CpuGuaranteeSum);
     }
 
     if (TestClearPropDirty(EProperty::CPU_POLICY) ||
@@ -2329,9 +2388,9 @@ void TContainer::FreeRuntimeResources() {
 
     PropagateCpuLimit();
 
-    if (CpuGuarantee) {
-        for (auto parent = Parent; parent; parent = parent->Parent)
-            (void)parent->PropagateCpuGuarantee();
+    if (CpuGuarantee && config().container().propagate_cpu_guarantee()) {
+        for (auto p = Parent; p; p = p->Parent)
+            (void)p->ApplyCpuGuarantee();
     }
 }
 

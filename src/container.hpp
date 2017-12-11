@@ -13,7 +13,6 @@
 #include "util/idmap.hpp"
 #include "task.hpp"
 #include "stream.hpp"
-#include "cgroup.hpp"
 #include "property.hpp"
 #include "network.hpp"
 
@@ -99,7 +98,9 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                        TBitMap &threads, TBitMap &cores);
     TError DistributeCpus();
-    TError PropagateCpuGuarantee();
+    TError SetCpuLimit(uint64_t limit);
+    TError ApplyCpuLimit();
+    TError ApplyCpuGuarantee();
     void PropagateCpuLimit();
 
 public:
@@ -188,8 +189,8 @@ public:
     int SchedPrio;
     int SchedNice;
 
-    double CpuLimit = 0;
-    double CpuGuarantee = 0;
+    uint64_t CpuLimit = 0;
+    uint64_t CpuGuarantee = 0;
     double CpuWeight = 1;
     uint64_t CpuPeriod;
 
@@ -201,9 +202,10 @@ public:
     TBitMap CpuReserve;
 
     /* Under CpuAffinityMutex */
-    double CpuGuaranteeSum = 0;
-    double CpuGuaranteeCur = 0;
-    double CpuLimitSum = 0;
+    uint64_t CpuGuaranteeSum = 0;
+    uint64_t CpuGuaranteeCur = 0;
+    uint64_t CpuLimitSum = 0;
+    uint64_t CpuLimitCur = 0;
 
     bool ToRespawn;
     int MaxRespawns;
