@@ -90,7 +90,9 @@ def SnapshotProps(r):
     props = [ "aging_time", "anon_limit", "bind",
               #"capabilities", #FIXME enable later, os: "<set1>" -> "<set2>" ,
                                #app: "" -> "<not empty>"
-              "command", "cpu_guarantee", "cpu_limit", "cpu_policy",
+              "command", "cpu_guarantee",
+              # "cpu_limit",
+              "cpu_policy",
               "cwd", "devices", "enable_porto", "env",
               #"group",
               "hostname",
