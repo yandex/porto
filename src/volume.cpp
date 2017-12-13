@@ -1516,13 +1516,22 @@ TError TVolume::Configure(const TStringMap &cfg) {
 
     InternalPath = Place / PORTO_VOLUMES / Id / "volume";
 
+    std::shared_ptr<TContainer> target;
+
+    if (cfg.count(V_TARGET_CONTAINER)) {
+        error = CL->WriteContainer(cfg.at(V_TARGET_CONTAINER), target, true);
+        if (error)
+            return error;
+    } else
+        target = CL->ClientContainer;
+
     /* Verify volume path */
     if (!Path.IsEmpty()) {
         if (!Path.IsAbsolute())
             return TError(EError::InvalidValue, "Volume path must be absolute");
         if (!Path.IsNormal())
             return TError(EError::InvalidValue, "Volume path must be normalized");
-        Path = CL->ResolvePath(Path);
+        Path = target->RootPath / Path;
         if (!Path.Exists())
             return TError(EError::InvalidValue, "Volume path does not exist");
         if (!Path.IsDirectoryStrict())
@@ -1530,12 +1539,12 @@ TError TVolume::Configure(const TStringMap &cfg) {
         if (IsSystemPath(Path))
             return TError(EError::InvalidValue, "Volume in system directory");
     } else {
-        if (CL->ClientContainer->RootPath.IsRoot()) {
+        if (target->RootPath.IsRoot()) {
             /* /place/porto_volumes/<id>/volume */
             Path = InternalPath;
         } else {
             /* /chroot/porto/volume_<id> */
-            TPath porto_path = CL->ResolvePath(PORTO_CHROOT_VOLUMES);
+            TPath porto_path = target->RootPath / PORTO_CHROOT_VOLUMES;
             if (!porto_path.Exists()) {
                 error = porto_path.Mkdir(0755);
                 if (error)
@@ -2435,7 +2444,8 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_STATE,       "volume state (ro)", true },
     { V_PRIVATE,     "user-defined property", false },
-    { V_OWNER_CONTAINER, "owner container (default - creator)", false },
+    { V_TARGET_CONTAINER, "target container (default - self)", false },
+    { V_OWNER_CONTAINER, "owner container (default - self)", false },
     { V_OWNER_USER,  "owner user (default - creator)", false },
     { V_OWNER_GROUP, "owner group (default - creator)", false },
     { V_USER,        "directory user (default - creator)", false },
@@ -2443,7 +2453,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_PERMISSIONS, "directory permissions (default - 0775)", false },
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", false },
-    { V_CONTAINERS,  "container;... - initial links, default - self", false },
+    { V_CONTAINERS,  "container;... - initial links (default - self)", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_PLACE_KEY,   "key for charging place_limit for owner_container (ro)", true },
@@ -2745,6 +2755,8 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_BACKEND) {
             BackendType = prop.second;
+
+        } else if (prop.first == V_TARGET_CONTAINER) {
 
         } else if (prop.first == V_OWNER_CONTAINER) {
 

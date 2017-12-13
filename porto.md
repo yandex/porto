@@ -818,6 +818,10 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **owner\_group**  - owner group, default: creator
 
+* **target\_container** - define root path, default: creator
+
+    Volume will be created inside **root** path of this container.
+
 * **user**          - directory user, default: creator
 
 * **group**         - directory group, default: creator

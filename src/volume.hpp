@@ -19,6 +19,7 @@ constexpr const char *V_RAW_CONTAINERS = "_containers";
 constexpr const char *V_CONTAINERS = "containers";
 constexpr const char *V_LOOP_DEV = "_loop_dev";
 constexpr const char *V_AUTO_PATH = "_auto_path";
+constexpr const char *V_TARGET_CONTAINER = "target_container";
 
 constexpr const char *V_OWNER_CONTAINER = "owner_container";
 constexpr const char *V_OWNER_USER = "owner_user";
