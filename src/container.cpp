@@ -1687,6 +1687,14 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
+    if (TestClearPropDirty(EProperty::DEVICE_CONF)) {
+        error = ApplyDeviceConf();
+        if (error) {
+            L_ERR("Cannot change allowed devices: {}", error);
+            return error;
+        }
+    }
+
     return TError::Success();
 }
 
@@ -1725,6 +1733,42 @@ TError TContainer::PrepareOomMonitor() {
     return error;
 }
 
+TError TContainer::ApplyDeviceConf() const {
+    TMultiTuple allow = SplitEscapedString(DeviceConf, ' ', ';');
+    TPath root = fmt::format("/proc/{}/root", WaitTask.Pid);
+    TCgroup cg = GetCgroup(DevicesSubsystem);
+    TDevice device;
+    TError error;
+
+    for (auto &cfg: allow) {
+        error = device.Parse(cfg);
+        if (error)
+            return error;
+
+        error = device.Permitted(CL->Cred);
+        if (error)
+            return error;;
+
+        error = DevicesSubsystem.ApplyDevice(cg, device);
+        if (error)
+            return error;
+
+        if (!RootPath.IsRoot() && !device.Wildcard) {
+            if (device.Read || device.Write) {
+                error = device.Makedev(root);
+                if (error)
+                    return error;
+            } else {
+                error = (root / device.Name).Unlink();
+                if (error)
+                    L_WRN("Cannot remove device node {}", device.Name);
+            }
+        }
+    }
+
+    return TError::Success();
+}
+
 TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     auto cg = GetCgroup(DevicesSubsystem);
     TDevice device;
@@ -1739,18 +1783,22 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
             return error;
     }
 
-    for (auto &cfg: Devices) {
+    TMultiTuple allow = SplitEscapedString(DeviceConf, ' ', ';');
+    for (auto &cfg: allow) {
         error = device.Parse(cfg);
         if (error)
-            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+            return error;
+
+        if (!device.Wildcard)
+            device.Mknod = true; //FIXME requires for mknod in Makedev at start
 
         error = device.Permitted(OwnerCred);
         if (error)
-            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+            return error;
 
         error = DevicesSubsystem.ApplyDevice(cg, device);
         if (error)
-            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+            return error;
 
         devices.push_back(device);
     }
@@ -1759,7 +1807,10 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     for (auto &cfg: extra) {
         error = device.Parse(cfg);
         if (error)
-            return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+            return error;
+
+        if (!device.Wildcard)
+            device.Mknod = true; //FIXME requires for mknod in Makedev at start
 
         bool found = false;
         for (auto &dev: devices)
@@ -1770,7 +1821,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
         if (Level == 1) {
             error = DevicesSubsystem.ApplyDevice(cg, device);
             if (error)
-                return TError(error, "device: " + MergeEscapeStrings(cfg, ' '));
+                return error;
         }
 
         if (!RootPath.IsRoot())
@@ -2116,6 +2167,7 @@ TError TContainer::StartTask() {
 
     /* Applied by starting task */
     TestClearPropDirty(EProperty::RESOLV_CONF);
+    TestClearPropDirty(EProperty::DEVICE_CONF);
 
     error = ApplyDynamicProperties();
     if (error)

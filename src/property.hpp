@@ -189,7 +189,7 @@ enum class EProperty {
     BIND,
     NET,
     NET_TOS,
-    DEVICES,
+    DEVICE_CONF,
     CAPABILITIES,
     IP,
     IP_LIMIT,

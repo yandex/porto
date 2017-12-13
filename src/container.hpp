@@ -74,6 +74,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplySchedPolicy() const;
     TError ApplyIoPolicy() const;
     TError ApplyResolvConf() const;
+    TError ApplyDeviceConf() const;
     TError ApplyDynamicProperties();
     TError PrepareOomMonitor();
     void ShutdownOom();
@@ -150,7 +151,7 @@ public:
     TCapabilities CapBound;     /* actual bounding set */
     TMultiTuple DefaultGw;
     std::string ResolvConf;
-    TMultiTuple Devices;
+    std::string DeviceConf;
     TStringMap Sysctl;
 
     time_t RealCreationTime;

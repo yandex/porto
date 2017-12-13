@@ -54,9 +54,6 @@ TError TDevice::Parse(TTuple &opt) {
         }
     }
 
-    if (!Wildcard)
-        Mknod = true; //FIXME requires for mknod in Makedev at start
-
     if (opt.size() > 2)
         Name = opt[2];
 
@@ -152,19 +149,19 @@ TError TDevice::Permitted(const TCred &cred) const {
         return error;
 
     if (Read && !TFile::Access(st, cred, TFile::R))
-        return TError(EError::Permission, "No read access");
+        return TError(EError::Permission, cred.ToString() + " has no read permissions for " + Path.ToString());
 
     if (Write && !TFile::Access(st, cred, TFile::W))
-        return TError(EError::Permission, "No write access");
+        return TError(EError::Permission, cred.ToString() + " has no write permissions for " + Path.ToString());
 
     if (Privileged && !cred.IsRootUser())
-        return TError(EError::Permission, "Not root user");
+        return TError(EError::Permission, cred.ToString() + " isn't root user for " + Path.ToString());
 
     return TError::Success();
 }
 
-TError TDevice::Makedev() const {
-    TPath path(Name);
+TError TDevice::Makedev(const TPath &root) const {
+    TPath path = root / Name;
     TError error;
 
     error = path.DirName().MkdirAll(0755);

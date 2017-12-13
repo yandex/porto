@@ -251,6 +251,9 @@ container { default_ulimit: "type: soft hard;..." }
     /dev/ptmx  
     /dev/pts/*  
 
+    Inside chroots porto creates device nodes in /dev only for allowed devices.
+    Permissions could be changes in runtime.
+
     Access to devices for all containers could be granted in portod.conf:
 ```
 container { extra_devices: "<device> [rwm]... ;..." }

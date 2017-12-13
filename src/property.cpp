@@ -1413,25 +1413,26 @@ public:
 
 class TDevices : public TProperty {
 public:
-    TDevices() : TProperty(P_DEVICES, EProperty::DEVICES,
+    TDevices() : TProperty(P_DEVICES, EProperty::DEVICE_CONF,
                                    "Devices that container can access: "
                                    "<device> [r][w][m][-] [name] [mode] "
-                                   "[user] [group]; ...")
+                                   "[user] [group]; ... (dynamic)")
     {
         RequireControllers = CGROUP_DEVICES;
     }
     TError Get(std::string &value) {
-        value = MergeEscapeStrings(CT->Devices, ' ', ';');
+        value = CT->DeviceConf;
         return TError::Success();
     }
-    TError Set(const std::string &dev) {
-        TError error = WantControllers(CGROUP_DEVICES);
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
         if (error)
             return error;
-
-        CT->Devices = SplitEscapedString(dev, ' ', ';');
-        CT->SetProp(EProperty::DEVICES);
-
+        error = WantControllers(CGROUP_DEVICES);
+        if (error)
+            return error;
+        CT->DeviceConf = value;
+        CT->SetProp(EProperty::DEVICE_CONF);
         return TError::Success();
     }
 } static Devices;
