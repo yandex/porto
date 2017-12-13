@@ -367,17 +367,35 @@ write permissions to the target or owning related volume.
 
 ## Memory
 
-* **memory\_usage** - current memory usage: anon + cache
+* **memory\_usage** - current memory usage
+
+    This counts physical pages owned by this contianer:
+    - touched anonymounts\private **mmap(2)**, anonymous part of RSS
+    - tmpfs\shmem
+    - filesystem\disk cache
+
+    Task RSS is a count of touched pages in _virtual_ address space:
+    populated PTEs. It includes executable and other mapped files.
+    And doesn't include filesytem cache and unmapped tmpfs.
+    Also some pages could be mapped and counted multiple times.
 
 * **anon\_usage** - current anon memory usage
 
+    This counts physical pages that have no filesystem\disk backend:
+    anonymous RSS, tmpfs\shmem.
+
 * **cache\_usage** - current cache usage
+
+    Physical memory pages that have filesystem\disk backend,
+    potentially could be reclaimed by kernel.
 
 * **hugetlb\_usage** - current hugetlb memory usage
 
 * **hugetlb\_limit** - hugetlb memory limit
 
 * **max\_rss** - peak anon memory usage (offstream kernel feature)
+
+    Name is wrong for historical reasons.
 
 * **memory\_guarantee** - guarantee for memory\_usage, default: 0
 
