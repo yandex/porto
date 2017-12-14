@@ -622,7 +622,7 @@ static void TestHolder(Porto::Connection &api) {
     ExpectEq(state, "running");
     ExpectApiSuccess(api.Create("a/c"));
     ExpectApiSuccess(api.SetProperty("a/c", "command", "__invalid_command__"));
-    ExpectApiFailure(api.Start("a/c"), EError::InvalidValue);
+    ExpectApiFailure(api.Start("a/c"), EError::InvalidCommand);
     ExpectApiSuccess(api.GetData("a", "state", state));
     ExpectEq(state, "meta");
     ExpectApiSuccess(api.GetData("a/b", "state", state));
