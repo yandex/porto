@@ -9,6 +9,7 @@
 #include "util/unix.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
+#include "util/md5.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -369,9 +370,46 @@ static bool TarSupportsXattrs() {
         result = !null.OpenReadWrite("/dev/null") &&
                  !RunCommand({ "tar", "--create", "--xattrs",
                                "--files-from", "/dev/null"}, TFile(), null, null);
+        L_SYS("tar {}supports extended attributes", result ? "" : "not ");
         tested = true;
     }
     return result;
+}
+
+TError TStorage::SaveChecksums() {
+    TPathWalk walk;
+    TError error;
+
+    error = walk.OpenScan(Path);
+    if (error)
+        return error;
+
+    Size = 0;
+
+    while (1) {
+        error = walk.Next();
+        if (error)
+            return error;
+        if (!walk.Path)
+            break;
+        if (!walk.Postorder)
+            Size += walk.Stat->st_blocks * 512ull;
+        if (!S_ISREG(walk.Stat->st_mode))
+            continue;
+        TFile file;
+        error = file.OpenRead(walk.Path);
+        if (error)
+            return error;
+        std::string sum;
+        error = Md5Sum(file, sum);
+        if (error)
+            return error;
+        error = file.SetXAttr("user.porto.md5sum", sum);
+        if (error)
+            return error;
+    }
+
+    return OK;
 }
 
 TError TStorage::ImportArchive(const TPath &archive, const std::string &compress, bool merge) {
@@ -469,7 +507,8 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
             args.insert(args.begin() + 3, {
                         "--xattrs",
                         "--xattrs-include=security.capability",
-                        "--xattrs-include=trusted.overlay.*" });
+                        "--xattrs-include=trusted.overlay.*",
+                        "--xattrs-include=user.*"});
 
         error = RunCommand(args, import_dir, arc, TFile());
     } else if (compress_format == "squashfs") {
@@ -583,6 +622,17 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
         return error;
 
     IncPlaceLoad(Place);
+
+    if (Type == PORTO_VOLUMES && compress_format == "tar") {
+        L_ACT("Save checksums in {}", Path);
+        error = SaveChecksums();
+        if (error)
+            return error;
+        L("Unpacked size {} {}", Path, StringFormatSize(Size));
+        error = arc.SetXAttr("user.porto.unpacked_size", std::to_string(Size));
+        if (error)
+            L_WRN("Cannot save unpacked size in xattr: {}", error);
+    }
 
     if (compress_format == "tar") {
         TTuple args = { "tar",

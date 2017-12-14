@@ -13,6 +13,7 @@ public:
     TCred Owner;
     std::string Private;
     time_t LastChange = 0;
+    uint64_t Size = 0;
 
     TStorage(const TPath &place, const std::string &type,
              const std::string &name) :
@@ -32,6 +33,7 @@ public:
     TError Touch();
     TError SetOwner(const TCred &owner);
     TError SetPrivate(const std::string &text);
+    TError SaveChecksums();
 
     static void Init();
     static void IncPlaceLoad(const TPath &place);

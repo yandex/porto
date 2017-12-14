@@ -562,7 +562,7 @@ int64_t TPath::SinceModificationMs() const {
            (int64_t)st.st_mtim.tv_sec * 1000 - st.st_mtim.tv_nsec / 1000000;
 }
 
-TError TPath::GetXAttr(const std::string name, std::string &value) const {
+TError TPath::GetXAttr(const std::string &name, std::string &value) const {
     ssize_t size = syscall(SYS_lgetxattr, Path.c_str(), name.c_str(), nullptr, 0);
     if (size >= 0) {
         value.resize(size);
@@ -572,11 +572,10 @@ TError TPath::GetXAttr(const std::string name, std::string &value) const {
     return TError::System("getxattr(" + Path + ", " + name + ")");
 }
 
-TError TPath::SetXAttr(const std::string name, const std::string value) const {
+TError TPath::SetXAttr(const std::string &name, const std::string &value) const {
     if (syscall(SYS_setxattr, Path.c_str(), name.c_str(),
                 value.c_str(), value.length(), 0))
-        return TError(EError::Unknown, errno,
-                "setxattr(" + Path + ", " + name + ")");
+        return TError::System("setxattr {} {}", Path, name);
     return OK;
 }
 
@@ -1131,6 +1130,16 @@ TPath TFile::ProcPath(void) const {
     return TPath("/proc/self/fd/" + std::to_string(Fd));
 }
 
+TError TFile::Read(std::string &text) const {
+    if (!text.size())
+        text.resize(16<<10);
+    ssize_t ret = read(Fd, &text[0], text.size());
+    if (ret < 0)
+        return TError::System("read");
+    text.resize(ret);
+    return OK;
+}
+
 TError TFile::ReadAll(std::string &text, size_t max) const {
     struct stat st;
     if (fstat(Fd, &st) < 0)
@@ -1291,6 +1300,22 @@ TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
 TError TFile::Touch() const {
     if (futimes(Fd, NULL))
         return TError::System("futimes");
+    return OK;
+}
+
+TError TFile::GetXAttr(const std::string &name, std::string &value) const {
+    ssize_t size = syscall(SYS_fgetxattr, Fd, name.c_str(), nullptr, 0);
+    if (size >= 0) {
+        value.resize(size);
+        if (syscall(SYS_fgetxattr, Fd, name.c_str(), value.c_str(), size) >= 0)
+            return OK;
+    }
+    return TError::System("getxattr {}", name);
+}
+
+TError TFile::SetXAttr(const std::string &name, const std::string &value) const {
+    if (syscall(SYS_fsetxattr, Fd, name.c_str(), value.c_str(), value.length(), 0))
+        return TError::System("setxattr {}", name);
     return OK;
 }
 

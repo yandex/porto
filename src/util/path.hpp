@@ -145,8 +145,8 @@ public:
     TError ListSubdirs(std::vector<std::string> &result) const;
     TError ClearDirectory() const;
     TError StatFS(TStatFS &result) const;
-    TError GetXAttr(const std::string name, std::string &value) const;
-    TError SetXAttr(const std::string name, const std::string value) const;
+    TError GetXAttr(const std::string &name, std::string &value) const;
+    TError SetXAttr(const std::string &name, const std::string &value) const;
     TError Truncate(off_t size) const;
     TError RotateLog(off_t max_disk_usage, off_t &loss) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
@@ -233,6 +233,7 @@ public:
     static void CloseAll(std::vector<int> except);
     TPath RealPath(void) const;
     TPath ProcPath(void) const;
+    TError Read(std::string &text) const;
     TError ReadAll(std::string &text, size_t max) const;
     TError Truncate(off_t size) const;
     TError WriteAll(const std::string &text) const;
@@ -256,6 +257,8 @@ public:
     }
     TError ChmodAt(const TPath &path, mode_t mode) const;
     TError Touch() const;
+    TError GetXAttr(const std::string &name, std::string &value) const;
+    TError SetXAttr(const std::string &name, const std::string &value) const;
     TError WalkFollow(const TFile &dir, const TPath &path);
     TError WalkStrict(const TFile &dir, const TPath &path);
     TError Chdir() const;
