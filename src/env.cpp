@@ -25,15 +25,15 @@ TError TEnv::SetEnv(const std::string &name, const std::string &value,
             return TError(EError::InvalidValue, "variable " + name + " already set");
         if (var.Locked && value != var.Value) {
             L("Variable {} locked to {}, value {} is ignored", name, var.Value, value);
-            return TError::Success();
+            return OK;
         }
         var.Value = value;
         var.Set = true;
         var.Locked = lock;
-        return TError::Success();
+        return OK;
     }
     Vars.push_back({name, value, true, lock, ""});
-    return TError::Success();
+    return OK;
 }
 
 TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
@@ -44,14 +44,14 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
             return TError(EError::InvalidValue, "variable " + name + " already set");
         if (var.Locked && var.Set) {
             L("Variable {} locked to {}, unset is ignored", name, var.Value);
-            return TError::Success();
+            return OK;
         }
         var.Value = "";
         var.Set = false;
-        return TError::Success();
+        return OK;
     }
     Vars.push_back({name, "", false, false, ""});
-    return TError::Success();
+    return OK;
 }
 
 TError TEnv::Parse(const std::vector<std::string> &cfg, bool overwrite) {
@@ -67,7 +67,7 @@ TError TEnv::Parse(const std::vector<std::string> &cfg, bool overwrite) {
         if (error && overwrite)
             return error;
     }
-    return TError::Success();
+    return OK;
 }
 
 void TEnv::Format(std::vector<std::string> &cfg) const {
@@ -84,9 +84,9 @@ TError TEnv::Apply() const {
     clearenv();
     for (auto &var: Vars) {
         if (var.Set && setenv(var.Name.c_str(), var.Value.c_str(), 1))
-            return TError(EError::Unknown, errno, "setenv");
+            return TError::System("setenv");
     }
-    return TError::Success();
+    return OK;
 }
 
 char **TEnv::Envp() {

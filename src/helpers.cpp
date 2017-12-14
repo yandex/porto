@@ -21,7 +21,7 @@ TError RunCommand(const std::vector<std::string> &command,
     TPath path = dir.RealPath();
 
     if (!command.size())
-        return TError(EError::Unknown, "External command is empty");
+        return TError("External command is empty");
 
     error = err.CreateUnnamed("/tmp", O_APPEND);
     if (error)

@@ -187,10 +187,7 @@ void ICmd::PrintPair(const std::string &key, const std::string &val) {
 }
 
 void ICmd::PrintError(const TError &error, const string &str) {
-    if (error.GetMsg().length())
-        std::cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << std::endl;
-    else
-        std::cerr << str << ": " << ErrorName(error.GetError()) << std::endl;
+    std::cerr << str << ": " << error.ToString() << std::endl;
 }
 
 void ICmd::PrintError(const string &str) {

@@ -41,7 +41,7 @@ TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
 
     uid = pwd.pw_uid;
     gid = pwd.pw_gid;
-    return TError::Success();
+    return OK;
 }
 
 TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups) {
@@ -51,11 +51,11 @@ TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups
         groups.resize(ngroups);
         if (getgrouplist(user.c_str(), gid, groups.data(), &ngroups) >= 0) {
             groups.resize(ngroups);
-            return TError::Success();
+            return OK;
         }
     }
 
-    return TError(EError::Unknown, "Cannot list groups for " + user);
+    return TError("Cannot list groups for " + user);
 }
 
 TError UserId(const std::string &user, uid_t &uid) {
@@ -65,7 +65,7 @@ TError UserId(const std::string &user, uid_t &uid) {
 
     if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0) {
         uid = id;
-        return TError::Success();
+        return OK;
     }
 
     while (getpwnam_r(user.c_str(), &pwd, buf.data(), buf.size(), &ptr)) {
@@ -80,7 +80,7 @@ TError UserId(const std::string &user, uid_t &uid) {
         return TError(EError::InvalidValue, "Cannot find user: " + user);
 
     uid = pwd.pw_uid;
-    return TError::Success();
+    return OK;
 }
 
 std::string UserName(uid_t uid) {
@@ -112,7 +112,7 @@ TError GroupId(const std::string &group, gid_t &gid) {
 
     if (isdigit(group[0]) && !StringToInt(group, id) && id >= 0) {
         gid = id;
-        return TError::Success();
+        return OK;
     }
 
     while (getgrnam_r(group.c_str(), &grp, buf.data(), buf.size(), &ptr)) {
@@ -127,7 +127,7 @@ TError GroupId(const std::string &group, gid_t &gid) {
         return TError(EError::InvalidValue, "Cannot find group: " + group);
 
     gid = grp.gr_gid;
-    return TError::Success();
+    return OK;
 }
 
 std::string GroupName(gid_t gid) {
@@ -196,21 +196,21 @@ bool TCred::IsMemberOf(gid_t group) const {
 
 TError TCred::Apply() const {
     if (prctl(PR_SET_SECUREBITS, SECBIT_KEEP_CAPS | SECBIT_NO_SETUID_FIXUP, 0, 0, 0) < 0)
-        return TError(EError::Unknown, errno, "prctl(PR_SET_KEEPCAPS, 1)");
+        return TError::System("prctl(PR_SET_KEEPCAPS, 1)");
 
     if (setgid(Gid) < 0)
-        return TError(EError::Unknown, errno, "setgid()");
+        return TError::System("setgid()");
 
     if (setgroups(Groups.size(), Groups.data()) < 0)
-        return TError(EError::Unknown, errno, "setgroups()");
+        return TError::System("setgroups()");
 
     if (setuid(Uid) < 0)
-        return TError(EError::Unknown, errno, "setuid()");
+        return TError::System("setuid()");
 
     if (prctl(PR_SET_SECUREBITS, 0, 0, 0, 0) < 0)
-        return TError(EError::Unknown, errno, "prctl(PR_SET_KEEPCAPS, 0)");
+        return TError::System("prctl(PR_SET_KEEPCAPS, 0)");
 
-    return TError::Success();
+    return OK;
 }
 
 void InitPortoCgroups() {
@@ -303,7 +303,7 @@ TError TCapabilities::Load(pid_t pid, int type) {
     struct __user_cap_data_struct data[2];
 
     if (syscall(SYS_capget, &header, data) < 0)
-        return TError(EError::Unknown, errno, "capget " + Format());
+        return TError::System("capget " + Format());
 
     switch (type) {
         case 0: Permitted = data[0].effective | (uint64_t)data[1].effective << 32; break;
@@ -311,7 +311,7 @@ TError TCapabilities::Load(pid_t pid, int type) {
         case 2: Permitted = data[0].inheritable | (uint64_t)data[1].inheritable << 32; break;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TCapabilities::Dump() {
@@ -331,7 +331,7 @@ TError TCapabilities::Apply(int mask) const {
     struct __user_cap_data_struct data[2];
 
     if (mask != 7 && syscall(SYS_capget, &header, data) < 0)
-        return TError(EError::Unknown, errno, "capget");
+        return TError::System("capget");
 
     if (mask & 1) {
         data[0].effective = Permitted;
@@ -347,9 +347,9 @@ TError TCapabilities::Apply(int mask) const {
     }
 
     if (syscall(SYS_capset, &header, data) < 0)
-        return TError(EError::Unknown, errno, "capset " + Format());
+        return TError::System("capset " + Format());
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCapabilities::ApplyLimit() const {
@@ -363,14 +363,14 @@ TError TCapabilities::ApplyLimit() const {
 
     if (!(Permitted & BIT(CAP_SETPCAP)) &&
             prctl(PR_CAPBSET_DROP, CAP_SETPCAP, 0, 0, 0) < 0)
-        return TError(EError::Unknown, errno, "prctl(PR_CAPBSET_DROP, CAP_SETPCAP)");
+        return TError::System("prctl(PR_CAPBSET_DROP, CAP_SETPCAP)");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCapabilities::ApplyAmbient() const {
     if (!HasAmbientCapabilities)
-        return TError::Success();
+        return OK;
 
     TError error = Apply(4);
     if (error)
@@ -389,7 +389,7 @@ TError TCapabilities::ApplyAmbient() const {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCapabilities::ApplyEffective() const {

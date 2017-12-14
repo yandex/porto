@@ -43,11 +43,11 @@ bool TTask::Exists() const {
 
 TError TTask::Kill(int signal) const {
     if (!Pid)
-        return TError(EError::Unknown, "Task is not running");
+        return TError("Task is not running");
     L_ACT("kill {} {}", signal, Pid);
     if (kill(Pid, signal))
-        return TError(EError::Unknown, errno, "kill(" + std::to_string(Pid) + ")");
-    return TError::Success();
+        return TError::System("kill(" + std::to_string(Pid) + ")");
+    return OK;
 }
 
 bool TTask::IsZombie() const {
@@ -135,12 +135,12 @@ TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens) {
     }
     closedir(dir);
 
-    return TError::Success();
+    return OK;
 
 full_scan:
     dir = opendir("/proc");
     if (!dir)
-        return TError(EError::Unknown, errno, "Cannot open /proc");
+        return TError::System("Cannot open /proc");
 
     while ((de = readdir(dir))) {
         file = fopen(("/proc/" + std::string(de->d_name) + "/stat").c_str(), "r");
@@ -153,7 +153,7 @@ full_scan:
         fclose(file);
     }
     closedir(dir);
-    return TError::Success();
+    return OK;
 }
 
 uint64_t GetCurrentTimeMs() {
@@ -236,7 +236,7 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) 
             cgmap[tokens[1]] = tokens[2];
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string GetHostName() {
@@ -251,9 +251,9 @@ std::string GetHostName() {
 TError SetHostName(const std::string &name) {
     int ret = sethostname(name.c_str(), name.length());
     if (ret < 0)
-        return TError(EError::Unknown, errno, "sethostname(" + name + ")");
+        return TError::System("sethostname(" + name + ")");
 
-    return TError::Success();
+    return OK;
 }
 
 TError SetOomScoreAdj(int value) {
@@ -317,18 +317,18 @@ TError TUnixSocket::SocketPair(TUnixSocket &sock1, TUnixSocket &sock2) {
 
     ret = socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockfds);
     if (ret)
-        return TError(EError::Unknown, errno, "socketpair(AF_UNIX)");
+        return TError::System("socketpair(AF_UNIX)");
 
     if (setsockopt(sockfds[0], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0 ||
         setsockopt(sockfds[1], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0) {
         close(sockfds[0]);
         close(sockfds[1]);
-        return TError(EError::Unknown, errno, "setsockopt(SO_PASSCRED)");
+        return TError::System("setsockopt(SO_PASSCRED)");
     }
 
     sock1 = sockfds[0];
     sock2 = sockfds[1];
-    return TError::Success();
+    return OK;
 }
 
 TError TUnixSocket::SendInt(int val) const {
@@ -336,10 +336,10 @@ TError TUnixSocket::SendInt(int val) const {
 
     ret = write(SockFd, &val, sizeof(val));
     if (ret < 0)
-        return TError(EError::Unknown, errno, "cannot send int");
+        return TError::System("cannot send int");
     if (ret != sizeof(val))
-        return TError(EError::Unknown, "partial read of int: " + std::to_string(ret));
-    return TError::Success();
+        return TError("partial read of int: " + std::to_string(ret));
+    return OK;
 }
 
 TError TUnixSocket::RecvInt(int &val) const {
@@ -347,10 +347,10 @@ TError TUnixSocket::RecvInt(int &val) const {
 
     ret = read(SockFd, &val, sizeof(val));
     if (ret < 0)
-        return TError(EError::Unknown, errno, "cannot receive int");
+        return TError::System("cannot receive int");
     if (ret != sizeof(val))
-        return TError(EError::Unknown, "partial read of int: " + std::to_string(ret));
-    return TError::Success();
+        return TError("partial read of int: {}", ret);
+    return OK;
 }
 
 TError TUnixSocket::SendPid(pid_t pid) const {
@@ -381,10 +381,10 @@ TError TUnixSocket::SendPid(pid_t pid) const {
 
     ret = sendmsg(SockFd, &msghdr, 0);
     if (ret < 0)
-        return TError(EError::Unknown, errno, "cannot report real pid");
+        return TError::System("cannot report real pid");
     if (ret != sizeof(pid))
-        return TError(EError::Unknown, "partial sendmsg: " + std::to_string(ret));
-    return TError::Success();
+        return TError("partial sendmsg: " + std::to_string(ret));
+    return OK;
 }
 
 TError TUnixSocket::RecvPid(pid_t &pid, pid_t &vpid) const {
@@ -412,14 +412,14 @@ TError TUnixSocket::RecvPid(pid_t &pid, pid_t &vpid) const {
 
     ret = recvmsg(SockFd, &msghdr, 0);
     if (ret < 0)
-        return TError(EError::Unknown, errno, "cannot receive real pid");
+        return TError::System("cannot receive real pid");
     if (ret != sizeof(pid))
-        return TError(EError::Unknown, "partial recvmsg: " + std::to_string(ret));
+        return TError("partial recvmsg: {}", ret);
     cmsg = CMSG_FIRSTHDR(&msghdr);
     if (!cmsg || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_CREDENTIALS)
-        return TError(EError::Unknown, "no credentials after recvmsg");
+        return TError("no credentials after recvmsg");
     pid = ucred->pid;
-    return TError::Success();
+    return OK;
 }
 
 TError TUnixSocket::SendError(const TError &error) const {
@@ -459,11 +459,11 @@ TError TUnixSocket::SendFd(int fd) const {
     ssize_t ret = sendmsg(SockFd, &msghdr, 0);
 
     if (ret <= 0)
-        return TError(EError::Unknown, errno, "cannot send fd");
+        return TError::System("cannot send fd");
     if (ret != sizeof(data))
-        return TError(EError::Unknown, "partial sendmsg: " + std::to_string(ret));
+        return TError("partial sendmsg: {}", ret);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TUnixSocket::RecvFd(int &fd) const {
@@ -489,9 +489,10 @@ TError TUnixSocket::RecvFd(int &fd) const {
 
     int ret = recvmsg(SockFd, &msghdr, 0);
     if (ret <= 0)
-        return TError(EError::Unknown, errno, "cannot receive fd");
+        return TError::System("cannot receive fd");
+
     if (ret != sizeof(data))
-        return TError(EError::Unknown, "partial recvmsg: " + std::to_string(ret));
+        return TError("partial recvmsg: {}", ret);
 
     for (struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msghdr); cmsg;
          cmsg = CMSG_NXTHDR(&msghdr, cmsg)) {
@@ -499,10 +500,10 @@ TError TUnixSocket::RecvFd(int &fd) const {
         if ((cmsg->cmsg_level == SOL_SOCKET) &&
             (cmsg->cmsg_type == SCM_RIGHTS)) {
             fd = *((int*) CMSG_DATA(cmsg));
-            return TError::Success();
+            return OK;
         }
     }
-    return TError(EError::Unknown, "no rights after recvmsg");
+    return TError("no rights after recvmsg");
 }
 
 TError TUnixSocket::SetRecvTimeout(int timeout_ms) const {
@@ -512,9 +513,9 @@ TError TUnixSocket::SetRecvTimeout(int timeout_ms) const {
     tv.tv_usec = (timeout_ms % 1000) * 1000;
 
     if (setsockopt(SockFd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv))
-        return TError(EError::Unknown, errno, "setsockopt(SO_RCVTIMEO)");
+        return TError::System("setsockopt(SO_RCVTIMEO)");
 
-    return TError::Success();
+    return OK;
 }
 
 TError GetSysctl(const std::string &name, std::string &value) {
@@ -605,14 +606,14 @@ TError TTask::Fork(bool detach) {
     localtime_r(&ForkTime, &ForkLocalTime);
     pid_t ret = fork();
     if (ret < 0)
-        return TError(EError::Unknown, errno, "TTask::Fork");
+        return TError::System("TTask::Fork");
     Pid = ret;
     if (!Pid)
         PostFork = true;
     else if (!detach)
         Tasks[Pid] = this;
     Running = true;
-    return TError::Success();
+    return OK;
 }
 
 TError TTask::Wait() {
@@ -638,15 +639,15 @@ TError TTask::Wait() {
             Tasks.erase(Pid);
             Running = false;
             Status = 100;
-            return TError(EError::Unknown, "task not found");
+            return TError("task not found");
         }
         if (Tasks.find(Pid) == Tasks.end())
-            return TError(EError::Unknown, "detached task");
+            return TError("detached task");
         TasksCV.wait(lock);
     }
     if (Status)
         return TError(EError::Unknown, FormatExitStatus(Status));
-    return TError::Success();
+    return OK;
 }
 
 bool TTask::Deliver(pid_t pid, int status) {
@@ -727,12 +728,12 @@ TError TPidFile::Load() {
     if (error)
         return error;
     if (kill(pid, 0) && errno == ESRCH)
-        return TError(EError::Unknown, errno, "Task not found");
+        return TError::System("Task not found");
     str = GetTaskName(pid);
     if (str != Name && str != AltName)
-        return TError(EError::Unknown, "Wrong task name: " + str + " expected: " + Name);
+        return TError("Wrong task name: {} expected: {}", str, Name);
     Pid = pid;
-    return TError::Success();
+    return OK;
 }
 
 bool TPidFile::Running() {
@@ -754,7 +755,7 @@ TError TPidFile::Save(pid_t pid) {
     if (error)
         return error;
     Pid = pid;
-    return TError::Success();
+    return OK;
 }
 
 TError TPidFile::Remove() {
@@ -816,7 +817,7 @@ TError ParseUlimit(const std::string &name, const std::string &value,
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 int SetIoPrio(pid_t pid, int ioprio)

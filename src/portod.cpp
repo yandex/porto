@@ -140,7 +140,7 @@ static TError CreatePortoSocket() {
                   "age {} : {}",
                   fd_stat.st_ino, sk_stat.st_ino,
                   now - fd_stat.st_ctime, now - sk_stat.st_ctime);
-            return TError::Success();
+            return OK;
         }
 
         L_WRN("Unlinked porto socket. Recreating...");
@@ -148,7 +148,7 @@ static TError CreatePortoSocket() {
 
     sock.SetFd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
     if (sock.Fd < 0)
-        return TError(EError::Unknown, errno, "socket()");
+        return TError::System("socket()");
 
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
@@ -157,10 +157,10 @@ static TError CreatePortoSocket() {
     (void)path.Unlink();
 
     if (fchmod(sock.Fd, PORTO_SOCKET_MODE) < 0)
-        return TError(EError::Unknown, errno, "fchmod()");
+        return TError::System("fchmod()");
 
     if (bind(sock.Fd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
-        return TError(EError::Unknown, errno, "bind()");
+        return TError::System("bind()");
 
     error = path.Chown(RootUser, PortoGroup);
     if (error)
@@ -171,14 +171,14 @@ static TError CreatePortoSocket() {
         return error;
 
     if (listen(sock.Fd, 0) < 0)
-        return TError(EError::Unknown, errno, "listen()");
+        return TError::System("listen()");
 
     if (sock.Fd == PORTO_SK_FD)
         sock.SetFd = -1;
     else if (dup2(sock.Fd, PORTO_SK_FD) != PORTO_SK_FD)
-        return TError(EError::Unknown, errno, "dup2()");
+        return TError::System("dup2()");
 
-    return TError::Success();
+    return OK;
 }
 
 void AckExitStatus(int pid) {
@@ -188,8 +188,7 @@ void AckExitStatus(int pid) {
     L_DBG("Acknowledge exit status for {}", pid);
     int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
     if (ret != sizeof(pid)) {
-        TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
-        L_ERR("Can't acknowledge exit status for {}: {}", pid, error);
+        L_ERR("Can't acknowledge exit status for {}: {}", pid, strerror(errno));
         Crash();
     }
 }
@@ -263,7 +262,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
     L_ACT("Drop client {} idle for {} ms", victim->Id, idle);
     Clients.erase(victim->Fd);
     victim->CloseConnection();
-    return TError::Success();
+    return OK;
 }
 
 static TError AcceptConnection(int listenFd) {
@@ -277,8 +276,8 @@ static TError AcceptConnection(int listenFd) {
                        &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
     if (clientFd < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK)
-            return TError::Success(); /* client already gone */
-        return TError(EError::Unknown, errno, "accept4()");
+            return OK; /* client already gone */
+        return TError::System("accept4()");
     }
 
     auto client = std::make_shared<TClient>(clientFd);
@@ -313,7 +312,7 @@ static TError AcceptConnection(int listenFd) {
     client->InEpoll = true; /* FIXME cleanup this crap */
     Clients[client->Fd] = client;
 
-    return TError::Success();
+    return OK;
 }
 
 static int Rpc() {
@@ -455,7 +454,7 @@ static int Rpc() {
                     error = client->SendResponse(false);
 
                 if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) ||
-                        (error && error.GetError() != EError::Queued)) {
+                        (error && error != EError::Queued)) {
                     Clients.erase(source->Fd);
                     client->CloseConnection();
                 }
@@ -500,9 +499,9 @@ static TError TuneLimits() {
 
     int ret = setrlimit(RLIMIT_NOFILE, &rlim);
     if (ret)
-        return TError(EError::Unknown, errno, "sertlimit");
+        return TError::System("sertlimit");
 
-    return TError::Success();
+    return OK;
 }
 
 static TError CreateRootContainer() {
@@ -554,7 +553,7 @@ static TError CreateRootContainer() {
 
     SystemClient.ReleaseContainer();
 
-    return TError::Success();
+    return OK;
 }
 
 static void RestoreContainers() {
@@ -568,9 +567,9 @@ static void RestoreContainers() {
         error = node->Load();
         if (!error) {
             if (!node->Has(P_RAW_ID))
-                error = TError(EError::Unknown, "id not found");
+                error = TError("id not found");
             if (!node->Has(P_RAW_NAME))
-                error = TError(EError::Unknown, "name not found");
+                error = TError("name not found");
         }
         if (error) {
             L_ERR("Cannot load {}: {}", node->Path, error);
@@ -881,12 +880,12 @@ static TError DeliverPidStatus(int fd, int pid, int status, size_t queued) {
     L_EVT("Deliver {} status {} ({} queued)", pid, status, queued);
 
     if (write(fd, &pid, sizeof(pid)) < 0)
-        return TError(EError::Unknown, "write(pid): ", errno);
+        return TError::System("write(pid): ");
 
     if (write(fd, &status, sizeof(status)) < 0)
-        return TError(EError::Unknown, "write(status): ", errno);
+        return TError::System("write(status): ");
 
-    return TError::Success();
+    return OK;
 }
 
 static void Reap(int pid) {
@@ -1481,7 +1480,7 @@ int UpgradePortod() {
 
     error = symlink.ReadLink(backup);
     if (error) {
-        if (error.GetErrno() == ENOENT) {
+        if (error.Errno == ENOENT) {
             if (update != "/usr/sbin/portod") {
                 std::cerr << "old portod can upgrade only to /usr/sbin/portod" << std::endl;
                 return EXIT_FAILURE;
@@ -1494,7 +1493,7 @@ int UpgradePortod() {
 
     if (backup != update) {
         error = symlink.Unlink();
-        if (error && error.GetErrno() != ENOENT) {
+        if (error && error.Errno != ENOENT) {
             std::cerr << "cannot remove old symlink: " << error << std::endl;
             return EXIT_FAILURE;
         }

@@ -229,7 +229,7 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
 static TError CheckPortoWriteAccess() {
     if (CL->AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "Write access denied");
-    return TError::Success();
+    return OK;
 }
 
 static noinline TError CreateContainer(std::string reqName, bool weak) {
@@ -314,7 +314,7 @@ noinline TError ListContainers(const rpc::TContainerListRequest &req,
             continue;
         rsp.mutable_list()->add_name(name);
     }
-    return TError::Success();
+    return OK;
 }
 
 noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &req,
@@ -420,8 +420,8 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
 
         keyval->set_variable(var);
         if (error) {
-            keyval->set_error(error.GetError());
-            keyval->set_errormsg(error.GetMsg());
+            keyval->set_error(error.Error);
+            keyval->set_errormsg(error.Text);
         } else {
             keyval->set_value(value);
         }
@@ -476,7 +476,7 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
 
     RootContainer->Unlock();
 
-    return TError::Success();
+    return OK;
 }
 
 noinline TError ListProperty(rpc::TContainerResponse &rsp) {
@@ -488,7 +488,7 @@ noinline TError ListProperty(rpc::TContainerResponse &rsp) {
         entry->set_name(elem.first);
         entry->set_desc(elem.second->Desc.c_str());
     }
-    return TError::Success();
+    return OK;
 }
 
 noinline TError ListData(rpc::TContainerResponse &rsp) {
@@ -500,7 +500,7 @@ noinline TError ListData(rpc::TContainerResponse &rsp) {
         entry->set_name(elem.first);
         entry->set_desc(elem.second->Desc.c_str());
     }
-    return TError::Success();
+    return OK;
 }
 
 noinline TError Kill(const rpc::TContainerKillRequest &req) {
@@ -520,7 +520,7 @@ noinline TError Version(rpc::TContainerResponse &rsp) {
     ver->set_tag(PORTO_VERSION);
     ver->set_revision(PORTO_REVISION);
 
-    return TError::Success();
+    return OK;
 }
 
 noinline TError Wait(const rpc::TContainerWaitRequest &req,
@@ -556,7 +556,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
                 (ct->State != EContainerState::Meta ||
                  !ct->RunningChildren)) {
             rsp.mutable_wait()->set_name(name);
-            return TError::Success();
+            return OK;
         }
 
         if (queueWait)
@@ -579,7 +579,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
             if (!client->ComposeName(ct->Name, name) &&
                     waiter->MatchWildcard(name)) {
                 rsp.mutable_wait()->set_name(name);
-                return TError::Success();
+                return OK;
             }
         }
 
@@ -589,7 +589,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
 
     if (!queueWait) {
         rsp.mutable_wait()->set_name("");
-        return TError::Success();
+        return OK;
     }
 
     client->Waiter = waiter;
@@ -622,7 +622,7 @@ noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
 
     if (src == dst) {
         rsp.mutable_convertpath()->set_path(req.path());
-        return TError::Success();
+        return OK;
     }
 
     TPath srcRoot;
@@ -647,7 +647,7 @@ noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
     if (path.IsEmpty())
         return TError(EError::InvalidValue, "Path is unreachable");
     rsp.mutable_convertpath()->set_path(path.ToString());
-    return TError::Success();
+    return OK;
 }
 
 noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
@@ -658,7 +658,7 @@ noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
         p->set_desc(prop.Desc);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 noinline static void
@@ -699,7 +699,7 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
         return error;
 
     FillVolumeDescription(rsp.mutable_volume(), *volume);
-    return TError::Success();
+    return OK;
 }
 
 noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
@@ -795,7 +795,7 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
 
         auto desc = rsp.mutable_volumelist()->add_volumes();
         FillVolumeDescription(desc, *volume);
-        return TError::Success();
+        return OK;
     }
 
     auto volumes_lock = LockVolumes();
@@ -818,7 +818,7 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
         FillVolumeDescription(desc, *volume);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
@@ -1007,7 +1007,7 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
             goto undo;
     }
 
-    return TError::Success();
+    return OK;
 
 undo:
     for (auto hy: Hierarchies) {
@@ -1041,7 +1041,7 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
 
     rsp.mutable_locateprocess()->set_name(name);
 
-    return TError::Success();
+    return OK;
 }
 
 noinline TError ListStorage(const rpc::TStorageListRequest &req,
@@ -1215,7 +1215,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {
         rsp.Clear();
-        error = TError(EError::Unknown, "memory allocation failure");
+        error = TError("memory allocation failure");
     } catch (std::string exc) {
         rsp.Clear();
         error = TError(EError::Unknown, exc);
@@ -1224,14 +1224,14 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         error = TError(EError::Unknown, exc.what());
     } catch (...) {
         rsp.Clear();
-        error = TError(EError::Unknown, "unknown error");
+        error = TError("unknown error");
     }
 
     client->FinishRequest();
 
-    if (error.GetError() != EError::Queued) {
-        rsp.set_error(error.GetError());
-        rsp.set_errormsg(error.GetMsg());
+    if (error != EError::Queued) {
+        rsp.set_error(error.Error);
+        rsp.set_errormsg(error.Text);
 
         /* log failed or slow silent requests */
         if (silent && (error || client->RequestTimeMs >= 1000)) {

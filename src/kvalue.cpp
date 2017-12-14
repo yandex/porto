@@ -25,7 +25,7 @@ TError TKeyValue::Load() {
         uint32_t len;
 
         if (!input.ReadVarint32(&len))
-            return TError(EError::Unknown, "KeyValue: corrupted storage");
+            return TError("KeyValue: corrupted storage");
 
         size -= google::protobuf::io::CodedOutputStream::VarintSize32(len);
         size -= len;
@@ -33,16 +33,16 @@ TError TKeyValue::Load() {
         node.Clear();
         auto limit = input.PushLimit(len);
         if (!node.ParseFromCodedStream(&input))
-            return TError(EError::Unknown, "KeyValue: cannot parse record");
+            return TError("KeyValue: cannot parse record");
         if (!input.ConsumedEntireMessage())
-            return TError(EError::Unknown, "KeyValue: corrupted record");
+            return TError("KeyValue: corrupted record");
         input.PopLimit(limit);
 
         for (const auto &pair: node.pairs())
             Data[pair.key()] = pair.val();
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TKeyValue::Save() {
@@ -60,13 +60,13 @@ TError TKeyValue::Save() {
     size_t lenLen = google::protobuf::io::CodedOutputStream::VarintSize32(len);
 
     if (len + lenLen > config().keyvalue_limit())
-        return TError(EError::Unknown, "KeyValue: object too big");
+        return TError("KeyValue: object too big");
 
     buf.resize(len + lenLen);
 
     google::protobuf::io::CodedOutputStream::WriteVarint32ToArray(len, (uint8_t *)&buf[0]);
     if (!node.SerializeToArray((uint8_t *)&buf[lenLen], len))
-        return TError(EError::Unknown, "KeyValue: cannot serialize");
+        return TError("KeyValue: cannot serialize");
 
     TPath tmpPath(Path.ToString() + ".tmp");
     error = tmpPath.Mkfile(0640);
@@ -106,7 +106,7 @@ TError TKeyValue::Mount(const TPath &root) {
         if (error)
             return error;
     } else if (mount.Type != "tmpfs")
-        return TError(EError::Unknown, "KeyValue: found non-tmpfs mount at " + root.ToString());
+        return TError("KeyValue: found non-tmpfs mount at " + root.ToString());
 
     std::vector<std::string> names;
     error = root.ReadDirectory(names);

@@ -29,7 +29,7 @@ TProperty::TProperty(std::string name, EProperty prop, std::string desc) {
 }
 
 TError TProperty::Has() {
-    return TError::Success();
+    return OK;
 }
 
 TError TProperty::Set(const std::string &) {
@@ -49,13 +49,13 @@ TError TProperty::SetIndexed(const std::string &, const std::string &) {
 TError TProperty::GetToSave(std::string &value) {
     if (Prop != EProperty::NONE)
         return Get(value);
-    return TError(EError::Unknown, "Trying to save non-serializable value");
+    return TError("Trying to save non-serializable value");
 }
 
 TError TProperty::SetFromRestore(const std::string &value) {
     if (Prop != EProperty::NONE)
         return Set(value);
-    return TError(EError::Unknown, "Trying to restore non-serializable value");
+    return TError("Trying to restore non-serializable value");
 }
 
 /*
@@ -73,21 +73,21 @@ TError TProperty::IsAliveAndStopped(void) {
                       " for not stopped container, current state: " +
                       TContainer::StateName(CT->State));
 
-    return TError::Success();
+    return OK;
 }
 
 TError TProperty::IsAlive(void) {
     if (CT->State == EContainerState::Dead)
         return TError(EError::InvalidState, "Cannot change property " + Name +
                       " while in the dead state");
-    return TError::Success();
+    return OK;
 }
 
 TError TProperty::IsDead(void) {
     if (CT->State != EContainerState::Dead)
         return TError(EError::InvalidState, "Available only in dead state: " + Name +
                       ", current state: " + TContainer::StateName(CT->State));
-    return TError::Success();
+    return OK;
 }
 
 TError TProperty::IsRunning(void) {
@@ -99,7 +99,7 @@ TError TProperty::IsRunning(void) {
      */
     if (CT->State == EContainerState::Stopped)
         return TError(EError::InvalidState, "Not available in stopped state: " + Name);
-    return TError::Success();
+    return OK;
 }
 
 TError TProperty::WantControllers(uint64_t controllers) const {
@@ -108,11 +108,11 @@ TError TProperty::WantControllers(uint64_t controllers) const {
         CT->RequiredControllers |= controllers;
     } else if ((CT->Controllers & controllers) != controllers)
         return TError(EError::NotSupported, "Cannot enable controllers in runtime");
-    return TError::Success();
+    return OK;
 }
 
 TError TProperty::Start(void) {
-    return TError::Success();
+    return OK;
 }
 
 class TCapLimit : public TProperty {
@@ -133,12 +133,12 @@ public:
 
         CT->CapLimit = limit;
         CT->SetProp(EProperty::CAPABILITIES);
-        return TError::Success();
+        return OK;
     }
 
     TError Get(std::string &value) {
         value = CT->CapLimit.Format();
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &value) {
@@ -156,7 +156,7 @@ public:
             return error;
         value = BoolToString((CT->CapLimit.Permitted &
                               caps.Permitted) == caps.Permitted);
-        return TError::Success();
+        return OK;
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -198,12 +198,12 @@ public:
 
         CT->CapAmbient = ambient;
         CT->SetProp(EProperty::CAPABILITIES_AMBIENT);
-        return TError::Success();
+        return OK;
     }
 
     TError Get(std::string &value) {
         value = CT->CapAmbient.Format();
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &value) {
@@ -221,7 +221,7 @@ public:
             return error;
         value = BoolToString((CT->CapAmbient.Permitted &
                               caps.Permitted) == caps.Permitted);
-        return TError::Success();
+        return OK;
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -246,7 +246,7 @@ public:
     TCwd() : TProperty(P_CWD, EProperty::CWD, "Container working directory") {}
     TError Get(std::string &value) {
         value = CT->GetCwd().ToString();
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &cwd) {
         TError error = IsAliveAndStopped();
@@ -254,12 +254,12 @@ public:
             return error;
         CT->Cwd = cwd;
         CT->SetProp(EProperty::CWD);
-        return TError::Success();
+        return OK;
     }
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::CWD))
             CT->Cwd = "/";
-        return TError::Success();
+        return OK;
     }
 } static Cwd;
 
@@ -270,7 +270,7 @@ public:
 
     TError Get(std::string &value) {
         value = StringMapToString(CT->Ulimit);
-        return TError::Success();
+        return OK;
     }
 
     TError GetIndexed(const std::string &index, std::string &value) {
@@ -279,7 +279,7 @@ public:
             value = it->second;
         else
             value = "";
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &value) {
@@ -303,7 +303,7 @@ public:
 
         CT->Ulimit = map;
         CT->SetProp(EProperty::ULIMIT);
-        return TError::Success();
+        return OK;
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -320,7 +320,7 @@ public:
             CT->Ulimit[index] = value;
         }
         CT->SetProp(EProperty::ULIMIT);
-        return TError::Success();
+        return OK;
     }
 
 } static Ulimit;
@@ -348,13 +348,13 @@ TError TCpuPolicy::Set(const std::string &policy) {
         CT->ChooseSchedPolicy();
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCpuPolicy::Get(std::string &value) {
     value = CT->CpuPolicy;
 
-    return TError::Success();
+    return OK;
 }
 
 class TIoPolicy : public TProperty {
@@ -393,13 +393,13 @@ TError TIoPolicy::Set(const std::string &policy) {
         CT->SetProp(EProperty::IO_POLICY);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TIoPolicy::Get(std::string &value) {
     value = CT->IoPolicy;
 
-    return TError::Success();
+    return OK;
 }
 
 class TIoWeight : public TProperty {
@@ -413,7 +413,7 @@ public:
     }
     TError Get(std::string &value) {
         value = StringFormat("%lg", CT->IoWeight);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -438,7 +438,7 @@ public:
             CT->SetProp(EProperty::IO_WEIGHT);
         }
 
-        return TError::Success();
+        return OK;
     }
 } static IoWeight;
 
@@ -448,7 +448,7 @@ public:
 
     TError Get(std::string &value) {
         value = UserName(CT->TaskCred.Uid);
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &username) {
@@ -468,13 +468,13 @@ public:
 
         CT->TaskCred = cred;
         CT->SetProp(EProperty::USER);
-        return TError::Success();
+        return OK;
     }
 
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS)
             CT->TaskCred.Uid = RootUser;
-        return TError::Success();
+        return OK;
     }
 } static User;
 
@@ -484,7 +484,7 @@ public:
 
     TError Get(std::string &value) {
         value = GroupName(CT->TaskCred.Gid);
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &groupname) {
@@ -499,13 +499,13 @@ public:
 
         CT->TaskCred.Gid = newGid;
         CT->SetProp(EProperty::GROUP);
-        return TError::Success();
+        return OK;
     }
 
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS)
             CT->TaskCred.Gid = RootGroup;
-        return TError::Success();
+        return OK;
     }
 } static Group;
 
@@ -516,7 +516,7 @@ public:
 
     TError Get(std::string &value) {
         value = UserName(CT->OwnerCred.Uid);
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &username) {
@@ -539,7 +539,7 @@ public:
         CT->OwnerCred = newCred;
         CT->SetProp(EProperty::OWNER_USER);
         CT->SanitizeCapabilities();
-        return TError::Success();
+        return OK;
     }
 } static OwnerUser;
 
@@ -550,7 +550,7 @@ public:
 
     TError Get(std::string &value) {
         value = GroupName(CT->OwnerCred.Gid);
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &groupname) {
@@ -567,7 +567,7 @@ public:
 
         CT->OwnerCred.Gid = newGid;
         CT->SetProp(EProperty::OWNER_GROUP);
-        return TError::Success();
+        return OK;
     }
 } static OwnerGroup;
 
@@ -615,13 +615,13 @@ TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
         CT->SetProp(EProperty::MEM_GUARANTEE);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMemoryGuarantee::Get(std::string &value) {
     value = std::to_string(CT->MemGuarantee);
 
-    return TError::Success();
+    return OK;
 }
 
 class TMemTotalGuarantee : public TProperty {
@@ -637,7 +637,7 @@ public:
         auto val = CT->GetTotalMemGuarantee();
         if (val)
             value = std::to_string(val);
-        return TError::Success();
+        return OK;
     }
 } static MemTotalGuarantee;
 
@@ -647,7 +647,7 @@ public:
                            "Command executed upon container start") {}
     TError Get(std::string &command) {
         command = CT->Command;
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &command) {
         TError error = IsAliveAndStopped();
@@ -655,12 +655,12 @@ public:
             return error;
         CT->Command = command;
         CT->SetProp(EProperty::COMMAND);
-        return TError::Success();
+        return OK;
     }
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::COMMAND))
             CT->Command = "/sbin/init";
-        return TError::Success();
+        return OK;
     }
 } static Command;
 
@@ -673,7 +673,7 @@ public:
     }
     TError Get(std::string &command) {
         command = CT->CoreCommand;
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &command) {
         TError error = IsAlive();
@@ -681,7 +681,7 @@ public:
             return error;
         CT->CoreCommand = command;
         CT->SetProp(EProperty::CORE_COMMAND);
-        return TError::Success();
+        return OK;
     }
 } static CoreCommand;
 
@@ -708,7 +708,7 @@ TError TVirtMode::Set(const std::string &virt_mode) {
 
     CT->SetProp(EProperty::VIRT_MODE);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TVirtMode::Get(std::string &value) {
@@ -725,7 +725,7 @@ TError TVirtMode::Get(std::string &value) {
             break;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 class TStdinPath : public TProperty {
@@ -734,7 +734,7 @@ public:
             "Container standard input path") {}
     TError Get(std::string &value) {
         value = CT->Stdin.Path.ToString();
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &path) {
         TError error = IsAliveAndStopped();
@@ -753,7 +753,7 @@ public:
             "Container standard output path") {}
     TError Get(std::string &value) {
         value =  CT->Stdout.Path.ToString();
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &path) {
         TError error = IsAliveAndStopped();
@@ -766,7 +766,7 @@ public:
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::STDOUT))
             CT->Stdout.SetOutside("/dev/null");
-        return TError::Success();
+        return OK;
     }
 } static StdoutPath;
 
@@ -776,7 +776,7 @@ public:
             "Container standard error path") {}
     TError Get(std::string &value) {
         value = CT->Stderr.Path.ToString();
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &path) {
         TError error = IsAliveAndStopped();
@@ -789,7 +789,7 @@ public:
     TError Start(void) {
          if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::STDERR))
             CT->Stderr.SetOutside("/dev/null");
-         return TError::Success();
+         return OK;
     }
 } static StderrPath;
 
@@ -799,7 +799,7 @@ public:
             "Limit for stored stdout and stderr size (dynamic)") {}
     TError Get(std::string &value) {
         value = std::to_string(CT->Stdout.Limit);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         uint64_t limit;
@@ -815,7 +815,7 @@ public:
         CT->Stdout.Limit = limit;
         CT->Stderr.Limit = limit;
         CT->SetProp(EProperty::STDOUT_LIMIT);
-        return TError::Success();
+        return OK;
     }
 } static StdoutLimit;
 
@@ -830,7 +830,7 @@ public:
         if (error)
             return error;
         value = std::to_string(CT->Stdout.Offset);
-        return TError::Success();
+        return OK;
     }
 } static StdoutOffset;
 
@@ -845,7 +845,7 @@ public:
         if (error)
             return error;
         value = std::to_string(CT->Stderr.Offset);
-        return TError::Success();
+        return OK;
     }
 } static StderrOffset;
 
@@ -898,7 +898,7 @@ public:
     }
     TError Get(std::string &value) {
         value = BoolToString(CT->BindDns);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -909,12 +909,12 @@ public:
         if (error)
             return error;
         CT->SetProp(EProperty::BIND_DNS);
-        return TError::Success();
+        return OK;
     }
     TError Start(void) {
         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::BIND_DNS))
             CT->BindDns = false;
-        return TError::Success();
+        return OK;
     }
 } static BindDns;
 
@@ -924,7 +924,7 @@ public:
                            "New pid/ipc/utc/env namespace") {}
     TError Get(std::string &value) {
         value = BoolToString(CT->Isolate);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -938,7 +938,7 @@ public:
 
         CT->Isolate = val;
         CT->SetProp(EProperty::ISOLATE);
-        return TError::Success();
+        return OK;
     }
 } static Isolate;
 
@@ -952,7 +952,7 @@ public:
 TError TRoot::Get(std::string &value) {
     value = CT->Root;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TRoot::Set(const std::string &root) {
@@ -963,7 +963,7 @@ TError TRoot::Set(const std::string &root) {
     CT->Root = root;
     CT->SetProp(EProperty::ROOT);
 
-    return TError::Success();
+    return OK;
 }
 
 class TNet : public TProperty {
@@ -994,7 +994,7 @@ public:
             CT->NetIsolate = true;
             CT->NetInherit = false;
         }
-        return TError::Success();
+        return OK;
     }
 } static Net;
 
@@ -1020,12 +1020,12 @@ TError TNet::Set(const std::string &net_desc) {
     CT->NetIsolate = NetEnv.NetIsolate;
     CT->NetInherit = NetEnv.NetInherit;
     CT->SetProp(EProperty::NET);
-    return TError::Success();
+    return OK;
 }
 
 TError TNet::Get(std::string &value) {
     value = MergeEscapeStrings(CT->NetProp, ' ', ';');
-    return TError::Success();
+    return OK;
 }
 
 class TRootRo : public TProperty {
@@ -1034,7 +1034,7 @@ public:
                           "Mount root directory in read-only mode") {}
     TError Get(std::string &value) {
         value = BoolToString(CT->RootRo);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -1052,7 +1052,7 @@ public:
     TUmask() : TProperty(P_UMASK, EProperty::UMASK, "Set file mode creation mask") { }
     TError Get(std::string &value) {
         value = StringFormat("%#o", CT->Umask);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -1062,7 +1062,7 @@ public:
         if (error)
             return error;
         CT->SetProp(EProperty::UMASK);
-        return TError::Success();
+        return OK;
     }
 } static Umask;
 
@@ -1071,7 +1071,7 @@ public:
     TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS, "Cgroup controllers") { }
     TError Get(std::string &value) {
         value = StringFormatFlags(CT->Controllers, ControllersName, ";");
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -1085,7 +1085,7 @@ public:
             return TError(EError::InvalidValue, "Cannot disable required controllers");
         CT->Controllers = val;
         CT->SetProp(EProperty::CONTROLLERS);
-        return TError::Success();
+        return OK;
     }
     TError GetIndexed(const std::string &index, std::string &value) {
         uint64_t val;
@@ -1093,7 +1093,7 @@ public:
         if (error)
             return error;
         value = BoolToString((CT->Controllers & val) == val);
-        return TError::Success();
+        return OK;
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
         uint64_t val;
@@ -1112,7 +1112,7 @@ public:
             return TError(EError::InvalidValue, "Cannot disable required controllers");
         CT->Controllers = val;
         CT->SetProp(EProperty::CONTROLLERS);
-        return TError::Success();
+        return OK;
     }
 } static Controllers;
 
@@ -1126,14 +1126,14 @@ public:
         for (auto &subsys: Subsystems)
             map[subsys->Type] = CT->GetCgroup(*subsys).Path().ToString();
         value = StringMapToString(map);
-        return TError::Success();
+        return OK;
     }
     TError GetIndexed(const std::string &index, std::string &value) {
         for (auto &subsys: Subsystems) {
             if (subsys->Type != index)
                 continue;
             value = CT->GetCgroup(*subsys).Path().ToString();
-            return TError::Success();
+            return OK;
         }
         return TError(EError::InvalidProperty, "Unknown cgroup subststem: " + index);
     }
@@ -1154,13 +1154,13 @@ TError THostname::Set(const std::string &hostname) {
     CT->Hostname = hostname;
     CT->SetProp(EProperty::HOSTNAME);
 
-    return TError::Success();
+    return OK;
 }
 
 TError THostname::Get(std::string &value) {
     value = CT->Hostname;
 
-    return TError::Success();
+    return OK;
 }
 
 class TEnvProperty : public TProperty {
@@ -1188,12 +1188,12 @@ TError TEnvProperty::Set(const std::string &env_val) {
     env.Format(CT->EnvCfg);
     CT->SetProp(EProperty::ENV);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TEnvProperty::Get(std::string &value) {
     value = MergeEscapeStrings(CT->EnvCfg, ';');
-    return TError::Success();
+    return OK;
 }
 
 TError TEnvProperty::SetIndexed(const std::string &index, const std::string &env_val) {
@@ -1213,7 +1213,7 @@ TError TEnvProperty::SetIndexed(const std::string &index, const std::string &env
     env.Format(CT->EnvCfg);
     CT->SetProp(EProperty::ENV);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TEnvProperty::GetIndexed(const std::string &index, std::string &value) {
@@ -1225,7 +1225,7 @@ TError TEnvProperty::GetIndexed(const std::string &index, std::string &value) {
     if (!env.GetEnv(index, value))
         return TError(EError::InvalidValue, "Variable " + index + " not defined");
 
-    return TError::Success();
+    return OK;
 }
 
 class TBind : public TProperty {
@@ -1268,7 +1268,7 @@ TError TBind::Set(const std::string &bind_str) {
     CT->BindMounts = bindMounts;
     CT->SetProp(EProperty::BIND);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TBind::Get(std::string &value) {
@@ -1277,7 +1277,7 @@ TError TBind::Get(std::string &value) {
         tuples.push_back({ bm.Source.ToString(), bm.Target.ToString(),
                            bm.ReadOnly ? "ro" : "rw" });
     value = MergeEscapeStrings(tuples, ' ', ';');
-    return TError::Success();
+    return OK;
 }
 
 class TIp : public TProperty {
@@ -1303,12 +1303,12 @@ TError TIp::Set(const std::string &ipaddr) {
     CT->IpList = ipaddrs;
     CT->SetProp(EProperty::IP);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TIp::Get(std::string &value) {
     value = MergeEscapeStrings(CT->IpList, ' ', ';');
-    return TError::Success();
+    return OK;
 }
 
 class TIpLimit : public TProperty {
@@ -1317,7 +1317,7 @@ public:
             "IP allowed for sub-containers: none|any|<ip>[/<mask>]; ...") {}
     TError Get(std::string &value) {
         value = MergeEscapeStrings(CT->IpLimit, ';');
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -1341,7 +1341,7 @@ public:
         CT->NetIpLimit = !list.empty() && list[0] != "any";
         CT->SetProp(EProperty::IP_LIMIT);
 
-        return TError::Success();
+        return OK;
     }
 } static IpLimit;
 
@@ -1368,12 +1368,12 @@ TError TDefaultGw::Set(const std::string &gw) {
     CT->DefaultGw = gws;
     CT->SetProp(EProperty::DEFAULT_GW);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TDefaultGw::Get(std::string &value) {
     value = MergeEscapeStrings(CT->DefaultGw, ' ', ';');
-    return TError::Success();
+    return OK;
 }
 
 class TResolvConf : public TProperty {
@@ -1386,7 +1386,7 @@ public:
             value = config().container().default_resolv_conf();
         else
             value = CT->ResolvConf;
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1397,7 +1397,7 @@ public:
             return TError(EError::InvalidState, "Cannot enable/disable resolv.conf overriding in runtime");
         CT->ResolvConf = value;
         CT->SetProp(EProperty::RESOLV_CONF);
-        return TError::Success();
+        return OK;
     }
     TError Start(void) {
         /* Set default resolv_conf for chroots */
@@ -1407,7 +1407,7 @@ public:
             else
                 CT->ResolvConf = "";
         }
-        return TError::Success();
+        return OK;
     }
 } static ResolvConf;
 
@@ -1422,7 +1422,7 @@ public:
     }
     TError Get(std::string &value) {
         value = CT->DeviceConf;
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1433,7 +1433,7 @@ public:
             return error;
         CT->DeviceConf = value;
         CT->SetProp(EProperty::DEVICE_CONF);
-        return TError::Success();
+        return OK;
     }
 } static Devices;
 
@@ -1447,7 +1447,7 @@ public:
         value = StringFormat("%d;%d;%d", CT->Task.Pid,
                                          CT->TaskVPid,
                                          CT->WaitTask.Pid);
-        return TError::Success();
+        return OK;
     }
     TError SetFromRestore(const std::string &value) {
         TError error;
@@ -1477,7 +1477,7 @@ public:
     }
     TError Get(std::string &value) {
         value = std::to_string(CT->SeizeTask.Pid);
-        return TError::Success();
+        return OK;
     }
     TError SetFromRestore(const std::string &value) {
         return StringToInt(value, CT->SeizeTask.Pid);
@@ -1501,7 +1501,7 @@ TError TRawLoopDev::SetFromRestore(const std::string &value) {
 TError TRawLoopDev::Get(std::string &value) {
     value = std::to_string(CT->LoopDev);
 
-    return TError::Success();
+    return OK;
 }
 
 class TRawStartTime : public TProperty {
@@ -1521,7 +1521,7 @@ TError TRawStartTime::SetFromRestore(const std::string &value) {
 TError TRawStartTime::Get(std::string &value) {
     value = std::to_string(CT->StartTime);
 
-    return TError::Success();
+    return OK;
 }
 
 class TRawDeathTime : public TProperty {
@@ -1541,7 +1541,7 @@ TError TRawDeathTime::SetFromRestore(const std::string &value) {
 TError TRawDeathTime::Get(std::string &value) {
     value = std::to_string(CT->DeathTime);
 
-    return TError::Success();
+    return OK;
 }
 
 class TPortoNamespace : public TProperty {
@@ -1550,7 +1550,7 @@ public:
             "Porto containers namespace (container name prefix) (deprecated, use enable_porto=isolate instead)") {}
     TError Get(std::string &value) {
         value = CT->NsName;
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -1558,7 +1558,7 @@ public:
             return error;
         CT->NsName = value;
         CT->SetProp(EProperty::PORTO_NAMESPACE);
-        return TError::Success();
+        return OK;
     }
 } static PortoNamespace;
 
@@ -1568,7 +1568,7 @@ public:
         "Places for volumes and layers: [default][;allowed...]") {}
     TError Get(std::string &value) {
         value = MergeEscapeStrings(CT->Place, ';');
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAliveAndStopped();
@@ -1576,7 +1576,7 @@ public:
             return error;
         CT->Place = SplitEscapedString(value, ';');
         CT->SetProp(EProperty::PLACE);
-        return TError::Success();
+        return OK;
     }
 } static PlaceProperty;
 
@@ -1593,7 +1593,7 @@ public:
         if (!CT->PlaceLimit.count(index))
             return TError(EError::InvalidValue, "invalid index " + index);
         value = std::to_string(CT->PlaceLimit.at(index));
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1635,7 +1635,7 @@ public:
         if (!CT->PlaceUsage.count(index))
             return TError(EError::InvalidValue, "invalid index " + index);
         value = std::to_string(CT->PlaceUsage.at(index));
-        return TError::Success();
+        return OK;
     }
 } static PlaceUsage;
 
@@ -1661,7 +1661,7 @@ public:
         }
 
         value = MergeEscapeStrings(paths, ';');
-        return TError::Success();
+        return OK;
     }
 };
 
@@ -1687,7 +1687,7 @@ public:
         }
 
         value = MergeEscapeStrings(paths, ';');
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1710,7 +1710,7 @@ public:
         }
         CT->RequiredVolumes = paths;
         CT->SetProp(EProperty::REQUIRED_VOLUMES);
-        return TError::Success();
+        return OK;
     }
 } static RequiredVolumes;
 
@@ -1748,7 +1748,7 @@ TError TMemoryLimit::Set(const std::string &limit) {
         CT->SetProp(EProperty::MEM_LIMIT);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMemoryLimit::Get(std::string &value) {
@@ -1756,7 +1756,7 @@ TError TMemoryLimit::Get(std::string &value) {
         value = std::to_string(GetTotalMemory());
     else
         value = std::to_string(CT->MemLimit);
-    return TError::Success();
+    return OK;
 }
 
 class TAnonLimit : public TProperty {
@@ -1797,13 +1797,13 @@ TError TAnonLimit::Set(const std::string &limit) {
         CT->SetProp(EProperty::ANON_LIMIT);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TAnonLimit::Get(std::string &value) {
     value = std::to_string(CT->AnonMemLimit);
 
-    return TError::Success();
+    return OK;
 }
 
 class TDirtyLimit : public TProperty {
@@ -1844,13 +1844,13 @@ TError TDirtyLimit::Set(const std::string &limit) {
         CT->SetProp(EProperty::DIRTY_LIMIT);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TDirtyLimit::Get(std::string &value) {
     value = std::to_string(CT->DirtyMemLimit);
 
-    return TError::Success();
+    return OK;
 }
 
 class THugetlbLimit : public TProperty {
@@ -1866,7 +1866,7 @@ public:
     TError Get(std::string &value) {
         if (CT->HasProp(EProperty::HUGETLB_LIMIT))
             value = std::to_string(CT->HugetlbLimit);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1893,7 +1893,7 @@ public:
             CT->HugetlbLimit = limit;
             CT->SetProp(EProperty::HUGETLB_LIMIT);
         }
-        return TError::Success();
+        return OK;
     }
 } static HugetlbLimit;
 
@@ -1935,13 +1935,13 @@ TError TRechargeOnPgfault::Set(const std::string &recharge) {
         CT->SetProp(EProperty::RECHARGE_ON_PGFAULT);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TRechargeOnPgfault::Get(std::string &value) {
     value = CT->RechargeOnPgfault ? "true" : "false";
 
-    return TError::Success();
+    return OK;
 }
 
 class TPressurizeOnDeath : public TProperty {
@@ -1952,7 +1952,7 @@ public:
     }
     TError Get(std::string &value) {
         value = BoolToString(CT->PressurizeOnDeath);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1978,7 +1978,7 @@ public:
     }
     TError Get(std::string &value) {
         value = CpuPowerToString(CT->CpuLimit);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -1999,7 +1999,7 @@ public:
             CT->SetProp(EProperty::CPU_LIMIT);
         }
 
-        return TError::Success();
+        return OK;
     }
 } static CpuLimit;
 
@@ -2013,7 +2013,7 @@ public:
     TError Get(std::string &value) {
         if (CT->CpuLimitSum)
             value = CpuPowerToString(CT->CpuLimitSum);
-        return TError::Success();
+        return OK;
     }
 } static CpuLimitTotal;
 
@@ -2027,7 +2027,7 @@ public:
     }
     TError Get(std::string &value) {
         value = CpuPowerToString(CT->CpuGuarantee);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -2044,7 +2044,7 @@ public:
             CT->CpuGuarantee = guarantee;
             CT->SetProp(EProperty::CPU_GUARANTEE);
         }
-        return TError::Success();
+        return OK;
     }
 } static CpuGuarantee;
 
@@ -2058,7 +2058,7 @@ public:
     TError Get(std::string &value) {
         if (CT->CpuGuarantee || CT->CpuGuaranteeSum)
             value = CpuPowerToString(std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
-        return TError::Success();
+        return OK;
     }
 } static CpuGuaranteeTotal;
 
@@ -2071,7 +2071,7 @@ public:
     }
     TError Get(std::string &value) {
         value = std::to_string(CT->CpuPeriod);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -2090,7 +2090,7 @@ public:
             CT->CpuPeriod = val;
             CT->SetProp(EProperty::CPU_PERIOD);
         }
-        return TError::Success();
+        return OK;
     }
 } static CpuPeriod;
 
@@ -2100,7 +2100,7 @@ public:
                             "CPU weight 0.01..100, default is 1 (dynamic)") {}
     TError Get(std::string &value) {
         value = StringFormat("%lg", CT->CpuWeight);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -2122,7 +2122,7 @@ public:
             CT->ChooseSchedPolicy();
         }
 
-        return TError::Success();
+        return OK;
     }
 } static CpuWeight;
 
@@ -2156,7 +2156,7 @@ public:
             value = StringFormat("cores %u", CT->CpuSetArg);
             break;
         }
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         TError error = IsAlive();
@@ -2215,7 +2215,7 @@ public:
             CT->SetProp(EProperty::CPU_SET);
         }
 
-        return TError::Success();
+        return OK;
     }
 } static CpuSet;
 
@@ -2228,7 +2228,7 @@ public:
     TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
         value = CT->CpuAffinity.Format();
-        return TError::Success();
+        return OK;
     }
 } static CpuSetAffinity;
 
@@ -2243,7 +2243,7 @@ public:
     TError GetMap(const TUintMap &limit, std::string &value) {
         if (limit.size() == 1 && limit.count("fs")) {
             value = std::to_string(limit.at("fs"));
-            return TError::Success();
+            return OK;
         }
         return UintMapToString(limit, value);
     }
@@ -2251,7 +2251,7 @@ public:
         if (!limit.count(index))
             return TError(EError::InvalidValue, "invalid index " + index);
         value = std::to_string(limit.at(index));
-        return TError::Success();
+        return OK;
     }
     TError SetMapMap(TUintMap &limit, const TUintMap &map) {
         TError error = IsAlive();
@@ -2269,7 +2269,7 @@ public:
         }
         limit = map;
         CT->SetProp(Prop);
-        return TError::Success();
+        return OK;
     }
     TError SetMap(TUintMap &limit, const std::string &value) {
         TUintMap map;
@@ -2349,13 +2349,13 @@ TError TRespawn::Set(const std::string &respawn) {
 
     CT->SetProp(EProperty::RESPAWN);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TRespawn::Get(std::string &value) {
     value = CT->ToRespawn ? "true" : "false";
 
-    return TError::Success();
+    return OK;
 }
 
 class TMaxRespawns : public TProperty {
@@ -2379,13 +2379,13 @@ TError TMaxRespawns::Set(const std::string &max) {
     CT->MaxRespawns = new_value;
     CT->SetProp(EProperty::MAX_RESPAWNS);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMaxRespawns::Get(std::string &value) {
     value = std::to_string(CT->MaxRespawns);
 
-    return TError::Success();
+    return OK;
 }
 
 class TPrivate : public TProperty {
@@ -2408,13 +2408,13 @@ TError TPrivate::Set(const std::string &value) {
     CT->Private = value;
     CT->SetProp(EProperty::PRIVATE);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPrivate::Get(std::string &value) {
     value = CT->Private;
 
-    return TError::Success();
+    return OK;
 }
 
 class TAgingTime : public TProperty {
@@ -2438,13 +2438,13 @@ TError TAgingTime::Set(const std::string &time) {
     CT->AgingTime = new_time * 1000;
     CT->SetProp(EProperty::AGING_TIME);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TAgingTime::Get(std::string &value) {
     value = std::to_string(CT->AgingTime / 1000);
 
-    return TError::Success();
+    return OK;
 }
 
 class TEnablePorto : public TProperty {
@@ -2488,7 +2488,7 @@ public:
                 value = "true";
                 break;
         }
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &value) {
@@ -2519,13 +2519,13 @@ public:
 
         CT->AccessLevel = level;
         CT->SetProp(EProperty::ENABLE_PORTO);
-        return TError::Success();
+        return OK;
     }
     TError Start(void) {
         auto parent = CT->Parent;
         if (!Compatible(parent->AccessLevel, CT->AccessLevel))
             CT->AccessLevel = parent->AccessLevel;
-        return TError::Success();
+        return OK;
     }
 } static EnablePorto;
 
@@ -2551,13 +2551,13 @@ TError TWeak::Set(const std::string &weak) {
 
     CT->SetProp(EProperty::WEAK);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TWeak::Get(std::string &value) {
     value = CT->IsWeak ? "true" : "false";
 
-    return TError::Success();
+    return OK;
 }
 
 /* Read-only properties derived from data filelds follow below... */
@@ -2577,7 +2577,7 @@ TError TAbsoluteName::Get(std::string &value) {
         value = ROOT_CONTAINER;
     else
         value = ROOT_PORTO_NAMESPACE + CT->Name;
-    return TError::Success();
+    return OK;
 }
 
 class TAbsoluteNamespace : public TProperty {
@@ -2593,7 +2593,7 @@ public:
 
 TError TAbsoluteNamespace::Get(std::string &value) {
     value = ROOT_PORTO_NAMESPACE + CT->GetPortoNamespace();
-    return TError::Success();
+    return OK;
 }
 
 class TState : public TProperty {
@@ -2603,7 +2603,7 @@ public:
     }
     TError Get(std::string &value) {
         value = TContainer::StateName(CT->State);
-        return TError::Success();
+        return OK;
     }
 } static State;
 
@@ -2618,7 +2618,7 @@ public:
     }
     TError GetToSave(std::string &value) {
         value = BoolToString(CT->OomKilled);
-        return TError::Success();
+        return OK;
     }
     TError Get(std::string &value) {
         TError error = IsDead();
@@ -2658,7 +2658,7 @@ public:
     }
     TError Get(std::string &value) {
         value = BoolToString(CT->OomIsFatal);
-        return TError::Success();
+        return OK;
     }
 } static OomIsFatal;
 
@@ -2681,11 +2681,11 @@ public:
             CT->OomScoreAdj = val;
             CT->SetProp(EProperty::OOM_SCORE_ADJ);
         }
-        return TError::Success();
+        return OK;
     }
     TError Get(std::string &value) {
         value = StringFormat("%d", CT->OomScoreAdj);
-        return TError::Success();
+        return OK;
     }
 } static OomScoreAdj;
 
@@ -2701,7 +2701,7 @@ public:
             value = ROOT_CONTAINER;
         else
             value = ROOT_PORTO_NAMESPACE + CT->Parent->Name;
-        return TError::Success();
+        return OK;
     }
 } static Parent;
 
@@ -2722,7 +2722,7 @@ TError TRespawnCount::SetFromRestore(const std::string &value) {
 TError TRespawnCount::Get(std::string &value) {
     value = std::to_string(CT->RespawnCount);
 
-    return TError::Success();
+    return OK;
 }
 
 class TRootPid : public TProperty {
@@ -2764,7 +2764,7 @@ TError TExitStatusProperty::SetFromRestore(const std::string &value) {
 TError TExitStatusProperty::GetToSave(std::string &value) {
     value = std::to_string(CT->ExitStatus);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TExitStatusProperty::Get(std::string &value) {
@@ -2791,7 +2791,7 @@ public:
             value = std::to_string(-WTERMSIG(CT->ExitStatus));
         else
             value = std::to_string(WEXITSTATUS(CT->ExitStatus));
-        return TError::Success();
+        return OK;
     }
 } static ExitCodeProperty;
 
@@ -2907,7 +2907,7 @@ TError TMinorFaults::Get(std::string &value) {
     else
         value = std::to_string(stat["total_pgfault"] - stat["total_pgmajfault"]);
 
-    return TError::Success();
+    return OK;
 }
 
 class TMajorFaults : public TProperty {
@@ -2932,7 +2932,7 @@ TError TMajorFaults::Get(std::string &value) {
     else
         value = std::to_string(stat["total_pgmajfault"]);
 
-    return TError::Success();
+    return OK;
 }
 
 class TMaxRss : public TProperty {
@@ -2964,7 +2964,7 @@ TError TMaxRss::Get(std::string &value) {
     else
         value = std::to_string(stat["total_max_rss"]);
 
-    return TError::Success();
+    return OK;
 }
 
 class TCpuUsage : public TProperty {
@@ -3051,7 +3051,7 @@ public:
             if (dev.Managed)
                 map[dev.Name] = str;
         value = StringMapToString(map);
-        return TError::Success();
+        return OK;
     }
     TError GetIndexed(const std::string &index, std::string &value) {
         if (!CT->Net)
@@ -3061,7 +3061,7 @@ public:
         for (auto &dev: CT->Net->Devices) {
             if (dev.Managed && dev.Name == index) {
                 value = StringFormat("%x:%x", id >> 16, id & 0xFFFF);
-                return TError::Success();
+                return OK;
             }
         }
         return TError(EError::InvalidProperty, "network device not found");
@@ -3103,7 +3103,7 @@ public:
             cur = map;
         }
 
-        return TError::Success();
+        return OK;
     }
 
     TError Get(std::string &value) {
@@ -3131,7 +3131,7 @@ public:
             cur[index] = val;
         }
 
-        return TError::Success();
+        return OK;
     }
 
     TError GetIndexed(const std::string &index, std::string &value) {
@@ -3141,14 +3141,14 @@ public:
         if (it == cur.end())
             return TError(EError::InvalidValue, "invalid index " + index);
         value = std::to_string(it->second);
-        return TError::Success();
+        return OK;
     }
 
     TError Start(void) {
         if (Prop == EProperty::NET_RX_LIMIT &&
                 !CT->NetIsolate && CT->NetClass.RxLimit.size())
             return TError(EError::InvalidValue, "Net rx limit requires isolated network");
-        return TError::Success();
+        return OK;
     }
 };
 
@@ -3181,11 +3181,11 @@ public:
                 return TError(EError::InvalidState, "Not available in stopped state");
             if (!(CT->Controllers & CGROUP_NETCLS))
                 return TError(EError::ResourceNotAvailable, "RequireControllers is disabled");
-            return TError::Success();
+            return OK;
         }
 
         if (!CT->NetInherit || CT->IsRoot())
-            return TError::Success();
+            return OK;
         return TError(EError::ResourceNotAvailable, "Shared network");
     }
 
@@ -3214,7 +3214,7 @@ public:
             return TError(EError::InvalidValue, "network device " + index + " not found");
         value = std::to_string(it->second.*Member);
 
-        return TError::Success();
+        return OK;
     }
 };
 
@@ -3285,7 +3285,7 @@ public:
             value = std::to_string(map[name]);
         }
 
-        return TError::Success();
+        return OK;
     }
 };
 
@@ -3304,7 +3304,7 @@ public:
                 map["fs"] = memStat["fs_io_bytes"] - memStat["fs_io_write_bytes"];
         }
 
-        return TError::Success();
+        return OK;
     }
 } static IoReadStat;
 
@@ -3323,7 +3323,7 @@ public:
                 map["fs"] = memStat["fs_io_write_bytes"];
         }
 
-        return TError::Success();
+        return OK;
     }
 } static IoWriteStat;
 
@@ -3342,7 +3342,7 @@ public:
                 map["fs"] = memStat["fs_io_operations"];
         }
 
-        return TError::Success();
+        return OK;
     }
 } static IoOpsStat;
 
@@ -3353,7 +3353,7 @@ public:
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
-        return TError::Success();
+        return OK;
     }
 } static IoTimeStat;
 
@@ -3378,7 +3378,7 @@ TError TTime::Get(std::string &value) {
         else
             value = std::to_string(si.uptime);
 
-        return TError::Success();
+        return OK;
     }
 
     if (!CT->HasProp(EProperty::DEATH_TIME) &&
@@ -3395,7 +3395,7 @@ TError TTime::Get(std::string &value) {
         value = std::to_string((GetCurrentTimeMs() -
                                CT->StartTime) / 1000);
 
-    return TError::Success();
+    return OK;
 }
 
 class TCreationTime : public TProperty {
@@ -3405,7 +3405,7 @@ public:
     }
     TError Get(std::string &value) {
         value = FormatTime(CT->RealCreationTime);
-        return TError::Success();
+        return OK;
     }
 } static CreationTime;
 
@@ -3417,7 +3417,7 @@ public:
     TError Get(std::string &value) {
         if (CT->RealStartTime)
             value = FormatTime(CT->RealStartTime);
-        return TError::Success();
+        return OK;
     }
 } static StartTime;
 
@@ -3501,7 +3501,7 @@ TError TPortoStat::GetIndexed(const std::string &index,
 
     value = std::to_string(m[index]);
 
-    return TError::Success();
+    return OK;
 }
 
 class TNetTos : public TProperty {
@@ -3529,7 +3529,7 @@ public:
         auto val = CT->GetTotalMemLimit();
         if (val)
             value = std::to_string(val);
-        return TError::Success();
+        return OK;
     }
 } static MemTotalLimit;
 
@@ -3592,7 +3592,7 @@ public:
     TError Get(std::string &value) {
         if (CT->HasProp(EProperty::THREAD_LIMIT))
             value = std::to_string(CT->ThreadLimit);
-        return TError::Success();
+        return OK;
     }
     TError Set(const std::string &value) {
         uint64_t val;
@@ -3604,7 +3604,7 @@ public:
             return error;
         CT->ThreadLimit = val;
         CT->SetProp(EProperty::THREAD_LIMIT);
-        return TError::Success();
+        return OK;
     }
 } static ThreadLimit;
 
@@ -3615,7 +3615,7 @@ public:
 
     TError Get(std::string &value) {
         value = StringMapToString(CT->Sysctl);
-        return TError::Success();
+        return OK;
     }
 
     TError GetIndexed(const std::string &index, std::string &value) {
@@ -3624,7 +3624,7 @@ public:
             value = it->second;
         else
             value = "";
-        return TError::Success();
+        return OK;
     }
 
     TError Set(const std::string &value) {
@@ -3637,7 +3637,7 @@ public:
             return error;
         CT->Sysctl = map;
         CT->SetProp(EProperty::SYSCTL);
-        return TError::Success();
+        return OK;
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -3647,7 +3647,7 @@ public:
         else
             CT->Sysctl[index] = value;
         CT->SetProp(EProperty::SYSCTL);
-        return TError::Success();
+        return OK;
     }
 
 } static SysctlProperty;

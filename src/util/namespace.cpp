@@ -12,9 +12,9 @@ TError TNamespaceFd::Open(TPath path) {
     Close();
     Fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
     if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+        return TError::System("Cannot open " + path.ToString());
     PORTO_ASSERT(Fd > 2);
-    return TError::Success();
+    return OK;
 }
 
 TError TNamespaceFd::Open(pid_t pid, std::string type) {
@@ -34,14 +34,14 @@ void TNamespaceFd::Close() {
 
 TError TNamespaceFd::SetNs(int type) const {
     if (Fd >= 0 && setns(Fd, type))
-        return TError(EError::Unknown, errno, "Cannot set namespace");
-    return TError::Success();
+        return TError::System("Cannot set namespace");
+    return OK;
 }
 
 TError TNamespaceFd::Chdir() const {
     if (Fd >= 0 && fchdir(Fd))
-        return TError(EError::Unknown, errno, "Cannot change cwd");
-    return TError::Success();
+        return TError::System("Cannot change cwd");
+    return OK;
 }
 
 TError TNamespaceFd::Chroot() const {
@@ -51,10 +51,10 @@ TError TNamespaceFd::Chroot() const {
             ret = chroot(".");
 
         if (ret)
-            return TError(EError::Unknown, errno, "Cannot change root");
+            return TError::System("Cannot change root");
     }
 
-    return TError::Success();
+    return OK;
 }
 
 ino_t TNamespaceFd::Inode() const {

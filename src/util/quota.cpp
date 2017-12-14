@@ -87,13 +87,13 @@ TError TProjectQuota::InitProjectQuotaFile(const TPath &path) {
 
     fd = open(path.c_str(), O_CREAT | O_RDWR | O_EXCL | O_CLOEXEC, 0600);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot create quota file");
+        return TError::System("Cannot create quota file");
     ret = write(fd, &quota_init, sizeof(quota_init));
     saved_errno = errno;
     fsync(fd);
     close(fd);
     if (ret == sizeof(quota_init))
-        return TError::Success();
+        return OK;
     if (ret >= 0)
         saved_errno = EIO;
     return TError(EError::Unknown, saved_errno, "Cannot write quota file");
@@ -114,7 +114,7 @@ TError TProjectQuota::Enable() {
                   0, (caddr_t)&statv)) {
         if ((statv.qs_flags & FS_QUOTA_PDQ_ACCT) &&
                 (statv.qs_flags & FS_QUOTA_PDQ_ENFD))
-            return TError::Success();
+            return OK;
     }
 
     auto lock = LockQuota();
@@ -124,7 +124,7 @@ TError TProjectQuota::Enable() {
         if (!(dqinfo.dqi_flags & DQF_SYS_FILE) ||
             !quotactl(QCMD(Q_QUOTAON, PRJQUOTA), Device.c_str(),
                       0, NULL) || errno == EEXIST)
-            return TError::Success();
+            return OK;
         return TError(EError::NotSupported, errno, "Cannot enable quota");
     }
 
@@ -160,7 +160,7 @@ TError TProjectQuota::GetProjectId(const TPath &path, uint32_t &id) {
         fd = open(path.DirName().c_str(), O_RDONLY | O_CLOEXEC |
                           O_DIRECTORY);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open: " + path.ToString());
+        return TError::System("Cannot open: " + path.ToString());
     ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
     if (ret)
         saved_errno = errno;
@@ -168,7 +168,7 @@ TError TProjectQuota::GetProjectId(const TPath &path, uint32_t &id) {
     if (ret)
         return TError(EError::Unknown, saved_errno, "Cannot get quota id: " + path.ToString());
     id = attr.fsx_projid;
-    return TError::Success();
+    return OK;
 }
 
 TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
@@ -181,7 +181,7 @@ TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
     if (fd < 0 && errno == EPERM)
         fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open: " + path.ToString());
+        return TError::System("Cannot open: " + path.ToString());
 
     ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
     if (!ret) {
@@ -190,7 +190,7 @@ TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
         ret = ioctl(fd, FS_IOC_FSSETXATTR, &attr);
     }
     if (ret)
-        error = TError(EError::Unknown, errno, "Cannot set quota id: " + path.ToString());
+        error = TError::System("Cannot set quota id: " + path.ToString());
     close(fd);
     return error;
 }
@@ -214,7 +214,7 @@ TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 /* Construct unique project id from directory inode number. */
@@ -227,7 +227,7 @@ TError TProjectQuota::InventProjectId(const TPath &path, uint32_t &id) {
         return error;
 
     id = st.st_ino | (1u << 31);
-    return TError::Success();
+    return OK;
 }
 
 TError TProjectQuota::FindProject() {
@@ -251,7 +251,7 @@ TError TProjectQuota::FindProject() {
                       " found: " + std::to_string(ProjectId) +
                       " expected: " + std::to_string(ExpectedId));
 
-    return TError::Success();
+    return OK;
 }
 
 TError TProjectQuota::FindDevice() {
@@ -260,11 +260,11 @@ TError TProjectQuota::FindDevice() {
 
     /* alredy found */
     if (!Device.IsEmpty())
-        return TError::Success();
+        return OK;
 
     auto device = Path.GetDev();
     if (!device)
-        return TError(EError::Unknown, "device not found: " + Path.ToString());
+        return TError("device not found: " + Path.ToString());
 
     std::vector<std::string> lines;
     error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
@@ -283,11 +283,11 @@ TError TProjectQuota::FindDevice() {
             Type = mount.Type;
             Device = mount.Source;
             RootPath = mount.Target;
-            return TError::Success();
+            return OK;
         }
     }
 
-    return TError(EError::Unknown, "mountpoint not found: " + Path.ToString());
+    return TError("mountpoint not found: " + Path.ToString());
 }
 
 bool TProjectQuota::Exists() {
@@ -310,14 +310,14 @@ TError TProjectQuota::Load() {
 
     if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
                  ProjectId, (caddr_t)&quota))
-        return TError(EError::Unknown, errno, "Cannot get quota state");
+        return TError::System("Cannot get quota state");
 
     SpaceLimit = quota.dqb_bhardlimit * QIF_DQBLKSIZE;
     SpaceUsage = quota.dqb_curspace;
     InodeLimit = quota.dqb_ihardlimit;
     InodeUsage = quota.dqb_curinodes;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TProjectQuota::Create() {
@@ -369,10 +369,10 @@ TError TProjectQuota::Create() {
             if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
                          ProjectId, (caddr_t)&quota))
                 L_WRN("Cannot reset quota {}: {}", ProjectId,
-                        TError(EError::Unknown, errno, ""));
+                        TError::System(""));
         }
     } else if (errno != ENOENT)
-        return TError(EError::Unknown, errno, "Cannot get quota state");
+        return TError::System("Cannot get quota state");
 
     memset(&quota, 0, sizeof(quota));
     quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE +
@@ -382,7 +382,7 @@ TError TProjectQuota::Create() {
 
     if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
                  ProjectId, (caddr_t)&quota))
-        return TError(EError::Unknown, errno, "Cannot set quota limits");
+        return TError::System("Cannot set quota limits");
 
     quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 
@@ -414,10 +414,10 @@ TError TProjectQuota::Resize() {
 
     if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
                  ProjectId, (caddr_t)&quota))
-        return TError(EError::Unknown, errno, "Cannot set quota limits");
+        return TError::System("Cannot set quota limits");
 
     quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
-    return TError::Success();
+    return OK;
 }
 
 TError TProjectQuota::Destroy() {
@@ -442,10 +442,10 @@ TError TProjectQuota::Destroy() {
     if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), Device.c_str(),
                  ProjectId, (caddr_t)&quota))
         L_WRN("Cannot destroy quota {}: {}", ProjectId,
-                TError(EError::Unknown, errno, ""));
+                TError::System(""));
 
     quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
-    return TError::Success();
+    return OK;
 }
 
 TError TProjectQuota::StatFS(TStatFS &result) {
@@ -477,5 +477,5 @@ TError TProjectQuota::StatFS(TStatFS &result) {
             result.InodeAvail = 0;
     }
 
-    return TError::Success();
+    return OK;
 }

@@ -42,17 +42,6 @@ void ExpectReturn(int ret, int exp, const char *where) {
     throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + where);
 }
 
-void ExpectError(const TError &ret, const TError &exp, const char *where) {
-    std::stringstream ss;
-
-    if (ret == exp)
-        return;
-
-    ss << "Got " << ret << ", but expected " << exp << " at " << where;
-
-    throw ss.str();
-}
-
 void ExpectApi(Porto::Connection &api, int ret, int exp, const char *where) {
     std::stringstream ss;
 
@@ -73,7 +62,7 @@ int ReadPid(const std::string &path) {
 
     TError error = TPath(path).ReadInt(pid);
     if (error)
-        throw std::string(error.GetMsg());
+        throw error.ToString();
 
     return pid;
 }
@@ -81,7 +70,7 @@ int ReadPid(const std::string &path) {
 TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     FILE *f = popen(cmd.c_str(), "r");
     if (f == nullptr)
-        return TError(EError::Unknown, errno, "Can't execute " + cmd);
+        return TError::System("Can't execute " + cmd);
 
     char *line = nullptr;
     size_t n = 0;
@@ -93,9 +82,9 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     free(line);
 
     if (ret)
-        return TError(EError::Unknown, "popen(" + cmd + ") failed: " + std::to_string(ret));
+        return TError("popen(" + cmd + ") failed: " + std::to_string(ret));
 
-    return TError::Success();
+    return OK;
 }
 
 int Pgrep(const std::string &name) {
@@ -184,7 +173,7 @@ std::string ReadLink(const std::string &path) {
     TPath f(path);
     TError error = f.ReadLink(lnk);
     if (error)
-        throw error.GetMsg();
+        throw error.ToString();
 
     return lnk.ToString();
 }
@@ -206,7 +195,7 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
     std::vector<std::string> lines;
     TError error = TPath("/proc/" + pid + "/cgroup").ReadLines(lines);
     if (error)
-        throw std::string("Can't get cgroups: " + error.GetMsg());
+        throw std::string("Can't get cgroups: " + error.ToString());
 
     for (auto l : lines) {
         auto tokens = SplitString(l, ':', 3);
@@ -391,15 +380,15 @@ void InitUsersAndGroups() {
 
     error = Nobody.Load("nobody");
     if (error)
-        throw error.GetMsg();
+        throw error.ToString();
 
     error = Alice.Load("porto-alice");
     if (error)
-        throw error.GetMsg();
+        throw error.ToString();
 
     error = Bob.Load("porto-bob");
     if (error)
-        throw error.GetMsg();
+        throw error.ToString();
 
     ExpectNeq(Alice.Uid, Bob.Uid);
     ExpectNeq(Alice.Gid, Bob.Gid);
@@ -468,7 +457,7 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
         if (!dest.Exists()) {
             error = dest.MkdirAll(0755);
             if (error)
-                throw error.GetMsg();
+                throw error.ToString();
         }
 
         Expect(system(("cp " + from.ToString() + " " + dest.ToString() + "/" + name).c_str()) == 0);
@@ -624,7 +613,7 @@ static bool IsCfqActive() {
 
         TError error = TPath("/sys/block/" + d + "/queue/scheduler").ReadAll(data);
         if (error)
-            throw error.GetMsg();
+            throw error.ToString();
         bool cfqEnabled = false;
         for (auto t : SplitString(data, ' ')) {
             if (t == std::string("[cfq]"))

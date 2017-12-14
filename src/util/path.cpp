@@ -79,14 +79,14 @@ std::string TPath::BaseName() const {
 
 TError TPath::StatStrict(struct stat &st) const {
     if (lstat(Path.c_str(), &st))
-        return TError(EError::Unknown, errno, "lstat " + Path);
-    return TError::Success();
+        return TError::System("lstat " + Path);
+    return OK;
 }
 
 TError TPath::StatFollow(struct stat &st) const {
     if (stat(Path.c_str(), &st))
-        return TError(EError::Unknown, errno, "stat " + Path);
-    return TError::Success();
+        return TError::System("stat " + Path);
+    return OK;
 }
 
 bool TPath::IsRegularStrict() const {
@@ -159,19 +159,19 @@ TPath TPath::AddComponent(const TPath &component) const {
 
 TError TPath::Chdir() const {
     if (unshare(CLONE_FS))
-        return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
+        return TError::System("unshare(CLONE_FS)");
     if (chdir(Path.c_str()) < 0)
         return TError(EError::InvalidValue, errno, "chdir(" + Path + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Chroot() const {
     L_ACT("chroot {}", Path);
 
     if (chroot(Path.c_str()) < 0)
-        return TError(EError::Unknown, errno, "chroot(" + Path + ")");
+        return TError::System("chroot(" + Path + ")");
 
-    return TError::Success();
+    return OK;
 }
 
 // https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
@@ -200,36 +200,36 @@ TError TPath::PivotRoot() const {
     }
 
     if (fchdir(newroot.Fd))
-        return TError(EError::Unknown, errno, "fchdir(newroot)");
+        return TError::System("fchdir(newroot)");
 
     if (syscall(__NR_pivot_root, ".", "."))
-        return TError(EError::Unknown, errno, "pivot_root()");
+        return TError::System("pivot_root()");
 
     if (fchdir(oldroot.Fd) < 0)
-        return TError(EError::Unknown, errno, "fchdir(oldroot)");
+        return TError::System("fchdir(oldroot)");
 
     if (umount2(".", MNT_DETACH) < 0)
-        return TError(EError::Unknown, errno, "umount2(.)");
+        return TError::System("umount2(.)");
 
     if (fchdir(newroot.Fd) < 0)
-        return TError(EError::Unknown, errno, "fchdir(newroot) reenter");
+        return TError::System("fchdir(newroot) reenter");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Chown(uid_t uid, gid_t gid) const {
     if (chown(Path.c_str(), uid, gid))
-        return TError(EError::Unknown, errno, "chown(" + Path + ", " +
+        return TError::System("chown(" + Path + ", " +
                         UserName(uid) + ", " + GroupName(gid) + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Chmod(const int mode) const {
     int ret = chmod(Path.c_str(), mode);
     if (ret)
-        return TError(EError::Unknown, errno, "chmod(" + Path + ", " + StringFormat("%#o", mode) + ")");
+        return TError::System("chmod(" + Path + ", " + StringFormat("%#o", mode) + ")");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::ReadLink(TPath &value) const {
@@ -238,34 +238,34 @@ TError TPath::ReadLink(TPath &value) const {
 
     len = readlink(Path.c_str(), buf, sizeof(buf) - 1);
     if (len < 0)
-        return TError(EError::Unknown, errno, "readlink(" + Path + ")");
+        return TError::System("readlink(" + Path + ")");
 
     buf[len] = '\0';
 
     value = TPath(buf);
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Hardlink(const TPath &target) const {
     int ret = link(target.c_str(), Path.c_str());
     if (ret)
-        return TError(EError::Unknown, errno, "link(" + target.ToString() + ", " + Path + ")");
-    return TError::Success();
+        return TError::System("link(" + target.ToString() + ", " + Path + ")");
+    return OK;
 }
 
 TError TPath::Symlink(const TPath &target) const {
     int ret = symlink(target.c_str(), Path.c_str());
     if (ret)
-        return TError(EError::Unknown, errno, "symlink(" + target.ToString() + ", " + Path + ")");
-    return TError::Success();
+        return TError::System("symlink(" + target.ToString() + ", " + Path + ")");
+    return OK;
 }
 
 TError TPath::Mknod(unsigned int mode, unsigned int dev) const {
     int ret = mknod(Path.c_str(), mode, dev);
     if (ret)
-        return TError(EError::Unknown, errno, "mknod(" + Path + ", " +
+        return TError::System("mknod(" + Path + ", " +
                 StringFormat("%#o", mode) + ", " + StringFormat("%#x", dev) + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Mkfile(unsigned int mode) const {
@@ -384,21 +384,21 @@ bool TPath::IsInside(const TPath &base) const {
 TError TPath::StatFS(TStatFS &result) const {
     struct statfs st;
     if (statfs(Path.c_str(), &st))
-        return TError(EError::Unknown, errno, "statfs(" + Path + ")");
+        return TError::System("statfs(" + Path + ")");
     result.Init(st);
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Unlink() const {
     if (unlink(c_str()))
-        return TError(EError::Unknown, errno, "unlink(" + Path + ")");
-    return TError::Success();
+        return TError::System("unlink(" + Path + ")");
+    return OK;
 }
 
 TError TPath::Rename(const TPath &dest) const {
     if (rename(c_str(), dest.c_str()))
-        return TError(EError::Unknown, errno, "rename(" + Path + ", " + dest.Path + ")");
-    return TError::Success();
+        return TError::System("rename(" + Path + ", " + dest.Path + ")");
+    return OK;
 }
 
 TError TPath::Mkdir(unsigned int mode) const {
@@ -406,7 +406,7 @@ TError TPath::Mkdir(unsigned int mode) const {
         return TError(errno == ENOSPC ? EError::NoSpace :
                                         EError::Unknown,
                       errno, "mkdir(" + Path + ", " + StringFormat("%#o", mode) + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::MkdirAll(unsigned int mode) const {
@@ -420,7 +420,7 @@ TError TPath::MkdirAll(unsigned int mode) const {
     }
 
     if (!path.IsDirectoryFollow())
-        return TError(EError::Unknown, "Not a directory: " + path.ToString());
+        return TError("Not a directory: {}", path);
 
     for (auto path = paths.rbegin(); path != paths.rend(); path++) {
         error = path->Mkdir(mode);
@@ -428,22 +428,22 @@ TError TPath::MkdirAll(unsigned int mode) const {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::MkdirTmp(const TPath &parent, const std::string &prefix, unsigned int mode) {
     Path = (parent / (prefix + "XXXXXX")).Path;
     if (!mkdtemp(&Path[0]))
-        return TError(EError::Unknown, errno, "mkdtemp(" + Path + ")");
+        return TError::System("mkdtemp(" + Path + ")");
     if (mode != 0700)
         return Chmod(mode);
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Rmdir() const {
     if (rmdir(Path.c_str()) < 0)
-        return TError(EError::Unknown, errno, "rmdir(" + Path + ")");
-    return TError::Success();
+        return TError::System("rmdir(" + Path + ")");
+    return OK;
 }
 
 /*
@@ -519,14 +519,14 @@ TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     result.clear();
     dir = opendir(c_str());
     if (!dir)
-        return TError(EError::Unknown, errno, "Cannot open directory " + Path);
+        return TError::System("Cannot open directory " + Path);
 
     while ((de = readdir(dir))) {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, ".."))
             result.push_back(std::string(de->d_name));
     }
     closedir(dir);
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::ListSubdirs(std::vector<std::string> &result) const {
@@ -536,7 +536,7 @@ TError TPath::ListSubdirs(std::vector<std::string> &result) const {
     result.clear();
     dir = opendir(c_str());
     if (!dir)
-        return TError(EError::Unknown, errno, "Cannot open directory " + Path);
+        return TError::System("Cannot open directory " + Path);
 
     while ((de = readdir(dir))) {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, "..") &&
@@ -546,7 +546,7 @@ TError TPath::ListSubdirs(std::vector<std::string> &result) const {
             result.push_back(std::string(de->d_name));
     }
     closedir(dir);
-    return TError::Success();
+    return OK;
 }
 
 int64_t TPath::SinceModificationMs() const {
@@ -567,9 +567,9 @@ TError TPath::GetXAttr(const std::string name, std::string &value) const {
     if (size >= 0) {
         value.resize(size);
         if (syscall(SYS_lgetxattr, Path.c_str(), name.c_str(), value.c_str(), size) >= 0)
-            return TError::Success();
+            return OK;
     }
-    return TError(EError::Unknown, errno, "getxattr(" + Path + ", " + name + ")");
+    return TError::System("getxattr(" + Path + ", " + name + ")");
 }
 
 TError TPath::SetXAttr(const std::string name, const std::string value) const {
@@ -577,13 +577,13 @@ TError TPath::SetXAttr(const std::string name, const std::string value) const {
                 value.c_str(), value.length(), 0))
         return TError(EError::Unknown, errno,
                 "setxattr(" + Path + ", " + name + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Truncate(off_t size) const {
     if (truncate(c_str(), size))
-        return TError(EError::Unknown, errno, "truncate(" + Path + ")");
-    return TError::Success();
+        return TError::System("truncate(" + Path + ")");
+    return OK;
 }
 
 TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
@@ -593,17 +593,17 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
 
     int fd = open(c_str(), O_RDWR | O_CLOEXEC | O_NOCTTY);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
+        return TError::System("open(" + Path + ")");
 
     if (fstat(fd, &st)) {
         close(fd);
-        return TError(EError::Unknown, errno, "fstat(" + Path + ")");
+        return TError::System("fstat(" + Path + ")");
     }
 
     if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage) {
         loss = 0;
         close(fd);
-        return TError::Success();
+        return OK;
     }
 
     /* Keep half of allowed size or trucate to zero */
@@ -614,7 +614,7 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     if (fallocate(fd, FALLOC_FL_COLLAPSE_RANGE, 0, hole_len)) {
         loss = st.st_size;
         if (ftruncate(fd, 0))
-            error = TError(EError::Unknown, errno, "truncate(" + Path + ")");
+            error = TError::System("truncate(" + Path + ")");
     }
 
     close(fd);
@@ -632,13 +632,13 @@ TError TPath::Chattr(unsigned add_flags, unsigned del_flags) const {
     error = TFile::Chattr(file.Fd, add_flags, del_flags);
     if (error)
         return TError(error, Path);
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Touch() const {
     if (utimes(c_str(), NULL))
-        return TError(EError::Unknown, errno, "utimes " + Path);
-    return TError::Success();
+        return TError::System("utimes " + Path);
+    return OK;
 }
 
 #ifndef MS_LAZYTIME
@@ -699,24 +699,24 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
           data, MountFlagsToString(flags));
 
     if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
-        return TError(EError::Unknown, errno, "mount(" + source.ToString() + ", " +
+        return TError::System("mount(" + source.ToString() + ", " +
                       Path + ", " + type + ", " + MountFlagsToString(flags) + ", " + data + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Bind(const TPath &source, unsigned long flags) const {
     L_ACT("bind mount {} {} {}", MountFlagsToString(flags), Path, source);
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))
-        return TError(EError::Unknown, errno, "mount(" + source.ToString() +
+        return TError::System("mount(" + source.ToString() +
                 ", " + Path + ", " + MountFlagsToString(MS_BIND | flags) + ")");
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::Remount(unsigned long flags) const {
     L_ACT("remount {} {}", Path, MountFlagsToString(flags));
 
     if (mount(NULL, Path.c_str(), NULL, flags, NULL))
-        return TError(EError::Unknown, errno, "mount(NULL, " + Path +
+        return TError::System("mount(NULL, " + Path +
                       ", NULL, " + MountFlagsToString(flags) + ", NULL)");
 
     /* vfsmount remount isn't recursive in kernel */
@@ -735,7 +735,7 @@ TError TPath::Remount(unsigned long flags) const {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
@@ -748,12 +748,12 @@ TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
 TError TPath::Umount(unsigned long flags) const {
     L_ACT("umount {} {}", Path, UmountFlagsToString(flags));
     if (!umount2(Path.c_str(), flags))
-        return TError::Success();
+        return OK;
     if (errno == EBUSY)
         return TError(EError::Busy, "Mount is busy: " + Path);
     if (errno == EINVAL || errno == ENOENT)
         return TError(EError::InvalidValue, "Not a mount: " + Path);
-    return TError(EError::Unknown, errno, "umount2(" + Path + ", " +
+    return TError::System("umount2(" + Path + ", " +
                   UmountFlagsToString(flags) +  ")");
 }
 
@@ -762,11 +762,11 @@ TError TPath::UmountAll() const {
     while (1) {
         if (umount2(c_str(), UMOUNT_NOFOLLOW)) {
             if (errno == EINVAL || errno == ENOENT)
-                return TError::Success(); /* not a mountpoint */
+                return OK; /* not a mountpoint */
             if (errno == EBUSY)
                 umount2(c_str(), UMOUNT_NOFOLLOW | MNT_DETACH);
             else
-                return TError(EError::Unknown, errno, "umount2(" + Path + ")");
+                return TError::System("umount2(" + Path + ")");
         }
     }
 }
@@ -802,7 +802,7 @@ TError TPath::ReadAll(std::string &text, size_t max) const {
     if (error)
         return TError(error, Path);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::WriteAll(const std::string &text) const {
@@ -817,7 +817,7 @@ TError TPath::WriteAll(const std::string &text) const {
     if (error)
         return TError(error, Path);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::WriteAtomic(const std::string &text) const {
@@ -879,7 +879,7 @@ TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
     while (std::getline(ss, line))
         lines.push_back(line);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::ReadInt(int &value) const {
@@ -899,7 +899,7 @@ TError TPath::FindMount(TMount &mount) const {
 
     auto device = GetDev();
     if (!device)
-        return TError(EError::Unknown, "device not found: " + Path);
+        return TError("device not found: {}", Path);
 
     TPath normal = NormalPath();
     bool found = false;
@@ -920,9 +920,9 @@ TError TPath::FindMount(TMount &mount) const {
     }
 
     if (!found)
-        return TError(EError::Unknown, "mountpoint not found: " + Path);
+        return TError("mountpoint not found: {}", Path);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TPath::ListAllMounts(std::list<TMount> &list) {
@@ -942,7 +942,7 @@ TError TPath::ListAllMounts(std::list<TMount> &list) {
         list.push_back(mount);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TMount::Demangle(const std::string &s) {
@@ -1001,10 +1001,10 @@ TError TMount::ParseMountinfo(const std::string &line) {
         OptFields.push_back(opt);
 
     if (opt != "-")
-        return TError(EError::Unknown, "optional delimiter not found");
+        return TError("optional delimiter not found");
 
     if (!std::getline(ss, opt) || !opt.size())
-        return TError(EError::Unknown, "remainder missing");
+        return TError("remainder missing");
 
     tokens = SplitString(opt, ' ', 3);
     if (tokens.size() < 3)
@@ -1014,7 +1014,7 @@ TError TMount::ParseMountinfo(const std::string &line) {
     Source = TMount::Demangle(tokens[1]);
     Options = TMount::Demangle(tokens[2]);
 
-    return TError::Success();
+    return OK;
 }
 
 bool TMount::HasOption(const std::string &option) const {
@@ -1028,8 +1028,8 @@ TError TFile::Open(const TPath &path, int flags) {
         close(Fd);
     SetFd = open(path.c_str(), flags);
     if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
-    return TError::Success();
+        return TError::System("Cannot open " + path.ToString());
+    return OK;
 }
 
 TError TFile::OpenRead(const TPath &path) {
@@ -1072,8 +1072,8 @@ TError TFile::CreateTemporary(TPath &temp, int flags) {
     Close();
     SetFd = mkostemp(&temp.Path[0], O_CLOEXEC | flags);
     if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot create temporary " + temp.Path);
-    return TError::Success();
+        return TError::System("Cannot create temporary " + temp.Path);
+    return OK;
 }
 
 TError TFile::CreateUnnamed(const TPath &dir, int flags) {
@@ -1092,8 +1092,8 @@ TError TFile::Create(const TPath &path, int flags, int mode) {
         close(Fd);
     SetFd = open(path.c_str(), flags, mode);
     if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot create " + path.ToString());
-    return TError::Success();
+        return TError::System("Cannot create " + path.ToString());
+    return OK;
 }
 
 TError TFile::CreateNew(const TPath &path, int mode) {
@@ -1134,10 +1134,10 @@ TPath TFile::ProcPath(void) const {
 TError TFile::ReadAll(std::string &text, size_t max) const {
     struct stat st;
     if (fstat(Fd, &st) < 0)
-        return TError(EError::Unknown, errno, "fstat");
+        return TError::System("fstat");
 
     if (st.st_size > (off_t)max)
-        return TError(EError::Unknown, "File too large: " + std::to_string(st.st_size));
+        return TError("File too large: {}", st.st_size);
 
     size_t size = st.st_size;
     if (st.st_size < 4096)
@@ -1150,24 +1150,24 @@ TError TFile::ReadAll(std::string &text, size_t max) const {
         if (size - off < 1024) {
             size += 16384;
             if (size > max)
-                return TError(EError::Unknown, "File too large: " + std::to_string(size));
+                return TError("File too large: {}", size);
             text.resize(size);
         }
         ret = read(Fd, &text[off], size - off);
         if (ret < 0)
-            return TError(EError::Unknown, errno, "read");
+            return TError::System("read");
         off += ret;
     } while (ret > 0);
 
     text.resize(off);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TFile::Truncate(off_t size) const {
     if (ftruncate(Fd, size))
-        return TError(EError::Unknown, errno, "ftruncate");
-    return TError::Success();
+        return TError::System("ftruncate");
+    return OK;
 }
 
 TError TFile::WriteAll(const std::string &text) const {
@@ -1175,24 +1175,24 @@ TError TFile::WriteAll(const std::string &text) const {
     do {
         ssize_t ret = write(Fd, &text[off], len - off);
         if (ret < 0)
-            return TError(EError::Unknown, errno, "write");
+            return TError::System("write");
         off += ret;
     } while (off < len);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TFile::Chattr(int fd, unsigned add_flags, unsigned del_flags) {
     unsigned old_flags, new_flags;
 
     if (ioctl(fd, FS_IOC_GETFLAGS, &old_flags))
-        return TError(EError::Unknown, errno, "ioctlFS_IOC_GETFLAGS)");
+        return TError::System("ioctlFS_IOC_GETFLAGS)");
 
     new_flags = (old_flags & ~del_flags) | add_flags;
     if ((new_flags != old_flags) && ioctl(fd, FS_IOC_SETFLAGS, &new_flags))
-        return TError(EError::Unknown, errno, "ioctl(FS_IOC_SETFLAGS)");
+        return TError::System("ioctl(FS_IOC_SETFLAGS)");
 
-    return TError::Success();
+    return OK;
 }
 
 int TFile::GetMountId(const TPath relative) const {
@@ -1209,9 +1209,9 @@ TError TFile::Dup(const TFile &other) {
         Close();
         SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC, 3);
         if (Fd < 0)
-            return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(other.Fd));
+            return TError::System("Cannot dup fd " + std::to_string(other.Fd));
     }
-    return TError::Success();
+    return OK;
 }
 
 TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags, int mode) {
@@ -1220,32 +1220,32 @@ TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags, int mode) {
     Close();
     SetFd = openat(dir.Fd, path.c_str(), flags, mode);
     if (Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open " + std::to_string(dir.Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot open " + std::to_string(dir.Fd) + " @ " + path.Path);
+    return OK;
 }
 
 TError TFile::MkdirAt(const TPath &path, int mode) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (mkdirat(Fd, path.c_str(), mode))
-        return TError(EError::Unknown, errno, "Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
 }
 
 TError TFile::UnlinkAt(const TPath &path) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (unlinkat(Fd, path.c_str(), 0))
-        return TError(EError::Unknown, errno, "Cannot unlink " + std::to_string(Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot unlink " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
 }
 
 TError TFile::RmdirAt(const TPath &path) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (unlinkat(Fd, path.c_str(), AT_REMOVEDIR))
-        return TError(EError::Unknown, errno, "Cannot rmdir " + std::to_string(Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot rmdir " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
 }
 
 TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
@@ -1254,44 +1254,44 @@ TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
     if (newpath.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + newpath.Path);
     if (renameat(Fd, oldpath.c_str(), Fd, newpath.c_str()))
-        return TError(EError::Unknown, errno, "Cannot rename " +
+        return TError::System("Cannot rename " +
                 std::to_string(Fd) + " @ " + oldpath.Path + " to " +
                 std::to_string(Fd) + " @ " + newpath.Path);
-    return TError::Success();
+    return OK;
 }
 
 TError TFile::Chown(uid_t uid, gid_t gid) const {
     if (fchown(Fd, uid, gid))
-        return TError(EError::Unknown, errno, "Cannot chown " + std::to_string(Fd));
-    return TError::Success();
+        return TError::System("Cannot chown " + std::to_string(Fd));
+    return OK;
 }
 
 TError TFile::Chmod(mode_t mode) const {
     if (fchmod(Fd, mode))
-        return TError(EError::Unknown, errno, "Cannot chmod " + std::to_string(Fd));
-    return TError::Success();
+        return TError::System("Cannot chmod " + std::to_string(Fd));
+    return OK;
 }
 
 TError TFile::ChownAt(const TPath &path, uid_t uid, gid_t gid) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchownat(Fd, path.c_str(), uid, gid, AT_SYMLINK_NOFOLLOW))
-        return TError(EError::Unknown, errno, "Cannot chown " + std::to_string(Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot chown " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
 }
 
 TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchmodat(Fd, path.c_str(), mode, AT_SYMLINK_NOFOLLOW))
-        return TError(EError::Unknown, errno, "Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
 }
 
 TError TFile::Touch() const {
     if (futimes(Fd, NULL))
-        return TError(EError::Unknown, errno, "futimes");
-    return TError::Success();
+        return TError::System("futimes");
+    return OK;
 }
 
 TError TFile::WalkFollow(const TFile &dir, const TPath &path) {
@@ -1302,7 +1302,7 @@ TError TFile::WalkFollow(const TFile &dir, const TPath &path) {
         return error;
     int next = openat(Fd, path.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY);
     if (next < 0)
-        error = TError(EError::Unknown, errno, "Cannot walk path: " + path.Path);
+        error = TError::System("Cannot walk path: " + path.Path);
     close(Fd);
     SetFd = next;
     return error;
@@ -1321,7 +1321,7 @@ TError TFile::WalkStrict(const TFile &dir, const TPath &path) {
             continue;
         int next = openat(Fd, name.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
         if (next < 0)
-            error = TError(EError::Unknown, errno, "Cannot walk: " + name + " in path " + path.Path);
+            error = TError::System("Cannot walk: " + name + " in path " + path.Path);
         close(Fd);
         SetFd = next;
         if (next < 0)
@@ -1332,23 +1332,23 @@ TError TFile::WalkStrict(const TFile &dir, const TPath &path) {
 
 TError TFile::Chdir() const {
     if (unshare(CLONE_FS))
-        return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
+        return TError::System("unshare(CLONE_FS)");
     if (fchdir(Fd))
-        return TError(EError::Unknown, "fchdir");
-    return TError::Success();
+        return TError::System("fchdir");
+    return OK;
 }
 
 TError TFile::Stat(struct stat &st) const {
     if (fstat(Fd, &st))
-        return TError(EError::Unknown, "Cannot stat: " + std::to_string(Fd));
-    return TError::Success();
+        return TError::System("Cannot fstat: {}", Fd);
+    return OK;
 }
 
 TError TFile::StatAt(const TPath &path, bool follow, struct stat &st) const {
     if (fstatat(Fd, path.c_str(), &st, AT_EMPTY_PATH |
                 (follow ? 0 : AT_SYMLINK_NOFOLLOW)))
-        return TError(EError::Unknown, "Cannot stat: " + std::to_string(Fd) + " @ " + path.Path);
-    return TError::Success();
+        return TError::System("Cannot fstatat: {} @ {}", Fd, path.Path);
+    return OK;
 }
 
 bool TFile::ExistsAt(const TPath &path) const {
@@ -1359,9 +1359,9 @@ bool TFile::ExistsAt(const TPath &path) const {
 TError TFile::StatFS(TStatFS &result) const {
     struct statfs st;
     if (fstatfs(Fd, &st))
-        return TError(EError::Unknown, errno, "statfs");
+        return TError::System("statfs");
     result.Init(st);
-    return TError::Success();
+    return OK;
 }
 
 bool TFile::Access(const struct stat &st, const TCred &cred, enum AccessMode mode) {
@@ -1379,14 +1379,14 @@ TError TFile::ReadAccess(const TCred &cred) const {
     if (error)
         return error;
     if (Access(st, cred, TFile::R))
-        return TError::Success();
+        return OK;
     return TError(EError::Permission, cred.ToString() + " has no read access to " + RealPath().ToString());
 }
 
 TError TFile::WriteAccess(const TCred &cred) const {
     struct statfs fs;
     if (fstatfs(Fd, &fs))
-        return TError(EError::Unknown, errno, "fstatfs");
+        return TError::System("fstatfs");
     if (fs.f_flags & ST_RDONLY)
         return TError(EError::Permission, "read only: " + RealPath().ToString());
     if (fs.f_type == PROC_SUPER_MAGIC)
@@ -1396,7 +1396,7 @@ TError TFile::WriteAccess(const TCred &cred) const {
     if (error)
         return error;
     if (Access(st, cred, TFile::W))
-        return TError::Success();
+        return OK;
     return TError(EError::Permission, cred.ToString() + " has no write access to " + RealPath().ToString());
 }
 
@@ -1421,8 +1421,8 @@ TError TPathWalk::Open(const TPath &path, int fts_flags,
     char* paths[] = { (char *)path.c_str(), nullptr };
     Fts = fts_open(paths, fts_flags, compar);
     if (!Fts)
-        return TError(EError::Unknown, errno, "fts_open");
-    return TError::Success();
+        return TError::System("fts_open");
+    return OK;
 }
 
 TError TPathWalk::OpenScan(const TPath &path)
@@ -1439,16 +1439,16 @@ TError TPathWalk::Next() {
     Ent = fts_read(Fts);
     if (!Ent) {
         if (errno)
-            return TError(EError::Unknown, errno, "fts_read");
+            return TError::System("fts_read");
         Path = "";
-        return TError::Success();
+        return OK;
     }
     switch (Ent->fts_info) {
     case FTS_DNR:
     case FTS_ERR:
     case FTS_NS:
     case FTS_NSOK:
-        return TError(EError::Unknown, errno, "fts_read");
+        return TError::System("fts_read");
     case FTS_DP:
         Postorder = true;
         break;
@@ -1458,7 +1458,7 @@ TError TPathWalk::Next() {
     }
     Path = Ent->fts_path;
     Stat = Ent->fts_statp;
-    return TError::Success();
+    return OK;
 }
 
 void TPathWalk::Close() {

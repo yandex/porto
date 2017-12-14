@@ -95,11 +95,11 @@ int main(int argc, char *argv[])
         auto nl = std::make_shared<TNl>();
         TError error = nl->Connect();
         if (error)
-            throw error.GetMsg();
+            throw error.ToString();
 
         error = nl->OpenLinks(test::links, false);
         if (error)
-            throw error.GetMsg();
+            throw error.ToString();
 
         test::InitKernelFeatures();
 

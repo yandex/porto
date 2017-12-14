@@ -364,7 +364,7 @@ TError TNetwork::New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net) {
         return error;
 
     if (unshare(CLONE_NEWNET))
-        return TError(EError::Unknown, errno, "unshare(CLONE_NEWNET)");
+        return TError::System("unshare(CLONE_NEWNET)");
 
     error = netns.Open("/proc/thread-self/ns/net");
     if (error)
@@ -403,7 +403,7 @@ TError TNetwork::Open(const TPath &path, TNamespaceFd &netns,
     auto it = NetworksIndex.find(inode);
     if (it != NetworksIndex.end()) {
         net = it->second;
-        return TError::Success();
+        return OK;
     }
 
     error = curNs.Open("/proc/thread-self/ns/net");
@@ -501,7 +501,7 @@ TError TNetwork::SetupIngress(TNetDevice &dev, TNetClass &cfg) {
     TError error;
 
     if (cfg.RxLimit.empty() || this == HostNetwork.get())
-        return TError::Success();
+        return OK;
 
     auto rate = dev.GetConfig(cfg.RxLimit);
 
@@ -509,13 +509,13 @@ TError TNetwork::SetupIngress(TNetDevice &dev, TNetClass &cfg) {
     (void)ingress.Delete(*Nl);
 
     if (!rate)
-        return TError::Success();
+        return OK;
 
     ingress.Kind = "ingress";
 
     error = ingress.Create(*Nl);
     if (error) {
-        if (error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+        if (error.Errno != ENODEV && error.Errno != ENOENT)
             L_WRN("Cannot create ingress qdisc: {}", error);
 
         return error;
@@ -529,7 +529,7 @@ TError TNetwork::SetupIngress(TNetDevice &dev, TNetClass &cfg) {
     police.Burst = dev.GetConfig(IngressBurst, std::max(rate / 10, police.Mtu * 10ul));
 
     error = police.Create(*Nl);
-    if (error && error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+    if (error && error.Errno != ENODEV && error.Errno != ENOENT)
         L_WRN("Can't create ingress filter: {}", error);
 
     return error;
@@ -638,7 +638,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
         RootContainer->NetClass.Rate[dev.Name] = dev.Rate;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TNetwork::SetDeviceOwner(const std::string &name, int owner) {
@@ -759,7 +759,7 @@ TError TNetwork::SyncDevices(bool force) {
             dev++;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
@@ -833,7 +833,7 @@ TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
     if (gate6.Addr)
         nl_addr_set_prefixlen(gate6.Addr, 128);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetwork::SetupProxyNeighbour(const std::vector <TNlAddr> &ips,
@@ -852,7 +852,7 @@ TError TNetwork::SetupProxyNeighbour(const std::vector <TNlAddr> &ips,
                 }
             }
         }
-        return TError::Success();
+        return OK;
     }
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
@@ -992,7 +992,7 @@ TError TNetwork::GetNatAddress(std::vector<TNlAddr> &addrs) {
         addrs.push_back(addr);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetwork::PutNatAddress(const std::vector<TNlAddr> &addrs) {
@@ -1008,7 +1008,7 @@ TError TNetwork::PutNatAddress(const std::vector<TNlAddr> &addrs) {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TNetwork::NewDeviceName(const std::string &prefix) {
@@ -1072,7 +1072,7 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
         return TError(error, "tc class");
 
     if (!cfg.Leaf)
-        return TError::Success();
+        return OK;
 
     TNlQdisc ctq(dev.Index, cfg.Leaf, TC_HANDLE(TC_H_MIN(cfg.Handle), CONTAINER_TC_MINOR));
 
@@ -1109,7 +1109,7 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
     if (error)
         return TError(error, "leaf tc qdisc");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg) {
@@ -1125,10 +1125,10 @@ TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg) {
 
     TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.Handle);
     error = cls.Delete(*Nl);
-    if (error && error.GetErrno() != ENODEV && error.GetErrno() != ENOENT)
+    if (error && error.Errno != ENODEV && error.Errno != ENOENT)
         return TError(error, "cannot remove class");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetwork::TrySetupClasses(TNetClass &cls) {
@@ -1152,7 +1152,7 @@ TError TNetwork::TrySetupClasses(TNetClass &cls) {
     state_lock.unlock();
     net_lock.unlock();
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetwork::SetupClasses(TNetClass &cls) {
@@ -1175,7 +1175,7 @@ TError TNetwork::SetupClasses(TNetClass &cls) {
     if (this != HostNetwork.get())
         return HostNetwork->SetupClasses(cls);
 
-    return TError::Success();
+    return OK;
 }
 
 void TNetwork::InitClass(TContainer &ct) {
@@ -1228,12 +1228,12 @@ void TNetwork::UnregisterClass(TNetClass &cls) {
 
 void TNetwork::FatalError(TError &error) {
     L_ERR("Fatal network {} error: {}", NetName, error);
-    if (!NetError || NetError.GetError() == EError::Queued)
+    if (!NetError || NetError == EError::Queued)
         NetError = error;
 }
 
 TError TNetwork::RepairLocked() {
-    bool force = NetError.GetError() != EError::Queued;
+    bool force = NetError != EError::Queued;
     TError error;
 
     NetError = TError::Queued();
@@ -1275,8 +1275,8 @@ TError TNetwork::RepairLocked() {
 
     state_lock.unlock();
 
-    if (NetError.GetError() == EError::Queued)
-        NetError = TError::Success();
+    if (NetError == EError::Queued)
+        NetError = OK;
 
     NetCv.notify_all();
 
@@ -1328,7 +1328,7 @@ TError TNetwork::WaitRepair() {
     }
 
     auto net_lock = LockNet();
-    NetCv.wait(net_lock, [this]{return NetError.GetError() != EError::Queued;});
+    NetCv.wait(net_lock, [this]{return NetError != EError::Queued;});
 
     return NetError;
 }
@@ -1520,7 +1520,7 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TNetwork::StopNetwork(TContainer &ct) {
@@ -1627,7 +1627,7 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
         error = TNetwork::Open("/proc/" + std::to_string(ct.Task.Pid) + "/ns/net", netNs, net);
         if (error) {
             if (ct.WaitTask.IsZombie())
-                return TError::Success();
+                return OK;
             return error;
         }
     } else
@@ -1662,7 +1662,7 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
     ct.Net = net;
     net->NetUsers++;
 
-    return TError::Success();
+    return OK;
 }
 
 //
@@ -1914,13 +1914,13 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
     if (!!NetInherit + !!NetIsolate + !NetNsName.empty() + !NetCtName.empty() != 1)
         return TError(EError::InvalidValue, "Uncertain network type");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::CheckIpLimit() {
     /* no changes -> no limits */
     if (NetInherit)
-        return TError::Success();
+        return OK;
 
     for (auto ct = Parent; ct; ct = ct->Parent) {
 
@@ -1955,7 +1955,7 @@ TError TNetEnv::CheckIpLimit() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::ParseIp(TMultiTuple &ip_settings) {
@@ -1972,7 +1972,7 @@ TError TNetEnv::ParseIp(TMultiTuple &ip_settings) {
             if (dev.Name == settings[0])
                 dev.Ip.push_back(ip);
     }
-    return TError::Success();
+    return OK;
 }
 
 void TNetEnv::FormatIp(TMultiTuple &ip_settings) {
@@ -1996,7 +1996,7 @@ TError TNetEnv::ParseGw(TMultiTuple &gw_settings) {
             if (dev.Name == settings[0])
                 dev.Gw = ip;
     }
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
@@ -2081,7 +2081,7 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
@@ -2109,7 +2109,7 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
         return error;
 
     if (dev.Name.size() >= IFNAMSIZ)
-        return TError(EError::InvalidValue, "tun name too long, max " + std::to_string(IFNAMSIZ-1));
+        return TError(EError::InvalidValue, "tun name too long, max {}", IFNAMSIZ-1);
 
     struct ifreq ifr;
     memset(&ifr, 0, sizeof(struct ifreq));
@@ -2117,16 +2117,16 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
     ifr.ifr_flags = IFF_TAP;
 
     if (ioctl(tun.Fd, TUNSETIFF, &ifr))
-        return TError(EError::Unknown, errno, "Cannot add tap device");
+        return TError::System("Cannot add tap device");
 
     if (ioctl(tun.Fd, TUNSETOWNER, dev.Tap.Uid))
-        return TError(EError::Unknown, errno, "Cannot set tap owner uid");
+        return TError::System("Cannot set tap owner uid");
 
     if (ioctl(tun.Fd, TUNSETGROUP, dev.Tap.Gid))
-        return TError(EError::Unknown, errno, "Cannot set tap owner gid");
+        return TError::System("Cannot set tap owner gid");
 
     if (ioctl(tun.Fd, TUNSETPERSIST, 1))
-        return TError(EError::Unknown, errno, "Cannot set tap persist");
+        return TError::System("Cannot set tap persist");
 
     tun.Close();
 
@@ -2184,7 +2184,7 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
 
     Net->SetDeviceOwner(dev.Name, Id);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::DestroyTap(TNetDeviceConfig &tap) {
@@ -2306,7 +2306,7 @@ TError TNetEnv::SetupInterfaces() {
         }
 
         if (!index)
-            return TError(EError::Unknown, "Network device " + dev.Name + " not found");
+            return TError("Network device {} not found", dev.Name);
 
         TNlLink link(target_nl, dev.Name, index);
         error = link.Load();
@@ -2349,7 +2349,7 @@ TError TNetEnv::SetupInterfaces() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::ApplySysctl() {
@@ -2369,7 +2369,7 @@ TError TNetEnv::ApplySysctl() {
             continue;
         error = SetSysctl(it.key(), it.val());
         if (error) {
-            if (error.GetErrno() == ENOENT)
+            if (error.Errno == ENOENT)
                 L_NET("Sysctl {} is not virtualized", it.key());
             else
                 goto err;
@@ -2392,7 +2392,7 @@ TError TNetEnv::ApplySysctl() {
             goto err;
     }
 
-    error = TError::Success();
+    error = OK;
 err:
     TError error2 = curNs.SetNs(CLONE_NEWNET);
     PORTO_ASSERT(!error2);
@@ -2432,7 +2432,7 @@ TError TNetEnv::Parse(TContainer &ct) {
 
     Net = ct.Net;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNetEnv::Open(TContainer &ct) {
@@ -2487,7 +2487,7 @@ TError TNetEnv::OpenNetwork() {
         HostNetwork = Net;
         NetThread = std::thread(&TNetwork::NetWatchdog);
 
-        return TError::Success();
+        return OK;
     }
 
     if (NetInherit)
@@ -2520,7 +2520,7 @@ TError TNetEnv::OpenNetwork() {
             return error;
         }
 
-        return TError::Success();
+        return OK;
     }
 
     if (NetNsName != "") {
@@ -2532,7 +2532,7 @@ TError TNetEnv::OpenNetwork() {
 
     if (NetCtName != "") {
         if (!CL)
-            return TError(EError::Unknown, "No client for net container");
+            return TError("No client for net container");
 
         std::shared_ptr<TContainer> target;
         auto lock = LockContainers();
@@ -2547,5 +2547,5 @@ TError TNetEnv::OpenNetwork() {
         return Open(*target);
     }
 
-    return TError(EError::Unknown, "Unknown network configuration");
+    return TError("Unknown network configuration");
 }

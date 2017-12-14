@@ -23,11 +23,11 @@ public:
 
     TError GetAt(int id) {
         if (id < Base || id >= Base + (int)Used.size())
-            return TError(EError::Unknown, "Id " + std::to_string(id) + " out of range");
+            return TError("Id " + std::to_string(id) + " out of range");
         if (Used[id - Base])
-            return TError(EError::Unknown, "Id " + std::to_string(id) + " already used");
+            return TError("Id " + std::to_string(id) + " already used");
         Used[id - Base] = true;
-        return TError::Success();
+        return OK;
     }
 
     TError Get(int &id) {
@@ -41,15 +41,15 @@ public:
         Last = it - Used.begin();
         id = Base + Last;
         *it = true;
-        return TError::Success();
+        return OK;
     }
 
     TError Put(int id) {
         if (id < Base || id >= Base + (int)Used.size())
-            return TError(EError::Unknown, "Id out of range");
+            return TError("Id out of range");
         if (!Used[id - Base])
-            return TError(EError::Unknown, "Freeing not allocated id");
+            return TError("Freeing not allocated id");
         Used[id - Base] = false;
-        return TError::Success();
+        return OK;
     }
 };

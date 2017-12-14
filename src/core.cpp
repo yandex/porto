@@ -15,7 +15,7 @@ TError TCore::Register(const TPath &portod) {
     TError error;
 
     if (!config().core().enable())
-        return TError::Success();
+        return OK;
 
     error = GetSysctl("kernel.core_pipe_limit", limit);
     if (error || limit == "0") {
@@ -33,7 +33,7 @@ TError TCore::Register(const TPath &portod) {
 
 TError TCore::Unregister() {
     if (!config().core().enable())
-        return TError::Success();
+        return OK;
 
     return SetSysctl("kernel.core_pattern", config().core().default_pattern());
 }
@@ -42,7 +42,7 @@ TError TCore::Handle(const TTuple &args) {
     TError error;
 
     if (args.size() < 7)
-        return TError(EError::Unknown, "should be executed via sysctl kernel.core_pattern");
+        return TError("should be executed via sysctl kernel.core_pattern");
 
     Pid = std::stoi(args[0]);
     Tid = std::stoi(args[1]);
@@ -80,7 +80,7 @@ TError TCore::Handle(const TTuple &args) {
     if (!Ulimit || !Dumpable) {
         L_ACT("Ignore core dump from container {} {} {}:{} thread {}:{} signal {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
-        return TError::Success();
+        return OK;
     }
 
     if (!error && CoreCommand.size()) {
@@ -110,7 +110,7 @@ TError TCore::Identify() {
     /* all threads except crashed are zombies */
     error = GetTaskCgroups(Tid, cgmap);
     if (!error && !cgmap.count("freezer"))
-        error = TError(EError::Unknown, "freezer not found");
+        error = TError("freezer not found");
     if (error) {
         L_ERR("Cannot get freezer cgroup: {}", error);
         return error;
@@ -147,7 +147,7 @@ TError TCore::Identify() {
     if (GroupId(OwnerGroup, OwnerGid))
         OwnerGid = -1;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCore::Forward() {
@@ -177,14 +177,14 @@ TError TCore::Forward() {
             Conn.SetProperty(core, P_CWD, Cwd) ||
             Conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')) ||
             Conn.Start(core))
-        return TError(EError::Unknown, "cannot create core container");
+        return TError("cannot create core container");
 
     L("Forwading core into {}", core);
 
     std::string result;
     Conn.WaitContainers({core}, result, config().core().timeout_s());
     Conn.Destroy(core);
-    return TError::Success();
+    return OK;
 }
 
 TError TCore::Save() {
@@ -262,15 +262,15 @@ TError TCore::Save() {
     if (filter.size()) {
         if (file.Fd != STDOUT_FILENO &&
                 dup2(file.Fd, STDOUT_FILENO) != STDOUT_FILENO)
-            return TError(EError::Unknown, errno, "dup2");
+            return TError::System("dup2");
         execlp(filter.c_str(), filter.c_str(), nullptr);
-        error = TError(EError::Unknown, errno, "cannot execute filter " + filter);
+        error = TError::System("cannot execute filter " + filter);
     } else {
         uint64_t buf[512];
         off_t sync_start = 0;
         off_t sync_block = config().core().sync_size();
 
-        error = TError::Success();
+        error = OK;
         do {
             size_t len = 0;
 
@@ -278,7 +278,7 @@ TError TCore::Save() {
                 ssize_t ret = read(STDIN_FILENO, (uint8_t*)buf + len, sizeof(buf) - len);
                 if (ret <= 0) {
                     if (ret < 0)
-                        error = TError(EError::Unknown, errno, "read");
+                        error = TError::System("read");
                     break;
                 }
                 len += ret;
@@ -298,7 +298,7 @@ TError TCore::Save() {
                 ssize_t ret = pwrite(file.Fd, (uint8_t*)buf + off, len - off, size + off);
                 if (ret <= 0) {
                     if (ret < 0)
-                        error = TError(EError::Unknown, errno, "write");
+                        error = TError::System("write");
                     break;
                 }
                 off += ret;

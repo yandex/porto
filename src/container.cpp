@@ -60,11 +60,11 @@ TError TContainer::ValidName(const std::string &name, bool superuser) {
 
     int path_max = superuser ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
     if (name.length() > path_max)
-        return TError(EError::InvalidValue, "container path too long, limit is " + std::to_string(path_max));
+        return TError(EError::InvalidValue, "container path too long, limit is {}", path_max);
 
     if (name[0] == '/') {
         if (name == ROOT_CONTAINER)
-            return TError::Success();
+            return OK;
         return TError(EError::InvalidValue, "container path starts with '/': " + name);
     }
 
@@ -103,7 +103,7 @@ TError TContainer::ValidName(const std::string &name, bool superuser) {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TContainer::ParentName(const std::string &name) {
@@ -124,7 +124,7 @@ std::shared_ptr<TContainer> TContainer::Find(const std::string &name) {
 TError TContainer::Find(const std::string &name, std::shared_ptr<TContainer> &ct) {
     ct = Find(name);
     if (ct)
-        return TError::Success();
+        return OK;
     return TError(EError::ContainerDoesNotExist, "container " + name + " not found");
 }
 
@@ -186,7 +186,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
         else
             ct->SubtreeWrite++;
     }
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::DowngradeLock() {
@@ -412,7 +412,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     auto parent = TContainer::Find(TContainer::ParentName(name));
     if (parent) {
         if (parent->Level == CONTAINER_LEVEL_MAX)
-            return TError(EError::InvalidValue, "You shall not go deeper! Maximum level is " + std::to_string(CONTAINER_LEVEL_MAX));
+            return TError(EError::InvalidValue, "You shall not go deeper! Maximum level is {}", CONTAINER_LEVEL_MAX);
         error = parent->LockRead(lock);
         if (error)
             return error;
@@ -473,7 +473,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (parent)
         parent->Unlock(true);
 
-    return TError::Success();
+    return OK;
 
 err:
     if (parent)
@@ -615,7 +615,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
     SystemClient.ReleaseContainer();
 
-    return TError::Success();
+    return OK;
 
 err:
     TNetwork::StopNetwork(*ct);
@@ -670,7 +670,7 @@ TPath TContainer::WorkDir() const {
 
 TError TContainer::CreateWorkDir() const {
     if (IsRoot())
-        return TError::Success();
+        return OK;
 
     TFile parent;
     TError error;
@@ -698,7 +698,7 @@ TError TContainer::CreateWorkDir() const {
     }
 
     if (error) {
-        if (error.GetErrno() == ENOSPC || error.GetErrno() == EROFS)
+        if (error.Errno == ENOSPC || error.Errno == EROFS)
             L("Cannot create working dir: {}", error);
         else
             L_ERR("Cannot create working dir: {}", error);
@@ -767,7 +767,7 @@ TError TContainer::UpdateSoftLimit() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::SetState(EContainerState next) {
@@ -831,7 +831,7 @@ TError TContainer::Destroy() {
     if (error)
         L_ERR("Can't remove key-value node {}: {}", path, error);
 
-    return TError::Success();
+    return OK;
 }
 
 bool TContainer::IsChildOf(const TContainer &ct) const {
@@ -910,7 +910,7 @@ TError TContainer::CheckMemGuarantee() const {
                       "Memory guarantee overcommit by " +
                       std::to_string(usage + reserve - total) + " bytes");
 
-    return TError::Success();
+    return OK;
 }
 
 uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
@@ -997,14 +997,14 @@ TError TContainer::ApplyUlimits() {
             for (auto &it: map) {
                 if (prlimit(pid, (enum __rlimit_resource)it.first,
                             &it.second, NULL) && errno != ESRCH)
-                    return TError(EError::Unknown, errno, "prlimit");
+                    return TError::System("prlimit");
             }
             retry = true;
         }
         prev = pids;
     } while (retry);
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::ChooseSchedPolicy() {
@@ -1058,16 +1058,16 @@ TError TContainer::ApplySchedPolicy() const {
                     sched_getscheduler(pid) == SchedPolicy)
                 continue;
             if (setpriority(PRIO_PROCESS, pid, SchedNice) && errno != ESRCH)
-                return TError(EError::Unknown, errno, "setpriority");
+                return TError::System("setpriority");
             if (sched_setscheduler(pid, SchedPolicy, &param) &&
                     errno != ESRCH)
-                return TError(EError::Unknown, errno, "sched_setscheduler");
+                return TError::System("sched_setscheduler");
             retry = true;
         }
         prev = pids;
     } while (retry);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::ApplyIoPolicy() const {
@@ -1085,13 +1085,13 @@ TError TContainer::ApplyIoPolicy() const {
             if (std::find(prev.begin(), prev.end(), pid) != prev.end())
                 continue;
             if (SetIoPrio(pid, IoPrio) && errno != ESRCH)
-                return TError(EError::Unknown, errno, "ioprio");
+                return TError::System("ioprio");
             retry = true;
         }
         prev = pids;
     } while (retry);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::ApplyResolvConf() const {
@@ -1164,7 +1164,7 @@ again:
         return TError(EError::ResourceNotAvailable, "Not enough cpus in " + Name);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::DistributeCpus() {
@@ -1350,7 +1350,7 @@ TError TContainer::DistributeCpus() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::ApplyCpuGuarantee() {
@@ -1382,7 +1382,7 @@ TError TContainer::ApplyCpuGuarantee() {
         CpuGuaranteeCur = cur;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::PropagateCpuLimit() {
@@ -1435,7 +1435,7 @@ TError TContainer::SetCpuLimit(uint64_t limit) {
         return error;
 
     CpuLimitCur = limit;
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::ApplyCpuLimit() {
@@ -1477,7 +1477,7 @@ TError TContainer::ApplyCpuLimit() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 
@@ -1489,7 +1489,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::MEM_GUARANTEE)) {
         error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
         if (error) {
-            if (error.GetErrno() != EINVAL)
+            if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_MEM_GUARANTEE, error);
             return error;
         }
@@ -1498,10 +1498,10 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::MEM_LIMIT)) {
         error = MemorySubsystem.SetLimit(memcg, MemLimit);
         if (error) {
-            if (error.GetErrno() == EBUSY)
-                return TError(EError::InvalidValue, std::to_string(MemLimit) + " is too low");
+            if (error.Errno == EBUSY)
+                return TError(EError::InvalidValue, "Limit is too low: {}", MemLimit);
 
-            if (error.GetErrno() != EINVAL)
+            if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_MEM_LIMIT, error);
             return error;
         }
@@ -1510,7 +1510,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
         error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
         if (error) {
-            if (error.GetErrno() != EINVAL && error.GetErrno() != EBUSY)
+            if (error.Errno != EINVAL && error.Errno != EBUSY)
                 L_ERR("Can't set {}: {}", P_ANON_LIMIT, error);
             return error;
         }
@@ -1519,7 +1519,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::DIRTY_LIMIT)) {
         error = MemorySubsystem.SetDirtyLimit(memcg, DirtyMemLimit);
         if (error) {
-            if (error.GetErrno() != EINVAL)
+            if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_DIRTY_LIMIT, error);
             return error;
         }
@@ -1528,7 +1528,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::RECHARGE_ON_PGFAULT)) {
         error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
         if (error) {
-            if (error.GetErrno() != EINVAL)
+            if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_RECHARGE_ON_PGFAULT, error);
             return error;
         }
@@ -1537,7 +1537,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::PRESSURIZE_ON_DEATH)) {
         error = UpdateSoftLimit();
         if (error) {
-            if (error.GetErrno() != EINVAL)
+            if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_PRESSURIZE_ON_DEATH, error);
             return error;
         }
@@ -1547,7 +1547,7 @@ TError TContainer::ApplyDynamicProperties() {
         if (IoBpsLimit.count("fs")) {
             error = MemorySubsystem.SetIoLimit(memcg, IoBpsLimit["fs"]);
             if (error) {
-                if (error.GetErrno() != EINVAL)
+                if (error.Errno != EINVAL)
                     L_ERR("Can't set {}: {}", P_IO_LIMIT, error);
                 return error;
             }
@@ -1561,7 +1561,7 @@ TError TContainer::ApplyDynamicProperties() {
         if (IoOpsLimit.count("fs")) {
             error = MemorySubsystem.SetIopsLimit(memcg, IoOpsLimit["fs"]);
             if (error) {
-                if (error.GetErrno() != EINVAL)
+                if (error.Errno != EINVAL)
                     L_ERR("Can't set {}: {}", P_IO_OPS_LIMIT, error);
                 return error;
             }
@@ -1576,7 +1576,7 @@ TError TContainer::ApplyDynamicProperties() {
         if (Controllers & CGROUP_BLKIO) {
             error = BlkioSubsystem.SetIoWeight(blkcg, IoPolicy, IoWeight);
             if (error) {
-                if (error.GetErrno() != EINVAL)
+                if (error.Errno != EINVAL)
                     L_ERR("Can't set {}: {}", P_IO_POLICY, error);
                 return error;
             }
@@ -1595,7 +1595,7 @@ TError TContainer::ApplyDynamicProperties() {
         auto cg = GetCgroup(HugetlbSubsystem);
         error = HugetlbSubsystem.SetHugeLimit(cg, HugetlbLimit);
         if (error) {
-            if (error.GetErrno() != EINVAL)
+            if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_HUGETLB_LIMIT, error);
             return error;
         }
@@ -1695,7 +1695,7 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
@@ -1766,7 +1766,7 @@ TError TContainer::ApplyDeviceConf() const {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
@@ -1775,7 +1775,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     TError error;
 
     if (IsRoot())
-        return TError::Success();
+        return OK;
 
     if (Parent->IsRoot() && (Controllers & CGROUP_DEVICES)) {
         error = DevicesSubsystem.ApplyDefault(cg);
@@ -1828,7 +1828,7 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
             devices.push_back(device);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::PrepareCgroups() {
@@ -1926,7 +1926,7 @@ TError TContainer::PrepareCgroups() {
         return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::GetEnvironment(TEnv &env) {
@@ -1955,7 +1955,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
             break;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
@@ -2090,7 +2090,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           TaskEnv.Mnt.RootRo ||
                           !TaskEnv.Mnt.Systemd.empty();
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::SanitizeCapabilities() {
@@ -2160,7 +2160,7 @@ TError TContainer::StartTask() {
         return error;
 
     if (IsRoot())
-        return TError::Success();
+        return OK;
 
     /* After restart apply all set dynamic properties */
     memcpy(PropDirty, PropSet, sizeof(PropDirty));
@@ -2175,7 +2175,7 @@ TError TContainer::StartTask() {
 
     /* Meta container without namespaces don't need task */
     if (IsMeta() && !Isolate && NetInherit && !TaskEnv.NewMountNs)
-        return TError::Success();
+        return OK;
 
     error = PrepareTask(TaskEnv);
     if (error)
@@ -2276,11 +2276,11 @@ TError TContainer::Start() {
      * FIXME: non-racy chroot validation is impossible for now
      */
     if (error && !RootPath.IsRoot())
-        error = TError::Success();
+        error = OK;
 
     /* Allow any user:group in sub-container if client can change uid/gid */
     if (error && CL->CanSetUidGid() && IsChildOf(*CL->ClientContainer))
-        error = TError::Success();
+        error = OK;
 
     if (error)
         return TError(error, "Cannot start container " + Name);
@@ -2418,7 +2418,7 @@ TError TContainer::PrepareResources() {
 
     PropagateCpuLimit();
 
-    return TError::Success();
+    return OK;
 }
 
 /* Some resources are not required in dead state */
@@ -2510,11 +2510,11 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
             return TError(EError::NotSupported, "Cannot terminate without freezer");
-        return TError::Success();
+        return OK;
     }
 
     if (cg.IsEmpty())
-        return TError::Success();
+        return OK;
 
     if (FreezerSubsystem.IsFrozen(cg))
         return cg.KillAll(SIGKILL);
@@ -2547,13 +2547,13 @@ TError TContainer::Terminate(uint64_t deadline) {
     }
 
     if (cg.IsEmpty())
-        return TError::Success();
+        return OK;
 
     error = cg.KillAll(SIGKILL);
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::ForgetPid() {
@@ -2571,7 +2571,7 @@ TError TContainer::Stop(uint64_t timeout) {
     TError error;
 
     if (State == EContainerState::Stopped)
-        return TError::Success();
+        return OK;
 
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
@@ -2631,7 +2631,7 @@ TError TContainer::Stop(uint64_t timeout) {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::Reap(bool oomKilled) {
@@ -2724,7 +2724,7 @@ TError TContainer::Pause() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TContainer::Resume() {
@@ -2755,7 +2755,7 @@ TError TContainer::Resume() {
             L_ERR("Cannot save state after resume: {}", error);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TContainer::SyncProperty(const std::string &name) {
@@ -2798,7 +2798,7 @@ TError TContainer::HasProperty(const std::string &property) const {
                 if (subsys->Type != type)
                     continue;
                 if (subsys->Kind & Controllers)
-                    return TError::Success();
+                    return OK;
                 return TError(EError::NoValue, "Controllers is disabled");
             }
             return TError(EError::InvalidProperty, "Unknown controller");
@@ -3007,7 +3007,7 @@ TError TContainer::Load(const TKeyValue &node) {
         SetState(state);
         SetProp(EProperty::STATE);
     } else
-        error = TError(EError::Unknown, "Container has no state");
+        error = TError("Container has no state");
 
     if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped)
         Controllers = RootContainer->Controllers;
@@ -3042,7 +3042,7 @@ TError TContainer::Seize() {
         if (GetTaskName(SeizeTask.Pid) == "portoinit") {
             pid_t ppid = SeizeTask.GetPPid();
             if (ppid == getpid() || ppid == getppid())
-                return TError::Success();
+                return OK;
             while(!kill(SeizeTask.Pid, SIGKILL))
                 usleep(100000);
         }
@@ -3073,7 +3073,7 @@ TError TContainer::Seize() {
 
     if (SeizeTask.Pid) {
         SetProp(EProperty::SEIZE_PID);
-        return TError::Success();
+        return OK;
     }
 
     if (cg.Attach(GetPid()))

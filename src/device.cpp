@@ -91,7 +91,7 @@ TError TDevice::Parse(TTuple &opt) {
             Privileged = true;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TDevice::Format() const {
@@ -157,7 +157,7 @@ TError TDevice::Permitted(const TCred &cred) const {
     if (Privileged && !cred.IsRootUser())
         return TError(EError::Permission, cred.ToString() + " isn't root user for " + Path.ToString());
 
-    return TError::Success();
+    return OK;
 }
 
 TError TDevice::Makedev(const TPath &root) const {
@@ -174,7 +174,7 @@ TError TDevice::Makedev(const TPath &root) const {
         if (!path.StatFollow(st)) {
             if (st.st_mode == Mode && st.st_rdev == Device &&
                     st.st_uid == User && st.st_gid == Group)
-                return TError::Success();
+                return OK;
             return TError(EError::Busy, "Different device node already exists: " + Name);
         }
 
@@ -187,5 +187,5 @@ TError TDevice::Makedev(const TPath &root) const {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }

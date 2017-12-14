@@ -12,8 +12,8 @@ extern "C" {
 static TError EpollCreate(int &epfd) {
     epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0)
-        return TError(EError::Unknown, errno, "epoll_create1()");
-    return TError::Success();
+        return TError::System("epoll_create1()");
+    return OK;
 }
 
 TError TEpollLoop::Create() {
@@ -23,7 +23,7 @@ TError TEpollLoop::Create() {
 
     Statistics->EpollSources = 0;
 
-    return TError::Success();
+    return OK;
 }
 
 void TEpollLoop::Destroy() {
@@ -50,13 +50,13 @@ TError TEpollLoop::GetEvents(std::vector<struct epoll_event> &evts, int timeout)
     int nr = epoll_wait(EpollFd, Events, MaxEvents, timeout);
     if (nr < 0) {
         if (errno != EINTR)
-            return TError(EError::Unknown, "epoll() error: ", errno);
+            return TError::System("epoll() error: ");
     }
 
     for (int i = 0; i < nr; i++)
         evts.push_back(Events[i]);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
@@ -68,7 +68,7 @@ TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
 
     if (!Sources[fd].expired()) {
         L_ERR("Duplicate epoll fd {}", fd);
-        return TError(EError::Unknown, "dublicate epoll fd");
+        return TError("dublicate epoll fd");
     }
 
     Sources[fd] = source;
@@ -78,9 +78,9 @@ TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
     ev.events = EPOLLIN | EPOLLHUP;
     ev.data.fd = fd;
     if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, fd, &ev) < 0)
-        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(fd) + ")");
+        return TError::System("epoll_add {}", fd);
 
-    return TError::Success();
+    return OK;
 }
 
 void TEpollLoop::RemoveSource(int fd) {
@@ -94,7 +94,7 @@ void TEpollLoop::RemoveSource(int fd) {
 
     if (epoll_ctl(EpollFd, EPOLL_CTL_DEL, fd, nullptr) < 0)
         L_ERR("Cannot remove epoll {} : {}", fd,
-              TError(EError::Unknown, errno, "epoll_ctl"));
+              TError::System("epoll_ctl"));
 }
 
 TError TEpollLoop::ModifySourceEvents(int fd, uint32_t events) const {
@@ -102,8 +102,8 @@ TError TEpollLoop::ModifySourceEvents(int fd, uint32_t events) const {
     ev.events = events;
     ev.data.fd = fd;
     if (epoll_ctl(EpollFd, EPOLL_CTL_MOD, fd, &ev) < 0)
-        return TError(EError::Unknown, errno, "epoll_mod(" + std::to_string(fd) + ")");
-    return TError::Success();
+        return TError::System("epoll_mod {}", fd);
+    return OK;
 }
 
 TError TEpollLoop::StartInput(int fd) const {

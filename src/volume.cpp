@@ -37,15 +37,15 @@ static std::condition_variable VolumesCv;
 /* TVolumeBackend - abstract */
 
 TError TVolumeBackend::Configure() {
-    return TError::Success();
+    return OK;
 }
 
 TError TVolumeBackend::Save() {
-    return TError::Success();
+    return OK;
 }
 
 TError TVolumeBackend::Restore() {
-    return TError::Success();
+    return OK;
 }
 
 TError TVolumeBackend::Resize(uint64_t, uint64_t) {
@@ -66,7 +66,7 @@ public:
         if (Volume->HaveQuota())
             return TError(EError::InvalidProperty, "Plain backend have no support of quota");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -103,7 +103,7 @@ public:
         if (Volume->HaveLayers())
             return TError(EError::InvalidProperty, "bind backend doesn't support layers");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -137,7 +137,7 @@ public:
         if (Volume->HaveStorage())
             return TError(EError::InvalidProperty, "tmpfs backed doesn't support storage");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -206,7 +206,7 @@ public:
         Volume->StoragePath = Volume->Path;
         Volume->KeepStorage = true;
 
-        return TError::Success();
+        return OK;
     }
 
     TError Restore() {
@@ -216,7 +216,7 @@ public:
         Volume->StoragePath = Volume->Path;
         Volume->KeepStorage = true;
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -285,7 +285,7 @@ public:
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::NotSupported, "project quota is disabled");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -351,14 +351,14 @@ static TError SetupLoopDev(const TFile &file, const TPath &path, int &loopNr) {
 
     if (config().volumes().direct_io_loop() &&
             fcntl(file.Fd, F_SETFL, fcntl(file.Fd, F_GETFL) | O_DIRECT))
-        L_WRN("Cannot enable O_DIRECT for loop {}", TError(EError::Unknown, errno, "fcntl"));
+        L_WRN("Cannot enable O_DIRECT for loop {}", TError::System("fcntl"));
 
     auto lock = std::unique_lock<std::mutex>(BigLoopLock);
 
 again:
     nr = ioctl(ctl.Fd, LOOP_CTL_GET_FREE);
     if (nr < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
+        return TError::System("ioctl(LOOP_CTL_GET_FREE)");
 
     error = dev.OpenReadWrite("/dev/loop" + std::to_string(nr));
     if (error)
@@ -371,14 +371,14 @@ again:
                     goto again;
             }
         }
-        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
+        return TError::System("ioctl(LOOP_SET_FD)");
     }
 
     memset(&info, 0, sizeof(info));
     strncpy((char *)info.lo_file_name, path.c_str(), LO_NAME_SIZE - 1);
 
     if (ioctl(dev.Fd, LOOP_SET_STATUS64, &info) < 0) {
-        error = TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
+        error = TError::System("ioctl(LOOP_SET_STATUS64)");
         (void)ioctl(dev.Fd, LOOP_CLR_FD, 0);
         return error;
     }
@@ -391,7 +391,7 @@ TError PutLoopDev(const int loopNr) {
     TFile loop;
     TError error = loop.OpenReadWrite("/dev/loop" + std::to_string(loopNr));
     if (!error && ioctl(loop.Fd, LOOP_CLR_FD, 0) < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
+        return TError::System("ioctl(LOOP_CLR_FD)");
     return error;
 }
 
@@ -427,7 +427,7 @@ public:
             }
         }
 
-        return TError::Success();
+        return OK;
     }
 
     TPath GetLoopDevice() {
@@ -442,7 +442,7 @@ public:
         L_ACT("Allocate loop image with size {} guarantee {}", size, guarantee);
 
         if (ftruncate(file.Fd, size))
-            return TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
+            return TError::System("truncate(" + path.ToString() + ")");
 
         if (guarantee && fallocate(file.Fd, FALLOC_FL_KEEP_SIZE, 0, guarantee))
             return TError(EError::ResourceNotAvailable, errno,
@@ -458,12 +458,12 @@ public:
         TError error;
 
         if (current < target && ftruncate(file.Fd, target))
-            return TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
+            return TError::System("truncate(" + path.ToString() + ")");
 
         error = RunCommand({"resize2fs", "-f", path.ToString(), size}, dir);
 
         if (!error && current > target && ftruncate(file.Fd, target))
-            error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
+            error = TError::System("truncate(" + path.ToString() + ")");
 
         return error;
     }
@@ -486,7 +486,7 @@ public:
             return error;
 
         if (ioctl(dev.Fd, LOOP_SET_CAPACITY, 0) < 0)
-            return TError(EError::Unknown, errno, "ioctl(LOOP_SET_CAPACITY)");
+            return TError::System("ioctl(LOOP_SET_CAPACITY)");
 
         return RunCommand({"resize2fs", path, size});
     }
@@ -547,7 +547,7 @@ public:
         TPath loop = GetLoopDevice();
 
         if (Volume->Device < 0)
-            return TError::Success();
+            return OK;
 
         L_ACT("Destroy loop {}", loop);
         TError error = Volume->InternalPath.UmountAll();
@@ -606,7 +606,7 @@ public:
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::InvalidProperty, "project quota is disabled");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -692,7 +692,7 @@ public:
                                      "upperdir=" + upperFd.ProcPath().ToString(),
                                      "workdir=" + workFd.ProcPath().ToString() });
 
-        if (error && error.GetErrno() == EINVAL && Volume->Layers.size() >= 500)
+        if (error && error.Errno == EINVAL && Volume->Layers.size() >= 500)
             error = TError(EError::InvalidValue, "Too many layers, kernel limits is 499 plus 1 for upper");
 
         (void)TPath("/").Chdir();
@@ -761,7 +761,7 @@ public:
         if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::InvalidProperty, "project quota is disabled");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Build() override {
@@ -813,7 +813,7 @@ public:
             error = Volume->InternalPath.BindRemount(lower, Volume->GetMountFlags());
             if (error)
                 goto err;
-            return TError::Success();
+            return OK;
         }
 
         if (Volume->HaveQuota()) {
@@ -877,7 +877,7 @@ public:
                                      "upperdir=" + upperFd.ProcPath().ToString(),
                                      "workdir=" + workFd.ProcPath().ToString() });
 
-        if (error && error.GetErrno() == EINVAL && Volume->Layers.size() >= 500)
+        if (error && error.Errno == EINVAL && Volume->Layers.size() >= 500)
             error = TError(EError::InvalidValue, "Too many layers, kernel limits is 499 plus 1 for upper");
 
         while (layer_idx--) {
@@ -916,7 +916,7 @@ err:
             (void)quota.Destroy();
         }
 
-        return TError::Success();
+        return OK;
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
@@ -964,7 +964,7 @@ public:
         if (error)
             return error;
         device = StringTrim(device);
-        return TError::Success();
+        return OK;
     }
 
     TError UnmapDevice(std::string device) {
@@ -1014,7 +1014,7 @@ public:
         TError error, error2;
 
         if (Volume->Device < 0)
-            return TError::Success();
+            return OK;
 
         error = Volume->InternalPath.UmountAll();
         error2 = UnmapDevice(device);
@@ -1089,7 +1089,7 @@ public:
         if (StringStartsWith(Origin, "porto_"))
             return TError(EError::InvalidValue, "origin is temporary volume");
 
-        return TError::Success();
+        return OK;
     }
 
     TError Restore() override {
@@ -1183,7 +1183,7 @@ std::shared_ptr<TVolume> TVolume::Find(const TPath &path) {
 TError TVolume::Find(const TPath &path, std::shared_ptr<TVolume> &volume) {
     volume = Find(path);
     if (volume)
-        return TError::Success();
+        return OK;
     return TError(EError::VolumeNotFound, "Volume " + path.ToString() + " not found");
 }
 
@@ -1253,7 +1253,7 @@ TError TVolume::OpenBackend() {
 
     Backend->Volume = this;
 
-    return TError::Success();
+    return OK;
 }
 
 /* /place/porto_volumes/<id>/<type> */
@@ -1282,7 +1282,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
     TPath storage;
 
     if (RemoteStorage() || (!space_guarantee && !inode_guarantee))
-        return TError::Success();
+        return OK;
 
     if (UserStorage())
         storage = StoragePath;
@@ -1363,7 +1363,7 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
                       std::to_string(inode_claimed) + " claimed " +
                       std::to_string(inode_guaranteed) + " guaranteed");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TVolume::ClaimPlace(uint64_t size) {
@@ -1373,7 +1373,7 @@ TError TVolume::ClaimPlace(uint64_t size) {
 
     auto place = Backend->ClaimPlace();
     if (place == "")
-        return TError::Success();
+        return OK;
 
     auto lock = LockVolumes();
 
@@ -1408,12 +1408,12 @@ TError TVolume::ClaimPlace(uint64_t size) {
 
     ClaimedSpace = size;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TVolume::DependsOn(const TPath &path) {
     if (State == EVolumeState::Ready && !path.Exists())
-        return TError(EError::Unknown, "dependecy path " + path.ToString() + " not found");
+        return TError("dependecy path " + path.ToString() + " not found");
 
     for (auto it = Volumes.rbegin(); it != Volumes.rend(); ++it) {
         auto &vol = it->second;
@@ -1425,7 +1425,7 @@ TError TVolume::DependsOn(const TPath &path) {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TVolume::CheckDependencies() {
@@ -1635,7 +1635,7 @@ TError TVolume::Configure(const TStringMap &cfg) {
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TVolume::Build() {
@@ -1969,7 +1969,7 @@ TError TVolume::Destroy(bool strict) {
             TStorage storage(volume->Place, PORTO_LAYERS, layer);
             if (StringStartsWith(layer, PORTO_WEAK_PREFIX)) {
                 error = storage.Remove();
-                if (error && error.GetError() != EError::Busy)
+                if (error && error != EError::Busy)
                     L_ERR("Cannot remove weak layer {} : {}", layer, error);
             } else if (layer[0] != '/')
                 (void)storage.Touch();
@@ -2182,7 +2182,7 @@ TError TVolume::GetUpperLayer(TPath &upper) {
         upper = StoragePath / "upper";
     else
         upper = Path;
-    return TError::Success();
+    return OK;
 }
 
 TError TVolume::LinkContainer(TContainer &container) {
@@ -2262,7 +2262,7 @@ TError TVolume::CheckRequired(const TTuple &paths) {
             return TError(EError::VolumeNotReady, path);
         vol->HasDependentContainer = true;
     }
-    return TError::Success();
+    return OK;
 }
 
 void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {
@@ -2429,7 +2429,7 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
@@ -2465,7 +2465,7 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     TError error;
 
     if (!CL)
-        return TError(EError::Unknown, "no client");
+        return TError("no client");
 
     if (cfg.count(V_PLACE)) {
         error = CL->CanControlPlace(cfg.at(V_PLACE));
@@ -2575,7 +2575,7 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TVolume::RestoreAll(void) {
@@ -2718,7 +2718,7 @@ void TVolume::RestoreAll(void) {
             if (StringStartsWith(layer.Name, PORTO_WEAK_PREFIX)) {
 
                 error = layer.Remove();
-                if (error && error.GetError() != EError::Busy)
+                if (error && error != EError::Busy)
                     L_ERR("Cannot remove weak layer {} : {}", layer.Name, error);
             }
         }
@@ -2854,5 +2854,5 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
             L_WRN("Skip unknown volume property {} = {}", prop.first, prop.second);
     }
 
-    return TError::Success();
+    return OK;
 }

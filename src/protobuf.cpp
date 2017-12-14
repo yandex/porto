@@ -45,7 +45,7 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
 
     fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "socket()");
+        return TError::System("socket()");
 
     peer_addr.sun_family = AF_UNIX;
     strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
@@ -54,8 +54,8 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     if (connect(fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
         close(fd);
         fd = -1;
-        return TError(EError::Unknown, errno, "connect(" + path + ")");
+        return TError::System("connect(" + path + ")");
     }
 
-    return TError::Success();
+    return OK;
 }

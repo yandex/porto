@@ -92,7 +92,7 @@ TError TClient::IdentifyClient(bool initial) {
     TError error;
 
     if (getsockopt(Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len))
-        return TError(EError::Unknown, errno, "Cannot identify client: getsockopt() failed");
+        return TError::System("Cannot identify client: getsockopt() failed");
 
     /* check that request from the same pid and container is still here */
     if (!initial && Pid == cr.pid && TaskCred.Uid == cr.uid &&
@@ -100,7 +100,7 @@ TError TClient::IdentifyClient(bool initial) {
             (ClientContainer->State == EContainerState::Running ||
              ClientContainer->State == EContainerState::Starting ||
              ClientContainer->State == EContainerState::Meta))
-        return TError::Success();
+        return OK;
 
     TaskCred.Uid = cr.uid;
     TaskCred.Gid = cr.gid;
@@ -110,7 +110,7 @@ TError TClient::IdentifyClient(bool initial) {
     Comm = GetTaskName(Pid);
 
     error = TContainer::FindTaskContainer(Pid, ct);
-    if (error && error.GetErrno() != ENOENT)
+    if (error && error.Errno != ENOENT)
         L_WRN("Cannot identify container of pid {} : {}", Pid, error);
 
     if (error)
@@ -160,7 +160,7 @@ TError TClient::IdentifyClient(bool initial) {
                 AccessLevel <= EAccessLevel::ReadOnly ? "ro" : "rw",
                 PortoNamespace, WriteNamespace);
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TClient::RelativeName(const std::string &name) const {
@@ -176,12 +176,12 @@ std::string TClient::RelativeName(const std::string &name) const {
 TError TClient::ComposeName(const std::string &name, std::string &relative_name) const {
     if (name == ROOT_CONTAINER) {
         relative_name = ROOT_CONTAINER;
-        return TError::Success();
+        return OK;
     }
 
     if (PortoNamespace == "") {
         relative_name = name;
-        return TError::Success();
+        return OK;
     }
 
     if (!StringStartsWith(name, PortoNamespace))
@@ -189,7 +189,7 @@ TError TClient::ComposeName(const std::string &name, std::string &relative_name)
                 "Cannot access container " + name + " from namespace " + PortoNamespace);
 
     relative_name = name.substr(PortoNamespace.length());
-    return TError::Success();
+    return OK;
 }
 
 TError TClient::ResolveName(const std::string &relative_name, std::string &name) const {
@@ -216,7 +216,7 @@ TError TClient::ResolveName(const std::string &relative_name, std::string &name)
             StringStartsWith(name, ClientContainer->Name + "/") ||
             StringStartsWith(ClientContainer->Name + "/", name + "/") ||
             name == ROOT_CONTAINER)
-        return TError::Success();
+        return OK;
 
     return TError(EError::Permission, "container name out of namespace: " + relative_name);
 }
@@ -241,7 +241,7 @@ TError TClient::ReadContainer(const std::string &relative_name,
     if (error)
         return error;
     LockedContainer = ct;
-    return TError::Success();
+    return OK;
 }
 
 TError TClient::WriteContainer(const std::string &relative_name,
@@ -260,7 +260,7 @@ TError TClient::WriteContainer(const std::string &relative_name,
     if (error)
         return error;
     LockedContainer = ct;
-    return TError::Success();
+    return OK;
 }
 
 TError TClient::LockContainer(std::shared_ptr<TContainer> &ct) {
@@ -296,7 +296,7 @@ TPath TClient::DefaultPlace() {
 TError TClient::CanControlPlace(const TPath &place) {
     for (auto &mask: ClientContainer->Place)
         if (StringMatch(place.ToString(), mask))
-            return TError::Success();
+            return OK;
     return TError(EError::Permission, "You are not permitted to use place " + place.ToString());
 }
 
@@ -317,18 +317,18 @@ TError TClient::CanControl(const TCred &other) {
         return TError(EError::Permission, "Write access denied");
 
     if (IsSuperUser() || Cred.Uid == other.Uid || other.IsUnknown())
-        return TError::Success();
+        return OK;
 
     /* Everybody can control users from group porto-containers */
     if (other.IsMemberOf(PortoCtGroup))
-        return TError::Success();
+        return OK;
 
     /* Load group $USER-containers lazily */
     if (!UserCtGroup && GroupId(Cred.User() + USER_CT_SUFFIX, UserCtGroup))
         UserCtGroup = NoGroup;
 
     if (other.IsMemberOf(UserCtGroup))
-        return TError::Success();
+        return OK;
 
     return TError(EError::Permission, Cred.ToString() + " cannot control " + other.ToString());
 }
@@ -359,7 +359,7 @@ TError TClient::CanControl(const TContainer &ct, bool child) {
                 return TError(error, "Write access denied: container " + ct.Name);
         }
 
-        return TError::Success();
+        return OK;
     }
 
     return TError(EError::Permission, "Write access denied: container " + ct.Name + " out of scope");
@@ -381,7 +381,7 @@ TError TClient::ReadAccess(const TFile &file) {
     if (error) {
         auto volume = TVolume::Locate(path);
         if (volume && !CanControl(volume->VolumeOwner))
-            error = TError::Success();
+            error = OK;
     }
 
     return error;
@@ -407,7 +407,7 @@ TError TClient::WriteAccess(const TFile &file) {
     if (error) {
         auto volume = TVolume::Locate(path);
         if (volume && !CanControl(volume->VolumeOwner))
-            error = TError::Success();
+            error = OK;
     }
 
     return error;
@@ -418,11 +418,11 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
 
     if (Processing) {
         L_WRN("Client request before response: {}", Id);
-        return TError::Success();
+        return OK;
     }
 
     if (Fd < 0)
-        return TError(EError::Unknown, "Connection closed");
+        return TError("Connection closed");
 
     if (Offset >= Buffer.size())
         Buffer.resize(Offset + 4096);
@@ -431,9 +431,9 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     if (len > 0)
         Offset += len;
     else if (len == 0)
-        return TError(EError::Unknown, "recv return zero");
+        return TError("recv return zero");
     else if (errno != EAGAIN && errno != EWOULDBLOCK)
-        return TError(EError::Unknown, errno, "recv request failed");
+        return TError::System("recv request failed");
 
     ActivityTimeMs = GetCurrentTimeMs();
 
@@ -448,7 +448,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
 
     if (!Length) {
         if (length > config().daemon().max_msg_len())
-            return TError(EError::Unknown, "oversized request: " + std::to_string(length));
+            return TError("oversized request: {}", length);
 
         Length = length + google::protobuf::io::CodedOutputStream::VarintSize32(length);
         if (Buffer.size() < Length)
@@ -459,10 +459,10 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     }
 
     if (!request.ParseFromCodedStream(&input))
-        return TError(EError::Unknown, "cannot parse request");
+        return TError("cannot parse request");
 
     if (Offset > Length)
-        return TError(EError::Unknown, "garbage after request");
+        return TError("garbage after request");
 
     Processing = true;
     return EpollLoop->StopInput(Fd);
@@ -472,19 +472,19 @@ TError TClient::SendResponse(bool first) {
     TScopedLock lock(Mutex);
 
     if (Fd < 0)
-        return TError::Success(); /* Connection closed */
+        return OK; /* Connection closed */
 
     ssize_t len = send(Fd, &Buffer[Offset], Length - Offset, MSG_DONTWAIT);
     if (len > 0)
         Offset += len;
     else if (len == 0) {
         if (!first)
-            return TError(EError::Unknown, "send return zero");
+            return TError("send return zero");
     } else if (errno == EPIPE) {
         L("Client disconnected: {}", Id);
-        return TError::Success();
+        return OK;
     } else if (errno != EAGAIN && errno != EWOULDBLOCK)
-        return TError(EError::Unknown, errno, "send response failed");
+        return TError::System("send response failed");
 
     ActivityTimeMs = GetCurrentTimeMs();
 
@@ -497,7 +497,7 @@ TError TClient::SendResponse(bool first) {
     if (first)
         return EpollLoop->StartOutput(Fd);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TClient::QueueResponse(rpc::TContainerResponse &response) {
@@ -512,7 +512,7 @@ TError TClient::QueueResponse(rpc::TContainerResponse &response) {
 
     google::protobuf::io::CodedOutputStream::WriteVarint32ToArray(length, &Buffer[0]);
     if (!response.SerializeToArray(&Buffer[lengthSize], length))
-        return TError(EError::Unknown, "cannot serialize response");
+        return TError("cannot serialize response");
 
     return SendResponse(true);
 }

@@ -56,7 +56,7 @@ TError TCgroup::Create() {
     TError error;
 
     if (Secondary())
-        return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
+        return TError("Cannot create secondary cgroup " + Type());
 
     L_CG("Create cgroup {}", *this);
     error = Path().Mkdir(0755);
@@ -118,7 +118,7 @@ TError TCgroup::RemoveOne() {
     TError error;
 
     if (Secondary())
-        return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
+        return TError("Cannot create secondary cgroup " + Type());
 
     L_CG("Remove cgroup {}", *this);
     error = Path().Rmdir();
@@ -126,7 +126,7 @@ TError TCgroup::RemoveOne() {
     //FIXME CLEANUP
 
     /* workaround for bad synchronization */
-    if (error && error.GetErrno() == EBUSY &&
+    if (error && error.Errno == EBUSY &&
         !Path().StatStrict(st) && st.st_nlink == 2) {
         uint64_t deadline = GetCurrentTimeMs() +
                             config().daemon().cgroup_remove_timeout_s() * 1000;
@@ -137,12 +137,12 @@ TError TCgroup::RemoveOne() {
 
             error = Path().Rmdir();
 
-            if (!error || error.GetErrno() != EBUSY)
+            if (!error || error.Errno != EBUSY)
                 break;
         } while (!WaitDeadline(deadline));
     }
 
-    if (error && (error.GetErrno() != ENOENT || Exists())) {
+    if (error && (error.Errno != ENOENT || Exists())) {
         std::vector<pid_t> tasks;
         GetTasks(tasks);
         L_ERR("Cannot remove cgroup {} : {}, {} tasks inside",
@@ -160,7 +160,7 @@ bool TCgroup::Has(const std::string &knob) const {
 
 TError TCgroup::Get(const std::string &knob, std::string &value) const {
     if (!Subsystem)
-        return TError(EError::Unknown, "Cannot get from null cgroup");
+        return TError("Cannot get from null cgroup");
     TError error = Knob(knob).ReadAll(value);
     if (error)
         error = TError(error, "Cannot get cgroup " + knob);
@@ -169,7 +169,7 @@ TError TCgroup::Get(const std::string &knob, std::string &value) const {
 
 TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     if (!Subsystem)
-        return TError(EError::Unknown, "Cannot set to null cgroup");
+        return TError("Cannot set to null cgroup");
     L_CG("Set {} {} = {}", *this, knob, value);
     TError error = Knob(knob).WriteAll(value);
     if (error)
@@ -215,14 +215,14 @@ TError TCgroup::SetBool(const std::string &knob, bool value) const {
 
 TError TCgroup::GetUintMap(const std::string &knob, TUintMap &value) const {
     if (!Subsystem)
-        return TError(EError::Unknown, "Cannot get from null cgroup");
+        return TError("Cannot get from null cgroup");
 
     FILE *file = fopen(Knob(knob).c_str(), "r");
     char *key;
     unsigned long long val;
 
     if (!file)
-        return TError(EError::Unknown, errno, "Cannot open knob " + knob);
+        return TError::System("Cannot open knob " + knob);
 
     while (fscanf(file, "%ms %llu\n", &key, &val) == 2) {
         value[std::string(key)] = val;
@@ -230,12 +230,12 @@ TError TCgroup::GetUintMap(const std::string &knob, TUintMap &value) const {
     }
 
     fclose(file);
-    return TError::Success();
+    return OK;
 }
 
 TError TCgroup::Attach(pid_t pid) const {
     if (Secondary())
-        return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
+        return TError("Cannot attach to secondary cgroup " + Type());
 
     L_CG("Attach process {} to {}", pid, *this);
     TError error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
@@ -247,7 +247,7 @@ TError TCgroup::Attach(pid_t pid) const {
 
 TError TCgroup::AttachAll(const TCgroup &cg) const {
     if (Secondary())
-        return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
+        return TError("Cannot attach to secondary cgroup " + Type());
 
     L_CG("Attach all processes from {} to {}", cg, *this);
 
@@ -261,14 +261,14 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
         retry = false;
         for (auto pid: pids) {
             error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
-            if (error && error.GetErrno() != ESRCH)
+            if (error && error.Errno != ESRCH)
                 return error;
             retry = retry || std::find(prev.begin(), prev.end(), pid) == prev.end();
         }
         prev = pids;
     } while (retry);
 
-    return TError::Success();
+    return OK;
 }
 
 TCgroup TCgroup::Child(const std::string& name) const {
@@ -290,7 +290,7 @@ TError TCgroup::Childs(std::vector<TCgroup> &cgroups) const {
             continue;
         cgroups.push_back(Child(name));
     }
-    return TError::Success();
+    return OK;
 }
 
 TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
@@ -317,17 +317,17 @@ TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const
     int pid;
 
     if (!Subsystem)
-        return TError(EError::Unknown, "Cannot get from null cgroup");
+        return TError("Cannot get from null cgroup");
 
     pids.clear();
     file = fopen(Knob(knob).c_str(), "r");
     if (!file)
-        return TError(EError::Unknown, errno, "Cannot open knob " + knob);
+        return TError::System("Cannot open knob " + knob);
     while (fscanf(file, "%d", &pid) == 1)
         pids.push_back(pid);
     fclose(file);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCgroup::GetCount(bool threads, uint64_t &count) const {
@@ -335,7 +335,7 @@ TError TCgroup::GetCount(bool threads, uint64_t &count) const {
     TError error;
 
     if (!Subsystem)
-        TError(EError::Unknown, "Cannot get from null cgroup");
+        TError("Cannot get from null cgroup");
     error = ChildsAll(childs);
     if (error)
         return error;
@@ -386,7 +386,7 @@ TError TCgroup::KillAll(int signal) const {
         for (auto pid: tasks) {
             if (std::find(killed.begin(), killed.end(), pid) == killed.end()) {
                 if (kill(pid, signal) && errno != ESRCH && !error) {
-                    error = TError(EError::Unknown, errno, "kill");
+                    error = TError::System("kill");
                     L_ERR("Cannot kill process {} : {}", pid, error);
                 }
                 retry = true;
@@ -433,12 +433,11 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
         if (found) {
             cgroup.Subsystem = this;
             cgroup.Name = fields[2];
-            return TError::Success();
+            return OK;
         }
     }
 
-    return TError(EError::Unknown, "Cannot find " + Type +
-                    " cgroup for process " + std::to_string(pid));
+    return TError("Cannot find {} cgroup for process {}", Type, pid);
 }
 
 bool TSubsystem::IsBound(const TCgroup &cgroup) const {
@@ -465,7 +464,7 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
         return error;
 
     if (old_limit == limit)
-        return TError::Success();
+        return OK;
 
     /* Memory limit cannot be bigger than Memory+Swap limit. */
     if (SupportSwap()) {
@@ -488,7 +487,7 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
             new_limit = limit;
         }
     } while (cur_limit != limit && new_limit <= cur_limit - 4096 &&
-             (!error || error.GetErrno() == EBUSY));
+             (!error || error.Errno == EBUSY));
 
     if (!error && SupportSwap())
         error = cg.SetUint64(MEM_SWAP_LIMIT, limit);
@@ -529,24 +528,24 @@ bool TMemorySubsystem::SupportAnonLimit() const {
 TError TMemorySubsystem::SetAnonLimit(TCgroup &cg, uint64_t limit) const {
     if (cg.Has(ANON_LIMIT))
         return cg.Set(ANON_LIMIT, limit ? std::to_string(limit) : "-1");
-    return TError::Success();
+    return OK;
 }
 
 TError TMemorySubsystem::SetIoLimit(TCgroup &cg, uint64_t limit) {
     if (!SupportIoLimit())
-        return TError::Success();
+        return OK;
     return cg.SetUint64(FS_BPS_LIMIT, limit);
 }
 
 TError TMemorySubsystem::SetIopsLimit(TCgroup &cg, uint64_t limit) {
     if (!SupportIoLimit())
-        return TError::Success();
+        return OK;
     return cg.SetUint64(FS_IOPS_LIMIT, limit);
 }
 
 TError TMemorySubsystem::SetDirtyLimit(TCgroup &cg, uint64_t limit) {
     if (!SupportDirtyLimit())
-        return TError::Success();
+        return OK;
     if (limit || !cg.Has(DIRTY_RATIO))
         return cg.SetUint64(DIRTY_LIMIT, limit);
     return cg.SetUint64(DIRTY_RATIO, 50);
@@ -565,7 +564,7 @@ TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, TFile &event) {
     event.Close();
     event.SetFd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (event.Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot create eventfd");
+        return TError::System("Cannot create eventfd");
 
     PORTO_ASSERT(event.Fd > 2);
 
@@ -594,7 +593,7 @@ TError TFreezerSubsystem::WaitState(const TCgroup &cg, const std::string &state)
             return error;
     } while (!WaitDeadline(deadline));
 
-    return TError(EError::Unknown, "Freezer " + cg.Name + " timeout waiting " + state);
+    return TError("Freezer {} timeout waiting {}", cg.Name, state);
 }
 
 TError TFreezerSubsystem::Freeze(const TCgroup &cg, bool wait) const {
@@ -664,7 +663,7 @@ void TCpuSubsystem::InitializeSubsystem() {
 TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
     if (HasRtGroup && config().container().rt_priority())
         (void)cg.SetInt64("cpu.rt_runtime_us", -1);
-    return TError::Success();
+    return OK;
 }
 
 TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
@@ -689,7 +688,7 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
         if (error)
             return error;
     }
-    return TError::Success();
+    return OK;
 }
 
 TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
@@ -751,7 +750,7 @@ TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TCpuSubsystem::SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
@@ -792,7 +791,7 @@ TError TCpuSubsystem::SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
             return error;
         }
     }
-    return TError::Success();
+    return OK;
 }
 
 // Cpuacct
@@ -810,7 +809,7 @@ TError TCpuacctSubsystem::SystemUsage(TCgroup &cg, uint64_t &value) const {
     if (error)
         return error;
     value = stat["system"] * (1000000000 / sysconf(_SC_CLK_TCK));
-    return TError::Success();
+    return OK;
 }
 
 // Cpuset
@@ -877,7 +876,7 @@ TError TCpusetSubsystem::InitializeCgroup(TCgroup &cg) {
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }
 
 // Netcls
@@ -928,7 +927,7 @@ TError TBlkioSubsystem::ResolveDisk(const TPath &root, const std::string &key, s
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const {
@@ -1003,7 +1002,7 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     }
     map["hw"] = total;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
@@ -1069,7 +1068,7 @@ TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
 TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
                                     double weight) const {
     if (!HasWeight)
-        return TError::Success();
+        return OK;
 
     if (policy == "rt" || policy == "high")
         weight *= 1000;
@@ -1351,5 +1350,5 @@ TError InitializeDaemonCgroups() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }

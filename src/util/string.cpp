@@ -22,7 +22,7 @@ TError StringToUint64(const std::string &str, uint64_t &value) {
         end++;
     if (*end)
         return TError(EError::InvalidValue, "Bad uint64 value: " + str);
-    return TError::Success();
+    return OK;
 }
 
 TError StringToInt64(const std::string &str, int64_t &value) {
@@ -37,7 +37,7 @@ TError StringToInt64(const std::string &str, int64_t &value) {
         end++;
     if (*end)
         return TError(EError::InvalidValue, "Bad int64 value: " + str);
-    return TError::Success();
+    return OK;
 }
 
 TError StringToInt(const std::string &str, int &value) {
@@ -45,7 +45,7 @@ TError StringToInt(const std::string &str, int &value) {
     if (StringToInt64(str, val) || val < INT32_MIN || val > INT32_MAX)
         return TError(EError::InvalidValue, "Bad int value: " + str);
     value = val;
-    return TError::Success();
+    return OK;
 }
 
 TError StringToOct(const std::string &str, unsigned &value) {
@@ -61,7 +61,7 @@ TError StringToOct(const std::string &str, unsigned &value) {
     if (*end)
         return TError(EError::InvalidValue, "Bad oct value: " + str);
     value = val;
-    return TError::Success();
+    return OK;
 }
 
 TError StringToBool(const std::string &str, bool &value) {
@@ -70,8 +70,8 @@ TError StringToBool(const std::string &str, bool &value) {
     else if (str == "false")
         value = false;
     else
-        return TError(EError::Unknown, "Bad boolean value: " + str);
-    return TError::Success();
+        return TError("Bad boolean value: " + str);
+    return OK;
 }
 
 std::string BoolToString(bool value) {
@@ -93,7 +93,7 @@ TError StringToValue(const std::string &str, double &value, std::string &unit) {
     while (len && isspace(end[len-1]))
         len--;
     unit = std::string(end, len);
-    return TError::Success();
+    return OK;
 }
 
 static char size_unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 0};
@@ -145,7 +145,7 @@ ok:
         return TError(EError::InvalidValue, "Too big: " + str);
 
     size = value * mult;
-    return TError::Success();
+    return OK;
 }
 
 std::string StringFormatSize(uint64_t value)
@@ -212,7 +212,7 @@ ok:
         return TError(EError::InvalidValue, "Too big: " + str);
 
     nsec = value * mult;
-    return TError::Success();
+    return OK;
 }
 
 TTuple SplitString(const std::string &str, const char sep, int max) {
@@ -422,7 +422,7 @@ TError StringParseFlags(const std::string &str, const TFlagsNames &names,
         if (!found)
             return TError(EError::InvalidValue, "Unknown flag \"" + name + "\"");
     }
-    return TError::Success();
+    return OK;
 }
 
 std::string StringFormat(const char *format, ...) {
@@ -460,7 +460,7 @@ TError StringToCpuPower(const std::string &str, uint64_t &power) {
     else
         return TError(EError::InvalidValue, "Invalid cpu power unit " + str);
 
-    return TError::Success();
+    return OK;
 }
 
 std::string CpuPowerToString(uint64_t nsec) {
@@ -478,7 +478,7 @@ TError UintMapToString(const TUintMap &map, std::string &value) {
 
     value = str.str();
 
-    return TError::Success();
+    return OK;
 }
 
 TError StringToUintMap(const std::string &value, TUintMap &result) {
@@ -499,7 +499,7 @@ TError StringToUintMap(const std::string &value, TUintMap &result) {
         result[key] = val;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string StringMapToString(const TStringMap &map) {
@@ -527,7 +527,7 @@ TError StringToStringMap(const std::string &value, TStringMap &result) {
         result[key] = val;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 int CompareVersions(const std::string &a, const std::string &b) {
@@ -559,7 +559,7 @@ TError TBitMap::Parse(const std::string &text) {
         std::fill(bits.begin() + first, bits.begin() + last + 1, true);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TBitMap::Format() const {

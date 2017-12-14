@@ -68,7 +68,7 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
     TError error;
 
     error = base.StatStrict(st);
-    if (error && error.GetErrno() == ENOENT) {
+    if (error && error.Errno == ENOENT) {
         /* In non-default place user must create base structure */
         if (place != PORTO_PLACE && (type == PORTO_VOLUMES || type == PORTO_LAYERS))
             return TError(EError::InvalidValue, base.ToString() + " must be directory");
@@ -139,7 +139,7 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TStorage::CheckPlace(const TPath &place) {
@@ -163,7 +163,7 @@ TError TStorage::CheckPlace(const TPath &place) {
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TStorage::CheckName(const std::string &name) {
@@ -177,7 +177,7 @@ TError TStorage::CheckName(const std::string &name) {
             StringStartsWith(name, REMOVE_PREFIX) ||
             StringStartsWith(name, PRIVATE_PREFIX))
         return TError(EError::InvalidValue, "invalid layer name '" + name + "'");
-    return TError::Success();
+    return OK;
 }
 
 TError TStorage::List(const TPath &place, const std::string &type,
@@ -222,7 +222,7 @@ TError TStorage::CheckUsage() {
         }
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TPath TStorage::TempPath(const std::string &kind) {
@@ -241,11 +241,11 @@ TError TStorage::Load() {
     error = priv.Open(TempPath(PRIVATE_PREFIX),
                       O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW);
     if (error || priv.Stat(st)) {
-        if (error.GetErrno() != ENOENT)
+        if (error.Errno != ENOENT)
             return error;
         error = Path.StatStrict(st);
         if (error) {
-            if (error.GetErrno() == ENOENT) {
+            if (error.Errno == ENOENT) {
                 if (Type == PORTO_LAYERS)
                     return TError(EError::LayerNotFound, "Layer " + Name + " not found");
                 if (Type == PORTO_STORAGE)
@@ -256,7 +256,7 @@ TError TStorage::Load() {
         Owner = TCred(NoUser, NoGroup);
         LastChange = st.st_mtime;
         Private = "";
-        return TError::Success();
+        return OK;
     }
 
     Owner = TCred(st.st_uid, st.st_gid);
@@ -289,7 +289,7 @@ TError TStorage::SetPrivate(const std::string &text) {
 
 TError TStorage::Touch() {
     TError error = TempPath(PRIVATE_PREFIX).Touch();
-    if (error && error.GetErrno() == ENOENT)
+    if (error && error.Errno == ENOENT)
         error = Path.Touch();
     return error;
 }
@@ -345,13 +345,13 @@ static TError Compression(const TPath &archive, const TFile &arc,
 
 tar:
     option = "--no-auto-compress";
-    return TError::Success();
+    return OK;
 gz:
     option = "--gzip";
-    return TError::Success();
+    return OK;
 xz:
     option = "--xz";
-    return TError::Success();
+    return OK;
 squash:
     format = "squashfs";
     auto sep = compress.find('.');
@@ -359,7 +359,7 @@ squash:
         option = compress.substr(0, sep);
     else
         option = config().volumes().squashfs_compression();
-    return TError::Success();
+    return OK;
 }
 
 static bool TarSupportsXattrs() {
@@ -522,7 +522,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
 
     StorageCv.notify_all();
 
-    return TError::Success();
+    return OK;
 
 err:
     TError error2 = temp.RemoveAll();
@@ -742,5 +742,5 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
         }
     }
 
-    return TError::Success();
+    return OK;
 }

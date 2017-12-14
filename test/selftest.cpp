@@ -805,7 +805,7 @@ static void TestExitStatus(Porto::Connection &api) {
     Say() << "Check exit status of invalid command" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectApiSuccess(api.SetProperty(name, "cwd", "/"));
-    ExpectApiFailure(api.Start(name), EError::InvalidValue);
+    ExpectApiFailure(api.Start(name), EError::InvalidCommand);
     ExpectApiFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
@@ -1804,7 +1804,7 @@ static void TestRootProperty(Porto::Connection &api) {
     if (f.Exists()) {
         TError error = f.RemoveAll();
         if (error)
-            throw error.GetMsg();
+            throw error.ToString();
     }
     AsAlice(api);
 
@@ -2435,7 +2435,7 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
     int lastCap;
     TError error = TPath("/proc/sys/kernel/cap_last_cap").ReadInt(lastCap);
     if (error)
-        throw error.GetMsg();
+        throw error.ToString();
 
     //uint64_t allCap = (1ULL << (lastCap + 1)) - 1;
 
@@ -2819,7 +2819,7 @@ static void TestIdmap(Porto::Connection &) {
         ExpectEq(id, i);
     }
 
-    ExpectEq(idmap.Get(id).GetError(), EError::ResourceNotAvailable);
+    ExpectEq(idmap.Get(id).Error, EError::ResourceNotAvailable);
 
     for (int i = 1; i <= 99; i++)
         ExpectSuccess(idmap.Put(i));
@@ -4202,7 +4202,7 @@ static void CleanupVolume(Porto::Connection &api, const std::string &path) {
     if (dir.Exists()) {
         TError error = dir.RemoveAll();
         if (error)
-            throw error.GetMsg();
+            throw error.ToString();
     }
     AsAlice(api);
 }

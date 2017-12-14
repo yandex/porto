@@ -127,7 +127,7 @@ TError TMountNamespace::MountBinds() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMountNamespace::MountRun() {
@@ -144,7 +144,7 @@ TError TMountNamespace::MountRun() {
 
     /* We want to recreate /run dir tree with up to RUN_SUBDIR_LIMIT nodes */
     if (subdirs.size() >= RUN_SUBDIR_LIMIT)
-        return TError(EError::Unknown, "Too many subdirectories in /run!");
+        return TError("Too many subdirectories in /run!");
 
     run_paths.reserve(RUN_SUBDIR_LIMIT);
     for (const auto &i: subdirs) {
@@ -165,7 +165,7 @@ TError TMountNamespace::MountRun() {
             return error;
 
         if (subdirs.size() + run_paths.size() >= RUN_SUBDIR_LIMIT)
-            return TError(EError::Unknown, "Too many subdirectories in /run!");
+            return TError("Too many subdirectories in /run!");
 
         for (auto dir : subdirs)
             run_paths.push_back(current + "/" + dir);
@@ -210,7 +210,7 @@ TError TMountNamespace::MountRun() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMountNamespace::MountTraceFs() {
@@ -247,7 +247,7 @@ TError TMountNamespace::MountTraceFs() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMountNamespace::MountSystemd() {
@@ -395,7 +395,7 @@ TError TMountNamespace::SetupRoot() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMountNamespace::ProtectProc() {
@@ -419,7 +419,7 @@ TError TMountNamespace::ProtectProc() {
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }
 
 TError TMountNamespace::Setup() {
@@ -494,5 +494,5 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    return TError::Success();
+    return OK;
 }

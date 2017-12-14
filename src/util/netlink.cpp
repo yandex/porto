@@ -59,9 +59,9 @@ TError TNl::Error(int nl_err, const std::string &prefix) {
 
     switch (abs(nl_err)) {
         case NLE_OBJ_NOTFOUND:
-            return TError(EError::Unknown, desc, ENOENT);
+            return TError(EError::Unknown, ENOENT, desc);
         case NLE_NODEV:
-            return TError(EError::Unknown, desc, ENODEV);
+            return TError(EError::Unknown, ENODEV, desc);
         default:
             return TError(EError::Unknown, desc);
     }
@@ -87,7 +87,7 @@ TError TNl::Connect() {
 
     Sock = nl_socket_alloc();
     if (!Sock)
-        return TError(EError::Unknown, "Cannot allocate netlink socket");
+        return TError("Cannot allocate netlink socket");
 
     /*
     nl_socket_modify_cb(Sock, NL_CB_MSG_IN, NL_CB_DEBUG, nullptr, nullptr);
@@ -100,7 +100,7 @@ TError TNl::Connect() {
         return Error(ret, "Cannot connect netlink socket");
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TNl::Disconnect() {
@@ -133,7 +133,7 @@ TError TNl::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all) {
 
     nl_cache_free(cache);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
@@ -142,7 +142,7 @@ TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
 
     neigh = rtnl_neigh_alloc();
     if (!neigh)
-        return TError(EError::Unknown, "Cannot allocate neighbour");
+        return TError("Cannot allocate neighbour");
 
     ret = rtnl_neigh_set_dst(neigh, addr.Addr);
     if (ret) {
@@ -168,7 +168,7 @@ TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
     if (ret)
         return Error(ret, "Cannot modify neighbour for l3 network");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNl::PermanentNeighbour(int ifindex, const TNlAddr &addr,
@@ -178,7 +178,7 @@ TError TNl::PermanentNeighbour(int ifindex, const TNlAddr &addr,
 
     neigh = rtnl_neigh_alloc();
     if (!neigh)
-        return TError(EError::Unknown, "Cannot allocate neighbour");
+        return TError("Cannot allocate neighbour");
 
     ret = rtnl_neigh_set_dst(neigh, addr.Addr);
     if (ret) {
@@ -204,7 +204,7 @@ TError TNl::PermanentNeighbour(int ifindex, const TNlAddr &addr,
     if (ret)
         return Error(ret, "Cannot modify neighbour entry");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNl::AddrLabel(const TNlAddr &prefix, uint32_t label) {
@@ -221,7 +221,7 @@ TError TNl::AddrLabel(const TNlAddr &prefix, uint32_t label) {
 
     msg = nlmsg_alloc_simple(RTM_NEWADDRLABEL, NLM_F_EXCL|NLM_F_CREATE);
     if (!msg)
-        return TError(EError::Unknown, "nlmsg_alloc_simple addrlabel");
+        return TError("nlmsg_alloc_simple addrlabel");
 
     ret = nlmsg_append(msg, &al, sizeof(al), NLMSG_ALIGNTO);
     if (ret < 0) {
@@ -286,7 +286,7 @@ TError TNlLink::Load() {
         return Error(ret, "Cannot load link");
     rtnl_link_put(Link);
     Link = link;
-    return TError::Success();
+    return OK;
 }
 
 int TNlLink::GetIndex() const {
@@ -343,7 +343,7 @@ TError TNlLink::Up() {
     rtnl_link_put(change);
     if (ret < 0)
         return Error(ret, "Cannot set up");
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::Remove() {
@@ -351,7 +351,7 @@ TError TNlLink::Remove() {
     int ret = rtnl_link_delete(GetSock(), Link);
     if (ret)
         return Error(ret, "Cannot remove");
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::ChangeNs(const std::string &newName, int nsFd) {
@@ -365,7 +365,7 @@ TError TNlLink::ChangeNs(const std::string &newName, int nsFd) {
     rtnl_link_put(change);
     if (ret < 0)
         return Error(ret, "Cannot change ns");
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
@@ -375,7 +375,7 @@ TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
 
     route = rtnl_route_alloc();
     if (!route)
-        return TError(EError::Unknown, "Cannot allocate route");
+        return TError("Cannot allocate route");
 
     ret = rtnl_route_set_dst(route, addr.Addr);
     if (ret < 0) {
@@ -386,7 +386,7 @@ TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
     nh = rtnl_route_nh_alloc();
     if (!nh) {
         rtnl_route_put(route);
-        return TError(EError::Unknown, "Cannot allocate next hop");
+        return TError("Cannot allocate next hop");
     }
 
     rtnl_route_nh_set_ifindex(nh, GetIndex());
@@ -398,7 +398,7 @@ TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
     if (ret < 0)
         return Error(ret, "Cannot add direct route");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
@@ -414,7 +414,7 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
 
     route = rtnl_route_alloc();
     if (!route)
-        return TError(EError::Unknown, "Unable to allocate route");
+        return TError("Unable to allocate route");
 
     ret = rtnl_route_set_dst(route, all.Addr);
     if (ret < 0) {
@@ -425,7 +425,7 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     nh = rtnl_route_nh_alloc();
     if (!nh) {
         rtnl_route_put(route);
-        return TError(EError::Unknown, "Unable to allocate next hop");
+        return TError("Unable to allocate next hop");
     }
 
     rtnl_route_nh_set_gateway(nh, addr.Addr);
@@ -438,13 +438,13 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     if (ret < 0)
         return Error(ret, "Cannot set default gateway");
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::AddAddress(const TNlAddr &addr) {
     struct rtnl_addr *a = rtnl_addr_alloc();
     if (!a)
-        return TError(EError::Unknown, "Cannot allocate address");
+        return TError("Cannot allocate address");
 
     rtnl_addr_set_link(a, Link);
     rtnl_addr_set_family(a, nl_addr_get_family(addr.Addr));
@@ -464,7 +464,7 @@ TError TNlLink::AddAddress(const TNlAddr &addr) {
 
     rtnl_addr_put(a);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::WaitAddress(int timeout_s) {
@@ -492,7 +492,7 @@ TError TNlLink::WaitAddress(int timeout_s) {
             L_NET("Got {} at {}", TNlAddr(rtnl_addr_get_local(addr)).Format(), GetDesc());
 
             nl_cache_free(cache);
-            return TError::Success();
+            return OK;
         }
 
         usleep(1000000);
@@ -502,7 +502,7 @@ TError TNlLink::WaitAddress(int timeout_s) {
     } while (--timeout_s > 0);
 
     nl_cache_free(cache);
-    return TError(EError::Unknown, "Network autoconf timeout");
+    return TError("Network autoconf timeout");
 }
 
 #ifdef IFLA_IPVLAN_MAX
@@ -524,7 +524,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
                          uint32_t type,
                          const std::string &hw,
                          int mtu) {
-    TError error = TError::Success();
+    TError error = OK;
     int ret;
     uint32_t masterIdx;
     struct nl_msg *msg;
@@ -534,7 +534,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     auto Name = GetName();
 
     if (hw.length() && !ether_aton_r(hw.c_str(), &ea))
-        return TError(EError::Unknown, "Invalid " + vlantype + " mac address " + hw);
+        return TError("Invalid " + vlantype + " mac address " + hw);
 
     TNlLink masterLink(Nl, master);
     error = masterLink.Load();
@@ -545,11 +545,11 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
 
     msg = nlmsg_alloc_simple(RTM_NEWLINK, NLM_F_CREATE);
     if (!msg)
-        return TError(EError::Unknown, "Unable to add " + vlantype + ": no memory");
+        return TError("Unable to add " + vlantype + ": no memory");
 
     ret = nlmsg_append(msg, &ifi, sizeof(ifi), NLMSG_ALIGNTO);
     if (ret < 0) {
-        error = TError(EError::Unknown, "Unable to add " + vlantype + ": " + nl_geterror(ret));
+        error = TError("Unable to add " + vlantype + ": " + nl_geterror(ret));
         goto free_msg;
     }
 
@@ -592,7 +592,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     /* link type */
     linkinfo = nla_nest_start(msg, IFLA_LINKINFO);
     if (!linkinfo) {
-        error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_LINKINFO");
+        error = TError("Unable to add " + vlantype + ": can't nest IFLA_LINKINFO");
         goto free_msg;
     }
     ret = nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
@@ -604,7 +604,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     /* xvlan specific */
     infodata = nla_nest_start(msg, IFLA_INFO_DATA);
     if (!infodata) {
-        error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_INFO_DATA");
+        error = TError("Unable to add " + vlantype + ": can't nest IFLA_INFO_DATA");
         goto free_msg;
     }
 
@@ -677,7 +677,7 @@ TError TNlLink::Enslave(const std::string &name) {
     }
 
     rtnl_link_put(link);
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::AddVeth(const std::string &name,
@@ -688,7 +688,7 @@ TError TNlLink::AddVeth(const std::string &name,
 
     peer = rtnl_link_veth_alloc();
     if (!peer)
-        return TError(EError::Unknown, "Unable to allocate veth");
+        return TError("Unable to allocate veth");
 
     rtnl_link_set_name(peer, rtnl_link_get_name(Link));
 
@@ -774,7 +774,7 @@ TError TNlLink::SetMtu(int mtu) {
     if (ret)
         return Error(ret, "Cannot set mtu for " + GetName());
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::SetGroup(int group) {
@@ -789,7 +789,7 @@ TError TNlLink::SetGroup(int group) {
     if (ret)
         return Error(ret, "Cannot set group for " + GetName());
 
-    return TError::Success();
+    return OK;
 }
 
 TError TNlLink::SetMacAddr(const std::string &mac) {
@@ -808,7 +808,7 @@ TError TNlLink::SetMacAddr(const std::string &mac) {
     if (ret)
         return Error(ret, "Cannot set mac for " + GetName());
 
-    return TError::Success();
+    return OK;
 }
 
 bool TNlLink::ValidIpVlanMode(const std::string &mode) {
@@ -857,7 +857,7 @@ TError TNlClass::Load(const TNl &nl) {
     tclass = rtnl_class_get(cache, Index, Handle);
     if (!tclass) {
         nl_cache_free(cache);
-        return TError(EError::Unknown, "Can't find tc class");
+        return TError("Can't find tc class");
     }
 
     Kind = rtnl_tc_get_kind(TC_CAST(tclass));
@@ -879,7 +879,7 @@ TError TNlClass::Load(const TNl &nl) {
     rtnl_class_put(tclass);
     nl_cache_free(cache);
 
-    return TError::Success();
+    return OK;
 }
 
 bool TNlClass::Exists(const TNl &nl) {
@@ -887,7 +887,7 @@ bool TNlClass::Exists(const TNl &nl) {
 }
 
 TError TNlQdisc::Create(const TNl &nl) {
-    TError error = TError::Success();
+    TError error = OK;
     int ret;
     struct rtnl_qdisc *qdisc;
 
@@ -968,7 +968,7 @@ TError TNlQdisc::Delete(const TNl &nl) {
     if (ret < 0)
         return nl.Error(ret, "Cannot remove qdisc");
 
-    return TError::Success();
+    return OK;
 }
 
 bool TNlQdisc::Check(const TNl &nl) {
@@ -1022,7 +1022,7 @@ TError TNlClass::Create(const TNl &nl) {
 
     cls = rtnl_class_alloc();
     if (!cls)
-        return TError(EError::Unknown, "Cannot allocate rtnl_class object");
+        return TError("Cannot allocate rtnl_class object");
 
     rtnl_tc_set_ifindex(TC_CAST(cls), Index);
     rtnl_tc_set_parent(TC_CAST(cls), Parent);
@@ -1115,7 +1115,7 @@ TError TNlClass::Delete(const TNl &nl) {
 
     cls = rtnl_class_alloc();
     if (!cls)
-        return TError(EError::Unknown, "Cannot allocate rtnl_class object");
+        return TError("Cannot allocate rtnl_class object");
 
     rtnl_tc_set_ifindex(TC_CAST(cls), Index);
     rtnl_tc_set_handle(TC_CAST(cls), Handle);
@@ -1166,7 +1166,7 @@ out:
 TError TNlPoliceFilter::Create(const TNl &nl) {
     uint32_t table[256];
     uint32_t result = TC_ACT_OK;
-    TError error = TError::Success();
+    TError error = OK;
     struct nlattr *u32, *u32_police;
     struct tc_u32_sel sel = {};
     struct tc_police parm = {};
@@ -1187,7 +1187,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
 
     msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
     if (!msg)
-        return TError(EError::Unknown, "Unable to add u32 filter: no memory");
+        return TError("Unable to add u32 filter: no memory");
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
@@ -1293,7 +1293,7 @@ free_msg:
 }
 
 TError TNlPoliceFilter::Delete(const TNl &nl) {
-    TError error = TError::Success();
+    TError error = OK;
     struct tcmsg tchdr;
     struct nl_msg *msg;
     int ret;
@@ -1306,7 +1306,7 @@ TError TNlPoliceFilter::Delete(const TNl &nl) {
 
     msg = nlmsg_alloc_simple(RTM_DELTFILTER, 0);
     if (!msg)
-        return TError(EError::Unknown, "Unable to del policer: no memory");
+        return TError("Unable to del policer: no memory");
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
@@ -1334,7 +1334,7 @@ free_msg:
 }
 
 TError TNlCgFilter::Create(const TNl &nl) {
-    TError error = TError::Success();
+    TError error = OK;
     struct nl_msg *msg;
     int ret;
     struct tcmsg tchdr;
@@ -1347,7 +1347,7 @@ TError TNlCgFilter::Create(const TNl &nl) {
 
     msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
     if (!msg)
-        return TError(EError::Unknown, "Unable to add filter: no memory");
+        return TError("Unable to add filter: no memory");
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
@@ -1374,7 +1374,7 @@ TError TNlCgFilter::Create(const TNl &nl) {
         error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 
     if (!error && !Exists(nl))
-        error = TError(EError::Unknown, "BUG: created filter doesn't exist");
+        error = TError("BUG: created filter doesn't exist");
 
     return error;
 
@@ -1414,7 +1414,7 @@ bool TNlCgFilter::Exists(const TNl &nl) {
 }
 
 TError TNlCgFilter::Delete(const TNl &nl) {
-    TError error = TError::Success();
+    TError error = OK;
     struct rtnl_cls *cls;
     int ret;
 
@@ -1511,7 +1511,7 @@ TError TNlAddr::Parse(int family, const std::string &string) {
     if (ret)
         return TNl::Error(ret, "Cannot parse address " + string);
 
-    return TError::Success();
+    return OK;
 }
 
 std::string TNlAddr::Format() const {

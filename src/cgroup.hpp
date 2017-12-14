@@ -40,7 +40,7 @@ public:
 
     virtual TError InitializeCgroup(TCgroup &cgroup) {
         (void)cgroup;
-        return TError::Success();
+        return OK;
     }
 
     TCgroup RootCgroup() const;
@@ -171,7 +171,7 @@ public:
 
     TError SetGuarantee(TCgroup &cg, uint64_t guarantee) const {
         if (!SupportGuarantee())
-            return TError::Success();
+            return OK;
         return cg.SetUint64(LOW_LIMIT, guarantee);
     }
 
@@ -193,7 +193,7 @@ public:
 
     TError RechargeOnPgfault(TCgroup &cg, bool enable) const {
         if (!SupportRechargeOnPgfault())
-            return TError::Success();
+            return OK;
         return cg.SetBool(RECHARGE_ON_PAGE_FAULT, enable);
     }
 

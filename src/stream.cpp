@@ -56,7 +56,7 @@ retry:
             goto retry;
         if (fd >= 0 && fchown(fd, cred.Uid, cred.Gid)) {
             close(fd);
-            return TError(EError::Unknown, errno, "fchown " + path.ToString());
+            return TError::System("fchown " + path.ToString());
         }
     }
     if (fd < 0)
@@ -65,7 +65,7 @@ retry:
     if (fd != Stream) {
         if (dup2(fd, Stream) < 0) {
             close(fd);
-            return TError(EError::Unknown, errno, "dup2(" + std::to_string(fd) +
+            return TError::System("dup2(" + std::to_string(fd) +
                           ", " + std::to_string(Stream) + ")");
         }
         close(fd);
@@ -73,7 +73,7 @@ retry:
         Stream = fd;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TStdStream::OpenOutside(const TContainer &container,
@@ -111,7 +111,7 @@ TError TStdStream::OpenOutside(const TContainer &container,
     } else if (Outside)
         return Open(ResolveOutside(container), container.TaskCred);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TStdStream::OpenInside(const TContainer &container) {
@@ -130,13 +130,13 @@ TError TStdStream::OpenInside(const TContainer &container) {
 TError TStdStream::Remove(const TContainer &container) {
     /* Custom stdout/stderr files are not removed */
     if (!Outside || Path.IsAbsolute())
-        return TError::Success();
+        return OK;
     TPath path = ResolveOutside(container);
     if (path.IsEmpty() || !path.IsRegularStrict())
-        return TError::Success();
+        return OK;
     TError error = path.Unlink();
-    if (error && error.GetErrno() == ENOENT)
-        return TError::Success();
+    if (error && error.Errno == ENOENT)
+        return OK;
     if (error)
         L_ERR("Cannot remove {}: {}", path, error);
     return error;
@@ -145,7 +145,7 @@ TError TStdStream::Remove(const TContainer &container) {
 TError TStdStream::Rotate(const TContainer &container) {
     TPath path = ResolveOutside(container);
     if (path.IsEmpty() || !path.IsRegularStrict())
-        return TError::Success();
+        return OK;
     off_t loss;
     TError error = path.RotateLog(Limit, loss);
     if (error) {
@@ -154,7 +154,7 @@ TError TStdStream::Rotate(const TContainer &container) {
     }
     Statistics->LogRotateBytes += loss;
     Offset += loss;
-    return TError::Success();
+    return OK;
 }
 
 TError TStdStream::Read(const TContainer &container, std::string &text,
@@ -186,7 +186,7 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
         if (error)
             return error;
         if (offset < Offset)
-            return TError(EError::InvalidData, "Requested offset lower than current " + std::to_string(Offset));
+            return TError(EError::InvalidData, "Requested offset lower than current {}", Offset);
         offset -= Offset;
     } else
         offset = 0;
@@ -221,11 +221,11 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
         ssize_t result = pread(file.Fd, &text[0], limit, offset);
 
         if (result < 0)
-            return TError(EError::Unknown, errno, "Read " + path.ToString());
+            return TError::System("Read " + path.ToString());
 
         if ((uint64_t)result < limit)
             text.resize(result);
     }
 
-    return TError::Success();
+    return OK;
 }

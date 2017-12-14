@@ -21,7 +21,6 @@ namespace test {
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
     void ExpectReturn(int ret, int exp, const char *func);
-    void ExpectError(const TError &ret, const TError &exp, const char *where);
     void ExpectApi(Porto::Connection &api, int ret, int exp, const char *where);
 
     int ReadPid(const std::string &path);
@@ -110,8 +109,7 @@ namespace test {
 
 #define Expect(ret) ExpectReturn(ret, true, WHERE)
 
-#define ExpectSuccess(ret) ExpectError(ret, TError::Success(), WHERE)
-#define ExpectFailure(ret, exp) ExpectError(ret, exp, WHERE)
+#define ExpectSuccess(ret) do { if (ret) throw "Unexpected error: " + ret.ToString() + " " + WHERE; } while(0)
 
 #define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, WHERE)
 #define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, WHERE)

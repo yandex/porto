@@ -63,7 +63,7 @@ void InitIpcSysctl() {
 
 void TTaskEnv::ReportPid(pid_t pid) {
     TError error = Sock.SendPid(pid);
-    if (error && error.GetErrno() != ENOMEM) {
+    if (error && error.Errno != ENOMEM) {
         L_ERR("{}", error);
         Abort(error);
     }
@@ -82,12 +82,12 @@ void TTaskEnv::Abort(const TError &error) {
 
     for (int stage = ReportStage; stage < 2; stage++) {
         error2 = Sock.SendPid(getpid());
-        if (error2 && error2.GetErrno() != ENOMEM)
+        if (error2 && error2.Errno != ENOMEM)
             L_ERR("{}", error2);
     }
 
     error2 = Sock.SendError(error);
-    if (error2 && error2.GetErrno() != ENOMEM)
+    if (error2 && error2.Errno != ENOMEM)
         L_ERR("{}", error2);
 
     _exit(EXIT_FAILURE);
@@ -116,8 +116,7 @@ TError TTaskEnv::ChildExec() {
         SetDieOnParentExit(0);
         TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), LogFile.Fd});
         fexecve(PortoInit.Fd, (char *const *)args, envp);
-        return TError(EError::InvalidValue, errno, "fexecve(" +
-                      std::to_string(PortoInit.Fd) +  ", portoinit)");
+        return TError::System("cannot exec portoinit");
     }
 
     wordexp_t result;
@@ -125,16 +124,16 @@ TError TTaskEnv::ChildExec() {
     int ret = wordexp(CT->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
-        return TError(EError::Unknown, EINVAL, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
+        return TError(EError::InvalidCommand, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
     case WRDE_BADVAL:
-        return TError(EError::Unknown, EINVAL, "wordexp(): undefined shell variable was referenced");
+        return TError(EError::InvalidCommand, "wordexp(): undefined shell variable was referenced");
     case WRDE_CMDSUB:
-        return TError(EError::Unknown, EINVAL, "wordexp(): command substitution is not supported");
+        return TError(EError::InvalidCommand, "wordexp(): command substitution is not supported");
     case WRDE_SYNTAX:
-        return TError(EError::Unknown, EINVAL, "wordexp(): syntax error");
+        return TError(EError::InvalidCommand, "wordexp(): syntax error");
     default:
     case WRDE_NOSPACE:
-        return TError(EError::Unknown, EINVAL, "wordexp(): error " + std::to_string(ret));
+        return TError(EError::InvalidCommand, "wordexp(): error {}", ret);
     case 0:
         break;
     }
@@ -146,12 +145,12 @@ TError TTaskEnv::ChildExec() {
         for (unsigned i = 0; envp[i]; i++)
             L("environ[{}]={}", i, envp[i]);
     }
+
     SetDieOnParentExit(0);
     TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
-    return TError(EError::InvalidValue, errno, std::string("execvpe(") +
-            result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ")");
+    return TError(EError::InvalidCommand, errno, "cannot exec {}", result.we_wordv[0]);
 }
 
 TError TTaskEnv::ChildApplyLimits() {
@@ -172,12 +171,12 @@ TError TTaskEnv::ChildApplyLimits() {
                           "setrlimit " + it.first + " " + it.second);
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TTaskEnv::WriteResolvConf() {
     if (!CT->ResolvConf.size())
-        return TError::Success();
+        return OK;
     L_ACT("Write resolv.conf for CT{}:{}", CT->Id, CT->Name);
     std::string cfg = StringReplaceAll(CT->ResolvConf, ";", "\n");
     return TPath("/etc/resolv.conf").WritePrivate(cfg);
@@ -224,7 +223,7 @@ TError TTaskEnv::ApplySysctl() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 TError TTaskEnv::ConfigureChild() {
@@ -235,7 +234,7 @@ TError TTaskEnv::ConfigureChild() {
         return error;
 
     if (setsid() < 0)
-        return TError(EError::Unknown, errno, "setsid()");
+        return TError::System("setsid()");
 
     umask(0);
 
@@ -276,7 +275,7 @@ TError TTaskEnv::ConfigureChild() {
     if (QuadroFork) {
         pid_t pid = fork();
         if (pid < 0)
-            return TError(EError::Unknown, errno, "fork()");
+            return TError::System("fork()");
 
         if (pid) {
             auto pid_ = std::to_string(pid);
@@ -296,11 +295,11 @@ TError TTaskEnv::ConfigureChild() {
 
             TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), LogFile.Fd});
             fexecve(PortoInit.Fd, (char *const *)argv, envp);
-            return TError(EError::Unknown, errno, "fexecve()");
+            return TError::System("cannot exec portoinit");
         }
 
         if (setsid() < 0)
-            return TError(EError::Unknown, errno, "setsid()");
+            return TError::System("setsid()");
     }
 
     /* Report VPid */
@@ -320,7 +319,7 @@ TError TTaskEnv::ConfigureChild() {
         ReportPid(GetPid());
 
     error = TPath("/proc/self/loginuid").WriteAll(std::to_string(LoginUid));
-    if (error && error.GetErrno() != ENOENT)
+    if (error && error.Errno != ENOENT)
         L_WRN("Cannot set loginuid: {}", error);
 
     error = Cred.Apply();
@@ -360,12 +359,12 @@ TError TTaskEnv::ConfigureChild() {
 
     umask(CT->Umask);
 
-    return TError::Success();
+    return OK;
 }
 
 TError TTaskEnv::WaitAutoconf() {
     if (Autoconf.empty())
-        return TError::Success();
+        return OK;
 
     SetProcessName("portod-autoconf");
 
@@ -386,7 +385,7 @@ TError TTaskEnv::WaitAutoconf() {
             return error;
     }
 
-    return TError::Success();
+    return OK;
 }
 
 void TTaskEnv::StartChild() {
@@ -482,15 +481,15 @@ TError TTaskEnv::Start() {
             Abort(error);
 
         if (setpriority(PRIO_PROCESS, 0, CT->SchedNice))
-            Abort(TError(EError::Unknown, errno, "setpriority"));
+            Abort(TError::System("setpriority"));
 
         struct sched_param param;
         param.sched_priority = CT->SchedPrio;
         if (sched_setscheduler(0, CT->SchedPolicy, &param))
-            Abort(TError(EError::Unknown, errno, "sched_setparm"));
+            Abort(TError::System("sched_setparm"));
 
         if (SetIoPrio(0, CT->IoPrio))
-            Abort(TError(EError::Unknown, errno, "ioprio"));
+            Abort(TError::System("ioprio"));
 
         /* Default streams and redirections are outside */
         error = CT->Stdin.OpenOutside(*CT, *Client);
@@ -542,7 +541,7 @@ TError TTaskEnv::Start() {
              */
             pid_t forkPid = vfork();
             if (forkPid < 0)
-                Abort(TError(EError::Unknown, errno, "fork()"));
+                Abort(TError::System("fork()"));
 
             if (forkPid)
                 _exit(EXIT_SUCCESS);
@@ -653,7 +652,7 @@ TError TTaskEnv::Start() {
         goto kill_all;
     }
 
-    return TError::Success();
+    return OK;
 
 kill_all:
     L("Task start failed: {}", error);

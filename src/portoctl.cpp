@@ -132,7 +132,7 @@ public:
         } else
             Properties.emplace_back(key, val);
 
-        return TError::Success();
+        return OK;
     }
 
     TError SetProperty(const std::string &prop) {
@@ -151,7 +151,7 @@ public:
         if (Api->ImportLayer(id, path.ToString(), false, Place))
             return GetLastError();
         ImportedLayers.push_back(id);
-        return TError::Success();
+        return OK;
     }
 
     TError ImportLayers() {
@@ -233,7 +233,7 @@ public:
             VolumeLinked = false;
         }
 
-        return TError::Success();
+        return OK;
     }
 
     TError WaitContainer(int timeout) {
@@ -268,20 +268,20 @@ public:
     TError OpenPty() {
         MasterPty = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
         if (MasterPty < 0)
-            return TError(EError::Unknown, errno, "Cannot open master terminal");
+            return TError::System("Cannot open master terminal");
 
         char slave[128];
         if (ptsname_r(MasterPty, slave, sizeof(slave)))
-            return TError(EError::Unknown, errno, "Cannot get terminal name");
+            return TError::System("Cannot get terminal name");
 
         if (unlockpt(MasterPty))
-            return TError(EError::Unknown, errno, "Cannot unlock terminal");
+            return TError::System("Cannot unlock terminal");
 
         SlavePty = open(slave, O_RDWR | O_NOCTTY | O_CLOEXEC);
         if (SlavePty < 0)
-            return TError(EError::Unknown, errno, "Cannot open slave terminal");
+            return TError::System("Cannot open slave terminal");
 
-        return TError::Success();
+        return OK;
     }
 
     void CloseSlavePty() {
@@ -321,7 +321,7 @@ public:
         pid_t pid = fork();
 
         if (pid < 0)
-            return TError(EError::Unknown, errno, "cannot fork");
+            return TError::System("cannot fork");
 
         if (!pid) {
             while (1) {
@@ -373,7 +373,7 @@ public:
 
         CloseMasterPty();
 
-        return TError::Success();
+        return OK;
     }
 
     TError ApplyConfig() {
@@ -409,7 +409,7 @@ public:
         if (Api->SetProperty(Container, "env", MergeEscapeStrings(Environment, ';')))
             goto err;
 
-        return TError::Success();
+        return OK;
 err:
         return GetLastError();
     }
@@ -468,7 +468,7 @@ err:
                 goto err;
         }
 
-        return TError::Success();
+        return OK;
 
 err:
         Cleanup();
@@ -480,7 +480,7 @@ err:
             std::cerr << "Cannot stop container " << Container << " : " << GetLastError() << std::endl;
             return GetLastError();
         }
-        return TError::Success();
+        return OK;
     }
 
     void Cleanup() {
@@ -497,7 +497,7 @@ err:
         }
 
         for (auto &layer : ImportedLayers) {
-            if (Api->RemoveLayer(layer, Place) && GetLastError().GetError() != EError::LayerNotFound)
+            if (Api->RemoveLayer(layer, Place) && GetLastError() != EError::LayerNotFound)
                 std::cerr << "Cannot remove layer " << layer << " : " << GetLastError() << std::endl;
         }
         ImportedLayers.clear();
