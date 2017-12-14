@@ -626,9 +626,6 @@ public:
                   return error;
         }
 
-        if (unshare(CLONE_FS))
-            return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
-
         for (auto &name: Volume->Layers) {
             TPath path, temp;
             TFile pin;
@@ -774,9 +771,6 @@ public:
         int layer_idx = 0;
         TError error;
         TPath lower;
-
-        if (unshare(CLONE_FS))
-            return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
 
         lower = Volume->GetInternal("lower");
         error = lower.Mkdir(0755);

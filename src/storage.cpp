@@ -693,59 +693,54 @@ TError TStorage::Remove() {
     return error;
 }
 
-/* FIXME recursive */
 TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
-    std::vector<std::string> content;
+    TPathWalk walk;
+    TError error;
 
-    TError error = layer.ReadDirectory(content);
+    error = walk.Open(layer);
     if (error)
         return error;
 
-    for (auto &entry: content) {
-        TPath path = layer / entry;
+    while (1) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            return error;
 
         /* Handle aufs whiteouts and metadata */
-        if (entry.compare(0, 4, ".wh.") == 0) {
+        if (StringStartsWith(walk.Path.ToString(), ".wh.")) {
 
             /* Remove it completely */
-            error = path.RemoveAll();
+            error = walk.Path.RemoveAll();
             if (error)
                 return error;
 
             /* Opaque directory - hide entries in lower layers */
-            if (entry == ".wh..wh..opq") {
-                error = layer.SetXAttr("trusted.overlay.opaque", "y");
+            if (walk.Path.ToString() == ".wh..wh..opq") {
+                error = walk.Path.DirName().SetXAttr("trusted.overlay.opaque", "y");
                 if (error)
                     return error;
             }
 
             /* Metadata is done */
-            if (entry.compare(0, 8, ".wh..wh.") == 0)
+            if (StringStartsWith(walk.Path.ToString(), ".wh..wh."))
                 continue;
 
             /* Remove whiteouted entry */
-            path = layer / entry.substr(4);
-            if (path.Exists()) {
-                error = path.RemoveAll();
+            TPath real = walk.Path.DirName() / walk.Name().substr(4);
+            if (real.Exists()) {
+                error = real.RemoveAll();
                 if (error)
                     return error;
             }
 
             if (!merge) {
                 /* Convert into overlayfs whiteout */
-                error = path.Mknod(S_IFCHR, 0);
+                error = walk.Path.Mknod(S_IFCHR, 0);
                 if (error)
                     return error;
             }
-
-            continue;
-        }
-
-        if (path.IsDirectoryStrict()) {
-            error = SanitizeLayer(path, merge);
-            if (error)
-                return error;
         }
     }
+
     return TError::Success();
 }

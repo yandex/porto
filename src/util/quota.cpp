@@ -11,7 +11,6 @@ extern "C" {
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <fts.h>
 }
 
 #ifndef PRJQUOTA
@@ -64,7 +63,7 @@ static inline std::unique_lock<std::mutex> LockQuota() {
     return std::unique_lock<std::mutex>(QuotaMutex);
 }
 
-TError TProjectQuota::InitProjectQuotaFile(TPath path) {
+TError TProjectQuota::InitProjectQuotaFile(const TPath &path) {
     struct {
         struct v2_disk_dqheader header;
         struct v2_disk_dqinfo info;
@@ -172,17 +171,17 @@ TError TProjectQuota::GetProjectId(const TPath &path, uint32_t &id) {
     return TError::Success();
 }
 
-TError TProjectQuota::SetProjectIdOne(const char *path, uint32_t id) {
+TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
     struct fsxattr attr;
     int fd, ret;
     TError error;
 
-    fd = open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW |
+    fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW |
                     O_NOATIME | O_NONBLOCK);
     if (fd < 0 && errno == EPERM)
-        fd = open(path, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
+        fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "Cannot open: " + std::string(path));
+        return TError(EError::Unknown, errno, "Cannot open: " + path.ToString());
 
     ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
     if (!ret) {
@@ -191,50 +190,31 @@ TError TProjectQuota::SetProjectIdOne(const char *path, uint32_t id) {
         ret = ioctl(fd, FS_IOC_FSSETXATTR, &attr);
     }
     if (ret)
-        error = TError(EError::Unknown, errno, "Cannot set quota id: " + std::string(path));
+        error = TError(EError::Unknown, errno, "Cannot set quota id: " + path.ToString());
     close(fd);
     return error;
 }
 
 TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
-    const char *paths[] = { path.c_str(), NULL };
+    TPathWalk walk;
     TError error;
 
-    FTS *fts = fts_open((char**)paths, FTS_PHYSICAL | FTS_NOCHDIR | FTS_XDEV, NULL);
-    if (!fts)
-        return TError(EError::Unknown, errno, "fts_open");
+    error = walk.OpenScan(path);
+    if (error)
+        return error;
 
-    do {
-        FTSENT *ent = fts_read(fts);
-        if (ent == NULL) {
-            if (errno)
-                error = TError(EError::Unknown, errno, "fts_read");
-            break;
+    while (1) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            return error;
+        if (S_ISDIR(walk.Stat->st_mode) || S_ISREG(walk.Stat->st_mode)) {
+            error = SetProjectIdOne(walk.Path, id);
+            if (error)
+                return error;
         }
-        switch (ent->fts_info) {
-            case FTS_D:
-            case FTS_F:
-                error = SetProjectIdOne(ent->fts_accpath, id);
-                break;
-            case FTS_DC:
-            case FTS_NS:
-            case FTS_DNR:
-            case FTS_ERR:
-            case FTS_NSOK:
-                error = TError(EError::Unknown, errno,
-                               "SetProjectId walk error: " +
-                               std::string(ent->fts_accpath));
-                break;
-            case FTS_DP:
-            case FTS_SL:
-            case FTS_SLNONE:
-            case FTS_DEFAULT:
-            case FTS_DOT:
-                break;
-        }
-    } while (!error);
-    fts_close(fts);
-    return error;
+    }
+
+    return TError::Success();
 }
 
 /* Construct unique project id from directory inode number. */

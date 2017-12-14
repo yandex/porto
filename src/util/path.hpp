@@ -10,6 +10,7 @@
 
 extern "C" {
 #include <sys/mount.h>
+#include <fts.h>
 }
 
 struct TStatFS {
@@ -144,6 +145,7 @@ public:
     TError ListSubdirs(std::vector<std::string> &result) const;
     TError ClearDirectory() const;
     TError StatFS(TStatFS &result) const;
+    TError GetXAttr(const std::string name, std::string &value) const;
     TError SetXAttr(const std::string name, const std::string value) const;
     TError Truncate(off_t size) const;
     TError RotateLog(off_t max_disk_usage, off_t &loss) const;
@@ -273,4 +275,25 @@ public:
     static bool Access(const struct stat &st, const TCred &cred, enum AccessMode mode);
     TError ReadAccess(const TCred &cred) const;
     TError WriteAccess(const TCred &cred) const;
+};
+
+class TPathWalk {
+public:
+    FTS *Fts = nullptr;
+    FTSENT *Ent = nullptr;
+    TPath Path;
+    struct stat *Stat;
+    bool Postorder = false;
+
+    static int CompareNames(const FTSENT **a, const FTSENT **b);
+    static int CompareInodes(const FTSENT **a, const FTSENT **b);
+
+    TPathWalk() {}
+    ~TPathWalk() { Close(); }
+    TError Open(const TPath &patht, int fts_flags = FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, int (*compar)(const FTSENT **, const FTSENT **) = nullptr);
+    TError OpenScan(const TPath &path);
+    TError OpenList(const TPath &path);
+    TError Next();
+    std::string Name() { return Ent ? Ent->fts_name : ""; }
+    void Close();
 };

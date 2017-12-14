@@ -14,9 +14,9 @@ class TProjectQuota {
     TError FindProject();
     TError FindDevice();
 
-    static TError InitProjectQuotaFile(TPath path);
+    static TError InitProjectQuotaFile(const TPath &path);
     static TError GetProjectId(const TPath &path, uint32_t &id);
-    static TError SetProjectIdOne(const char *path, uint32_t id);
+    static TError SetProjectIdOne(const TPath &path, uint32_t id);
     static TError SetProjectIdAll(const TPath &path, uint32_t id);
     static TError InventProjectId(const TPath &path, uint32_t &id);
 public:

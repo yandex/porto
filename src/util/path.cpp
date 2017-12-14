@@ -158,9 +158,10 @@ TPath TPath::AddComponent(const TPath &component) const {
 }
 
 TError TPath::Chdir() const {
+    if (unshare(CLONE_FS))
+        return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
     if (chdir(Path.c_str()) < 0)
         return TError(EError::InvalidValue, errno, "chdir(" + Path + ")");
-
     return TError::Success();
 }
 
@@ -457,109 +458,33 @@ TError TPath::ClearDirectory() const {
     return dir.ClearDirectory();
 }
 
-/* FIXME speedup and simplify */
 TError TFile::ClearDirectory() const {
-    int top_fd, dir_fd, sub_fd;
-    DIR *top = NULL, *dir;
-    struct dirent *de;
-    struct stat top_st, st;
-    TError error = TError::Success();
+    TPathWalk walk;
+    TError error;
 
-    top_fd = fcntl(Fd, F_DUPFD_CLOEXEC, 3);
-    if (top_fd < 0 || Fd < 0)
-        return TError(EError::Unknown, errno, "Cannot dup fd " + std::to_string(Fd));
+    error = Chdir();
+    if (error)
+        return error;
 
-    if (fstat(top_fd, &top_st)) {
-        close(top_fd);
-        return TError(EError::Unknown, errno, "ClearDirectory fstat()");
-    }
+    error = walk.OpenScan(".");
+    if (error)
+        return error;
 
-    dir_fd = top_fd;
-
-deeper:
-    dir = fdopendir(dir_fd);
-    if (dir == NULL) {
-        close(dir_fd);
-        if (dir_fd != top_fd)
-            closedir(top);
-        return TError(EError::Unknown, errno, "ClearDirectory fdopendir()");
-    }
-
-restart:
-    while ((de = readdir(dir))) {
-        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
-            continue;
-
-        if (fstatat(dir_fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW)) {
-            if (errno == ENOENT)
+    while (1) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            return error;
+        if (S_ISDIR(walk.Stat->st_mode)) {
+            if (!walk.Postorder || walk.Path == ".")
                 continue;
-            error = TError(EError::Unknown, errno, "ClearDirectory fstatat(" + std::string(de->d_name) + ")");
-            break;
-        }
-
-        if (st.st_dev != top_st.st_dev) {
-            error = TError(EError::Unknown, EXDEV, "ClearDirectory found mountpoint");
-            break;
-        }
-
-        if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
-            continue;
-
-        if (errno == ENOENT)
-            continue;
-
-        if (errno == EPERM || errno == EACCES) {
-            sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_CLOEXEC |
-                                    O_NOFOLLOW | O_NOCTTY | O_NONBLOCK);
-            if (sub_fd >= 0) {
-                error = TFile::Chattr(sub_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
-                close(sub_fd);
-                if (error)
-                    L_ERR("Cannot change {} attributes: {}" , de->d_name, error);
-            }
-            error = TFile::Chattr(dir_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
-            if (error)
-                L_ERR("Cannot change directory attributes: {}", error);
-
-            if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
-                continue;
-        }
-
-        if (!S_ISDIR(st.st_mode) || (errno != ENOTEMPTY && errno != EEXIST)) {
-            error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" + std::string(de->d_name) + ")");
-            break;
-        }
-
-        sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC |
-                                            O_NOFOLLOW | O_NOATIME);
-        if (sub_fd >= 0) {
-            if (dir_fd != top_fd)
-                closedir(dir); /* closes dir_fd */
-            else
-                top = dir;
-            dir_fd = sub_fd;
-            goto deeper;
-        }
-        if (errno == ENOENT)
-            continue;
-
-        error = TError(EError::Unknown, errno, "ClearDirectory openat(" + std::string(de->d_name) + ")");
-        break;
+            error = RmdirAt(walk.Path);
+        } else
+            error = UnlinkAt(walk.Path);
+        if (error)
+            return error;
     }
 
-    closedir(dir); /* closes dir_fd */
-
-    if (dir_fd != top_fd) {
-        if (!error) {
-            rewinddir(top);
-            dir = top;
-            dir_fd = top_fd;
-            goto restart; /* Restart from top directory */
-        }
-        closedir(top); /* closes top_fd */
-    }
-
-    return error;
+    return TPath("/").Chdir();
 }
 
 TError TFile::RemoveAt(const TPath &path) const {
@@ -635,6 +560,16 @@ int64_t TPath::SinceModificationMs() const {
 
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000 -
            (int64_t)st.st_mtim.tv_sec * 1000 - st.st_mtim.tv_nsec / 1000000;
+}
+
+TError TPath::GetXAttr(const std::string name, std::string &value) const {
+    ssize_t size = syscall(SYS_lgetxattr, Path.c_str(), name.c_str(), nullptr, 0);
+    if (size >= 0) {
+        value.resize(size);
+        if (syscall(SYS_lgetxattr, Path.c_str(), name.c_str(), value.c_str(), size) >= 0)
+            return TError::Success();
+    }
+    return TError(EError::Unknown, errno, "getxattr(" + Path + ", " + name + ")");
 }
 
 TError TPath::SetXAttr(const std::string name, const std::string value) const {
@@ -1396,6 +1331,8 @@ TError TFile::WalkStrict(const TFile &dir, const TPath &path) {
 }
 
 TError TFile::Chdir() const {
+    if (unshare(CLONE_FS))
+        return TError(EError::Unknown, errno, "unshare(CLONE_FS)");
     if (fchdir(Fd))
         return TError(EError::Unknown, "fchdir");
     return TError::Success();
@@ -1461,4 +1398,71 @@ TError TFile::WriteAccess(const TCred &cred) const {
     if (Access(st, cred, TFile::W))
         return TError::Success();
     return TError(EError::Permission, cred.ToString() + " has no write access to " + RealPath().ToString());
+}
+
+
+int TPathWalk::CompareNames(const FTSENT **a, const FTSENT **b) {
+    return strcmp((**a).fts_name, (**b).fts_name);
+}
+
+int TPathWalk::CompareInodes(const FTSENT **a, const FTSENT **b) {
+    ino_t a_ino = ((**a).fts_info == FTS_NS || (**a).fts_info == FTS_NSOK) ?  0 : (**a).fts_statp->st_ino;
+    ino_t b_ino = ((**b).fts_info == FTS_NS || (**b).fts_info == FTS_NSOK) ?  0 : (**b).fts_statp->st_ino;
+    if (a_ino < b_ino)
+        return -1;
+    if (a_ino > b_ino)
+        return 1;
+    return 0;
+}
+
+TError TPathWalk::Open(const TPath &path, int fts_flags,
+                       int (*compar)(const FTSENT **, const FTSENT **)) {
+    Close();
+    char* paths[] = { (char *)path.c_str(), nullptr };
+    Fts = fts_open(paths, fts_flags, compar);
+    if (!Fts)
+        return TError(EError::Unknown, errno, "fts_open");
+    return TError::Success();
+}
+
+TError TPathWalk::OpenScan(const TPath &path)
+{
+    return Open(path, FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, TPathWalk::CompareInodes);
+}
+
+TError TPathWalk::OpenList(const TPath &path)
+{
+    return Open(path, FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, TPathWalk::CompareNames);
+}
+
+TError TPathWalk::Next() {
+    Ent = fts_read(Fts);
+    if (!Ent) {
+        if (errno)
+            return TError(EError::Unknown, errno, "fts_read");
+        Path = "";
+        return TError::Success();
+    }
+    switch (Ent->fts_info) {
+    case FTS_DNR:
+    case FTS_ERR:
+    case FTS_NS:
+    case FTS_NSOK:
+        return TError(EError::Unknown, errno, "fts_read");
+    case FTS_DP:
+        Postorder = true;
+        break;
+    default:
+        Postorder = false;
+        break;
+    }
+    Path = Ent->fts_path;
+    Stat = Ent->fts_statp;
+    return TError::Success();
+}
+
+void TPathWalk::Close() {
+    if (Fts)
+        fts_close(Fts);
+    Fts = nullptr;
 }
