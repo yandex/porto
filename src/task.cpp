@@ -150,7 +150,7 @@ TError TTaskEnv::ChildExec() {
     TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
-    return TError(EError::InvalidCommand, errno, "cannot exec {}", result.we_wordv[0]);
+    return TError(EError::InvalidCommand, errno, "cannot exec " + std::string(result.we_wordv[0]));
 }
 
 TError TTaskEnv::ChildApplyLimits() {

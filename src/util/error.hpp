@@ -24,9 +24,6 @@ public:
 
     TError(EError err, int eno, const std::string &text): Error(err), Errno(eno), Text(text) {}
 
-    template <typename... Args> TError(EError err, int eno, const char* fmt, const Args&... args):
-        Error(err), Errno(eno), Text(fmt::format(fmt, args...)) {}
-
     template <typename... Args> TError(EError err, const char* fmt, const Args&... args):
         Error(err), Text(fmt::format(fmt, args...)) {}
 
@@ -71,12 +68,6 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const TError& err);
-
-    template<typename ostream>
-    friend ostream& operator<<(ostream& os, const TError &err) {
-        os << err.ToString();
-        return os;
-    }
 
     TError Serialize(int fd) const;
     static bool Deserialize(int fd, TError &error);
