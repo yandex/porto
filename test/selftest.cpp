@@ -1712,7 +1712,7 @@ static void TestRootProperty(Porto::Connection &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ls"));
     ExpectApiSuccess(api.SetProperty(name, "root", path));
-    ExpectApiFailure(api.Start(name), EError::InvalidValue);
+    ExpectApiFailure(api.Start(name), EError::InvalidCommand);
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check filesystem isolation" << std::endl;
