@@ -702,8 +702,8 @@ Variables set in environment and substituted in core\_command:
 
 Command executed in non-isolated sub-container and gets core dump as stdin.
 
-For example core\_command='tee core-\$\{CORE\_TASK\_NAME\}-\$\{CORE\_PID\}-\$\{CORE\_SIG\}'
-saves core into file in container. Container ulimit\[core\] must be set > 1 or unlimited.
+For example core\_command='cp --sparse=always /dev/stdin crash-\$\{CORE\_EXE\_NAME\}-\$\{CORE\_PID\}-S\$\{CORE\_SIG\}.core'
+saves core into file in container. Container ulimit\[core\] should be set to unlimited, or anything > 1.
 
 Information in proc about crashed process and thread available too.
 Porto makes sure that sysctl kernel.core\_pipe\_limit isn't zero,
