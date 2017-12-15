@@ -164,6 +164,9 @@ TError TCore::Forward() {
         {"CORE_OWNER_GID", std::to_string(OwnerGid)},
     };
 
+    /* To let open /dev/stdin */
+    fchmod(STDIN_FILENO, 0666);
+
     if (Conn.CreateWeakContainer(core) ||
             Conn.SetProperty(core, P_ISOLATE, "false") ||
             Conn.SetProperty(core, P_STDIN_PATH, "/dev/fd/0") ||
