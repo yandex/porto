@@ -1,3 +1,26 @@
+yandex-porto (4.4.0) unstable; urgency=low
+
+  * tests: move sudo inside
+  * tests: add target porto_test
+  * tests: cleanup
+  * tests: really cleanup logs
+  * layers: fix pip
+  * layers: remove atop
+  * cpu: keep power in ns/s and disable unneeded nested limits
+  * tests: default cpu_limit is 0c
+  * porto: memory accounting model
+  * volume: add property target_container
+  * porto: allow dynamic configuration device permissions
+  * path: add TPathWalk
+  * error: cleanup
+  * test: fix
+  * error: remove unsed templates
+  * test: fix
+  * layers: save data checksums and unpacked size into xattrs
+  * core: chmod pipe to 0666 to let open it again
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 18 Dec 2017 17:56:22 +0300
+
 yandex-porto (4.3.2) unstable; urgency=low
 
   * porto: env format is key=val;...
