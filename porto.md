@@ -47,7 +47,8 @@ Also porto limits nesting with 16 levels.
 Container could be addressed using short name relative current porto
 namespaces: "name", or absolute name "/porto/name" which stays the
 same regardless of porto namespace.
-See **absolute\_name** and **porto\_namespace** below.
+See **absolute\_name**, **absolute\_namespace**,
+**enable\_porto** and **porto\_namespace** below.
 
 Host is a pseudo-container "/".
 
@@ -172,6 +173,8 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **absolute\_namespace** - full container namespace including parent namespaces
 
+    This is required prefix of **absolute\_name** for seeing other container.
+
 * **controllers** - enabled cgroup controllers, see [CGROUPS] below
 
 * **cgroups** - paths to cgroups, syntax: \<name\>: \<path\>
@@ -272,6 +275,8 @@ container { extra_devices: "<device> [rwm]... ;..." }
     All containers with read access could examine **"/"**, **"."**, **"self"** and all own parents.
 
 * **porto\_namespace** - name prefix required to shown containers (deprecated, use **enable\_porto**=isolate)
+
+    Actual porto namespace concatenates prefixes from parents, see **absolute\_namespace**.
 
 * **owner\_user** - container owner user, default: creator
 
