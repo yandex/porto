@@ -275,6 +275,7 @@ void TContainer::Unregister() {
     if (error)
         L_WRN("Cannot put CT{}:{} id: {}", Id, Name, error);
 
+    PORTO_ASSERT(State == EContainerState::Stopped);
     State = EContainerState::Destroyed;
 }
 
@@ -619,6 +620,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
 err:
     TNetwork::StopNetwork(*ct);
+    ct->SetState(EContainerState::Stopped);
     ct->RemoveWorkDir();
     lock.lock();
     SystemClient.ReleaseContainer(true);
@@ -1398,7 +1400,7 @@ void TContainer::PropagateCpuLimit() {
 
         for (auto &child: ct->Children) {
             if (child->State == EContainerState::Running ||
-                    child->State == EContainerState::Starting && !child->IsMeta())
+                    (child->State == EContainerState::Starting && !child->IsMeta()))
                 sum += child->CpuLimit ?: max;
             else if (child->State == EContainerState::Meta)
                 sum += std::min(child->CpuLimit ?: max, child->CpuLimitSum);
@@ -3092,18 +3094,18 @@ void TContainer::SyncState() {
         if (State != EContainerState::Stopped)
             L_WRN("Freezer not found");
         ForgetPid();
-        State = EContainerState::Stopped;
+        SetState(EContainerState::Stopped);
         return;
     }
 
     if (State == EContainerState::Starting)
-        State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
+        SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
 
     if (FreezerSubsystem.IsFrozen(freezerCg)) {
         if (State != EContainerState::Paused)
             FreezerSubsystem.Thaw(freezerCg);
     } else if (State == EContainerState::Paused)
-        State = IsMeta() ? EContainerState::Meta : EContainerState::Running;
+        SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
 
     if (State == EContainerState::Stopped) {
         L("Found unexpected freezer");
@@ -3156,7 +3158,7 @@ void TContainer::SyncState() {
             break;
         case EContainerState::Paused:
             if (State == EContainerState::Running || State == EContainerState::Meta)
-                State = EContainerState::Paused;
+                SetState(EContainerState::Paused);
             break;
         case EContainerState::Destroyed:
             L_ERR("Destroyed parent?");
