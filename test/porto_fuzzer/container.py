@@ -14,10 +14,11 @@ WaitCache = []
 def set_active(is_active):
     properties.ACTIVE = is_active
 
-def Create(conn,dest):
+def Create(conn, name):
     if VERBOSE:
-        print "Creating container: " + dest
-    conn.Create(dest)
+        print "Creating container: " + name
+    conn.Create(name)
+    conn.SetProperty(name, 'private', FUZZER_PRIVATE)
 
 def Destroy(conn,dest):
     if VERBOSE:
@@ -75,7 +76,6 @@ def SetProperty(conn,dest):
             (15, properties.MaxRespawns),
             (10, properties.Weak),
             (20, properties.AgingTime),
-            (20, properties.Private),
             (25, properties.EnablePorto),
             (50, properties.MemoryLimit),
             (50, properties.MemoryGuarantee),

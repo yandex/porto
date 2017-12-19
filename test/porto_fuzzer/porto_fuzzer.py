@@ -18,6 +18,7 @@ import argparse
 import subprocess
 import signal
 import functools
+import traceback
 
 def fuzzer_killer(prob, timeout=180, verbose=False):
 
@@ -107,6 +108,7 @@ def fuzzer_main(tid, iter_num, queue,
 
         except BaseException as e:
             if not ignore_failure or type(e) is AssertionError:
+                traceback.print_exc()
                 queue.put(e)
                 sys.exit(1)
             else:

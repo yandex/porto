@@ -1,14 +1,12 @@
 #!/usr/bin/python -u
 
+from common import *
+import targets
+
 import pwd
 import grp
 import psutil
 import sys
-import random
-from random import randint
-from random import random as randf
-
-from common import *
 
 ACTIVE=False
 ACTIVE_IO=False
@@ -82,9 +80,6 @@ def AgingTime():
                     )
                 )
            )
-
-def Private():
-    return ("private", get_random_str(256))
 
 def EnablePorto():
     return ("enable_porto", select_by_weight( [(2, "true"),
@@ -232,11 +227,9 @@ def VirtMode():
     return ("virt_mode", select_by_weight([ (2, "false"), (1, "true") ]) )
 
 def Root(conn):
-    vlist = conn.ListVolumes()
     vol = select_by_weight( [
         (5, ""),
-        (5, vlist[randint(0, len(vlist) - 1)]  if len(vlist) > 0\
-            else get_random_dir(VOL_MNT_PLACE) ),
+        (5, targets.our_volume(conn)),
         (1, get_random_dir(VOL_PLACE)),
         (1, get_random_str(256))
     ] )

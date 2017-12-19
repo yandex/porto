@@ -1,41 +1,72 @@
 #!/usr/bin/python
 
+from common import *
+
 import os
+import random
+import functools
 import porto
 import container
 import volume
 import layer
 
-from common import *
+def our_containers(conn):
+    our = []
+    for c in conn.ListContainers():
+        try:
+            if c.GetProperty('private') == FUZZER_PRIVATE:
+                our.append(c.name)
+        except porto.exceptions.ContainerDoesNotExist:
+            pass
+    return our
 
-import random
-from random import randint
-from random import random as randf
-import functools
+def our_container(conn):
+    return select_equal(our_containers(conn), get_random_str(NAME_LIMIT))
 
-def existing_container(conn):
-    existing = conn.List()
-    if len(existing) == 0:
-        return get_random_str(NAME_LIMIT)
-    return existing[randint(0, len(existing) - 1)]
+def our_volumes(conn):
+    our = []
+    for v in conn.ListVolumes():
+        try:
+            if v.GetProperty('private') == FUZZER_PRIVATE:
+                our.append(v.path)
+        except porto.exceptions.VolumeNotFound:
+            pass
+    return our
 
-def existing_volume(conn):
-    existing = conn.ListVolumes()
-    if len(existing) == 0:
-        return ""
-    return existing[randint(0, len(existing) - 1)].path
+def our_volume(conn):
+    return select_equal(our_volumes(conn), "")
 
-def existing_layer(conn):
-    place = select_by_weight([(1, None), (1, VOL_PLACE)])
-    existing = conn.ListLayers(**{"place" : place})
-    if len(existing) == 0:
-        return ""
-    layer = existing[randint(0, len(existing) - 1)].name
+def our_layers(conn, place=None):
+    our = []
+    for l in conn.ListLayers(place=place):
+        try:
+            if l.GetPrivate() == FUZZER_PRIVATE:
+                our.append(l.name)
+        except porto.exceptions.LayerNotFound:
+            pass
+    return our
 
-    if layer == "ubuntu-precise" or layer == "ubuntu-xenial":
-        return ""
+def all_layers(conn, place=None):
+    return [ l.name for l in conn.ListLayers(place=place) ]
 
-    return layer
+def get_random_layers(conn, place=None):
+    max_depth = randint(1, LAYER_LIMIT)
+    result = []
+    layers = all_layers(conn, place)
+    for i in range(0, max_depth):
+        result.append(select_by_weight( [
+            (3, select_equal(layers, get_random_str(LAYERNAME_LIMIT))),
+            (1, get_random_str(LAYERNAME_LIMIT))
+        ]))
+
+    return result
+
+def select_layers(conn, place=None):
+    return select_by_weight( [
+        (10, []),
+        (8, ["ubuntu-precise"]),
+        (5, get_random_layers(conn, place)),
+    ] )
 
 def select_container(conn):
     return select_by_weight( [
@@ -43,40 +74,36 @@ def select_container(conn):
             (1, "/"),
             ] )
         ),
-        (45, existing_container(conn)),
+        (45, our_container(conn)),
         (40, select_by_weight( [
                 (60, get_random_str(NAME_LIMIT)),
-                (40, existing_container(conn) + "/" + get_random_str(NAME_LIMIT))
+                (40, our_container(conn) + "/" + get_random_str(NAME_LIMIT))
             ] )
         )
     ] )
 
 def select_volume_container(conn):
     return select_by_weight( [
-        (30, "/"),
-        (40, select_container(conn))
+        (10, "/"),
+        (10, "self"),
+        (10, None),
+        (10, "***"),
+        (100, select_container(conn))
     ] )
 
 def select_volume(conn):
     return select_by_weight( [
         (15, None),
-        (20, existing_volume(conn)),
+        (20, our_volume(conn)),
         (30, get_random_dir(VOL_MNT_PLACE))
-    ] )
-
-def select_layer(conn):
-    return select_by_weight( [
-        (5, existing_layer(conn)),
-        (5, get_random_str(LAYERNAME_LIMIT))
     ] )
 
 def volume_action(conn):
     try:
-        ct = select_volume_container(conn)
         select_by_weight( [
             (1, volume.Create),
-            (2, functools.partial(volume.Unlink, **{"container" : ct})),
-            (2, functools.partial(volume.Link, **{"container" : ct})),
+            (2, volume.Unlink),
+            (2, volume.Link),
         ] )(conn, select_volume(conn))
         return 0
     except (
@@ -96,13 +123,24 @@ def volume_action(conn):
            ):
         return 1
 
+def select_place():
+    return select_by_weight( [
+        (1, None),
+        (1, VOL_PLACE)
+    ] )
+
 def layer_action(conn):
+    place = select_place()
+    name = select_by_weight( [
+        (5, select_equal(our_layers(conn, place), get_random_str(LAYERNAME_LIMIT))),
+        (5, get_random_str(LAYERNAME_LIMIT))
+    ] )
     try:
         select_by_weight( [
             (1, layer.Import),
             (2, layer.Merge),
             (2, layer.Remove)
-        ] )(conn, select_layer(conn))
+        ] )(conn, place, name)
         return 0
     except (
             porto.exceptions.LayerAlreadyExists,
@@ -112,7 +150,6 @@ def layer_action(conn):
             porto.exceptions.UnknownError
            ):
         return 1
-     
 
 def container_action(conn):
     try:

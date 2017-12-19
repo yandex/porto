@@ -1,29 +1,11 @@
 #!/usr/bin/python
 
-import common
 from common import *
-from random import randint
+import targets
+
 import os
 
 VERBOSE=True
-
-def get_random_layers(conn, place):
-    max_depth = randint(1, LAYER_LIMIT) 
-    result = []
-
-    for i in range(0, max_depth):
-        layers = conn.ListLayers(place)
-        if len(layers) == 0:
-            result += [get_random_str(LAYERNAME_LIMIT)]
-        else:
-            result += [
-                select_by_weight( [
-                    (3, layers[randint(0, len(layers) - 1)].name),
-                    (1, get_random_str(LAYERNAME_LIMIT))
-                ] )
-            ]
-
-    return result
 
 def Create(conn, pathstr):
 
@@ -38,7 +20,7 @@ def Create(conn, pathstr):
 
     def select_backend():
         return select_by_weight( [
-            (10, None), 
+            (10, None),
             (5, "bind"),
             (5, "plain"),
             (5, "tmpfs"),
@@ -46,20 +28,6 @@ def Create(conn, pathstr):
 #            (3, "quota"),
             (3, "native"),
             (3, "loop"),
-#            (1, "rbd")       
-        ] )
-
-    def select_layers(conn, place):
-        return select_by_weight( [
-            (10, []),
-            (8, ["ubuntu-precise"]),
-            (5, get_random_layers(conn, place)),
-        ] )
-
-    def select_place():
-        return select_by_weight( [
-            (1, None),
-            (1, VOL_PLACE)
         ] )
 
     if VERBOSE:
@@ -74,11 +42,11 @@ def Create(conn, pathstr):
     if backend is not None:
         kwargs["backend"] = backend
 
-    place = select_place()
+    place = targets.select_place()
     if place is not None:
         kwargs["place"] = place
 
-    layers = select_layers(conn, place)
+    layers = targets.select_layers(conn, place)
     if layers is not None:
         kwargs["layers"] = layers
 
@@ -86,22 +54,32 @@ def Create(conn, pathstr):
         #Skip operation
         return
 
+    kwargs['private'] = FUZZER_PRIVATE
+
     conn.CreateVolume(pathstr, **kwargs)
 
-def Unlink(conn, pathstr, **kwargs):
+def Unlink(conn, pathstr):
+    ct = targets.select_volume_container(conn)
+
     if VERBOSE:
-        print "Unlinking volume: {} from container: {}".format(pathstr, kwargs["container"])
+        print "Unlinking volume: {} from container: {}".format(pathstr, ct)
 
     if pathstr is None:
         pathstr = ""
 
-    conn.UnlinkVolume(pathstr, **kwargs)
+    conn.UnlinkVolume(pathstr, ct)
 
-def Link(conn, pathstr, **kwargs):
+def Link(conn, pathstr):
+
+    ct = targets.select_volume_container(conn)
+
     if VERBOSE:
-        print "Linking volume: {} to container {}".format(pathstr, kwargs["container"])
+        print "Linking volume: {} to container {}".format(pathstr, ct)
 
     if pathstr is None:
         pathstr = ""
 
-    conn.LinkVolume(pathstr, **kwargs)
+    if ct is None:
+        ct = ""
+
+    conn.LinkVolume(pathstr, ct)

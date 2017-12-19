@@ -8,7 +8,8 @@ import re
 import random
 import subprocess
 import tarfile
-from random import randint
+
+FUZZER_PRIVATE = "porto-fuzzer"
 
 NAME_LIMIT=2
 RUN_TIME_LIMIT=10
@@ -59,29 +60,29 @@ def prepare_fuzzer():
 def cleanup_fuzzer():
     conn = porto.Connection()
 
-    containers = conn.List()
-    while len(containers) > 0 :
+    for c in our_containers(conn):
         try:
-            conn.Destroy(containers[0])
+            conn.Destroy(c)
         except porto.exceptions.ContainerDoesNotExist:
             pass
 
-        containers = conn.List()
+    for v in our_volumes(conn):
+        conn.UnlinkVolume(v, '***')
 
-    volumes = conn.ListVolumes()
-    while len(volumes) > 0:
-        conn.UnlinkVolume(volumes[0].path, "/")
-        volumes = conn.ListVolumes()
-
-    for layer in conn.ListLayers():
-        if len(layer.name) == LAYERNAME_LIMIT:
-            layer.Remove()
+    for l in our_layers(conn):
+        conn.RemoveLayer(l)
 
     if (os.path.ismount(FUZZER_MNT)):
         subprocess.check_call(["umount", FUZZER_MNT])
 
     if (os.path.exists(FUZZER_MNT)):
         os.rmdir(FUZZER_MNT)
+
+def randint(a, b):
+   return random.randint(a, b)
+
+def randf():
+   return random.random()
 
 def get_random_str(length):
    return ''.join(random.choice(string.lowercase) for i in range(length))
@@ -98,8 +99,10 @@ def select_by_weight(wlist):
 
         accum += i[0]
 
-def select_equal(elems):
-    return elems[randint(0, len(elems)) - 1]
+def select_equal(elems, default=None):
+    if elems:
+        return elems[randint(0, len(elems)) - 1]
+    return default
 
 def inject_test_utils(path):
     file_path = path + "/mem_test.py"
