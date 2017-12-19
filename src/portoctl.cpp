@@ -432,10 +432,9 @@ err:
                 goto err;
         }
 
-        /* forward terminal only if all streams are tty */
+        /* forward terminal only if stdin is a tty */
         if (ForwardTerminal)
-             ForwardTerminal = isatty(STDIN_FILENO) &&
-                 isatty(STDOUT_FILENO) && isatty(STDERR_FILENO);
+             ForwardTerminal = isatty(STDIN_FILENO);
 
         if (ForwardTerminal) {
             error = OpenPty();
