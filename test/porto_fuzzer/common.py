@@ -2,12 +2,10 @@
 
 import porto
 import string
-import sys
 import os
 import re
 import random
 import subprocess
-import tarfile
 
 FUZZER_PRIVATE = "porto-fuzzer"
 
@@ -21,62 +19,11 @@ LAYER_LIMIT=4
 LAYERNAME_LIMIT=2
 
 FUZZER_MNT="/tmp/fuzzer_mnt"
-VOL_PLACE = FUZZER_MNT + "/place" 
+VOL_PLACE = FUZZER_MNT + "/place"
 VOL_MNT_PLACE = FUZZER_MNT + "/mnt"
 VOL_STORAGE = FUZZER_MNT + "/storage"
 TAR1 = FUZZER_MNT + "/l1.tar"
 TAR2 = FUZZER_MNT + "/l2.tar"
-
-def prepare_fuzzer():
-    if not os.path.exists(FUZZER_MNT):
-        os.mkdir(FUZZER_MNT)
-    
-    if os.path.ismount(FUZZER_MNT):
-        subprocess.check_call(["umount", "-l", FUZZER_MNT])
-
-    subprocess.check_call(["mount", "-t", "tmpfs", "-o", "size=1G", "None", FUZZER_MNT])
-    
-    verify_paths = [VOL_MNT_PLACE, VOL_PLACE, VOL_STORAGE,
-                    VOL_PLACE + "/porto_volumes", VOL_PLACE + "/porto_layers"]
-
-    for p in verify_paths:
-        if not os.path.exists(p):
-            os.mkdir(p)
-       
-    open(FUZZER_MNT + "/f1.txt", "w").write("1234567890")
-    open(FUZZER_MNT + "/f2.txt", "w").write("0987654321")
-    open(FUZZER_MNT + "/f3.txt", "w").write("abcdeABCDE")
-
-    t = tarfile.open(name=TAR1, mode="w")
-    t.add(FUZZER_MNT + "/f1.txt", arcname="f1.txt")
-    t.add(FUZZER_MNT + "/f2.txt", arcname="f2.txt")
-    t.close()
-    
-    t = tarfile.open(name=TAR2, mode="w")
-    t.add(FUZZER_MNT + "/f1.txt", arcname="f2.txt")
-    t.add(FUZZER_MNT + "/f2.txt", arcname="f3.txt")
-    t.close()
-    
-def cleanup_fuzzer():
-    conn = porto.Connection()
-
-    for c in our_containers(conn):
-        try:
-            conn.Destroy(c)
-        except porto.exceptions.ContainerDoesNotExist:
-            pass
-
-    for v in our_volumes(conn):
-        conn.UnlinkVolume(v, '***')
-
-    for l in our_layers(conn):
-        conn.RemoveLayer(l)
-
-    if (os.path.ismount(FUZZER_MNT)):
-        subprocess.check_call(["umount", FUZZER_MNT])
-
-    if (os.path.exists(FUZZER_MNT)):
-        os.rmdir(FUZZER_MNT)
 
 def randint(a, b):
    return random.randint(a, b)
@@ -149,7 +96,7 @@ def get_portod_pid():
     except:
         slave = None
 
-    try:       
+    try:
         master = int(open("/run/portoloop.pid").read())
     except:
         master = None

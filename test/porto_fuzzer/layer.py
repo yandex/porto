@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
-import common
 from common import *
-from random import randint
+
 import os
 
 VERBOSE=True

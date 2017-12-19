@@ -1,15 +1,11 @@
 #!/usr/bin/python -u
 
-import porto
-
-import common
 from common import *
 import targets
 
-import random
-from random import randint
-from random import random as randf
+import porto
 
+import random
 import time
 import os
 import sys
@@ -19,6 +15,62 @@ import subprocess
 import signal
 import functools
 import traceback
+import tarfile
+
+
+def prepare_fuzzer():
+    if not os.path.exists(FUZZER_MNT):
+        os.mkdir(FUZZER_MNT)
+
+    if os.path.ismount(FUZZER_MNT):
+        subprocess.check_call(["umount", "-l", FUZZER_MNT])
+
+    subprocess.check_call(["mount", "-t", "tmpfs", "-o", "size=1G", "None", FUZZER_MNT])
+
+    verify_paths = [VOL_MNT_PLACE, VOL_PLACE, VOL_STORAGE,
+                    VOL_PLACE + "/porto_volumes", VOL_PLACE + "/porto_layers"]
+
+    for p in verify_paths:
+        if not os.path.exists(p):
+            os.mkdir(p)
+
+    open(FUZZER_MNT + "/f1.txt", "w").write("1234567890")
+    open(FUZZER_MNT + "/f2.txt", "w").write("0987654321")
+    open(FUZZER_MNT + "/f3.txt", "w").write("abcdeABCDE")
+
+    t = tarfile.open(name=TAR1, mode="w")
+    t.add(FUZZER_MNT + "/f1.txt", arcname="f1.txt")
+    t.add(FUZZER_MNT + "/f2.txt", arcname="f2.txt")
+    t.close()
+
+    t = tarfile.open(name=TAR2, mode="w")
+    t.add(FUZZER_MNT + "/f1.txt", arcname="f2.txt")
+    t.add(FUZZER_MNT + "/f2.txt", arcname="f3.txt")
+    t.close()
+
+def cleanup_fuzzer():
+    conn = porto.Connection()
+
+    for c in targets.our_containers(conn):
+        try:
+            conn.Destroy(c)
+        except porto.exceptions.ContainerDoesNotExist:
+            pass
+
+    for v in targets.our_volumes(conn):
+        try:
+            conn.UnlinkVolume(v, '***')
+        except porto.exceptions.VolumeNotFound:
+            pass
+
+    for l in targets.our_layers(conn):
+        conn.RemoveLayer(l)
+
+    if (os.path.ismount(FUZZER_MNT)):
+        subprocess.check_call(["umount", FUZZER_MNT])
+
+    if (os.path.exists(FUZZER_MNT)):
+        os.rmdir(FUZZER_MNT)
 
 def fuzzer_killer(prob, timeout=180, verbose=False):
 

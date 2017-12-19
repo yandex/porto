@@ -27,7 +27,7 @@ def Command():
                         (1, "/f1.txt"),
                         (1, "/f2.txt"),
                         (1, "/f3.txt")
-                    ] )                
+                    ] )
                 )),
                 (2, get_random_str(256)),
                 (2 if ACTIVE else 0, "python /tmp/mem_test.py " +

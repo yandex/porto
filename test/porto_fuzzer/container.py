@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
-import common
-import signal
-from random import randint
 from common import *
+
+import signal
 import properties
 import functools
 
