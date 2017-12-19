@@ -1115,6 +1115,10 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
 TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg) {
     TError error;
 
+    /* default class qdisc */
+    if (cfg.Leaf == TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR))
+        return OK;
+
     TNlQdisc ctq(dev.Index, cfg.Handle, TC_HANDLE(TC_H_MIN(cfg.Handle), CONTAINER_TC_MINOR));
     (void)ctq.Delete(*Nl);
 
