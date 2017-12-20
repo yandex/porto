@@ -886,19 +886,19 @@ public:
             (void)temp.Rmdir();
         }
 
+err:
         (void)TPath("/").Chdir();
 
-        if (!error)
-            return error;
-
-err:
-        if (Volume->HaveQuota())
-            (void)quota.Destroy();
-        if (Volume->Device >= 0) {
-            lower.UmountAll();
-            PutLoopDev(Volume->Device);
-            Volume->Device = -1;
+        if (error) {
+            if (Volume->HaveQuota())
+                (void)quota.Destroy();
+            if (Volume->Device >= 0) {
+                lower.UmountAll();
+                PutLoopDev(Volume->Device);
+                Volume->Device = -1;
+            }
         }
+
         return error;
     }
 

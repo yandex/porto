@@ -778,10 +778,15 @@ static int Portod() {
     if (error)
         FatalError("Cannot mount volumes keyvalue", error);
 
-    // We want propagate mounts into containers
-    error = TPath("/").Remount(MS_SHARED | MS_REC);
+    TPath root("/");
+    error = root.Chdir();
     if (error)
-        FatalError("Can't remount / recursively as shared", error);
+        FatalError("Cannot chdir to /", error);
+
+    // We want propagate mounts into containers
+    error = root.Remount(MS_SHARED | MS_REC);
+    if (error)
+        FatalError("Cannot remount / recursively as shared", error);
 
     EpollLoop = std::unique_ptr<TEpollLoop>(new TEpollLoop());
     EventQueue = std::unique_ptr<TEventQueue>(new TEventQueue());
@@ -1335,17 +1340,20 @@ static int PortodMain() {
 
     AllocStatistics();
 
+    int ret = chdir("/");
+    PORTO_ASSERT(!ret);
+
     (void)close(STDIN_FILENO);
     int null = open("/dev/null", O_RDWR);
     PORTO_ASSERT(null == STDIN_FILENO);
 
     if (!StdLog || fcntl(STDOUT_FILENO, F_GETFD) < 0) {
-        int ret = dup2(null, STDOUT_FILENO);
+        ret = dup2(null, STDOUT_FILENO);
         PORTO_ASSERT(ret == STDOUT_FILENO);
     }
 
     if (!StdLog || fcntl(STDERR_FILENO, F_GETFD) < 0) {
-        int ret = dup2(null, STDERR_FILENO);
+        ret = dup2(null, STDERR_FILENO);
         PORTO_ASSERT(ret == STDERR_FILENO);
     }
 

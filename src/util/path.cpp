@@ -467,24 +467,20 @@ TError TFile::ClearDirectory() const {
         return error;
 
     error = walk.OpenScan(".");
-    if (error)
-        return error;
-
-    while (1) {
+    while (!error) {
         error = walk.Next();
         if (error || !walk.Path)
-            return error;
+            break;
         if (S_ISDIR(walk.Stat->st_mode)) {
             if (!walk.Postorder || walk.Path == ".")
                 continue;
             error = RmdirAt(walk.Path);
         } else
             error = UnlinkAt(walk.Path);
-        if (error)
-            return error;
     }
 
-    return TPath("/").Chdir();
+    (void)TPath("/").Chdir();
+    return error;
 }
 
 TError TFile::RemoveAt(const TPath &path) const {
