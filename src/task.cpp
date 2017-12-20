@@ -150,6 +150,10 @@ TError TTaskEnv::ChildExec() {
     TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
+    if (errno == EAGAIN)
+        return TError(EError::ResourceNotAvailable, errno, "cannot exec " +
+                      std::string(result.we_wordv[0]) + ": not enough ulimit nproc");
+
     return TError(EError::InvalidCommand, errno, "cannot exec " + std::string(result.we_wordv[0]));
 }
 
