@@ -51,9 +51,10 @@ public:
         return Error != error;
     }
 
-    std::string ToString() const;
-
     static std::string ErrorName(EError error);
+
+    std::string Message() const;
+    std::string ToString() const;
 
     static TError System(const std::string &text) {
         return TError(EError::Unknown, errno, text);

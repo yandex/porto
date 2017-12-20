@@ -421,7 +421,7 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
         keyval->set_variable(var);
         if (error) {
             keyval->set_error(error.Error);
-            keyval->set_errormsg(error.Text);
+            keyval->set_errormsg(error.Message());
         } else {
             keyval->set_value(value);
         }
@@ -1231,7 +1231,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     if (error != EError::Queued) {
         rsp.set_error(error.Error);
-        rsp.set_errormsg(error.Text);
+        rsp.set_errormsg(error.Message());
 
         /* log failed or slow silent requests */
         if (silent && (error || client->RequestTimeMs >= 1000)) {

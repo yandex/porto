@@ -8,6 +8,12 @@ std::string TError::ErrorName(EError error) {
     return rpc::EError_Name(error);
 }
 
+std::string TError::Message() const {
+    if (Errno)
+        return fmt::format("{}: {}", strerror(Errno), Text);
+    return Text;
+}
+
 std::string TError::ToString() const {
     if (Errno)
         return fmt::format("{}:({}: {})", ErrorName(Error), strerror(Errno), Text);
