@@ -20,7 +20,6 @@ extern "C" {
 #include <errno.h>
 #include <time.h>
 #include <string.h>
-#include <libgen.h>
 #include <sys/sysinfo.h>
 #include <sys/prctl.h>
 #include <poll.h>

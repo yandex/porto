@@ -15,7 +15,6 @@ extern "C" {
 #include <sys/time.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
-#include <libgen.h>
 #include <linux/limits.h>
 #include <linux/falloc.h>
 #include <linux/fs.h>
@@ -51,30 +50,22 @@ struct FileHandle {
     }
 };
 
-std::string TPath::DirNameStr() const {
-    char *dup = strdup(Path.c_str());
-    PORTO_ASSERT(dup != nullptr);
-
-    char *p = dirname(dup);
-    std::string out(p);
-    free(dup);
-
-    return out;
-}
-
 TPath TPath::DirName() const {
-    std::string s = DirNameStr();
-    return TPath(s);
+    TPath norm = NormalPath();
+    auto sep = norm.Path.rfind('/');
+    if (sep == std::string::npos)
+        return norm ? "." : "";
+    norm = norm.Path.substr(0, sep);
+    return norm ? norm : "/";
 }
 
 std::string TPath::BaseName() const {
-    char *dup = strdup(Path.c_str());
-    PORTO_ASSERT(dup != nullptr);
-    char *p = basename(dup);
-    std::string out(p);
-    free(dup);
-
-    return out;
+    TPath norm = NormalPath();
+    auto sep = norm.Path.rfind('/');
+    if (sep == std::string::npos)
+        return norm.Path;
+    norm = norm.Path.substr(sep + 1);
+    return norm ? norm.Path : "/";
 }
 
 TError TPath::StatStrict(struct stat &st) const {

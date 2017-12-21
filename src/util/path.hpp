@@ -31,7 +31,6 @@ class TPath {
     friend class TFile;
     std::string Path;
 
-    std::string DirNameStr() const;
     TPath AddComponent(const TPath &component) const;
 
 public:

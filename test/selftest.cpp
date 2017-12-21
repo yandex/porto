@@ -2799,6 +2799,35 @@ static void TestPath(Porto::Connection &) {
         { "abc", "abcdef", "", "" },
     };
 
+    /* path, dirname, basename */
+    std::vector<std::vector<std::string>> split = {
+        { "/usr/lib", "/usr", "lib" },
+        { "/usr/", "/", "usr" },
+        { "usr", ".", "usr" },
+        { "/", "/", "/" },
+        { ".", ".", "." },
+        { "..", ".", ".." },
+
+        { "//usr//lib", "/usr", "lib" },
+        { "//usr//", "/", "usr" },
+        { "usr//", ".", "usr" },
+        { "//", "/", "/" },
+        { "///", "/", "/" },
+        { ".//", ".", "." },
+        { "..//", ".", ".." },
+
+        { "", "", "" },
+        { "/.", "/", "/" },
+        { "/..", "/", "/" },
+        { "/a/..", "/", "/" },
+        { "/../a", "/", "a" },
+        { "/../a/../b/c", "/b", "c" },
+        { "a/..", ".", "." },
+        { "../a", "..", "a" },
+        { "../..", "..", ".."},
+        { "../../..", "../..", ".."},
+    };
+
     for (auto n: normalize)
         ExpectEq(TPath(n.first).NormalPath().ToString(), n.second);
 
@@ -2807,6 +2836,11 @@ static void TestPath(Porto::Connection &) {
         ExpectEq(TPath(n[0]).InnerPath(n[1], true).ToString(), n[3]);
         if (n[3] != "")
             ExpectEq((TPath(n[0]) / n[3]).ToString(), n[1]);
+    }
+
+    for (auto n: split) {
+        ExpectEq(TPath(n[0]).DirName().ToString(), n[1]);
+        ExpectEq(TPath(n[0]).BaseName(), n[2]);
     }
 }
 
