@@ -1196,7 +1196,7 @@ TError TVolume::Find(const TPath &path, std::shared_ptr<TVolume> &volume) {
 /* FIXME could be implemented with single lookup */
 std::shared_ptr<TVolume> TVolume::Locate(const TPath &path) {
     if (path.IsAbsolute()) {
-        for (auto p = path; !p.IsRoot(); p = p.DirName()) {
+        for (auto p = path.NormalPath(); !p.IsRoot(); p = p.DirName()) {
             auto volume = Find(p);
             if (volume)
                 return volume;
