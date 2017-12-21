@@ -10,18 +10,14 @@ import container
 import volume
 import layer
 
+def random_container():
+    return FUZZER_PRIVATE + '-' + get_random_str(NAME_LIMIT)
+
 def our_containers(conn):
-    our = []
-    for c in conn.ListContainers():
-        try:
-            if c.GetProperty('private') == FUZZER_PRIVATE:
-                our.append(c.name)
-        except porto.exceptions.ContainerDoesNotExist:
-            pass
-    return our
+    return conn.List(mask=FUZZER_PRIVATE+"-***")
 
 def our_container(conn):
-    return select_equal(our_containers(conn), get_random_str(NAME_LIMIT))
+    return select_equal(our_containers(conn), random_container())
 
 def our_volumes(conn):
     our = []
@@ -70,17 +66,15 @@ def select_layers(conn, place=None):
 
 def select_container(conn):
     return select_by_weight( [
-        (1, select_by_weight( [
-            (1, "/"),
-            ] )
-        ),
-        (45, our_container(conn)),
-        (40, select_by_weight( [
-                (60, get_random_str(NAME_LIMIT)),
-                (40, our_container(conn) + "/" + get_random_str(NAME_LIMIT))
-            ] )
-        )
-    ] )
+        (1, lambda conn: "/"),
+        (1, lambda conn: "self"),
+        (50, our_container),
+        (20, lambda conn: random_container()),
+        (10, lambda conn: random_container() + "/" + random_container()),
+        (5, lambda conn: random_container() + "/" + random_container() + "/" + random_container()),
+        (2, lambda conn: our_container(conn) + "/" + random_container()),
+        (1, lambda conn: our_container(conn) + "/" + random_container() + "/" + random_container()),
+    ] )(conn)
 
 def select_volume_container(conn):
     return select_by_weight( [
