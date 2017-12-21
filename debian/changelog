@@ -1,3 +1,9 @@
+yandex-porto (4.3.4) unstable; urgency=low
+
+  * volume: normalize path before locating volume
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 21 Dec 2017 18:55:35 +0300
+
 yandex-porto (4.3.3) unstable; urgency=low
 
   * core: chmod pipe to 0666 to let open it again
