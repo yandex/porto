@@ -1816,6 +1816,7 @@ TError TVolume::Build() {
     if (!KeepStorage && HaveStorage())
         KeepStorage = true;
 
+    BuildTime = FormatTime(time(nullptr));
     SetState(EVolumeState::Ready);
 
     return Save();
@@ -2301,6 +2302,8 @@ void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {
         ret[V_PERMISSIONS] = StringFormat("%#o", VolumePerms);
     ret[V_CREATOR] = Creator;
     ret[V_READY] = BoolToString(State == EVolumeState::Ready);
+    if (BuildTime.size())
+        ret[V_BUILD_TIME] = BuildTime;
     ret[V_STATE] = StateName(State);
     ret[V_PRIVATE] = Private;
     ret[V_READ_ONLY] = BoolToString(IsReadOnly);
@@ -2792,6 +2795,9 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
                 return error;
 
             SetState(ready ? EVolumeState::Ready : EVolumeState::ToDestroy);
+
+        } else if (prop.first == V_BUILD_TIME) {
+            BuildTime = prop.second;
 
         } else if (prop.first == V_PRIVATE) {
             Private = prop.second;

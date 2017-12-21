@@ -808,6 +808,8 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **ready**         - is construction complete
 
+* **build\_time**   - format: YYYY-MM-DD hh:mm::ss
+
 * **state**         - volume state
     - *initial*
     - *building*
