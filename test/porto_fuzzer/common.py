@@ -182,66 +182,20 @@ def get_random_dir(base):
     return result
 
 def print_stacktrace(pid):
-    print subprocess.check_output([
-        "gdb", "-ex", "thread apply all bt",
-        "-ex", "set confirm off", "-ex", "quit",
-        "-q", "-p", str(pid)
-    ])
-
-def find_last_log_lines(filename, num, OFFSET=1048576, tag_re="ERR",
-                        date_re="[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}",
-                        process_re="portod(-slave|-worker[0-9]+|-spawn-c|-spawn-p)?\[[0-9]+\]:"):
-    re_obj = re.compile("{} {} {}".format(date_re, process_re, tag_re))
-
-    result = []
-
-    f = open(filename, "r")
-    size = os.lseek(f.fileno(), 0, os.SEEK_END)
-    running = True
-    pos = size
-
-    while pos and (num == 0 or len(result) < num):
-        if pos > OFFSET:
-            pos -= OFFSET
-        else:
-            pos = 0
-
-        os.lseek(f.fileno(), pos, os.SEEK_SET)
-        ss = f.read(OFFSET)
-        ll = ss.splitlines()
-
-        if len(ll) > 1 and len(ll[0]) > 0 and pos > 0:
-            pos += len(ll[0]) + 1
-
-        for l in ll[:0:-1]:
-            m = re_obj.search(l)
-            if m:
-                result.insert(0, l[m.start():])
-                if len(result) >= num:
-                    break
-
-    return result
-
-def grep_portod_tag(tag_re, num):
-    result = find_last_log_lines("/var/log/portod.log", num, tag_re=tag_re)
-
-    if len(result) < num:
-        print "Some {} lines were missing, found {} instead of {}".format(tag_re, len(result), num)
-
-    if len(result) > num:
-        print "Unexpected {} were found {} instead of {}, forgot to clean up?".format(tag_re, len(result), num)
-
-    return result
+    subprocess.call(["gdb", "-ex", "thread apply all bt",
+                            "-ex", "thread apply all bt full",
+                            "-ex", "set confirm off",
+                            "-ex", "quit", "-q", "-p", str(pid)])
 
 def print_logged_errors():
+    errors = None
     try:
-        e = int(porto.Connection(timeout=30).GetProperty("/", "porto_stat[errors]"))
+        errors = porto.Connection(timeout=30).GetProperty("/", "porto_stat[errors]")
     except:
-        return
-
-    msgs = grep_portod_tag("ERR", e if e > 0 else 0)
-
-    if len(msgs) > 0:
-        print "Found {} errors logged by porto:".format(str(e) if e > 0 else "")
-        for m in msgs:
-            print m
+        pass
+    if errors != "0":
+        print "Errors:", errors
+        try:
+            subprocess.call(["grep", "-wE", "WRN|ERR", "/var/log/portod.log"])
+        except:
+            pass
