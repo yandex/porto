@@ -579,17 +579,18 @@ Interfaces aggregated into groups from /etc/iproute2/group, see **ip-link(8)**.
     Inside container root /etc/hostname must be a regular file,
     porto bind-mounts temporary file over it.
 
-* **resolv\_conf**   - DNS resolver configuration, syntax: \<resolv.conf option\>;...
+* **resolv\_conf**   - DNS resolver configuration, syntax: default|keep|\<resolv.conf option\>;...
 
-    Default value for containers with chroot could be set in portod.conf:
+    Default setting **resolv\_conf**="default" loads configuration from portod.conf:
 ```
 container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 ```
+    or from host /etc/resolv.conf if option in portod.conf isn't set.
 
     Inside container root /etc/resolv.conf must be a regular file,
     porto bind-mounts temporary file over it.
 
-    Setting **resolv\_conf**="" keeps configuraion in chroot as is.
+    Setting **resolv\_conf**="keep" keeps configuraion in container as is.
 
 * **sysctl**         - sysctl configuration, syntax: \<sysctl\>: \<value\>;...
 

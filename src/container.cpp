@@ -1100,6 +1100,9 @@ TError TContainer::ApplyResolvConf() const {
     TError error;
     TFile file;
 
+    if (CT->HasProp(EProperty::RESOLV_CONF) ? CT->ResolvConf == "" : CT->Root == "/")
+        return OK;
+
     if (!Task.Pid)
         return TError(EError::InvalidState, "No container task pid");
 
@@ -1113,7 +1116,8 @@ TError TContainer::ApplyResolvConf() const {
         return TError(EError::NotSupported, "resolv.conf not on tmpfs");
 
     L_ACT("Apply resolv.conf for CT{}:{}", Id, Name);
-    std::string cfg = StringReplaceAll(CT->ResolvConf, ";", "\n");
+    std::string cfg = StringReplaceAll(CT->ResolvConf.size() ? CT->ResolvConf :
+            config().container().default_resolv_conf(), ";", "\n");
     error = file.Truncate(0);
     if (!error)
         error = file.WriteAll(cfg);

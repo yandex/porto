@@ -179,10 +179,11 @@ TError TTaskEnv::ChildApplyLimits() {
 }
 
 TError TTaskEnv::WriteResolvConf() {
-    if (!CT->ResolvConf.size())
+    if (CT->HasProp(EProperty::RESOLV_CONF) ? CT->ResolvConf == "" : CT->Root == "/")
         return OK;
     L_ACT("Write resolv.conf for CT{}:{}", CT->Id, CT->Name);
-    std::string cfg = StringReplaceAll(CT->ResolvConf, ";", "\n");
+    std::string cfg = StringReplaceAll(CT->ResolvConf.size() ? CT->ResolvConf :
+            config().container().default_resolv_conf(), ";", "\n");
     return TPath("/etc/resolv.conf").WritePrivate(cfg);
 }
 

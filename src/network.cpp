@@ -310,9 +310,15 @@ void TNetwork::InitializeConfig() {
 
     if (config().container().default_resolv_conf().empty()) {
         TTuple lines;
-
-        if (!TPath("/etc/resolv.conf").ReadLines(lines))
-            config().mutable_container()->set_default_resolv_conf(MergeEscapeStrings(lines, ';'));
+        std::string conf;
+        if (!TPath("/etc/resolv.conf").ReadLines(lines)) {
+            for (auto &line: lines) {
+                if (line[0] == '#' || line[0] == ';')
+                    continue;
+                conf += line + ";";
+            }
+            config().mutable_container()->set_default_resolv_conf(conf);
+        }
     }
 }
 

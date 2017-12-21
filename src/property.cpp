@@ -1379,13 +1379,22 @@ TError TDefaultGw::Get(std::string &value) {
 class TResolvConf : public TProperty {
 public:
     TResolvConf() : TProperty(P_RESOLV_CONF, EProperty::RESOLV_CONF,
-                              "DNS resolver configuration: "
-                              "<resolv.conf option>;... (dynamic)") {}
+            "DNS resolver configuration: default|keep|<resolv.conf option>;... (dynamic)") {}
     TError Get(std::string &value) {
         if (CT->IsRoot())
             value = config().container().default_resolv_conf();
-        else
+        else if (CT->ResolvConf.size())
             value = CT->ResolvConf;
+        else if (CT->HasProp(EProperty::RESOLV_CONF))
+            value = "keep";
+        else if (CT->Root == "/")
+            value = "inherit";
+        else
+            value = "default";
+        return OK;
+    }
+    TError GetToSave(std::string &value) {
+        value = CT->ResolvConf;
         return OK;
     }
     TError Set(const std::string &value) {
@@ -1393,19 +1402,18 @@ public:
         if (error)
             return error;
         if (CT->State != EContainerState::Stopped &&
-                (!CT->ResolvConf.size() || !value.size()))
+            ((CT->HasProp(EProperty::RESOLV_CONF) ? CT->ResolvConf == "" : CT->Root == "/") !=
+             (value == "keep" || value == "" || (CT->Root == "/" && value == "inherit"))))
             return TError(EError::InvalidState, "Cannot enable/disable resolv.conf overriding in runtime");
-        CT->ResolvConf = value;
-        CT->SetProp(EProperty::RESOLV_CONF);
-        return OK;
-    }
-    TError Start(void) {
-        /* Set default resolv_conf for chroots */
-        if (!CT->HasProp(EProperty::RESOLV_CONF)) {
-            if (CT->Root != "/")
-                CT->ResolvConf = config().container().default_resolv_conf();
-            else
-                CT->ResolvConf = "";
+        if (value == "default" || value == "inherit") {
+            CT->ResolvConf = "";
+            CT->ClearProp(EProperty::RESOLV_CONF);
+        } else if (value == "keep" || value == "") {
+            CT->ResolvConf = "";
+            CT->SetProp(EProperty::RESOLV_CONF);
+        } else {
+            CT->ResolvConf = value;
+            CT->SetProp(EProperty::RESOLV_CONF);
         }
         return OK;
     }
