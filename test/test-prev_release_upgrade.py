@@ -105,7 +105,8 @@ def SnapshotProps(r):
               # "net_priority",
               "porto_namespace",
               "private", "recharge_on_pgfault",
-              "resolv_conf", "respawn", "root", "root_readonly",
+              # "resolv_conf",
+              "respawn", "root", "root_readonly",
               #"stderr_path", #FIXME enable later, "/dev/null" -> ""
               #"stdout_path", #FIXME enable later, "/dev/null" -> ""
               "stdin_path", "stdout_limit", "ulimit",
