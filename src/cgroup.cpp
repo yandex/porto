@@ -574,6 +574,17 @@ TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, TFile &event) {
     return error;
 }
 
+TError TMemorySubsystem::GetOomKills(TCgroup &cg, uint64_t &count) {
+    TUintMap map;
+    TError error = cg.GetUintMap(OOM_CONTROL, map);
+    if (error)
+        return error;
+    if (!map.count("oom_kill"))
+        return TError(EError::NotSupported, "no oom kill counter");
+    count = map.at("oom_kill");
+    return OK;
+}
+
 uint64_t TMemorySubsystem::GetOomEvents(TCgroup &cg) {
     TUintMap stat;
     if (!Statistics(cg, stat))

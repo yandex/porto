@@ -2636,6 +2636,27 @@ public:
     }
 } static OomKilled;
 
+class TOomKills : public TProperty {
+public:
+    TOomKills() : TProperty(D_OOM_KILLS, EProperty::NONE, "Count of tasks killed in container since start (ro)") {
+        IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+    void Init(void) {
+        auto cg = MemorySubsystem.RootCgroup();
+        uint64_t count;
+        IsSupported = !MemorySubsystem.GetOomKills(cg, count);
+    }
+    TError Get(std::string &value) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        uint64_t count;
+        auto error = MemorySubsystem.GetOomKills(cg, count);
+        if (!error)
+            value = std::to_string(count);
+        return error;
+    }
+} static OomKills;
+
 class TCoreDumped : public TProperty {
 public:
     TCoreDumped() : TProperty(D_CORE_DUMPED, EProperty::NONE,

@@ -143,6 +143,8 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **oom\_killed** - true, if container has been OOM killed
 
+* **oom\_kills** - count of tasks killed in container since start (Linux 4.13 or offstream patches)
+
 * **core\_dumped** - true, if main process dumped core
 
 * **respawn\_count** - how many times container has been respawned (using respawn property)

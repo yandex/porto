@@ -208,6 +208,7 @@ public:
     TError SetDirtyLimit(TCgroup &cg, uint64_t limit);
     TError SetupOOMEvent(TCgroup &cg, TFile &event);
     uint64_t GetOomEvents(TCgroup &cg);
+    TError GetOomKills(TCgroup &cg, uint64_t &count);
 };
 
 class TFreezerSubsystem : public TSubsystem {

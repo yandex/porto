@@ -86,6 +86,7 @@ constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
 constexpr const char *D_STATE = "state";
 constexpr const char *D_OOM_KILLED = "oom_killed";
+constexpr const char *D_OOM_KILLS = "oom_kills";
 constexpr const char *D_CORE_DUMPED = "core_dumped";
 constexpr const char *D_PARENT = "parent";
 constexpr const char *D_RESPAWN_COUNT = "respawn_count";
