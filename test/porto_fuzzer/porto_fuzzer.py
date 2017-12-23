@@ -101,7 +101,8 @@ def fuzzer_killer(prob, timeout=180, verbose=False):
 
                 time.sleep(1)
 
-                print "{} portod killed\n".format(conn_name),
+                if verbose:
+                    print "{} portod killed\n".format(conn_name),
 
                 conn.connect()
                 check_errors_present(conn, "{} ".format(conn_name))
@@ -124,7 +125,8 @@ def fuzzer_main(tid, iter_num, queue,
     warns_value = "0"
     conn_name = "fuzzer%02d[%d]:" %(tid, os.getpid())
 
-    print conn_name + " started\n",
+    if print_progress:
+        print conn_name + " started\n",
 
     while retry:
         try:
@@ -166,7 +168,9 @@ def fuzzer_main(tid, iter_num, queue,
             else:
                 iter_saved += 1
 
-    print "{} finished, action performed: {}, invalid: {}\n".format(conn_name, iter_num, fail_cnt),
+    if print_progress:
+        print "{} finished, action performed: {}, invalid: {}\n".format(conn_name, iter_num, fail_cnt),
+
     try:
         check_errors_present(conn, "{} ".format(conn_name))
         check_warns_present(conn, "0")
