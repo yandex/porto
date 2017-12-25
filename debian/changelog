@@ -1,3 +1,26 @@
+yandex-porto (4.4.1) unstable; urgency=low
+
+  * fuzzer: mark all created objects with private=porto-fuzzer
+  * container: keep in sync states and counter of running childs
+  * network: do not delete default network class and qdisc
+  * porto: add more hints about porto namespaces
+  * portoctl shell: forward tty if stdin is tty
+  * fuzzer: fix cleanup
+  * porto: always chdir back to root
+  * error: fix errno to mesage conversion
+  * container: map execve error EAGAIN as ResourceNotAvailable
+  * path: normalize paths in DirName and BaseName
+  * container: simplify resolv_conf configuration
+  * volume: add build_time
+  * fuzzer: simplify log grepping
+  * fuzzer: filter containers by prefix
+  * test: base version is 4.3.2
+  * test: ingnore resolv_conf changes
+  * property: add oom_kills
+  * test: silence fuzzer progress
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 25 Dec 2017 12:31:47 +0300
+
 yandex-porto (4.4.0) unstable; urgency=low
 
   * tests: move sudo inside
