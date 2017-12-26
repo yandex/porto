@@ -702,6 +702,7 @@ class Connection(object):
 
     def ReExportLayer(self, layer, tarball, place=None):
         request = rpc_pb2.TContainerRequest()
+        request.exportLayer.volume = ""
         request.exportLayer.layer = layer
         request.exportLayer.tarball = tarball
         if place is not None:
