@@ -26,7 +26,7 @@ message TCfg {
         optional string device_ceil = 27;
         optional string device_quantum = 18;
         optional string default_rate = 19;
-        optional string porto_rate = 20;
+        optional string default_ceil = 20;
         optional string container_rate = 21;
         optional string device_rate_burst = 22;
         optional string device_ceil_burst = 23;

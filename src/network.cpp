@@ -51,9 +51,9 @@ static TUintMap DeviceRateBurst;
 static TUintMap DeviceCeilBurst;
 static TUintMap DeviceQuantum;
 
-static TUintMap PortoRate;
+static TUintMap DefaultClassRate;
+static TUintMap DefaultClassCeil;
 
-static TUintMap DefaultRate;
 static TStringMap DefaultQdisc;
 static TUintMap DefaultQdiscLimit;
 static TUintMap DefaultQdiscQuantum;
@@ -257,11 +257,11 @@ void TNetwork::InitializeConfig() {
     if (config().network().has_device_rate())
         StringToUintMap(config().network().device_rate(), DeviceRate);
     if (config().network().has_device_ceil())
-        StringToUintMap(config().network().device_rate(), DeviceCeil);
+        StringToUintMap(config().network().device_ceil(), DeviceCeil);
     if (config().network().has_default_rate())
-        StringToUintMap(config().network().default_rate(), DefaultRate);
-    if (config().network().has_porto_rate())
-        StringToUintMap(config().network().porto_rate(), PortoRate);
+        StringToUintMap(config().network().default_rate(), DefaultClassRate);
+    if (config().network().has_default_ceil())
+        StringToUintMap(config().network().default_ceil(), DefaultClassCeil);
     if (config().network().has_container_rate())
         StringToUintMap(config().network().container_rate(), ContainerRate);
     if (config().network().has_device_quantum())
@@ -597,7 +597,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR);
     cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
     cls.Prio = NET_DEFAULT_PRIO;
-    cls.Rate = dev.Ceil;
+    cls.Rate = dev.Rate;
     cls.Ceil = dev.Ceil;
 
     error = cls.Create(*Nl);
@@ -608,8 +608,8 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
 
     cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
     cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
-    cls.Rate = dev.GetConfig(DefaultRate);
-    cls.Ceil = 0;
+    cls.Rate = dev.GetConfig(DefaultClassRate);
+    cls.Ceil = dev.GetConfig(DefaultClassCeil);
 
     error = cls.Create(*Nl);
     if (error) {
@@ -1054,8 +1054,6 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
 
     if (cfg.Handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
         cls.defRate = dev.Rate;
-    else if (cfg.Handle == TC_HANDLE(ROOT_TC_MAJOR, LEGACY_CONTAINER_ID))
-        cls.defRate = dev.GetConfig(PortoRate);
     else
         cls.defRate = dev.GetConfig(ContainerRate);
 
@@ -1086,9 +1084,9 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
     cls.Handle = cfg.Leaf;
 
     if (cfg.Leaf == TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR)) {
-        cls.Rate = dev.GetConfig(DefaultRate);
+        cls.Rate = dev.GetConfig(DefaultClassRate);
+        cls.Ceil = dev.GetConfig(DefaultClassCeil);
         cls.defRate = cls.Rate;
-        cls.Ceil = 0;
 
         ctq.Handle = TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR);
         ctq.Kind = dev.GetConfig(DefaultQdisc);
