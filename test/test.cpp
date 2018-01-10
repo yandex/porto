@@ -36,33 +36,11 @@ std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
         return std::cerr << "- ";
 }
 
-void ExpectReturn(int ret, int exp, const char *where) {
-    if (ret == exp)
-        return;
-    throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + where);
-}
-
-void ExpectApi(Porto::Connection &api, int ret, int exp, const char *where) {
-    std::stringstream ss;
-
-    if (ret == exp)
-        return;
-
-    int err;
-    std::string msg;
-    api.GetLastError(err, msg);
-    TError error((rpc::EError)err, msg);
-    ss << "Got error from libporto: " << error << " (" << ret << " != " << exp << ") at " << where;
-
-    throw ss.str();
-}
-
 int ReadPid(const std::string &path) {
     int pid = 0;
 
     TError error = TPath(path).ReadInt(pid);
-    if (error)
-        throw error.ToString();
+    ExpectOk(error);
 
     return pid;
 }
@@ -89,7 +67,7 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
 
 int Pgrep(const std::string &name) {
     vector<string> lines;
-    ExpectSuccess(Popen("pgrep -x " + name + " || true", lines));
+    ExpectOk(Popen("pgrep -x " + name + " || true", lines));
     return lines.size();
 }
 
@@ -123,7 +101,7 @@ void WaitProcessExit(const std::string &pid, int sec) {
     } while (kill(pidVal, 0) == 0);
 
     if (times <= 0)
-        throw std::string("Waited too long for process to exit");
+        Fail("Waited too long for process to exit");
 }
 
 void WaitContainer(Porto::Connection &api, const std::string &name, int sec) {
@@ -148,7 +126,7 @@ void WaitState(Porto::Connection &api, const std::string &name, const std::strin
     } while (ret != state);
 
     if (times <= 0)
-        throw std::string("Waited too long for task to change state");
+        Fail("Waited too long for task to change state");
 }
 
 void WaitPortod(Porto::Connection &api, int times) {
@@ -164,7 +142,7 @@ void WaitPortod(Porto::Connection &api, int times) {
     } while (api.List(clist) != 0);
 
     if (times <= 0)
-        throw std::string("Waited too long for portod startup");
+        Fail("Waited too long for portod startup");
 }
 
 std::string ReadLink(const std::string &path) {
@@ -172,8 +150,7 @@ std::string ReadLink(const std::string &path) {
 
     TPath f(path);
     TError error = f.ReadLink(lnk);
-    if (error)
-        throw error.ToString();
+    ExpectOk(error);
 
     return lnk.ToString();
 }
@@ -194,8 +171,7 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
     std::map<std::string, std::string> cgmap;
     std::vector<std::string> lines;
     TError error = TPath("/proc/" + pid + "/cgroup").ReadLines(lines);
-    if (error)
-        throw std::string("Can't get cgroups: " + error.ToString());
+    ExpectOk(error);
 
     for (auto l : lines) {
         auto tokens = SplitString(l, ':', 3);
@@ -232,7 +208,7 @@ std::string GetState(const std::string &pid) {
     if (name != "State:") {
         if (kill(stoi(pid), 0))
             return "X";
-        throw std::string("PARSING ERROR");
+        Fail("PARSING ERROR");
     }
 
     return state;
@@ -245,7 +221,7 @@ uint64_t GetCap(const std::string &pid, const std::string &type) {
     if (fields[0] == type)
         return stoull(fields[1], nullptr, 16);
 
-    throw std::string("PARSING ERROR");
+    Fail("PARSING ERROR");
 }
 
 void GetUidGid(const std::string &pid, int &uid, int &gid) {
@@ -261,7 +237,7 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
     ssuid >> fsuid;
 
     if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
-        throw std::string("Invalid uid");
+        Fail("Invalid uid");
 
     std::string stgid = GetStatusLine(pid, "Gid:");
     std::stringstream ssgid(stgid);
@@ -274,13 +250,13 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
     ssgid >> fsgid;
 
     if (name != "Gid:" || gid != egid || egid != sgid || sgid != fsgid)
-        throw std::string("Invalid gid");
+        Fail("Invalid gid");
 }
 
 std::string GetEnv(const std::string &pid) {
     std::string env;
-    if (TPath("/proc/" + pid + "/environ").ReadAll(env))
-        throw std::string("Can't get environment");
+    TError error = TPath("/proc/" + pid + "/environ").ReadAll(env);
+    ExpectOk(error);
 
     return env;
 }
@@ -299,21 +275,21 @@ std::string CgRoot(const std::string &subsystem, const std::string &name) {
 
 std::string GetFreezer(const std::string &name) {
     std::string state;
-    if (TPath(CgRoot("freezer", name) + "freezer.state").ReadAll(state))
-        throw std::string("Can't get freezer");
+    TError error = TPath(CgRoot("freezer", name) + "freezer.state").ReadAll(state);
+    ExpectOk(error);
     return state;
 }
 
 void SetFreezer(const std::string &name, const std::string &state) {
-    if (TPath(CgRoot("freezer", name) + "freezer.state").WriteAll(state))
-        throw std::string("Can't set freezer");
+    TError error = TPath(CgRoot("freezer", name) + "freezer.state").WriteAll(state);
+    ExpectOk(error);
 
     int retries = 1000000;
     while (retries--)
         if (GetFreezer(name) == state + "\n")
             return;
 
-    throw std::string("Can't set freezer state to ") + state;
+    Fail("Can't set freezer state");
 }
 
 std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob) {
@@ -339,7 +315,7 @@ int GetVmRss(const std::string &pid) {
     ss>> unit;
 
     if (name != "VmRSS:")
-        throw std::string("PARSING ERROR");
+        Fail("PARSING ERROR");
 
     return std::stoi(size);
 }
@@ -358,8 +334,8 @@ int WordCount(const std::string &path, const std::string &word) {
     int nr = 0;
 
     std::vector<std::string> lines;
-    if (TPath(path).ReadLines(lines, 1 << 30))
-        throw "Can't read log " + path;
+    TError error = TPath(path).ReadLines(lines, 1 << 30);
+    ExpectOk(error);
 
     for (auto s : lines) {
         if (s.find(word) != std::string::npos)
@@ -379,16 +355,13 @@ void InitUsersAndGroups() {
     InitPortoCgroups();
 
     error = Nobody.Load("nobody");
-    if (error)
-        throw error.ToString();
+    ExpectOk(error);
 
     error = Alice.Load("porto-alice");
-    if (error)
-        throw error.ToString();
+    ExpectOk(error);
 
     error = Bob.Load("porto-bob");
-    if (error)
-        throw error.ToString();
+    ExpectOk(error);
 
     ExpectNeq(Alice.Uid, Bob.Uid);
     ExpectNeq(Alice.Gid, Bob.Gid);
@@ -431,7 +404,7 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
         (void)path.RemoveAll();
 
     vector<string> lines;
-    ExpectSuccess(Popen("ldd " + cmd, lines));
+    ExpectOk(Popen("ldd " + cmd, lines));
 
     for (auto &line : lines) {
         auto tokens = SplitString(line, ' ');
@@ -456,8 +429,7 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
         TPath dest = path / from.DirName();
         if (!dest.Exists()) {
             error = dest.MkdirAll(0755);
-            if (error)
-                throw error.ToString();
+            ExpectOk(error);
         }
 
         Expect(system(("cp " + from.ToString() + " " + dest.ToString() + "/" + name).c_str()) == 0);
@@ -483,7 +455,7 @@ bool NetworkEnabled() {
 
 static size_t ChildrenNum(int pid) {
     vector<string> lines;
-    ExpectSuccess(Popen("pgrep -P " + std::to_string(pid) + " || true", lines));
+    ExpectOk(Popen("pgrep -P " + std::to_string(pid) + " || true", lines));
     return lines.size();
 }
 
@@ -612,8 +584,7 @@ static bool IsCfqActive() {
         std::string data;
 
         TError error = TPath("/sys/block/" + d + "/queue/scheduler").ReadAll(data);
-        if (error)
-            throw error.ToString();
+        ExpectOk(error);
         bool cfqEnabled = false;
         for (auto t : SplitString(data, ' ')) {
             if (t == std::string("[cfq]"))
@@ -668,69 +639,5 @@ void InitKernelFeatures() {
         (KernelSupports(KernelFeature::MAX_RSS) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  CFQ" <<
         (KernelSupports(KernelFeature::CFQ) ? "yes" : "no") << std::endl;
-}
-
-template<typename T>
-static inline void ExpectEqTemplate(T ret, T exp, const char *where) {
-    if (ret != exp) {
-        Say() << "Unexpected " << ret << " != " << exp << " at " << where << std::endl;
-        abort();
-    }
-}
-
-template<typename T>
-static inline void ExpectNeqTemplate(T ret, T exp, const char *where) {
-    if (ret == exp) {
-        Say() << "Unexpected " << ret << " == " << exp << " at " << where << std::endl;
-        abort();
-    }
-}
-
-template<typename T>
-static inline void ExpectLessTemplate(T ret, T exp, const char *where) {
-    if (ret >= exp) {
-        Say() << "Unexpected " << ret << " >= " << exp << " at " << where << std::endl;
-        abort();
-    }
-}
-
-template<typename T>
-static inline void ExpectLessEqTemplate(T ret, T exp, const char *where) {
-    if (ret > exp) {
-        Say() << "Unexpected " << ret << " > " << exp << " at " << where << std::endl;
-        abort();
-    }
-}
-
-void _ExpectEq(size_t ret, size_t exp, const char *where) {
-    ExpectEqTemplate(ret, exp, where);
-}
-
-void _ExpectEq(const std::string &ret, const std::string &exp, const char *where) {
-    ExpectEqTemplate(ret, exp, where);
-}
-
-void _ExpectNeq(size_t ret, size_t exp, const char *where) {
-    ExpectNeqTemplate(ret, exp, where);
-}
-
-void _ExpectNeq(const std::string &ret, const std::string &exp, const char *where) {
-    ExpectNeqTemplate(ret, exp, where);
-}
-
-void _ExpectLess(size_t ret, size_t exp, const char *where) {
-    ExpectLessTemplate(ret, exp, where);
-}
-
-void _ExpectLess(const std::string &ret, const std::string &exp, const char *where) {
-    ExpectLessTemplate(ret, exp, where);
-}
-
-void _ExpectLessEq(size_t ret, size_t exp, const char *where) {
-    ExpectLessEqTemplate(ret, exp, where);
-}
-
-void _ExpectLessEq(const std::string &ret, const std::string &exp, const char *where) {
-    ExpectLessEqTemplate(ret, exp, where);
 }
 }

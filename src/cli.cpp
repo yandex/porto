@@ -284,23 +284,10 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
         return EXIT_SUCCESS;
     }
 
-    int ret = EXIT_FAILURE;
-    try {
-        // Skip program name and command name to build
-        // a list of command arguments.
-        const std::vector<std::string> commandArgs(argv + 2, argv + argc);
-        ret = TryExec(name, commandArgs);
-    } catch (const std::exception &exc) {
-        std::cerr << exc.what() << std::endl;
-    } catch (const string &err) {
-        std::cerr << err << std::endl;
-    } catch (const char *err) {
-        std::cerr << err << std::endl;
-    } catch (...) {
-        std::cerr << "Got unknown error" << std::endl;
-    }
-
-    return ret;
+    // Skip program name and command name to build
+    // a list of command arguments.
+    const std::vector<std::string> commandArgs(argv + 2, argv + argc);
+    return TryExec(name, commandArgs);
 }
 
 void TCommandHandler::Usage(const char *command) {

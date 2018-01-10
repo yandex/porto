@@ -55,42 +55,28 @@ public:
     }
 
     void WorkerFn(const std::string &name) {
-        try {
-            SetProcessName(name);
-            auto lock = ScopedLock();
-            while (Valid) {
-                if (Queue.empty())
-                    Wait(lock);
+        SetProcessName(name);
+        auto lock = ScopedLock();
+        while (Valid) {
+            if (Queue.empty())
+                Wait(lock);
 
-                while (Valid && !Queue.empty()) {
-                    T request = Top();
-                    Queue.pop();
+            while (Valid && !Queue.empty()) {
+                T request = Top();
+                Queue.pop();
 
-                    size_t seq = Seq;
-                    lock.unlock();
-                    bool handled = Handle(request);
-                    lock.lock();
-                    bool haveNewData = seq != Seq;
+                size_t seq = Seq;
+                lock.unlock();
+                bool handled = Handle(request);
+                lock.lock();
+                bool haveNewData = seq != Seq;
 
-                    if (!handled) {
-                        Queue.push(request);
-                        if (!haveNewData)
-                            Wait(lock);
-                    }
+                if (!handled) {
+                    Queue.push(request);
+                    if (!haveNewData)
+                        Wait(lock);
                 }
             }
-        } catch (std::string s) {
-            L_ERR("EXCEPTION: {}", s);
-            Crash();
-        } catch (const char *s) {
-            L_ERR("EXCEPTION: {}", s);
-            Crash();
-        } catch (const std::exception &exc) {
-            L_ERR("EXCEPTION: {}", exc.what());
-            Crash();
-        } catch (...) {
-            L_ERR("EXCEPTION: uncaught exception!");
-            Crash();
         }
     }
 

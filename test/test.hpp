@@ -4,6 +4,8 @@
 #include <string>
 #include <atomic>
 
+#include "fmt/format.h"
+
 #include "libporto.hpp"
 #include "util/cred.hpp"
 #include "util/path.hpp"
@@ -20,8 +22,6 @@ namespace test {
     extern std::vector<std::shared_ptr<TNlLink>> links;
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
-    void ExpectReturn(int ret, int exp, const char *func);
-    void ExpectApi(Porto::Connection &api, int ret, int exp, const char *where);
 
     int ReadPid(const std::string &path);
     int Pgrep(const std::string &name);
@@ -87,34 +87,17 @@ namespace test {
     void InitKernelFeatures();
     bool KernelSupports(const KernelFeature &feature);
 
-    void _ExpectEq(size_t ret, size_t exp, const char *where);
-    void _ExpectEq(const std::string &ret, const std::string &exp,
-                   const char *where);
-    void _ExpectNeq(size_t ret, size_t exp, const char *where);
-    void _ExpectNeq(const std::string &ret, const std::string &exp,
-                    const char *where);
-    void _ExpectLess(size_t ret, size_t exp, const char *where);
-    void _ExpectLess(const std::string &ret, const std::string &exp,
-                     const char *where);
-    void _ExpectLessEq(size_t ret, size_t exp, const char *where);
-    void _ExpectLessEq(const std::string &ret, const std::string &exp,
-                       const char *where);
-
     TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 }
 
 #define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define WHERE __FILE__ ":" TOSTRING(__LINE__)
-
-#define Expect(ret) ExpectReturn(ret, true, WHERE)
-
-#define ExpectSuccess(ret) do { if (ret) throw "Unexpected error: " + ret.ToString() + " " + WHERE; } while(0)
-
-#define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, WHERE)
-#define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, WHERE)
-
-#define ExpectEq(ret, exp) _ExpectEq(ret, exp, WHERE)
-#define ExpectNeq(ret, exp) _ExpectNeq(ret, exp, WHERE)
-#define ExpectLess(ret, exp) _ExpectLess(ret, exp, WHERE)
-#define ExpectLessEq(ret, exp) _ExpectLessEq(ret, exp, WHERE)
+#define Fail(arg) do { fmt::print(stderr, "FAIL {} at {}:{}", (arg), __FILE__, __LINE__); std::abort(); } while(0)
+#define ExpectOp(a, op, b) do { auto __a = (a); auto __b = (b); if (!(__a op __b)) { fmt::print(stderr, "FAIL {} ({}) {} {} ({}) at {}:{}", STRINGIFY(a), __a, STRINGIFY(op), STRINGIFY(b), __b, __FILE__, __LINE__); std::abort(); } } while(0)
+#define ExpectOk(error) do { if (error) Fail(error); } while(0)
+#define ExpectApiSuccess(ret) do { if (ret) Fail(api.TextError()); } while (0)
+#define ExpectApiFailure(ret, exp) do { if ( (ret) != (exp) ) Fail(api.TextError()); } while (0)
+#define Expect(a) ExpectOp((bool)(a), ==, true)
+#define ExpectEq(a, b) ExpectOp(a, ==, b)
+#define ExpectNeq(a, b) ExpectOp(a, !=, b)
+#define ExpectLessEq(a, b) ExpectOp(a, <=, b)
+#define ExpectState(api, name, state) do { std::string __state; if (api.GetData(name, "state", __state)) Fail(api.TextError()); ExpectEq(__state, state); } while (0)

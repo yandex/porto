@@ -60,14 +60,8 @@ static int TestConnectivity() {
 
 int main(int argc, char *argv[])
 {
-    if (argc == 2 && !strcmp(argv[1], "connectivity")) {
-        try {
-            return TestConnectivity();
-        } catch (...) {
-            std::cerr << "Test connectivity failed" << std::endl;
-            return EXIT_FAILURE;
-        }
-    }
+    if (argc == 2 && !strcmp(argv[1], "connectivity"))
+        return TestConnectivity();
 
     // in case client closes pipe we are writing to in the protobuf code
     Signal(SIGPIPE, SIG_IGN);
@@ -87,37 +81,27 @@ int main(int argc, char *argv[])
         }
     }
 
-    try {
-        config.Load();
+    config.Load();
 
-        test::InitUsersAndGroups();
+    test::InitUsersAndGroups();
 
-        auto nl = std::make_shared<TNl>();
-        TError error = nl->Connect();
-        if (error)
-            throw error.ToString();
+    auto nl = std::make_shared<TNl>();
+    TError error = nl->Connect();
+    if (error)
+        return EXIT_FAILURE;
 
-        error = nl->OpenLinks(test::links, false);
-        if (error)
-            throw error.ToString();
+    error = nl->OpenLinks(test::links, false);
+    if (error)
+        return EXIT_FAILURE;
 
-        test::InitKernelFeatures();
+    test::InitKernelFeatures();
 
-        string what = "";
-        if (argc >= 2)
-            what = argv[1];
+    string what = "";
+    if (argc >= 2)
+        what = argv[1];
 
-        if (what == "stress")
-            return Stresstest(argc - 2, argv + 2);
-        else
-            return Selftest(argc - 1, argv + 1);
-    } catch (string err) {
-        std::cerr << "Exception: " << err << std::endl;
-    } catch (const std::exception &exc) {
-        std::cerr << "Exception: " << exc.what() << std::endl;
-    } catch (...) {
-        std::cerr << "Unknown exception" << std::endl;
-    }
+    if (what == "stress")
+        return Stresstest(argc - 2, argv + 2);
 
-    return EXIT_FAILURE;
+    return Selftest(argc - 1, argv + 1);
 }

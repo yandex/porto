@@ -4,11 +4,7 @@
 #include "version.hpp"
 
 static double ParseNumber(const std::string &str) {
-    try {
-        return stod(str);
-    } catch (...) {
-        return NAN;
-    }
+    return strtod(str.c_str(), nullptr);
 }
 
 static double ParseValue(const std::string &value, bool map) {
@@ -942,12 +938,11 @@ bool TPortoTop::AddColumn(std::string title, std::string signal,
             case ' ':
                 break;
             default:
-                try {
-                    size_t tmp;
-                    multiplier = stod(signal.substr(off), &tmp);
-                    off += tmp - 1;
+                {
+                    char *endp;
+                    multiplier = strtod(signal.c_str() + off, &endp);
+                    off = endp - signal.c_str();
                     flags |= ValueFlags::Multiplier;
-                } catch (...) {
                 }
                 break;
             }

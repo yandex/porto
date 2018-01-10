@@ -406,6 +406,10 @@ void Connection::GetLastError(int &error, std::string &msg) const {
     msg = Impl->LastErrorMsg;
 }
 
+std::string Connection::TextError() const {
+    return rpc::EError_Name((EError)Impl->LastError) + ":" + Impl->LastErrorMsg;
+}
+
 int Connection::ListVolumeProperties(std::vector<Property> &list) {
     Impl->Req.mutable_listvolumeproperties();
 

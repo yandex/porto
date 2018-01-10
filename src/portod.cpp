@@ -1357,23 +1357,7 @@ static int PortodMain() {
         PORTO_ASSERT(ret == STDERR_FILENO);
     }
 
-    try {
-        return PortodMaster();
-    } catch (std::string s) {
-        L_ERR("EXCEPTION: {}", s);
-        Crash();
-    } catch (const char *s) {
-        L_ERR("EXCEPTION: {}", s);
-        Crash();
-    } catch (const std::exception &exc) {
-        L_ERR("EXCEPTION: {}", exc.what());
-        Crash();
-    } catch (...) {
-        L_ERR("EXCEPTION: uncaught exception!");
-        Crash();
-    }
-
-    return EXIT_FAILURE;
+    return PortodMaster();
 }
 
 static int StartPortod() {

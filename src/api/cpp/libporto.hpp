@@ -102,6 +102,7 @@ public:
 
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
+    std::string TextError() const;
 
     int ListVolumeProperties(std::vector<Property> &list);
     int CreateVolume(const std::string &path,

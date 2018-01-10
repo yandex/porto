@@ -52,14 +52,6 @@ static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"ut
 
 static int LeakConainersNr = 1000;
 
-#define ExpectState(api, name, state) _ExpectState(api, name, state, "somewhere")
-void _ExpectState(Porto::Connection &api, const std::string &name, const std::string &state,
-                  const char *where) {
-    std::string v;
-    ExpectApi(api, api.GetData(name, "state", v), 0, where);
-    _ExpectEq(v, state, where);
-}
-
 static std::string StartWaitAndGetData(Porto::Connection &api, const std::string &name, const std::string &data) {
     string v;
     ExpectApiSuccess(api.Start(name));
@@ -73,11 +65,11 @@ static void RemakeDir(Porto::Connection &api, const TPath &path) {
         bool drop = geteuid() != 0;
         if (drop)
             AsRoot(api);
-        ExpectSuccess(path.RemoveAll());
+        ExpectOk(path.RemoveAll());
         if (drop)
             AsAlice(api);
     }
-    ExpectSuccess(path.MkdirAll(0755));
+    ExpectOk(path.MkdirAll(0755));
 }
 
 static void ExpectCorrectCgroups(const string &pid, const string &name, const string &name2) {
@@ -249,14 +241,14 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const string &nam
 
     int intval;
     ExpectApiSuccess(api.GetData(name, "minor_faults", v));
-    ExpectSuccess(StringToInt(v, intval));
+    ExpectOk(StringToInt(v, intval));
     Expect(intval > 0);
     ExpectApiSuccess(api.GetData(name, "major_faults", v));
-    ExpectSuccess(StringToInt(v, intval));
+    ExpectOk(StringToInt(v, intval));
     Expect(intval >= 0);
     if (KernelSupports(KernelFeature::MAX_RSS)) {
         ExpectApiSuccess(api.GetData(name, "max_rss", v));
-        ExpectSuccess(StringToInt(v, intval));
+        ExpectOk(StringToInt(v, intval));
         Expect(intval >= 0);
     }
 
@@ -1541,8 +1533,8 @@ static void TestStdPathProperty(Porto::Connection &api) {
     (void)stdoutPath.Unlink();
     (void)stderrPath.Unlink();
 
-    ExpectSuccess(stdinPath.Mkfile(0600));
-    ExpectSuccess(stdinPath.WriteAll("hi"));
+    ExpectOk(stdinPath.Mkfile(0600));
+    ExpectOk(stdinPath.WriteAll("hi"));
 
     ExpectApiSuccess(api.SetProperty(name, "stdin_path", "/tmp/a_stdin"));
     ExpectApiSuccess(api.SetProperty(name, "stdout_path", "/tmp/a_stdout"));
@@ -1573,9 +1565,9 @@ static void TestStdPathProperty(Porto::Connection &api) {
     Expect(stdoutPath.Exists());
     Expect(stderrPath.Exists());
 
-    ExpectSuccess(stdinPath.Unlink());
-    ExpectSuccess(stdoutPath.Unlink());
-    ExpectSuccess(stderrPath.Unlink());
+    ExpectOk(stdinPath.Unlink());
+    ExpectOk(stdoutPath.Unlink());
+    ExpectOk(stderrPath.Unlink());
 }
 
 struct TMountInfo {
@@ -1588,8 +1580,7 @@ static map<string, TMountInfo> ParseMountinfo(std::vector<std::string> lines) {
 
     for (auto &line : lines) {
         auto tok = SplitString(line, ' ');
-        if (tok.size() <= 5)
-            throw string("Invalid mount: ") + line;
+        ExpectOp(tok.size(), >, 5);
 
         TMountInfo i;
         i.flags = tok[5];
@@ -1803,8 +1794,7 @@ static void TestRootProperty(Porto::Connection &api) {
     AsRoot(api);
     if (f.Exists()) {
         TError error = f.RemoveAll();
-        if (error)
-            throw error.ToString();
+        ExpectOk(error);
     }
     AsAlice(api);
 
@@ -1936,9 +1926,9 @@ static void TestHostnameProperty(Porto::Connection &api) {
     RemakeDir(api, path);
 
     AsRoot(api);
-    ExpectSuccess(path.Mount(name, "tmpfs", 0, {"size=32m"}));
-    ExpectSuccess(TPath(path + "/etc").Mkdir(0755));
-    ExpectSuccess(TPath(path + "/etc/hostname").Mkfile(0644));
+    ExpectOk(path.Mount(name, "tmpfs", 0, {"size=32m"}));
+    ExpectOk(TPath(path + "/etc").Mkdir(0755));
+    ExpectOk(TPath(path + "/etc/hostname").Mkfile(0644));
     BootstrapCommand("/bin/hostname", path, false);
     BootstrapCommand("/bin/sleep", path, false);
     BootstrapCommand("/bin/cat", path, false);
@@ -2001,7 +1991,7 @@ static void TestHostnameProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 
     AsRoot(api);
-    ExpectSuccess(path.Umount(0));
+    ExpectOk(path.Umount(0));
     AsAlice(api);
 }
 
@@ -2020,12 +2010,10 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
     map<string, LinkInfo> ret;
     for (auto &ipline : iplines) {
         auto lines = SplitString(ipline, '\\');
-        if (lines.size() < 2)
-            throw "Invalid interface: " + ipline;
+        ExpectOp(lines.size(), >, 1);
 
         auto tokens = SplitString(lines[0], ':');
-        if (tokens.size() < 2)
-            throw "Invalid line 1: " + lines[0];
+        ExpectOp(tokens.size(), >, 1);
 
         string fulliface = StringTrim(tokens[1]);
         string flags = StringTrim(tokens[2]);
@@ -2056,8 +2044,7 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
         string iface = StringTrim(tokens[0]);
 
         tokens = SplitString(StringTrim(lines[1]), ' ');
-        if (tokens.size() < 2)
-            throw "Invalid line 2: " + lines[1];
+        ExpectOp(tokens.size(), >, 1);
 
         string hw = StringTrim(tokens[1]);
 
@@ -2088,7 +2075,7 @@ static bool ShareMacAddress(const vector<string> &a, const vector<string> &b) {
 static string System(const std::string &cmd) {
     Say() << cmd << std::endl;
     vector<string> lines;
-    ExpectSuccess(Popen(cmd, lines));
+    ExpectOk(Popen(cmd, lines));
     ExpectEq(lines.size(), 1);
     return StringTrim(lines[0]);
 }
@@ -2188,7 +2175,7 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiFailure(api.SetProperty(name, "net_tos", "1"), EError::NotSupported);
 
     vector<string> hostLink;
-    ExpectSuccess(Popen("ip -o link show", hostLink));
+    ExpectOk(Popen("ip -o link show", hostLink));
 
     string link = links[0]->GetName();
 
@@ -2331,11 +2318,11 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o link show'"));
 
     vector<string> v;
-    ExpectSuccess(Popen("ip -o link show", v));
+    ExpectOk(Popen("ip -o link show", v));
     auto pre = IfHw(v);
     ExpectApiSuccess(api.Start(name));
     v.clear();
-    ExpectSuccess(Popen("ip -o link show", v));
+    ExpectOk(Popen("ip -o link show", v));
     auto post = IfHw(v);
     ExpectEq(pre.size() + 1, post.size());
     for (auto kv : pre)
@@ -2357,7 +2344,7 @@ static void TestNetProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Stop(name));
 
     v.clear();
-    ExpectSuccess(Popen("ip -o link show", v));
+    ExpectOk(Popen("ip -o link show", v));
     post = IfHw(v);
     Expect(post.find("portobr0") != post.end());
     AsRoot(api);
@@ -2434,8 +2421,7 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
 
     int lastCap;
     TError error = TPath("/proc/sys/kernel/cap_last_cap").ReadInt(lastCap);
-    if (error)
-        throw error.ToString();
+    ExpectOk(error);
 
     //uint64_t allCap = (1ULL << (lastCap + 1)) - 1;
 
@@ -2849,21 +2835,21 @@ static void TestIdmap(Porto::Connection &) {
     int id;
 
     for (int i = 1; i <= 99; i++) {
-        ExpectSuccess(idmap.Get(id));
+        ExpectOk(idmap.Get(id));
         ExpectEq(id, i);
     }
 
     ExpectEq(idmap.Get(id).Error, EError::ResourceNotAvailable);
 
     for (int i = 1; i <= 99; i++)
-        ExpectSuccess(idmap.Put(i));
+        ExpectOk(idmap.Put(i));
 
-    ExpectSuccess(idmap.Get(id));
+    ExpectOk(idmap.Get(id));
     ExpectEq(id, 1);
 
-    ExpectSuccess(idmap.Put(1));
+    ExpectOk(idmap.Put(1));
 
-    ExpectSuccess(idmap.Get(id));
+    ExpectOk(idmap.Get(id));
     ExpectEq(id, 2);
 }
 
@@ -2873,17 +2859,17 @@ static void TestFormat(Porto::Connection &) {
     ExpectEq(StringFormat("%s %d", "a", 1), "a 1");
     ExpectEq(StringFormatSize(1), "1B");
     ExpectEq(StringFormatSize(1<<20), "1M");
-    ExpectSuccess(StringToSize("1", v));
+    ExpectOk(StringToSize("1", v));
     ExpectEq(v, 1);
-    ExpectSuccess(StringToSize("1kb", v));
+    ExpectOk(StringToSize("1kb", v));
     ExpectEq(v, 1<<10);
-    ExpectSuccess(StringToSize("1M", v));
+    ExpectOk(StringToSize("1M", v));
     ExpectEq(v, 1<<20);
-    ExpectSuccess(StringToSize("1 Gb", v));
+    ExpectOk(StringToSize("1 Gb", v));
     ExpectEq(v, 1ull<<30);
-    ExpectSuccess(StringToSize("1TiB", v));
+    ExpectOk(StringToSize("1TiB", v));
     ExpectEq(v, 1ull<<40);
-    ExpectSuccess(StringToSize("\t1\tPB\t", v));
+    ExpectOk(StringToSize("\t1\tPB\t", v));
     ExpectEq(v, 1ull<<50);
     Expect(!!StringToSize("", v));
     Expect(!!StringToSize("z", v));
@@ -3094,8 +3080,8 @@ static void ExpectLessEqLink(Porto::Connection &api, const std::string &name,
         int64_t i, ri;
         ExpectApiSuccess(api.GetProperty(name, data + "[" + link->GetName() + "]", v, Porto::GetFlags::Sync));
         ExpectApiSuccess(api.GetProperty("/", data + "[" + link->GetName() + "]", rv, Porto::GetFlags::Sync));
-        ExpectSuccess(StringToInt64(v, i));
-        ExpectSuccess(StringToInt64(rv, ri));
+        ExpectOk(StringToInt64(v, i));
+        ExpectOk(StringToInt64(rv, ri));
         ExpectLessEq(i, ri);
     }
 }
@@ -3174,8 +3160,8 @@ static void TestData(Porto::Connection &api) {
     ExpectNeq(v, "-1");
 
     uint64_t val;
-    ExpectSuccess(StringToUint64(v, val));
-    ExpectLess(val, 1024 * 1024);
+    ExpectOk(StringToUint64(v, val));
+    ExpectOp(val, <, 1024 * 1024);
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
@@ -3243,7 +3229,7 @@ static TUintMap ParseMap(const std::string &s) {
         std::string key = StringTrim(nameval[0]);
         uint64_t val;
 
-        ExpectSuccess(StringToUint64(nameval[1], val));
+        ExpectOk(StringToUint64(nameval[1], val));
 
         m[key] = val;
     }
@@ -3356,7 +3342,7 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
 
         uint64_t period, quota;
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", "/", "cpu.cfs_period_us"), period));
+        ExpectOk(StringToUint64(GetCgKnob("cpu", "/", "cpu.cfs_period_us"), period));
         long ncores = sysconf(_SC_NPROCESSORS_CONF);
 
         const uint64_t minQuota = 1 * 1000;
@@ -3366,7 +3352,7 @@ static void TestLimits(Porto::Connection &api) {
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "20"));
         ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
+        ExpectOk(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
         Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
 
         Expect(quota < half);
@@ -3375,7 +3361,7 @@ static void TestLimits(Porto::Connection &api) {
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "80"));
         ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
+        ExpectOk(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
         Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
         Expect(quota > half);
         Expect(quota > minQuota);
@@ -3397,19 +3383,19 @@ static void TestLimits(Porto::Connection &api) {
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
         ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+        ExpectOk(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
         ExpectEq(shares, 1024);
         ExpectApiSuccess(api.Stop(name));
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1c"));
         ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+        ExpectOk(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
         ExpectEq(shares, 1024 + 1024);
         ExpectApiSuccess(api.Stop(name));
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0.5c"));
         ExpectApiSuccess(api.Start(name));
-        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+        ExpectOk(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
         ExpectEq(shares, 1024 + 512);
         ExpectApiSuccess(api.Stop(name));
 
@@ -3475,7 +3461,7 @@ static void TestLimits(Porto::Connection &api) {
         i = 0;
         for (auto &link : links) {
             TNlClass tclass(link->GetIndex(), -1, handle);
-            ExpectSuccess(tclass.Load(*link->GetNl()));
+            ExpectOk(tclass.Load(*link->GetNl()));
             ExpectEq(tclass.Rate, netGuarantee + i);
             ExpectEq(tclass.Ceil, netCeil + i);
 
@@ -4074,8 +4060,8 @@ static void TestLeaks(Porto::Connection &api) {
     int perct = 64;
     uint64_t time;
 
-    ExpectSuccess(TPath(PORTO_PIDFILE).ReadAll(slavePid));
-    ExpectSuccess(TPath(PORTO_MASTER_PIDFILE).ReadAll(masterPid));
+    ExpectOk(TPath(PORTO_PIDFILE).ReadAll(slavePid));
+    ExpectOk(TPath(PORTO_MASTER_PIDFILE).ReadAll(masterPid));
 
     int initSlave = GetVmRss(slavePid);
     int initMaster = GetVmRss(masterPid);
@@ -4235,8 +4221,7 @@ static void CleanupVolume(Porto::Connection &api, const std::string &path) {
     TPath dir(path);
     if (dir.Exists()) {
         TError error = dir.RemoveAll();
-        if (error)
-            throw error.ToString();
+        ExpectOk(error);
     }
     AsAlice(api);
 }
@@ -4257,7 +4242,7 @@ static void TestVolumeHolder(Porto::Connection &api) {
     TPath aPath(a);
     ExpectEq(aPath.Exists(), false);
 
-    ExpectSuccess(aPath.Mkdir(0775));
+    ExpectOk(aPath.Mkdir(0775));
 
     Say() << "Create volume A" << std::endl;
     ExpectApiSuccess(api.CreateVolume(a, prop_default));
@@ -4365,7 +4350,7 @@ static void TestVolumeImpl(Porto::Connection &api) {
     Say() << "Make mountpoint is created" << std::endl;
 
     vector<string> v;
-    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    ExpectOk(Popen("cat /proc/self/mountinfo", v));
     auto m = ParseMountinfo(v);
     Expect(m.find(a) != m.end());
     Expect(m.find(b) != m.end());
@@ -4388,7 +4373,7 @@ static void TestVolumeImpl(Porto::Connection &api) {
         off_t mistake = 1 * 1024 * 1024;
 
         struct stat st;
-        ExpectSuccess(loopFile.StatStrict(st));
+        ExpectOk(loopFile.StatStrict(st));
         Expect(st.st_size > expected - mistake && st.st_size < expected + mistake);
 
         Say() << "Make sure no loop device is created without quota" << std::endl;
@@ -4396,19 +4381,19 @@ static void TestVolumeImpl(Porto::Connection &api) {
     }
 
     /*
-    ExpectSuccess(StringToUint64(volumes[0].Properties["space_usage"], usage));
-    ExpectSuccess(StringToUint64(volumes[0].Properties["space_limit"], limit));
-    ExpectSuccess(StringToUint64(volumes[0].Properties["space_avail"], avail));
-    ExpectSuccess(StringToUint64(volumes[0].Properties["space_guarantee"], guarantee));
+    ExpectOk(StringToUint64(volumes[0].Properties["space_usage"], usage));
+    ExpectOk(StringToUint64(volumes[0].Properties["space_limit"], limit));
+    ExpectOk(StringToUint64(volumes[0].Properties["space_avail"], avail));
+    ExpectOk(StringToUint64(volumes[0].Properties["space_guarantee"], guarantee));
 
     Expect(limit == 104857600);
     Expect(usage + avail <= limit);
     Expect(usage + avail >= guarantee);
 
-    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_usage"], usage));
-    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_limit"], limit));
-    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_avail"], avail));
-    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_guarantee"], guarantee));
+    ExpectOk(StringToUint64(volumes[0].Properties["inode_usage"], usage));
+    ExpectOk(StringToUint64(volumes[0].Properties["inode_limit"], limit));
+    ExpectOk(StringToUint64(volumes[0].Properties["inode_avail"], avail));
+    ExpectOk(StringToUint64(volumes[0].Properties["inode_guarantee"], guarantee));
 
     Expect(limit == 100);
     Expect(usage + avail <= limit);
@@ -4428,7 +4413,7 @@ static void TestSigPipe(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", before));
 
     int fd;
-    ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
+    ExpectOk(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
 
     rpc::TContainerRequest req;
     req.mutable_list();
@@ -4478,7 +4463,7 @@ static void CheckErrorCounters(Porto::Connection &api) {
 static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
     int pid = ReadPid(PORTO_MASTER_PIDFILE);
     if (kill(pid, sig))
-        throw "Can't send " + std::to_string(sig) + " to master";
+        Fail("Cannot kill portod-master");
     WaitProcessExit(std::to_string(pid));
     WaitPortod(api, times);
 
@@ -4494,7 +4479,7 @@ static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
 static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
     int portodPid = ReadPid(PORTO_PIDFILE);
     if (kill(portodPid, sig))
-        throw "Can't send " + std::to_string(sig) + " to slave";
+        Fail("Cannot kill portod");
     WaitProcessExit(std::to_string(portodPid));
     WaitPortod(api, times);
     expectedRespawns++;
@@ -4771,7 +4756,7 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
     AsRoot(api);
-    ExpectSuccess(TPath(CgRoot("memory", "/") + "cgroup.procs").WriteAll(pid));
+    ExpectOk(TPath(CgRoot("memory", "/") + "cgroup.procs").WriteAll(pid));
     auto cgmap = GetCgroups(pid);
     ExpectEq(cgmap["memory"], "/");
     KillSlave(api, SIGKILL);
@@ -4889,7 +4874,7 @@ static void TestRecovery(Porto::Connection &api) {
 static void TestVolumeFiles(Porto::Connection &, const std::string &path) {
     vector<string> v;
 
-    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    ExpectOk(Popen("cat /proc/self/mountinfo", v));
     auto m = ParseMountinfo(v);
     Expect(m.find(path) != m.end());
 }
@@ -4901,7 +4886,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
     std::map<std::string, std::string> prop_unlimit = {};
 
     CleanupVolume(api, a);
-    ExpectSuccess(TPath(a).Mkdir(0775));
+    ExpectOk(TPath(a).Mkdir(0775));
 
     std::vector<Porto::Volume> volumes;
     ExpectApiSuccess(api.ListVolumes(volumes));
@@ -4913,7 +4898,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
     TPath volume = TPath(PORTO_PLACE) / PORTO_VOLUMES / "leftover_volume";
     AsRoot(api);
     volume.RemoveAll();
-    ExpectSuccess(volume.Mkdir(0755));
+    ExpectOk(volume.Mkdir(0755));
     AsAlice(api);
 
     ExpectEq(volume.Exists(), true);
@@ -4930,7 +4915,7 @@ static void TestVolumeRecovery(Porto::Connection &api) {
     TestVolumeFiles(api, b);
 
     vector<string> v;
-    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    ExpectOk(Popen("cat /proc/self/mountinfo", v));
     auto m = ParseMountinfo(v);
     Expect(m.find(a) != m.end());
     Expect(m.find(b) != m.end());
@@ -4939,12 +4924,12 @@ static void TestVolumeRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.UnlinkVolume(b, ""));
 
     v.clear();
-    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    ExpectOk(Popen("cat /proc/self/mountinfo", v));
     m = ParseMountinfo(v);
     Expect(m.find(a) == m.end());
     Expect(m.find(b) == m.end());
 
-    ExpectSuccess(TPath(a).Rmdir());
+    ExpectOk(TPath(a).Rmdir());
     ExpectEq(TPath(b).Exists(), false);
 }
 
@@ -4955,12 +4940,12 @@ static void TestCgroups(Porto::Connection &api) {
 
     TPath freezerCg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
 
-    ExpectSuccess(freezerCg.MkdirAll(0755));
+    ExpectOk(freezerCg.MkdirAll(0755));
 
     KillSlave(api, SIGINT);
 
     ExpectEq(freezerCg.Exists(), true);
-    ExpectSuccess(freezerCg.Rmdir());
+    ExpectOk(freezerCg.Rmdir());
 
     Say() << "Make sure we can remove freezed cgroups" << std::endl;
 
@@ -4968,15 +4953,15 @@ static void TestCgroups(Porto::Connection &api) {
     TPath memoryCg = "/sys/fs/cgroup/memory/porto/asdf";
     TPath cpuCg = "/sys/fs/cgroup/cpu/porto/asdf";
 
-    ExpectSuccess(freezerCg.MkdirAll(0755));
-    ExpectSuccess(memoryCg.MkdirAll(0755));
-    ExpectSuccess(cpuCg.MkdirAll(0755));
+    ExpectOk(freezerCg.MkdirAll(0755));
+    ExpectOk(memoryCg.MkdirAll(0755));
+    ExpectOk(cpuCg.MkdirAll(0755));
 
     int pid = fork();
     if (pid == 0) {
-        ExpectSuccess(TPath(freezerCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
-        ExpectSuccess(TPath(memoryCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
-        ExpectSuccess(TPath(cpuCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
+        ExpectOk(TPath(freezerCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
+        ExpectOk(TPath(memoryCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
+        ExpectOk(TPath(cpuCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
         execlp("sleep", "sleep", "1000", nullptr);
         abort();
     }
@@ -5024,7 +5009,7 @@ static void TestBadClient(Porto::Connection &api) {
     int fd;
     string buf = "xyz";
     alarm(sec);
-    ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
+    ExpectOk(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
     int ret = write(fd, buf.c_str(), buf.length());
 
     Expect(ret > 0);
@@ -5067,7 +5052,7 @@ static void TestStdoutLimit(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
     ExpectApiSuccess(api.GetProperty(name, "stdout_limit", limitStr));
-    ExpectSuccess(StringToUint64(limitStr, limit));
+    ExpectOk(StringToUint64(limitStr, limit));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "dd if=/dev/zero bs=" + limitStr + " count=2"));
 
@@ -5077,7 +5062,7 @@ static void TestStdoutLimit(Porto::Connection &api) {
     usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
 
     TPath stdoutPath(cwd + "/" + v);
-    ExpectSuccess(stdoutPath.StatFollow(st));
+    ExpectOk(stdoutPath.StatFollow(st));
     ExpectLessEq(st.st_size, limit);
 
     ExpectApiSuccess(api.Stop(name));
@@ -5086,7 +5071,7 @@ static void TestStdoutLimit(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
 
     usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
-    ExpectSuccess(stdoutPath.StatFollow(st));
+    ExpectOk(stdoutPath.StatFollow(st));
     ExpectLessEq(st.st_size, 1<<20);
 
     ExpectApiSuccess(api.Destroy(name));
@@ -5099,14 +5084,9 @@ static void TestStats(Porto::Connection &api) {
     int errors = WordCount(PORTO_LOG, "ERR ");
     int warns = WordCount(PORTO_LOG, "WRN ");
 
-    if (respawns != loggedRespawns + expectedRespawns)
-        throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));
-
-    if (errors != loggedErrors + expectedErrors)
-        throw string("ERROR: Unexpected number of errors: " + std::to_string(errors));
-
-    if (warns != loggedWarns + expectedWarns)
-        throw string("ERROR: Unexpected number of warnings: " + std::to_string(warns));
+    ExpectEq(respawns, loggedRespawns + expectedRespawns);
+    ExpectEq(errors, loggedErrors + expectedErrors);
+    ExpectEq(warns, loggedWarns + expectedWarns);
 
     AsAlice(api);
 }
@@ -5225,28 +5205,21 @@ int SelfTest(std::vector<std::string> args) {
 
     InitUsersAndGroups();
 
-    try {
+    InitErrorCounters(api);
 
-        InitErrorCounters(api);
+    for (auto t : tests) {
+        if (except ^ (std::find(args.begin(), args.end(), t.first) == args.end()))
+            continue;
 
-        for (auto t : tests) {
-            if (except ^ (std::find(args.begin(), args.end(), t.first) == args.end()))
-                continue;
+        std::cerr << ">>> Testing " << t.first << "..." << std::endl;
+        AsAlice(api);
 
-            std::cerr << ">>> Testing " << t.first << "..." << std::endl;
-            AsAlice(api);
+        t.second(api);
 
-            t.second(api);
-
-            CheckErrorCounters(api);
-        }
-
-        AsRoot(api);
-    } catch (string e) {
-        std::cerr << "EXCEPTION: " << e << std::endl;
-        ret = EXIT_FAILURE;
-        goto exit;
+        CheckErrorCounters(api);
     }
+
+    AsRoot(api);
 
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
     if (!CanTestLimits())

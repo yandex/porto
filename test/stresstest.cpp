@@ -74,7 +74,7 @@ static void Create(Porto::Connection &api, const std::string &name, const std::s
         TPath f(cwd);
         if (!f.Exists()) {
             TError error = f.MkdirAll(0755);
-            ExpectSuccess(error);
+            ExpectOk(error);
         }
     }
 }
@@ -109,17 +109,15 @@ static void PauseResume(Porto::Connection &api, const std::string &name) {
         ExpectApiSuccess(api.GetData(name, "state", ret));
         if (ret == "dead")
             return;
-        else if (ret != "paused")
-            throw "Can't pause, invalid state " + ret;
+        else
+            ExpectEq(ret, "paused");
     }
     usleep(1000000);
     err = api.Resume(name);
     if (err) {
         ExpectApiSuccess(api.GetData(name, "state", ret));
-        if (ret == "dead" || ret == "running")
-            return;
-        else
-            throw "Can't resume, invalid state " + ret;
+        if (ret != "dead" && ret != "running")
+            Fail("Wrong state " + ret);
     }
 }
 
@@ -140,7 +138,7 @@ static void WaitDead(Porto::Connection &api, std::string name, std::string timeo
         usleep(1000000);
     }
     done++;
-    throw std::string("Timeout");
+    Fail("Wait timeout");
 }
 
 static void CheckStdout(Porto::Connection &api, std::string name, std::string stream) {
@@ -194,46 +192,42 @@ static void Tasks(int n, int iter) {
     tid = n;
     Say() << "Run task" << std::to_string(n) << std::endl;
     usleep(10000 * n);
-    try {
-        Porto::Connection api;
-        for (; iter; iter--) {
-            if (iter % 10 == 0)
-                Say() << std::to_string(iter) << " iterations left" << std::endl;
-            for (unsigned int t = 0; t < vtasks.size(); t++) {
-                std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
-                if (vtasks[t].find("name") != vtasks[t].end())
-                    name = vtasks[t]["name"];
 
-                std::string parent;
-                if (vtasks[t].find("parent") != vtasks[t].end()) {
-                    parent = vtasks[t]["parent"] + std::to_string(n) + "_" + std::to_string(t);
-                    name = parent + "/" + name;
-                }
+    Porto::Connection api;
+    for (; iter; iter--) {
+        if (iter % 10 == 0)
+            Say() << std::to_string(iter) << " iterations left" << std::endl;
+        for (unsigned int t = 0; t < vtasks.size(); t++) {
+            std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
+            if (vtasks[t].find("name") != vtasks[t].end())
+                name = vtasks[t]["name"];
 
-                if (parent.length())
-                    Create(api, parent, "");
-
-                std::string cwd = "/tmp/stresstest/" + name;
-                Create(api, name, cwd);
-                SetProperty(api, name, "env", vtasks[t]["env"]);
-                SetProperty(api, name, "command", vtasks[t]["command"]);
-                SetProperty(api, name, "cwd", cwd);
-                Start(api, name);
-                WaitDead(api, name, vtasks[t]["timeout"]);
-                CheckExit(api, name, vtasks[t]["exit_status"]);
-                CheckStdout(api, name, vtasks[t]["stdout"]);
-                CheckStderr(api, name, vtasks[t]["stderr"]);
-                Destroy(api, name, cwd);
-
-                if (parent.length())
-                    Destroy(api, parent, "");
+            std::string parent;
+            if (vtasks[t].find("parent") != vtasks[t].end()) {
+                parent = vtasks[t]["parent"] + std::to_string(n) + "_" + std::to_string(t);
+                name = parent + "/" + name;
             }
+
+            if (parent.length())
+                Create(api, parent, "");
+
+            std::string cwd = "/tmp/stresstest/" + name;
+            Create(api, name, cwd);
+            SetProperty(api, name, "env", vtasks[t]["env"]);
+            SetProperty(api, name, "command", vtasks[t]["command"]);
+            SetProperty(api, name, "cwd", cwd);
+            Start(api, name);
+            WaitDead(api, name, vtasks[t]["timeout"]);
+            CheckExit(api, name, vtasks[t]["exit_status"]);
+            CheckStdout(api, name, vtasks[t]["stdout"]);
+            CheckStderr(api, name, vtasks[t]["stderr"]);
+            Destroy(api, name, cwd);
+
+            if (parent.length())
+                Destroy(api, parent, "");
         }
-    } catch (std::string e) {
-        Say() << "ERROR: Exception " << e << std::endl;
-        Say() << "ERROR: Stop task" << std::to_string(n) << std::endl;
-        abort();
     }
+
     Say() << "Stop task" << std::to_string(n) << std::endl;
 }
 
@@ -264,27 +258,22 @@ int StressTest(int threads, int iter, bool killPorto) {
     if (threads < 0)
         threads = vtasks.size();
 
-    try {
-        (void)signal(SIGPIPE, SIG_IGN);
+    (void)signal(SIGPIPE, SIG_IGN);
 
-        config.Load();
-        Porto::Connection api;
+    config.Load();
+    Porto::Connection api;
 
-        for (i = 1; i <= threads; i++)
-            thrTasks.push_back(std::thread(Tasks, i, iter));
-        if (killPorto)
-            thrKill = std::thread(StressKill);
-        for (auto& th : thrTasks)
-            th.join();
-        done++;
-        if (killPorto)
-            thrKill.join();
+    for (i = 1; i <= threads; i++)
+        thrTasks.push_back(std::thread(Tasks, i, iter));
+    if (killPorto)
+        thrKill = std::thread(StressKill);
+    for (auto& th : thrTasks)
+        th.join();
+    done++;
+    if (killPorto)
+        thrKill.join();
 
-        TestDaemon(api);
-    } catch (std::string e) {
-        std::cerr << "ERROR: " << e << std::endl;
-        abort();
-    }
+    TestDaemon(api);
 
     std::cout << "Test completed!" << std::endl;
 

@@ -1135,97 +1135,83 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     rsp.set_error(EError::Unknown);
 
     TError error;
-    try {
-        if (!ValidRequest(req)) {
-            L_ERR("Invalid request {} from {}", req.ShortDebugString(), client->Id);
+    if (!ValidRequest(req)) {
+        L_ERR("Invalid request {} from {}", req.ShortDebugString(), client->Id);
             error = TError(EError::InvalidMethod, "invalid request");
-        } else if (req.has_create())
-            error = CreateContainer(req.create().name(), false);
-        else if (req.has_createweak())
-            error = CreateContainer(req.createweak().name(), true);
-        else if (req.has_destroy())
-            error = DestroyContainer(req.destroy());
-        else if (req.has_list())
-            error = ListContainers(req.list(), rsp);
-        else if (req.has_getproperty())
-            error = GetContainerProperty(req.getproperty(), rsp);
-        else if (req.has_setproperty())
-            error = SetContainerProperty(req.setproperty());
-        else if (req.has_getdata())
-            error = GetContainerData(req.getdata(), rsp);
-        else if (req.has_get())
-            error = GetContainerCombined(req.get(), rsp);
-        else if (req.has_start())
-            error = StartContainer(req.start());
-        else if (req.has_stop())
-            error = StopContainer(req.stop());
-        else if (req.has_pause())
-            error = PauseContainer(req.pause());
-        else if (req.has_resume())
-            error = ResumeContainer(req.resume());
-        else if (req.has_propertylist())
-            error = ListProperty(rsp);
-        else if (req.has_datalist())
-            error = ListData(rsp);
-        else if (req.has_kill())
-            error = Kill(req.kill());
-        else if (req.has_version())
-            error = Version(rsp);
-        else if (req.has_wait())
-            error = Wait(req.wait(), rsp, client);
-        else if (req.has_listvolumeproperties())
-            error = ListVolumeProperties(rsp);
-        else if (req.has_createvolume())
-            error = CreateVolume(req.createvolume(), rsp);
-        else if (req.has_linkvolume())
-            error = LinkVolume(req.linkvolume());
-        else if (req.has_unlinkvolume())
-            error = UnlinkVolume(req.unlinkvolume());
-        else if (req.has_listvolumes())
-            error = ListVolumes(req.listvolumes(), rsp);
-        else if (req.has_tunevolume())
-            error = TuneVolume(req.tunevolume());
-        else if (req.has_importlayer())
-            error = ImportLayer(req.importlayer());
-        else if (req.has_exportlayer())
-            error = ExportLayer(req.exportlayer());
-        else if (req.has_removelayer())
-            error = RemoveLayer(req.removelayer());
-        else if (req.has_listlayers())
-            error = ListLayers(req.listlayers(), rsp);
-        else if (req.has_convertpath())
-            error = ConvertPath(req.convertpath(), rsp);
-        else if (req.has_attachprocess())
-            error = AttachProcess(req.attachprocess());
-        else if (req.has_getlayerprivate())
-            error = GetLayerPrivate(req.getlayerprivate(), rsp);
-        else if (req.has_setlayerprivate())
-            error = SetLayerPrivate(req.setlayerprivate());
-        else if (req.has_liststorage())
-            error = ListStorage(req.liststorage(), rsp);
-        else if (req.has_removestorage())
-            error = RemoveStorage(req.removestorage());
-        else if (req.has_importstorage())
-            error = ImportStorage(req.importstorage());
-        else if (req.has_exportstorage())
-            error = ExportStorage(req.exportstorage());
-        else if (req.has_locateprocess())
-            error = LocateProcess(req.locateprocess(), rsp);
-        else
-            error = TError(EError::InvalidMethod, "invalid RPC method");
-    } catch (std::bad_alloc exc) {
-        rsp.Clear();
-        error = TError("memory allocation failure");
-    } catch (std::string exc) {
-        rsp.Clear();
-        error = TError(EError::Unknown, exc);
-    } catch (const std::exception &exc) {
-        rsp.Clear();
-        error = TError(EError::Unknown, exc.what());
-    } catch (...) {
-        rsp.Clear();
-        error = TError("unknown error");
-    }
+    } else if (req.has_create())
+        error = CreateContainer(req.create().name(), false);
+    else if (req.has_createweak())
+        error = CreateContainer(req.createweak().name(), true);
+    else if (req.has_destroy())
+        error = DestroyContainer(req.destroy());
+    else if (req.has_list())
+        error = ListContainers(req.list(), rsp);
+    else if (req.has_getproperty())
+        error = GetContainerProperty(req.getproperty(), rsp);
+    else if (req.has_setproperty())
+        error = SetContainerProperty(req.setproperty());
+    else if (req.has_getdata())
+        error = GetContainerData(req.getdata(), rsp);
+    else if (req.has_get())
+        error = GetContainerCombined(req.get(), rsp);
+    else if (req.has_start())
+        error = StartContainer(req.start());
+    else if (req.has_stop())
+        error = StopContainer(req.stop());
+    else if (req.has_pause())
+        error = PauseContainer(req.pause());
+    else if (req.has_resume())
+        error = ResumeContainer(req.resume());
+    else if (req.has_propertylist())
+        error = ListProperty(rsp);
+    else if (req.has_datalist())
+        error = ListData(rsp);
+    else if (req.has_kill())
+        error = Kill(req.kill());
+    else if (req.has_version())
+        error = Version(rsp);
+    else if (req.has_wait())
+        error = Wait(req.wait(), rsp, client);
+    else if (req.has_listvolumeproperties())
+        error = ListVolumeProperties(rsp);
+    else if (req.has_createvolume())
+        error = CreateVolume(req.createvolume(), rsp);
+    else if (req.has_linkvolume())
+        error = LinkVolume(req.linkvolume());
+    else if (req.has_unlinkvolume())
+        error = UnlinkVolume(req.unlinkvolume());
+    else if (req.has_listvolumes())
+        error = ListVolumes(req.listvolumes(), rsp);
+    else if (req.has_tunevolume())
+        error = TuneVolume(req.tunevolume());
+    else if (req.has_importlayer())
+        error = ImportLayer(req.importlayer());
+    else if (req.has_exportlayer())
+        error = ExportLayer(req.exportlayer());
+    else if (req.has_removelayer())
+        error = RemoveLayer(req.removelayer());
+    else if (req.has_listlayers())
+        error = ListLayers(req.listlayers(), rsp);
+    else if (req.has_convertpath())
+        error = ConvertPath(req.convertpath(), rsp);
+    else if (req.has_attachprocess())
+        error = AttachProcess(req.attachprocess());
+    else if (req.has_getlayerprivate())
+        error = GetLayerPrivate(req.getlayerprivate(), rsp);
+    else if (req.has_setlayerprivate())
+        error = SetLayerPrivate(req.setlayerprivate());
+    else if (req.has_liststorage())
+        error = ListStorage(req.liststorage(), rsp);
+    else if (req.has_removestorage())
+        error = RemoveStorage(req.removestorage());
+    else if (req.has_importstorage())
+        error = ImportStorage(req.importstorage());
+    else if (req.has_exportstorage())
+        error = ExportStorage(req.exportstorage());
+    else if (req.has_locateprocess())
+        error = LocateProcess(req.locateprocess(), rsp);
+    else
+        error = TError(EError::InvalidMethod, "invalid RPC method");
 
     client->FinishRequest();
 
