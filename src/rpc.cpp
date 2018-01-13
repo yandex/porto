@@ -186,46 +186,6 @@ static bool SilentRequest(const rpc::TContainerRequest &req) {
         req.has_locateprocess();
 }
 
-static bool ValidRequest(const rpc::TContainerRequest &req) {
-    return
-        req.has_create() +
-        req.has_createweak() +
-        req.has_destroy() +
-        req.has_list() +
-        req.has_getproperty() +
-        req.has_setproperty() +
-        req.has_getdata() +
-        req.has_get() +
-        req.has_start() +
-        req.has_stop() +
-        req.has_pause() +
-        req.has_resume() +
-        req.has_propertylist() +
-        req.has_datalist() +
-        req.has_kill() +
-        req.has_version() +
-        req.has_wait() +
-        req.has_listvolumeproperties() +
-        req.has_createvolume() +
-        req.has_linkvolume() +
-        req.has_unlinkvolume() +
-        req.has_listvolumes() +
-        req.has_tunevolume() +
-        req.has_importlayer() +
-        req.has_exportlayer() +
-        req.has_removelayer() +
-        req.has_listlayers() +
-        req.has_convertpath() +
-        req.has_attachprocess() +
-        req.has_getlayerprivate() +
-        req.has_setlayerprivate() +
-        req.has_liststorage() +
-        req.has_removestorage() +
-        req.has_importstorage() +
-        req.has_exportstorage() +
-        req.has_locateprocess() == 1;
-}
-
 static TError CheckPortoWriteAccess() {
     if (CL->AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "Write access denied");
@@ -1118,10 +1078,30 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
                                  req.has_compress() ? req.compress() : "");
 }
 
+static TError CheckRpcRequest(const rpc::TContainerRequest &req) {
+    auto req_ref = req.GetReflection();
+
+    std::vector<const google::protobuf::FieldDescriptor *> req_fields;
+    req_ref->ListFields(req, &req_fields);
+
+    if (req_fields.size() != 1)
+        return TError(EError::InvalidMethod, "Request has {} known methods", req_fields.size());
+
+    auto msg = &req_ref->GetMessage(req, req_fields[0]);
+    auto msg_ref = msg->GetReflection();
+    auto msg_unknown = &msg_ref->GetUnknownFields(*msg);
+
+    if (msg_unknown->field_count() != 0)
+        return TError(EError::InvalidMethod, "Request has {} unknown fields", msg_unknown->field_count());
+
+    return OK;
+}
+
 void HandleRpcRequest(const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
     std::string str;
+    TError error;
 
     client->StartRequest();
 
@@ -1132,13 +1112,11 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     if (Debug)
         L_REQ("{} from {}", req.ShortDebugString(), client->Id);
 
-    rsp.set_error(EError::Unknown);
-
-    TError error;
-    if (!ValidRequest(req)) {
-        L_ERR("Invalid request {} from {}", req.ShortDebugString(), client->Id);
-            error = TError(EError::InvalidMethod, "invalid request");
-    } else if (req.has_create())
+    error = CheckRpcRequest(req);
+    if (error)
+        L_ERR("Invalid request {} from {} ({})", req.ShortDebugString(),
+                client->Id, req.ShortDebugString());
+    else if (req.has_create())
         error = CreateContainer(req.create().name(), false);
     else if (req.has_createweak())
         error = CreateContainer(req.createweak().name(), true);
