@@ -1,3 +1,14 @@
+yandex-porto (4.5.0) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * api/python: add missing required field in ReExportLayer
+
+  [ Konstantin Khlebnikov ]
+  * porto: no exceptions
+  * porto: detect unknown fields in protobuf rpc message
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 16 Jan 2018 11:59:38 +0300
+
 yandex-porto (4.4.1) unstable; urgency=low
 
   * fuzzer: mark all created objects with private=porto-fuzzer
