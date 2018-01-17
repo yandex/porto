@@ -131,36 +131,37 @@ static TError CreatePortoSocket() {
     if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD) {
         struct stat fd_stat, sk_stat;
 
-        if (fstat(PORTO_SK_FD, &fd_stat) || !S_ISSOCK(fd_stat.st_mode))
-            Crash();
-
-        if (!path.StatStrict(sk_stat) && S_ISSOCK(sk_stat.st_mode)) {
+        sock.SetFd = PORTO_SK_FD;
+        if (!sock.Stat(fd_stat) && S_ISSOCK(fd_stat.st_mode) &&
+                !path.StatStrict(sk_stat) && S_ISSOCK(sk_stat.st_mode)) {
             time_t now = time(nullptr);
             L_SYS("Reuse porto socket: inode {} : {} "
                   "age {} : {}",
                   fd_stat.st_ino, sk_stat.st_ino,
                   now - fd_stat.st_ctime, now - sk_stat.st_ctime);
-            return OK;
+        } else {
+            L_WRN("Unlinked porto socket. Recreating...");
+            sock.SetFd = -1;
         }
-
-        L_WRN("Unlinked porto socket. Recreating...");
     }
 
-    sock.SetFd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    if (sock.Fd < 0)
-        return TError::System("socket()");
+    if (!sock) {
+        sock.SetFd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+        if (sock.Fd < 0)
+            return TError::System("socket()");
 
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+        memset(&addr, 0, sizeof(addr));
+        addr.sun_family = AF_UNIX;
+        strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
 
-    (void)path.Unlink();
+        (void)path.Unlink();
+
+        if (bind(sock.Fd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+            return TError::System("bind()");
+    }
 
     if (fchmod(sock.Fd, PORTO_SOCKET_MODE) < 0)
         return TError::System("fchmod()");
-
-    if (bind(sock.Fd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
-        return TError::System("bind()");
 
     error = path.Chown(RootUser, PortoGroup);
     if (error)
@@ -170,7 +171,7 @@ static TError CreatePortoSocket() {
     if (error)
         return error;
 
-    if (listen(sock.Fd, 0) < 0)
+    if (listen(sock.Fd, config().daemon().max_clients()) < 0)
         return TError::System("listen()");
 
     if (sock.Fd == PORTO_SK_FD)
