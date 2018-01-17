@@ -1625,7 +1625,7 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (TestPropDirty(EProperty::CPU_LIMIT))
-        Parent->PropagateCpuLimit();
+        PropagateCpuLimit();
 
     if ((Controllers & CGROUP_CPU) &&
             (TestPropDirty(EProperty::CPU_POLICY) |
