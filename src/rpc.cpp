@@ -51,9 +51,14 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
         return ret;
     } else if (req.has_start())
         return "start " + req.start().name();
-    else if (req.has_stop())
-        return "stop " + req.stop().name();
-    else if (req.has_pause())
+    else if (req.has_stop()) {
+        std::string ret = "stop " + req.stop().name();
+
+        if (req.stop().has_timeout_ms())
+            ret += fmt::format(" timeout {} ms", req.stop().timeout_ms());
+
+        return ret;
+    } else if (req.has_pause())
         return "pause " + req.pause().name();
     else if (req.has_resume())
         return "resume " + req.resume().name();
@@ -71,8 +76,8 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
         for (int i = 0; i < req.wait().name_size(); i++)
             ret += " " + req.wait().name(i);
 
-        if (req.wait().has_timeout())
-            ret += " timeout " + std::to_string(req.wait().timeout());
+        if (req.wait().has_timeout_ms())
+            ret += fmt::format(" timeout {} ms", req.wait().timeout_ms());
 
         return ret;
     } else if (req.has_createvolume()) {
@@ -487,7 +492,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
                      rpc::TContainerResponse &rsp,
                      std::shared_ptr<TClient> &client) {
     auto lock = LockContainers();
-    bool queueWait = !req.has_timeout() || req.timeout() != 0;
+    bool queueWait = !req.has_timeout_ms() || req.timeout_ms() != 0;
 
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
@@ -554,10 +559,10 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
 
     client->Waiter = waiter;
 
-    if (req.has_timeout()) {
+    if (req.has_timeout_ms()) {
         TEvent e(EEventType::WaitTimeout, nullptr);
         e.WaitTimeout.Waiter = waiter;
-        EventQueue->Add(req.timeout(), e);
+        EventQueue->Add(req.timeout_ms(), e);
     }
 
     return TError::Queued();

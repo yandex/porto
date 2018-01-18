@@ -280,8 +280,8 @@ class Container(object):
     def GetData(self, data, sync=False):
         return self.conn.GetData(self.name, data, sync)
 
-    def Wait(self, timeout=None):
-        return self.conn.Wait([self.name], timeout)
+    def Wait(self, **kwargs):
+        return self.conn.Wait([self.name], **kwargs)
 
     def __str__(self):
         return 'Container `{}`'.format(self.name)
@@ -563,12 +563,14 @@ class Connection(object):
         result = self.rpc.call(request, self.rpc.timeout).volumePropertyList.properties
         return [prop.name for prop in result]
 
-    def Wait(self, containers, timeout=None):
+    def Wait(self, containers, timeout=None, timeout_s=None):
         request = rpc_pb2.TContainerRequest()
         request.wait.name.extend(containers)
+        if timeout_s is not None:
+            timeout = timeout_s * 1000
         if timeout is not None and timeout >= 0:
-            request.wait.timeout = timeout
-            resp = self.rpc.call(request, timeout)
+            request.wait.timeout_ms = timeout
+            resp = self.rpc.call(request, timeout / 1000)
         else:
             resp = self.rpc.call(request, None)
         if resp.error != rpc_pb2.Success:

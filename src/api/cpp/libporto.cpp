@@ -382,7 +382,7 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
         wait->add_name(c);
 
     if (timeout >= 0) {
-        wait->set_timeout(timeout * 1000);
+        wait->set_timeout_ms(timeout * 1000);
         recv_timeout = timeout + (Impl->Timeout ?: timeout);
     }
 

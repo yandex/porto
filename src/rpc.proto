@@ -104,7 +104,7 @@ message TContainerStartRequest {
 
 message TContainerStopRequest {
     required string name = 1;
-    // Timeout between SIGTERM and SIGKILL, default 30s
+    // Timeout in 1/1000 seconds between SIGTERM and SIGKILL, default 30s
     optional uint32 timeout_ms = 2;
 }
 
@@ -155,8 +155,8 @@ message TContainerGetRequest {
 message TContainerWaitRequest {
     // list of containers
     repeated string name = 1;
-    // timeout, ms
-    optional uint32 timeout = 2;
+    // timeout in 1/1000 seconds
+    optional uint32 timeout_ms = 2;
 }
 
 // Move process into container
