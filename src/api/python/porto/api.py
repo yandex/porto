@@ -280,8 +280,8 @@ class Container(object):
     def GetData(self, data, sync=False):
         return self.conn.GetData(self.name, data, sync)
 
-    def Wait(self, **kwargs):
-        return self.conn.Wait([self.name], **kwargs)
+    def Wait(self, *args, **kwargs):
+        return self.conn.Wait([self.name], *args, **kwargs)
 
     def __str__(self):
         return 'Container `{}`'.format(self.name)
