@@ -278,35 +278,31 @@ TCgroup TCgroup::Child(const std::string& name) const {
     return TCgroup(Subsystem, Name + "/" + name);
 }
 
-TError TCgroup::Childs(std::vector<TCgroup> &cgroups) const {
-    std::vector<std::string> subdirs;
+TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
+    TPathWalk walk;
+    TError error;
 
-    TError error = Path().ListSubdirs(subdirs);
+    cgroups.clear();
+
+    error = walk.OpenList(Path());
     if (error)
         return error;
 
-    for (auto &name : subdirs) {
-        if (IsRoot() && !StringStartsWith(name, PORTO_CGROUP_PREFIX + 1))
+    while (1) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            break;
+
+        if (!S_ISDIR(walk.Stat->st_mode) || walk.Postorder)
             continue;
-        cgroups.push_back(Child(name));
-    }
-    return OK;
-}
 
-TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
-    TError error;
+        std::string name = Subsystem->Root.InnerPath(walk.Path).ToString();
 
-    error = Childs(cgroups);
-    if (!error) {
-        for (std::vector<TCgroup>::size_type i = 0; i < cgroups.size(); i++) {
-            TCgroup cgroup = cgroups[i];
-            TError error2 = cgroup.Childs(cgroups);
-            if (error2) {
-                L_ERR("Cannot dump childs of {} : {}", cgroup, error);
-                if (!error)
-                    error = error2;
-            }
-        }
+        /* Ignore non-proto cgroups */
+        if (!StringStartsWith(name, PORTO_CGROUP_PREFIX))
+            continue;
+
+        cgroups.push_back(TCgroup(Subsystem,  name));
     }
 
     return error;

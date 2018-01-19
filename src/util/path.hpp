@@ -10,6 +10,7 @@
 
 extern "C" {
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <fts.h>
 }
 

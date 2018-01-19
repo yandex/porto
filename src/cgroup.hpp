@@ -80,7 +80,6 @@ public:
     }
 
     TCgroup Child(const std::string& name) const;
-    TError Childs(std::vector<TCgroup> &cgroups) const;
     TError ChildsAll(std::vector<TCgroup> &cgroups) const;
 
     TPath Path() const;
