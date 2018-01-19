@@ -25,7 +25,7 @@ def prepare_fuzzer():
     if os.path.ismount(FUZZER_MNT):
         subprocess.check_call(["umount", "-l", FUZZER_MNT])
 
-    subprocess.check_call(["mount", "-t", "tmpfs", "-o", "size=1G", "None", FUZZER_MNT])
+    subprocess.check_call(["mount", "-t", "tmpfs", "-o", "size=512M", "None", FUZZER_MNT])
 
     verify_paths = [VOL_MNT_PLACE, VOL_PLACE, VOL_STORAGE,
                     VOL_PLACE + "/porto_volumes", VOL_PLACE + "/porto_layers"]
