@@ -19,105 +19,161 @@ extern "C" {
 #include <sys/stat.h>
 }
 
-static std::string RequestAsString(const rpc::TContainerRequest &req) {
-    if (req.has_create())
-        return std::string("create ") + req.create().name();
-    else if (req.has_createweak())
-        return std::string("create weak ") + req.createweak().name();
-    else if (req.has_destroy())
-        return "destroy " + req.destroy().name();
-    else if (req.has_list())
-        return "list containers";
-    else if (req.has_getproperty())
-        return "pget "  + req.getproperty().name() + " " + req.getproperty().property();
-    else if (req.has_setproperty())
-        return "pset " + req.setproperty().name() + " " +
-                         req.setproperty().property() + " " +
-                         req.setproperty().value();
-    else if (req.has_getdata())
-        return "dget " + req.getdata().name() + " " + req.getdata().data();
-    else if (req.has_get()) {
-        std::string ret = "get";
-
+static void RequestToString(const rpc::TContainerRequest &req,
+                            std::string &cmd, std::vector<std::string> &arg) {
+    if (req.has_create()) {
+        cmd = "Create";
+        arg = { req.create().name() };
+    } else if (req.has_createweak()) {
+        cmd = "Create";
+        arg = { req.createweak().name(), "weak=true" };
+    } else if (req.has_destroy()) {
+        cmd = "Destroy";
+        arg = { req.destroy().name() };
+    } else if (req.has_list()) {
+        cmd = "List";
+        if (req.list().has_mask())
+            arg.push_back(req.list().mask());
+    } else if (req.has_getproperty()) {
+        cmd = "Get";
+        arg = { req.getproperty().name(), req.getproperty().property() };
+        if (req.getproperty().has_sync() && req.getproperty().sync())
+            arg.push_back("sync=true");
+        if (req.getproperty().has_real() && req.getproperty().real())
+            arg.push_back("real=true");
+    } else if (req.has_getdata()) {
+        cmd = "Get";
+        arg = { req.getdata().name(), req.getdata().data() };
+        if (req.getdata().has_sync() && req.getdata().sync())
+            arg.push_back("sync=true");
+        if (req.getdata().has_real() && req.getdata().real())
+            arg.push_back("real=true");
+    } else if (req.has_get()) {
+        cmd = "Get";
         for (int i = 0; i < req.get().name_size(); i++)
-            ret += " " + req.get().name(i);
-
-        if (req.get().name_size() && req.get().variable_size())
-            ret += ",";
-
+            arg.push_back(req.get().name(i));
+        arg.push_back("--");
         for (int i = 0; i < req.get().variable_size(); i++)
-            ret += " " + req.get().variable(i);
-
-        return ret;
-    } else if (req.has_start())
-        return "start " + req.start().name();
-    else if (req.has_stop()) {
-        std::string ret = "stop " + req.stop().name();
-
+            arg.push_back(req.get().variable(i));
+        if (req.get().has_nonblock() && req.get().nonblock())
+            arg.push_back("nonblock=true");
+        if (req.get().has_sync() && req.get().sync())
+            arg.push_back("sync=true");
+        if (req.get().has_real() && req.get().real())
+            arg.push_back("real=true");
+    } else if (req.has_setproperty()) {
+        cmd = "Set";
+        arg = { req.setproperty().name(), req.setproperty().property() + "=" + req.setproperty().value() };
+    } else if (req.has_start()) {
+        cmd = "Start";
+        arg = { req.start().name() };
+    } else if (req.has_stop()) {
+        cmd = "Stop";
+        arg = { req.stop().name() };
         if (req.stop().has_timeout_ms())
-            ret += fmt::format(" timeout {} ms", req.stop().timeout_ms());
-
-        return ret;
-    } else if (req.has_pause())
-        return "pause " + req.pause().name();
-    else if (req.has_resume())
-        return "resume " + req.resume().name();
-    else if (req.has_propertylist())
-        return "list available properties";
-    else if (req.has_datalist())
-        return "list available data";
-    else if (req.has_kill())
-        return "kill " + req.kill().name() + " " + std::to_string(req.kill().sig());
-    else if (req.has_version())
-        return "get version";
-    else if (req.has_wait()) {
-        std::string ret = "wait";
-
+            arg.push_back(fmt::format("timeout={} ms", req.stop().timeout_ms()));
+    } else if (req.has_pause()) {
+        cmd = "Pause";
+        arg = { req.pause().name() };
+    } else if (req.has_resume()) {
+        cmd = "Resume";
+        arg = { req.resume().name() };
+    } else if (req.has_wait()) {
+        cmd = "Wait";
         for (int i = 0; i < req.wait().name_size(); i++)
-            ret += " " + req.wait().name(i);
-
+            arg.push_back(req.wait().name(i));
         if (req.wait().has_timeout_ms())
-            ret += fmt::format(" timeout {} ms", req.wait().timeout_ms());
-
-        return ret;
+            arg.push_back(fmt::format("timeout={} ms", req.wait().timeout_ms()));
+    } else if (req.has_propertylist() || req.has_datalist()) {
+        cmd = "ListProperties";
+    } else if (req.has_kill()) {
+        cmd = "Kill";
+        arg = { req.kill().name(), std::to_string(req.kill().sig()) };
+    } else if (req.has_version()) {
+        cmd = "Version";
     } else if (req.has_createvolume()) {
-        std::string ret = "create volume " + req.createvolume().path();
+        cmd = "CreateVolume";
+        arg = { req.createvolume().path() };
         for (auto p: req.createvolume().properties())
-            ret += " " + p.name() + "=" + p.value();
-        return ret;
-    } else if (req.has_linkvolume())
-        return "link volume " + req.linkvolume().path() + " to " +
-                                    req.linkvolume().container();
-    else if (req.has_unlinkvolume())
-        return "unlink volume " + req.unlinkvolume().path() + " from " +
-                                      req.unlinkvolume().container();
-    else if (req.has_listvolumes())
-        return "list volumes";
-    else if (req.has_tunevolume()) {
-        std::string ret = "tune volume " + req.tunevolume().path();
+            arg.push_back(p.name() + "=" + p.value());
+    } else if (req.has_linkvolume()) {
+        cmd = "LinkVolume";
+        arg = { req.linkvolume().path(), req.linkvolume().container() };
+    } else if (req.has_unlinkvolume()) {
+        cmd = "UnlinkVolume";
+        arg = { req.unlinkvolume().path(), req.unlinkvolume().container() };
+        if (req.unlinkvolume().has_strict() && req.unlinkvolume().strict())
+            arg.push_back("strict=true");
+    } else if (req.has_listvolumes()) {
+        cmd = "ListVolumes";
+        if (req.listvolumes().has_path())
+            arg.push_back(req.listvolumes().path());
+        if (req.listvolumes().has_container())
+            arg.push_back("container=" + req.listvolumes().container());
+    } else if (req.has_tunevolume()) {
+        cmd = "TuneVolume";
+        arg = { req.tunevolume().path() };
         for (auto p: req.tunevolume().properties())
-            ret += " " + p.name() + "=" + p.value();
-        return ret;
-    } else if (req.has_convertpath())
-        return "convert " + req.convertpath().path() +
-            " from " + req.convertpath().source() +
-            " to " + req.convertpath().destination();
-    else if (req.has_attachprocess())
-        return "attach " + std::to_string(req.attachprocess().pid()) +
-            " (" + req.attachprocess().comm() + ") to " +
-            req.attachprocess().name();
-    else if (req.has_locateprocess())
-        return "locate " + std::to_string(req.locateprocess().pid()) +
-                " (" + req.locateprocess().comm() + ")";
-    else
-        return req.ShortDebugString();
+            arg.push_back(p.name() + "=" + p.value());
+    } else if (req.has_listvolumeproperties()) {
+        cmd = "ListVolumeProperities";
+    } else if (req.has_importlayer()) {
+        cmd = "ImportLayer";
+        arg = { req.importlayer().layer(), req.importlayer().tarball() };
+        if (req.importlayer().has_compress())
+            arg.push_back("compress=" + req.importlayer().compress());
+        if (req.importlayer().has_place())
+            arg.push_back("place=" + req.importlayer().place());
+        if (req.importlayer().has_merge())
+            arg.push_back("merge=true");
+        if (req.importlayer().has_private_value())
+            arg.push_back("private=" + req.importlayer().private_value());
+    } else if (req.has_exportlayer()) {
+        cmd = "ExportLayer";
+        arg = { req.exportlayer().tarball() };
+        if (req.exportlayer().has_compress())
+            arg.push_back("compress=" + req.exportlayer().compress());
+        if (req.exportlayer().has_place())
+            arg.push_back("place=" + req.exportlayer().place());
+        if (req.exportlayer().has_layer())
+            arg.push_back("layer=" + req.exportlayer().layer());
+        else
+            arg.push_back("volume=" + req.exportlayer().volume());
+    } else if (req.has_removelayer()) {
+        cmd = "RemoveLayer";
+        arg = { req.removelayer().layer() };
+        if (req.removelayer().has_place())
+            arg.push_back("place=" + req.removelayer().place());
+    } else if (req.has_listlayers()) {
+        cmd = "ListLayers";
+        if (req.listlayers().has_mask())
+            arg.push_back("mask=" + req.listlayers().mask());
+        if (req.listlayers().has_place())
+            arg.push_back("place=" + req.listlayers().place());
+    } else if (req.has_getlayerprivate()) {
+        cmd = "GetLayerPrivate";
+    } else if (req.has_setlayerprivate()) {
+        cmd = "SetLayerPrivate";
+    } else if (req.has_convertpath()) {
+        cmd = "ConvertPath";
+        arg = { req.convertpath().path(), req.convertpath().source(), req.convertpath().destination() };
+    } else if (req.has_attachprocess()) {
+        cmd = "AttachProcess";
+        arg = { req.attachprocess().name(), std::to_string(req.attachprocess().pid()), req.attachprocess().comm() };
+    } else if (req.has_locateprocess()) {
+        cmd = "LocateProcess";
+        arg = { std::to_string(req.locateprocess().pid()), req.locateprocess().comm() };
+    } else {
+        cmd = "UnknownCommand";
+        arg = { req.ShortDebugString() };
+    }
 }
 
 static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     std::string ret;
 
     if (resp.error()) {
-        ret = fmt::format("Error: {}:{}({})", resp.error(),
+        ret = fmt::format("Error {}:{}({})", resp.error(),
                           rpc::EError_Name(resp.error()), resp.errormsg());
     } else if (resp.has_list()) {
         for (int i = 0; i < resp.list().name_size(); i++)
@@ -1105,17 +1161,21 @@ static TError CheckRpcRequest(const rpc::TContainerRequest &req) {
 void HandleRpcRequest(const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
-    std::string str;
+    std::string cmd, args;
+    std::vector<std::string> arg;
     TError error;
 
     client->StartRequest();
 
+    RequestToString(req, cmd, arg);
+    for (auto &a: arg)
+        args += " " + a;
+
     bool silent = !Verbose && SilentRequest(req);
     if (!silent)
-        L_REQ("{} from {}", RequestAsString(req), client->Id);
+        L_REQ("{}{} from {}", cmd, args, client->Id);
 
-    if (Debug)
-        L_REQ("{} from {}", req.ShortDebugString(), client->Id);
+    L_DBG("{}", req.ShortDebugString());
 
     error = CheckRpcRequest(req);
     if (error)
@@ -1204,16 +1264,15 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
         /* log failed or slow silent requests */
         if (silent && (error || client->RequestTimeMs >= 1000)) {
-            L_REQ("{} from {}", RequestAsString(req), client->Id);
+            L_REQ("{}{} from {}", cmd, args, client->Id);
             silent = false;
         }
 
         if (!silent)
-            L_RSP("{} to {} (request took {} ms)",
-                  ResponseAsString(rsp), client->Id, client->RequestTimeMs);
+            L_RSP("{} {} to {} time={} ms", cmd, ResponseAsString(rsp),
+                    client->Id, client->RequestTimeMs);
 
-        if (Debug)
-            L_RSP("{} to {}", rsp.ShortDebugString(), client->Id);
+        L_DBG("{}", rsp.ShortDebugString());
 
         error = client->QueueResponse(rsp);
         if (error)

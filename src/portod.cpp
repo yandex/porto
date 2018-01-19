@@ -260,7 +260,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
                       "All client slots are active: " +
                       (from ? from->Name : "globally"));
 
-    L_ACT("Drop client {} idle for {} ms", victim->Id, idle);
+    L_ACT("Kick {} idle={} ms", victim->Id, idle);
     Clients.erase(victim->Fd);
     victim->CloseConnection();
     return OK;
@@ -882,8 +882,8 @@ static int Portod() {
     return code;
 }
 
-static TError DeliverPidStatus(int fd, int pid, int status, size_t queued) {
-    L_EVT("Deliver {} status {} ({} queued)", pid, status, queued);
+static TError DeliverPidStatus(int fd, int pid, int status) {
+    L_EVT("Deliver pid={} status={}", pid, status);
 
     if (write(fd, &pid, sizeof(pid)) < 0)
         return TError::System("write(pid): ");
@@ -935,8 +935,8 @@ static int ReapDead(int fd, std::map<int,int> &exited, int &portodStatus) {
         if (exited.find(info.si_pid) != exited.end())
             break;
 
+        TError error = DeliverPidStatus(fd, info.si_pid, status);
         exited[info.si_pid] = status;
-        TError error = DeliverPidStatus(fd, info.si_pid, status, exited.size());
         if (error)
             L_WRN("Fail to deliver pid status to porto: {}", error);
     }
@@ -955,11 +955,11 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
             continue;
 
         if (exited.find(pid) == exited.end()) {
-            L_WRN("Got acknowledge for unknown pid {}", pid);
+            L_WRN("Got ack for unknown pid={}", pid);
         } else {
             exited.erase(pid);
             Reap(pid);
-            L_EVT("Got acknowledge for {} ({} queued)", pid, exited.size());
+            L_EVT("Reap pid={}", pid);
         }
 
         nr++;
@@ -1052,7 +1052,7 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
     Statistics->Spawned++;
 
     for (auto &pair : exited)
-        (void)DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
+        (void)DeliverPidStatus(evtfd[1], pair.first, pair.second);
 
     UpdateQueueSize(exited);
 

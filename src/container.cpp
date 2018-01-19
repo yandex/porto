@@ -1847,7 +1847,7 @@ TError TContainer::PrepareCgroups() {
         if (!Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
             Controllers |= CGROUP_CPUSET;
             RequiredControllers |= CGROUP_CPUSET;
-            L("Enable cpuset for {} because parent has reserved cpus", Name);
+            L("Enable cpuset for CT{}:{} because parent has reserved cpus", Id, Name);
         } else {
             CpuAffinity.Clear();
             CpuAffinity.Set(Parent->CpuAffinity);
@@ -1869,7 +1869,7 @@ TError TContainer::PrepareCgroups() {
         TPath cmd = RootPath / Command;
         TPath dst;
         if (!cmd.ReadLink(dst) && dst.BaseName() == "systemd") {
-            L("Enable systemd cgroup for {}", Name);
+            L("Enable systemd cgroup for CT{}:{}", Id, Name);
             Controllers |= CGROUP_SYSTEMD;
         }
     }
@@ -2645,7 +2645,7 @@ void TContainer::Reap(bool oomKilled) {
 
     error = Terminate(0);
     if (error)
-        L_WRN("Cannot terminate container {} : {}", Name, error);
+        L_WRN("Cannot terminate CT{}:{} : {}", Id, Name, error);
 
     DeathTime = GetCurrentTimeMs();
     SetProp(EProperty::DEATH_TIME);
@@ -2687,7 +2687,7 @@ void TContainer::Exit(int status, bool oomKilled) {
             WEXITSTATUS(status) < 128 + SIGRTMIN * 2)
         status = WEXITSTATUS(status) - ((WEXITSTATUS(status) > 128 + SIGRTMIN) ? SIGRTMIN : 128);
 
-    L_EVT("Exit {} {} {}", Name, FormatExitStatus(status),
+    L_EVT("Exit CT{}:{} {} {}", Id, Name, FormatExitStatus(status),
           (oomKilled ? "invoked by OOM" : ""));
 
     ExitStatus = status;
@@ -2696,7 +2696,7 @@ void TContainer::Exit(int status, bool oomKilled) {
     /* Detect memory shortage that happened in syscalls */
     auto cg = GetCgroup(MemorySubsystem);
     if (!oomKilled && OomIsFatal && MemorySubsystem.GetOomEvents(cg)) {
-        L("Container {} hit memory limit", Name);
+        L("Container CT{}:{} hit memory limit", Id, Name);
         oomKilled = true;
     }
 
@@ -3244,7 +3244,7 @@ bool TContainer::RecvOomEvents() {
             val) {
         OomEvents += val;
         Statistics->ContainersOOM += val;
-        L_EVT("OOM in {}", Name);
+        L_EVT("OOM in CT{}:{}", Id, Name);
         return true;
     }
 
