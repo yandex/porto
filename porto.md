@@ -327,9 +327,10 @@ Write access to container requires any of these conditions:
 
 * **bind** - bind mounts: \<source\> \<target\> \[ro|rw\];...
 
-    This option creates new mount namespace and binds directories and files
-    from parent container mount namespace. Bind mounts are invisible from
-    host or parent container and cannot be used for volumes.
+    This option creates new mount namespace and binds directories or files
+    from parent container mount namespace. Resulting bind-mounts are invisible
+    from host or parent container and cannot be used for creating volumes.
+    For that use volume **backend**=bind instead.
 
 * **stdout\_path** - stdout file, default: internal rotated storage
 
