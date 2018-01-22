@@ -24,6 +24,9 @@ public:
 
     TError(EError err, int eno, const std::string &text): Error(err), Errno(eno), Text(text) {}
 
+    template <typename... Args> TError(EError err,  int eno, const char* fmt, const Args&... args):
+        Error(err), Errno(eno), Text(fmt::format(fmt, args...)) {}
+
     template <typename... Args> TError(EError err, const char* fmt, const Args&... args):
         Error(err), Text(fmt::format(fmt, args...)) {}
 

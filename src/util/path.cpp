@@ -1448,10 +1448,11 @@ TError TPathWalk::OpenList(const TPath &path)
 }
 
 TError TPathWalk::Next() {
+next:
     Ent = fts_read(Fts);
     if (!Ent) {
         if (errno)
-            return TError::System("fts_read");
+            return TError(EError::Unknown, errno, "fts_read");
         Path = "";
         return OK;
     }
@@ -1459,8 +1460,11 @@ TError TPathWalk::Next() {
     case FTS_DNR:
     case FTS_ERR:
     case FTS_NS:
+        if (Ent->fts_errno == ENOENT)
+            goto next;
+        return TError(EError::Unknown, Ent->fts_errno, "fts_read {}", Ent->fts_path);
     case FTS_NSOK:
-        return TError::System("fts_read");
+        return TError(EError::Unknown, "fts_read FTS_NSOK");
     case FTS_DP:
         Postorder = true;
         break;

@@ -962,13 +962,17 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
         std::vector<TCgroup> list;
 
         error = cg.ChildsAll(list);
-        if (error)
+        if (error) {
+            L_WRN("Cannot get io stat {}", error);
             return error;
+        }
 
         for (auto &child_cg: list) {
             error = child_cg.Knob(knob).ReadLines(lines);
-            if (error)
+            if (error && error.Errno != ENOENT) {
+                L_WRN("Cannot get io stat {}", error);
                 return error;
+            }
         }
     }
 
