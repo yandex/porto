@@ -153,7 +153,7 @@ TError TClient::IdentifyClient(bool initial) {
             AccessLevel = EAccessLevel::ReadOnly;
     }
 
-    Id = fmt::format("{}:{}({}) CT{}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
+    Id = fmt::format("CL{}:{}({}) CT{}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
 
     L_VERBOSE("Connected {} cred={} tcred={} access={} ns={} wns={}",
                 Id, Cred.ToString(), TaskCred.ToString(),
@@ -417,7 +417,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     TScopedLock lock(Mutex);
 
     if (Processing) {
-        L_WRN("Client {} request before response", Id);
+        L_WRN("{} request before response", Id);
         return OK;
     }
 
@@ -481,7 +481,7 @@ TError TClient::SendResponse(bool first) {
         if (!first)
             return TError("send return zero");
     } else if (errno == EPIPE) {
-        L("Client disconnected: {}", Id);
+        L_VERBOSE("Disconnected {}", Id);
         return OK;
     } else if (errno != EAGAIN && errno != EWOULDBLOCK)
         return TError::System("send response failed");

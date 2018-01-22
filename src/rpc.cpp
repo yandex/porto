@@ -1175,12 +1175,11 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     if (!silent)
         L_REQ("{}{} from {}", cmd, args, client->Id);
 
-    L_DBG("{}", req.ShortDebugString());
+    L_DBG("Raw request: {}", req.ShortDebugString());
 
     error = CheckRpcRequest(req);
     if (error)
-        L_ERR("Invalid request {} from {} ({})", req.ShortDebugString(),
-                client->Id, req.ShortDebugString());
+        L_VERBOSE("Invalid request from {} : {} : {}", client->Id, error, req.ShortDebugString());
     else if (req.has_create())
         error = CreateContainer(req.create().name(), false);
     else if (req.has_createweak())
@@ -1272,7 +1271,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
             L_RSP("{} {} to {} time={} ms", cmd, ResponseAsString(rsp),
                     client->Id, client->RequestTimeMs);
 
-        L_DBG("{}", rsp.ShortDebugString());
+        L_DBG("Raw response: {}", rsp.ShortDebugString());
 
         error = client->QueueResponse(rsp);
         if (error)
