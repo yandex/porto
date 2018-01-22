@@ -1196,6 +1196,10 @@ noinline static TError GetSystemProperties(rpc::TContainerResponse &rsp) {
     sys->set_request_longer_30s(Statistics->RequestsLonger30s);
     sys->set_request_longer_5m(Statistics->RequestsLonger5m);
 
+    sys->set_fail_system(Statistics->FailSystem);
+    sys->set_fail_invalid_value(Statistics->FailInvalidValue);
+    sys->set_fail_invalid_command(Statistics->FailInvalidCommand);
+
     return OK;
 }
 
@@ -1340,8 +1344,22 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
     if (error != EError::Queued) {
 
-        if (error)
+        if (error) {
             Statistics->RequestsFailed++;
+            switch (error.Error) {
+                case EError::Unknown:
+                    Statistics->FailSystem++;
+                    break;
+                case EError::InvalidValue:
+                    Statistics->FailInvalidValue++;
+                    break;
+                case EError::InvalidCommand:
+                    Statistics->FailInvalidCommand++;
+                    break;
+                default:
+                    break;
+            }
+        }
 
         rsp.set_error(error.Error);
         rsp.set_errormsg(error.Message());
