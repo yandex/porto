@@ -617,7 +617,7 @@ TError TPath::Chattr(unsigned add_flags, unsigned del_flags) const {
         return error;
     error = TFile::Chattr(file.Fd, add_flags, del_flags);
     if (error)
-        return TError(error, Path);
+        return TError(error, "Cannot chattr {}", Path);
     return OK;
 }
 
@@ -786,7 +786,7 @@ TError TPath::ReadAll(std::string &text, size_t max) const {
 
     error = file.ReadAll(text, max);
     if (error)
-        return TError(error, Path);
+        return TError(error, "Cannot read {}", Path);
 
     return OK;
 }
@@ -801,7 +801,7 @@ TError TPath::WriteAll(const std::string &text) const {
 
     error = file.WriteAll(text);
     if (error)
-        return TError(error, Path);
+        return TError(error, "Cannot write {}", Path);
 
     return OK;
 }

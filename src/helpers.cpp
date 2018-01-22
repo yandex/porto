@@ -41,14 +41,23 @@ TError RunCommand(const std::vector<std::string> &command,
     if (task.Pid) {
         error = task.Wait();
         if (error) {
+            struct stat st;
             char buf[2048];
-            ssize_t len = pread(err.Fd, buf, sizeof(buf), 0);
-            if (len > 0)
-                error = TError(error, std::string(buf, len));
+            ssize_t len = 0;
+            if (err.Stat(st) || st.st_size <= sizeof(buf)) {
+                len = pread(err.Fd, buf, sizeof(buf), 0);
+            } else {
+                len = pread(err.Fd, buf, sizeof(buf) / 2 - 1, 0);
+                if (len < 0)
+                    len = 0;
+                buf[len++] = '\n';
+                buf[len++] = '\n';
+                ssize_t len2 = pread(err.Fd, buf + len, sizeof(buf) - len, 0);
+                if (len2 > 0)
+                        len += len2;
+            }
+            error = TError(error, "helper: {} stderr: {}", cmdline, std::string(buf, len));
         }
-        struct stat st;
-        if (!err.Stat(st) && st.st_size > 2048)
-            L_WRN("Helper {} generated {} bytes in stderr", cmdline, st.st_size);
         return error;
     }
 

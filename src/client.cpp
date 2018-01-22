@@ -356,13 +356,13 @@ TError TClient::CanControl(const TContainer &ct, bool child) {
         if (!(child && ct.IsRoot())) {
             TError error = CanControl(ct.OwnerCred);
             if (error)
-                return TError(error, "Write access denied: container " + ct.Name);
+                return TError(error, "Write access denied: container {}", ct.Name);
         }
 
         return OK;
     }
 
-    return TError(EError::Permission, "Write access denied: container " + ct.Name + " out of scope");
+    return TError(EError::Permission, "Write access denied: container {} out of scope", ct.Name);
 }
 
 TError TClient::ReadAccess(const TFile &file) {

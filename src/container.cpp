@@ -2239,7 +2239,7 @@ TError TContainer::Start() {
     /* Extra check */
     error = CL->CanControl(OwnerCred);
     if (error)
-        return TError(error, "Cannot start container " + Name);
+        return TError(error, "Cannot start container {}", Name);
 
     /* Normalize root path */
     if (Parent) {
@@ -2289,7 +2289,7 @@ TError TContainer::Start() {
         error = OK;
 
     if (error)
-        return TError(error, "Cannot start container " + Name);
+        return TError(error, "Cannot start container {}", Name);
 
     /* Even without capabilities user=root require chroot */
     if (RootPath.IsRoot() && TaskCred.IsRootUser() && !OwnerCred.IsRootUser())

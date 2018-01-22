@@ -741,7 +741,7 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
 
     error = CL->CanControl(volume->VolumeOwner);
     if (error)
-        return TError(error, "Cannot tune volume " + volume->Path.ToString());
+        return TError(error, "Cannot tune volume {}", volume->Path);
 
     return volume->Tune(cfg);
 }
@@ -760,7 +760,7 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
         return error;
     error = CL->CanControl(volume->VolumeOwner);
     if (error)
-        return TError(error, "Cannot link volume" + volume->Path.ToString());
+        return TError(error, "Cannot link volume {}", volume->Path);
 
     return volume->LinkContainer(*ct);
 }
@@ -784,7 +784,7 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
         return error;
     error = CL->CanControl(volume->VolumeOwner);
     if (error)
-        return TError(error, "Cannot unlink volume " + volume->Path.ToString());
+        return TError(error, "Cannot unlink volume {}", volume->Path);
 
     if (ct) {
         error = volume->UnlinkContainer(*ct, strict);
@@ -888,7 +888,7 @@ noinline TError SetLayerPrivate(const rpc::TLayerSetPrivateRequest &req) {
         return error;
     error = CL->CanControl(layer.Owner);
     if (error)
-        return TError(error, "Cannot set layer private " + layer.Name);
+        return TError(error, "Cannot set layer private {}", layer.Name);
     return layer.SetPrivate(req.private_value());
 }
 

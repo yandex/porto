@@ -636,7 +636,7 @@ public:
                     goto err;
                 error = CL->WriteAccess(pin);
                 if (error) {
-                    error = TError(error, "Layer " + name);
+                    error = TError(error, "Layer {}", name);
                     goto err;
                 }
                 path = pin.ProcPath();
@@ -845,7 +845,7 @@ public:
                     goto err;
                 error = CL->WriteAccess(pin);
                 if (error) {
-                    error = TError(error, "Layer " + name);
+                    error = TError(error, "Layer {}", name);
                     goto err;
                 }
                 path = pin.ProcPath();
@@ -1489,7 +1489,7 @@ TError TVolume::Configure(const TStringMap &cfg) {
     /* Verify credentials */
     error = CL->CanControl(VolumeOwner);
     if (error)
-        return TError(error, "Volume " + Path.ToString());
+        return TError(error, "Volume {}", Path);
 
     if (VolumeOwner.Gid != CL->Cred.Gid && !CL->IsSuperUser() &&
             !CL->Cred.IsMemberOf(VolumeOwner.Gid))
@@ -1670,7 +1670,7 @@ TError TVolume::Build() {
     } else if (UserStorage()) {
         error = CL->WriteAccess(StorageFd);
         if (error)
-            return TError(error, "Volume " + Path.ToString());
+            return TError(error, "Volume {}", Path);
     } else if (HaveStorage()) {
         TStorage storage(Place, PORTO_STORAGE, Storage);
         error = storage.Load();
@@ -1678,7 +1678,7 @@ TError TVolume::Build() {
             return error;
         error = CL->CanControl(storage.Owner);
         if (error)
-            return TError(error, "Storage " + Storage);
+            return TError(error, "Storage {}", Storage);
         if (storage.Owner.IsUnknown()) {
             error = storage.SetOwner(VolumeOwner);
             if (error)
@@ -1714,7 +1714,7 @@ TError TVolume::Build() {
     if (!IsAutoPath) {
         error = CL->WriteAccess(PathFd);
         if (error)
-            return TError(error, "Volume " + Path.ToString());
+            return TError(error, "Volume {}", Path);
     }
 
     if (Path != InternalPath) {
@@ -1746,7 +1746,7 @@ TError TVolume::Build() {
 
                 error = CL->WriteAccess(pin);
                 if (error)
-                    return TError(error, "Layer " + name);
+                    return TError(error, "Layer {}", name);
 
                 temp = GetInternal("temp");
                 error = temp.Mkdir(0700);

@@ -161,10 +161,7 @@ bool TCgroup::Has(const std::string &knob) const {
 TError TCgroup::Get(const std::string &knob, std::string &value) const {
     if (!Subsystem)
         return TError("Cannot get from null cgroup");
-    TError error = Knob(knob).ReadAll(value);
-    if (error)
-        error = TError(error, "Cannot get cgroup " + knob);
-    return error;
+    return Knob(knob).ReadAll(value);
 }
 
 TError TCgroup::Set(const std::string &knob, const std::string &value) const {
@@ -173,7 +170,7 @@ TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     L_CG("Set {} {} = {}", *this, knob, value);
     TError error = Knob(knob).WriteAll(value);
     if (error)
-        error = TError(error, "Cannot set cgroup " + knob + " = " + value);
+        error = TError(error, "Cannot set cgroup {} = {}", knob, value);
     return error;
 }
 
@@ -286,11 +283,14 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
 
     error = walk.OpenList(Path());
     if (error)
-        return error;
+        return TError(error, "Cannot get childs for {}", *this);
 
     while (1) {
         error = walk.Next();
-        if (error || !walk.Path)
+        if (error)
+            return TError(error, "Cannot get childs for {}", *this);
+
+        if (!walk.Path)
             break;
 
         if (!S_ISDIR(walk.Stat->st_mode) || walk.Postorder)
@@ -305,7 +305,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
         cgroups.push_back(TCgroup(Subsystem,  name));
     }
 
-    return error;
+    return OK;
 }
 
 TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const {

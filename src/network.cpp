@@ -2552,7 +2552,7 @@ TError TNetEnv::OpenNetwork() {
 
         error = CL->CanControl(*target);
         if (error)
-            return TError(error, "net container " + NetCtName);
+            return TError(error, "net container {}", NetCtName);
 
         return Open(*target);
     }

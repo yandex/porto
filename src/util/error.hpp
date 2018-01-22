@@ -30,9 +30,9 @@ public:
     template <typename... Args> TError(const char* fmt, const Args&... args):
         Error(EError::Unknown), Text(fmt::format(fmt, args...)) {}
 
-    TError(const TError &other, const std::string &prefix) :
+    template <typename... Args> TError(const TError &other, const char* fmt, const Args&... args) :
         Error(other.Error), Errno(other.Errno),
-        Text(prefix + ": " + other.Text) {}
+        Text(fmt::format(fmt, args...) + ": " + other.Text) {}
 
     TError(const TError &other) = default;
     TError(TError &&other) = default;

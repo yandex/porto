@@ -444,7 +444,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
 
     error = CL->ReadAccess(arc);
     if (error)
-        return TError(error, "Cannot import " + Name + " from " + archive.ToString());
+        return TError(error, "Cannot import {} from {}", Name, archive);
 
     std::string compress_format, compress_option;
     error = Compression(archive, arc, compress, compress_format, compress_option);
@@ -468,7 +468,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
             return error;
         error = CL->CanControl(layer.Owner);
         if (error)
-            return TError(error, "Cannot merge " + Path.ToString());
+            return TError(error, "Cannot merge {}", Path);
     }
 
     if (Path.Exists()) {
@@ -589,7 +589,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
 
     error = CL->CanControl(Owner);
     if (error)
-        return TError(error, "Cannot export " + Path.ToString());
+        return TError(error, "Cannot export {}", Path);
 
     if (!archive.IsAbsolute())
         return TError(EError::InvalidValue, "archive path must be absolute");
@@ -691,7 +691,7 @@ TError TStorage::Remove() {
 
     error = CL->CanControl(Owner);
     if (error && !StringStartsWith(Name, PORTO_WEAK_PREFIX))
-        return TError(error, "Cannot remove " + Path.ToString());
+        return TError(error, "Cannot remove {}", Path);
 
     auto lock = LockVolumes();
 
