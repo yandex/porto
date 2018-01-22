@@ -3498,7 +3498,11 @@ void TPortoStat::Populate(TUintMap &m) {
     m["starting_children"] = CT->StartingChildren;
 
     m["volumes"] = Statistics->VolumesCount;
+    m["volumes_created"] = Statistics->VolumesCreated;
+    m["volumes_failed"] = Statistics->VolumesFailed;
+
     m["clients"] = Statistics->ClientsCount;
+    m["clients_connected"] = Statistics->ClientsConnected;
 
     m["container_clients"] = CT->ClientsCount;
     m["container_oom"] = CT->OomEvents;
@@ -3506,6 +3510,7 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["requests_queued"] = Statistics->RequestsQueued;
     m["requests_completed"] = Statistics->RequestsCompleted;
+    m["requests_failed"] = Statistics->RequestsFailed;
 
     m["requests_longer_1s"] = Statistics->RequestsLonger1s;
     m["requests_longer_3s"] = Statistics->RequestsLonger3s;

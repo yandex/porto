@@ -281,6 +281,8 @@ static TError AcceptConnection(int listenFd) {
         return TError::System("accept4()");
     }
 
+    Statistics->ClientsConnected++;
+
     auto client = std::make_shared<TClient>(clientFd);
     error = client->IdentifyClient(true);
     if (error)
@@ -1533,6 +1535,31 @@ undo:
     return EXIT_FAILURE;
 }
 
+static int GetSystemProperties() {
+    Porto::Connection conn;
+    std::string rsp;
+    int ret = conn.Raw("getSystem {}", rsp);
+    if (ret) {
+        std::cerr << conn.TextError() << std::endl;
+        return EXIT_FAILURE;
+    }
+    std::cout << rsp << std::endl;
+    return EXIT_SUCCESS;
+}
+
+static int SetSystemProperties(TTuple arg) {
+    Porto::Connection conn;
+    std::string rsp;
+    if (arg.size() != 2)
+        return EXIT_FAILURE;
+    int ret = conn.Raw(fmt::format("setSystem {{ {}: {} }}", arg[0], arg[1]), rsp);
+    if (ret) {
+        std::cerr << conn.TextError() << std::endl;
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 static void Usage() {
     std::cout
         << std::endl
@@ -1556,6 +1583,8 @@ static void Usage() {
         << "  reload          reexec portod" << std::endl
         << "  upgrade         upgrade running portod" << std::endl
         << "  dump            print internal key-value state" << std::endl
+        << "  get             print system properties" << std::endl
+        << "  set             change system properties" << std::endl
         << "  core            receive and forward core dump" << std::endl
         << "  help            print this message" << std::endl
         << "  version         print version and revision" << std::endl
@@ -1646,6 +1675,12 @@ int main(int argc, char **argv) {
         KvDump();
         return EXIT_SUCCESS;
     }
+
+    if (cmd == "get")
+        return GetSystemProperties();
+
+    if (cmd == "set")
+        return SetSystemProperties(TTuple(argv + opt + 1, argv + argc));
 
     if (cmd == "core") {
         TCore core;

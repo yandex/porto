@@ -180,6 +180,15 @@ void Connection::Close() {
     Impl->Close();
 }
 
+int Connection::Rpc(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+    Impl->Req.CopyFrom(req);
+    if (!Impl->Req.IsInitialized())
+        return -1;
+    int ret = Impl->Rpc();
+    rsp.CopyFrom(Impl->Rsp);
+    return ret;
+}
+
 int Connection::Raw(const std::string &message, std::string &responce) {
     if (!google::protobuf::TextFormat::ParseFromString(message, &Impl->Req) ||
         !Impl->Req.IsInitialized())
@@ -187,7 +196,7 @@ int Connection::Raw(const std::string &message, std::string &responce) {
 
     int ret = Impl->Rpc();
     if (!ret)
-        responce = Impl->Rsp.ShortDebugString();
+        responce = Impl->Rsp.DebugString();
 
     return ret;
 }

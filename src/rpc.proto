@@ -64,6 +64,135 @@ enum EError {
     Queued = 1000;
 }
 
+message TContainerRequest {
+    optional TContainerCreateRequest create = 1;
+    optional TContainerDestroyRequest destroy = 2;
+    optional TContainerListRequest list = 3;
+    optional TContainerGetPropertyRequest getProperty = 4;
+    optional TContainerSetPropertyRequest setProperty = 5;
+    optional TContainerGetDataRequest getData = 6;
+
+    optional TContainerStartRequest start = 7;
+    optional TContainerStopRequest stop = 8;
+    optional TContainerPauseRequest pause = 9;
+    optional TContainerResumeRequest resume = 10;
+    optional TContainerPropertyListRequest propertyList = 11;
+    optional TContainerDataListRequest dataList = 12;
+    optional TContainerKillRequest kill = 13;
+    optional TVersionRequest version = 14;
+    optional TContainerGetRequest get = 15;
+    optional TContainerWaitRequest wait = 16;
+    optional TContainerCreateRequest createWeak = 17;
+
+    optional TVolumePropertyListRequest listVolumeProperties = 103;
+    optional TVolumeCreateRequest createVolume = 104;
+    optional TVolumeLinkRequest linkVolume = 105;
+    optional TVolumeUnlinkRequest unlinkVolume = 106;
+    optional TVolumeListRequest listVolumes = 107;
+    optional TVolumeTuneRequest tuneVolume = 108;
+
+    optional TLayerImportRequest importLayer = 110;
+    optional TLayerRemoveRequest removeLayer = 111;
+    optional TLayerListRequest listLayers = 112;
+    optional TLayerExportRequest exportLayer = 113;
+
+    optional TLayerGetPrivateRequest getlayerprivate = 114;
+    optional TLayerSetPrivateRequest setlayerprivate = 115;
+
+    optional TStorageListRequest listStorage = 116;
+    optional TStorageRemoveRequest removeStorage = 117;
+    optional TStorageImportRequest importStorage = 118;
+    optional TStorageExportRequest exportStorage = 119;
+
+    optional TConvertPathRequest convertPath = 200;
+    optional TAttachProcessRequest attachProcess = 201;
+    optional TLocateProcessRequest locateProcess = 202;
+
+    optional TGetSystemProperties getSystem = 300;
+    optional TSetSystemProperties setSystem = 301;
+}
+
+message TContainerResponse {
+    required EError error = 1;
+    optional string errorMsg = 2;
+
+    optional TContainerListResponse list = 3;
+    optional TContainerGetPropertyResponse getProperty = 4;
+    optional TContainerGetDataResponse getData = 5;
+    optional TContainerPropertyListResponse propertyList = 6;
+    optional TContainerDataListResponse dataList = 7;
+    optional TVersionResponse version = 8;
+
+    optional TVolumeListResponse volumeList = 9;
+    optional TContainerGetResponse get = 10;
+    optional TContainerWaitResponse wait = 11;
+    optional TVolumePropertyListResponse volumePropertyList = 12;
+    optional TVolumeDescription volume = 13;
+    optional TLayerListResponse layers = 14;
+    optional TConvertPathResponse convertPath = 15;
+    optional TLayerGetPrivateResponse layer_private = 16;
+    optional TStorageListResponse storageList = 17;
+    optional TLocateProcessResponse locateProcess = 18;
+
+    optional TSystemProperties system = 300;
+}
+
+message TGetSystemProperties {
+}
+
+message TSetSystemProperties {
+    optional bool verbose = 100;
+    optional bool debug = 101;
+}
+
+message TSystemProperties {
+    required string porto_version = 1;
+    required string porto_revision = 2;
+    required string kernel_version = 3;
+
+    required fixed64 errors = 4;
+    required fixed64 warnings = 5;
+    required fixed64 restarts = 6;
+    required fixed64 porto_uptime = 7;
+    required fixed64 master_uptime = 8;
+
+    required bool verbose = 100;
+    required bool debug = 101;
+    required fixed64 log_lines = 102;
+    required fixed64 log_bytes = 103;
+
+    required fixed64 stream_rotate_bytes = 104;
+    required fixed64 stream_rotate_errors = 105;
+
+    required fixed64 container_count = 200;
+    required fixed64 container_limit = 201;
+    required fixed64 container_running = 202;
+    required fixed64 container_created = 203;
+    required fixed64 container_started = 204;
+    required fixed64 container_start_failed = 205;
+    required fixed64 container_oom = 206;
+    required fixed64 container_buried = 207;
+    required fixed64 container_lost = 208;
+
+    required fixed64 volume_count = 300;
+    required fixed64 volume_limit = 301;
+    required fixed64 volume_created = 303;
+    required fixed64 volume_failed = 304;
+
+    required fixed64 client_count = 400;
+    required fixed64 client_max = 401;
+    required fixed64 client_connected = 402;
+
+    required fixed64 request_queued = 500;
+    required fixed64 request_completed = 501;
+    required fixed64 request_failed = 502;
+    required fixed64 request_threads = 503;
+    required fixed64 request_longer_1s = 504;
+    required fixed64 request_longer_3s = 505;
+    required fixed64 request_longer_30s = 506;
+    required fixed64 request_longer_5m = 507;
+}
+
 message TContainerCreateRequest {
     required string name = 1;
 }
@@ -172,51 +301,6 @@ message TLocateProcessRequest {
     required string comm = 2; /* ignored if empty */
 }
 
-message TContainerRequest {
-    optional TContainerCreateRequest create = 1;
-    optional TContainerDestroyRequest destroy = 2;
-    optional TContainerListRequest list = 3;
-    optional TContainerGetPropertyRequest getProperty = 4;
-    optional TContainerSetPropertyRequest setProperty = 5;
-    optional TContainerGetDataRequest getData = 6;
-
-    optional TContainerStartRequest start = 7;
-    optional TContainerStopRequest stop = 8;
-    optional TContainerPauseRequest pause = 9;
-    optional TContainerResumeRequest resume = 10;
-    optional TContainerPropertyListRequest propertyList = 11;
-    optional TContainerDataListRequest dataList = 12;
-    optional TContainerKillRequest kill = 13;
-    optional TVersionRequest version = 14;
-    optional TContainerGetRequest get = 15;
-    optional TContainerWaitRequest wait = 16;
-    optional TContainerCreateRequest createWeak = 17;
-
-    optional TVolumePropertyListRequest listVolumeProperties = 103;
-    optional TVolumeCreateRequest createVolume = 104;
-    optional TVolumeLinkRequest linkVolume = 105;
-    optional TVolumeUnlinkRequest unlinkVolume = 106;
-    optional TVolumeListRequest listVolumes = 107;
-    optional TVolumeTuneRequest tuneVolume = 108;
-
-    optional TLayerImportRequest importLayer = 110;
-    optional TLayerRemoveRequest removeLayer = 111;
-    optional TLayerListRequest listLayers = 112;
-    optional TLayerExportRequest exportLayer = 113;
-
-    optional TLayerGetPrivateRequest getlayerprivate = 114;
-    optional TLayerSetPrivateRequest setlayerprivate = 115;
-
-    optional TStorageListRequest listStorage = 116;
-    optional TStorageRemoveRequest removeStorage = 117;
-    optional TStorageImportRequest importStorage = 118;
-    optional TStorageExportRequest exportStorage = 119;
-
-    optional TConvertPathRequest convertPath = 200;
-    optional TAttachProcessRequest attachProcess = 201;
-    optional TLocateProcessRequest locateProcess = 202;
-}
-
 message TContainerListResponse {
     repeated string name = 1;
 }
@@ -279,30 +363,6 @@ message TConvertPathResponse {
 
 message TLocateProcessResponse {
     required string name = 1;
-}
-
-message TContainerResponse {
-    required EError error = 1;
-    // Optional error message
-    optional string errorMsg = 2;
-
-    optional TContainerListResponse list = 3;
-    optional TContainerGetPropertyResponse getProperty = 4;
-    optional TContainerGetDataResponse getData = 5;
-    optional TContainerPropertyListResponse propertyList = 6;
-    optional TContainerDataListResponse dataList = 7;
-    optional TVersionResponse version = 8;
-
-    optional TVolumeListResponse volumeList = 9;
-    optional TContainerGetResponse get = 10;
-    optional TContainerWaitResponse wait = 11;
-    optional TVolumePropertyListResponse volumePropertyList = 12;
-    optional TVolumeDescription volume = 13;
-    optional TLayerListResponse layers = 14;
-    optional TConvertPathResponse convertPath = 15;
-    optional TLayerGetPrivateResponse layer_private = 16;
-    optional TStorageListResponse storageList = 17;
-    optional TLocateProcessResponse locateProcess = 18;
 }
 
 // VolumeAPI

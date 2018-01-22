@@ -5,6 +5,11 @@
 #include <string>
 #include <memory>
 
+namespace rpc {
+    class TContainerRequest;
+    class TContainerResponse;
+}
+
 namespace Porto {
 
 struct Property {
@@ -100,6 +105,7 @@ public:
 
     int GetVersion(std::string &tag, std::string &revision);
 
+    int Rpc(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
     std::string TextError() const;

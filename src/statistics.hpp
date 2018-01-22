@@ -30,6 +30,10 @@ struct TStatistics {
     std::atomic<uint64_t> RequestsLonger3s;
     std::atomic<uint64_t> RequestsLonger30s;
     std::atomic<uint64_t> RequestsLonger5m;
+    std::atomic<uint64_t> ClientsConnected;
+    std::atomic<uint64_t> RequestsFailed;
+    std::atomic<uint64_t> VolumesCreated;
+    std::atomic<uint64_t> VolumesFailed;
 };
 
 extern TStatistics *Statistics;

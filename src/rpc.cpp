@@ -163,6 +163,11 @@ static void RequestToString(const rpc::TContainerRequest &req,
     } else if (req.has_locateprocess()) {
         cmd = "LocateProcess";
         arg = { std::to_string(req.locateprocess().pid()), req.locateprocess().comm() };
+    } else if (req.has_getsystem()) {
+        cmd = "GetSystem";
+    } else if (req.has_setsystem()) {
+        cmd = "SetSystem";
+        arg = { req.ShortDebugString() };
     } else {
         cmd = "UnknownCommand";
         arg = { req.ShortDebugString() };
@@ -244,7 +249,8 @@ static bool SilentRequest(const rpc::TContainerRequest &req) {
         req.has_convertpath() ||
         req.has_getlayerprivate() ||
         req.has_liststorage() ||
-        req.has_locateprocess();
+        req.has_locateprocess() ||
+        req.has_getsystem();
 }
 
 static TError CheckPortoWriteAccess() {
@@ -715,9 +721,12 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
         cfg[V_PLACE] = CL->DefaultPlace().ToString();
 
     std::shared_ptr<TVolume> volume;
+    Statistics->VolumesCreated++;
     TError error = TVolume::Create(cfg, volume);
-    if (error)
+    if (error) {
+        Statistics->VolumesFailed++;
         return error;
+    }
 
     FillVolumeDescription(rsp.mutable_volume(), *volume);
     return OK;
@@ -1139,6 +1148,74 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
                                  req.has_compress() ? req.compress() : "");
 }
 
+noinline static TError GetSystemProperties(rpc::TContainerResponse &rsp) {
+    auto sys = rsp.mutable_system();
+
+    sys->set_porto_version(PORTO_VERSION);
+    sys->set_porto_revision(PORTO_REVISION);
+    sys->set_kernel_version(config().linux_version());
+    sys->set_errors(Statistics->Errors);
+    sys->set_warnings(Statistics->Warns);
+    sys->set_restarts(Statistics->Spawned - 1);
+    sys->set_porto_uptime((GetCurrentTimeMs() - Statistics->PortoStarted) / 1000);
+    sys->set_master_uptime((GetCurrentTimeMs() - Statistics->MasterStarted) / 1000);
+
+    sys->set_verbose(Verbose);
+    sys->set_debug(Debug);
+    sys->set_log_lines(Statistics->LogLines);
+    sys->set_log_bytes(Statistics->LogBytes);
+
+    sys->set_container_count(Statistics->ContainersCount - NR_SERVICE_CONTAINERS);
+    sys->set_container_limit(config().container().max_total());
+    sys->set_container_running(RootContainer->RunningChildren);
+    sys->set_container_created(Statistics->ContainersCreated);
+    sys->set_container_started(Statistics->ContainersStarted);
+    sys->set_container_start_failed(Statistics->ContainersFailedStart);
+    sys->set_container_oom(Statistics->ContainersOOM);
+    sys->set_container_buried(Statistics->RemoveDead);
+    sys->set_container_lost(Statistics->RestoreFailed);
+
+    sys->set_stream_rotate_bytes(Statistics->LogRotateBytes);
+    sys->set_stream_rotate_errors(Statistics->LogRotateErrors);
+
+    sys->set_volume_count(Statistics->VolumesCount);
+    sys->set_volume_limit(config().volumes().max_total());
+    sys->set_volume_created(Statistics->VolumesCreated);
+    sys->set_volume_failed(Statistics->VolumesFailed);
+
+    sys->set_client_count(Statistics->ClientsCount);
+    sys->set_client_max(config().daemon().max_clients());
+    sys->set_client_connected(Statistics->ClientsConnected);
+
+    sys->set_request_queued(Statistics->RequestsQueued);
+    sys->set_request_completed(Statistics->RequestsCompleted);
+    sys->set_request_failed(Statistics->RequestsFailed);
+    sys->set_request_threads(config().daemon().workers());
+    sys->set_request_longer_1s(Statistics->RequestsLonger1s);
+    sys->set_request_longer_3s(Statistics->RequestsLonger3s);
+    sys->set_request_longer_30s(Statistics->RequestsLonger30s);
+    sys->set_request_longer_5m(Statistics->RequestsLonger5m);
+
+    return OK;
+}
+
+noinline static TError SetSystemProperties(const rpc::TSetSystemProperties &req) {
+    if (!CL->IsSuperUser())
+        return TError(EError::Permission, "Only for super-user");
+
+    if (req.has_verbose()) {
+        Verbose = req.verbose();
+        Debug &= Verbose;
+    }
+
+    if (req.has_debug()) {
+        Debug = req.debug();
+        Verbose |= Debug;
+    }
+
+    return OK;
+}
+
 static TError CheckRpcRequest(const rpc::TContainerRequest &req) {
     auto req_ref = req.GetReflection();
 
@@ -1252,12 +1329,20 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         error = ExportStorage(req.exportstorage());
     else if (req.has_locateprocess())
         error = LocateProcess(req.locateprocess(), rsp);
+    else if (req.has_getsystem())
+        error = GetSystemProperties(rsp);
+    else if (req.has_setsystem())
+        error = SetSystemProperties(req.setsystem());
     else
         error = TError(EError::InvalidMethod, "invalid RPC method");
 
     client->FinishRequest();
 
     if (error != EError::Queued) {
+
+        if (error)
+            Statistics->RequestsFailed++;
+
         rsp.set_error(error.Error);
         rsp.set_errormsg(error.Message());
 
