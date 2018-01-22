@@ -78,26 +78,26 @@ TError TCore::Handle(const TTuple &args) {
     error = Identify();
 
     if (!Ulimit || !Dumpable) {
-        L_ACT("Ignore core dump from container {} {} {}:{} thread {}:{} signal {}",
+        L_ACT("Ignore core dump from CT:{} {} {}:{} thread {}:{} signal {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
         return OK;
     }
 
     if (!error && CoreCommand.size()) {
-        L_ACT("Forward core from container {} {} {}:{} thread {}:{} signal {}",
+        L_ACT("Forward core from CT:{} {} {}:{} thread {}:{} signal {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
         error = Forward();
         if (error)
-            L("Cannot forward core from container {}: {}", Container, error);
+            L("Cannot forward core from CT:{}: {}", Container, error);
     }
 
     if ((error || !CoreCommand.size()) && DefaultPattern) {
-        L_ACT("Save core from container {} {} {}:{} thread {}:{} signal {}",
+        L_ACT("Save core from CT:{} {} {}:{} thread {}:{} signal {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
 
         error = Save();
         if (error)
-            L("Cannot save core from container {}: {}", Container, error);
+            L("Cannot save core from CT:{}: {}", Container, error);
     }
 
     return error;
@@ -137,7 +137,7 @@ TError TCore::Identify() {
         std::string msg;
         Conn.GetLastError(err, msg);
         error = TError((EError)err, msg);
-        L_ERR("Cannot get container {} properties: {}", Container, error);
+        L_ERR("Cannot get CT:{} properties: {}", Container, error);
         return error;
     }
 
@@ -180,9 +180,9 @@ TError TCore::Forward() {
             Conn.SetProperty(core, P_CWD, Cwd) ||
             Conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')) ||
             Conn.Start(core))
-        return TError("cannot create core container");
+        return TError("cannot create CT:{}", core);
 
-    L("Forwading core into {}", core);
+    L("Forwading core into CT:{}", core);
 
     std::string result;
     Conn.WaitContainers({core}, result, config().core().timeout_s());

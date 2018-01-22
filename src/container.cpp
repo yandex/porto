@@ -157,7 +157,7 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
 
     while (1) {
         if (State == EContainerState::Destroyed) {
-            L_DBG("Lock failed, container CT{}:{} was destroyed", Id, Name);
+            L_DBG("Lock failed, CT{}:{} was destroyed", Id, Name);
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
         bool busy;
@@ -438,7 +438,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (error)
         goto err;
 
-    L_ACT("Create container {}:{}", id, name);
+    L_ACT("Create CT{}:{}", id, name);
 
     ct = std::make_shared<TContainer>(parent, id, name);
 
@@ -493,7 +493,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (error)
         return error;
 
-    L_ACT("Restore container {}:{}", id, kv.Name);
+    L_ACT("Restore CT{}:{}", id, kv.Name);
 
     auto lock = LockContainers();
 
@@ -776,7 +776,7 @@ void TContainer::SetState(EContainerState next) {
     if (State == next)
         return;
 
-    L_ACT("Change container CT{}:{} state {} -> {}", Id, Name, StateName(State), StateName(next));
+    L_ACT("Change CT{}:{} state {} -> {}", Id, Name, StateName(State), StateName(next));
 
     auto lock = LockContainers();
     auto prev = State;
@@ -804,7 +804,7 @@ void TContainer::SetState(EContainerState next) {
 TError TContainer::Destroy() {
     TError error;
 
-    L_ACT("Destroy container CT{}:{}", Id, Name);
+    L_ACT("Destroy CT{}:{}", Id, Name);
 
     if (State != EContainerState::Stopped) {
         error = Stop(0);
@@ -1167,7 +1167,7 @@ again:
         CpuVacant.Set(threads);
         threads.Clear();
         cores.Clear();
-        return TError(EError::ResourceNotAvailable, "Not enough cpus in " + Name);
+        return TError(EError::ResourceNotAvailable, "Not enough cpus in CT{}:{}", Id, Name);
     }
 
     return OK;
@@ -1233,7 +1233,7 @@ TError TContainer::DistributeCpus() {
         if (childs.empty())
             continue;
 
-        L_VERBOSE("Distribute CPUs {} in {}", parent->CpuVacant.Format(), parent->Name);
+        L_VERBOSE("Distribute CPUs {} in CT{}:{}", parent->CpuVacant.Format(), parent->Id, parent->Name);
 
         uint64_t vacantGuarantee = 0;
 
@@ -1258,7 +1258,7 @@ TError TContainer::DistributeCpus() {
                     break;
                 case ECpuSetType::Node:
                     if (!NumaNodes.Get(ct->CpuSetArg))
-                        return TError(EError::ResourceNotAvailable, "Numa node not found for " + ct->Name);
+                        return TError(EError::ResourceNotAvailable, "Numa node not found for CT{}:{}", ct->Id, ct->Name);
                     affinity.Set(NodeThreads[ct->CpuSetArg]);
                     break;
                 case ECpuSetType::Cores:
@@ -1284,7 +1284,7 @@ TError TContainer::DistributeCpus() {
                 }
 
                 if (!affinity.Weight() || !affinity.IsSubsetOf(parent->CpuAffinity))
-                    return TError(EError::ResourceNotAvailable, "Not enough cpus for " + ct->Name);
+                    return TError(EError::ResourceNotAvailable, "Not enough cpus for CT{}:{}", ct->Id, ct->Name);
 
                 if (!ct->CpuAffinity.IsEqual(affinity)) {
                     ct->CpuAffinity.Clear();
@@ -1293,11 +1293,11 @@ TError TContainer::DistributeCpus() {
                 }
 
                 if (ct->CpuReserve.Weight())
-                    L_ACT("Reserve CPUs {} for {}", ct->CpuReserve.Format(), ct->Name);
+                    L_ACT("Reserve CPUs {} for CT{}:{}", ct->CpuReserve.Format(), ct->Id, ct->Name);
                 else
                     vacantGuarantee += std::max(ct->CpuGuarantee, ct->CpuGuaranteeSum);
 
-                L_VERBOSE("Assign CPUs {} for {}", ct->CpuAffinity.Format(), ct->Name);
+                L_VERBOSE("Assign CPUs {} for CT{}:{}", ct->CpuAffinity.Format(), ct->Id, ct->Name);
 
                 ct->CpuVacant.Set(ct->CpuAffinity);
             }
@@ -1305,8 +1305,8 @@ TError TContainer::DistributeCpus() {
 
         if (vacantGuarantee > parent->CpuVacant.Weight() * CPU_POWER_PER_SEC) {
             if (!parent->CpuVacant.IsEqual(parent->CpuAffinity))
-                return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in " + parent->Name);
-            L("CPU guarantee overcommit in {}", parent->Name);
+                return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in CT{}:{}", parent->Id, Parent->Name);
+            L("CPU guarantee overcommit in CT{}:{}", parent->Id, parent->Name);
         }
     }
 
@@ -2332,7 +2332,7 @@ TError TContainer::Start() {
 TError TContainer::StartOne() {
     TError error;
 
-    L_ACT("Start container CT{}:{}", Id, Name);
+    L_ACT("Start CT{}:{}", Id, Name);
 
     SetState(EContainerState::Starting);
 
@@ -2500,7 +2500,7 @@ TError TContainer::Kill(int sig) {
     if (State != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state ");
 
-    L_ACT("Kill task {} in container CT{}:{}", Task.Pid, Id, Name);
+    L_ACT("Kill task {} in CT{}:{}", Task.Pid, Id, Name);
     return Task.Kill(sig);
 }
 
@@ -2511,7 +2511,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (IsRoot())
         return TError(EError::Permission, "Cannot terminate root container");
 
-    L_ACT("Terminate tasks in container CT{}:{}", Id, Name);
+    L_ACT("Terminate tasks in CT{}:{}", Id, Name);
 
     if (!(Controllers & CGROUP_FREEZER)) {
         if (Task.Pid)
@@ -2597,12 +2597,12 @@ TError TContainer::Stop(uint64_t timeout) {
 
         error = ct->Terminate(deadline);
         if (error) {
-            L_ERR("Cannot terminate tasks in container CT{}:{}: {}", ct->Id, ct->Name, error);
+            L_ERR("Cannot terminate tasks in CT{}:{}: {}", ct->Id, ct->Name, error);
             return error;
         }
 
         if (FreezerSubsystem.IsSelfFreezing(cg)) {
-            L_ACT("Thaw terminated paused container CT{}:{}", ct->Id, ct->Name);
+            L_ACT("Thaw terminated paused CT{}:{}", ct->Id, ct->Name);
             error = FreezerSubsystem.Thaw(cg, false);
             if (error)
                 return error;
@@ -2615,7 +2615,7 @@ TError TContainer::Stop(uint64_t timeout) {
         if (ct->State == EContainerState::Stopped)
             continue;
 
-        L_ACT("Stop container CT{}:{}", Id, Name);
+        L_ACT("Stop CT{}:{}", Id, Name);
 
         ct->ForgetPid();
 
@@ -2696,7 +2696,7 @@ void TContainer::Exit(int status, bool oomKilled) {
     /* Detect memory shortage that happened in syscalls */
     auto cg = GetCgroup(MemorySubsystem);
     if (!oomKilled && OomIsFatal && MemorySubsystem.GetOomEvents(cg)) {
-        L("Container CT{}:{} hit memory limit", Id, Name);
+        L("CT{}:{} hit memory limit", Id, Name);
         oomKilled = true;
     }
 
@@ -3092,7 +3092,7 @@ void TContainer::SyncState() {
     TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
     TError error;
 
-    L_ACT("Sync container CT{}:{} state {}", Id, Name, StateName(State));
+    L_ACT("Sync CT{}:{} state {}", Id, Name, StateName(State));
 
     if (!freezerCg.Exists()) {
         if (State != EContainerState::Stopped)
