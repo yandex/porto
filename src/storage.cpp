@@ -132,11 +132,10 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
         L_ACT("Remove junk: {}", path);
         error = RemoveRecursive(path);
         if (error) {
-            L_WRN("Cannot remove junk: {}: {}", path, error);
-
+            L_VERBOSE("Cannot remove junk {}: {}", path, error);
             error = path.RemoveAll();
             if (error)
-                L_WRN("cannot delete junk: {}: {}", path, error);
+                L_WRN("cannot remove junk {}: {}", path, error);
         }
     }
 
@@ -727,11 +726,10 @@ TError TStorage::Remove() {
 
     error = RemoveRecursive(temp);
     if (error) {
-        L_WRN("Cannot remove layer: {}", error);
-
+        L_VERBOSE("Cannot remove storage {}: {}", temp, error);
         error = temp.RemoveAll();
         if (error)
-            L_WRN("Cannot delete layer: {}", error);
+            L_WRN("Cannot remove storage {}: {}", temp, error);
     }
 
     DecPlaceLoad(Place);

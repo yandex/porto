@@ -676,11 +676,10 @@ static void CleanupTempdir() {
         TPath path = temp / name;
         error = RemoveRecursive(path);
         if (error) {
-            L_WRN("Cannot remove {}: {}", path, error);
-
+            L_VERBOSE("Cannot remove workdir {}: {}", path, error);
             error = path.RemoveAll();
             if (error)
-                L_WRN("Cannot delete {}: {}", path, error);
+                L_WRN("Cannot remove workdir {}: {}", path, error);
         }
     }
 }

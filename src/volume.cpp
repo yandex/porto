@@ -2035,11 +2035,10 @@ TError TVolume::DestroyOne(bool strict) {
         if (!UserStorage()) {
             error = RemoveRecursive(StoragePath);
             if (error) {
-                L_ERR("Cannot remove storage: {}", error);
-
+                L_VERBOSE("Cannot remove storage {}: {}", StoragePath, error);
                 error = StoragePath.RemoveAll();
                 if (error) {
-                    L_ERR("Cannot clear storage: {}", error);
+                    L_WRN("Cannot remove storage {}: {}", StoragePath, error);
                     if (!ret)
                         ret = error;
                 }
@@ -2048,10 +2047,10 @@ TError TVolume::DestroyOne(bool strict) {
             /* File image storage for backend=loop always persistent. */
             error = ClearRecursive(StoragePath);
             if (error)
-                L_ERR("Cannot clear storage: {}", error);
+                L_VERBOSE("Cannot clear storage {}: {}", StoragePath, error);
             error = StoragePath.ClearDirectory();
             if (error) {
-                L_ERR("Cannot clear storage: {}", error);
+                L_WRN("Cannot clear storage {}: {}", StoragePath, error);
                 if (!ret)
                     ret = error;
             }
@@ -2703,11 +2702,10 @@ void TVolume::RestoreAll(void) {
 
         error = RemoveRecursive(dir);
         if (error) {
-            L_ERR("Cannot remove directory {}: {}", dir, error);
-
+            L_VERBOSE("Cannot remove {}: {}", dir, error);
             error = dir.RemoveAll();
             if (error)
-                L_ERR("Cannot delete directory {}", dir);
+                L_WRN("Cannot remove {}: {}", dir, error);
         }
     }
 
