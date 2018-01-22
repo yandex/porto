@@ -1,3 +1,23 @@
+yandex-porto (4.6.0) unstable; urgency=low
+
+  * container: update own cpu_limit_total when changing cpu_limit
+  * porto: set backlog limit to max_clients
+  * porto: in rpc proto wait timeout in ms
+  * porto: fix Container.Wait in python api
+  * log: print command name in response line
+  * cgroup: walk sub-cgroups using TPathWalk
+  * fuzzer: use smaller tmpfs
+  * porto.md: add note abount replacing bind-mounts with volume backend=bind
+  * error: use format for error extension
+  * porto: supress error from non-fatal fails of helper calls
+  * path: handle ENOENT in TPathWalk.Next()
+  * container: use CT{Id}:{Name} for log and errors
+  * client: log clients as CL{Fd}:{Comm}({Pid}) CT{Id}:{Name}
+  * porto: add interface for getting/changing system properties
+  * porto: add counters for common error codes
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 22 Jan 2018 17:37:12 +0300
+
 yandex-porto (4.5.0) unstable; urgency=low
 
   [ Maxim Samoylov ]
