@@ -1,7 +1,4 @@
-debootstrap --foreign --variant=minbase --exclude systemd-sysv --include upstart-sysv --arch amd64 xenial . http://mirror.yandex.ru/ubuntu
-
-# Use upstart for /sbin/init
-sed -i -e 's/systemd-sysv /upstart-sysv /g' debootstrap/required
+debootstrap --foreign --variant=minbase --arch amd64 xenial . http://mirror.yandex.ru/ubuntu
 
 # Do not create devices
 tar cz -T /dev/null > debootstrap/devices.tar.gz

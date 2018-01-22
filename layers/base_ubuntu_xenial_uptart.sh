@@ -11,7 +11,13 @@ deb http://mirror.yandex.ru/ubuntu xenial-updates main restricted universe multi
 deb http://mirror.yandex.ru/ubuntu xenial-security main restricted universe multiverse
 EOF
 
-systemctl mask console-getty.service
+tee etc/init/power-status-changed.conf <<EOF
+start on power-status-changed
+exec /sbin/shutdown -h now
+EOF
+
+# Do not mount anything at boot
+sed -e 's/^/#/g' -i lib/init/fstab
 
 export DEBIAN_FRONTEND="noninteractive"
 
