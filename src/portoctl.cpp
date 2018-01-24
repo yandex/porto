@@ -2184,7 +2184,7 @@ public:
 class TBuildCmd final : public ICmd {
 public:
     TBuildCmd(Porto::Connection *api) : ICmd(api, "build", 0,
-            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-Q image.squashfs] [-B bootstrap] [-S script]... [properties]...",
+            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-Q image.squashfs] [-B|-b script] [-S script]... [properties]...",
             "build container image",
             "    -l layer|dir|tarball       layer for bootstrap, if empty run in host\n"
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
@@ -2193,6 +2193,7 @@ public:
             "    -Q image.squashfs          save as squashfs image\n"
             "    -c compression             override compression\n"
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
+            "    -b bootstrap2              bash script runs inside before os (with root=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
             "    -M                         merge all layers together\n"
             "    -k                         keep volume and container\n"
@@ -2203,6 +2204,7 @@ public:
     int Execute(TCommandEnviroment *environment) final override {
         TLauncher launcher(Api);
         TLauncher bootstrap(Api);
+        TLauncher bootstrap2(Api);
         TLauncher chroot(Api);
         TError error;
 
@@ -2223,6 +2225,7 @@ public:
         std::vector<std::string> layers;
         std::vector<TPath> scripts;
         TPath bootstrap_script;
+        TPath bootstrap2_script;
 
         const auto &opts = environment->GetOpts({
             { 'L', true, [&](const char *arg) { launcher.Layers.push_back(arg); } },
@@ -2232,6 +2235,7 @@ public:
             { 'Q', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); squash = true; } },
             { 'c', true, [&](const char *arg) { compression = arg; } },
             { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
+            { 'b', true, [&](const char *arg) { bootstrap2_script = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *) { launcher.WeakContainer = false; } },
             { 'M', false, [&](const char *) { launcher.MergeLayers = true; } },
@@ -2277,6 +2281,11 @@ public:
 
         if (!bootstrap_script.IsEmpty() && !bootstrap_script.Exists()) {
             std::cerr << "Bootstrap " << bootstrap_script << " not exists" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if (!bootstrap2_script.IsEmpty() && !bootstrap2_script.Exists()) {
+            std::cerr << "Bootstrap2 " << bootstrap2_script << " not exists" << std::endl;
             return EXIT_FAILURE;
         }
 
@@ -2370,11 +2379,52 @@ public:
             bootstrap.Cleanup();
         }
 
+        if (!bootstrap2_script.IsEmpty()) {
+            bootstrap2.Container = launcher.Container + "/bootstrap2";
+            bootstrap2.ForwardStreams = true;
+            bootstrap2.WaitExit = true;
+            bootstrap2.StartOS = true;
+            bootstrap2.Environment = launcher.Environment;
+
+            std::string script_text;
+            error = bootstrap2_script.ReadAll(script_text);
+            if (!error)
+                error = volume_script.WriteAll(script_text);
+            if (error) {
+                std::cout << "Cannot copy script: " << error << std::endl;
+                goto err;
+            }
+
+            bootstrap2.SetProperty("stdin_path", "/dev/null");
+            bootstrap2.SetProperty("isolate", "true");
+            bootstrap2.SetProperty("net", "inherited");
+            bootstrap2.SetProperty("root", volume);
+            bootstrap2.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
+
+            std::cout << "Starting bootstrap2 " << bootstrap2_script << std::endl;
+
+            error = bootstrap2.Launch();
+            if (error) {
+                std::cout << "Cannot start bootstrap2: " << error << std::endl;
+                goto err;
+            }
+
+            if (bootstrap2.ExitCode) {
+                std::cout << "Bootstrap2: " << bootstrap2.ExitMessage << std::endl;
+                goto err;
+            }
+
+            bootstrap2.Cleanup();
+        }
+
         chroot.Container = launcher.Container + "/chroot";
         chroot.Environment = launcher.Environment;
         chroot.SetProperty("root", volume);
         chroot.SetProperty("isolate", "true");
         chroot.SetProperty("net", "inherited");
+
+        if (chroot.StartOS)
+            std::cout << "Starting OS" << std::endl;
 
         error = chroot.Launch();
         if (error) {
