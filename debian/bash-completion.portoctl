@@ -140,26 +140,6 @@ _portoctl ()
 			;;
 		esac
 		;;
-	save)
-		case "$prev" in
-		-f)
-			_filedir
-			;;
-		*)
-			_porto_containers "-P" "-f"
-			;;
-		esac
-		;;
-	load)
-		case "$prev" in
-		-f)
-			_filedir
-			;;
-		*)
-			_porto_containers "-P" "-f" "-S"
-			;;
-		esac
-		;;
 	list)
 		COMPREPLY=( $( compgen -W "-1 -f -t" -- $cur ) )
 		;;
