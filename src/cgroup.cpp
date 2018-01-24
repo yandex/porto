@@ -1256,23 +1256,13 @@ TError InitializeCgroups() {
             }
 
             error = subsys->Root.Mount("cgroup", "cgroup", 0, { subsys->MntOption() });
-
-            /* in kernels < 3.14 cgroup net_cls was in module cls_cgroup */
-            if (error && subsys->Type == "net_cls") {
-                if (system("modprobe cls_cgroup"))
-                    L_ERR("Cannot load cls_cgroup");
-                error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
-            }
-
-            if (error && subsys->IsOptional()) {
-                L_CG("Cgroup subsystem {} is not supported: {}", subsys->Type, error);
-                error = subsys->Root.Rmdir();
-                continue;
-            }
-
             if (error) {
-                L_ERR("Cannot mount cgroup: {}", error);
                 (void)subsys->Root.Rmdir();
+                if (subsys->IsOptional()) {
+                    L_CG("Cgroup subsystem {} is not supported: {}", subsys->Type, error);
+                    continue;
+                }
+                L_ERR("Cannot mount cgroup: {}", error);
                 return error;
             }
         }
