@@ -638,7 +638,7 @@ bool TFreezerSubsystem::IsParentFreezing(const TCgroup &cg) const {
 }
 
 // Cpu
-void TCpuSubsystem::InitializeSubsystem() {
+TError TCpuSubsystem::InitializeSubsystem() {
     TCgroup cg = RootCgroup();
 
     HasShares = cg.Has("cpu.shares");
@@ -665,6 +665,8 @@ void TCpuSubsystem::InitializeSubsystem() {
         L_CG("support rt group");
     if (HasReserve)
         L_CG("support reserves");
+
+    return OK;
 }
 
 TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
@@ -1219,6 +1221,7 @@ TError InitializeCgroups() {
     }
 
     if (config().daemon().merge_memory_blkio_controllers() &&
+            !MemorySubsystem.IsDisabled() && !BlkioSubsystem.IsDisabled() &&
             MemorySubsystem.Root.IsEmpty() && BlkioSubsystem.Root.IsEmpty()) {
         TPath path = root / "memory,blkio";
 
@@ -1237,34 +1240,52 @@ TError InitializeCgroups() {
     }
 
     for (auto subsys: AllSubsystems) {
+        if (subsys->IsDisabled() || subsys->Root)
+            continue;
 
+        TPath path = root / subsys->Type;
+
+        L_CG("Mount cgroup subsysem {} at {}", subsys->Type, path);
+        if (!path.Exists()) {
+            error = path.Mkdir(0755);
+            if (error) {
+                L_ERR("Cannot create cgroup mountpoint: {}", error);
+                continue;
+            }
+        }
+
+        error = path.Mount("cgroup", "cgroup", 0, { subsys->MntOption() });
+        if (error) {
+            (void)path.Rmdir();
+            L_ERR("Cannot mount cgroup: {}", error);
+            continue;
+        }
+
+        subsys->Root = path;
+    }
+
+    for (auto subsys: AllSubsystems) {
+        if (!subsys->Root)
+            continue;
+        error = subsys->InitializeSubsystem();
+        if (error) {
+            L_ERR("Cannot initialize cgroup subsystem{}: {}", subsys->Type, error);
+            subsys->Root = "";
+        }
+    }
+
+    for (auto subsys: AllSubsystems) {
         if (subsys->IsDisabled()) {
             L_CG("Cgroup subsysem {} is disabled", subsys->Type);
             continue;
         }
 
-        if (subsys->Root.IsEmpty()) {
-            subsys->Root = root / subsys->Type;
-
-            L_CG("Mount cgroup subsysem {} at {}", subsys->Type, subsys->Root);
-            if (!subsys->Root.Exists()) {
-                error = subsys->Root.Mkdir(0755);
-                if (error) {
-                    L_ERR("Cannot create cgroup mountpoint: {}", error);
-                    return error;
-                }
+        if (!subsys->Root) {
+            if (subsys->IsOptional()) {
+                L_CG("Cgroup subsystem {} is not supported", subsys->Type);
+                continue;
             }
-
-            error = subsys->Root.Mount("cgroup", "cgroup", 0, { subsys->MntOption() });
-            if (error) {
-                (void)subsys->Root.Rmdir();
-                if (subsys->IsOptional()) {
-                    L_CG("Cgroup subsystem {} is not supported: {}", subsys->Type, error);
-                    continue;
-                }
-                L_ERR("Cannot mount cgroup: {}", error);
-                return error;
-            }
+            return TError(EError::NotSupported, "Cgroup {} is not supported", subsys->Type);
         }
 
         Subsystems.push_back(subsys);
@@ -1279,11 +1300,11 @@ TError InitializeCgroups() {
                 break;
             }
         }
+
         if (subsys->Hierarchy == subsys)
             Hierarchies.push_back(subsys);
 
         subsys->Supported = true;
-        subsys->InitializeSubsystem();
     }
 
     for (auto subsys: AllSubsystems)

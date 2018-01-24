@@ -36,7 +36,10 @@ public:
     virtual bool IsDisabled() { return false; }
     virtual bool IsOptional() { return false; }
     virtual std::string MntOption() { return Type; }
-    virtual void InitializeSubsystem() { }
+
+    virtual TError InitializeSubsystem() {
+        return OK;
+    }
 
     virtual TError InitializeCgroup(TCgroup &cgroup) {
         (void)cgroup;
@@ -234,7 +237,7 @@ public:
     uint64_t MaxShares = 0ull;
 
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
-    void InitializeSubsystem() override;
+    TError InitializeSubsystem() override;
     TError InitializeCgroup(TCgroup &cg) override;
     TError SetLimit(TCgroup &cg, uint64_t period, uint64_t limit);
     TError SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit);
@@ -269,12 +272,14 @@ public:
     bool HasThrottler = false;
     bool HasSaneBehavior = false;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
+    bool IsDisabled() override { return !config().container().enable_blkio(); }
     bool IsOptional() override { return true; }
-    void InitializeSubsystem() override {
+    TError InitializeSubsystem() override {
         HasWeight = RootCgroup().Has("blkio.weight");
         HasThrottler = RootCgroup().Has("blkio.throttle.read_bps_device");
         if (RootCgroup().GetBool("cgroup.sane_behavior", HasSaneBehavior))
             HasSaneBehavior = false;
+        return OK;
     }
     enum IoStat {
         Read = 1,
@@ -308,8 +313,10 @@ public:
     bool IsOptional() override { return true; }
 
     /* for now supports only 2MB pages */
-    void InitializeSubsystem() override {
-        Supported = RootCgroup().Has(HUGE_LIMIT);
+    TError InitializeSubsystem() override {
+        if (!RootCgroup().Has(HUGE_LIMIT))
+            return TError(EError::NotSupported, "No {}", HUGE_LIMIT);
+        return OK;
     }
 
     TError GetHugeUsage(TCgroup &cg, uint64_t &usage) const {

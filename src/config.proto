@@ -138,6 +138,7 @@ message TCfg {
         optional bool propagate_cpu_guarantee = 42;
         optional int64 dead_memory_soft_limit = 43;
         optional bool pressurize_on_death = 44;
+        optional bool enable_blkio = 45;
 
         message TSysctl {
             required string key = 1;
