@@ -23,12 +23,6 @@ pre-start script
 		exit 0
 	fi
 
-	# we want to clean up daemon state only if it stopped gracefully by
-	# the user
-	if [ ! -e /run/portoloop.pid ]; then
-		rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || :
-	fi
-
 	# if there is cgroup-bin or cgroup-lite installed
 	# we need to wait while it mounts sysfs and controllers
 	timeout=360
