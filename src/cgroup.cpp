@@ -1212,7 +1212,7 @@ TError InitializeCgroups() {
 
     for (auto subsys: AllSubsystems) {
         for (auto &mnt: mounts) {
-            if (mnt.Type == "cgroup" && mnt.HasOption(subsys->MntOption())) {
+            if (mnt.Type == "cgroup" && mnt.HasOption(subsys->TestOption())) {
                 subsys->Root = mnt.Target;
                 L_CG("Found cgroup subsystem {} mounted at {}", subsys->Type, subsys->Root);
                 break;
@@ -1254,7 +1254,7 @@ TError InitializeCgroups() {
             }
         }
 
-        error = path.Mount("cgroup", "cgroup", 0, { subsys->MntOption() });
+        error = path.Mount("cgroup", "cgroup", 0, subsys->MountOptions() );
         if (error) {
             (void)path.Rmdir();
             L_ERR("Cannot mount cgroup: {}", error);

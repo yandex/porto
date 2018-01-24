@@ -35,7 +35,8 @@ public:
     TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
     virtual bool IsDisabled() { return false; }
     virtual bool IsOptional() { return false; }
-    virtual std::string MntOption() { return Type; }
+    virtual std::string TestOption() { return Type; }
+    virtual std::vector<std::string> MountOptions() { return {Type}; }
 
     virtual TError InitializeSubsystem() {
         return OK;
@@ -349,7 +350,8 @@ public:
     TSystemdSubsystem() : TSubsystem(CGROUP_SYSTEMD, "systemd") {}
     bool IsDisabled() override { return !config().container().enable_systemd(); }
     bool IsOptional() override { return true; }
-    std::string MntOption() override { return "name=" + Type; }
+    std::string TestOption() override { return "name=" + Type; }
+    std::vector<std::string> MountOptions() override { return { "none", "name=" + Type }; }
 };
 
 extern TMemorySubsystem     MemorySubsystem;
