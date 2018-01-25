@@ -1,3 +1,17 @@
+yandex-porto (4.7.0) unstable; urgency=low
+
+  * portoctl build: add second bootstrap script
+  * layers: remove debian and ubuntu-xenial-upstart add ubuntu-bionic
+  * porto.md: list kernel features
+  * porto: remove pre-start kludge
+  * cgroup: remove kludge for 3.14
+  * cgroup: do not mount disabled cgroups
+  * cgroup: fix mounting cgroup for systemd
+  * error: limit description with 64k
+  * network: add optional ceil for default traffic class
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 25 Jan 2018 16:41:37 +0300
+
 yandex-porto (4.6.0) unstable; urgency=low
 
   * container: update own cpu_limit_total when changing cpu_limit
