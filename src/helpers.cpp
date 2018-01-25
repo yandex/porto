@@ -41,22 +41,11 @@ TError RunCommand(const std::vector<std::string> &command,
     if (task.Pid) {
         error = task.Wait();
         if (error) {
-            struct stat st;
-            char buf[2048];
-            ssize_t len = 0;
-            if (err.Stat(st) || st.st_size <= sizeof(buf)) {
-                len = pread(err.Fd, buf, sizeof(buf), 0);
-            } else {
-                len = pread(err.Fd, buf, sizeof(buf) / 2 - 1, 0);
-                if (len < 0)
-                    len = 0;
-                buf[len++] = '\n';
-                buf[len++] = '\n';
-                ssize_t len2 = pread(err.Fd, buf + len, sizeof(buf) - len, 0);
-                if (len2 > 0)
-                        len += len2;
-            }
-            error = TError(error, "helper: {} stderr: {}", cmdline, std::string(buf, len));
+            std::string text;
+            TError error2 = err.ReadEnds(text, TError::MAX - 1024);
+            if (error2)
+                text = "Cannot read stderr: " + error2.ToString();
+            error = TError(error, "helper: {} stderr: {}", cmdline, text);
         }
         return error;
     }

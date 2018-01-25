@@ -66,7 +66,7 @@ bool TError::Deserialize(int fd, TError &error) {
         return true;
     }
 
-    if (len < 0 || len > 4096) {
+    if (len < 0 || len > TError::MAX) {
         error = TError("Invalid error description length: {}", len);
         return true;
     }

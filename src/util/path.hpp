@@ -235,6 +235,7 @@ public:
     TPath ProcPath(void) const;
     TError Read(std::string &text) const;
     TError ReadAll(std::string &text, size_t max) const;
+    TError ReadEnds(std::string &text, size_t max) const;
     TError Truncate(off_t size) const;
     TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);

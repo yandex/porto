@@ -1160,6 +1160,32 @@ TError TFile::ReadAll(std::string &text, size_t max) const {
     return OK;
 }
 
+TError TFile::ReadEnds(std::string &text, size_t max) const {
+    ssize_t head = 0, tail, size;
+    struct stat st;
+
+    if (Stat(st) || st.st_size <= max) {
+        size = st.st_size ?: max;
+        text.resize(size);
+        tail = pread(Fd, &text[0], size, 0);
+    } else {
+        std::string cut = fmt::format("\n--cut {}--\n", StringFormatSize(st.st_size));
+        size = (max - cut.size()) / 2;
+        text.resize(max);
+        head = pread(Fd, &text[0], size, 0);
+        if (head < 0)
+            return TError::System("read");
+        memcpy(&text[head], cut.c_str(), cut.size());
+        head += cut.size();
+        size = max - head;
+        tail = pread(Fd, &text[head], size, st.st_size - size);
+    }
+    if (tail < 0)
+        return TError::System("read");
+    text.resize(head + tail);
+    return OK;
+}
+
 TError TFile::Truncate(off_t size) const {
     if (ftruncate(Fd, size))
         return TError::System("ftruncate");
