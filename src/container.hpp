@@ -326,6 +326,9 @@ public:
     bool HasPidFor(const TContainer &ct) const;
     TError GetPidFor(pid_t pidns, pid_t &pid) const;
 
+    TError GetThreadCount(uint64_t &count) const;
+    TError GetProcessCount(uint64_t &count) const;
+
     TError StartTask();
     TError Start();
     TError Stop(uint64_t timeout);
@@ -365,7 +368,7 @@ public:
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;
     TTuple RequiredVolumes;
 
-    TError GetEnvironment(TEnv &env);
+    TError GetEnvironment(TEnv &env) const;
 
     static TError ValidName(const std::string &name, bool superuser);
     static std::string ParentName(const std::string &name);

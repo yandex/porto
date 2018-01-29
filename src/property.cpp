@@ -3582,12 +3582,7 @@ public:
         if (error)
             return error;
         uint64_t count;
-        if (CT->IsRoot()) {
-            count = 0; /* too much work */
-        } else {
-            auto cg = CT->GetCgroup(FreezerSubsystem);
-            error = cg.GetCount(false, count);
-        }
+        error = CT->GetProcessCount(count);
         if (!error)
             value = std::to_string(count);
         return error;
@@ -3605,15 +3600,7 @@ public:
         if (error)
             return error;
         uint64_t count;
-        if (CT->IsRoot()) {
-            count = GetTotalThreads();
-        } else if (CT->Controllers & CGROUP_PIDS) {
-            auto cg = CT->GetCgroup(PidsSubsystem);
-            error = PidsSubsystem.GetUsage(cg, count);
-        } else {
-            auto cg = CT->GetCgroup(FreezerSubsystem);
-            error = cg.GetCount(true, count);
-        }
+        error = CT->GetThreadCount(count);
         if (!error)
             value = std::to_string(count);
         return error;

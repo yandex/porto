@@ -61,6 +61,17 @@ void InitIpcSysctl() {
     }
 }
 
+unsigned ProcBaseDirs;
+
+void InitProcBaseDirs() {
+    std::vector<std::string> dirs;
+    TPath("/proc").ListSubdirs(dirs);
+    for (auto &dir: dirs)
+        if (!StringOnlyDigits(dir))
+            ProcBaseDirs++;
+    ProcBaseDirs += 2;
+}
+
 void TTaskEnv::ReportPid(pid_t pid) {
     TError error = Sock.SendPid(pid);
     if (error && error.Errno != ENOMEM) {

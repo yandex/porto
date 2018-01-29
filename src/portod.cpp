@@ -726,6 +726,7 @@ static int Portod() {
     InitPortoCgroups();
     InitCapabilities();
     InitIpcSysctl();
+    InitProcBaseDirs();
     TNetwork::InitializeConfig();
 
     L_SYS("Portod config:\n{}", config().DebugString());

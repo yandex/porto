@@ -28,6 +28,7 @@
 #include "rpc.hpp"
 
 extern "C" {
+#include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -900,6 +901,37 @@ TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
             error = TError(EError::Permission, "pid is unreachable");
     }
     return error;
+}
+
+TError TContainer::GetThreadCount(uint64_t &count) const {
+    if (IsRoot()) {
+        struct sysinfo si;
+        if (sysinfo(&si) < 0)
+            return TError::System("sysinfo");
+        count = si.procs;
+    } else if (Controllers & CGROUP_PIDS) {
+        auto cg = GetCgroup(PidsSubsystem);
+        return PidsSubsystem.GetUsage(cg, count);
+    } else {
+        auto cg = GetCgroup(FreezerSubsystem);
+        return cg.GetCount(true, count);
+    }
+    return OK;
+}
+
+TError TContainer::GetProcessCount(uint64_t &count) const {
+    TError error;
+    if (IsRoot()) {
+        struct stat st;
+        error = TPath("/proc").StatStrict(st);
+        if (error)
+            return error;
+        count = st.st_nlink > ProcBaseDirs ? st.st_nlink  - ProcBaseDirs : 0;
+    } else {
+        auto cg = GetCgroup(FreezerSubsystem);
+        return cg.GetCount(false, count);
+    }
+    return OK;
 }
 
 TError TContainer::CheckMemGuarantee() const {
@@ -1935,7 +1967,7 @@ TError TContainer::PrepareCgroups() {
     return OK;
 }
 
-TError TContainer::GetEnvironment(TEnv &env) {
+TError TContainer::GetEnvironment(TEnv &env) const {
     env.ClearEnv();
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");

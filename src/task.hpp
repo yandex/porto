@@ -60,3 +60,6 @@ struct TTaskEnv {
 
 extern std::list<std::string> IpcSysctls;
 void InitIpcSysctl();
+
+extern unsigned ProcBaseDirs;
+void InitProcBaseDirs();
