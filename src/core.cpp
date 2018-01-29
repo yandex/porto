@@ -78,14 +78,14 @@ TError TCore::Handle(const TTuple &args) {
     error = Identify();
 
     if (!Ulimit || !Dumpable) {
-        L_ACT("Ignore core dump from CT:{} {} {}:{} thread {}:{} signal {}, ulimit {} dumpable {}",
+        L_CORE("Ignore core from CT:{} {} {}:{} thread {}:{} signal {}, ulimit {} dumpable {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal,
                 Ulimit, Dumpable);
         return OK;
     }
 
     if (!error && CoreCommand.size()) {
-        L_ACT("Forward core from CT:{} {} {}:{} thread {}:{} signal {}",
+        L_CORE("Forward core from CT:{} {} {}:{} thread {}:{} signal {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
         error = Forward();
         if (error)
@@ -93,7 +93,7 @@ TError TCore::Handle(const TTuple &args) {
     }
 
     if ((error || !CoreCommand.size()) && DefaultPattern) {
-        L_ACT("Save core from CT:{} {} {}:{} thread {}:{} signal {}",
+        L_CORE("Save core from CT:{} {} {}:{} thread {}:{} signal {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
 
         error = Save();
@@ -257,7 +257,7 @@ TError TCore::Save() {
         DefaultPattern = "";
     }
 
-    L("Dumping core into {} ({})", Pattern, DefaultPattern.BaseName());
+    L_CORE("Dumping core into {} ({})", Pattern, DefaultPattern.BaseName());
 
     off_t size = 0;
     off_t data = 0;
@@ -330,7 +330,7 @@ TError TCore::Save() {
     if (!error) {
         time_ms = GetCurrentTimeMs() - time_ms;
         time_ms = time_ms ?: 1;
-        L("Core dump {} ({}) written: {} data, {} holes, {} total, {}B/s",
+        L_CORE("Core dump {} ({}) written: {} data, {} holes, {} total, {}B/s",
                 Pattern, DefaultPattern.BaseName(), StringFormatSize(data),
                 StringFormatSize(size - data), StringFormatSize(size),
                 StringFormatSize(data * 1000ull / time_ms));
