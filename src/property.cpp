@@ -2847,6 +2847,26 @@ TError TMemUsage::Get(std::string &value) {
     return error;
 }
 
+class TMemReclaimed : public TProperty {
+public:
+    TMemReclaimed() : TProperty(D_MEMORY_RECLAIMED, EProperty::NONE,
+                            "memory reclaimed from container [bytes] (ro)") {
+        IsReadOnly = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+    TError Get(std::string &value) {
+        TError error = IsRunning();
+        if (error)
+            return error;
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        uint64_t val;
+        error = MemorySubsystem.GetReclaimed(cg, val);
+        if (!error)
+            value = std::to_string(val);
+        return error;
+    }
+} static MemReclaimed;
+
 class TAnonUsage : public TProperty {
 public:
     TError Get(std::string &value);

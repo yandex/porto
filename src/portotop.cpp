@@ -1141,6 +1141,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddColumn("Memory", "memory_usage b", "Memory usage");
     AddColumn("M g-e", "memory_guarantee b", "Memory guarantee");
     AddColumn("M lim", "memory_limit b", "Memory limit");
+    AddColumn("M r-d/s", "memory_reclaimed' b", "Memory reclaimed");
 
     AddColumn("Anon", "anon_usage b", "Anonymous memory usage");
     AddColumn("A lim", "anon_limit b", "Anonymous memory limit");

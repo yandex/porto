@@ -212,6 +212,7 @@ public:
     TError SetupOOMEvent(TCgroup &cg, TFile &event);
     uint64_t GetOomEvents(TCgroup &cg);
     TError GetOomKills(TCgroup &cg, uint64_t &count);
+    TError GetReclaimed(TCgroup &cg, uint64_t &count) const;
 };
 
 class TFreezerSubsystem : public TSubsystem {

@@ -588,6 +588,13 @@ uint64_t TMemorySubsystem::GetOomEvents(TCgroup &cg) {
     return 0;
 }
 
+TError TMemorySubsystem::GetReclaimed(TCgroup &cg, uint64_t &count) const {
+    TUintMap stat;
+    Statistics(cg, stat);
+    count = stat["total_pgpgout"] * 4096; /* Best estimation for now */
+    return OK;
+}
+
 // Freezer
 TError TFreezerSubsystem::WaitState(const TCgroup &cg, const std::string &state) const {
     uint64_t deadline = GetCurrentTimeMs() + config().daemon().freezer_wait_timeout_s() * 1000;

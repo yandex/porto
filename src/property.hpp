@@ -98,6 +98,7 @@ constexpr const char *D_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *D_STDERR = "stderr";
 constexpr const char *D_STDERR_OFFSET = "stderr_offset";
 constexpr const char *D_MEMORY_USAGE = "memory_usage";
+constexpr const char *D_MEMORY_RECLAIMED = "memory_reclaimed";
 constexpr const char *D_ANON_USAGE = "anon_usage";
 constexpr const char *D_CACHE_USAGE = "cache_usage";
 constexpr const char *D_HUGETLB_USAGE = "hugetlb_usage";
