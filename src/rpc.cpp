@@ -1148,72 +1148,70 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
                                  req.has_compress() ? req.compress() : "");
 }
 
-noinline static TError GetSystemProperties(rpc::TContainerResponse &rsp) {
-    auto sys = rsp.mutable_system();
+noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rpc::TGetSystemResponse *rsp) {
+    rsp->set_porto_version(PORTO_VERSION);
+    rsp->set_porto_revision(PORTO_REVISION);
+    rsp->set_kernel_version(config().linux_version());
+    rsp->set_errors(Statistics->Errors);
+    rsp->set_warnings(Statistics->Warns);
+    rsp->set_restarts(Statistics->Spawned - 1);
+    rsp->set_porto_uptime((GetCurrentTimeMs() - Statistics->PortoStarted) / 1000);
+    rsp->set_master_uptime((GetCurrentTimeMs() - Statistics->MasterStarted) / 1000);
 
-    sys->set_porto_version(PORTO_VERSION);
-    sys->set_porto_revision(PORTO_REVISION);
-    sys->set_kernel_version(config().linux_version());
-    sys->set_errors(Statistics->Errors);
-    sys->set_warnings(Statistics->Warns);
-    sys->set_restarts(Statistics->Spawned - 1);
-    sys->set_porto_uptime((GetCurrentTimeMs() - Statistics->PortoStarted) / 1000);
-    sys->set_master_uptime((GetCurrentTimeMs() - Statistics->MasterStarted) / 1000);
+    rsp->set_verbose(Verbose);
+    rsp->set_debug(Debug);
+    rsp->set_log_lines(Statistics->LogLines);
+    rsp->set_log_bytes(Statistics->LogBytes);
 
-    sys->set_verbose(Verbose);
-    sys->set_debug(Debug);
-    sys->set_log_lines(Statistics->LogLines);
-    sys->set_log_bytes(Statistics->LogBytes);
+    rsp->set_container_count(Statistics->ContainersCount - NR_SERVICE_CONTAINERS);
+    rsp->set_container_limit(config().container().max_total());
+    rsp->set_container_running(RootContainer->RunningChildren);
+    rsp->set_container_created(Statistics->ContainersCreated);
+    rsp->set_container_started(Statistics->ContainersStarted);
+    rsp->set_container_start_failed(Statistics->ContainersFailedStart);
+    rsp->set_container_oom(Statistics->ContainersOOM);
+    rsp->set_container_buried(Statistics->RemoveDead);
+    rsp->set_container_lost(Statistics->RestoreFailed);
 
-    sys->set_container_count(Statistics->ContainersCount - NR_SERVICE_CONTAINERS);
-    sys->set_container_limit(config().container().max_total());
-    sys->set_container_running(RootContainer->RunningChildren);
-    sys->set_container_created(Statistics->ContainersCreated);
-    sys->set_container_started(Statistics->ContainersStarted);
-    sys->set_container_start_failed(Statistics->ContainersFailedStart);
-    sys->set_container_oom(Statistics->ContainersOOM);
-    sys->set_container_buried(Statistics->RemoveDead);
-    sys->set_container_lost(Statistics->RestoreFailed);
+    rsp->set_stream_rotate_bytes(Statistics->LogRotateBytes);
+    rsp->set_stream_rotate_errors(Statistics->LogRotateErrors);
 
-    sys->set_stream_rotate_bytes(Statistics->LogRotateBytes);
-    sys->set_stream_rotate_errors(Statistics->LogRotateErrors);
+    rsp->set_volume_count(Statistics->VolumesCount);
+    rsp->set_volume_limit(config().volumes().max_total());
+    rsp->set_volume_created(Statistics->VolumesCreated);
+    rsp->set_volume_failed(Statistics->VolumesFailed);
 
-    sys->set_volume_count(Statistics->VolumesCount);
-    sys->set_volume_limit(config().volumes().max_total());
-    sys->set_volume_created(Statistics->VolumesCreated);
-    sys->set_volume_failed(Statistics->VolumesFailed);
+    rsp->set_client_count(Statistics->ClientsCount);
+    rsp->set_client_max(config().daemon().max_clients());
+    rsp->set_client_connected(Statistics->ClientsConnected);
 
-    sys->set_client_count(Statistics->ClientsCount);
-    sys->set_client_max(config().daemon().max_clients());
-    sys->set_client_connected(Statistics->ClientsConnected);
+    rsp->set_request_queued(Statistics->RequestsQueued);
+    rsp->set_request_completed(Statistics->RequestsCompleted);
+    rsp->set_request_failed(Statistics->RequestsFailed);
+    rsp->set_request_threads(config().daemon().workers());
+    rsp->set_request_longer_1s(Statistics->RequestsLonger1s);
+    rsp->set_request_longer_3s(Statistics->RequestsLonger3s);
+    rsp->set_request_longer_30s(Statistics->RequestsLonger30s);
+    rsp->set_request_longer_5m(Statistics->RequestsLonger5m);
 
-    sys->set_request_queued(Statistics->RequestsQueued);
-    sys->set_request_completed(Statistics->RequestsCompleted);
-    sys->set_request_failed(Statistics->RequestsFailed);
-    sys->set_request_threads(config().daemon().workers());
-    sys->set_request_longer_1s(Statistics->RequestsLonger1s);
-    sys->set_request_longer_3s(Statistics->RequestsLonger3s);
-    sys->set_request_longer_30s(Statistics->RequestsLonger30s);
-    sys->set_request_longer_5m(Statistics->RequestsLonger5m);
-
-    sys->set_fail_system(Statistics->FailSystem);
-    sys->set_fail_invalid_value(Statistics->FailInvalidValue);
-    sys->set_fail_invalid_command(Statistics->FailInvalidCommand);
+    rsp->set_fail_system(Statistics->FailSystem);
+    rsp->set_fail_invalid_value(Statistics->FailInvalidValue);
+    rsp->set_fail_invalid_command(Statistics->FailInvalidCommand);
 
     return OK;
 }
 
-noinline static TError SetSystemProperties(const rpc::TSetSystemProperties &req) {
+noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rpc::TSetSystemResponse *rsp) {
     if (!CL->IsSuperUser())
         return TError(EError::Permission, "Only for super-user");
 
-    if (req.has_verbose()) {
-        Verbose = req.verbose();
+    if (req->has_verbose()) {
+        Verbose = req->verbose();
         Debug &= Verbose;
     }
 
-    if (req.has_debug()) {
-        Debug = req.debug();
+    if (req->has_debug()) {
+        Debug = req->debug();
         Verbose |= Debug;
     }
 
@@ -1334,9 +1332,9 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     else if (req.has_locateprocess())
         error = LocateProcess(req.locateprocess(), rsp);
     else if (req.has_getsystem())
-        error = GetSystemProperties(rsp);
+        error = GetSystemProperties(&req.getsystem(), rsp.mutable_getsystem());
     else if (req.has_setsystem())
-        error = SetSystemProperties(req.setsystem());
+        error = SetSystemProperties(&req.setsystem(), rsp.mutable_setsystem());
     else
         error = TError(EError::InvalidMethod, "invalid RPC method");
 

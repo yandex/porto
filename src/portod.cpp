@@ -1539,7 +1539,7 @@ undo:
 static int GetSystemProperties() {
     Porto::Connection conn;
     std::string rsp;
-    int ret = conn.Raw("getSystem {}", rsp);
+    int ret = conn.Raw("GetSystem {}", rsp);
     if (ret) {
         std::cerr << conn.TextError() << std::endl;
         return EXIT_FAILURE;
@@ -1553,7 +1553,7 @@ static int SetSystemProperties(TTuple arg) {
     std::string rsp;
     if (arg.size() != 2)
         return EXIT_FAILURE;
-    int ret = conn.Raw(fmt::format("setSystem {{ {}: {} }}", arg[0], arg[1]), rsp);
+    int ret = conn.Raw(fmt::format("SetSystem {{ {}: {} }}", arg[0], arg[1]), rsp);
     if (ret) {
         std::cerr << conn.TextError() << std::endl;
         return EXIT_FAILURE;
@@ -1585,7 +1585,7 @@ static void Usage() {
         << "  upgrade         upgrade running portod" << std::endl
         << "  dump            print internal key-value state" << std::endl
         << "  get             print system properties" << std::endl
-        << "  set             change system properties" << std::endl
+        << "  set <key> <val> change system properties" << std::endl
         << "  core            receive and forward core dump" << std::endl
         << "  help            print this message" << std::endl
         << "  version         print version and revision" << std::endl

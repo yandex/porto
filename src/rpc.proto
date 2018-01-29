@@ -108,8 +108,8 @@ message TContainerRequest {
     optional TAttachProcessRequest attachProcess = 201;
     optional TLocateProcessRequest locateProcess = 202;
 
-    optional TGetSystemProperties getSystem = 300;
-    optional TSetSystemProperties setSystem = 301;
+    optional TGetSystemRequest GetSystem = 300;
+    optional TSetSystemRequest SetSystem = 301;
 }
 
 message TContainerResponse {
@@ -134,18 +134,14 @@ message TContainerResponse {
     optional TStorageListResponse storageList = 17;
     optional TLocateProcessResponse locateProcess = 18;
 
-    optional TSystemProperties system = 300;
+    optional TGetSystemResponse GetSystem = 300;
+    optional TSetSystemResponse SetSystem = 301;
 }
 
-message TGetSystemProperties {
+message TGetSystemRequest {
 }
 
-message TSetSystemProperties {
-    optional bool verbose = 100;
-    optional bool debug = 101;
-}
-
-message TSystemProperties {
+message TGetSystemResponse {
     required string porto_version = 1;
     required string porto_revision = 2;
     required string kernel_version = 3;
@@ -195,6 +191,14 @@ message TSystemProperties {
     required fixed64 fail_system = 600;
     required fixed64 fail_invalid_value = 601;
     required fixed64 fail_invalid_command = 602;
+}
+
+message TSetSystemRequest {
+    optional bool verbose = 100;
+    optional bool debug = 101;
+}
+
+message TSetSystemResponse {
 }
 
 message TContainerCreateRequest {
