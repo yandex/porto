@@ -1,3 +1,15 @@
+yandex-porto (4.7.1) unstable; urgency=low
+
+  * core: log state of ulimit and dumpable when refuse to dump
+  * core: log actions with keyword "CORE"
+  * Revert "porto: load and start saved containers atomatically"
+  * Revert "portoctl: add save and load"
+  * cgroup: do not include cgroup itself into list of childs
+  * container: add GetThreadCount and GetProcessCount
+  * porto: add property "memory_reclaimed"
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 29 Jan 2018 15:05:14 +0300
+
 yandex-porto (4.7.0) unstable; urgency=low
 
   * portoctl build: add second bootstrap script
