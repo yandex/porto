@@ -299,5 +299,6 @@ public:
     TError OpenList(const TPath &path);
     TError Next();
     std::string Name() { return Ent ? Ent->fts_name : ""; }
+    int Level() { return Ent ? Ent->fts_level : -2; }
     void Close();
 };
