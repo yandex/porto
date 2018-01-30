@@ -1112,10 +1112,19 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "of ", "porto_stat[containers]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Volumes: ", "porto_stat[volumes]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Clients: ", "porto_stat[clients]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "Errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "Warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
-    AddCommon(0, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
     AddCommon(0, "Uptime: ", "porto_stat[porto_uptime]", RootContainer, ValueFlags::Seconds);
+
+    AddCommon(1, "Started: ", "porto_stat[containers_started]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "Failed: ", "porto_stat[containers_failed_start]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "Errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "Warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "Unknown: ", "porto_stat[fail_system]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "OOM: ", "porto_stat[containers_oom]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "CPS: ", "porto_stat[clients_connected]", RootContainer, ValueFlags::DfDt);
+    AddCommon(1, "RPS: ", "porto_stat[requests_completed]", RootContainer, ValueFlags::DfDt);
+    AddCommon(1, "FPS: ", "porto_stat[requests_failed]", RootContainer, ValueFlags::DfDt);
+    AddCommon(1, "VAL: ", "porto_stat[fail_invalid_value]", RootContainer, ValueFlags::Raw);
+    AddCommon(1, "CMD: ", "porto_stat[fail_invalid_command]", RootContainer, ValueFlags::Raw);
 
     AddColumn(TColumn("Container", "Container name",
               TPortoValue(Cache, ContainerTree, "absolute_name", ValueFlags::Container), true, false));
@@ -1179,6 +1188,12 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddColumn("Net TX", "S(net_tx_bytes) 'b", "Bytes transmitted by interfaces");
     AddColumn("Pkt TX", "S(net_tx_packets)'", "Packets transmitted by interfaces");
     AddColumn("Drop TX", "S(net_tx_drops)'", "Incomming packets dropped by interfaces");
+
+    /* Porto */
+    AddColumn("Porto", "enable_porto", "Porto access level");
+    AddColumn("Cli", "porto_stat[container_clients]", "Porto clients");
+    AddColumn("RPS", "porto_stat[container_requests]'", "Porto requests/s");
+
 }
 
 static bool exit_immediatly = false;

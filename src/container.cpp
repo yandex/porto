@@ -389,6 +389,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
         AccessLevel = EAccessLevel::ReadOnly;
     else
         AccessLevel = EAccessLevel::Normal;
+    SetProp(EProperty::ENABLE_PORTO);
 }
 
 TContainer::~TContainer() {
