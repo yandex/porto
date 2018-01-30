@@ -1,3 +1,11 @@
+yandex-porto (4.7.2) unstable; urgency=low
+
+  * porto: cleanup GetSystem/SetSystem calls
+  * portotop: add more counters for errors
+  * porto: synchronize default resolv_conf with host
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 30 Jan 2018 19:48:47 +0300
+
 yandex-porto (4.7.1) unstable; urgency=low
 
   * core: log state of ulimit and dumpable when refuse to dump
