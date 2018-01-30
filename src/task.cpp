@@ -194,7 +194,7 @@ TError TTaskEnv::WriteResolvConf() {
         return OK;
     L_ACT("Write resolv.conf for CT{}:{}", CT->Id, CT->Name);
     std::string cfg = StringReplaceAll(CT->ResolvConf.size() ? CT->ResolvConf :
-            config().container().default_resolv_conf(), ";", "\n");
+                                       RootContainer->ResolvConf, ";", "\n");
     return TPath("/etc/resolv.conf").WritePrivate(cfg);
 }
 

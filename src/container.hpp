@@ -73,7 +73,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplyUlimits();
     TError ApplySchedPolicy() const;
     TError ApplyIoPolicy() const;
-    TError ApplyResolvConf() const;
     TError ApplyDeviceConf() const;
     TError ApplyDynamicProperties();
     TError PrepareOomMonitor();
@@ -341,6 +340,8 @@ public:
     /* Refresh cached counters */
     void SyncProperty(const std::string &name);
     static void SyncPropertiesAll();
+
+    TError ApplyResolvConf() const;
 
     TError HasProperty(const std::string &property) const;
     TError GetProperty(const std::string &property, std::string &value) const;

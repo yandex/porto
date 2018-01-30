@@ -556,6 +556,8 @@ static TError CreateRootContainer() {
 
     SystemClient.ReleaseContainer();
 
+    TNetwork::SyncResolvConf();
+
     return OK;
 }
 

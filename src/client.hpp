@@ -100,4 +100,5 @@ private:
 };
 
 extern TClient SystemClient;
+extern TClient WatchdogClient;
 extern __thread TClient *CL;

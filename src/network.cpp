@@ -39,6 +39,10 @@ static std::condition_variable NetThreadCv;
 static uint64_t NetWatchdogPeriod;
 static uint64_t NetProxyNeighbourPeriod;
 
+static std::string ResolvConfCurrent;
+static std::string ResolvConfPrev;
+static uint64_t ResolvConfPeriod = 0;
+
 static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
 static std::map<int, std::string> DeviceGroups;
@@ -305,19 +309,6 @@ void TNetwork::InitializeConfig() {
             auto sysctl = config().mutable_container()->add_net_sysctl();
             sysctl->set_key(key);
             sysctl->set_val(val);
-        }
-    }
-
-    if (config().container().default_resolv_conf().empty()) {
-        TTuple lines;
-        std::string conf;
-        if (!TPath("/etc/resolv.conf").ReadLines(lines)) {
-            for (auto &line: lines) {
-                if (line[0] == '#' || line[0] == ';')
-                    continue;
-                conf += line + ";";
-            }
-            config().mutable_container()->set_default_resolv_conf(conf);
         }
     }
 }
@@ -1291,8 +1282,61 @@ TError TNetwork::RepairLocked() {
     return NetError;
 }
 
+TError TNetwork::SyncResolvConf() {
+    TTuple lines;
+    std::string conf;
+    TError error;
+
+    conf = config().container().default_resolv_conf();
+    if (conf.empty()) {
+        error = TPath("/etc/resolv.conf").ReadLines(lines);
+        if (error)
+            return error;
+
+        for (auto &line: lines) {
+            if (line[0] == '#' || line[0] == ';')
+                continue;
+            conf += line + ";";
+        }
+
+        if (!ResolvConfPeriod) {
+            ResolvConfPeriod = config().network().resolv_conf_watchdog_ms();
+        } else if (conf != ResolvConfPrev) {
+            ResolvConfPrev = conf;
+            return OK;
+        }
+    }
+
+    if (conf == ResolvConfCurrent)
+        return OK;
+
+    error = WatchdogClient.LockContainer(RootContainer);
+    if (error)
+        return error;
+
+    L_ACT("Set default resolv_conf = {}", conf);
+
+    ResolvConfCurrent = conf;
+    RootContainer->ResolvConf = conf;
+
+    for (auto &ct: RootContainer->Subtree()) {
+        if (ct->Root != "/" && !ct->HasProp(EProperty::RESOLV_CONF) &&
+                ct->State != EContainerState::Dead &&
+                ct->State != EContainerState::Stopped) {
+            error = ct->ApplyResolvConf();
+            if (error)
+                L_WRN("Cannot apply resolv_conf CT{}:{} : {}", ct->Id, ct->Name, error);
+        }
+    }
+
+    WatchdogClient.ReleaseContainer();
+
+    return OK;
+}
+
 void TNetwork::NetWatchdog() {
     auto LastProxyNeighbour = GetCurrentTimeMs();
+    auto LastResolvConf = LastProxyNeighbour;
     TError error;
 
     SetProcessName("portod-network");
@@ -1313,6 +1357,10 @@ void TNetwork::NetWatchdog() {
             auto lock = HostNetwork->LockNet();
             HostNetwork->RepairProxyNeightbour();
             LastProxyNeighbour = GetCurrentTimeMs();
+        }
+        if (ResolvConfPeriod && GetCurrentTimeMs() - LastResolvConf >= ResolvConfPeriod) {
+            TNetwork::SyncResolvConf();
+            LastResolvConf = GetCurrentTimeMs();
         }
         auto lock = LockNetworks();
         NetThreadCv.wait_for(lock, std::chrono::milliseconds(NetWatchdogPeriod/2));

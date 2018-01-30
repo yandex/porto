@@ -52,6 +52,7 @@ message TCfg {
         optional bool enable_ip6tnl0 = 40;
         optional bool enable_iproute = 41;
         optional uint32 l3_default_mtu = 42;
+        optional uint32 resolv_conf_watchdog_ms = 43;
     }
 
     message TFileCfg {

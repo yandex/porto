@@ -25,6 +25,7 @@ extern "C" {
 }
 
 TClient SystemClient("<system>");
+TClient WatchdogClient("<watchdog>");
 __thread TClient *CL = nullptr;
 
 TClient::TClient(int fd) : TEpollSource(fd) {

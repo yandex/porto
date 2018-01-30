@@ -1133,7 +1133,7 @@ TError TContainer::ApplyResolvConf() const {
     TError error;
     TFile file;
 
-    if (CT->HasProp(EProperty::RESOLV_CONF) ? CT->ResolvConf == "" : CT->Root == "/")
+    if (HasProp(EProperty::RESOLV_CONF) ? ResolvConf == "" : Root == "/")
         return OK;
 
     if (!Task.Pid)
@@ -1148,9 +1148,9 @@ TError TContainer::ApplyResolvConf() const {
     if (fstatfs(file.Fd, &st) || st.f_type != TMPFS_MAGIC)
         return TError(EError::NotSupported, "resolv.conf not on tmpfs");
 
-    L_ACT("Apply resolv.conf for CT{}:{}", Id, Name);
-    std::string cfg = StringReplaceAll(CT->ResolvConf.size() ? CT->ResolvConf :
-            config().container().default_resolv_conf(), ";", "\n");
+    L_ACT("Apply resolv_conf for CT{}:{}", Id, Name);
+    std::string cfg = StringReplaceAll(ResolvConf.size() ? ResolvConf :
+                                       RootContainer->ResolvConf, ";", "\n");
     error = file.Truncate(0);
     if (!error)
         error = file.WriteAll(cfg);

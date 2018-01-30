@@ -1381,9 +1381,7 @@ public:
     TResolvConf() : TProperty(P_RESOLV_CONF, EProperty::RESOLV_CONF,
             "DNS resolver configuration: default|keep|<resolv.conf option>;... (dynamic)") {}
     TError Get(std::string &value) {
-        if (CT->IsRoot())
-            value = config().container().default_resolv_conf();
-        else if (CT->ResolvConf.size())
+        if (CT->ResolvConf.size() || CT->IsRoot())
             value = CT->ResolvConf;
         else if (CT->HasProp(EProperty::RESOLV_CONF))
             value = "keep";

@@ -242,6 +242,8 @@ public:
     static TError RestoreNetwork(TContainer &ct);
 
     static void NetWatchdog();
+
+    static TError SyncResolvConf();
 };
 
 struct TNetDeviceConfig {
