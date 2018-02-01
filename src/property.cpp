@@ -1362,7 +1362,7 @@ public:
             "DNS resolver configuration: default|keep|<resolv.conf option>;... (dynamic)") {}
     TError Get(std::string &value) {
         if (CT->ResolvConf.size() || CT->IsRoot())
-            value = CT->ResolvConf;
+            value = MergeEscapeStrings(CT->ResolvConf, ';');
         else if (CT->HasProp(EProperty::RESOLV_CONF))
             value = "keep";
         else if (CT->Root == "/")
@@ -1372,7 +1372,7 @@ public:
         return OK;
     }
     TError GetToSave(std::string &value) {
-        value = CT->ResolvConf;
+        value = MergeEscapeStrings(CT->ResolvConf, ';');
         return OK;
     }
     TError Set(const std::string &value) {
@@ -1380,17 +1380,17 @@ public:
         if (error)
             return error;
         if (CT->State != EContainerState::Stopped &&
-            ((CT->HasProp(EProperty::RESOLV_CONF) ? CT->ResolvConf == "" : CT->Root == "/") !=
+            ((CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/") !=
              (value == "keep" || value == "" || (CT->Root == "/" && value == "inherit"))))
             return TError(EError::InvalidState, "Cannot enable/disable resolv.conf overriding in runtime");
         if (value == "default" || value == "inherit") {
-            CT->ResolvConf = "";
+            CT->ResolvConf.clear();
             CT->ClearProp(EProperty::RESOLV_CONF);
         } else if (value == "keep" || value == "") {
-            CT->ResolvConf = "";
+            CT->ResolvConf.clear();
             CT->SetProp(EProperty::RESOLV_CONF);
         } else {
-            CT->ResolvConf = value;
+            CT->ResolvConf = SplitEscapedString(value, ';');
             CT->SetProp(EProperty::RESOLV_CONF);
         }
         return OK;

@@ -190,11 +190,11 @@ TError TTaskEnv::ChildApplyLimits() {
 }
 
 TError TTaskEnv::WriteResolvConf() {
-    if (CT->HasProp(EProperty::RESOLV_CONF) ? CT->ResolvConf == "" : CT->Root == "/")
+    if (CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/")
         return OK;
     L_ACT("Write resolv.conf for CT{}:{}", CT->Id, CT->Name);
-    std::string cfg = StringReplaceAll(CT->ResolvConf.size() ? CT->ResolvConf :
-                                       RootContainer->ResolvConf, ";", "\n");
+    std::string cfg = MergeEscapeStrings(CT->ResolvConf.size() ? CT->ResolvConf :
+                                         RootContainer->ResolvConf, '\n');
     return TPath("/etc/resolv.conf").WritePrivate(cfg);
 }
 

@@ -149,7 +149,7 @@ public:
     TCapabilities CapLimit;     /* upper limit */
     TCapabilities CapBound;     /* actual bounding set */
     TMultiTuple DefaultGw;
-    std::string ResolvConf;
+    TTuple ResolvConf;
     std::string DeviceConf;
     TStringMap Sysctl;
 
