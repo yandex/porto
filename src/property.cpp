@@ -263,22 +263,22 @@ public:
     }
 } static Cwd;
 
-class TUlimit : public TProperty {
+class TUlimitProperty : public TProperty {
 public:
-    TUlimit() : TProperty(P_ULIMIT, EProperty::ULIMIT,
+    TUlimitProperty() : TProperty(P_ULIMIT, EProperty::ULIMIT,
             "Process limits: as|core|data|locks|memlock|nofile|nproc|stack: [soft]|unlimited [hard];... (see man prlimit) (dynamic)") {}
 
     TError Get(std::string &value) {
-        value = StringMapToString(CT->Ulimit);
+        value = CT->Ulimit.Format();
         return OK;
     }
 
     TError GetIndexed(const std::string &index, std::string &value) {
-        auto it = CT->Ulimit.find(index);
-        if (it != CT->Ulimit.end())
-            value = it->second;
-        else
-            value = "";
+        auto type = TUlimit::GetType(index);
+        for (auto &res: CT->Ulimit.Resources) {
+            if (res.Type == type)
+                value = res.Format();
+        }
         return OK;
     }
 
@@ -286,39 +286,24 @@ public:
         TError error = IsAlive();
         if (error)
             return error;
-
-        TStringMap map;
-        error = StringToStringMap(value, map);
+        TUlimit lim;
+        error = lim.Parse(value);
         if (error)
             return error;
-
-        for (auto &it: map) {
-            int res;
-            struct rlimit lim;
-
-            error = ParseUlimit(it.first, it.second, res, lim);
-            if (error)
-                return error;
-        }
-
-        CT->Ulimit = map;
+        CT->Ulimit = lim;
         CT->SetProp(EProperty::ULIMIT);
         return OK;
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
-        TError error;
-        int res;
-        struct rlimit lim;
-
-        if (value == "") {
-            CT->Ulimit.erase(index);
-        } else {
-            error = ParseUlimit(index, value, res, lim);
-            if (error)
-                return error;
-            CT->Ulimit[index] = value;
-        }
+        TError error = IsAlive();
+        if (error)
+            return error;
+        TUlimit lim;
+        error = lim.Parse(index + ":" + value);
+        if (error)
+            return error;
+        CT->Ulimit.Merge(lim);
         CT->SetProp(EProperty::ULIMIT);
         return OK;
     }

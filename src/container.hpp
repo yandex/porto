@@ -160,7 +160,7 @@ public:
     uint64_t DeathTime;
     uint64_t AgingTime;
 
-    TStringMap Ulimit;
+    TUlimit Ulimit;
 
     std::string NsName;
 
@@ -307,7 +307,7 @@ public:
     void DowngradeLock(void);
     void UpgradeLock(void);
 
-    TStringMap GetUlimit() const;
+    TUlimit GetUlimit() const;
     void SanitizeCapabilities();
 
     TError CheckMemGuarantee() const;

@@ -1008,19 +1008,8 @@ TError TContainer::ApplyUlimits() {
     TError error;
     bool retry;
 
-    auto ulimit = GetUlimit();
-
-    for (auto &it: ulimit) {
-        int res;
-        struct rlimit lim;
-
-        error = ParseUlimit(it.first, it.second, res, lim);
-        if (error)
-            return error;
-        map[res] = lim;
-    }
-
     L_ACT("Apply ulimits");
+    auto lim = GetUlimit();
     do {
         error = cg.GetTasks(pids);
         if (error)
@@ -1029,11 +1018,9 @@ TError TContainer::ApplyUlimits() {
         for (auto pid: pids) {
             if (std::find(prev.begin(), prev.end(), pid) != prev.end())
                 continue;
-            for (auto &it: map) {
-                if (prlimit(pid, (enum __rlimit_resource)it.first,
-                            &it.second, NULL) && errno != ESRCH)
-                    return TError::System("prlimit");
-            }
+            error = lim.Apply(pid);
+            if (error && error.Errno != ESRCH)
+                return error;
             retry = true;
         }
         prev = pids;
@@ -2178,15 +2165,11 @@ void TContainer::SanitizeCapabilities() {
         CapLimit.Permitted = CapBound.Permitted;
 }
 
-TStringMap TContainer::GetUlimit() const {
-    TStringMap map = Ulimit;
-    for (auto p = Parent.get(); p; p = p->Parent.get()) {
-        for (const auto &it: p->Ulimit) {
-            if (map.find(it.first) == map.end())
-                map[it.first] = it.second;
-        }
-    }
-    return map;
+TUlimit TContainer::GetUlimit() const {
+    TUlimit res = Ulimit;
+    for (auto p = Parent.get(); p; p = p->Parent.get())
+        res.Merge(p->Ulimit, false);
+    return res;
 }
 
 TError TContainer::StartTask() {

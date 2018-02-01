@@ -46,7 +46,6 @@ struct TTaskEnv {
     void StartChild();
 
     TError ConfigureChild();
-    TError ChildApplyLimits();
     TError WriteResolvConf();
     TError SetHostname();
     TError ApplySysctl();

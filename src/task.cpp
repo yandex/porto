@@ -168,27 +168,6 @@ TError TTaskEnv::ChildExec() {
     return TError(EError::InvalidCommand, errno, "cannot exec " + std::string(result.we_wordv[0]));
 }
 
-TError TTaskEnv::ChildApplyLimits() {
-    auto ulimit = CT->GetUlimit();
-
-    for (const auto &it :ulimit) {
-        struct rlimit lim;
-        int res;
-        TError error;
-
-        error = ParseUlimit(it.first, it.second, res, lim);
-        if (error)
-            return error;
-
-        int ret = setrlimit(res, &lim);
-        if (ret < 0)
-            return TError(EError::Unknown, errno,
-                          "setrlimit " + it.first + " " + it.second);
-    }
-
-    return OK;
-}
-
 TError TTaskEnv::WriteResolvConf() {
     if (CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/")
         return OK;
@@ -245,7 +224,7 @@ TError TTaskEnv::ApplySysctl() {
 TError TTaskEnv::ConfigureChild() {
     TError error;
 
-    error = ChildApplyLimits();
+    error = CT->GetUlimit().Apply();
     if (error)
         return error;
 

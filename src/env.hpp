@@ -26,3 +26,25 @@ struct TEnv {
     void Format(std::vector<std::string> &cfg) const;
     TError Apply() const;
 };
+
+struct TUlimitResource {
+    int Type;
+    uint64_t Soft;
+    uint64_t Hard;
+
+    TError Parse(const std::string &str);
+    std::string Format() const;
+};
+
+struct TUlimit {
+    std::vector<TUlimitResource> Resources;
+
+    static int GetType(const std::string &name);
+    static std::string GetName(int type);
+    TError Parse(const std::string &str);
+    std::string Format() const;
+    TError Apply(pid_t pid = 0) const;
+    void Clear() { Resources.clear(); }
+    void Set(int type, uint64_t soft, uint64_t hard, bool overwrite = true);
+    void Merge(const TUlimit &ulimit, bool owerwrite = true);
+};

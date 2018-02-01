@@ -59,9 +59,6 @@ std::string FormatExitStatus(int status);
 int GetNumCores();
 void DumpMallocInfo();
 
-TError ParseUlimit(const std::string &name, const std::string &value,
-                   int &res, struct rlimit &lim);
-
 int SetIoPrio(pid_t pid, int ioprio);
 
 class TUnixSocket : public TNonCopyable {

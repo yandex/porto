@@ -519,23 +519,17 @@ static TError CreateRootContainer() {
 
     RootContainer->Isolate = false;
 
-    error = StringToStringMap(config().container().default_ulimit(),
-                              RootContainer->Ulimit);
+    error = RootContainer->Ulimit.Parse(config().container().default_ulimit());
     if (error)
         return error;
 
-    if (!RootContainer->Ulimit.count("nproc")) {
-        uint64_t pids, threads, lim;
-        std::string str;
-
-        if (!GetSysctl("kernel.pid_max", str) &&
-                !StringToUint64(str, pids) &&
-                !GetSysctl("kernel.threads-max", str) &&
-                !StringToUint64(str, threads)) {
-            lim = std::min(pids, threads) / 2;
-            L_SYS("Default nproc ulimit: {}", lim);
-            RootContainer->Ulimit["nproc"] = fmt::format("{} {}", lim, lim);
-        }
+    uint64_t pids_max, threads_max;
+    std::string str;
+    if (!GetSysctl("kernel.pid_max", str) && !StringToUint64(str, pids_max) &&
+            !GetSysctl("kernel.threads-max", str) && !StringToUint64(str, threads_max)) {
+        uint64_t lim = std::min(pids_max, threads_max) / 2;
+        L_SYS("Default nproc ulimit: {}", lim);
+        RootContainer->Ulimit.Set(TUlimit::GetType("nproc"), lim, lim, false);
     }
 
     error = SystemClient.LockContainer(RootContainer);
