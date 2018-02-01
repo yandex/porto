@@ -130,9 +130,9 @@ public:
     std::string Root;
     bool RootRo;
     mode_t Umask;
-    int VirtMode;
     bool BindDns;
     bool Isolate;               /* New pid/ipc/utc/env namespace */
+    bool OsMode;                /* Start as init process */
 
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */

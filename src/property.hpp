@@ -218,11 +218,6 @@ enum class EProperty {
     NR_PROPERTIES,
 };
 
-constexpr const char *P_VIRT_MODE_APP = "app";
-constexpr const char *P_VIRT_MODE_OS = "os";
-constexpr int VIRT_MODE_APP = 0;
-constexpr int VIRT_MODE_OS = 1;
-
 class TProperty {
 public:
     std::string Name;

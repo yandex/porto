@@ -303,8 +303,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     RootRo = false;
     Umask = 0002;
     Isolate = true;
+    OsMode = false;
     BindDns = config().container().default_bind_dns();
-    VirtMode = VIRT_MODE_APP;
 
     NetProp = { { "inherited" } };
     NetIsolate = false;
@@ -892,7 +892,7 @@ TError TContainer::GetPidFor(pid_t pidns, pid_t &pid) const {
     } else if (TNamespaceFd::PidInode(Task.Pid, "ns/pid") == inode) {
         if (!Isolate)
             pid = TaskVPid;
-        else if (VirtMode == VIRT_MODE_OS || IsMeta())
+        else if (OsMode || IsMeta())
             pid = 1;
         else
             pid = 2;
@@ -977,7 +977,7 @@ uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
         ContainersMutex.lock();
 
     /* Container without load limited with total limit of childrens */
-    if (IsMeta() && VirtMode == VIRT_MODE_APP) {
+    if (IsMeta() && !OsMode) {
         for (auto &child : Children) {
             if (child->State == EContainerState::Stopped)
                 continue;
@@ -1894,8 +1894,7 @@ TError TContainer::PrepareCgroups() {
         SetProp(EProperty::CPU_SET_AFFINITY);
     }
 
-    if (VirtMode == VIRT_MODE_OS &&
-            config().container().detect_systemd() &&
+    if (OsMode && config().container().detect_systemd() &&
             SystemdSubsystem.Supported &&
             !(Controllers & CGROUP_SYSTEMD) &&
             !RootPath.IsRoot()) {
@@ -2025,14 +2024,14 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Cred = TaskCred;
 
-    TaskEnv.LoginUid = (VirtMode == VIRT_MODE_APP) ? OwnerCred.Uid : -1;
+    TaskEnv.LoginUid = OsMode ? -1 : OwnerCred.Uid;
 
     error = GetEnvironment(TaskEnv.Env);
     if (error)
         return error;
 
     TaskEnv.TripleFork = false;
-    TaskEnv.QuadroFork = (VirtMode == VIRT_MODE_APP) && !IsMeta();
+    TaskEnv.QuadroFork = !OsMode && !IsMeta();
 
     TaskEnv.Mnt.BindMounts = BindMounts;
 
@@ -2561,7 +2560,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (Task.Pid && deadline && State != EContainerState::Meta) {
         int sig = SIGTERM;
 
-        if (Isolate && VirtMode == VIRT_MODE_OS) {
+        if (Isolate && OsMode) {
             uint64_t mask = TaskHandledSignals(Task.Pid);
             if (mask & BIT(SIGPWR - 1))
                 sig = SIGPWR;

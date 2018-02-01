@@ -2463,7 +2463,7 @@ TError TNetEnv::Parse(TContainer &ct) {
     Name = ct.Name;
     Parent = ct.Parent;
     Hostname = ct.Hostname;
-    NetUp = ct.VirtMode != VIRT_MODE_OS;
+    NetUp = !ct.OsMode;
     TaskCred = ct.TaskCred;
 
     error = ParseNet(ct.NetProp);

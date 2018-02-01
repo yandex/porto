@@ -257,7 +257,7 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::CWD))
+        if (CT->OsMode && !CT->HasProp(EProperty::CWD))
             CT->Cwd = "/";
         return OK;
     }
@@ -472,7 +472,7 @@ public:
     }
 
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS)
+        if (CT->OsMode)
             CT->TaskCred.Uid = RootUser;
         return OK;
     }
@@ -503,7 +503,7 @@ public:
     }
 
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS)
+        if (CT->OsMode)
             CT->TaskCred.Gid = RootGroup;
         return OK;
     }
@@ -658,7 +658,7 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::COMMAND))
+        if (CT->OsMode && !CT->HasProp(EProperty::COMMAND))
             CT->Command = "/sbin/init";
         return OK;
     }
@@ -687,46 +687,26 @@ public:
 
 class TVirtMode : public TProperty {
 public:
-    TError Set(const std::string &virt_mode);
-    TError Get(std::string &value);
     TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
                             "Virtualization mode: os|app") {}
-} static VirtMode;
-
-TError TVirtMode::Set(const std::string &virt_mode) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    if (virt_mode == P_VIRT_MODE_APP)
-        CT->VirtMode = VIRT_MODE_APP;
-    else if (virt_mode == P_VIRT_MODE_OS)
-        CT->VirtMode = VIRT_MODE_OS;
-    else
-        return TError(EError::InvalidValue, std::string("Unsupported ") +
-                      P_VIRT_MODE + ": " + virt_mode);
-
-    CT->SetProp(EProperty::VIRT_MODE);
-
-    return OK;
-}
-
-TError TVirtMode::Get(std::string &value) {
-
-    switch (CT->VirtMode) {
-        case VIRT_MODE_APP:
-            value = P_VIRT_MODE_APP;
-            break;
-        case VIRT_MODE_OS:
-            value = P_VIRT_MODE_OS;
-            break;
-        default:
-            value = "unknown " + std::to_string(CT->VirtMode);
-            break;
+    TError Get(std::string &value) {
+        value = CT->OsMode ? "os" : "app";
+        return OK;
     }
-
-    return OK;
-}
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        if (value == "app")
+            CT->OsMode = false;
+        else if (value == "os")
+            CT->OsMode = true;
+        else
+            return TError(EError::InvalidValue, "Unknown: {}", value);
+        CT->SetProp(EProperty::VIRT_MODE);
+        return OK;
+    }
+} static VirtMode;
 
 class TStdinPath : public TProperty {
 public:
@@ -764,7 +744,7 @@ public:
         return error;
     }
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::STDOUT))
+        if (CT->OsMode && !CT->HasProp(EProperty::STDOUT))
             CT->Stdout.SetOutside("/dev/null");
         return OK;
     }
@@ -787,7 +767,7 @@ public:
         return error;
     }
     TError Start(void) {
-         if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::STDERR))
+         if (CT->OsMode && !CT->HasProp(EProperty::STDERR))
             CT->Stderr.SetOutside("/dev/null");
          return OK;
     }
@@ -912,7 +892,7 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::BIND_DNS))
+        if (CT->OsMode && !CT->HasProp(EProperty::BIND_DNS))
             CT->BindDns = false;
         return OK;
     }
@@ -989,7 +969,7 @@ public:
             "ip <cmd> <args>... | "
             "netns <name>") {}
     TError Start(void) {
-        if (CT->VirtMode == VIRT_MODE_OS && !CT->HasProp(EProperty::NET)) {
+        if (CT->OsMode && !CT->HasProp(EProperty::NET)) {
             CT->NetProp = { { "none" } };
             CT->NetIsolate = true;
             CT->NetInherit = false;
