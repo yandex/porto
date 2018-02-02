@@ -300,8 +300,6 @@ public:
 class TDevicesSubsystem : public TSubsystem {
 public:
     TDevicesSubsystem() : TSubsystem(CGROUP_DEVICES, "devices") {}
-    TError ApplyDefault(TCgroup &cg);
-    TError ApplyDevice(TCgroup &cg, const TDevice &device);
 };
 
 class THugetlbSubsystem : public TSubsystem {

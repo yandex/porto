@@ -31,7 +31,6 @@ struct TTaskEnv {
     TEnv Env;
     bool TripleFork;
     bool QuadroFork;
-    std::vector<TDevice> Devices;
     std::vector<std::string> Autoconf;
     bool NewMountNs;
     std::vector<TCgroup> Cgroups;

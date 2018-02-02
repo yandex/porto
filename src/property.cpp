@@ -1382,17 +1382,15 @@ public:
     }
 } static ResolvConf;
 
-class TDevices : public TProperty {
+class TDevicesProperty : public TProperty {
 public:
-    TDevices() : TProperty(P_DEVICES, EProperty::DEVICE_CONF,
-                                   "Devices that container can access: "
-                                   "<device> [r][w][m][-] [name] [mode] "
-                                   "[user] [group]; ... (dynamic)")
+    TDevicesProperty() : TProperty(P_DEVICES, EProperty::DEVICE_CONF,
+            "Devices that container can access: <device> [r][w][m][-] [path] [mode] [user] [group]; ... (dynamic)")
     {
         RequireControllers = CGROUP_DEVICES;
     }
     TError Get(std::string &value) {
-        value = CT->DeviceConf;
+        value = CT->Devices.Format();
         return OK;
     }
     TError Set(const std::string &value) {
@@ -1402,7 +1400,11 @@ public:
         error = WantControllers(CGROUP_DEVICES);
         if (error)
             return error;
-        CT->DeviceConf = value;
+        TDevices devices;
+        error = devices.Parse(value);
+        if (error)
+            return error;
+        CT->Devices = devices;
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
     }

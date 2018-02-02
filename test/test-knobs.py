@@ -46,8 +46,8 @@ knobs = {
     "cpu_policy" : "normal",
     "cpu_set" : "1-2,4",
     "cwd" : "/var/log/../../home",
-    "devices" : "/dev/loop0 rwm newdev0 rw porto-alice porto-alice;"\
-                "/dev/loop1 - newdev1 ro porto-bobo porto-bob",
+    "devices" : "/dev/loop0 rwm /dev/loop_alice 0660 porto-alice porto-alice; "\
+                "/dev/loop1 rwm /dev/loop_bob 0660 porto-bob porto-bob; ",
     "enable_porto" : "child-only",
     "env" : "A1=123;A2=321;B=D",
     "group" : "porto-bob",

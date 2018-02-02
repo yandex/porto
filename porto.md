@@ -243,7 +243,7 @@ container { default_ulimit: "type: soft hard;..." }
 
     Requires Linux 4.3
 
-* **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[name\] \[mode\] \[user\] \[group\];...
+* **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[path\] \[mode\] \[user\] \[group\];...
 
     By default porto grants access to:  
     /dev/null  
@@ -252,14 +252,16 @@ container { default_ulimit: "type: soft hard;..." }
     /dev/random  
     /dev/urandom  
     /dev/tty  
-    /dev/console  (forwarded to /dev/null)  
+    /dev/console  (as alias for /dev/null)  
     /dev/ptmx  
     /dev/pts/*  
 
-    Inside chroots porto creates device nodes in /dev only for allowed devices.
+    Container inherits perissmions from parent and cannot surpass them.
     Permissions could be changes in runtime.
 
-    Access to devices for all containers could be granted in portod.conf:
+    Inside chroots porto creates device nodes in /dev only for allowed devices.
+
+    Access to devices for all containers could be also granted in portod.conf:
 ```
 container { extra_devices: "<device> [rwm]... ;..." }
 ```

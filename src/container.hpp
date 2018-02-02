@@ -15,6 +15,7 @@
 #include "stream.hpp"
 #include "property.hpp"
 #include "network.hpp"
+#include "device.hpp"
 
 class TEpollSource;
 class TCgroup;
@@ -78,7 +79,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareOomMonitor();
     void ShutdownOom();
     TError PrepareCgroups();
-    TError ConfigureDevices(std::vector<TDevice> &devices);
+    TError ConfigureDevices();
     TError PrepareTask(TTaskEnv &TaskEnv);
     TError StartOne();
 
@@ -150,7 +151,7 @@ public:
     TCapabilities CapBound;     /* actual bounding set */
     TMultiTuple DefaultGw;
     TTuple ResolvConf;
-    std::string DeviceConf;
+    TDevices Devices;
     TStringMap Sysctl;
 
     time_t RealCreationTime;

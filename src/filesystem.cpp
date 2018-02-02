@@ -332,26 +332,6 @@ TError TMountNamespace::SetupRoot() {
 
     struct {
         const std::string path;
-        mode_t mode;
-        dev_t dev;
-    } nodes[] = {
-        { "/dev/null",    0666 | S_IFCHR, MKDEV(1, 3) },
-        { "/dev/zero",    0666 | S_IFCHR, MKDEV(1, 5) },
-        { "/dev/full",    0666 | S_IFCHR, MKDEV(1, 7) },
-        { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
-        { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
-        { "/dev/tty",     0666 | S_IFCHR, MKDEV(5, 0) },
-        { "/dev/console", 0600 | S_IFCHR, MKDEV(1, 3) }, /* to /dev/null */
-    };
-
-    for (auto &n : nodes) {
-        error = (Root + n.path).Mknod(n.mode, n.dev);
-        if (error)
-            return error;
-    }
-
-    struct {
-        const std::string path;
         const std::string target;
     } symlinks[] = {
         { "/dev/ptmx", "pts/ptmx" },

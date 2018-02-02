@@ -1104,45 +1104,6 @@ TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
 
 // Devices
 
-TError TDevicesSubsystem::ApplyDefault(TCgroup &cg) {
-    TError error = cg.Set("devices.deny", "a");
-    if (error)
-        return error;
-
-    //FIXME 'm' required only for start
-    std::vector<std::string> rules = {
-        "c 1:3 rwm",     // /dev/null
-        "c 1:5 rwm",     // /dev/zero
-        "c 1:7 rwm",     // /dev/full
-        "c 1:8 rwm",     // /dev/random
-        "c 1:9 rwm",     // /dev/urandom
-        "c 5:0 rwm",     // /dev/tty
-        "c 5:2 rw",     // /dev/ptmx
-        "c 136:* rw",   // /dev/pts/*
-    };
-
-    for (auto &rule: rules) {
-        error = cg.Set("devices.allow", rule);
-        if (error)
-            break;
-    }
-
-    return error;
-}
-
-TError TDevicesSubsystem::ApplyDevice(TCgroup &cg, const TDevice &device) {
-    std::string rule;
-    TError error;
-
-    rule = device.CgroupRule(true);
-    if (rule != "")
-        error = cg.Set("devices.allow", rule);
-    rule = device.CgroupRule(false);
-    if (!error && rule != "")
-        error = cg.Set("devices.deny", rule);
-    return error;
-}
-
 // Pids
 
 TError TPidsSubsystem::GetUsage(TCgroup &cg, uint64_t &usage) const {

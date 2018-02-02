@@ -239,18 +239,23 @@ TError TTaskEnv::ConfigureChild() {
             return error;
     }
 
+    if (!Mnt.Root.IsRoot()) {
+        TDevices devices = CT->Devices;
+
+        for (auto p = CT->Parent; p; p = p->Parent)
+            devices.Merge(p->Devices);
+
+        error = devices.Makedev();
+        if (error)
+            return error;
+    }
+
     error = ApplySysctl();
     if (error)
         return error;
 
     if (NewMountNs) {
         error = Mnt.ProtectProc();
-        if (error)
-            return error;
-    }
-
-    for (auto &dev: Devices) {
-        error = dev.Makedev();
         if (error)
             return error;
     }

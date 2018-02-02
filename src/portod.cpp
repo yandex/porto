@@ -532,6 +532,10 @@ static TError CreateRootContainer() {
         RootContainer->Ulimit.Set(TUlimit::GetType("nproc"), lim, lim, false);
     }
 
+    error = RootContainer->Devices.InitDefault();
+    if (error)
+        return error;
+
     error = SystemClient.LockContainer(RootContainer);
     if (error)
         return error;

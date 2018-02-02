@@ -1760,93 +1760,48 @@ TError TContainer::PrepareOomMonitor() {
 }
 
 TError TContainer::ApplyDeviceConf() const {
-    TMultiTuple allow = SplitEscapedString(DeviceConf, ' ', ';');
-    TPath root = fmt::format("/proc/{}/root", WaitTask.Pid);
     TCgroup cg = GetCgroup(DevicesSubsystem);
-    TDevice device;
     TError error;
 
-    for (auto &cfg: allow) {
-        error = device.Parse(cfg);
+    error = Devices.Permitted(CL->Cred);
+    if (error)
+        return error;
+
+    error = Devices.Apply(cg);
+    if (error)
+        return error;
+
+    if (!RootPath.IsRoot()) {
+        error = Devices.Makedev(fmt::format("/proc/{}/root", WaitTask.Pid));
         if (error)
             return error;
-
-        error = device.Permitted(CL->Cred);
-        if (error)
-            return error;;
-
-        error = DevicesSubsystem.ApplyDevice(cg, device);
-        if (error)
-            return error;
-
-        if (!RootPath.IsRoot() && !device.Wildcard) {
-            if (device.Read || device.Write) {
-                error = device.Makedev(root);
-                if (error)
-                    return error;
-            } else {
-                error = (root / device.Name).Unlink();
-                if (error)
-                    L_WRN("Cannot remove device node {}", device.Name);
-            }
-        }
     }
 
     return OK;
 }
 
-TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
+TError TContainer::ConfigureDevices() {
     auto cg = GetCgroup(DevicesSubsystem);
-    TDevice device;
     TError error;
 
     if (IsRoot())
         return OK;
 
+    error = Devices.Permitted(OwnerCred);
+    if (error)
+        return error;
+
+    /* Nested cgroup makes a copy from parent at creation */
+
     if (Parent->IsRoot() && (Controllers & CGROUP_DEVICES)) {
-        error = DevicesSubsystem.ApplyDefault(cg);
+        error = RootContainer->Devices.Apply(cg, true);
         if (error)
             return error;
     }
 
-    TMultiTuple allow = SplitEscapedString(DeviceConf, ' ', ';');
-    for (auto &cfg: allow) {
-        error = device.Parse(cfg);
-        if (error)
-            return error;
-
-        error = device.Permitted(OwnerCred);
-        if (error)
-            return error;
-
-        error = DevicesSubsystem.ApplyDevice(cg, device);
-        if (error)
-            return error;
-
-        devices.push_back(device);
-    }
-
-    TMultiTuple extra = SplitEscapedString(config().container().extra_devices(), ' ', ';');
-    for (auto &cfg: extra) {
-        error = device.Parse(cfg);
-        if (error)
-            return error;
-
-        bool found = false;
-        for (auto &dev: devices)
-            found |= dev.Name == device.Name;
-        if (found)
-            continue;
-
-        if (Level == 1) {
-            error = DevicesSubsystem.ApplyDevice(cg, device);
-            if (error)
-                return error;
-        }
-
-        if (!RootPath.IsRoot())
-            devices.push_back(device);
-    }
+    error = Devices.Apply(cg);
+    if (error)
+        return error;
 
     return OK;
 }
@@ -2044,7 +1999,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
 
-    error = ConfigureDevices(TaskEnv.Devices);
+    error = ConfigureDevices();
     if (error) {
         L_ERR("Cannot configure devices: {}", error);
         return error;
