@@ -79,7 +79,7 @@ knobs = {
              "msgqueue: 8192 8192; nice: 10 15; "\
              "nofile: 819200 1024000; nproc: 20480 30720; rss: 65536 65536; "\
              "rtprio: 1024 1024; rttime: 10000 10000; sigpending: 10 10; "\
-             "stack: 16384 16384",
+             "stack: 16384 16384; ",
     "umask" : "0777",
     "user" : "porto-alice",
     "virt_mode" : "os",

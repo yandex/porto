@@ -222,6 +222,7 @@ TError TUlimit::Parse(const std::string &str) {
     TError error;
 
     while(std::getline(ss, lim, ';')) {
+        lim = StringTrim(lim);
         if (!lim.size())
             continue;
 
@@ -239,7 +240,7 @@ TError TUlimit::Parse(const std::string &str) {
 std::string TUlimit::Format() const {
     std::string str;
     for (auto &res: Resources)
-        str += res.Format() + ";";
+        str += res.Format() + "; ";
     return str;
 }
 

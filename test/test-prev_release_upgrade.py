@@ -70,7 +70,10 @@ def CheckCaps(r, new_porto):
 def PropTrim(prop):
     if not (type(prop) is str or type(prop) is unicode):
         return prop
-    return str(prop.replace("; ", ";"))
+    prop = str(prop.replace("; ", ";"))
+    if len(prop) > 0 and prop[-1] == ';':
+        prop = prop[:-1]
+    return prop
 
 def SetProps(r, props):
     for p in props:
@@ -167,8 +170,7 @@ c.Start("test2")
 parent_knobs = [
     ("private", "parent"),
     ("respawn", False),
-    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; "\
-               "nofile: 100 200; nproc: 500 1000"),
+    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
     ("isolate", True),
     ("env", "CONTAINER=porto;PARENT=1")
 ]
@@ -189,9 +191,7 @@ app_knobs = [
     ("cwd", portosrc),
     ("net_limit", "default: 0"),
     ("cpu_guarantee", "0.01c"),
-    ("ulimit", "data: 16000000 32000000;memlock: 4096 4096;"\
-               "nofile: 100 200;nproc: 500 1000"\
-               ),
+    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
     ("io_limit", "300000"),
     ("isolate", False),
     ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
@@ -236,8 +236,7 @@ r.Start()
 rt_parent_knobs = [
     ("private", "rt_parent"),
     ("respawn", False),
-    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; "\
-               "nofile: 100 200; nproc: 500 1000"),
+    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
     ("isolate", True),
     ("env", "CONTAINER=porto;PARENT=1")
 ]
@@ -258,9 +257,7 @@ rt_app_knobs = [
     ("cwd", portosrc),
     ("net_limit", "default: 0"),
     ("cpu_guarantee", "4c"),
-    ("ulimit", "data: 16000000 32000000;memlock: 4096 4096;"\
-               "nofile: 100 200;nproc: 500 1000"\
-               ),
+    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
     ("recharge_on_pgfault", True),
     ("isolate", False),
     ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")

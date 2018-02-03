@@ -3506,6 +3506,8 @@ static void TestUlimitProperty(Porto::Connection &api) {
     Say() << "Check rlimits parsing" << std::endl;
 
     ExpectApiSuccess(api.SetProperty(name, "ulimit", ""));
+    ExpectApiSuccess(api.SetProperty(name, "ulimit", ";;;"));
+    ExpectApiSuccess(api.SetProperty(name, "ulimit", " ; ; ; "));
     ExpectApiFailure(api.SetProperty(name, "ulimit", "qwe"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "ulimit", "qwe: 123"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "ulimit", "qwe: 123 456"), EError::InvalidValue);
@@ -3525,12 +3527,8 @@ static void TestUlimitProperty(Porto::Connection &api) {
     };
 
     string ulimit;
-    for (auto &lim : rlim) {
-        if (ulimit.length())
-            ulimit += "; ";
-
-        ulimit += lim.first + ": " + lim.second.first + " " + lim.second.second;
-    }
+    for (auto &lim : rlim)
+        ulimit += lim.first + ": " + lim.second.first + " " + lim.second.second + "; ";
 
     ExpectApiSuccess(api.SetProperty(name, "ulimit", ulimit));
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
