@@ -12,11 +12,11 @@
 class TConfig : public TNonCopyable {
     cfg::TCfg Cfg;
 
-    void LoadDefaults();
-    bool LoadFile(const std::string &path);
+    void ReadDefaults();
+    bool ReadFile(const std::string &path);
 public:
     TConfig() {}
-    void Load();
+    void Read();
     cfg::TCfg &operator()();
 };
 

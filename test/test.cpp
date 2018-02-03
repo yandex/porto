@@ -354,13 +354,13 @@ void InitUsersAndGroups() {
 
     InitPortoCgroups();
 
-    error = Nobody.Load("nobody");
+    error = Nobody.Init("nobody");
     ExpectOk(error);
 
-    error = Alice.Load("porto-alice");
+    error = Alice.Init("porto-alice");
     ExpectOk(error);
 
-    error = Bob.Load("porto-bob");
+    error = Bob.Init("porto-bob");
     ExpectOk(error);
 
     ExpectNeq(Alice.Uid, Bob.Uid);

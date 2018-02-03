@@ -144,7 +144,7 @@ TError TClient::IdentifyClient(bool initial) {
     if (!ct->IsRoot())
         Cred = ct->OwnerCred;
 
-    (void)Cred.LoadGroups(Cred.User());
+    (void)Cred.InitGroups(Cred.User());
 
     if (Cred.IsRootUser()) {
         if (AccessLevel == EAccessLevel::Normal)
@@ -324,7 +324,7 @@ TError TClient::CanControl(const TCred &other) {
     if (other.IsMemberOf(PortoCtGroup))
         return OK;
 
-    /* Load group $USER-containers lazily */
+    /* Init group $USER-containers lazily */
     if (!UserCtGroup && GroupId(Cred.User() + USER_CT_SUFFIX, UserCtGroup))
         UserCtGroup = NoGroup;
 

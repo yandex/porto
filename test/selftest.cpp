@@ -5198,7 +5198,7 @@ int SelfTest(std::vector<std::string> args) {
     portoctl = (path.DirName() / "portoctl").ToString();
     portoinit = (path.DirName() / "portoinit").ToString();
 
-    config.Load();
+    config.Read();
     Porto::Connection api;
 
     InitUsersAndGroups();

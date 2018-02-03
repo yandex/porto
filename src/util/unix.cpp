@@ -707,7 +707,7 @@ std::string FormatTime(time_t t, const char *fmt) {
     return ss.str();
 }
 
-TError TPidFile::Load() {
+TError TPidFile::Read() {
     std::string str;
     TError error;
     int pid;

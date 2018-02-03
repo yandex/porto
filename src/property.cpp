@@ -442,7 +442,7 @@ public:
             return error;
 
         TCred cred;
-        error = cred.Load(username);
+        error = cred.Init(username);
         if (error) {
             cred.Gid = CT->TaskCred.Gid;
             error = UserId(username, cred.Uid);
@@ -507,7 +507,7 @@ public:
     TError Set(const std::string &username) {
         TCred newCred;
         gid_t oldGid = CT->OwnerCred.Gid;
-        TError error = newCred.Load(username);
+        TError error = newCred.Init(username);
         if (error)
             return error;
 

@@ -260,7 +260,7 @@ int StressTest(int threads, int iter, bool killPorto) {
 
     (void)signal(SIGPIPE, SIG_IGN);
 
-    config.Load();
+    config.Read();
     Porto::Connection api;
 
     for (i = 1; i <= threads; i++)

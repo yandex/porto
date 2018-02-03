@@ -18,7 +18,7 @@ static void NetSysctl(const std::string &key, const std::string &val)
     sysctl->set_val(val);
 }
 
-void TConfig::LoadDefaults() {
+void TConfig::ReadDefaults() {
     config().Clear();
 
     std::string version;
@@ -135,7 +135,7 @@ void TConfig::LoadDefaults() {
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");
 }
 
-bool TConfig::LoadFile(const std::string &path) {
+bool TConfig::ReadFile(const std::string &path) {
     TFile file;
 
     if (file.OpenRead(path))
@@ -151,11 +151,11 @@ bool TConfig::LoadFile(const std::string &path) {
     return true;
 }
 
-void TConfig::Load() {
-    LoadDefaults();
+void TConfig::Read() {
+    ReadDefaults();
 
-    if (!LoadFile("/etc/portod.conf"))
-        LoadFile("/etc/default/portod.conf");
+    if (!ReadFile("/etc/portod.conf"))
+        ReadFile("/etc/default/portod.conf");
 
     Debug |= config().log().debug();
     Verbose |= Debug | config().log().verbose();

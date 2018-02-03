@@ -718,7 +718,7 @@ static int Portod() {
     if (error)
         FatalError("Cannot save pid", error);
 
-    config.Load();
+    config.Read();
     InitPortoCgroups();
     InitCapabilities();
     InitIpcSysctl();
@@ -1277,7 +1277,7 @@ static void PrintVersion() {
     TPath thisBin, currBin;
 
     TPath("/proc/self/exe").ReadLink(thisBin);
-    if (MasterPidFile.Load() || TPath("/proc/" +
+    if (MasterPidFile.Read() || TPath("/proc/" +
                 std::to_string(MasterPidFile.Pid) +"/exe").ReadLink(currBin))
         TPath(PORTO_BINARY_PATH).ReadLink(currBin);
 
@@ -1313,7 +1313,7 @@ static bool SanityCheck() {
         return EXIT_FAILURE;
     }
 
-    if (!MasterPidFile.Load() && MasterPidFile.Pid != getpid() && CheckPortoAlive()) {
+    if (!MasterPidFile.Read() && MasterPidFile.Pid != getpid() && CheckPortoAlive()) {
         std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
@@ -1387,7 +1387,7 @@ static int StartPortod() {
 static int StopPortod() {
     TError error;
 
-    if (MasterPidFile.Load()) {
+    if (MasterPidFile.Read()) {
         std::cerr << "portod already stopped" << std::endl;
         return EXIT_SUCCESS;
     }
@@ -1397,7 +1397,7 @@ static int StopPortod() {
         if (!kill(pid, SIGINT)) {
             uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_stop_timeout() * 1000;
             do {
-                if (MasterPidFile.Load() || MasterPidFile.Pid != pid)
+                if (MasterPidFile.Read() || MasterPidFile.Pid != pid)
                     return EXIT_SUCCESS;
             } while (!WaitDeadline(deadline));
         } else if (errno != ESRCH) {
@@ -1421,7 +1421,7 @@ static int StopPortod() {
 }
 
 static int ReexecPortod() {
-    if (MasterPidFile.Load() || PortodPidFile.Load()) {
+    if (MasterPidFile.Read() || PortodPidFile.Read()) {
         std::cerr << "portod not running" << std::endl;
         return EXIT_FAILURE;
     }
@@ -1452,7 +1452,7 @@ int UpgradePortod() {
         return EXIT_FAILURE;
     }
 
-    error = MasterPidFile.Load();
+    error = MasterPidFile.Read();
     if (error) {
         std::cerr << "portod not running" << std::endl;
         return EXIT_FAILURE;
@@ -1463,7 +1463,7 @@ int UpgradePortod() {
         return EXIT_FAILURE;
     }
 
-    error = PortodPidFile.Load();
+    error = PortodPidFile.Read();
     if (error) {
         std::cerr << "cannot find portod: " << error << std::endl;
         return EXIT_FAILURE;
@@ -1507,7 +1507,7 @@ int UpgradePortod() {
             break;
     } while (!WaitDeadline(deadline));
 
-    error = MasterPidFile.Load();
+    error = MasterPidFile.Read();
     if (error) {
         std::cerr << "online upgrade failed: " << error << std::endl;
         goto undo;
@@ -1646,7 +1646,7 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    config.Load();
+    config.Read();
 
     if (cmd == "" || cmd == "daemon")
         return PortodMain();

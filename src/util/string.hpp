@@ -73,8 +73,8 @@ public:
     ~TBitMap() {}
     TError Parse(const std::string &text);
     std::string Format() const;
-    TError Load(const TPath &path);
-    TError Save(const TPath &path) const;
+    TError Read(const TPath &path);
+    TError Write(const TPath &path) const;
 
     unsigned Size() const {
         return bits.size();

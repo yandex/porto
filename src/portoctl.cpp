@@ -1230,7 +1230,7 @@ public:
 
             if (group == "") {
                 TCred cred;
-                if (!cred.Load(user))
+                if (!cred.Init(user))
                     group = cred.Group();
             }
         }

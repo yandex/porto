@@ -1198,7 +1198,7 @@ TError TContainer::DistributeCpus() {
     TError error;
 
     if (IsRoot()) {
-        error = CpuAffinity.Load("/sys/devices/system/cpu/online");
+        error = CpuAffinity.Read("/sys/devices/system/cpu/online");
         if (error)
             return error;
 
@@ -1208,12 +1208,12 @@ TError TContainer::DistributeCpus() {
         for (unsigned cpu = 0; cpu < CpuAffinity.Size(); cpu++) {
             if (!CpuAffinity.Get(cpu))
                 continue;
-            error = CoreThreads[cpu].Load(StringFormat("/sys/devices/system/cpu/cpu%u/topology/thread_siblings_list", cpu));
+            error = CoreThreads[cpu].Read(StringFormat("/sys/devices/system/cpu/cpu%u/topology/thread_siblings_list", cpu));
             if (error)
                 return error;
         }
 
-        error = NumaNodes.Load("/sys/devices/system/node/online");
+        error = NumaNodes.Read("/sys/devices/system/node/online");
         if (error)
             return error;
 
@@ -1223,7 +1223,7 @@ TError TContainer::DistributeCpus() {
         for (unsigned node = 0; node < NumaNodes.Size(); node++) {
             if (!NumaNodes.Get(node))
                 continue;
-            error = NodeThreads[node].Load(StringFormat("/sys/devices/system/node/node%u/cpulist", node));
+            error = NodeThreads[node].Read(StringFormat("/sys/devices/system/node/node%u/cpulist", node));
             if (error)
                 return error;
         }
@@ -2273,7 +2273,7 @@ TError TContainer::Start() {
             return error;
     }
 
-    (void)TaskCred.LoadGroups(TaskCred.User());
+    (void)TaskCred.InitGroups(TaskCred.User());
 
     SanitizeCapabilities();
 
@@ -2281,7 +2281,7 @@ TError TContainer::Start() {
     error = CL->CanControl(TaskCred);
     if (!error && !OwnerCred.IsMemberOf(TaskCred.Gid) && !CL->IsSuperUser()) {
         TCred cred;
-        cred.Load(TaskCred.User());
+        cred.Init(TaskCred.User());
         if (!cred.IsMemberOf(TaskCred.Gid))
             error = TError(EError::Permission, "Cannot control group " + TaskCred.Group());
     }

@@ -92,7 +92,7 @@ public:
     pid_t Pid = 0;
 
     TPidFile(const std::string &path, const std::string &name, const std::string &altname): Path(path), Name(name), AltName(altname) { }
-    TError Load();
+    TError Read();
     bool Running();
     TError Save(pid_t pid);
     TError Remove();

@@ -35,8 +35,8 @@ struct TCred {
 
     static TCred Current();
 
-    TError Load(const std::string &user);
-    TError LoadGroups(const std::string &user);
+    TError Init(const std::string &user);
+    TError InitGroups(const std::string &user);
 
     TError Apply() const;
 
@@ -70,7 +70,7 @@ struct TCapabilities {
     TError ApplyLimit() const;
     TError ApplyAmbient() const;
     TError ApplyEffective() const;
-    TError Load(pid_t pid, int type);
+    TError Get(pid_t pid, int type);
     void Dump();
     friend std::ostream& operator<<(std::ostream& os, const TCapabilities &c) {
         return os << c.Format();

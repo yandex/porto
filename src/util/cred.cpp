@@ -162,7 +162,7 @@ TCred TCred::Current() {
     return cred;
 }
 
-TError TCred::LoadGroups(const std::string &user) {
+TError TCred::InitGroups(const std::string &user) {
     TError error = FindGroups(user, Gid, Groups);
     if (error) {
         L("Cannot load groups for {}", user);
@@ -172,10 +172,10 @@ TError TCred::LoadGroups(const std::string &user) {
     return error;
 }
 
-TError TCred::Load(const std::string &user) {
+TError TCred::Init(const std::string &user) {
     TError error = FindUser(user, Uid, Gid);
     if (!error)
-        (void)LoadGroups(user);
+        (void)InitGroups(user);
     return error;
 }
 
@@ -295,7 +295,7 @@ TError TCapabilities::Parse(const std::string &string) {
     return StringParseFlags(string, CapNames, Permitted, ';');
 }
 
-TError TCapabilities::Load(pid_t pid, int type) {
+TError TCapabilities::Get(pid_t pid, int type) {
     struct __user_cap_header_struct header = {
         .version = _LINUX_CAPABILITY_VERSION_3,
         .pid = pid,
@@ -315,11 +315,11 @@ TError TCapabilities::Load(pid_t pid, int type) {
 }
 
 void TCapabilities::Dump() {
-    Load(0, 0);
+    Get(0, 0);
     L("Effective: {}", Format());
-    Load(0, 1);
+    Get(0, 1);
     L("Permitted: {}", Format());
-    Load(0, 2);
+    Get(0, 2);
     L("Inheritable: {}", Format());
 }
 

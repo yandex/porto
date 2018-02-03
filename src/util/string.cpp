@@ -584,7 +584,7 @@ std::string TBitMap::Format() const {
     return ss.str();
 }
 
-TError TBitMap::Load(const TPath &path) {
+TError TBitMap::Read(const TPath &path) {
     std::string text;
     TError error = path.ReadAll(text, 4096);
     if (error)
@@ -592,6 +592,6 @@ TError TBitMap::Load(const TPath &path) {
     return Parse(text);
 }
 
-TError TBitMap::Save(const TPath &path) const {
+TError TBitMap::Write(const TPath &path) const {
     return path.WriteAll(Format());
 }
