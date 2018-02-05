@@ -456,7 +456,12 @@ TError TMountNamespace::Setup() {
     error = proc.UmountAll();
     if (error)
         return error;
+
     error = proc.Mount("proc", "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
+    if (error)
+        return error;
+
+    error = MountBinds();
     if (error)
         return error;
 
@@ -464,6 +469,7 @@ TError TMountNamespace::Setup() {
     error = sys.UmountAll();
     if (error)
         return error;
+
     error = sys.Mount("sysfs", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {});
     if (error)
         return error;
@@ -479,10 +485,6 @@ TError TMountNamespace::Setup() {
         if (error)
             return error;
     }
-
-    error = MountBinds();
-    if (error)
-        return error;
 
     // enter chroot
     if (!Root.IsRoot()) {
