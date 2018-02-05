@@ -2535,6 +2535,28 @@ TError TWeak::Get(std::string &value) {
 
 /* Read-only properties derived from data filelds follow below... */
 
+class TIdProperty : public TProperty {
+public:
+    TIdProperty() : TProperty(D_ID, EProperty::NONE, "container id (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = fmt::format("{}", CT->Id);
+        return OK;
+    }
+} static IdProperty;
+
+class TLevelProperty : public TProperty {
+public:
+    TLevelProperty() : TProperty(D_LEVEL, EProperty::NONE, "container level (ro)") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = fmt::format("{}", CT->Level);
+        return OK;
+    }
+} static LevelProperty;
+
 class TAbsoluteName : public TProperty {
 public:
     TError Get(std::string &value);

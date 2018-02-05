@@ -82,6 +82,8 @@ constexpr const char *P_THREAD_LIMIT = "thread_limit";
 constexpr const char *P_SYSCTL = "sysctl";
 constexpr const char *P_CORE_COMMAND = "core_command";
 
+constexpr const char *D_ID = "id";
+constexpr const char *D_LEVEL = "level";
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
 constexpr const char *D_STATE = "state";

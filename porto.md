@@ -135,6 +135,10 @@ container { default_ulimit: "type: soft hard;..." }
 
 ## State
 
+* **id** - container id, 64-bit decimal
+
+* **level** - container level, 0 for root, 1 for first level
+
 * **state** - current state, see [States]
 
 * **exit\_code** - 0: success, 1..255: error code, -64..-1: termination signal, -99: OOM
