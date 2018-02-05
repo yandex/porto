@@ -8,6 +8,7 @@
 #include "util/path.hpp"
 #include "util/locks.hpp"
 
+constexpr const char *V_ID = "id";
 constexpr const char *V_PATH = "path";
 constexpr const char *V_BACKEND = "backend";
 constexpr const char *V_READY = "ready";
@@ -15,7 +16,7 @@ constexpr const char *V_BUILD_TIME = "build_time";
 constexpr const char *V_STATE = "state";
 constexpr const char *V_PRIVATE = "private";
 
-constexpr const char *V_ID = "_id";
+constexpr const char *V_RAW_ID = "_id";
 constexpr const char *V_RAW_CONTAINERS = "_containers";
 constexpr const char *V_CONTAINERS = "containers";
 constexpr const char *V_LOOP_DEV = "_loop_dev";

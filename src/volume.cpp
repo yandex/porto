@@ -2309,6 +2309,8 @@ void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {
 
     auto lock = LockVolumes();
 
+    ret[V_ID] = Id;
+
     if (UserStorage() && !RemoteStorage())
         ret[V_STORAGE] = root.InnerPath(StoragePath).ToString();
     else
@@ -2370,7 +2372,7 @@ TError TVolume::Save() {
      * the previous scheme stored knobs selectively.
      */
 
-    node.Set(V_ID, Id);
+    node.Set(V_RAW_ID, Id);
     node.Set(V_PATH, Path.ToString());
     node.Set(V_AUTO_PATH, BoolToString(IsAutoPath));
     node.Set(V_STORAGE, Storage);
@@ -2415,7 +2417,7 @@ TError TVolume::Save() {
 }
 
 TError TVolume::Restore(const TKeyValue &node) {
-    if (!node.Has(V_ID))
+    if (!node.Has(V_RAW_ID))
         return TError(EError::InvalidValue, "No volume id stored");
 
     TError error = ApplyConfig(node.Data);
@@ -2633,7 +2635,7 @@ void TVolume::RestoreAll(void) {
         }
 
         /* key for sorting */
-        node.Name = node.Get(V_ID);
+        node.Name = node.Get(V_RAW_ID);
         node.Name.insert(0, 20 - node.Name.size(), '0');
     }
 
@@ -2814,7 +2816,7 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
         } else if (prop.first == V_CREATOR) {
             Creator = prop.second;
 
-        } else if (prop.first == V_ID) {
+        } else if (prop.first == V_RAW_ID) {
             Id = prop.second;
 
         } else if (prop.first == V_READY) {

@@ -794,6 +794,8 @@ strict unlink calls normal umount and fails if some files are opened.
 
 Like for container volume configuration is a set of key-value pairs.
 
+* **id** - volume id, 64-bit decimal
+
 * **backend** - backend engine, default: autodetect
     - *plain*     - bind mount **storage** to volume path
     - *bind*      - bind mount **storage** to volume path, requires volume path
@@ -921,7 +923,7 @@ and sample scripts in layers/ in porto sources.
 
 Storage is a directory used by volume backend for keeping volume data.
 Most volume backends by default use non-persistent temporary storage:
-**place**/porto\_volumes/id/**backend**.
+**place**/porto\_volumes/**id**/**backend**.
 
 If storage is specified then volume becomes persistent and could be
 reconstructed using same storage.
