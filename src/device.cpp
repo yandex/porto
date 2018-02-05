@@ -344,7 +344,7 @@ void TDevices::Merge(const TDevices &devices, bool overwrite) {
     for (auto &device: devices.Devices) {
         bool found = false;
         for (auto &d: Devices) {
-            if (d.Node == device.Node || d.PathInside == device.PathInside) {
+            if (d.PathInside == device.PathInside) {
                 found = true;
                 if (overwrite)
                     d = device;
