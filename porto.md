@@ -331,12 +331,15 @@ Write access to container requires any of these conditions:
 
 * **root\_readonly** - remount everything read-only
 
-* **bind** - bind mounts: \<source\> \<target\> \[ro|rw\];...
+* **bind** - bind mounts: \<source\> \<target\> \[ro|rw|rec\]... ;...
 
     This option creates new mount namespace and binds directories or files
-    from parent container mount namespace. Resulting bind-mounts are invisible
-    from host or parent container and cannot be used for creating volumes.
-    For that use volume **backend**=bind instead.
+    from parent container mount namespace.
+
+    Resulting bind-mounts are invisible from host or parent container and
+    cannot be used for creating volumes. For that use volume **backend**=bind instead.
+
+    Bind mount is non-recurse by default, add flag "rec" to bind sub-mounts too.
 
 * **stdout\_path** - stdout file, default: internal rotated storage
 

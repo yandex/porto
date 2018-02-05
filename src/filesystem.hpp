@@ -11,8 +11,12 @@ struct TBindMount {
     TPath Source;
     TPath Target;
     bool ReadOnly = false;
+    bool Recursive = false;
     bool ControlSource = false;
     bool ControlTarget = false;
+
+    static TError Parse(const std::string &str, std::vector<TBindMount> &binds);
+    static std::string Format(const std::vector<TBindMount> &binds);
 };
 
 struct TMountNamespace {
