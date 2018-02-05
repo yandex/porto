@@ -54,6 +54,9 @@ TError TDevice::Parse(TTuple &opt) {
         }
     }
 
+    if (!Wildcard)
+        Mknod = true; //FIXME requires for mknod in Makedev at start
+
     if (opt.size() > 2)
         Name = opt[2];
 
