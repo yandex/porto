@@ -117,7 +117,7 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_ipip6_ttl(64);
 
     config().mutable_network()->set_enable_ip6tnl0(true);
-    config().mutable_network()->set_enable_iproute(true);
+    config().mutable_network()->set_enable_iproute(false);
 
     config().mutable_core()->set_enable(false);
     config().mutable_core()->set_timeout_s(600); /* 10min */
