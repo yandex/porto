@@ -407,7 +407,8 @@ TError TClient::WriteAccess(const TFile &file) {
     /* Also volume owner gains full access inside */
     if (error) {
         auto volume = TVolume::Locate(path);
-        if (volume && !CanControl(volume->VolumeOwner))
+        if (volume && !volume->IsReadOnly &&
+                !CanControl(volume->VolumeOwner))
             error = OK;
     }
 

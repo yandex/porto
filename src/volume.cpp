@@ -1696,7 +1696,10 @@ TError TVolume::Build() {
     if (RemoteStorage()) {
         /* Nothing to check */
     } else if (UserStorage()) {
-        error = CL->WriteAccess(StorageFd);
+        if (IsReadOnly)
+            error = CL->ReadAccess(StorageFd);
+        else
+            error = CL->WriteAccess(StorageFd);
         if (error)
             return TError(error, "Volume {}", Path);
     } else if (HaveStorage()) {
