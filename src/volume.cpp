@@ -1050,22 +1050,34 @@ public:
     std::string Origin;
     std::string Device;
 
+    static TError CheckName(const std::string &name) {
+        auto pos = name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+_.-");
+        if (pos != std::string::npos)
+            return TError(EError::InvalidValue, "lvm character {:#x} in name", name[pos]);
+        return OK;
+    }
+
     TError Configure() override {
+        TError error;
+
         // storage=[Group][/Name][@Thin][:Origin]
 
         auto col = Volume->Storage.find(':');
         if (col != std::string::npos)
             Origin = Volume->Storage.substr(col + 1);
+
         auto at = Volume->Storage.find('@');
         if (at != std::string::npos && at < col)
             Thin = Volume->Storage.substr(at + 1, col - at - 1);
         else
             at = col;
+
         auto sep = Volume->Storage.find('/');
         if (sep != std::string::npos && sep < at)
             Name = Volume->Storage.substr(sep + 1, at - sep - 1);
         else
             sep = at;
+
         Group = Volume->Storage.substr(0, sep);
 
         if (Group.empty())
@@ -1074,6 +1086,22 @@ public:
         Persistent = !Name.empty();
         if (!Persistent)
             Name = "porto_lvm_" + Volume->Id;
+
+        error = CheckName(Group);
+        if (error)
+            return error;
+
+        error = CheckName(Name);
+        if (error)
+            return error;
+
+        error = CheckName(Thin);
+        if (error)
+            return error;
+
+        error = CheckName(Origin);
+        if (error)
+            return error;
 
         Device = "/dev/" + Group + "/" + Name;
 
