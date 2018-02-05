@@ -1,3 +1,11 @@
+yandex-porto (4.6.1) unstable; urgency=low
+
+  * devices: always allow mknod for devices #PORTO-346
+  * lvm: validate names #PORTO-347
+  * network: disable embedded iproute by default #PORTO-348
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 05 Feb 2018 14:51:27 +0300
+
 yandex-porto (4.6.0) unstable; urgency=low
 
   * container: update own cpu_limit_total when changing cpu_limit
