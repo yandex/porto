@@ -791,6 +791,13 @@ static int Portod() {
     if (error)
         FatalError("Cannot remount / recursively as shared", error);
 
+    TPath tracefs = "/sys/kernel/tracing";
+    if (config().container().enable_tracefs() && tracefs.Exists()) {
+        error = tracefs.Mount("none", "tracefs", MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
+        if (error && error.Errno != EBUSY)
+            L("Cannot mount tracefs: {}", error);
+    }
+
     EpollLoop = std::unique_ptr<TEpollLoop>(new TEpollLoop());
     EventQueue = std::unique_ptr<TEventQueue>(new TEventQueue());
 

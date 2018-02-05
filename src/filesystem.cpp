@@ -8,7 +8,13 @@ extern "C" {
 #include <sys/fcntl.h>
 #include <sys/stat.h>
 #include <linux/kdev_t.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 }
+
+#ifndef TRACEFS_MAGIC
+#define TRACEFS_MAGIC          0x74726163
+#endif
 
 static std::vector<TPath> SystemPaths = {
     "/bin",
@@ -257,33 +263,28 @@ TError TMountNamespace::MountRun() {
 TError TMountNamespace::MountTraceFs() {
     TError error;
 
-    TPath debugfs("/sys/kernel/debug");
+    TPath tracefs = "/sys/kernel/tracing";
+    if (!config().container().enable_tracefs() || !tracefs.Exists())
+        return OK;
+
+    struct statfs st;
+    if (statfs(tracefs.c_str(), &st) || st.f_type != TRACEFS_MAGIC)
+        return TError(EError::Unknown, "Tracefs is not mounted");
+
+    error = (Root / tracefs).BindRemount(tracefs, MS_RDONLY);
+    if (error)
+        return error;
+
+    TPath debugfs = Root / "/sys/kernel/debug";
     if (debugfs.Exists()) {
-        TPath tmp = debugfs / "tmp";
-        TPath tmp_tracefs = tmp / "tracing";
-        TPath tracefs = debugfs / "tracing";
+        TPath tracing = debugfs / "tracing";
         error = debugfs.Mount("none", "tmpfs", 0, {"mode=755", "size=0"});
         if (!error)
-            error = tracefs.Mkdir(0700);
+            error = tracing.Mkdir(0700);
         if (!error)
-            error = tmp.Mkdir(0700);
-        if (!error)
-            error = tmp.Mount("none", "debugfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
-        if (!error)
-            error = tracefs.BindRemount(tmp_tracefs, MS_RDONLY);
-        if (!error)
-            error = tmp.Umount(0);
-        if (!error)
-            error = tmp.Rmdir();
+            error = tracing.BindRemount(tracefs, MS_RDONLY);
         if (!error)
             error = debugfs.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
-        if (error)
-            return error;
-    }
-
-    TPath tracefs("/sys/kernel/tracing");
-    if (tracefs.Exists()) {
-        error = tracefs.Mount("none", "tracefs", MS_RDONLY | MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
         if (error)
             return error;
     }
@@ -292,6 +293,10 @@ TError TMountNamespace::MountTraceFs() {
 }
 
 TError TMountNamespace::MountSystemd() {
+
+    if (Systemd.empty())
+        return OK;
+
     TPath tmpfs = Root / "sys/fs/cgroup";
     TPath systemd = tmpfs / "systemd";
     TPath systemd_rw = systemd / Systemd;
@@ -465,12 +470,12 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    // mount sysfs read-only
-    error = sys.UmountAll();
+    // remount sysfs read-only
+    error = sys.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
     if (error)
         return error;
 
-    error = sys.Mount("sysfs", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {});
+    error = TPath("/sys/fs/cgroup").UmountAll();
     if (error)
         return error;
 
@@ -478,17 +483,16 @@ TError TMountNamespace::Setup() {
         error = SetupRoot();
         if (error)
             return error;
-    }
 
-    if (!Systemd.empty()) {
+        error = MountTraceFs();
+        if (error)
+            L_WRN("Cannot mount tracefs: {}", error);
+
         error = MountSystemd();
         if (error)
             return error;
-    }
 
-    // enter chroot
-    if (!Root.IsRoot()) {
-        // also binds root recursively if needed
+        // enter chroot, also binds root recursively if needed
         error = Root.PivotRoot();
         if (error) {
             L_WRN("Cannot pivot root, roll back to chroot: {}", error);
@@ -496,6 +500,7 @@ TError TMountNamespace::Setup() {
             if (error)
                 return error;
         }
+
         error = root.Chdir();
         if (error)
             return error;
@@ -505,12 +510,6 @@ TError TMountNamespace::Setup() {
     error = root.Remount(MS_REMOUNT | MS_BIND | (RootRo ? MS_RDONLY : 0));
     if (error)
         return error;
-
-    if (config().container().enable_tracefs()) {
-        error = MountTraceFs();
-        if (error)
-            L_WRN("Cannot mount tracefs: {}", error);
-    }
 
     // remount as shared: subcontainers will get propgation from us
     error = root.Remount(MS_SHARED | MS_REC);
