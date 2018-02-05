@@ -1795,9 +1795,6 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
         if (error)
             return error;
 
-        if (!device.Wildcard)
-            device.Mknod = true; //FIXME requires for mknod in Makedev at start
-
         error = device.Permitted(OwnerCred);
         if (error)
             return error;
@@ -1814,9 +1811,6 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
         error = device.Parse(cfg);
         if (error)
             return error;
-
-        if (!device.Wildcard)
-            device.Mknod = true; //FIXME requires for mknod in Makedev at start
 
         bool found = false;
         for (auto &dev: devices)
