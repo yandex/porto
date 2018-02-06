@@ -20,7 +20,7 @@ struct Property {
 struct Volume {
     std::string Path;
     std::map<std::string, std::string> Properties;
-    std::vector<std::string> Containers;
+    std::map<std::string, std::string> Links;
 };
 
 struct Layer {
@@ -117,7 +117,9 @@ public:
     int CreateVolume(std::string &path,
                      const std::map<std::string, std::string> &config);
     int LinkVolume(const std::string &path,
-            const std::string &container = std::string());
+                   const std::string &container = "",
+                   const std::string &target = "",
+                   bool required = false);
     int UnlinkVolume(const std::string &path,
                      const std::string &container = "", bool strict = false);
     int ListVolumes(const std::string &path, const std::string &container,

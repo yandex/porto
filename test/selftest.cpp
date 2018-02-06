@@ -4249,7 +4249,7 @@ static void TestVolumeHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 1);
     ExpectEq(volumes[0].Path, a);
-    ExpectEq(volumes[0].Containers.size(), 1);
+    ExpectEq(volumes[0].Links.size(), 1);
 
     ExpectEq(volumes[0].Properties.count("ready"), 1);
     ExpectEq(volumes[0].Properties.count("backend"), 1);
@@ -4285,8 +4285,8 @@ static void TestVolumeHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 2);
 
-    ExpectEq(volumes[0].Containers.size(), 1);
-    ExpectEq(volumes[1].Containers.size(), 1);
+    ExpectEq(volumes[0].Links.size(), 1);
+    ExpectEq(volumes[1].Links.size(), 1);
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(b, "", volumes));
@@ -4304,7 +4304,7 @@ static void TestVolumeHolder(Porto::Connection &api) {
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 1);
     ExpectEq(volumes[0].Path, b);
-    ExpectEq(volumes[0].Containers.size(), 1);
+    ExpectEq(volumes[0].Links.size(), 1);
 
     ExpectEq(aPath.Exists(), true);
     ExpectEq(bPath.Exists(), true);

@@ -1208,10 +1208,30 @@ std::shared_ptr<TVolume> TVolume::Find(const TPath &path) {
     return TVolume::FindLocked(path);
 }
 
-TError TVolume::Find(const TPath &path, std::shared_ptr<TVolume> &volume) {
-    volume = Find(path);
+TPath TVolume::Compose(const TContainer &ct) const {
+    PORTO_LOCKED(VolumesMutex);
+    for (auto c = &ct; c && c->RootPath == ct.RootPath; c = c->Parent.get()) {
+        auto link = Links.find(c->Name);
+        if (link != Links.end() && link->second != "")
+            return link->second;
+    }
+    return ct.RootPath.InnerPath(Path);
+}
+
+TError TVolume::Resolve(const TContainer &ct, const TPath &path, std::shared_ptr<TVolume> &volume) {
+    auto volumes_lock = LockVolumes();
+    volume = TVolume::FindLocked(ct.RootPath / path);
     if (volume)
         return OK;
+    for (auto c = &ct; c && c->RootPath == ct.RootPath; c = c->Parent.get()) {
+        for (auto &link: c->LinkedVolumes) {
+            auto it = link->Links.find(c->Name);
+            if (it != link->Links.end() && it->second == path) {
+                volume = link;
+                return OK;
+            }
+        }
+    }
     return TError(EError::VolumeNotFound, "Volume " + path.ToString() + " not found");
 }
 
@@ -1853,6 +1873,38 @@ TError TVolume::Build() {
     return Save();
 }
 
+TError TVolume::Mount(const TPath &target) {
+    if (!target.IsAbsolute() || !target.IsNormal())
+        return TError(EError::InvalidValue, "Non-normalized target path {}", target);
+
+    auto lock = ScopedLock();
+    TError error;
+    TFile fd;
+
+    if (State != EVolumeState::Ready)
+        return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
+
+    L_ACT("Mount volume {} to {}", Path, target);
+
+    error = fd.OpenDir(target);
+    if (error)
+        return error;
+
+    TPath real = fd.RealPath();
+    if (real != target)
+        return TError(EError::InvalidValue, "Real target path differs: {} != {}", target, real);
+
+    error = CL->WriteAccess(fd);
+    if (error)
+        return error;
+
+    error = fd.ProcPath().Bind(InternalPath);
+    if (error)
+        return error;
+
+    return OK;
+}
+
 void TVolume::DestroyAll() {
     std::list<std::shared_ptr<TVolume>> plan;
     for (auto &it : Volumes)
@@ -1952,11 +2004,11 @@ TError TVolume::Destroy(bool strict) {
 
         if (error && strict) {
             volumes_lock.lock();
-            volume->SetState(Containers.empty() ?
+            volume->SetState(Links.empty() ?
                     EVolumeState::Unlinked : EVolumeState::Ready);
             for (auto &volume : plan) {
                 if (volume->State == EVolumeState::ToDestroy)
-                    volume->SetState(Containers.empty() ?
+                    volume->SetState(Links.empty() ?
                             EVolumeState::Unlinked : EVolumeState::Ready);
             }
             return error;
@@ -1979,7 +2031,8 @@ TError TVolume::Destroy(bool strict) {
         volume->VolumeOwnerContainer->OwnedVolumes.remove(volume);
         volume->VolumeOwnerContainer = nullptr;
 
-        for (auto &name: volume->Containers) {
+        for (auto &it: volume->Links) {
+            auto &name = it.first;
             L_ACT("Forced unlink volume {} from {}", volume->Path, name);
             volumes_lock.unlock();
             auto containers_lock = LockContainers();
@@ -2216,8 +2269,12 @@ TError TVolume::GetUpperLayer(TPath &upper) {
     return OK;
 }
 
-TError TVolume::LinkContainer(TContainer &container) {
+TError TVolume::LinkContainer(TContainer &container, const TPath &target) {
+    if (target && (!target.IsAbsolute() || !target.IsNormal()))
+        return TError(EError::InvalidValue, "Non-normalized target path {}", target);
+
     auto volumes_lock = LockVolumes();
+    TError error;
 
     auto it = std::find(container.LinkedVolumes.begin(),
                         container.LinkedVolumes.end(), shared_from_this());
@@ -2230,14 +2287,23 @@ TError TVolume::LinkContainer(TContainer &container) {
     if (State != EVolumeState::Ready && State != EVolumeState::Building)
         return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
 
-    Containers.push_back(container.Name);
-    TError error = Save();
+    Links[container.Name] = target.ToString();
+    error = Save();
     if (error) {
-        Containers.pop_back();
-        if (Containers.empty() && State == EVolumeState::Ready)
+        Links.erase(container.Name);
+        if (Links.empty() && State == EVolumeState::Ready)
             SetState(EVolumeState::Unlinked);
-    } else
-        container.LinkedVolumes.emplace_back(shared_from_this());
+        return error;
+    }
+    container.LinkedVolumes.emplace_back(shared_from_this());
+    volumes_lock.unlock();
+
+    if (target && container.IsActive()) {
+        error = Mount(container.RootPath / target);
+        if (error)
+            (void)UnlinkContainer(container);
+    }
+
     return error;
 }
 
@@ -2250,17 +2316,39 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     if (it == container.LinkedVolumes.end())
         return TError(EError::VolumeNotLinked, "Container is not linked");
 
-    if (strict && Containers.size() > 1)
+    if (strict && Links.size() > 1)
         return TError(EError::Busy, "More than one linked container");
 
-    container.LinkedVolumes.erase(it);
-    Containers.erase(std::remove(Containers.begin(), Containers.end(),
-                                 container.Name), Containers.end());
-
-    if (Containers.empty() && State == EVolumeState::Ready)
+    TPath target = Links[container.Name];
+    Links.erase(container.Name);
+    if (Links.empty() && State == EVolumeState::Ready)
         SetState(EVolumeState::Unlinked);
+    error = Save();
+    if (error) {
+        Links[container.Name] = target.ToString();
+        if (State == EVolumeState::Unlinked)
+            SetState(EVolumeState::Ready);
+        return error;
+    }
+    container.LinkedVolumes.erase(it);
+    volumes_lock.unlock();
 
-    return Save();
+    if (target && container.IsActive()) {
+        error = (container.RootPath / target).UmountAll();
+        if (error)
+            L_ERR("Cannot umount linked volume {}: {}", Path, error);
+    }
+
+    return error;
+}
+
+std::string TVolume::GetLinkTarget(TContainer &container) {
+    auto volumes_lock = LockVolumes();
+    std::string target;
+    auto it = Links.find(container.Name);
+    if (it != Links.end())
+        target = it->second;
+    return target;
 }
 
 void TVolume::UnlinkAllVolumes(TContainer &container) {
@@ -2296,7 +2384,7 @@ TError TVolume::CheckRequired(const TTuple &paths) {
     return OK;
 }
 
-void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {
+void TVolume::DumpConfig(TStringMap &ret, TStringMap &links) const {
     TPath &root = CL->ClientContainer->RootPath;
     TStatFS stat;
 
@@ -2318,8 +2406,8 @@ void TVolume::DumpConfig(TStringMap &ret, TTuple &links) const {
 
     ret[V_BACKEND] = BackendType;
 
-    for (auto &name: Containers)
-        links.push_back(CL->RelativeName(name));
+    for (auto &link: Links)
+        links.emplace(CL->RelativeName(link.first), link.second);
 
     if (VolumeOwnerContainer)
         ret[V_OWNER_CONTAINER] = CL->RelativeName(VolumeOwnerContainer->Name);
@@ -2401,7 +2489,6 @@ TError TVolume::Save() {
         node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
     node.Set(V_READY, BoolToString(State == EVolumeState::Ready));
     node.Set(V_PRIVATE, Private);
-    node.Set(V_RAW_CONTAINERS, MergeEscapeStrings(Containers, ';'));
     node.Set(V_LOOP_DEV, std::to_string(Device));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
     node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
@@ -2409,6 +2496,14 @@ TError TVolume::Save() {
     node.Set(V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
     node.Set(V_INODE_LIMIT, std::to_string(InodeLimit));
     node.Set(V_INODE_GUARANTEE, std::to_string(InodeGuarantee));
+
+    std::string str;
+    for (auto &link: Links) {
+        if (str != "")
+            str += ";";
+        str += link.second == "" ? link.first : (link.first + "=" + link.second);
+    }
+    node.Set(V_RAW_CONTAINERS, str);
 
     if (CustomPlace)
         node.Set(V_PLACE, Place.ToString());
@@ -2482,7 +2577,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_PERMISSIONS, "directory permissions (default - 0775)", false },
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", false },
-    { V_CONTAINERS,  "container;... - initial links (default - self)", false },
+    { V_CONTAINERS,  "container[=target];... - initial links (default - self)", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_PLACE_KEY,   "key for charging place_limit for owner_container (ro)", true },
@@ -2586,11 +2681,15 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     }
 
     if (cfg.count(V_CONTAINERS)) {
-        for (auto &name: SplitEscapedString(cfg.at(V_CONTAINERS), ';')) {
+        for (auto &str: SplitEscapedString(cfg.at(V_CONTAINERS), ';')) {
+            auto sep = str.find('=');
+            auto name = str.substr(0, sep);
+            auto path = sep == std::string::npos ? "" : str.substr(sep + 1);
+
             std::shared_ptr<TContainer> ct;
             error = CL->WriteContainer(name, ct, true);
             if (!error)
-                error = volume->LinkContainer(*ct);
+                error = volume->LinkContainer(*ct, path);
             if (error) {
                 volume->Destroy();
                 return error;
@@ -2668,12 +2767,12 @@ void TVolume::RestoreAll(void) {
 
         auto containers_lock = LockContainers();
 
-        for (auto &name: volume->Containers) {
-            auto container = TContainer::Find(name);
+        for (auto &link: volume->Links) {
+            auto container = TContainer::Find(link.first);
             if (container)
                 container->LinkedVolumes.emplace_back(volume);
             else
-                L_WRN("Cannot find container {}", name);
+                L_WRN("Cannot find container {}", link.first);
         }
 
         containers_lock.unlock();
@@ -2684,7 +2783,7 @@ void TVolume::RestoreAll(void) {
             continue;
         }
 
-        if (!volume->Containers.size()) {
+        if (!volume->Links.size()) {
             L_WRN("Volume {} has no containers", volume->Path);
             broken_volumes.push_back(volume);
             continue;
@@ -2834,8 +2933,13 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
             Private = prop.second;
 
         } else if (prop.first == V_RAW_CONTAINERS) {
-            Containers = SplitEscapedString(prop.second, ';');
+            for (auto &str: SplitEscapedString(prop.second, ';')) {
+                auto sep = str.find('=');
+                auto name = str.substr(0, sep);
+                auto path = sep == std::string::npos ? "" : str.substr(sep + 1);
 
+                Links[name] = path;
+            }
         } else if (prop.first == V_CONTAINERS) {
 
         } else if (prop.first == V_LOOP_DEV) {

@@ -116,6 +116,12 @@ public:
     int RunningChildren = 0;
     int StartingChildren = 0;
 
+    bool IsActive() const {
+        return State == EContainerState::Running ||
+               State == EContainerState::Meta ||
+               State == EContainerState::Paused;
+    }
+
     /* protected with ContainersMutex */
     std::list<std::shared_ptr<TContainer>> Children;
 

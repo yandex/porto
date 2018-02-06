@@ -104,6 +104,8 @@ message TContainerRequest {
     optional TStorageImportRequest importStorage = 118;
     optional TStorageExportRequest exportStorage = 119;
 
+    optional TVolumeLinkPathRequest linkVolumePath = 120;
+
     optional TConvertPathRequest convertPath = 200;
     optional TAttachProcessRequest attachProcess = 201;
     optional TLocateProcessRequest locateProcess = 202;
@@ -385,10 +387,16 @@ message TVolumePropertyDescription {
     required string desc = 2;
 }
 
+message TVolumeLink {
+    required string container = 1;
+    optional string target = 2;
+}
+
 message TVolumeDescription {
     required string path = 1;
     repeated TVolumeProperty properties = 2;
     repeated string containers = 3;
+    repeated TVolumeLink links = 4;
 }
 
 message TVolumePropertyListRequest {
@@ -406,6 +414,13 @@ message TVolumeCreateRequest {
 message TVolumeLinkRequest {
     required string path = 1;
     optional string container = 2;
+}
+
+message TVolumeLinkPathRequest {
+    required string path = 1;
+    optional string container = 2;
+    optional string target = 3;
+    optional bool required = 4;
 }
 
 message TVolumeUnlinkRequest {

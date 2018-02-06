@@ -452,7 +452,8 @@ int Connection::CreateVolume(const std::string &path,
     if (!ret) {
         const auto &volume = Impl->Rsp.volume();
         result.Path = volume.path();
-        result.Containers = std::vector<std::string>(std::begin(volume.containers()), std::end(volume.containers()));
+        for (auto &ct: volume.containers())
+            result.Links[ct] = "";
         for (const auto &p: volume.properties())
             result.Properties[p.name()] = p.value();
     }
@@ -468,12 +469,19 @@ int Connection::CreateVolume(std::string &path,
     return ret;
 }
 
-int Connection::LinkVolume(const std::string &path, const std::string &container) {
-    auto req = Impl->Req.mutable_linkvolume();
-
-    req->set_path(path);
-    if (!container.empty())
+int Connection::LinkVolume(const std::string &path, const std::string &container, const std::string &target, bool required) {
+    if (target == "" && !required) {
+        auto req = Impl->Req.mutable_linkvolume();
+        req->set_path(path);
+        if (!container.empty())
+            req->set_container(container);
+    } else {
+        auto req = Impl->Req.mutable_linkvolumepath();
+        req->set_path(path);
         req->set_container(container);
+        req->set_target(target);
+        req->set_required(required);
+    }
 
     return Impl->Rpc();
 }
@@ -511,8 +519,13 @@ int Connection::ListVolumes(const std::string &path,
 
         for (const auto &v: list.volumes()) {
             volumes[i].Path = v.path();
-            volumes[i].Containers = std::vector<std::string>(
-                    std::begin(v.containers()), std::end(v.containers()));
+            if (v.links().size()) {
+                for (auto &link: v.links())
+                    volumes[i].Links[link.container()] = link.target();
+            } else {
+                for (auto &ct: v.containers())
+                    volumes[i].Links[ct] = "";
+            }
             for (const auto &p: v.properties())
                 volumes[i].Properties[p.name()] = p.value();
             i++;

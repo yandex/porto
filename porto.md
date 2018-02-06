@@ -790,6 +790,10 @@ A volume can be linked to one or more containers, links act as reference
 counter: unlinked volume will be destroyed automatically. By default volume
 is linked to the container that created it: "self", "/" for host.
 
+Each link might define target path for exposing volume inside container
+when it stats. This path also works as alias for volume path for requests
+from container.
+
 By default volume unlink calls lazy **umount(2)** with flag MNT\_DETACH,
 strict unlink calls normal umount and fails if some files are opened.
 
@@ -857,7 +861,7 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **read\_only**    - true or false, default: false
 
-* **containers**    - initial container references, syntax: container;...  default: "self"
+* **containers**    - initial links, syntax: container[=target];...  default: "self"
 
 * **layers**        - layers, syntax: top-layer;...;bottom-layer
 

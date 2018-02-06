@@ -2386,6 +2386,15 @@ TError TContainer::PrepareResources() {
         RootPath = RootVolume->Path;
     }
 
+    for (auto &volume: LinkedVolumes) {
+        TPath target = volume->GetLinkTarget(*this);
+        if (target) {
+            error = volume->Mount(RootPath / target);
+            if (error)
+                return error;
+        }
+    }
+
     PropagateCpuLimit();
 
     return OK;
@@ -2446,6 +2455,15 @@ void TContainer::FreeResources() {
             error = tmp.RemoveAll();
             if (error)
                 L_ERR("Can't remove {}: {}", tmp, error);
+        }
+    }
+
+    for (auto &volume: LinkedVolumes) {
+        TPath target = volume->GetLinkTarget(*this);
+        if (target) {
+            error = (RootPath / target).UmountAll();
+            if (error)
+                L_ERR("Cannot umount linked volume {}: {}", volume->Path, error);
         }
     }
 

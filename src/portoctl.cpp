@@ -1693,13 +1693,16 @@ public:
 
 class TLinkVolumeCmd final : public ICmd {
 public:
-    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1, "<path> [container]",
+    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1, "[-r] <path> [container] [target]",
                     "link volume to container", "default container - current\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
-        const auto &args = env->GetArgs();
+        bool required = false;
+        const auto &args = env->GetOpts({
+                {'r', false, [&](const char *) { required = true; }},
+        });
         const auto path = TPath(args[0]).RealPath().ToString();
-        int ret = Api->LinkVolume(path, (args.size() > 1) ? args[1] : "");
+        int ret = Api->LinkVolume(path, (args.size() > 1) ? args[1] : "", (args.size() > 2) ? args[2] : "", required);
         if (ret)
             PrintError("Can't link volume");
         return ret;
@@ -1734,10 +1737,10 @@ public:
                 return EXIT_FAILURE;
             }
 
-            for (auto ct: vol[0].Containers) {
-                ret = Api->UnlinkVolume(path, ct);
+            for (auto link: vol[0].Links) {
+                ret = Api->UnlinkVolume(path, link.first);
                 if (ret) {
-                    PrintError("Cannot unlink volume from " + ct);
+                    PrintError("Cannot unlink volume from " + link.first);
                     break;
                 }
             }
@@ -1810,8 +1813,12 @@ public:
                 ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
             }
 
-            for (auto name: v.Containers)
-                std::cout << " " << name;
+            for (auto link: v.Links) {
+                if (link.second == "")
+                    std::cout << " " << link.first;
+                else
+                    std::cout << " " << link.first << "=" << link.second;
+            }
 
             std::cout << std::endl;
         }
@@ -1820,8 +1827,12 @@ public:
             return;
 
         std::cout << "  " << std::left << std::setw(20) << "containers";
-        for (auto name: v.Containers)
-            std::cout << " " << name;
+        for (auto link: v.Links) {
+            if (link.second == "")
+                std::cout << " " << link.first;
+            else
+                std::cout << " " << link.first << "=" << link.second;
+        }
         std::cout << std::endl;
         std::cout << std::resetiosflags(std::ios::adjustfield);
 

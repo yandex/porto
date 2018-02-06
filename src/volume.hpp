@@ -110,7 +110,7 @@ public:
     bool HasDependentContainer = false;
 
     std::vector<std::string> Layers;
-    std::vector<std::string> Containers;
+    std::map<std::string, std::string> Links; /* container -> path */
 
     uint64_t ClaimedSpace = 0;
     uint64_t SpaceLimit = 0;
@@ -140,17 +140,20 @@ public:
 
     static std::shared_ptr<TVolume> FindLocked(const TPath &path);
     static std::shared_ptr<TVolume> Find(const TPath &path);
-    static TError Find(const TPath &path, std::shared_ptr<TVolume> &volume);
     static std::shared_ptr<TVolume> Locate(const TPath &path);
+
+    TPath Compose(const TContainer &ct) const;
+    static TError Resolve(const TContainer &ct, const TPath &path, std::shared_ptr<TVolume> &volume);
 
     TError Configure(const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
-    void DumpConfig(TStringMap &props, TTuple &links) const;
+    void DumpConfig(TStringMap &props, TStringMap &links) const;
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
 
     TError Build(void);
+    TError Mount(const TPath &target);
 
     static void DestroyAll();
     TError DestroyOne(bool strict = false);
@@ -161,8 +164,9 @@ public:
 
     static void RestoreAll(void);
 
-    TError LinkContainer(TContainer &container);
+    TError LinkContainer(TContainer &container, const TPath &target = "");
     TError UnlinkContainer(TContainer &container, bool strict = false);
+    std::string GetLinkTarget(TContainer &container);
     static void UnlinkAllVolumes(TContainer &container);
 
     static TError CheckRequired(const TTuple &paths);
