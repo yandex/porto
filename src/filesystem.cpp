@@ -466,6 +466,11 @@ TError TMountNamespace::Setup() {
         error = bind.Mount(BindCred, Root);
         if (error)
             return error;
+
+        // disable propagation in both directions
+        error = bind.Target.Remount(MS_PRIVATE | (bind.Recursive ? MS_REC : 0));
+        if (error)
+            return error;
     }
 
     // remount sysfs read-only
