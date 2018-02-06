@@ -15,6 +15,8 @@ struct TBindMount {
     bool ControlSource = false;
     bool ControlTarget = false;
 
+    TError Mount(const TCred &cred, const TPath &root) const;
+
     static TError Parse(const std::string &str, std::vector<TBindMount> &binds);
     static std::string Format(const std::vector<TBindMount> &binds);
 };
