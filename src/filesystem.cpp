@@ -453,6 +453,11 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
+    // remount as shared: subcontainers will get propgation from us
+    error = root.Remount(MS_SHARED | MS_REC);
+    if (error)
+        return error;
+
     // mount proc so PID namespace works
     error = proc.UmountAll();
     if (error)
@@ -511,11 +516,6 @@ TError TMountNamespace::Setup() {
 
     // allow suid binaries and remount read-only if required
     error = root.Remount(MS_REMOUNT | MS_BIND | (RootRo ? MS_RDONLY : 0));
-    if (error)
-        return error;
-
-    // remount as shared: subcontainers will get propgation from us
-    error = root.Remount(MS_SHARED | MS_REC);
     if (error)
         return error;
 
