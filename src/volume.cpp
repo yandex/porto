@@ -1879,30 +1879,29 @@ TError TVolume::Mount(const TPath &target) {
 
     auto lock = ScopedLock();
     TError error;
-    TFile fd;
 
     if (State != EVolumeState::Ready)
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
     L_ACT("Mount volume {} to {}", Path, target);
 
-    error = fd.OpenDir(target);
-    if (error)
-        return error;
+    TBindMount bind;
 
-    TPath real = fd.RealPath();
-    if (real != target)
-        return TError(EError::InvalidValue, "Real target path differs: {} != {}", target, real);
+    bind.Recursive = false;
+    bind.IsDirectory = true;
+    bind.ReadOnly = IsReadOnly;
 
-    error = CL->WriteAccess(fd);
-    if (error)
-        return error;
+    bind.Source = InternalPath;
+    bind.ControlSource = true;
 
-    error = fd.ProcPath().Bind(InternalPath);
-    if (error)
-        return error;
+    bind.Target = target;
+    bind.CreateTarget = true;
+    bind.FollowTraget = false;
 
-    return OK;
+    auto target_volume = TVolume::Locate(target);
+    bind.ControlTarget = target_volume && !CL->CanControl(target_volume->VolumeOwner);
+
+    return bind.Mount(CL->Cred, "/");
 }
 
 void TVolume::DestroyAll() {

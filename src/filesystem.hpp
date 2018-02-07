@@ -14,6 +14,10 @@ struct TBindMount {
     bool Recursive = false;
     bool ControlSource = false;
     bool ControlTarget = false;
+    bool CreateTarget = false;
+    bool FollowTraget = false;
+    bool IsDirectory = false;
+    bool IsFile = false;
 
     TError Mount(const TCred &cred, const TPath &root) const;
 

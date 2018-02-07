@@ -61,6 +61,9 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
         bind.Source = line[0];
         bind.Target = line[1];
 
+        bind.CreateTarget = true;
+        bind.FollowTraget = true;
+
         for (unsigned i = 2; i < line.size(); i++) {
             if (line[i] == "ro")
                 bind.ReadOnly = true;
@@ -89,15 +92,16 @@ std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
 }
 
 TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
+    bool directory = IsDirectory;
     TFile src, dst;
-    bool directory;
     TError error;
 
     error = src.OpenPath(Source);
     if (error)
         return error;
 
-    directory = Source.IsDirectoryFollow();
+    if (!IsDirectory && !IsFile)
+        directory = Source.IsDirectoryFollow();
 
     if (!ControlSource) {
         if (!ReadOnly || (directory && IsSystemPath(Source)))
@@ -108,7 +112,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
             return TError(error, "Bindmount {}", Target);
     }
 
-    if (!Target.Exists()) {
+    if (CreateTarget && !Target.Exists()) {
         TPath base = Target.DirName();
         std::list<std::string> dirs;
         TFile dir;
@@ -122,17 +126,23 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
         if (error)
             return error;
 
-        if (root.IsRoot()) {
-            if (!ControlTarget)
-                error = dir.WriteAccess(cred);
-        } else if (!dir.RealPath().IsInside(root))
-            error = TError(EError::InvalidValue, "Bind mount target {} out of chroot", Target);
+        TPath real = dir.RealPath();
+        if (!FollowTraget && base != real)
+            return TError(EError::InvalidValue, "Real target path differs: {} -> {}", base, real);
+
+        if (!root.IsRoot() && !real.IsInside(root))
+            return TError(EError::InvalidValue, "Bind mount target out of chroot: {} -> {}", base, real);
+
+        if (root.IsRoot() && !ControlTarget)
+            error = dir.WriteAccess(cred);
 
         for (auto &name: dirs) {
             if (!error)
                 error = dir.MkdirAt(name, 0755);
             if (!error)
                 error = dir.WalkStrict(dir, name);
+            if (!error)
+                error = dir.Chown(cred);
         }
 
         if (error)
@@ -143,32 +153,41 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
             if (!error)
                 error = dst.OpenDir(Target);
         } else
-            error = dst.OpenAt(dir, Target.BaseName(), O_CREAT | O_WRONLY | O_CLOEXEC, 0644);
+            error = dst.OpenAt(dir, Target.BaseName(), O_CREAT | O_WRONLY | O_CLOEXEC |
+                               (FollowTraget ? 0 : O_NOFOLLOW), 0644);
+        if (!error)
+            error = dir.Chown(cred);
     } else {
         if (directory)
             error = dst.OpenDir(Target);
         else
             error = dst.OpenRead(Target);
 
-        // do not override data in system directories
-        if (!error && !ControlTarget && root.IsRoot() && IsSystemPath(Target))
+        // do not override non-writable directies in host or system directories
+        if (!error && !ControlTarget && (root.IsRoot() || IsSystemPath(Target)))
             error = dst.WriteAccess(cred);
     }
     if (error)
         return TError(error, "Bindmount {}", Target);
 
-    if (!root.IsRoot() && !dst.RealPath().IsInside(root))
-        return TError(EError::InvalidValue, "Bind mount target {} out of chroot", Target);
+    TPath real = dst.RealPath();
+
+    if (!FollowTraget && Target != real)
+        return TError(EError::InvalidValue, "Real target path differs: {} -> {}", Target, real);
+
+    if (!root.IsRoot() && !real.IsInside(root))
+        return TError(EError::InvalidValue, "Bind mount target out of chroot: {} -> {}", Target, real);
 
     error = dst.ProcPath().Bind(src.ProcPath(), Recursive ? MS_REC : 0);
     if (error)
         return error;
 
-    error = Target.Remount(MS_REMOUNT | MS_BIND |
-                           (Recursive ? MS_REC : 0) |
-                           (ReadOnly ? MS_RDONLY : 0));
-    if (error)
-        return error;
+    if (ReadOnly) {
+        error = Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY |
+                               (Recursive ? MS_REC : 0));
+        if (error)
+            return error;
+    }
 
     return OK;
 }
