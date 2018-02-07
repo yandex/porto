@@ -99,12 +99,12 @@ static void RequestToString(const rpc::TContainerRequest &req,
     } else if (req.has_linkvolume()) {
         cmd = "LinkVolume";
         arg = { req.linkvolume().path(), req.linkvolume().container() };
-    } else if (req.has_linkvolumepath()) {
+    } else if (req.has_linkvolumetarget()) {
         cmd = "LinkVolume";
-        arg = { req.linkvolumepath().path(), req.linkvolumepath().container() };
-        if (req.linkvolumepath().target() != "")
-            arg.push_back("target=" + req.linkvolumepath().target());
-        if (req.linkvolumepath().required())
+        arg = { req.linkvolumetarget().path(), req.linkvolumetarget().container() };
+        if (req.linkvolumetarget().target() != "")
+            arg.push_back("target=" + req.linkvolumetarget().target());
+        if (req.linkvolumetarget().required())
             arg.push_back("required=true");
     } else if (req.has_unlinkvolume()) {
         cmd = "UnlinkVolume";
@@ -769,24 +769,6 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
 
 noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
     std::shared_ptr<TContainer> ct;
-    TError error = CL->WriteContainer(req.has_container() ?
-                                req.container() : SELF_CONTAINER, ct, true);
-    if (error)
-        return error;
-
-    std::shared_ptr<TVolume> volume;
-    error = TVolume::Resolve(*CL->ClientContainer, req.path(), volume);
-    if (error)
-        return error;
-    error = CL->CanControl(volume->VolumeOwner);
-    if (error)
-        return TError(error, "Cannot link volume {}", volume->Path);
-
-    return volume->LinkContainer(*ct);
-}
-
-noinline TError LinkVolumePath(const rpc::TVolumeLinkPathRequest &req) {
-    std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.container() != "" ? req.container() : SELF_CONTAINER, ct, true);
     if (error)
         return error;
@@ -1341,8 +1323,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         error = CreateVolume(req.createvolume(), rsp);
     else if (req.has_linkvolume())
         error = LinkVolume(req.linkvolume());
-    else if (req.has_linkvolumepath())
-        error = LinkVolumePath(req.linkvolumepath());
+    else if (req.has_linkvolumetarget())
+        error = LinkVolume(req.linkvolumetarget());
     else if (req.has_unlinkvolume())
         error = UnlinkVolume(req.unlinkvolume());
     else if (req.has_listvolumes())

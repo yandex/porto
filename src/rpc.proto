@@ -1,9 +1,5 @@
 // Portod daemon listens on /run/portod.socket unix socket.
-// Messages are in delimited protocol buffers i/o format.
-// A message consists of their's length in varint format followed by protobuf data.
-// http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja
-// https://developers.google.com/protocol-buffers/docs/reference/java/com/google/protobuf/MessageLite#writeDelimitedTo%28java.io.OutputStream%29).
-// Basic request type is TContainerRequest, response type is TContainerResponse (even for VolumeAPI requests).
+// Protocol: Varint length, TContainerRequest req | TContainerResponse rsp.
 
 package rpc;
 
@@ -87,6 +83,7 @@ message TContainerRequest {
     optional TVolumePropertyListRequest listVolumeProperties = 103;
     optional TVolumeCreateRequest createVolume = 104;
     optional TVolumeLinkRequest linkVolume = 105;
+    optional TVolumeLinkRequest LinkVolumeTarget = 120;
     optional TVolumeUnlinkRequest unlinkVolume = 106;
     optional TVolumeListRequest listVolumes = 107;
     optional TVolumeTuneRequest tuneVolume = 108;
@@ -103,8 +100,6 @@ message TContainerRequest {
     optional TStorageRemoveRequest removeStorage = 117;
     optional TStorageImportRequest importStorage = 118;
     optional TStorageExportRequest exportStorage = 119;
-
-    optional TVolumeLinkPathRequest linkVolumePath = 120;
 
     optional TConvertPathRequest convertPath = 200;
     optional TAttachProcessRequest attachProcess = 201;
@@ -413,14 +408,9 @@ message TVolumeCreateRequest {
 
 message TVolumeLinkRequest {
     required string path = 1;
-    optional string container = 2;
-}
-
-message TVolumeLinkPathRequest {
-    required string path = 1;
-    optional string container = 2;
-    optional string target = 3;
-    optional bool required = 4;
+    optional string container = 2;      // default - self
+    optional string target = 3;         // path in container
+    optional bool required = 4;         // stop container at fail
 }
 
 message TVolumeUnlinkRequest {
