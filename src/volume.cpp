@@ -2407,7 +2407,7 @@ void TVolume::DumpConfig(TStringMap &ret, TStringMap &links) const {
     ret[V_BACKEND] = BackendType;
 
     for (auto &link: Links)
-        links.emplace(CL->RelativeName(link.first), link.second);
+        links[CL->RelativeName(link.first)] = link.second;
 
     if (VolumeOwnerContainer)
         ret[V_OWNER_CONTAINER] = CL->RelativeName(VolumeOwnerContainer->Name);
