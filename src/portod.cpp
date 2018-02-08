@@ -689,15 +689,14 @@ static void CleanupTempdir() {
 }
 
 static void DestroyContainers(bool weak) {
+    SystemClient.LockContainer(RootContainer);
+
     /* leaves first */
     for (auto &ct: RootContainer->Subtree()) {
         if (ct->IsRoot() || (weak && !ct->IsWeak))
             continue;
 
-        TError error = SystemClient.LockContainer(ct);
-        if (!error)
-            error = ct->Destroy();
-
+        TError error = ct->Destroy();
         if (error)
             L_ERR("Cannot destroy container {}: {}", ct->Name, error);
     }
