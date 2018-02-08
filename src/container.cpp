@@ -2571,6 +2571,13 @@ TError TContainer::Stop(uint64_t timeout) {
 
     DowngradeLock();
 
+    if (!timeout) {
+        L_ACT("Killing spree");
+        for (auto it = subtree.rbegin(); it != subtree.rend(); ++it)
+            if ((*it)->Isolate && (*it)->WaitTask.Pid)
+                (void)(*it)->WaitTask.Kill(SIGKILL);
+    }
+
     for (auto &ct : subtree) {
         auto cg = ct->GetCgroup(FreezerSubsystem);
 
