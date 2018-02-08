@@ -6,11 +6,13 @@ Documentation=https://github.com/yandex/porto
 
 [Service]
 ExecStart=/usr/sbin/portod
-ExecReload=/bin/kill -HUP $MAINPID
+ExecReload=/usr/sbin/portod reload
+ExecStop=/usr/sbin/portod stop
 PIDFile=/run/portoloop.pid
 Restart=on-failure
 KillSignal=SIGINT
 KillMode=process
+TimeoutStopSec=360
 
 [Install]
 WantedBy=multi-user.target

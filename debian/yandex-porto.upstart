@@ -11,7 +11,7 @@ stop on runlevel [!2345]
 respawn
 
 kill signal SIGINT
-kill timeout 60
+kill timeout 300
 
 env PORTO_NAME
 

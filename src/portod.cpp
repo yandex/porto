@@ -59,6 +59,8 @@ static pid_t PortodPid;
 static bool respawnPortod = true;
 static bool discardState = false;
 
+static int CmdTimeout = -1;
+
 static void FatalError(const std::string &text, TError &error) {
     L_ERR("{}: {}", text, error);
     _exit(EXIT_FAILURE);
@@ -1103,7 +1105,7 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
                 do {
                     if (waitpid(PortodPid, nullptr, WNOHANG) == PortodPid)
                         break;
-                } while (!WaitDeadline(deadline, 1));
+                } while (!WaitDeadline(deadline));
 
                 ret = -s;
                 goto exit;
@@ -1381,7 +1383,8 @@ static int StartPortod() {
     if (!pid)
         return PortodMain();
 
-    uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
+    uint64_t timeout = CmdTimeout >= 0 ? CmdTimeout : config().daemon().portod_start_timeout();
+    uint64_t deadline = GetCurrentTimeMs() + timeout * 1000;
     do {
         if (CheckPortoAlive())
             return EXIT_SUCCESS;
@@ -1395,6 +1398,30 @@ static int StartPortod() {
     return EXIT_FAILURE;
 }
 
+static int KillPortod() {
+    TError error;
+
+    if (MasterPidFile.Read()) {
+        std::cerr << "portod not running" << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    error = MasterPidFile.Remove();
+    if (error)
+        std::cerr << "cannot remove pidfile: " << error << std::endl;
+
+    error = PortodPidFile.Remove();
+    if (error)
+        std::cerr << "cannot remove pidfile: " << error << std::endl;
+
+    if (kill(MasterPidFile.Pid, SIGKILL) && errno != ESRCH) {
+        std::cerr << "cannot kill portod: " << strerror(errno) << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 static int StopPortod() {
     TError error;
 
@@ -1403,10 +1430,12 @@ static int StopPortod() {
         return EXIT_SUCCESS;
     }
 
+    uint64_t timeout = CmdTimeout >= 0 ? CmdTimeout : config().daemon().portod_stop_timeout();
+
     pid_t pid = MasterPidFile.Pid;
-    if (CheckPortoAlive()) {
+    if (timeout > 0 && CheckPortoAlive()) {
         if (!kill(pid, SIGINT)) {
-            uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_stop_timeout() * 1000;
+            uint64_t deadline = GetCurrentTimeMs() + timeout * 1000;
             do {
                 if (MasterPidFile.Read() || MasterPidFile.Pid != pid)
                     return EXIT_SUCCESS;
@@ -1418,17 +1447,7 @@ static int StopPortod() {
     }
 
     std::cerr << "portod not responding. sending sigkill" << std::endl;
-    if (kill(pid, SIGKILL) && errno != ESRCH) {
-        std::cerr << "cannot kill portod: " << strerror(errno) << std::endl;
-        return EXIT_FAILURE;
-    }
-    error = MasterPidFile.Remove();
-    if (error)
-        std::cerr << "cannot remove pidfile: " << error << std::endl;
-    error = PortodPidFile.Remove();
-    if (error)
-        std::cerr << "cannot remove pidfile: " << error << std::endl;
-    return EXIT_SUCCESS;
+    return KillPortod();
 }
 
 static int ReexecPortod() {
@@ -1442,7 +1461,8 @@ static int ReexecPortod() {
         return EXIT_FAILURE;
     }
 
-    uint64_t deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
+    uint64_t timeout = CmdTimeout >= 0 ? CmdTimeout : config().daemon().portod_start_timeout();
+    uint64_t deadline = GetCurrentTimeMs() + timeout * 1000;
     do {
         if (!PortodPidFile.Running() && CheckPortoAlive())
             return EXIT_SUCCESS;
@@ -1587,6 +1607,7 @@ static void Usage() {
         << "  daemon          start portod, this is default" << std::endl
         << "  start           daemonize and start portod" << std::endl
         << "  stop            stop running portod" << std::endl
+        << "  kill            kill running portod" << std::endl
         << "  restart         stop followed by start" << std::endl
         << "  reload          reexec portod" << std::endl
         << "  upgrade         upgrade running portod" << std::endl
@@ -1625,7 +1646,10 @@ int main(int argc, char **argv) {
             respawnPortod = false;
         else if (arg == "--discard")
             discardState = true;
-        else {
+        else if (arg == "--timeout") {
+           if (StringToInt(argv[++opt], CmdTimeout))
+               return EXIT_FAILURE;
+        } else {
             std::cerr << "Unknown option: " << arg << std::endl;
             Usage();
             return EXIT_FAILURE;
@@ -1667,6 +1691,9 @@ int main(int argc, char **argv) {
 
     if (cmd == "stop")
         return StopPortod();
+
+    if (cmd == "kill")
+        return KillPortod();
 
     if (cmd == "restart") {
         StopPortod();
