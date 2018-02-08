@@ -56,10 +56,14 @@ std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
 static pid_t PortodPid;
-static bool respawnPortod = true;
-static bool discardState = false;
+static int PortodStatus;
+
+static bool RespawnPortod = true;
+static bool DiscardState = false;
 
 static int CmdTimeout = -1;
+
+static std::map<pid_t, int> Zombies;
 
 static void FatalError(const std::string &text, TError &error) {
     L_ERR("{}: {}", text, error);
@@ -71,25 +75,6 @@ static void AllocStatistics() {
                                      PROT_READ | PROT_WRITE,
                                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     PORTO_ASSERT(Statistics != nullptr);
-}
-
-static void DaemonShutdown(bool master, int code) {
-    L_SYS("Stopped {}", code);
-
-    if (master)
-        MasterPidFile.Remove();
-    else
-        PortodPidFile.Remove();
-
-    if (code < 0) {
-        int sig = -code;
-        Signal(sig, SIG_DFL);
-        raise(sig);
-        if (master)
-            exit(128 + sig);
-        else
-            _exit(128 + sig);
-    }
 }
 
 struct TRequest {
@@ -320,23 +305,22 @@ static TError AcceptConnection(int listenFd) {
     return OK;
 }
 
-static int Rpc() {
+static void PortodServer() {
     TRpcWorker worker(config().daemon().workers());
-    int ret = 0;
     TError error;
 
     auto AcceptSource = std::make_shared<TEpollSource>(PORTO_SK_FD);
     error = EpollLoop->AddSource(AcceptSource);
     if (error) {
         L_ERR("Can't add RPC server fd to epoll: {}", error);
-        return EXIT_FAILURE;
+        return;
     }
 
     auto MasterSource = std::make_shared<TEpollSource>(REAP_EVT_FD);
     error = EpollLoop->AddSource(MasterSource);
     if (error) {
         L_ERR("Can't add master fd to epoll: {}", error);
-        return EXIT_FAILURE;
+        return;
     }
 
     /* Don't disturb threads. Deliver signals via signalfd. */
@@ -346,7 +330,7 @@ static int Rpc() {
     error = EpollLoop->AddSource(sigSource);
     if (error) {
         L_ERR("Can't add sigSource to epoll: {}", error);
-        return EXIT_FAILURE;
+        return;
     }
 
     std::vector<struct epoll_event> events;
@@ -363,12 +347,10 @@ static int Rpc() {
         error = EpollLoop->GetEvents(events, -1);
         if (error) {
             L_ERR("epoll error {}", error);
-            ret = EXIT_FAILURE;
             goto exit;
         }
 
-        ret = RecvExitEvents(REAP_EVT_FD);
-        if (ret)
+        if (RecvExitEvents(REAP_EVT_FD))
             goto exit;
 
         for (auto ev : events) {
@@ -386,15 +368,14 @@ static int Rpc() {
 
                 switch (sigInfo.ssi_signo) {
                     case SIGINT:
-                        discardState = true;
-                        ret = -SIGINT;
+                        DiscardState = true;
+                        RespawnPortod = false;
                         goto exit;
                     case SIGTERM:
-                        ret = -SIGTERM;
+                        RespawnPortod = false;
                         goto exit;
                     case SIGHUP:
                         L_EVT("Updating");
-                        ret = -SIGHUP;
                         goto exit;
                     case SIGUSR1:
                         OpenLog(PORTO_LOG);
@@ -477,8 +458,6 @@ exit:
     for (auto c : Clients)
         c.second->CloseConnection();
     Clients.clear();
-
-    return ret;
 }
 
 static TError TuneLimits() {
@@ -830,8 +809,8 @@ static int Portod() {
 
     DestroyContainers(true);
 
-    if (discardState) {
-        discardState = false;
+    if (DiscardState) {
+        DiscardState = false;
         L_ACT("Discard state...");
         DestroyContainers(false);
         TVolume::DestroyAll();
@@ -847,11 +826,12 @@ static int Portod() {
 
     L_SYS("Done restoring");
 
-    int code = Rpc();
+    PortodServer();
+
     L_SYS("Shutting down...");
 
-    if (discardState) {
-        discardState = false;
+    if (DiscardState) {
+        DiscardState = false;
 
         L_ACT("Discard state...");
 
@@ -887,46 +867,25 @@ static int Portod() {
             L_ERR("Can't destroy volume key-value storage: {}", error);
     }
 
-    DaemonShutdown(false, code);
+    PortodPidFile.Remove();
 
-    return code;
+    return EXIT_SUCCESS;
 }
 
-static TError DeliverPidStatus(int fd, int pid, int status) {
-    L_EVT("Deliver pid={} status={}", pid, status);
-
-    if (write(fd, &pid, sizeof(pid)) < 0)
-        return TError::System("write(pid): ");
-
-    if (write(fd, &status, sizeof(status)) < 0)
-        return TError::System("write(status): ");
-
-    return OK;
+static void UpdateQueueSize() {
+    Statistics->QueuedStatuses = Zombies.size();
 }
 
-static void Reap(int pid) {
-    (void)waitpid(pid, NULL, 0);
-}
-
-static void UpdateQueueSize(std::map<int,int> &exited) {
-    Statistics->QueuedStatuses = exited.size();
-}
-
-static int ReapDead(int fd, std::map<int,int> &exited, int &portodStatus) {
+static void ReportZombies(int fd) {
     while (true) {
         siginfo_t info;
 
-        if (waitpid(PortodPid, &portodStatus, WNOHANG) == PortodPid)
-            return -1;
-
         info.si_pid = 0;
+        if (waitid(P_PID, PortodPid, &info, WNOHANG | WNOWAIT | WEXITED) || !info.si_pid)
+            if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) || !info.si_pid)
+                break;
 
-        if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
-            break;
-
-        if (info.si_pid <= 0)
-            break;
-
+        pid_t pid = info.si_pid;
         int status = 0;
         if (info.si_code == CLD_KILLED) {
             status = info.si_status;
@@ -936,27 +895,29 @@ static int ReapDead(int fd, std::map<int,int> &exited, int &portodStatus) {
             status = info.si_status << 8;
         }
 
-        if (info.si_pid == PortodPid) {
-            portodStatus = status;
-            Reap(info.si_pid);
-            return -1;
+        if (pid == PortodPid) {
+            (void)waitpid(pid, NULL, 0);
+            PortodPid = 0;
+            PortodStatus = status;
+            break;
         }
 
-        if (exited.find(info.si_pid) != exited.end())
+        if (Zombies.count(pid))
             break;
 
-        TError error = DeliverPidStatus(fd, info.si_pid, status);
-        exited[info.si_pid] = status;
-        if (error)
-            L_WRN("Fail to deliver pid status to porto: {}", error);
+        L_VERBOSE("Report zombie pid={} status={}", pid, status);
+        int report[2] = {pid, status};
+        if (write(fd, report, sizeof(report)) != sizeof(report)) {
+            L_WRN("Cannot report zombie: {}", TError::System("write"));
+            break;
+        }
+
+        Zombies[pid] = status;
+        UpdateQueueSize();
     }
-
-    UpdateQueueSize(exited);
-
-    return 0;
 }
 
-static int ReceiveAcks(int fd, std::map<int,int> &exited) {
+static int ReapZombies(int fd) {
     int pid;
     int nr = 0;
 
@@ -964,18 +925,18 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
         if (pid <= 0)
             continue;
 
-        if (exited.find(pid) == exited.end()) {
-            L_WRN("Got ack for unknown pid={}", pid);
+        if (Zombies.find(pid) == Zombies.end()) {
+            L_WRN("Got ack for unknown zombie pid={}", pid);
         } else {
-            exited.erase(pid);
-            Reap(pid);
-            L_EVT("Reap pid={}", pid);
+            L_VERBOSE("Reap zombie pid={}", pid);
+            (void)waitpid(pid, NULL, 0);
+            Zombies.erase(pid);
+            UpdateQueueSize();
         }
 
         nr++;
     }
 
-    UpdateQueueSize(exited);
     return nr;
 }
 
@@ -1013,22 +974,19 @@ static int UpgradeMaster() {
     return EXIT_FAILURE;
 }
 
-static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exited) {
+static void SpawnPortod(std::shared_ptr<TEpollLoop> loop) {
     int evtfd[2];
     int ackfd[2];
-    int ret = EXIT_FAILURE;
     TError error;
-
-    PortodPid = 0;
 
     if (pipe2(evtfd, O_NONBLOCK | O_CLOEXEC) < 0) {
         L_ERR("pipe(): {}", strerror(errno));
-        return EXIT_FAILURE;
+        return;
     }
 
     if (pipe2(ackfd, O_NONBLOCK | O_CLOEXEC) < 0) {
         L_ERR("pipe(): {}", strerror(errno));
-        return EXIT_FAILURE;
+        return;
     }
 
     auto AckSource = std::make_shared<TEpollSource>(ackfd[0]);
@@ -1037,10 +995,13 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
 
     auto sigSource = std::make_shared<TEpollSource>(sigFd);
 
+    /* Forget all zombies to report them again */
+    Zombies.clear();
+    UpdateQueueSize();
+
     PortodPid = fork();
     if (PortodPid < 0) {
         L_ERR("fork(): {}", strerror(errno));
-        ret = EXIT_FAILURE;
         goto exit;
     } else if (PortodPid == 0) {
         close(evtfd[1]);
@@ -1061,52 +1022,50 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
     L_SYS("Spawned portod {}", PortodPid);
     Statistics->Spawned++;
 
-    for (auto &pair : exited)
-        (void)DeliverPidStatus(evtfd[1], pair.first, pair.second);
-
-    UpdateQueueSize(exited);
-
     error = loop->AddSource(AckSource);
     if (error) {
         L_ERR("Can't add ackfd[0] to epoll: {}", error);
-        return EXIT_FAILURE;
+        goto exit;
     }
 
     error = loop->AddSource(sigSource);
     if (error) {
         L_ERR("Can't add sigSource to epoll: {}", error);
-        return EXIT_FAILURE;
+        goto exit;
     }
 
-    while (true) {
+    while (PortodPid) {
         std::vector<struct epoll_event> events;
 
         error = loop->GetEvents(events, -1);
         if (error) {
             L_ERR("master: epoll error {}", error);
-            return EXIT_FAILURE;
+            goto exit;
         }
 
         struct signalfd_siginfo sigInfo;
 
         while (read(sigFd, &sigInfo, sizeof sigInfo) == sizeof sigInfo) {
-            int s = sigInfo.ssi_signo;
+            int signo = sigInfo.ssi_signo;
 
-            switch (s) {
+            switch (signo) {
             case SIGINT:
             case SIGTERM: {
-                if (kill(PortodPid, s) < 0)
-                    L_ERR("Can't send {} to porto", s);
+                L_SYS("Forward signal {} to portod", signo);
+                if (kill(PortodPid, signo) < 0)
+                    L_ERR("Cannot kill portod: {}", TError::System("kill"));
 
                 L_SYS("Waiting for porto to exit...");
                 uint64_t deadline = GetCurrentTimeMs() +
                                     config().daemon().portod_stop_timeout() * 1000;
                 do {
-                    if (waitpid(PortodPid, nullptr, WNOHANG) == PortodPid)
+                    if (waitpid(PortodPid, &PortodStatus, WNOHANG) == PortodPid) {
+                        PortodPid = 0;
                         break;
+                    }
                 } while (!WaitDeadline(deadline));
 
-                ret = -s;
+                RespawnPortod = false;
                 goto exit;
             }
             case SIGUSR1:
@@ -1114,14 +1073,10 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
                 break;
             case SIGUSR2:
                 DumpMallocInfo();
-
-                L("Statuses:");
-                for (auto pair : exited)
-                    L("{} = {}", pair.first, pair.second);
-
                 break;
             case SIGHUP:
-                return UpgradeMaster();
+                UpgradeMaster();
+                break;
             default:
                 /* Ignore other signals */
                 break;
@@ -1133,12 +1088,10 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
             if (!source)
                 continue;
 
-
             if (source->Fd == sigFd) {
 
             } else if (source->Fd == ackfd[0]) {
-                if (!ReceiveAcks(ackfd[0], exited)) {
-                    ret = EXIT_FAILURE;
+                if (!ReapZombies(ackfd[0])) {
                     goto exit;
                 }
             } else {
@@ -1147,15 +1100,20 @@ static int SpawnPortod(std::shared_ptr<TEpollLoop> loop, std::map<int,int> &exit
             }
         }
 
-        int status;
-        if (ReapDead(evtfd[1], exited, status)) {
-            L_SYS("Portod exited with {}", status);
-            ret = EXIT_SUCCESS;
-            goto exit;
-        }
+        ReportZombies(evtfd[1]);
     }
 
 exit:
+    if (PortodPid) {
+        L_SYS("Kill portod");
+        if (kill(PortodPid, SIGKILL) < 0)
+            L_ERR("Cannot kill portod: {}", TError::System("kill"));
+        (void)waitpid(PortodPid, &PortodStatus, 0);
+        PortodPid = 0;
+    }
+
+    L_SYS("Portod {}", FormatExitStatus(PortodStatus));
+
     loop->RemoveSource(sigFd);
     close(sigFd);
 
@@ -1166,8 +1124,6 @@ exit:
 
     close(ackfd[0]);
     close(ackfd[1]);
-
-    return ret;
 }
 
 static int PortodMaster() {
@@ -1245,27 +1201,17 @@ static int PortodMaster() {
         return EXIT_FAILURE;
     }
 
-    std::map<int,int> exited;
-    int code;
-
-    while (true) {
+    do {
         uint64_t started = GetCurrentTimeMs();
         uint64_t next = started + config().container().respawn_delay_ms();
-        code = SpawnPortod(ELoop, exited);
-        L_SYS("Portod returned {}", code);
+
+        SpawnPortod(ELoop);
+
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
-        if (PortodPid) {
-            (void)kill(PortodPid, SIGKILL);
-            Reap(PortodPid);
-        }
-
-        if (code < 0 || !respawnPortod)
-            break;
-
         PreviousVersion = PORTO_VERSION;
-    }
+    } while (RespawnPortod);
 
     error = TCore::Unregister();
     if (error)
@@ -1275,9 +1221,9 @@ static int PortodMaster() {
     if (error)
         L_ERR("Cannot unlink socket file: {}", error);
 
-    DaemonShutdown(true, code);
+    MasterPidFile.Remove();
 
-    return code;
+    return EXIT_SUCCESS;
 }
 
 static void KvDump() {
@@ -1642,9 +1588,9 @@ int main(int argc, char **argv) {
         else if (arg == "--debug")
             Verbose = Debug = true;
         else if (arg == "--norespawn")
-            respawnPortod = false;
+            RespawnPortod = false;
         else if (arg == "--discard")
-            discardState = true;
+            DiscardState = true;
         else if (arg == "--timeout") {
            if (StringToInt(argv[++opt], CmdTimeout))
                return EXIT_FAILURE;
