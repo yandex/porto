@@ -2,15 +2,14 @@ import os
 import subprocess
 import porto
 import shutil
-import time
 from test_common import *
 
 AsRoot()
 
-BASE_VERSION="4.3.2"
+PREV_VERSION = "4.6.1"
 
 TMPDIR = "/tmp/test-release-upgrade"
-PORTOD_PATH = "/run/portod"
+prev_portod = TMPDIR + "/old/usr/sbin/portod"
 
 try:
     os.mkdir(TMPDIR)
@@ -126,15 +125,20 @@ def VerifySnapshot(r, props):
     for i in props:
         assert PropTrim(props[i]) == PropTrim(props2[i]), "{} property {} should be {} not {}".format(r, i, props[i], props2[i])
 
+c = porto.Connection(timeout=3)
+
 #Check  working with older version
 
-print "Checking upgrade from", BASE_VERSION
+print "Checking upgrade from", PREV_VERSION
+
+ver, rev = c.Version()
+ExpectNe(ver, PREV_VERSION)
 
 cwd=os.path.abspath(os.getcwd())
 
 os.chdir(TMPDIR)
 subprocess.call(["apt-get", "update"])
-download = subprocess.check_output(["apt-get", "--force-yes", "download", "yandex-porto=" + BASE_VERSION])
+download = subprocess.check_output(["apt-get", "--force-yes", "download", "yandex-porto=" + PREV_VERSION])
 
 print "Package successfully downloaded"
 
@@ -149,16 +153,17 @@ os.unlink(pktname)
 
 os.chdir(cwd)
 
-os.unlink(PORTOD_PATH)
-os.symlink(TMPDIR + "/old/usr/sbin/portod", PORTOD_PATH)
-subprocess.check_call([PORTOD_PATH + "&"], shell=True)
-time.sleep(1)
+print " - start previous version"
 
-oldver = subprocess.check_output([portod, "--version"]).split()[6]
+subprocess.check_call([prev_portod, "start"])
+
+ver, rev = c.Version()
+ExpectEq(ver, PREV_VERSION)
 
 AsAlice()
 
 c = porto.Connection(timeout=3)
+
 c.Create("test")
 c.SetProperty("test", "command", "sleep 5")
 c.Start("test")
@@ -274,17 +279,19 @@ c.disconnect()
 
 AsRoot()
 
-os.unlink(PORTOD_PATH)
-os.symlink(portod, PORTOD_PATH)
-subprocess.check_call([portod, "reload"])
-time.sleep(1)
+print " - upgrade"
 
-assert subprocess.check_output([portod, "--version"]).split()[6] != oldver
+subprocess.check_call([portod, "upgrade"])
+
 #That means we've upgraded successfully
 
 AsAlice()
 
 c = porto.Connection(timeout=3)
+
+ver, rev = c.Version()
+ExpectNe(ver, PREV_VERSION)
+
 c.Wait(["test"])
 
 #Checking if we can create subcontainers successfully (cgroup migration involved)
@@ -339,18 +346,16 @@ c.disconnect()
 
 AsRoot()
 
-#Now, the downgrade
-os.unlink(PORTOD_PATH)
-os.symlink(TMPDIR + "/old/usr/sbin/portod", PORTOD_PATH)
+print " - downgrade"
 
-subprocess.check_call([portod, "reload"])
-time.sleep(1)
-
-assert subprocess.check_output([portod, "--version"]).split()[6] == oldver
+subprocess.check_call([prev_portod, "upgrade"])
 
 AsAlice()
 
 c = porto.Connection(timeout=3)
+
+ver, rev = c.Version()
+ExpectEq(ver, PREV_VERSION)
 
 r = c.Find("test2")
 assert r.Wait() == "test2"
@@ -389,10 +394,13 @@ VerifySnapshot(r, snap_rt_app)
 CheckCaps(r, False)
 assert legacy_rt_settings == DumpLegacyRt(r)
 
-c.disconnect()
-
 AsRoot()
 
-subprocess.check_call([portod, "--verbose", "--discard", "restart"])
+print " - restart to new vetsion"
+
+subprocess.check_call([portod, "restart"])
+
+ver, rev = c.Version()
+ExpectNe(ver, PREV_VERSION)
 
 shutil.rmtree(TMPDIR)
