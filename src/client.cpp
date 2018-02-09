@@ -466,7 +466,10 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     if (Offset > Length)
         return TError("garbage after request");
 
+    WaitRequest = request.has_wait();
+    Offset = 0;
     Processing = true;
+
     return EpollLoop->StopInput(Fd);
 }
 
@@ -493,6 +496,10 @@ TError TClient::SendResponse(bool first) {
     if (Offset >= Length) {
         Length = Offset = 0;
         Processing = false;
+
+        if (ShutdownPortod && shutdown(Fd, SHUT_RDWR))
+            L_ERR("Cannot shutdown client: {}", TError::System("shutdown"));
+
         return EpollLoop->StartInput(Fd);
     }
 

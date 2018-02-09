@@ -31,6 +31,7 @@ public:
     uint64_t ActivityTimeMs = 0;
     uint64_t RequestTimeMs = 0;
     bool Processing = false;
+    bool WaitRequest = false;
     bool InEpoll = false;
 
     TClient(int fd);
@@ -45,6 +46,10 @@ public:
 
     bool IsInternalUser(void) const {
         return AccessLevel == EAccessLevel::Internal;
+    }
+
+    bool IsBlockShutdown() const {
+        return (Processing && !WaitRequest) || Offset;
     }
 
     bool CanSetUidGid() const;

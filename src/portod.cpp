@@ -65,6 +65,9 @@ static int CmdTimeout = -1;
 
 static std::map<pid_t, int> Zombies;
 
+bool ShutdownPortod = false;
+static uint64_t ShutdownDeadline = 0;
+
 static void FatalError(const std::string &text, TError &error) {
     L_ERR("{}: {}", text, error);
     _exit(EXIT_FAILURE);
@@ -305,6 +308,29 @@ static TError AcceptConnection(int listenFd) {
     return OK;
 }
 
+static void StartShutdown() {
+    L_SYS("Start portod shutdown");
+
+    ShutdownPortod = true;
+    ShutdownDeadline = GetCurrentTimeMs() + config().daemon().portod_shutdown_timeout() * 1000;
+
+    /* Stop accepting new clients */
+    EpollLoop->RemoveSource(PORTO_SK_FD);
+
+    /* Kick idle clients */
+    for (auto it = Clients.begin(); it != Clients.end(); ) {
+        auto client = it->second;
+
+        if (client->IsBlockShutdown()) {
+            L_SYS("Client blocks shutdown: {}", client->Id);
+            ++it;
+        } else {
+            client->CloseConnection();
+            it = Clients.erase(it);
+        }
+    }
+}
+
 static void PortodServer() {
     TRpcWorker worker(config().daemon().workers());
     TError error;
@@ -344,7 +370,7 @@ static void PortodServer() {
     }
 
     while (true) {
-        error = EpollLoop->GetEvents(events, -1);
+        error = EpollLoop->GetEvents(events, 1000);
         if (error) {
             L_ERR("epoll error {}", error);
             goto exit;
@@ -370,13 +396,16 @@ static void PortodServer() {
                     case SIGINT:
                         DiscardState = true;
                         RespawnPortod = false;
-                        goto exit;
+                        StartShutdown();
+                        break;
                     case SIGTERM:
                         RespawnPortod = false;
-                        goto exit;
+                        StartShutdown();
+                        break;
                     case SIGHUP:
                         L_EVT("Updating");
-                        goto exit;
+                        StartShutdown();
+                        break;
                     case SIGUSR1:
                         OpenLog(PORTO_LOG);
                         break;
@@ -449,15 +478,27 @@ static void PortodServer() {
                 EpollLoop->RemoveSource(source->Fd);
             }
         }
+
+        if (ShutdownPortod) {
+            if (Clients.empty()) {
+                L_SYS("All clients are gone");
+                break;
+            }
+            if (int64_t(ShutdownDeadline - GetCurrentTimeMs()) < 0) {
+                L_SYS("Shutdown timeout exceeded");
+                break;
+            }
+        }
     }
 
 exit:
-    EventQueue->Stop();
-    worker.Stop();
 
     for (auto c : Clients)
         c.second->CloseConnection();
     Clients.clear();
+
+    EventQueue->Stop();
+    worker.Stop();
 }
 
 static TError TuneLimits() {
