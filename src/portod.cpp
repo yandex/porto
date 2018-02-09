@@ -1276,7 +1276,13 @@ static int PortodMaster() {
     if (error)
         L_ERR("Cannot unlink socket file: {}", error);
 
+    PortodPidFile.Remove();
     MasterPidFile.Remove();
+    pathBin.Unlink();
+    pathVer.Unlink();
+    TPath(PORTO_CONTAINERS_KV).Rmdir();
+    TPath(PORTO_VOLUMES_KV).Rmdir();
+    TPath("/run/porto").Rmdir();
 
     L_SYS("Shutdown complete.");
 
