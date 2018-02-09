@@ -1,3 +1,43 @@
+yandex-porto (4.8.0) unstable; urgency=low
+
+  * core: add CAP_SYS_PTRACE into ambient capabilities
+  * cleanup: VirtMode == VIRT_MODE_OS -> OsMode
+  * network: keep resolv_conf splitted into lines
+  * ulimit: refactor structure
+  * tests: fix ulimit
+  * devices: always allow mknod for devices #PORTO-346
+  * lvm: validate names #PORTO-347
+  * network: disable embedded iproute by default #PORTO-348
+  * volume: read-only should deny writes access
+  * porto: rename some methods
+  * devices: refactor structure
+  * device: merge lists only by paths inside
+  * container: expose id and level
+  * volume: expose id
+  * porto: make bind-mounts back non-recursive by default
+  * porto: mount bind-mounts before populating rootfs
+  * porto: use read-only bind mount for tracefs instead of new read-only mount
+  * filesystem: cleanup bind mount operation
+  * filesystem: disable proparation for bind-mounts
+  * filesystem: enable next level proparation only from lower level mounts
+  * porto: target path for volume links
+  * rpc: use same structure for new volume link request
+  * porto: fix compilation for ancient libstdc++
+  * volume: use bind mount helper for mounting targets
+  * portod: set timeout for start and stop to 300 seconds
+  * container: stop with zero timeout should just kill top level init
+  * container: at stop destroy all containers under single exclusive lock
+  * portod: cleanup respawn sequences
+  * portod: synchronize server update with client requests
+  * portod: cleanup logging
+  * portod: cleanup /run at stop
+  * portod: detect if master is gone after reload
+  * test: use bultin commands for upgrade
+  * Revert "filesystem: enable next level proparation only from lower level mounts"
+  * filesystem: fix permissions for created mountpoint targets
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 09 Feb 2018 19:49:16 +0300
+
 yandex-porto (4.7.2) unstable; urgency=low
 
   * porto: cleanup GetSystem/SetSystem calls
