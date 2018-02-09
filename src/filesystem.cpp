@@ -138,7 +138,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
 
         for (auto &name: dirs) {
             if (!error)
-                error = dir.MkdirAt(name, 0755);
+                error = dir.MkdirAt(name, 0775);
             if (!error)
                 error = dir.WalkStrict(dir, name);
             if (!error)
@@ -149,14 +149,14 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
             return TError(error, "Bindmount {}", Target);
 
         if (directory) {
-            error = dir.MkdirAt(Target.BaseName(), 0755);
+            error = dir.MkdirAt(Target.BaseName(), 0775);
             if (!error)
                 error = dst.OpenDir(Target);
         } else
             error = dst.OpenAt(dir, Target.BaseName(), O_CREAT | O_WRONLY | O_CLOEXEC |
-                               (FollowTraget ? 0 : O_NOFOLLOW), 0644);
+                               (FollowTraget ? 0 : O_NOFOLLOW), 0664);
         if (!error)
-            error = dir.Chown(cred);
+            error = dst.Chown(cred);
     } else {
         if (directory)
             error = dst.OpenDir(Target);
