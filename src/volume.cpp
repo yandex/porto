@@ -2798,7 +2798,7 @@ void TVolume::RestoreAll(void) {
         L("Volume {} restored", volume->Path);
     }
 
-    L_ACT("Remove broken volumes...");
+    L_SYS("Remove broken volumes...");
 
     for (auto &volume : broken_volumes) {
         if (volume->State != EVolumeState::Ready)
@@ -2807,7 +2807,7 @@ void TVolume::RestoreAll(void) {
 
     TPath volumes = place / PORTO_VOLUMES;
 
-    L_ACT("Remove stale volumes...");
+    L_SYS("Remove stale volumes...");
 
     std::vector<std::string> subdirs;
     error = volumes.ReadDirectory(subdirs);
@@ -2840,7 +2840,7 @@ void TVolume::RestoreAll(void) {
         }
     }
 
-    L_ACT("Remove stale weak layers...");
+    L_SYS("Remove stale weak layers...");
 
     std::list<TStorage> layers;
 

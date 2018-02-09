@@ -66,6 +66,7 @@ static int CmdTimeout = -1;
 static std::map<pid_t, int> Zombies;
 
 bool ShutdownPortod = false;
+static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
 
 static void FatalError(const std::string &text, TError &error) {
@@ -250,7 +251,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
                       "All client slots are active: " +
                       (from ? from->Name : "globally"));
 
-    L_ACT("Kick {} idle={} ms", victim->Id, idle);
+    L_SYS("Kick client {} idle={} ms", victim->Id, idle);
     Clients.erase(victim->Fd);
     victim->CloseConnection();
     return OK;
@@ -309,10 +310,9 @@ static TError AcceptConnection(int listenFd) {
 }
 
 static void StartShutdown() {
-    L_SYS("Start portod shutdown");
-
     ShutdownPortod = true;
-    ShutdownDeadline = GetCurrentTimeMs() + config().daemon().portod_shutdown_timeout() * 1000;
+    ShutdownStart = GetCurrentTimeMs();
+    ShutdownDeadline = ShutdownStart + config().daemon().portod_shutdown_timeout() * 1000;
 
     /* Stop accepting new clients */
     EpollLoop->RemoveSource(PORTO_SK_FD);
@@ -396,14 +396,16 @@ static void PortodServer() {
                     case SIGINT:
                         DiscardState = true;
                         RespawnPortod = false;
+                        L_SYS("Shutdown...");
                         StartShutdown();
                         break;
                     case SIGTERM:
                         RespawnPortod = false;
+                        L_SYS("Shutdown...");
                         StartShutdown();
                         break;
                     case SIGHUP:
-                        L_EVT("Updating");
+                        L_SYS("Updating...");
                         StartShutdown();
                         break;
                     case SIGUSR1:
@@ -428,7 +430,7 @@ static void PortodServer() {
             } else if (source->Fd == PORTO_SK_FD) {
                 error = AcceptConnection(source->Fd);
                 if (error)
-                    L("Cannot accept connection: {}", error);
+                    L_SYS("Cannot accept connection: {}", error);
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the
@@ -497,6 +499,7 @@ exit:
         c.second->CloseConnection();
     Clients.clear();
 
+    L_SYS("Stop threads...");
     EventQueue->Stop();
     worker.Stop();
 }
@@ -683,7 +686,7 @@ again:
         goto again;
 }
 
-static void CleanupTempdir() {
+static void CleanupWorkdir() {
     TPath temp(PORTO_WORKDIR);
     std::vector<std::string> list;
     TError error;
@@ -816,7 +819,7 @@ static int Portod() {
     if (config().container().enable_tracefs() && tracefs.Exists()) {
         error = tracefs.Mount("none", "tracefs", MS_NOEXEC | MS_NOSUID | MS_NODEV, {"mode=755"});
         if (error && error.Errno != EBUSY)
-            L("Cannot mount tracefs: {}", error);
+            L_SYS("Cannot mount tracefs: {}", error);
     }
 
     EpollLoop = std::unique_ptr<TEpollLoop>(new TEpollLoop());
@@ -842,41 +845,45 @@ static int Portod() {
 
     SystemClient.ClientContainer = RootContainer;
 
+    L_SYS("Restore containers...");
     RestoreContainers();
 
+    L_SYS("Restore statistics...");
     TContainer::SyncPropertiesAll();
 
+    L_SYS("Restore volumes...");
     TVolume::RestoreAll();
 
     DestroyContainers(true);
 
     if (DiscardState) {
         DiscardState = false;
-        L_ACT("Discard state...");
+
+        L_SYS("Destroy containers...");
         DestroyContainers(false);
+
+        L_SYS("Destroy volumes...");
         TVolume::DestroyAll();
     }
 
     SystemClient.FinishRequest();
 
-    L_ACT("Remove cgroup leftovers...");
+    L_SYS("Cleanup cgroup...");
     CleanupCgroups();
 
-    L_ACT("Cleanup temp dir...");
-    CleanupTempdir();
+    L_SYS("Cleanup workdir...");
+    CleanupWorkdir();
 
-    L_SYS("Done restoring");
+    L_SYS("Restore complete. time={} ms", GetCurrentTimeMs() - Statistics->PortoStarted);
 
     PortodServer();
-
-    L_SYS("Shutting down...");
 
     if (DiscardState) {
         DiscardState = false;
 
-        L_ACT("Discard state...");
-
         SystemClient.LockContainer(RootContainer);
+
+        L_SYS("Stop containers...");
 
         error = RootContainer->Stop(0);
         if (error)
@@ -885,8 +892,13 @@ static int Portod() {
         SystemClient.ReleaseContainer();
 
         SystemClient.StartRequest();
+
+        L_SYS("Destroy containers...");
         DestroyContainers(false);
+
+        L_SYS("Destroy volumes...");
         TVolume::DestroyAll();
+
         SystemClient.FinishRequest();
 
         SystemClient.LockContainer(RootContainer);
@@ -909,6 +921,8 @@ static int Portod() {
     }
 
     PortodPidFile.Remove();
+
+    L_SYS("Shutdown complete. time={} ms", GetCurrentTimeMs() - ShutdownStart);
 
     return EXIT_SUCCESS;
 }
@@ -982,7 +996,7 @@ static int ReapZombies(int fd) {
 }
 
 static int UpgradeMaster() {
-    L_SYS("Updating");
+    L_SYS("Updating...");
 
     if (kill(PortodPid, SIGHUP) < 0) {
         L_ERR("Cannot send SIGHUP to porto: {}", strerror(errno));
@@ -1096,7 +1110,7 @@ static void SpawnPortod(std::shared_ptr<TEpollLoop> loop) {
                 if (kill(PortodPid, signo) < 0)
                     L_ERR("Cannot kill portod: {}", TError::System("kill"));
 
-                L_SYS("Waiting for porto to exit...");
+                L_SYS("Waiting for portod shutdown...");
                 uint64_t deadline = GetCurrentTimeMs() +
                                     config().daemon().portod_stop_timeout() * 1000;
                 do {
@@ -1263,6 +1277,8 @@ static int PortodMaster() {
         L_ERR("Cannot unlink socket file: {}", error);
 
     MasterPidFile.Remove();
+
+    L_SYS("Shutdown complete.");
 
     return EXIT_SUCCESS;
 }
