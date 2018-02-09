@@ -1472,7 +1472,9 @@ static int ReexecPortod() {
     uint64_t timeout = CmdTimeout >= 0 ? CmdTimeout : config().daemon().portod_start_timeout();
     uint64_t deadline = GetCurrentTimeMs() + timeout * 1000;
     do {
-        if (!PortodPidFile.Running() && CheckPortoAlive())
+        if (!MasterPidFile.Running())
+            return EXIT_FAILURE;
+        if (CheckPortoAlive())
             return EXIT_SUCCESS;
     } while (!WaitDeadline(deadline));
 
@@ -1482,7 +1484,7 @@ static int ReexecPortod() {
 
 int UpgradePortod() {
     TPath symlink(PORTO_BINARY_PATH), procexe("/proc/self/exe"), update, backup;
-    uint64_t deadline;
+    uint64_t timeout, deadline;
     TError error;
 
     error = procexe.ReadLink(update);
@@ -1540,7 +1542,8 @@ int UpgradePortod() {
         goto undo;
     }
 
-    deadline = GetCurrentTimeMs() + config().daemon().portod_start_timeout() * 1000;
+    timeout = CmdTimeout >= 0 ? CmdTimeout : config().daemon().portod_start_timeout();
+    deadline = GetCurrentTimeMs() + timeout * 1000;
     do {
         if (!MasterPidFile.Running() || !PortodPidFile.Running())
             break;
@@ -1553,6 +1556,8 @@ int UpgradePortod() {
     }
 
     do {
+        if (!MasterPidFile.Running())
+            return EXIT_FAILURE;
         if (CheckPortoAlive()) {
             PrintVersion();
             return EXIT_SUCCESS;

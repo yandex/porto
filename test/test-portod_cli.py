@@ -64,7 +64,6 @@ try:
     raise BaseException("Succesful reload with {} set to {} ?".format(PORTOD_PATH, "/bin/ls"))
 except subprocess.CalledProcessError as e:
     assert e.returncode == 1
-    assert e.output == "timeout exceeded\n"
 
 try:
     subprocess.check_output([portod, "status"])
