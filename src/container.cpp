@@ -2569,7 +2569,9 @@ TError TContainer::Stop(uint64_t timeout) {
 
     auto subtree = Subtree();
 
-    DowngradeLock();
+    /* Downgrade explusive lock if we are going to wait. */
+    if (timeout)
+        CL->LockedContainer->DowngradeLock();
 
     if (!timeout) {
         L_ACT("Killing spree");
@@ -2598,7 +2600,8 @@ TError TContainer::Stop(uint64_t timeout) {
         }
     }
 
-    UpgradeLock();
+    if (timeout)
+        CL->LockedContainer->UpgradeLock();
 
     for (auto &ct: subtree) {
         if (ct->State == EContainerState::Stopped)
