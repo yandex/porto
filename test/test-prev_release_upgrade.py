@@ -101,7 +101,9 @@ def SnapshotProps(r):
               # "io_limit", "io_ops_limit", FIXME "0" -> ""
               # "io_policy",
               "ip",
-              "isolate", "max_respawns", "memory_guarantee", "memory_limit", "net",
+              "isolate",
+              # "max_respawns",
+              "memory_guarantee", "memory_limit", "net",
               #"net_guarantee", #FIXME enable later, "default:0" -> ""
               #"net_limit", #FIXME enable later, "default:0" -> ""
               # "net_priority",
