@@ -40,10 +40,6 @@ TError TVolumeBackend::Configure() {
     return OK;
 }
 
-TError TVolumeBackend::Save() {
-    return OK;
-}
-
 TError TVolumeBackend::Restore() {
     return OK;
 }
@@ -1774,11 +1770,12 @@ TError TVolume::Build() {
             return error;
     }
 
-    error = Backend->Build();
+    /* Save volume state before building */
+    error = Save();
     if (error)
         return error;
 
-    error = Backend->Save();
+    error = Backend->Build();
     if (error)
         return error;
 

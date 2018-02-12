@@ -67,7 +67,6 @@ class TVolumeBackend {
 public:
     TVolume *Volume;
     virtual TError Configure(void);
-    virtual TError Save(void);
     virtual TError Restore(void);
     virtual TError Build(void) =0;
     virtual TError Destroy(void) =0;
