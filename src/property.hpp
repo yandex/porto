@@ -231,10 +231,15 @@ public:
     bool IsSupported = true;
     bool IsReadOnly = false;
     bool IsHidden = false;
-    TError IsAliveAndStopped(void);
-    TError IsAlive(void);
-    TError IsDead(void);
-    TError IsRunning(void);
+    bool IsDynamic = false;
+    bool IsRuntimeOnly = false;
+    bool IsDeadOnly = false;
+    bool IsAnyState = false;
+
+    std::string GetDesc() const;
+
+    TError CanGet() const;
+    TError CanSet() const;
     TError WantControllers(uint64_t controllers) const;
     TProperty(std::string name, EProperty prop, std::string desc);
 
@@ -246,9 +251,6 @@ public:
 
     virtual TError GetIndexed(const std::string &index, std::string &value);
     virtual TError SetIndexed(const std::string &index, const std::string &value);
-
-    virtual TError GetToSave(std::string &value);
-    virtual TError SetFromRestore(const std::string &value);
 
     virtual TError Start(void);
 };

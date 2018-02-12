@@ -526,24 +526,26 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
 
 noinline TError ListProperty(rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
-    for (auto elem : ContainerProperties) {
-        if (elem.second->IsReadOnly || !elem.second->IsSupported || elem.second->IsHidden)
+    for (auto &elem : ContainerProperties) {
+        auto &prop = elem.second;
+        if (prop->IsReadOnly || !prop->IsSupported || prop->IsHidden)
             continue;
         auto entry = list->add_list();
-        entry->set_name(elem.first);
-        entry->set_desc(elem.second->Desc.c_str());
+        entry->set_name(prop->Name);
+        entry->set_desc(prop->GetDesc());
     }
     return OK;
 }
 
 noinline TError ListData(rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
-    for (auto elem : ContainerProperties) {
-        if (!elem.second->IsReadOnly || !elem.second->IsSupported || elem.second->IsHidden)
+    for (auto &elem : ContainerProperties) {
+        auto &prop = elem.second;
+        if (!prop->IsReadOnly || !prop->IsSupported || prop->IsHidden)
             continue;
         auto entry = list->add_list();
-        entry->set_name(elem.first);
-        entry->set_desc(elem.second->Desc.c_str());
+        entry->set_name(prop->Name);
+        entry->set_desc(prop->GetDesc());
     }
     return OK;
 }

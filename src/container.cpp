@@ -2899,14 +2899,14 @@ TError TContainer::GetProperty(const std::string &origProperty, std::string &val
                               "Unknown container property: " + property);
     auto prop = it->second;
 
-    if (!prop->IsSupported)
-        return TError(EError::NotSupported, "Not supported: " + property);
-
     CT = const_cast<TContainer *>(this);
-    if (idx.length())
-        error = prop->GetIndexed(idx, value);
-    else
-        error = prop->Get(value);
+    error = prop->CanGet();
+    if (!error) {
+        if (idx.length())
+            error = prop->GetIndexed(idx, value);
+        else
+            error = prop->Get(value);
+    }
     CT = nullptr;
 
     return error;
@@ -2931,13 +2931,13 @@ TError TContainer::SetProperty(const std::string &origProperty,
         return TError(EError::InvalidProperty, "Invalid property " + property);
     auto prop = it->second;
 
-    if (!prop->IsSupported)
-        return TError(EError::NotSupported, property + " is not supported");
-
     CT = this;
 
+    error = prop->CanSet();
     std::string oldValue;
-    error = prop->Get(oldValue);
+
+    if (!error)
+        error = prop->Get(oldValue);
 
     if (!error) {
         if (idx.length())
@@ -2946,9 +2946,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
             error = prop->Set(value);
     }
 
-    if (!error && (State == EContainerState::Running ||
-                   State == EContainerState::Meta ||
-                   State == EContainerState::Paused)) {
+    if (!error && IsActive()) {
         error = ApplyDynamicProperties();
         if (error) {
             (void)prop->Set(oldValue);
@@ -2981,7 +2979,7 @@ TError TContainer::Save(void) {
         if (knob.second->Prop == EProperty::NONE || !HasProp(knob.second->Prop))
             continue;
 
-        error = knob.second->GetToSave(value);
+        error = knob.second->Get(value);
         if (error)
             break;
 
@@ -3027,7 +3025,7 @@ TError TContainer::Load(const TKeyValue &node) {
         }
         auto prop = it->second;
 
-        error = prop->SetFromRestore(value);
+        error = prop->Set(value);
         if (error) {
             L_ERR("Cannot load {} : {}", key, error);
             state = EContainerState::Dead;

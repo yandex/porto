@@ -33,8 +33,6 @@ TError TProperty::Has() {
 }
 
 TError TProperty::Set(const std::string &) {
-    if (IsReadOnly)
-        return TError(EError::InvalidValue, "Read-only value: " + Name);
     return TError(EError::NotSupported, "Not implemented: " + Name);
 }
 
@@ -46,59 +44,41 @@ TError TProperty::SetIndexed(const std::string &, const std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
-TError TProperty::GetToSave(std::string &value) {
-    if (Prop != EProperty::NONE)
-        return Get(value);
-    return TError("Trying to save non-serializable value");
+std::string TProperty::GetDesc() const {
+    auto desc = Desc;
+    if (IsReadOnly)
+        desc += " (ro)";
+    if (IsDynamic)
+        desc += " (dynamic)";
+    return desc;
 }
 
-TError TProperty::SetFromRestore(const std::string &value) {
-    if (Prop != EProperty::NONE)
-        return Set(value);
-    return TError("Trying to restore non-serializable value");
-}
+TError TProperty::CanGet() const {
+    if (!IsSupported)
+        return TError(EError::NotSupported, "{} is not supported", Name);
 
-/*
- * Note for properties:
- * Dead state 2-line check is mandatory for all properties
- * Some properties require to check if the property is supported
- * Some properties may forbid changing it in runtime
- * Of course, some properties can be read-only
- */
+    if (IsRuntimeOnly && CT->State == EContainerState::Stopped)
+        return TError(EError::InvalidState, "{} is not available in stopped state", Name);
 
-TError TProperty::IsAliveAndStopped(void) {
-    if (CT->State != EContainerState::Stopped)
-        return TError(EError::InvalidState,
-                      "Cannot change property " + Name +
-                      " for not stopped container, current state: " +
-                      TContainer::StateName(CT->State));
+    if (IsDeadOnly && CT->State != EContainerState::Dead)
+        return TError(EError::InvalidState, "{} available only in dead state", Name);
 
     return OK;
 }
 
-TError TProperty::IsAlive(void) {
-    if (CT->State == EContainerState::Dead)
-        return TError(EError::InvalidState, "Cannot change property " + Name +
-                      " while in the dead state");
-    return OK;
-}
+TError TProperty::CanSet() const {
+    if (!IsSupported)
+        return TError(EError::NotSupported, "{} is not supported", Name);
 
-TError TProperty::IsDead(void) {
-    if (CT->State != EContainerState::Dead)
-        return TError(EError::InvalidState, "Available only in dead state: " + Name +
-                      ", current state: " + TContainer::StateName(CT->State));
-    return OK;
-}
+    if (IsReadOnly)
+        return TError(EError::InvalidValue, "{} is raad-only", Name);
 
-TError TProperty::IsRunning(void) {
-    /*
-     * This snippet is taken from TContainer::GetProperty.
-     * The method name misguides a bit, but may be the semantic
-     * of such properties is that we can look at the value in
-     * the dead state too...
-     */
-    if (CT->State == EContainerState::Stopped)
-        return TError(EError::InvalidState, "Not available in stopped state: " + Name);
+    if (!IsDynamic && CT->State != EContainerState::Stopped)
+        return TError(EError::InvalidState, "{} could be set only in stopped state", Name);
+
+    if (!IsAnyState && CT->State == EContainerState::Dead)
+        return TError(EError::InvalidState, "{} cannot be set in dead state", Name);
+
     return OK;
 }
 
@@ -121,10 +101,6 @@ public:
             "Limit capabilities in container: SYS_ADMIN;NET_ADMIN;... see man capabilities") {}
 
     TError CommitLimit(TCapabilities &limit) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-
         if (limit.Permitted & ~AllCapabilities.Permitted) {
             limit.Permitted &= ~AllCapabilities.Permitted;
             return TError(EError::InvalidValue,
@@ -186,10 +162,6 @@ public:
     }
 
     TError CommitAmbient(TCapabilities &ambient) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-
         if (ambient.Permitted & ~AllCapabilities.Permitted) {
             ambient.Permitted &= ~AllCapabilities.Permitted;
             return TError(EError::InvalidValue,
@@ -249,9 +221,6 @@ public:
         return OK;
     }
     TError Set(const std::string &cwd) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
         CT->Cwd = cwd;
         CT->SetProp(EProperty::CWD);
         return OK;
@@ -266,7 +235,10 @@ public:
 class TUlimitProperty : public TProperty {
 public:
     TUlimitProperty() : TProperty(P_ULIMIT, EProperty::ULIMIT,
-            "Process limits: as|core|data|locks|memlock|nofile|nproc|stack: [soft]|unlimited [hard];... (see man prlimit) (dynamic)") {}
+            "Process limits: as|core|data|locks|memlock|nofile|nproc|stack: [soft]|unlimited [hard];... (see man prlimit)") 
+    {
+        IsDynamic = true;
+    }
 
     TError Get(std::string &value) {
         value = CT->Ulimit.Format();
@@ -283,11 +255,8 @@ public:
     }
 
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
         TUlimit lim;
-        error = lim.Parse(value);
+        TError error = lim.Parse(value);
         if (error)
             return error;
         CT->Ulimit = lim;
@@ -296,11 +265,8 @@ public:
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
         TUlimit lim;
-        error = lim.Parse(index + ":" + value);
+        TError error = lim.Parse(index + ":" + value);
         if (error)
             return error;
         CT->Ulimit.Merge(lim);
@@ -315,14 +281,13 @@ public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
     TCpuPolicy() : TProperty(P_CPU_POLICY, EProperty::CPU_POLICY,
-            "CPU policy: rt, high, normal, batch, idle (dynamic)") {}
+            "CPU policy: rt, high, normal, batch, idle")
+    {
+        IsDynamic = true;
+    }
 } static CpuPolicy;
 
 TError TCpuPolicy::Set(const std::string &policy) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
     if (policy != "rt" && policy != "high" && policy != "normal" &&
             policy != "batch"  && policy != "idle" && policy != "iso")
         return TError(EError::InvalidValue, "Unknown cpu policy: " + policy);
@@ -347,15 +312,14 @@ public:
     TError Set(const std::string &policy);
     TError Get(std::string &value);
     TIoPolicy() : TProperty(P_IO_POLICY, EProperty::IO_POLICY,
-                            "IO policy: none | rt | high | normal | batch | idle (dynamic)") {}
+                            "IO policy: none | rt | high | normal | batch | idle")
+    {
+        IsDynamic = true;
+    }
 } static IoPolicy;
 
 TError TIoPolicy::Set(const std::string &policy) {
     int ioprio;
-
-    TError error = IsAlive();
-    if (error)
-        return error;
 
     if (policy == "" || policy == "none")
         ioprio = 0;
@@ -390,7 +354,8 @@ TError TIoPolicy::Get(std::string &value) {
 class TIoWeight : public TProperty {
 public:
     TIoWeight() : TProperty(P_IO_WEIGHT, EProperty::IO_WEIGHT,
-                            "IO weight: 0.01..100, default is 1 (dynamic)") {
+                            "IO weight: 0.01..100, default is 1") {
+        IsDynamic = true;
         RequireControllers = CGROUP_BLKIO;
     }
     void Init(void) {
@@ -401,11 +366,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
-        error = WantControllers(CGROUP_BLKIO);
+        TError error = WantControllers(CGROUP_BLKIO);
         if (error)
             return error;
 
@@ -430,19 +391,13 @@ public:
 class TUser : public TProperty {
 public:
     TUser() : TProperty(P_USER, EProperty::USER, "Start command with given user") {}
-
     TError Get(std::string &value) {
         value = UserName(CT->TaskCred.Uid);
         return OK;
     }
-
     TError Set(const std::string &username) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-
         TCred cred;
-        error = cred.Init(username);
+        TError error = cred.Init(username);
         if (error) {
             cred.Gid = CT->TaskCred.Gid;
             error = UserId(username, cred.Uid);
@@ -450,12 +405,10 @@ public:
                 return error;
         } else if (CT->HasProp(EProperty::GROUP))
             cred.Gid = CT->TaskCred.Gid;
-
         CT->TaskCred = cred;
         CT->SetProp(EProperty::USER);
         return OK;
     }
-
     TError Start(void) {
         if (CT->OsMode)
             CT->TaskCred.Uid = RootUser;
@@ -466,27 +419,19 @@ public:
 class TGroup : public TProperty {
 public:
     TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
-
     TError Get(std::string &value) {
         value = GroupName(CT->TaskCred.Gid);
         return OK;
     }
-
     TError Set(const std::string &groupname) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-
         gid_t newGid;
-        error = GroupId(groupname, newGid);
+        TError error = GroupId(groupname, newGid);
         if (error)
             return error;
-
         CT->TaskCred.Gid = newGid;
         CT->SetProp(EProperty::GROUP);
         return OK;
     }
-
     TError Start(void) {
         if (CT->OsMode)
             CT->TaskCred.Gid = RootGroup;
@@ -561,9 +506,9 @@ public:
     TError Set(const std::string &mem_guarantee);
     TError Get(std::string &value);
     TMemoryGuarantee() : TProperty(P_MEM_GUARANTEE, EProperty::MEM_GUARANTEE,
-                                    "Guaranteed amount of memory "
-                                    "[bytes] (dynamic)")
+            "Guaranteed amount of memory [bytes]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -572,11 +517,7 @@ public:
 } static MemoryGuarantee;
 
 TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
+    TError error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -612,7 +553,7 @@ TError TMemoryGuarantee::Get(std::string &value) {
 class TMemTotalGuarantee : public TProperty {
 public:
     TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, EProperty::NONE,
-            "Total memory guarantee for container hierarchy (ro)") {
+            "Total memory guarantee for container hierarchy") {
         IsReadOnly = true;
     }
     void Init(void) {
@@ -635,9 +576,6 @@ public:
         return OK;
     }
     TError Set(const std::string &command) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
         CT->Command = command;
         CT->SetProp(EProperty::COMMAND);
         return OK;
@@ -652,7 +590,10 @@ public:
 class TCoreCommand : public TProperty {
 public:
     TCoreCommand() : TProperty(P_CORE_COMMAND, EProperty::CORE_COMMAND,
-                           "Command for receiving core dump (dynamic)") {}
+                           "Command for receiving core dump")
+    {
+        IsDynamic = true;
+    }
     void Init(void) {
         IsSupported = config().core().enable();
     }
@@ -661,9 +602,6 @@ public:
         return OK;
     }
     TError Set(const std::string &command) {
-        TError error = IsAlive();
-        if (error)
-            return error;
         CT->CoreCommand = command;
         CT->SetProp(EProperty::CORE_COMMAND);
         return OK;
@@ -679,9 +617,6 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
         if (value == "app")
             CT->OsMode = false;
         else if (value == "os")
@@ -702,12 +637,9 @@ public:
         return OK;
     }
     TError Set(const std::string &path) {
-        TError error = IsAliveAndStopped();
-        if (!error) {
-            CT->Stdin.SetInside(path);
-            CT->SetProp(EProperty::STDIN);
-        }
-        return error;
+        CT->Stdin.SetInside(path);
+        CT->SetProp(EProperty::STDIN);
+        return OK;
     }
 
 } static StdinPath;
@@ -721,12 +653,9 @@ public:
         return OK;
     }
     TError Set(const std::string &path) {
-        TError error = IsAliveAndStopped();
-        if (!error) {
-            CT->Stdout.SetInside(path);
-            CT->SetProp(EProperty::STDOUT);
-        }
-        return error;
+        CT->Stdout.SetInside(path);
+        CT->SetProp(EProperty::STDOUT);
+        return OK;
     }
     TError Start(void) {
         if (CT->OsMode && !CT->HasProp(EProperty::STDOUT))
@@ -744,12 +673,9 @@ public:
         return OK;
     }
     TError Set(const std::string &path) {
-        TError error = IsAliveAndStopped();
-        if (!error) {
-            CT->Stderr.SetInside(path);
-            CT->SetProp(EProperty::STDERR);
-        }
-        return error;
+        CT->Stderr.SetInside(path);
+        CT->SetProp(EProperty::STDERR);
+        return OK;
     }
     TError Start(void) {
          if (CT->OsMode && !CT->HasProp(EProperty::STDERR))
@@ -761,7 +687,10 @@ public:
 class TStdoutLimit : public TProperty {
 public:
     TStdoutLimit() : TProperty(P_STDOUT_LIMIT, EProperty::STDOUT_LIMIT,
-            "Limit for stored stdout and stderr size (dynamic)") {}
+            "Limit for stored stdout and stderr size")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         value = std::to_string(CT->Stdout.Limit);
         return OK;
@@ -787,13 +716,12 @@ public:
 class TStdoutOffset : public TProperty {
 public:
     TStdoutOffset() : TProperty(D_STDOUT_OFFSET, EProperty::NONE,
-            "Offset of stored stdout (ro)") {
+            "Offset of stored stdout")
+    {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         value = std::to_string(CT->Stdout.Offset);
         return OK;
     }
@@ -802,13 +730,12 @@ public:
 class TStderrOffset : public TProperty {
 public:
     TStderrOffset() : TProperty(D_STDERR_OFFSET, EProperty::NONE,
-            "Offset of stored stderr (ro)") {
+            "Offset of stored stderr")
+    {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         value = std::to_string(CT->Stderr.Offset);
         return OK;
     }
@@ -817,19 +744,15 @@ public:
 class TStdout : public TProperty {
 public:
     TStdout() : TProperty(D_STDOUT, EProperty::NONE,
-            "stdout [[offset][:length]] (ro)") {
+            "stdout [[offset][:length]]")
+    {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         return CT->Stdout.Read(*CT, value);
     }
     TError GetIndexed(const std::string &index, std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         return CT->Stdout.Read(*CT, value, index);
     }
 } static Stdout;
@@ -837,19 +760,14 @@ public:
 class TStderr : public TProperty {
 public:
     TStderr() : TProperty(D_STDERR, EProperty::NONE,
-            "stderr [[offset][:length]] (ro))") {
+            "stderr [[offset][:length]])") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         return CT->Stderr.Read(*CT, value);
     }
     TError GetIndexed(const std::string &index, std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         return CT->Stderr.Read(*CT, value, index);
     }
 } static Stderr;
@@ -866,9 +784,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
+        TError error;
 
         error = StringToBool(value, CT->BindDns);
         if (error)
@@ -892,15 +808,10 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-
         bool val;
-        error = StringToBool(value, val);
+        TError error = StringToBool(value, val);
         if (error)
             return error;
-
         CT->Isolate = val;
         CT->SetProp(EProperty::ISOLATE);
         return OK;
@@ -921,13 +832,8 @@ TError TRoot::Get(std::string &value) {
 }
 
 TError TRoot::Set(const std::string &root) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
     CT->Root = root;
     CT->SetProp(EProperty::ROOT);
-
     return OK;
 }
 
@@ -964,9 +870,7 @@ public:
 } static Net;
 
 TError TNet::Set(const std::string &net_desc) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
+    TError error;
 
     auto new_net_desc = SplitEscapedString(net_desc, ' ', ';');
 
@@ -1002,9 +906,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
+        TError error;
         error = StringToBool(value, CT->RootRo);
         if (!error)
             CT->SetProp(EProperty::ROOT_RDONLY);
@@ -1020,10 +922,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-        error = StringToOct(value, CT->Umask);
+        TError error = StringToOct(value, CT->Umask);
         if (error)
             return error;
         CT->SetProp(EProperty::UMASK);
@@ -1039,9 +938,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
+        TError error;
         uint64_t val;
         error = StringParseFlags(value, ControllersName, val, ';');
         if (error)
@@ -1083,7 +980,7 @@ public:
 
 class TCgroups : public TProperty {
 public:
-    TCgroups() : TProperty(D_CGROUPS, EProperty::NONE, "cgroups (ro)") {
+    TCgroups() : TProperty(D_CGROUPS, EProperty::NONE, "cgroups") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -1112,13 +1009,8 @@ public:
 } static Hostname;
 
 TError THostname::Set(const std::string &hostname) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
     CT->Hostname = hostname;
     CT->SetProp(EProperty::HOSTNAME);
-
     return OK;
 }
 
@@ -1139,9 +1031,7 @@ public:
 } static EnvProperty;
 
 TError TEnvProperty::Set(const std::string &env_val) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
+    TError error;
 
     auto envs = SplitEscapedString(env_val, ';');
 
@@ -1162,9 +1052,7 @@ TError TEnvProperty::Get(std::string &value) {
 }
 
 TError TEnvProperty::SetIndexed(const std::string &index, const std::string &env_val) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
+    TError error;
 
     TEnv env;
     error = env.Parse(CT->EnvCfg, true);
@@ -1201,11 +1089,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
         std::vector<TBindMount> result;
-        error = TBindMount::Parse(value, result);
+        TError error = TBindMount::Parse(value, result);
         if (error)
             return error;
         CT->BindMounts = result;
@@ -1223,10 +1108,7 @@ public:
 } static Ip;
 
 TError TIp::Set(const std::string &ipaddr) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
+    TError error;
     auto ipaddrs = SplitEscapedString(ipaddr, ' ', ';');
 
     TNetEnv NetEnv;
@@ -1254,10 +1136,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
-
+        TError error;
         auto list = SplitEscapedString(value, ';');
 
         for (auto &str: list) {
@@ -1288,20 +1167,13 @@ public:
 } static DefaultGw;
 
 TError TDefaultGw::Set(const std::string &gw) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
     TNetEnv NetEnv;
     auto gws = SplitEscapedString(gw, ' ', ';');
-
-    error = NetEnv.ParseGw(gws);
+    TError error = NetEnv.ParseGw(gws);
     if (error)
         return error;
-
     CT->DefaultGw = gws;
     CT->SetProp(EProperty::DEFAULT_GW);
-
     return OK;
 }
 
@@ -1313,7 +1185,10 @@ TError TDefaultGw::Get(std::string &value) {
 class TResolvConf : public TProperty {
 public:
     TResolvConf() : TProperty(P_RESOLV_CONF, EProperty::RESOLV_CONF,
-            "DNS resolver configuration: default|keep|<resolv.conf option>;... (dynamic)") {}
+            "DNS resolver configuration: default|keep|<resolv.conf option>;...")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         if (CT->ResolvConf.size() || CT->IsRoot())
             value = MergeEscapeStrings(CT->ResolvConf, ';');
@@ -1325,14 +1200,7 @@ public:
             value = "default";
         return OK;
     }
-    TError GetToSave(std::string &value) {
-        value = MergeEscapeStrings(CT->ResolvConf, ';');
-        return OK;
-    }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
         if (CT->State != EContainerState::Stopped &&
             ((CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/") !=
              (value == "keep" || value == "" || (CT->Root == "/" && value == "inherit"))))
@@ -1354,8 +1222,9 @@ public:
 class TDevicesProperty : public TProperty {
 public:
     TDevicesProperty() : TProperty(P_DEVICES, EProperty::DEVICE_CONF,
-            "Devices that container can access: <device> [r][w][m][-] [path] [mode] [user] [group]; ... (dynamic)")
+            "Devices that container can access: <device> [r][w][m][-] [path] [mode] [user] [group]; ...")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_DEVICES;
     }
     TError Get(std::string &value) {
@@ -1363,10 +1232,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-        error = WantControllers(CGROUP_DEVICES);
+        TError error = WantControllers(CGROUP_DEVICES);
         if (error)
             return error;
         TDevices devices;
@@ -1391,7 +1257,7 @@ public:
                                          CT->WaitTask.Pid);
         return OK;
     }
-    TError SetFromRestore(const std::string &value) {
+    TError Set(const std::string &value) {
         TError error;
 
         auto val = SplitEscapedString(value, ';');
@@ -1421,70 +1287,55 @@ public:
         value = std::to_string(CT->SeizeTask.Pid);
         return OK;
     }
-    TError SetFromRestore(const std::string &value) {
+    TError Set(const std::string &value) {
         return StringToInt(value, CT->SeizeTask.Pid);
     }
 } static SeizePid;
 
 class TRawLoopDev : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError Get(std::string &value);
     TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, EProperty::LOOP_DEV, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->LoopDev);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        return StringToInt(value, CT->LoopDev);
+    }
 } static RawLoopDev;
-
-TError TRawLoopDev::SetFromRestore(const std::string &value) {
-    return StringToInt(value, CT->LoopDev);
-}
-
-TError TRawLoopDev::Get(std::string &value) {
-    value = std::to_string(CT->LoopDev);
-
-    return OK;
-}
 
 class TRawStartTime : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError Get(std::string &value);
     TRawStartTime() : TProperty(P_RAW_START_TIME, EProperty::START_TIME, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->StartTime);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        return StringToUint64(value, CT->StartTime);
+    }
 } static RawStartTime;
-
-TError TRawStartTime::SetFromRestore(const std::string &value) {
-    return StringToUint64(value, CT->StartTime);
-}
-
-TError TRawStartTime::Get(std::string &value) {
-    value = std::to_string(CT->StartTime);
-
-    return OK;
-}
 
 class TRawDeathTime : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError Get(std::string &value);
     TRawDeathTime() : TProperty(P_RAW_DEATH_TIME, EProperty::DEATH_TIME, "") {
         IsReadOnly = true;
         IsHidden = true;
     }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->DeathTime);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        return StringToUint64(value, CT->DeathTime);
+    }
 } static RawDeathTime;
-
-TError TRawDeathTime::SetFromRestore(const std::string &value) {
-    return StringToUint64(value, CT->DeathTime);
-}
-
-TError TRawDeathTime::Get(std::string &value) {
-    value = std::to_string(CT->DeathTime);
-
-    return OK;
-}
 
 class TPortoNamespace : public TProperty {
 public:
@@ -1495,9 +1346,6 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
         CT->NsName = value;
         CT->SetProp(EProperty::PORTO_NAMESPACE);
         return OK;
@@ -1513,9 +1361,6 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
         CT->Place = SplitEscapedString(value, ';');
         CT->SetProp(EProperty::PLACE);
         return OK;
@@ -1525,7 +1370,10 @@ public:
 class TPlaceLimit : public TProperty {
 public:
     TPlaceLimit() : TProperty(P_PLACE_LIMIT, EProperty::PLACE_LIMIT,
-            "Limits sum of volume space_limit: total|default|/place|tmpfs|lvm group|rbd: bytes;... (dynamic)") {}
+            "Limits sum of volume space_limit: total|default|/place|tmpfs|lvm group|rbd: bytes;...")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         auto lock = LockVolumes();
         return UintMapToString(CT->PlaceLimit, value);
@@ -1538,11 +1386,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
         TUintMap val;
-        error = StringToUintMap(value, val);
+        TError error = StringToUintMap(value, val);
         if (!error) {
             auto lock = LockVolumes();
             CT->PlaceLimit = val;
@@ -1565,7 +1410,7 @@ public:
 class TPlaceUsage : public TProperty {
 public:
     TPlaceUsage() : TProperty(D_PLACE_USAGE, EProperty::NONE,
-            "Current sum of volume space_limit: total|/place|tmpfs|lvm group|rbd: bytes;... (ro)") {
+            "Current sum of volume space_limit: total|/place|tmpfs|lvm group|rbd: bytes;...") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -1608,15 +1453,18 @@ public:
 };
 
 static TVolumesList OwnerVolumes(D_OWNED_VOLUMES, &TContainer::OwnedVolumes,
-                                 "Owned volumes: volume;... (ro)");
+                                 "Owned volumes: volume;...");
 static TVolumesList LinedVolumes(D_LINKED_VOLUMES, &TContainer::LinkedVolumes,
-                                 "Linked volumes: volume;... (ro)");
+                                 "Linked volumes: volume;...");
 
 class TRequiredVolumes : public TProperty {
 public:
     TRequiredVolumes() :
         TProperty(P_REQUIRED_VOLUMES, EProperty::REQUIRED_VOLUMES,
-                 "Required volumes: volume;... (dynamic)") {}
+                 "Required volumes: volume;...")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         TTuple paths;
 
@@ -1632,10 +1480,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
+        TError error;
         TTuple paths = SplitEscapedString(value, ';');
         for (auto &path: paths) {
             if (path[0] == '%')
@@ -1661,18 +1506,15 @@ public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
     TMemoryLimit() : TProperty(P_MEM_LIMIT, EProperty::MEM_LIMIT,
-                               "Memory hard limit [bytes] (dynamic)")
+            "Memory hard limit [bytes]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
 } static MemoryLimit;
 
 TError TMemoryLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
+    TError error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -1706,8 +1548,9 @@ public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
     TAnonLimit() : TProperty(P_ANON_LIMIT, EProperty::ANON_LIMIT,
-                             "Anonymous memory limit [bytes] (dynamic)")
+                             "Anonymous memory limit [bytes]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -1717,11 +1560,7 @@ public:
 } static AnonLimit;
 
 TError TAnonLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
+    TError error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -1753,9 +1592,9 @@ public:
     TError Set(const std::string &limit);
     TError Get(std::string &value);
     TDirtyLimit() : TProperty(P_DIRTY_LIMIT, EProperty::DIRTY_LIMIT,
-                              "Dirty file cache limit [bytes] "
-                              "(dynamic)" )
+            "Dirty file cache limit [bytes]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -1764,11 +1603,7 @@ public:
 } static DirtyLimit;
 
 TError TDirtyLimit::Set(const std::string &limit) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
+    TError error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -1798,8 +1633,9 @@ TError TDirtyLimit::Get(std::string &value) {
 class THugetlbLimit : public TProperty {
 public:
     THugetlbLimit() : TProperty(P_HUGETLB_LIMIT, EProperty::HUGETLB_LIMIT,
-                                "Hugetlb memory limit [bytes] (dynamic)")
+                                "Hugetlb memory limit [bytes]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_HUGETLB;
     }
     void Init(void) {
@@ -1811,10 +1647,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-        error = WantControllers(CGROUP_HUGETLB);
+        TError error = WantControllers(CGROUP_HUGETLB);
         if (error)
             return error;
         if (value.empty()) {
@@ -1843,11 +1676,10 @@ class TRechargeOnPgfault : public TProperty {
 public:
     TError Set(const std::string &recharge);
     TError Get(std::string &value);
-    TRechargeOnPgfault() : TProperty(P_RECHARGE_ON_PGFAULT,
-                                     EProperty::RECHARGE_ON_PGFAULT,
-                                     "Recharge memory on "
-                                     "page fault (dynamic)")
+    TRechargeOnPgfault() : TProperty(P_RECHARGE_ON_PGFAULT, EProperty::RECHARGE_ON_PGFAULT,
+            "Recharge memory on page fault")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -1856,11 +1688,7 @@ public:
 } static RechargeOnPgfault;
 
 TError TRechargeOnPgfault::Set(const std::string &recharge) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    error = WantControllers(CGROUP_MEMORY);
+    TError error = WantControllers(CGROUP_MEMORY);
     if (error)
         return error;
 
@@ -1889,7 +1717,9 @@ TError TRechargeOnPgfault::Get(std::string &value) {
 class TPressurizeOnDeath : public TProperty {
 public:
     TPressurizeOnDeath() : TProperty(P_PRESSURIZE_ON_DEATH, EProperty::PRESSURIZE_ON_DEATH,
-                                     "After death set tiny soft memory limit (dynamic)") {
+                                     "After death set tiny soft memory limit")
+    {
+        IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
     TError Get(std::string &value) {
@@ -1897,9 +1727,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
+        TError error;
         bool val;
         error = StringToBool(value, val);
         if (!error && val != CT->PressurizeOnDeath) {
@@ -1913,9 +1741,9 @@ public:
 class TCpuLimit : public TProperty {
 public:
     TCpuLimit() : TProperty(P_CPU_LIMIT, EProperty::CPU_LIMIT,
-                            "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c "
-                            " [cores] (dynamic)")
+            "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
     TError Get(std::string &value) {
@@ -1923,11 +1751,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
-        error = WantControllers(CGROUP_CPU);
+        TError error = WantControllers(CGROUP_CPU);
         if (error)
             return error;
 
@@ -1948,7 +1772,7 @@ public:
 class TCpuLimitTotal : public TProperty {
 public:
     TCpuLimitTotal() : TProperty(P_CPU_TOTAL_LIMIT, EProperty::NONE,
-                                     "CPU total limit: <CPUS>c [cores] (ro)")
+                                     "CPU total limit: <CPUS>c [cores]")
     {
         IsReadOnly = true;
     }
@@ -1962,9 +1786,9 @@ public:
 class TCpuGuarantee : public TProperty {
 public:
     TCpuGuarantee() : TProperty(P_CPU_GUARANTEE, EProperty::CPU_GUARANTEE,
-                                "CPU guarantee: 0-100.0 [%] | "
-                                "0.0c-<CPUS>c [cores] (dynamic)")
+            "CPU guarantee: 0.0c-<CPUS>c [cores]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
     TError Get(std::string &value) {
@@ -1972,10 +1796,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-        error = WantControllers(CGROUP_CPU);
+        TError error = WantControllers(CGROUP_CPU);
         if (error)
             return error;
         uint64_t guarantee;
@@ -1993,7 +1814,7 @@ public:
 class TCpuGuaranteeTotal : public TProperty {
 public:
     TCpuGuaranteeTotal() : TProperty(P_CPU_TOTAL_GUARANTEE, EProperty::NONE,
-                                     "CPU total guarantee: <CPUS>c [cores] (ro)")
+                                     "CPU total guarantee: <CPUS>c [cores]")
     {
         IsReadOnly = true;
     }
@@ -2007,8 +1828,9 @@ public:
 class TCpuPeriod : public TProperty {
 public:
     TCpuPeriod() : TProperty(P_CPU_PERIOD, EProperty::CPU_PERIOD,
-            "CPU limit period: 1ms..1s, default: 100ms [nanoseconds] (dynamic)")
+            "CPU limit period: 1ms..1s, default: 100ms [nanoseconds]")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
     TError Get(std::string &value) {
@@ -2016,10 +1838,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-        error = WantControllers(CGROUP_CPU);
+        TError error = WantControllers(CGROUP_CPU);
         if (error)
             return error;
         uint64_t val;
@@ -2039,15 +1858,16 @@ public:
 class TCpuWeight : public TProperty {
 public:
     TCpuWeight() : TProperty(P_CPU_WEIGHT, EProperty::CPU_WEIGHT,
-                            "CPU weight 0.01..100, default is 1 (dynamic)") {}
+                            "CPU weight 0.01..100, default is 1")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         value = StringFormat("%lg", CT->CpuWeight);
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
+        TError error;
 
         double val;
         std::string unit;
@@ -2071,8 +1891,9 @@ public:
 class TCpuSet : public TProperty {
 public:
     TCpuSet() : TProperty(P_CPU_SET, EProperty::CPU_SET,
-            "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N (dynamic)")
+            "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N")
     {
+        IsDynamic = true;
         RequireControllers = CGROUP_CPUSET;
     }
     TError Get(std::string &value) {
@@ -2101,10 +1922,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-        error = WantControllers(CGROUP_CPUSET);
+        TError error = WantControllers(CGROUP_CPUSET);
         if (error)
             return error;
 
@@ -2164,7 +1982,7 @@ public:
 class TCpuSetAffinity : public TProperty {
 public:
     TCpuSetAffinity() : TProperty(D_CPU_SET_AFFINITY, EProperty::NONE,
-            "Resulting CPU affinity: [N,N-M,]... (ro)") {
+            "Resulting CPU affinity: [N,N-M,]...") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2196,9 +2014,7 @@ public:
         return OK;
     }
     TError SetMapMap(TUintMap &limit, const TUintMap &map) {
-        TError error = IsAlive();
-        if (error)
-            return error;
+        TError error;
         if (map.count("fs")) {
             error = WantControllers(CGROUP_MEMORY);
             if (error)
@@ -2236,7 +2052,10 @@ public:
 class TIoBpsLimit : public TIoLimit {
 public:
     TIoBpsLimit()  : TIoLimit(P_IO_LIMIT, EProperty::IO_LIMIT,
-            "IO bandwidth limit: fs|<path>|<disk> [r|w]: <bytes/s>;... (dynamic)") {}
+            "IO bandwidth limit: fs|<path>|<disk> [r|w]: <bytes/s>;...")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         return GetMap(CT->IoBpsLimit, value);
     }
@@ -2254,7 +2073,10 @@ public:
 class TIoOpsLimit : public TIoLimit {
 public:
     TIoOpsLimit()  : TIoLimit(P_IO_OPS_LIMIT, EProperty::IO_OPS_LIMIT,
-            "IOPS limit: fs|<path>|<disk> [r|w]: <iops>;... (dynamic)") {}
+            "IOPS limit: fs|<path>|<disk> [r|w]: <iops>;...")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         return GetMap(CT->IoOpsLimit, value);
     }
@@ -2272,15 +2094,17 @@ public:
 class TRespawn : public TProperty {
 public:
     TRespawn() : TProperty(P_RESPAWN, EProperty::RESPAWN,
-                           "Automatically respawn dead container (dynamic)") {}
+                           "Automatically respawn dead container")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
     TError Get(std::string &value) {
         value = BoolToString(CT->AutoRespawn);
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
+        TError error;
         bool val;
         error = StringToBool(value, val);
         if (error)
@@ -2294,7 +2118,10 @@ public:
 class TRespawnCount : public TProperty {
 public:
     TRespawnCount() : TProperty(P_RESPAWN_COUNT, EProperty::RESPAWN_COUNT,
-                                "current respawn count (dynamic)") {
+                                "current respawn count")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
     }
     TError Get(std::string &value) {
         value = std::to_string(CT->RespawnCount);
@@ -2315,7 +2142,11 @@ public:
 class TRespawnLimit : public TProperty {
 public:
     TRespawnLimit() : TProperty(P_RESPAWN_LIMIT, EProperty::RESPAWN_LIMIT,
-            "Limit respawn count for specific container (dynamic)") {}
+            "Limit respawn count for specific container")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
     TError Get(std::string &value) {
         if (CT->HasProp(EProperty::RESPAWN_LIMIT))
             value = std::to_string(CT->RespawnLimit);
@@ -2341,7 +2172,11 @@ public:
 class TRespawnDelay : public TProperty {
 public:
     TRespawnDelay() : TProperty(P_RESPAWN_DELAY, EProperty::RESPAWN_DELAY,
-                               "Delay before automatic respawn (dynamic)") {}
+                               "Delay before automatic respawn")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
     TError Get(std::string &value) {
         value = fmt::format("{}ns", CT->RespawnDelay);
         return OK;
@@ -2363,14 +2198,15 @@ public:
     TError Set(const std::string &max);
     TError Get(std::string &value);
     TPrivate() : TProperty(P_PRIVATE, EProperty::PRIVATE,
-                           "User-defined property (dynamic)") {}
+                           "User-defined property")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
 } static Private;
 
 TError TPrivate::Set(const std::string &value) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
+    TError error;
     uint32_t max = config().container().private_max();
     if (value.length() > max)
         return TError(EError::InvalidValue, "Value is too long");
@@ -2392,14 +2228,15 @@ public:
     TError Set(const std::string &time);
     TError Get(std::string &value);
     TAgingTime() : TProperty(P_AGING_TIME, EProperty::AGING_TIME,
-      "Remove dead containrs after [seconds] (dynamic)") {}
+            "Remove dead containrs after [seconds]")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
 } static AgingTime;
 
 TError TAgingTime::Set(const std::string &time) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
+    TError error;
     uint64_t new_time;
     error = StringToUint64(time, new_time);
     if (error)
@@ -2420,7 +2257,10 @@ TError TAgingTime::Get(std::string &value) {
 class TEnablePorto : public TProperty {
 public:
     TEnablePorto() : TProperty(P_ENABLE_PORTO, EProperty::ENABLE_PORTO,
-            "Proto access level: false (none) | read-isolate | read-only | isolate | child-only | true (full) (dynamic)") {}
+            "Proto access level: false (none) | read-isolate | read-only | isolate | child-only | true (full)")
+    {
+        IsDynamic = true;
+    }
 
     static bool Compatible(EAccessLevel parent, EAccessLevel child) {
         switch (parent) {
@@ -2504,14 +2344,15 @@ public:
     TError Set(const std::string &weak);
     TError Get(std::string &value);
     TWeak() : TProperty(P_WEAK, EProperty::WEAK,
-                        "Destroy container when client disconnects (dynamic)") {}
+                        "Destroy container when client disconnects")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
 } static Weak;
 
 TError TWeak::Set(const std::string &weak) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
+    TError error;
     if (weak == "true")
         CT->IsWeak = true;
     else if (weak == "false")
@@ -2534,7 +2375,8 @@ TError TWeak::Get(std::string &value) {
 
 class TIdProperty : public TProperty {
 public:
-    TIdProperty() : TProperty(D_ID, EProperty::NONE, "container id (ro)") {
+    TIdProperty() : TProperty(D_ID, EProperty::NONE, "container id")
+    {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2545,7 +2387,8 @@ public:
 
 class TLevelProperty : public TProperty {
 public:
-    TLevelProperty() : TProperty(D_LEVEL, EProperty::NONE, "container level (ro)") {
+    TLevelProperty() : TProperty(D_LEVEL, EProperty::NONE, "container level")
+    {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2559,7 +2402,7 @@ public:
     TError Get(std::string &value);
     TAbsoluteName() : TProperty(D_ABSOLUTE_NAME, EProperty::NONE,
                                 "container name including "
-                                "porto namespaces (ro)") {
+                                "porto namespaces") {
         IsReadOnly = true;
     }
 } static AbsoluteName;
@@ -2578,7 +2421,7 @@ public:
     TAbsoluteNamespace() : TProperty(D_ABSOLUTE_NAMESPACE, EProperty::NONE,
                                      "container namespace "
                                      "including parent "
-                                     "namespaces (ro)") {
+                                     "namespaces") {
         IsReadOnly = true;
     }
 } static AbsoluteNamespace;
@@ -2590,7 +2433,8 @@ TError TAbsoluteNamespace::Get(std::string &value) {
 
 class TState : public TProperty {
 public:
-    TState() : TProperty(D_STATE, EProperty::STATE, "container state (ro)") {
+    TState() : TProperty(D_STATE, EProperty::STATE, "container state")
+    {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2602,27 +2446,23 @@ public:
 class TOomKilled : public TProperty {
 public:
     TOomKilled() : TProperty(D_OOM_KILLED, EProperty::OOM_KILLED,
-                             "container has been killed by OOM (ro)") {
+                             "container has been killed by OOM") {
         IsReadOnly = true;
+        IsDeadOnly = true;
     }
-    TError SetFromRestore(const std::string &value) {
+    TError Set(const std::string &value) {
         return StringToBool(value, CT->OomKilled);
     }
-    TError GetToSave(std::string &value) {
+    TError Get(std::string &value) {
         value = BoolToString(CT->OomKilled);
         return OK;
-    }
-    TError Get(std::string &value) {
-        TError error = IsDead();
-        if (!error)
-            value = BoolToString(CT->OomKilled);
-        return error;
     }
 } static OomKilled;
 
 class TOomKills : public TProperty {
 public:
-    TOomKills() : TProperty(D_OOM_KILLS, EProperty::NONE, "Count of tasks killed in container since start (ro)") {
+    TOomKills() : TProperty(D_OOM_KILLS, EProperty::NONE, "Count of tasks killed in container since start")
+    {
         IsReadOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
@@ -2644,27 +2484,26 @@ public:
 class TCoreDumped : public TProperty {
 public:
     TCoreDumped() : TProperty(D_CORE_DUMPED, EProperty::NONE,
-                             "main process dumped core (ro)") {
+                             "main process dumped core") {
         IsReadOnly = true;
+        IsDeadOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsDead();
-        if (!error)
-            value = BoolToString(WIFSIGNALED(CT->ExitStatus) &&
-                                 WCOREDUMP(CT->ExitStatus));
-        return error;
+        value = BoolToString(WIFSIGNALED(CT->ExitStatus) &&
+                             WCOREDUMP(CT->ExitStatus));
+        return OK;
     }
 } static CoreDumped;
 
 class TOomIsFatal : public TProperty {
 public:
     TOomIsFatal() : TProperty(P_OOM_IS_FATAL, EProperty::OOM_IS_FATAL,
-                              "Kill all affected containers on OOM (dynamic)") {
+                              "Kill all affected containers on OOM")
+    {
+        IsDynamic = true;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (!error)
-            error = StringToBool(value, CT->OomIsFatal);
+        TError error = StringToBool(value, CT->OomIsFatal);
         if (!error)
             CT->SetProp(EProperty::OOM_IS_FATAL);
         return error;
@@ -2681,9 +2520,7 @@ public:
                                "OOM score adjustment: -1000..1000") {
     }
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
+        TError error;
         int val;
         error = StringToInt(value, val);
         if (error)
@@ -2704,7 +2541,8 @@ public:
 
 class TParent : public TProperty {
 public:
-    TParent() : TProperty(D_PARENT, EProperty::NONE, "parent container absolute name (ro)") {
+    TParent() : TProperty(D_PARENT, EProperty::NONE, "parent container absolute name")
+    {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2720,19 +2558,16 @@ public:
 
 class TRootPid : public TProperty {
 public:
-    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE, "root task pid (ro)") {
+    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE, "root task pid") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
-
         if (!CT->HasPidFor(*CL->ClientContainer))
             return TError(EError::Permission, "pid is unreachable");
 
         pid_t pid;
-        error = CT->GetPidFor(CL->Pid, pid);
+        TError error = CT->GetPidFor(CL->Pid, pid);
         if (!error)
             value = std::to_string(pid);
         return error;
@@ -2741,43 +2576,28 @@ public:
 
 class TExitStatusProperty : public TProperty {
 public:
-    TError SetFromRestore(const std::string &value);
-    TError GetToSave(std::string &value);
-    TError Get(std::string &value);
     TExitStatusProperty() : TProperty(D_EXIT_STATUS, EProperty::EXIT_STATUS,
-                                      "container exit status (ro)") {
+            "container exit status") {
         IsReadOnly = true;
+        IsDeadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->ExitStatus);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        return StringToInt(value, CT->ExitStatus);
     }
 } static ExitStatusProperty;
-
-TError TExitStatusProperty::SetFromRestore(const std::string &value) {
-    return StringToInt(value, CT->ExitStatus);
-}
-
-TError TExitStatusProperty::GetToSave(std::string &value) {
-    value = std::to_string(CT->ExitStatus);
-
-    return OK;
-}
-
-TError TExitStatusProperty::Get(std::string &value) {
-    TError error = IsDead();
-    if (error)
-        return error;
-
-    return GetToSave(value);
-}
 
 class TExitCodeProperty : public TProperty {
 public:
     TExitCodeProperty() : TProperty(D_EXIT_CODE, EProperty::NONE,
-            "container exit code, negative: exit signal, OOM: -99 (ro)") {
+            "container exit code, negative: exit signal, OOM: -99") {
         IsReadOnly = true;
+        IsDeadOnly = true;
     }
     TError Get(std::string &value) {
-        TError error = IsDead();
-        if (error)
-            return error;
         if (CT->OomKilled)
             value = "-99";
         else if (WIFSIGNALED(CT->ExitStatus))
@@ -2792,20 +2612,17 @@ class TMemUsage : public TProperty {
 public:
     TError Get(std::string &value);
     TMemUsage() : TProperty(D_MEMORY_USAGE, EProperty::NONE,
-                            "current memory usage [bytes] (ro)") {
+                            "current memory usage [bytes]") {
         IsReadOnly = true;
         RequireControllers = CGROUP_MEMORY;
+        IsRuntimeOnly = true;
     }
 } static MemUsage;
 
 TError TMemUsage::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(MemorySubsystem);
     uint64_t val;
-    error = MemorySubsystem.Usage(cg, val);
+    TError error = MemorySubsystem.Usage(cg, val);
     if (!error)
         value = std::to_string(val);
     return error;
@@ -2814,17 +2631,15 @@ TError TMemUsage::Get(std::string &value) {
 class TMemReclaimed : public TProperty {
 public:
     TMemReclaimed() : TProperty(D_MEMORY_RECLAIMED, EProperty::NONE,
-                            "memory reclaimed from container [bytes] (ro)") {
+                            "memory reclaimed from container [bytes]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         auto cg = CT->GetCgroup(MemorySubsystem);
         uint64_t val;
-        error = MemorySubsystem.GetReclaimed(cg, val);
+        TError error = MemorySubsystem.GetReclaimed(cg, val);
         if (!error)
             value = std::to_string(val);
         return error;
@@ -2835,20 +2650,17 @@ class TAnonUsage : public TProperty {
 public:
     TError Get(std::string &value);
     TAnonUsage() : TProperty(D_ANON_USAGE, EProperty::NONE,
-                             "current anonymous memory usage [bytes] (ro)") {
+                             "current anonymous memory usage [bytes]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
 } static AnonUsage;
 
 TError TAnonUsage::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(MemorySubsystem);
     uint64_t val;
-    error = MemorySubsystem.GetAnonUsage(cg, val);
+    TError error = MemorySubsystem.GetAnonUsage(cg, val);
     if (!error)
         value = std::to_string(val);
     return error;
@@ -2857,18 +2669,15 @@ TError TAnonUsage::Get(std::string &value) {
 class TCacheUsage : public TProperty {
 public:
     TCacheUsage() : TProperty(D_CACHE_USAGE, EProperty::NONE,
-                            "file cache usage [bytes] (ro)") {
+                            "file cache usage [bytes]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
-
         auto cg = CT->GetCgroup(MemorySubsystem);
         uint64_t val;
-        error = MemorySubsystem.GetCacheUsage(cg, val);
+        TError error = MemorySubsystem.GetCacheUsage(cg, val);
         if (!error)
             value = std::to_string(val);
         return error;
@@ -2878,20 +2687,18 @@ public:
 class THugetlbUsage : public TProperty {
 public:
     THugetlbUsage() : TProperty(D_HUGETLB_USAGE, EProperty::NONE,
-                             "current hugetlb memory usage [bytes] (ro)") {
+                             "current hugetlb memory usage [bytes]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_HUGETLB;
     }
     void Init(void) {
         IsSupported = HugetlbSubsystem.Supported;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         auto cg = CT->GetCgroup(HugetlbSubsystem);
         uint64_t val;
-        error = HugetlbSubsystem.GetHugeUsage(cg, val);
+        TError error = HugetlbSubsystem.GetHugeUsage(cg, val);
         if (!error)
             value = std::to_string(val);
         return error;
@@ -2901,17 +2708,14 @@ public:
 class TMinorFaults : public TProperty {
 public:
     TError Get(std::string &value);
-    TMinorFaults() : TProperty(D_MINOR_FAULTS, EProperty::NONE, "minor page faults (ro)") {
+    TMinorFaults() : TProperty(D_MINOR_FAULTS, EProperty::NONE, "minor page faults") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
 } static MinorFaults;
 
 TError TMinorFaults::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(MemorySubsystem);
     TUintMap stat;
 
@@ -2926,17 +2730,14 @@ TError TMinorFaults::Get(std::string &value) {
 class TMajorFaults : public TProperty {
 public:
     TError Get(std::string &value);
-    TMajorFaults() : TProperty(D_MAJOR_FAULTS, EProperty::NONE, "major page faults (ro)") {
+    TMajorFaults() : TProperty(D_MAJOR_FAULTS, EProperty::NONE, "major page faults") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
 } static MajorFaults;
 
 TError TMajorFaults::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(MemorySubsystem);
     TUintMap stat;
 
@@ -2952,8 +2753,9 @@ class TMaxRss : public TProperty {
 public:
     TError Get(std::string &value);
     TMaxRss() : TProperty(D_MAX_RSS, EProperty::NONE,
-                          "peak anonymous memory usage [bytes] (ro)") {
+                          "peak anonymous memory usage [bytes]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -2966,10 +2768,6 @@ public:
 } static MaxRss;
 
 TError TMaxRss::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(MemorySubsystem);
     TUintMap stat;
     if (MemorySubsystem.Statistics(cg, stat))
@@ -2983,20 +2781,17 @@ TError TMaxRss::Get(std::string &value) {
 class TCpuUsage : public TProperty {
 public:
     TError Get(std::string &value);
-    TCpuUsage() : TProperty(D_CPU_USAGE, EProperty::NONE, "consumed CPU time [nanoseconds] (ro)") {
+    TCpuUsage() : TProperty(D_CPU_USAGE, EProperty::NONE, "consumed CPU time [nanoseconds]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_CPUACCT;
     }
 } static CpuUsage;
 
 TError TCpuUsage::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(CpuacctSubsystem);
     uint64_t val;
-    error = CpuacctSubsystem.Usage(cg, val);
+    TError error = CpuacctSubsystem.Usage(cg, val);
     if (!error)
         value = std::to_string(val);
     return error;
@@ -3006,20 +2801,17 @@ class TCpuSystem : public TProperty {
 public:
     TError Get(std::string &value);
     TCpuSystem() : TProperty(D_CPU_SYSTEM, EProperty::NONE,
-                             "consumed system CPU time [nanoseconds] (ro)") {
+                             "consumed system CPU time [nanoseconds]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_CPUACCT;
     }
 } static CpuSystem;
 
 TError TCpuSystem::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     auto cg = CT->GetCgroup(CpuacctSubsystem);
     uint64_t val;
-    error = CpuacctSubsystem.SystemUsage(cg, val);
+    TError error = CpuacctSubsystem.SystemUsage(cg, val);
     if (!error)
         value = std::to_string(val);
     return error;
@@ -3028,19 +2820,17 @@ TError TCpuSystem::Get(std::string &value) {
 class TCpuWait : public TProperty {
 public:
     TCpuWait() : TProperty(D_CPU_WAIT, EProperty::NONE,
-                             "CPU time without execution [nanoseconds] (ro)") {
+                             "CPU time without execution [nanoseconds]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_CPUACCT;
     }
     void Init(void) {
         IsSupported = CpuacctSubsystem.RootCgroup().Has("cpuacct.wait");
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         auto cg = CT->GetCgroup(CpuacctSubsystem);
-        error = cg.Get("cpuacct.wait", value);
+        TError error = cg.Get("cpuacct.wait", value);
         if (!error)
             value = StringTrim(value);
         return error;
@@ -3050,8 +2840,9 @@ public:
 class TNetClassId : public TProperty {
 public:
     TNetClassId() : TProperty(D_NET_CLASS_ID, EProperty::NONE,
-            "network tc class: major:minor (hex) (ro)") {
+            "network tc class: major:minor (hex)") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
         if (!CT->Net)
@@ -3089,14 +2880,11 @@ public:
     {
         if (prop == EProperty::NET_PRIO)
             IsHidden = true;
+        IsDynamic = true;
         RequireControllers = CGROUP_NETCLS;
     }
     TError Set(const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
-        error = WantControllers(CGROUP_NETCLS);
+        TError error = WantControllers(CGROUP_NETCLS);
         if (error)
             return error;
 
@@ -3124,10 +2912,7 @@ public:
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
-        TError error = IsAlive();
-        if (error)
-            return error;
-
+        TError error;
         uint64_t val;
         error = StringToSize(value, val);
         if (error)
@@ -3166,16 +2951,16 @@ public:
 };
 
 TNetProperty NetGuarantee(P_NET_GUARANTEE, &TNetClass::Rate, EProperty::NET_GUARANTEE,
-        "Guaranteed network bandwidth: <interface>|default: <Bps>;... (dynamic)");
+        "Guaranteed network bandwidth: <interface>|default: <Bps>;...");
 
 TNetProperty NetLimit(P_NET_LIMIT, &TNetClass::Limit, EProperty::NET_LIMIT,
-        "Maximum network bandwidth: <interface>|default: <Bps>;... (dynamic)");
+        "Maximum network bandwidth: <interface>|default: <Bps>;...");
 
 TNetProperty NetRxLimit(P_NET_RX_LIMIT, &TNetClass::RxLimit, EProperty::NET_RX_LIMIT,
-        "Maximum ingress bandwidth: <interface>|default: <Bps>;... (dynamic)");
+        "Maximum ingress bandwidth: <interface>|default: <Bps>;...");
 
 TNetProperty NetPriority(P_NET_PRIO, &TNetClass::Prio, EProperty::NET_PRIO,
-        "Container network priority: <interface>|default: 0-7;... (dynamic)");
+        "Container network priority: <interface>|default: 0-7;...");
 
 class TNetStatProperty : public TProperty {
 public:
@@ -3185,6 +2970,7 @@ public:
                      std::string desc) : TProperty(name, EProperty::NONE, desc) {
         Member = member;
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
 
     TError Has() {
@@ -3203,70 +2989,57 @@ public:
     }
 
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
-
         TUintMap stat;
-
         auto lock = CT->LockNetState();
         for (auto &it : CT->NetClass.Fold->Stat)
             stat[it.first] = &it.second->*Member;
-
         return UintMapToString(stat, value);
     }
 
     TError GetIndexed(const std::string &index, std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
-
         auto lock = CT->LockNetState();
         auto it = CT->NetClass.Fold->Stat.find(index);
         if (it == CT->NetClass.Fold->Stat.end())
             return TError(EError::InvalidValue, "network device " + index + " not found");
         value = std::to_string(it->second.*Member);
-
         return OK;
     }
 };
 
 TNetStatProperty NetBytes(D_NET_BYTES, &TNetStat::Bytes,
-        "tx bytes: <interface>: <bytes>;... (ro)");
+        "tx bytes: <interface>: <bytes>;...");
 TNetStatProperty NetPackets(D_NET_PACKETS, &TNetStat::Packets,
-        "tx packets: <interface>: <packets>;... (ro)");
+        "tx packets: <interface>: <packets>;...");
 TNetStatProperty NetDrops(D_NET_DROPS, &TNetStat::Drops,
-        "tx drops: <interface>: <packets>;... (ro)");
+        "tx drops: <interface>: <packets>;...");
 TNetStatProperty NetOverlimits(D_NET_OVERLIMITS, &TNetStat::Overlimits,
-        "tx overlimits: <interface>: <packets>;... (ro)");
+        "tx overlimits: <interface>: <packets>;...");
 
 TNetStatProperty NetRxBytes(D_NET_RX_BYTES, &TNetStat::RxBytes,
-        "device rx bytes: <interface>: <bytes>;... (ro)");
+        "device rx bytes: <interface>: <bytes>;...");
 TNetStatProperty NetRxPackets(D_NET_RX_PACKETS, &TNetStat::RxPackets,
-        "device rx packets: <interface>: <packets>;... (ro)");
+        "device rx packets: <interface>: <packets>;...");
 TNetStatProperty NetRxDrops(D_NET_RX_DROPS, &TNetStat::RxDrops,
-        "device rx drops: <interface>: <packets>;... (ro)");
+        "device rx drops: <interface>: <packets>;...");
 
 TNetStatProperty NetTxBytes(D_NET_TX_BYTES, &TNetStat::TxBytes,
-        "device tx bytes: <interface>: <bytes>;... (ro)");
+        "device tx bytes: <interface>: <bytes>;...");
 TNetStatProperty NetTxPackets(D_NET_TX_PACKETS, &TNetStat::TxPackets,
-        "device tx packets: <interface>: <packets>;... (ro)");
+        "device tx packets: <interface>: <packets>;...");
 TNetStatProperty NetTxDrops(D_NET_TX_DROPS, &TNetStat::TxDrops,
-        "device tx drops: <interface>: <packets>;... (ro)");
+        "device tx drops: <interface>: <packets>;...");
 
 class TIoStat : public TProperty {
 public:
     TIoStat(std::string name, EProperty prop, std::string desc) : TProperty(name, prop, desc) {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY | CGROUP_BLKIO;
     }
     virtual TError GetMap(TUintMap &map) = 0;
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         TUintMap map;
-        error = GetMap(map);
+        TError error = GetMap(map);
         if (error)
             return error;
         return UintMapToString(map, value);
@@ -3274,10 +3047,6 @@ public:
     TError GetIndexed(const std::string &index, std::string &value) {
         TUintMap map;
         TError error;
-
-        error = IsRunning();
-        if (error)
-            return error;
 
         error = GetMap(map);
         if (error)
@@ -3305,7 +3074,7 @@ public:
 class TIoReadStat : public TIoStat {
 public:
     TIoReadStat() : TIoStat(D_IO_READ, EProperty::NONE,
-            "read from disk: fs|hw|<disk>|<path>: <bytes>;... (ro)") {}
+            "read from disk: fs|hw|<disk>|<path>: <bytes>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Read, map);
@@ -3324,7 +3093,7 @@ public:
 class TIoWriteStat : public TIoStat {
 public:
     TIoWriteStat() : TIoStat(D_IO_WRITE, EProperty::NONE,
-            "written to disk: fs|hw|<disk>|<path>: <bytes>;... (ro)") {}
+            "written to disk: fs|hw|<disk>|<path>: <bytes>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Write, map);
@@ -3343,7 +3112,7 @@ public:
 class TIoOpsStat : public TIoStat {
 public:
     TIoOpsStat() : TIoStat(D_IO_OPS, EProperty::NONE,
-            "io operations: fs|hw|<disk>|<path>: <ops>;... (ro)") {}
+            "io operations: fs|hw|<disk>|<path>: <ops>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Iops, map);
@@ -3362,7 +3131,7 @@ public:
 class TIoTimeStat : public TIoStat {
 public:
     TIoTimeStat() : TIoStat(D_IO_TIME, EProperty::NONE,
-            "io time: hw|<disk>|<path>: <nanoseconds>;... (ro)") {}
+            "io time: hw|<disk>|<path>: <nanoseconds>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
@@ -3373,16 +3142,13 @@ public:
 class TTime : public TProperty {
 public:
     TError Get(std::string &value);
-    TTime() : TProperty(D_TIME, EProperty::NONE, "running time [seconds] (ro)") {
+    TTime() : TProperty(D_TIME, EProperty::NONE, "running time [seconds]") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
     }
 } static Time;
 
 TError TTime::Get(std::string &value) {
-    TError error = IsRunning();
-    if (error)
-        return error;
-
     if (CT->IsRoot()) {
         struct sysinfo si;
         int ret = sysinfo(&si);
@@ -3413,7 +3179,7 @@ TError TTime::Get(std::string &value) {
 
 class TCreationTime : public TProperty {
 public:
-    TCreationTime() : TProperty(D_CREATION_TIME, EProperty::NONE, "creation time (ro)") {
+    TCreationTime() : TProperty(D_CREATION_TIME, EProperty::NONE, "creation time") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -3424,7 +3190,7 @@ public:
 
 class TStartTime : public TProperty {
 public:
-    TStartTime() : TProperty(D_START_TIME, EProperty::NONE, "start time (ro)") {
+    TStartTime() : TProperty(D_START_TIME, EProperty::NONE, "start time") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -3439,7 +3205,7 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TPortoStat() : TProperty(D_PORTO_STAT, EProperty::NONE, "porto statistics (ro)") {
+    TPortoStat() : TProperty(D_PORTO_STAT, EProperty::NONE, "porto statistics") {
         IsReadOnly = true;
         IsHidden = true;
     }
@@ -3544,7 +3310,7 @@ public:
 class TMemTotalLimit : public TProperty {
 public:
     TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, EProperty::NONE,
-            "Total memory limit for container hierarchy (ro)") {
+            "Total memory limit for container hierarchy") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -3557,16 +3323,14 @@ public:
 
 class TProcessCount : public TProperty {
 public:
-    TProcessCount() : TProperty(D_PROCESS_COUNT, EProperty::NONE, "Total process count (ro)") {
+    TProcessCount() : TProperty(D_PROCESS_COUNT, EProperty::NONE, "Total process count") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_FREEZER;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         uint64_t count;
-        error = CT->GetProcessCount(count);
+        TError error = CT->GetProcessCount(count);
         if (!error)
             value = std::to_string(count);
         return error;
@@ -3575,16 +3339,14 @@ public:
 
 class TThreadCount : public TProperty {
 public:
-    TThreadCount() : TProperty(D_THREAD_COUNT, EProperty::NONE, "Total thread count (ro)") {
+    TThreadCount() : TProperty(D_THREAD_COUNT, EProperty::NONE, "Total thread count") {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_FREEZER | CGROUP_PIDS;
     }
     TError Get(std::string &value) {
-        TError error = IsRunning();
-        if (error)
-            return error;
         uint64_t count;
-        error = CT->GetThreadCount(count);
+        TError error = CT->GetThreadCount(count);
         if (!error)
             value = std::to_string(count);
         return error;
@@ -3593,8 +3355,9 @@ public:
 
 class TThreadLimit : public TProperty {
 public:
-    TThreadLimit() : TProperty(P_THREAD_LIMIT, EProperty::THREAD_LIMIT, "Limit pid usage (dynamic)") {}
+    TThreadLimit() : TProperty(P_THREAD_LIMIT, EProperty::THREAD_LIMIT, "Limit pid usage") {}
     void Init() {
+        IsDynamic = true;
         IsSupported = PidsSubsystem.Supported;
         RequireControllers = CGROUP_PIDS;
     }
@@ -3637,9 +3400,7 @@ public:
     }
 
     TError Set(const std::string &value) {
-        TError error = IsAliveAndStopped();
-        if (error)
-            return error;
+        TError error;
         TStringMap map;
         error = StringToStringMap(value, map);
         if (error)
