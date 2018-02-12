@@ -382,6 +382,11 @@ int Connection::Resume(const std::string &name) {
     return Impl->Rpc();
 }
 
+int Connection::Respawn(const std::string &name) {
+    Impl->Req.mutable_respawn()->set_name(name);
+    return Impl->Rpc();
+}
+
 int Connection::WaitContainers(const std::vector<std::string> &containers,
                                std::string &name, int timeout) {
     auto wait = Impl->Req.mutable_wait();

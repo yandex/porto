@@ -83,9 +83,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareTask(TTaskEnv &TaskEnv);
     TError StartOne();
 
-    void ScheduleRespawn();
-    TError Respawn();
-
     TError PrepareResources();
     void FreeRuntimeResources();
     void FreeResources();
@@ -214,9 +211,14 @@ public:
     uint64_t CpuLimitSum = 0;
     uint64_t CpuLimitCur = 0;
 
-    bool ToRespawn;
-    int MaxRespawns;
+    bool AutoRespawn;
+    int64_t RespawnLimit;
     uint64_t RespawnCount;
+    uint64_t RespawnDelay;
+
+    TError MayRespawn();
+    TError Respawn();
+    void ScheduleRespawn();
 
     std::string Private;
     EAccessLevel AccessLevel;
@@ -368,8 +370,6 @@ public:
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
     void ChooseSchedPolicy();
-
-    bool MayRespawn();
 
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> LinkedVolumes;

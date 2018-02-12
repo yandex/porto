@@ -78,6 +78,9 @@ static void RequestToString(const rpc::TContainerRequest &req,
     } else if (req.has_resume()) {
         cmd = "Resume";
         arg = { req.resume().name() };
+    } else if (req.has_respawn()) {
+        cmd = "Respawn";
+        arg = { req.respawn().name() };
     } else if (req.has_wait()) {
         cmd = "Wait";
         for (int i = 0; i < req.wait().name_size(); i++)
@@ -334,6 +337,14 @@ noinline TError ResumeContainer(const rpc::TContainerResumeRequest &req) {
     if (error)
         return error;
     return ct->Resume();
+}
+
+noinline TError RespawnContainer(const rpc::TContainerRespawnRequest &req) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CL->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+    return ct->Respawn();
 }
 
 noinline TError ListContainers(const rpc::TContainerListRequest &req,
@@ -1307,6 +1318,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         error = PauseContainer(req.pause());
     else if (req.has_resume())
         error = ResumeContainer(req.resume());
+    else if (req.has_respawn())
+        error = RespawnContainer(req.respawn());
     else if (req.has_propertylist())
         error = ListProperty(rsp);
     else if (req.has_datalist())

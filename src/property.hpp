@@ -53,7 +53,9 @@ constexpr const char *P_NET_LIMIT = "net_limit";
 constexpr const char *P_NET_PRIO = "net_priority";
 constexpr const char *P_NET_RX_LIMIT = "net_rx_limit";
 constexpr const char *P_RESPAWN = "respawn";
-constexpr const char *P_MAX_RESPAWNS = "max_respawns";
+constexpr const char *P_RESPAWN_COUNT = "respawn_count";
+constexpr const char *P_RESPAWN_LIMIT = "max_respawns";
+constexpr const char *P_RESPAWN_DELAY = "respawn_delay";
 constexpr const char *P_ISOLATE = "isolate";
 constexpr const char *P_PRIVATE = "private";
 constexpr const char *P_ULIMIT = "ulimit";
@@ -91,7 +93,6 @@ constexpr const char *D_OOM_KILLED = "oom_killed";
 constexpr const char *D_OOM_KILLS = "oom_kills";
 constexpr const char *D_CORE_DUMPED = "core_dumped";
 constexpr const char *D_PARENT = "parent";
-constexpr const char *D_RESPAWN_COUNT = "respawn_count";
 constexpr const char *D_ROOT_PID = "root_pid";
 constexpr const char *D_EXIT_STATUS = "exit_status";
 constexpr const char *D_EXIT_CODE = "exit_code";
@@ -184,7 +185,8 @@ enum class EProperty {
     NET_LIMIT,
     NET_PRIO,
     RESPAWN,
-    MAX_RESPAWNS,
+    RESPAWN_LIMIT,
+    RESPAWN_DELAY,
     ISOLATE,
     PRIVATE,
     ULIMIT,

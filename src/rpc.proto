@@ -79,6 +79,7 @@ message TContainerRequest {
     optional TContainerGetRequest get = 15;
     optional TContainerWaitRequest wait = 16;
     optional TContainerCreateRequest createWeak = 17;
+    optional TContainerRespawnRequest Respawn = 18;
 
     optional TVolumePropertyListRequest listVolumeProperties = 103;
     optional TVolumeCreateRequest createVolume = 104;
@@ -233,6 +234,10 @@ message TContainerGetDataRequest {
 }
 
 message TContainerStartRequest {
+    required string name = 1;
+}
+
+message TContainerRespawnRequest {
     required string name = 1;
 }
 

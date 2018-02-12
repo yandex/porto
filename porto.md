@@ -151,8 +151,6 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **core\_dumped** - true, if main process dumped core
 
-* **respawn\_count** - how many times container has been respawned (using respawn property)
-
 * **root\_pid** - main process pid in client pid namespace (could be unreachable)
 
 * **stdout\[[offset\]\[:length\]]** - stdout text, see **stdout\_path**
@@ -201,11 +199,17 @@ container { default_ulimit: "type: soft hard;..." }
 
     Contianer must be created by special API call, client could clear **weak** flag after that.
 
-* **respawn** - restart container after death
+* **respawn** - automatically restart container after death
 
-    Delay between respawns is 1 second.
+    Nested containers will be stopped and not respawned.
+
+* **respawn\_count** - how many times container has been respawned
+
+    Could be reset at any time.
 
 * **max\_respawns** - limit for automatic respawns, default: -1 (unlimited)
+
+* **respawn\_delay** - delay before automaic respawn in nanoseconds, default 1s
 
 * **aging\_time** - time in seconds before auto-destroying dead containers, default: 1 day
 

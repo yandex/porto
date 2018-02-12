@@ -79,6 +79,7 @@ public:
     int Kill(const std::string &name, int sig);
     int Pause(const std::string &name);
     int Resume(const std::string &name);
+    int Respawn(const std::string &name);
 
     int WaitContainers(const std::vector<std::string> &containers,
                        std::string &name, int timeout);

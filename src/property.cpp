@@ -2271,64 +2271,92 @@ public:
 
 class TRespawn : public TProperty {
 public:
-    TError Set(const std::string &respawn);
-    TError Get(std::string &value);
     TRespawn() : TProperty(P_RESPAWN, EProperty::RESPAWN,
                            "Automatically respawn dead container (dynamic)") {}
+    TError Get(std::string &value) {
+        value = BoolToString(CT->AutoRespawn);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        TError error = IsAlive();
+        if (error)
+            return error;
+        bool val;
+        error = StringToBool(value, val);
+        if (error)
+            return error;
+        CT->AutoRespawn = val;
+        CT->SetProp(EProperty::RESPAWN);
+        return OK;
+    }
 } static Respawn;
 
-TError TRespawn::Set(const std::string &respawn) {
-    TError error = IsAlive();
-    if (error)
-        return error;
-
-    if (respawn == "true")
-        CT->ToRespawn = true;
-    else if (respawn == "false")
-        CT->ToRespawn = false;
-    else
-        return TError(EError::InvalidValue, "Invalid bool value");
-
-    CT->SetProp(EProperty::RESPAWN);
-
-    return OK;
-}
-
-TError TRespawn::Get(std::string &value) {
-    value = CT->ToRespawn ? "true" : "false";
-
-    return OK;
-}
-
-class TMaxRespawns : public TProperty {
+class TRespawnCount : public TProperty {
 public:
-    TError Set(const std::string &max);
-    TError Get(std::string &value);
-    TMaxRespawns() : TProperty(P_MAX_RESPAWNS, EProperty::MAX_RESPAWNS,
-                               "Limit respawn count for specific "
-                               "container (dynamic)") {}
-} static MaxRespawns;
+    TRespawnCount() : TProperty(P_RESPAWN_COUNT, EProperty::RESPAWN_COUNT,
+                                "current respawn count (dynamic)") {
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->RespawnCount);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        TError error;
+        uint64_t val;
+        error = StringToUint64(value, val);
+        if (error)
+            return error;
+        CT->RespawnCount = val;
+        CT->SetProp(EProperty::RESPAWN_COUNT);
+        return OK;
+    }
+} static RespawnCount;
 
-TError TMaxRespawns::Set(const std::string &max) {
-    TError error = IsAlive();
-    if (error)
-        return error;
+class TRespawnLimit : public TProperty {
+public:
+    TRespawnLimit() : TProperty(P_RESPAWN_LIMIT, EProperty::RESPAWN_LIMIT,
+            "Limit respawn count for specific container (dynamic)") {}
+    TError Get(std::string &value) {
+        if (CT->HasProp(EProperty::RESPAWN_LIMIT))
+            value = std::to_string(CT->RespawnLimit);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        TError error;
+        int64_t val;
+        if (value != "") {
+            error = StringToInt64(value, val);
+            if (error)
+                return error;
+        }
+        CT->RespawnLimit = val;
+        if (val >= 0)
+            CT->SetProp(EProperty::RESPAWN_LIMIT);
+        else
+            CT->ClearProp(EProperty::RESPAWN_LIMIT);
+        return OK;
+    }
+} static RespawnLimit;
 
-    int new_value;
-    if (StringToInt(max, new_value))
-        return TError(EError::InvalidValue, "Invalid integer value " + max);
-
-    CT->MaxRespawns = new_value;
-    CT->SetProp(EProperty::MAX_RESPAWNS);
-
-    return OK;
-}
-
-TError TMaxRespawns::Get(std::string &value) {
-    value = std::to_string(CT->MaxRespawns);
-
-    return OK;
-}
+class TRespawnDelay : public TProperty {
+public:
+    TRespawnDelay() : TProperty(P_RESPAWN_DELAY, EProperty::RESPAWN_DELAY,
+                               "Delay before automatic respawn (dynamic)") {}
+    TError Get(std::string &value) {
+        value = fmt::format("{}ns", CT->RespawnDelay);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        TError error;
+        uint64_t val;
+        error = StringToNsec(value, val);
+        if (error)
+            return error;
+        CT->RespawnDelay = val;
+        CT->ClearProp(EProperty::RESPAWN_DELAY);
+        return OK;
+    }
+} static RespawnDelay;
 
 class TPrivate : public TProperty {
 public:
@@ -2689,26 +2717,6 @@ public:
         return OK;
     }
 } static Parent;
-
-class TRespawnCount : public TProperty {
-public:
-    TError SetFromRestore(const std::string &value);
-    TError Get(std::string &value);
-    TRespawnCount() : TProperty(D_RESPAWN_COUNT, EProperty::RESPAWN_COUNT,
-                                "current respawn count (ro)") {
-        IsReadOnly = true;
-    }
-} static RespawnCount;
-
-TError TRespawnCount::SetFromRestore(const std::string &value) {
-    return StringToUint64(value, CT->RespawnCount);
-}
-
-TError TRespawnCount::Get(std::string &value) {
-    value = std::to_string(CT->RespawnCount);
-
-    return OK;
-}
 
 class TRootPid : public TProperty {
 public:

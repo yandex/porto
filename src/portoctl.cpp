@@ -925,6 +925,21 @@ public:
     }
 };
 
+class TRespawnCmd final : public ICmd {
+public:
+    TRespawnCmd(Porto::Connection *api) : ICmd(api, "respawn", 1, "<container1> [container2...]", "respawn container") {}
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Respawn(arg);
+            if (ret) {
+                PrintError("Cannot respawn container");
+                return ret;
+            }
+        }
+        return 0;
+    }
+};
+
 class TGetCmd final : public ICmd {
 public:
     TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1,
@@ -2608,6 +2623,7 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TKillCmd>();
     handler.RegisterCommand<TPauseCmd>();
     handler.RegisterCommand<TResumeCmd>();
+    handler.RegisterCommand<TRespawnCmd>();
     handler.RegisterCommand<TGetPropertyCmd>();
     handler.RegisterCommand<TSetPropertyCmd>();
     handler.RegisterCommand<TGetDataCmd>();
