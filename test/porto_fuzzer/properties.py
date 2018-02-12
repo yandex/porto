@@ -63,7 +63,7 @@ def Respawn():
     return ("respawn", select_equal(["true", "false"]) )
 
 def MaxRespawns():
-    return ("max_respawns", str(randint(0,10)))
+    return ("max_respawns", str(randint(-1,10)))
 
 def Weak():
     return ("weak", select_equal(["true", "false"]) )

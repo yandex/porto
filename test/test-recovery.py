@@ -32,7 +32,7 @@ def ValidateDefaultProp(r):
             "NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;" +\
             "SYS_NICE;SYS_RESOURCE;MKNOD;AUDIT_WRITE;SETFCAP",\
             "isolate" : True, "stdout_limit" : "8388608", "private" : "",\
-            "bind" : "", "root_readonly" : False, "max_respawns" : "-1",\
+            "bind" : "", "root_readonly" : False, "max_respawns" : "",\
             "enable_porto" : True
           }
 
@@ -60,7 +60,7 @@ def ValidateDefaultProp(r):
 def ValidateDefaultData(r):
     ExpectException(r.GetData, porto.exceptions.InvalidProperty, "__invalid_data__")
 
-    ref = { "state" : "stopped", "max_respawns" : "-1", "parent" : "/" }
+    ref = { "state" : "stopped", "max_respawns" : "", "parent" : "/" }
     for d in ref:
         ExpectProp(r, d, ref[d])
 
