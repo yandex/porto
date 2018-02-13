@@ -709,7 +709,7 @@ noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
 }
 
 noinline static void
-FillVolumeDescription(const TVolume &volume, const TPath &path, rpc::TVolumeDescription *desc) {
+FillVolumeDescription(TVolume &volume, const TPath &path, rpc::TVolumeDescription *desc) {
 
     if (path)
         desc->set_path(path.ToString());
@@ -718,7 +718,7 @@ FillVolumeDescription(const TVolume &volume, const TPath &path, rpc::TVolumeDesc
 
     TStringMap props;
     TStringMap links;
-    volume.DumpConfig(props, links);
+    volume.Dump(props, links);
 
     for (auto &kv: props) {
         auto p = desc->add_properties();

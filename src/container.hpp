@@ -311,6 +311,9 @@ public:
     void Unlock(bool locked = false);
     static void DumpLocks();
 
+    bool IsLocked(bool for_read = false);
+    bool IsReadLocked() { return IsLocked(true); }
+
     /* Only for temporary write lock downgrade
      * with subsequent upgrade */
     void DowngradeLock(void);
@@ -371,8 +374,10 @@ public:
 
     void ChooseSchedPolicy();
 
-    /* protected with VolumesLock */
+    /* protected with VolumesLock and container lock */
     std::list<std::shared_ptr<TVolume>> LinkedVolumes;
+
+    /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;
     TTuple RequiredVolumes;
 

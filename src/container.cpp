@@ -190,6 +190,13 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     return OK;
 }
 
+bool TContainer::IsLocked(bool for_read) {
+    for (auto ct = this; ct; ct = ct->Parent.get())
+        if (ct->Locked < 0 || (for_read && ct->Locked > 0))
+            return true;
+    return false;
+}
+
 void TContainer::DowngradeLock() {
     auto lock = LockContainers();
     PORTO_ASSERT(Locked == -1);
@@ -2168,6 +2175,8 @@ TError TContainer::StartTask() {
 
 TError TContainer::Start() {
     TError error;
+
+    PORTO_ASSERT(IsLocked());
 
     for (auto p = Parent; p && p->State == EContainerState::Stopped; p = p->Parent) {
         error = CL->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);

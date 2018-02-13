@@ -3,10 +3,10 @@
 #include <memory>
 #include <string>
 #include <set>
+#include <mutex>
 #include "common.hpp"
 #include "statistics.hpp"
 #include "util/path.hpp"
-#include "util/locks.hpp"
 
 constexpr const char *V_ID = "id";
 constexpr const char *V_PATH = "path";
@@ -76,11 +76,15 @@ public:
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
-                public TLockable,
                 public TNonCopyable {
 
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();
+
+    std::mutex Mutex;
+    std::unique_lock<std::mutex> Lock() {
+        return std::unique_lock<std::mutex>(Mutex);
+    }
 
 public:
     TPath Path;
@@ -146,7 +150,7 @@ public:
 
     TError Configure(const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
-    void DumpConfig(TStringMap &props, TStringMap &links) const;
+    void Dump(TStringMap &props, TStringMap &links);
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
@@ -177,7 +181,7 @@ public:
 
     TError Tune(const TStringMap &cfg);
 
-    TError CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee) const;
+    TError CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee);
 
     bool HaveQuota(void) const {
         return SpaceLimit || InodeLimit;
@@ -209,7 +213,7 @@ public:
         return !Layers.empty();
     }
 
-    TError StatFS(TStatFS &result) const;
+    TError StatFS(TStatFS &result);
 
     TError GetUpperLayer(TPath &upper);
 

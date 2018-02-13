@@ -1439,7 +1439,7 @@ public:
     TError Get(std::string &value) {
         TTuple paths;
 
-        auto lock = LockVolumes();
+        auto volumes_lock = LockVolumes();
         for (auto &vol: CT->*Member) {
             TPath path = CL->ComposePath(vol->Path);
             if (!path)
