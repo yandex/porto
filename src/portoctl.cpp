@@ -993,24 +993,14 @@ public:
             printHuman = false;
         } else {
             vector<Porto::Property> plist;
-            ret = Api->Plist(plist);
+            ret = Api->ListProperties(plist);
             if (ret) {
                 PrintError("Can't list properties");
                 return EXIT_FAILURE;
             }
-
-            vector<Porto::Property> dlist;
-            ret = Api->Dlist(dlist);
-            if (ret) {
-                PrintError("Can't list data");
-                return EXIT_FAILURE;
-            }
-
-            vars.reserve(plist.size() + dlist.size());
+            vars.reserve(plist.size());
             for (auto p : plist)
                 vars.push_back(p.Name);
-            for (auto d : dlist)
-                vars.push_back(d.Name);
             std::sort(vars.begin(), vars.end());
         }
 
@@ -1563,22 +1553,15 @@ public:
             showData.push_back("net_packets");
             showData.push_back("state");
         } else {
-            vector<Porto::Property> dlist;
-            ret = Api->Dlist(dlist);
-            if (ret) {
-                PrintError("Can't list data");
-                return EXIT_FAILURE;
-            }
-
             vector<Porto::Property> plist;
-            ret = Api->Plist(plist);
+            ret = Api->ListProperties(plist);
             if (ret) {
                 PrintError("Can't list properties");
                 return EXIT_FAILURE;
             }
 
             for (const auto &arg : showData) {
-                if (!ValidData(dlist, arg) && !ValidProperty(plist, arg)) {
+                if (!ValidProperty(plist, arg)) {
                     TError error(EError::InvalidValue, "Invalid value");
                     PrintError(error, "Can't parse argument");
                     return EXIT_FAILURE;

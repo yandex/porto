@@ -2912,6 +2912,25 @@ static void TestRoot(Porto::Connection &api) {
         "enable_porto",
         "resolv_conf",
         "weak",
+        "anon_usage",
+        "absolute_name",
+        "absolute_namespace",
+        "state",
+        "oom_killed",
+        "exit_status",
+        "stdout",
+        "stdout_offset",
+        "stderr",
+        "stderr_offset",
+        "cpu_usage",
+        "cpu_usage_system",
+        "memory_usage",
+        "minor_faults",
+        "major_faults",
+        "io_read",
+        "io_write",
+        "io_ops",
+        "time",
     };
 
     if (KernelSupports(KernelFeature::LOW_LIMIT))
@@ -2939,61 +2958,28 @@ static void TestRoot(Porto::Connection &api) {
         */
     }
 
-    vector<string> data = {
-        "anon_usage",
-        "absolute_name",
-        "absolute_namespace",
-        "state",
-        "oom_killed",
-        "exit_status",
-        "stdout",
-        "stdout_offset",
-        "stderr",
-        "stderr_offset",
-        "cpu_usage",
-        "cpu_usage_system",
-        "memory_usage",
-        "minor_faults",
-        "major_faults",
-        "io_read",
-        "io_write",
-        "io_ops",
-        "time",
-    };
-
     if (NetworkEnabled()) {
-        data.push_back("net_bytes");
-        data.push_back("net_packets");
-        data.push_back("net_drops");
-        data.push_back("net_overlimits");
+        properties.push_back("net_bytes");
+        properties.push_back("net_packets");
+        properties.push_back("net_drops");
+        properties.push_back("net_overlimits");
 
-        data.push_back("net_rx_bytes");
-        data.push_back("net_rx_packets");
-        data.push_back("net_rx_drops");
+        properties.push_back("net_rx_bytes");
+        properties.push_back("net_rx_packets");
+        properties.push_back("net_rx_drops");
     }
 
     if (KernelSupports(KernelFeature::MAX_RSS))
-        data.push_back("max_rss");
+        properties.push_back("max_rss");
 
     std::vector<Porto::Property> plist;
 
-    ExpectApiSuccess(api.Plist(plist));
+    ExpectApiSuccess(api.ListProperties(plist));
 
     for (auto name: properties) {
         bool found = false;
         for (auto p: plist)
             found |= p.Name == name;
-        Expect(found);
-    }
-
-    std::vector<Porto::Property> dlist;
-
-    ExpectApiSuccess(api.Dlist(dlist));
-
-    for (auto name: data) {
-        bool found = false;
-        for (auto d: dlist)
-            found |= d.Name == name;
         Expect(found);
     }
 
@@ -4021,10 +4007,8 @@ static void ReadPropsAndData(Porto::Connection &api, const std::string &name) {
     };
 
     std::vector<Porto::Property> plist;
-    std::vector<Porto::Property> dlist;
 
-    ExpectApiSuccess(api.Plist(plist));
-    ExpectApiSuccess(api.Dlist(dlist));
+    ExpectApiSuccess(api.ListProperties(plist));
 
     if (!NetworkEnabled()) {
         plist.erase(std::remove_if(plist.begin(),
@@ -4033,22 +4017,12 @@ static void ReadPropsAndData(Porto::Connection &api, const std::string &name) {
                                        return skipNet.find(p.Name) != skipNet.end();
                                    }),
                     plist.end());
-
-        dlist.erase(std::remove_if(dlist.begin(),
-                                   dlist.end(),
-                                   [&](Porto::Property &d){
-                                       return skipNet.find(d.Name) != skipNet.end();
-                                   }),
-                    dlist.end());
     }
 
     std::string v;
 
     for (auto p : plist)
         (void)api.GetProperty(name, p.Name, v);
-
-    for (auto d : dlist)
-        (void)api.GetData(name, d.Name, v);
 }
 
 static void TestLeaks(Porto::Connection &api) {

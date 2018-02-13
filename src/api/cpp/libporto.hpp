@@ -15,6 +15,8 @@ namespace Porto {
 struct Property {
     std::string Name;
     std::string Description;
+    bool ReadOnly = false;
+    bool Dynamic = false;
 };
 
 struct Volume {
@@ -86,8 +88,7 @@ public:
 
     int List(std::vector<std::string> &list,
              const std::string &mask = "");
-    int Plist(std::vector<Property> &list);
-    int Dlist(std::vector<Property> &list);
+    int ListProperties(std::vector<Property> &list);
 
     int Get(const std::vector<std::string> &name,
             const std::vector<std::string> &variable,

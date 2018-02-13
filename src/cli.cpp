@@ -59,14 +59,12 @@ size_t MaxFieldLength(const Collection &coll, MapFunction mapper, size_t min = M
 }
 
 class THelpCmd final : public ICmd {
-    const bool UsagePrintData;
     TCommandHandler &Handler;
 
 public:
-    THelpCmd(TCommandHandler &handler, bool usagePrintData)
+    THelpCmd(TCommandHandler &handler)
         : ICmd(&handler.GetPortoApi(), "help", 1,
                "[command]", "print help message for command"),
-          UsagePrintData(usagePrintData),
           Handler(handler) {}
 
     void Usage();
@@ -102,9 +100,9 @@ void THelpCmd::Usage() {
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
-    std::cout << std::endl << "Property list:" << std::endl;
+    std::cout << std::endl << "Container properties:" << std::endl;
     vector<Porto::Property> plist;
-    ret = Api->Plist(plist);
+    ret = Api->ListProperties(plist);
     if (ret) {
         PrintError("Properties unavailable");
     } else {
@@ -114,20 +112,6 @@ void THelpCmd::Usage() {
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
-    if (!UsagePrintData)
-        return;
-
-    std::cout << std::endl << "Data list:" << std::endl;
-    vector<Porto::Property> dlist;
-    ret = Api->Dlist(dlist);
-    if (ret) {
-        PrintError("Data properties unavailable");
-    } else {
-        nameWidth = MaxFieldLength(dlist, [](const Porto::Property &d) { return d.Name; });
-
-        for (const auto &d : dlist)
-            PrintAligned(d.Name, d.Description, nameWidth, termWidth);
-    }
     std::cout << std::endl;
 }
 
@@ -242,7 +226,7 @@ int TCommandHandler::TryExec(const std::string &commandName,
 }
 
 TCommandHandler::TCommandHandler(Porto::Connection &api) : PortoApi(api) {
-    RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this, true)));
+    RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this)));
 }
 
 TCommandHandler::~TCommandHandler() {

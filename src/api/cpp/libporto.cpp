@@ -233,32 +233,34 @@ int Connection::List(std::vector<std::string> &list, const std::string &mask) {
     return ret;
 }
 
-int Connection::Plist(std::vector<Property> &list) {
+int Connection::ListProperties(std::vector<Property> &list) {
     Impl->Req.mutable_propertylist();
 
     int ret = Impl->Rpc();
+    bool has_data = false;
+    int i = 0;
+
     if (!ret) {
-        int i = 0;
         list.resize(Impl->Rsp.propertylist().list_size());
         for (const auto &prop: Impl->Rsp.propertylist().list()) {
             list[i].Name = prop.name();
-            list[i++].Description = prop.desc();
+            list[i].Description = prop.desc();
+            list[i].ReadOnly =  prop.read_only();
+            list[i].Dynamic =  prop.dynamic();
+            has_data |= list[i].ReadOnly;
+            i++;
         }
     }
 
-    return ret;
-}
-
-int Connection::Dlist(std::vector<Property> &list) {
-    Impl->Req.mutable_datalist();
-
-    int ret = Impl->Rpc();
-    if (!ret) {
-        int i = 0;
-        list.resize(Impl->Rsp.datalist().list_size());
-        for (const auto &data: Impl->Rsp.datalist().list()) {
-            list[i].Name = data.name();
-            list[i++].Description = data.desc();
+    if (!has_data) {
+        Impl->Req.mutable_datalist();
+        ret = Impl->Rpc();
+        if (!ret) {
+            list.resize(list.size() + Impl->Rsp.datalist().list_size());
+            for (const auto &data: Impl->Rsp.datalist().list()) {
+                list[i].Name = data.name();
+                list[i++].Description = data.desc();
+            }
         }
     }
 

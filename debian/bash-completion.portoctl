@@ -20,7 +20,7 @@ _porto_layers ()
 _portoctl ()
 {
 	local i cur prev ct=
-	local _porto_commands _porto_properies _porto_data
+	local _porto_commands _porto_properies
 
 	COMPREPLY=()
 	_get_comp_words_by_ref -n : cur prev words cword
@@ -28,8 +28,7 @@ _portoctl ()
 	i=$(portoctl 2>&1)
 	_porto_commands=$(echo "$i" | awk '/^Command/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
 	_porto_volume_properies=$(echo "$i" | awk '/^Volume properties/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
-	_porto_properies=$(echo "$i" | awk '/^Property/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
-	_porto_data=$(echo "$i" | awk '/^Data/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_properies=$(echo "$i" | awk '/^Container properties/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
 
 	if [ "$cword" = 1 ]; then
 		COMPREPLY=( $(compgen -W "$_porto_commands -h --help -v --version" -- $cur) )
@@ -99,21 +98,7 @@ _portoctl ()
 		if [ -z "$ct" ] ; then
 			_porto_containers / /porto
 		else
-			COMPREPLY=( $( compgen -W "$_porto_data $_porto_properies" -- $cur ) )
-		fi
-		;;
-	pget)
-		if [ -z "$ct" ] ; then
-			_porto_containers / /porto "-k"
-		else
 			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
-		fi
-		;;
-	dget)
-		if [ -z "$ct" ] ; then
-			_porto_containers / /porto "-k"
-		else
-			COMPREPLY=( $( compgen -W "$_porto_data" -- $cur ) )
 		fi
 		;;
 	set)
@@ -144,7 +129,7 @@ _portoctl ()
 		COMPREPLY=( $( compgen -W "-1 -f -t" -- $cur ) )
 		;;
 	sort)
-		COMPREPLY=( $( compgen -W "$_porto_data $_porto_properies" -- $cur ) )
+		COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
 		;;
 	top)
 		_filedir

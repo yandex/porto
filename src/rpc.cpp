@@ -197,10 +197,6 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
         for (int i = 0; i < resp.propertylist().list_size(); i++)
             ret += resp.propertylist().list(i).name()
                 + " (" + resp.propertylist().list(i).desc() + ")";
-    } else if (resp.has_datalist()) {
-        for (int i = 0; i < resp.datalist().list_size(); i++)
-            ret += resp.datalist().list(i).name()
-                + " (" + resp.datalist().list(i).desc() + ")";
     } else if (resp.has_volumelist()) {
         for (auto v: resp.volumelist().volumes())
             ret += v.path() + " ";
@@ -528,24 +524,13 @@ noinline TError ListProperty(rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
     for (auto &elem : ContainerProperties) {
         auto &prop = elem.second;
-        if (prop->IsReadOnly || !prop->IsSupported || prop->IsHidden)
+        if (!prop->IsSupported || prop->IsHidden)
             continue;
         auto entry = list->add_list();
         entry->set_name(prop->Name);
         entry->set_desc(prop->GetDesc());
-    }
-    return OK;
-}
-
-noinline TError ListData(rpc::TContainerResponse &rsp) {
-    auto list = rsp.mutable_datalist();
-    for (auto &elem : ContainerProperties) {
-        auto &prop = elem.second;
-        if (!prop->IsReadOnly || !prop->IsSupported || prop->IsHidden)
-            continue;
-        auto entry = list->add_list();
-        entry->set_name(prop->Name);
-        entry->set_desc(prop->GetDesc());
+        entry->set_read_only(prop->IsReadOnly);
+        entry->set_dynamic(prop->IsDynamic);
     }
     return OK;
 }
@@ -1325,7 +1310,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     else if (req.has_propertylist())
         error = ListProperty(rsp);
     else if (req.has_datalist())
-        error = ListData(rsp);
+        error = OK; // deprecated
     else if (req.has_kill())
         error = Kill(req.kill());
     else if (req.has_version())

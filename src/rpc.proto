@@ -73,7 +73,7 @@ message TContainerRequest {
     optional TContainerPauseRequest pause = 9;
     optional TContainerResumeRequest resume = 10;
     optional TContainerPropertyListRequest propertyList = 11;
-    optional TContainerDataListRequest dataList = 12;
+    optional TContainerDataListRequest dataList = 12; // deprecated
     optional TContainerKillRequest kill = 13;
     optional TVersionRequest version = 14;
     optional TContainerGetRequest get = 15;
@@ -118,7 +118,7 @@ message TContainerResponse {
     optional TContainerGetPropertyResponse getProperty = 4;
     optional TContainerGetDataResponse getData = 5;
     optional TContainerPropertyListResponse propertyList = 6;
-    optional TContainerDataListResponse dataList = 7;
+    optional TContainerDataListResponse dataList = 7; // deprecated
     optional TVersionResponse version = 8;
 
     optional TVolumeListResponse volumeList = 9;
@@ -325,19 +325,18 @@ message TContainerGetDataResponse {
 
 message TContainerPropertyListResponse {
     message TContainerPropertyListEntry {
-        // Property name
         required string name = 1;
-        // Property description
         required string desc = 2;
+        optional bool read_only = 3;
+        optional bool dynamic = 4;
     }
     repeated TContainerPropertyListEntry list = 1;
 }
 
+// deprecated
 message TContainerDataListResponse {
     message TContainerDataListEntry {
-        // Data name
         required string name = 1;
-        // Data description
         required string desc = 2;
     }
     repeated TContainerDataListEntry list = 1;
