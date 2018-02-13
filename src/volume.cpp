@@ -1215,6 +1215,8 @@ TPath TVolume::Compose(const TContainer &ct) const {
 }
 
 TError TVolume::Resolve(const TContainer &ct, const TPath &path, std::shared_ptr<TVolume> &volume) {
+    if (!path)
+        return TError(EError::VolumeNotFound, "");
     auto volumes_lock = LockVolumes();
     volume = TVolume::FindLocked(ct.RootPath / path);
     if (volume)
