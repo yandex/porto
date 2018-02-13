@@ -682,7 +682,7 @@ public:
 
 class TStdoutOffset : public TProperty {
 public:
-    TStdoutOffset() : TProperty(D_STDOUT_OFFSET, EProperty::NONE,
+    TStdoutOffset() : TProperty(P_STDOUT_OFFSET, EProperty::NONE,
             "Offset of stored stdout")
     {
         IsReadOnly = true;
@@ -696,7 +696,7 @@ public:
 
 class TStderrOffset : public TProperty {
 public:
-    TStderrOffset() : TProperty(D_STDERR_OFFSET, EProperty::NONE,
+    TStderrOffset() : TProperty(P_STDERR_OFFSET, EProperty::NONE,
             "Offset of stored stderr")
     {
         IsReadOnly = true;
@@ -710,7 +710,7 @@ public:
 
 class TStdout : public TProperty {
 public:
-    TStdout() : TProperty(D_STDOUT, EProperty::NONE,
+    TStdout() : TProperty(P_STDOUT, EProperty::NONE,
             "Read stdout [[offset][:length]]")
     {
         IsReadOnly = true;
@@ -726,7 +726,7 @@ public:
 
 class TStderr : public TProperty {
 public:
-    TStderr() : TProperty(D_STDERR, EProperty::NONE,
+    TStderr() : TProperty(P_STDERR, EProperty::NONE,
             "Read stderr [[offset][:length]])")
     {
         IsReadOnly = true;
@@ -932,7 +932,7 @@ public:
 
 class TCgroups : public TProperty {
 public:
-    TCgroups() : TProperty(D_CGROUPS, EProperty::NONE, "Cgroups") {
+    TCgroups() : TProperty(P_CGROUPS, EProperty::NONE, "Cgroups") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -1323,7 +1323,7 @@ public:
 
 class TPlaceUsage : public TProperty {
 public:
-    TPlaceUsage() : TProperty(D_PLACE_USAGE, EProperty::NONE,
+    TPlaceUsage() : TProperty(P_PLACE_USAGE, EProperty::NONE,
             "Current sum of volume space_limit: total|/place|tmpfs|lvm group|rbd: bytes;...") {
         IsReadOnly = true;
     }
@@ -1366,9 +1366,9 @@ public:
     }
 };
 
-static TVolumesList OwnerVolumes(D_OWNED_VOLUMES, &TContainer::OwnedVolumes,
+static TVolumesList OwnerVolumes(P_OWNED_VOLUMES, &TContainer::OwnedVolumes,
         "Owned volumes: volume;...");
-static TVolumesList LinedVolumes(D_LINKED_VOLUMES, &TContainer::LinkedVolumes,
+static TVolumesList LinedVolumes(P_LINKED_VOLUMES, &TContainer::LinkedVolumes,
         "Linked volumes: volume;...");
 
 class TRequiredVolumes : public TProperty {
@@ -1816,7 +1816,7 @@ public:
 
 class TCpuSetAffinity : public TProperty {
 public:
-    TCpuSetAffinity() : TProperty(D_CPU_SET_AFFINITY, EProperty::NONE,
+    TCpuSetAffinity() : TProperty(P_CPU_SET_AFFINITY, EProperty::NONE,
             "Resulting CPU affinity: [N,N-M,]...") {
         IsReadOnly = true;
     }
@@ -2182,7 +2182,7 @@ public:
 
 class TIdProperty : public TProperty {
 public:
-    TIdProperty() : TProperty(D_ID, EProperty::NONE,
+    TIdProperty() : TProperty(P_ID, EProperty::NONE,
             "Container id")
     {
         IsReadOnly = true;
@@ -2195,7 +2195,7 @@ public:
 
 class TLevelProperty : public TProperty {
 public:
-    TLevelProperty() : TProperty(D_LEVEL, EProperty::NONE,
+    TLevelProperty() : TProperty(P_LEVEL, EProperty::NONE,
             "Container level")
     {
         IsReadOnly = true;
@@ -2208,7 +2208,7 @@ public:
 
 class TAbsoluteName : public TProperty {
 public:
-    TAbsoluteName() : TProperty(D_ABSOLUTE_NAME, EProperty::NONE,
+    TAbsoluteName() : TProperty(P_ABSOLUTE_NAME, EProperty::NONE,
             "Container name including porto namespaces") {
         IsReadOnly = true;
     }
@@ -2223,7 +2223,7 @@ public:
 
 class TAbsoluteNamespace : public TProperty {
 public:
-    TAbsoluteNamespace() : TProperty(D_ABSOLUTE_NAMESPACE, EProperty::NONE,
+    TAbsoluteNamespace() : TProperty(P_ABSOLUTE_NAMESPACE, EProperty::NONE,
             "Container namespace including parent namespaces") {
         IsReadOnly = true;
     }
@@ -2235,7 +2235,7 @@ public:
 
 class TState : public TProperty {
 public:
-    TState() : TProperty(D_STATE, EProperty::STATE, "container state")
+    TState() : TProperty(P_STATE, EProperty::STATE, "container state")
     {
         IsReadOnly = true;
     }
@@ -2247,7 +2247,7 @@ public:
 
 class TOomKilled : public TProperty {
 public:
-    TOomKilled() : TProperty(D_OOM_KILLED, EProperty::OOM_KILLED,
+    TOomKilled() : TProperty(P_OOM_KILLED, EProperty::OOM_KILLED,
             "Container has been killed by OOM") {
         IsReadOnly = true;
         IsDeadOnly = true;
@@ -2263,7 +2263,7 @@ public:
 
 class TOomKills : public TProperty {
 public:
-    TOomKills() : TProperty(D_OOM_KILLS, EProperty::NONE,
+    TOomKills() : TProperty(P_OOM_KILLS, EProperty::NONE,
             "Count of tasks killed in container since start")
     {
         IsReadOnly = true;
@@ -2287,7 +2287,7 @@ public:
 
 class TCoreDumped : public TProperty {
 public:
-    TCoreDumped() : TProperty(D_CORE_DUMPED, EProperty::NONE,
+    TCoreDumped() : TProperty(P_CORE_DUMPED, EProperty::NONE,
             "Main task dumped core at exit")
     {
         IsReadOnly = true;
@@ -2347,7 +2347,7 @@ public:
 
 class TParent : public TProperty {
 public:
-    TParent() : TProperty(D_PARENT, EProperty::NONE,
+    TParent() : TProperty(P_PARENT, EProperty::NONE,
             "Parent container absolute name")
     {
         IsReadOnly = true;
@@ -2365,7 +2365,7 @@ public:
 
 class TRootPid : public TProperty {
 public:
-    TRootPid() : TProperty(D_ROOT_PID, EProperty::NONE,
+    TRootPid() : TProperty(P_ROOT_PID, EProperty::NONE,
             "Main task pid")
     {
         IsReadOnly = true;
@@ -2385,7 +2385,7 @@ public:
 
 class TExitStatusProperty : public TProperty {
 public:
-    TExitStatusProperty() : TProperty(D_EXIT_STATUS, EProperty::EXIT_STATUS,
+    TExitStatusProperty() : TProperty(P_EXIT_STATUS, EProperty::EXIT_STATUS,
             "Main task exit status")
     {
         IsReadOnly = true;
@@ -2402,7 +2402,7 @@ public:
 
 class TExitCodeProperty : public TProperty {
 public:
-    TExitCodeProperty() : TProperty(D_EXIT_CODE, EProperty::NONE,
+    TExitCodeProperty() : TProperty(P_EXIT_CODE, EProperty::NONE,
             "Main task exit code, negative: exit signal, OOM: -99")
     {
         IsReadOnly = true;
@@ -2421,7 +2421,7 @@ public:
 
 class TMemUsage : public TProperty {
 public:
-    TMemUsage() : TProperty(D_MEMORY_USAGE, EProperty::NONE,
+    TMemUsage() : TProperty(P_MEMORY_USAGE, EProperty::NONE,
             "Memory usage [bytes]")
     {
         IsReadOnly = true;
@@ -2440,7 +2440,7 @@ public:
 
 class TMemReclaimed : public TProperty {
 public:
-    TMemReclaimed() : TProperty(D_MEMORY_RECLAIMED, EProperty::NONE,
+    TMemReclaimed() : TProperty(P_MEMORY_RECLAIMED, EProperty::NONE,
             "Memory reclaimed from container [bytes]")
     {
         IsReadOnly = true;
@@ -2459,7 +2459,7 @@ public:
 
 class TAnonUsage : public TProperty {
 public:
-    TAnonUsage() : TProperty(D_ANON_USAGE, EProperty::NONE,
+    TAnonUsage() : TProperty(P_ANON_USAGE, EProperty::NONE,
             "Anonymous memory usage [bytes]")
     {
         IsReadOnly = true;
@@ -2478,7 +2478,7 @@ public:
 
 class TCacheUsage : public TProperty {
 public:
-    TCacheUsage() : TProperty(D_CACHE_USAGE, EProperty::NONE,
+    TCacheUsage() : TProperty(P_CACHE_USAGE, EProperty::NONE,
             "File cache usage [bytes]")
     {
         IsReadOnly = true;
@@ -2497,7 +2497,7 @@ public:
 
 class THugetlbUsage : public TProperty {
 public:
-    THugetlbUsage() : TProperty(D_HUGETLB_USAGE, EProperty::NONE,
+    THugetlbUsage() : TProperty(P_HUGETLB_USAGE, EProperty::NONE,
             "HugeTLB memory usage [bytes]")
     {
         IsReadOnly = true;
@@ -2519,7 +2519,7 @@ public:
 
 class TMinorFaults : public TProperty {
 public:
-    TMinorFaults() : TProperty(D_MINOR_FAULTS, EProperty::NONE,
+    TMinorFaults() : TProperty(P_MINOR_FAULTS, EProperty::NONE,
             "Minor page faults")
     {
         IsReadOnly = true;
@@ -2539,7 +2539,7 @@ public:
 
 class TMajorFaults : public TProperty {
 public:
-    TMajorFaults() : TProperty(D_MAJOR_FAULTS, EProperty::NONE,
+    TMajorFaults() : TProperty(P_MAJOR_FAULTS, EProperty::NONE,
             "Major page faults")
     {
         IsReadOnly = true;
@@ -2559,7 +2559,7 @@ public:
 
 class TMaxRss : public TProperty {
 public:
-    TMaxRss() : TProperty(D_MAX_RSS, EProperty::NONE,
+    TMaxRss() : TProperty(P_MAX_RSS, EProperty::NONE,
             "Peak anonymous memory usage [bytes]")
     {
         IsReadOnly = true;
@@ -2586,7 +2586,7 @@ public:
 
 class TCpuUsage : public TProperty {
 public:
-    TCpuUsage() : TProperty(D_CPU_USAGE, EProperty::NONE,
+    TCpuUsage() : TProperty(P_CPU_USAGE, EProperty::NONE,
             "Consumed CPU time [nanoseconds]")
     {
         IsReadOnly = true;
@@ -2605,7 +2605,7 @@ public:
 
 class TCpuSystem : public TProperty {
 public:
-    TCpuSystem() : TProperty(D_CPU_SYSTEM, EProperty::NONE,
+    TCpuSystem() : TProperty(P_CPU_SYSTEM, EProperty::NONE,
             "Consumed system CPU time [nanoseconds]")
     {
         IsReadOnly = true;
@@ -2624,7 +2624,7 @@ public:
 
 class TCpuWait : public TProperty {
 public:
-    TCpuWait() : TProperty(D_CPU_WAIT, EProperty::NONE,
+    TCpuWait() : TProperty(P_CPU_WAIT, EProperty::NONE,
             "CPU time waited for execution [nanoseconds]")
     {
         IsReadOnly = true;
@@ -2645,7 +2645,7 @@ public:
 
 class TNetClassId : public TProperty {
 public:
-    TNetClassId() : TProperty(D_NET_CLASS_ID, EProperty::NONE,
+    TNetClassId() : TProperty(P_NET_CLASS_ID, EProperty::NONE,
             "Network class: major:minor (hex)")
     {
         IsReadOnly = true;
@@ -2808,27 +2808,27 @@ public:
     }
 };
 
-TNetStatProperty NetBytes(D_NET_BYTES, &TNetStat::Bytes,
+TNetStatProperty NetBytes(P_NET_BYTES, &TNetStat::Bytes,
         "Class TX bytes: <interface>: <bytes>;...");
-TNetStatProperty NetPackets(D_NET_PACKETS, &TNetStat::Packets,
+TNetStatProperty NetPackets(P_NET_PACKETS, &TNetStat::Packets,
         "Class TX packets: <interface>: <packets>;...");
-TNetStatProperty NetDrops(D_NET_DROPS, &TNetStat::Drops,
+TNetStatProperty NetDrops(P_NET_DROPS, &TNetStat::Drops,
         "Class TX drops: <interface>: <packets>;...");
-TNetStatProperty NetOverlimits(D_NET_OVERLIMITS, &TNetStat::Overlimits,
+TNetStatProperty NetOverlimits(P_NET_OVERLIMITS, &TNetStat::Overlimits,
         "Class TX overlimits: <interface>: <packets>;...");
 
-TNetStatProperty NetRxBytes(D_NET_RX_BYTES, &TNetStat::RxBytes,
+TNetStatProperty NetRxBytes(P_NET_RX_BYTES, &TNetStat::RxBytes,
         "Device RX bytes: <interface>: <bytes>;...");
-TNetStatProperty NetRxPackets(D_NET_RX_PACKETS, &TNetStat::RxPackets,
+TNetStatProperty NetRxPackets(P_NET_RX_PACKETS, &TNetStat::RxPackets,
         "Device RX packets: <interface>: <packets>;...");
-TNetStatProperty NetRxDrops(D_NET_RX_DROPS, &TNetStat::RxDrops,
+TNetStatProperty NetRxDrops(P_NET_RX_DROPS, &TNetStat::RxDrops,
         "Device RX drops: <interface>: <packets>;...");
 
-TNetStatProperty NetTxBytes(D_NET_TX_BYTES, &TNetStat::TxBytes,
+TNetStatProperty NetTxBytes(P_NET_TX_BYTES, &TNetStat::TxBytes,
         "Device TX bytes: <interface>: <bytes>;...");
-TNetStatProperty NetTxPackets(D_NET_TX_PACKETS, &TNetStat::TxPackets,
+TNetStatProperty NetTxPackets(P_NET_TX_PACKETS, &TNetStat::TxPackets,
         "Device TX packets: <interface>: <packets>;...");
-TNetStatProperty NetTxDrops(D_NET_TX_DROPS, &TNetStat::TxDrops,
+TNetStatProperty NetTxDrops(P_NET_TX_DROPS, &TNetStat::TxDrops,
         "Device TX drops: <interface>: <packets>;...");
 
 class TIoStat : public TProperty {
@@ -2873,7 +2873,7 @@ public:
 
 class TIoReadStat : public TIoStat {
 public:
-    TIoReadStat() : TIoStat(D_IO_READ, EProperty::NONE,
+    TIoReadStat() : TIoStat(P_IO_READ, EProperty::NONE,
             "Bytes read from disk: fs|hw|<disk>|<path>: <bytes>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
@@ -2892,7 +2892,7 @@ public:
 
 class TIoWriteStat : public TIoStat {
 public:
-    TIoWriteStat() : TIoStat(D_IO_WRITE, EProperty::NONE,
+    TIoWriteStat() : TIoStat(P_IO_WRITE, EProperty::NONE,
             "Bytes written to disk: fs|hw|<disk>|<path>: <bytes>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
@@ -2911,7 +2911,7 @@ public:
 
 class TIoOpsStat : public TIoStat {
 public:
-    TIoOpsStat() : TIoStat(D_IO_OPS, EProperty::NONE,
+    TIoOpsStat() : TIoStat(P_IO_OPS, EProperty::NONE,
             "IO operations: fs|hw|<disk>|<path>: <ops>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
@@ -2930,7 +2930,7 @@ public:
 
 class TIoTimeStat : public TIoStat {
 public:
-    TIoTimeStat() : TIoStat(D_IO_TIME, EProperty::NONE,
+    TIoTimeStat() : TIoStat(P_IO_TIME, EProperty::NONE,
             "IO time: hw|<disk>|<path>: <nanoseconds>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
@@ -2941,7 +2941,7 @@ public:
 
 class TTime : public TProperty {
 public:
-    TTime() : TProperty(D_TIME, EProperty::NONE,
+    TTime() : TProperty(P_TIME, EProperty::NONE,
             "Running time [seconds]")
     {
         IsReadOnly = true;
@@ -2969,7 +2969,7 @@ public:
 
 class TCreationTime : public TProperty {
 public:
-    TCreationTime() : TProperty(D_CREATION_TIME, EProperty::NONE, "Creation time") {
+    TCreationTime() : TProperty(P_CREATION_TIME, EProperty::NONE, "Creation time") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2980,7 +2980,7 @@ public:
 
 class TStartTime : public TProperty {
 public:
-    TStartTime() : TProperty(D_START_TIME, EProperty::NONE, "Start time") {
+    TStartTime() : TProperty(P_START_TIME, EProperty::NONE, "Start time") {
         IsReadOnly = true;
     }
     TError Get(std::string &value) {
@@ -2995,7 +2995,7 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
-    TPortoStat() : TProperty(D_PORTO_STAT, EProperty::NONE, "Porto statistics") {
+    TPortoStat() : TProperty(P_PORTO_STAT, EProperty::NONE, "Porto statistics") {
         IsReadOnly = true;
         IsHidden = true;
     }
@@ -3099,7 +3099,7 @@ public:
 
 class TMemTotalLimit : public TProperty {
 public:
-    TMemTotalLimit() : TProperty(D_MEM_TOTAL_LIMIT, EProperty::NONE,
+    TMemTotalLimit() : TProperty(P_MEM_TOTAL_LIMIT, EProperty::NONE,
             "Total memory limit for container hierarchy") {
         IsReadOnly = true;
     }
@@ -3113,7 +3113,7 @@ public:
 
 class TProcessCount : public TProperty {
 public:
-    TProcessCount() : TProperty(D_PROCESS_COUNT, EProperty::NONE,
+    TProcessCount() : TProperty(P_PROCESS_COUNT, EProperty::NONE,
             "Process count")
     {
         IsReadOnly = true;
@@ -3131,7 +3131,7 @@ public:
 
 class TThreadCount : public TProperty {
 public:
-    TThreadCount() : TProperty(D_THREAD_COUNT, EProperty::NONE,
+    TThreadCount() : TProperty(P_THREAD_COUNT, EProperty::NONE,
             "Thread count")
     {
         IsReadOnly = true;

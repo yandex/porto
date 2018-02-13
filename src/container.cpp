@@ -3019,7 +3019,7 @@ TError TContainer::Load(const TKeyValue &node) {
         std::string key = kv.first;
         std::string value = kv.second;
 
-        if (key == D_STATE) {
+        if (key == P_STATE) {
             /*
              * We need to set state at the last moment
              * because properties depends on the current value
