@@ -240,7 +240,6 @@ public:
 
     TError CanGet() const;
     TError CanSet() const;
-    TError WantControllers(uint64_t controllers) const;
     TProperty(std::string name, EProperty prop, std::string desc);
 
     virtual void Init(void) {}

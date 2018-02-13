@@ -355,6 +355,7 @@ public:
 
     TError ApplyResolvConf() const;
 
+    TError EnableControllers(uint64_t controllers);
     TError HasProperty(const std::string &property) const;
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);

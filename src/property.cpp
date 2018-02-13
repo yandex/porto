@@ -82,15 +82,6 @@ TError TProperty::CanSet() const {
     return OK;
 }
 
-TError TProperty::WantControllers(uint64_t controllers) const {
-    if (CT->State == EContainerState::Stopped) {
-        CT->Controllers |= controllers;
-        CT->RequiredControllers |= controllers;
-    } else if ((CT->Controllers & controllers) != controllers)
-        return TError(EError::NotSupported, "Cannot enable controllers in runtime");
-    return OK;
-}
-
 TError TProperty::Start(void) {
     return OK;
 }
@@ -366,13 +357,9 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_BLKIO);
-        if (error)
-            return error;
-
         double val;
         std::string unit;
-        error = StringToValue(value, val, unit);
+        TError error = StringToValue(value, val, unit);
         if (error)
             return error;
 
@@ -517,12 +504,8 @@ public:
 } static MemoryGuarantee;
 
 TError TMemoryGuarantee::Set(const std::string &mem_guarantee) {
-    TError error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
     uint64_t new_val = 0lu;
-    error = StringToSize(mem_guarantee, new_val);
+    TError error = StringToSize(mem_guarantee, new_val);
     if (error)
         return error;
 
@@ -784,9 +767,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
-
-        error = StringToBool(value, CT->BindDns);
+        TError error = StringToBool(value, CT->BindDns);
         if (error)
             return error;
         CT->SetProp(EProperty::BIND_DNS);
@@ -870,17 +851,14 @@ public:
 } static Net;
 
 TError TNet::Set(const std::string &net_desc) {
-    TError error;
-
     auto new_net_desc = SplitEscapedString(net_desc, ' ', ';');
-
     TNetEnv NetEnv;
-    error = NetEnv.ParseNet(new_net_desc);
+    TError error = NetEnv.ParseNet(new_net_desc);
     if (error)
         return error;
 
     if (!NetEnv.NetInherit) {
-        error = WantControllers(CGROUP_NETCLS);
+        error = CT->EnableControllers(CGROUP_NETCLS);
         if (error)
             return error;
     }
@@ -906,8 +884,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
-        error = StringToBool(value, CT->RootRo);
+        TError error = StringToBool(value, CT->RootRo);
         if (!error)
             CT->SetProp(EProperty::ROOT_RDONLY);
         return error;
@@ -938,9 +915,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
         uint64_t val;
-        error = StringParseFlags(value, ControllersName, val, ';');
+        TError error = StringParseFlags(value, ControllersName, val, ';');
         if (error)
             return error;
         if ((val & CT->RequiredControllers) != CT->RequiredControllers)
@@ -1031,12 +1007,9 @@ public:
 } static EnvProperty;
 
 TError TEnvProperty::Set(const std::string &env_val) {
-    TError error;
-
     auto envs = SplitEscapedString(env_val, ';');
-
     TEnv env;
-    error =  env.Parse(envs, true);
+    TError error =  env.Parse(envs, true);
     if (error)
         return error;
 
@@ -1052,10 +1025,8 @@ TError TEnvProperty::Get(std::string &value) {
 }
 
 TError TEnvProperty::SetIndexed(const std::string &index, const std::string &env_val) {
-    TError error;
-
     TEnv env;
-    error = env.Parse(CT->EnvCfg, true);
+    TError error = env.Parse(CT->EnvCfg, true);
     if (error)
         return error;
 
@@ -1108,17 +1079,13 @@ public:
 } static Ip;
 
 TError TIp::Set(const std::string &ipaddr) {
-    TError error;
     auto ipaddrs = SplitEscapedString(ipaddr, ' ', ';');
-
     TNetEnv NetEnv;
-    error = NetEnv.ParseIp(ipaddrs);
+    TError error = NetEnv.ParseIp(ipaddrs);
     if (error)
         return error;
-
     CT->IpList = ipaddrs;
     CT->SetProp(EProperty::IP);
-
     return OK;
 }
 
@@ -1136,8 +1103,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
         auto list = SplitEscapedString(value, ';');
+        TError error;
 
         for (auto &str: list) {
             if (str == "any" || str == "none")
@@ -1232,11 +1199,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_DEVICES);
-        if (error)
-            return error;
         TDevices devices;
-        error = devices.Parse(value);
+        TError error = devices.Parse(value);
         if (error)
             return error;
         CT->Devices = devices;
@@ -1514,12 +1478,8 @@ public:
 } static MemoryLimit;
 
 TError TMemoryLimit::Set(const std::string &limit) {
-    TError error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
     uint64_t new_size = 0lu;
-    error = StringToSize(limit, new_size);
+    TError error = StringToSize(limit, new_size);
     if (error)
         return error;
 
@@ -1560,12 +1520,8 @@ public:
 } static AnonLimit;
 
 TError TAnonLimit::Set(const std::string &limit) {
-    TError error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
     uint64_t new_size = 0lu;
-    error = StringToSize(limit, new_size);
+    TError error = StringToSize(limit, new_size);
     if (error)
         return error;
 
@@ -1603,12 +1559,8 @@ public:
 } static DirtyLimit;
 
 TError TDirtyLimit::Set(const std::string &limit) {
-    TError error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
     uint64_t new_size = 0lu;
-    error = StringToSize(limit, new_size);
+    TError error = StringToSize(limit, new_size);
     if (error)
         return error;
 
@@ -1647,9 +1599,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_HUGETLB);
-        if (error)
-            return error;
+        TError error;
+
         if (value.empty()) {
             CT->HugetlbLimit = -1;
             CT->ClearProp(EProperty::HUGETLB_LIMIT);
@@ -1688,10 +1639,6 @@ public:
 } static RechargeOnPgfault;
 
 TError TRechargeOnPgfault::Set(const std::string &recharge) {
-    TError error = WantControllers(CGROUP_MEMORY);
-    if (error)
-        return error;
-
     bool new_val;
     if (recharge == "true")
         new_val = true;
@@ -1727,9 +1674,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
         bool val;
-        error = StringToBool(value, val);
+        TError error = StringToBool(value, val);
         if (!error && val != CT->PressurizeOnDeath) {
             CT->PressurizeOnDeath = val;
             CT->SetProp(EProperty::PRESSURIZE_ON_DEATH);
@@ -1751,12 +1697,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_CPU);
-        if (error)
-            return error;
-
         uint64_t limit;
-        error = StringToCpuPower(value, limit);
+        TError error = StringToCpuPower(value, limit);
         if (error)
             return error;
 
@@ -1796,11 +1738,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_CPU);
-        if (error)
-            return error;
         uint64_t guarantee;
-        error = StringToCpuPower(value, guarantee);
+        TError error = StringToCpuPower(value, guarantee);
         if (error)
             return error;
         if (CT->CpuGuarantee != guarantee) {
@@ -1838,11 +1777,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_CPU);
-        if (error)
-            return error;
         uint64_t val;
-        error = StringToNsec(value, val);
+        TError error = StringToNsec(value, val);
         if (error)
             return error;
         if (val < 1000000 || val > 1000000000)
@@ -1867,11 +1803,9 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
-
         double val;
         std::string unit;
-        error = StringToValue(value, val, unit);
+        TError error = StringToValue(value, val, unit);
         if (error)
             return error;
 
@@ -1922,13 +1856,9 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_CPUSET);
-        if (error)
-            return error;
-
         auto cfg = SplitEscapedString(value, ' ');
-
         auto lock = LockCpuAffinity();
+        TError error;
 
         ECpuSetType type;
         int arg = !CT->CpuSetArg;
@@ -2016,12 +1946,12 @@ public:
     TError SetMapMap(TUintMap &limit, const TUintMap &map) {
         TError error;
         if (map.count("fs")) {
-            error = WantControllers(CGROUP_MEMORY);
+            error = CT->EnableControllers(CGROUP_MEMORY);
             if (error)
                 return error;
         }
         if (map.size() > map.count("fs")) {
-            error = WantControllers(CGROUP_BLKIO);
+            error = CT->EnableControllers(CGROUP_BLKIO);
             if (error)
                 return error;
         }
@@ -2104,9 +2034,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
         bool val;
-        error = StringToBool(value, val);
+        TError error = StringToBool(value, val);
         if (error)
             return error;
         CT->AutoRespawn = val;
@@ -2128,9 +2057,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
         uint64_t val;
-        error = StringToUint64(value, val);
+        TError error = StringToUint64(value, val);
         if (error)
             return error;
         CT->RespawnCount = val;
@@ -2182,9 +2110,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
         uint64_t val;
-        error = StringToNsec(value, val);
+        TError error = StringToNsec(value, val);
         if (error)
             return error;
         CT->RespawnDelay = val;
@@ -2236,9 +2163,8 @@ public:
 } static AgingTime;
 
 TError TAgingTime::Set(const std::string &time) {
-    TError error;
     uint64_t new_time;
-    error = StringToUint64(time, new_time);
+    TError error = StringToUint64(time, new_time);
     if (error)
         return error;
 
@@ -2341,35 +2267,26 @@ public:
 
 class TWeak : public TProperty {
 public:
-    TError Set(const std::string &weak);
-    TError Get(std::string &value);
     TWeak() : TProperty(P_WEAK, EProperty::WEAK,
                         "Destroy container when client disconnects")
     {
         IsDynamic = true;
         IsAnyState = true;
     }
+    TError Get(std::string &value) {
+        value = BoolToString(CT->IsWeak);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        bool val;
+        TError error = StringToBool(value, val);
+        if (error)
+            return error;
+        CT->IsWeak = val;
+        CT->SetProp(EProperty::WEAK);
+        return OK;
+    }
 } static Weak;
-
-TError TWeak::Set(const std::string &weak) {
-    TError error;
-    if (weak == "true")
-        CT->IsWeak = true;
-    else if (weak == "false")
-        CT->IsWeak = false;
-    else
-        return TError(EError::InvalidValue, "Invalid bool value");
-
-    CT->SetProp(EProperty::WEAK);
-
-    return OK;
-}
-
-TError TWeak::Get(std::string &value) {
-    value = CT->IsWeak ? "true" : "false";
-
-    return OK;
-}
 
 /* Read-only properties derived from data filelds follow below... */
 
@@ -2464,6 +2381,7 @@ public:
     TOomKills() : TProperty(D_OOM_KILLS, EProperty::NONE, "Count of tasks killed in container since start")
     {
         IsReadOnly = true;
+        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -2520,9 +2438,8 @@ public:
                                "OOM score adjustment: -1000..1000") {
     }
     TError Set(const std::string &value) {
-        TError error;
         int val;
-        error = StringToInt(value, val);
+        TError error = StringToInt(value, val);
         if (error)
             return error;
         if (val < -1000 || val > 1000)
@@ -2614,8 +2531,8 @@ public:
     TMemUsage() : TProperty(D_MEMORY_USAGE, EProperty::NONE,
                             "current memory usage [bytes]") {
         IsReadOnly = true;
-        RequireControllers = CGROUP_MEMORY;
         IsRuntimeOnly = true;
+        RequireControllers = CGROUP_MEMORY;
     }
 } static MemUsage;
 
@@ -2884,12 +2801,8 @@ public:
         RequireControllers = CGROUP_NETCLS;
     }
     TError Set(const std::string &value) {
-        TError error = WantControllers(CGROUP_NETCLS);
-        if (error)
-            return error;
-
         TUintMap map;
-        error = StringToUintMap(value, map);
+        TError error = StringToUintMap(value, map);
         if (error)
             return error;
 
@@ -2912,9 +2825,8 @@ public:
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
-        TError error;
         uint64_t val;
-        error = StringToSize(value, val);
+        TError error = StringToSize(value, val);
         if (error)
             return TError(EError::InvalidValue, "Invalid value " + value);
 
@@ -3046,9 +2958,7 @@ public:
     }
     TError GetIndexed(const std::string &index, std::string &value) {
         TUintMap map;
-        TError error;
-
-        error = GetMap(map);
+        TError error = GetMap(map);
         if (error)
             return error;
 
@@ -3371,9 +3281,6 @@ public:
         TError error = StringToSize(value, val);
         if (error)
             return error;
-        error = WantControllers(CGROUP_PIDS);
-        if (error)
-            return error;
         CT->ThreadLimit = val;
         CT->SetProp(EProperty::THREAD_LIMIT);
         return OK;
@@ -3400,9 +3307,8 @@ public:
     }
 
     TError Set(const std::string &value) {
-        TError error;
         TStringMap map;
-        error = StringToStringMap(value, map);
+        TError error = StringToStringMap(value, map);
         if (error)
             return error;
         CT->Sysctl = map;
@@ -3411,7 +3317,6 @@ public:
     }
 
     TError SetIndexed(const std::string &index, const std::string &value) {
-        TError error;
         if (value == "")
             CT->Sysctl.erase(index);
         else

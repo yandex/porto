@@ -52,6 +52,10 @@ public:
 
     TError TaskCgroup(pid_t pid, TCgroup &cgroup) const;
     bool IsBound(const TCgroup &cgroup) const;
+
+    static std::string Format(uint64_t controllers) {
+        return StringFormatFlags(controllers, ControllersName, ";");
+    }
 };
 
 class TCgroup {

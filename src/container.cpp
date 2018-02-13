@@ -2943,8 +2943,11 @@ TError TContainer::SetProperty(const std::string &origProperty,
     CT = this;
 
     error = prop->CanSet();
-    std::string oldValue;
 
+    if (!error && prop->RequireControllers)
+        error = EnableControllers(prop->RequireControllers);
+
+    std::string oldValue;
     if (!error)
         error = prop->Get(oldValue);
 
@@ -3005,6 +3008,7 @@ TError TContainer::Save(void) {
 
 TError TContainer::Load(const TKeyValue &node) {
     EContainerState state = EContainerState::Destroyed;
+    uint64_t controllers = 0;
     TError error;
 
     CT = this;
@@ -3034,6 +3038,8 @@ TError TContainer::Load(const TKeyValue &node) {
         }
         auto prop = it->second;
 
+        controllers |= prop->RequireControllers;
+
         error = prop->Set(value);
         if (error) {
             L_ERR("Cannot load {} : {}", key, error);
@@ -3056,6 +3062,9 @@ TError TContainer::Load(const TKeyValue &node) {
     if (Level == 1 && CpusetSubsystem.Supported &&
             !(Controllers & CGROUP_CPUSET))
         Controllers |= CGROUP_CPUSET;
+
+    if (controllers & ~Controllers)
+        L_WRN("Missing cgroup controllers {}", TSubsystem::Format(controllers & ~Controllers));
 
     if (!node.Has(P_OWNER_USER) || !node.Has(P_OWNER_GROUP))
         OwnerCred = TaskCred;
@@ -3251,6 +3260,15 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
         return subsystem.RootCgroup();
 
     return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" + cg);
+}
+
+TError TContainer::EnableControllers(uint64_t controllers) {
+    if (State == EContainerState::Stopped) {
+        Controllers |= controllers;
+        RequiredControllers |= controllers;
+    } else if ((Controllers & controllers) != controllers)
+        return TError(EError::NotSupported, "Cannot enable controllers in runtime");
+    return OK;
 }
 
 bool TContainer::RecvOomEvents() {
