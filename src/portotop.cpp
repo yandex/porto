@@ -1136,6 +1136,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
     AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
     AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
+    AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%");
 
     AddColumn("C pol", "cpu_policy", "Cpu scheduler policy");
     AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores");

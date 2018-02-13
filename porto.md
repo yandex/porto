@@ -465,6 +465,8 @@ write permissions to the target or owning related volume.
 
 * **cpu\_wait** - total time waiting for execution in nanoseconds (offstream kernel feature)
 
+* **cpu\_throttled** - total throttled time in nanoseconds
+
 * **cpu\_weight** - CPU weight, syntax: 0.01..100, default: 1
 
     Multiplies cpu.shares and increase task priority/nice.

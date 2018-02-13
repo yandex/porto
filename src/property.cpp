@@ -2643,6 +2643,29 @@ public:
     }
 } static CpuWait;
 
+class TCpuThrottled : public TProperty {
+public:
+    TCpuThrottled() : TProperty(P_CPU_THROTTLED, EProperty::NONE,
+            "CPU throttled time [nanoseconds]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_CPU;
+    }
+    void Init(void) {
+        TUintMap stat;
+        IsSupported = !CpuSubsystem.RootCgroup().GetUintMap("cpu.stat", stat) && stat.count("throttled_time");
+    }
+    TError Get(std::string &value) {
+        auto cg = CT->GetCgroup(CpuSubsystem);
+        TUintMap stat;
+        TError error = cg.GetUintMap("cpu.stat", stat);
+        if (!error)
+            value = std::to_string(stat["throttled_time"]);
+        return error;
+    }
+} static CpuThrottled;
+
 class TNetClassId : public TProperty {
 public:
     TNetClassId() : TProperty(P_NET_CLASS_ID, EProperty::NONE,
