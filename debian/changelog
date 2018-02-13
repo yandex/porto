@@ -1,3 +1,24 @@
+yandex-porto (4.9.0) unstable; urgency=low
+
+  * container: stop now could be called with locked parent container
+  * container: cleanup respawning
+  * volume: save volume state before building
+  * test: ignore max_respawns changes
+  * test: respawn_count is a property now
+  * test: fix default max_respawns
+  * property: cleanup
+  * volume: empty path should not be resolved into any volume
+  * volume: fix some races
+  * property: manage controllers in container
+  * property: cleanup
+  * property: merge container "data" into properties
+  * property: rename data contants
+  * proprty: add cpu_throttled
+  * test: fix
+  * network: add network namespaces counter
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 13 Feb 2018 19:11:18 +0300
+
 yandex-porto (4.8.0) unstable; urgency=low
 
   * core: add CAP_SYS_PTRACE into ambient capabilities
