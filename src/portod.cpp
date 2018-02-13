@@ -737,6 +737,7 @@ static int Portod() {
     Statistics->ClientsCount = 0;
     Statistics->VolumesCount = 0;
     Statistics->RequestsQueued = 0;
+    Statistics->NetworksCount = 0;
 
     SetProcessName(PORTOD_NAME);
 

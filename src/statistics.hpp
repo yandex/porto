@@ -37,6 +37,7 @@ struct TStatistics {
     std::atomic<uint64_t> FailSystem;
     std::atomic<uint64_t> FailInvalidValue;
     std::atomic<uint64_t> FailInvalidCommand;
+    std::atomic<uint64_t> NetworksCount;
 };
 
 extern TStatistics *Statistics;

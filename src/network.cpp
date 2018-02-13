@@ -325,6 +325,7 @@ TNetwork::~TNetwork() {
 
 void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
     L_NET_VERBOSE("Register network {}", inode);
+    Statistics->NetworksCount++;
     auto newList = std::make_shared<std::list<std::shared_ptr<TNetwork>>>();
     for (auto &net_copy: *NetworksList)
         newList->emplace_back(net_copy);
@@ -341,6 +342,7 @@ void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
 
 void TNetwork::Unregister() {
     L_NET_VERBOSE("Unregister network {} {}", NetInode, NetName);
+    Statistics->NetworksCount--;
     auto newList = std::make_shared<std::list<std::shared_ptr<TNetwork>>>();
     for (auto &net: *NetworksList)
         if (net.get() != this)

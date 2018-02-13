@@ -1111,6 +1111,7 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddCommon(0, "Containers running: ", "porto_stat[running]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "of ", "porto_stat[containers]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Volumes: ", "porto_stat[volumes]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Networks: ", "porto_stat[networks]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Clients: ", "porto_stat[clients]", RootContainer, ValueFlags::Raw);
     AddCommon(0, "Uptime: ", "porto_stat[porto_uptime]", RootContainer, ValueFlags::Seconds);
 
