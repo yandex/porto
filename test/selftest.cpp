@@ -2916,11 +2916,7 @@ static void TestRoot(Porto::Connection &api) {
         "absolute_name",
         "absolute_namespace",
         "state",
-        "oom_killed",
-        "exit_status",
-        "stdout",
         "stdout_offset",
-        "stderr",
         "stderr_offset",
         "cpu_usage",
         "cpu_usage_system",
@@ -3011,12 +3007,13 @@ static void TestRoot(Porto::Connection &api) {
 
     ExpectApiSuccess(api.GetData(root, "state", v));
     ExpectEq(v, string("meta"));
+
     ExpectApiFailure(api.GetData(root, "exit_status", v), EError::InvalidState);
-    ExpectApiSuccess(api.GetData(root, "root_pid", v));
+    ExpectApiFailure(api.GetData(root, "oom_killed", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(root, "stdout", v), EError::InvalidData);
+    ExpectApiFailure(api.GetData(root, "stderr", v), EError::InvalidData);
     ExpectApiSuccess(api.GetData(root, "parent", v));
     ExpectEq(v, "");
-    ExpectApiFailure(api.GetData(root, "stderr", v), EError::InvalidData);
     ExpectApiSuccess(api.GetData(root, "time", v));
 
     Say() << "Check that stop on root stops all children" << std::endl;
