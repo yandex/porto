@@ -6,7 +6,6 @@ import sys
 import signal
 import time
 import subprocess
-import psutil
 import shutil
 import traceback
 from test_common import *

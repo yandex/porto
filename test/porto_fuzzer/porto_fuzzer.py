@@ -14,9 +14,7 @@ import argparse
 import subprocess
 import signal
 import functools
-import traceback
 import tarfile
-
 
 def prepare_fuzzer():
     if not os.path.exists(FUZZER_MNT):
@@ -72,257 +70,129 @@ def cleanup_fuzzer():
     if (os.path.exists(FUZZER_MNT)):
         os.rmdir(FUZZER_MNT)
 
-def fuzzer_killer(prob, timeout=180, verbose=False):
+def should_stop():
+    conn=porto.Connection(timeout=10)
+    porto_errors = get_property(conn, "/", "porto_stat[errors]", "0")
+    porto_warnings = get_property(conn, "/", "porto_stat[warnings]", "0")
+    return porto_errors != "0" or porto_warnings != "0"
 
-    if prob == 0.0:
-        sys.exit(0)
-
-    #Exit with an error if portod spawns errors after restore
-
-    conn_name = "killer[{}]:".format(os.getpid())
-
+def fuzzer_killer(stop, porto_reloads, porto_kills):
     random.seed(time.time() + os.getpid())
-    conn=porto.Connection(timeout=timeout)
-    conn.connect()
+    conn=porto.Connection(timeout=10)
+    while not stop.is_set():
+        target = select_by_weight([
+            (90, None),
+            (5, True if opts.reload else None),
+            (5, False if opts.kill else None),
+            ])
 
-    warns_value = "0"
+        if target is None:
+            pid = None
+        elif target:
+            pid = get_portod_master_pid()
+            sig = signal.SIGHUP
+            counter = porto_reloads
+        else:
+            pid = get_portod_pid()
+            sig = signal.SIGKILL
+            counter = porto_kills
 
-    try:
-        while True:
-            if random.random() < prob:
-                conn.disconnect()
+        if pid is not None:
+            os.kill(pid, sig)
+            with counter.get_lock():
+                counter.value += 1
 
-                select_by_weight(
-                    [
-                        (1, functools.partial(os.kill, get_portod_pid()[1], signal.SIGKILL)),
-                        (1, functools.partial(os.kill, get_portod_pid()[0], signal.SIGHUP))
-                    ]
-                )()
+        time.sleep(1)
 
-                time.sleep(1)
+        if should_stop():
+            stop.set();
 
-                if verbose:
-                    print "{} portod killed\n".format(conn_name),
-
-                conn.connect()
-                check_errors_present(conn, "{} ".format(conn_name))
-
-                if verbose:
-                    warns_value = check_warns_present(conn, warns_value)
-            else:
-                time.sleep(1)
-
-    except BaseException as e:
-        print "{} got {}\n".format(conn_name, e),
-        sys.exit(1)
-
-def fuzzer_main(tid, iter_num, queue,
-                verbose=False, timeout=180, print_progress=False,
-                active=False, ignore_failure=False):
-
-    retry = True
-    iter_saved = 0
-    warns_value = "0"
-    conn_name = "fuzzer%02d[%d]:" %(tid, os.getpid())
-
-    if print_progress:
-        print conn_name + " started\n",
-
-    while retry:
+def fuzzer_thread(please_stop, iter_count, fail_count):
+    random.seed(time.time() + os.getpid())
+    conn=porto.Connection(timeout=opts.timeout)
+    fail_cnt = 0
+    iter_cnt = 0;
+    while True:
+        if iter_cnt % 100 == 0 and please_stop.is_set():
+            break
+        iter_cnt += 1
         try:
-            pids = get_portod_pid()
-            conn=porto.Connection(timeout=timeout)
-            conn.connect()
-            random.seed(time.time() + os.getpid())
-
-            fail_cnt = 0
-            targets.set_verbose(verbose)
-            targets.set_active(active)
-            for i in range(iter_saved, iter_num):
-                iter_saved = i
-
-                if i > 0 and i % 100 == 0:
-                    if print_progress:
-                        print "{} completed {} of {}\n".format(conn_name, i, iter_num),
-
-                    check_portod_pid_valid(*pids)
-                    check_errors_present(conn, "{} ".format(conn_name))
-                    if verbose:
-                        warns_value = check_warns_present(conn, warns_value)
-
-                fail_cnt += select_by_weight(
-                    [
-                        (100, targets.container_action),
-                        (10, targets.volume_action),
-                        (1, targets.layer_action)
-                    ]
-                )(conn)
-
-            retry = False
-
-        except BaseException as e:
-            if not ignore_failure or type(e) is AssertionError:
-                traceback.print_exc()
-                queue.put(e)
-                sys.exit(1)
-            else:
-                iter_saved += 1
-
-    if print_progress:
-        print "{} finished, action performed: {}, invalid: {}\n".format(conn_name, iter_num, fail_cnt),
-
-    try:
-        check_errors_present(conn, "{} ".format(conn_name))
-        check_warns_present(conn, "0")
-    except porto.exceptions.SocketError:
-        pass
-
+            fail_cnt += select_by_weight([
+                (100, targets.container_action),
+                (10, targets.volume_action),
+                (1, targets.layer_action)
+            ])(conn)
+        except porto.exceptions.SocketError:
+            fail_cnt += 1
+    with iter_count.get_lock():
+        iter_count.value += iter_cnt
+    with fail_count.get_lock():
+        fail_count.value += fail_cnt
 
 parser = argparse.ArgumentParser(description="Porto fuzzing utility")
-parser.add_argument("thread_num",type=int,\
-                    help="Number of connections",\
-                    )
-parser.add_argument("iter_num",type=int,\
-                    help="Number of operations to execute per connection",\
-                    )
-parser.add_argument("--verbose", dest="verbose", action="store_true",\
-                    help="Be verbose")
-parser.add_argument("--progress", dest="progress", action="store_true",\
-                    help="Report test progress")
-parser.add_argument("--timeout", dest="timeout", default=180, type=int,\
-                    help="Timeout for each connection in seconds")
-parser.add_argument("--active", dest="active", action="store_true",\
-                    help="Start some resource-consuming apps in containers")
-parser.add_argument("--no-cleanup", dest="cleanup", action="store_false",\
-                    help="Remove containers, volumes and place after successful run")
-parser.add_argument("--kill_probability", dest="kill_prob", default=0.0, type=float,\
-                    help="Probability of fuzzer sending signal to portod, default 0.0")
+parser.add_argument("--time", default=60, type=int)
+parser.add_argument("--threads", default=100, type=int)
+parser.add_argument("--timeout", default=180, type=int)
+parser.add_argument("--verbose", action="store_true")
+parser.add_argument("--active", action="store_true")
+parser.add_argument("--no-kill", dest="kill", action="store_false")
+parser.add_argument("--no-reload", dest="reload", action="store_false")
+parser.add_argument("--no-cleanup", dest="cleanup", action="store_false")
 opts = parser.parse_args()
 
-if os.getuid() != 0:
-    print "Running as root required!"
-    sys.exit(1)
-
 prepare_fuzzer()
+
+skip_log = os.path.getsize("/var/log/portod.log")
+
+targets.set_verbose(opts.verbose)
+targets.set_active(opts.active)
 
 procs=[]
 inject_test_utils("/tmp")
 
 start_time = time.time()
-pids = get_portod_pid()
 
-kill_prob = opts.kill_prob
+stop = multiprocessing.Event()
+iter_count = multiprocessing.Value('i', 0)
+fail_count = multiprocessing.Value('i', 0)
+porto_reloads = multiprocessing.Value('i', 0)
+porto_kills = multiprocessing.Value('i', 0)
 
-kill_proc = None
+kill_proc = multiprocessing.Process(target=fuzzer_killer, args=(stop, porto_reloads, porto_kills), name="Killer")
+kill_proc.start()
 
-if kill_prob:
-    kill_proc = multiprocessing.Process(target=fuzzer_killer, args=(kill_prob,),
-                                          name="Killer",
-                                          kwargs={"timeout" : opts.timeout,
-                                                  "verbose" : opts.verbose})
-    kill_proc.start()
-
-for i in range(0, opts.thread_num):
-    q = multiprocessing.Queue()
-    proc = multiprocessing.Process(target=fuzzer_main, args=(i, opts.iter_num, q,),
-                                   name="fuzzer%02d" %(i),
-                                   kwargs={"verbose" : opts.verbose,
-                                           "timeout" : opts.timeout,
-                                           "print_progress" : opts.progress,
-                                           "active" : opts.active,
-                                           "ignore_failure" : kill_prob != 0.0})
+for i in range(0, opts.threads):
+    proc = multiprocessing.Process(target=fuzzer_thread, args=(stop, iter_count, fail_count))
     proc.start()
-    procs += [(proc, None, q)]
+    procs += [proc]
 
-retry = True
+stop.wait(opts.time)
+stop.set()
 
-try:
-    while retry:
+kill_proc.join()
+for p in procs:
+    p.join()
 
-        time.sleep(0.3)
-        retry = False
+conn = porto.Connection(timeout=30)
 
-        if kill_proc is not None:
-            kill_proc.join(0.001)
+print "Running time", time.time() - start_time
+print "Iterations", iter_count.value
+print "Fails", fail_count.value
+print "Reloads", porto_reloads.value
+print "Kills", porto_kills.value
+print "Errors", get_property(conn, "/", "porto_stat[errors]")
+print "Warnings", get_property(conn, "/", "porto_stat[warnings]")
+print "Spawned", get_property(conn, "/", "porto_stat[spawned]")
+print "RestoreFailed", get_property(conn, "/", "porto_stat[restore_failed]")
 
-            if kill_proc.exitcode is not None:
-                raise BaseException("killer[{}] returns exit code: {},"\
-                                    " terminating".format(kill_proc.pid,
-                                                          kill_proc.exitcode))
+failed = get_property(conn, "/", "porto_stat[errors]") != "0" or get_property(conn, "/", "porto_stat[warnings]") != "0"
 
-        for p in procs:
-            if p[1] is None:
-                p[0].join(0.001)
-
-                if p[0].exitcode is not None:
-                    p = (p[0], p[0].exitcode, p[2])
-                    if p[1] > 0:
-                        raise BaseException("{}[{}] finished with: {}".format(p[0].name,
-                                                                              p[0].pid, p[2].get()))
-                else:
-                    retry = True
-
-except (KeyboardInterrupt, SystemExit):
-    print "Exiting...\n",
-    for p in procs:
-        if p[1] is None:
-            p[0].terminate()
-            p[0].join()
-
-    if kill_proc is not None:
-        kill_proc.terminate()
-        kill_proc.join()
-
-    sys.exit(1)
-
-except BaseException as e:
-    try:
-        print "checking portod pids...\n",
-        if kill_proc is None:
-            check_portod_pid_valid(*pids)
-        msg = "\nfuzzer FAIL : {}".format(e)
-        print msg
-        print "\nportod-master stacktrace:\n\n",
-        print_stacktrace(pids[0])
-        print "\nportod stacktrace:\n\n",
-        print_stacktrace(pids[1])
-        print msg
-        print_logged_errors()
-    except BaseException as e2:
-        print "fuzzer FAIL : {}\n".format(e2),
-
-    for p in procs:
-        if p[1] is None:
-            p[0].terminate()
-            p[0].join()
-
-    if kill_proc is not None:
-        kill_proc.terminate()
-        kill_proc.join()
-
-    sys.exit(1)
-
-if kill_proc is not None:
-    kill_proc.terminate()
-    kill_proc.join()
-
-running_time = time.time() - start_time
-rps = (opts.thread_num * opts.iter_num) / running_time
-
-print "Running time: {}\n".format(running_time),
-print "Total average rps: {}\n".format(rps),
-print "Finish iterating\n",
-print_logged_errors()
+print ("--- log ---")
+os.system("tail -c +{} /var/log/portod.log | grep -wE 'WRN|ERR|STK'".format(skip_log))
+print ("--- end ---")
 
 if opts.cleanup:
-    print "Performing cleanup: ",
-    try:
-        cleanup_fuzzer()
-        print "OK"
-    except BaseException as e:
-        print "FAIL"
-        print e
-        sys.exit(1)
+    cleanup_fuzzer()
 
-print "fuzzer with {} threads and {} iterations pass OK\n".format(opts.thread_num, opts.iter_num),
-
+if failed:
+    sys.exit(1)

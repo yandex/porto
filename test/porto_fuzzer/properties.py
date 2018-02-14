@@ -5,14 +5,15 @@ import targets
 
 import pwd
 import grp
-import psutil
 import sys
 
 ACTIVE=False
 ACTIVE_IO=False
 
+cpunr = 32
+ramsize = 32 << 30
+
 def Command():
-    cpunr = psutil.cpu_count()
     return ("command",
             select_by_weight( [
                 (2, "sleep " + str(
@@ -88,47 +89,44 @@ def EnablePorto():
                                                (2, "child-only")] ))
 
 def MemoryLimit():
-    total = psutil.virtual_memory().total
     return ("memory_limit", str(
             select_by_weight( [
-                (3, randint(total / 32, total / 2)),
-                (3, randint(total / 2, total)),
-                (1, randint(total + 1, sys.maxint)),
-                (2, randint(0, total / 32))
+                (3, randint(ramsize / 32, ramsize / 2)),
+                (3, randint(ramsize / 2, ramsize)),
+                (1, randint(ramsize + 1, sys.maxint)),
+                (2, randint(0, ramsize / 32))
             ] )
         )
     )
 
 def MemoryGuarantee():
-    avail = psutil.virtual_memory().available
     return ("memory_guarantee", str(
             select_by_weight( [
-                (3, randint(avail / 32, avail / 2)),
-                (3, randint(avail / 2, avail)),
-                (1, randint(avail + 1, sys.maxint)),
-                (2, randint(0, avail / 32))
+                (1, 0),
+                (3, randint(ramsize / 32, ramsize / 2)),
+                (3, randint(ramsize / 2, ramsize)),
+                (1, randint(ramsize + 1, sys.maxint)),
+                (2, randint(0, ramsize / 32))
             ] )
         )
     )
 
 def AnonLimit():
-    total = psutil.virtual_memory().total
     return ("anon_limit", str(
             select_by_weight( [
-                (6, randint(total / 32, total) / PAGE_SIZE),
-                (1, randint(0, total / 32) / PAGE_SIZE),
-                (1, randint(total + 1, sys.maxint) / PAGE_SIZE)
+                (6, randint(ramsize / 32, ramsize) / PAGE_SIZE),
+                (1, randint(0, ramsize / 32) / PAGE_SIZE),
+                (1, randint(ramsize + 1, sys.maxint) / PAGE_SIZE)
             ] )
         )
     )
 
 def DirtyLimit():
-    total = psutil.virtual_memory().total
     return ("dirty_limit", str(
             select_by_weight( [
-                (6, randint(total / 32, total) / PAGE_SIZE),
-                (1, randint(0, total / 32) / PAGE_SIZE),
-                (1, randint(total + 1, sys.maxint) / PAGE_SIZE)
+                (6, randint(ramsize / 32, ramsize) / PAGE_SIZE),
+                (1, randint(0, ramsize / 32) / PAGE_SIZE),
+                (1, randint(ramsize + 1, sys.maxint) / PAGE_SIZE)
             ] )
         )
     )
@@ -137,7 +135,6 @@ def RechargeOnPgfault():
     return ("recharge_on_pgfault", select_equal(["true", "false"]) )
 
 def CpuLimit():
-    cpunr = psutil.cpu_count()
     return ("cpu_limit",
             select_by_weight( [
                 (12, select_by_weight( [
@@ -153,17 +150,15 @@ def CpuLimit():
    )
 
 def CpuGuarantee():
-    util = psutil.cpu_percent()
-    cpunr = psutil.cpu_count()
     return ("cpu_guarantee",
             select_by_weight( [
                 (12, select_equal( [
-                    str( randint(0, int(util * cpunr)) ),
-                    str( randf() * util ) + "c"
+                    str( randint(0, cpunr * 100) ),
+                    str( randf() ) + "c"
                 ] ) ),
                 (1, select_equal(["0", "0c"])),
                 (2, select_equal( [
-                    str( randint(int(util * cpunr), sys.maxint) ),
+                    str( randint(int(cpunr * 100), sys.maxint) ),
                     str( randf() * randint(1, sys.maxint) )
                 ] ) )
             ] )

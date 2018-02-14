@@ -26,13 +26,13 @@ TAR1 = FUZZER_MNT + "/l1.tar"
 TAR2 = FUZZER_MNT + "/l2.tar"
 
 def randint(a, b):
-   return random.randint(a, b)
+    return random.randint(a, b)
 
 def randf():
-   return random.random()
+    return random.random()
 
 def get_random_str(length):
-   return ''.join(random.choice(string.lowercase) for i in range(length))
+    return ''.join(random.choice(string.lowercase) for i in range(length))
 
 def select_by_weight(wlist):
     total = reduce(lambda res, x: res + x[0], wlist, 0)
@@ -92,16 +92,21 @@ dd if=/dev/zero of=./zeroes bs=$1 count=$2
 
 def get_portod_pid():
     try:
-        slave = int(open("/run/portod.pid").read())
+        return int(open("/run/portod.pid").read())
     except:
-        slave = None
+        return None
 
+def get_portod_master_pid():
     try:
-        master = int(open("/run/portoloop.pid").read())
+        return int(open("/run/portoloop.pid").read())
     except:
-        master = None
+        return None
 
-    return (master, slave)
+def get_property(conn, ct, prop, fallback=None):
+    try:
+        return conn.GetProperty(ct, prop)
+    except:
+        return fallback
 
 def check_errors_present(conn, hdr):
     try:
@@ -186,16 +191,3 @@ def print_stacktrace(pid):
                             "-ex", "thread apply all bt full",
                             "-ex", "set confirm off",
                             "-ex", "quit", "-q", "-p", str(pid)])
-
-def print_logged_errors():
-    errors = None
-    try:
-        errors = porto.Connection(timeout=30).GetProperty("/", "porto_stat[errors]")
-    except:
-        pass
-    if errors != "0":
-        print "Errors:", errors
-        try:
-            subprocess.call(["grep", "-wE", "WRN|ERR", "/var/log/portod.log"])
-        except:
-            pass

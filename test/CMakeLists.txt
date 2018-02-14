@@ -94,7 +94,6 @@ ADD_PYTHON_TEST(performance)
 
 add_test(NAME fuzzer
          COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
-         --timeout 300 32 2000
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # tail
