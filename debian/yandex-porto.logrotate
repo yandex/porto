@@ -8,6 +8,7 @@
 
 	postrotate
 		[ -f /run/portod.pid ] && kill -USR1 `cat /run/portod.pid`
+		[ -f /run/portoloop.pid ] && kill -USR1 `cat /run/portoloop.pid`
 	endscript
 
 }

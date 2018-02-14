@@ -1124,9 +1124,12 @@ static void SpawnPortod(std::shared_ptr<TEpollLoop> loop) {
                 RespawnPortod = false;
                 goto exit;
             }
-            case SIGUSR1:
+            case SIGUSR1: {
                 OpenLog(PORTO_LOG);
+                if (kill(PortodPid, signo) < 0)
+                    L_ERR("Cannot kill portod: {}", TError::System("kill"));
                 break;
+            }
             case SIGUSR2:
                 DumpMallocInfo();
                 break;
