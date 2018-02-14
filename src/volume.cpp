@@ -1459,13 +1459,13 @@ TError TVolume::ClaimPlace(uint64_t size) {
 
 TError TVolume::DependsOn(const TPath &path) {
     if (State == EVolumeState::Ready && !path.Exists())
-        return TError("dependecy path " + path.ToString() + " not found");
+        return TError("Required path {} not found", path);
 
     for (auto it = Volumes.rbegin(); it != Volumes.rend(); ++it) {
         auto &vol = it->second;
         if (path.IsInside(vol->Path)) {
             if (vol->State != EVolumeState::Ready)
-                return TError(EError::VolumeNotReady, "Volume not ready: " + vol->Path.ToString());
+                return TError(EError::VolumeNotReady, "Required volume {} not ready", vol->Path);
             vol->Nested.insert(shared_from_this());
             break;
         }
@@ -2684,11 +2684,14 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     if (error)
         return error;
 
-    error = volume->CheckDependencies();
-    if (error)
-        return error;
-
+    /* also check if volume depends on itself */
     Volumes[volume->Path] = volume;
+
+    error = volume->CheckDependencies();
+    if (error) {
+        Volumes.erase(volume->Path);
+        return error;
+    }
 
     volume->VolumeOwnerContainer = owner;
     owner->OwnedVolumes.push_back(volume);
