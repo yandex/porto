@@ -2565,9 +2565,6 @@ TError TVolume::Restore(const TKeyValue &node) {
     else if (!UserStorage() && !RemoteStorage())
         StoragePath = TStorage(Place, PORTO_STORAGE, Storage).Path;
 
-    if (State != EVolumeState::Ready)
-        return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
-
     error = OpenBackend();
     if (error)
         return error;
@@ -2832,6 +2829,12 @@ void TVolume::RestoreAll(void) {
             continue;
         }
 
+        if (volume->State != EVolumeState::Ready) {
+            L("Volume {} is not ready ({}) and will be removed", volume->Path, StateName(volume->State));
+            broken_volumes.push_back(volume);
+            continue;
+        }
+
         L("Volume {} restored", volume->Path);
     }
 
@@ -2904,12 +2907,9 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
             Path = prop.second;
 
         } else if (prop.first == V_AUTO_PATH) {
-            if (prop.second == "true")
-                IsAutoPath = true;
-            else if (prop.second == "false")
-                IsAutoPath = false;
-            else
-                return TError(EError::InvalidValue, "Invalid bool value");
+            error = StringToBool(prop.second, IsAutoPath);
+            if (error)
+                return error;
 
         } else if (prop.first == V_STORAGE) {
             Storage = prop.second;
