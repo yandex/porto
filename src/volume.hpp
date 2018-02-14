@@ -121,7 +121,9 @@ public:
     uint64_t InodeLimit = 0;
     uint64_t InodeGuarantee = 0;
 
+    /* protected with VolumesLock */
     std::shared_ptr<TContainer> VolumeOwnerContainer;
+
     TCred VolumeOwner;
     TCred VolumeCred;
     unsigned VolumePerms = 0;

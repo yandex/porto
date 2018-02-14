@@ -2024,9 +2024,6 @@ TError TVolume::Destroy(bool strict) {
 
         Volumes.erase(volume->Path);
 
-        volume->VolumeOwnerContainer->OwnedVolumes.remove(volume);
-        volume->VolumeOwnerContainer = nullptr;
-
         while (!volume->Links.empty()) {
             auto name = volume->Links.begin()->first;
             volume->Links.erase(name);
@@ -2048,6 +2045,11 @@ TError TVolume::Destroy(bool strict) {
                 if (vol_iter != container->LinkedVolumes.end())
                     container->LinkedVolumes.erase(vol_iter);
             }
+        }
+
+        if (volume->VolumeOwnerContainer) {
+            volume->VolumeOwnerContainer->OwnedVolumes.remove(volume);
+            volume->VolumeOwnerContainer = nullptr;
         }
 
         volumes_lock.unlock();
@@ -2378,13 +2380,12 @@ void TVolume::UnlinkAllVolumes(TContainer &container) {
         volumes_lock.lock();
     }
 
-    if (!container.OwnedVolumes.empty() && container.Parent) {
-        for (auto &volume: container.OwnedVolumes) {
-            volume->VolumeOwnerContainer = container.Parent;
-            container.Parent->OwnedVolumes.push_back(volume);
-        }
-        container.OwnedVolumes.clear();
+    for (auto &volume: container.OwnedVolumes) {
+        volume->VolumeOwnerContainer = container.Parent;
+        if (volume->VolumeOwnerContainer)
+            volume->VolumeOwnerContainer->OwnedVolumes.push_back(volume);
     }
+    container.OwnedVolumes.clear();
 }
 
 TError TVolume::CheckRequired(const TTuple &paths) {
@@ -2484,17 +2485,19 @@ TError TVolume::Save() {
     node.Set(V_STORAGE, Storage);
     node.Set(V_BACKEND, BackendType);
 
-    /*
-     * Older porto versions afraid volumes with unknown properties.
-     * Save owner container into first word in creator.
-     */
-    if (config().volumes().owner_container_migration_hack()) {
-        auto creator = SplitEscapedString(Creator, ' ');
-        creator[0] = VolumeOwnerContainer->Name;
-        node.Set(V_CREATOR, MergeEscapeStrings(creator, ' '));
-    } else {
-        node.Set(V_CREATOR, Creator);
-        node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
+    if (VolumeOwnerContainer) {
+        /*
+         * Older porto versions afraid volumes with unknown properties.
+         * Save owner container into first word in creator.
+         */
+        if (config().volumes().owner_container_migration_hack()) {
+            auto creator = SplitEscapedString(Creator, ' ');
+            creator[0] = VolumeOwnerContainer->Name;
+            node.Set(V_CREATOR, MergeEscapeStrings(creator, ' '));
+        } else {
+            node.Set(V_CREATOR, Creator);
+            node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
+        }
     }
 
     node.Set(V_OWNER_USER, VolumeOwner.User());
