@@ -1220,6 +1220,8 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_fail_invalid_value(Statistics->FailInvalidValue);
     rsp->set_fail_invalid_command(Statistics->FailInvalidCommand);
 
+    rsp->set_network_count(Statistics->NetworksCount);
+
     return OK;
 }
 
