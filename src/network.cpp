@@ -1682,8 +1682,14 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
                 return OK;
             return error;
         }
-    } else
-        return TError(EError::InvalidState, "Cannot restore network: task not found");
+    } else {
+        /* FIXME kludge for restoring dead container, add dead network for that */
+        L("Cannot restore network. Task is dead. Create fake netns.");
+        TNamespaceFd netns;
+        error = TNetwork::New(netns, net);
+        if (error)
+            return error;
+    }
 
     error = env.Parse(ct);
     if (error)
