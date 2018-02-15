@@ -2474,6 +2474,11 @@ TError TVolume::Save() {
 
     auto volumes_lock = LockVolumes();
 
+    if (State == EVolumeState::ToDestroy ||
+            State == EVolumeState::Destroying ||
+            State == EVolumeState::Destroyed)
+        return OK;
+
     /*
      * Storing all state values on save,
      * the previous scheme stored knobs selectively.
