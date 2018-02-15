@@ -2821,12 +2821,6 @@ void TVolume::RestoreAll(void) {
             continue;
         }
 
-        if (!volume->Links.size()) {
-            L_WRN("Volume {} has no containers", volume->Path);
-            broken_volumes.push_back(volume);
-            continue;
-        }
-
         error = volume->CheckDependencies();
         if (error) {
             L_WRN("Volume {} has broken dependcies: {}", volume->Path, error);
@@ -2836,6 +2830,12 @@ void TVolume::RestoreAll(void) {
 
         if (volume->State != EVolumeState::Ready) {
             L("Volume {} is not ready ({}) and will be removed", volume->Path, StateName(volume->State));
+            broken_volumes.push_back(volume);
+            continue;
+        }
+
+        if (!volume->Links.size()) {
+            L_WRN("Volume {} has no linked containers", volume->Path);
             broken_volumes.push_back(volume);
             continue;
         }
