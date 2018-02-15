@@ -79,7 +79,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareOomMonitor();
     void ShutdownOom();
     TError PrepareCgroups();
-    TError ConfigureDevices();
     TError PrepareTask(TTaskEnv &TaskEnv);
 
     TError PrepareResources();

@@ -1762,27 +1762,6 @@ TError TContainer::ApplyDeviceConf() const {
     TCgroup cg = GetCgroup(DevicesSubsystem);
     TError error;
 
-    error = Devices.Permitted(CL->Cred);
-    if (error)
-        return error;
-
-    error = Devices.Apply(cg);
-    if (error)
-        return error;
-
-    if (!RootPath.IsRoot()) {
-        error = Devices.Makedev(fmt::format("/proc/{}/root", WaitTask.Pid));
-        if (error)
-            return error;
-    }
-
-    return OK;
-}
-
-TError TContainer::ConfigureDevices() {
-    auto cg = GetCgroup(DevicesSubsystem);
-    TError error;
-
     if (IsRoot())
         return OK;
 
@@ -1790,17 +1769,15 @@ TError TContainer::ConfigureDevices() {
     if (error)
         return error;
 
-    /* Nested cgroup makes a copy from parent at creation */
-
-    if (Parent->IsRoot() && (Controllers & CGROUP_DEVICES)) {
-        error = RootContainer->Devices.Apply(cg, true);
-        if (error)
-            return error;
-    }
-
     error = Devices.Apply(cg);
     if (error)
         return error;
+
+    if (State != EContainerState::Starting && WaitTask.Pid && !RootPath.IsRoot()) {
+        error = Devices.Makedev(fmt::format("/proc/{}/root", WaitTask.Pid));
+        if (error)
+            return error;
+    }
 
     return OK;
 }
@@ -1882,6 +1859,14 @@ TError TContainer::PrepareCgroups() {
             L_ERR("Can't prepare OOM monitoring: {}", error);
             return error;
         }
+    }
+
+    /* Nested cgroup makes a copy from parent at creation */
+    if (Level == 1 && (Controllers & CGROUP_DEVICES)) {
+        TCgroup devcg = GetCgroup(DevicesSubsystem);
+        error = RootContainer->Devices.Apply(devcg, true);
+        if (error)
+            return error;
     }
 
     if (Controllers & CGROUP_NETCLS) {
@@ -1999,12 +1984,6 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     }
 
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
-
-    error = ConfigureDevices();
-    if (error) {
-        L_ERR("Cannot configure devices: {}", error);
-        return error;
-    }
 
     if (IsMeta() || TaskEnv.TripleFork || TaskEnv.QuadroFork) {
         TPath exe("/proc/self/exe");
