@@ -92,6 +92,10 @@ add_test(NAME leaks
 
 ADD_PYTHON_TEST(performance)
 
+add_test(NAME fuzzer_soft
+         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py --no-kill
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
 add_test(NAME fuzzer
          COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -u ${CMAKE_SOURCE_DIR}/test/porto_fuzzer/porto_fuzzer.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
