@@ -74,26 +74,6 @@ TError TCgroup::Create() {
     return error;
 }
 
-TError TCgroup::SetSuffix(const std::string suffix) {
-    auto dir = Path().DirName();
-    auto basename = Path().BaseName();
-    auto pos = basename.find('#');
-
-    if (pos != std::string::npos)
-        basename = basename.substr(0, pos);
-
-    if (suffix.size())
-        basename += "#" + suffix;
-
-    auto error = Path().Rename(dir / basename);
-
-    if (!error)
-        Name = (TPath(Name).DirName() / basename).ToString();
-
-    return error;
-}
-
-
 TError TCgroup::Remove() {
     if (Subsystem->Kind & CGROUP_SYSTEMD) {
         std::vector<TCgroup> children;
@@ -114,7 +94,6 @@ TError TCgroup::Remove() {
 
 TError TCgroup::RemoveOne() {
     struct stat st;
-    uint64_t count = 0;
     TError error;
 
     if (Secondary())
@@ -123,20 +102,12 @@ TError TCgroup::RemoveOne() {
     L_CG("Remove cgroup {}", *this);
     error = Path().Rmdir();
 
-    //FIXME CLEANUP
-
     /* workaround for bad synchronization */
-    if (error && error.Errno == EBUSY &&
-        !Path().StatStrict(st) && st.st_nlink == 2) {
-        uint64_t deadline = GetCurrentTimeMs() +
-                            config().daemon().cgroup_remove_timeout_s() * 1000;
-
+    if (error && error.Errno == EBUSY && !Path().StatStrict(st) && st.st_nlink == 2) {
+        uint64_t deadline = GetCurrentTimeMs() + config().daemon().cgroup_remove_timeout_s() * 1000;
         do {
-            (void)SetSuffix(std::to_string(count++));
             (void)KillAll(SIGKILL);
-
             error = Path().Rmdir();
-
             if (!error || error.Errno != EBUSY)
                 break;
         } while (!WaitDeadline(deadline));
