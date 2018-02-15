@@ -1734,17 +1734,6 @@ TError TContainer::ApplyDynamicProperties() {
     return OK;
 }
 
-std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
-    auto p = Parent;
-    while (p) {
-        if (p->Task.Pid)
-            return p;
-        p = p->Parent;
-    }
-
-    return nullptr;
-}
-
 void TContainer::ShutdownOom() {
     if (Source)
         EpollLoop->RemoveSource(Source->Fd);
@@ -1943,7 +1932,6 @@ TError TContainer::GetEnvironment(TEnv &env) const {
 }
 
 TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
-    auto parent = FindRunningParent();
     TError error;
 
     TaskEnv.CT = shared_from_this();
@@ -2015,8 +2003,12 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         return error;
     }
 
-    if (parent) {
-        pid_t pid = parent->Task.Pid;
+    auto target = Parent;
+    while (target && !target->Task.Pid)
+        target = target->Parent;
+
+    if (target) {
+        pid_t pid = target->Task.Pid;
 
         error = TaskEnv.IpcFd.Open(pid, "ns/ipc");
         if (error)
@@ -2153,69 +2145,62 @@ TError TContainer::StartTask() {
     if (error)
         return error;
 
-    /* Meta container without namespaces don't need task */
-    if (IsMeta() && !Isolate && NetInherit && !TaskEnv.NewMountNs)
-        return OK;
-
     error = PrepareTask(TaskEnv);
     if (error)
         return error;
 
+    /* Meta container without namespaces don't need task */
+    if (IsMeta() && !Isolate && NetInherit && !TaskEnv.NewMountNs)
+        return OK;
+
     error = TaskEnv.Start();
 
     /* Always report OOM stuation if any */
-    if (error && RecvOomEvents()) {
-        if (error)
-            L("Start error: {}", error);
-        return TError(EError::InvalidValue, ENOMEM, "OOM, memory limit too low");
-    }
+    if (error && RecvOomEvents())
+        error = TError(EError::ResourceNotAvailable, "OOM at container {} start: {}", Name, error);
 
     return error;
 }
 
-TError TContainer::Start() {
+TError TContainer::StartParents() {
     TError error;
 
-    PORTO_ASSERT(IsLocked());
+    if (!Parent)
+        return OK;
 
-    for (auto p = Parent; p && p->State == EContainerState::Stopped; p = p->Parent) {
-        error = CL->WriteContainer(ROOT_PORTO_NAMESPACE + p->Name, p);
+    auto cg = Parent->GetCgroup(FreezerSubsystem);
+    if (FreezerSubsystem.IsFrozen(cg))
+        return TError(EError::InvalidState, "Parent container is frozen");
+
+    if (Parent->State == EContainerState::Running ||
+            Parent->State == EContainerState::Meta)
+        return OK;
+
+    std::shared_ptr<TContainer> target;
+    do {
+        target = Parent;
+        while (target->Parent && target->Parent->State != EContainerState::Running &&
+                target->Parent->State != EContainerState::Meta)
+            target = target->Parent;
+
+        error = CL->LockContainer(target);
         if (error)
             return error;
-    }
 
-    if (State != EContainerState::Stopped)
-        return TError(EError::InvalidState, "Cannot start, container is not stopped: " + Name);
-
-    if (Parent) {
-
-        /* Automatically start parent container */
-        if (Parent->State == EContainerState::Stopped) {
-            error = Parent->Start();
-            if (error)
-                return error;
-        }
-
-        if (Parent->State == EContainerState::Paused)
-            return TError(EError::InvalidState, "Parent container is paused: " + Parent->Name);
-
-        if (Parent->State != EContainerState::Running &&
-                Parent->State != EContainerState::Meta)
-            return TError(EError::InvalidState, "Parent container is not running: " + Parent->Name);
-
-        auto cg = Parent->GetCgroup(FreezerSubsystem);
-        if (FreezerSubsystem.IsFrozen(cg))
-            return TError(EError::InvalidState, "Parent container is frozen");
-    } else {
-        error = DistributeCpus();
+        error = target->Start();
         if (error)
             return error;
-    }
+    } while (target != Parent);
 
-    /* Extra check */
+    return OK;
+}
+
+TError TContainer::PrepareStart() {
+    TError error;
+
     error = CL->CanControl(OwnerCred);
     if (error)
-        return TError(error, "Cannot start container {}", Name);
+        return error;
 
     /* Normalize root path */
     if (Parent) {
@@ -2265,7 +2250,7 @@ TError TContainer::Start() {
         error = OK;
 
     if (error)
-        return TError(error, "Cannot start container {}", Name);
+        return error;
 
     /* Even without capabilities user=root require chroot */
     if (RootPath.IsRoot() && TaskCred.IsRootUser() && !OwnerCred.IsRootUser())
@@ -2298,15 +2283,26 @@ TError TContainer::Start() {
             Place = {PORTO_PLACE};
     }
 
-    error = StartOne();
-    if (error)
-        Statistics->ContainersFailedStart++;
-
-    return error;
+    return OK;
 }
 
-TError TContainer::StartOne() {
+TError TContainer::Start() {
     TError error;
+
+    if (State != EContainerState::Stopped)
+        return TError(EError::InvalidState, "Cannot start container {} in state {}", Name, StateName(State));
+
+    error = StartParents();
+    if (error)
+        return error;
+
+    PORTO_ASSERT(IsLocked());
+
+    error = PrepareStart();
+    if (error) {
+        error = TError(error, "Cannot prepare start for container {}", Name);
+        goto out;
+    }
 
     L_ACT("Start CT{}:{}", Id, Name);
 
@@ -2319,7 +2315,7 @@ TError TContainer::StartOne() {
     error = PrepareResources();
     if (error) {
         SetState(EContainerState::Stopped);
-        return error;
+        goto out;
     }
 
     CL->LockedContainer->DowngradeLock();
@@ -2332,7 +2328,7 @@ TError TContainer::StartOne() {
         (void)Terminate(0);
         SetState(EContainerState::Stopped);
         FreeResources();
-        return error;
+        goto out;
     }
 
     if (IsMeta())
@@ -2342,19 +2338,29 @@ TError TContainer::StartOne() {
 
     SetProp(EProperty::ROOT_PID);
 
-    Statistics->ContainersStarted++;
-
     error = Save();
     if (error) {
         L_ERR("Cannot save state after start {}", error);
         (void)Reap(false);
     }
 
+out:
+    if (error)
+        Statistics->ContainersFailedStart++;
+    else
+        Statistics->ContainersStarted++;
+
     return error;
 }
 
 TError TContainer::PrepareResources() {
     TError error;
+
+    if (IsRoot()) {
+        error = DistributeCpus();
+        if (error)
+            return error;
+    }
 
     error = CheckMemGuarantee();
     if (error)

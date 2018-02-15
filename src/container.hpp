@@ -81,7 +81,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareCgroups();
     TError ConfigureDevices();
     TError PrepareTask(TTaskEnv &TaskEnv);
-    TError StartOne();
 
     TError PrepareResources();
     void FreeRuntimeResources();
@@ -341,7 +340,10 @@ public:
     TError GetProcessCount(uint64_t &count) const;
 
     TError StartTask();
+    TError StartParents();
+    TError PrepareStart();
     TError Start();
+
     TError Stop(uint64_t timeout);
     TError Pause();
     TError Resume();
@@ -369,7 +371,6 @@ public:
     TError Load(const TKeyValue &node);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
-    std::shared_ptr<TContainer> FindRunningParent() const;
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
