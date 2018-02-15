@@ -110,6 +110,51 @@ static int ChildFn(void *arg) {
     return EXIT_FAILURE;
 }
 
+TError TTaskEnv::OpenNamespaces(TContainer &ct) {
+    TError error;
+
+    auto target = &ct;
+    while (target && !target->Task.Pid)
+        target = target->Parent.get();
+
+    if (!target)
+        return OK;
+
+    pid_t pid = target->Task.Pid;
+
+    error = IpcFd.Open(pid, "ns/ipc");
+    if (error)
+        return error;
+
+    error = UtsFd.Open(pid, "ns/uts");
+    if (error)
+        return error;
+
+    if (NetFd.GetFd() < 0) {
+        error = NetFd.Open(pid, "ns/net");
+        if (error)
+            return error;
+    }
+
+    error = PidFd.Open(pid, "ns/pid");
+    if (error)
+        return error;
+
+    error = MntFd.Open(pid, "ns/mnt");
+    if (error)
+        return error;
+
+    error = RootFd.Open(pid, "root");
+    if (error)
+        return error;
+
+    error = CwdFd.Open(pid, "cwd");
+    if (error)
+        return error;
+
+    return OK;
+}
+
 TError TTaskEnv::ChildExec() {
 
     /* set environment for wordexp */

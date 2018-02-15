@@ -1964,7 +1964,10 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     if (error)
         return error;
 
-    TaskEnv.TripleFork = false;
+    /* one more fork for creating nested pid-namespace */
+    TaskEnv.TripleFork = Isolate && TaskEnv.PidFd.GetFd() >= 0 &&
+        TaskEnv.PidFd.Inode() != TNamespaceFd::PidInode(getpid(), "ns/pid");
+
     TaskEnv.QuadroFork = !OsMode && !IsMeta();
 
     TaskEnv.Mnt.BindMounts = BindMounts;
@@ -2001,48 +2004,6 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     if (error) {
         L_ERR("Cannot configure devices: {}", error);
         return error;
-    }
-
-    auto target = Parent;
-    while (target && !target->Task.Pid)
-        target = target->Parent;
-
-    if (target) {
-        pid_t pid = target->Task.Pid;
-
-        error = TaskEnv.IpcFd.Open(pid, "ns/ipc");
-        if (error)
-            return error;
-
-        error = TaskEnv.UtsFd.Open(pid, "ns/uts");
-        if (error)
-            return error;
-
-        if (NetInherit) {
-            error = TaskEnv.NetFd.Open(pid, "ns/net");
-            if (error)
-                return error;
-        }
-
-        error = TaskEnv.PidFd.Open(pid, "ns/pid");
-        if (error)
-            return error;
-
-        error = TaskEnv.MntFd.Open(pid, "ns/mnt");
-        if (error)
-            return error;
-
-        error = TaskEnv.RootFd.Open(pid, "root");
-        if (error)
-            return error;
-
-        error = TaskEnv.CwdFd.Open(pid, "cwd");
-        if (error)
-            return error;
-
-        /* one more fork for creating nested pid-namespace */
-        if (Isolate && TaskEnv.PidFd.Inode() != TNamespaceFd::PidInode(getpid(), "ns/pid"))
-            TaskEnv.TripleFork = true;
     }
 
     if (IsMeta() || TaskEnv.TripleFork || TaskEnv.QuadroFork) {
@@ -2142,6 +2103,10 @@ TError TContainer::StartTask() {
     TestClearPropDirty(EProperty::DEVICE_CONF);
 
     error = ApplyDynamicProperties();
+    if (error)
+        return error;
+
+    error = TaskEnv.OpenNamespaces(*this);
     if (error)
         return error;
 

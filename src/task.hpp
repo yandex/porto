@@ -41,6 +41,8 @@ struct TTaskEnv {
     TUnixSocket Sock2, MasterSock2;
     int ReportStage = 0;
 
+    TError OpenNamespaces(TContainer &ct);
+
     TError Start();
     void StartChild();
 
