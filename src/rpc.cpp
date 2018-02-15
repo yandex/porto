@@ -20,167 +20,181 @@ extern "C" {
 }
 
 static void RequestToString(const rpc::TContainerRequest &req,
-                            std::string &cmd, std::vector<std::string> &arg) {
+                            std::string &cmd, std::string &arg,
+                            std::vector<std::string> &opts) {
     if (req.has_create()) {
         cmd = "Create";
-        arg = { req.create().name() };
+        arg = req.create().name();
     } else if (req.has_createweak()) {
         cmd = "Create";
-        arg = { req.createweak().name(), "weak=true" };
+        arg = req.createweak().name();
+        opts = { "weak=true" };
     } else if (req.has_destroy()) {
         cmd = "Destroy";
-        arg = { req.destroy().name() };
+        arg = req.destroy().name();
     } else if (req.has_list()) {
         cmd = "List";
         if (req.list().has_mask())
-            arg.push_back(req.list().mask());
+            opts = { "mas=" + req.list().mask() };
     } else if (req.has_getproperty()) {
         cmd = "Get";
-        arg = { req.getproperty().name(), req.getproperty().property() };
+        arg = req.getproperty().name();
+        opts = { "property=" + req.getproperty().property() };
         if (req.getproperty().has_sync() && req.getproperty().sync())
-            arg.push_back("sync=true");
+            opts.push_back("sync=true");
         if (req.getproperty().has_real() && req.getproperty().real())
-            arg.push_back("real=true");
+            opts.push_back("real=true");
     } else if (req.has_getdata()) {
         cmd = "Get";
-        arg = { req.getdata().name(), req.getdata().data() };
+        arg = req.getdata().name();
+        opts = { "property=" + req.getdata().data() };
         if (req.getdata().has_sync() && req.getdata().sync())
-            arg.push_back("sync=true");
+            opts.push_back("sync=true");
         if (req.getdata().has_real() && req.getdata().real())
-            arg.push_back("real=true");
+            opts.push_back("real=true");
     } else if (req.has_get()) {
         cmd = "Get";
         for (int i = 0; i < req.get().name_size(); i++)
-            arg.push_back(req.get().name(i));
-        arg.push_back("--");
+            opts.push_back(req.get().name(i));
+        opts.push_back("--");
         for (int i = 0; i < req.get().variable_size(); i++)
-            arg.push_back(req.get().variable(i));
+            opts.push_back(req.get().variable(i));
         if (req.get().has_nonblock() && req.get().nonblock())
-            arg.push_back("nonblock=true");
+            opts.push_back("nonblock=true");
         if (req.get().has_sync() && req.get().sync())
-            arg.push_back("sync=true");
+            opts.push_back("sync=true");
         if (req.get().has_real() && req.get().real())
-            arg.push_back("real=true");
+            opts.push_back("real=true");
     } else if (req.has_setproperty()) {
         cmd = "Set";
-        arg = { req.setproperty().name(), req.setproperty().property() + "=" + req.setproperty().value() };
+        arg = req.setproperty().name();
+        opts = { req.setproperty().property() + "=" + req.setproperty().value() };
     } else if (req.has_start()) {
         cmd = "Start";
-        arg = { req.start().name() };
+        arg = req.start().name();
     } else if (req.has_stop()) {
         cmd = "Stop";
-        arg = { req.stop().name() };
+        arg = req.stop().name();
         if (req.stop().has_timeout_ms())
-            arg.push_back(fmt::format("timeout={} ms", req.stop().timeout_ms()));
+            opts.push_back(fmt::format("timeout={} ms", req.stop().timeout_ms()));
     } else if (req.has_pause()) {
         cmd = "Pause";
-        arg = { req.pause().name() };
+        arg = req.pause().name();
     } else if (req.has_resume()) {
         cmd = "Resume";
-        arg = { req.resume().name() };
+        arg = req.resume().name();
     } else if (req.has_respawn()) {
         cmd = "Respawn";
-        arg = { req.respawn().name() };
+        arg = req.respawn().name();
     } else if (req.has_wait()) {
         cmd = "Wait";
         for (int i = 0; i < req.wait().name_size(); i++)
-            arg.push_back(req.wait().name(i));
+            opts.push_back(req.wait().name(i));
         if (req.wait().has_timeout_ms())
-            arg.push_back(fmt::format("timeout={} ms", req.wait().timeout_ms()));
+            opts.push_back(fmt::format("timeout={} ms", req.wait().timeout_ms()));
     } else if (req.has_propertylist() || req.has_datalist()) {
         cmd = "ListProperties";
     } else if (req.has_kill()) {
         cmd = "Kill";
-        arg = { req.kill().name(), std::to_string(req.kill().sig()) };
+        arg = req.kill().name();
+        opts = { fmt::format("signal={}", req.kill().sig()) };
     } else if (req.has_version()) {
         cmd = "Version";
     } else if (req.has_createvolume()) {
         cmd = "CreateVolume";
-        arg = { req.createvolume().path() };
+        arg = req.createvolume().path();
         for (auto p: req.createvolume().properties())
-            arg.push_back(p.name() + "=" + p.value());
+            opts.push_back(p.name() + "=" + p.value());
     } else if (req.has_linkvolume()) {
         cmd = "LinkVolume";
-        arg = { req.linkvolume().path(), req.linkvolume().container() };
+        arg = req.linkvolume().path();
+        opts = { "container=" + req.linkvolume().container() };
     } else if (req.has_linkvolumetarget()) {
         cmd = "LinkVolume";
-        arg = { req.linkvolumetarget().path(), req.linkvolumetarget().container() };
+        arg = req.linkvolumetarget().path();
+        opts = { "container=" + req.linkvolumetarget().container() };
         if (req.linkvolumetarget().target() != "")
-            arg.push_back("target=" + req.linkvolumetarget().target());
+            opts.push_back("target=" + req.linkvolumetarget().target());
         if (req.linkvolumetarget().required())
-            arg.push_back("required=true");
+            opts.push_back("required=true");
     } else if (req.has_unlinkvolume()) {
         cmd = "UnlinkVolume";
-        arg = { req.unlinkvolume().path(), req.unlinkvolume().container() };
+        arg = req.unlinkvolume().path();
+        opts = { "container=" + req.unlinkvolume().container() };
         if (req.unlinkvolume().has_strict() && req.unlinkvolume().strict())
-            arg.push_back("strict=true");
+            opts.push_back("strict=true");
     } else if (req.has_listvolumes()) {
         cmd = "ListVolumes";
         if (req.listvolumes().has_path())
-            arg.push_back(req.listvolumes().path());
+            arg = req.listvolumes().path();
         if (req.listvolumes().has_container())
-            arg.push_back("container=" + req.listvolumes().container());
+            opts = { "container=" + req.listvolumes().container() };
     } else if (req.has_tunevolume()) {
         cmd = "TuneVolume";
-        arg = { req.tunevolume().path() };
+        arg = req.tunevolume().path();
         for (auto p: req.tunevolume().properties())
-            arg.push_back(p.name() + "=" + p.value());
+            opts.push_back(p.name() + "=" + p.value());
     } else if (req.has_listvolumeproperties()) {
         cmd = "ListVolumeProperities";
     } else if (req.has_importlayer()) {
         cmd = "ImportLayer";
-        arg = { req.importlayer().layer(), req.importlayer().tarball() };
+        arg = req.importlayer().layer();
+        opts = { "tarball=" + req.importlayer().tarball() };
         if (req.importlayer().has_compress())
-            arg.push_back("compress=" + req.importlayer().compress());
+            opts.push_back("compress=" + req.importlayer().compress());
         if (req.importlayer().has_place())
-            arg.push_back("place=" + req.importlayer().place());
+            opts.push_back("place=" + req.importlayer().place());
         if (req.importlayer().has_merge())
-            arg.push_back("merge=true");
+            opts.push_back("merge=true");
         if (req.importlayer().has_private_value())
-            arg.push_back("private=" + req.importlayer().private_value());
+            opts.push_back("private=" + req.importlayer().private_value());
     } else if (req.has_exportlayer()) {
-        cmd = "ExportLayer";
-        arg = { req.exportlayer().tarball() };
+        if (req.exportlayer().has_layer()) {
+            cmd = "ReexportLayer";
+            arg = req.exportlayer().layer();
+        } else {
+            cmd = "ExportLayer";
+            arg = req.exportlayer().volume();
+        }
+        opts = { "tarball+" + req.exportlayer().tarball() };
         if (req.exportlayer().has_compress())
-            arg.push_back("compress=" + req.exportlayer().compress());
+            opts.push_back("compress=" + req.exportlayer().compress());
         if (req.exportlayer().has_place())
-            arg.push_back("place=" + req.exportlayer().place());
-        if (req.exportlayer().has_layer())
-            arg.push_back("layer=" + req.exportlayer().layer());
-        else
-            arg.push_back("volume=" + req.exportlayer().volume());
+            opts.push_back("place=" + req.exportlayer().place());
     } else if (req.has_removelayer()) {
         cmd = "RemoveLayer";
-        arg = { req.removelayer().layer() };
+        arg = req.removelayer().layer();
         if (req.removelayer().has_place())
-            arg.push_back("place=" + req.removelayer().place());
+            opts.push_back("place=" + req.removelayer().place());
     } else if (req.has_listlayers()) {
         cmd = "ListLayers";
         if (req.listlayers().has_mask())
-            arg.push_back("mask=" + req.listlayers().mask());
+            opts.push_back("mask=" + req.listlayers().mask());
         if (req.listlayers().has_place())
-            arg.push_back("place=" + req.listlayers().place());
+            opts.push_back("place=" + req.listlayers().place());
     } else if (req.has_getlayerprivate()) {
         cmd = "GetLayerPrivate";
     } else if (req.has_setlayerprivate()) {
         cmd = "SetLayerPrivate";
     } else if (req.has_convertpath()) {
         cmd = "ConvertPath";
-        arg = { req.convertpath().path(), req.convertpath().source(), req.convertpath().destination() };
+        arg = req.convertpath().path();
+        opts = { "source=" + req.convertpath().source(), "destination=" + req.convertpath().destination() };
     } else if (req.has_attachprocess()) {
         cmd = "AttachProcess";
-        arg = { req.attachprocess().name(), std::to_string(req.attachprocess().pid()), req.attachprocess().comm() };
+        arg = req.attachprocess().name();
+        opts = { "pid=" + std::to_string(req.attachprocess().pid()), "comm=" + req.attachprocess().comm() };
     } else if (req.has_locateprocess()) {
         cmd = "LocateProcess";
-        arg = { std::to_string(req.locateprocess().pid()), req.locateprocess().comm() };
+        opts = { "pid=" + std::to_string(req.locateprocess().pid()), "comm=" + req.locateprocess().comm() };
     } else if (req.has_getsystem()) {
         cmd = "GetSystem";
     } else if (req.has_setsystem()) {
         cmd = "SetSystem";
-        arg = { req.ShortDebugString() };
+        arg = req.ShortDebugString();
     } else {
         cmd = "UnknownCommand";
-        arg = { req.ShortDebugString() };
+        arg = req.ShortDebugString();
     }
 }
 
@@ -1264,19 +1278,19 @@ static TError CheckRpcRequest(const rpc::TContainerRequest &req) {
 void HandleRpcRequest(const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
-    std::string cmd, args;
-    std::vector<std::string> arg;
+    std::string cmd, arg, opt;
+    std::vector<std::string> opts;
     TError error;
 
     client->StartRequest();
 
-    RequestToString(req, cmd, arg);
-    for (auto &a: arg)
-        args += " " + a;
+    RequestToString(req, cmd, arg, opts);
+    for (auto &o: opts)
+        opt += " " + o;
 
     bool silent = !Verbose && SilentRequest(req);
     if (!silent)
-        L_REQ("{}{} from {}", cmd, args, client->Id);
+        L_REQ("{} {}{} from {}", cmd, arg, opt, client->Id);
 
     L_DBG("Raw request: {}", req.ShortDebugString());
 
@@ -1392,12 +1406,12 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
         /* log failed or slow silent requests */
         if (silent && (error || client->RequestTimeMs >= 1000)) {
-            L_REQ("{}{} from {}", cmd, args, client->Id);
+            L_REQ("{} {}{} from {}", cmd, arg, opt, client->Id);
             silent = false;
         }
 
         if (!silent)
-            L_RSP("{} {} to {} time={} ms", cmd, ResponseAsString(rsp),
+            L_RSP("{} {} {} to {} time={} ms", cmd, arg, ResponseAsString(rsp),
                     client->Id, client->RequestTimeMs);
 
         L_DBG("Raw response: {}", rsp.ShortDebugString());
