@@ -502,6 +502,22 @@ TError TMountNamespace::Setup() {
         return error;
 
     if (!Root.IsRoot()) {
+        TFile rootFd;
+
+        error = rootFd.OpenDir(Root);
+        if (error)
+            return error;
+
+        /* new root must be a different mount */
+        if (rootFd.GetMountId() == rootFd.GetMountId("..")) {
+            error = Root.Bind(Root, MS_REC);
+            if (error)
+                return error;
+            error = rootFd.OpenDir(Root);
+            if (error)
+                return error;
+        }
+
         error = SetupRoot();
         if (error)
             return error;
@@ -514,8 +530,7 @@ TError TMountNamespace::Setup() {
         if (error)
             return error;
 
-        // enter chroot, also binds root recursively if needed
-        error = Root.PivotRoot();
+        error = rootFd.PivotRoot();
         if (error) {
             L_WRN("Cannot pivot root, roll back to chroot: {}", error);
             error = Root.Chroot();

@@ -120,7 +120,6 @@ public:
 
     TError Chdir() const;
     TError Chroot() const;
-    TError PivotRoot() const;
 
     TError Chown(uid_t uid, gid_t gid) const;
 
@@ -269,6 +268,7 @@ public:
     bool ExistsAt(const TPath &path) const;
 
     TError StatFS(TStatFS &result) const;
+    TError PivotRoot() const;
 
     enum AccessMode {
         E   = 000, /* Exists */

@@ -166,31 +166,17 @@ TError TPath::Chroot() const {
 }
 
 // https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
-TError TPath::PivotRoot() const {
-    TFile oldroot, newroot;
+TError TFile::PivotRoot() const {
+    TFile oldroot;
     TError error;
 
-    L_ACT("pivot root {}", Path);
+    L_ACT("pivot root {}", RealPath());
 
     error = oldroot.OpenDir("/");
     if (error)
         return error;
 
-    error = newroot.OpenDir(*this);
-    if (error)
-        return error;
-
-    /* new root must be a different mount */
-    if (newroot.GetMountId() == newroot.GetMountId("..")) {
-        error = Bind(*this, MS_REC);
-        if (error)
-            return error;
-        error = newroot.OpenDir(*this);
-        if (error)
-            return error;
-    }
-
-    if (fchdir(newroot.Fd))
+    if (fchdir(Fd))
         return TError::System("fchdir(newroot)");
 
     if (syscall(__NR_pivot_root, ".", "."))
@@ -202,7 +188,7 @@ TError TPath::PivotRoot() const {
     if (umount2(".", MNT_DETACH) < 0)
         return TError::System("umount2(.)");
 
-    if (fchdir(newroot.Fd) < 0)
+    if (fchdir(Fd) < 0)
         return TError::System("fchdir(newroot) reenter");
 
     return OK;
