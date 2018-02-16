@@ -2310,7 +2310,7 @@ TError TVolume::LinkContainer(TContainer &container, const TPath &target) {
         return error;
     }
 
-    if (target && container.IsActive()) {
+    if (target && container.HasResources()) {
         error = Mount(container.RootPath / target);
         if (error)
             (void)UnlinkContainer(container);
@@ -2344,7 +2344,7 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     if (error)
         goto undo;
 
-    if (target && container.IsActive()) {
+    if (target && container.HasResources()) {
         TPath path = container.RootPath / target;
         if (strict)
             error = path.Umount(UMOUNT_NOFOLLOW);

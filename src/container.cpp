@@ -2908,7 +2908,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
             error = prop->Set(value);
     }
 
-    if (!error && IsActive()) {
+    if (!error && HasResources()) {
         error = ApplyDynamicProperties();
         if (error) {
             (void)prop->Set(oldValue);

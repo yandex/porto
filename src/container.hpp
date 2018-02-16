@@ -111,10 +111,11 @@ public:
     int RunningChildren = 0;
     int StartingChildren = 0;
 
-    bool IsActive() const {
+    bool HasResources() const {
         return State == EContainerState::Running ||
                State == EContainerState::Meta ||
-               State == EContainerState::Paused;
+               State == EContainerState::Paused ||
+               State == EContainerState::Dead;
     }
 
     /* protected with ContainersMutex */
