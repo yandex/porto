@@ -834,16 +834,9 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
 
     if (ct) {
         error = volume->UnlinkContainer(*ct, strict);
-        if (error)
-            return error;
-    }
-
-    CL->ReleaseContainer();
-
-    if (volume->State == EVolumeState::Unlinked || !ct) {
+        CL->ReleaseContainer();
+    } else {
         error = volume->Destroy(strict);
-        if (error && strict && ct)
-            (void)volume->LinkContainer(*ct);
     }
 
     return error;

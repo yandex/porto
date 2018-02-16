@@ -2341,21 +2341,42 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     volumes_lock.unlock();
 
     error = Save();
-    if (error) {
-        volumes_lock.lock();
-        Links[container.Name] = target.ToString();
-        if (State == EVolumeState::Unlinked)
-            SetState(EVolumeState::Ready);
-        container.LinkedVolumes.emplace_back(shared_from_this());
-        return error;
-    }
+    if (error)
+        goto undo;
 
     if (target && container.IsActive()) {
-        error = (container.RootPath / target).UmountAll();
-        if (error)
-            L_ERR("Cannot umount linked volume {}: {}", Path, error);
+        TPath path = container.RootPath / target;
+        if (strict)
+            error = path.Umount(UMOUNT_NOFOLLOW);
+        else
+            error = path.UmountAll();
+        if (error) {
+            if (strict && error.Error == EError::Busy)
+                goto undo;
+            L_WRN("Cannot umount linked volume {} from {}: {}", Path, path, error);
+        }
     }
 
+    volumes_lock.lock();
+    if (State == EVolumeState::Unlinked) {
+        volumes_lock.unlock();
+        error = Destroy(strict);
+        if (error) {
+            if (strict && error.Error == EError::Busy)
+                goto undo;
+            L_WRN("Cannot destroy volume {}: {}", Path, error);
+        }
+    }
+
+    return error;
+
+undo:
+    volumes_lock.lock();
+    Links[container.Name] = target.ToString();
+    if (State == EVolumeState::Unlinked)
+        SetState(EVolumeState::Ready);
+    container.LinkedVolumes.emplace_back(shared_from_this());
+    (void)Save();
     return error;
 }
 
@@ -2375,8 +2396,6 @@ void TVolume::UnlinkAllVolumes(TContainer &container) {
         std::shared_ptr<TVolume> volume = container.LinkedVolumes.back();
         volumes_lock.unlock();
         volume->UnlinkContainer(container);
-        if (volume->State == EVolumeState::Unlinked)
-            (void)volume->Destroy();
         volumes_lock.lock();
     }
 
