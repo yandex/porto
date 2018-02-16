@@ -66,11 +66,11 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
 
         for (unsigned i = 2; i < line.size(); i++) {
             if (line[i] == "ro")
-                bind.ReadOnly = true;
+                bind.Flags |= MS_RDONLY;
             else if (line[i] == "rw")
-                bind.ReadOnly = false;
+                bind.Flags &= ~MS_RDONLY;
             else if (line[i] == "rec")
-                bind.Recursive = true;
+                bind.Flags |= MS_REC;
             else
                 return TError(EError::InvalidValue, "Invalid bind mount flag {}", line[i]);
         }
@@ -84,8 +84,8 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
 std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     TMultiTuple lines;
     for (auto &bind: binds) {
-        lines.push_back({bind.Source.ToString(), bind.Target.ToString(), bind.ReadOnly ? "ro": "rw"});
-        if (bind.Recursive)
+        lines.push_back({bind.Source.ToString(), bind.Target.ToString(), (bind.Flags & MS_RDONLY) ? "ro": "rw"});
+        if (bind.Flags & MS_REC)
             lines.back().push_back("rec");
     }
     return MergeEscapeStrings(lines, ' ', ';');
@@ -104,7 +104,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
         directory = Source.IsDirectoryFollow();
 
     if (!ControlSource) {
-        if (!ReadOnly || (directory && IsSystemPath(Source)))
+        if (!(Flags & MS_RDONLY) || (directory && IsSystemPath(Source)))
             error = src.WriteAccess(cred);
         else
             error = src.ReadAccess(cred);
@@ -178,16 +178,14 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
     if (!root.IsRoot() && !real.IsInside(root))
         return TError(EError::InvalidValue, "Bind mount target out of chroot: {} -> {}", Target, real);
 
-    error = dst.ProcPath().Bind(src.ProcPath(), Recursive ? MS_REC : 0);
+    error = dst.ProcPath().Bind(src.ProcPath(), Flags & MS_REC);
     if (error)
         return error;
 
-    if (ReadOnly) {
-        error = Target.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY |
-                               (Recursive ? MS_REC : 0));
-        if (error)
-            return error;
-    }
+    /* allow suid inside and remount read-only if required */
+    error = Target.Remount(MS_BIND | MS_NODEV | Flags, MS_NOEXEC | MS_NOSUID);
+    if (error)
+        return error;
 
     return OK;
 }
@@ -286,6 +284,7 @@ TError TMountNamespace::MountTraceFs() {
     if (statfs(tracefs.c_str(), &st) || st.f_type != TRACEFS_MAGIC)
         return TError(EError::Unknown, "Tracefs is not mounted");
 
+    /* read-only bind instead for new mount to preserve read-write in host */
     error = (Root / tracefs).BindRemount(tracefs, MS_RDONLY);
     if (error)
         return error;
@@ -299,7 +298,7 @@ TError TMountNamespace::MountTraceFs() {
         if (!error)
             error = tracing.BindRemount(tracefs, MS_RDONLY);
         if (!error)
-            error = debugfs.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
+            error = debugfs.Remount(MS_RDONLY);
         if (error)
             return error;
     }
@@ -321,9 +320,9 @@ TError TMountNamespace::MountSystemd() {
     if (!error)
         error = systemd.MkdirAll(0755);
     if (!error)
-        error = tmpfs.Remount(MS_REMOUNT | MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME | MS_RDONLY);
+        error = tmpfs.Remount(MS_RDONLY);
     if (!error)
-        systemd.Mount("cgroup", "cgroup", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, { "name=systemd" });
+        error = systemd.Mount("cgroup", "cgroup", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, { "name=systemd" });
     if (!error)
         error = systemd_rw.BindRemount(systemd_rw, MS_NOSUID | MS_NOEXEC | MS_NODEV);
 
@@ -465,10 +464,30 @@ TError TMountNamespace::ProtectProc() {
 
 TError TMountNamespace::Setup() {
     TPath root("/"), proc("/proc"), sys("/sys");
+    TFile rootFd;
     TError error;
 
     // remount as slave to receive propagations from parent namespace
     error = root.Remount(MS_SLAVE | MS_REC);
+    if (error)
+        return error;
+
+    error = rootFd.OpenDir(Root);
+    if (error)
+        return error;
+
+    /* new root must be a different mount */
+    if (rootFd.GetMountId() == rootFd.GetMountId("..")) {
+        error = Root.Bind(Root, MS_REC);
+        if (error)
+            return error;
+        error = rootFd.OpenDir(Root);
+        if (error)
+            return error;
+    }
+
+    // allow suid binaries inside and remount read-only if needed
+    error = Root.Remount(MS_BIND | MS_REC | (RootRo ? MS_RDONLY : 0), MS_NOSUID);
     if (error)
         return error;
 
@@ -481,43 +500,24 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    for (const auto &bind : BindMounts) {
-        error = bind.Mount(BindCred, Root);
+    // protect sysfs
+    if (Root.IsRoot()) {
+        error = TPath("/sys/fs/cgroup").UmountAll();
         if (error)
             return error;
 
-        // disable propagation in both directions
-        error = bind.Target.Remount(MS_PRIVATE | (bind.Recursive ? MS_REC : 0));
+        error = sys.Remount(MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
         if (error)
             return error;
     }
 
-    // remount sysfs read-only
-    error = sys.Remount(MS_REMOUNT | MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
-    if (error)
-        return error;
-
-    error = TPath("/sys/fs/cgroup").UmountAll();
-    if (error)
-        return error;
-
-    if (!Root.IsRoot()) {
-        TFile rootFd;
-
-        error = rootFd.OpenDir(Root);
+    for (const auto &bind : BindMounts) {
+        error = bind.Mount(BindCred, Root);
         if (error)
             return error;
+    }
 
-        /* new root must be a different mount */
-        if (rootFd.GetMountId() == rootFd.GetMountId("..")) {
-            error = Root.Bind(Root, MS_REC);
-            if (error)
-                return error;
-            error = rootFd.OpenDir(Root);
-            if (error)
-                return error;
-        }
-
+    if (!Root.IsRoot()) {
         error = SetupRoot();
         if (error)
             return error;
@@ -542,11 +542,6 @@ TError TMountNamespace::Setup() {
         if (error)
             return error;
     }
-
-    // allow suid binaries and remount read-only if required
-    error = root.Remount(MS_REMOUNT | MS_BIND | (RootRo ? MS_RDONLY : 0));
-    if (error)
-        return error;
 
     // remount as shared: subcontainers will get propgation from us
     error = root.Remount(MS_SHARED | MS_REC);

@@ -667,8 +667,7 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
         return TError(EError::Unknown, E2BIG, "mount option too big: " +
                       std::to_string(data.length()));
 
-    L_ACT("mount -t {} {} {} -o {} {}", type, source, Path,
-          data, MountFlagsToString(flags));
+    L_ACT("mount {} -t {} {} -o {} {}", Path, type, source, data, MountFlagsToString(flags));
 
     if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
         return TError::System("mount(" + source.ToString() + ", " +
@@ -677,22 +676,41 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
 }
 
 TError TPath::Bind(const TPath &source, unsigned long flags) const {
-    L_ACT("bind mount {} {} {}", MountFlagsToString(flags), Path, source);
+    L_ACT("mount bind {} {} {}", RealPath(), source.RealPath(), MountFlagsToString(flags));
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))
-        return TError::System("mount(" + source.ToString() +
-                ", " + Path + ", " + MountFlagsToString(MS_BIND | flags) + ")");
+        return TError::System("mount({}, {}, {})", source, Path, MountFlagsToString(MS_BIND | flags));
     return OK;
 }
 
-TError TPath::Remount(unsigned long flags) const {
-    L_ACT("remount {} {}", Path, MountFlagsToString(flags));
+TError TPath::Remount(unsigned long flags, unsigned long clear_flags) const {
+    L_ACT("remount {} {} -{}", Path, MountFlagsToString(flags), MountFlagsToString(clear_flags));
 
-    if (mount(NULL, Path.c_str(), NULL, flags, NULL))
-        return TError::System("mount(NULL, " + Path +
-                      ", NULL, " + MountFlagsToString(flags) + ", NULL)");
+    unsigned long recursive = flags & MS_REC;
+
+    if (flags & MS_SLAVE) {
+        if (mount(NULL, Path.c_str(), NULL, MS_SLAVE | recursive, NULL))
+            return TError::System("Remount {} MS_SLAVE", Path);
+    }
+
+    if (flags & MS_SHARED) {
+        if (mount(NULL, Path.c_str(), NULL, MS_SHARED | recursive, NULL))
+            return TError::System("Remount {} MS_SHARED", Path);
+    }
+
+    if (flags & MS_PRIVATE) {
+        if (mount(NULL, Path.c_str(), NULL, MS_PRIVATE | recursive, NULL))
+            return TError::System("Remount {} MS_PRIVATE", Path);
+    }
+
+    if (flags & MS_UNBINDABLE) {
+        if (mount(NULL, Path.c_str(), NULL, MS_UNBINDABLE | recursive, NULL))
+            return TError::System("Remount {} MS_UNBINDABLE", Path);
+    }
+
+    unsigned long remount_flags = flags & ~(MS_UNBINDABLE | MS_PRIVATE | MS_SLAVE | MS_SHARED | MS_REC);
 
     /* vfsmount remount isn't recursive in kernel */
-    if ((flags & MS_BIND) && (flags & MS_REC)) {
+    if (recursive && (remount_flags & MS_BIND)) {
         TPath normal = NormalPath();
         std::list<TMount> mounts;
         TError error = TPath::ListAllMounts(mounts);
@@ -700,21 +718,47 @@ TError TPath::Remount(unsigned long flags) const {
             return error;
         for (auto &mnt: mounts) {
             if (mnt.Target.IsInside(normal) && mnt.Target != normal) {
-                error = mnt.Target.Remount(flags & ~MS_REC);
+                error = mnt.Target.Remount(remount_flags, clear_flags);
                 if (error)
                     return error;
             }
         }
     }
 
+    if (remount_flags || clear_flags) {
+        struct statfs st;
+        if (statfs(Path.c_str(), &st))
+            return TError::System("statfs {}", Path);
+
+        /* preserve ro,nodev,noexec,nosuid */
+        if ((st.f_flags & ST_RDONLY) && !(MS_RDONLY & clear_flags))
+            remount_flags |= MS_RDONLY;
+        if ((st.f_flags & ST_NODEV) && !(MS_NODEV & clear_flags))
+            remount_flags |= MS_NODEV;
+        if ((st.f_flags & ST_NOEXEC) && !(MS_NOEXEC & clear_flags))
+            remount_flags |= MS_NOEXEC;
+        if ((st.f_flags & ST_NOSUID) && !(MS_NOSUID & clear_flags))
+            remount_flags |= MS_NOSUID;
+
+        if (mount(NULL, Path.c_str(), NULL, MS_REMOUNT | remount_flags, NULL))
+            return TError::System("Remount {} {}", Path, MountFlagsToString(remount_flags));
+    }
+
     return OK;
 }
 
 TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
-    TError error = Bind(source, flags & MS_REC);
-    if (!error)
-        error = Remount(MS_REMOUNT | MS_BIND | flags);
-    return error;
+    TError error;
+
+    error = Bind(source, flags & MS_REC);
+    if (error)
+        return error;
+
+    error = Remount(MS_BIND | flags);
+    if (error)
+        return error;
+
+    return OK;
 }
 
 TError TPath::Umount(unsigned long flags) const {

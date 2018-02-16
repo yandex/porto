@@ -67,7 +67,7 @@ public:
 
     TError Build() override {
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
-                                        Volume->GetMountFlags());
+                Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
     }
 
     std::string ClaimPlace() override {
@@ -104,7 +104,7 @@ public:
 
     TError Build() override {
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
-                                                Volume->GetMountFlags() | MS_REC);
+                Volume->GetMountFlags() | MS_REC | MS_SLAVE | MS_SHARED);
     }
 
     std::string ClaimPlace() override {
@@ -299,7 +299,7 @@ public:
         }
 
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
-                                                Volume->GetMountFlags());
+                Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
     }
 
     TError Destroy() override {
@@ -647,9 +647,7 @@ public:
             temp = Volume->GetInternal(layer_id);
             error = temp.Mkdir(700);
             if (!error)
-                error = temp.BindRemount(path, MS_RDONLY | MS_NODEV);
-            if (!error)
-                error = temp.Remount(MS_PRIVATE);
+                error = temp.BindRemount(path, MS_RDONLY | MS_NODEV | MS_PRIVATE);
             if (error)
                 goto err;
 
@@ -857,9 +855,7 @@ public:
             temp = Volume->GetInternal(layer_id);
             error = temp.Mkdir(700);
             if (!error)
-                error = temp.BindRemount(path, MS_RDONLY | MS_NODEV);
-            if (!error)
-                error = temp.Remount(MS_PRIVATE);
+                error = temp.BindRemount(path, MS_RDONLY | MS_NODEV | MS_PRIVATE);
             if (error)
                 goto err;
 
@@ -1800,9 +1796,7 @@ TError TVolume::Build() {
                 temp = GetInternal("temp");
                 error = temp.Mkdir(0700);
                 if (!error)
-                    error = temp.BindRemount(pin.ProcPath(), MS_RDONLY | MS_NODEV);
-                if (!error)
-                    error = temp.Remount(MS_PRIVATE);
+                    error = temp.BindRemount(pin.ProcPath(), MS_RDONLY | MS_NODEV | MS_PRIVATE);
                 if (error) {
                     (void)temp.Rmdir();
                     return error;
@@ -1856,6 +1850,9 @@ TError TVolume::Build() {
         error = PathFd.ProcPath().Bind(InternalPath, MS_REC);
         if (error)
             return error;
+        error = Path.Remount(MS_SLAVE | MS_SHARED | MS_REC);
+        if (error)
+            return error;
     }
 
     PathFd.Close();
@@ -1885,9 +1882,9 @@ TError TVolume::Mount(const TPath &target) {
 
     TBindMount bind;
 
-    bind.Recursive = false;
     bind.IsDirectory = true;
-    bind.ReadOnly = IsReadOnly;
+    if (IsReadOnly)
+        bind.Flags |= MS_RDONLY;
 
     bind.Source = InternalPath;
     bind.ControlSource = true;
