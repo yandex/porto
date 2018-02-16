@@ -604,10 +604,18 @@ class Connection(object):
             request.unlinkVolume.strict = strict
         self.rpc.call(request, self.rpc.timeout)
 
-    def LinkVolume(self, path, container):
+    def LinkVolume(self, path, container, target=None, required=False):
         request = rpc_pb2.TContainerRequest()
-        request.linkVolume.path = path
-        request.linkVolume.container = container
+        if target is not None or required:
+            command = request.LinkVolumeTarget
+        else:
+            command = request.linkVolume
+        command.path = path
+        command.container = container
+        if target is not None:
+            command.target = target
+        if required:
+            command.required = True
         self.rpc.call(request, self.rpc.timeout)
 
     def DestroyVolume(self, volume, containers=None):

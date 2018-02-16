@@ -58,7 +58,7 @@ def Create(conn, pathstr):
 
     conn.CreateVolume(pathstr, **kwargs)
 
-def Unlink(conn, pathstr):
+def UnlinkVolume(conn, pathstr):
     ct = targets.select_volume_container(conn)
 
     if VERBOSE:
@@ -69,7 +69,18 @@ def Unlink(conn, pathstr):
 
     conn.UnlinkVolume(pathstr, ct)
 
-def Link(conn, pathstr):
+def UnlinkVolumeStrict(conn, pathstr):
+    ct = targets.select_volume_container(conn)
+
+    if VERBOSE:
+        print "Unlinking volume: {} from container: {}".format(pathstr, ct)
+
+    if pathstr is None:
+        pathstr = ""
+
+    conn.UnlinkVolume(pathstr, ct, strict=True)
+
+def LinkVolume(conn, pathstr):
 
     ct = targets.select_volume_container(conn)
 
@@ -83,3 +94,19 @@ def Link(conn, pathstr):
         ct = ""
 
     conn.LinkVolume(pathstr, ct)
+
+def LinkVolumeTarget(conn, pathstr):
+
+    ct = targets.select_volume_container(conn)
+    target = get_random_dir(FUZZER_MNT)
+
+    if VERBOSE:
+        print "Linking volume: {} to container {} to {}".format(pathstr, ct, target)
+
+    if pathstr is None:
+        pathstr = ""
+
+    if ct is None:
+        ct = ""
+
+    conn.LinkVolume(pathstr, ct, target=target)

@@ -96,8 +96,10 @@ def volume_action(conn):
     try:
         select_by_weight( [
             (1, volume.Create),
-            (2, volume.Unlink),
-            (2, volume.Link),
+            (2, volume.UnlinkVolume),
+            (2, volume.UnlinkVolumeStrict),
+            (2, volume.LinkVolume),
+            (2, volume.LinkVolumeTarget),
         ] )(conn, select_volume(conn))
         return 0
     except (
