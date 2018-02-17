@@ -394,6 +394,8 @@ message TVolumePropertyDescription {
 message TVolumeLink {
     required string container = 1;
     optional string target = 2;
+    optional bool required = 3;
+    optional bool read_only = 4;
 }
 
 message TVolumeDescription {
@@ -420,6 +422,7 @@ message TVolumeLinkRequest {
     optional string container = 2;      // default - self
     optional string target = 3;         // path in container
     optional bool required = 4;         // stop container at fail
+    optional bool read_only = 5;
 }
 
 message TVolumeUnlinkRequest {

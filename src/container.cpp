@@ -2352,12 +2352,9 @@ TError TContainer::PrepareResources() {
     }
 
     for (auto &volume: LinkedVolumes) {
-        TPath target = volume->GetLinkTarget(*this);
-        if (target) {
-            error = volume->Mount(RootPath / target);
-            if (error)
-                return error;
-        }
+        error = volume->MountLink(*this);
+        if (error)
+            return error;
     }
 
     PropagateCpuLimit();
@@ -2424,12 +2421,9 @@ void TContainer::FreeResources() {
     }
 
     for (auto &volume: LinkedVolumes) {
-        TPath target = volume->GetLinkTarget(*this);
-        if (target) {
-            error = (RootPath / target).UmountAll();
-            if (error)
-                L_ERR("Cannot umount linked volume {}: {}", volume->Path, error);
-        }
+        error = volume->UmountLink(*this);
+        if (error)
+            L_ERR("Cannot umount linked volume {}: {}", volume->Path, error);
     }
 
     if (RootVolume) {

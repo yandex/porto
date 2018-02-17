@@ -115,6 +115,8 @@ static void RequestToString(const rpc::TContainerRequest &req,
         opts = { "container=" + req.linkvolumetarget().container() };
         if (req.linkvolumetarget().target() != "")
             opts.push_back("target=" + req.linkvolumetarget().target());
+        if (req.linkvolumetarget().read_only())
+            opts.push_back("read_only=true");
         if (req.linkvolumetarget().required())
             opts.push_back("required=true");
     } else if (req.has_unlinkvolume()) {
@@ -793,21 +795,9 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
     if (error)
         return TError(error, "Cannot link volume {}", volume->Path);
 
-    error = volume->LinkContainer(*ct, req.target());
+    error = volume->LinkContainer(*ct, req.target(), req.read_only(), req.required());
     if (error)
         return error;
-
-    if (req.required()) {
-        auto lock = LockVolumes();
-        auto &paths = ct->RequiredVolumes;
-        if (std::find(paths.begin(), paths.end(), volume->Path) == paths.end()) {
-            paths.push_back(volume->Path.ToString());
-            volume->HasDependentContainer = true;
-            lock.unlock();
-            ct->SetProp(EProperty::REQUIRED_VOLUMES);
-            ct->Save();
-        }
-    }
 
     return OK;
 }

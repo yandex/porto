@@ -75,6 +75,15 @@ public:
     virtual std::string ClaimPlace();
 };
 
+struct TVolumeLink {
+    TPath Target;
+    bool Required = false;
+    bool ReadOnly = false;
+
+    std::string Format();
+    TError Parse(const std::string &str);
+};
+
 class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TNonCopyable {
 
@@ -113,7 +122,7 @@ public:
     bool HasDependentContainer = false;
 
     std::vector<std::string> Layers;
-    std::map<std::string, std::string> Links; /* container -> path */
+    std::map<std::string, TVolumeLink> Links; /* container -> target */
 
     uint64_t ClaimedSpace = 0;
     uint64_t SpaceLimit = 0;
@@ -158,7 +167,6 @@ public:
     TError CheckDependencies();
 
     TError Build(void);
-    TError Mount(const TPath &target);
 
     static void DestroyAll();
     TError DestroyOne(bool strict = false);
@@ -169,12 +177,15 @@ public:
 
     static void RestoreAll(void);
 
-    TError LinkContainer(TContainer &container, const TPath &target = "");
+    TError LinkContainer(TContainer &container, const TPath &target = "",
+                         bool read_only = false, bool required = false);
     TError UnlinkContainer(TContainer &container, bool strict = false);
-    std::string GetLinkTarget(TContainer &container);
     static void UnlinkAllVolumes(TContainer &container);
 
-    static TError CheckRequired(const TTuple &paths);
+    TError MountLink(const TContainer &ct);
+    TError UmountLink(const TContainer &ct, bool strict = false);
+
+    static TError CheckRequired(const std::list<std::string> &paths);
 
     TError ClaimPlace(uint64_t size);
 

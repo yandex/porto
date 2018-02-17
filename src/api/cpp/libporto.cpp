@@ -476,7 +476,8 @@ int Connection::CreateVolume(std::string &path,
     return ret;
 }
 
-int Connection::LinkVolume(const std::string &path, const std::string &container, const std::string &target, bool required) {
+int Connection::LinkVolume(const std::string &path, const std::string &container,
+        const std::string &target, bool read_only, bool required) {
     auto req = (target == "" && !required) ? Impl->Req.mutable_linkvolume() :
                                              Impl->Req.mutable_linkvolumetarget();
     req->set_path(path);
@@ -484,6 +485,8 @@ int Connection::LinkVolume(const std::string &path, const std::string &container
         req->set_container(container);
     if (target != "")
         req->set_target(target);
+    if (read_only)
+        req->set_read_only(read_only);
     if (required)
         req->set_required(required);
     return Impl->Rpc();

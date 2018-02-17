@@ -1691,16 +1691,18 @@ public:
 
 class TLinkVolumeCmd final : public ICmd {
 public:
-    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1, "[-r] <path> [container] [target]",
+    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1, "[-rR] <path> [container] [target]",
                     "link volume to container", "default container - current\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool required = false;
+        bool read_only = false;
         const auto &args = env->GetOpts({
-                {'r', false, [&](const char *) { required = true; }},
+                {'r', false, [&](const char *) { read_only = true; }},
+                {'R', false, [&](const char *) { required = true; }},
         });
         const auto path = TPath(args[0]).RealPath().ToString();
-        int ret = Api->LinkVolume(path, (args.size() > 1) ? args[1] : "", (args.size() > 2) ? args[2] : "", required);
+        int ret = Api->LinkVolume(path, (args.size() > 1) ? args[1] : "", (args.size() > 2) ? args[2] : "", read_only, required);
         if (ret)
             PrintError("Can't link volume");
         return ret;

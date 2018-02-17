@@ -1395,12 +1395,12 @@ public:
     }
     TError Set(const std::string &value) {
         TError error;
-        TTuple paths = SplitEscapedString(value, ';');
-        for (auto &path: paths) {
+        std::list<std::string> paths;
+        for (auto &path: SplitEscapedString(value, ';')) {
             if (path[0] == '%')
-                path = path.substr(1);
+                paths.push_back(path.substr(1));
             else
-                path = CL->ResolvePath(path).ToString();
+                paths.push_back(CL->ResolvePath(path).ToString());
         }
 
         auto lock = LockVolumes();

@@ -121,6 +121,7 @@ public:
     int LinkVolume(const std::string &path,
                    const std::string &container = "",
                    const std::string &target = "",
+                   bool read_only = false,
                    bool required = false);
     int UnlinkVolume(const std::string &path,
                      const std::string &container = "", bool strict = false);
