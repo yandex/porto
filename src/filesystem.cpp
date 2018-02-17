@@ -506,6 +506,22 @@ TError TMountNamespace::Setup() {
         if (error)
             return error;
 
+        error = TPath("/sys/fs/pstore").UmountAll();
+        if (error)
+            return error;
+
+        error = TPath("/sys/kernel/security").UmountAll();
+        if (error)
+            return error;
+
+        error = TPath(PORTO_CONTAINERS_KV).UmountAll();
+        if (error)
+            return error;
+
+        error = TPath(PORTO_VOLUMES_KV).UmountAll();
+        if (error)
+            return error;
+
         error = sys.Remount(MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
         if (error)
             return error;
