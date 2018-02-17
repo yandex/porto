@@ -477,7 +477,7 @@ TError TMountNamespace::Setup() {
         return error;
 
     /* new root must be a different mount */
-    if (rootFd.GetMountId() == rootFd.GetMountId("..")) {
+    if (!Root.IsRoot() && rootFd.GetMountId() == rootFd.GetMountId("..")) {
         error = Root.Bind(Root, MS_REC);
         if (error)
             return error;
