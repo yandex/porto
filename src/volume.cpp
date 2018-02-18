@@ -2065,7 +2065,6 @@ TError TVolume::Destroy(bool strict) {
 
         while (!volume->Links.empty()) {
             auto name = volume->Links.begin()->first;
-            volume->Links.erase(name);
             volumes_lock.unlock();
 
             L_ACT("Forced unlink volume {} from {}", volume->Path, name);
@@ -2073,17 +2072,13 @@ TError TVolume::Destroy(bool strict) {
             auto container = TContainer::Find(name);
             containers_lock.unlock();
 
-            if (container)
+            if (container) {
                 CL->LockContainer(container);
+                UnlinkContainer(*container);
+                CL->ReleaseContainer();
+            }
 
             volumes_lock.lock();
-            if (container) {
-                auto vol_iter = std::find(container->LinkedVolumes.begin(),
-                                          container->LinkedVolumes.end(),
-                                          volume);
-                if (vol_iter != container->LinkedVolumes.end())
-                    container->LinkedVolumes.erase(vol_iter);
-            }
         }
 
         if (volume->VolumeOwnerContainer) {
