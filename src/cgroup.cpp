@@ -293,7 +293,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
         if (!walk.Path)
             break;
 
-        if (!S_ISDIR(walk.Stat->st_mode) || walk.Postorder)
+        if (!S_ISDIR(walk.Stat->st_mode) || walk.Postorder || walk.Level() == 0)
             continue;
 
         std::string name = Subsystem->Root.InnerPath(walk.Path).ToString();
