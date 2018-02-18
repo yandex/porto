@@ -183,6 +183,9 @@ TError TCore::Forward() {
             Conn.Start(core))
         return TError("cannot create CT:{}", core);
 
+    /* Allow poking tasks with suid and ambient capabilities */
+    Conn.SetProperty(core, P_CAPABILITIES_AMBIENT, "SYS_PTRACE");
+
     L("Forwading core into CT:{}", core);
 
     std::string result;
