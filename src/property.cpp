@@ -1230,55 +1230,24 @@ TError TEnvProperty::GetIndexed(const std::string &index, std::string &value) {
 
 class TBind : public TProperty {
 public:
-    TError Set(const std::string &bind_str);
-    TError Get(std::string &value);
-    TBind() : TProperty(P_BIND, EProperty::BIND, "Bind mounts: <source> <target> [ro|rw];...") {}
-} static Bind;
-
-TError TBind::Set(const std::string &bind_str) {
-    TError error = IsAliveAndStopped();
-    if (error)
-        return error;
-
-    auto binds = SplitEscapedString(bind_str, ' ', ';');
-
-    std::vector<TBindMount> bindMounts;
-
-    for (auto &bind : binds) {
-        TBindMount bm;
-
-        if (bind.size() != 2 && bind.size() != 3)
-            return TError(EError::InvalidValue, "Invalid bind in: " +
-                          MergeEscapeStrings(bind, ' '));
-
-        bm.Source = bind[0];
-        bm.Target = bind[1];
-        bm.ReadOnly = false;
-
-        if (bind.size() == 3) {
-            if (bind[2] == "ro")
-                bm.ReadOnly = true;
-            else if (bind[2] != "rw")
-                return TError(EError::InvalidValue, "Invalid bind type: " + bind[2]);
-        }
-
-        bindMounts.push_back(bm);
+    TBind() : TProperty(P_BIND, EProperty::BIND, "Bind mounts: <source> <target> [ro|rw|rec]... ;...") {}
+    TError Get(std::string &value) {
+        value = TBindMount::Format(CT->BindMounts);
+        return OK;
     }
-
-    CT->BindMounts = bindMounts;
-    CT->SetProp(EProperty::BIND);
-
-    return OK;
-}
-
-TError TBind::Get(std::string &value) {
-    TMultiTuple tuples;
-    for (const auto &bm : CT->BindMounts)
-        tuples.push_back({ bm.Source.ToString(), bm.Target.ToString(),
-                           bm.ReadOnly ? "ro" : "rw" });
-    value = MergeEscapeStrings(tuples, ' ', ';');
-    return OK;
-}
+    TError Set(const std::string &value) {
+        TError error = IsAliveAndStopped();
+        if (error)
+            return error;
+        std::vector<TBindMount> result;
+        error = TBindMount::Parse(value, result);
+        if (error)
+            return error;
+        CT->BindMounts = result;
+        CT->SetProp(EProperty::BIND);
+        return OK;
+    }
+} static Bind;
 
 class TIp : public TProperty {
 public:

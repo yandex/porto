@@ -43,6 +43,45 @@ bool IsSystemPath(const TPath &path) {
     return false;
 }
 
+TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds) {
+    auto lines = SplitEscapedString(str, ' ', ';');
+
+    for (auto &line: lines) {
+        if (line.size() < 2)
+            return TError(EError::InvalidValue, "Invalid bind mount {}", str);
+
+        TBindMount bind;
+
+        bind.Source = line[0];
+        bind.Target = line[1];
+
+        for (unsigned i = 2; i < line.size(); i++) {
+            if (line[i] == "ro")
+                bind.ReadOnly = true;
+            else if (line[i] == "rw")
+                bind.ReadOnly = false;
+            else if (line[i] == "rec")
+                bind.Recursive = true;
+            else
+                return TError(EError::InvalidValue, "Invalid bind mount flag {}", line[i]);
+        }
+
+        binds.push_back(bind);
+    }
+
+    return OK;
+}
+
+std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
+    TMultiTuple lines;
+    for (auto &bind: binds) {
+        lines.push_back({bind.Source.ToString(), bind.Target.ToString(), bind.ReadOnly ? "ro": "rw"});
+        if (bind.Recursive)
+            lines.back().push_back("rec");
+    }
+    return MergeEscapeStrings(lines, ' ', ';');
+}
+
 TError TMountNamespace::MountBinds() {
     for (const auto &bm : BindMounts) {
         auto &source = bm.Source;
@@ -118,11 +157,13 @@ TError TMountNamespace::MountBinds() {
             return TError(EError::InvalidValue, "Bind mount target " +
                           target.ToString() + " out of chroot");
 
-        error = dst.ProcPath().Bind(src.ProcPath(), MS_REC);
+        error = dst.ProcPath().Bind(src.ProcPath(), bm.Recursive ? MS_REC : 0);
         if (error)
             return error;
 
-        error = target.Remount(MS_REMOUNT | MS_BIND | MS_REC | (bm.ReadOnly ? MS_RDONLY : 0));
+        error = target.Remount(MS_REMOUNT | MS_BIND |
+                               (bm.Recursive ? MS_REC : 0) |
+                               (bm.ReadOnly ? MS_RDONLY : 0));
         if (error)
             return error;
     }
