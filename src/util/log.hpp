@@ -83,6 +83,10 @@ template <typename... Args> inline void L_NL(const char* fmt, const Args&... arg
     WriteLog("NL ", fmt::format(fmt, args...));
 }
 
+template <typename... Args> inline void L_CORE(const char* fmt, const Args&... args) {
+    WriteLog("CORE", fmt::format(fmt, args...));
+}
+
 void porto_assert(const char *msg, const char *file, size_t line);
 
 #define PORTO_ASSERT(EXPR) do { if (!(EXPR)) porto_assert(#EXPR, __FILE__, __LINE__); } while (0)
