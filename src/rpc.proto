@@ -60,6 +60,9 @@ enum EError {
     // Cannot parse or execute command
     InvalidCommand = 22;
 
+    // Error code is lost or came from future
+    LostError = 23;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }
@@ -113,7 +116,7 @@ message TContainerRequest {
 }
 
 message TContainerResponse {
-    required EError error = 1;
+    optional EError error = 1 [ default = LostError ];
     optional string errorMsg = 2;
 
     optional TContainerListResponse list = 3;
