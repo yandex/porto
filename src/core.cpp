@@ -78,8 +78,9 @@ TError TCore::Handle(const TTuple &args) {
     error = Identify();
 
     if (!Ulimit || !Dumpable) {
-        L_ACT("Ignore core dump from CT:{} {} {}:{} thread {}:{} signal {}",
-                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
+        L_ACT("Ignore core dump from CT:{} {} {}:{} thread {}:{} signal {}, ulimit {} dumpable {}",
+                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal,
+                Ulimit, Dumpable);
         return OK;
     }
 
