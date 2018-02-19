@@ -1942,7 +1942,11 @@ TError TVolume::UmountLink(const TContainer &ct, bool strict) {
     L_ACT("Umount volume {} from {}", Path, link.Target);
 
     TPath path = ct.RootPath / link.Target;
-    return path.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
+    TError error = path.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
+    if (error && error.Error != EError::InvalidValue)
+        return error;
+
+    return OK;
 }
 
 void TVolume::DestroyAll() {
@@ -2404,7 +2408,8 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
         if (error) {
             if (strict && error.Error == EError::Busy)
                 goto undo;
-            L_WRN("Cannot umount linked volume {} from {}: {}", Path, path, error);
+            if (error.Error != EError::InvalidValue)
+                L_WRN("Cannot umount linked volume {} from {}: {}", Path, path, error);
         }
     }
 

@@ -2408,7 +2408,7 @@ void TContainer::FreeResources() {
     if (LoopDev >= 0) {
         error = PutLoopDev(LoopDev);
         if (error)
-            L_ERR("Can't put loop device {}: {}", LoopDev, error);
+            L_WRN("Can't put loop device {}: {}", LoopDev, error);
         LoopDev = -1;
         SetProp(EProperty::LOOP_DEV);
 
@@ -2416,14 +2416,14 @@ void TContainer::FreeResources() {
         if (tmp.Exists()) {
             error = tmp.RemoveAll();
             if (error)
-                L_ERR("Can't remove {}: {}", tmp, error);
+                L_WRN("Can't remove {}: {}", tmp, error);
         }
     }
 
     for (auto &volume: LinkedVolumes) {
         error = volume->UmountLink(*this);
         if (error)
-            L_ERR("Cannot umount linked volume {}: {}", volume->Path, error);
+            L_WRN("Cannot umount linked volume {}: {}", volume->Path, error);
     }
 
     if (RootVolume) {
