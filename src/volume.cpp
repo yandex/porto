@@ -2153,11 +2153,16 @@ TError TVolume::Destroy(bool strict) {
 
             if (container) {
                 CL->LockContainer(container);
-                UnlinkContainer(*container);
+                error = volume->UnlinkContainer(*container);
+                if (error)
+                    L_WRN("Cannot unlink container {} {}", name, error);
                 CL->ReleaseContainer();
-            }
+            } else
+                L_WRN("Container not found {}", name);
 
             volumes_lock.lock();
+            if (!container || error)
+                volume->Links.erase(name);
         }
 
         if (volume->VolumeOwnerContainer) {
