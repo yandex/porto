@@ -611,6 +611,7 @@ noinline TError Wait(const rpc::TContainerWaitRequest &req,
         /* Explicit wait notifies non-running and hollow meta immediately */
         if (ct->State != EContainerState::Running &&
                 ct->State != EContainerState::Starting &&
+                ct->State != EContainerState::Stopping &&
                 (ct->State != EContainerState::Meta ||
                  !ct->RunningChildren)) {
             rsp.mutable_wait()->set_name(name);

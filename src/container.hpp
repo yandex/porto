@@ -35,6 +35,7 @@ enum class EContainerState {
     Dead,
     Starting,
     Running,
+    Stopping,
     Paused,
     Meta,
     Destroyed,
@@ -114,6 +115,8 @@ public:
 
     bool HasResources() const {
         return State == EContainerState::Running ||
+               State == EContainerState::Starting ||
+               State == EContainerState::Stopping ||
                State == EContainerState::Meta ||
                State == EContainerState::Paused ||
                State == EContainerState::Dead;

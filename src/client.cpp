@@ -100,6 +100,7 @@ TError TClient::IdentifyClient(bool initial) {
             TaskCred.Gid == cr.gid && ClientContainer &&
             (ClientContainer->State == EContainerState::Running ||
              ClientContainer->State == EContainerState::Starting ||
+             ClientContainer->State == EContainerState::Stopping ||
              ClientContainer->State == EContainerState::Meta))
         return OK;
 
@@ -129,6 +130,7 @@ TError TClient::IdentifyClient(bool initial) {
 
     if (ct->State != EContainerState::Running &&
             ct->State != EContainerState::Starting &&
+            ct->State != EContainerState::Stopping &&
             ct->State != EContainerState::Meta)
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 

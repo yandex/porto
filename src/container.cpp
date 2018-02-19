@@ -651,6 +651,8 @@ std::string TContainer::StateName(EContainerState state) {
         return "starting";
     case EContainerState::Running:
         return "running";
+    case EContainerState::Stopping:
+        return "stopping";
     case EContainerState::Paused:
         return "paused";
     case EContainerState::Meta:
@@ -671,6 +673,8 @@ EContainerState TContainer::ParseState(const std::string &name) {
         return EContainerState::Starting;
     if (name == "running")
         return EContainerState::Running;
+    if (name == "stopping")
+        return EContainerState::Stopping;
     if (name == "paused")
         return EContainerState::Paused;
     if (name == "meta")
@@ -809,7 +813,8 @@ void TContainer::SetState(EContainerState next) {
 
     if (next != EContainerState::Running &&
             next != EContainerState::Meta &&
-            next != EContainerState::Starting)
+            next != EContainerState::Starting &&
+            next != EContainerState::Stopping)
         NotifyWaiters();
 }
 
@@ -1399,7 +1404,8 @@ TError TContainer::ApplyCpuGuarantee() {
         for (auto child: Children) {
             if (child->State == EContainerState::Running ||
                     child->State == EContainerState::Meta ||
-                    child->State == EContainerState::Starting)
+                    child->State == EContainerState::Starting ||
+                    child->State == EContainerState::Stopping)
                 CpuGuaranteeSum += std::max(child->CpuGuarantee, child->CpuGuaranteeSum);
         }
         ct_lock.unlock();
@@ -2269,9 +2275,10 @@ TError TContainer::Start() {
     CL->LockedContainer->UpgradeLock();
 
     if (error) {
+        SetState(EContainerState::Stopping);
         (void)Terminate(0);
-        SetState(EContainerState::Stopped);
         FreeResources();
+        SetState(EContainerState::Stopped);
         goto out;
     }
 
@@ -2427,7 +2434,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (FreezerSubsystem.IsFrozen(cg))
         return cg.KillAll(SIGKILL);
 
-    if (Task.Pid && deadline && State != EContainerState::Meta) {
+    if (Task.Pid && deadline && !IsMeta()) {
         int sig = SIGTERM;
 
         if (Isolate && OsMode) {
@@ -2506,17 +2513,16 @@ TError TContainer::Stop(uint64_t timeout) {
         if (ct->IsRoot() || ct->State == EContainerState::Stopped)
             continue;
 
+        ct->SetState(EContainerState::Stopping);
         error = ct->Terminate(deadline);
-        if (error) {
+        if (error)
             L_ERR("Cannot terminate tasks in CT{}:{}: {}", ct->Id, ct->Name, error);
-            return error;
-        }
 
         if (FreezerSubsystem.IsSelfFreezing(cg)) {
             L_ACT("Thaw terminated paused CT{}:{}", ct->Id, ct->Name);
             error = FreezerSubsystem.Thaw(cg, false);
             if (error)
-                return error;
+                L_ERR("Cannot thaw CT{}:{}: {}", ct->Id, ct->Name, error);
         }
     }
 
@@ -2541,8 +2547,8 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->OomKilled = false;
         ct->ClearProp(EProperty::OOM_KILLED);
 
-        ct->SetState(EContainerState::Stopped);
         ct->FreeResources();
+        ct->SetState(EContainerState::Stopped);
 
         error = Save();
         if (error)
@@ -3110,6 +3116,7 @@ void TContainer::SyncState() {
         case EContainerState::Running:
         case EContainerState::Meta:
         case EContainerState::Starting:
+        case EContainerState::Stopping:
             /* Any state is ok */
             break;
         case EContainerState::Paused:

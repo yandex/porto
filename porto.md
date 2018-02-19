@@ -62,6 +62,7 @@ this is common parent for all visible containers.
 * **stopped**   - initial state
 * **starting**  - start in progress
 * **running**   - execution in progress
+* **stopping**  - stop in progress
 * **paused**    - frozen, consumes memory but no cpu
 * **dead**      - execution complete
 * **meta**      - running container without command
@@ -69,8 +70,8 @@ this is common parent for all visible containers.
 ## Operations
 * **create**    - creates new container in stopped state
 * **start**     - stopped -\> starting -\> running | meta
-* **stop**      - running | meta | dead -\> stopped
-* **restart**   - dead -\> stopped -\> starting -\> running | meta
+* **stop**      - running | meta | dead -\> stopping -\> stopped
+* **restart**   - dead -\> stopping -\> stopped -\> starting -\> running
 * **kill**      - running -\> dead
 * **death**     - running -\> dead
 * **pause**     - running | meta -\> paused
@@ -83,7 +84,7 @@ this is common parent for all visible containers.
 
 ## Usual Life Cycle:
 
-create -\> (stopped) -\> set -\> start -\> (running) -\> death -\> (dead) -\> get -\> destroy
+create -\> (stopped) -\> setup -\> start -\> (running) -\> death -\> (dead) -\> get -\> destroy
 
 ## Properties
 
