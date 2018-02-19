@@ -214,6 +214,7 @@ public:
         return BackendType == "rbd" ||
                BackendType == "lvm" ||
                BackendType == "tmpfs" ||
+               BackendType == "dir" ||
                BackendType == "quota";
     }
 

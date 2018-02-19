@@ -52,6 +52,53 @@ std::string TVolumeBackend::ClaimPlace() {
     return Volume->UserStorage() ? "" : Volume->Place.ToString();
 }
 
+/* TVolumeDirBackend - directory */
+
+class TVolumeDirBackend : public TVolumeBackend {
+public:
+
+    TError Configure() override {
+
+        if (Volume->IsAutoPath)
+            return TError(EError::InvalidProperty, "Dir backend requires path");
+
+        if (Volume->HaveQuota())
+            return TError(EError::InvalidProperty, "Dir backend doesn't support quota");
+
+        if (Volume->IsReadOnly)
+            return TError(EError::InvalidProperty, "Dir backed doesn't support read_only");
+
+        if (Volume->HaveStorage())
+            return TError(EError::InvalidProperty, "Dir backed doesn't support storage");
+
+        if (Volume->HaveLayers())
+            return TError(EError::InvalidProperty, "Dir backed doesn't support layers");
+
+        /* All data is stored right here */
+        Volume->InternalPath = Volume->Path;
+        Volume->StoragePath = Volume->Path;
+        Volume->KeepStorage = true;
+
+        return OK;
+    }
+
+    TError Build() override {
+        return OK;
+    }
+
+    std::string ClaimPlace() override {
+        return "";
+    }
+
+    TError Destroy() override {
+        return OK;
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->Path.StatFS(result);
+    }
+};
+
 /* TVolumePlainBackend - bindmount */
 
 class TVolumePlainBackend : public TVolumeBackend {
@@ -1307,7 +1354,9 @@ void TVolume::SetState(EVolumeState state) {
 }
 
 TError TVolume::OpenBackend() {
-    if (BackendType == "plain")
+    if (BackendType == "dir")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeDirBackend());
+    else if (BackendType == "plain")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
     else if (BackendType == "bind")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeBindBackend());
@@ -2143,7 +2192,7 @@ TError TVolume::DestroyOne(bool strict) {
     TPath internal = GetInternal("");
     TError ret, error;
 
-    if (strict && BackendType != "quota") {
+    if (strict && BackendType != "dir" && BackendType != "quota") {
         error = Path.Umount(UMOUNT_NOFOLLOW);
         if (error)
             return error;
@@ -2699,7 +2748,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
-    { V_BACKEND,     "plain|bind|rbind|tmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
+    { V_BACKEND,     "dir|plain|bind|rbind|tmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_STATE,       "volume state (ro)", true },

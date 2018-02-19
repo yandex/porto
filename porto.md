@@ -810,6 +810,7 @@ Like for container volume configuration is a set of key-value pairs.
 * **id** - volume id, 64-bit decimal
 
 * **backend** - backend engine, default: autodetect
+    - *dir*       - directory for linking into containers
     - *plain*     - bind mount **storage** to volume path
     - *bind*      - bind mount **storage** to volume path, requires volume path
     - *rbind*     - recursive bind mount **storage** to volume path, requires volume path
