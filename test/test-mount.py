@@ -5,11 +5,11 @@ from test_common import *
 
 c = porto.Connection(timeout=10)
 
-def CheckBaseMounts(mnt):
+def CheckBaseMounts(mnt, chroot=True):
     Expect("rw" in mnt['/']['flag'])
     Expect("rw" in mnt['/dev']['flag'])
     Expect("rw" in mnt['/dev/pts']['flag'])
-    Expect("rw" in mnt['/dev/shm']['flag'])
+    Expect(not chroot or "rw" in mnt['/dev/shm']['flag'])
     Expect("rw" in mnt['/run']['flag'])
     Expect("ro" in mnt['/sys']['flag'])
     Expect("rw" in mnt['/proc']['flag'])
@@ -30,7 +30,7 @@ ro_volume = c.CreateVolume(backend='plain', read_only='true', containers='w')
 # no chroot
 a = c.Run("a")
 mnt = ParseMountinfo(a['root_pid'])
-CheckBaseMounts(mnt)
+CheckBaseMounts(mnt, chroot=False)
 a.Destroy()
 
 # simple chroot
