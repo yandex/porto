@@ -812,6 +812,7 @@ Like for container volume configuration is a set of key-value pairs.
 * **backend** - backend engine, default: autodetect
     - *plain*     - bind mount **storage** to volume path
     - *bind*      - bind mount **storage** to volume path, requires volume path
+    - *rbind*     - recursive bind mount **storage** to volume path, requires volume path
     - *tmpfs*     - mount new tmpfs instance
     - *quota*     - project quota for volume path
     - *native*    - bind mount **storage** to volume path and setup project quota
