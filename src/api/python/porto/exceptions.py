@@ -6,10 +6,10 @@ class EError(Exception):
 
     @classmethod
     def _Init(cls):
-        for name, eid in rpc_pb2.EError.items():
-            e_class = type(name, (cls,), {'EID': eid})
+        for eid, err in rpc_pb2._EERROR.values_by_number.iteritems():
+            e_class = type(err.name, (cls,), {'EID': eid})
             cls.__TYPES__[eid] = e_class
-            globals()[name] = e_class
+            globals()[err.name] = e_class
 
     @classmethod
     def Create(cls, eid, msg):
