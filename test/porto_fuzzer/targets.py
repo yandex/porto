@@ -167,6 +167,7 @@ def container_action(conn):
             porto.exceptions.InvalidProperty,
             porto.exceptions.InvalidValue,
             porto.exceptions.InvalidState,
+            porto.exceptions.InvalidCommand,
             porto.exceptions.ContainerAlreadyExists,
             porto.exceptions.UnknownError,
             porto.exceptions.ResourceNotAvailable,
