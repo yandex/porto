@@ -159,7 +159,7 @@ public:
     TPath Compose(const TContainer &ct) const;
     static TError Resolve(const TContainer &ct, const TPath &path, std::shared_ptr<TVolume> &volume);
 
-    TError Configure(const TStringMap &cfg);
+    TError Configure(const TPath &target_root, const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
     void Dump(TStringMap &props, TStringMap &links);
 

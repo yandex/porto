@@ -1499,7 +1499,7 @@ TError TVolume::CheckDependencies() {
     return error;
 }
 
-TError TVolume::Configure(const TStringMap &cfg) {
+TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
     TError error;
 
     /* Verify properties */
@@ -1552,35 +1552,15 @@ TError TVolume::Configure(const TStringMap &cfg) {
 
     InternalPath = Place / PORTO_VOLUMES / Id / "volume";
 
-    std::shared_ptr<TContainer> target;
-
-    if (cfg.count(V_TARGET_CONTAINER)) {
-        error = CL->WriteContainer(cfg.at(V_TARGET_CONTAINER), target, true);
-        if (error)
-            return error;
-    } else
-        target = CL->ClientContainer;
-
-    /* Verify volume path */
-    if (!Path.IsEmpty()) {
-        if (!Path.IsAbsolute())
-            return TError(EError::InvalidValue, "Volume path must be absolute");
-        if (!Path.IsNormal())
-            return TError(EError::InvalidValue, "Volume path must be normalized");
-        Path = target->RootPath / Path;
-        if (!Path.Exists())
-            return TError(EError::InvalidValue, "Volume path does not exist");
-        if (!Path.IsDirectoryStrict())
-            return TError(EError::InvalidValue, "Volume path must be a directory");
-        if (IsSystemPath(Path))
-            return TError(EError::InvalidValue, "Volume in system directory");
+    if (Path) {
+        Path = target_root / Path;
     } else {
-        if (target->RootPath.IsRoot()) {
+        if (target_root.IsRoot()) {
             /* /place/porto_volumes/<id>/volume */
             Path = InternalPath;
         } else {
             /* /chroot/porto/volume_<id> */
-            TPath porto_path = target->RootPath / PORTO_CHROOT_VOLUMES;
+            TPath porto_path = target_root / PORTO_CHROOT_VOLUMES;
             if (!porto_path.Exists()) {
                 error = porto_path.Mkdir(0755);
                 if (error)
@@ -2728,6 +2708,18 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     }
 
     std::shared_ptr<TContainer> owner;
+    TPath target_root;
+
+    if (cfg.count(V_TARGET_CONTAINER)) {
+        std::shared_ptr<TContainer> target;
+        error = CL->WriteContainer(cfg.at(V_TARGET_CONTAINER), target, true);
+        if (error)
+            return error;
+        if (target->State == EContainerState::Stopped)
+            return TError(EError::InvalidState, "Target container is stopped");
+        target_root = target->RootPath;
+    } else
+        target_root = CL->ClientContainer->RootPath;
 
     if (cfg.count(V_OWNER_CONTAINER)) {
         error = CL->WriteContainer(cfg.at(V_OWNER_CONTAINER), owner, true);
@@ -2748,7 +2740,24 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max_vol));
 
     if (cfg.count(V_PATH)) {
-        TPath path(cfg.at(V_PATH));
+        TPath path = cfg.at(V_PATH);
+
+        if (!path.IsAbsolute())
+            return TError(EError::InvalidValue, "Volume path must be absolute");
+
+        if (!path.IsNormal())
+            return TError(EError::InvalidValue, "Volume path must be normalized");
+
+        path = target_root / path;
+
+        if (!path.Exists())
+            return TError(EError::InvalidValue, "Volume path does not exist");
+
+        if (!path.IsDirectoryStrict())
+            return TError(EError::InvalidValue, "Volume path must be a directory");
+
+        if (IsSystemPath(path))
+            return TError(EError::InvalidValue, "Volume in system directory");
 
         for (auto &it : Volumes) {
             auto &vol = it.second;
@@ -2776,7 +2785,7 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     volume = std::make_shared<TVolume>();
     volume->Id = std::to_string(NextId++);
 
-    error = volume->Configure(cfg);
+    error = volume->Configure(target_root, cfg);
     if (error)
         return error;
 
