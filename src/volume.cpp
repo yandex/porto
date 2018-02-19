@@ -1962,12 +1962,15 @@ TError TVolume::MountLink(const TContainer &ct) {
     if (IsReadOnly || link.ReadOnly)
         bind.Flags |= MS_RDONLY;
 
+    if (BackendType == "rbind" || BackendType == "dir")
+        bind.Flags |= MS_REC;
+
     if (!IsReadOnly && link.ReadOnly) {
         bind.Source = GetInternal("volume_ro");
         error = bind.Source.Mkdir(700);
         if (error)
             return error;
-        error = bind.Source.BindRemount(InternalPath, MS_RDONLY);
+        error = bind.Source.BindRemount(InternalPath, bind.Flags);
         if (error)
             return error;
     } else
