@@ -45,6 +45,8 @@ set_tests_properties(go_api
 endif()
 
 ADD_PYTHON_TEST(knobs)
+ADD_PYTHON_TEST(mount)
+
 ADD_PYTHON_TEST(portoctl-exec)
 ADD_PYTHON_TEST(portoctl-wait)
 ADD_PYTHON_TEST(self-container)
