@@ -1936,8 +1936,12 @@ TError TVolume::UmountLink(const TContainer &ct, bool strict) {
     auto link = it->second;
     volumes_lock.unlock();
 
+    if (!link.Target)
+        return OK;
+
+    L_ACT("Umount volume {} from {}", Path, link.Target);
+
     TPath path = ct.RootPath / link.Target;
-    if (strict)
     return path.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
 }
 
