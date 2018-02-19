@@ -29,9 +29,7 @@ class SocketError(EError):
 class SocketTimeout(EError):
     pass
 
-
-class UnknownError(EError):
-    pass
-
-
 EError._Init()
+
+PermissionError = Permission
+UnknownError = Unknown
