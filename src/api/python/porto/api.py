@@ -6,8 +6,6 @@ import threading
 from . import rpc_pb2
 from . import exceptions
 
-__all__ = ['Connection']
-
 
 def _VarintEncoder():
     """Return an encoder for a basic varint value (does not include tag)."""
@@ -246,6 +244,20 @@ class Container(object):
         self.conn = conn
         self.name = name
 
+    def __str__(self):
+        return 'Container `{}`'.format(self.name)
+
+    def __div__(self, child):
+        if self.name == "/":
+            return Container(self.conn, child)
+        return Container(self.conn, self.name + "/" + child)
+
+    def __getitem__(self, property):
+        return self.conn.GetProperty(self.name, property)
+
+    def __setitem__(self, property, value):
+        return self.conn.SetProperty(self.name, property, value)
+
     def Start(self):
         self.conn.Start(self.name)
 
@@ -271,7 +283,6 @@ class Container(object):
         return self.Get(self.conn.Plist())
 
     def GetProperty(self, property, sync=False):
-        # TODO make real property getters/setters
         return self.conn.GetProperty(self.name, property, sync)
 
     def SetProperty(self, property, value):
@@ -283,12 +294,11 @@ class Container(object):
     def Wait(self, *args, **kwargs):
         return self.conn.Wait([self.name], *args, **kwargs)
 
-    def __str__(self):
-        return 'Container `{}`'.format(self.name)
-
     def Destroy(self):
         self.conn.Destroy(self.name)
 
+    def ListVolumeLinks(self):
+        return self.conn.ListVolumeLinks(container=self)
 
 class Layer(object):
     def __init__(self, conn, name, place=None, desc=None):
@@ -348,6 +358,19 @@ class Storage(object):
     def RemoveStorage(self):
         return self.conn.RemoveStorage(self.name, self.place)
 
+class VolumeLink(object):
+    def __init__(self, volume, container, target, read_only, required):
+        self.volume = volume
+        self.container = container
+        self.target = target
+        self.read_only = read_only
+        self.required = required
+
+    def __str__(self):
+        return 'VolumeLink `{}` `{}` `{}`'.format(self.volume.path, self.container.name, self.target)
+
+    def Unlink(self):
+        self.volume.Unlink(container)
 
 class Volume(object):
     def __init__(self, conn, path):
@@ -357,14 +380,23 @@ class Volume(object):
     def __str__(self):
         return 'Volume `{}`'.format(self.path)
 
-    def GetProperties(self):
-        return {p.name: p.value for p in self.conn._ListVolumes(path=self.path)[0].properties}
+    def __getitem__(self, property):
+        return self.conn.GetVolumeProperties(self.path)[property]
 
-    def GetProperty(self, name):
-        return self.GetProperties()[name]
+    def __setitem__(self, property, value):
+        self.conn.TuneVolume(self.path, **{property: value})
+
+    def GetProperty(self, property):
+        return self.conn.GetVolumeProperties(self.path)[property]
+
+    def GetProperties(self):
+        return self.conn.GetVolumeProperties(self.path)
 
     def GetContainers(self):
         return [Container(self.conn, c) for c in self.conn._ListVolumes(path=self.path)[0].containers]
+
+    def ListVolumeLinks(self):
+        return self.conn.ListVolumeLinks(volume=self)
 
     def GetLayers(self):
         properties = self.GetProperties()
@@ -373,10 +405,10 @@ class Volume(object):
         layers = layers.split(';') if layers else []
         return [Layer(self.conn, l, place) for l in layers]
 
-    def Link(self, container):
+    def Link(self, container, *args, **kwargs):
         if isinstance(container, Container):
             container = container.name
-        self.conn.LinkVolume(self.path, container)
+        self.conn.LinkVolume(self.path, container, *args, **kwargs)
 
     def Unlink(self, container=None, strict=None):
         if isinstance(container, Container):
@@ -426,17 +458,27 @@ class Connection(object):
         self.GetProperty(name, "state")
         return Container(self, name)
 
-    def Create(self, name):
+    def Create(self, name, weak=False):
         request = rpc_pb2.TContainerRequest()
-        request.create.name = name
+        if weak:
+            request.createWeak.name = name
+        else:
+            request.create.name = name
         self.rpc.call(request, self.rpc.timeout)
         return Container(self, name)
 
     def CreateWeakContainer(self, name):
-        request = rpc_pb2.TContainerRequest()
-        request.createWeak.name = name
-        self.rpc.call(request, self.rpc.timeout)
-        return Container(self, name)
+        return self.Create(name, weak=True)
+
+    def Run(self, name, weak=True, start=True, **kwargs):
+        ct = self.Create(name, weak=True)
+        for property, value in kwargs.iteritems():
+            ct.SetProperty(property, value)
+        if start:
+            ct.Start()
+        if not weak:
+            ct.SetProperty('weak', False)
+        return ct
 
     def Destroy(self, container):
         if isinstance(container, Container):
@@ -649,6 +691,16 @@ class Connection(object):
     def ListVolumes(self, container=None):
         return [Volume(self, v.path) for v in self._ListVolumes(container)]
 
+    def ListVolumeLinks(self, volume=None, container=None):
+        links = []
+        for v in self.conn._ListVolumes(path=volume.path if isinstance(volume, Volume) else volume, container=container):
+            for l in v.links:
+                links.append(VolumeLink(Volume(self, v.path), Container(self, l.container), l.target, l.read_only, l.required))
+        return links
+
+    def GetVolumeProperties(self, path):
+        return {p.name: p.value for p in self._ListVolumes(path=path)[0].properties}
+
     def TuneVolume(self, path, **properties):
         request = rpc_pb2.TContainerRequest()
         request.tuneVolume.CopyFrom(rpc_pb2.TVolumeTuneRequest())
@@ -808,22 +860,3 @@ class Connection(object):
         request.version.CopyFrom(rpc_pb2.TVersionRequest())
         response = self.rpc.call(request, self.rpc.timeout)
         return (response.version.tag, response.version.revision)
-
-# Example:
-# from porto import *
-# conn = Connection()
-# conn.connect()
-# print conn.Create('test')
-# print conn.Plist()
-# print conn.Dlist()
-# print conn.GetProperty('test', 'command')
-# print conn.GetData('/', 'state')
-# print conn.List()
-# print conn.Destroy('test')
-#
-# container = conn.Create('test2')
-# print container.GetProperty('command')
-# print container.GetData('state')
-# print container.Get(['command', 'state'])
-# conn.Destroy(container)
-# conn.disconnect()

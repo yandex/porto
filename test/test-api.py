@@ -61,6 +61,7 @@ assert a.name == container_name
 assert c.Find(container_name).name == container_name
 assert container_name in c.List()
 
+assert a["state"] == "stopped"
 assert a.GetData("state") == "stopped"
 a.SetProperty("command", "false")
 assert a.GetProperty("command") == False
@@ -106,6 +107,10 @@ c.Destroy(a)
 
 assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
 assert not container_name in c.List()
+
+a = c.Run(container_name, command="sleep 5")
+assert a["command"] == "sleep 5"
+a.Destroy()
 
 c.ListVolumes()
 v = c.CreateVolume(private=volume_private)
