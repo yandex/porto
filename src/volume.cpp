@@ -1724,7 +1724,8 @@ TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
                     StoragePath == other->StoragePath &&
                     Place == other->Place &&
                     (!IsReadOnly || !other->IsReadOnly) &&
-                    (BackendType != "bind" || other->BackendType != "bind"))
+                    (!(BackendType == "bind" || BackendType == "rbind") ||
+                     !(other->BackendType == "bind" || other->BackendType == "rbind")))
                 return TError(EError::Busy, "Storage already in use by volume " +
                         other->Path.ToString());
         }
