@@ -142,7 +142,8 @@ public:
     static TError Find(const TPath &path, std::shared_ptr<TVolume> &volume);
     static std::shared_ptr<TVolume> Locate(const TPath &path);
 
-    TError Configure(const TStringMap &cfg);
+    TError Configure(const TPath &target_root, const TStringMap &cfg);
+
     TError ApplyConfig(const TStringMap &cfg);
     void DumpConfig(TStringMap &props, TTuple &links) const;
 
