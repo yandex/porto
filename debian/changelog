@@ -1,3 +1,21 @@
+yandex-porto (4.6.2) unstable; urgency=low
+
+  * core: log state of ulimit and dumpable when refuse to dump
+  * core: log actions with keyword "CORE"
+  * core: add CAP_SYS_PTRACE into ambient capabilities
+  * proto: make error codes future-compatible
+  * cgroup: do not include cgroup itself into list of childs
+  * volume: read-only should deny writes access
+  * porto: make bind-mounts back non-recursive by default
+  * volume: refactor mount flags operations
+  * volume: add backend=rbind
+  * volume: bind and rbind could share storage
+  * volume: include target root path into volume path verification
+  * test: add test for mount layout
+  * test: test sub-mounts for bind/rbind
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 20 Feb 2018 17:04:03 +0300
+
 yandex-porto (4.6.1) unstable; urgency=low
 
   * devices: always allow mknod for devices #PORTO-346
