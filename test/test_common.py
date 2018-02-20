@@ -49,15 +49,16 @@ def ParseMountinfo(pid="self"):
     ret = {}
     for line in open("/proc/{}/mountinfo".format(pid), "r"):
         l = line.split()
-        sep = l.index("-")
-        m = { "path": l[4], "flag": l[5].split(','), "type": l[sep+1], "dev": l[sep+2], "opt": l[sep+3].split(',') }
+        sep = l.index('-')
+        m = { 'mount_id': l[0], 'parent_id': l[1], 'dev': l[2], 'bind': l[3], 'target': l[4], 'flag': l[5].split(','), 'type': l[sep+1], 'source': l[sep+2], 'opt': l[sep+3].split(',') }
         for tag in l[6:sep]:
             if ':' in tag:
                 n, v = tag.split(':', 2)
                 m[n] = v
             else:
                 m[tag] = True
-        ret[m['path']] = m
+        # override lower mounts
+        ret[m['target']] = m
     return ret
 
 def MemoryStat(ct, stat):

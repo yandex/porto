@@ -16,6 +16,8 @@ import signal
 import functools
 import tarfile
 
+test_fails = 0
+
 def prepare_fuzzer():
     if not os.path.exists(FUZZER_MNT):
         os.mkdir(FUZZER_MNT)
@@ -64,8 +66,13 @@ def cleanup_fuzzer():
     for l in targets.our_layers(conn):
         conn.RemoveLayer(l)
 
+    for path, mnt in ParseMountinfo().iteritems():
+        if path.startswith(FUZZER_MNT + "/"):
+            print "Stale mount: ", path, mnt
+            test_fails += 1
+
     if (os.path.ismount(FUZZER_MNT)):
-        subprocess.check_call(["umount", FUZZER_MNT])
+        subprocess.check_call(["umount", '-l', FUZZER_MNT])
 
     if (os.path.exists(FUZZER_MNT)):
         os.rmdir(FUZZER_MNT)
@@ -185,7 +192,11 @@ print "Warnings", get_property(conn, "/", "porto_stat[warnings]")
 print "Spawned", get_property(conn, "/", "porto_stat[spawned]")
 print "RestoreFailed", get_property(conn, "/", "porto_stat[restore_failed]")
 
-failed = get_property(conn, "/", "porto_stat[errors]") != "0" or get_property(conn, "/", "porto_stat[warnings]") != "0"
+if get_property(conn, "/", "porto_stat[errors]") != "0":
+    test_fails += 1
+
+if get_property(conn, "/", "porto_stat[warnings]") != "0":
+    test_fails += 1
 
 print ("--- log ---")
 os.system("tail -c +{} /var/log/portod.log | grep -wE 'WRN|ERR|STK'".format(skip_log))
@@ -194,5 +205,5 @@ print ("--- end ---")
 if opts.cleanup:
     cleanup_fuzzer()
 
-if failed:
+if test_fails != 0:
     sys.exit(1)
