@@ -80,6 +80,8 @@ struct TVolumeLink {
     bool Required = false;
     bool ReadOnly = false;
 
+    TPath HostTarget;
+
     std::string Format();
     TError Parse(const std::string &str);
 };

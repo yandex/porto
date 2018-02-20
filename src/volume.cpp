@@ -1614,6 +1614,14 @@ TError TVolume::CheckConflicts(const TPath &path) {
             if (layer.IsAbsolute() && (layer.IsInside(path) || path.IsInside(layer)))
                 return TError(EError::Busy, "Path overlaps with layer {}", layer);
         }
+
+        for (auto &link: vol->Links) {
+            TPath &target = link.second.HostTarget;
+            if (target == path)
+                return TError(EError::Busy, "Path is used by volume {} link {}", vol->Path, target);
+            if (target.IsInside(path))
+                return TError(EError::Busy, "Path overlaps with volume {} link {}", vol->Path, target);
+        }
     }
 
     return OK;
@@ -1969,70 +1977,78 @@ TError TVolume::Build() {
 }
 
 TError TVolume::MountLink(const TContainer &ct) {
+    std::shared_ptr<TVolume> target_volume;
     TError error;
 
     auto volumes_lock = LockVolumes();
     auto it = Links.find(ct.Name);
     if (it == Links.end())
         return TError(EError::VolumeNotLinked, "Link not found");
-    auto link = it->second;
-
-    if (link.Target) {
-        error = CheckConflicts(ct.RootPath / link.Target);
-        if (error)
-            return error;
-    }
-
-    volumes_lock.unlock();
-
-    if (!link.Target)
+    if (!it->second.Target)
         return OK;
+    TPath target = ct.RootPath / it->second.Target;
+    bool ro = it->second.ReadOnly;
+    it->second.HostTarget = "";
+    error = CheckConflicts(target);
+    if (error)
+        return error;
+    it->second.HostTarget = target;
+    volumes_lock.unlock();
 
     auto lock = Lock();
 
     if (State != EVolumeState::Ready)
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
-    L_ACT("Mount volume {} to {}", Path, link.Target);
+    L_ACT("Mount volume {} to {}", Path, target);
 
     TBindMount bind;
 
     bind.IsDirectory = true;
-    if (IsReadOnly || link.ReadOnly)
+    if (IsReadOnly || ro)
         bind.Flags |= MS_RDONLY;
 
     if (BackendType == "rbind" || BackendType == "dir")
         bind.Flags |= MS_REC;
 
-    if (!IsReadOnly && link.ReadOnly) {
+    if (!IsReadOnly && ro) {
         bind.Source = GetInternal("volume_ro");
         error = bind.Source.Mkdir(700);
         if (error)
-            return error;
+            goto undo;
         error = bind.Source.BindRemount(InternalPath, bind.Flags);
         if (error)
-            return error;
+            goto undo;
     } else
         bind.Source = InternalPath;
 
     bind.ControlSource = true;
 
-    bind.Target = ct.RootPath / link.Target;
+    bind.Target = target;
     bind.CreateTarget = true;
     bind.FollowTraget = false;
 
-    auto target_volume = TVolume::Locate(bind.Target);
+    target_volume = TVolume::Locate(bind.Target);
     bind.ControlTarget = target_volume && !CL->CanControl(target_volume->VolumeOwner);
 
     error = bind.Mount(CL->Cred, "/");
 
-    if (!IsReadOnly && link.ReadOnly) {
+    if (!IsReadOnly && ro) {
         TError error2 = bind.Source.UmountAll();
         if (error2)
             L_WRN("Cannot umount {}", error2);
         error2 = bind.Source.Rmdir();
         if (error2)
             L_WRN("Cannot remove {}", error2);
+    }
+
+undo:
+    if (error) {
+        volumes_lock.lock();
+        auto it = Links.find(ct.Name);
+        if (it != Links.end())
+            it->second.HostTarget = "";
+        volumes_lock.unlock();
     }
 
     return error;
@@ -2043,20 +2059,15 @@ TError TVolume::UmountLink(const TContainer &ct, bool strict) {
     auto it = Links.find(ct.Name);
     if (it == Links.end())
         return TError(EError::VolumeNotLinked, "Link not found");
-    auto link = it->second;
+    if (!it->second.HostTarget)
+        return OK;
+    TPath target = it->second.HostTarget;
+    it->second.HostTarget = "";
     volumes_lock.unlock();
 
-    if (!link.Target)
-        return OK;
+    L_ACT("Umount volume {} from {}", Path, target);
 
-    L_ACT("Umount volume {} from {}", Path, link.Target);
-
-    TPath path = ct.RootPath / link.Target;
-    TError error = path.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
-    if (error && error.Error != EError::InvalidValue)
-        return error;
-
-    return OK;
+    return target.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
 }
 
 void TVolume::DestroyAll() {
@@ -2444,9 +2455,11 @@ TError TVolume::LinkContainer(TContainer &container, const TPath &target,
 
     auto volumes_lock = LockVolumes();
     TError error;
+    TPath host_target;
 
     if (target && container.HasResources()) {
-        error = CheckConflicts(container.RootPath / target);
+        host_target = container.RootPath / target;
+        error = CheckConflicts(host_target);
         if (error)
             return error;
     }
@@ -2463,9 +2476,10 @@ TError TVolume::LinkContainer(TContainer &container, const TPath &target,
         return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
 
     auto &link = Links[container.Name];
-    link.Target = target.ToString();
+    link.Target = target;
     link.ReadOnly = read_only;
     link.Required = required;
+    link.HostTarget = host_target;     /* protect path */
 
     container.LinkedVolumes.emplace_back(shared_from_this());
     if (required) {
@@ -2525,16 +2539,12 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
     if (error)
         goto undo;
 
-    if (link.Target && container.HasResources()) {
-        TPath path = container.RootPath / link.Target;
-        error = path.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
+    if (link.HostTarget) {
+        error = link.HostTarget.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
         if (error) {
             if (strict && error.Error == EError::Busy)
                 goto undo;
-            if (error.Error == EError::InvalidValue)
-                error = OK;
-            if (error)
-                L_WRN("Cannot umount linked volume {} from {}: {}", Path, path, error);
+            L_WRN("Cannot umount linked volume {} from {}: {}", Path, link.HostTarget, error);
         }
     }
 
