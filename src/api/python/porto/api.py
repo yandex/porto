@@ -206,7 +206,7 @@ class _RPC(object):
         resp.ParseFromString(buf[length[1]:])
 
         if resp.error != rpc_pb2.Success:
-            raise exceptions.EError.Create(resp.error, resp.errorMsg)
+            raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
 
         return resp
 
@@ -526,14 +526,14 @@ class Connection(object):
             request.get.nonblock = nonblock
         resp = self.rpc.call(request, self.rpc.timeout)
         if resp.error != rpc_pb2.Success:
-            raise exceptions.EError.Create(resp.error, resp.errorMsg)
+            raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
 
         res = {}
         for container in resp.get.list:
             var = {}
             for kv in container.keyval:
                 if kv.HasField('error'):
-                    var[kv.variable] = exceptions.EError.Create(kv.error, kv.errorMsg)
+                    var[kv.variable] = exceptions.PortoException.Create(kv.error, kv.errorMsg)
                     continue
                 if kv.value == 'false':
                     var[kv.variable] = False
@@ -616,7 +616,7 @@ class Connection(object):
         else:
             resp = self.rpc.call(request, None)
         if resp.error != rpc_pb2.Success:
-            raise exceptions.EError.Create(resp.error, resp.errorMsg)
+            raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
         return resp.wait.name
 
     def CreateVolume(self, path=None, layers=[], **properties):

@@ -1,6 +1,6 @@
 from . import rpc_pb2
 
-class EError(Exception):
+class PortoException(Exception):
     EID = None
     __TYPES__ = {}
 
@@ -22,14 +22,15 @@ class EError(Exception):
         return '{}: {}'.format(self.__class__.__name__, self.message)
 
 
-class SocketError(EError):
+class SocketError(PortoException):
     pass
 
 
-class SocketTimeout(EError):
+class SocketTimeout(PortoException):
     pass
 
-EError._Init()
+PortoException._Init()
 
+EError = PortoException
 PermissionError = Permission
 UnknownError = Unknown
