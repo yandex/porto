@@ -2530,7 +2530,9 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
         if (error) {
             if (strict && error.Error == EError::Busy)
                 goto undo;
-            if (error.Error != EError::InvalidValue)
+            if (error.Error == EError::InvalidValue)
+                error = OK;
+            if (error)
                 L_WRN("Cannot umount linked volume {} from {}: {}", Path, path, error);
         }
     }
