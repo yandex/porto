@@ -1813,12 +1813,8 @@ public:
                 ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
             }
 
-            for (auto link: v.Links) {
-                if (link.second == "")
-                    std::cout << " " << link.first;
-                else
-                    std::cout << " " << link.first << "=" << link.second;
-            }
+            for (auto link: v.Links)
+                std::cout << " " << link.first;
 
             std::cout << std::endl;
         }
@@ -1827,13 +1823,14 @@ public:
             return;
 
         std::cout << "  " << std::left << std::setw(20) << "containers";
-        for (auto link: v.Links) {
-            if (link.second == "")
-                std::cout << " " << link.first;
-            else
-                std::cout << " " << link.first << "=" << link.second;
-        }
+        for (auto link: v.Links)
+            std::cout << " " << link.first;
         std::cout << std::endl;
+
+        for (auto link: v.Links)
+            if (link.second != "")
+                std::cout << "  " << std::left << std::setw(20) << "link" << " " << link.first << " -> " << link.second << std::endl;
+
         std::cout << std::resetiosflags(std::ios::adjustfield);
 
         for (auto kv: v.Properties) {
