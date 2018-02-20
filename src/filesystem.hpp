@@ -10,8 +10,7 @@
 struct TBindMount {
     TPath Source;
     TPath Target;
-    bool ReadOnly = false;
-    bool Recursive = false;
+    unsigned long Flags = 0;
     bool ControlSource = false;
     bool ControlTarget = false;
 

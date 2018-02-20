@@ -87,10 +87,10 @@ TError RunCommand(const std::vector<std::string> &command,
         if (dir.Chdir() ||
                 unshare(CLONE_NEWNS) ||
                 root.Remount(MS_PRIVATE | MS_REC) ||
-                root.Remount(MS_REMOUNT | MS_BIND | MS_REC | MS_RDONLY) ||
+                root.Remount(MS_BIND | MS_REC | MS_RDONLY) ||
                 dot.Bind(dot, MS_REC) ||
                 TPath("../" + path.BaseName()).Chdir() ||
-                dot.Remount(MS_REMOUNT | MS_BIND | MS_REC))
+                dot.Remount(MS_BIND | MS_REC, MS_RDONLY))
             _exit(EXIT_FAILURE);
     } else {
         if (root.Chdir())
