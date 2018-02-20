@@ -25,7 +25,7 @@ def our_volumes(conn):
         try:
             if v.GetProperty('private') == FUZZER_PRIVATE:
                 our.append(v.path)
-        except porto.exceptions.VolumeNotFound:
+        except porto.exceptions.PortoException:
             pass
     return our
 
@@ -38,7 +38,7 @@ def our_layers(conn, place=None):
         try:
             if l.GetPrivate() == FUZZER_PRIVATE:
                 our.append(l.name)
-        except porto.exceptions.LayerNotFound:
+        except porto.exceptions.PortoException:
             pass
     return our
 
@@ -93,31 +93,13 @@ def select_volume(conn):
     ] )
 
 def volume_action(conn):
-    try:
-        select_by_weight( [
-            (1, volume.Create),
-            (2, volume.UnlinkVolume),
-            (2, volume.UnlinkVolumeStrict),
-            (2, volume.LinkVolume),
-            (2, volume.LinkVolumeTarget),
-        ] )(conn, select_volume(conn))
-        return 0
-    except (
-            porto.exceptions.VolumeNotFound,
-            porto.exceptions.ContainerDoesNotExist,
-            porto.exceptions.PermissionError,
-            porto.exceptions.VolumeAlreadyExists,
-            porto.exceptions.VolumeAlreadyLinked,
-            porto.exceptions.VolumeNotLinked,
-            porto.exceptions.VolumeNotReady,
-            porto.exceptions.InvalidValue,
-            porto.exceptions.Busy,
-            porto.exceptions.ResourceNotAvailable,
-            porto.exceptions.InvalidProperty,
-            porto.exceptions.LayerNotFound,
-            porto.exceptions.UnknownError
-           ):
-        return 1
+    select_by_weight( [
+        (1, volume.Create),
+        (2, volume.UnlinkVolume),
+        (2, volume.UnlinkVolumeStrict),
+        (2, volume.LinkVolume),
+        (2, volume.LinkVolumeTarget),
+    ] )(conn, select_volume(conn))
 
 def select_place():
     return select_by_weight( [
@@ -131,51 +113,24 @@ def layer_action(conn):
         (5, select_equal(our_layers(conn, place), get_random_str(LAYERNAME_LIMIT))),
         (5, get_random_str(LAYERNAME_LIMIT))
     ] )
-    try:
-        select_by_weight( [
-            (1, layer.Import),
-            (2, layer.Merge),
-            (2, layer.Remove)
-        ] )(conn, place, name)
-        return 0
-    except (
-            porto.exceptions.LayerAlreadyExists,
-            porto.exceptions.LayerNotFound,
-            porto.exceptions.InvalidValue,
-            porto.exceptions.Busy,
-            porto.exceptions.UnknownError
-           ):
-        return 1
+    select_by_weight( [
+        (1, layer.Import),
+        (2, layer.Merge),
+        (2, layer.Remove)
+    ] )(conn, place, name)
 
 def container_action(conn):
-    try:
-        select_by_weight( [
-                (75, container.Create),
-                (20, container.Destroy),
-                (150, container.SetProperty),
-                (40, container.Start),
-                (30, container.Stop),
-#                (15, container.Pause),
-#                (15, container.Resume),
-                (15, container.Wait),
-                (25, container.Kill)
-        ] )(conn, select_container(conn))
-        return 0
-    except (
-            porto.exceptions.ContainerDoesNotExist,
-            porto.exceptions.PermissionError,
-            porto.exceptions.InvalidProperty,
-            porto.exceptions.InvalidValue,
-            porto.exceptions.InvalidState,
-            porto.exceptions.InvalidCommand,
-            porto.exceptions.ContainerAlreadyExists,
-            porto.exceptions.UnknownError,
-            porto.exceptions.ResourceNotAvailable,
-            porto.exceptions.Busy,
-            porto.exceptions.NotSupported,
-           ):
-        return 1
-    #Otherwise immediately fail if abnormal exception raised (script or lib bound)
+    select_by_weight( [
+        (75, container.Create),
+        (20, container.Destroy),
+        (150, container.SetProperty),
+        (40, container.Start),
+        (30, container.Stop),
+#       (15, container.Pause),
+#       (15, container.Resume),
+        (15, container.Wait),
+        (25, container.Kill)
+    ] )(conn, select_container(conn))
 
 def set_verbose(is_verbose):
     container.VERBOSE = is_verbose

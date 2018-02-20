@@ -69,6 +69,7 @@ def cleanup_fuzzer():
     for path, mnt in ParseMountinfo().iteritems():
         if path.startswith(FUZZER_MNT + "/"):
             print "Stale mount: ", path, mnt
+            global test_fails
             test_fails += 1
 
     if (os.path.ismount(FUZZER_MNT)):
@@ -124,12 +125,12 @@ def fuzzer_thread(please_stop, iter_count, fail_count):
             break
         iter_cnt += 1
         try:
-            fail_cnt += select_by_weight([
+            select_by_weight([
                 (100, targets.container_action),
                 (10, targets.volume_action),
                 (1, targets.layer_action)
             ])(conn)
-        except porto.exceptions.SocketError:
+        except porto.exceptions.PortoException:
             fail_cnt += 1
     with iter_count.get_lock():
         iter_count.value += iter_cnt
