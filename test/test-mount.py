@@ -42,6 +42,9 @@ root_volume = c.CreateVolume(backend='overlay', layers=['ubuntu-precise'], conta
 test_volume = c.CreateVolume(backend='plain', containers='w')
 ro_volume = c.CreateVolume(backend='plain', read_only='true', containers='w')
 
+os.mkdir(test_volume.path + "/sub")
+sub_volume = c.CreateVolume(path=test_volume.path + "/sub", backend='plain', containers='w')
+
 # no chroot
 a = Run("a")
 mnt = ParseMountinfo(a.GetProperty('root_pid'))
@@ -55,15 +58,33 @@ CheckBaseMounts(mnt)
 a.Destroy()
 
 # container binds
-a = Run("a", root=root_volume.path, bind="{0} /test; {0} /test_ro ro; {1} /ro_vol".format(test_volume.path, ro_volume.path))
+a = Run("a", root=root_volume.path, bind="{0} /test; {0} /test_ro ro rec; {1} /ro_vol".format(test_volume.path, ro_volume.path))
 mnt = ParseMountinfo(a.GetProperty('root_pid'))
 CheckBaseMounts(mnt)
 Expect('/test' in mnt)
 Expect('rw' in mnt['/test']['flag'])
 Expect('/test_ro' in mnt)
 Expect('ro' in mnt['/test_ro']['flag'])
+Expect('/test/sub' not in mnt)
+Expect('/test_ro/sub' in mnt)
+Expect('ro' in mnt['/test_ro/sub']['flag'])
 Expect('/ro_vol' in mnt)
 Expect('ro' in mnt['/ro_vol']['flag'])
+a.Destroy()
+
+#backend bind and rbind
+a = Run("a", root=root_volume.path)
+test_bind = c.CreateVolume(path=root_volume.path + "/test", backend='bind', storage=test_volume.path, containers='a')
+test_ro_rbind = c.CreateVolume(path=root_volume.path + "/test_ro", backend='rbind', read_only='true', storage=test_volume.path, containers='a')
+mnt = ParseMountinfo(a.GetProperty('root_pid'))
+CheckBaseMounts(mnt)
+Expect('/test' in mnt)
+Expect('rw' in mnt['/test']['flag'])
+Expect('/test_ro' in mnt)
+Expect('ro' in mnt['/test_ro']['flag'])
+Expect('/test/sub' not in mnt)
+Expect('/test_ro/sub' in mnt)
+Expect('ro' in mnt['/test_ro/sub']['flag'])
 a.Destroy()
 
 # volumes in chroot
