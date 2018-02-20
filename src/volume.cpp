@@ -108,6 +108,43 @@ public:
 
     TError Build() override {
         return Volume->InternalPath.BindRemount(Volume->StoragePath,
+                Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
+    }
+
+    std::string ClaimPlace() override {
+        return "";
+    }
+
+    TError Destroy() override {
+        return Volume->InternalPath.UmountAll();
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->InternalPath.StatFS(result);
+    }
+};
+
+/* TVolumeRBindBackend - recursive bind mount */
+
+class TVolumeRBindBackend : public TVolumeBackend {
+public:
+
+    TError Configure() override {
+
+        if (!Volume->HaveStorage())
+            return TError(EError::InvalidProperty, "rbind backed require storage");
+
+        if (Volume->HaveQuota())
+            return TError(EError::InvalidProperty, "rbind backend doesn't support quota");
+
+        if (Volume->HaveLayers())
+            return TError(EError::InvalidProperty, "rbind backend doesn't support layers");
+
+        return OK;
+    }
+
+    TError Build() override {
+        return Volume->InternalPath.BindRemount(Volume->StoragePath,
                 Volume->GetMountFlags() | MS_REC | MS_SLAVE | MS_SHARED);
     }
 
@@ -1256,6 +1293,8 @@ TError TVolume::OpenBackend() {
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
     else if (BackendType == "bind")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeBindBackend());
+    else if (BackendType == "rbind")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRBindBackend());
     else if (BackendType == "tmpfs")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeTmpfsBackend());
     else if (BackendType == "quota")
@@ -2460,7 +2499,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
-    { V_BACKEND,     "plain|bind|tmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
+    { V_BACKEND,     "plain|bind|rbind|tmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_STATE,       "volume state (ro)", true },
