@@ -165,6 +165,7 @@ public:
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
+    static TError CheckConflicts(const TPath &path);
 
     TError Build(void);
 

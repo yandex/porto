@@ -1587,6 +1587,38 @@ TError TVolume::CheckDependencies() {
     return error;
 }
 
+TError TVolume::CheckConflicts(const TPath &path) {
+    if (IsSystemPath(path))
+        return TError(EError::Busy, "Path in system directory");
+
+    for (auto &it : Volumes) {
+        auto &vol = it.second;
+
+        if (vol->Path == path)
+            return TError(EError::Busy, "Path is used by volume {}", vol->Path);
+
+        if (vol->Path.IsInside(path))
+            return TError(EError::Busy, "Path overlaps with volume {}", vol->Path);
+
+        if (path.IsInside(vol->Path) && vol->State != EVolumeState::Ready)
+            return TError(EError::VolumeNotReady, "Path inside volume {} and it's not ready", vol->Path);
+
+        if (vol->Place.IsInside(path))
+            return TError(EError::Busy, "Path overlaps with place {}", vol->Place);
+
+        if (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath))
+            return TError(EError::Busy, "Path overlaps with storage {}", vol->StoragePath);
+
+        for (auto &l: vol->Layers) {
+            TPath layer(l);
+            if (layer.IsAbsolute() && (layer.IsInside(path) || path.IsInside(layer)))
+                return TError(EError::Busy, "Path overlaps with layer {}", layer);
+        }
+    }
+
+    return OK;
+}
+
 TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
     TError error;
 
@@ -1936,18 +1968,24 @@ TError TVolume::Build() {
 }
 
 TError TVolume::MountLink(const TContainer &ct) {
+    TError error;
 
     auto volumes_lock = LockVolumes();
     auto it = Links.find(ct.Name);
     if (it == Links.end())
         return TError(EError::VolumeNotLinked, "Link not found");
     auto link = it->second;
+
+    if (link.Target) {
+        error = CheckConflicts(ct.RootPath / link.Target);
+        if (error)
+            return error;
+    }
+
     volumes_lock.unlock();
 
     if (!link.Target)
         return OK;
-
-    TError error;
 
     auto lock = Lock();
 
@@ -2406,10 +2444,16 @@ TError TVolume::LinkContainer(TContainer &container, const TPath &target,
     auto volumes_lock = LockVolumes();
     TError error;
 
+    if (target && container.HasResources()) {
+        error = CheckConflicts(container.RootPath / target);
+        if (error)
+            return error;
+    }
+
     auto it = std::find(container.LinkedVolumes.begin(),
                         container.LinkedVolumes.end(), shared_from_this());
     if (it != container.LinkedVolumes.end())
-        return TError(EError::VolumeAlreadyLinked, "Already linked");
+        return TError(EError::VolumeAlreadyLinked, "Volume already linked");
 
     if (State == EVolumeState::Unlinked)
         SetState(EVolumeState::Ready);
@@ -2848,36 +2892,18 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
         path = target_root / path;
 
+        if (Volumes.count(path))
+            return TError(EError::VolumeAlreadyExists, "Volume already exists");
+
         if (!path.Exists())
             return TError(EError::InvalidValue, "Volume path does not exist");
 
         if (!path.IsDirectoryStrict())
             return TError(EError::InvalidValue, "Volume path must be a directory");
 
-        if (IsSystemPath(path))
-            return TError(EError::InvalidValue, "Volume in system directory");
-
-        for (auto &it : Volumes) {
-            auto &vol = it.second;
-
-            if (vol->Path == path)
-                return TError(EError::VolumeAlreadyExists, "Volume already exists");
-
-            if (vol->Path.IsInside(path))
-                return TError(EError::Busy, "Path overlaps with volume " + vol->Path.ToString());
-
-            if (vol->Place.IsInside(path))
-                return TError(EError::Busy, "Path overlaps with place " + vol->Place.ToString());
-
-            if (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath))
-                return TError(EError::Busy, "Path overlaps with storage " + vol->StoragePath.ToString());
-
-            for (auto &l: vol->Layers) {
-                TPath layer(l);
-                if (layer.IsAbsolute() && (layer.IsInside(path) || path.IsInside(layer)))
-                    return TError(EError::Busy, "Path overlaps with layer " + l);
-            }
-        }
+        error = CheckConflicts(path);
+        if (error)
+            return error;
     }
 
     volume = std::make_shared<TVolume>();
