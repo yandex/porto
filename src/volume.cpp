@@ -2000,7 +2000,7 @@ TError TVolume::MountLink(const TContainer &ct) {
     if (State != EVolumeState::Ready)
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
-    L_ACT("Mount volume {} to {}", Path, target);
+    L_ACT("Mount volume {} link {} for CT{}:{}", Path, target, ct.Id, ct.Name);
 
     TBindMount bind;
 
@@ -2065,7 +2065,7 @@ TError TVolume::UmountLink(const TContainer &ct, bool strict) {
     it->second.HostTarget = "";
     volumes_lock.unlock();
 
-    L_ACT("Umount volume {} from {}", Path, target);
+    L_ACT("Umount volume {} link {} for CT{}:{}", Path, target, ct.Id, ct.Name);
 
     return target.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
 }
@@ -2540,6 +2540,7 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
         goto undo;
 
     if (link.HostTarget) {
+        L_ACT("Umount volume {} link {} for CT{}:{}", Path, link.HostTarget, container.Id, container.Name);
         error = link.HostTarget.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
         if (error) {
             if (strict && error.Error == EError::Busy)
@@ -3045,12 +3046,17 @@ void TVolume::RestoreAll(void) {
 
         auto containers_lock = LockContainers();
 
-        for (auto &link: volume->Links) {
-            auto container = TContainer::Find(link.first);
-            if (container)
-                container->LinkedVolumes.emplace_back(volume);
-            else
-                L_WRN("Cannot find container {}", link.first);
+        for (auto &it: volume->Links) {
+            auto &link = it.second;
+            auto ct = TContainer::Find(it.first);
+            if (ct) {
+                ct->LinkedVolumes.emplace_back(volume);
+                if (link.Target && ct->HasResources()) {
+                    link.HostTarget = ct->RootPath / link.Target;
+                    L_ACT("Restore volume {} link {} for CT{}:{}", volume->Path, link.HostTarget, ct->Id, ct->Name);
+                }
+            } else
+                L_WRN("Cannot find container {}", it.first);
         }
 
         containers_lock.unlock();
