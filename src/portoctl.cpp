@@ -1712,11 +1712,12 @@ public:
 class TUnlinkVolumeCmd final : public ICmd {
 public:
     TUnlinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vunlink", 1,
-                    "[-A] [-S] <path> [container|***]",
+                    "[-A] [-S] <path> [<container>|self|***] [<target>|***]",
                     "unlink volume from container",
-                    "    -A        unlink from all containers\n"
+                    "    -A        unlink from all containers, same as ***\n"
                     "    -S        strict unlink with non-lazy umount\n"
                     "default container - current, *** - unlink from all containers\n"
+                    "default target - *** - unlink all targets\n"
                     "removing last link destroys volume\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
@@ -1730,25 +1731,10 @@ public:
         std::vector<Porto::Volume> vol;
         int ret;
 
-        if (all) {
-            ret = Api->ListVolumes(path, "", vol);
-            if (ret || vol.size() != 1) {
-                PrintError("Cannot list volume");
-                return EXIT_FAILURE;
-            }
-
-            for (auto link: vol[0].Links) {
-                ret = Api->UnlinkVolume(path, link.first);
-                if (ret) {
-                    PrintError("Cannot unlink volume from " + link.first);
-                    break;
-                }
-            }
-        } else {
-            ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : "", strict);
-            if (ret)
-                PrintError("Cannot unlink volume");
-        }
+        ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : all ? "***" : "",
+                                args.size() > 2 ? args[2] : "***", strict);
+        if (ret)
+            PrintError("Cannot unlink volume");
         return ret;
     }
 };
@@ -1759,11 +1745,12 @@ class TListVolumesCmd final : public ICmd {
     bool inodes = false;
 
 public:
-    TListVolumesCmd(Porto::Connection *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [volume]...",
+    TListVolumesCmd(Porto::Connection *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [-c <ct>] [volume]...",
         "list volumes",
         "    -1        list only paths\n"
         "    -i        list inode information\n"
         "    -v        list all properties\n"
+        "    -c <ct>   list volumes linked to container\n"
         ) {}
 
     void ShowSizeProperty(Porto::Volume &v, const char *p, int w, bool raw = false) {
@@ -1814,7 +1801,7 @@ public:
             }
 
             for (auto link: v.Links)
-                std::cout << " " << link.first;
+                std::cout << " " << link.Container;
 
             std::cout << std::endl;
         }
@@ -1824,12 +1811,12 @@ public:
 
         std::cout << "  " << std::left << std::setw(20) << "containers";
         for (auto link: v.Links)
-            std::cout << " " << link.first;
+            std::cout << " " << link.Container;
         std::cout << std::endl;
 
         for (auto link: v.Links)
-            if (link.second != "")
-                std::cout << "  " << std::left << std::setw(20) << "link" << " " << link.first << " -> " << link.second << std::endl;
+            if (link.Target != "")
+                std::cout << "  " << std::left << std::setw(20) << (link.ReadOnly ? "target_ro" : "target") << " " << link.Container << " " << link.Target << std::endl;
 
         std::cout << std::resetiosflags(std::ios::adjustfield);
 
@@ -1845,10 +1832,12 @@ public:
     }
 
     int Execute(TCommandEnviroment *env) final override {
+        std::string container;
         const auto &args = env->GetOpts({
             { '1', false, [&](const char *) { details = false; } },
             { 'i', false, [&](const char *) { inodes = true; } },
             { 'v', false, [&](const char *) { verbose = true; details = false; } },
+            { 'c', true , [&](const char *arg) { container = arg; } },
         });
 
         vector<Porto::Volume> vlist;
@@ -1863,7 +1852,7 @@ public:
         }
 
         if (args.empty()) {
-          int ret = Api->ListVolumes(vlist);
+          int ret = Api->ListVolumes("", container, vlist);
           if (ret) {
               PrintError("Can't list volumes");
               return ret;

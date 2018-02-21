@@ -24,6 +24,7 @@ class TEvent;
 class TContainerWaiter;
 class TClient;
 class TVolume;
+class TVolumeLink;
 class TKeyValue;
 struct TBindMount;
 
@@ -377,7 +378,7 @@ public:
     void ChooseSchedPolicy();
 
     /* protected with VolumesLock and container lock */
-    std::list<std::shared_ptr<TVolume>> LinkedVolumes;
+    std::list<std::shared_ptr<TVolumeLink>> VolumeLinks;
 
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;

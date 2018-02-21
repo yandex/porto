@@ -89,6 +89,7 @@ message TContainerRequest {
     optional TVolumeLinkRequest linkVolume = 105;
     optional TVolumeLinkRequest LinkVolumeTarget = 120;
     optional TVolumeUnlinkRequest unlinkVolume = 106;
+    optional TVolumeUnlinkRequest UnlinkVolumeTarget = 121;
     optional TVolumeListRequest listVolumes = 107;
     optional TVolumeTuneRequest tuneVolume = 108;
 
@@ -420,15 +421,16 @@ message TVolumeCreateRequest {
 message TVolumeLinkRequest {
     required string path = 1;
     optional string container = 2;      // default - self
-    optional string target = 3;         // path in container
+    optional string target = 3;         // path in container, "" - anon
     optional bool required = 4;         // stop container at fail
     optional bool read_only = 5;
 }
 
 message TVolumeUnlinkRequest {
     required string path = 1;
-    optional string container = 2; // default - self, *** - all
-    optional bool strict = 3; // non-lazy umount
+    optional string container = 2;      // default - self, "***" - all
+    optional bool strict = 3;           // non-lazy umount
+    optional string target = 4;         // path in container, "" - anon, none or "***" - all
 }
 
 message TVolumeListRequest {

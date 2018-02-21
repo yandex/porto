@@ -19,10 +19,17 @@ struct Property {
     bool Dynamic = false;
 };
 
+struct VolumeLink {
+    std::string Container;
+    std::string Target;
+    bool ReadOnly = false;
+    bool Required = false;
+};
+
 struct Volume {
     std::string Path;
     std::map<std::string, std::string> Properties;
-    std::map<std::string, std::string> Links;
+    std::vector<VolumeLink> Links;
 };
 
 struct Layer {
@@ -124,7 +131,9 @@ public:
                    bool read_only = false,
                    bool required = false);
     int UnlinkVolume(const std::string &path,
-                     const std::string &container = "", bool strict = false);
+                     const std::string &container = "",
+                     const std::string &target = "",
+                     bool strict = false);
     int ListVolumes(const std::string &path, const std::string &container,
                     std::vector<Volume> &volumes);
     int ListVolumes(std::vector<Volume> &volumes) {

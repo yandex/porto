@@ -459,8 +459,6 @@ int Connection::CreateVolume(const std::string &path,
     if (!ret) {
         const auto &volume = Impl->Rsp.volume();
         result.Path = volume.path();
-        for (auto &ct: volume.containers())
-            result.Links[ct] = "";
         for (const auto &p: volume.properties())
             result.Properties[p.name()] = p.value();
     }
@@ -493,12 +491,17 @@ int Connection::LinkVolume(const std::string &path, const std::string &container
 }
 
 int Connection::UnlinkVolume(const std::string &path,
-                             const std::string &container, bool strict) {
-    auto req = Impl->Req.mutable_unlinkvolume();
+                             const std::string &container,
+                             const std::string &target,
+                             bool strict) {
+    auto req = (target == "") ? Impl->Req.mutable_unlinkvolume() :
+                                Impl->Req.mutable_unlinkvolumetarget();
 
     req->set_path(path);
     if (!container.empty())
         req->set_container(container);
+    if (!target.empty())
+        req->set_target(target);
     if (strict)
         req->set_strict(strict);
 
@@ -525,12 +528,20 @@ int Connection::ListVolumes(const std::string &path,
 
         for (const auto &v: list.volumes()) {
             volumes[i].Path = v.path();
+            int l = 0;
             if (v.links().size()) {
-                for (auto &link: v.links())
-                    volumes[i].Links[link.container()] = link.target();
+                volumes[i].Links.resize(v.links().size());
+                for (auto &link: v.links()) {
+                    volumes[i].Links[l].Container = link.container();
+                    volumes[i].Links[l].Target = link.target();
+                    volumes[i].Links[l].ReadOnly = link.read_only();
+                    volumes[i].Links[l].Required = link.required();
+                    ++l;
+                }
             } else {
+                volumes[i].Links.resize(v.containers().size());
                 for (auto &ct: v.containers())
-                    volumes[i].Links[ct] = "";
+                    volumes[i].Links[l++].Container = ct;
             }
             for (const auto &p: v.properties())
                 volumes[i].Properties[p.name()] = p.value();

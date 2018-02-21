@@ -798,7 +798,7 @@ is linked to the container that created it: "self", "/" for host.
 
 Each link might define target path for exposing volume inside container
 when it stats. This path also works as alias for volume path for requests
-from container.
+from container. Link also might restrict access to read-only.
 
 By default volume unlink calls lazy **umount(2)** with flag MNT\_DETACH,
 strict unlink calls normal umount and fails if some files are opened.
@@ -869,7 +869,7 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **read\_only**    - true or false, default: false
 
-* **containers**    - initial links, syntax: container[=target];...  default: "self"
+* **containers**    - initial links, syntax: container \[target\] \[ro\];...  default: "self"
 
 * **layers**        - layers, syntax: top-layer;...;bottom-layer
 

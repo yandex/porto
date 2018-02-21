@@ -1340,13 +1340,9 @@ public:
     }
 } static PlaceUsage;
 
-class TVolumesList : public TProperty {
-    std::list<std::shared_ptr<TVolume>> TContainer:: *Member;
+class TOwnedVolumes : public TProperty {
 public:
-    TVolumesList(std::string name,
-            std::list<std::shared_ptr<TVolume>> TContainer:: *member,
-            std::string desc) :
-        TProperty(name, EProperty::NONE, desc), Member(member)
+    TOwnedVolumes() : TProperty(P_OWNED_VOLUMES, EProperty::NONE, "Owned volumes: volume;...")
     {
         IsReadOnly = true;
     }
@@ -1354,7 +1350,7 @@ public:
         TTuple paths;
 
         auto volumes_lock = LockVolumes();
-        for (auto &vol: CT->*Member) {
+        for (auto &vol: CT->OwnedVolumes) {
             TPath path = CL->ComposePath(vol->Path);
             if (!path)
                 path = "@" + vol->Path.ToString();
@@ -1364,12 +1360,33 @@ public:
         value = MergeEscapeStrings(paths, ';');
         return OK;
     }
-};
+} OwnedVolumes;
 
-static TVolumesList OwnerVolumes(P_OWNED_VOLUMES, &TContainer::OwnedVolumes,
-        "Owned volumes: volume;...");
-static TVolumesList LinedVolumes(P_LINKED_VOLUMES, &TContainer::LinkedVolumes,
-        "Linked volumes: volume;...");
+class TLinkedVolumes : public TProperty {
+public:
+    TLinkedVolumes() : TProperty(P_LINKED_VOLUMES, EProperty::NONE, "Linked volumes: volume [target] [ro];...")
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        TMultiTuple links;
+
+        auto volumes_lock = LockVolumes();
+        for (auto &link: CT->VolumeLinks) {
+            TPath path = link->Volume->Compose(*CL->ClientContainer);
+            if (!path)
+                path = "%" + link->Volume->Path.ToString();
+            links.push_back({path.ToString()});
+            if (link->Target)
+                links.back().push_back(link->Target.ToString());
+            if (link->ReadOnly)
+                links.back().push_back("ro");
+        }
+
+        value = MergeEscapeStrings(links, ' ', ';');
+        return OK;
+    }
+} LinkedVolumes;
 
 class TRequiredVolumes : public TProperty {
 public:

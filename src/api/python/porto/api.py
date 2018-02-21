@@ -415,6 +415,9 @@ class Volume(object):
             container = container.name
         self.conn.UnlinkVolume(self.path, container, strict)
 
+    def Destroy(self):
+        self.conn.UnlinkVolume(self.path, '***')
+
     def Tune(self, **properties):
         self.conn.TuneVolume(self.path, **properties)
 
@@ -637,15 +640,6 @@ class Connection(object):
         self._ListVolumes(path=path)
         return Volume(self, path)
 
-    def UnlinkVolume(self, path, container=None, strict=None):
-        request = rpc_pb2.TContainerRequest()
-        request.unlinkVolume.path = path
-        if container:
-            request.unlinkVolume.container = container
-        if strict is not None:
-            request.unlinkVolume.strict = strict
-        self.rpc.call(request, self.rpc.timeout)
-
     def LinkVolume(self, path, container, target=None, read_only=False, required=False):
         request = rpc_pb2.TContainerRequest()
         if target is not None or required:
@@ -662,20 +656,23 @@ class Connection(object):
             command.required = True
         self.rpc.call(request, self.rpc.timeout)
 
-    def DestroyVolume(self, volume, containers=None):
-        path = volume.path if isinstance(volume, Volume) else volume
-        if containers is None:
-            containers = self._ListVolumes(path=path)[0].containers
-        for container in containers:
-            try:
-                self.UnlinkVolume(path, container)
-            except exceptions.VolumeNotLinked:
-                pass
-        try:
-            self._ListVolumes(path=path)
-            raise exceptions.Busy("volume `%s` is busy" % path)
-        except exceptions.VolumeNotFound:
-            pass
+    def UnlinkVolume(self, path, container=None, target=None, strict=None):
+        request = rpc_pb2.TContainerRequest()
+        if target is not None:
+            command = request.UnlinkVolumeTarget
+        else:
+            command = request.unlinkVolume
+        command.path = path
+        if container:
+            command.container = container
+        if target:
+            command.target = target
+        if strict is not None:
+            command.strict = strict
+        self.rpc.call(request, self.rpc.timeout)
+
+    def DestroyVolume(self, volume):
+        self.UnlinkVolume(volume.path if isinstance(volume, Volume) else volume, '***')
 
     def _ListVolumes(self, path=None, container=None):
         if isinstance(container, Container):

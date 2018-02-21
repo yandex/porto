@@ -123,7 +123,17 @@ static void RequestToString(const rpc::TContainerRequest &req,
         cmd = "UnlinkVolume";
         arg = req.unlinkvolume().path();
         opts = { "container=" + req.unlinkvolume().container() };
-        if (req.unlinkvolume().has_strict() && req.unlinkvolume().strict())
+        if (req.unlinkvolume().has_target())
+            opts.push_back("target=" + req.unlinkvolume().target());
+        if (req.unlinkvolume().strict())
+            opts.push_back("strict=true");
+    } else if (req.has_unlinkvolumetarget()) {
+        cmd = "UnlinkVolume";
+        arg = req.unlinkvolumetarget().path();
+        opts = { "container=" + req.unlinkvolumetarget().container() };
+        if (req.unlinkvolumetarget().has_target())
+            opts.push_back("target=" + req.unlinkvolumetarget().target());
+        if (req.unlinkvolumetarget().strict())
             opts.push_back("strict=true");
     } else if (req.has_listvolumes()) {
         cmd = "ListVolumes";
@@ -718,7 +728,7 @@ FillVolumeDescription(TVolume &volume, const TPath &path, rpc::TVolumeDescriptio
         desc->set_path(CL->ComposePath(volume.Path).ToString());
 
     TStringMap props;
-    TStringMap links;
+    TMultiTuple links;
     volume.Dump(props, links);
 
     for (auto &kv: props) {
@@ -727,11 +737,14 @@ FillVolumeDescription(TVolume &volume, const TPath &path, rpc::TVolumeDescriptio
         p->set_value(kv.second);
     }
 
-    for (auto &it: links) {
-        desc->add_containers(it.first);
-        auto link = desc->add_links();
-        link->set_container(it.first);
-        link->set_target(it.second);
+    for (auto &link: links) {
+        desc->add_containers(link[0]);
+        auto l = desc->add_links();
+        l->set_container(link[0]);
+        if (link[1] != "")
+            l->set_target(link[1]);
+        if (link[2] == "ro")
+            l->set_read_only(true);
     }
 }
 
@@ -795,7 +808,7 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
     if (error)
         return TError(error, "Cannot link volume {}", volume->Path);
 
-    error = volume->LinkContainer(*ct, req.target(), req.read_only(), req.required());
+    error = volume->LinkContainer(ct, req.target(), req.read_only(), req.required());
     if (error)
         return error;
 
@@ -803,7 +816,6 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
 }
 
 noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
-    bool strict = req.has_strict() && req.strict();
     std::shared_ptr<TContainer> ct;
     TError error;
 
@@ -823,10 +835,10 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
         return TError(error, "Cannot unlink volume {}", volume->Path);
 
     if (ct) {
-        error = volume->UnlinkContainer(*ct, strict);
+        error = volume->UnlinkContainer(ct, req.has_target() ? req.target() : "***", req.strict());
         CL->ReleaseContainer();
     } else {
-        error = volume->Destroy(strict);
+        error = volume->Destroy();
     }
 
     return error;
@@ -848,17 +860,31 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
         return OK;
     }
 
-    auto volumes_lock = LockVolumes();
+    std::shared_ptr<TContainer> ct;
+    if (req.has_container()) {
+        auto lock = LockContainers();
+        error = CL->ResolveContainer(req.container(), ct);
+        if (error)
+            return error;
+    }
+
     std::list<std::pair<std::shared_ptr<TVolume>, TPath>> list;
-    for (auto &it : Volumes) {
-        auto volume = it.second;
 
-        if (req.has_container() && !volume->Links.count(req.container()))
-            continue;
-
-        auto path = volume->Compose(*CL->ClientContainer);
-        if (path)
-            list.emplace_back(volume, path);
+    auto volumes_lock = LockVolumes();
+    if (ct) {
+        for (auto &link: ct->VolumeLinks) {
+            auto &volume = link->Volume;
+            auto path = volume->Compose(*CL->ClientContainer);
+            if (path)
+                list.emplace_back(volume, path);
+        }
+    } else {
+        for (auto &it : Volumes) {
+            auto &volume = it.second;
+            auto path = volume->Compose(*CL->ClientContainer);
+            if (path)
+                list.emplace_back(volume, path);
+        }
     }
     volumes_lock.unlock();
 
@@ -1326,6 +1352,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         error = LinkVolume(req.linkvolumetarget());
     else if (req.has_unlinkvolume())
         error = UnlinkVolume(req.unlinkvolume());
+    else if (req.has_unlinkvolumetarget())
+        error = UnlinkVolume(req.unlinkvolumetarget());
     else if (req.has_listvolumes())
         error = ListVolumes(req.listvolumes(), rsp);
     else if (req.has_tunevolume())

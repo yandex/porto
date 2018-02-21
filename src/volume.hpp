@@ -75,15 +75,19 @@ public:
     virtual std::string ClaimPlace();
 };
 
-struct TVolumeLink {
+class TVolumeLink {
+public:
+    std::shared_ptr<TVolume> Volume;
+    std::shared_ptr<TContainer> Container;
     TPath Target;
+    TPath HostTarget;
     bool Required = false;
     bool ReadOnly = false;
 
-    TPath HostTarget;
+    TVolumeLink(std::shared_ptr<TVolume> v, std::shared_ptr<TContainer> c) : Volume(v), Container(c) {}
 
-    std::string Format();
-    TError Parse(const std::string &str);
+    TError MountTarget();
+    TError UmountTarget(bool strict = false);
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
@@ -93,9 +97,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
     TError OpenBackend();
 
     std::mutex Mutex;
-    std::unique_lock<std::mutex> Lock() {
-        return std::unique_lock<std::mutex>(Mutex);
-    }
 
 public:
     TPath Path;
@@ -124,7 +125,7 @@ public:
     bool HasDependentContainer = false;
 
     std::vector<std::string> Layers;
-    std::map<std::string, TVolumeLink> Links; /* container -> target */
+    std::list<std::shared_ptr<TVolumeLink>> Links;
 
     uint64_t ClaimedSpace = 0;
     uint64_t SpaceLimit = 0;
@@ -151,6 +152,10 @@ public:
         Statistics->VolumesCount--;
     }
 
+    std::unique_lock<std::mutex> Lock() {
+        return std::unique_lock<std::mutex>(Mutex);
+    }
+
     static TError Create(const TStringMap &cfg,
                          std::shared_ptr<TVolume> &volume);
 
@@ -163,7 +168,7 @@ public:
 
     TError Configure(const TPath &target_root, const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
-    void Dump(TStringMap &props, TStringMap &links);
+    void Dump(TStringMap &props, TMultiTuple &links);
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
@@ -172,21 +177,24 @@ public:
     TError Build(void);
 
     static void DestroyAll();
-    TError DestroyOne(bool strict = false);
-    TError Destroy(bool strict = false);
+    TError DestroyOne();
+    TError Destroy();
 
     TError Save(void);
     TError Restore(const TKeyValue &node);
 
     static void RestoreAll(void);
 
-    TError LinkContainer(TContainer &container, const TPath &target = "",
-                         bool read_only = false, bool required = false);
-    TError UnlinkContainer(TContainer &container, bool strict = false);
-    static void UnlinkAllVolumes(TContainer &container);
+    TError LinkContainer(std::shared_ptr<TContainer> container,
+                         const TPath &target = "",
+                         bool read_only = false,
+                         bool required = false);
 
-    TError MountLink(const TContainer &ct);
-    TError UmountLink(const TContainer &ct, bool strict = false);
+    TError UnlinkContainer(std::shared_ptr<TContainer> container,
+                           const TPath &target,
+                           bool strict = false);
+
+    static void UnlinkAllVolumes(std::shared_ptr<TContainer> container);
 
     static TError CheckRequired(const std::list<std::string> &paths);
 

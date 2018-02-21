@@ -834,7 +834,7 @@ TError TContainer::Destroy() {
         }
     }
 
-    TVolume::UnlinkAllVolumes(*this);
+    TVolume::UnlinkAllVolumes(shared_from_this());
 
     auto lock = LockContainers();
 
@@ -2349,8 +2349,8 @@ TError TContainer::PrepareResources() {
         RootPath = RootVolume->Path;
     }
 
-    for (auto &volume: LinkedVolumes) {
-        error = volume->MountLink(*this);
+    for (auto &link: VolumeLinks) {
+        error = link->MountTarget();
         if (error)
             goto undo;
     }
@@ -2422,10 +2422,10 @@ void TContainer::FreeResources() {
         }
     }
 
-    for (auto &volume: LinkedVolumes) {
-        error = volume->UmountLink(*this);
+    for (auto &link: VolumeLinks) {
+        error = link->UmountTarget();
         if (error)
-            L_WRN("Cannot umount volume link {}: {}", volume->Path, error);
+            L_WRN("UmountTarget {}", error);
     }
 
     if (RootVolume) {
