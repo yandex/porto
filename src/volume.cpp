@@ -1997,12 +1997,14 @@ TError TVolume::MountLink(const TContainer &ct) {
 
     auto lock = Lock();
 
-    if (State != EVolumeState::Ready)
-        return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
-
     L_ACT("Mount volume {} link {} for CT{}:{}", Path, target, ct.Id, ct.Name);
 
     TBindMount bind;
+
+    if (State != EVolumeState::Ready) {
+        error = TError(EError::VolumeNotReady, "Volume {} not ready", Path);
+        goto undo;
+    }
 
     bind.IsDirectory = true;
     if (IsReadOnly || ro)
