@@ -1618,9 +1618,9 @@ TError TVolume::CheckConflicts(const TPath &path) {
         for (auto &link: vol->Links) {
             TPath &target = link.second.HostTarget;
             if (target == path)
-                return TError(EError::Busy, "Path is used by volume {} link {}", vol->Path, target);
+                return TError(EError::Busy, "Path is used by volume {} link {} for {}", vol->Path, target, link.first);
             if (target.IsInside(path))
-                return TError(EError::Busy, "Path overlaps with volume {} link {}", vol->Path, target);
+                return TError(EError::Busy, "Path overlaps with volume {} link {} for {}", vol->Path, target, link.first);
         }
     }
 
@@ -2545,7 +2545,7 @@ TError TVolume::UnlinkContainer(TContainer &container, bool strict) {
         if (error) {
             if (strict && error.Error == EError::Busy)
                 goto undo;
-            L_WRN("Cannot umount linked volume {} from {}: {}", Path, link.HostTarget, error);
+            L_WRN("Cannot umount linked volume {} link {} for CT{}:{} : {}", Path, link.HostTarget, container.Id, container.Name, error);
         }
     }
 

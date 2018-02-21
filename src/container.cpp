@@ -2329,8 +2329,7 @@ TError TContainer::PrepareResources() {
     error = PrepareCgroups();
     if (error) {
         L_ERR("Can't prepare task cgroups: {}", error);
-        FreeResources();
-        return error;
+        goto undo;
     }
 
     if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
@@ -2344,8 +2343,7 @@ TError TContainer::PrepareResources() {
         error = TVolume::Create(cfg, RootVolume);
         if (error) {
             L_ERR("Cannot create root volume: {}", error);
-            FreeResources();
-            return error;
+            goto undo;
         }
 
         RootPath = RootVolume->Path;
@@ -2354,12 +2352,16 @@ TError TContainer::PrepareResources() {
     for (auto &volume: LinkedVolumes) {
         error = volume->MountLink(*this);
         if (error)
-            return error;
+            goto undo;
     }
 
     PropagateCpuLimit();
 
     return OK;
+
+undo:
+    FreeResources();
+    return error;
 }
 
 /* Some resources are not required in dead state */
@@ -2423,7 +2425,7 @@ void TContainer::FreeResources() {
     for (auto &volume: LinkedVolumes) {
         error = volume->UmountLink(*this);
         if (error)
-            L_WRN("Cannot umount linked volume {}: {}", volume->Path, error);
+            L_WRN("Cannot umount volume link {}: {}", volume->Path, error);
     }
 
     if (RootVolume) {
