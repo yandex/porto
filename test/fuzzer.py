@@ -644,18 +644,17 @@ def UnlinkVolume(conn, pathstr):
     if pathstr is None:
         pathstr = ""
 
-    conn.UnlinkVolume(pathstr, ct)
+    target = select_by_weight( [
+       (10, None),
+       (1, get_random_dir(FUZZER_MNT)),
+       ] )
 
-def UnlinkVolumeStrict(conn, pathstr):
-    ct = select_volume_container(conn)
+    strict = select_by_weight( [
+       (10, False),
+       (1, True),
+       ] )
 
-    if VERBOSE:
-        print "Unlinking volume: {} from container: {}".format(pathstr, ct)
-
-    if pathstr is None:
-        pathstr = ""
-
-    conn.UnlinkVolume(pathstr, ct, strict=True)
+    conn.UnlinkVolume(pathstr, ct, target=target, strict=strict)
 
 def LinkVolume(conn, pathstr):
 
@@ -670,24 +669,17 @@ def LinkVolume(conn, pathstr):
     if ct is None:
         ct = ""
 
-    conn.LinkVolume(pathstr, ct)
+    target = select_by_weight( [
+       (10, None),
+       (1, get_random_dir(FUZZER_MNT)),
+       ] )
 
-def LinkVolumeTarget(conn, pathstr):
+    read_only = select_by_weight( [
+       (10, False),
+       (1, True),
+       ] )
 
-    ct = select_volume_container(conn)
-    target = get_random_dir(FUZZER_MNT)
-
-    if VERBOSE:
-        print "Linking volume: {} to container {} to {}".format(pathstr, ct, target)
-
-    if pathstr is None:
-        pathstr = ""
-
-    if ct is None:
-        ct = ""
-
-    conn.LinkVolume(pathstr, ct, target=target)
-
+    conn.LinkVolume(pathstr, ct, target=target, read_only=read_only)
 
 def random_container():
     return FUZZER_PRIVATE + '-' + get_random_str(NAME_LIMIT)
@@ -775,9 +767,7 @@ def volume_action(conn):
     select_by_weight( [
         (1, CreateVolume),
         (2, UnlinkVolume),
-        (2, UnlinkVolumeStrict),
         (2, LinkVolume),
-        (2, LinkVolumeTarget),
     ] )(conn, select_volume(conn))
 
 def select_place():
