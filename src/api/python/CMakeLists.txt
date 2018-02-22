@@ -1,7 +1,5 @@
 project(python-portopy)
 
-include(FindPythonInterp)
-
 add_custom_command(
 	OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/porto/rpc_pb2.py
 	DEPENDS ${porto_SOURCE_DIR}/rpc.proto

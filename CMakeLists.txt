@@ -82,6 +82,15 @@ else()
 	SET(LIBNL_ROUTE ${INSTALL_DIR}/lib/libnl-route-3.a)
 endif()
 
+find_library(PB NAMES libprotobuf.a)
+find_package(Protobuf REQUIRED)
+# FindProtobuf requires only the libraries to be present
+if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+	message(FATAL_ERROR "Couldn't find protoc executable.")
+endif()
+
+find_package(Curses REQUIRED)
+
 enable_testing()
 add_custom_target(porto_test COMMAND ctest -V -T Test)
 
@@ -93,6 +102,7 @@ add_subdirectory(src)
 add_subdirectory(test)
 
 if(ENABLE_PYTHON)
+	include(FindPythonInterp)
 	add_subdirectory(src/api/python)
 endif()
 

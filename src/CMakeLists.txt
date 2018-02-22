@@ -1,14 +1,6 @@
 project(porto)
 
-find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
-
-find_library(PB NAMES libprotobuf.a)
-find_package(Protobuf REQUIRED)
-# FindProtobuf requires only the libraries to be present
-if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-	message(FATAL_ERROR "Couldn't find protoc executable.")
-endif()
 
 PROTOBUF_GENERATE_CPP(RPC_PROTO_SRCS RPC_PROTO_HDRS rpc.proto)
 add_library(rpc_proto STATIC ${RPC_PROTO_SRCS})
