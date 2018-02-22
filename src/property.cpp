@@ -1349,7 +1349,6 @@ public:
     TError Get(std::string &value) {
         TTuple paths;
 
-        auto volumes_lock = LockVolumes();
         for (auto &vol: CT->OwnedVolumes) {
             TPath path = CL->ComposePath(vol->Path);
             if (!path)
@@ -1371,9 +1370,8 @@ public:
     TError Get(std::string &value) {
         TMultiTuple links;
 
-        auto volumes_lock = LockVolumes();
         for (auto &link: CT->VolumeLinks) {
-            TPath path = link->Volume->Compose(*CL->ClientContainer);
+            TPath path = link->Volume->ComposePath(*CL->ClientContainer);
             if (!path)
                 path = "%" + link->Volume->Path.ToString();
             links.push_back({path.ToString()});
@@ -3080,6 +3078,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["volumes"] = Statistics->VolumesCount;
     m["volumes_created"] = Statistics->VolumesCreated;
     m["volumes_failed"] = Statistics->VolumesFailed;
+    m["volume_mounts"] = Statistics->VolumeMounts;
 
     m["networks"] = Statistics->NetworksCount;
 

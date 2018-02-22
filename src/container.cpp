@@ -1971,7 +1971,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         if (!bm.Source.IsAbsolute())
             bm.Source = Parent->GetCwd() / bm.Source;
 
-        auto src = TVolume::Locate(Parent->RootPath / bm.Source);
+        auto src = TVolume::ResolveOrigin(Parent->RootPath / bm.Source);
         bm.ControlSource = src && !CL->CanControl(src->VolumeOwner);
 
         if (bm.Target.IsAbsolute())
@@ -1979,7 +1979,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         else
             bm.Target = TaskEnv.Mnt.Root / TaskEnv.Mnt.Cwd / bm.Target;
 
-        auto dst = TVolume::Locate(Parent->RootPath / bm.Target);
+        auto dst = TVolume::ResolveOrigin(Parent->RootPath / bm.Target);
         bm.ControlTarget = dst && !CL->CanControl(dst->VolumeOwner);
 
         // disable propagation in both directions
@@ -2350,7 +2350,7 @@ TError TContainer::PrepareResources() {
     }
 
     for (auto &link: VolumeLinks) {
-        error = link->MountTarget();
+        error = link->Volume->MountLink(*link);
         if (error)
             goto undo;
     }
@@ -2423,9 +2423,9 @@ void TContainer::FreeResources() {
     }
 
     for (auto &link: VolumeLinks) {
-        error = link->UmountTarget();
+        error = link->Volume->UmountLink(*link);
         if (error)
-            L_WRN("UmountTarget {}", error);
+            L_WRN("Cannot umount volume link: {}", error);
     }
 
     if (RootVolume) {

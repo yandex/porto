@@ -231,6 +231,24 @@ TError TClient::ResolveContainer(const std::string &relative_name,
     return TContainer::Find(name, ct);
 }
 
+TError TClient::ResolveVolume(const TPath &path, std::shared_ptr<TVolume> &volume) {
+    volume = TVolume::ResolveMount(ClientContainer->RootPath / path);
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume {} not found", path);
+    return OK;
+}
+
+TError TClient::ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume) {
+    if (AccessLevel <= EAccessLevel::ReadOnly)
+        return TError(EError::Permission, "Write access denied");
+    volume = TVolume::ResolveMount(ClientContainer->RootPath / path);
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume {} not found", path);
+    if (CanControl(volume->VolumeOwner))
+        return TError(EError::Permission, "Cannot control volume {}", path);
+    return OK;
+}
+
 TError TClient::ReadContainer(const std::string &relative_name,
                               std::shared_ptr<TContainer> &ct, bool try_lock) {
     auto lock = LockContainers();
@@ -380,7 +398,7 @@ TError TClient::ReadAccess(const TFile &file) {
 
     /* Volume owner also gains full control inside */
     if (error) {
-        auto volume = TVolume::Locate(path);
+        auto volume = TVolume::ResolveOrigin(path);
         if (volume && !CanControl(volume->VolumeOwner))
             error = OK;
     }
@@ -406,7 +424,7 @@ TError TClient::WriteAccess(const TFile &file) {
 
     /* Also volume owner gains full access inside */
     if (error) {
-        auto volume = TVolume::Locate(path);
+        auto volume = TVolume::ResolveOrigin(path);
         if (volume && !volume->IsReadOnly &&
                 !CanControl(volume->VolumeOwner))
             error = OK;

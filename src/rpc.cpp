@@ -719,35 +719,6 @@ noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
     return OK;
 }
 
-noinline static void
-FillVolumeDescription(TVolume &volume, const TPath &path, rpc::TVolumeDescription *desc) {
-
-    if (path)
-        desc->set_path(path.ToString());
-    else
-        desc->set_path(CL->ComposePath(volume.Path).ToString());
-
-    TStringMap props;
-    TMultiTuple links;
-    volume.Dump(props, links);
-
-    for (auto &kv: props) {
-        auto p = desc->add_properties();
-        p->set_name(kv.first);
-        p->set_value(kv.second);
-    }
-
-    for (auto &link: links) {
-        desc->add_containers(link[0]);
-        auto l = desc->add_links();
-        l->set_container(link[0]);
-        if (link[1] != "")
-            l->set_target(link[1]);
-        if (link[2] == "ro")
-            l->set_read_only(true);
-    }
-}
-
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp) {
     TStringMap cfg;
@@ -761,15 +732,16 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
     if (!cfg.count(V_PLACE) && CL->DefaultPlace() != PORTO_PLACE)
         cfg[V_PLACE] = CL->DefaultPlace().ToString();
 
-    std::shared_ptr<TVolume> volume;
     Statistics->VolumesCreated++;
+
+    std::shared_ptr<TVolume> volume;
     TError error = TVolume::Create(cfg, volume);
     if (error) {
         Statistics->VolumesFailed++;
         return error;
     }
 
-    FillVolumeDescription(*volume, "", rsp.mutable_volume());
+    volume->Dump(volume->ComposePath(*CL->ClientContainer), rsp.mutable_volume());
     return OK;
 }
 
@@ -783,13 +755,9 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
         cfg[p.name()] = p.value();
 
     std::shared_ptr<TVolume> volume;
-    error = TVolume::Resolve(*CL->ClientContainer, req.path(), volume);
+    error = CL->ControlVolume(req.path(), volume);
     if (error)
         return error;
-
-    error = CL->CanControl(volume->VolumeOwner);
-    if (error)
-        return TError(error, "Cannot tune volume {}", volume->Path);
 
     return volume->Tune(cfg);
 }
@@ -801,14 +769,11 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
         return error;
 
     std::shared_ptr<TVolume> volume;
-    error = TVolume::Resolve(*CL->ClientContainer, req.path(), volume);
+    error = CL->ControlVolume(req.path(), volume);
     if (error)
         return error;
-    error = CL->CanControl(volume->VolumeOwner);
-    if (error)
-        return TError(error, "Cannot link volume {}", volume->Path);
 
-    error = volume->LinkContainer(ct, req.target(), req.read_only(), req.required());
+    error = volume->LinkVolume(ct, req.target(), req.read_only(), req.required());
     if (error)
         return error;
 
@@ -827,15 +792,12 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
     }
 
     std::shared_ptr<TVolume> volume;
-    error = TVolume::Resolve(*CL->ClientContainer, req.path(), volume);
+    error = CL->ControlVolume(req.path(), volume);
     if (error)
         return error;
-    error = CL->CanControl(volume->VolumeOwner);
-    if (error)
-        return TError(error, "Cannot unlink volume {}", volume->Path);
 
     if (ct) {
-        error = volume->UnlinkContainer(ct, req.has_target() ? req.target() : "***", req.strict());
+        error = volume->UnlinkVolume(ct, req.has_target() ? req.target() : "***", req.strict());
         CL->ReleaseContainer();
     } else {
         error = volume->Destroy();
@@ -850,47 +812,37 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
 
     if (req.has_path() && !req.path().empty()) {
         std::shared_ptr<TVolume> volume;
-
-        error = TVolume::Resolve(*CL->ClientContainer, req.path(), volume);
+        error = CL->ResolveVolume(req.path(), volume);
         if (error)
             return error;
-
-        auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(*volume, req.path(), desc);
+        volume->Dump(req.path(), rsp.mutable_volumelist()->add_volumes());
         return OK;
     }
 
-    std::shared_ptr<TContainer> ct;
+    TPath base_path;
     if (req.has_container()) {
+        std::shared_ptr<TContainer> ct;
         auto lock = LockContainers();
         error = CL->ResolveContainer(req.container(), ct);
         if (error)
             return error;
-    }
+        base_path = ct->RootPath;
+        if (!ct->HasResources() || !base_path)
+            return TError(EError::InvalidState, "Requested container {} is not running", ct->Name);
+    } else
+        base_path = CL->ClientContainer->RootPath;
 
-    std::list<std::pair<std::shared_ptr<TVolume>, TPath>> list;
-
+    std::map<TPath, std::shared_ptr<TVolume>> map;
     auto volumes_lock = LockVolumes();
-    if (ct) {
-        for (auto &link: ct->VolumeLinks) {
-            auto &volume = link->Volume;
-            auto path = volume->Compose(*CL->ClientContainer);
-            if (path)
-                list.emplace_back(volume, path);
-        }
-    } else {
-        for (auto &it : Volumes) {
-            auto &volume = it.second;
-            auto path = volume->Compose(*CL->ClientContainer);
-            if (path)
-                list.emplace_back(volume, path);
-        }
+    for (auto &it: VolumeMounts) {
+        TPath path = base_path.InnerPath(it.first);
+        if (path)
+            map[path] = it.second;
     }
     volumes_lock.unlock();
 
-    for (auto &pair: list)
-        FillVolumeDescription(*pair.first, pair.second,
-                              rsp.mutable_volumelist()->add_volumes());
+    for (auto &it: map)
+        it.second->Dump(it.first, rsp.mutable_volumelist()->add_volumes());
 
     return OK;
 }
@@ -967,7 +919,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     }
 
     std::shared_ptr<TVolume> volume;
-    error = TVolume::Resolve(*CL->ClientContainer, req.volume(), volume);
+    error = CL->ControlVolume(req.volume(), volume);
     if (error)
         return error;
 

@@ -71,6 +71,7 @@ public:
 
     TError ResolveContainer(const std::string &relative_name,
                             std::shared_ptr<TContainer> &ct) const;
+
     TError ReadContainer(const std::string &relative_name,
                          std::shared_ptr<TContainer> &ct, bool try_lock = false);
     TError WriteContainer(const std::string &relative_name,
@@ -81,6 +82,11 @@ public:
 
     TPath ComposePath(const TPath &path);
     TPath ResolvePath(const TPath &path);
+
+    TError ResolveVolume(const TPath &path, std::shared_ptr<TVolume> &volume);
+
+    TError ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume);
+
     TPath DefaultPlace();
     TError CanControlPlace(const TPath &place);
 
