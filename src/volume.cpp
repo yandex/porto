@@ -1287,10 +1287,8 @@ std::shared_ptr<TVolumeLink> TVolume::ResolveLink(const TPath &path) {
 
 std::shared_ptr<TVolumeLink> TVolume::ResolveOriginLocked(const TPath &path) {
     auto it = VolumeLinks.lower_bound(path);
-    if (it != VolumeLinks.end() &&
-            (it->first == path ||
-             (it != VolumeLinks.begin() &&
-              path.IsInside((--it)->first))))
+    if ((it != VolumeLinks.end() && it->first == path) ||
+        (it != VolumeLinks.begin() && path.IsInside((--it)->first)))
         return it->second;
     return nullptr;
 }
@@ -2938,14 +2936,23 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     if (error)
         return error;
 
-    /* also check if volume depends on itself */
-    Volumes[volume->Path] = volume;
+    /* Add common link */
+    auto link = std::make_shared<TVolumeLink>(volume, RootContainer);
+    link->Target = volume->Path;
+    link->HostTarget = volume->Path;
+    link->ReadOnly = volume->IsReadOnly;
+    VolumeLinks[volume->Path] = link;
+    link.reset();
 
+    /* also check if volume depends on itself */
     error = volume->CheckDependencies();
     if (error) {
-        Volumes.erase(volume->Path);
+        VolumeLinks.erase(volume->Path);
         return error;
     }
+
+    Volumes[volume->Path] = volume;
+    Statistics->VolumeLinksMounted++;
 
     volume->VolumeOwnerContainer = owner;
     owner->OwnedVolumes.push_back(volume);
@@ -2968,14 +2975,6 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
     volumes_lock.lock();
     volume->SetState(EVolumeState::Ready);
-
-    /* Add common link */
-    auto link = std::make_shared<TVolumeLink>(volume, RootContainer);
-    link->Target = volume->Path;
-    link->HostTarget = volume->Path;
-    link->ReadOnly = volume->IsReadOnly;
-    VolumeLinks[volume->Path] = link;
-    Statistics->VolumeLinksMounted++;
 
     volumes_lock.unlock();
 
