@@ -2198,12 +2198,14 @@ TError TVolume::Destroy() {
             error = CL->LockContainer(link->Container);
             if (!error) {
                 error = volume->UnlinkVolume(link->Container, link->Target);
-                if (error)
-                    L_WRN("Cannot unlink volume {} {}", volume->Path, error);
                 CL->ReleaseContainer();
             }
 
             volumes_lock.lock();
+            if (error && link == volume->Links.back()) {
+                L_WRN("Cannot unlink volume {}: {}", volume->Path, error);
+                volume->Links.remove(link);
+            }
         }
 
         volumes_lock.unlock();
@@ -2585,9 +2587,11 @@ void TVolume::UnlinkAllVolumes(std::shared_ptr<TContainer> container) {
         std::shared_ptr<TVolumeLink> link = container->VolumeLinks.back();
         volumes_lock.unlock();
         error = link->Volume->UnlinkVolume(container, link->Target);
-        if (error)
-            L_WRN("Cannot unlink volume {}: {}", link->Volume->Path, error);
         volumes_lock.lock();
+        if (error && link == container->VolumeLinks.back()) {
+            L_WRN("Cannot unlink volume {}: {}", link->Volume->Path, error);
+            container->VolumeLinks.remove(link);
+        }
     }
 
     for (auto &volume: container->OwnedVolumes) {
