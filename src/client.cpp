@@ -402,8 +402,8 @@ TError TClient::ReadAccess(const TFile &file) {
 
     /* Volume owner also gains full control inside */
     if (error) {
-        auto volume = TVolume::ResolveOrigin(path);
-        if (volume && !CanControl(volume->VolumeOwner))
+        auto link = TVolume::ResolveOrigin(path);
+        if (link && !CanControl(link->Volume->VolumeOwner))
             error = OK;
     }
 
@@ -428,9 +428,8 @@ TError TClient::WriteAccess(const TFile &file) {
 
     /* Also volume owner gains full access inside */
     if (error) {
-        auto volume = TVolume::ResolveOrigin(path);
-        if (volume && !volume->IsReadOnly &&
-                !CanControl(volume->VolumeOwner))
+        auto link = TVolume::ResolveOrigin(path);
+        if (link && !link->ReadOnly && !CanControl(link->Volume->VolumeOwner))
             error = OK;
     }
 

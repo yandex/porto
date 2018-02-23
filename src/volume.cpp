@@ -1285,17 +1285,17 @@ std::shared_ptr<TVolumeLink> TVolume::ResolveLink(const TPath &path) {
     return ResolveLinkLocked(path);
 }
 
-std::shared_ptr<TVolume> TVolume::ResolveOriginLocked(const TPath &path) {
+std::shared_ptr<TVolumeLink> TVolume::ResolveOriginLocked(const TPath &path) {
     auto it = VolumeLinks.lower_bound(path);
     if (it != VolumeLinks.end() &&
             (it->first == path ||
              (it != VolumeLinks.begin() &&
               path.IsInside((--it)->first))))
-        return it->second->Volume;
+        return it->second;
     return nullptr;
 }
 
-std::shared_ptr<TVolume> TVolume::ResolveOrigin(const TPath &path) {
+std::shared_ptr<TVolumeLink> TVolume::ResolveOrigin(const TPath &path) {
     auto volumes_lock = LockVolumes();
     return ResolveOriginLocked(path);
 }
@@ -1542,12 +1542,13 @@ TError TVolume::DependsOn(const TPath &path) {
     if (State == EVolumeState::Ready && !path.Exists())
         return TError("Required path {} not found", path);
 
-    auto volume = ResolveOriginLocked(path);
-    if (volume) {
-        if (volume->State != EVolumeState::Ready)
-            return TError(EError::VolumeNotReady, "Required volume {} not ready", volume->Path);
-        L("Volume {} depends on volume {}", Path, volume->Path);
-        volume->Nested.insert(shared_from_this());
+    auto link = ResolveOriginLocked(path);
+    if (link) {
+        if (link->Volume->State != EVolumeState::Ready)
+            return TError(EError::VolumeNotReady, "Required volume {} not ready", link->Volume->Path);
+        L("Volume {} depends on volume {}", Path, link->Volume->Path);
+        /* FIXME should depends on link */
+        link->Volume->Nested.insert(shared_from_this());
     }
 
     return OK;
@@ -1971,7 +1972,7 @@ TError TVolume::Build() {
 }
 
 TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
-    std::shared_ptr<TVolume> target_volume;
+    std::shared_ptr<TVolumeLink> target_link;
     TError error;
 
     if (!link->Target)
@@ -2027,8 +2028,9 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     bind.CreateTarget = true;
     bind.FollowTraget = false;
 
-    target_volume = TVolume::ResolveOrigin(bind.Target);
-    bind.ControlTarget = target_volume && !CL->CanControl(target_volume->VolumeOwner);
+    /* FIXME should depends on link */
+    target_link = TVolume::ResolveOrigin(bind.Target);
+    bind.ControlTarget = target_link && !CL->CanControl(target_link->Volume->VolumeOwner);
 
     error = bind.Mount(CL->Cred, "/");
 
@@ -2225,6 +2227,7 @@ TError TVolume::Destroy() {
 
         Volumes.erase(volume->Path);
 
+        /* Remove common link */
         if (VolumeLinks.erase(volume->Path))
             Statistics->VolumeLinksMounted--;
 
@@ -2961,11 +2964,15 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
     volumes_lock.lock();
     volume->SetState(EVolumeState::Ready);
+
+    /* Add common link */
     auto link = std::make_shared<TVolumeLink>(volume, RootContainer);
     link->Target = volume->Path;
     link->HostTarget = volume->Path;
     link->ReadOnly = volume->IsReadOnly;
     VolumeLinks[volume->Path] = link;
+    Statistics->VolumeLinksMounted++;
+
     volumes_lock.unlock();
 
     if (cfg.count(V_CONTAINERS)) {
@@ -3049,6 +3056,14 @@ void TVolume::RestoreAll(void) {
         }
 
         Volumes[volume->Path] = volume;
+
+        /* Restore common link */
+        auto link = std::make_shared<TVolumeLink>(volume, RootContainer);
+        link->Target = volume->Path;
+        link->HostTarget = volume->Path;
+        link->ReadOnly = volume->IsReadOnly;
+        VolumeLinks[volume->Path] = link;
+        Statistics->VolumeLinksMounted++;
 
         error = volume->Save();
         if (error) {

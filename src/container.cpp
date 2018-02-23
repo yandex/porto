@@ -1972,7 +1972,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
             bm.Source = Parent->GetCwd() / bm.Source;
 
         auto src = TVolume::ResolveOrigin(Parent->RootPath / bm.Source);
-        bm.ControlSource = src && !CL->CanControl(src->VolumeOwner);
+        bm.ControlSource = src && !CL->CanControl(src->Volume->VolumeOwner);
 
         if (bm.Target.IsAbsolute())
             bm.Target = TaskEnv.Mnt.Root / bm.Target;
@@ -1980,7 +1980,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
             bm.Target = TaskEnv.Mnt.Root / TaskEnv.Mnt.Cwd / bm.Target;
 
         auto dst = TVolume::ResolveOrigin(Parent->RootPath / bm.Target);
-        bm.ControlTarget = dst && !CL->CanControl(dst->VolumeOwner);
+        bm.ControlTarget = dst && !CL->CanControl(dst->Volume->VolumeOwner);
 
         // disable propagation in both directions
         bm.Flags |= MS_PRIVATE;

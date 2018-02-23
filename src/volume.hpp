@@ -166,8 +166,8 @@ public:
     static std::shared_ptr<TVolumeLink> ResolveLink(const TPath &path);
 
     /* link inner path */
-    static std::shared_ptr<TVolume> ResolveOriginLocked(const TPath &path);
-    static std::shared_ptr<TVolume> ResolveOrigin(const TPath &path);
+    static std::shared_ptr<TVolumeLink> ResolveOriginLocked(const TPath &path);
+    static std::shared_ptr<TVolumeLink> ResolveOrigin(const TPath &path);
 
     TPath ComposePath(const TContainer &ct) const;
 

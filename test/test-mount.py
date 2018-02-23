@@ -98,7 +98,7 @@ a.Destroy()
 a = c.Create("a", weak=True)
 a['root'] = root=root_volume.path
 test_volume.Link(a, target="/test_ro", read_only=True)
-ro_volume.Link(a, target="/ro_vol")
+ro_volume.Link(a, target="/ro_vol", read_only=True)
 
 mnt = ParseMountinfo()
 Expect(root_volume.path + '/test_ro' not in mnt)
