@@ -2026,7 +2026,6 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     bind.CreateTarget = true;
     bind.FollowTraget = false;
 
-    /* FIXME should depends on link */
     target_link = TVolume::ResolveOrigin(bind.Target);
     bind.ControlTarget = target_link && !CL->CanControl(target_link->Volume->VolumeOwner);
 
@@ -2067,8 +2066,6 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link, bool strict) {
     TPath host_target = link->HostTarget;
     link->HostTarget = "";
 
-    /* FIXME handle nested volumes and links */
-
     volumes_lock.unlock();
 
     L_ACT("Umount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
@@ -2082,6 +2079,30 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link, bool strict) {
 
     /* Save changes only after umounting */
     (void)Save();
+
+    /* Umount nested links */
+    volumes_lock.lock();
+    while (true) {
+        auto it = VolumeLinks.lower_bound(host_target);
+        if (it == VolumeLinks.end() || !it->first.IsInside(host_target))
+            break;
+        auto link = it->second;
+
+        /* common link */
+        if (link->HostTarget == link->Volume->Path) {
+            ++it; /* FIXME destroy volume */
+            continue;
+        }
+
+        L_ACT("Umount nested volume {} link {} for CT{}:{}", link->Volume->Path, link->HostTarget, link->Container->Id, link->Container->Name);
+        link->HostTarget = "";
+        Statistics->VolumeLinksMounted--;
+        VolumeLinks.erase(it);
+        volumes_lock.unlock();
+        (void)link->Volume->Save();
+        volumes_lock.lock();
+    }
+    volumes_lock.unlock();
 
     return error;
 
