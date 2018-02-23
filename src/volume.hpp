@@ -84,7 +84,12 @@ public:
     bool ReadOnly = false;
     bool Required = false;
 
-    TVolumeLink(std::shared_ptr<TVolume> v, std::shared_ptr<TContainer> c) : Volume(v), Container(c) {}
+    TVolumeLink(std::shared_ptr<TVolume> v, std::shared_ptr<TContainer> c) : Volume(v), Container(c) {
+        Statistics->VolumeLinks++;
+    }
+    ~TVolumeLink() {
+        Statistics->VolumeLinks--;
+    }
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
@@ -157,8 +162,8 @@ public:
                          std::shared_ptr<TVolume> &volume);
 
     /* link target path */
-    static std::shared_ptr<TVolume> ResolveMountLocked(const TPath &path);
-    static std::shared_ptr<TVolume> ResolveMount(const TPath &path);
+    static std::shared_ptr<TVolumeLink> ResolveLinkLocked(const TPath &path);
+    static std::shared_ptr<TVolumeLink> ResolveLink(const TPath &path);
 
     /* link inner path */
     static std::shared_ptr<TVolume> ResolveOriginLocked(const TPath &path);
@@ -186,9 +191,9 @@ public:
 
     static void RestoreAll(void);
 
-    TError MountLink(TVolumeLink &link);
+    TError MountLink(std::shared_ptr<TVolumeLink> link);
 
-    TError UmountLink(TVolumeLink &link, bool strict = false);
+    TError UmountLink(std::shared_ptr<TVolumeLink> link, bool strict = false);
 
     TError LinkVolume(std::shared_ptr<TContainer> container,
                       const TPath &target = "",
@@ -263,7 +268,7 @@ extern std::vector<TVolumeProperty> VolumeProperties;
 
 extern std::mutex VolumesMutex;
 extern std::map<TPath, std::shared_ptr<TVolume>> Volumes;
-extern std::map<TPath, std::shared_ptr<TVolume>> VolumeMounts;
+extern std::map<TPath, std::shared_ptr<TVolumeLink>> VolumeLinks;
 extern TPath VolumesKV;
 
 static inline std::unique_lock<std::mutex> LockVolumes() {

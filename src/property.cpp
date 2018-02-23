@@ -3078,7 +3078,8 @@ void TPortoStat::Populate(TUintMap &m) {
     m["volumes"] = Statistics->VolumesCount;
     m["volumes_created"] = Statistics->VolumesCreated;
     m["volumes_failed"] = Statistics->VolumesFailed;
-    m["volume_mounts"] = Statistics->VolumeMounts;
+    m["volume_links"] = Statistics->VolumeLinks;
+    m["volume_links_mounted"] = Statistics->VolumeLinksMounted;
 
     m["networks"] = Statistics->NetworksCount;
 

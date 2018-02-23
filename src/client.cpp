@@ -232,20 +232,24 @@ TError TClient::ResolveContainer(const std::string &relative_name,
 }
 
 TError TClient::ResolveVolume(const TPath &path, std::shared_ptr<TVolume> &volume) {
-    volume = TVolume::ResolveMount(ClientContainer->RootPath / path);
-    if (!volume)
+    auto link = TVolume::ResolveLink(ClientContainer->RootPath / path);
+    if (!link)
         return TError(EError::VolumeNotFound, "Volume {} not found", path);
+    volume = link->Volume;
     return OK;
 }
 
-TError TClient::ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume) {
+TError TClient::ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume, bool read_only) {
     if (AccessLevel <= EAccessLevel::ReadOnly)
-        return TError(EError::Permission, "Write access denied");
-    volume = TVolume::ResolveMount(ClientContainer->RootPath / path);
-    if (!volume)
+        return TError(EError::Permission, "Write access to porto denied");
+    auto link = TVolume::ResolveLink(ClientContainer->RootPath / path);
+    if (!link)
         return TError(EError::VolumeNotFound, "Volume {} not found", path);
-    if (CanControl(volume->VolumeOwner))
+    if (CanControl(link->Volume->VolumeOwner))
         return TError(EError::Permission, "Cannot control volume {}", path);
+    if (!read_only && link->ReadOnly)
+        return TError(EError::Permission, "Volume {} is read-only", path);
+    volume = link->Volume;
     return OK;
 }
 

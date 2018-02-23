@@ -85,7 +85,8 @@ public:
 
     TError ResolveVolume(const TPath &path, std::shared_ptr<TVolume> &volume);
 
-    TError ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume);
+    TError ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume,
+                         bool read_only = false);
 
     TPath DefaultPlace();
     TError CanControlPlace(const TPath &place);

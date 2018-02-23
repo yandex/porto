@@ -736,6 +736,8 @@ static int Portod() {
     Statistics->ContainersCount = 0;
     Statistics->ClientsCount = 0;
     Statistics->VolumesCount = 0;
+    Statistics->VolumeLinks = 0;
+    Statistics->VolumeLinksMounted = 0;
     Statistics->RequestsQueued = 0;
     Statistics->NetworksCount = 0;
 

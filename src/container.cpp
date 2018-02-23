@@ -2350,7 +2350,7 @@ TError TContainer::PrepareResources() {
     }
 
     for (auto &link: VolumeLinks) {
-        error = link->Volume->MountLink(*link);
+        error = link->Volume->MountLink(link);
         if (error)
             goto undo;
     }
@@ -2423,7 +2423,7 @@ void TContainer::FreeResources() {
     }
 
     for (auto &link: VolumeLinks) {
-        error = link->Volume->UmountLink(*link);
+        error = link->Volume->UmountLink(link);
         if (error)
             L_WRN("Cannot umount volume link: {}", error);
     }

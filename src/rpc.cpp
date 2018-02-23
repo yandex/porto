@@ -769,7 +769,7 @@ noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
         return error;
 
     std::shared_ptr<TVolume> volume;
-    error = CL->ControlVolume(req.path(), volume);
+    error = CL->ControlVolume(req.path(), volume, !req.has_target() || req.read_only());
     if (error)
         return error;
 
@@ -792,7 +792,7 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
     }
 
     std::shared_ptr<TVolume> volume;
-    error = CL->ControlVolume(req.path(), volume);
+    error = CL->ControlVolume(req.path(), volume, true);
     if (error)
         return error;
 
@@ -834,10 +834,10 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
 
     std::map<TPath, std::shared_ptr<TVolume>> map;
     auto volumes_lock = LockVolumes();
-    for (auto &it: VolumeMounts) {
+    for (auto &it: VolumeLinks) {
         TPath path = base_path.InnerPath(it.first);
         if (path)
-            map[path] = it.second;
+            map[path] = it.second->Volume;
     }
     volumes_lock.unlock();
 
@@ -919,7 +919,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     }
 
     std::shared_ptr<TVolume> volume;
-    error = CL->ControlVolume(req.volume(), volume);
+    error = CL->ControlVolume(req.volume(), volume, true);
     if (error)
         return error;
 
