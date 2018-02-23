@@ -1927,10 +1927,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Mnt.Cwd = GetCwd();
 
-    if (RootVolume)
-        TaskEnv.Mnt.Root = Parent->RootPath.InnerPath(RootVolume->Path);
-    else
-        TaskEnv.Mnt.Root = Root;
+    TaskEnv.Mnt.Root = Root;
 
     TaskEnv.Mnt.RootRo = RootRo;
 
@@ -2332,23 +2329,6 @@ TError TContainer::PrepareResources() {
         goto undo;
     }
 
-    if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
-        TStringMap cfg;
-
-        cfg[V_BACKEND] = "loop";
-        cfg[V_STORAGE] = RootPath.ToString();
-        cfg[V_READ_ONLY] = BoolToString(RootRo);
-        cfg[V_CONTAINERS] = ROOT_PORTO_NAMESPACE + Name;
-
-        error = TVolume::Create(cfg, RootVolume);
-        if (error) {
-            L_ERR("Cannot create root volume: {}", error);
-            goto undo;
-        }
-
-        RootPath = RootVolume->Path;
-    }
-
     for (auto &link: VolumeLinks) {
         error = link->Volume->MountLink(link);
         if (error)
@@ -2406,31 +2386,10 @@ void TContainer::FreeResources() {
         }
     }
 
-    /* Legacy non-volume root on loop device */
-    if (LoopDev >= 0) {
-        error = PutLoopDev(LoopDev);
-        if (error)
-            L_WRN("Can't put loop device {}: {}", LoopDev, error);
-        LoopDev = -1;
-        SetProp(EProperty::LOOP_DEV);
-
-        TPath tmp = TPath(PORTO_WORKDIR) / std::to_string(Id);
-        if (tmp.Exists()) {
-            error = tmp.RemoveAll();
-            if (error)
-                L_WRN("Can't remove {}: {}", tmp, error);
-        }
-    }
-
     for (auto &link: VolumeLinks) {
         error = link->Volume->UmountLink(link);
         if (error)
             L_WRN("Cannot umount volume link: {}", error);
-    }
-
-    if (RootVolume) {
-        RootVolume->Destroy();
-        RootVolume = nullptr;
     }
 
     RemoveWorkDir();

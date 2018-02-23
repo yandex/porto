@@ -1206,21 +1206,6 @@ public:
     }
 } static SeizePid;
 
-class TRawLoopDev : public TProperty {
-public:
-    TRawLoopDev() : TProperty(P_RAW_LOOP_DEV, EProperty::LOOP_DEV, "") {
-        IsReadOnly = true;
-        IsHidden = true;
-    }
-    TError Get(std::string &value) {
-        value = std::to_string(CT->LoopDev);
-        return OK;
-    }
-    TError Set(const std::string &value) {
-        return StringToInt(value, CT->LoopDev);
-    }
-} static RawLoopDev;
-
 class TRawStartTime : public TProperty {
 public:
     TRawStartTime() : TProperty(P_RAW_START_TIME, EProperty::START_TIME, "") {

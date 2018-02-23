@@ -235,8 +235,6 @@ public:
     bool RecvOomEvents();
 
     TPath RootPath; /* path in host namespace, set at start */
-    int LoopDev = -1; /* legacy */
-    std::shared_ptr<TVolume> RootVolume;
     std::vector<std::string> Place;
 
     /* Pritected with VolumesMutex */

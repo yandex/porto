@@ -7,7 +7,6 @@
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr const char *P_SEIZE_PID = "seize_pid";
 constexpr const char *P_RAW_ID = "_id";
-constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
 constexpr const char *P_RAW_NAME = "_name";
 constexpr const char *P_RAW_START_TIME = "_start_time";
 constexpr const char *P_RAW_DEATH_TIME = "_death_time";
