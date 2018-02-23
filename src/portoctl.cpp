@@ -1691,18 +1691,21 @@ public:
 
 class TLinkVolumeCmd final : public ICmd {
 public:
-    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1, "[-rR] <path> [container] [target]",
-                    "link volume to container", "default container - current\n") {}
+    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1,
+            "[-R] <path> [container] [target] [ro|rw]",
+            "link volume to container", "default container - self\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
         bool required = false;
-        bool read_only = false;
         const auto &args = env->GetOpts({
-                {'r', false, [&](const char *) { read_only = true; }},
                 {'R', false, [&](const char *) { required = true; }},
         });
         const auto path = TPath(args[0]).RealPath().ToString();
-        int ret = Api->LinkVolume(path, (args.size() > 1) ? args[1] : "", (args.size() > 2) ? args[2] : "", read_only, required);
+        int ret = Api->LinkVolume(path,
+                (args.size() > 1) ? args[1] : "",
+                (args.size() > 2) ? args[2] : "",
+                (args.size() > 3) && args[3] == "ro",
+                required);
         if (ret)
             PrintError("Can't link volume");
         return ret;
@@ -1785,9 +1788,12 @@ public:
         if (!details) {
             std::cout << v.Path << std::endl;
         } else {
-            std::cout << std::left << std::setw(40) << v.Path << std::right;
+            std::cout << std::left << std::setw(40) << v.Path;
             if (v.Path.length() > 40)
                 std::cout << std::endl << std::setw(40) << " ";
+            std::cout << std::setw(8) << v.Properties[V_ID];
+            std::cout << std::setw(8) << v.Properties[V_BACKEND];
+            std::cout << std::right;
             if (inodes) {
                 ShowSizeProperty(v, V_INODE_LIMIT, 10, true);
                 ShowSizeProperty(v, V_INODE_USED, 10, true);
@@ -1800,10 +1806,16 @@ public:
                 ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
             }
 
-            for (auto link: v.Links)
+            for (auto link: v.Links) {
                 std::cout << " " << link.Container;
+                if (link.Target != "")
+                    std::cout << "(" << link.Target << (link.ReadOnly ? " ro" : "") << ")";
+            }
 
             std::cout << std::endl;
+
+            if (v.Path.length() > 40)
+                std::cout << std::endl;
         }
 
         if (!verbose)
@@ -1816,7 +1828,8 @@ public:
 
         for (auto link: v.Links)
             if (link.Target != "")
-                std::cout << "  " << std::left << std::setw(20) << (link.ReadOnly ? "target_ro" : "target") << " " << link.Container << " " << link.Target << std::endl;
+                std::cout << "  " << std::left << std::setw(20) << "link" << " "
+                    << link.Container << " " << link.Target << (link.ReadOnly ? " ro" : "") << std::endl;
 
         std::cout << std::resetiosflags(std::ios::adjustfield);
 
@@ -1843,7 +1856,10 @@ public:
         vector<Porto::Volume> vlist;
 
         if (details) {
-            std::cout << std::left << std::setw(40) << "Volume" << std::right;
+            std::cout << std::left << std::setw(40) << "Volume";
+            std::cout << std::setw(8) << "ID";
+            std::cout << std::setw(8) << "Backend";
+            std::cout << std::right;
             std::cout << std::setw(10) << "Limit";
             std::cout << std::setw(10) << "Used";
             std::cout << std::setw(10) << "Avail";
