@@ -687,6 +687,11 @@ TError TPath::Remount(unsigned long flags, unsigned long clear_flags) const {
 
     unsigned long recursive = flags & MS_REC;
 
+    if (flags & MS_PRIVATE) {
+        if (mount(NULL, Path.c_str(), NULL, MS_PRIVATE | recursive, NULL))
+            return TError::System("Remount {} MS_PRIVATE", Path);
+    }
+
     if (flags & MS_SLAVE) {
         if (mount(NULL, Path.c_str(), NULL, MS_SLAVE | recursive, NULL))
             return TError::System("Remount {} MS_SLAVE", Path);
@@ -695,11 +700,6 @@ TError TPath::Remount(unsigned long flags, unsigned long clear_flags) const {
     if (flags & MS_SHARED) {
         if (mount(NULL, Path.c_str(), NULL, MS_SHARED | recursive, NULL))
             return TError::System("Remount {} MS_SHARED", Path);
-    }
-
-    if (flags & MS_PRIVATE) {
-        if (mount(NULL, Path.c_str(), NULL, MS_PRIVATE | recursive, NULL))
-            return TError::System("Remount {} MS_PRIVATE", Path);
     }
 
     if (flags & MS_UNBINDABLE) {

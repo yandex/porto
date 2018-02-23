@@ -1783,8 +1783,6 @@ TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
 }
 
 TError TVolume::Build() {
-    TFile PathFd;
-
     L_ACT("Build volume: {} backend: {}", Path, BackendType);
 
     TError error = GetInternal("").Mkdir(0755);
@@ -1841,33 +1839,9 @@ TError TVolume::Build() {
             return error;
     }
 
-    /* Create and pin volume path */
-    if (IsAutoPath) {
-        error = Path.Mkdir(0755);
-        if (error)
-            return error;
-    }
-
-    error = PathFd.OpenDir(Path);
+    error = InternalPath.Mkdir(0755);
     if (error)
         return error;
-
-    TPath RealPath = PathFd.RealPath();
-    if (RealPath != Path)
-        return TError(EError::InvalidValue, "Volume real path differs: " +
-                      RealPath.ToString() + " != " + Path.ToString());
-
-    if (!IsAutoPath) {
-        error = CL->WriteAccess(PathFd);
-        if (error)
-            return TError(error, "Volume {}", Path);
-    }
-
-    if (Path != InternalPath) {
-        error = InternalPath.Mkdir(0755);
-        if (error)
-            return error;
-    }
 
     /* Save volume state before building */
     error = Save();
@@ -1947,17 +1921,6 @@ TError TVolume::Build() {
     if (error)
         return error;
 
-    /* And finally, publish volume in requested path */
-    if (Path != InternalPath) {
-        error = PathFd.ProcPath().Bind(InternalPath, MS_REC);
-        if (error)
-            return error;
-        error = Path.Remount(MS_SLAVE | MS_SHARED | MS_REC);
-        if (error)
-            return error;
-    }
-
-    PathFd.Close();
     StorageFd.Close();
 
     /* Keep storage only after successful build */
@@ -1971,7 +1934,7 @@ TError TVolume::Build() {
 
 TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     std::shared_ptr<TVolumeLink> target_link;
-    TError error;
+    TError error, error2;
 
     if (!link->Target)
         return OK;
@@ -1984,13 +1947,15 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     if (link->Volume.get() != this)
         return TError(EError::InvalidValue, "Wrong volume link");
     TPath host_target = link->Container->RootPath / link->Target;
-    link->HostTarget = "";
-    error = TVolume::CheckConflicts(host_target);
-    if (error)
-        return error;
-    link->HostTarget = host_target;
-    VolumeLinks[host_target] = link;
-    Statistics->VolumeLinksMounted++;
+    if (host_target != link->Volume->Path) {
+        link->HostTarget = "";
+        error = TVolume::CheckConflicts(host_target);
+        if (error)
+            return error;
+        link->HostTarget = host_target;
+        VolumeLinks[host_target] = link;
+        Statistics->VolumeLinksMounted++;
+    }
     volumes_lock.unlock();
 
     L_ACT("Mount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
@@ -2008,17 +1973,14 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     if (BackendType == "rbind" || BackendType == "dir")
         bind.Flags |= MS_REC;
 
-    /* make source read-only because remount is not propagated */
-    if (!IsReadOnly && link->ReadOnly) {
-        bind.Source = GetInternal("volume_ro");
-        error = bind.Source.Mkdir(700);
-        if (error)
-            goto undo;
-        error = bind.Source.BindRemount(InternalPath, bind.Flags);
-        if (error)
-            goto undo;
-    } else
-        bind.Source = InternalPath;
+    /* Start new shared group and make read-only - that isn't propagated */
+    bind.Source = GetInternal("volume_link");
+    error = bind.Source.Mkdir(700);
+    if (error)
+        goto undo;
+    error = bind.Source.BindRemount(InternalPath, bind.Flags | MS_PRIVATE | MS_SHARED);
+    if (error)
+        goto undo;
 
     bind.ControlSource = true;
 
@@ -2031,24 +1993,25 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     error = bind.Mount(CL->Cred, "/");
 
-    if (!IsReadOnly && link->ReadOnly) {
-        TError error2 = bind.Source.UmountAll();
-        if (error2)
-            L_WRN("Cannot umount {}", error2);
-        error2 = bind.Source.Rmdir();
-        if (error2)
-            L_WRN("Cannot remove {}", error2);
-    }
+    error2 = bind.Source.UmountAll();
+    if (error2)
+        L_WRN("Cannot umount {}", error2);
+    error2 = bind.Source.Rmdir();
+    if (error2)
+        L_WRN("Cannot remove {}", error2);
+
+    if (error)
+        goto undo;
+
+    return OK;
 
 undo:
-    if (error) {
-        volumes_lock.lock();
-        if (VolumeLinks.erase(link->HostTarget))
-            Statistics->VolumeLinksMounted--;
-        link->HostTarget = "";
-        volumes_lock.unlock();
-        (void)Save();
-    }
+    volumes_lock.lock();
+    if (VolumeLinks.erase(link->HostTarget))
+        Statistics->VolumeLinksMounted--;
+    link->HostTarget = "";
+    volumes_lock.unlock();
+    (void)Save();
 
     return error;
 }
@@ -2958,12 +2921,11 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         return error;
 
     /* Add common link */
-    auto link = std::make_shared<TVolumeLink>(volume, RootContainer);
-    link->Target = volume->Path;
-    link->HostTarget = volume->Path;
-    link->ReadOnly = volume->IsReadOnly;
-    VolumeLinks[volume->Path] = link;
-    link.reset();
+    auto common_link = std::make_shared<TVolumeLink>(volume, RootContainer);
+    common_link->Target = volume->Path;
+    common_link->HostTarget = volume->Path;
+    common_link->ReadOnly = volume->IsReadOnly;
+    VolumeLinks[volume->Path] = common_link;
 
     /* also check if volume depends on itself */
     error = volume->CheckDependencies();
@@ -2996,8 +2958,16 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
     volumes_lock.lock();
     volume->SetState(EVolumeState::Ready);
-
     volumes_lock.unlock();
+
+    /* And finally, mount common link in requested path */
+    if (volume->Path != volume->InternalPath) {
+        error = volume->MountLink(common_link);
+        if (error) {
+            (void)volume->Destroy();
+            return error;
+        }
+    }
 
     if (cfg.count(V_CONTAINERS)) {
         for (auto &link: SplitEscapedString(cfg.at(V_CONTAINERS), ' ', ';')) {
@@ -3082,11 +3052,11 @@ void TVolume::RestoreAll(void) {
         Volumes[volume->Path] = volume;
 
         /* Restore common link */
-        auto link = std::make_shared<TVolumeLink>(volume, RootContainer);
-        link->Target = volume->Path;
-        link->HostTarget = volume->Path;
-        link->ReadOnly = volume->IsReadOnly;
-        VolumeLinks[volume->Path] = link;
+        auto common_link = std::make_shared<TVolumeLink>(volume, RootContainer);
+        common_link->Target = volume->Path;
+        common_link->HostTarget = volume->Path;
+        common_link->ReadOnly = volume->IsReadOnly;
+        VolumeLinks[volume->Path] = common_link;
         Statistics->VolumeLinksMounted++;
 
         error = volume->Save();
