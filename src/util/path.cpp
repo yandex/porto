@@ -1126,6 +1126,53 @@ TError TFile::CreateTrunc(const TPath &path, int mode) {
     return Create(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, mode);
 }
 
+TError TFile::CreatePath(const TPath &path, const TCred &cred, const TPath &bound) {
+    TError error = OpenDir(path);
+
+    if (error && !path.Exists()) {
+        std::list<std::string> dirs;
+        TPath base = path;
+
+        while (!base.Exists()) {
+            dirs.push_front(base.BaseName());
+            base = base.DirName();
+        }
+
+        error = OpenDir(base);
+        if (error)
+            return error;
+
+        if (bound) {
+            TPath real = RealPath();
+            if (!real.IsInside(bound))
+                error = TError(EError::Permission, "Base path {} for {} out of bound {}", real, path, bound);
+        } else
+            error = WriteAccess(cred);
+        if (error)
+            return error;
+
+        for (auto &name: dirs) {
+            if (!error)
+                error = MkdirAt(name, 0775);
+            if (!error)
+                error = WalkStrict(*this, name);
+            if (!error)
+                error = Chown(cred);
+        }
+        if (error)
+            return TError(error, "Cannot create path {}", path);
+    }
+
+    if (bound) {
+        TPath real = RealPath();
+        if (!real.IsInside(bound))
+            error = TError(EError::Permission, "Real path {} for {} out of bound {}", real, path, bound);
+    } else
+        error = WriteAccess(cred);
+
+    return error;
+}
+
 void TFile::Close(void) {
     if (Fd >= 0)
         close(Fd);

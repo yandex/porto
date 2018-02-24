@@ -233,6 +233,7 @@ public:
     TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
     TError CreateTrunc(const TPath &path, int mode);
+    TError CreatePath(const TPath &path, const TCred &cred, const TPath &bound = "");
     void Close(void);
     static void CloseAll(std::vector<int> except);
     TPath RealPath(void) const;
