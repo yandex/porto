@@ -742,7 +742,7 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
         return error;
     }
 
-    volume->Dump(volume->ComposePath(*CL->ClientContainer), rsp.mutable_volume());
+    volume->Dump(nullptr, volume->ComposePath(*CL->ClientContainer), rsp.mutable_volume());
     return OK;
 }
 
@@ -812,11 +812,10 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
     TError error;
 
     if (req.has_path() && !req.path().empty()) {
-        std::shared_ptr<TVolume> volume;
-        error = CL->ResolveVolume(req.path(), volume);
-        if (error)
-            return error;
-        volume->Dump(req.path(), rsp.mutable_volumelist()->add_volumes());
+        auto link = TVolume::ResolveLink(CL->ClientContainer->RootPath / req.path());
+        if (!link)
+            return TError(EError::VolumeNotFound, "Volume {} not found", req.path());
+        link->Volume->Dump(link.get(), req.path(), rsp.mutable_volumelist()->add_volumes());
         return OK;
     }
 
@@ -833,17 +832,17 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
     } else
         base_path = CL->ClientContainer->RootPath;
 
-    std::map<TPath, std::shared_ptr<TVolume>> map;
+    std::map<TPath, std::shared_ptr<TVolumeLink>> map;
     auto volumes_lock = LockVolumes();
     for (auto &it: VolumeLinks) {
         TPath path = base_path.InnerPath(it.first);
         if (path)
-            map[path] = it.second->Volume;
+            map[path] = it.second;
     }
     volumes_lock.unlock();
 
     for (auto &it: map)
-        it.second->Dump(it.first, rsp.mutable_volumelist()->add_volumes());
+        it.second->Volume->Dump(it.second.get(), it.first, rsp.mutable_volumelist()->add_volumes());
 
     return OK;
 }

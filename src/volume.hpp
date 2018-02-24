@@ -174,7 +174,7 @@ public:
     TError Configure(const TPath &target_root, const TStringMap &cfg);
     TError ApplyConfig(const TStringMap &cfg);
 
-    void Dump(const TPath &path, rpc::TVolumeDescription *dump);
+    void Dump(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump);
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();

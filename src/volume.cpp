@@ -2600,7 +2600,7 @@ TError TVolume::CheckRequired(const std::list<std::string> &paths) {
     return OK;
 }
 
-void TVolume::Dump(const TPath &path, rpc::TVolumeDescription *dump) {
+void TVolume::Dump(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump) {
     TStringMap ret;
 
     auto volumes_lock = LockVolumes();
@@ -2653,7 +2653,21 @@ void TVolume::Dump(const TPath &path, rpc::TVolumeDescription *dump) {
     if (Backend)
         ret[V_PLACE_KEY] = Backend->ClaimPlace();
 
-    for (auto &link: Links) {
+    /* common link is pinned by all links */
+    if (!link || link->HostTarget == Path) {
+        for (auto &link: Links) {
+            auto name = CL->RelativeName(link->Container->Name);
+            dump->add_containers(name);
+            auto l = dump->add_links();
+            l->set_container(name);
+            if (link->Target)
+                l->set_target(link->Target.ToString());
+            if (link->ReadOnly)
+                l->set_read_only(true);
+            if (link->Required)
+                l->set_required(true);
+        }
+    } else {
         auto name = CL->RelativeName(link->Container->Name);
         dump->add_containers(name);
         auto l = dump->add_links();

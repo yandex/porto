@@ -233,14 +233,6 @@ TError TClient::ResolveContainer(const std::string &relative_name,
     return TContainer::Find(name, ct);
 }
 
-TError TClient::ResolveVolume(const TPath &path, std::shared_ptr<TVolume> &volume) {
-    auto link = TVolume::ResolveLink(ClientContainer->RootPath / path);
-    if (!link)
-        return TError(EError::VolumeNotFound, "Volume {} not found", path);
-    volume = link->Volume;
-    return OK;
-}
-
 TError TClient::ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume, bool read_only) {
     if (AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "Write access to porto denied");

@@ -83,8 +83,6 @@ public:
     TPath ComposePath(const TPath &path);
     TPath ResolvePath(const TPath &path);
 
-    TError ResolveVolume(const TPath &path, std::shared_ptr<TVolume> &volume);
-
     TError ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume,
                          bool read_only = false);
 
