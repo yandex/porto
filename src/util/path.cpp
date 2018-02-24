@@ -681,6 +681,13 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
     return OK;
 }
 
+TError TPath::MoveMount(const TPath &target) const {
+    L_ACT("mount move {} to {}", RealPath(), target.RealPath());
+    if (mount(c_str(), target.c_str(), NULL, MS_MOVE, NULL))
+        return TError::System("mount({}, {}, MS_MOVE)", Path, target);
+    return OK;
+}
+
 TError TPath::Bind(const TPath &source, unsigned long flags) const {
     L_ACT("mount bind {} {} {}", RealPath(), source.RealPath(), MountFlagsToString(flags));
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))

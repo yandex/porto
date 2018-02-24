@@ -59,23 +59,73 @@ a.Destroy()
 
 #backend bind and rbind
 a = c.Run("a", root=root_volume.path)
+os.mkdir(root_volume.path + "/test_rbind")
+os.mkdir(root_volume.path + "/test_ro_rbind")
 test_bind = c.CreateVolume(path=root_volume.path + "/test", backend='bind', storage=test_volume.path, containers='a')
-test_ro_rbind = c.CreateVolume(path=root_volume.path + "/test_ro", backend='rbind', read_only='true', storage=test_volume.path, containers='a')
+test_rbind = c.CreateVolume(path=root_volume.path + "/test_rbind", backend='rbind', storage=test_volume.path, containers='a')
+test_ro_rbind = c.CreateVolume(path=root_volume.path + "/test_ro_rbind", backend='rbind', read_only='true', storage=test_volume.path, containers='a')
+
 mnt = ParseMountinfo()
+
+Expect(root_volume.path + "/test" in mnt)
+
 Expect(root_volume.path + "/test/sub" not in mnt)
-Expect('rw' in mnt[root_volume.path + "/test"]['flag'])
-Expect(root_volume.path + "/test_ro/sub" in mnt)
-Expect('ro' in mnt[root_volume.path + "/test_ro"]['flag'])
-Expect('ro' in mnt[root_volume.path + "/test_ro/sub"]['flag'])
+
+Expect(root_volume.path + "/test_rbind" in mnt)
+Expect('rw' in mnt[root_volume.path + "/test_rbind"]['flag'])
+
+Expect(root_volume.path + "/test_rbind/sub" in mnt)
+Expect('rw' in mnt[root_volume.path + "/test_rbind/sub"]['flag'])
+
+Expect(root_volume.path + "/test_ro_rbind" in mnt)
+Expect('ro' in mnt[root_volume.path + "/test_ro_rbind"]['flag'])
+
+Expect(root_volume.path + "/test_ro_rbind/sub" in mnt)
+Expect('ro' in mnt[root_volume.path + "/test_ro_rbind/sub"]['flag'])
+
 mnt = ParseMountinfo(a['root_pid'])
+
 CheckBaseMounts(mnt)
+
 Expect('/test' in mnt)
 Expect('rw' in mnt['/test']['flag'])
-Expect('/test_ro' in mnt)
-Expect('ro' in mnt['/test_ro']['flag'])
+
 Expect('/test/sub' not in mnt)
-Expect('/test_ro/sub' in mnt)
-Expect('ro' in mnt['/test_ro/sub']['flag'])
+
+Expect('/test_rbind' in mnt)
+Expect('rw' in mnt['/test_rbind']['flag'])
+
+Expect('/test_rbind/sub' in mnt)
+Expect('rw' in mnt['/test_rbind/sub']['flag'])
+
+Expect('/test_ro_rbind' in mnt)
+Expect('ro' in mnt['/test_ro_rbind']['flag'])
+
+Expect('/test_ro_rbind/sub' in mnt)
+Expect('ro' in mnt['/test_ro_rbind/sub']['flag'])
+
+# rbind propagation
+os.mkdir(test_volume.path + "/sub2")
+test_sub2 = c.CreateVolume(path=test_volume.path + "/sub2", backend='plain', containers='a')
+mnt = ParseMountinfo(a['root_pid'])
+
+Expect('/test/sub2' in mnt)
+
+Expect('/test_rbind/sub2' in mnt)
+Expect('rw' in mnt['/test_rbind/sub2']['flag'])
+
+Expect('/test_ro_rbind/sub2' in mnt)
+Expect('rw' in mnt['/test_ro_rbind/sub2']['flag']) # no ro propagation
+
+# no backward propagation
+test_sub2.Link(a, target="/test_rbind/sub2_link")
+mnt = ParseMountinfo()
+Expect(root_volume.path + "/test_rbind/sub2_link" in mnt)
+Expect(root_volume.path + "/test_ro_rbind/sub2_link" not in mnt)
+Expect(test_volume.path + "/sub2_link" not in mnt)
+mnt = ParseMountinfo(a['root_pid'])
+Expect('/test_rbind/sub2_link' in mnt)
+Expect('/test_ro_rbind/sub2_link' not in mnt)
 a.Destroy()
 
 # volumes in chroot

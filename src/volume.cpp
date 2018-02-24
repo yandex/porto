@@ -1937,7 +1937,6 @@ TError TVolume::Build() {
 }
 
 TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
-    std::shared_ptr<TVolumeLink> target_link;
     TError error, error2;
 
     if (!link->Target)
@@ -1951,68 +1950,73 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     if (link->Volume.get() != this)
         return TError(EError::InvalidValue, "Wrong volume link");
     TPath host_target = link->Container->RootPath / link->Target;
+    link->HostTarget = "";
+    auto target_link = ResolveOriginLocked(host_target);
     if (host_target != link->Volume->Path) {
-        link->HostTarget = "";
         error = TVolume::CheckConflicts(host_target);
         if (error)
             return error;
-        link->HostTarget = host_target;
         VolumeLinks[host_target] = link;
         Statistics->VolumeLinksMounted++;
     }
+    link->HostTarget = host_target;
     volumes_lock.unlock();
 
     L_ACT("Mount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
 
-    TBindMount bind;
+    TFile target_file;
+    TPath bound, link_mount;
+    unsigned long flags = 0;
+
+    if (target_link && !CL->CanControl(target_link->Volume->VolumeOwner)) {
+        bound = target_link->HostTarget;
+    } else {
+        bound = link->Container->RootPath;
+        if (bound.IsRoot())
+            bound = "";
+    }
+
+    error = target_file.CreatePath(host_target, CL->Cred, bound);
+    if (error)
+        goto undo;
+
+    if (IsReadOnly || link->ReadOnly)
+        flags |= MS_RDONLY;
+
+    if (BackendType == "rbind" || BackendType == "dir")
+        flags |= MS_REC;
+
     /* save state before changes */
     error = Save();
     if (error)
         goto undo;
 
-    bind.IsDirectory = true;
-    if (IsReadOnly || link->ReadOnly)
-        bind.Flags |= MS_RDONLY;
+    link_mount = GetInternal("volume_link");
+    (void)link_mount.Mkdir(700);
 
-    if (BackendType == "rbind" || BackendType == "dir")
-        bind.Flags |= MS_REC;
+    /* make private - cannot move from shared mount */
+    error = link_mount.BindRemount(link_mount, MS_PRIVATE);
+    if (error)
+        goto undo;
 
     /* Start new shared group and make read-only - that isn't propagated */
-    bind.Source = GetInternal("volume_link");
-    error = bind.Source.Mkdir(700);
-    if (error)
-        goto undo;
-    error = bind.Source.BindRemount(InternalPath, bind.Flags | MS_PRIVATE | MS_SHARED);
+    error = link_mount.BindRemount(InternalPath, flags | MS_SLAVE | MS_SHARED);
     if (error)
         goto undo;
 
-    bind.ControlSource = true;
-
-    bind.Target = host_target;
-    bind.CreateTarget = true;
-    bind.FollowTraget = false;
-
-    target_link = TVolume::ResolveOrigin(bind.Target);
-    bind.ControlTarget = target_link && !CL->CanControl(target_link->Volume->VolumeOwner);
-
-    error = bind.Mount(CL->Cred, "/");
-
-    error2 = bind.Source.Remount(MS_PRIVATE | MS_REC);
-    if (error2)
-        L_WRN("Cannot remount {}", error2);
-    error2 = bind.Source.UmountAll();
-    if (error2)
-        L_WRN("Cannot umount {}", error2);
-    error2 = bind.Source.Rmdir();
-    if (error2)
-        L_WRN("Cannot remove {}", error2);
-
+    /* Move to target path and propagate into namespaces */
+    error = link_mount.MoveMount(target_file.ProcPath());
     if (error)
         goto undo;
+
+    link_mount.UmountAll();
+    link_mount.Rmdir();
 
     return OK;
 
 undo:
+    link_mount.UmountAll();
+    link_mount.Rmdir();
     volumes_lock.lock();
     if (VolumeLinks.erase(link->HostTarget))
         Statistics->VolumeLinksMounted--;
