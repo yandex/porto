@@ -1996,6 +1996,9 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     error = bind.Mount(CL->Cred, "/");
 
+    error2 = bind.Source.Remount(MS_PRIVATE | MS_REC);
+    if (error2)
+        L_WRN("Cannot remount {}", error2);
     error2 = bind.Source.UmountAll();
     if (error2)
         L_WRN("Cannot umount {}", error2);
