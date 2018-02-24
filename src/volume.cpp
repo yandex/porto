@@ -83,6 +83,16 @@ public:
         return OK;
     }
 
+    TError Restore() {
+
+        /* Restore configuration */
+        Volume->InternalPath = Volume->Path;
+        Volume->StoragePath = Volume->Path;
+        Volume->KeepStorage = true;
+
+        return OK;
+    }
+
     TError Build() override {
         return OK;
     }
@@ -1843,9 +1853,11 @@ TError TVolume::Build() {
             return error;
     }
 
-    error = InternalPath.Mkdir(0755);
-    if (error)
-        return error;
+    if (BackendType != "dir" && BackendType != "quota") {
+        error = InternalPath.Mkdir(0755);
+        if (error)
+            return error;
+    }
 
     /* Save volume state before building */
     error = Save();
