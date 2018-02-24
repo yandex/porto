@@ -17,6 +17,7 @@
 #include <google/protobuf/io/coded_stream.h>
 
 extern "C" {
+#include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -46,7 +47,7 @@ TClient::~TClient() {
 }
 
 void TClient::CloseConnection() {
-    TScopedLock lock(Mutex);
+    auto lock = Lock();
 
     if (Fd >= 0) {
         if (InEpoll)
@@ -430,20 +431,13 @@ TError TClient::WriteAccess(const TFile &file) {
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {
-    TScopedLock lock(Mutex);
-
-    if (Processing) {
-        L_WRN("{} request before response", Id);
-        return OK;
-    }
-
     if (Fd < 0)
         return TError("Connection closed");
 
     if (Offset >= Buffer.size())
         Buffer.resize(Offset + 4096);
 
-    ssize_t len = recv(Fd, &Buffer[Offset], Buffer.size() - Offset, MSG_DONTWAIT);
+    ssize_t len = recv(Fd, &Buffer[Offset], Length ? (Length - Offset) : 1, MSG_DONTWAIT);
     if (len > 0)
         Offset += len;
     else if (len == 0)
@@ -456,6 +450,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     if (Length && Offset < Length)
         return TError::Queued();
 
+    Receiving = true;
     google::protobuf::io::CodedInputStream input(&Buffer[0], Offset);
 
     uint32_t length;
@@ -480,19 +475,18 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     if (Offset > Length)
         return TError("garbage after request");
 
-    WaitRequest = request.has_wait();
-    Offset = 0;
-    Processing = true;
+    Length = Offset = 0;
+    Receiving = false;
 
     return EpollLoop->StopInput(Fd);
 }
 
 TError TClient::SendResponse(bool first) {
-    TScopedLock lock(Mutex);
 
     if (Fd < 0)
         return OK; /* Connection closed */
 
+next:
     ssize_t len = send(Fd, &Buffer[Offset], Length - Offset, MSG_DONTWAIT);
     if (len > 0)
         Offset += len;
@@ -508,34 +502,128 @@ TError TClient::SendResponse(bool first) {
     ActivityTimeMs = GetCurrentTimeMs();
 
     if (Offset >= Length) {
-        Length = Offset = 0;
-        Processing = false;
-
         if (ShutdownPortod && shutdown(Fd, SHUT_RDWR))
             L_ERR("Cannot shutdown client: {}", TError::System("shutdown"));
+
+        Length = Offset = 0;
+
+        if (!ReportQueue.empty()) {
+            QueueReport(ReportQueue.front(), true);
+            ReportQueue.pop_front();
+            goto next;
+        }
+
+        Sending = false;
+
+        /* Out of order message */
+        if (Processing)
+            return OK;
 
         return EpollLoop->StartInput(Fd);
     }
 
-    if (first)
+    if (first) {
+        Sending = true;
         return EpollLoop->StartOutput(Fd);
+    }
 
-    return OK;
+    return TError::Queued();
 }
 
 TError TClient::QueueResponse(rpc::TContainerResponse &response) {
+
+    if (Receiving)
+        return TError(EError::Busy, "QueueResponse while Receiving");
+
     uint32_t length = response.ByteSize();
     size_t lengthSize = google::protobuf::io::CodedOutputStream::VarintSize32(length);
 
-    Offset = 0;
-    Length = lengthSize + length;
+    size_t tail = Length;
+    Length += lengthSize + length;
 
     if (Buffer.size() < Length)
         Buffer.resize(Length);
 
-    google::protobuf::io::CodedOutputStream::WriteVarint32ToArray(length, &Buffer[0]);
-    if (!response.SerializeToArray(&Buffer[lengthSize], length))
+    google::protobuf::io::CodedOutputStream::WriteVarint32ToArray(length, &Buffer[tail]);
+    if (!response.SerializeToArray(&Buffer[tail + lengthSize], length))
         return TError("cannot serialize response");
 
+    return OK;
+}
+
+TError TClient::QueueReport(const TContainerReport &report, bool async) {
+    rpc::TContainerResponse rsp;
+
+    rsp.set_error(EError::Success);
+    auto wait = async ? rsp.mutable_asyncwait() : rsp.mutable_wait();
+    wait->set_name(report.Name);
+    wait->set_state(report.State);
+    wait->set_when(report.When);
+
+    if (Verbose)
+        L_RSP("{}Wait name={} state={} to {}", async ? "Async" : "", report.Name, report.State, Id);
+
+    return QueueResponse(rsp);
+}
+
+TError TClient::MakeReport(const std::string &name, const std::string &state, bool async) {
+    auto lock = Lock();
+    TError error;
+
+    if (async) {
+        if (Sending || Receiving) {
+            ReportQueue.emplace_back(name, state, time(nullptr));
+            return OK;
+        }
+    } else
+        Processing = false;
+
+    error = QueueReport({name, state, time(nullptr)}, async);
+    if (error)
+        return error;
+
     return SendResponse(true);
+}
+
+TError TClient::Event(uint32_t events) {
+    auto lock = Lock();
+    TError error;
+
+    if (Sending && (events & EPOLLOUT)) {
+        error = SendResponse(false);
+        if (error && error != EError::Queued)
+            return error;
+    }
+
+    if ((!Processing && !Sending) && (events & EPOLLIN)) {
+        TRequest req;
+
+        error = ReadRequest(req.Request);
+        if (!error) {
+            error = IdentifyClient(false);
+            if (!error) {
+                ClientContainer->ContainerRequests++;
+                Statistics->RequestsQueued++;
+                req.Client = shared_from_this();
+                Processing = true;
+                WaitRequest = req.Request.has_wait() ||
+                              req.Request.has_asyncwait();
+                QueueRpcRequest(req);
+            }
+
+            if (!error && !ReportQueue.empty()) {
+                QueueReport(ReportQueue.front(), true);
+                ReportQueue.pop_front();
+                error = SendResponse(true);
+            }
+        }
+
+        if (error && error != EError::Queued)
+            return error;
+    }
+
+    if (events & (EPOLLHUP | EPOLLERR))
+        return TError::System("Connection lost");
+
+    return OK;
 }

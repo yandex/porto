@@ -6,6 +6,7 @@
 #include "property.hpp"
 #include "container.hpp"
 #include "volume.hpp"
+#include "waiter.hpp"
 #include "event.hpp"
 #include "protobuf.hpp"
 #include "helpers.hpp"
@@ -94,6 +95,12 @@ static void RequestToString(const rpc::TContainerRequest &req,
             opts.push_back(req.wait().name(i));
         if (req.wait().has_timeout_ms())
             opts.push_back(fmt::format("timeout={} ms", req.wait().timeout_ms()));
+    } else if (req.has_asyncwait()) {
+        cmd = "AsyncWait";
+        for (int i = 0; i < req.asyncwait().name_size(); i++)
+            opts.push_back(req.asyncwait().name(i));
+        if (req.asyncwait().has_timeout_ms())
+            opts.push_back(fmt::format("timeout={} ms", req.asyncwait().timeout_ms()));
     } else if (req.has_propertylist() || req.has_datalist()) {
         cmd = "ListProperties";
     } else if (req.has_kill()) {
@@ -257,7 +264,12 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
         if (resp.wait().name().empty())
             ret = "Wait timeout";
         else
-            ret = "Wait " + resp.wait().name();
+            ret = "Wait " + resp.wait().name() + " state=" + resp.wait().state();
+    } else if (resp.has_asyncwait()) {
+        if (resp.asyncwait().name().empty())
+            ret = "AsyncWait timeout";
+        else
+            ret = "AsyncWait " + resp.asyncwait().name() + " state=" + resp.asyncwait().state();
     } else if (resp.has_convertpath())
         ret = resp.convertpath().path();
     else
@@ -277,6 +289,7 @@ static bool SilentRequest(const rpc::TContainerRequest &req) {
         req.has_datalist() ||
         req.has_version() ||
         req.has_wait() ||
+        req.has_asyncwait() ||
         req.has_listvolumeproperties() ||
         req.has_listvolumes() ||
         req.has_listlayers() ||
@@ -596,85 +609,98 @@ noinline TError Version(rpc::TContainerResponse &rsp) {
     return OK;
 }
 
-noinline TError Wait(const rpc::TContainerWaitRequest &req,
-                     rpc::TContainerResponse &rsp,
-                     std::shared_ptr<TClient> &client) {
+noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async,
+        rpc::TContainerResponse &rsp, std::shared_ptr<TClient> &client) {
     auto lock = LockContainers();
-    bool queueWait = !req.has_timeout_ms() || req.timeout_ms() != 0;
+    std::string name, full_name;
+    TError error;
 
-    if (!req.name_size())
-        return TError(EError::InvalidValue, "Containers are not specified");
+    if (!req.name_size() && !async)
+        return TError(EError::InvalidValue, "Containers to wait are not set");
 
-    auto waiter = std::make_shared<TContainerWaiter>(client);
+    auto waiter = std::make_shared<TContainerWaiter>(async);
 
     for (int i = 0; i < req.name_size(); i++) {
-        std::string name = req.name(i);
-        std::string abs_name;
+        name = req.name(i);
 
-        if (name.find_first_of("*?") != std::string::npos) {
+        if (name == "***") {
             waiter->Wildcards.push_back(name);
             continue;
         }
 
-        std::shared_ptr<TContainer> ct;
-        TError error = client->ResolveContainer(name, ct);
+        error = client->ResolveName(name, full_name);
         if (error) {
             rsp.mutable_wait()->set_name(name);
             return error;
         }
 
-        /* Explicit wait notifies non-running and hollow meta immediately */
-        if (ct->State != EContainerState::Running &&
-                ct->State != EContainerState::Starting &&
-                ct->State != EContainerState::Stopping &&
-                (ct->State != EContainerState::Meta ||
-                 !ct->RunningChildren)) {
-            rsp.mutable_wait()->set_name(name);
-            return OK;
+        if (name.find_first_of("*?") != std::string::npos) {
+            waiter->Wildcards.push_back(full_name);
+            continue;
         }
 
-        if (queueWait)
-            ct->AddWaiter(waiter);
+        waiter->Names.push_back(full_name);
+
+        std::shared_ptr<TContainer> ct;
+        error = TContainer::Find(full_name, ct);
+        if (error) {
+            if (async)
+                continue;
+            rsp.mutable_wait()->set_name(name);
+            return error;
+        }
+
+        if (waiter->ShouldReport(*ct)) {
+            if (async) {
+                client->MakeReport(name, TContainer::StateName(ct->State), true);
+            } else {
+                auto wait = rsp.mutable_wait();
+                wait->set_name(name);
+                wait->set_state(TContainer::StateName(ct->State));
+                wait->set_when(time(nullptr));
+                return OK;
+            }
+        }
     }
 
     if (!waiter->Wildcards.empty()) {
         for (auto &it: Containers) {
             auto &ct = it.second;
-            if (ct->IsRoot())
-                continue;
-
-            /* Wildcard notifies immediately only dead and hollow meta */
-            if (ct->State != EContainerState::Dead &&
-                    (ct->State != EContainerState::Meta ||
-                     ct->RunningChildren))
-                continue;
-
-            std::string name;
-            if (!client->ComposeName(ct->Name, name) &&
-                    waiter->MatchWildcard(name)) {
-                rsp.mutable_wait()->set_name(name);
-                return OK;
+            if (waiter->ShouldReport(*ct) && !client->ComposeName(ct->Name, name)) {
+                if (async) {
+                    client->MakeReport(name, TContainer::StateName(ct->State), true);
+                } else {
+                    auto wait = rsp.mutable_wait();
+                    wait->set_name(name);
+                    wait->set_state(TContainer::StateName(ct->State));
+                    wait->set_when(time(nullptr));
+                    return OK;
+                }
             }
         }
-
-        if (queueWait)
-            TContainerWaiter::AddWildcard(waiter);
     }
 
-    if (!queueWait) {
-        rsp.mutable_wait()->set_name("");
+    if (req.has_timeout_ms() && req.timeout_ms() == 0) {
+        if (async) {
+            client->MakeReport("", "timeout", true);
+        } else {
+            auto wait = rsp.mutable_wait();
+            wait->set_name("");
+            wait->set_state("timeout");
+            wait->set_when(time(nullptr));
+        }
         return OK;
     }
 
-    client->Waiter = waiter;
+    waiter->Activate(client);
 
-    if (req.has_timeout_ms()) {
+    if (req.timeout_ms()) {
         TEvent e(EEventType::WaitTimeout, nullptr);
         e.WaitTimeout.Waiter = waiter;
         EventQueue->Add(req.timeout_ms(), e);
     }
 
-    return TError::Queued();
+    return async ? OK : TError::Queued();
 }
 
 noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
@@ -1382,7 +1408,9 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     else if (req.has_version())
         error = Version(rsp);
     else if (req.has_wait())
-        error = Wait(req.wait(), rsp, client);
+        error = WaitContainers(req.wait(), false, rsp, client);
+    else if (req.has_asyncwait())
+        error = WaitContainers(req.asyncwait(), true, rsp, client);
     else if (req.has_listvolumeproperties())
         error = ListVolumeProperties(rsp);
     else if (req.has_createvolume())
@@ -1476,26 +1504,12 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
 
         L_DBG("Raw response: {}", rsp.ShortDebugString());
 
+        auto lock = client->Lock();
+        client->Processing = false;
         error = client->QueueResponse(rsp);
+        if (!error && !client->Sending)
+            error = client->SendResponse(true);
         if (error)
             L_WRN("Cannot send response for {} : {}", client->Id, error);
     }
-}
-
-void SendWaitResponse(TClient &client, const std::string &name) {
-    rpc::TContainerResponse rsp;
-
-    rsp.set_error(EError::Success);
-    rsp.mutable_wait()->set_name(name);
-
-    if (!name.empty() || Verbose)
-        L_RSP("{} to {} (request took {} ms)", ResponseAsString(rsp),
-                client.Id, client.RequestTimeMs);
-
-    if (Debug)
-        L_RSP("{} to {}", rsp.ShortDebugString(), client.Id);
-
-    TError error = client.QueueResponse(rsp);
-    if (error)
-        L_WRN("Cannot send response for {} : {}", client.Id, error);
 }

@@ -5,6 +5,7 @@
 #include <list>
 
 #include "container.hpp"
+#include "waiter.hpp"
 #include "common.hpp"
 #include "epoll.hpp"
 #include "util/cred.hpp"
@@ -18,7 +19,8 @@ namespace rpc {
     class TContainerRequest;
 }
 
-class TClient : public TEpollSource {
+class TClient : public std::enable_shared_from_this<TClient>,
+                public TEpollSource {
 public:
     std::string Id;
     TCred Cred;
@@ -31,12 +33,18 @@ public:
     uint64_t ActivityTimeMs = 0;
     uint64_t RequestTimeMs = 0;
     bool Processing = false;
+    bool Sending = false;
+    bool Receiving = false;
     bool WaitRequest = false;
     bool InEpoll = false;
 
     TClient(int fd);
     TClient(const std::string &special);
     ~TClient();
+
+    std::unique_lock<std::mutex> Lock() {
+        return std::unique_lock<std::mutex>(Mutex);
+    }
 
     EAccessLevel AccessLevel = EAccessLevel::None;
     std::string PortoNamespace;
@@ -89,14 +97,16 @@ public:
     TPath DefaultPlace();
     TError CanControlPlace(const TPath &place);
 
+    std::shared_ptr<TContainerWaiter> SyncWaiter;
+    std::shared_ptr<TContainerWaiter> AsyncWaiter;
+    std::list<TContainerReport> ReportQueue;
 
-    std::shared_ptr<TContainerWaiter> Waiter;
-
+    TError Event(uint32_t events);
     TError ReadRequest(rpc::TContainerRequest &request);
-    bool ReadInterrupted();
-
-    TError QueueResponse(rpc::TContainerResponse &response);
     TError SendResponse(bool first);
+    TError QueueResponse(rpc::TContainerResponse &response);
+    TError QueueReport(const TContainerReport &report, bool async);
+    TError MakeReport(const std::string &name, const std::string &state, bool async);
 
     std::list<std::weak_ptr<TContainer>> WeakContainers;
 

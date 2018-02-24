@@ -115,11 +115,6 @@ static bool SanityCheck() {
     return EXIT_SUCCESS;
 }
 
-struct TRequest {
-    std::shared_ptr<TClient> Client;
-    rpc::TContainerRequest Request;
-};
-
 class TRpcWorker : public TWorker<TRequest> {
 public:
     TRpcWorker(const size_t nr) : TWorker("portod-worker", nr) {}
@@ -146,6 +141,13 @@ public:
         return true;
     }
 };
+
+std::shared_ptr<TRpcWorker> RpcWorker;
+
+// FIXME
+void QueueRpcRequest(TRequest &req) {
+    RpcWorker->Push(req);
+}
 
 static TError CreatePortoSocket() {
     TPath path(PORTO_SOCKET_PATH);
@@ -268,7 +270,7 @@ static TError DropIdleClient(std::shared_ptr<TContainer> from = nullptr) {
     for (auto &it: Clients) {
         auto &client = it.second;
 
-        if (client->Processing)
+        if (client->Processing || client->Sending)
             continue;
 
         if (from && client->ClientContainer != from)
@@ -366,7 +368,6 @@ static void StartShutdown() {
 }
 
 static void PortodServer() {
-    TRpcWorker worker(config().daemon().workers());
     TError error;
 
     auto AcceptSource = std::make_shared<TEpollSource>(PORTO_SK_FD);
@@ -395,7 +396,9 @@ static void PortodServer() {
 
     std::vector<struct epoll_event> events;
 
-    worker.Start();
+    RpcWorker = std::make_shared<TRpcWorker>(config().daemon().workers());
+
+    RpcWorker->Start();
     EventQueue->Start();
 
     if (config().daemon().log_rotate_ms()) {
@@ -484,28 +487,8 @@ static void PortodServer() {
 
             } else if (Clients.find(source->Fd) != Clients.end()) {
                 auto client = Clients[source->Fd];
-
-                if (ev.events & EPOLLIN) {
-                    TRequest req;
-
-                    req.Client = client;
-                    error = client->ReadRequest(req.Request);
-
-                    if (!error) {
-                        error = client->IdentifyClient(false);
-                        if (!error) {
-                            client->ClientContainer->ContainerRequests++;
-                            Statistics->RequestsQueued++;
-                            worker.Push(req);
-                        }
-                    }
-                }
-
-                if (ev.events & EPOLLOUT)
-                    error = client->SendResponse(false);
-
-                if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) ||
-                        (error && error != EError::Queued)) {
+                error = client->Event(ev.events);
+                if (error) {
                     Clients.erase(source->Fd);
                     client->CloseConnection();
                 }
@@ -535,7 +518,7 @@ exit:
 
     L_SYS("Stop threads...");
     EventQueue->Stop();
-    worker.Stop();
+    RpcWorker->Stop();
 }
 
 static TError TuneLimits() {

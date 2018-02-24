@@ -21,7 +21,6 @@ class TEpollSource;
 class TCgroup;
 class TSubsystem;
 class TEvent;
-class TContainerWaiter;
 class TClient;
 class TVolume;
 class TVolumeLink;
@@ -64,9 +63,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TFile OomEvent;
 
-    /* protected with ContainersMutex */
-    std::list<std::weak_ptr<TContainerWaiter>> Waiters;
-
     std::shared_ptr<TEpollSource> Source;
 
     // data
@@ -89,9 +85,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     void Reap(bool oomKilled);
     void Exit(int status, bool oomKilled);
-
-    void CleanupWaiters();
-    void NotifyWaiters();
 
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                        TBitMap &threads, TBitMap &cores);
@@ -378,8 +371,6 @@ public:
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
 
-    void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
-
     void ChooseSchedPolicy();
 
     /* protected with VolumesLock and container lock */
@@ -405,21 +396,6 @@ public:
     static TError Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct);
 
     static void Event(const TEvent &event);
-};
-
-class TContainerWaiter {
-private:
-    static std::mutex WildcardLock;
-    static std::list<std::weak_ptr<TContainerWaiter>> WildcardWaiters;
-    std::weak_ptr<TClient> Client;
-public:
-    TContainerWaiter(std::shared_ptr<TClient> client);
-    void WakeupWaiter(const TContainer *who, bool wildcard = false);
-    static void WakeupWildcard(const TContainer *who);
-    static void AddWildcard(std::shared_ptr<TContainerWaiter> &waiter);
-
-    std::vector<std::string> Wildcards;
-    bool MatchWildcard(const std::string &name);
 };
 
 extern std::mutex ContainersMutex;

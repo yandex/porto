@@ -14,6 +14,7 @@
 #include "device.hpp"
 #include "property.hpp"
 #include "event.hpp"
+#include "waiter.hpp"
 #include "network.hpp"
 #include "epoll.hpp"
 #include "kvalue.hpp"
@@ -486,6 +487,8 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (parent)
         parent->Unlock(true);
 
+    TContainerWaiter::ReportAll(*ct);
+
     return OK;
 
 err:
@@ -807,15 +810,11 @@ void TContainer::SetState(EContainerState next) {
         for (auto p = Parent; p; p = p->Parent) {
             p->RunningChildren += next == EContainerState::Running ? 1 : -1;
             if (!p->RunningChildren && p->State == EContainerState::Meta)
-                p->NotifyWaiters();
+                TContainerWaiter::ReportAll(*p);
         }
     }
 
-    if (next != EContainerState::Running &&
-            next != EContainerState::Meta &&
-            next != EContainerState::Starting &&
-            next != EContainerState::Stopping)
-        NotifyWaiters();
+    TContainerWaiter::ReportAll(*this);
 }
 
 TError TContainer::Destroy() {
@@ -856,6 +855,8 @@ TError TContainer::Destroy() {
     lock.unlock();
 
     TVolume::DestroyUnlinked(unlinked);
+
+    TContainerWaiter::ReportAll(*this);
 
     return OK;
 }
@@ -3360,9 +3361,9 @@ void TContainer::Event(const TEvent &event) {
     }
     case EEventType::WaitTimeout:
     {
-        auto w = event.WaitTimeout.Waiter.lock();
-        if (w)
-            w->WakeupWaiter(nullptr);
+        auto waiter = event.WaitTimeout.Waiter.lock();
+        if (waiter)
+            waiter->Timeout();
         break;
     }
 
@@ -3422,85 +3423,6 @@ std::string TContainer::GetPortoNamespace(bool write) const {
         ns = ct->NsName + ns;
     }
     return ns;
-}
-
-void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
-    CleanupWaiters();
-    Waiters.push_back(waiter);
-}
-
-void TContainer::NotifyWaiters() {
-    CleanupWaiters();
-    for (auto &w : Waiters) {
-        auto waiter = w.lock();
-        if (waiter)
-            waiter->WakeupWaiter(this);
-    }
-    if (!IsRoot())
-        TContainerWaiter::WakeupWildcard(this);
-}
-
-void TContainer::CleanupWaiters() {
-    for (auto iter = Waiters.begin(); iter != Waiters.end();) {
-        if (iter->expired()) {
-            iter = Waiters.erase(iter);
-            continue;
-        }
-        iter++;
-    }
-}
-
-TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client) : Client(client) { }
-
-void TContainerWaiter::WakeupWaiter(const TContainer *who, bool wildcard) {
-    std::shared_ptr<TClient> client = Client.lock();
-    if (client) {
-        std::string name;
-
-        if (who && client->ComposeName(who->Name, name))
-            return;
-
-        if (who && wildcard && !MatchWildcard(name))
-            return;
-
-        SendWaitResponse(*client, name);
-
-        Client.reset();
-        client->Waiter = nullptr;
-    }
-}
-
-std::mutex TContainerWaiter::WildcardLock;
-std::list<std::weak_ptr<TContainerWaiter>> TContainerWaiter::WildcardWaiters;
-
-void TContainerWaiter::WakeupWildcard(const TContainer *who) {
-    WildcardLock.lock();
-    for (auto &w : WildcardWaiters) {
-        auto waiter = w.lock();
-        if (waiter)
-            waiter->WakeupWaiter(who, true);
-    }
-    WildcardLock.unlock();
-}
-
-void TContainerWaiter::AddWildcard(std::shared_ptr<TContainerWaiter> &waiter) {
-    WildcardLock.lock();
-    for (auto iter = WildcardWaiters.begin(); iter != WildcardWaiters.end();) {
-        if (iter->expired()) {
-            iter = WildcardWaiters.erase(iter);
-            continue;
-        }
-        iter++;
-    }
-    WildcardWaiters.push_back(waiter);
-    WildcardLock.unlock();
-}
-
-bool TContainerWaiter::MatchWildcard(const std::string &name) {
-    for (const auto &wildcard: Wildcards)
-        if (StringMatch(name, wildcard))
-            return true;
-    return false;
 }
 
 TTuple TContainer::Taint() {
