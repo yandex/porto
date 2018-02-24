@@ -1286,10 +1286,13 @@ std::shared_ptr<TVolumeLink> TVolume::ResolveLink(const TPath &path) {
 }
 
 std::shared_ptr<TVolumeLink> TVolume::ResolveOriginLocked(const TPath &path) {
-    auto it = VolumeLinks.lower_bound(path);
-    if ((it != VolumeLinks.end() && it->first == path) ||
-        (it != VolumeLinks.begin() && path.IsInside((--it)->first)))
-        return it->second;
+    if (path.IsAbsolute()) {
+        for (auto p = path.NormalPath(); !p.IsRoot(); p = p.DirNameNormal()) {
+            auto link = ResolveLinkLocked(p);
+            if (link)
+                return link;
+        }
+    }
     return nullptr;
 }
 

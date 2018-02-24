@@ -50,22 +50,28 @@ struct FileHandle {
     }
 };
 
-TPath TPath::DirName() const {
-    TPath norm = NormalPath();
-    auto sep = norm.Path.rfind('/');
+TPath TPath::DirNameNormal() const {
+    auto sep = Path.rfind('/');
     if (sep == std::string::npos)
-        return norm ? "." : "";
-    norm = norm.Path.substr(0, sep);
-    return norm ? norm : "/";
+        return Path.empty() ? "" : ".";
+    if (sep == 0)
+        return "/";
+    return Path.substr(0, sep);
+}
+
+std::string TPath::BaseNameNormal() const {
+    auto sep = Path.rfind('/');
+    if (sep == std::string::npos || Path.size() == 1)
+        return Path;
+    return Path.substr(sep + 1);
+}
+
+TPath TPath::DirName() const {
+    return NormalPath().DirNameNormal();
 }
 
 std::string TPath::BaseName() const {
-    TPath norm = NormalPath();
-    auto sep = norm.Path.rfind('/');
-    if (sep == std::string::npos)
-        return norm.Path;
-    norm = norm.Path.substr(sep + 1);
-    return norm ? norm.Path : "/";
+    return NormalPath().BaseNameNormal();
 }
 
 TError TPath::StatStrict(struct stat &st) const {

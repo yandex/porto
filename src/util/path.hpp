@@ -93,9 +93,14 @@ public:
         return *this;
     }
 
+    TPath NormalPath() const;
+
+    TPath DirNameNormal() const;
+    std::string BaseNameNormal() const;
+
     TPath DirName() const;
     std::string BaseName() const;
-    TPath NormalPath() const;
+
     TPath AbsolutePath() const;
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
