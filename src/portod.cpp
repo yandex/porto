@@ -884,6 +884,8 @@ static int Portod() {
     if (DiscardState) {
         DiscardState = false;
 
+        SystemClient.StartRequest();
+
         SystemClient.LockContainer(RootContainer);
 
         L_SYS("Stop containers...");
@@ -892,17 +894,11 @@ static int Portod() {
         if (error)
             L_ERR("Failed to stop root container and its children {}", error);
 
-        SystemClient.ReleaseContainer();
-
-        SystemClient.StartRequest();
-
         L_SYS("Destroy containers...");
         DestroyContainers(false);
 
         L_SYS("Destroy volumes...");
         TVolume::DestroyAll();
-
-        SystemClient.FinishRequest();
 
         SystemClient.LockContainer(RootContainer);
 
@@ -910,7 +906,7 @@ static int Portod() {
         if (error)
             L_ERR("Cannot destroy root container{}", error);
 
-        SystemClient.ReleaseContainer();
+        SystemClient.FinishRequest();
 
         RootContainer = nullptr;
 
