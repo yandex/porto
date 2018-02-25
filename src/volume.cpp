@@ -1962,7 +1962,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         return TError(EError::InvalidValue, "Wrong volume link");
     TPath host_target = link->Container->RootPath / link->Target;
     link->HostTarget = "";
-    auto target_link = ResolveOriginLocked(host_target);
+    auto target_link = ResolveOriginLocked(host_target.DirNameNormal());
     if (host_target != link->Volume->Path) {
         error = TVolume::CheckConflicts(host_target);
         if (error)
