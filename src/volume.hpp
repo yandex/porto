@@ -202,9 +202,12 @@ public:
 
     TError UnlinkVolume(std::shared_ptr<TContainer> container,
                         const TPath &target,
+                        std::list<std::shared_ptr<TVolume>> &unlinked,
                         bool strict = false);
 
-    static void UnlinkAllVolumes(std::shared_ptr<TContainer> container);
+    static void UnlinkAllVolumes(std::shared_ptr<TContainer> container,
+                                 std::list<std::shared_ptr<TVolume>> &unlinked);
+    static void DestroyUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked);
 
     static TError CheckRequired(const std::list<std::string> &paths);
 

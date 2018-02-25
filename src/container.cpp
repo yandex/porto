@@ -829,9 +829,12 @@ TError TContainer::Destroy() {
             return error;
     }
 
+    std::list<std::shared_ptr<TVolume>> unlinked;
+
     if (!Children.empty()) {
         for (auto &ct: Subtree()) {
             if (ct.get() != this) {
+                TVolume::UnlinkAllVolumes(ct, unlinked);
                 error = ct->Destroy();
                 if (error)
                     return error;
@@ -839,7 +842,7 @@ TError TContainer::Destroy() {
         }
     }
 
-    TVolume::UnlinkAllVolumes(shared_from_this());
+    TVolume::UnlinkAllVolumes(shared_from_this(), unlinked);
 
     auto lock = LockContainers();
 
@@ -849,6 +852,8 @@ TError TContainer::Destroy() {
     error = path.Unlink();
     if (error)
         L_ERR("Can't remove key-value node {}: {}", path, error);
+
+    TVolume::DestroyUnlinked(unlinked);
 
     return OK;
 }

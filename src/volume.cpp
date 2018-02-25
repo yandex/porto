@@ -2200,7 +2200,7 @@ TError TVolume::Destroy() {
 
             error = CL->LockContainer(link->Container);
             if (!error) {
-                error = volume->UnlinkVolume(link->Container, link->Target);
+                error = volume->UnlinkVolume(link->Container, link->Target, plan);
                 CL->ReleaseContainer();
             }
 
@@ -2478,7 +2478,7 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
             return error;
     }
 
-    if (State != EVolumeState::Ready && State != EVolumeState::Unlinked)
+    if (State != EVolumeState::Ready)
         return TError(EError::VolumeNotReady, "Volume not ready: {}", Path);
 
     L_ACT("Add volume {} link {} for CT{}:{}", Path, target, container->Id, container->Name);
@@ -2491,9 +2491,6 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
 
     Links.emplace_back(link);
     container->VolumeLinks.emplace_back(link);
-
-    if (State == EVolumeState::Unlinked)
-        SetState(EVolumeState::Ready);
 
     if (required) {
         container->RequiredVolumes.emplace_back(Path.ToString());
@@ -2519,12 +2516,17 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
     return OK;
 
 undo:
-    (void)UnlinkVolume(container, target);
+    volumes_lock.lock();
+    Links.remove(link);
+    container->VolumeLinks.remove(link);
+    if (required)
+        container->RequiredVolumes.remove(Path.ToString());
+    volumes_lock.unlock();
     return error;
 }
 
-TError TVolume::UnlinkVolume(std::shared_ptr<TContainer> container,
-                             const TPath &target, bool strict) {
+TError TVolume::UnlinkVolume(std::shared_ptr<TContainer> container, const TPath &target,
+                             std::list<std::shared_ptr<TVolume>> &unlinked, bool strict) {
 
     PORTO_ASSERT(container->IsLocked());
 
@@ -2568,8 +2570,10 @@ next:
     L_ACT("Del volume {} link {} for CT{}:{}", Path, link->Target, container->Id, container->Name);
 
     Links.remove(link);
-    if (Links.empty() && State == EVolumeState::Ready)
+    if (Links.empty() && State == EVolumeState::Ready) {
         SetState(EVolumeState::Unlinked);
+        unlinked.emplace_back(shared_from_this());
+    }
     container->VolumeLinks.remove(link);
     if (link->Required)
         container->RequiredVolumes.remove(Path.ToString());
@@ -2578,28 +2582,23 @@ next:
 
     (void)Save();
 
-    volumes_lock.lock();
-    if (State == EVolumeState::Unlinked) {
-        volumes_lock.unlock();
-        error = Destroy();
-        if (error)
-            L_WRN("Cannot destroy volume {}: {}", Path, error);
+    if (all) {
         volumes_lock.lock();
-    }
-    if (all)
         goto next;
+    }
 
     return OK;
 }
 
-void TVolume::UnlinkAllVolumes(std::shared_ptr<TContainer> container) {
+void TVolume::UnlinkAllVolumes(std::shared_ptr<TContainer> container,
+                               std::list<std::shared_ptr<TVolume>> &unlinked) {
     auto volumes_lock = LockVolumes();
     TError error;
 
     while (!container->VolumeLinks.empty()) {
         std::shared_ptr<TVolumeLink> link = container->VolumeLinks.back();
         volumes_lock.unlock();
-        error = link->Volume->UnlinkVolume(container, link->Target);
+        error = link->Volume->UnlinkVolume(container, link->Target, unlinked);
         volumes_lock.lock();
         if (error && link == container->VolumeLinks.back()) {
             L_WRN("Cannot unlink volume {}: {}", link->Volume->Path, error);
@@ -2613,6 +2612,16 @@ void TVolume::UnlinkAllVolumes(std::shared_ptr<TContainer> container) {
             volume->VolumeOwnerContainer->OwnedVolumes.push_back(volume);
     }
     container->OwnedVolumes.clear();
+}
+
+void TVolume::DestroyUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked) {
+    TError error;
+
+    for (auto &volume: unlinked) {
+        error = volume->Destroy();
+        if (error)
+            L_WRN("Cannot destroy volume {}: {}", volume->Path, error);
+    }
 }
 
 TError TVolume::CheckRequired(const std::list<std::string> &paths) {

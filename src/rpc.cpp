@@ -798,8 +798,10 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
         return error;
 
     if (ct) {
-        error = volume->UnlinkVolume(ct, req.has_target() ? req.target() : "***", req.strict());
+        std::list<std::shared_ptr<TVolume>> unlinked;
+        error = volume->UnlinkVolume(ct, req.has_target() ? req.target() : "***", unlinked, req.strict());
         CL->ReleaseContainer();
+        TVolume::DestroyUnlinked(unlinked);
     } else {
         error = volume->Destroy();
     }
