@@ -211,7 +211,7 @@ public:
                                  std::list<std::shared_ptr<TVolume>> &unlinked);
     static void DestroyUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked);
 
-    static TError CheckRequired(const std::list<std::string> &paths);
+    static TError CheckRequired(TContainer &ct);
 
     TError ClaimPlace(uint64_t size);
 

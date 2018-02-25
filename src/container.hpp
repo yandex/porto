@@ -383,7 +383,7 @@ public:
 
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;
-    std::list<std::string> RequiredVolumes;
+    std::vector<std::string> RequiredVolumes;
 
     TError GetEnvironment(TEnv &env) const;
 

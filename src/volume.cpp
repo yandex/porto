@@ -2155,22 +2155,19 @@ TError TVolume::Destroy() {
         volumes_lock.unlock();
 
         for (auto &ct: RootContainer->Subtree()) {
-            if (ct->State == EContainerState::Stopped ||
-                    ct->State == EContainerState::Dead ||
-                    ct->RequiredVolumes.empty())
+            if (ct->RequiredVolumes.empty() || !ct->HasResources())
                 continue;
-            volumes_lock.lock();
-            error = TVolume::CheckRequired(ct->RequiredVolumes);
-            volumes_lock.unlock();
-            if (error) {
-                L_ACT("Stop CT{}:{} because {}", ct->Id, ct->Name, error);
-                error = CL->LockContainer(ct);
-                if (!error)
-                    error = ct->Stop(0);
-                if (error)
-                    L_WRN("Cannot stop: {}", error);
-                CL->ReleaseContainer();
-            }
+            error = TVolume::CheckRequired(*ct);
+            if (!error)
+                continue;
+
+            L_ACT("Stop CT{}:{} because {}", ct->Id, ct->Name, error);
+            error = CL->LockContainer(ct);
+            if (!error)
+                error = ct->Stop(0);
+            if (error)
+                L_WRN("Cannot stop: {}", error);
+            CL->ReleaseContainer();
         }
 
         volumes_lock.lock();
@@ -2512,8 +2509,12 @@ undo:
     volumes_lock.lock();
     Links.remove(link);
     container->VolumeLinks.remove(link);
-    if (required)
-        container->RequiredVolumes.remove(Path.ToString());
+    if (required) {
+        auto it = std::find(container->RequiredVolumes.begin(),
+                            container->RequiredVolumes.end(), target);
+        if (it != container->RequiredVolumes.end())
+            container->RequiredVolumes.erase(it);
+    }
     volumes_lock.unlock();
     return error;
 }
@@ -2568,8 +2569,12 @@ next:
         unlinked.emplace_back(shared_from_this());
     }
     container->VolumeLinks.remove(link);
-    if (link->Required)
-        container->RequiredVolumes.remove(Path.ToString());
+    if (link->Required) {
+        auto it = std::find(container->RequiredVolumes.begin(),
+                            container->RequiredVolumes.end(), target);
+        if (it != container->RequiredVolumes.end())
+            container->RequiredVolumes.erase(it);
+    }
     volumes_lock.unlock();
     link.reset();
 
@@ -2617,10 +2622,10 @@ void TVolume::DestroyUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked) {
     }
 }
 
-TError TVolume::CheckRequired(const std::list<std::string> &paths) {
-    PORTO_LOCKED(VolumesMutex);
-    for (auto &path: paths) {
-        auto link = ResolveLinkLocked(path);
+TError TVolume::CheckRequired(TContainer &ct) {
+    auto volumes_lock = LockVolumes();
+    for (auto &path: ct.RequiredVolumes) {
+        auto link = ResolveLinkLocked(ct.RootPath / path);
         if (!link)
             return TError(EError::VolumeNotFound, "Required volume {} not found", path);
         if (link->Volume->State != EVolumeState::Ready)

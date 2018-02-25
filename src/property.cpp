@@ -1373,43 +1373,28 @@ public:
 
 class TRequiredVolumes : public TProperty {
 public:
-    TRequiredVolumes() :
-        TProperty(P_REQUIRED_VOLUMES, EProperty::REQUIRED_VOLUMES,
-                "Required volumes: volume;...")
+    TRequiredVolumes() : TProperty(P_REQUIRED_VOLUMES, EProperty::REQUIRED_VOLUMES,
+            "Volume links required by container: path;...")
     {
         IsDynamic = true;
     }
     TError Get(std::string &value) {
-        TTuple paths;
-
-        auto lock = LockVolumes();
-        for (auto &path: CT->RequiredVolumes) {
-            TPath p = CL->ComposePath(path);
-            if (!p)
-                p = "%" + path;
-            paths.push_back(p.ToString());
-        }
-
-        value = MergeEscapeStrings(paths, ';');
+        value = MergeEscapeStrings(CT->RequiredVolumes, ';');
         return OK;
     }
     TError Set(const std::string &value) {
-        TError error;
-        std::list<std::string> paths;
-        for (auto &path: SplitEscapedString(value, ';')) {
-            if (path[0] == '%')
-                paths.push_back(path.substr(1));
-            else
-                paths.push_back(CL->ResolvePath(path).ToString());
-        }
-
-        auto lock = LockVolumes();
-        if (CT->State != EContainerState::Stopped) {
-            error = TVolume::CheckRequired(paths);
-            if (error)
+        auto volumes_lock = LockVolumes();
+        auto prev = CT->RequiredVolumes;
+        CT->RequiredVolumes = SplitEscapedString(value, ';');
+        if (CT->HasResources()) {
+            volumes_lock.unlock();;
+            TError error = TVolume::CheckRequired(*CT);
+            if (error) {
+                volumes_lock.lock();
+                CT->RequiredVolumes = prev;
                 return error;
+            }
         }
-        CT->RequiredVolumes = paths;
         CT->SetProp(EProperty::REQUIRED_VOLUMES);
         return OK;
     }

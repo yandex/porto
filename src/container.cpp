@@ -2322,13 +2322,6 @@ TError TContainer::PrepareResources() {
     if (error)
         return error;
 
-    if (RequiredVolumes.size()) {
-        auto lock = LockVolumes();
-        error = TVolume::CheckRequired(RequiredVolumes);
-        if (error)
-            return error;
-    }
-
     error = CreateWorkDir();
     if (error)
         return error;
@@ -2343,6 +2336,12 @@ TError TContainer::PrepareResources() {
 
     for (auto &link: VolumeLinks) {
         error = link->Volume->MountLink(link);
+        if (error)
+            goto undo;
+    }
+
+    if (RequiredVolumes.size()) {
+        error = TVolume::CheckRequired(*this);
         if (error)
             goto undo;
     }
