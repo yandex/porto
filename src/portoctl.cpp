@@ -812,7 +812,7 @@ static const map<string, int> sigMap = {
     { "SIGLOST",    SIGLOST },
 #endif
     { "SIGWINCH",   SIGWINCH },
-    { "SIGUNUSED",  SIGUNUSED },
+    { "SIGUNUSED",  SIGSYS },
 };
 
 class TKillCmd final : public ICmd {
