@@ -94,6 +94,13 @@ public:
     int WaitContainers(const std::vector<std::string> &containers,
                        std::string &name, int timeout);
 
+    int AsyncWait(const std::vector<std::string> &containers,
+                  std::function<void(const std::string &name,
+                                     const std::string &state,
+                                     time_t when)> callbacks,
+                  int timeout = -1);
+    int Recv();
+
     int List(std::vector<std::string> &list,
              const std::string &mask = "");
     int ListProperties(std::vector<Property> &list);

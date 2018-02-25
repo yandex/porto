@@ -26,6 +26,10 @@ public:
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
 
+    std::vector<std::string> AsyncWaitContainers;
+    int AsyncWaitTimeout = -1;
+    std::function<void(const std::string &name, const std::string &state, time_t when)> AsyncWaitCallback;
+
     int LastError = 0;
     std::string LastErrorMsg;
 
@@ -80,6 +84,15 @@ int Connection::ConnectionImpl::Connect()
     if (connect(Fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0)
         return Error(errno, "connect");
 
+    /* restore async wait */
+    if (!AsyncWaitContainers.empty()) {
+        for (auto &name: AsyncWaitContainers)
+            Req.mutable_asyncwait()->add_name(name);
+        if (AsyncWaitTimeout >= 0)
+            Req.mutable_asyncwait()->set_timeout_ms(AsyncWaitTimeout * 1000);
+        return Rpc();
+    }
+
     return EError::Success;
 }
 
@@ -124,14 +137,26 @@ int Connection::ConnectionImpl::Recv() {
     google::protobuf::io::FileInputStream raw(Fd);
     google::protobuf::io::CodedInputStream input(&raw);
 
-    uint32_t size;
-    if (input.ReadVarint32(&size)) {
-        (void)input.PushLimit(size);
-        if (Rsp.ParseFromCodedStream(&input))
+    while (true) {
+        uint32_t size;
+
+        if (!input.ReadVarint32(&size))
+            return Error(raw.GetErrno() ?: EIO, "recv");
+
+        auto prev_limit = input.PushLimit(size);
+
+        Rsp.Clear();
+        if (!Rsp.ParseFromCodedStream(&input))
+            return Error(raw.GetErrno() ?: EIO, "recv");
+
+        input.PopLimit(prev_limit);
+
+        if (Rsp.has_asyncwait()) {
+            if (AsyncWaitCallback)
+                AsyncWaitCallback(Rsp.asyncwait().name(), Rsp.asyncwait().state(), Rsp.asyncwait().when());
+        } else
             return EError::Success;
     }
-
-    return Error(raw.GetErrno() ?: EIO, "recv");
 }
 
 int Connection::ConnectionImpl::Rpc() {
@@ -145,10 +170,8 @@ int Connection::ConnectionImpl::Rpc() {
 
     Req.Clear();
 
-    if (!ret) {
-        Rsp.Clear();
+    if (!ret)
         ret = Recv();
-    }
 
     if (!ret) {
         LastErrorMsg = Rsp.errormsg();
@@ -415,6 +438,27 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
 
     name.assign(Impl->Rsp.wait().name());
     return ret;
+}
+
+int Connection::AsyncWait(const std::vector<std::string> &containers,
+        std::function<void(const std::string &name, const std::string &state, time_t when)> callback, int timeout) {
+    Impl->AsyncWaitContainers.clear();
+    Impl->AsyncWaitTimeout = timeout;
+    Impl->AsyncWaitCallback = callback;
+    for (auto &name: containers)
+        Impl->Req.mutable_asyncwait()->add_name(name);
+    if (timeout >= 0)
+        Impl->Req.mutable_asyncwait()->set_timeout_ms(timeout * 1000);
+    int ret = Impl->Rpc();
+    if (ret)
+        Impl->AsyncWaitCallback = nullptr;
+    else
+        Impl->AsyncWaitContainers = containers;
+    return ret;
+}
+
+int Connection::Recv() {
+    return Impl->Recv();
 }
 
 void Connection::GetLastError(int &error, std::string &msg) const {

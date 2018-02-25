@@ -1359,17 +1359,36 @@ public:
 class TWaitCmd final : public ICmd {
 public:
     TWaitCmd(Porto::Connection *api) : ICmd(api, "wait", 0,
-             "[-T <seconds>] <container|wildcard> ...",
+             "[-A] [-T <seconds>] <container|wildcard> ...",
              "Wait for any listed container change state to dead or meta without running children",
              "    -T <seconds>  timeout\n"
+             "    -A            async wait\n"
              ) {}
+
+    static void PrintAsyncWait(const std::string &name, const std::string &state, time_t when) {
+        fmt::print("{} {}\t{}\n", FormatTime(when), state, name);
+        if (state == "timeout")
+            exit(0);
+    }
 
     int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
+        bool async = false;
         const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = (std::stoi(arg) + 999) / 1000; } },
             { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
+            { 'A', false, [&](const char *) { async = true; } },
         });
+
+        if (async) {
+            int ret = Api->AsyncWait(containers.empty() ? std::vector<std::string>({"***"}) : containers, PrintAsyncWait, timeout);
+            if (ret) {
+                PrintError("Can't wait for containers");
+                return ret;
+            }
+            Api->Recv();
+            return 0;
+        }
 
         if (containers.empty()) {
             PrintUsage();
