@@ -1355,7 +1355,7 @@ std::string TVolume::StateName(EVolumeState state) {
 }
 
 void TVolume::SetState(EVolumeState state) {
-    L_VERBOSE("Change volume {} state {} -> {}", Path, StateName(State), StateName(state));
+    L("Change volume {} state {} -> {}", Path, StateName(State), StateName(state));
     State = state;
     if (state == EVolumeState::Ready || state == EVolumeState::Destroyed)
         VolumesCv.notify_all();
@@ -2070,15 +2070,15 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link, bool strict) {
     volumes_lock.lock();
     while (true) {
         auto it = VolumeLinks.lower_bound(host_target);
+
+        /* common link - FIXME destroy volume */
+        while (it != VolumeLinks.end() && it->second->HostTarget == it->second->Volume->Path)
+            ++it;
+
         if (it == VolumeLinks.end() || !it->first.IsInside(host_target))
             break;
-        auto link = it->second;
 
-        /* common link */
-        if (link->HostTarget == link->Volume->Path) {
-            ++it; /* FIXME destroy volume */
-            continue;
-        }
+        auto link = it->second;
 
         L_ACT("Umount nested volume {} link {} for CT{}:{}", link->Volume->Path, link->HostTarget, link->Container->Id, link->Container->Name);
         link->HostTarget = "";
@@ -2197,8 +2197,6 @@ TError TVolume::Destroy() {
         while (!volume->Links.empty()) {
             auto link = volume->Links.back();
             volumes_lock.unlock();
-
-            L_ACT("Forced unlink volume {} from CT{}:{}", volume->Path, link->Container->Id, link->Container->Name);
 
             error = CL->LockContainer(link->Container);
             if (!error) {
@@ -2458,6 +2456,7 @@ TError TVolume::GetUpperLayer(TPath &upper) {
 
 TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
                            const TPath &target, bool read_only, bool required) {
+
     PORTO_ASSERT(container->IsLocked());
 
     if (target && (!target.IsAbsolute() || !target.IsNormal()))
@@ -2479,11 +2478,10 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
             return error;
     }
 
-    if (State == EVolumeState::Unlinked)
-        SetState(EVolumeState::Ready);
-
-    if (State != EVolumeState::Ready && State != EVolumeState::Building)
+    if (State != EVolumeState::Ready && State != EVolumeState::Unlinked)
         return TError(EError::VolumeNotReady, "Volume not ready: {}", Path);
+
+    L_ACT("Add volume {} link {} for CT{}:{}", Path, target, container->Id, container->Name);
 
     auto link = std::make_shared<TVolumeLink>(shared_from_this(), container);
     link->Target = target;
@@ -2493,6 +2491,10 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
 
     Links.emplace_back(link);
     container->VolumeLinks.emplace_back(link);
+
+    if (State == EVolumeState::Unlinked)
+        SetState(EVolumeState::Ready);
+
     if (required) {
         container->RequiredVolumes.emplace_back(Path.ToString());
         HasDependentContainer = true;
@@ -2523,6 +2525,7 @@ undo:
 
 TError TVolume::UnlinkVolume(std::shared_ptr<TContainer> container,
                              const TPath &target, bool strict) {
+
     PORTO_ASSERT(container->IsLocked());
 
     TError error;
@@ -2554,10 +2557,15 @@ next:
     if (link->HostTarget) {
         volumes_lock.unlock();
         error = UmountLink(link, strict);
-        if (error && strict)
-            return error;
+        if (error) {
+            if (strict)
+                return error;
+            L_WRN("Cannot umount volume link: {}", error);
+        }
         volumes_lock.lock();
     }
+
+    L_ACT("Del volume {} link {} for CT{}:{}", Path, link->Target, container->Id, container->Name);
 
     Links.remove(link);
     if (Links.empty() && State == EVolumeState::Ready)
