@@ -2069,15 +2069,19 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
 
     /* Umount nested links */
     volumes_lock.lock();
-    for (auto it = VolumeLinks.lower_bound(host_target); it->first.IsInside(host_target);) {
+    for (auto it = VolumeLinks.lower_bound(host_target);
+            it != VolumeLinks.end() && it->first.IsInside(host_target);) {
         auto &link = it->second;
+
         L_ACT("Umount nested volume {} link {} for CT{}:{}", link->Volume->Path, link->HostTarget, link->Container->Id, link->Container->Name);
-        link->HostTarget = "";
+
         /* common link */
         if (it->first == link->Volume->Path) {
             link->Volume->SetState(EVolumeState::Unlinked);
             unlinked.emplace_back(link->Volume);
         }
+
+        link->HostTarget = "";
         it = VolumeLinks.erase(it);
         Statistics->VolumeLinksMounted--;
     }
