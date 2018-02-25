@@ -2398,11 +2398,15 @@ void TContainer::FreeResources() {
         }
     }
 
+    std::list<std::shared_ptr<TVolume>> unlinked;
+
     for (auto &link: VolumeLinks) {
-        error = link->Volume->UmountLink(link);
+        error = link->Volume->UmountLink(link, unlinked);
         if (error)
             L_WRN("Cannot umount volume link: {}", error);
     }
+
+    TVolume::DestroyUnlinked(unlinked);
 
     RemoveWorkDir();
 

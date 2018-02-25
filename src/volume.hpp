@@ -193,7 +193,9 @@ public:
 
     TError MountLink(std::shared_ptr<TVolumeLink> link);
 
-    TError UmountLink(std::shared_ptr<TVolumeLink> link, bool strict = false);
+    TError UmountLink(std::shared_ptr<TVolumeLink> link,
+                      std::list<std::shared_ptr<TVolume>> &unlinked,
+                      bool strict = false);
 
     TError LinkVolume(std::shared_ptr<TContainer> container,
                       const TPath &target = "",

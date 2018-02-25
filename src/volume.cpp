@@ -1558,7 +1558,6 @@ TError TVolume::DependsOn(const TPath &path) {
         if (link->Volume->State != EVolumeState::Ready)
             return TError(EError::VolumeNotReady, "Required volume {} not ready", link->Volume->Path);
         L("Volume {} depends on volume {}", Path, link->Volume->Path);
-        /* FIXME should depends on link */
         link->Volume->Nested.insert(shared_from_this());
     }
 
@@ -2039,7 +2038,9 @@ undo:
     return error;
 }
 
-TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link, bool strict) {
+TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
+                           std::list<std::shared_ptr<TVolume>> &unlinked,
+                           bool strict) {
     TError error;
 
     auto volumes_lock = LockVolumes();
@@ -2068,25 +2069,17 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link, bool strict) {
 
     /* Umount nested links */
     volumes_lock.lock();
-    while (true) {
-        auto it = VolumeLinks.lower_bound(host_target);
-
-        /* common link - FIXME destroy volume */
-        while (it != VolumeLinks.end() && it->second->HostTarget == it->second->Volume->Path)
-            ++it;
-
-        if (it == VolumeLinks.end() || !it->first.IsInside(host_target))
-            break;
-
-        auto link = it->second;
-
+    for (auto it = VolumeLinks.lower_bound(host_target); it->first.IsInside(host_target);) {
+        auto &link = it->second;
         L_ACT("Umount nested volume {} link {} for CT{}:{}", link->Volume->Path, link->HostTarget, link->Container->Id, link->Container->Name);
         link->HostTarget = "";
+        /* common link */
+        if (it->first == link->Volume->Path) {
+            link->Volume->SetState(EVolumeState::Unlinked);
+            unlinked.emplace_back(link->Volume);
+        }
+        it = VolumeLinks.erase(it);
         Statistics->VolumeLinksMounted--;
-        VolumeLinks.erase(it);
-        volumes_lock.unlock();
-        (void)link->Volume->Save();
-        volumes_lock.lock();
     }
     volumes_lock.unlock();
 
@@ -2558,7 +2551,7 @@ next:
 
     if (link->HostTarget) {
         volumes_lock.unlock();
-        error = UmountLink(link, strict);
+        error = UmountLink(link, unlinked, strict);
         if (error) {
             if (strict)
                 return error;
