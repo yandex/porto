@@ -432,7 +432,7 @@ message TVolumeUnlinkRequest {
     required string path = 1;
     optional string container = 2;      // default - self, "***" - all
     optional bool strict = 3;           // non-lazy umount
-    optional string target = 4;         // path in container, "" - anon, none or "***" - all
+    optional string target = 4;         // path in container, "" - anon, default - "***" - all
 }
 
 message TVolumeListRequest {

@@ -132,7 +132,7 @@ public:
                    bool required = false);
     int UnlinkVolume(const std::string &path,
                      const std::string &container = "",
-                     const std::string &target = "",
+                     const std::string &target = "***",
                      bool strict = false);
     int ListVolumes(const std::string &path, const std::string &container,
                     std::vector<Volume> &volumes);

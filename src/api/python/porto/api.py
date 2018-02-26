@@ -665,7 +665,7 @@ class Connection(object):
         command.path = path
         if container:
             command.container = container
-        if target:
+        if target is not None:
             command.target = target
         if strict is not None:
             command.strict = strict

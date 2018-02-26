@@ -494,13 +494,13 @@ int Connection::UnlinkVolume(const std::string &path,
                              const std::string &container,
                              const std::string &target,
                              bool strict) {
-    auto req = (target == "") ? Impl->Req.mutable_unlinkvolume() :
-                                Impl->Req.mutable_unlinkvolumetarget();
+    auto req = (target == "***") ? Impl->Req.mutable_unlinkvolume() :
+                                   Impl->Req.mutable_unlinkvolumetarget();
 
     req->set_path(path);
     if (!container.empty())
         req->set_container(container);
-    if (!target.empty())
+    if (target != "***")
         req->set_target(target);
     if (strict)
         req->set_strict(strict);
