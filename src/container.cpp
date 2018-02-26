@@ -853,6 +853,8 @@ TError TContainer::Destroy() {
     if (error)
         L_ERR("Can't remove key-value node {}: {}", path, error);
 
+    lock.unlock();
+
     TVolume::DestroyUnlinked(unlinked);
 
     return OK;
