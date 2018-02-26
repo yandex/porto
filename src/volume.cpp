@@ -2589,8 +2589,9 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
             if (vol->Place.IsInside(path))
                 return TError(EError::Busy, "Path overlaps with place " + vol->Place.ToString());
 
-            if (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath))
-                return TError(EError::Busy, "Path overlaps with storage " + vol->StoragePath.ToString());
+            if (!vol->RemoteStorage() && vol->BackendType != "bind" && vol->BackendType != "rbind" &&
+                    (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath)))
+                return TError(EError::Busy, "Path overlaps with storage {}", vol->StoragePath);
 
             for (auto &l: vol->Layers) {
                 TPath layer(l);
