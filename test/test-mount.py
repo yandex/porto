@@ -43,18 +43,42 @@ CheckBaseMounts(mnt)
 a.Destroy()
 
 # container binds
-a = c.Run("a", root=root_volume.path, bind="{0} /test; {0} /test_ro ro rec; {1} /ro_vol".format(test_volume.path, ro_volume.path))
+a = c.Run("a", root=root_volume.path, bind="{0} /test; {0} /test_ro ro,rec; {1} /ro_vol".format(test_volume.path, ro_volume.path))
 mnt = ParseMountinfo(a['root_pid'])
+host_mnt = ParseMountinfo()
 CheckBaseMounts(mnt)
 Expect('/test' in mnt)
 Expect('rw' in mnt['/test']['flag'])
+Expect('shared' in mnt['/test'])
+Expect('master' in mnt['/test'])
+ExpectEq(mnt['/test']['master'], host_mnt[test_volume.path]['shared'])
+
+Expect('/test/sub' not in mnt)
+
 Expect('/test_ro' in mnt)
 Expect('ro' in mnt['/test_ro']['flag'])
-Expect('/test/sub' not in mnt)
+Expect('shared' in mnt['/test_ro'])
+Expect('master' in mnt['/test_ro'])
+ExpectEq(mnt['/test_ro']['master'], host_mnt[test_volume.path]['shared'])
+
 Expect('/test_ro/sub' in mnt)
 Expect('ro' in mnt['/test_ro/sub']['flag'])
+Expect('shared' in mnt['/test_ro/sub'])
+Expect('master' in mnt['/test_ro/sub'])
+ExpectEq(mnt['/test_ro/sub']['master'], host_mnt[sub_volume.path]['shared'])
+
 Expect('/ro_vol' in mnt)
 Expect('ro' in mnt['/ro_vol']['flag'])
+
+# container binds propagation
+os.mkdir(test_volume.path + "/sub2")
+test_sub2 = c.CreateVolume(path=test_volume.path + "/sub2", backend='plain', containers='a')
+mnt = ParseMountinfo(a['root_pid'])
+Expect('/test/sub2' in mnt)
+Expect('rw' in mnt['/test/sub2']['flag'])
+Expect('/test_ro/sub2' in mnt)
+Expect('rw' in mnt['/test_ro/sub2']['flag'])
+
 a.Destroy()
 
 #backend bind and rbind
@@ -89,6 +113,8 @@ CheckBaseMounts(mnt)
 
 Expect('/test' in mnt)
 Expect('rw' in mnt['/test']['flag'])
+Expect('master' in mnt['/test'])
+Expect('shared' in mnt['/test'])
 
 Expect('/test/sub' not in mnt)
 
@@ -100,16 +126,20 @@ Expect('rw' in mnt['/test_rbind/sub']['flag'])
 
 Expect('/test_ro_rbind' in mnt)
 Expect('ro' in mnt['/test_ro_rbind']['flag'])
+Expect('master' in mnt['/test_ro_rbind'])
+Expect('shared' in mnt['/test_ro_rbind'])
 
 Expect('/test_ro_rbind/sub' in mnt)
 Expect('ro' in mnt['/test_ro_rbind/sub']['flag'])
+Expect('master' in mnt['/test_ro_rbind/sub'])
+Expect('shared' in mnt['/test_ro_rbind/sub'])
 
-# rbind propagation
-os.mkdir(test_volume.path + "/sub2")
+# backend bind and rbind propagation
 test_sub2 = c.CreateVolume(path=test_volume.path + "/sub2", backend='plain', containers='a')
 mnt = ParseMountinfo(a['root_pid'])
 
 Expect('/test/sub2' in mnt)
+Expect('rw' in mnt['/test/sub2']['flag'])
 
 Expect('/test_rbind/sub2' in mnt)
 Expect('rw' in mnt['/test_rbind/sub2']['flag'])

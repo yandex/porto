@@ -1012,7 +1012,7 @@ public:
 class TBind : public TProperty {
 public:
     TBind() : TProperty(P_BIND, EProperty::BIND,
-            "Bind mounts: <source> <target> [ro|rw|rec]... ;...") {}
+            "Bind mounts: <source> <target> [ro|rw|<flag>],... ;...") {}
     TError Get(std::string &value) {
         value = TBindMount::Format(CT->BindMounts);
         return OK;
