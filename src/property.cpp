@@ -1230,7 +1230,7 @@ TError TEnvProperty::GetIndexed(const std::string &index, std::string &value) {
 
 class TBind : public TProperty {
 public:
-    TBind() : TProperty(P_BIND, EProperty::BIND, "Bind mounts: <source> <target> [ro|rw|rec]... ;...") {}
+    TBind() : TProperty(P_BIND, EProperty::BIND, "Bind mounts: <source> <target> [ro|rw|<flag>],... ;...") {}
     TError Get(std::string &value) {
         value = TBindMount::Format(CT->BindMounts);
         return OK;

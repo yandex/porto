@@ -2021,9 +2021,6 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
         auto dst = TVolume::Locate(Parent->RootPath / bm.Target);
         bm.ControlTarget = dst && !CL->CanControl(dst->VolumeOwner);
-
-        // disable propagation in both directions
-        bm.Flags |= MS_PRIVATE;
     }
 
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;

@@ -45,6 +45,7 @@ bool IsSystemPath(const TPath &path) {
 
 TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds) {
     auto lines = SplitEscapedString(str, ' ', ';');
+    TError error;
 
     for (auto &line: lines) {
         if (line.size() < 2)
@@ -55,15 +56,21 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
         bind.Source = line[0];
         bind.Target = line[1];
 
-        for (unsigned i = 2; i < line.size(); i++) {
-            if (line[i] == "ro")
-                bind.Flags |= MS_RDONLY;
-            else if (line[i] == "rw")
-                bind.Flags &= ~MS_RDONLY;
-            else if (line[i] == "rec")
-                bind.Flags |= MS_REC;
-            else
-                return TError(EError::InvalidValue, "Invalid bind mount flag {}", line[i]);
+        if (line.size() > 2) {
+            uint64_t flags;
+            error = StringParseFlags(line[2], TPath::MountFlags, flags, ',');
+            if (error)
+                return error;
+
+            if (flags & ~(MS_RDONLY | MS_REC | MS_PRIVATE | MS_UNBINDABLE |
+                          MS_NOSUID | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME | MS_RELATIME))
+                return TError(EError::InvalidValue, "Invalid bind mount flag {}", line[2]);
+
+            // by default disable backward propagation
+            if (!(flags & (MS_PRIVATE | MS_UNBINDABLE)))
+                flags |= MS_SLAVE | MS_SHARED;
+
+            bind.Flags = flags;
         }
 
         binds.push_back(bind);
@@ -74,11 +81,9 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
 
 std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     TMultiTuple lines;
-    for (auto &bind: binds) {
-        lines.push_back({bind.Source.ToString(), bind.Target.ToString(), (bind.Flags & MS_RDONLY) ? "ro": "rw"});
-        if (bind.Flags & MS_REC)
-            lines.back().push_back("rec");
-    }
+    for (auto &bind: binds)
+        lines.push_back({bind.Source.ToString(), bind.Target.ToString(),
+                         TPath::MountFlagsToString(bind.Flags & ~(MS_SLAVE | MS_SHARED))});
     return MergeEscapeStrings(lines, ' ', ';');
 }
 
