@@ -1348,7 +1348,7 @@ public:
 
 class TLinkedVolumes : public TProperty {
 public:
-    TLinkedVolumes() : TProperty(P_LINKED_VOLUMES, EProperty::NONE, "Linked volumes: volume [target] [ro];...")
+    TLinkedVolumes() : TProperty(P_LINKED_VOLUMES, EProperty::NONE, "Linked volumes: volume [target] [ro] [!];...")
     {
         IsReadOnly = true;
     }
@@ -1364,6 +1364,8 @@ public:
                 links.back().push_back(link->Target.ToString());
             if (link->ReadOnly)
                 links.back().push_back("ro");
+            if (link->Required)
+                links.back().push_back("!");
         }
 
         value = MergeEscapeStrings(links, ' ', ';');

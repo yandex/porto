@@ -1809,7 +1809,7 @@ public:
             for (auto link: v.Links) {
                 std::cout << " " << link.Container;
                 if (link.Target != "")
-                    std::cout << "(" << link.Target << (link.ReadOnly ? " ro" : "") << ")";
+                    std::cout << "(" << link.Target << (link.ReadOnly ? " ro" : "") << (link.Required ? " !" : "") << ")";
             }
 
             std::cout << std::endl;
@@ -1829,7 +1829,10 @@ public:
         for (auto link: v.Links)
             if (link.Target != "")
                 std::cout << "  " << std::left << std::setw(20) << "link" << " "
-                    << link.Container << " " << link.Target << (link.ReadOnly ? " ro" : "") << std::endl;
+                    << link.Container << " " << link.Target
+                    << (link.ReadOnly ? " ro" : "")
+                    << (link.Required ? " !" : "")
+                    << std::endl;
 
         std::cout << std::resetiosflags(std::ios::adjustfield);
 

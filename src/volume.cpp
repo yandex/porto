@@ -1551,12 +1551,12 @@ TError TVolume::ClaimPlace(uint64_t size) {
 
 TError TVolume::DependsOn(const TPath &path) {
     if (State == EVolumeState::Ready && !path.Exists())
-        return TError("Required path {} not found", path);
+        return TError(EError::VolumeNotFound, "Volume {} depends on non-existent path {}", Path, path);
 
     auto link = ResolveOriginLocked(path);
     if (link) {
         if (link->Volume->State != EVolumeState::Ready)
-            return TError(EError::VolumeNotReady, "Required volume {} not ready", link->Volume->Path);
+            return TError(EError::VolumeNotReady, "Volume {} depends on non-ready volume {}", Path, link->Volume->Path);
         L("Volume {} depends on volume {}", Path, link->Volume->Path);
         link->Volume->Nested.insert(shared_from_this());
     }
@@ -2486,10 +2486,18 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
     Links.emplace_back(link);
     container->VolumeLinks.emplace_back(link);
 
-    if (required) {
-        container->RequiredVolumes.emplace_back(Path.ToString());
+    bool was_required = std::find(container->RequiredVolumes.begin(),
+            container->RequiredVolumes.end(), target.ToString()) != container->RequiredVolumes.end();
+
+    if (required && !was_required)
+        container->RequiredVolumes.emplace_back(target.ToString());
+
+    if (!required && was_required)
+        link->Required = true;
+
+    if (link->Required && !HasDependentContainer)
         HasDependentContainer = true;
-    }
+
     volumes_lock.unlock();
 
     error = Save();
@@ -2502,7 +2510,7 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
             goto undo;
     }
 
-    if (required) {
+    if (required && !was_required) {
         container->SetProp(EProperty::REQUIRED_VOLUMES);
         (void)container->Save();
     }
@@ -2513,9 +2521,9 @@ undo:
     volumes_lock.lock();
     Links.remove(link);
     container->VolumeLinks.remove(link);
-    if (required) {
+    if (required && !was_required) {
         auto it = std::find(container->RequiredVolumes.begin(),
-                            container->RequiredVolumes.end(), target);
+                            container->RequiredVolumes.end(), target.ToString());
         if (it != container->RequiredVolumes.end())
             container->RequiredVolumes.erase(it);
     }
@@ -2573,12 +2581,7 @@ next:
         unlinked.emplace_back(shared_from_this());
     }
     container->VolumeLinks.remove(link);
-    if (link->Required) {
-        auto it = std::find(container->RequiredVolumes.begin(),
-                            container->RequiredVolumes.end(), target);
-        if (it != container->RequiredVolumes.end())
-            container->RequiredVolumes.erase(it);
-    }
+    /* Required path at container is sticky */
     volumes_lock.unlock();
     link.reset();
 
@@ -2800,6 +2803,7 @@ TError TVolume::Save() {
             links.push_back({link->Container->Name,
                              link->Target.ToString(),
                              link->ReadOnly ? "ro" : "rw",
+                             link->Required ? "!" : ".",
                              link->HostTarget.ToString()});
         else
             links.push_back({link->Container->Name});
@@ -2879,7 +2883,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_PERMISSIONS, "directory permissions (default - 0775)", false },
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", false },
-    { V_CONTAINERS,  "container[=target];... - initial links (default - self)", false },
+    { V_CONTAINERS,  "container [target] [ro] [!];... - initial links (default - self)", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_PLACE_KEY,   "key for charging place_limit for owner_container (ro)", true },
@@ -3033,7 +3037,9 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
                 break;
             auto target = link.size() > 1 ? link[1] : "";
             bool ro = link.size() > 2 && link[2] == "ro";
-            error = volume->LinkVolume(ct, target, ro);
+            bool required = (link.size() > 2 && link[2] == "!") ||
+                            (link.size() > 3 && link[3] == "!");
+            error = volume->LinkVolume(ct, target, ro, required);
             if (error)
                 break;
         }
@@ -3291,8 +3297,10 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
                     link->Target = l[1];
                 if (l.size() > 2)
                     link->ReadOnly = l[2] == "ro";
-                if (l.size() > 3) {
-                    link->HostTarget = l[3];
+                if (l.size() > 3)
+                    link->Required = l[3] == "!";
+                if (l.size() > 4) {
+                    link->HostTarget = l[4];
                     Statistics->VolumeLinksMounted++;
                 }
                 Links.emplace_back(link);

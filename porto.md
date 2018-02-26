@@ -870,7 +870,9 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **read\_only**    - true or false, default: false
 
-* **containers**    - initial links, syntax: container \[target\] \[ro\];...  default: "self"
+* **containers**    - initial links, syntax: container \[target\] \[ro\] \[!\];...  default: "self"
+
+    Target defines path inside container, flag "ro" makes link read-only, "!" - required.
 
 * **layers**        - layers, syntax: top-layer;...;bottom-layer
 
