@@ -124,6 +124,14 @@ Expect('rw' in mnt['/test/sub2']['flag'])
 Expect('/test_ro/sub2' in mnt)
 Expect('rw' in mnt['/test_ro/sub2']['flag'])
 
+test_sub2.Unlink('a')
+
+test_sub2 = c.CreateVolume(path=test_ro_rbind.path + "/sub2", backend='plain', containers='a')
+mnt = ParseMountinfo(a.GetProperty('root_pid'))
+Expect('/test/sub2' not in mnt)
+Expect('/test_ro/sub2' in mnt)
+Expect('rw' in mnt['/test_ro/sub2']['flag'])
+
 a.Destroy()
 
 # volumes in chroot

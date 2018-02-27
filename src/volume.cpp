@@ -1846,10 +1846,24 @@ TError TVolume::Build() {
 
     /* And finally, publish volume in requested path */
     if (Path != InternalPath) {
-        error = PathFd.ProcPath().Bind(InternalPath, MS_REC);
-        if (error)
-            return error;
-        error = Path.Remount(MS_SLAVE | MS_SHARED | MS_REC);
+        TPath link_mount = GetInternal("volume_link");
+        error = link_mount.Mkdir(700);
+
+        /* make private - cannot move from shared mount */
+        if (!error)
+            error = link_mount.BindRemount(link_mount, MS_PRIVATE);
+
+        /* Start new shared group and make read-only - that isn't propagated */
+        if (!error)
+            error = link_mount.BindRemount(InternalPath, MS_REC | MS_SLAVE | MS_SHARED);
+
+        /* Move to target path and propagate into namespaces */
+        if (!error)
+            error = link_mount.MoveMount(PathFd.ProcPath());
+
+        link_mount.UmountAll();
+        link_mount.Rmdir();
+
         if (error)
             return error;
     }
