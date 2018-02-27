@@ -28,6 +28,16 @@ struct TStatFS {
 
 struct TMount;
 
+#ifndef MS_LAZYTIME
+# define MS_LAZYTIME    (1<<25)
+#endif
+
+/* inverted flags with lower priority */
+#define MS_ALLOW_WRITE  (1ull << 60)
+#define MS_ALLOW_EXEC   (1ull << 61)
+#define MS_ALLOW_SUID   (1ull << 62)
+#define MS_ALLOW_DEV    (1ull << 63)
+
 class TPath {
     friend class TFile;
     std::string Path;
@@ -156,21 +166,18 @@ public:
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
     TError Touch() const;
 
-    static const TFlagsNames MountFlags;
-    static const TFlagsNames UmountFlags;
-    static std::string MountFlagsToString(unsigned long flags);
-    static std::string UmountFlagsToString(unsigned long flags);
+    static std::string UmountFlagsToString(uint64_t flags);
 
     TError FindMount(TMount &mount) const;
     static TError ListAllMounts(std::list<TMount> &list);
 
-    TError Mount(const TPath &source, const std::string &type, unsigned long flags,
+    TError Mount(const TPath &source, const std::string &type, uint64_t flags,
                  const std::vector<std::string> &options) const;
-    TError Bind(const TPath &source, unsigned long flags = 0) const;
+    TError Bind(const TPath &source, uint64_t flags = 0) const;
     TError MoveMount(const TPath &target) const;
-    TError Remount(unsigned long flags, unsigned long clear_flags = 0) const;
-    TError BindRemount(const TPath &source, unsigned long flags) const;
-    TError Umount(unsigned long flags) const;
+    TError Remount(uint64_t flags) const;
+    TError BindRemount(const TPath &source, uint64_t flags) const;
+    TError Umount(uint64_t flags) const;
     TError UmountAll() const;
     TError UmountNested() const;
 
@@ -208,6 +215,9 @@ struct TMount {
                << " -t " << mount.Type << " -o " << mount.Options;
         return stream;
     }
+
+    static TError ParseFlags(const std::string &str, uint64_t &flags, uint64_t allowed = -1);
+    static std::string FormatFlags(uint64_t flags);
 };
 
 class TFile {

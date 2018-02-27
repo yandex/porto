@@ -79,7 +79,7 @@ TError RunCommand(const std::vector<std::string> &command,
                 root.Remount(MS_BIND | MS_REC | MS_RDONLY) ||
                 dot.Bind(dot, MS_REC) ||
                 TPath("../" + path.BaseName()).Chdir() ||
-                dot.Remount(MS_BIND | MS_REC, MS_RDONLY))
+                dot.Remount(MS_BIND | MS_REC | MS_ALLOW_WRITE))
             _exit(EXIT_FAILURE);
     } else {
         if (root.Chdir())

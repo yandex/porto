@@ -6,9 +6,13 @@ from test_common import *
 c = porto.Connection(timeout=10)
 
 def CheckBaseMounts(mnt, chroot=True):
-    Expect("rw" in mnt['/']['flag'])
+    Expect('rw' in mnt['/']['flag'])
+    Expect('nosuid' not in mnt['/']['flag'])
+    Expect(not chroot or 'nodev' in mnt['/']['flag'])
     Expect("rw" in mnt['/dev']['flag'])
+    Expect('nodev' not in mnt['/dev']['flag'])
     Expect("rw" in mnt['/dev/pts']['flag'])
+    Expect('nodev' not in mnt['/dev/pts']['flag'])
     Expect(not chroot or "rw" in mnt['/dev/shm']['flag'])
     Expect("rw" in mnt['/run']['flag'])
     Expect("ro" in mnt['/sys']['flag'])
@@ -30,6 +34,20 @@ ro_volume = c.CreateVolume(backend='plain', read_only='true', containers='w')
 os.mkdir(test_volume.path + "/sub")
 sub_volume = c.CreateVolume(path=test_volume.path + "/sub", backend='plain', containers='w')
 
+host_mnt = ParseMountinfo()
+
+Expect('rw' in host_mnt[root_volume.path]['flag'])
+Expect('nodev' in host_mnt[root_volume.path]['flag'])
+Expect('nosuid' in host_mnt[root_volume.path]['flag'])
+
+Expect('rw' in host_mnt[test_volume.path]['flag'])
+Expect('nodev' in host_mnt[test_volume.path]['flag'])
+Expect('nosuid' in host_mnt[test_volume.path]['flag'])
+
+Expect('ro' in host_mnt[ro_volume.path]['flag'])
+Expect('nodev' in host_mnt[ro_volume.path]['flag'])
+Expect('nosuid' in host_mnt[ro_volume.path]['flag'])
+
 # no chroot
 a = c.Run("a")
 mnt = ParseMountinfo(a['root_pid'])
@@ -45,10 +63,14 @@ a.Destroy()
 # container binds
 a = c.Run("a", root=root_volume.path, bind="{0} /test; {0} /test_ro ro,rec; {1} /ro_vol".format(test_volume.path, ro_volume.path))
 mnt = ParseMountinfo(a['root_pid'])
-host_mnt = ParseMountinfo()
 CheckBaseMounts(mnt)
+Expect('/' in mnt)
+Expect('nosuid' not in mnt['/']['flag'])
+
 Expect('/test' in mnt)
 Expect('rw' in mnt['/test']['flag'])
+Expect('nodev' in mnt['/test']['flag'])
+Expect('nosuid' not in mnt['/test']['flag'])
 Expect('shared' in mnt['/test'])
 Expect('master' in mnt['/test'])
 ExpectEq(mnt['/test']['master'], host_mnt[test_volume.path]['shared'])
@@ -115,6 +137,9 @@ Expect('/test' in mnt)
 Expect('rw' in mnt['/test']['flag'])
 Expect('master' in mnt['/test'])
 Expect('shared' in mnt['/test'])
+
+Expect('nodev' in mnt['/test']['flag'])
+Expect('nosuid' in mnt['/test']['flag'])
 
 Expect('/test/sub' not in mnt)
 
@@ -200,6 +225,10 @@ a.Start()
 mnt = ParseMountinfo()
 Expect(root_volume.path + '/test_ro' in mnt)
 Expect('ro' in mnt[root_volume.path + '/test_ro']['flag'])
+
+Expect('nodev' in mnt[root_volume.path + '/test_ro']['flag'])
+Expect('nosuid' in mnt[root_volume.path + '/test_ro']['flag'])
+
 Expect(root_volume.path + '/test_ro/sub' not in mnt)
 Expect(root_volume.path + '/ro_vol' in mnt)
 Expect('ro' in mnt[root_volume.path + '/ro_vol']['flag'])
@@ -209,6 +238,10 @@ Expect(root_volume.path + '/test/test' in mnt)
 mnt = ParseMountinfo(a['root_pid'])
 Expect('/test_ro' in mnt)
 Expect('ro' in mnt['/test_ro']['flag'])
+
+Expect('nodev' in mnt['/test_ro']['flag'])
+Expect('nosuid' not in mnt['/test_ro']['flag'])
+
 Expect('/test_ro/sub' not in mnt)
 Expect('/ro_vol' in mnt)
 Expect('ro' in mnt['/ro_vol']['flag'])

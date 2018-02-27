@@ -1136,7 +1136,7 @@ TError InitializeCgroups() {
             return error;
         }
     } else if (StringStartsWith(mount.Options, "ro,")) {
-        error = root.Remount(MS_NODEV | MS_NOSUID | MS_NOEXEC, MS_RDONLY);
+        error = root.Remount(MS_NODEV | MS_NOSUID | MS_NOEXEC | MS_ALLOW_WRITE);
         if (error) {
             L_ERR("Cannot remount cgroups root: {}", error);
             return error;

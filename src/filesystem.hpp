@@ -10,7 +10,7 @@
 struct TBindMount {
     TPath Source;
     TPath Target;
-    unsigned long Flags = 0;
+    uint64_t MntFlags = 0;
     bool ControlSource = false;
     bool ControlTarget = false;
     bool CreateTarget = false;

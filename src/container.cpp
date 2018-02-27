@@ -1972,7 +1972,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         TBindMount bm;
         bm.Source = "/etc/hosts";
         bm.Target = "/etc/hosts";
-        bm.Flags |= MS_RDONLY;
+        bm.MntFlags |= MS_RDONLY;
         TaskEnv.Mnt.BindMounts.push_back(bm);
     }
 
@@ -1991,6 +1991,15 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
         auto dst = TVolume::ResolveOrigin(Parent->RootPath / bm.Target);
         bm.ControlTarget = dst && !CL->CanControl(dst->Volume->VolumeOwner);
+
+        /* allow suid inside by default */
+        bm.MntFlags |= MS_ALLOW_SUID;
+
+        if (bm.MntFlags & MS_ALLOW_DEV) {
+            if (!OwnerCred.IsRootUser())
+                return TError(EError::Permission, "Not enough permissions to allow devices at bind mount");
+        } else
+            bm.MntFlags |= MS_NODEV;
     }
 
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;

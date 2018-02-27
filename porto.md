@@ -336,7 +336,7 @@ Write access to container requires any of these conditions:
 
 * **root\_readonly** - remount everything read-only
 
-* **bind** - bind mounts: \<source\> \<target\> \[ro|rw|rec|private|unbindable|nosuid|noexec|noatime|nodiratime|relatime\],... ;...
+* **bind** - bind mounts: \<source\> \<target\> \[ro|rw|rec|dev|nodev|suid|nosuid|exec|noexec|private|unbindable|noatime|nodiratime|relatime\],... ;...
 
     This option creates new mount namespace and binds directories or files
     from parent container mount namespace.

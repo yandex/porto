@@ -67,19 +67,21 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
 
         if (line.size() > 2) {
             uint64_t flags;
-            error = StringParseFlags(line[2], TPath::MountFlags, flags, ',');
+            error = TMount::ParseFlags(line[2], flags,
+                                       MS_RDONLY | MS_ALLOW_WRITE |
+                                       MS_NODEV | MS_ALLOW_DEV |    /* check permissions at start */
+                                       MS_NOSUID | MS_ALLOW_SUID |
+                                       MS_NOEXEC | MS_ALLOW_EXEC |
+                                       MS_REC | MS_PRIVATE | MS_UNBINDABLE |
+                                       MS_NOATIME | MS_NODIRATIME | MS_RELATIME);
             if (error)
                 return error;
-
-            if (flags & ~(MS_RDONLY | MS_REC | MS_PRIVATE | MS_UNBINDABLE |
-                          MS_NOSUID | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME | MS_RELATIME))
-                return TError(EError::InvalidValue, "Invalid bind mount flag {}", line[2]);
 
             // by default disable backward propagation
             if (!(flags & (MS_PRIVATE | MS_UNBINDABLE)))
                 flags |= MS_SLAVE | MS_SHARED;
 
-            bind.Flags = flags;
+            bind.MntFlags = flags;
         }
 
         binds.push_back(bind);
@@ -92,7 +94,7 @@ std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     TMultiTuple lines;
     for (auto &bind: binds)
         lines.push_back({bind.Source.ToString(), bind.Target.ToString(),
-                         TPath::MountFlagsToString(bind.Flags & ~(MS_SLAVE | MS_SHARED))});
+                         TMount::FormatFlags(bind.MntFlags & ~(MS_SLAVE | MS_SHARED))});
     return MergeEscapeStrings(lines, ' ', ';');
 }
 
@@ -109,7 +111,8 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
         directory = Source.IsDirectoryFollow();
 
     if (!ControlSource) {
-        if (!(Flags & MS_RDONLY) || (directory && IsSystemPath(Source)))
+        /* not read-only means read-write, protect system directories from dac override */
+        if (!(MntFlags & MS_RDONLY) || (directory && IsSystemPath(Source)))
             error = src.WriteAccess(cred);
         else
             error = src.ReadAccess(cred);
@@ -183,12 +186,11 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
     if (!root.IsRoot() && !real.IsInside(root))
         return TError(EError::InvalidValue, "Bind mount target out of chroot: {} -> {}", Target, real);
 
-    error = dst.ProcPath().Bind(src.ProcPath(), Flags & MS_REC);
+    error = dst.ProcPath().Bind(src.ProcPath(), MntFlags & MS_REC);
     if (error)
         return error;
 
-    /* allow suid inside and remount read-only if required */
-    error = Target.Remount(MS_BIND | MS_NODEV | Flags, MS_NOEXEC | MS_NOSUID);
+    error = Target.Remount(MS_BIND | MntFlags);
     if (error)
         return error;
 
@@ -492,7 +494,7 @@ TError TMountNamespace::Setup() {
     }
 
     // allow suid binaries inside and remount read-only if needed
-    error = Root.Remount(MS_BIND | MS_REC | (RootRo ? MS_RDONLY : 0), MS_NOSUID);
+    error = Root.Remount(MS_BIND | MS_REC | (RootRo ? MS_RDONLY : 0) | MS_ALLOW_SUID);
     if (error)
         return error;
 

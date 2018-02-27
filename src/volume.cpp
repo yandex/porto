@@ -1410,6 +1410,7 @@ unsigned long TVolume::GetMountFlags(void) const {
     if (IsReadOnly)
         flags |= MS_RDONLY;
 
+    /* in host namespace volumes are nodev and nosuid */
     flags |= MS_NODEV | MS_NOSUID;
 
     return flags;

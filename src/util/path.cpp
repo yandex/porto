@@ -619,15 +619,14 @@ TError TPath::Touch() const {
     return OK;
 }
 
-#ifndef MS_LAZYTIME
-# define MS_LAZYTIME    (1<<25)
-#endif
-
-const TFlagsNames TPath::MountFlags = {
+static const TFlagsNames MountFlags = {
+    { MS_ALLOW_WRITE,   "rw" },
     { MS_RDONLY,        "ro" },
-    { 0,                "rw" },
+    { MS_ALLOW_SUID,    "suid" },
     { MS_NOSUID,        "nosuid" },
+    { MS_ALLOW_DEV,     "dev" },
     { MS_NODEV,         "nodev" },
+    { MS_ALLOW_EXEC,    "exec" },
     { MS_NOEXEC,        "noexec" },
     { MS_SYNCHRONOUS,   "sync" },
     { MS_REMOUNT,       "remount" },
@@ -650,22 +649,32 @@ const TFlagsNames TPath::MountFlags = {
     { MS_LAZYTIME,      "lazyatime" },
 };
 
-const TFlagsNames TPath::UmountFlags = {
+static const TFlagsNames UmountFlags = {
     { MNT_FORCE,        "force" },
     { MNT_DETACH,       "detach" },
     { MNT_EXPIRE,       "expire" },
     { UMOUNT_NOFOLLOW,  "nofollow" },
 };
 
-std::string TPath::MountFlagsToString(unsigned long flags) {
-    return StringFormatFlags(flags, MountFlags);
+TError TMount::ParseFlags(const std::string &str, uint64_t &mnt_flags, uint64_t allowed)
+{
+    TError error = StringParseFlags(str, MountFlags, mnt_flags);
+    if (error)
+        return error;
+    if (mnt_flags & ~allowed)
+        return TError(EError::InvalidValue, "Not allowed flags {}", TMount::FormatFlags(mnt_flags & ~allowed));
+    return OK;
 }
 
-std::string TPath::UmountFlagsToString(unsigned long flags) {
-    return StringFormatFlags(flags, UmountFlags);
+std::string TMount::FormatFlags(uint64_t mnt_flags) {
+    return StringFormatFlags(mnt_flags, MountFlags);
 }
 
-TError TPath::Mount(const TPath &source, const std::string &type, unsigned long flags,
+std::string TPath::UmountFlagsToString(uint64_t mnt_flags) {
+    return StringFormatFlags(mnt_flags, UmountFlags);
+}
+
+TError TPath::Mount(const TPath &source, const std::string &type, uint64_t mnt_flags,
                     const std::vector<std::string> &options) const {
     std::string data = MergeEscapeStrings(options, ',');
 
@@ -673,11 +682,11 @@ TError TPath::Mount(const TPath &source, const std::string &type, unsigned long 
         return TError(EError::Unknown, E2BIG, "mount option too big: " +
                       std::to_string(data.length()));
 
-    L_ACT("mount {} -t {} {} -o {} {}", Path, type, source, data, MountFlagsToString(flags));
+    L_ACT("mount {} -t {} {} -o {} {}", Path, type, source, data, TMount::FormatFlags(mnt_flags));
 
-    if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
-        return TError::System("mount(" + source.ToString() + ", " +
-                      Path + ", " + type + ", " + MountFlagsToString(flags) + ", " + data + ")");
+    if (mount(source.c_str(), Path.c_str(), type.c_str(), (uint32_t)mnt_flags, data.c_str()))
+        return TError::System("mount({}, {}, {}, {}, {}", source, Path, type, TMount::FormatFlags(mnt_flags), data);
+
     return OK;
 }
 
@@ -688,39 +697,39 @@ TError TPath::MoveMount(const TPath &target) const {
     return OK;
 }
 
-TError TPath::Bind(const TPath &source, unsigned long flags) const {
-    L_ACT("mount bind {} {} {}", RealPath(), source.RealPath(), MountFlagsToString(flags));
-    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))
-        return TError::System("mount({}, {}, {})", source, Path, MountFlagsToString(MS_BIND | flags));
+TError TPath::Bind(const TPath &source, uint64_t mnt_flags) const {
+    L_ACT("mount bind {} {} {}", RealPath(), source.RealPath(), TMount::FormatFlags(mnt_flags));
+    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | (uint32_t)mnt_flags, NULL))
+        return TError::System("mount({}, {}, {})", source, Path, TMount::FormatFlags(MS_BIND | mnt_flags));
     return OK;
 }
 
-TError TPath::Remount(unsigned long flags, unsigned long clear_flags) const {
-    L_ACT("remount {} {} -{}", Path, MountFlagsToString(flags), MountFlagsToString(clear_flags));
+TError TPath::Remount(uint64_t mnt_flags) const {
+    L_ACT("remount {} {}", Path, TMount::FormatFlags(mnt_flags));
 
-    unsigned long recursive = flags & MS_REC;
+    uint32_t recursive = mnt_flags & MS_REC;
 
-    if (flags & MS_PRIVATE) {
+    if (mnt_flags & MS_PRIVATE) {
         if (mount(NULL, Path.c_str(), NULL, MS_PRIVATE | recursive, NULL))
             return TError::System("Remount {} MS_PRIVATE", Path);
     }
 
-    if (flags & MS_SLAVE) {
+    if (mnt_flags & MS_SLAVE) {
         if (mount(NULL, Path.c_str(), NULL, MS_SLAVE | recursive, NULL))
             return TError::System("Remount {} MS_SLAVE", Path);
     }
 
-    if (flags & MS_SHARED) {
+    if (mnt_flags & MS_SHARED) {
         if (mount(NULL, Path.c_str(), NULL, MS_SHARED | recursive, NULL))
             return TError::System("Remount {} MS_SHARED", Path);
     }
 
-    if (flags & MS_UNBINDABLE) {
+    if (mnt_flags & MS_UNBINDABLE) {
         if (mount(NULL, Path.c_str(), NULL, MS_UNBINDABLE | recursive, NULL))
             return TError::System("Remount {} MS_UNBINDABLE", Path);
     }
 
-    unsigned long remount_flags = flags & ~(MS_UNBINDABLE | MS_PRIVATE | MS_SLAVE | MS_SHARED | MS_REC);
+    uint64_t remount_flags = mnt_flags & ~(uint64_t)(MS_UNBINDABLE | MS_PRIVATE | MS_SLAVE | MS_SHARED | MS_REC);
 
     /* vfsmount remount isn't recursive in kernel */
     if (recursive && (remount_flags & MS_BIND)) {
@@ -731,50 +740,50 @@ TError TPath::Remount(unsigned long flags, unsigned long clear_flags) const {
             return error;
         for (auto &mnt: mounts) {
             if (mnt.Target.IsInside(normal) && mnt.Target != normal) {
-                error = mnt.Target.Remount(remount_flags, clear_flags);
+                error = mnt.Target.Remount(remount_flags);
                 if (error)
                     return error;
             }
         }
     }
 
-    if (remount_flags || clear_flags) {
+    if (remount_flags) {
         struct statfs st;
         if (statfs(Path.c_str(), &st))
             return TError::System("statfs {}", Path);
 
         /* preserve ro,nodev,noexec,nosuid */
-        if ((st.f_flags & ST_RDONLY) && !(MS_RDONLY & clear_flags))
+        if ((st.f_flags & ST_RDONLY) && !(MS_ALLOW_WRITE & remount_flags))
             remount_flags |= MS_RDONLY;
-        if ((st.f_flags & ST_NODEV) && !(MS_NODEV & clear_flags))
+        if ((st.f_flags & ST_NODEV) && !(MS_ALLOW_DEV & remount_flags))
             remount_flags |= MS_NODEV;
-        if ((st.f_flags & ST_NOEXEC) && !(MS_NOEXEC & clear_flags))
+        if ((st.f_flags & ST_NOEXEC) && !(MS_ALLOW_EXEC & remount_flags))
             remount_flags |= MS_NOEXEC;
-        if ((st.f_flags & ST_NOSUID) && !(MS_NOSUID & clear_flags))
+        if ((st.f_flags & ST_NOSUID) && !(MS_ALLOW_SUID & remount_flags))
             remount_flags |= MS_NOSUID;
 
-        if (mount(NULL, Path.c_str(), NULL, MS_REMOUNT | remount_flags, NULL))
-            return TError::System("Remount {} {}", Path, MountFlagsToString(remount_flags));
+        if (mount(NULL, Path.c_str(), NULL, MS_REMOUNT | (uint32_t)remount_flags, NULL))
+            return TError::System("Remount {} {}", Path, TMount::FormatFlags(remount_flags));
     }
 
     return OK;
 }
 
-TError TPath::BindRemount(const TPath &source, unsigned long flags) const {
+TError TPath::BindRemount(const TPath &source, uint64_t mnt_flags) const {
     TError error;
 
-    error = Bind(source, flags & MS_REC);
+    error = Bind(source, mnt_flags & MS_REC);
     if (error)
         return error;
 
-    error = Remount(MS_BIND | flags);
+    error = Remount(MS_BIND | mnt_flags);
     if (error)
         return error;
 
     return OK;
 }
 
-TError TPath::Umount(unsigned long flags) const {
+TError TPath::Umount(uint64_t flags) const {
     L_ACT("umount {} {}", Path, UmountFlagsToString(flags));
     if (!umount2(Path.c_str(), flags))
         return OK;
@@ -782,8 +791,7 @@ TError TPath::Umount(unsigned long flags) const {
         return TError(EError::Busy, "Mount is busy: " + Path);
     if (errno == EINVAL || errno == ENOENT)
         return TError(EError::InvalidValue, "Not a mount: " + Path);
-    return TError::System("umount2(" + Path + ", " +
-                  UmountFlagsToString(flags) +  ")");
+    return TError::System("umount2({}, {})", Path, UmountFlagsToString(flags));
 }
 
 TError TPath::UmountAll() const {
@@ -1018,7 +1026,7 @@ TError TMount::ParseMountinfo(const std::string &line) {
     BindPath = TMount::Demangle(tokens[3]);
     Target = TMount::Demangle(tokens[4]);
 
-    error = StringParseFlags(tokens[5], TPath::MountFlags, MntFlags, ',');
+    error = TMount::ParseFlags(tokens[5], MntFlags);
     if (error)
         return TError(error, "while parsing mountinfo flags");
 
