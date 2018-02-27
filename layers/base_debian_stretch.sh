@@ -6,16 +6,7 @@ deb http://mirror.yandex.ru/debian stretch-updates main contrib non-free
 deb http://mirror.yandex.ru/debian-security stretch/updates main contrib non-free
 EOF
 
-tee -a etc/inittab <<EOF
-p0::powerfail:/sbin/init 0
-EOF
+apt-get update
 
 export DEBIAN_FRONTEND="noninteractive"
-
-APT_GET="apt-get --yes --no-install-recommends"
-
-apt-get update
-
-apt-get update
-
-$APT_GET dist-upgrade
+apt-get --yes --no-install-recommends dist-upgrade

@@ -1,10 +1,7 @@
-APT_GET="apt-get --yes --no-install-recommends"
-
-$APT_GET install \
+export DEBIAN_FRONTEND="noninteractive"
+apt-get --yes --no-install-recommends install \
 bc \
 binutils \
-bsd-mailx \
-bsdmainutils \
 bzip2 \
 cron \
 curl \
@@ -16,8 +13,6 @@ htop \
 iproute \
 iptables \
 iputils-ping \
-isc-dhcp-client \
-libnss-myhostname \
 less \
 lockfile-progs \
 logrotate \

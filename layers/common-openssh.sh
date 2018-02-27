@@ -7,3 +7,7 @@ rm -f /etc/ssh/ssh_host_*key*
 tee etc/cron.d/ssh-reconfigure <<EOF
 @reboot root /usr/sbin/dpkg-reconfigure openssh-server && rm /etc/cron.d/ssh-reconfigure
 EOF
+
+umask 0077
+mkdir -p /root/.ssh
+touch /root/.ssh/authorized_keys

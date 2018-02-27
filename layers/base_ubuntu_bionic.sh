@@ -8,10 +8,7 @@ EOF
 
 systemctl mask console-getty.service
 
-export DEBIAN_FRONTEND="noninteractive"
-
-APT_GET="apt-get --yes --no-install-recommends"
-
 apt-get update
 
-$APT_GET dist-upgrade
+export DEBIAN_FRONTEND="noninteractive"
+apt-get --yes --no-install-recommends dist-upgrade

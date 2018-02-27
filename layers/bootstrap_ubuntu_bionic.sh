@@ -1,7 +1,8 @@
-debootstrap --foreign --variant=minbase --include systemd-sysv --arch amd64 bionic . http://mirror.yandex.ru/ubuntu
+debootstrap --foreign --variant=minbase --include systemd-sysv,tzdata,locales --arch amd64 bionic . http://mirror.yandex.ru/ubuntu
 
-# Do not mount/umount anything
+# Do not mknod/mount/umount anything
 tee -a debootstrap/functions <<EOF
+mknod () { warning "" "skip mknod \$*"; }
 mount () { warning "" "skip mount \$*"; }
 umount () { warning "" "skip umount \$*"; }
 EOF
