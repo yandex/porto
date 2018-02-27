@@ -1,3 +1,9 @@
+yandex-porto (4.6.4) unstable; urgency=low
+
+  * volume: start new shared group before publishing
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 27 Feb 2018 18:12:39 +0300
+
 yandex-porto (4.6.3) unstable; urgency=low
 
   * volume: ignore conflicts for storage of bind and rbind
