@@ -106,6 +106,10 @@ message TContainerRequest {
     optional TStorageImportRequest importStorage = 118;
     optional TStorageExportRequest exportStorage = 119;
 
+    optional TMetaStorage CreateMetaStorage = 122;
+    optional TMetaStorage ResizeMetaStorage = 123;
+    optional TMetaStorage RemoveMetaStorage = 124;
+
     optional TConvertPathRequest convertPath = 200;
     optional TAttachProcessRequest attachProcess = 201;
     optional TLocateProcessRequest locateProcess = 202;
@@ -520,6 +524,7 @@ message TStorageListRequest {
 
 message TStorageListResponse {
     repeated TStorageDescription storages = 1;
+    repeated TMetaStorage meta_storages = 2;
 }
 
 message TStorageRemoveRequest {
@@ -540,4 +545,20 @@ message TStorageExportRequest {
     required string tarball = 2;
     optional string place = 3;
     optional string compress = 4;
+}
+
+message TMetaStorage {
+    required string name = 1;
+    optional string place = 2;
+    optional string private_value = 3;
+    optional uint64 space_limit = 4;
+    optional uint64 inode_limit = 5;
+
+    optional uint64 space_used = 6;
+    optional uint64 space_available = 7;
+    optional uint64 inode_used = 8;
+    optional uint64 inode_available = 9;
+    optional string owner_user = 10;
+    optional string owner_group = 11;
+    optional uint64 last_usage = 12;
 }

@@ -10,6 +10,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/md5.hpp"
+#include "util/quota.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -21,6 +22,8 @@ static const char LAYER_TMP[] = "_tmp_";
 static const char IMPORT_PREFIX[] = "_import_";
 static const char REMOVE_PREFIX[] = "_remove_";
 static const char PRIVATE_PREFIX[] = "_private_";
+static const char META_PREFIX[] = "_meta_";
+static const char META_LAYER[] = "_layer_";
 
 /* Protected with VolumesMutex */
 
@@ -37,6 +40,40 @@ static std::condition_variable StorageCv;
 
 static TUintMap PlaceLoad;
 static TUintMap PlaceLoadLimit;
+
+TStorage::TStorage(EStorageType type, const TPath &place, const std::string &name) {
+    Type = type;
+    Place = place;
+    Name = name;
+
+    auto sep = name.find('/');
+    if (sep != std::string::npos)
+        Meta = name.substr(0, sep);
+
+    switch (type) {
+    case EStorageType::Place:
+        Path = Place;
+        break;
+    case EStorageType::Layer:
+        if (sep == std::string::npos)
+            Path = Place / PORTO_LAYERS / Name;
+        else
+            Path = place / PORTO_STORAGE / fmt::format("{}{}/{}{}", META_PREFIX, Meta, META_LAYER, name.substr(sep + 1));
+        break;
+    case EStorageType::Storage:
+        if (sep == std::string::npos)
+            Path = Place / PORTO_STORAGE / Name;
+        else
+            Path = place / PORTO_STORAGE / fmt::format("{}{}/{}", META_PREFIX, Meta, name.substr(sep + 1));
+        break;
+    case EStorageType::Meta:
+        Path = place / PORTO_STORAGE / fmt::format("{}{}", META_PREFIX, Name);
+        break;
+    case EStorageType::Volume:
+        Path = place / PORTO_VOLUMES / name;
+        break;
+    }
+}
 
 void TStorage::Init() {
     if (StringToUintMap(config().volumes().place_load_limit(), PlaceLoadLimit))
@@ -63,15 +100,30 @@ void TStorage::DecPlaceLoad(const TPath &place) {
 }
 
 /* FIXME racy. rewrite with openat... etc */
-TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned perms) {
-    TPath base = place / type;
+TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) {
+    TPath base;
     struct stat st;
     TError error;
+
+    switch (type) {
+    case EStorageType::Volume:
+        base = place / PORTO_VOLUMES;
+        break;
+    case EStorageType::Layer:
+        base = place / PORTO_LAYERS;
+        break;
+    case EStorageType::Storage:
+        base = place / PORTO_STORAGE;
+        break;
+    case EStorageType::Meta:
+        base = place;
+        break;
+    }
 
     error = base.StatStrict(st);
     if (error && error.Errno == ENOENT) {
         /* In non-default place user must create base structure */
-        if (place != PORTO_PLACE && (type == PORTO_VOLUMES || type == PORTO_LAYERS))
+        if (place != PORTO_PLACE && (type == EStorageType::Volume || type == EStorageType::Layer))
             return TError(EError::InvalidValue, base.ToString() + " must be directory");
         error = base.MkdirAll(perms);
         if (!error)
@@ -103,8 +155,20 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
     for (auto &name: list) {
         TPath path = base / name;
 
-        if (path.IsDirectoryStrict() && !CheckName(name))
+        if (type == EStorageType::Storage && path.IsDirectoryStrict() &&
+                StringStartsWith(name, META_PREFIX)) {
+            error = Cleanup(path, EStorageType::Meta, 0700);
+            if (error)
+                L_WRN("Cannot cleaup metastorage {} {}", path, error);
             continue;
+        }
+
+        if (path.IsDirectoryStrict()) {
+            if (!CheckName(name))
+                continue;
+            if (type == EStorageType::Meta && StringStartsWith(name, META_LAYER))
+                continue;
+        }
 
         auto lock = LockVolumes();
 
@@ -116,7 +180,7 @@ TError TStorage::Cleanup(const TPath &place, const std::string &type, unsigned p
             path = dirent.RealPath();
 
         } else if (path.IsRegularStrict()) {
-            if (type != PORTO_VOLUMES && StringStartsWith(name, PRIVATE_PREFIX)) {
+            if (type != EStorageType::Volume && StringStartsWith(name, PRIVATE_PREFIX)) {
                 std::string tail = name.substr(std::string(PRIVATE_PREFIX).size());
                 if ((base / tail).IsDirectoryStrict() ||
                         (base / (std::string(IMPORT_PREFIX) + tail)).IsDirectoryStrict())
@@ -151,22 +215,29 @@ TError TStorage::CheckPlace(const TPath &place) {
     if (IsSystemPath(place))
         return TError(EError::InvalidValue, "place in system directory");
 
-    error = Cleanup(place, PORTO_VOLUMES, 0755);
+    error = Cleanup(place, EStorageType::Volume, 0755);
     if (error)
         return error;
 
-    error = Cleanup(place, PORTO_LAYERS, 0700);
+    error = Cleanup(place, EStorageType::Layer, 0700);
     if (error)
         return error;
 
-    error = Cleanup(place, PORTO_STORAGE, 0700);
+    error = Cleanup(place, EStorageType::Storage, 0700);
     if (error)
         return error;
 
     return OK;
 }
 
-TError TStorage::CheckName(const std::string &name) {
+TError TStorage::CheckName(const std::string &name, bool meta) {
+    auto sep = name.find('/');
+    if (!meta && sep != std::string::npos) {
+        TError error = CheckName(name.substr(0, sep), true);
+        if (error)
+            return error;
+        return CheckName(name.substr(sep + 1), true);
+    }
     auto pos = name.find_first_not_of(PORTO_NAME_CHARS);
     if (pos != std::string::npos)
         return TError(EError::InvalidValue, "forbidden character " +
@@ -175,20 +246,62 @@ TError TStorage::CheckName(const std::string &name) {
             StringStartsWith(name, LAYER_TMP) ||
             StringStartsWith(name, IMPORT_PREFIX) ||
             StringStartsWith(name, REMOVE_PREFIX) ||
-            StringStartsWith(name, PRIVATE_PREFIX))
+            StringStartsWith(name, PRIVATE_PREFIX) ||
+            StringStartsWith(name, META_PREFIX) ||
+            StringStartsWith(name, META_LAYER))
         return TError(EError::InvalidValue, "invalid layer name '" + name + "'");
     return OK;
 }
 
-TError TStorage::List(const TPath &place, const std::string &type,
-                      std::list<TStorage> &list) {
+TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     std::vector<std::string> names;
-    TError error = TPath(place / type).ListSubdirs(names);
-    if (!error) {
-        for (auto &name: names)
-            if (!CheckName(name))
-                list.emplace_back(place, type, name);
+    TPath path = Path;
+
+    if (Type == EStorageType::Place) {
+        if (type == EStorageType::Layer)
+            path = Place / PORTO_LAYERS;
+        else
+            path = Place / PORTO_STORAGE;
     }
+
+    TError error = path.ListSubdirs(names);
+    if (error)
+        return error;
+
+    for (auto &name: names) {
+        if (Type == EStorageType::Place && StringStartsWith(name, META_PREFIX)) {
+            TStorage meta(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
+            list.push_back(meta);
+            if (type == EStorageType::Storage) {
+                error = meta.List(type, list);
+                if (error)
+                    return error;
+            }
+        } else if (Type == EStorageType::Meta) {
+            if (StringStartsWith(name, META_LAYER)) {
+                if (type == EStorageType::Layer)
+                    list.emplace_back(EStorageType::Layer, Place, Name + "/" + name.substr(std::string(META_LAYER).size()));
+            } else if (type == EStorageType::Storage && !CheckName(name))
+                list.emplace_back(EStorageType::Storage, Place, Name + "/" + name);
+        } else if (!CheckName(name))
+            list.emplace_back(type, Place, name);
+    }
+
+    if (Type == EStorageType::Place && type == EStorageType::Layer) {
+        names.clear();
+        error = TPath(Place / PORTO_STORAGE).ListSubdirs(names);
+        if (error)
+            return error;
+        for (auto &name: names) {
+            if (StringStartsWith(name, META_PREFIX)) {
+                TStorage meta(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
+                error = meta.List(EStorageType::Layer, list);
+                if (error)
+                    return error;
+            }
+        }
+    }
+
     return error;
 }
 
@@ -203,30 +316,39 @@ uint64_t TStorage::LastUsage() {
 TError TStorage::CheckUsage() {
     PORTO_LOCKED(VolumesMutex);
 
-    if (Type == PORTO_LAYERS) {
+    if (Type == EStorageType::Layer) {
         if (!Exists())
             return TError(EError::LayerNotFound, "Layer " + Name + " not found");
         for (auto &it: Volumes) {
             for (auto &layer: it.second->Layers)
-                if (Path == it.second->Place / PORTO_LAYERS / layer)
+                if (Place == it.second->Place && Name == layer)
                     return TError(EError::Busy, "Layer " + Name + " in use by volume " + it.second->Path.ToString());
         }
     }
 
-    if (Type == PORTO_STORAGE) {
+    if (Type == EStorageType::Storage) {
         if (!Exists())
             return TError(EError::VolumeNotFound, "Storage " + Name + " not found");
         for (auto &it: Volumes) {
-            if (Path == it.second->Place / PORTO_STORAGE / it.second->Storage)
+            if (Place == it.second->Place && Name == it.second->Storage)
                 return TError(EError::Busy, "Storage " + Name + " in use by volume " + it.second->Path.ToString());
         }
+    }
+
+    if (Type == EStorageType::Meta) {
+        struct stat st;
+        TError error = Path.StatStrict(st);
+        if (error)
+            return error;
+        if (st.st_nlink != 2)
+            return TError(EError::Busy, "MetaStorage {} in use, {} not empty", Name, Path);
     }
 
     return OK;
 }
 
 TPath TStorage::TempPath(const std::string &kind) {
-    return Place / Type / (kind + Name);
+    return Path.DirNameNormal() / kind + Path.BaseNameNormal();
 }
 
 TError TStorage::Load() {
@@ -246,9 +368,9 @@ TError TStorage::Load() {
         error = Path.StatStrict(st);
         if (error) {
             if (error.Errno == ENOENT) {
-                if (Type == PORTO_LAYERS)
+                if (Type == EStorageType::Layer)
                     return TError(EError::LayerNotFound, "Layer " + Name + " not found");
-                if (Type == PORTO_STORAGE)
+                if (Type == EStorageType::Storage)
                     return TError(EError::VolumeNotFound, "Storage " + Name + " not found");
             }
             return error;
@@ -267,7 +389,7 @@ TError TStorage::Load() {
     return error;
 }
 
-TError TStorage::SetOwner(const TCred &owner) {
+TError TStorage::SaveOwner(const TCred &owner) {
     TPath priv = TempPath(PRIVATE_PREFIX);
     if (!priv.Exists())
         (void)priv.Mkfile(0644);
@@ -278,6 +400,21 @@ TError TStorage::SetOwner(const TCred &owner) {
 }
 
 TError TStorage::SetPrivate(const std::string &text) {
+    TError error;
+
+    error = CL->CanControlPlace(Place);
+    if (error)
+        return error;
+    error = Load();
+    if (error)
+        return error;
+    error = CL->CanControl(Owner);
+    if (error)
+        return TError(error, "Cannot set private {}", Name);
+    return SavePrivate(text);
+}
+
+TError TStorage::SavePrivate(const std::string &text) {
     TPath priv = TempPath(PRIVATE_PREFIX);
     if (!priv.Exists())
         (void)priv.Mkfile(0644);
@@ -461,7 +598,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     }
 
     if (merge && Exists()) {
-        TStorage layer(Place, Type, Name);
+        TStorage layer(Type, Place, Name);
         error = layer.Load();
         if (error)
             return error;
@@ -530,20 +667,20 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     if (error)
         goto err;
 
-    if (Type == PORTO_LAYERS) {
+    if (Type == EStorageType::Layer) {
         error = SanitizeLayer(temp, merge);
         if (error)
             goto err;
     }
 
     if (!Owner.IsUnknown()) {
-        error = SetOwner(Owner);
+        error = SaveOwner(Owner);
         if (error)
             goto err;
     }
 
     if (!Private.empty()) {
-        error = SetPrivate(Private);
+        error = SavePrivate(Private);
         if (error)
             goto err;
     }
@@ -609,7 +746,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
     if (error)
         return error;
 
-    if (Type == PORTO_STORAGE) {
+    if (Type == EStorageType::Storage) {
         auto lock = LockVolumes();
         error = CheckUsage();
         if (error)
@@ -622,7 +759,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
 
     IncPlaceLoad(Place);
 
-    if (Type == PORTO_VOLUMES && compress_format == "tar") {
+    if (Type == EStorageType::Volume && compress_format == "tar") {
         L_ACT("Save checksums in {}", Path);
         error = SaveChecksums();
         if (error)
@@ -724,6 +861,13 @@ TError TStorage::Remove() {
 
     IncPlaceLoad(Place);
 
+    if (Type == EStorageType::Meta) {
+        TProjectQuota quota(temp);
+        error = quota.Destroy();
+        if (error)
+            L_WRN("Cannot destroy quota {}: {}", temp, error);
+    }
+
     error = RemoveRecursive(temp);
     if (error) {
         L_VERBOSE("Cannot remove storage {}: {}", temp, error);
@@ -791,4 +935,84 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
     }
 
     return OK;
+}
+
+TError TStorage::CreateMeta(uint64_t space_limit, uint64_t inode_limit) {
+    TError error;
+
+    error = CheckName(Name, true);
+    if (error)
+        return error;
+
+    error = CL->CanControlPlace(Place);
+    if (error)
+        return error;
+
+    error = CheckPlace(Place);
+    if (error)
+        return error;
+
+    auto lock = LockVolumes();
+
+    error = Path.Mkdir(0700);
+    if (error)
+        return error;
+
+    lock.unlock();
+
+    TProjectQuota quota(Path);
+    quota.SpaceLimit = space_limit;
+    quota.InodeLimit = inode_limit;
+
+    error = quota.Create();
+    if (error)
+        goto err;
+
+    if (!Owner.IsUnknown()) {
+        error = SaveOwner(Owner);
+        if (error)
+            goto err;
+    }
+
+    if (!Private.empty()) {
+        error = SavePrivate(Private);
+        if (error)
+            goto err;
+    }
+
+    return OK;
+
+err:
+    Path.Rmdir();
+    return error;
+}
+
+TError TStorage::ResizeMeta(uint64_t space_limit, uint64_t inode_limit) {
+    TError error;
+
+    error = CheckName(Name);
+    if (error)
+        return error;
+
+    error = CL->CanControlPlace(Place);
+    if (error)
+        return error;
+
+    error = CheckPlace(Place);
+    if (error)
+        return error;
+
+    error = Load();
+    if (error)
+        return error;
+
+    error = CL->CanControl(Owner);
+    if (error)
+        return TError(error, "Cannot resize {}", Path);
+
+    auto lock = LockVolumes();
+    TProjectQuota quota(Path);
+    quota.SpaceLimit = space_limit;
+    quota.InodeLimit = inode_limit;
+    return quota.Resize();
 }

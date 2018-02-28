@@ -8,6 +8,7 @@
 namespace rpc {
     class TContainerRequest;
     class TContainerResponse;
+    class TStorageListResponse;
 }
 
 namespace Porto {
@@ -158,9 +159,8 @@ public:
     int SetLayerPrivate(const std::string &private_value, const std::string &layer,
                         const std::string &place = "");
 
-    int ListStorage(std::vector<Storage> &storages,
-                    const std::string &place = "",
-                    const std::string &mask = "");
+    const rpc::TStorageListResponse *ListStorage(const std::string &place = "", const std::string &mask = "");
+
     int RemoveStorage(const std::string &name, const std::string &place = "");
     int ImportStorage(const std::string &name,
                       const std::string &archive,

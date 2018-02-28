@@ -1936,7 +1936,7 @@ public:
 class TStorageCmd final : public ICmd {
 public:
     TStorageCmd(Porto::Connection *api) : ICmd(api, "storage", 0,
-        "[-P <place>] -L|-R|-F <storage>",
+        "[-P <place>] [-M] -L|-R|-F [meta/][storage]",
         "Manage internal persistent volume storage",
         "    -P <place>               optional path to place\n"
         "    -L                       list existing storages\n"
@@ -1946,6 +1946,10 @@ public:
         "    -I <storage> <archive>   import storage from archive\n"
         "    -E <storage> <archive>   export storage to archive\n"
         "    -c <compression>         override compression\n"
+        "    -M                       meta storage\n"
+        "    -r                       resize\n"
+        "    -Q <space_limit>\n"
+        "    -q <inode_limit>\n"
         ) {}
 
     int ret = EXIT_SUCCESS;
@@ -1954,9 +1958,13 @@ public:
     bool flush = false;
     bool import = false;
     bool export_ = false;
+    bool meta = false;
+    bool resize = false;
     std::string place;
     std::string private_;
     std::string compression;
+    uint64_t space_limit = 0;
+    uint64_t inode_limit = 0;
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetOpts({
@@ -1967,7 +1975,11 @@ public:
             { 'F', false, [&](const char *) { flush = true;   } },
             { 'I', false, [&](const char *) { import = true;   } },
             { 'E', false, [&](const char *) { export_ = true;   } },
+            { 'M', false, [&](const char *) { meta = true;   } },
+            { 'r', false, [&](const char *) { resize = true;   } },
             { 'c', true, [&](const char * arg) { compression = arg; } },
+            { 'q', true, [&](const char * arg) {  StringToSize(arg, inode_limit); } },
+            { 'Q', true, [&](const char * arg) { StringToSize(arg, space_limit); } },
         });
 
         std::string archive;
@@ -1975,48 +1987,59 @@ public:
             archive = TPath(args[1]).AbsolutePath().ToString();
 
         std::string storage;
-        if (remove) {
-            if (args.size() < 1)
-                return EXIT_FAILURE;
-
-            ret = Api->RemoveStorage(args[0], place);
-            if (ret)
-                PrintError("Cannot remove storage");
-        } else if (flush) {
+        if (flush) {
             uint64_t age = 0;
             if (args.size() >= 1) {
                 if (StringToUint64(args[0], age))
                     return EXIT_FAILURE;
                 age *= 60*60*24;
             }
-            std::vector<Porto::Storage> storage;
-            ret = Api->ListStorage(storage, place);
-            if (ret) {
+            auto rsp = Api->ListStorage(storage, place);
+            if (!rsp) {
                 PrintError("Cannot list storage paths");
                 return EXIT_FAILURE;
             }
-            for (const auto &s: storage) {
-                if (s.LastUsage < age)
+            for (const auto &s: rsp->storages()) {
+                if (s.last_usage() < age)
                     continue;
-                std::cout << "remove " << s.Name << std::endl;
-                ret = Api->RemoveStorage(s.Name, place);
+                std::cout << "remove " << s.name() << std::endl;
+                ret = Api->RemoveStorage(s.name(), place);
                 if (ret)
                     PrintError("Cannot remove storage");
             }
         } else if (list) {
-            std::vector<Porto::Storage> storage;
-            ret = Api->ListStorage(storage, place);
-            if (ret) {
+            auto rsp = Api->ListStorage(storage, place);
+            if (!rsp) {
                 PrintError("Cannot list storage paths");
             } else {
-                for (const auto &s: storage) {
-                    std::cout << s.Name << std::endl;
-                    if (s.OwnerUser.size())
-                        std::cout << "\towner\t" << s.OwnerUser << ":" << s.OwnerGroup << std::endl;
-                    if (s.LastUsage)
-                        std::cout << "\tusage\t" << StringFormatDuration(s.LastUsage * 1000) << " ago" << std::endl;
-                    if (s.PrivateValue.size())
-                        std::cout << "\tprivate\t" << s.PrivateValue << std::endl;
+
+                for (const auto &s: rsp->meta_storages()) {
+                    std::cout << "meta " << s.name() << std::endl;
+                    if (s.has_owner_user())
+                        std::cout << "\towner\t" << s.owner_user() << ":" << s.owner_group() << std::endl;
+                    if (s.has_last_usage())
+                        std::cout << "\tusage\t" << StringFormatDuration(s.last_usage() * 1000) << " ago" << std::endl;
+                    if (s.has_private_value())
+                        std::cout << "\tprivate\t" << s.private_value() << std::endl;
+
+                    std::cout << "\tspace_limit\t" << StringFormatSize(s.space_limit()) << std::endl;
+                    std::cout << "\tspace_used\t" << StringFormatSize(s.space_used()) << std::endl;
+                    std::cout << "\tspace_available\t" << StringFormatSize(s.space_available()) << std::endl;
+                    std::cout << "\tinode_limit\t" << s.inode_limit() << std::endl;
+                    std::cout << "\tinode_used\t" << s.inode_used() << std::endl;
+                    std::cout << "\tinode_available\t" << s.inode_available() << std::endl;
+
+                    std::cout << std::endl;
+                }
+
+                for (const auto &s: rsp->storages()) {
+                    std::cout << s.name() << std::endl;
+                    if (s.has_owner_user())
+                        std::cout << "\towner\t" << s.owner_user() << ":" << s.owner_group() << std::endl;
+                    if (s.has_last_usage())
+                        std::cout << "\tusage\t" << StringFormatDuration(s.last_usage() * 1000) << " ago" << std::endl;
+                    if (s.has_private_value())
+                        std::cout << "\tprivate\t" << s.private_value() << std::endl;
                     std::cout << std::endl;
                 }
             }
@@ -2032,6 +2055,39 @@ public:
             ret = Api->ExportStorage(args[0], archive, place, compression);
             if (ret)
                 PrintError("Cannot export storage");
+        } else if (meta) {
+            if (args.size() < 1)
+                return EXIT_FAILURE;
+            rpc::TContainerRequest req;
+            rpc::TContainerResponse rsp;
+            rpc::TMetaStorage *s;
+
+            if (remove)
+                s = req.mutable_removemetastorage();
+            else if (resize)
+                s = req.mutable_resizemetastorage();
+            else
+                s = req.mutable_createmetastorage();
+
+            s->set_name(args[0]);
+            if (place != "")
+                s->set_place(place);
+            if (private_ != "")
+                s->set_private_value(private_);
+            if (inode_limit)
+                s->set_inode_limit(inode_limit);
+            if (space_limit)
+                s->set_space_limit(space_limit);
+            ret = Api->Rpc(req, rsp);
+            if (ret)
+                PrintError("");
+        } else if (remove) {
+            if (args.size() < 1)
+                return EXIT_FAILURE;
+
+            ret = Api->RemoveStorage(args[0], place);
+            if (ret)
+                PrintError("Cannot remove storage");
         } else {
             PrintUsage();
             return EXIT_FAILURE;
