@@ -347,6 +347,12 @@ Write access to container requires any of these conditions:
     Bind mount is non-recurse by default, add flag "rec" to bind sub-mounts too.
     By default mount is slave-shared - implements one way propagation.
 
+* **symlink** - create symlink, format: \<symlink\>: \<target\>;...
+
+    Both paths are resolved in chroot, relative paths starts from **cwd**.
+    Porto creates missing parent directories and makes relative symlink which
+    could be resolved outside chroot. Existing symlinks are replaced when needed.
+
 * **stdout\_path** - stdout file, default: internal rotated storage
 
     By default *stdout* and *stderr* are redirected into files created in

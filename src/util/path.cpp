@@ -299,16 +299,43 @@ TPath TPath::NormalPath() const {
     return TPath(path);
 }
 
-TPath TPath::AbsolutePath() const {
-    char cwd[PATH_MAX];
-
+TPath TPath::AbsolutePath(const TPath &base) const {
     if (IsAbsolute() || IsEmpty())
         return TPath(Path);
 
+    if (base)
+        return base / Path;
+
+    char cwd[PATH_MAX];
     if (!getcwd(cwd, sizeof(cwd)))
         return TPath();
 
-    return TPath(std::string(cwd) + "/" + Path);
+    return TPath(cwd) / Path;
+}
+
+TPath TPath::RelativePath(const TPath &base) const {
+    if (!IsAbsolute() || !base.IsAbsolute())
+        return TPath();
+
+    std::string rel = NormalPath().Path;
+    std::string pre = base.NormalPath().Path;
+
+    while (pre.size()) {
+        auto a = pre.find('/');
+        auto b = rel.find('/');
+        if (pre.substr(0, a) != rel.substr(0, b))
+            break;
+        pre = a != std::string::npos ? pre.substr(a + 1) : "";
+        rel = b != std::string::npos ? rel.substr(b + 1) : "";
+    }
+
+    while (pre.size()) {
+        auto a = pre.find('/');
+        pre = a != std::string::npos ? pre.substr(a + 1) : "";
+        rel = rel.size() ? "../" + rel : "..";
+    }
+
+    return rel.size() ? rel : ".";
 }
 
 TPath TPath::RealPath() const {
@@ -1349,6 +1376,23 @@ TError TFile::MkdirAt(const TPath &path, int mode) const {
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (mkdirat(Fd, path.c_str(), mode))
         return TError::System("Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
+}
+
+TError TFile::SymlinkAt(const TPath &path, const TPath &target) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    if (symlinkat(target.c_str(), Fd, path.c_str()))
+        return TError::System("Cannot symlink " + std::to_string(Fd) + " @ " + path.Path);
+    return OK;
+}
+
+TError TFile::ReadlinkAt(const TPath &path, TPath &target) const {
+    target.Path.resize(PATH_MAX + 1);
+    ssize_t len = readlinkat(Fd, path.c_str(), &target.Path[0], PATH_MAX);
+    if (len < 0)
+        return TError::System("readlinkat {} @ {}", Fd, path);
+    target.Path.resize(len);
     return OK;
 }
 

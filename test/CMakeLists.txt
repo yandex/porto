@@ -46,6 +46,7 @@ endif()
 
 ADD_PYTHON_TEST(knobs)
 ADD_PYTHON_TEST(mount)
+ADD_PYTHON_TEST(symlink)
 
 ADD_PYTHON_TEST(portoctl-exec)
 ADD_PYTHON_TEST(portoctl-wait)

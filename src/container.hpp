@@ -149,6 +149,7 @@ public:
     std::string Hostname;
     TTuple EnvCfg;
     std::vector<TBindMount> BindMounts;
+    std::map<TPath, TPath> Symlink;
     TMultiTuple IpList;
     TTuple IpLimit;
     TCapabilities CapAmbient;   /* get at start */

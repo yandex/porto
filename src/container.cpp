@@ -1965,6 +1965,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.QuadroFork = !OsMode && !IsMeta();
 
     TaskEnv.Mnt.BindMounts = BindMounts;
+    TaskEnv.Mnt.Symlink = Symlink;
 
     /* legacy kludge */
     if (BindDns && !TaskEnv.Mnt.Root.IsRoot()) {

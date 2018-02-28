@@ -32,6 +32,7 @@ public:
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRo;
     std::vector<TBindMount> BindMounts;
+    std::map<TPath, TPath> Symlink;
     bool BindPortoSock;
     uint64_t RunSize;
     std::string Systemd;

@@ -111,7 +111,9 @@ public:
     TPath DirName() const;
     std::string BaseName() const;
 
-    TPath AbsolutePath() const;
+    TPath AbsolutePath(const TPath &base = "") const;
+    TPath RelativePath(const TPath &base) const;
+
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
 
@@ -263,6 +265,8 @@ public:
     TError RmdirAt(const TPath &path) const;
     TError RemoveAt(const TPath &path) const;
     TError RenameAt(const TPath &oldpath, const TPath &newpath) const;
+    TError SymlinkAt(const TPath &path, const TPath &target) const;
+    TError ReadlinkAt(const TPath &path, TPath &target) const;
     TError Chown(uid_t uid, gid_t gid) const;
     TError Chown(const TCred &cred) const {
         return Chown(cred.Uid, cred.Gid);

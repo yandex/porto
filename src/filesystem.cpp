@@ -566,6 +566,40 @@ TError TMountNamespace::Setup() {
             return error;
     }
 
+    for (const auto &link: Symlink) {
+        TPath sym = link.first.AbsolutePath(Cwd).NormalPath();
+        TPath sym_name = link.first.BaseNameNormal();
+        TFile dir;
+
+        // in chroot allow to change anything
+        error = dir.CreatePath(sym.DirNameNormal(), BindCred, Root.IsRoot() ? "" : "/");
+        if (error)
+            return error;
+
+        TPath target = link.second.AbsolutePath(Cwd).NormalPath().RelativePath(dir.RealPath());
+        TPath cur_target;
+
+        if (!dir.ReadlinkAt(sym_name, cur_target)) {
+            if (cur_target == target) {
+                L_ACT("symlink {} already points to {}", sym, target);
+            } else {
+                L_ACT("symlink {} replace {} with {}", sym, cur_target, target);
+                (void)dir.UnlinkAt(sym_name);
+                error = dir.SymlinkAt(sym_name, target);
+                if (!error)
+                    dir.ChownAt(sym_name, BindCred);
+            }
+        } else {
+            L_ACT("symlink {} to {}", sym, target);
+            error = dir.SymlinkAt(sym_name, target);
+            if (!error)
+                dir.ChownAt(sym_name, BindCred);
+        }
+
+        if (error)
+            return error;
+    }
+
     // remount as shared: subcontainers will get propgation from us
     error = root.Remount(MS_SHARED | MS_REC);
     if (error)

@@ -544,6 +544,7 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
             name == "default_gw" ||
             name == "devices" ||
             name == "bind" ||
+            name == "symlink" ||
             name == "ulimit" ||
             name == "cgroups" ||
             name == "controllers" ||

@@ -2810,6 +2810,19 @@ static void TestPath(Porto::Connection &) {
         { "../../..", "../..", ".."},
     };
 
+    /* base, path, relative */
+    std::vector<std::vector<std::string>> relative = {
+        { "/a", "/a/b", "b" },
+        { "/a", "/a", "." },
+        { "/a/b", "/a", ".." },
+        { "/a/b", "/a/b/c", "c" },
+        { "/a/b", "/a/b/c/d", "c/d" },
+        { "/a/b", "/c", "../../c" },
+        { "/a/b", "/c/d", "../../c/d" },
+        { "/a/b/c", "/a/c/d", "../../c/d" },
+        { "/a/b/c", "/a", "../.." },
+    };
+
     for (auto n: normalize)
         ExpectEq(TPath(n.first).NormalPath().ToString(), n.second);
 
@@ -2824,6 +2837,9 @@ static void TestPath(Porto::Connection &) {
         ExpectEq(TPath(n[0]).DirName().ToString(), n[1]);
         ExpectEq(TPath(n[0]).BaseName(), n[2]);
     }
+
+    for (auto n: relative)
+        ExpectEq(TPath(n[1]).RelativePath(n[0]).ToString(), n[2]);
 }
 
 static void TestIdmap(Porto::Connection &) {
