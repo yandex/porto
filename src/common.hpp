@@ -83,6 +83,8 @@ constexpr const char *PORTO_BINARY_PATH = "/run/portod";
 constexpr const char *PORTO_MASTER_PIDFILE = "/run/portoloop.pid";
 constexpr const char *PORTO_PIDFILE = "/run/portod.pid";
 
+constexpr const char *PORTOD_STAT_FILE = "/run/portod.stat";
+
 constexpr const char *PORTOD_MASTER_NAME = "portod-master";
 constexpr const char *PORTOD_NAME = "portod";
 

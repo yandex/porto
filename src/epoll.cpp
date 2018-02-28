@@ -1,5 +1,4 @@
 #include "epoll.hpp"
-#include "statistics.hpp"
 #include "config.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"

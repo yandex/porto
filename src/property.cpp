@@ -6,7 +6,6 @@
 #include "container.hpp"
 #include "volume.hpp"
 #include "network.hpp"
-#include "statistics.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -3012,7 +3011,7 @@ public:
 } static PortoStat;
 
 void TPortoStat::Populate(TUintMap &m) {
-    m["spawned"] = Statistics->Spawned;
+    m["spawned"] = Statistics->PortoStarts;
     m["errors"] = Statistics->Errors;
     m["warnings"] = Statistics->Warns;
     m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;

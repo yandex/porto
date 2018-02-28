@@ -7,7 +7,6 @@
 #include "container.hpp"
 #include "volume.hpp"
 #include "property.hpp"
-#include "statistics.hpp"
 #include "config.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"

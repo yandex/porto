@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include "version.hpp"
-#include "statistics.hpp"
 #include "kvalue.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
@@ -74,11 +73,46 @@ static void FatalError(const std::string &text, TError &error) {
     _exit(EXIT_FAILURE);
 }
 
-static void AllocStatistics() {
-    Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
-                                     PROT_READ | PROT_WRITE,
-                                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    PORTO_ASSERT(Statistics != nullptr);
+static bool RunningInContainer() {
+    if (getpid() == 1)
+        return getenv("container") != nullptr;
+    std::string env;
+    if (TPath("/proc/1/environ").ReadAll(env))
+        return false;
+    return StringStartsWith(env, "container=") ||
+        env.find(std::string("\0container=", 11)) != std::string::npos;
+}
+
+static bool CheckPortoAlive() {
+    Porto::Connection conn;
+    if (conn.SetTimeout(1) != EError::Success)
+        return false;
+    std::string ver, rev;
+    return !conn.GetVersion(ver, rev);
+}
+
+static bool SanityCheck() {
+    if (getuid() != 0) {
+        std::cerr << "Need root privileges to start" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (!MasterPidFile.Read() && MasterPidFile.Pid != getpid() && CheckPortoAlive()) {
+        std::cerr << "Another instance of portod is running!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (RunningInContainer()) {
+        std::cerr << "Cannot start in container" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (CompareVersions(config().linux_version(), "3.18") < 0) {
+        std::cerr << "Require Linux >= 3.18\n";
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
 
 struct TRequest {
@@ -732,14 +766,9 @@ static int Portod() {
 
     SetDieOnParentExit(SIGKILL);
 
+    ResetStatistics();
+
     Statistics->PortoStarted = GetCurrentTimeMs();
-    Statistics->ContainersCount = 0;
-    Statistics->ClientsCount = 0;
-    Statistics->VolumesCount = 0;
-    Statistics->VolumeLinks = 0;
-    Statistics->VolumeLinksMounted = 0;
-    Statistics->RequestsQueued = 0;
-    Statistics->NetworksCount = 0;
 
     SetProcessName(PORTOD_NAME);
 
@@ -1073,8 +1102,8 @@ static void SpawnPortod(std::shared_ptr<TEpollLoop> loop) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    L_SYS("Spawned portod {}", PortodPid);
-    Statistics->Spawned++;
+    L_SYS("Start portod {}", PortodPid);
+    Statistics->PortoStarts++;
 
     error = loop->AddSource(AckSource);
     if (error) {
@@ -1185,12 +1214,37 @@ exit:
 
 static int PortodMaster() {
     TError error;
+    int ret;
 
-    Statistics->MasterStarted = GetCurrentTimeMs();
+    if (SanityCheck())
+        return EXIT_FAILURE;
 
     SetProcessName(PORTOD_MASTER_NAME);
 
+    (void)close(STDIN_FILENO);
+    int null = open("/dev/null", O_RDWR);
+    PORTO_ASSERT(null == STDIN_FILENO);
+
+    if (!StdLog || fcntl(STDOUT_FILENO, F_GETFD) < 0) {
+        ret = dup2(null, STDOUT_FILENO);
+        PORTO_ASSERT(ret == STDOUT_FILENO);
+    }
+
+    if (!StdLog || fcntl(STDERR_FILENO, F_GETFD) < 0) {
+        ret = dup2(null, STDERR_FILENO);
+        PORTO_ASSERT(ret == STDERR_FILENO);
+    }
+
     OpenLog(PORTO_LOG);
+
+    InitStatistics();
+
+    Statistics->MasterStarted = GetCurrentTimeMs();
+
+    ret = chdir("/");
+    PORTO_ASSERT(!ret);
+
+    CatchFatalSignals();
 
     error = MasterPidFile.Save(getpid());
     if (error)
@@ -1285,6 +1339,7 @@ static int PortodMaster() {
     TPath(PORTO_CONTAINERS_KV).Rmdir();
     TPath(PORTO_VOLUMES_KV).Rmdir();
     TPath("/run/porto").Rmdir();
+    TPath(PORTOD_STAT_FILE).Unlink();
 
     L_SYS("Shutdown complete.");
 
@@ -1312,76 +1367,6 @@ static void PrintVersion() {
         std::cout << "running: " <<  ver + " " + rev << " " << currBin << std::endl;
 }
 
-static bool CheckPortoAlive() {
-    Porto::Connection conn;
-    if (conn.SetTimeout(1) != EError::Success)
-        return false;
-    std::string ver, rev;
-    return !conn.GetVersion(ver, rev);
-}
-
-static bool RunningInContainer() {
-    if (getpid() == 1)
-        return getenv("container") != nullptr;
-    std::string env;
-    if (TPath("/proc/1/environ").ReadAll(env))
-        return false;
-    return StringStartsWith(env, "container=") ||
-        env.find(std::string("\0container=", 11)) != std::string::npos;
-}
-
-static bool SanityCheck() {
-    if (getuid() != 0) {
-        std::cerr << "Need root privileges to start" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (!MasterPidFile.Read() && MasterPidFile.Pid != getpid() && CheckPortoAlive()) {
-        std::cerr << "Another instance of portod is running!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (RunningInContainer()) {
-        std::cerr << "Cannot start in container" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (CompareVersions(config().linux_version(), "3.18") < 0) {
-        std::cerr << "Require Linux >= 3.18\n";
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
-static int PortodMain() {
-    if (SanityCheck())
-        return EXIT_FAILURE;
-
-    CatchFatalSignals();
-
-    AllocStatistics();
-
-    int ret = chdir("/");
-    PORTO_ASSERT(!ret);
-
-    (void)close(STDIN_FILENO);
-    int null = open("/dev/null", O_RDWR);
-    PORTO_ASSERT(null == STDIN_FILENO);
-
-    if (!StdLog || fcntl(STDOUT_FILENO, F_GETFD) < 0) {
-        ret = dup2(null, STDOUT_FILENO);
-        PORTO_ASSERT(ret == STDOUT_FILENO);
-    }
-
-    if (!StdLog || fcntl(STDERR_FILENO, F_GETFD) < 0) {
-        ret = dup2(null, STDERR_FILENO);
-        PORTO_ASSERT(ret == STDERR_FILENO);
-    }
-
-    return PortodMaster();
-}
-
 static int StartPortod() {
     if (SanityCheck())
         return EXIT_FAILURE;
@@ -1391,7 +1376,7 @@ static int StartPortod() {
         return EXIT_FAILURE;
 
     if (!pid)
-        return PortodMain();
+        return PortodMaster();
 
     uint64_t timeout = CmdTimeout >= 0 ? CmdTimeout : config().daemon().portod_start_timeout();
     uint64_t deadline = GetCurrentTimeMs() + timeout * 1000;
@@ -1699,7 +1684,7 @@ int main(int argc, char **argv) {
     config.Read();
 
     if (cmd == "" || cmd == "daemon")
-        return PortodMain();
+        return PortodMaster();
 
     if (cmd == "start")
         return StartPortod();

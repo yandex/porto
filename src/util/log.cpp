@@ -7,6 +7,7 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <execinfo.h>
 #include <cxxabi.h>
@@ -17,6 +18,25 @@ bool Verbose = false;
 bool Debug = false;
 
 TStatistics *Statistics = nullptr;
+
+void InitStatistics() {
+    TError error;
+    TFile file;
+
+    error = file.Create(PORTOD_STAT_FILE, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
+    if (!error)
+        error = file.Truncate(sizeof(TStatistics));
+    if (error) {
+        L_ERR("Cannot init {} {}", PORTOD_STAT_FILE, error);
+        file.Close();
+    }
+
+    Statistics = (TStatistics *)mmap(nullptr, sizeof(TStatistics),
+                                     PROT_READ | PROT_WRITE,
+                                     MAP_SHARED | (file ? 0 : MAP_ANONYMOUS),
+                                     file.Fd, 0);
+    PORTO_ASSERT(Statistics != nullptr);
+}
 
 TFile LogFile(STDOUT_FILENO);
 

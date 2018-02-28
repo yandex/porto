@@ -5,8 +5,8 @@
 #include <set>
 #include <mutex>
 #include "common.hpp"
-#include "statistics.hpp"
 #include "util/path.hpp"
+#include "util/log.hpp"
 
 constexpr const char *V_ID = "id";
 constexpr const char *V_PATH = "path";

@@ -3,7 +3,6 @@
 #include "util/log.hpp"
 #include "client.hpp"
 #include "container.hpp"
-#include "statistics.hpp"
 
 extern "C" {
 #include <sys/ioctl.h>
