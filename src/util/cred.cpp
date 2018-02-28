@@ -402,6 +402,7 @@ bool TCapabilities::HasSetUidGid() const {
 
 TCapabilities NoCapabilities;
 TCapabilities PortoInitCapabilities;
+TCapabilities HelperCapabilities;
 TCapabilities MemCgCapabilities;
 TCapabilities PidNsCapabilities;
 TCapabilities NetNsCapabilities;
@@ -469,4 +470,7 @@ void InitCapabilities() {
         BIT(CAP_SYS_ADMIN) |
         BIT(CAP_SYS_NICE) |
         BIT(CAP_SYS_RESOURCE);
+
+    HelperCapabilities.Permitted = HostCapBound.Permitted;
+    HelperCapabilities.Permitted &= ~BIT(CAP_SYS_RESOURCE);
 }

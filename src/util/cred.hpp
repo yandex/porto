@@ -81,6 +81,7 @@ struct TCapabilities {
 extern bool HasAmbientCapabilities;
 extern TCapabilities NoCapabilities;
 extern TCapabilities PortoInitCapabilities;
+extern TCapabilities HelperCapabilities;
 extern TCapabilities MemCgCapabilities;
 extern TCapabilities PidNsCapabilities;
 extern TCapabilities NetNsCapabilities;

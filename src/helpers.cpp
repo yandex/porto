@@ -86,6 +86,9 @@ TError RunCommand(const std::vector<std::string> &command,
             _exit(EXIT_FAILURE);
     }
 
+    if (HelperCapabilities.ApplyLimit())
+        _exit(EXIT_FAILURE);
+
     const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
     for (size_t i = 0; i < command.size(); i++)
         argv[i] = command[i].c_str();
