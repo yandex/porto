@@ -974,7 +974,8 @@ print "Kills", porto_kills.value
 print "Errors", get_property(conn, "/", "porto_stat[errors]")
 print "Warnings", get_property(conn, "/", "porto_stat[warnings]")
 print "Spawned", get_property(conn, "/", "porto_stat[spawned]")
-print "RestoreFailed", get_property(conn, "/", "porto_stat[restore_failed]")
+print "VolumeLost", get_property(conn, "/", "porto_stat[volume_lost]")
+print "ContainerLost", get_property(conn, "/", "porto_stat[restore_failed]")
 
 if get_property(conn, "/", "porto_stat[errors]") != "0":
     test_fails += 1

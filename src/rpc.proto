@@ -178,6 +178,7 @@ message TGetSystemResponse {
     required fixed64 volume_failed = 304;
     required fixed64 volume_links = 305;
     required fixed64 volume_links_mounted = 306;
+    required fixed64 volume_lost = 307;
 
     required fixed64 client_count = 400;
     required fixed64 client_max = 401;

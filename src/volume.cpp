@@ -3100,9 +3100,8 @@ void TVolume::RestoreAll(void) {
         L_ACT("Restore volume: {}", node.Path);
         error = volume->Restore(node);
         if (error) {
-            /* Apparently, we cannot trust node contents, remove right away */
-            L_WRN("Corrupted volume {} removed: {}", node.Path, error);
-            (void)volume->Destroy();
+            L_WRN("Volume {} restore: {}", node.Path, error);
+            broken_volumes.push_back(volume);
             continue;
         }
 
@@ -3143,6 +3142,7 @@ void TVolume::RestoreAll(void) {
 
         if (!volume->Links.size()) {
             L_WRN("Volume {} has no linked containers", volume->Path);
+            volume->SetState(EVolumeState::Unlinked);
             broken_volumes.push_back(volume);
             continue;
         }
@@ -3153,8 +3153,10 @@ void TVolume::RestoreAll(void) {
     L_SYS("Remove broken volumes...");
 
     for (auto &volume : broken_volumes) {
-        if (volume->State != EVolumeState::Ready)
-            (void)volume->Destroy();
+        Statistics->VolumeLost++;
+        error = volume->Destroy();
+        if (error)
+            L_WRN("Volume {} destroy: {}", volume->Path, error);
     }
 
     TPath volumes = place / PORTO_VOLUMES;

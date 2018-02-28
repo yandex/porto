@@ -1170,7 +1170,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_container_start_failed(Statistics->ContainersFailedStart);
     rsp->set_container_oom(Statistics->ContainersOOM);
     rsp->set_container_buried(Statistics->RemoveDead);
-    rsp->set_container_lost(Statistics->RestoreFailed);
+    rsp->set_container_lost(Statistics->ContainerLost);
 
     rsp->set_stream_rotate_bytes(Statistics->LogRotateBytes);
     rsp->set_stream_rotate_errors(Statistics->LogRotateErrors);
@@ -1181,6 +1181,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_volume_failed(Statistics->VolumesFailed);
     rsp->set_volume_links(Statistics->VolumeLinks);
     rsp->set_volume_links_mounted(Statistics->VolumeLinksMounted);
+    rsp->set_volume_lost(Statistics->VolumeLost);
 
     rsp->set_client_count(Statistics->ClientsCount);
     rsp->set_client_max(config().daemon().max_clients());

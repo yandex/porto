@@ -620,7 +620,7 @@ static void RestoreContainers() {
         error = TContainer::Restore(node, ct);
         if (error) {
             L_ERR("Cannot restore {}: {}", node.Name, error);
-            Statistics->RestoreFailed++;
+            Statistics->ContainerLost++;
             node.Path.Unlink();
             continue;
         }

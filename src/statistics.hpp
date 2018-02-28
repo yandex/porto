@@ -19,7 +19,7 @@ struct TStatistics {
     std::atomic<uint64_t> LogBytes;
     std::atomic<uint64_t> LogRotateBytes;
     std::atomic<uint64_t> LogRotateErrors;
-    std::atomic<uint64_t> RestoreFailed;
+    std::atomic<uint64_t> ContainerLost;
     std::atomic<uint64_t> EpollSources;
     std::atomic<uint64_t> ContainersCount;
     std::atomic<uint64_t> VolumesCount;
@@ -40,6 +40,7 @@ struct TStatistics {
     std::atomic<uint64_t> NetworksCount;
     std::atomic<uint64_t> VolumeLinks;
     std::atomic<uint64_t> VolumeLinksMounted;
+    std::atomic<uint64_t> VolumeLost;
 };
 
 extern TStatistics *Statistics;
