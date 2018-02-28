@@ -39,10 +39,6 @@ using std::pair;
 
 namespace test {
 
-static int loggedRespawns;
-static int loggedErrors;
-static int loggedWarns;
-
 static int expectedRespawns;
 static int expectedErrors;
 static int expectedWarns;
@@ -4410,10 +4406,6 @@ static void InitErrorCounters(Porto::Connection &api) {
 
     ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
     StringToInt(v, expectedWarns);
-
-    loggedRespawns = WordCount(PORTO_LOG, "SYS Spawned") - expectedRespawns;
-    loggedErrors = WordCount(PORTO_LOG, "ERR ") - expectedErrors;
-    loggedWarns = WordCount(PORTO_LOG, "WRN ") - expectedWarns;
 }
 
 static void CheckErrorCounters(Porto::Connection &api) {
@@ -4436,12 +4428,7 @@ static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
     WaitProcessExit(std::to_string(pid));
     WaitPortod(api, times);
 
-    loggedRespawns += expectedRespawns;
-    loggedErrors += expectedErrors;
-    loggedWarns += expectedWarns;
-
-    expectedRespawns = 1;
-    expectedErrors = expectedWarns = 0;
+    expectedRespawns++;
     CheckErrorCounters(api);
 }
 
@@ -5046,20 +5033,6 @@ static void TestStdoutLimit(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestStats(Porto::Connection &api) {
-    AsRoot(api);
-
-    int respawns = WordCount(PORTO_LOG, "SYS Spawned");
-    int errors = WordCount(PORTO_LOG, "ERR ");
-    int warns = WordCount(PORTO_LOG, "WRN ");
-
-    ExpectEq(respawns, loggedRespawns + expectedRespawns);
-    ExpectEq(errors, loggedErrors + expectedErrors);
-    ExpectEq(warns, loggedWarns + expectedWarns);
-
-    AsAlice(api);
-}
-
 static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("abc"));
     ExpectApiSuccess(api.SetProperty("abc", "root", "/root_abc"));
@@ -5142,7 +5115,7 @@ int SelfTest(std::vector<std::string> args) {
         { "vholder", TestVolumeHolder },
         { "volume_impl", TestVolumeImpl },
         { "sigpipe", TestSigPipe },
-        { "stats", TestStats },
+        { "stats", CheckErrorCounters },
         { "daemon", TestDaemon },
         { "convert", TestConvertPath },
         { "leaks", TestLeaks },
@@ -5155,7 +5128,7 @@ int SelfTest(std::vector<std::string> args) {
         { "cgroups", TestCgroups },
         { "version", TestVersion },
         { "remove_dead", TestRemoveDead },
-        { "stats", TestStats },
+        { "stats", CheckErrorCounters },
     };
 
     int ret = EXIT_SUCCESS;
