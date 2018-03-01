@@ -927,6 +927,25 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **inode\_available** - available disk inodes
 
+## Volume Storage
+
+Storage is a directory used by volume backend for keeping volume data.
+Most volume backends by default use non-persistent temporary storage:
+**place**/porto\_volumes/**id**/**backend**.
+
+If storage is specified then volume becomes persistent and could be
+reconstructed using same storage.
+
+Porto provides internal volume storage similar to layers storage:
+data are stored in **place**/porto\_storage/**storage**.
+
+Several volume storages and layers could be enclosed into precreted
+meta-storage which enforces space limit for them all together.
+In this case names of layers and storages have prefix **meta-storage**/
+-- **meta-storage**/**sub-layer** and **meta-storage**/**sub-storage**.
+
+For details see **portoctl** command storage and API.
+
 ## Volume Layers
 
 Porto provides internal storage for overlayfs layers.
@@ -943,20 +962,6 @@ in overlay or aufs formats. For details see **portoctl** command layers.
 
 For building layers see **portoctl** command build
 and sample scripts in layers/ in porto sources.
-
-## Volume Storage
-
-Storage is a directory used by volume backend for keeping volume data.
-Most volume backends by default use non-persistent temporary storage:
-**place**/porto\_volumes/**id**/**backend**.
-
-If storage is specified then volume becomes persistent and could be
-reconstructed using same storage.
-
-Porto provides internal volume storage similar to layers storage:
-data are stored in **place**/porto\_storage/**storage**.
-
-For details see **portoctl** command storage.
 
 ## Backend LVM
 
@@ -1057,9 +1062,11 @@ See **portoctl(8)** for details.
 
     Default place for persistent volume storages.
 
-/place/porto\_containers/*container*.CT
+/place/porto\_storage/\_meta\_*meta-storage*  
+/place/porto\_storage/\_meta\_*meta-storage*/*sub-storage*  
+/place/porto\_storage/\_meta\_*meta-storage*/\_layer\_*sub-layer*
 
-    Container saved by **portoctl** and auto-started by porto service.
+    Meta-storage with nested layers and storages.
 
 # LINUX KERNEL FEATURES
 
