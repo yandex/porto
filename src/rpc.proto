@@ -184,6 +184,10 @@ message TGetSystemResponse {
     required fixed64 volume_links_mounted = 306;
     required fixed64 volume_lost = 307;
 
+    required fixed64 layer_import = 390;
+    required fixed64 layer_export = 391;
+    required fixed64 layer_remove = 392;
+
     required fixed64 client_count = 400;
     required fixed64 client_max = 401;
     required fixed64 client_connected = 402;

@@ -53,6 +53,9 @@ struct TStatistics {
     std::atomic<uint64_t> VolumeLinks;
     std::atomic<uint64_t> VolumeLinksMounted;
     std::atomic<uint64_t> VolumeLost;
+    std::atomic<uint64_t> LayerImport;
+    std::atomic<uint64_t> LayerExport;
+    std::atomic<uint64_t> LayerRemove;
 
     /* --- add new fields at the end --- */
 };

@@ -3084,6 +3084,10 @@ void TPortoStat::Populate(TUintMap &m) {
     m["running_children"] = CT->RunningChildren;
     m["starting_children"] = CT->StartingChildren;
 
+    m["layer_import"] = Statistics->LayerImport;
+    m["layer_export"] = Statistics->LayerExport;
+    m["layer_remove"] = Statistics->LayerRemove;
+
     m["volumes"] = Statistics->VolumesCount;
     m["volumes_created"] = Statistics->VolumesCreated;
     m["volumes_failed"] = Statistics->VolumesFailed;

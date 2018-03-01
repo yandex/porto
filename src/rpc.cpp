@@ -1238,6 +1238,10 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_volume_links_mounted(Statistics->VolumeLinksMounted);
     rsp->set_volume_lost(Statistics->VolumeLost);
 
+    rsp->set_layer_import(Statistics->LayerImport);
+    rsp->set_layer_export(Statistics->LayerExport);
+    rsp->set_layer_remove(Statistics->LayerRemove);
+
     rsp->set_client_count(Statistics->ClientsCount);
     rsp->set_client_max(config().daemon().max_clients());
     rsp->set_client_connected(Statistics->ClientsConnected);

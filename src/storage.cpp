@@ -631,6 +631,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     lock.unlock();
 
     IncPlaceLoad(Place);
+    Statistics->LayerImport++;
 
     if (compress_format == "tar") {
         TTuple args = { "tar",
@@ -758,6 +759,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
         return error;
 
     IncPlaceLoad(Place);
+    Statistics->LayerExport++;
 
     if (Type == EStorageType::Volume && compress_format == "tar") {
         L_ACT("Save checksums in {}", Path);
@@ -860,6 +862,7 @@ TError TStorage::Remove() {
         return error;
 
     IncPlaceLoad(Place);
+    Statistics->LayerRemove++;
 
     if (Type == EStorageType::Meta) {
         TProjectQuota quota(temp);
