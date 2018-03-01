@@ -1,3 +1,106 @@
+yandex-porto (4.10.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * network: create fake netns for restoring almost-dead containers
+  * volume: check if new volume depends on itself
+  * volume: simply remove not-ready volumes at restore
+  * test: also call fuzzer without kills
+  * log: print main argument in response line too
+  * volume: do not save volume state during destruction
+  * volume: at restore check volume links after state
+  * container: regroup starting sequence
+  * container: refactror preparation of task namespaces
+  * cgroup: revert renaming from remove
+  * container: cleanup devices cgroup initialization
+  * volume: fix race between link and unlink-destroy
+  * fuzzer: add new operations
+  * container: in dead state resources are still active
+  * filesystem: move cration of root bindmount out of pivotroot
+  * volume: refactor mount flags operations
+  * proto: make error codes future-compatible
+  * filesystem: fix root mountpoint check
+  * filesystem: protect pstore, securityfs and porto kv
+  * volume: add read-only attribute to link
+  * volume: umount links at forced unlink
+  * python: create exceptions for all errors
+  * python: update api
+  * volume: fix target umount at container stop
+  * test: add test for mount layout
+  * python: add aliases for legacy exception names
+  * fuzzer: catch InvalidCommand
+  * volume: ignore error at umounting not mounted target path
+  * volume: include target root path into volume path verification
+  * volume: add backend=rbind
+  * volume: add backend=dir
+  * volume: mount link rbind and dir recursively
+  * python: more portable error enumeration
+  * test: /dev/shm might be symlink in host
+  * volume: fix forced unlink
+  * volume: fix race between container destroy and forced unlink
+  * volume: check conflicts for link target path
+  * volume: remove warning at unlinking not-mounted link target
+  * fuzzer: detect and handle stale mounts
+  * python: rename base exception into PortoException
+  * fuzzer: catch all porto exceptions
+  * portoctl: in vlist show link targets one per line
+  * volume: bind and rbind could share storage
+  * test: test sub-mounts for bind/rbind
+  * volume: protect volume links from conflicts
+  * volume: restore link target path in host at reload
+  * volume: undo link mount at failed container start
+  * test: merge fuzzer into one file
+  * volume: reset host link if volume not ready for it
+  * volume: refactor target mounts once again
+  * fuzzer: merge all volume link/unlnk operations
+  * volume: rework dependecies and path resolution
+  * porto: move dependencise into top cmake file
+  * volume: check link read-only status
+  * portoctl: print id, backend and links in vlist
+  * volume: count and restore common link
+  * volume: fix warning if forced unlink races with normal unlink
+  * volume: fix check for dependency on itself
+  * volume: umount nested volume links
+  * volume: start new shared group for mounted links
+  * porto: remove legacy loop devices
+  * container: add stopping state
+  * volume: fix resolving link by nested path
+  * volume: only common link pinned by all other links
+  * volume: make temporary link private before umount
+  * volume: ignore conflicts for storage of bind and rbind
+  * util/path: add CreatePath
+  * volume: mount links in two phases
+  * volume: fix backends dir and quota
+  * volume: log link/unlink actions
+  * volume: move destroy out of unlink
+  * volume: destroy volumes nested inside unmounted links
+  * volume: check required_volumes as links inside
+  * volume: check permissions for link parent directory
+  * portod: container stop needs client context
+  * volume: fix crash at umounting nested links
+  * volumes: move DestroyUnlinked out of ContainersLock
+  * volume: make required volume paths sticty
+  * porto: enable forward propagation for container bind mounts
+  * volume: by default vunlink unlinks all targets
+  * test: binds by default read-write
+
+  [ Stanislaw Datskevich ]
+  * Fix building against GCC 7.3.0 on ubuntu 18.04
+
+  [ Konstantin Khlebnikov ]
+  * porto: allow devices at bindmount for root user
+  * volume: add counter for lost volumes
+  * porto: keep statistics in /run/portod.stat
+  * helpers: drop CAP_SYS_RESOURCE
+  * volume: add meta storage with space limit
+  * test: now porto keeps counters after crash
+  * container: add property symlink
+  * porto: add documentation about meta-storages
+  * volume: ext4 online resize needs CAP_SYS_RESOURCE
+  * volume: lvresize needs CAP_SYS_RESOURCE too
+  * volume: add counters for layer operations
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 01 Mar 2018 13:24:02 +0300
+
 yandex-porto (4.9.1) unstable; urgency=low
 
   * volumes: fix races around owner container
