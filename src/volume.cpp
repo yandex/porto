@@ -1268,9 +1268,10 @@ public:
     }
 
     TError Resize(uint64_t space_limit, uint64_t) override {
+        /* needs CAP_SYS_RESOURCE */
         return RunCommand({"lvm", "lvresize", "--force", "--resizefs",
                            "--size", std::to_string(space_limit) + "B",
-                           Device});
+                           Device}, TFile(), TFile(), TFile(), HostCapBound);
     }
 
     std::string ClaimPlace() override {
