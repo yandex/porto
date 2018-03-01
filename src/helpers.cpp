@@ -13,7 +13,8 @@ extern "C" {
 }
 
 TError RunCommand(const std::vector<std::string> &command,
-                  const TFile &dir, const TFile &in, const TFile &out) {
+                  const TFile &dir, const TFile &in, const TFile &out,
+                  const TCapabilities &caps) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
     TFile err;
@@ -86,7 +87,7 @@ TError RunCommand(const std::vector<std::string> &command,
             _exit(EXIT_FAILURE);
     }
 
-    if (HelperCapabilities.ApplyLimit())
+    if (caps.ApplyLimit())
         _exit(EXIT_FAILURE);
 
     const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));

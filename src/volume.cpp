@@ -579,7 +579,8 @@ public:
         if (ioctl(dev.Fd, LOOP_SET_CAPACITY, 0) < 0)
             return TError::System("ioctl(LOOP_SET_CAPACITY)");
 
-        return RunCommand({"resize2fs", path, size});
+        /* needs CAP_SYS_RESOURCE */
+        return RunCommand({"resize2fs", path, size}, TFile(), TFile(), TFile(), HostCapBound);
     }
 
     TError Build() override {
