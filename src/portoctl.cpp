@@ -2427,7 +2427,8 @@ public:
 
             /* give write access only to volume and /tmp */
             if (bootstrap.Layers.empty()) {
-                bootstrap.SetProperty("bind", volume + " " + volume + " rw;/tmp /tmp rw");
+                /* allow devices at root for unpatched debootsrap */
+                bootstrap.SetProperty("bind", volume + " " + volume + " rw,dev;/tmp /tmp rw");
                 bootstrap.SetProperty("root_readonly" "true");
             } else {
                 bootstrap.SetProperty("bind", volume + " " + volume + " rw");
