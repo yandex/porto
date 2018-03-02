@@ -14,10 +14,13 @@ start on power-status-changed
 exec /sbin/shutdown -h now
 EOF
 
-# Fix start procps, ignore sysctl errors
-sed -e 's#\(| sysctl -e -p -$\)#\1 || true#' -i etc/init/procps.conf
-
 apt-get update
 
 export DEBIAN_FRONTEND="noninteractive"
 apt-get --yes --no-install-recommends dist-upgrade
+
+# Do not mount anything at boot
+sed -e 's/^/#/g' -i lib/init/fstab
+
+# Fix start procps, ignore sysctl errors
+sed -e 's#\(| sysctl -e -p -$\)#\1 || true#' -i etc/init/procps.conf
