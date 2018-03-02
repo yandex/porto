@@ -473,10 +473,13 @@ class Connection(object):
     def CreateWeakContainer(self, name):
         return self.Create(name, weak=True)
 
-    def Run(self, name, weak=True, start=True, **kwargs):
+    def Run(self, name, weak=True, start=True, root_volume=None, **kwargs):
         ct = self.Create(name, weak=True)
         for property, value in kwargs.iteritems():
             ct.SetProperty(property, value)
+        if root_volume is not None:
+            root = self.CreateVolume(containers=name, **root_volume)
+            ct.SetProperty('root', root.path)
         if start:
             ct.Start()
         if not weak:
