@@ -11,6 +11,8 @@ constexpr const char *P_RAW_NAME = "_name";
 constexpr const char *P_RAW_START_TIME = "_start_time";
 constexpr const char *P_RAW_DEATH_TIME = "_death_time";
 
+constexpr const char *P_TAINT = "taint";
+
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";

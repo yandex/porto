@@ -3268,6 +3268,18 @@ public:
 
 } static SysctlProperty;
 
+class TTaint : public TProperty {
+public:
+    TTaint() : TProperty(P_TAINT, EProperty::NONE, "Container problems") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        for (auto &taint: CT->Taint())
+            value += taint + "\n";
+        return OK;
+    }
+} static Taint;
+
 void InitContainerProperties(void) {
     for (auto prop: ContainerProperties)
         prop.second->Init();

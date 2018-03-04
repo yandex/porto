@@ -295,6 +295,8 @@ container { extra_devices: "<device> [rwm]... ;..." }
 
 * **owner\_group** - container owner group, default: creator
 
+* **taint** - list of known problems in container configuration
+
 Porto client authentication is based on task pid, uid, gid received via
 **socket(7)** SO\_PEERCRED and task freezer cgroup from /proc/pid/cgroup.
 

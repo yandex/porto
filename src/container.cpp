@@ -3423,3 +3423,52 @@ bool TContainerWaiter::MatchWildcard(const std::string &name) {
             return true;
     return false;
 }
+
+TTuple TContainer::Taint() {
+    TTuple taint;
+
+    if (OwnerCred.IsRootUser())
+        taint.push_back("Container owned by root has unrestricted capabilities.");
+
+    if (NetIsolate && Hostname == "")
+        taint.push_back("Container with network namespace without hostname is confusing.");
+
+    if (BindDns)
+        taint.push_back("Property bind_dns is deprecated and will be removed soon.");
+
+    if (!OomIsFatal)
+        taint.push_back("Containers with oom_is_fatal=false oftern stuck in broken state after OOM, you have been warned.");
+
+    if (OsMode && HasProp(EProperty::COMMAND) && Command != "/sbin/init")
+        taint.push_back("Containers virt_mode=os and custom command often infected with zombies, use virt_mode=app user=root group=root.");
+
+    if (CpuPolicy == "rt" && CpuLimit)
+        taint.push_back("RT scheduler works really badly when usage hits cpu_limit, use cpu_policy=high");
+
+    if (Level == 1) {
+        if (!MemLimit)
+            taint.push_back("First level container without memory_limit.");
+        if (!CpuLimit)
+            taint.push_back("First level container without cpu_limit.");
+        if (!Isolate)
+            taint.push_back("First level container without pid namespace.");
+        if (!(Controllers & CGROUP_DEVICES))
+            taint.push_back("First level container without devices cgroup.");
+    }
+
+    if (AccessLevel >= EAccessLevel::Normal) {
+        if (Root != "/")
+            taint.push_back("Container could escape chroot with enable_porto=true.");
+        if (Isolate)
+            taint.push_back("Container could escape pid namespace with enable_porto=true.");
+        if (NetIsolate)
+            taint.push_back("Container could escape network namespace with enable_porto=true.");
+    }
+
+    if (AccessLevel > EAccessLevel::ReadOnly) {
+        if (NetIsolate && !NetIpLimit)
+            taint.push_back("Container could escape network namespace without ip_limit.");
+    }
+
+    return taint;
+}

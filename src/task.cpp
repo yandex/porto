@@ -371,7 +371,7 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
-    if (HasAmbientCapabilities)
+    if (CT->CapAmbient.Permitted)
         L("Ambient capabilities: {}", CT->CapAmbient);
 
     error = CT->CapAmbient.ApplyAmbient();
@@ -389,6 +389,9 @@ TError TTaskEnv::ConfigureChild() {
         if (error)
             return error;
     }
+
+    for (auto &taint: CT->Taint())
+        WriteLog("TAINT", taint);
 
     error = CT->Stdin.OpenInside(*CT);
     if (error)

@@ -312,6 +312,7 @@ public:
     }
     void Unlock(bool locked = false);
     static void DumpLocks();
+    TTuple Taint();
 
     bool IsLocked(bool for_read = false);
     bool IsReadLocked() { return IsLocked(true); }
