@@ -354,6 +354,8 @@ Write access to container requires any of these conditions:
     Both paths are resolved in chroot, relative paths starts from **cwd**.
     Porto creates missing parent directories and makes relative symlink which
     could be resolved outside chroot. Existing symlinks are replaced when needed.
+    Symlinks could be changed in runtime. Setting empty target removes symlink.
+    For changing single symlink use property "symlink[\<symlink\>]".
 
 * **stdout\_path** - stdout file, default: internal rotated storage
 

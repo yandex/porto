@@ -110,6 +110,8 @@ message TContainerRequest {
     optional TMetaStorage ResizeMetaStorage = 123;
     optional TMetaStorage RemoveMetaStorage = 124;
 
+    optional TSetSymlinkRequest SetSymlink = 125;
+
     optional TConvertPathRequest convertPath = 200;
     optional TAttachProcessRequest attachProcess = 201;
     optional TLocateProcessRequest locateProcess = 202;
@@ -565,4 +567,10 @@ message TMetaStorage {
     optional string owner_user = 10;
     optional string owner_group = 11;
     optional uint64 last_usage = 12;
+}
+
+message TSetSymlinkRequest {
+    required string container = 1;
+    required string symlink = 2;
+    optional string target = 3;
 }

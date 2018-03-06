@@ -291,6 +291,9 @@ class Container(object):
     def GetData(self, data, sync=False):
         return self.conn.GetData(self.name, data, sync)
 
+    def SetSymlink(self, symlink, target):
+        return self.conn.SetSymlink(self.name, symlink, target)
+
     def Wait(self, *args, **kwargs):
         return self.conn.Wait([self.name], *args, **kwargs)
 
@@ -840,6 +843,13 @@ class Connection(object):
         request.convertPath.source = source
         request.convertPath.destination = destination
         return self.rpc.call(request, self.rpc.timeout).convertPath.path
+
+    def SetSymlink(self, name, symlink, target):
+        request = rpc_pb2.TContainerRequest()
+        request.SetSymlink.container = name
+        request.SetSymlink.symlink = symlink
+        request.SetSymlink.target = target
+        self.rpc.call(request, self.rpc.timeout)
 
     def AttachProcess(self, name, pid, comm=""):
         request = rpc_pb2.TContainerRequest()

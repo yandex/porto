@@ -1794,6 +1794,36 @@ TError TContainer::ApplyDeviceConf() const {
     return OK;
 }
 
+TError TContainer::SetSymlink(const TPath &symlink, const TPath &target) {
+    TError error;
+
+    if (WaitTask.Pid) {
+        TMountNamespace mnt;
+        mnt.Cwd = GetCwd();
+        mnt.Root = Root;
+        mnt.BindCred = TaskCred;
+
+        error = mnt.Enter(WaitTask.Pid);
+        if (error)
+            return error;
+
+        error = mnt.CreateSymlink(symlink, target);
+
+        TError error2 = mnt.Leave();
+        PORTO_ASSERT(!error2);
+    }
+
+    if (!error) {
+        if (target)
+            Symlink[symlink] = target;
+        else
+            Symlink.erase(symlink);
+        SetProp(EProperty::SYMLINK);
+    }
+
+    return error;
+}
+
 TError TContainer::PrepareCgroups() {
     TError error;
 

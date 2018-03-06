@@ -18,6 +18,19 @@ ExpectEq(os.stat(a['cwd'] + "/a").st_gid, alice_gid)
 ExpectEq(os.stat(a['cwd'] + "/a").st_mode & 0777, 0775)
 ExpectEq(os.lstat(a['cwd'] + "/a/b").st_uid, alice_uid)
 
+a["symlink[tmp]"] = "foo"
+ExpectEq(os.readlink(a['cwd'] + "/tmp"), "foo")
+ExpectEq(a['symlink'], "a/b: c/d; tmp: foo; ")
+
+a["symlink[tmp]"] = ""
+ExpectEq(os.path.lexists(a['cwd'] + "/tmp"), False)
+ExpectEq(a['symlink'], "a/b: c/d; ")
+
+a.SetSymlink("tmp", "/foo")
+ExpectEq(a['symlink'], "a/b: c/d; tmp: /foo; ")
+
+ExpectException(a.SetProperty, porto.exceptions.Permission, "symlink[/test]", "foo")
+
 v = c.CreateVolume(layers=["ubuntu-precise"], containers="a")
 a.Stop()
 a['symlink'] = "/foo/bar//../bar/baz: /xxx"
@@ -27,4 +40,14 @@ a.Start()
 ExpectEq(a['symlink'], "/foo/bar/baz: /xxx; a: b; ")
 ExpectEq(os.readlink(a['root'] + "/a"), "b")
 ExpectEq(os.readlink(a['root'] + "/foo/bar/baz"), "../../xxx")
+
+a["symlink[/test/test]"] = "foo"
+ExpectEq(os.readlink(a['root'] + "/test/test"), "../foo")
+
+a["symlink"] = ""
+ExpectEq(a['symlink'], "")
+ExpectEq(os.path.lexists(a['root'] + "/test/test"), False)
+ExpectEq(os.path.lexists(a['root'] + "/a"), False)
+ExpectEq(os.path.lexists(a['root'] + "/foo/bar/baz"), False)
+
 a.Destroy()

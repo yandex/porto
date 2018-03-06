@@ -567,35 +567,7 @@ TError TMountNamespace::Setup() {
     }
 
     for (const auto &link: Symlink) {
-        TPath sym = link.first.AbsolutePath(Cwd).NormalPath();
-        TPath sym_name = link.first.BaseNameNormal();
-        TFile dir;
-
-        // in chroot allow to change anything
-        error = dir.CreatePath(sym.DirNameNormal(), BindCred, Root.IsRoot() ? "" : "/");
-        if (error)
-            return error;
-
-        TPath target = link.second.AbsolutePath(Cwd).NormalPath().RelativePath(dir.RealPath());
-        TPath cur_target;
-
-        if (!dir.ReadlinkAt(sym_name, cur_target)) {
-            if (cur_target == target) {
-                L_ACT("symlink {} already points to {}", sym, target);
-            } else {
-                L_ACT("symlink {} replace {} with {}", sym, cur_target, target);
-                (void)dir.UnlinkAt(sym_name);
-                error = dir.SymlinkAt(sym_name, target);
-                if (!error)
-                    dir.ChownAt(sym_name, BindCred);
-            }
-        } else {
-            L_ACT("symlink {} to {}", sym, target);
-            error = dir.SymlinkAt(sym_name, target);
-            if (!error)
-                dir.ChownAt(sym_name, BindCred);
-        }
-
+        error = CreateSymlink(link.first, link.second);
         if (error)
             return error;
     }
@@ -606,4 +578,84 @@ TError TMountNamespace::Setup() {
         return error;
 
     return OK;
+}
+
+TError TMountNamespace::Enter(pid_t pid) {
+    TError error;
+
+    error = HostNs.Open("/proc/thread-self/ns/mnt");
+    if (error)
+        return error;
+
+    error = ContainerNs.Open(pid, "ns/mnt");
+    if (error)
+        return error;
+
+    if (unshare(CLONE_FS))
+        return TError::System("unshare(CLONE_FS)");
+
+    error = ContainerNs.SetNs(CLONE_NEWNS);
+    if (error)
+        return error;
+
+    error = TPath("/").Chdir();
+    if (error)
+        return error;
+
+    return OK;
+}
+
+TError TMountNamespace::Leave() {
+    TError error;
+
+    error = HostNs.SetNs(CLONE_NEWNS);
+    if (error)
+        return error;
+
+    error = TPath("/").Chdir();
+    if (error)
+        return error;
+
+    return OK;
+}
+
+TError TMountNamespace::CreateSymlink(const TPath &symlink, const TPath &target) {
+    TPath sym = symlink.AbsolutePath(Cwd).NormalPath();
+    TPath sym_dir = sym.DirNameNormal();
+    TPath sym_name = sym.BaseNameNormal();
+    TError error;
+    TFile dir;
+
+    // in chroot allow to change anything
+    error = dir.CreatePath(sym_dir, BindCred, Root.IsRoot() ? "" : "/");
+    if (error)
+        return error;
+
+    TPath tgt = target.AbsolutePath(Cwd).NormalPath().RelativePath(sym_dir);
+    TPath cur_tgt;
+
+    if (!dir.ReadlinkAt(sym_name, cur_tgt)) {
+        if (!target) {
+            L_ACT("symlink {} remove {}", sym, cur_tgt);
+            error = dir.UnlinkAt(sym_name);
+        } else if (cur_tgt == tgt) {
+            L_ACT("symlink {} already points to {}", sym, tgt);
+        } else {
+            L_ACT("symlink {} replace {} with {}", sym, cur_tgt, tgt);
+            TPath sym_next = ".next_" + sym_name.ToString();
+            (void)dir.UnlinkAt(sym_next);
+            error = dir.SymlinkAt(sym_next, tgt);
+            if (!error)
+                error = dir.ChownAt(sym_next, BindCred);
+            if (!error)
+                error = dir.RenameAt(sym_next, sym_name);
+        }
+    } else {
+        L_ACT("symlink {} to {}", sym, tgt);
+        error = dir.SymlinkAt(sym_name, tgt);
+        if (!error)
+            error = dir.ChownAt(sym_name, BindCred);
+    }
+
+    return error;
 }

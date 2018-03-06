@@ -1202,6 +1202,17 @@ noinline TError RemoveMetaStorage(const rpc::TMetaStorage &req) {
     return storage.Remove();
 }
 
+noinline TError SetSymlink(const rpc::TSetSymlinkRequest &req) {
+    std::shared_ptr<TContainer> ct;
+    TError error = CL->WriteContainer(req.container(), ct);
+    if (error)
+        return error;
+    error = ct->SetSymlink(req.symlink(), req.target());
+    if (error)
+        return error;
+    return ct->Save();
+}
+
 noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rpc::TGetSystemResponse *rsp) {
     rsp->set_porto_version(PORTO_VERSION);
     rsp->set_porto_revision(PORTO_REVISION);
@@ -1403,6 +1414,8 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
         error = ResizeMetaStorage(req.resizemetastorage());
     else if (req.has_removemetastorage())
         error = RemoveMetaStorage(req.removemetastorage());
+    else if (req.has_setsymlink())
+        error = SetSymlink(req.setsymlink());
     else if (req.has_locateprocess())
         error = LocateProcess(req.locateprocess(), rsp);
     else if (req.has_getsystem())

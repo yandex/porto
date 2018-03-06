@@ -360,6 +360,7 @@ public:
     static void SyncPropertiesAll();
 
     TError ApplyResolvConf() const;
+    TError SetSymlink(const TPath &symlink, const TPath &target);
 
     TError EnableControllers(uint64_t controllers);
     TError HasProperty(const std::string &property) const;

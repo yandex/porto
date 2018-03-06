@@ -6,6 +6,7 @@
 #include "util/error.hpp"
 #include "util/path.hpp"
 #include "util/cred.hpp"
+#include "util/namespace.hpp"
 
 struct TBindMount {
     TPath Source;
@@ -37,6 +38,9 @@ public:
     uint64_t RunSize;
     std::string Systemd;
 
+    TNamespaceFd HostNs;
+    TNamespaceFd ContainerNs;
+
     TError SetupRoot();
     TError MountRun();
     TError MountBinds();
@@ -45,6 +49,10 @@ public:
     TError MountSystemd();
 
     TError Setup();
+
+    TError Enter(pid_t pid);
+    TError Leave();
+    TError CreateSymlink(const TPath &symlink, const TPath &target);
 };
 
 bool IsSystemPath(const TPath &path);

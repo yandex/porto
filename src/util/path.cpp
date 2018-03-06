@@ -1186,7 +1186,7 @@ TError TFile::CreatePath(const TPath &path, const TCred &cred, const TPath &boun
 
         if (bound) {
             TPath real = RealPath();
-            if (!real.IsInside(bound))
+            if (!bound.IsRoot() && !real.IsInside(bound))
                 error = TError(EError::Permission, "Base path {} for {} out of bound {}", real, path, bound);
         } else
             error = WriteAccess(cred);
@@ -1207,7 +1207,7 @@ TError TFile::CreatePath(const TPath &path, const TCred &cred, const TPath &boun
 
     if (bound) {
         TPath real = RealPath();
-        if (!real.IsInside(bound))
+        if (!bound.IsRoot() && !real.IsInside(bound))
             error = TError(EError::Permission, "Real path {} for {} out of bound {}", real, path, bound);
     } else
         error = WriteAccess(cred);

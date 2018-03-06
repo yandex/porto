@@ -1029,11 +1029,27 @@ public:
 
 class TSymlink : public TProperty {
 public:
-    TSymlink() : TProperty(P_SYMLINK, EProperty::SYMLINK, "Symlinks: <symlink>: <target>;...") {}
+    TSymlink() : TProperty(P_SYMLINK, EProperty::SYMLINK, "Symlinks: <symlink>: <target>;...")
+    {
+        IsDynamic = true;
+    }
     TError Get(std::string &value) {
         for (auto &link: CT->Symlink)
             value += fmt::format("{}: {}; ", link.first, link.second);
         return OK;
+    }
+    TError GetIndexed(const std::string &key, std::string &value) {
+        TPath sym = TPath(key).NormalPath();
+        auto it = CT->Symlink.find(sym);
+        if (it == CT->Symlink.end())
+            return TError(EError::NoValue, "Symlink {} not set", key);
+        value = it->second.ToString();
+        return OK;
+    }
+    TError SetIndexed(const std::string &key, const std::string &value) {
+        auto sym = TPath(key).NormalPath();
+        auto tgt = TPath(value).NormalPath();
+        return CT->SetSymlink(sym, tgt);
     }
     TError Set(const std::string &value) {
         TStringMap map;
@@ -1046,21 +1062,15 @@ public:
             auto tgt = TPath(link.second).NormalPath();
             symlink[sym] = tgt;
         }
-        CT->Symlink = symlink;
-        CT->SetProp(EProperty::SYMLINK);
-        return OK;
-    }
-    TError GetIndexed(const std::string &key, std::string &value) {
-        TPath sym = TPath(key).NormalPath();
-        auto it = CT->Symlink.find(sym);
-        if (it == CT->Symlink.end())
-            return TError(EError::NoValue, "Symlink {} not set", key);
-        value = it->second.ToString();
-        return OK;
-    }
-    TError SetIndexed(const std::string &key, const std::string &value) {
-        CT->Symlink[TPath(key).NormalPath()] = TPath(value).NormalPath();
-        CT->SetProp(EProperty::SYMLINK);
+        for (auto &link: CT->Symlink) {
+            if (!symlink.count(link.first))
+                symlink[link.first] = "";
+        }
+        for (auto &link: symlink) {
+            error = CT->SetSymlink(link.first, link.second);
+            if (error)
+                return error;
+        }
         return OK;
     }
 } static Symlink;
