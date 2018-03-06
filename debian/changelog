@@ -1,3 +1,9 @@
+yandex-porto (4.10.3) unstable; urgency=low
+
+  * container: dynamic symlink update
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 06 Mar 2018 11:22:08 +0300
+
 yandex-porto (4.10.2) unstable; urgency=low
 
   * container: add property taint
