@@ -164,8 +164,8 @@ public:
     time_t RealCreationTime;
     time_t RealStartTime = 0;
 
-    uint64_t StartTime;
-    uint64_t DeathTime;
+    uint64_t StartTime = 0;
+    uint64_t DeathTime = 0;
     uint64_t AgingTime;
 
     TUlimit Ulimit;

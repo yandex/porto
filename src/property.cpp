@@ -1264,7 +1264,9 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        return StringToUint64(value, CT->StartTime);
+        StringToUint64(value, CT->StartTime);
+        CT->RealStartTime = time(nullptr) - (GetCurrentTimeMs() - CT->StartTime) / 1000;
+        return OK;
     }
 } static RawStartTime;
 
@@ -2998,11 +3000,9 @@ public:
 
 class TTime : public TProperty {
 public:
-    TTime() : TProperty(P_TIME, EProperty::NONE,
-            "Running time [seconds]")
+    TTime() : TProperty(P_TIME, EProperty::NONE, "Running time [seconds]")
     {
         IsReadOnly = true;
-        IsRuntimeOnly = true;
     }
     TError Get(std::string &value) {
         if (CT->IsRoot()) {
@@ -3012,11 +3012,9 @@ public:
             value = std::to_string(si.uptime);
             return OK;
         }
-        if (!CT->HasProp(EProperty::DEATH_TIME) && (CT->State == EContainerState::Dead)) {
-            CT->DeathTime = GetCurrentTimeMs();
-            CT->SetProp(EProperty::DEATH_TIME);
-        }
-        if (CT->State == EContainerState::Dead)
+        if (CT->State == EContainerState::Stopped)
+            value = "0";
+        else if (CT->State == EContainerState::Dead)
             value = std::to_string((CT->DeathTime - CT->StartTime) / 1000);
         else
             value = std::to_string((GetCurrentTimeMs() - CT->StartTime) / 1000);

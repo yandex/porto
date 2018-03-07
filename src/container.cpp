@@ -2583,6 +2583,10 @@ TError TContainer::Stop(uint64_t timeout) {
 
         ct->ForgetPid();
 
+        ct->StartTime = 0;
+        ct->RealStartTime = 0;
+        ct->ClearProp(EProperty::START_TIME);
+
         ct->DeathTime = 0;
         ct->ClearProp(EProperty::DEATH_TIME);
 
@@ -3031,17 +3035,6 @@ TError TContainer::Load(const TKeyValue &node) {
 
     SanitizeCapabilities();
 
-    if (state == EContainerState::Running) {
-        auto now = GetCurrentTimeMs();
-
-        if (!HasProp(EProperty::START_TIME)) {
-            StartTime = now;
-            SetProp(EProperty::START_TIME);
-        }
-
-        RealStartTime = time(nullptr) - (now - StartTime) / 1000;
-    }
-
     CT = nullptr;
 
     return error;
@@ -3172,6 +3165,17 @@ void TContainer::SyncState() {
         case EContainerState::Destroyed:
             L_ERR("Destroyed parent?");
             break;
+    }
+
+    if (State != EContainerState::Stopped && !HasProp(EProperty::START_TIME)) {
+        StartTime = GetCurrentTimeMs();
+        RealStartTime = time(nullptr);
+        SetProp(EProperty::START_TIME);
+    }
+
+    if (State == EContainerState::Dead && !HasProp(EProperty::DEATH_TIME)) {
+        DeathTime = GetCurrentTimeMs();
+        SetProp(EProperty::DEATH_TIME);
     }
 }
 
