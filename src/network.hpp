@@ -233,6 +233,7 @@ public:
     TError SetupAddrLabel();
 
     static void InitializeConfig();
+    static std::string DeviceGroupName(int group);
 
     static bool NetworkSysctl(const std::string &key);
     static bool NamespaceSysctl(const std::string &key);

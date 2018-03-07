@@ -171,11 +171,7 @@ TNetDevice::TNetDevice(struct rtnl_link *link) {
     Link = rtnl_link_get_link(link);
     Group = rtnl_link_get_group(link);
     MTU = rtnl_link_get_mtu(link);
-
-    if (DeviceGroups.count(Group))
-        GroupName = DeviceGroups[Group];
-    else
-        GroupName = std::to_string(Group);
+    GroupName = TNetwork::DeviceGroupName(Group);
 
     Rate = NET_MAX_RATE;
     Ceil = NET_MAX_RATE;
@@ -311,6 +307,13 @@ void TNetwork::InitializeConfig() {
             sysctl->set_val(val);
         }
     }
+}
+
+std::string TNetwork::DeviceGroupName(int group) {
+    auto it = DeviceGroups.find(group);
+    if (it != DeviceGroups.end())
+        return it->second;
+    return std::to_string(group);
 }
 
 TNetwork::TNetwork() : NatBitmap(0, 0) {
@@ -2077,12 +2080,18 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     if (error)
         return error;
 
+    std::string ipStr;
     for (auto &ip : dev.Ip) {
         if (ip.Family() == AF_INET && gate4.IsEmpty())
             return TError(EError::InvalidValue, "Ipv4 gateway not found");
         if (ip.Family() == AF_INET6 && gate6.IsEmpty())
             return TError(EError::InvalidValue, "Ipv6 gateway not found");
+        ipStr += fmt::format("{}={} ", ip.Family() == AF_INET ? "ip4" : "ip6", ip.Format());
     }
+
+    L_NET("Setup L3 device {} peer={} mtu={} group={} master={} {}gw4={} gw6={}",
+            dev.Name, peerName, dev.Mtu, TNetwork::DeviceGroupName(dev.Group),
+            dev.Master, ipStr, gate4.Format(), gate6.Format());
 
     error = peer.AddVeth(dev.Name, "", dev.Mtu, VirtualDeviceGroup, NetNs.GetFd());
     if (error)
