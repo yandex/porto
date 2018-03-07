@@ -476,12 +476,12 @@ TError TFile::ClearDirectory() const {
     if (error)
         return error;
 
-    error = walk.OpenScan(".");
+    error = walk.OpenNoStat(".");
     while (!error) {
         error = walk.Next();
         if (error || !walk.Path)
             break;
-        if (S_ISDIR(walk.Stat->st_mode)) {
+        if (walk.Directory) {
             if (!walk.Postorder || walk.Path == ".")
                 continue;
             error = RmdirAt(walk.Path);
@@ -1615,6 +1615,11 @@ TError TPathWalk::OpenList(const TPath &path)
     return Open(path, FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, TPathWalk::CompareNames);
 }
 
+TError TPathWalk::OpenNoStat(const TPath &path)
+{
+    return Open(path, FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV | FTS_NOSTAT, nullptr);
+}
+
 TError TPathWalk::Next() {
 next:
     Ent = fts_read(Fts);
@@ -1631,12 +1636,17 @@ next:
         if (Ent->fts_errno == ENOENT)
             goto next;
         return TError(EError::Unknown, Ent->fts_errno, "fts_read {}", Ent->fts_path);
-    case FTS_NSOK:
-        return TError(EError::Unknown, "fts_read FTS_NSOK");
+    case FTS_D:
+    case FTS_DC:
+        Directory = true;
+        Postorder = false;
+        break;
     case FTS_DP:
+        Directory = true;
         Postorder = true;
         break;
     default:
+        Directory = false;
         Postorder = false;
         break;
     }

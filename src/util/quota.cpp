@@ -176,8 +176,7 @@ TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
     int fd, ret;
     TError error;
 
-    fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW |
-                    O_NOATIME | O_NONBLOCK);
+    fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW | O_NOATIME | O_NONBLOCK);
     if (fd < 0 && errno == EPERM)
         fd = open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0)
@@ -199,7 +198,7 @@ TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
     TPathWalk walk;
     TError error;
 
-    error = walk.OpenScan(path);
+    error = walk.OpenNoStat(path);
     if (error)
         return error;
 
@@ -207,10 +206,12 @@ TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
         error = walk.Next();
         if (error || !walk.Path)
             return error;
-        if (S_ISDIR(walk.Stat->st_mode) || S_ISREG(walk.Stat->st_mode)) {
-            error = SetProjectIdOne(walk.Path, id);
-            if (error)
+        error = SetProjectIdOne(walk.Path, id);
+        if (error) {
+            /* ignore errors for non-regular and non-directory */
+            if (walk.Directory || walk.Path.IsRegularStrict())
                 return error;
+            L_VERBOSE("SetProjectIdAll {}", error);
         }
     }
 

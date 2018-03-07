@@ -308,6 +308,7 @@ public:
     FTSENT *Ent = nullptr;
     TPath Path;
     struct stat *Stat;
+    bool Directory = false;
     bool Postorder = false;
 
     static int CompareNames(const FTSENT **a, const FTSENT **b);
@@ -318,6 +319,7 @@ public:
     TError Open(const TPath &patht, int fts_flags = FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, int (*compar)(const FTSENT **, const FTSENT **) = nullptr);
     TError OpenScan(const TPath &path);
     TError OpenList(const TPath &path);
+    TError OpenNoStat(const TPath &path);
     TError Next();
     std::string Name() { return Ent ? Ent->fts_name : ""; }
     int Level() { return Ent ? Ent->fts_level : -2; }
