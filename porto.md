@@ -254,6 +254,11 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[path\] \[mode\] \[user\] \[group\];...
 
+    "device" - device path in host (/dev/null)  
+    "rwm-" - read, write, mknod, no-access  
+    "path" - device path in container, defaults same as in host  
+    "mode", "user", "group" - device node permissions and owner, only host root allowed to change this, defaults are taken from host  
+
     By default porto grants access to:  
     /dev/null  
     /dev/zero  
@@ -265,10 +270,15 @@ container { default_ulimit: "type: soft hard;..." }
     /dev/ptmx  
     /dev/pts/*  
 
-    Container inherits perissmions from parent and cannot surpass them.
-    Permissions could be changes in runtime.
-
     Inside chroots porto creates device nodes in /dev only for allowed devices.
+
+    Device access control could be entirely disabled for containers without
+    chroot by setting property **controllers\[devices\]**=false at
+    first-level container, in this case **devices** must stay unchnaged.
+
+    Container inherits perissmions from parent and cannot surpass them,
+    thus any additional permissions must be granted for first-level container.
+    Configuration could be changes in runtime.
 
     Access to devices for all containers could be also granted in portod.conf:
 ```
