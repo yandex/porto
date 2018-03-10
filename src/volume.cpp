@@ -2243,10 +2243,10 @@ TError TVolume::Destroy() {
 
         for (auto &layer: volume->Layers) {
             TStorage storage(EStorageType::Layer, volume->Place, layer);
-            if (StringStartsWith(layer, PORTO_WEAK_PREFIX)) {
-                error = storage.Remove();
+            if (storage.Weak()) {
+                error = storage.Remove(true);
                 if (error && error != EError::Busy)
-                    L_ERR("Cannot remove weak layer {} : {}", layer, error);
+                    L_WRN("Cannot remove weak layer {} : {}", layer, error);
             } else if (layer[0] != '/')
                 (void)storage.Touch();
         }
@@ -2291,9 +2291,20 @@ TError TVolume::DestroyOne() {
     StorageFd.Close();
 
     if (KeepStorage && !UserStorage() && !RemoteStorage()) {
-        error = TStorage(EStorageType::Storage, Place, Storage).Touch();
-        if (error)
-            L_WRN("Cannot touch storage: {}", error);
+        TStorage storage(EStorageType::Storage, Place, Storage);
+        if (storage.Weak()) {
+            Storage = "";
+            error = storage.Remove(true);
+            Storage = storage.Name;
+            if (error)
+                L_WRN("Cannot remove storage {}: {}", storage.Path, error);
+        } else {
+            error = storage.Touch();
+            if (error)
+                L_WRN("Cannot touch storage: {}", error);
+        }
+        if (error && !ret)
+            ret = error;
     }
 
     if (!KeepStorage && !RemoteStorage() && StoragePath.Exists()) {
@@ -3195,22 +3206,36 @@ void TVolume::RestoreAll(void) {
         }
     }
 
-    L_SYS("Remove stale weak layers...");
+    L_SYS("Remove stale layers...");
 
-    std::list<TStorage> layers;
-
-    error = TStorage(EStorageType::Place, place).List(EStorageType::Layer, layers);
-    if (!error) {
-        for (auto &layer : layers) {
-            if (StringStartsWith(layer.Name, PORTO_WEAK_PREFIX)) {
-
-                error = layer.Remove();
+    std::list<TStorage> storages;
+    error = TStorage(EStorageType::Place, place).List(EStorageType::Layer, storages);
+    if (error) {
+        L_WRN("Layers listing failed : {}", error);
+    } else {
+        for (auto &layer : storages) {
+            if (layer.Weak()) {
+                error = layer.Remove(true);
                 if (error && error != EError::Busy)
-                    L_ERR("Cannot remove weak layer {} : {}", layer.Name, error);
+                    L_WRN("Cannot remove layer {} : {}", layer.Name, error);
             }
         }
+    }
+
+    L_SYS("Remove stale storages...");
+
+    storages.clear();
+    error = TStorage(EStorageType::Place, place).List(EStorageType::Storage, storages);
+    if (error) {
+        L_WRN("Storage listing failed : {}", error);
     } else {
-        L_WRN("Layers listing failed : {}", error);
+        for (auto &storage : storages) {
+            if (storage.Weak()) {
+                error = storage.Remove(true);
+                if (error && error != EError::Busy)
+                    L_WRN("Cannot remove storage {} : {}", storage.Name, error);
+            }
+        }
     }
 }
 

@@ -19,6 +19,7 @@ public:
 
     TPath Path;
     std::string Meta;
+    std::string FirstName;
 
     TCred Owner;
     std::string Private;
@@ -33,10 +34,11 @@ public:
     TError List(enum EStorageType type, std::list<TStorage> &list);
     TError ImportArchive(const TPath &archive, const std::string &compress = "", bool merge = false);
     TError ExportArchive(const TPath &archive, const std::string &compress = "");
-    bool Exists();
-    uint64_t LastUsage();
+    bool Exists() const;
+    bool Weak() const;
+    uint64_t LastUsage() const;
     TError Load();
-    TError Remove();
+    TError Remove(bool weak = false);
     TError Touch();
     TError SaveOwner(const TCred &owner);
     TError SetPrivate(const std::string &text);

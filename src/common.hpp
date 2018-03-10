@@ -111,8 +111,6 @@ constexpr uint64_t RUN_SUBDIR_LIMIT = 100u;
 
 constexpr const char *PORTO_NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
 
-constexpr const char *PORTO_WEAK_PREFIX = "_weak_";
-
 extern void AckExitStatus(int pid);
 
 extern std::string PreviousVersion;

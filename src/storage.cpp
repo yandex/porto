@@ -19,6 +19,7 @@ extern "C" {
 }
 
 static const char LAYER_TMP[] = "_tmp_";
+static const char WEAK_PREFIX[] = "_weak_";
 static const char IMPORT_PREFIX[] = "_import_";
 static const char REMOVE_PREFIX[] = "_remove_";
 static const char PRIVATE_PREFIX[] = "_private_";
@@ -45,10 +46,13 @@ TStorage::TStorage(EStorageType type, const TPath &place, const std::string &nam
     Type = type;
     Place = place;
     Name = name;
+    FirstName = name;
 
     auto sep = name.find('/');
-    if (sep != std::string::npos)
+    if (sep != std::string::npos) {
         Meta = name.substr(0, sep);
+        FirstName = name.substr(sep + 1);
+    }
 
     switch (type) {
     case EStorageType::Place:
@@ -305,11 +309,15 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     return error;
 }
 
-bool TStorage::Exists() {
+bool TStorage::Exists() const {
     return Path.Exists();
 }
 
-uint64_t TStorage::LastUsage() {
+bool TStorage::Weak() const {
+    return StringStartsWith(FirstName, WEAK_PREFIX);
+}
+
+uint64_t TStorage::LastUsage() const {
     return LastChange ? (time(nullptr) - LastChange) : 0;
 }
 
@@ -807,12 +815,12 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
     return error;
 }
 
-TError TStorage::Remove() {
+TError TStorage::Remove(bool weak) {
     TPath temp;
     TError error;
 
     error = CL->CanControlPlace(Place);
-    if (error && !StringStartsWith(Name, PORTO_WEAK_PREFIX))
+    if (error && !weak)
         return error;
 
     error = CheckName(Name);
@@ -828,7 +836,7 @@ TError TStorage::Remove() {
         return error;
 
     error = CL->CanControl(Owner);
-    if (error && !StringStartsWith(Name, PORTO_WEAK_PREFIX))
+    if (error && !weak)
         return TError(error, "Cannot remove {}", Path);
 
     auto lock = LockVolumes();
