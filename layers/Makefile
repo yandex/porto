@@ -4,12 +4,17 @@ NET=NAT
 PORTOCTL=portoctl
 
 define build
-${PORTOCTL} build -o "$1" $2 net="${NET}"
--${PORTOCTL} layer -R "${1:.${COMPRESS}=}"
-${PORTOCTL} layer -I "${1:.${COMPRESS}=}" "$1"
+	${PORTOCTL} build -o "$1" $2 net="${NET}"
+	-${PORTOCTL} layer -R "${1:.${COMPRESS}=}"
+	${PORTOCTL} layer -I "${1:.${COMPRESS}=}" "$1"
 endef
 
-all: put_authorized_keys.sh bootstrap.${COMPRESS} ubuntu-xenial.${COMPRESS}
+define second_layer
+${1}-${2}.${COMPRESS}:
+$(call build,${1}-${2}.${COMPRESS}, -L $1 -S common-update.sh -S $3 -S common-cleanup.sh)
+endef
+
+all: put_authorized_keys.sh bootstrap.${COMPRESS} ubuntu-xenial.${COMPRESS} ubuntu-xenial-devel.${COMPRESS}
 
 clean:
 	rm -f put_authorized_keys.sh *.${COMPRESS}
@@ -42,7 +47,6 @@ ubuntu-precise.${COMPRESS}:
 		-S common-misc.sh \
 		-S common-openssh.sh \
 		-S put_authorized_keys.sh \
-		-S common-devel.sh \
 		-S common-cleanup.sh \
 	)
 
@@ -60,7 +64,6 @@ ubuntu-xenial.${COMPRESS}:
 		-S common-misc.sh \
 		-S common-openssh.sh \
 		-S put_authorized_keys.sh \
-		-S common-devel.sh \
 		-S common-cleanup.sh \
 	)
 
@@ -77,7 +80,6 @@ ubuntu-bionic.${COMPRESS}:
 		-S common-misc.sh \
 		-S common-openssh.sh \
 		-S put_authorized_keys.sh \
-		-S common-devel.sh \
 		-S common-cleanup.sh \
 	)
 
@@ -93,6 +95,10 @@ debian-stretch.${COMPRESS}:
 		-S common-misc.sh \
 		-S common-openssh.sh \
 		-S put_authorized_keys.sh \
-		-S common-devel.sh \
 		-S common-cleanup.sh \
 	)
+
+$(eval $(call second_layer,ubuntu-precise,devel,common-devel.sh))
+$(eval $(call second_layer,ubuntu-xenial,devel,common-devel.sh))
+$(eval $(call second_layer,ubuntu-bionic,devel,common-devel.sh))
+$(eval $(call second_layer,debian-stretch,devel,common-devel.sh))

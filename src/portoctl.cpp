@@ -2281,6 +2281,9 @@ public:
         TLauncher chroot(Api);
         TError error;
 
+        std::string build_script = "porto_build";
+        std::string build_command = "/bin/bash -ex porto_build";
+
         launcher.Container = "portoctl-build-" + std::to_string(GetPid());
         launcher.SetProperty("isolate", "false");
         launcher.SetProperty("net", "NAT");
@@ -2397,7 +2400,7 @@ public:
 
         volume = launcher.Volume.Path;
 
-        volume_script = TPath(volume + "/script");
+        volume_script = volume + "/" + build_script;
         volume_script.Unlink();
         error = volume_script.Mkfile(0644);
         if (error) {
@@ -2435,9 +2438,9 @@ public:
             }
 
             bootstrap.SetProperty("cwd", volume);
-            bootstrap.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
+            bootstrap.SetProperty("command", build_command);
 
-            std::cout << "Starting bootstrap " << bootstrap_script << std::endl;
+            std::cout << "\nStarting bootstrap " << bootstrap_script << " ...\n" << std::endl;
 
             error = bootstrap.Launch();
             if (error) {
@@ -2473,9 +2476,9 @@ public:
             bootstrap2.SetProperty("isolate", "true");
             bootstrap2.SetProperty("net", "inherited");
             bootstrap2.SetProperty("root", volume);
-            bootstrap2.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
+            bootstrap2.SetProperty("command", build_command);
 
-            std::cout << "Starting bootstrap2 " << bootstrap2_script << std::endl;
+            std::cout << "\nStarting bootstrap2 " << bootstrap2_script << " ...\n" << std::endl;
 
             error = bootstrap2.Launch();
             if (error) {
@@ -2498,7 +2501,7 @@ public:
         chroot.SetProperty("net", "inherited");
 
         if (chroot.StartOS)
-            std::cout << "Starting OS" << std::endl;
+            std::cout << "\nStarting OS ..." << std::endl;
 
         error = chroot.Launch();
         if (error) {
@@ -2527,9 +2530,9 @@ public:
             executor.SetProperty("isolate", "false");
             executor.SetProperty("virt_mode", "os");
             executor.SetProperty("net", "inherited");
-            executor.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
+            executor.SetProperty("command", build_command);
 
-            std::cout << "Starting script " << script << std::endl;
+            std::cout << "\nStarting script " << script << " ...\n" << std::endl;
 
             error = executor.Launch();
             if (error) {
@@ -2546,13 +2549,24 @@ public:
             volume_script.WriteAll("");
         }
 
+        error = chroot.StopContainer();
+        if (error) {
+            std::cerr << "Cannot stop chroot container: " << error << std::endl;
+            goto err;
+        }
+
+        if (Api->SetProperty(chroot.Container, "command", "rm " + build_script) ||
+                Api->SetProperty(chroot.Container, "virt_mode", "os") ||
+                Api->Start(chroot.Container) || chroot.WaitContainer(-1)) {
+            std::cerr << "Cannot remove script" << std::endl;
+            goto err;
+        }
+
         if (!scripts.empty() && launcher.StopContainer())
             goto err;
 
-        volume_script.Unlink();
-
         if (!output.IsEmpty()) {
-            std::cout << "Exporting layer into " << output.ToString() << std::endl;
+            std::cout << "\nExporting layer into " << output.ToString() << " ..." << std::endl;
 
             if (Api->ExportLayer(volume, output.ToString(), compression)) {
                 std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
@@ -2561,7 +2575,7 @@ public:
         }
 
         if (squash) {
-            std::cout << "Exporting squashfs into " << outputImage.ToString() << std::endl;
+            std::cout << "\nExporting squashfs into " << outputImage.ToString() << " ..." << std::endl;
 
             if (Api->ExportLayer(volume, outputImage.ToString(), compression)) {
                 std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
@@ -2573,7 +2587,7 @@ public:
             launcher.Cleanup();
 
         if (!outputImage.IsEmpty() && !squash) {
-            std::cout << "Exporting image into " << outputImage.ToString() << std::endl;
+            std::cout << "\nExporting image into " << outputImage.ToString() << " ..." << std::endl;
 
             error = loopImage.Rename(outputImage);
             if (error) {
