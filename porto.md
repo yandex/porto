@@ -35,6 +35,14 @@ Porto requires Linux kernel 3.18 and optionally some offstream patches.
 
 # CONTAINERS
 
+Container is a basic object which holds resources and contains some workload.
+
+Depending on configuration properties container constructs own
+namespaces and cgroups or inherits them from parent container.
+
+Container executes **command** or OS (**virt\_mode**=os) or
+works as _meta_ container for nested sub-containers.
+
 ## Name
 
 Container name could contains only these characters: 'a'..'z', 'A'..'Z', '0'..'9',
@@ -61,11 +69,11 @@ this is common parent for all visible containers.
 ## States
 * **stopped**   - initial state
 * **starting**  - start in progress
-* **running**   - execution in progress
+* **running**   - **command** execution in progress
 * **stopping**  - stop in progress
 * **paused**    - frozen, consumes memory but no cpu
 * **dead**      - execution complete
-* **meta**      - running container without command
+* **meta**      - running container without **command**
 
 ## Operations
 * **create**    - creates new container in stopped state
@@ -107,6 +115,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 * **command** - container command string
 
     Environment variables $VAR are expanded using **wordexp(3)**.
+    Container with empty command is a _meta_ container.
 
 * **core\_command** - command for receiving core dumps
 
@@ -131,8 +140,8 @@ container { default_ulimit: "type: soft hard;..." }
    Hardcoded default is "core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M".
 
 * **virt\_mode** - virtualization mode:
-    - *app* - (default) start command as normal process
-    - *os* - start command as init process
+    - *app* - (default) start **command** as normal process
+    - *os* - start **command** as init process
 
 ## State
 
@@ -681,10 +690,21 @@ container {
 
 * **net\_tx\_packets** - device tx packets: \<interface\>|group \<group\>: \<packets\>;...
 
-L3 network connects host and container netns with veth pair and configures
+# NETWORKING
+
+## L2
+
+Mode net="macvlan eth0 eth0" or net="macvlan eth0 eth0; autoconf eth0" for SLAAC
+creates isolated netns with macvlan eth0 at device eth0. See man **ip-link(8)**.
+
+## L3
+
+Mode net=L3 connects host and container netns with veth pair and configures
 routing in both directions. Also it adds neighbour/arp proxy entries to
 interfaces with addresses from the same network, this way container becomes
-reachable from the outside. This requires sysctl configuration in host:
+reachable from the outside.
+
+Host sysctl configuration:
 ```
 net.ipv4.conf.all.forwarding = 1
 net.ipv6.conf.all.forwarding = 1
@@ -692,7 +712,10 @@ net.ipv6.conf.all.proxy_ndp = 1
 net.ipv6.conf.all.accept_ra = 2
 ```
 
-NAT requires configuration in iptables and in portod.conf:
+## NAT
+
+Mode **net**=NAT works as L3 and automatically allocates IP from pool configured in portod.conf:
+
 ```
 network {
     nat_first_ipv4: "*ip*"
@@ -703,14 +726,20 @@ network {
 
 Example:
 ```
-# iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -j MASQUERADE
-# ip6tables -t nat -A POSTROUTING -s fec0::42:0/120 -j MASQUERADE
 network {
     nat_first_ipv4: "192.168.42.1"
     nat_first_ipv6: "fec0::42:1"
     nat_count: 255
 }
 ```
+
+Host iptables configuration:
+```
+iptables -t nat -A POSTROUTING -s 192.168.42.0/24 -j MASQUERADE
+ip6tables -t nat -A POSTROUTING -s fec0::42:0/120 -j MASQUERADE
+```
+
+## Address label
 
 In new network namespaces porto setup **ip-addrlabel(8)** from portod.conf:
 ```
@@ -722,7 +751,11 @@ network {
         ...
 ```
 
-Porto setup **tc-hfsc(8)** scheduler for all interfaces except listed in
+This helps container to choose correct source IP when it works in several networks.
+
+## Traffic scheduler
+
+Porto setup **tc-hfsc(8)** scheduler for all host interfaces except listed in
 portod.conf as unmanaged:
 ```
 network {
@@ -950,15 +983,8 @@ Most volume backends by default use non-persistent temporary storage:
 If storage is specified then volume becomes persistent and could be
 reconstructed using same storage.
 
-Porto provides internal volume storage similar to layers storage:
+Porto provides internal persistent volume storage,
 data are stored in **place**/porto\_storage/**storage**.
-
-Several volume storages and layers could be enclosed into precreted
-meta-storage which enforces space limit for them all together.
-In this case names of layers and storages have prefix **meta-storage**/
--- **meta-storage**/**sub-layer** and **meta-storage**/**sub-storage**.
-
-For details see **portoctl** command storage and API.
 
 ## Volume Layers
 
@@ -967,7 +993,7 @@ Each layer belongs to particular place and identified by name,
 stored in **place**/porto\_layers/**layer**.
 Porto remembers owner's user:group and time since last usage.
 
-Layer name shouldn't start with '\_'.
+Layer name shouldn't start with '\_', except special prefixes.
 
 Layer which names starts with '\_weak\_' are removed once last their user is gone.
 
@@ -976,6 +1002,16 @@ in overlay or aufs formats. For details see **portoctl** command layers.
 
 For building layers see **portoctl** command build
 and sample scripts in layers/ in porto sources.
+
+## Meta Storage
+
+Several volume storages and layers could be enclosed into precreted
+meta-storage which enforces space limit for them all together.
+
+Such layers and storages have name with prefix **meta-storage**/
+-- **meta-storage**/**sub-layer** and **meta-storage**/**sub-storage**.
+
+For details see **portoctl** command storage and API.
 
 ## Backend LVM
 
@@ -1002,20 +1038,33 @@ $ portoctl exec hello command='echo "Hello, world!"'
 
 Run command in background:
 ```
-$ portoctl run stress command='stress -c 4' cpu\_limit=2.5c
+$ portoctl run stress command='stress -c 4' memory\_limit=1G cpu\_limit=2.5c
 $ portoctl destroy stress
+```
+
+Create volume and destroy:
+```
+$ mkdir volume
+$ portoctl vcreate $PWD/volume space_limit=1G
+$ portoctl vlist -v $PWD/volume
+$ portoctl vunlink $PWD/volume
+$ rmdir volume
 ```
 
 Create volume with automatic path and destroy:
 ```
-$ V=$(portoctl vcreate -A space_limit=1G)
-$ portoctl vunlink $V
+$ VOLUME=$(portoctl vcreate -A space_limit=1G)
+$ portoctl vunlink $VOLUME
 ```
 
 Run os level container and enter inside:
 ```
-portoctl run vm layers=template.tgz space_limit=1G virt_mode=os hostname=vm memory_limit=1G cpu_limit=2c net="L3 eth0" ip="eth0 192.168.1.42"
+portoctl layer -I vm-layer vm-layer.tgz
+portoctl run vm layers=vm-layer space_limit=1G virt_mode=os hostname=vm memory_limit=1G cpu_limit=2c net="L3 eth0" ip="eth0 192.168.1.42"
 portoctl shell vm
+^D
+portoctl destroy vm
+portoctl layer -R vm-layer
 ```
 
 Show containers and resource usage:
