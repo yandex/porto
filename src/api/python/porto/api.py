@@ -241,10 +241,14 @@ class _RPC(object):
 
 class Container(object):
     def __init__(self, conn, name):
+        assert isinstance(conn, Connection)
         self.conn = conn
         self.name = name
 
     def __str__(self):
+        return self.name
+
+    def __repr__(self):
         return 'Container `{}`'.format(self.name)
 
     def __div__(self, child):
@@ -304,29 +308,40 @@ class Container(object):
         return self.conn.ListVolumeLinks(container=self)
 
 class Layer(object):
-    def __init__(self, conn, name, place=None, desc=None):
+    def __init__(self, conn, name, place=None, pb=None):
+        assert isinstance(conn, Connection)
         self.conn = conn
         self.name = name
         self.place = place
-        if desc is None:
-            self.owner_user = ""
-            self.owner_group = ""
-            self.last_usage = None
-            self.private_value = None
-        else:
-            self.owner_user = desc.owner_user
-            self.owner_group = desc.owner_group
-            self.last_usage = desc.last_usage
-            self.private_value = desc.private_value
+        self.owner_user = None
+        self.owner_group = None
+        self.last_usage = None
+        self.private_value = None
+        if pb is not None:
+            self.Update(pb)
+
+    def Update(self, pb=None):
+        if pb is None:
+            pb = self.conn._ListLayers(self.place, self.name).layers[0]
+        self.owner_user = pb.owner_user
+        self.owner_group = pb.owner_group
+        self.last_usage = pb.last_usage
+        self.private_value = pb.private_value
 
     def __str__(self):
-        return 'Layer `{}` at {}'.format(self.name, self.place or "(default)")
+        return self.name
+
+    def __repr__(self):
+        return 'Layer `{}` at `{}`'.format(self.name, self.place or "/place")
 
     def Merge(self, tarball, private_value=None):
         self.conn.MergeLayer(self.name, tarball, place=self.place, private_value=private_value)
 
     def Remove(self):
         self.conn.RemoveLayer(self.name, place=self.place)
+
+    def Export(self, tarball, compress=None):
+        self.conn.ReExportLayer(self.name, place=self.place, tarball=tarball, compress=compress)
 
     def GetPrivate(self):
         return self.conn.GetLayerPrivate(self.name, place=self.place)
@@ -336,30 +351,107 @@ class Layer(object):
 
 
 class Storage(object):
-    def __init__(self, conn, name, place):
+    def __init__(self, conn, name, place, pb=None):
+        assert isinstance(conn, Connection)
         self.conn = conn
         self.name = name
         self.place = place
+        self.private_value = None
+        self.owner_user = None
+        self.owner_group = None
+        self.last_usage = None
+        if pb is not None:
+            self.Update(pb)
 
     def __str__(self):
-        return 'Storage `{}`'.format(self.name)
+        return self.name
 
-    def GetProperties(self):
-        result = {}
-        p = self.conn._ListStorage(self.place, self.name)[0]
-        result["name"] = p.name
-        result["private_value"] = p.private_value
-        result["owner_user"] = p.owner_user
-        result["owner_group"] = p.owner_group
-        result["last_usage"] = p.last_usage
+    def __repr__(self):
+        return 'Storage `{}` at `{}`'.format(self.name, self.place or "/place")
 
-        return result
+    def Update(self, pb=None):
+        if pb is None:
+            pb = self.conn._ListStorages(self.place, self.name).storages[0]
+        self.private_value = pb.private_value
+        self.owner_user = pb.owner_user
+        self.owner_group = pb.owner_group
+        self.last_usage = pb.last_usage
+        return self
 
     def GetProperty(self, name):
-        return self.GetProperties()[name]
+        self.Update().getattr(name)
 
-    def RemoveStorage(self):
-        return self.conn.RemoveStorage(self.name, self.place)
+    def Remove(self):
+        self.conn.RemoveStorage(self.name, self.place)
+
+    def Import(self, tarball):
+        self.conn.ImportStorage(self.name, place=self.place, tarball=tarball, private_value=self.private_value)
+        self.Update()
+
+    def Export(self, tarball):
+        self.conn.ExportStorage(self.name, place=self.place, tarball=tarball)
+
+class MetaStorage(object):
+    def __init__(self, conn, name, place, pb=None):
+        assert isinstance(conn, Connection)
+        self.conn = conn
+        self.name = name
+        self.place = place
+        self.private_value = None
+        self.owner_user = None
+        self.owner_group = None
+        self.last_usage = None
+        self.space_limit = None
+        self.inode_limit = None
+        self.space_used = None
+        self.inode_used = None
+        self.space_available = None
+        self.inode_available = None
+        if pb is not None:
+            self.Update(pb)
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return 'MetaStorage `{}` at `{}`'.format(self.name, self.place or "/place")
+
+    def Update(self, pb=None):
+        if pb is None:
+            pb = self.conn._ListStorages(self.place, self.name).meta_storages[0]
+        self.private_value = pb.private_value
+        self.owner_user = pb.owner_user
+        self.owner_group = pb.owner_group
+        self.last_usage = pb.last_usage
+        self.space_limit = pb.space_limit
+        self.inode_limit = pb.inode_limit
+        self.space_used = pb.space_used
+        self.inode_used = pb.inode_used
+        self.space_available = pb.space_available
+        self.inode_available = pb.inode_available
+        return self
+
+    def GetProperty(self, name):
+        self.Update().getattr(name)
+
+    def Resize(self, private_value=None, space_limit=None, inode_limit=None):
+        self.conn.ResizeMetaStorage(self.name, self.place, private_value, space_limit, inode_limit)
+        self.Update()
+
+    def Remove(self):
+        self.conn.RemoveMetaStorage(self.name, self.place)
+
+    def ListLayers(self):
+        return self.conn.ListLayers(place=self.place, mask=self.name + "/*")
+
+    def ListStorages(self):
+        return self.conn.ListStorages(place=self.place, mask=self.name + "/*")
+
+    def FindLayer(self, subname):
+        return self.conn.FindLayer(self.name + "/" + subname, place=self.place)
+
+    def FindStorage(self, subname):
+        return self.conn.FindStorage(self.name + "/" + subname, place=self.place)
 
 class VolumeLink(object):
     def __init__(self, volume, container, target, read_only, required):
@@ -369,63 +461,105 @@ class VolumeLink(object):
         self.read_only = read_only
         self.required = required
 
-    def __str__(self):
+    def __repr__(self):
         return 'VolumeLink `{}` `{}` `{}`'.format(self.volume.path, self.container.name, self.target)
 
     def Unlink(self):
         self.volume.Unlink(container)
 
 class Volume(object):
-    def __init__(self, conn, path):
+    def __init__(self, conn, path, pb=None):
+        assert isinstance(conn, Connection)
         self.conn = conn
         self.path = path
+        if pb is not None:
+            self.Update(pb)
+
+    def Update(self, pb=None):
+        if pb is None:
+            pb = self.conn._ListVolumes(path=self.path)[0]
+
+        self.containers = [Container(self.conn, c) for c in pb.containers]
+        self.properties = {p.name: p.value for p in pb.properties}
+        self.place = self.properties.get('place')
+        self.private_value = self.properties.get('private')
+        self.id = self.properties.get('id')
+        self.state = self.properties.get('state')
+        self.backend = self.properties.get('backend')
+        self.read_only = self.properties.get('read_only') == "true"
+        self.owner_user = self.properties.get('owner_user')
+        self.owner_group = self.properties.get('owner_group')
+
+        if 'owner_container' in self.properties:
+            self.owner_container = Container(self.conn, self.properties.get('owner_container'))
+        else:
+            self.owner_container = None
+
+        layers = self.properties.get('layers', "")
+        layers = layers.split(';') if layers else []
+        self.layers = [Layer(self.conn, l, self.place) for l in layers]
+
+        if self.properties.get('storage') and self.properties['storage'][0] != '/':
+            self.storage = Storage(self.conn, self.properties['storage'], place=self.place)
+        else:
+            self.storage = None
+
+        for name in ['space_limit', 'inode_limit', 'space_used', 'inode_used', 'space_available', 'inode_available', 'space_guarantee', 'inode_guarantee']:
+            setattr(self, name, int(self.properties[name]) if name in self.properties else None)
+
+        return self
 
     def __str__(self):
+        return self.path
+
+    def __repr__(self):
         return 'Volume `{}`'.format(self.path)
 
     def __getitem__(self, property):
-        return self.conn.GetVolumeProperties(self.path)[property]
+        self.Update()
+        return getattr(self, property)
 
     def __setitem__(self, property, value):
-        self.conn.TuneVolume(self.path, **{property: value})
-
-    def GetProperty(self, property):
-        return self.conn.GetVolumeProperties(self.path)[property]
+        self.Tune(**{property: value})
+        self.Update()
 
     def GetProperties(self):
-        return self.conn.GetVolumeProperties(self.path)
+        self.Update()
+        return self.properties
+
+    def GetProperty(self, property):
+        self.Update()
+        return getattr(self, property)
 
     def GetContainers(self):
-        return [Container(self.conn, c) for c in self.conn._ListVolumes(path=self.path)[0].containers]
+        self.Update()
+        return self.containers
 
     def ListVolumeLinks(self):
         return self.conn.ListVolumeLinks(volume=self)
 
     def GetLayers(self):
-        properties = self.GetProperties()
-        place = properties.get('place')
-        layers = properties['layers']
-        layers = layers.split(';') if layers else []
-        return [Layer(self.conn, l, place) for l in layers]
+        self.Update()
+        return self.layers
 
-    def Link(self, container, *args, **kwargs):
+    def Link(self, container=None, target=None, read_only=False, required=False):
         if isinstance(container, Container):
             container = container.name
-        self.conn.LinkVolume(self.path, container, *args, **kwargs)
+        self.conn.LinkVolume(self.path, container, target=target, read_only=read_only, required=required)
 
     def Unlink(self, container=None, strict=None):
         if isinstance(container, Container):
             container = container.name
         self.conn.UnlinkVolume(self.path, container, strict)
 
-    def Destroy(self):
-        self.conn.UnlinkVolume(self.path, '***')
-
     def Tune(self, **properties):
         self.conn.TuneVolume(self.path, **properties)
 
-    def Export(self, tarball):
-        self.conn.ExportLayer(self.path, tarball)
+    def Export(self, tarball, compress=None):
+        self.conn.ExportLayer(self.path, place=self.place, tarball=tarball, compress=compress)
+
+    def Destroy(self):
+        self.conn.UnlinkVolume(self.path, '***')
 
 
 class Connection(object):
@@ -628,10 +762,13 @@ class Connection(object):
             raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
         return resp.wait.name
 
-    def CreateVolume(self, path=None, layers=[], **properties):
+    def CreateVolume(self, path=None, layers=[], storage=None, **properties):
         if layers:
             layers = [l.name if isinstance(l, Layer) else l for l in layers]
             properties['layers'] = ';'.join(layers)
+
+        if storage is not None:
+            properties['storage'] = str(storage)
 
         request = rpc_pb2.TContainerRequest()
         request.createVolume.CopyFrom(rpc_pb2.TVolumeCreateRequest())
@@ -640,11 +777,12 @@ class Connection(object):
         for name, value in properties.iteritems():
             prop = request.createVolume.properties.add()
             prop.name, prop.value = name, value
-        return Volume(self, self.rpc.call(request, self.rpc.timeout).volume.path)
+        pb = self.rpc.call(request, self.rpc.timeout).volume
+        return Volume(self, pb.path, pb)
 
     def FindVolume(self, path):
-        self._ListVolumes(path=path)
-        return Volume(self, path)
+        pb = self._ListVolumes(path=path)[0]
+        return Volume(self, path, pb)
 
     def LinkVolume(self, path, container, target=None, read_only=False, required=False):
         request = rpc_pb2.TContainerRequest()
@@ -692,13 +830,13 @@ class Connection(object):
         return self.rpc.call(request, self.rpc.timeout).volumeList.volumes
 
     def ListVolumes(self, container=None):
-        return [Volume(self, v.path) for v in self._ListVolumes(container)]
+        return [Volume(self, v.path, v) for v in self._ListVolumes(container)]
 
     def ListVolumeLinks(self, volume=None, container=None):
         links = []
-        for v in self.conn._ListVolumes(path=volume.path if isinstance(volume, Volume) else volume, container=container):
+        for v in self._ListVolumes(path=volume.path if isinstance(volume, Volume) else volume, container=container):
             for l in v.links:
-                links.append(VolumeLink(Volume(self, v.path), Container(self, l.container), l.target, l.read_only, l.required))
+                links.append(VolumeLink(Volume(self, v.path, v), Container(self, l.container), l.target, l.read_only, l.required))
         return links
 
     def GetVolumeProperties(self, path):
@@ -761,19 +899,25 @@ class Connection(object):
             request.setlayerprivate.place = place
         self.rpc.call(request, self.rpc.timeout)
 
-    def ExportLayer(self, volume, tarball):
+    def ExportLayer(self, volume, tarball, place=None, compress=None):
         request = rpc_pb2.TContainerRequest()
         request.exportLayer.volume = volume
         request.exportLayer.tarball = tarball
+        if place is not None:
+            request.exportLayer.place = place
+        if compress is not None:
+            request.exportLayer.compress = compress
         self.rpc.call(request, self.rpc.timeout)
 
-    def ReExportLayer(self, layer, tarball, place=None):
+    def ReExportLayer(self, layer, tarball, place=None, compress=None):
         request = rpc_pb2.TContainerRequest()
         request.exportLayer.volume = ""
         request.exportLayer.layer = layer
         request.exportLayer.tarball = tarball
         if place is not None:
             request.exportLayer.place = place
+        if compress is not None:
+            request.exportLayer.compress = compress
         self.rpc.call(request, self.rpc.timeout)
 
     def _ListLayers(self, place=None, mask=None):
@@ -799,17 +943,32 @@ class Connection(object):
             return Layer(self, layer, place, response.layers[0])
         return Layer(self, layer, place)
 
-    def _ListStorage(self, place=None, mask=None):
+    def _ListStorages(self, place=None, mask=None):
         request = rpc_pb2.TContainerRequest()
         request.listStorage.CopyFrom(rpc_pb2.TStorageListRequest())
         if place is not None:
             request.listStorage.place = place
         if mask is not None:
             request.listStorage.mask = mask
-        return self.rpc.call(request, self.rpc.timeout).storageList.storages
+        return self.rpc.call(request, self.rpc.timeout).storageList
 
-    def ListStorage(self, place=None, mask=None):
-        return [Storage(self, s.name, place) for s in self._ListStorage(place, mask)]
+    def ListStorages(self, place=None, mask=None):
+        return [Storage(self, s.name, place, s) for s in self._ListStorages(place, mask).storages]
+
+    def FindStorage(self, name, place=None):
+        response = self._ListStorages(place, name)
+        if not response.storages:
+            raise exceptions.VolumeNotFound("storage `%s` not found" % name)
+        return Storage(self, name, place, response.storages[0])
+
+    def ListMetaStorages(self, place=None, mask=None):
+        return [MetaStorage(self, s.name, place, s) for s in self._ListStorages(place, mask).meta_storages]
+
+    def FindMetaStorage(self, name, place=None):
+        response = self._ListStorages(place, name)
+        if not response.meta_storages:
+            raise exceptions.VolumeNotFound("meta storage `%s` not found" % name)
+        return MetaStorage(self, name, place, response.meta_storages[0])
 
     def RemoveStorage(self, name, place=None):
         request = rpc_pb2.TContainerRequest()
@@ -835,6 +994,40 @@ class Connection(object):
         request.exportStorage.tarball = tarball
         if place is not None:
             request.exportStorage.place = place
+        self.rpc.call(request, self.rpc.timeout)
+
+    def CreateMetaStorage(self, name, place=None, private_value=None, space_limit=None, inode_limit=None):
+        request = rpc_pb2.TContainerRequest()
+        request.CreateMetaStorage.name = name
+        if place is not None:
+            request.CreateMetaStorage.place = place
+        if private_value is not None:
+            request.CreateMetaStorage.private_value = private_value
+        if space_limit is not None:
+            request.CreateMetaStorage.space_limit = space_limit
+        if inode_limit is not None:
+            request.CreateMetaStorage.inode_limit = inode_limit
+        self.rpc.call(request, self.rpc.timeout)
+        return MetaStorage(self, name, place)
+
+    def ResizeMetaStorage(self, name, place=None, private_value=None, space_limit=None, inode_limit=None):
+        request = rpc_pb2.TContainerRequest()
+        request.ResizeMetaStorage.name = name
+        if place is not None:
+            request.ResizeMetaStorage.place = place
+        if private_value is not None:
+            request.ResizeMetaStorage.private_value = private_value
+        if space_limit is not None:
+            request.ResizeMetaStorage.space_limit = space_limit
+        if inode_limit is not None:
+            request.ResizeMetaStorage.inode_limit = inode_limit
+        self.rpc.call(request, self.rpc.timeout)
+
+    def RemoveMetaStorage(self, name, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.RemoveMetaStorage.name = name
+        if place is not None:
+            request.RemoveMetaStorage.place = place
         self.rpc.call(request, self.rpc.timeout)
 
     def ConvertPath(self, path, source, destination):

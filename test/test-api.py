@@ -19,6 +19,8 @@ c.Version()
 c.ListContainers()
 c.ListVolumes()
 c.ListLayers()
+c.ListStorages()
+c.ListMetaStorages()
 
 r = c.Find("/")
 r.GetData('cpu_usage')
@@ -31,6 +33,12 @@ volume_size = 256*(2**20)
 volume_size_eps = 40*(2**20) # loop/ext4: 5% reserve + 256 byte inode per 4k of data
 volume_path = "/tmp/" + prefix + "layer"
 tarball_path = "/tmp/" + prefix + "layer.tgz"
+storage_tarball_path = "/tmp/" + prefix + "storage.tgz"
+storage_name = prefix + "volume_storage"
+meta_storage_name = prefix + "meta_storage"
+storage_in_meta = meta_storage_name + "/storage"
+layer_in_meta = meta_storage_name + "/layer"
+
 
 # CLEANUP
 
@@ -52,6 +60,24 @@ if not Catch(c.FindLayer, layer_name):
 
 if os.access(tarball_path, os.F_OK):
     os.unlink(tarball_path)
+
+if os.access(storage_tarball_path, os.F_OK):
+    os.unlink(storage_tarball_path)
+
+for l in c.ListLayers():
+    if l.name == layer_in_meta:
+        l.Remove()
+
+for st in c.ListStorages():
+    if st.name == storage_in_meta:
+        st.Remove()
+
+for ms in c.ListMetaStorages():
+    if ms.name == meta_storage_name:
+        ms.Remove()
+
+
+# CONTAINERS
 
 assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
 assert not container_name in c.List()
@@ -112,6 +138,9 @@ a = c.Run(container_name, command="sleep 5")
 assert a["command"] == "sleep 5"
 a.Destroy()
 
+
+# LAYERS
+
 c.ListVolumes()
 v = c.CreateVolume(private=volume_private)
 v.GetProperties()
@@ -130,6 +159,12 @@ l.SetPrivate("123654")
 assert l.GetPrivate() == "123654"
 l.SetPrivate("AbC")
 assert l.GetPrivate() == "AbC"
+
+l.Update()
+assert l.owner_user == "porto-alice"
+assert l.owner_group == "porto-alice"
+assert l.last_usage >= 0
+assert l.private_value == "AbC"
 
 assert Catch(c.GetLayerPrivate, "my1980") == porto.exceptions.LayerNotFound
 assert Catch(c.SetLayerPrivate, "my1980", "my1980") == porto.exceptions.LayerNotFound
@@ -165,8 +200,11 @@ assert int(w.GetProperty("space_available")) < volume_size_eps
 
 a = c.Create(container_name)
 w.Link(a)
+assert len(w.GetContainers()) == 2
+assert len(w.ListVolumeLinks()) == 2
 w.Unlink()
 assert len(w.GetContainers()) == 1
+assert len(w.ListVolumeLinks()) == 1
 assert w.GetContainers()[0].name == container_name
 assert Catch(l.Remove) == porto.exceptions.Busy
 
@@ -182,6 +220,65 @@ c.DestroyVolume(v.path)
 l.Remove()
 os.rmdir(volume_path)
 
+
+# STORAGE
+
+v = c.CreateVolume(storage=storage_name, private=volume_private)
+assert v.storage.name == storage_name
+assert c.FindStorage(storage_name).name == storage_name
+v.Destroy()
+
+st = c.FindStorage(storage_name)
+assert st.private_value == volume_private
+st.Export(storage_tarball_path)
+st.Remove()
+assert Catch(c.FindStorage, storage_name) == porto.exceptions.VolumeNotFound
+st = c.ImportStorage(storage_name, storage_tarball_path, private_value=volume_private)
+assert c.FindStorage(storage_name).name == storage_name
+st.Remove()
+os.unlink(storage_tarball_path)
+
+# META STORAGE
+
+ms = c.CreateMetaStorage(meta_storage_name, space_limit=2**20)
+
+ml = c.ImportLayer(layer_in_meta, tarball_path)
+assert c.FindLayer(layer_in_meta).name == layer_in_meta
+assert ms.FindLayer("layer").name == layer_in_meta
+assert len(ms.ListLayers()) == 1
+
+assert Catch(ms.Remove) == porto.exceptions.Busy
+
+ms.Update()
+assert ms.space_limit == 2**20
+assert 0 < ms.space_available < 2**20
+assert 0 < ms.space_used < 2**20
+assert ms.space_used + ms.space_available == ms.space_limit
+
+ms.Resize(space_limit=2**30)
+assert ms.space_limit == 2**30
+
+v = c.CreateVolume(storage=storage_in_meta, private=volume_private, layers=[ml])
+st = ms.FindStorage("storage")
+assert st.name == storage_in_meta
+assert c.FindStorage(storage_in_meta).name == storage_in_meta
+assert len(ms.ListStorages()) == 1
+v.Destroy()
+
+ml.Remove()
+
+st.Export(storage_tarball_path)
+st.Remove()
+assert len(ms.ListStorages()) == 0
+st.Import(storage_tarball_path)
+assert len(ms.ListStorages()) == 1
+st.Remove()
+
+ms.Remove()
+
+
+# WEAK CONTAINERS
+
 a = c.CreateWeakContainer(container_name)
 a.SetProperty("command", "sleep 60")
 a.Start()
@@ -192,6 +289,9 @@ if Catch(c.Find, container_name) != porto.exceptions.ContainerDoesNotExist:
     assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
 
 Catch(c.Destroy, container_name)
+
+
+# PID and RECONNECT
 
 c2 = porto.Connection(auto_reconnect=False)
 c2.connect()
