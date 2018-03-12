@@ -1,3 +1,16 @@
+yandex-porto (4.10.4) unstable; urgency=low
+
+  * porto: update documentaion about device permissions
+  * network: log L3 devices configuration
+  * container: restore start_time for meta containers at upgrade
+  * path: use fts_open without stat if possible
+  * portoctl build: prevent ssh reconfiguration when building second layer
+  * storage: handle weak layers and storages in meta-storage
+  * porto: update documentation
+  * network: reconnect netlink socket
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 12 Mar 2018 10:01:25 +0300
+
 yandex-porto (4.10.3) unstable; urgency=low
 
   * container: dynamic symlink update
