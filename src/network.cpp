@@ -321,7 +321,7 @@ TNetwork::TNetwork() : NatBitmap(0, 0) {
 }
 
 TNetwork::~TNetwork() {
-    PORTO_ASSERT(!NetUsers);
+    PORTO_ASSERT(NetUsers.empty());
     PORTO_ASSERT(NetClasses.empty());
     PORTO_ASSERT(!NetInode);
 }
@@ -438,7 +438,7 @@ TError TNetwork::Open(const TPath &path, TNamespaceFd &netns,
 void TNetwork::Destroy() {
     TError error;
 
-    PORTO_ASSERT(!NetUsers);
+    PORTO_ASSERT(NetUsers.empty());
 
     auto networks_lock = LockNetworks();
     Unregister();
@@ -1236,6 +1236,36 @@ void TNetwork::FatalError(TError &error) {
         NetError = error;
 }
 
+TError TNetwork::Reconnect() {
+    TNamespaceFd netns, cur_ns;
+    TError error;
+
+    if (this == HostNetwork.get())
+        return Nl->Connect();
+
+    error = cur_ns.Open("/proc/thread-self/ns/net");
+    if (error)
+        return error;
+
+    auto state_lock = LockNetState();
+    for (auto ct: NetUsers) {
+        error = netns.Open(ct->Task.Pid, "ns/net");
+        if (!error && netns.Inode() != NetInode)
+            error = TError(EError::Unknown, "Wrong net-ns inode");
+        if (!error)
+            error = netns.SetNs(CLONE_NEWNET);
+        if (!error)
+            error = Nl->Connect();
+        if (!error)
+            break;
+    }
+    state_lock.unlock();
+
+    TError error2 = cur_ns.SetNs(CLONE_NEWNET);
+    PORTO_ASSERT(!error2);
+    return error;
+}
+
 TError TNetwork::RepairLocked() {
     bool force = NetError != EError::Queued;
     TError error;
@@ -1243,6 +1273,13 @@ TError TNetwork::RepairLocked() {
     NetError = TError::Queued();
 
     error = SyncDevices();
+    if (error) {
+        L_NET("Reconnect network {} netlink after: {}", NetName, error);
+        error = Reconnect();
+        if (error)
+            L_NET("Cannot reconnect network {} netlink: {}", NetName, error);
+        error = SyncDevices();
+    }
     if (error) {
         FatalError(error);
         return error;
@@ -1564,7 +1601,7 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
         ct.Net->RegisterClass(ct.NetClass);
         ct.Net->InitStat(ct.NetClass);
     }
-    ct.Net->NetUsers++;
+    ct.Net->NetUsers.push_back(&ct);
     lock.unlock();
 
     task.NetFd = std::move(env.NetNs);
@@ -1591,7 +1628,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
     if (ct.Controllers & CGROUP_NETCLS)
         net->UnregisterClass(ct.NetClass);
 
-    bool last = !--net->NetUsers;
+    net->NetUsers.remove(&ct);
+    bool last = net->NetUsers.empty();
 
     state_lock.unlock();
 
@@ -1721,7 +1759,7 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
     }
 
     ct.Net = net;
-    net->NetUsers++;
+    net->NetUsers.push_back(&ct);
 
     return OK;
 }
