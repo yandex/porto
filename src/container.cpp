@@ -2128,7 +2128,6 @@ TError TContainer::StartTask() {
 
     /* Applied by starting task */
     TestClearPropDirty(EProperty::RESOLV_CONF);
-    TestClearPropDirty(EProperty::DEVICE_CONF);
 
     error = ApplyDynamicProperties();
     if (error)
