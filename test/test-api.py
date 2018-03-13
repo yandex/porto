@@ -22,6 +22,8 @@ c.ListLayers()
 c.ListStorages()
 c.ListMetaStorages()
 
+c.ListStorage()
+
 r = c.Find("/")
 r.GetData('cpu_usage')
 

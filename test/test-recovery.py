@@ -591,7 +591,7 @@ def TestPersistentStorage():
 
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
-    ExpectEq(len(c.ListStorage()), 1)
+    ExpectEq(len(c.ListStorages()), 1)
 
     r.SetProperty("root", base.path)
     r.SetProperty("command", "bash -c \'echo 123 > 123.txt\'")
@@ -603,7 +603,7 @@ def TestPersistentStorage():
     subprocess.check_call([portod, "restart"])
     AsAlice()
 
-    ExpectEq(len(c.ListStorage()), 1)
+    ExpectEq(len(c.ListStorages()), 1)
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
 
@@ -617,7 +617,7 @@ def TestPersistentStorage():
 
     os.mkdir(base.path + "/loop")
     loop = c.CreateVolume(base.path + "/loop", backend="loop", storage="test-persistent-loop", space_limit="1G")
-    ExpectEq(len(c.ListStorage()), 2)
+    ExpectEq(len(c.ListStorages()), 2)
 
     r.SetProperty("command", "bash -c \'echo 789 > /loop/loop.txt\'")
     r.Start()
@@ -628,7 +628,7 @@ def TestPersistentStorage():
     subprocess.check_call([portod, "restart"])
     AsAlice()
 
-    ExpectEq(len(c.ListStorage()), 2)
+    ExpectEq(len(c.ListStorages()), 2)
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
     loop = c.CreateVolume(base.path + "/loop", backend="loop", storage="test-persistent-loop", space_limit="1G")
@@ -643,11 +643,11 @@ def TestPersistentStorage():
     ExpectException(c.RemoveStorage, porto.exceptions.Busy, "test-persistent-loop")
     loop.Unlink()
     c.RemoveStorage("test-persistent-loop")
-    ExpectEq(len(c.ListStorage()), 1)
+    ExpectEq(len(c.ListStorages()), 1)
 
     os.mkdir(base.path + "/native")
     native = c.CreateVolume(base.path + "/native", backend="native", storage="test-persistent-native")
-    ExpectEq(len(c.ListStorage()), 2)
+    ExpectEq(len(c.ListStorages()), 2)
 
     r.SetProperty("command", "bash -c \'echo abcde > /native/abcde.txt\'")
     r.Start()
@@ -657,12 +657,12 @@ def TestPersistentStorage():
     AsRoot()
     subprocess.check_call([portod, "restart"])
     AsAlice()
-    ExpectEq(len(c.ListStorage()), 2)
+    ExpectEq(len(c.ListStorages()), 2)
 
     r = c.Create("test")
     base = c.CreateVolume(None, layers=["ubuntu-precise"], storage="test-persistent-base")
     native = c.CreateVolume(base.path + "/native", backend="native", storage="test-persistent-native")
-    ExpectEq(len(c.ListStorage()), 2)
+    ExpectEq(len(c.ListStorages()), 2)
 
     r.SetProperty("root", base.path)
     r.SetProperty("command", "cat /native/abcde.txt")
@@ -682,7 +682,7 @@ def TestPersistentStorage():
     os.mkdir("/tmp/test-recover-place/porto_storage")
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native", private="some_private_value")
-    ExpectEq(len(c.ListStorage(place="/tmp/test-recover-place")), 1)
+    ExpectEq(len(c.ListStorages(place="/tmp/test-recover-place")), 1)
     f = open(v.path + "/test.txt", "w")
     f.write("testtesttest")
     f.close()
@@ -692,16 +692,16 @@ def TestPersistentStorage():
     AsAlice()
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native")
-    ExpectEq(len(c.ListStorage(place="/tmp/test-recover-place")), 1)
-    s = c.ListStorage(place="/tmp/test-recover-place")[0]
+    ExpectEq(len(c.ListStorages(place="/tmp/test-recover-place")), 1)
+    s = c.ListStorages(place="/tmp/test-recover-place")[0]
     ExpectProp(s, "private_value", "some_private_value")
     f = open(v.path + "/test.txt", "r").read() == "testtesttest\n"
 
     v.Unlink()
     c.RemoveStorage("test", place="/tmp/test-recover-place")
 
-    ExpectEq(len(c.ListStorage(place="/tmp/test-recover-place")), 0)
-    ExpectEq(len(c.ListStorage()), 0)
+    ExpectEq(len(c.ListStorages(place="/tmp/test-recover-place")), 0)
+    ExpectEq(len(c.ListStorages()), 0)
 
 
 
@@ -733,14 +733,14 @@ for v in c.ListVolumes():
     except:
         pass
 
-for s in c.ListStorage():
+for s in c.ListStorages():
     try:
         s.RemoveStorage()
     except:
         pass
 
 if os.path.exists("/tmp/test-recover-place"):
-    for s in c.ListStorage(place="/tmp/test-recover-place"):
+    for s in c.ListStorages(place="/tmp/test-recover-place"):
         try:
             s.RemoveStorage()
         except:

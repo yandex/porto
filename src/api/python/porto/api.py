@@ -961,6 +961,10 @@ class Connection(object):
     def ListStorages(self, place=None, mask=None):
         return [Storage(self, s.name, place, s) for s in self._ListStorages(place, mask).storages]
 
+    # deprecated
+    def ListStorage(self, place=None, mask=None):
+        return [Storage(self, s.name, place, s) for s in self._ListStorages(place, mask).storages]
+
     def FindStorage(self, name, place=None):
         response = self._ListStorages(place, name)
         if not response.storages:
