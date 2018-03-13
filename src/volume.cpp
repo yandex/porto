@@ -2553,6 +2553,7 @@ TError TVolume::UnlinkVolume(std::shared_ptr<TContainer> container, const TPath 
     auto volumes_lock = LockVolumes();
     std::shared_ptr<TVolumeLink> link;
     bool all = target.ToString() == "***";
+    bool was_linked = false;
 
 next:
     for (auto &l: Links) {
@@ -2562,10 +2563,11 @@ next:
         }
     }
     if (!link) {
-        if (all)
+        if (was_linked)
             return OK;
         return TError(EError::VolumeNotLinked, "Container {} is not linked with volume {}", container->Name, Path);
     }
+    was_linked = true;
 
     /* If strict then fail if volume is used */
 
