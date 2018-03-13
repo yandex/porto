@@ -1,3 +1,12 @@
+yandex-porto (4.10.5) unstable; urgency=low
+
+  * volume: wildcard unlink should fail if volume has no links with container
+  * python api: add meta storages
+  * container: apply device permissions at start
+  * test: add test for devices
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 13 Mar 2018 11:35:18 +0300
+
 yandex-porto (4.10.4) unstable; urgency=low
 
   * porto: update documentaion about device permissions
