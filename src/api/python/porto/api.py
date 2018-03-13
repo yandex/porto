@@ -378,9 +378,6 @@ class Storage(object):
         self.last_usage = pb.last_usage
         return self
 
-    def GetProperty(self, name):
-        self.Update().getattr(name)
-
     def Remove(self):
         self.conn.RemoveStorage(self.name, self.place)
 
@@ -430,9 +427,6 @@ class MetaStorage(object):
         self.space_available = pb.space_available
         self.inode_available = pb.inode_available
         return self
-
-    def GetProperty(self, name):
-        self.Update().getattr(name)
 
     def Resize(self, private_value=None, space_limit=None, inode_limit=None):
         self.conn.ResizeMetaStorage(self.name, self.place, private_value, space_limit, inode_limit)
@@ -530,7 +524,7 @@ class Volume(object):
 
     def GetProperty(self, property):
         self.Update()
-        return getattr(self, property)
+        return self.properties[property]
 
     def GetContainers(self):
         self.Update()

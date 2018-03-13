@@ -693,8 +693,9 @@ def TestPersistentStorage():
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native")
     ExpectEq(len(c.ListStorages(place="/tmp/test-recover-place")), 1)
+    ExpectEq(v.GetProperty('private'), "some_private_value")
     s = c.ListStorages(place="/tmp/test-recover-place")[0]
-    ExpectProp(s, "private_value", "some_private_value")
+    ExpectEq(s.private_value, "some_private_value")
     f = open(v.path + "/test.txt", "r").read() == "testtesttest\n"
 
     v.Unlink()

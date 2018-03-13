@@ -235,13 +235,18 @@ assert v.GetProperty("private") == volume_private
 assert c.FindStorage(storage_name).name == storage_name
 v.Destroy()
 
+v = c.CreateVolume(storage=storage_name)
+assert v.private_value == volume_private
+v.Destroy()
+
 st = c.FindStorage(storage_name)
 assert st.private_value == volume_private
 st.Export(storage_tarball_path)
 st.Remove()
 assert Catch(c.FindStorage, storage_name) == porto.exceptions.VolumeNotFound
-st = c.ImportStorage(storage_name, storage_tarball_path, private_value=volume_private)
-assert c.FindStorage(storage_name).name == storage_name
+c.ImportStorage(storage_name, storage_tarball_path, private_value=volume_private)
+st = c.FindStorage(storage_name)
+assert st.private_value == volume_private
 st.Remove()
 os.unlink(storage_tarball_path)
 
