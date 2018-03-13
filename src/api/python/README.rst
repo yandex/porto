@@ -15,10 +15,6 @@ List all properties::
 
     >>> print rpc.Plist()
 
-List data::
-
-    >>> print rpc.Dlist()
-
 Get *command* property of container *test*::
 
     >>> print rpc.GetProperty('test', 'command')

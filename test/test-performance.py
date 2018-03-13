@@ -129,7 +129,7 @@ class Executor(object):
 
     @measure_time
     def Get(self, ct):
-        return ct.Get(self.Conn.Dlist())
+        return ct.Get(self.Conn.Plist())
 
     @measure_time
     def _Wait(self, ct):

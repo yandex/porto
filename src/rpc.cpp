@@ -563,6 +563,19 @@ noinline TError ListProperty(rpc::TContainerResponse &rsp) {
     return OK;
 }
 
+noinline TError ListDataProperty(rpc::TContainerResponse &rsp) {
+    auto list = rsp.mutable_datalist();
+    for (auto &elem : ContainerProperties) {
+        auto &prop = elem.second;
+        if (!prop->IsReadOnly || !prop->IsSupported || prop->IsHidden)
+             continue;
+         auto entry = list->add_list();
+         entry->set_name(prop->Name);
+         entry->set_desc(prop->GetDesc());
+     }
+     return OK;
+}
+
 noinline TError Kill(const rpc::TContainerKillRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
@@ -1361,7 +1374,7 @@ void HandleRpcRequest(const rpc::TContainerRequest &req,
     else if (req.has_propertylist())
         error = ListProperty(rsp);
     else if (req.has_datalist())
-        error = OK; // deprecated
+        error = ListDataProperty(rsp); // deprecated
     else if (req.has_kill())
         error = Kill(req.kill());
     else if (req.has_version())
