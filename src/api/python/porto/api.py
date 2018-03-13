@@ -482,6 +482,7 @@ class Volume(object):
         self.containers = [Container(self.conn, c) for c in pb.containers]
         self.properties = {p.name: p.value for p in pb.properties}
         self.place = self.properties.get('place')
+        self.private = self.properties.get('private')
         self.private_value = self.properties.get('private')
         self.id = self.properties.get('id')
         self.state = self.properties.get('state')
@@ -610,10 +611,12 @@ class Connection(object):
     def CreateWeakContainer(self, name):
         return self.Create(name, weak=True)
 
-    def Run(self, name, weak=True, start=True, root_volume=None, **kwargs):
+    def Run(self, name, weak=True, start=True, root_volume=None, private_value=None, **kwargs):
         ct = self.Create(name, weak=True)
         for property, value in kwargs.iteritems():
             ct.SetProperty(property, value)
+        if private_value is not None:
+            ct.SetProperty('private', private_value)
         if root_volume is not None:
             root = self.CreateVolume(containers=name, **root_volume)
             ct.SetProperty('root', root.path)
@@ -762,13 +765,16 @@ class Connection(object):
             raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
         return resp.wait.name
 
-    def CreateVolume(self, path=None, layers=[], storage=None, **properties):
+    def CreateVolume(self, path=None, layers=[], storage=None, private_value=None, **properties):
         if layers:
             layers = [l.name if isinstance(l, Layer) else l for l in layers]
             properties['layers'] = ';'.join(layers)
 
         if storage is not None:
             properties['storage'] = str(storage)
+
+        if private_value is not None:
+            properties['private'] = private_value
 
         request = rpc_pb2.TContainerRequest()
         request.createVolume.CopyFrom(rpc_pb2.TVolumeCreateRequest())

@@ -134,8 +134,9 @@ c.Destroy(a)
 assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
 assert not container_name in c.List()
 
-a = c.Run(container_name, command="sleep 5")
+a = c.Run(container_name, command="sleep 5", private_value=volume_private)
 assert a["command"] == "sleep 5"
+assert a["private"] == volume_private
 a.Destroy()
 
 
@@ -223,8 +224,12 @@ os.rmdir(volume_path)
 
 # STORAGE
 
-v = c.CreateVolume(storage=storage_name, private=volume_private)
+v = c.CreateVolume(storage=storage_name, private_value=volume_private)
 assert v.storage.name == storage_name
+assert v.private == volume_private
+assert v.private_value == volume_private
+assert v["private"] == volume_private
+assert v.GetProperty("private") == volume_private
 assert c.FindStorage(storage_name).name == storage_name
 v.Destroy()
 
