@@ -309,7 +309,9 @@ TError TMountNamespace::MountSystemd() {
     if (!error)
         error = systemd.Mount("cgroup", "cgroup", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, { "name=systemd" });
     if (!error)
-        error = systemd_rw.BindRemount(systemd_rw, MS_NOSUID | MS_NOEXEC | MS_NODEV);
+        error = systemd_rw.Bind(systemd_rw);
+    if (!error)
+        error = systemd_rw.Remount(MS_BIND | MS_NOSUID | MS_NOEXEC | MS_NODEV, MS_RDONLY);
 
     return error;
 }
