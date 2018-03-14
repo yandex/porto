@@ -16,6 +16,9 @@ c.Dlist()
 c.Vlist()
 c.Version()
 
+c.ContainerProperties()
+c.VolumeProperties()
+
 c.ListContainers()
 c.ListVolumes()
 c.ListLayers()

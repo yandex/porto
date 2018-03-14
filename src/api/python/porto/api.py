@@ -38,11 +38,11 @@ def _VarintDecoder(mask):
 
     local_ord = ord
 
-    def DecodeVarint(buffer, pos):
+    def DecodeVarint(buf, pos):
         result = 0
         shift = 0
         while 1:
-            b = local_ord(buffer[pos])
+            b = local_ord(buf[pos])
             result |= ((b & 0x7f) << shift)
             pos += 1
             if not (b & 0x80):
@@ -216,11 +216,11 @@ class Container(object):
             return Container(self.conn, child)
         return Container(self.conn, self.name + "/" + child)
 
-    def __getitem__(self, property):
-        return self.conn.GetProperty(self.name, property)
+    def __getitem__(self, key):
+        return self.conn.GetProperty(self.name, key)
 
-    def __setitem__(self, property, value):
-        return self.conn.SetProperty(self.name, property, value)
+    def __setitem__(self, key, value):
+        return self.conn.SetProperty(self.name, key, value)
 
     def Start(self):
         self.conn.Start(self.name)
@@ -246,11 +246,11 @@ class Container(object):
     def GetProperties(self):
         return self.Get(self.conn.Plist())
 
-    def GetProperty(self, property, sync=False):
-        return self.conn.GetProperty(self.name, property, sync)
+    def GetProperty(self, key, sync=False):
+        return self.conn.GetProperty(self.name, key, sync)
 
-    def SetProperty(self, property, value):
-        self.conn.SetProperty(self.name, property, value)
+    def SetProperty(self, key, value):
+        self.conn.SetProperty(self.name, key, value)
 
     def GetData(self, data, sync=False):
         return self.conn.GetData(self.name, data, sync)
@@ -474,21 +474,21 @@ class Volume(object):
     def __repr__(self):
         return 'Volume `{}`'.format(self.path)
 
-    def __getitem__(self, property):
+    def __getitem__(self, key):
         self.Update()
-        return getattr(self, property)
+        return getattr(self, key)
 
-    def __setitem__(self, property, value):
-        self.Tune(**{property: value})
+    def __setitem__(self, key, value):
+        self.Tune(**{key: value})
         self.Update()
 
     def GetProperties(self):
         self.Update()
         return self.properties
 
-    def GetProperty(self, property):
+    def GetProperty(self, key):
         self.Update()
-        return self.properties[property]
+        return self.properties[key]
 
     def GetContainers(self):
         self.Update()
@@ -520,6 +520,18 @@ class Volume(object):
     def Destroy(self, timeout=None):
         self.conn.UnlinkVolume(self.path, '***', timeout=timeout)
 
+class Property(object):
+    def __init__(self, name, desc, read_only, dynamic):
+        self.name = name
+        self.desc = desc
+        self.read_only = read_only
+        self.dynamic = dynamic
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return 'Property `{}` `{}`'.format(self.name, self.desc)
 
 class Connection(object):
     def __init__(self,
@@ -579,8 +591,8 @@ class Connection(object):
 
     def Run(self, name, weak=True, start=True, root_volume=None, private_value=None, **kwargs):
         ct = self.Create(name, weak=True)
-        for property, value in kwargs.iteritems():
-            ct.SetProperty(property, value)
+        for key, value in kwargs.iteritems():
+            ct.SetProperty(key, value)
         if private_value is not None:
             ct.SetProperty('private', private_value)
         if root_volume is not None:
@@ -654,10 +666,10 @@ class Connection(object):
             res[container.name] = var
         return res
 
-    def GetProperty(self, name, property, sync=False):
+    def GetProperty(self, name, key, sync=False):
         request = rpc_pb2.TContainerRequest()
         request.getProperty.name = name
-        request.getProperty.property = property
+        request.getProperty.property = key
         request.getProperty.sync = sync
         res = self.rpc.call(request).getProperty.value
         if res == 'false':
@@ -666,7 +678,7 @@ class Connection(object):
             return True
         return res
 
-    def SetProperty(self, name, property, value):
+    def SetProperty(self, name, key, value):
         if value is False:
             value = 'false'
         elif value is True:
@@ -678,7 +690,7 @@ class Connection(object):
 
         request = rpc_pb2.TContainerRequest()
         request.setProperty.name = name
-        request.setProperty.property = property
+        request.setProperty.property = key
         request.setProperty.value = value
         self.rpc.call(request)
 
@@ -698,11 +710,28 @@ class Connection(object):
             return True
         return res
 
+    def ContainerProperties(self):
+        request = rpc_pb2.TContainerRequest()
+        request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
+        res = {}
+        for prop in self.rpc.call(request).propertyList.list:
+            res[prop.name] = Property(prop.name, prop.desc, prop.read_only, prop.dynamic)
+        return res
+
+    def VolumeProperties(self):
+        request = rpc_pb2.TContainerRequest()
+        request.listVolumeProperties.CopyFrom(rpc_pb2.TVolumePropertyListRequest())
+        res = {}
+        for prop in self.rpc.call(request).volumePropertyList.properties:
+            res[prop.name] = Property(prop.name, prop.desc, False, False)
+        return res
+
     def Plist(self):
         request = rpc_pb2.TContainerRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
         return [item.name for item in self.rpc.call(request).propertyList.list]
 
+    # deprecated - now they properties
     def Dlist(self):
         request = rpc_pb2.TContainerRequest()
         request.dataList.CopyFrom(rpc_pb2.TContainerDataListRequest())
