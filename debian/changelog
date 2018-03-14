@@ -1,3 +1,16 @@
+yandex-porto (4.10.7) unstable; urgency=low
+
+  * python/api: remove GetProperty from Storage and MetaStorage
+  * python/api: refactor timeout engine
+  * python/api: handle negative timeout as infinite
+  * python/api: add class to describe properties
+  * porto: create dynamic devices and symlinks in correct namespace
+  * porto: enable devices controller for containers with chroot
+  * python/api: fix wait timeout less than 1 second
+  * porto: do not hang at logging stacktrace
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 14 Mar 2018 16:50:49 +0300
+
 yandex-porto (4.10.6) unstable; urgency=low
 
   * python/api: add volume property alias "private_value" for "private"
