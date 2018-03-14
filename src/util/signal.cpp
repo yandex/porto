@@ -20,6 +20,9 @@ void Crash() {
 }
 
 void FatalSignal(int sig) {
+    /* don't hang */
+    alarm(5);
+
     L_ERR("Fatal signal: {}", std::string(strsignal(sig)));
     Stacktrace();
 
