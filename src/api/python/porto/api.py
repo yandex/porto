@@ -89,7 +89,7 @@ class _RPC(object):
                 raise exceptions.SocketError("Porto socket connected by other pid {}".format(self.sock_pid))
 
     def _set_deadline(self, timeout):
-        if timeout is None:
+        if timeout is None or timeout < 0:
             self.deadline = None
         else:
             self.deadline = time.time() + timeout
@@ -136,16 +136,22 @@ class _RPC(object):
 
         with self.lock:
             self._set_deadline(self.timeout)
+            request_deadline = self.deadline
+
             while True:
+                self.deadline = request_deadline
                 self._check_deadline()
+
                 try:
                     self._check_connect()
                     self._set_socket_timeout()
                     self.sock.sendall(req)
-                    if call_timeout is None:
+
+                    if call_timeout is None or call_timeout < 0:
                         self.deadline = None
                     elif self.deadline is not None:
                         self.deadline += call_timeout
+
                     rsp = self._recv_response()
                 except socket.timeout as e:
                     self.sock = None
@@ -252,6 +258,10 @@ class Container(object):
     def SetSymlink(self, symlink, target):
         return self.conn.SetSymlink(self.name, symlink, target)
 
+    def WaitContainer(self, timeout=None):
+        return self.conn.WaitContainers([self.name], timeout=timeout)
+
+    # legacy compat - timeout in ms
     def Wait(self, *args, **kwargs):
         return self.conn.Wait([self.name], *args, **kwargs)
 
@@ -627,9 +637,6 @@ class Connection(object):
         if nonblock:
             request.get.nonblock = nonblock
         resp = self.rpc.call(request)
-        if resp.error != rpc_pb2.Success:
-            raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
-
         res = {}
         for container in resp.get.list:
             var = {}
@@ -707,21 +714,25 @@ class Connection(object):
         result = self.rpc.call(request).volumePropertyList.properties
         return [prop.name for prop in result]
 
-    def Wait(self, containers, timeout=None, timeout_s=None):
+    def WaitContainers(self, containers, timeout=None):
         request = rpc_pb2.TContainerRequest()
-        request.wait.name.extend(containers)
-        if timeout_s is not None:
-            timeout = timeout_s * 1000
+        request.wait.name.extend(map(str, containers))
         if timeout is not None and timeout >= 0:
-            request.wait.timeout_ms = int(timeout)
-            resp = self.rpc.call(request, timeout / 1000)
+            request.wait.timeout_ms = int(timeout * 1000)
         else:
-            resp = self.rpc.call(request, None)
-        if resp.error != rpc_pb2.Success:
-            raise exceptions.PortoException.Create(resp.error, resp.errorMsg)
+            timeout = None
+        resp = self.rpc.call(request, timeout)
         return resp.wait.name
 
-    def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, **properties):
+    # legacy compat - timeout in ms
+    def Wait(self, containers, timeout=None, timeout_s=None):
+        if timeout_s is not None:
+            timeout = timeout_s
+        elif timeout is not None and timeout >= 0:
+            timeout = timeout / 1000
+        return self.WaitContainers(containers, timeout)
+
+    def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
         if layers:
             layers = [l.name if isinstance(l, Layer) else l for l in layers]
             properties['layers'] = ';'.join(layers)
@@ -739,7 +750,7 @@ class Connection(object):
         for name, value in properties.iteritems():
             prop = request.createVolume.properties.add()
             prop.name, prop.value = name, value
-        pb = self.rpc.call(request).volume
+        pb = self.rpc.call(request, timeout or self.disk_timeout).volume
         return Volume(self, pb.path, pb)
 
     def FindVolume(self, path):
