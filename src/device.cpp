@@ -239,6 +239,8 @@ TError TDevices::Parse(const std::string &str) {
         error = device.Parse(cfg);
         if (error)
             return error;
+        if (device.MayRead || device.MayWrite || !device.MayMknod)
+            NeedCgroup = true;
         Devices.push_back(device);
     }
 
@@ -268,7 +270,7 @@ TError TDevices::Makedev(const TPath &root) const {
     TError error;
 
     for (auto &device: Devices) {
-        if (device.MayRead || device.MayWrite) {
+        if (device.MayRead || device.MayWrite || device.MayMknod) {
             error = device.Makedev(root);
             if (error)
                 return error;
@@ -340,7 +342,11 @@ TError TDevices::InitDefault() {
     return OK;
 }
 
-void TDevices::Merge(const TDevices &devices, bool overwrite) {
+void TDevices::Merge(const TDevices &devices, bool overwrite, bool replace) {
+    if (replace) {
+        for (auto &device: Devices)
+            device.MayRead = device.MayWrite = device.MayMknod = false;
+    }
     for (auto &device: devices.Devices) {
         bool found = false;
         for (auto &d: Devices) {

@@ -1771,7 +1771,6 @@ TError TContainer::PrepareOomMonitor() {
 }
 
 TError TContainer::ApplyDeviceConf() const {
-    TCgroup cg = GetCgroup(DevicesSubsystem);
     TError error;
 
     if (IsRoot())
@@ -1781,9 +1780,12 @@ TError TContainer::ApplyDeviceConf() const {
     if (error)
         return error;
 
-    error = Devices.Apply(cg);
-    if (error)
-        return error;
+    if (Controllers & CGROUP_DEVICES) {
+        TCgroup cg = GetCgroup(DevicesSubsystem);
+        error = Devices.Apply(cg);
+        if (error)
+            return error;
+    }
 
     if (State != EContainerState::Starting && Task.Pid && !RootPath.IsRoot()) {
         error = Devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
@@ -1903,12 +1905,14 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    /* Nested cgroup makes a copy from parent at creation */
-    if (Level == 1 && (Controllers & CGROUP_DEVICES)) {
+    if (Controllers & CGROUP_DEVICES) {
         TCgroup devcg = GetCgroup(DevicesSubsystem);
-        error = RootContainer->Devices.Apply(devcg, true);
-        if (error)
-            return error;
+        /* Nested cgroup makes a copy from parent at creation */
+        if (Level == 1 || TPath(devcg.Name).IsSimple()) {
+            error = RootContainer->Devices.Apply(devcg, true);
+            if (error)
+                return error;
+        }
     }
 
     if (Controllers & CGROUP_NETCLS) {
@@ -3487,6 +3491,11 @@ TTuple TContainer::Taint() {
             taint.push_back("First level container without pid namespace.");
         if (!(Controllers & CGROUP_DEVICES))
             taint.push_back("First level container without devices cgroup.");
+    }
+
+    if (Root != "/") {
+        if (!(Controllers & CGROUP_DEVICES))
+            taint.push_back("Container with chroot and without devices cgroup.");
     }
 
     if (AccessLevel >= EAccessLevel::Normal) {

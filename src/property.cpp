@@ -791,6 +791,12 @@ public:
         return OK;
     }
     TError Set(const std::string &root) {
+        TError error;
+
+        error = CT->EnableControllers(CGROUP_DEVICES);
+        if (error)
+            return error;
+
         CT->Root = root;
         CT->SetProp(EProperty::ROOT);
         return OK;
@@ -1189,7 +1195,6 @@ public:
             "Devices that container can access: <device> [r][w][m][-] [path] [mode] [user] [group]; ...")
     {
         IsDynamic = true;
-        RequireControllers = CGROUP_DEVICES;
     }
     TError Get(std::string &value) {
         value = CT->Devices.Format();
@@ -1200,9 +1205,27 @@ public:
         TError error = devices.Parse(value);
         if (error)
             return error;
-        CT->Devices = devices;
+        if (devices.NeedCgroup) {
+            error = CT->EnableControllers(CGROUP_DEVICES);
+            if (error)
+                return error;
+        }
+        CT->Devices.Merge(devices, true, true);
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        TDevices devices;
+        TError error = devices.Parse(index + " " + value);
+        if (error)
+            return error;
+        if (devices.NeedCgroup) {
+            error = CT->EnableControllers(CGROUP_DEVICES);
+            if (error)
+                return error;
+        }
+        CT->Devices.Merge(devices, true);
+        CT->SetProp(EProperty::DEVICE_CONF);
     }
 } static Devices;
 

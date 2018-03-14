@@ -38,6 +38,7 @@ struct TDevice {
 
 struct TDevices {
     std::vector<TDevice> Devices;
+    bool NeedCgroup = false;
 
     TError Parse(const std::string &str);
     std::string Format() const;
@@ -47,5 +48,5 @@ struct TDevices {
     TError Apply(const TCgroup &cg, bool reset = false) const;
 
     TError InitDefault();
-    void Merge(const TDevices &devices, bool overwrite = false);
+    void Merge(const TDevices &devices, bool overwrite = false, bool replace = false);
 };
