@@ -758,7 +758,7 @@ class Connection(object):
         if timeout_s is not None:
             timeout = timeout_s
         elif timeout is not None and timeout >= 0:
-            timeout = timeout / 1000
+            timeout = timeout / 1000.
         return self.WaitContainers(containers, timeout)
 
     def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
