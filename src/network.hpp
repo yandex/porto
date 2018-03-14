@@ -135,7 +135,7 @@ class TNetwork : public TNonCopyable {
     void RegisterClass(TNetClass &cls);
     void UnregisterClass(TNetClass &cls);
 
-    unsigned NetUsers = 0;
+    std::list<TContainer *> NetUsers;
 
     ino_t NetInode = 0;
 
@@ -152,6 +152,7 @@ class TNetwork : public TNonCopyable {
     TError TrySetupClasses(TNetClass &cls);
 
     void SyncStatLocked();
+    TError Reconnect();
     TError RepairLocked();
 
     /* Something went wrong, handled by Repair */

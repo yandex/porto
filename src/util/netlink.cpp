@@ -85,6 +85,8 @@ TError TNl::Connect() {
     int ret;
     TError error;
 
+    Disconnect();
+
     Sock = nl_socket_alloc();
     if (!Sock)
         return TError("Cannot allocate netlink socket");
