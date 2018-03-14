@@ -1,3 +1,12 @@
+yandex-porto (4.6.6) unstable; urgency=low
+
+  * network: reconnect netlink socket
+  * python/api: backport methods for tests
+  * test: add test for devices
+  * cgroup: fix permissions for systemd cgroup in container
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 14 Mar 2018 08:25:48 +0300
+
 yandex-porto (4.6.5) unstable; urgency=low
 
   * test: binds by default read-write
