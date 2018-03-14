@@ -1785,8 +1785,8 @@ TError TContainer::ApplyDeviceConf() const {
     if (error)
         return error;
 
-    if (State != EContainerState::Starting && WaitTask.Pid && !RootPath.IsRoot()) {
-        error = Devices.Makedev(fmt::format("/proc/{}/root", WaitTask.Pid));
+    if (State != EContainerState::Starting && Task.Pid && !RootPath.IsRoot()) {
+        error = Devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
         if (error)
             return error;
     }
@@ -1803,7 +1803,7 @@ TError TContainer::SetSymlink(const TPath &symlink, const TPath &target) {
         mnt.Root = Root;
         mnt.BindCred = TaskCred;
 
-        error = mnt.Enter(WaitTask.Pid);
+        error = mnt.Enter(Task.Pid);
         if (error)
             return error;
 

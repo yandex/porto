@@ -51,3 +51,10 @@ ExpectEq(os.path.lexists(a['root'] + "/a"), False)
 ExpectEq(os.path.lexists(a['root'] + "/foo/bar/baz"), False)
 
 a.Destroy()
+
+m = c.Run("m")
+a = c.Run("m/a", root_volume={"layers": ["ubuntu-precise"]})
+a["symlink"] = "/a: /b"
+ExpectEq(os.path.lexists(a['root'] + "/a"), True)
+a.Destroy()
+m.Destroy()

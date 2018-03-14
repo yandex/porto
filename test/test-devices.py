@@ -57,6 +57,16 @@ a.Destroy()
 
 m.Destroy()
 
+m = c.Run("m", devices="/dev/ram0 rw")
+b = c.Run("m/b", root_volume={"layers": ["ubuntu-precise"]}, devices="/dev/ram0 -")
+b["devices"] = "/dev/ram0 rw"
+a = c.Run("m/b/a", command="dd if=/dev/ram0 of=/dev/null count=1")
+a.Wait()
+ExpectEq(a["exit_code"], "0")
+a.Destroy()
+b.Destroy()
+m.Destroy()
+
 AsRoot()
 
 os.chmod("/dev/ram0", 0660)
