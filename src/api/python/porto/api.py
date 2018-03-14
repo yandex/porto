@@ -246,6 +246,12 @@ class Container(object):
         self.conn = conn
         self.name = name
 
+    def __getitem__(self, property):
+        return self.conn.GetProperty(self.name, property)
+
+    def __setitem__(self, property, value):
+        return self.conn.SetProperty(self.name, property, value)
+
     def Start(self):
         self.conn.Start(self.name)
 
@@ -437,6 +443,21 @@ class Connection(object):
         request.createWeak.name = name
         self.rpc.call(request, self.rpc.timeout)
         return Container(self, name)
+
+    def Run(self, name, weak=True, start=True, root_volume=None, private_value=None, **kwargs):
+        ct = self.CreateWeakContainer(name)
+        for property, value in kwargs.iteritems():
+            ct.SetProperty(property, value)
+        if private_value is not None:
+            ct.SetProperty('private', private_value)
+        if root_volume is not None:
+            root = self.CreateVolume(containers=name, **root_volume)
+            ct.SetProperty('root', root.path)
+        if start:
+            ct.Start()
+        if not weak:
+            ct.SetProperty('weak', False)
+        return ct
 
     def Destroy(self, container):
         if isinstance(container, Container):
