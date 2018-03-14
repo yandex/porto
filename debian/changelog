@@ -1,3 +1,10 @@
+yandex-porto (4.6.7) unstable; urgency=low
+
+  * porto: create dynamic devices and symlinks in correct namespace
+  * porto: do not hang at logging stacktrace
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 14 Mar 2018 18:11:02 +0300
+
 yandex-porto (4.6.6) unstable; urgency=low
 
   * network: reconnect netlink socket
