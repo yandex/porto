@@ -1741,7 +1741,7 @@ TError TContainer::PrepareOomMonitor() {
 
 TError TContainer::ApplyDeviceConf() const {
     TMultiTuple allow = SplitEscapedString(DeviceConf, ' ', ';');
-    TPath root = fmt::format("/proc/{}/root", WaitTask.Pid);
+    TPath root = fmt::format("/proc/{}/root", Task.Pid);
     TCgroup cg = GetCgroup(DevicesSubsystem);
     TDevice device;
     TError error;
