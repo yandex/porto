@@ -255,6 +255,11 @@ container { default_ulimit: "type: soft hard;..." }
     Container owned by root by default have all these capabilities and
     ignore any restrictions.
 
+    These capabilities are *not available* by default:
+    SYS\_RAWIO, SYS\_TIME, SYS\_MODULE, IPC\_OWNER, DAC\_READ\_SEARCH,
+    LEASE, SYSLOG, MAC\_OVERRIDE, MAC\_ADMIN, AUDIT\_CONTROL, AUDIT\_READ,
+    NET\_BROADCAST, SYS\_PACCT, SYS\_TTY\_CONFIG, WAKE\_ALARM, BLOCK\_SUSPEND.
+
 * **capabilities\_ambient** - raise ambient capabilities, syntax: CAP;... see **capabilities(7)**
 
     All tasks in container will have these capabilities.
