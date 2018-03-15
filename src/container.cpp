@@ -1909,7 +1909,8 @@ TError TContainer::PrepareCgroups() {
         TCgroup devcg = GetCgroup(DevicesSubsystem);
         /* Nested cgroup makes a copy from parent at creation */
         if (Level == 1 || TPath(devcg.Name).IsSimple()) {
-            error = RootContainer->Devices.Apply(devcg, true);
+            /* at restore child cgroups blocks reset */
+            error = RootContainer->Devices.Apply(devcg, State == EContainerState::Starting);
             if (error)
                 return error;
         }
