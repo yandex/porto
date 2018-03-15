@@ -3242,7 +3242,7 @@ void TVolume::RestoreAll(void) {
 }
 
 TError TVolume::ApplyConfig(const TStringMap &cfg) {
-    TError error;
+    TError error, ret;
 
     for (auto &prop : cfg) {
         if (prop.first == V_PATH) {
@@ -3250,8 +3250,6 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_AUTO_PATH) {
             error = StringToBool(prop.second, IsAutoPath);
-            if (error)
-                return error;
 
         } else if (prop.first == V_STORAGE) {
             Storage = prop.second;
@@ -3267,28 +3265,18 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_OWNER_USER) {
             error = UserId(prop.second, VolumeOwner.Uid);
-            if (error)
-                return error;
 
         } else if (prop.first == V_OWNER_GROUP) {
             error = GroupId(prop.second, VolumeOwner.Gid);
-            if (error)
-                return error;
 
         } else if (prop.first == V_USER) {
             error = UserId(prop.second, VolumeCred.Uid);
-            if (error)
-                return error;
 
         } else if (prop.first == V_GROUP) {
             error = GroupId(prop.second, VolumeCred.Gid);
-            if (error)
-                return error;
 
         } else if (prop.first == V_PERMISSIONS) {
             error = StringToOct(prop.second, VolumePerms);
-            if (error)
-                return error;
 
         } else if (prop.first == V_CREATOR) {
             Creator = prop.second;
@@ -3299,10 +3287,8 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
         } else if (prop.first == V_READY) {
             bool ready;
             error = StringToBool(prop.second, ready);
-            if (error)
-                return error;
-
-            SetState(ready ? EVolumeState::Ready : EVolumeState::ToDestroy);
+            if (!error)
+                SetState(ready ? EVolumeState::Ready : EVolumeState::ToDestroy);
 
         } else if (prop.first == V_BUILD_TIME) {
             BuildTime = prop.second;
@@ -3312,16 +3298,22 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else if (prop.first == V_RAW_CONTAINERS) {
             auto containers_lock = LockContainers();
-            TError ret;
 
             /* container target ro|rw host-target */
             for (auto &l: SplitEscapedString(prop.second, ' ', ';')) {
                 std::shared_ptr<TContainer> ct;
+
                 error = TContainer::Find(l[0], ct);
                 if (error) {
+                    L_WRN("Missing container {}", l[0]);
                     if (!ret)
                         ret = error;
-                    ct = RootContainer; /* placeholder */
+
+                    if (l.size() > 4) {
+                        l[1] = "";
+                        ct = RootContainer; /* placeholder */
+                    } else
+                        continue;
                 }
                 auto link = std::make_shared<TVolumeLink>(shared_from_this(), ct);
                 if (l.size() > 1)
@@ -3338,20 +3330,13 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
                 ct->VolumeLinks.emplace_back(link);
             }
 
-            if (ret)
-                return ret;
-
         } else if (prop.first == V_CONTAINERS) {
 
         } else if (prop.first == V_LOOP_DEV) {
             error = StringToInt(prop.second, Device);
-            if (error)
-                return error;
 
         } else if (prop.first == V_READ_ONLY) {
             error = StringToBool(prop.second, IsReadOnly);
-            if (error)
-                return error;
 
         } else if (prop.first == V_LAYERS) {
             Layers = SplitEscapedString(prop.second, ';');
@@ -3359,34 +3344,26 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
         } else if (prop.first == V_SPACE_LIMIT) {
             uint64_t limit;
             error = StringToSize(prop.second, limit);
-            if (error)
-                return error;
-
-            SpaceLimit = limit;
+            if (!error)
+                SpaceLimit = limit;
 
         } else if (prop.first == V_SPACE_GUARANTEE) {
             uint64_t guarantee;
             error = StringToSize(prop.second, guarantee);
-            if (error)
-                return error;
-
-            SpaceGuarantee = guarantee;
+            if (!error)
+                SpaceGuarantee = guarantee;
 
         } else if (prop.first == V_INODE_LIMIT) {
             uint64_t limit;
             error = StringToSize(prop.second, limit);
-            if (error)
-                return error;
-
-            InodeLimit = limit;
+            if (!error)
+                InodeLimit = limit;
 
         } else if (prop.first == V_INODE_GUARANTEE) {
             uint64_t guarantee;
             error = StringToSize(prop.second, guarantee);
-            if (error)
-                return error;
-
-            InodeGuarantee = guarantee;
+            if (!error)
+                InodeGuarantee = guarantee;
 
         } else if (prop.first == V_PLACE) {
             Place = prop.second;
@@ -3394,7 +3371,10 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
         } else
             L_WRN("Skip unknown volume property {} = {}", prop.first, prop.second);
+
+        if (error && !ret)
+            ret = error;
     }
 
-    return OK;
+    return ret;
 }
