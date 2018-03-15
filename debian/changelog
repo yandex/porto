@@ -1,3 +1,12 @@
+yandex-porto (4.10.8) unstable; urgency=low
+
+  * volume: restore state for destroying when linked containers are missing
+  * test/devices: check restore nested cgroup
+  * devices: do not reset first level cgroup at restore
+  * porto: document removed capabilities
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 15 Mar 2018 17:07:12 +0300
+
 yandex-porto (4.10.7) unstable; urgency=low
 
   * python/api: remove GetProperty from Storage and MetaStorage
