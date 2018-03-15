@@ -1,5 +1,6 @@
 import sys
 import os
+import signal
 import pwd
 import grp
 import time
@@ -130,6 +131,9 @@ def GetMasterPid():
     pid = int(open("/run/portoloop.pid").read())
     open("/proc/" + str(pid) + "/status").readline().index("portod-master")
     return pid
+
+def ReloadPortod():
+    os.kill(GetMasterPid(), signal.SIGHUP)
 
 def GetState(pid):
     if isinstance(pid, int):

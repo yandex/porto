@@ -122,4 +122,11 @@ m.Destroy()
 
 AsRoot()
 
+a = c.Run("a", weak=False, **{"controllers[devices]": "true"})
+b = c.Run("a/b", weak=False, **{"controllers[devices]": "true"})
+ReloadPortod()
+assert b["state"] == "meta"
+b.Destroy()
+a.Destroy()
+
 os.chmod("/dev/ram0", 0660)
