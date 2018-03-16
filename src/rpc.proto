@@ -59,6 +59,8 @@ enum EError {
     // Error code is lost or came from future
     LostError = 23;
 
+    DeviceNotFound = 24;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }

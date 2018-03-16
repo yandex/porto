@@ -1737,8 +1737,8 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestClearPropDirty(EProperty::DEVICE_CONF)) {
         error = ApplyDeviceConf();
-        if (error) {
-            L_ERR("Cannot change allowed devices: {}", error);
+        if (error && error.Error != EError::DeviceNotFound) {
+            L_WRN("Cannot change allowed devices: {}", error);
             return error;
         }
     }

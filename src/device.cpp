@@ -26,11 +26,14 @@ TError TDevice::Init(const TPath &path) {
         return error;
 
     error = path.StatFollow(st);
-    if (error)
+    if (error) {
+        if (error.Errno == ENOENT)
+            return TError(EError::DeviceNotFound, "Device {} does not exists", Path);
         return error;
+    }
 
     if (!S_ISCHR(st.st_mode) && !S_ISBLK(st.st_mode))
-        return TError(EError::InvalidValue, "Not a device node: {}", path);
+        return TError(EError::DeviceNotFound, "Not a device node: {}", path);
 
     Path = path;
     PathInside = path;
@@ -183,8 +186,11 @@ TError TDevice::Permitted(const TCred &cred) const {
         return OK;
 
     TError error = Path.StatFollow(st);
-    if (error)
+    if (error) {
+        if (error.Errno == ENOENT)
+            return TError(EError::DeviceNotFound, "Device {} does not exists", Path);
         return error;
+    }
 
     if (MayRead && !TFile::Access(st, cred, TFile::R))
         return TError(EError::Permission, "{} cannot read device {}", cred.ToString(), Path);
