@@ -1,3 +1,10 @@
+yandex-porto (4.10.9) unstable; urgency=low
+
+  * devices: do not log error if requested device doesn't exist
+  * porto: fix crash at invalid command
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 16 Mar 2018 17:46:07 +0300
+
 yandex-porto (4.10.8) unstable; urgency=low
 
   * volume: restore state for destroying when linked containers are missing
