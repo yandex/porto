@@ -180,7 +180,7 @@ TError TTaskEnv::ChildExec() {
     int ret = wordexp(CT->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
-        return TError(EError::InvalidCommand, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
+        return TError(EError::InvalidCommand, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {{, }}");
     case WRDE_BADVAL:
         return TError(EError::InvalidCommand, "wordexp(): undefined shell variable was referenced");
     case WRDE_CMDSUB:
