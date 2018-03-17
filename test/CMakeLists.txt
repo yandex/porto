@@ -44,6 +44,7 @@ set_tests_properties(go_api
                      ENVIRONMENT GOPATH=${CMAKE_SOURCE_DIR}:/usr/share/gocode)
 endif()
 
+ADD_PYTHON_TEST(ct-state)
 ADD_PYTHON_TEST(knobs)
 ADD_PYTHON_TEST(mount)
 ADD_PYTHON_TEST(symlink)
