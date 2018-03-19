@@ -2,6 +2,7 @@
 Description=Porto service
 After=network-online.target
 Requires=network-online.target
+ConditionVirtualization=!container
 Documentation=https://github.com/yandex/porto
 
 [Service]
