@@ -12,14 +12,15 @@ static double ParseValue(const std::string &value, bool map) {
         return ParseNumber(value);
 
     double ret = 0;
-    unsigned long start_v = 0;
-    for (unsigned long off = 0; off < value.length(); off++) {
-        if (value[off] == ':')
-            start_v = off + 2; // key: value
-        else if (value[off] == ';')
-            ret += ParseNumber(value.substr(start_v, off - start_v));
+    TUintMap tmp;
+    if (!StringToUintMap(value, tmp)) {
+        for (auto it: tmp) {
+            /* FIXME sum ethX as uplink */
+            if (StringStartsWith(it.first, "eth"))
+                ret += it.second;
+        }
     }
-    return ret + ParseNumber(value.substr(start_v));
+    return ret;
 }
 
 static double DfDt(double curr, double prev, uint64_t dt) {
@@ -903,10 +904,12 @@ bool TPortoTop::AddColumn(std::string title, std::string signal,
         data = signal.substr(2, off == std::string::npos ?
                            std::string::npos : off - 2);
         flags |= ValueFlags::Map;
+        if (off != std::string::npos)
+            off++;
     } else {
         off = signal.find('\'');
         if (off == std::string::npos)
-            off = signal.find(' ');
+            off = signal.rfind(' ');
         if (off == std::string::npos)
             off = signal.find('%');
 
@@ -1179,17 +1182,53 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs");
 
     /* Network */
-    AddColumn("Net TC", "S(net_bytes) 'b", "Bytes transmitted by container");
-    AddColumn("Pkt TC", "S(net_packets)'", "Packets transmitted by container");
-    AddColumn("Drop TC", "S(net_drops)'", "Packets dropped by container");
 
-    AddColumn("Net RX", "S(net_rx_bytes) 'b", "Bytes received by interfaces");
-    AddColumn("Pkt RX", "S(net_rx_packets)'", "Packets received by interfaces");
-    AddColumn("Drop RX", "S(net_rx_drops)'", "Outcomming packets dropped by interfaces");
+    std::string value;
+    TUintMap map;
+    if (!api->GetProperty("/", "net_tx_bytes", value))
+        StringToUintMap(value, map);
+    bool has_fastbone = map.count("group fastbone");
+    bool has_backbone = map.count("group backbone");
 
-    AddColumn("Net TX", "S(net_tx_bytes) 'b", "Bytes transmitted by interfaces");
-    AddColumn("Pkt TX", "S(net_tx_packets)'", "Packets transmitted by interfaces");
-    AddColumn("Drop TX", "S(net_tx_drops)'", "Incomming packets dropped by interfaces");
+    AddColumn("Net g-e", "net_guarantee[default] b", "Default network TC guarantee");
+    AddColumn("Net lim", "net_limit[default] b", "Default network TC limit");
+
+    if (has_fastbone) {
+        AddColumn("FB g-e", "net_guarantee[group fastbone] b", "Fastbone network TC guarantee");
+        AddColumn("FB lim", "net_limit[group fastbone] b", "Fastbone network TC limit");
+    }
+
+    AddColumn("Net UP", "S(net_bytes) 'b", "Uplink bytes transmitted");
+    if (has_backbone)
+        AddColumn("Net BB", "net_bytes[group backbone]' b", "Backbone bytes transmitted");
+    if (has_fastbone)
+        AddColumn("Net FB", "net_bytes[group fastbone]' b", "Fastbone bytes transmitted");
+
+    AddColumn("Pkt UP", "S(net_packets)'", "Uplink packets transmitted");
+    if (has_backbone)
+        AddColumn("Pkt BB", "net_packets[group backbone]'", "Backbone packets transmitted");
+    if (has_fastbone)
+        AddColumn("Pkt FB", "net_packets[group fastbone]'", "Fastbone packets transmitted");
+
+    AddColumn("Drop UP", "S(net_drops)'", "Uplink packets dropped");
+    if (has_backbone)
+        AddColumn("Drop BB", "net_drops[group backbone]'", "Backbone packets dropped");
+    if (has_fastbone)
+        AddColumn("Drop FB", "net_drops[group fastbone]'", "Fastbone packets dropped");
+
+    AddColumn("UP RX", "S(net_rx_bytes) 'b", "Bytes received by uplink interfaces");
+    AddColumn("UP TX", "S(net_tx_bytes) 'b", "Bytes transmitted by uplink interfaces");
+
+    if (has_fastbone) {
+        AddColumn("FB RX", "net_rx_bytes[group fastbone]' b", "Bytes received by fastbone interfaces");
+        AddColumn("FB TX", "net_tx_bytes[group fastbone]' b", "Bytes transmitted by fastbone interfaces");
+    }
+
+    AddColumn("Pkt RX", "S(net_rx_packets)'", "Packets received by uplink interfaces");
+    AddColumn("Pkt TX", "S(net_tx_packets)'", "Packets transmitted by uplink interfaces");
+
+    AddColumn("Drop RX", "S(net_rx_drops)'", "Outcomming packets dropped by uplink interfaces");
+    AddColumn("Drop TX", "S(net_tx_drops)'", "Incomming packets dropped by uplink interfaces");
 
     /* Porto */
     AddColumn("Porto", "enable_porto", "Porto access level");

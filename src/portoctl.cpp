@@ -567,6 +567,7 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         return StringReplaceAll(val, ";", ";\n      ");
 
     if (name == "net_limit" ||
+         name == "net_rx_limit" ||
          name == "net_guarantee" ||
          name == "net_bytes" ||
          name == "net_rx_bytes" ||
