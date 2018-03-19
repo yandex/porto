@@ -294,8 +294,11 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     if (Type == EStorageType::Place && type == EStorageType::Layer) {
         names.clear();
         error = TPath(Place / PORTO_STORAGE).ListSubdirs(names);
-        if (error)
+        if (error) {
+            if (!TPath(Place / PORTO_STORAGE).Exists())
+                return OK;
             return error;
+        }
         for (auto &name: names) {
             if (StringStartsWith(name, META_PREFIX)) {
                 TStorage meta(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
