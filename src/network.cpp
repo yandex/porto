@@ -181,10 +181,6 @@ TNetDevice::TNetDevice(struct rtnl_link *link) {
     Missing = false;
 }
 
-std::string TNetDevice::GetDesc(void) const {
-    return std::to_string(Index) + ":" + Name + " (" + Type + ")";
-}
-
 uint64_t TNetDevice::GetConfig(const TUintMap &cfg, uint64_t def) const {
     for (auto &it: cfg) {
         if (StringMatch(Name, it.first))
@@ -568,7 +564,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     //          +- 6:0 qdisc b (pfifo)
 
 
-    L_NET("Setup queue for network {} device {}", NetName, dev.GetDesc());
+    L_NET("Setup queue for network {} device {}:{}", NetName, dev.Index, dev.Name);
 
     TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
     qdisc.Kind = dev.GetConfig(DeviceQdisc);
@@ -583,8 +579,6 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
             return error;
         }
     }
-
-    GetDeviceSpeed(dev);
 
     TNlClass cls;
 
@@ -633,11 +627,6 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
             if (error)
                 return error;
         }
-    }
-
-    if (this == HostNetwork.get()) {
-        RootContainer->NetClass.Limit[dev.Name] = dev.Ceil;
-        RootContainer->NetClass.Rate[dev.Name] = dev.Rate;
     }
 
     return OK;
@@ -729,7 +718,7 @@ TError TNetwork::SyncDevices(bool force) {
             d = dev;
             if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") !=
                     dev.GetConfig(DeviceQdisc)) {
-                L_NET("Missing network {} qdisc at {}", NetName, d.GetDesc());
+                L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
                 StartRepair();
             } else if (!force)
                 d.Prepared = true;
@@ -739,10 +728,20 @@ TError TNetwork::SyncDevices(bool force) {
             break;
         }
         if (!found) {
-            L_NET("New network {} {}managed device {}", NetName,
-                    dev.Managed ? "" : "un", dev.GetDesc());
+            GetDeviceSpeed(dev);
+
+            L_NET("New network {} {}managed device {}:{} type={} group={} speed={}Mbps {}iB/s",
+                    NetName, dev.Managed ? "" : "un",
+                    dev.Index, dev.Name, dev.Type, dev.GroupName,
+                    dev.Ceil / 125000, StringFormatSize(dev.Ceil));
+
             if (dev.Managed)
                 StartRepair();
+            if (this == HostNetwork.get()) {
+                RootContainer->NetClass.Rate[dev.Name] = dev.Rate;
+                RootContainer->NetClass.Limit[dev.Name] = dev.Ceil;
+                RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
+            }
             Devices.push_back(dev);
         }
     }
@@ -751,10 +750,13 @@ TError TNetwork::SyncDevices(bool force) {
 
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
-            L_NET("Forget network {} device {}", NetName, dev->GetDesc());
+
+            L_NET("Forget network {} device {}:{}", NetName, dev->Index, dev->Name);
+
             if (this == HostNetwork.get()) {
-                RootContainer->NetClass.Limit.erase(dev->Name);
                 RootContainer->NetClass.Rate.erase(dev->Name);
+                RootContainer->NetClass.Limit.erase(dev->Name);
+                RootContainer->NetClass.RxLimit.erase(dev->Name);
             }
             dev = Devices.erase(dev);
         } else
@@ -1457,7 +1459,7 @@ void TNetwork::SyncStatLocked() {
 
         int ret = rtnl_class_alloc_cache(GetSock(), dev.Index, &dev.ClassCache);
         if (ret) {
-            L_NET("Cannot dump network {} classes at {}", NetName, dev.GetDesc());
+            L_NET("Cannot dump network {} classes at {}:{}", NetName, dev.Index, dev.Name);
             StartRepair();
             continue;
         }
@@ -1489,7 +1491,7 @@ void TNetwork::SyncStatLocked() {
 
             struct rtnl_class *tc = rtnl_class_get(dev.ClassCache, dev.Index, cls->Leaf);
             if (!tc) {
-                L_NET("Missing network {} class {} at {}", NetName, cls->Leaf, dev.GetDesc());
+                L_NET("Missing network {} class {} at {}:{}", NetName, cls->Leaf, dev.Index, dev.Name);
                 StartRepair();
                 continue;
             }
@@ -2577,6 +2579,9 @@ TError TNetEnv::OpenNetwork() {
         if (error)
             return error;
 
+        Net->NetName = "host";
+        HostNetwork = Net;
+
         error = Net->SyncDevices();
         if (error)
             return error;
@@ -2588,8 +2593,6 @@ TError TNetEnv::OpenNetwork() {
         if (config().network().has_nat_count())
             Net->NatBitmap.Resize(config().network().nat_count());
 
-        Net->NetName = "host";
-        HostNetwork = Net;
         NetThread = std::thread(&TNetwork::NetWatchdog);
 
         return OK;
