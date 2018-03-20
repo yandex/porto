@@ -589,19 +589,28 @@ class Connection(object):
     def CreateWeakContainer(self, name):
         return self.Create(name, weak=True)
 
-    def Run(self, name, weak=True, start=True, root_volume=None, private_value=None, **kwargs):
+    def Run(self, name, weak=True, start=True, wait=0, root_volume=None, private_value=None, **kwargs):
         ct = self.Create(name, weak=True)
-        for key, value in kwargs.iteritems():
-            ct.SetProperty(key, value)
-        if private_value is not None:
-            ct.SetProperty('private', private_value)
-        if root_volume is not None:
-            root = self.CreateVolume(containers=name, **root_volume)
-            ct.SetProperty('root', root.path)
-        if start:
-            ct.Start()
-        if not weak:
-            ct.SetProperty('weak', False)
+        try:
+            for key, value in kwargs.iteritems():
+                ct.SetProperty(key, value)
+            if private_value is not None:
+                ct.SetProperty('private', private_value)
+            if root_volume is not None:
+                root = self.CreateVolume(containers=name, **root_volume)
+                ct.SetProperty('root', root.path)
+            if start:
+                ct.Start()
+            if not weak:
+                ct.SetProperty('weak', False)
+            if wait != 0:
+                ct.WaitContainer(wait)
+        except exceptions.PortoException as e:
+            try:
+                ct.Destroy()
+            except exceptions.PortoException.ContainerDoesNotExist:
+                pass
+            raise e
         return ct
 
     def Destroy(self, container):
@@ -751,6 +760,8 @@ class Connection(object):
         else:
             timeout = None
         resp = self.rpc.call(request, timeout)
+        if resp.wait.name == "":
+            raise exceptions.WaitContainerTimeout("Timeout {} exceeded".format(timeout))
         return resp.wait.name
 
     # legacy compat - timeout in ms
@@ -759,7 +770,10 @@ class Connection(object):
             timeout = timeout_s
         elif timeout is not None and timeout >= 0:
             timeout = timeout / 1000.
-        return self.WaitContainers(containers, timeout)
+        try:
+            return self.WaitContainers(containers, timeout)
+        except exceptions.WaitContainerTimeout:
+            return ""
 
     def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
         if layers:

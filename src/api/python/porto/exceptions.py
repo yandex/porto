@@ -29,6 +29,11 @@ class SocketError(PortoException):
 class SocketTimeout(PortoException):
     pass
 
+
+class WaitContainerTimeout(PortoException):
+    pass
+
+
 PortoException._Init()
 
 EError = PortoException
