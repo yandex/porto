@@ -1240,6 +1240,8 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_debug(Debug);
     rsp->set_log_lines(Statistics->LogLines);
     rsp->set_log_bytes(Statistics->LogBytes);
+    rsp->set_log_lines_lost(Statistics->LogLinesLost);
+    rsp->set_log_bytes_lost(Statistics->LogBytesLost);
 
     rsp->set_container_count(Statistics->ContainersCount - NR_SERVICE_CONTAINERS);
     rsp->set_container_limit(config().container().max_total());

@@ -3100,6 +3100,8 @@ void TPortoStat::Populate(TUintMap &m) {
 
     m["log_lines"] = Statistics->LogLines;
     m["log_bytes"] = Statistics->LogBytes;
+    m["log_lines_lost"] = Statistics->LogLinesLost;
+    m["log_bytes_lost"] = Statistics->LogBytesLost;
 
     m["log_rotate_bytes"] = Statistics->LogRotateBytes;
     m["log_rotate_errors"] = Statistics->LogRotateErrors;

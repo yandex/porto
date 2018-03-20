@@ -170,6 +170,9 @@ message TGetSystemResponse {
     required fixed64 stream_rotate_bytes = 104;
     required fixed64 stream_rotate_errors = 105;
 
+    required fixed64 log_lines_lost = 106;
+    required fixed64 log_bytes_lost = 107;
+
     required fixed64 container_count = 200;
     required fixed64 container_limit = 201;
     required fixed64 container_running = 202;

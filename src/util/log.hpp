@@ -56,6 +56,8 @@ struct TStatistics {
     std::atomic<uint64_t> LayerImport;
     std::atomic<uint64_t> LayerExport;
     std::atomic<uint64_t> LayerRemove;
+    std::atomic<uint64_t> LogLinesLost;
+    std::atomic<uint64_t> LogBytesLost;
 
     /* --- add new fields at the end --- */
 };

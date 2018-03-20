@@ -76,8 +76,11 @@ void WriteLog(const char *prefix, const std::string &log_msg) {
         Statistics->LogBytes += msg.size();
     }
 
-    if (LogFile)
-        LogFile.WriteAll(msg);
+    if (LogFile && LogFile.WriteAll(msg) && Statistics) {
+        Statistics->Warns++;
+        Statistics->LogLinesLost++;
+        Statistics->LogBytesLost += msg.size();
+    }
 }
 
 void porto_assert(const char *msg, const char *file, size_t line) {
