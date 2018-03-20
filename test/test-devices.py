@@ -103,6 +103,21 @@ a.Destroy()
 b.Destroy()
 m.Destroy()
 
+
+ExpectEq(Catch(c.Run, "m", devices="/dev//ram0 rw"), porto.exceptions.InvalidValue)
+
+ExpectEq(Catch(c.Run, "m", devices="/dev/../ram0 rw"), porto.exceptions.InvalidValue)
+
+ExpectEq(Catch(c.Run, "m", devices="/tmp/ram0 rw"), porto.exceptions.InvalidValue)
+
+ExpectEq(Catch(c.Run, "m", devices="/dev/__missing__ rw"), porto.exceptions.DeviceNotFound)
+
+ExpectEq(Catch(c.Run, "m", devices="/dev/ram1 rw"), porto.exceptions.Permission)
+
+m = c.Run("m")
+ExpectEq(Catch(c.Run, "m/a", devices="/dev/ram0 rw"), porto.exceptions.Permission)
+m.Destroy()
+
 AsRoot()
 
 a = c.Run("a", weak=False, **{"controllers[devices]": "true"})

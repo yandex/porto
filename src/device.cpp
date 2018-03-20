@@ -306,8 +306,11 @@ TError TDevices::Apply(const TCgroup &cg, bool reset) const {
         rule = device.CgroupRule(true);
         if (rule != "") {
             error = cg.Set("devices.allow", rule);
-            if (error)
+            if (error) {
+                if (error.Errno == EPERM)
+                    return TError(EError::Permission, "Device {} is not pertmitted for parent container", device.Path);
                 return error;
+            }
         }
 
         rule = device.CgroupRule(false);
