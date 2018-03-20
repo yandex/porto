@@ -185,10 +185,8 @@ a.Destroy()
 
 # volumes in chroot
 a = c.Run("a", root=root_volume.path, bind="{} /bin/portoctl ro".format(portoctl))
-a1 = c.Run("a/a1", command="portoctl vcreate /test backend=plain")
-a1.Wait()
-a2 = c.Run("a/a2", command="portoctl vcreate /test_ro backend=plain read_only=true")
-a2.Wait()
+a1 = c.Run("a/a1", wait=60, command="portoctl vcreate /test backend=plain")
+a2 = c.Run("a/a2", wait=60, command="portoctl vcreate /test_ro backend=plain read_only=true")
 
 mnt = ParseMountinfo()
 Expect(root_volume.path + '/test' in mnt)
