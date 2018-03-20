@@ -773,6 +773,8 @@ static int Portod() {
     SetProcessName(PORTOD_NAME);
 
     OpenLog(PORTO_LOG);
+    if (!LogFile)
+        return EXIT_FAILURE;
 
     error = PortodPidFile.Save(getpid());
     if (error)
@@ -1236,6 +1238,8 @@ static int PortodMaster() {
     }
 
     OpenLog(PORTO_LOG);
+    if (!LogFile)
+        return EXIT_FAILURE;
 
     InitStatistics();
 
