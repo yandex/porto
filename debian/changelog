@@ -1,3 +1,19 @@
+yandex-porto (4.11.0) unstable; urgency=low
+
+  * test: add ct-state
+  * network: init and log device speed right at discovery
+  * portoctl top: add backbone and fastbone
+  * debian: remove kludges from upstart job
+  * debian: do not start systemd service in container
+  * storage: list layers for place without sub-directory porto_storage
+  * python/api: add WaitContainerTimeout exception and wait argument into Run
+  * test: use run with wait
+  * devices: hide warning if devices are not permitted
+  * porto: add counters for lost log lines and bytes
+  * porto: fail if cannot open log file
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 20 Mar 2018 12:59:42 +0300
+
 yandex-porto (4.10.9) unstable; urgency=low
 
   * devices: do not log error if requested device doesn't exist
