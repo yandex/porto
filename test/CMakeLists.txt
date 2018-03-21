@@ -74,6 +74,8 @@ ADD_PYTHON_TEST(locate-process)
 ADD_PYTHON_TEST(prev_release_upgrade)
 ADD_PYTHON_TEST(oom_non_fatal)
 
+ADD_PYTHON_TEST(volume-restore)
+
 # legacy tests
 
 add_test(NAME portotest

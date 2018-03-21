@@ -3305,10 +3305,8 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
 
                 error = TContainer::Find(l[0], ct);
                 if (error) {
+                    error = OK;
                     L_WRN("Missing container {}", l[0]);
-                    if (!ret)
-                        ret = error;
-
                     if (l.size() > 4) {
                         l[1] = "";
                         ct = RootContainer; /* placeholder */
