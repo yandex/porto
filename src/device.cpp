@@ -213,25 +213,34 @@ TError TDevice::Makedev(const TPath &root) const {
     if (Wildcard || !MayMknod)
         return OK;
 
-    L_ACT("Make {} device node {} {}:{} {:#o} {}:{}",
-            S_ISBLK(Mode) ? "blk" : "chr", PathInside,
-            major(Node), minor(Node), Mode & 0777,
-            UserName(Uid), GroupName(Gid));
-
-    if (!path.StatFollow(st)) {
-        if (st.st_mode == Mode && st.st_rdev == Node &&
-                st.st_uid == Uid && st.st_gid == Gid)
-            return OK;
-        return TError(EError::Busy, "Different device node already exists: {}", PathInside);
+    if (path.StatFollow(st)) {
+        L_ACT("Make {} device node {} {}:{} {:#o} {}:{}",
+                S_ISBLK(Mode) ? "blk" : "chr", PathInside,
+                major(Node), minor(Node), Mode & 0777,
+                UserName(Uid), GroupName(Gid));
+        error = path.Mknod(Mode, Node);
+        if (error)
+            return error;
+        error = path.Chown(Uid, Gid);
+        if (error)
+            return error;
+    } else {
+        if ((st.st_mode & S_IFMT) != (Mode & S_IFMT) || st.st_rdev != Node)
+            return TError(EError::Busy, "Different device node {} {:#o} {}:{} in container",
+                          PathInside, st.st_mode, major(st.st_rdev), minor(st.st_rdev));
+        if (st.st_mode != Mode) {
+            L_ACT("Update device node {} permissions {:#o}", PathInside, Mode & 0777);
+            error = path.Chmod(Mode & 0777);
+            if (error)
+                return error;
+        }
+        if (st.st_uid != Uid || st.st_gid != Gid) {
+            L_ACT("Update device node {} owner {}:{}", PathInside, UserName(Uid), GroupName(Gid));
+            error = path.Chown(Uid, Gid);
+            if (error)
+                return error;
+        }
     }
-
-    error = path.Mknod(Mode, Node);
-    if (error)
-        return error;
-
-    error = path.Chown(Uid, Gid);
-    if (error)
-        return error;
 
     return OK;
 }
