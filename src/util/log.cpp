@@ -36,12 +36,14 @@ void OpenLog(const TPath &path) {
     if (fd >= 0 && fd < 3)
         fd = fcntl(fd, F_DUPFD_CLOEXEC, 3);
 
-    if (fd > 2) {
+    if (fd >= 0) {
         if (LogFile.Fd != STDOUT_FILENO)
             LogFile.Close();
         LogFile.SetFd = fd;
+    }
 
-        /* redirect stdout and stderr into log */
+    /* redirect stdout and stderr into log */
+    if (fd >= 0 && !StdLog) {
         dup3(fd, STDOUT_FILENO, O_CLOEXEC);
         dup3(fd, STDERR_FILENO, O_CLOEXEC);
     }
