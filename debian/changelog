@@ -1,3 +1,10 @@
+yandex-porto (4.11.3) unstable; urgency=low
+
+  * debian: start after upstart event static-network-up
+  * network: log device mtu
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 22 Mar 2018 16:07:53 +0300
+
 yandex-porto (4.11.2) unstable; urgency=low
 
   * cgroup: pin cgroup mounts
