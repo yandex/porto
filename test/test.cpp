@@ -500,7 +500,7 @@ void TestDaemon(Porto::Connection &api) {
      */
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    ExpectLessEq(nr, 12 + sssFd);
+    ExpectLessEq(nr, 12 + sssFd + 10);
     ExpectLessEq(12, nr);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
