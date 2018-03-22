@@ -30,6 +30,7 @@ public:
     const std::string Type;
     const TSubsystem *Hierarchy = nullptr;
     TPath Root;
+    TFile Base;
     bool Supported = false;
 
     TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }

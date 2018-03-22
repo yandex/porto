@@ -1277,6 +1277,12 @@ TError InitializeCgroups() {
             }
         }
 
+        error = subsys->Base.OpenDir(subsys->Root);
+        if (error) {
+            L_ERR("Cannot open cgroup {} root directory: {}", subsys->Type, error);
+            return error;
+        }
+
         Subsystems.push_back(subsys);
 
         subsys->Hierarchy = subsys;
@@ -1299,6 +1305,9 @@ TError InitializeCgroups() {
     for (auto subsys: AllSubsystems)
         if (subsys->Hierarchy)
             subsys->Controllers |= subsys->Hierarchy->Controllers;
+
+    /* This piece of code should never be executed. */
+    TPath("/usr/sbin/cgclear").Chmod(0);
 
     return error;
 }
