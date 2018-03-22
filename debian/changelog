@@ -1,3 +1,9 @@
+yandex-porto (4.11.2) unstable; urgency=low
+
+  * cgroup: pin cgroup mounts
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 22 Mar 2018 09:56:39 +0300
+
 yandex-porto (4.11.1) unstable; urgency=low
 
   * devices: at restore check only type and major:minor
