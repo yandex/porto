@@ -730,18 +730,20 @@ TError TNetwork::SyncDevices(bool force) {
         if (!found) {
             GetDeviceSpeed(dev);
 
-            L_NET("New network {} {}managed device {}:{} type={} group={} speed={}Mbps {}iB/s",
+            L_NET("New network {} {}managed device {}:{} type={} group={} mtu={} speed={}Mbps {}iB/s",
                     NetName, dev.Managed ? "" : "un",
-                    dev.Index, dev.Name, dev.Type, dev.GroupName,
+                    dev.Index, dev.Name, dev.Type, dev.GroupName, dev.MTU,
                     dev.Ceil / 125000, StringFormatSize(dev.Ceil));
 
             if (dev.Managed)
                 StartRepair();
+
             if (this == HostNetwork.get()) {
                 RootContainer->NetClass.Rate[dev.Name] = dev.Rate;
                 RootContainer->NetClass.Limit[dev.Name] = dev.Ceil;
                 RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
             }
+
             Devices.push_back(dev);
         }
     }
