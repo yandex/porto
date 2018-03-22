@@ -23,23 +23,6 @@ pre-start script
 		exit 0
 	fi
 
-	# we want to clean up daemon state only if it stopped gracefully by
-	# the user
-	if [ ! -e /run/portoloop.pid ]; then
-		rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || :
-	fi
-
-	# if there is cgroup-bin or cgroup-lite installed
-	# we need to wait while it mounts sysfs and controllers
-	timeout=360
-	for service in cgred cgroup-lite yandex-networking; do if status $service; then
-		for i in `seq $timeout`; do
-			if status $service | grep -q "^$service start/running" > /dev/null; then
-				break
-			fi
-			sleep 1
-		done
-	fi ; done
 end script
 
 post-start script
