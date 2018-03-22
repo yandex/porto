@@ -59,7 +59,7 @@ public:
     bool NeedVolume = false;
     bool ChrootVolume = true;
     bool MergeLayers = false;
-    bool StartOS = false;
+    std::string VirtMode = "app";
     bool ForwardTerminal = false;
     bool ForwardStreams = false;
     bool WaitExit = false;
@@ -106,7 +106,7 @@ public:
     TError SetProperty(const std::string &key, const std::string &val) {
 
         if (key == "virt_mode")
-            StartOS = val == "os";
+            VirtMode = val;
 
         if (key == "env") {
             auto list = SplitEscapedString(val, ';');
@@ -403,7 +403,7 @@ public:
                 goto err;
         }
 
-        if (Api->SetProperty(Container, "virt_mode", StartOS ? "os" : "app"))
+        if (Api->SetProperty(Container, "virt_mode", VirtMode))
             goto err;
 
         if (Api->SetProperty(Container, "env", MergeEscapeStrings(Environment, ';')))
@@ -2291,7 +2291,7 @@ public:
         launcher.WeakContainer = true;
         launcher.NeedVolume = true;
         launcher.ChrootVolume = false;
-        launcher.StartOS = true;
+        launcher.VirtMode = "os";
 
         TPath output;
         TPath outputImage;
@@ -2387,8 +2387,8 @@ public:
         }
 
         /* Start os in chroot container */
-        chroot.StartOS = launcher.StartOS;
-        launcher.StartOS = false;
+        chroot.VirtMode = launcher.VirtMode;
+        launcher.VirtMode = "app";
 
         std::string volume;
         TPath volume_script;
@@ -2413,7 +2413,7 @@ public:
             bootstrap.Container = launcher.Container + "/bootstrap";
             bootstrap.ForwardStreams = true;
             bootstrap.WaitExit = true;
-            bootstrap.StartOS = true;
+            bootstrap.VirtMode = "os";
             bootstrap.Environment = launcher.Environment;
 
             std::string script_text;
@@ -2461,7 +2461,7 @@ public:
             bootstrap2.Container = launcher.Container + "/bootstrap2";
             bootstrap2.ForwardStreams = true;
             bootstrap2.WaitExit = true;
-            bootstrap2.StartOS = true;
+            bootstrap2.VirtMode = "os";
             bootstrap2.Environment = launcher.Environment;
 
             std::string script_text;
@@ -2501,7 +2501,7 @@ public:
         chroot.SetProperty("isolate", "true");
         chroot.SetProperty("net", "inherited");
 
-        if (chroot.StartOS)
+        if (chroot.VirtMode == "os")
             std::cout << "\nStarting OS ..." << std::endl;
 
         error = chroot.Launch();
