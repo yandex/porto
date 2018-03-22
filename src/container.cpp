@@ -310,6 +310,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     Umask = 0002;
     Isolate = true;
     OsMode = false;
+    HostMode = IsRoot();
     BindDns = config().container().default_bind_dns();
 
     NetProp = { { "inherited" } };
@@ -1909,7 +1910,7 @@ TError TContainer::PrepareCgroups() {
     if (Controllers & CGROUP_DEVICES) {
         TCgroup devcg = GetCgroup(DevicesSubsystem);
         /* Nested cgroup makes a copy from parent at creation */
-        if (Level == 1 || TPath(devcg.Name).IsSimple()) {
+        if ((Level == 1 || TPath(devcg.Name).IsSimple()) && !HostMode) {
             /* at restore child cgroups blocks reset */
             error = RootContainer->Devices.Apply(devcg, State == EContainerState::Starting);
             if (error)
@@ -2053,7 +2054,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     }
 
     // Create new mount namespaces if we have to make any changes
-    TaskEnv.NewMountNs = Isolate || Parent->IsRoot() ||
+    TaskEnv.NewMountNs = Isolate || (Level == 1 && !HostMode) ||
                           TaskEnv.Mnt.BindMounts.size() ||
                           Hostname.size() ||
                           ResolvConf.size() ||
@@ -2061,16 +2062,21 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           TaskEnv.Mnt.RootRo ||
                           !TaskEnv.Mnt.Systemd.empty();
 
+    if (TaskEnv.NewMountNs && HostMode)
+        return TError(EError::InvalidValue, "Cannot change mount-namespace in virt_mode=host");
+
     return OK;
 }
 
 void TContainer::SanitizeCapabilities() {
     if (OwnerCred.IsRootUser()) {
         if (HasProp(EProperty::CAPABILITIES))
-            CapBound.Permitted = CapLimit.Permitted;
+            CapBound = CapLimit;
+        else if (HostMode)
+            CapBound = AllCapabilities;
         else
-            CapBound.Permitted = HostCapBound.Permitted;
-        CapAllowed.Permitted = CapBound.Permitted;
+            CapBound = HostCapBound;
+        CapAllowed = CapBound;
     } else {
         bool chroot = false;
         bool pidns = false;
@@ -2078,7 +2084,10 @@ void TContainer::SanitizeCapabilities() {
         bool netns = false;
         bool netip = false;
 
-        CapBound = HostCapBound;
+        if (HostMode)
+            CapBound = AllCapabilities;
+        else
+            CapBound = HostCapBound;
 
         for (auto ct = this; ct; ct = ct->Parent.get()) {
             chroot |= ct->Root != "/";
@@ -2101,10 +2110,13 @@ void TContainer::SanitizeCapabilities() {
 
         if (chroot) {
             CapBound.Permitted &= ChrootCapBound.Permitted & ~remove.Permitted;
-            CapAllowed.Permitted = CapBound.Permitted;
-        } else
+            CapAllowed = CapBound;
+        } else if (HostMode) {
+            CapAllowed.Permitted = CapBound.Permitted & ~remove.Permitted;
+        } else {
             CapAllowed.Permitted = HostCapAllowed.Permitted &
                                    CapBound.Permitted & ~remove.Permitted;
+        }
     }
 
     if (!HasProp(EProperty::CAPABILITIES))
@@ -2253,6 +2265,13 @@ TError TContainer::PrepareStart() {
     /* Even without capabilities user=root require chroot */
     if (RootPath.IsRoot() && TaskCred.IsRootUser() && !OwnerCred.IsRootUser())
         return TError(EError::Permission, "user=root requires chroot");
+
+    if (HostMode && Level) {
+        if (!Parent->HostMode)
+            return TError(EError::Permission, "For virt_mode=host parent must be in the same mode");
+        if (!CL->ClientContainer->HostMode)
+            return TError(EError::Permission, "For virt_mode=host client must be in the same mode");
+    }
 
     if (CapLimit.Permitted & ~CapBound.Permitted) {
         TCapabilities cap = CapLimit;

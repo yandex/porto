@@ -68,6 +68,7 @@ ADD_PYTHON_TEST(cpu_limit)
 
 ADD_PYTHON_TEST(uid_handling)
 ADD_PYTHON_TEST(unpriv-cred)
+ADD_PYTHON_TEST(isolation)
 ADD_PYTHON_TEST(security)
 ADD_PYTHON_TEST(tc-rebuild)
 ADD_PYTHON_TEST(locate-process)

@@ -142,6 +142,7 @@ container { default_ulimit: "type: soft hard;..." }
 * **virt\_mode** - virtualization mode:
     - *app* - (default) start **command** as normal process
     - *os* - start **command** as init process
+    - *host* - start **command** without security restrictions
 
 ## State
 

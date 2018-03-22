@@ -577,17 +577,22 @@ public:
 class TVirtMode : public TProperty {
 public:
     TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
-            "Virtualization mode: os|app") {}
+            "Virtualization mode: os|app|host") {}
     TError Get(std::string &value) {
-        value = CT->OsMode ? "os" : "app";
+        value = CT->HostMode ? "host" : CT->OsMode ? "os" : "app";
         return OK;
     }
     TError Set(const std::string &value) {
-        if (value == "app")
+        if (value == "app") {
             CT->OsMode = false;
-        else if (value == "os")
+            CT->HostMode = false;
+        } else if (value == "os") {
             CT->OsMode = true;
-        else
+            CT->HostMode = false;
+        } else if (value == "host") {
+            CT->OsMode = false;
+            CT->HostMode = true;
+        } else
             return TError(EError::InvalidValue, "Unknown: {}", value);
         CT->SetProp(EProperty::VIRT_MODE);
         return OK;
@@ -781,6 +786,14 @@ public:
         CT->SetProp(EProperty::ISOLATE);
         return OK;
     }
+    TError Start(void) {
+        if (CT->HostMode) {
+            if (CT->Isolate && CT->HasProp(EProperty::ISOLATE))
+                return TError(EError::InvalidValue, "isolate=true incopatible with virt_mode=host");
+            CT->Isolate = false;
+        }
+        return OK;
+    }
 } static Isolate;
 
 class TRoot : public TProperty {
@@ -799,6 +812,11 @@ public:
 
         CT->Root = root;
         CT->SetProp(EProperty::ROOT);
+        return OK;
+    }
+    TError Start(void) {
+        if (CT->HostMode && CT->Root != "/")
+            return TError(EError::InvalidValue, "Cannot change root with virt_mode=host");
         return OK;
     }
 } static Root;

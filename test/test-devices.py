@@ -25,6 +25,12 @@ a = c.Run("a", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1", devices=
 ExpectNe(a["exit_code"], "0")
 a.Destroy()
 
+# virt_mode=host
+
+a = c.Run("a", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1", virt_mode="host")
+ExpectEq(a["exit_code"], "0")
+a.Destroy()
+
 # disable controller
 
 a = c.Run("a", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1", **{"controllers[devices]": "false"})

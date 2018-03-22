@@ -143,6 +143,13 @@ def ReloadPortod():
     except OSError:
         pass
 
+def ProcStatus(pid, key):
+    for line in open("/proc/{}/status".format(pid)).readlines():
+        k, v = line.split(None, 1)
+        if k == key + ":":
+            return v.strip()
+    return None
+
 def GetState(pid):
     if isinstance(pid, int):
         pid = str(pid)
