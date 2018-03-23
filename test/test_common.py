@@ -133,7 +133,15 @@ def GetMasterPid():
     return pid
 
 def ReloadPortod():
+    pid = GetPortodPid()
     os.kill(GetMasterPid(), signal.SIGHUP)
+    try:
+        for i in range(3000):
+            os.kill(pid, 0)
+            time.sleep(0.1)
+        raise Exception("cannot reload porto")
+    except OSError:
+        pass
 
 def GetState(pid):
     if isinstance(pid, int):
