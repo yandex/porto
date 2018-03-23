@@ -148,6 +148,8 @@ message TCfg {
         }
         repeated TSysctl net_sysctl = 34;
         repeated TSysctl ipc_sysctl = 33;
+
+        repeated string rec_bind_hack = 46; /* FIXME remove */
     }
 
     message TPrivilegesCfg {
