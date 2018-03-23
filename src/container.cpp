@@ -2389,6 +2389,27 @@ TError TContainer::PrepareResources() {
             goto undo;
     }
 
+    if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
+        std::shared_ptr<TVolume> vol;
+        TStringMap cfg;
+
+        L_WRN("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
+
+        cfg[V_BACKEND] = "loop";
+        cfg[V_STORAGE] = RootPath.ToString();
+        cfg[V_READ_ONLY] = BoolToString(RootRo);
+        cfg[V_CONTAINERS] = ROOT_PORTO_NAMESPACE + Name;
+
+        error = TVolume::Create(cfg, vol);
+        if (error) {
+            L_ERR("Cannot create root volume: {}", error);
+            goto undo;
+        }
+
+        RootPath = vol->Path;
+        Root = vol->Path.ToString();
+    }
+
     PropagateCpuLimit();
 
     return OK;
