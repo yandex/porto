@@ -70,6 +70,11 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
             if (!(flags & (MS_PRIVATE | MS_UNBINDABLE)))
                 flags |= MS_SLAVE | MS_SHARED;
 
+            // FIXME temporary hack
+            for (auto &src: config().container().rec_bind_hack())
+                if (bind.Source == src)
+                    flags |= MS_REC;
+
             bind.Flags = flags;
         }
 
