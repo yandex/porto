@@ -1,3 +1,9 @@
+yandex-porto (4.11.5) unstable; urgency=low
+
+  * porto: emulation for deprecated root on loop devices
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 23 Mar 2018 20:25:54 +0300
+
 yandex-porto (4.11.4) unstable; urgency=low
 
   * test: wait for portod reload
