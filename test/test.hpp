@@ -90,6 +90,7 @@ namespace test {
     TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 }
 
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #define STRINGIFY(x) #x
 #define Fail(arg) do { fmt::print(stderr, "FAIL {} at {}:{}", (arg), __FILE__, __LINE__); std::abort(); } while(0)
 #define ExpectOp(a, op, b) do { auto __a = (a); auto __b = (b); if (!(__a op __b)) { fmt::print(stderr, "FAIL {} ({}) {} {} ({}) at {}:{}", STRINGIFY(a), __a, STRINGIFY(op), STRINGIFY(b), __b, __FILE__, __LINE__); std::abort(); } } while(0)

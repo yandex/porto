@@ -5197,7 +5197,6 @@ int SelfTest(std::vector<std::string> args) {
     if (!KernelSupports(KernelFeature::FSIO))
         std::cerr << "WARNING: io_limit is not tested" << std::endl;
 
-exit:
     AsRoot(api);
     if (system("hostname -F /etc/hostname") != 0)
         std::cerr << "WARNING: can't restore hostname" << std::endl;
