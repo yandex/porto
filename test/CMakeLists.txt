@@ -17,6 +17,12 @@ macro(ADD_PYTHON_TEST NAME)
                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endmacro()
 
+macro(ADD_PYTHON3_TEST NAME)
+         add_test(NAME python3-${NAME}
+                  COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python3 -u ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
+                  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endmacro()
+
 # head
 
 add_test(NAME cleanup_portod
@@ -34,6 +40,8 @@ add_test(NAME portod_start
 # interface tests
 
 ADD_PYTHON_TEST(api)
+
+ADD_PYTHON3_TEST(api)
 
 if(EXISTS /usr/bin/go AND EXISTS /usr/share/gocode/src/github.com/golang/protobuf)
 add_test(NAME go_api

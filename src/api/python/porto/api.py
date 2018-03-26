@@ -6,57 +6,6 @@ import threading
 from . import rpc_pb2
 from . import exceptions
 
-
-def _VarintEncoder():
-    """Return an encoder for a basic varint value (does not include tag)."""
-
-    local_chr = chr
-
-    def EncodeVarint(write, value):
-        bits = value & 0x7f
-        value >>= 7
-        while value:
-            write(local_chr(0x80 | bits))
-            bits = value & 0x7f
-            value >>= 7
-        return write(local_chr(bits))
-
-    return EncodeVarint
-
-_EncodeVarint = _VarintEncoder()
-
-
-def _VarintDecoder(mask):
-    """Return an encoder for a basic varint value (does not include tag).
-
-    Decoded values will be bitwise-anded with the given mask before being
-    returned, e.g. to limit them to 32 bits.  The returned decoder does not
-    take the usual "end" parameter -- the caller is expected to do bounds checking
-    after the fact (often the caller can defer such checking until later).  The
-    decoder returns a (value, new_pos) pair.
-    """
-
-    local_ord = ord
-
-    def DecodeVarint(buf, pos):
-        result = 0
-        shift = 0
-        while 1:
-            b = local_ord(buf[pos])
-            result |= ((b & 0x7f) << shift)
-            pos += 1
-            if not (b & 0x80):
-                result &= mask
-                return (result, pos)
-            shift += 7
-            if shift >= 64:
-                raise IOError('Too many bytes when decoding varint.')
-    return DecodeVarint
-
-_DecodeVarint = _VarintDecoder((1 << 64) - 1)
-_DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
-
-
 class _RPC(object):
     def __init__(self, socket_path, timeout, socket_constructor,
                  lock_constructor, auto_reconnect):
@@ -70,7 +19,7 @@ class _RPC(object):
         self.auto_reconnect = auto_reconnect
 
     def _connect(self):
-        SOCK_CLOEXEC = 02000000
+        SOCK_CLOEXEC = 0o2000000
         self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM | SOCK_CLOEXEC)
         self._set_socket_timeout()
         self.sock.connect(self.socket_path)
@@ -109,29 +58,35 @@ class _RPC(object):
                 raise exceptions.SocketTimeout("Porto connection timeout")
 
     def _recv_data(self, count):
-        msg = ''
+        msg = bytearray()
         while len(msg) < count:
             self._set_socket_timeout()
             chunk = self.sock.recv(count - len(msg))
-            if chunk == '':
+            if not chunk:
                 raise socket.error(socket.errno.ECONNRESET, os.strerror(socket.errno.ECONNRESET))
-            msg += chunk
+            msg.extend(chunk)
         return msg
 
     def _recv_response(self):
-        msb = 1
-        buf = ""
-        while msb:
+        length = shift = 0
+        while True:
             b = self._recv_data(1)
-            msb = ord(b) >> 7
-            buf += b
-        length = _DecodeVarint32(buf, 0)
-        return self._recv_data(length[0])
+            length |= (b[0] & 0x7f) << shift
+            shift += 7
+            if b[0] <= 0x7f:
+                break
+        return self._recv_data(length)
 
     def call(self, request, call_timeout=0):
         req = request.SerializeToString()
+
+        length = len(req)
         hdr = bytearray()
-        _EncodeVarint(hdr.append, len(req))
+        while length > 0x7f:
+            hdr.append(0x80 | (length & 0x7f))
+            length >>= 7
+        hdr.append(length)
+
         req = hdr + req
 
         with self.lock:
@@ -165,7 +120,7 @@ class _RPC(object):
                     break
 
         response = rpc_pb2.TContainerResponse()
-        response.ParseFromString(rsp)
+        response.ParseFromString(bytes(rsp))
         if response.error != rpc_pb2.Success:
             raise exceptions.PortoException.Create(response.error, response.errorMsg)
         return response
@@ -592,7 +547,7 @@ class Connection(object):
     def Run(self, name, weak=True, start=True, wait=0, root_volume=None, private_value=None, **kwargs):
         ct = self.Create(name, weak=True)
         try:
-            for key, value in kwargs.iteritems():
+            for key, value in kwargs.items():
                 ct.SetProperty(key, value)
             if private_value is not None:
                 ct.SetProperty('private', private_value)
@@ -694,7 +649,7 @@ class Connection(object):
             value = 'true'
         elif value is None:
             value = ''
-        elif isinstance(value, (int, long)):
+        else:
             value = str(value)
 
         request = rpc_pb2.TContainerRequest()
@@ -754,7 +709,8 @@ class Connection(object):
 
     def WaitContainers(self, containers, timeout=None):
         request = rpc_pb2.TContainerRequest()
-        request.wait.name.extend(map(str, containers))
+        for ct in containers:
+            request.wait.name.append(str(ct))
         if timeout is not None and timeout >= 0:
             request.wait.timeout_ms = int(timeout * 1000)
         else:
@@ -790,7 +746,7 @@ class Connection(object):
         request.createVolume.CopyFrom(rpc_pb2.TVolumeCreateRequest())
         if path:
             request.createVolume.path = path
-        for name, value in properties.iteritems():
+        for name, value in properties.items():
             prop = request.createVolume.properties.add()
             prop.name, prop.value = name, value
         pb = self.rpc.call(request, timeout or self.disk_timeout).volume
@@ -862,7 +818,7 @@ class Connection(object):
         request = rpc_pb2.TContainerRequest()
         request.tuneVolume.CopyFrom(rpc_pb2.TVolumeTuneRequest())
         request.tuneVolume.path = path
-        for name, value in properties.iteritems():
+        for name, value in properties.items():
             prop = request.tuneVolume.properties.add()
             prop.name, prop.value = name, value
         self.rpc.call(request)

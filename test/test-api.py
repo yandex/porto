@@ -1,6 +1,15 @@
-import porto
+from __future__ import print_function
+
 import sys
 import os
+
+try:
+    import google.protobuf
+except ImportError as e:
+    print(e)
+    sys.exit(0)
+
+import porto
 
 import test_common
 from test_common import *
@@ -151,7 +160,7 @@ c.ListVolumes()
 v = c.CreateVolume(private=volume_private)
 v.GetProperties()
 v.Tune()
-f = file(v.path + "/file", 'w')
+f = open(v.path + "/file", 'w')
 f.write("test")
 f.close()
 
@@ -182,7 +191,7 @@ assert w.path == volume_path
 assert c.FindVolume(volume_path).path == volume_path
 assert len(w.GetLayers()) == 1
 assert w.GetLayers()[0].name == layer_name
-f = file(w.path + "/file", 'r+')
+f = open(w.path + "/file", 'r+')
 assert f.read() == "test"
 w.Unlink()
 
@@ -192,7 +201,7 @@ assert c.FindVolume(volume_path).path == volume_path
 assert len(w.GetLayers()) == 1
 assert w.GetLayers()[0].name == layer_name
 
-f = file(w.path + "/file", 'r+')
+f = open(w.path + "/file", 'r+')
 assert f.read() == "test"
 assert int(w.GetProperty("space_used")) <= volume_size_eps
 assert int(w.GetProperty("space_available")) > volume_size - volume_size_eps

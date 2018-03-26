@@ -18,6 +18,21 @@ PLACE="/place/porto_volumes"
 DUMMYLAYER = DIR + "/test_layer.tar"
 c = None
 
+def DumpObjectState(r, keys):
+    for k in keys:
+        try:
+            value = r.GetProperty(k)
+            try:
+                value = value.rstrip()
+            except:
+                pass
+        except:
+            value = "n/a"
+
+        print "{} : \"{}\"".format(k, value)
+
+    print ""
+
 def porto_reconnect(c):
     if c is not None:
         c.disconnect()

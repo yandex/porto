@@ -193,21 +193,6 @@ def get_kernel_maj_min():
     kver = re.match("([0-9])\.([0-9])", platform.uname()[2]).groups()
     return (int(kver[0]), int(kver[1]))
 
-def DumpObjectState(r, keys):
-    for k in keys:
-        try:
-            value = r.GetProperty(k)
-            try:
-                value = value.rstrip()
-            except:
-                pass
-        except:
-            value = "n/a"
-
-        print "{} : \"{}\"".format(k, value)
-
-    print ""
-
 portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 portobin = os.getcwd()
 portoctl = portobin + "/portoctl"
