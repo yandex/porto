@@ -9,6 +9,7 @@ Build-Depends:
  bash-completion, pandoc
 Standards-Version: 3.9.2
 X-Python-Version: >= 2.6
+X-Python3-Version: >= 3.2
 Homepage: https://github.com/yandex/porto
 Vcs-Git: https://github.com/yandex/porto.git
 
@@ -31,3 +32,10 @@ Priority: optional
 Architecture: all
 Depends: python-protobuf, ${python:Depends}
 Description: Python API for porto
+
+Package: python3-portopy
+Section: python
+Priority: optional
+Architecture: all
+Depends: python3-protobuf, ${python3:Depends}
+Description: Python 3 API for porto
