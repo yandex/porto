@@ -17,6 +17,9 @@ class _RPC(object):
         self.sock_pid = None
         self.deadline = None
         self.auto_reconnect = auto_reconnect
+        self.async_wait_names = []
+        self.async_wait_callback = None
+        self.async_wait_timeout = None
 
     def _connect(self):
         SOCK_CLOEXEC = 0o2000000
@@ -24,6 +27,7 @@ class _RPC(object):
         self._set_socket_timeout()
         self.sock.connect(self.socket_path)
         self.sock_pid = os.getpid()
+        self._resend_async_wait()
 
     def _check_connect(self):
         if self.sock is None:
@@ -68,26 +72,36 @@ class _RPC(object):
         return msg
 
     def _recv_response(self):
-        length = shift = 0
+        rsp = rpc_pb2.TContainerResponse()
         while True:
-            b = self._recv_data(1)
-            length |= (b[0] & 0x7f) << shift
-            shift += 7
-            if b[0] <= 0x7f:
-                break
-        return self._recv_data(length)
+            length = shift = 0
+            while True:
+                b = self._recv_data(1)
+                length |= (b[0] & 0x7f) << shift
+                shift += 7
+                if b[0] <= 0x7f:
+                    break
 
-    def call(self, request, call_timeout=0):
+            rsp.ParseFromString(bytes(self._recv_data(length)))
+
+            if rsp.HasField('AsyncWait'):
+                if self.async_wait_callback is not None:
+                    self.async_wait_callback(name=rsp.AsyncWait.name, state=rsp.AsyncWait.state, when=rsp.AsyncWait.when)
+            else:
+                return rsp
+
+    def encode_request(self, request):
         req = request.SerializeToString()
-
         length = len(req)
         hdr = bytearray()
         while length > 0x7f:
             hdr.append(0x80 | (length & 0x7f))
             length >>= 7
         hdr.append(length)
+        return hdr + req
 
-        req = hdr + req
+    def call(self, request, call_timeout=0):
+        req = self.encode_request(request)
 
         with self.lock:
             self._set_deadline(self.timeout)
@@ -107,7 +121,7 @@ class _RPC(object):
                     elif self.deadline is not None:
                         self.deadline += call_timeout
 
-                    rsp = self._recv_response()
+                    response = self._recv_response()
                 except socket.timeout as e:
                     self.sock = None
                     if not self.auto_reconnect:
@@ -119,8 +133,6 @@ class _RPC(object):
                 else:
                     break
 
-        response = rpc_pb2.TContainerResponse()
-        response.ParseFromString(bytes(rsp))
         if response.error != rpc_pb2.Success:
             raise exceptions.PortoException.Create(response.error, response.errorMsg)
         return response
@@ -152,6 +164,33 @@ class _RPC(object):
             if self.sock is not None:
                 self.sock.close()
                 self.sock = None
+
+    def _resend_async_wait(self):
+        if not self.async_wait_names:
+            return
+
+        request = rpc_pb2.TContainerRequest()
+        request.AsyncWait.name.extend(self.async_wait_names)
+        if self.async_wait_timeout is not None:
+            request.AsyncWait.timeout_ms = int(self.async_wait_timeout * 1000)
+
+        self.sock.sendall(self.encode_request(request))
+        response = self._recv_response()
+        if response.error != rpc_pb2.Success:
+            raise exceptions.PortoException.Create(response.error, response.errorMsg)
+
+    def async_wait(self, names, callback, timeout):
+        with self.lock:
+            self.async_wait_names = names
+            self.async_wait_callback = callback
+            self.async_wait_timeout = timeout
+
+        request = rpc_pb2.TContainerRequest()
+        request.AsyncWait.name.extend(names)
+        if timeout is not None:
+            request.AsyncWait.timeout_ms = int(timeout * 1000)
+
+        self.call(request)
 
 
 class Container(object):
@@ -730,6 +769,9 @@ class Connection(object):
             return self.WaitContainers(containers, timeout)
         except exceptions.WaitContainerTimeout:
             return ""
+
+    def AsyncWait(self, containers, callback, timeout=None):
+        self.rpc.async_wait([str(ct) for ct in containers], callback, timeout)
 
     def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
         if layers:
