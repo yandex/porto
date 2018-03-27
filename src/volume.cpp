@@ -2470,7 +2470,7 @@ TError TVolume::GetUpperLayer(TPath &upper) {
 TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
                            const TPath &target, bool read_only, bool required) {
 
-    PORTO_ASSERT(container->IsLocked());
+    PORTO_ASSERT(container->IsActionLocked());
 
     if (target) {
         if (!target.IsAbsolute())
@@ -2557,7 +2557,7 @@ undo:
 TError TVolume::UnlinkVolume(std::shared_ptr<TContainer> container, const TPath &target,
                              std::list<std::shared_ptr<TVolume>> &unlinked, bool strict) {
 
-    PORTO_ASSERT(container->IsLocked());
+    PORTO_ASSERT(container->IsActionLocked());
 
     TError error;
     auto volumes_lock = LockVolumes();

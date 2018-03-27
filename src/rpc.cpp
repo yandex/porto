@@ -407,10 +407,12 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
     if (!error) {
         std::string value;
 
+        ct->LockStateRead();
+
         if (req.has_real() && req.real()) {
             error = ct->HasProperty(req.property());
             if (error)
-                return error;
+                goto out;
         }
 
         if (req.has_sync() && req.sync())
@@ -419,6 +421,8 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
         error = ct->GetProperty(req.property(), value);
         if (!error)
             rsp.mutable_getproperty()->set_value(value);
+out:
+        ct->UnlockState();
     }
     return error;
 }
@@ -452,7 +456,11 @@ noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &re
     if (error)
         return error;
 
-    return ct->SetProperty(property, value);
+    ct->LockStateWrite();
+    error = ct->SetProperty(property, value);
+    ct->UnlockState();
+
+    return error;
 }
 
 noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
@@ -462,10 +470,12 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
     if (!error) {
         std::string value;
 
+        ct->LockStateRead();
+
         if (req.has_real() && req.real()) {
             error = ct->HasProperty(req.data());
             if (error)
-                return error;
+                goto out;
         }
 
         if (req.has_sync() && req.sync())
@@ -474,6 +484,8 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
         error = ct->GetProperty(req.data(), value);
         if (!error)
             rsp.mutable_getdata()->set_value(value);
+out:
+        ct->UnlockState();
     }
     return error;
 }
@@ -486,6 +498,9 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
     auto lock = LockContainers();
     TError containerError = CL->ResolveContainer(name, ct);
     lock.unlock();
+
+    if (!containerError)
+        ct->LockStateRead();
 
     auto entry = rsp.add_list();
     entry->set_name(name);
@@ -509,11 +524,13 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
             keyval->set_value(value);
         }
     }
+
+    if (!containerError)
+        ct->UnlockState();
 }
 
 noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
                                      rpc::TContainerResponse &rsp) {
-    bool try_lock = req.has_nonblock() && req.nonblock();
     auto get = rsp.mutable_get();
     std::list <std::string> masks, names;
 
@@ -543,21 +560,11 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
         }
     }
 
-    /* Lock all containers for read. TODO: lock only common ancestor */
-
-    auto lock = LockContainers();
-    TError error = RootContainer->LockRead(lock, try_lock);
-    lock.unlock();
-    if (error)
-        return error;
-
     if (req.has_sync() && req.sync())
         TContainer::SyncPropertiesAll();
 
     for (auto &name: names)
         FillGetResponse(req, *get, name);
-
-    RootContainer->Unlock();
 
     return OK;
 }
@@ -598,7 +605,10 @@ noinline TError Kill(const rpc::TContainerKillRequest &req) {
     error = CL->CanControl(*ct);
     if (error)
         return error;
-    return ct->Kill(req.sig());
+    ct->LockStateRead();
+    error = ct->Kill(req.sig());
+    ct->UnlockState();
+    return error;
 }
 
 noinline TError Version(rpc::TContainerResponse &rsp) {

@@ -247,16 +247,12 @@ TError TClient::ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volum
 }
 
 TError TClient::ReadContainer(const std::string &relative_name,
-                              std::shared_ptr<TContainer> &ct, bool try_lock) {
+                              std::shared_ptr<TContainer> &ct) {
     auto lock = LockContainers();
     TError error = ResolveContainer(relative_name, ct);
     if (error)
         return error;
     ReleaseContainer(true);
-    error = ct->LockRead(lock, try_lock);
-    if (error)
-        return error;
-    LockedContainer = ct;
     return OK;
 }
 
@@ -272,7 +268,7 @@ TError TClient::WriteContainer(const std::string &relative_name,
     if (error)
         return error;
     ReleaseContainer(true);
-    error = ct->Lock(lock);
+    error = ct->LockAction(lock);
     if (error)
         return error;
     LockedContainer = ct;
@@ -282,15 +278,15 @@ TError TClient::WriteContainer(const std::string &relative_name,
 TError TClient::LockContainer(std::shared_ptr<TContainer> &ct) {
     auto lock = LockContainers();
     ReleaseContainer(true);
-    TError error = ct->Lock(lock);
+    TError error = ct->LockAction(lock);
     if (!error)
         LockedContainer = ct;
     return error;
 }
 
-void TClient::ReleaseContainer(bool locked) {
+void TClient::ReleaseContainer(bool containers_locked) {
     if (LockedContainer) {
-        LockedContainer->Unlock(locked);
+        LockedContainer->UnlockAction(containers_locked);
         LockedContainer = nullptr;
     }
 }

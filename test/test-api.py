@@ -300,7 +300,7 @@ c.disconnect()
 c.connect()
 if Catch(c.Find, container_name) != porto.exceptions.ContainerDoesNotExist:
     Catch(c.Wait, [container_name], 1000)
-    assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
+    assert Catch(c.Destroy, container_name) == porto.exceptions.ContainerDoesNotExist
 
 Catch(c.Destroy, container_name)
 

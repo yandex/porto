@@ -81,7 +81,7 @@ public:
                             std::shared_ptr<TContainer> &ct) const;
 
     TError ReadContainer(const std::string &relative_name,
-                         std::shared_ptr<TContainer> &ct, bool try_lock = false);
+                         std::shared_ptr<TContainer> &ct);
     TError WriteContainer(const std::string &relative_name,
                           std::shared_ptr<TContainer> &ct, bool child = false);
 

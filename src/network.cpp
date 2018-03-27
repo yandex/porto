@@ -1599,14 +1599,16 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
         HostNetwork->RegisterClass(ct.NetClass);
     }
 
-    auto lock = env.Net->LockNetState();
+    ct.LockStateWrite();
     ct.Net = env.Net;
+    auto lock = ct.Net->LockNetState();
     if (ct.Controllers & CGROUP_NETCLS) {
         ct.Net->RegisterClass(ct.NetClass);
         ct.Net->InitStat(ct.NetClass);
     }
     ct.Net->NetUsers.push_back(&ct);
     lock.unlock();
+    ct.UnlockState();
 
     task.NetFd = std::move(env.NetNs);
 
@@ -1622,10 +1624,13 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
 void TNetwork::StopNetwork(TContainer &ct) {
     TError error;
 
+    ct.LockStateWrite();
     auto state_lock = ct.LockNetState();
 
     auto net = ct.Net;
     ct.Net = nullptr;
+    ct.UnlockState();
+
     if (!net)
         return;
 
@@ -1634,7 +1639,6 @@ void TNetwork::StopNetwork(TContainer &ct) {
 
     net->NetUsers.remove(&ct);
     bool last = net->NetUsers.empty();
-
     state_lock.unlock();
 
     if (ct.Controllers & CGROUP_NETCLS) {
@@ -1708,8 +1712,11 @@ void TNetwork::StopNetwork(TContainer &ct) {
         }
     }
 
-    if (env.SaveIp)
+    if (env.SaveIp) {
+        ct.LockStateWrite();
         env.FormatIp(ct.IpList);
+        ct.UnlockState();
+    }
 }
 
 TError TNetwork::RestoreNetwork(TContainer &ct) {
@@ -1749,6 +1756,8 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
         }
     }
 
+    ct.LockStateWrite();
+
     ct.NetClass.HostClass = net == HostNetwork;
 
     if ((ct.Controllers & CGROUP_NETCLS) && !ct.NetClass.HostClass) {
@@ -1764,6 +1773,9 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
 
     ct.Net = net;
     net->NetUsers.push_back(&ct);
+    state_lock.unlock();
+
+    ct.UnlockState();
 
     return OK;
 }

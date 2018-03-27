@@ -149,12 +149,9 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
     return TContainer::Find(name.substr(prefix.length()), ct);
 }
 
-/* lock subtree for read or write */
-TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
-    L_DBG("{} {} CT{}:{}",
-          (try_lock ? "TryLock" : "Lock"),
-          (for_read ? "read" : "write"),
-          Id, Name);
+/* lock subtree shared or exclusive */
+TError TContainer::LockAction(std::unique_lock<std::mutex> &containers_lock, bool shared) {
+    L_DBG("LockAction{} CT{}:{}", (shared ? "Shared" : ""), Id, Name);
 
     while (1) {
         if (State == EContainerState::Destroyed) {
@@ -162,27 +159,23 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
         bool busy;
-        if (for_read)
-            busy = Locked < 0 || PendingWrite || SubtreeWrite;
+        if (shared)
+            busy = ActionLocked < 0 || PendingWrite || SubtreeWrite;
         else
-            busy = Locked || SubtreeRead || SubtreeWrite;
+            busy = ActionLocked || SubtreeRead || SubtreeWrite;
         for (auto ct = Parent.get(); !busy && ct; ct = ct->Parent.get())
-            busy = ct->PendingWrite || (for_read ? ct->Locked < 0 : ct->Locked);
+            busy = ct->PendingWrite || (shared ? ct->ActionLocked < 0 : ct->ActionLocked);
         if (!busy)
             break;
-        if (try_lock) {
-            L_DBG("TryLock {} Failed CT{}:{}", (for_read ? "read" : "write"), Id, Name);
-            return TError(EError::Busy, "Container is busy: " + Name);
-        }
-        if (!for_read)
+        if (!shared)
             PendingWrite = true;
-        ContainersCV.wait(lock);
+        ContainersCV.wait(containers_lock);
     }
     PendingWrite = false;
-    Locked += for_read ? 1 : -1;
+    ActionLocked += shared ? 1 : -1;
     LastOwner = GetTid();
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
-        if (for_read)
+        if (shared)
             ct->SubtreeRead++;
         else
             ct->SubtreeWrite++;
@@ -190,32 +183,54 @@ TError TContainer::Lock(TScopedLock &lock, bool for_read, bool try_lock) {
     return OK;
 }
 
-bool TContainer::IsLocked(bool for_read) {
+void TContainer::UnlockAction(bool containers_locked) {
+    L_DBG("UnlockAction{} CT{}:{}", (ActionLocked > 0 ? "Shared" : ""), Id, Name);
+    if (!containers_locked)
+        ContainersMutex.lock();
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        if (ActionLocked > 0) {
+            PORTO_ASSERT(ct->SubtreeRead > 0);
+            ct->SubtreeRead--;
+        } else {
+            PORTO_ASSERT(ct->SubtreeWrite > 0);
+            ct->SubtreeWrite--;
+        }
+    }
+    PORTO_ASSERT(ActionLocked);
+    ActionLocked += (ActionLocked > 0) ? -1 : 1;
+    /* not so effective and fair but simple */
+    ContainersCV.notify_all();
+    if (!containers_locked)
+        ContainersMutex.unlock();
+}
+
+bool TContainer::IsActionLocked(bool shared) {
     for (auto ct = this; ct; ct = ct->Parent.get())
-        if (ct->Locked < 0 || (for_read && ct->Locked > 0))
+        if (ct->ActionLocked < 0 || (shared && ct->ActionLocked > 0))
             return true;
     return false;
 }
 
-void TContainer::DowngradeLock() {
+void TContainer::DowngradeActionLock() {
     auto lock = LockContainers();
-    PORTO_ASSERT(Locked == -1);
+    PORTO_ASSERT(ActionLocked == -1);
 
-    L_DBG("Downgrading write to read CT{}:{}", Id, Name);
+    L_DBG("Downgrading exclusive to shared CT{}:{}", Id, Name);
 
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
         ct->SubtreeRead++;
         ct->SubtreeWrite--;
     }
 
-    Locked = 1;
+    ActionLocked = 1;
     ContainersCV.notify_all();
 }
 
-void TContainer::UpgradeLock() {
+/* only after downgrade */
+void TContainer::UpgradeActionLock() {
     auto lock = LockContainers();
 
-    L_DBG("Upgrading read back to write CT{}:{}", Id, Name);
+    L_DBG("Upgrading shared back to exclusive CT{}:{}", Id, Name);
 
     PendingWrite = true;
 
@@ -224,42 +239,58 @@ void TContainer::UpgradeLock() {
         ct->SubtreeWrite++;
     }
 
-    while (Locked != 1)
+    while (ActionLocked != 1)
         ContainersCV.wait(lock);
 
-    Locked = -1;
+    ActionLocked = -1;
     LastOwner = GetTid();
 
     PendingWrite = false;
 }
 
-void TContainer::Unlock(bool locked) {
-    L_DBG("Unlock {} CT{}:{}", (Locked > 0 ? "read" : "write"), Id, Name);
-    if (!locked)
-        ContainersMutex.lock();
-    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
-        if (Locked > 0) {
-            PORTO_ASSERT(ct->SubtreeRead > 0);
-            ct->SubtreeRead--;
-        } else {
-            PORTO_ASSERT(ct->SubtreeWrite > 0);
-            ct->SubtreeWrite--;
-        }
-    }
-    PORTO_ASSERT(Locked);
-    Locked += (Locked > 0) ? -1 : 1;
-    /* not so effective and fair but simple */
+void TContainer::LockStateRead() {
+    auto lock = LockContainers();
+    L_DBG("LockStateRead CT{}:{}", Id, Name);
+    while (StateLocked < 0)
+        ContainersCV.wait(lock);
+    StateLocked++;
+}
+
+void TContainer::LockStateWrite() {
+    auto lock = LockContainers();
+    L_DBG("LockStateWrite CT{}:{}", Id, Name);
+    while (StateLocked < 0)
+        ContainersCV.wait(lock);
+    StateLocked = -1 - StateLocked;
+    while (StateLocked != -1)
+        ContainersCV.wait(lock);
+}
+
+void TContainer::DowngradeStateLock() {
+    auto lock = LockContainers();
+    L_DBG("DowngradeStateLock CT{}:{}", Id, Name);
+    PORTO_ASSERT(StateLocked == -1);
+    StateLocked = 1;
     ContainersCV.notify_all();
-    if (!locked)
-        ContainersMutex.unlock();
+}
+
+void TContainer::UnlockState() {
+    auto lock = LockContainers();
+    L_DBG("UnlockState CT{}:{}", Id, Name);
+    PORTO_ASSERT(StateLocked);
+    if (StateLocked > 0)
+        --StateLocked;
+    else if (++StateLocked >= -1)
+        ContainersCV.notify_all();
 }
 
 void TContainer::DumpLocks() {
     auto lock = LockContainers();
     for (auto &it: Containers) {
         auto &ct = it.second;
-        if (ct->Locked || ct->PendingWrite || ct->SubtreeRead || ct->SubtreeWrite)
-            L("CT{}:{} Locked {} by {} Read {} Write {}{}", ct->Id, ct->Name, ct->Locked,
+        if (ct->ActionLocked || ct->PendingWrite || ct->SubtreeRead || ct->SubtreeWrite || ct->StateLocked)
+            L("CT{}:{} StateLocked {} ActionLocked {} by {} Read {} Write {}{}",
+                ct->Id, ct->Name, ct->StateLocked, ct->ActionLocked,
                 ct->LastOwner, ct->SubtreeRead, ct->SubtreeWrite,
                 (ct->PendingWrite ? " PendingWrite" : ""));
     }
@@ -355,6 +386,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     IoPrio = 0;
 
     PressurizeOnDeath = config().container().pressurize_on_death();
+    RunningChildren = 0;
+    StartingChildren = 0;
 
     Controllers = RequiredControllers = CGROUP_FREEZER;
 
@@ -431,7 +464,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     if (parent) {
         if (parent->Level == CONTAINER_LEVEL_MAX)
             return TError(EError::InvalidValue, "You shall not go deeper! Maximum level is {}", CONTAINER_LEVEL_MAX);
-        error = parent->LockRead(lock);
+        error = parent->LockActionShared(lock);
         if (error)
             return error;
         error = CL->CanControl(*parent, true);
@@ -489,7 +522,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
     ct->Register();
 
     if (parent)
-        parent->Unlock(true);
+        parent->UnlockAction(true);
 
     TContainerWaiter::ReportAll(*ct);
 
@@ -497,7 +530,7 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
 
 err:
     if (parent)
-        parent->Unlock(true);
+        parent->UnlockAction(true);
     if (id >= 0)
         ContainerIdMap.Put(id);
     ct = nullptr;
@@ -801,7 +834,8 @@ void TContainer::SetState(EContainerState next) {
 
     L_ACT("Change CT{}:{} state {} -> {}", Id, Name, StateName(State), StateName(next));
 
-    auto lock = LockContainers();
+    LockStateWrite();
+
     auto prev = State;
     State = next;
 
@@ -811,14 +845,21 @@ void TContainer::SetState(EContainerState next) {
     }
 
     if (prev == EContainerState::Running || next == EContainerState::Running) {
-        for (auto p = Parent; p; p = p->Parent) {
+        for (auto p = Parent; p; p = p->Parent)
             p->RunningChildren += next == EContainerState::Running ? 1 : -1;
+    }
+
+    DowngradeStateLock();
+
+    if (prev == EContainerState::Running || next == EContainerState::Running) {
+        for (auto p = Parent; p; p = p->Parent)
             if (!p->RunningChildren && p->State == EContainerState::Meta)
                 TContainerWaiter::ReportAll(*p);
-        }
     }
 
     TContainerWaiter::ReportAll(*this);
+
+    UnlockState();
 }
 
 TError TContainer::Destroy() {
@@ -847,15 +888,13 @@ TError TContainer::Destroy() {
 
     TVolume::UnlinkAllVolumes(shared_from_this(), unlinked);
 
-    auto lock = LockContainers();
-
-    Unregister();
-
     TPath path(ContainersKV / std::to_string(Id));
     error = path.Unlink();
     if (error)
         L_ERR("Can't remove key-value node {}: {}", path, error);
 
+    auto lock = LockContainers();
+    Unregister();
     lock.unlock();
 
     TVolume::DestroyUnlinked(unlinked);
@@ -975,15 +1014,14 @@ TError TContainer::CheckMemGuarantee() const {
     return OK;
 }
 
-uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
+uint64_t TContainer::GetTotalMemGuarantee(bool containers_locked) const {
     uint64_t sum = 0lu;
 
     /* Stopped container doesn't have memory guarantees */
     if (State == EContainerState::Stopped)
         return 0;
 
-    // FIXME ugly
-    if (!locked)
+    if (!containers_locked)
         ContainersMutex.lock();
 
     for (auto &child : Children)
@@ -991,7 +1029,7 @@ uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
 
     sum = std::max(NewMemGuarantee, sum);
 
-    if (!locked)
+    if (!containers_locked)
         ContainersMutex.unlock();
 
     return sum;
@@ -999,7 +1037,6 @@ uint64_t TContainer::GetTotalMemGuarantee(bool locked) const {
 uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
     uint64_t lim = 0;
 
-    // FIXME ugly
     if (!base)
         ContainersMutex.lock();
 
@@ -2238,11 +2275,13 @@ TError TContainer::PrepareStart() {
 
     if (Parent) {
         CT = this;
+        LockStateWrite();
         for (auto &knob: ContainerProperties) {
             error = knob.second->Start();
             if (error)
                 break;
         }
+        UnlockState();
         CT = nullptr;
         if (error)
             return error;
@@ -2331,7 +2370,7 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    PORTO_ASSERT(IsLocked());
+    PORTO_ASSERT(IsActionLocked());
 
     error = PrepareStart();
     if (error) {
@@ -2362,11 +2401,11 @@ TError TContainer::Start() {
         }
     }
 
-    CL->LockedContainer->DowngradeLock();
+    CL->LockedContainer->DowngradeActionLock();
 
     error = StartTask();
 
-    CL->LockedContainer->UpgradeLock();
+    CL->LockedContainer->UpgradeActionLock();
 
     if (error) {
         SetState(EContainerState::Stopping);
@@ -2453,8 +2492,10 @@ TError TContainer::PrepareResources() {
             goto undo;
         }
 
+        LockStateWrite();
         RootPath = vol->Path;
         Root = vol->Path.ToString();
+        UnlockState();
     }
 
     PropagateCpuLimit();
@@ -2617,7 +2658,7 @@ TError TContainer::Stop(uint64_t timeout) {
 
     /* Downgrade explusive lock if we are going to wait. */
     if (timeout)
-        CL->LockedContainer->DowngradeLock();
+        CL->LockedContainer->DowngradeActionLock();
 
     if (!timeout) {
         L_ACT("Killing spree");
@@ -2646,13 +2687,15 @@ TError TContainer::Stop(uint64_t timeout) {
     }
 
     if (timeout)
-        CL->LockedContainer->UpgradeLock();
+        CL->LockedContainer->UpgradeActionLock();
 
     for (auto &ct: subtree) {
         if (ct->State == EContainerState::Stopped)
             continue;
 
         L_ACT("Stop CT{}:{}", Id, Name);
+
+        ct->LockStateWrite();
 
         ct->ForgetPid();
 
@@ -2669,6 +2712,8 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->OomEvents = 0;
         ct->OomKilled = false;
         ct->ClearProp(EProperty::OOM_KILLED);
+
+        ct->UnlockState();
 
         ct->FreeResources();
         ct->SetState(EContainerState::Stopped);
@@ -2688,6 +2733,8 @@ void TContainer::Reap(bool oomKilled) {
     if (error)
         L_WRN("Cannot terminate CT{}:{} : {}", Id, Name, error);
 
+    LockStateWrite();
+
     DeathTime = GetCurrentTimeMs();
     SetProp(EProperty::DEATH_TIME);
 
@@ -2697,6 +2744,8 @@ void TContainer::Reap(bool oomKilled) {
     }
 
     ForgetPid();
+
+    UnlockState();
 
     Stdout.Rotate(*this);
     Stderr.Rotate(*this);
@@ -2731,8 +2780,10 @@ void TContainer::Exit(int status, bool oomKilled) {
     L_EVT("Exit CT{}:{} {} {}", Id, Name, FormatExitStatus(status),
           (oomKilled ? "invoked by OOM" : ""));
 
+    LockStateWrite();
     ExitStatus = status;
     SetProp(EProperty::EXIT_STATUS);
+    UnlockState();
 
     /* Detect memory shortage that happened in syscalls */
     auto cg = GetCgroup(MemorySubsystem);
@@ -2832,13 +2883,16 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
+    LockStateWrite();
     RespawnCount++;
     SetProp(EProperty::RESPAWN_COUNT);
+    UnlockState();
 
     return Start();
 }
 
 void TContainer::SyncProperty(const std::string &name) {
+    PORTO_ASSERT(IsStateLockedRead());
     if (StringStartsWith(name, "net_") && Net)
         Net->SyncStat();
 }
@@ -3049,6 +3103,7 @@ TError TContainer::Load(const TKeyValue &node) {
     TError error;
 
     CT = this;
+    LockStateWrite();
 
     OwnerCred = CL->Cred;
 
@@ -3088,7 +3143,9 @@ TError TContainer::Load(const TKeyValue &node) {
     }
 
     if (state != EContainerState::Destroyed) {
+        UnlockState();
         SetState(state);
+        LockStateWrite();
         SetProp(EProperty::STATE);
     } else
         error = TError("Container has no state");
@@ -3108,6 +3165,7 @@ TError TContainer::Load(const TKeyValue &node) {
 
     SanitizeCapabilities();
 
+    UnlockState();
     CT = nullptr;
 
     return error;
@@ -3339,12 +3397,12 @@ void TContainer::Event(const TEvent &event) {
     case EEventType::OOM:
     {
         if (ct) {
-            error = ct->Lock(lock);
+            error = ct->LockAction(lock);
             lock.unlock();
             if (!error) {
                 if (ct->OomIsFatal)
                     ct->Exit(SIGKILL, true);
-                ct->Unlock();
+                ct->UnlockAction();
             }
         }
         break;
@@ -3365,7 +3423,7 @@ void TContainer::Event(const TEvent &event) {
             if (ct->WaitTask.Pid != event.Exit.Pid &&
                     ct->SeizeTask.Pid != event.Exit.Pid)
                 continue;
-            error = ct->Lock(lock);
+            error = ct->LockAction(lock);
             lock.unlock();
             if (!error) {
                 if (ct->WaitTask.Pid == event.Exit.Pid ||
@@ -3373,7 +3431,7 @@ void TContainer::Event(const TEvent &event) {
                     ct->Exit(event.Exit.Status, false);
                     delivered = true;
                 }
-                ct->Unlock();
+                ct->UnlockAction();
             }
             break;
         }
@@ -3396,7 +3454,7 @@ void TContainer::Event(const TEvent &event) {
 
     case EEventType::DestroyAgedContainer:
         if (ct) {
-            error = ct->Lock(lock);
+            error = ct->LockAction(lock);
             lock.unlock();
             if (!error) {
                 if (ct->State == EContainerState::Dead &&
@@ -3404,19 +3462,19 @@ void TContainer::Event(const TEvent &event) {
                     Statistics->RemoveDead++;
                     ct->Destroy();
                 }
-                ct->Unlock();
+                ct->UnlockAction();
             }
         }
         break;
 
     case EEventType::DestroyWeakContainer:
         if (ct) {
-            error = ct->Lock(lock);
+            error = ct->LockAction(lock);
             lock.unlock();
             if (!error) {
                 if (ct->IsWeak)
                     ct->Destroy();
-                ct->Unlock();
+                ct->UnlockAction();
             }
         }
         break;

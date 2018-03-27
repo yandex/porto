@@ -53,11 +53,14 @@ std::string TProperty::GetDesc() const {
 }
 
 TError TProperty::CanGet() const {
+    PORTO_ASSERT(CT->IsStateLockedRead());
+
     if (!IsSupported)
         return TError(EError::NotSupported, "{} is not supported", Name);
 
-    if (IsRuntimeOnly && CT->State == EContainerState::Stopped)
-        return TError(EError::InvalidState, "{} is not available in stopped state", Name);
+    if (IsRuntimeOnly && (CT->State == EContainerState::Stopped ||
+                          CT->State == EContainerState::Starting))
+        return TError(EError::InvalidState, "{} is not available in {} state", TContainer::StateName(CT->State), Name);
 
     if (IsDeadOnly && CT->State != EContainerState::Dead)
         return TError(EError::InvalidState, "{} available only in dead state", Name);
@@ -66,6 +69,8 @@ TError TProperty::CanGet() const {
 }
 
 TError TProperty::CanSet() const {
+    PORTO_ASSERT(CT->IsStateLockedWrite());
+
     if (!IsSupported)
         return TError(EError::NotSupported, "{} is not supported", Name);
 

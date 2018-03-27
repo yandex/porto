@@ -8,7 +8,6 @@
 #include <condition_variable>
 
 #include "util/unix.hpp"
-#include "util/locks.hpp"
 #include "util/log.hpp"
 #include "util/idmap.hpp"
 #include "task.hpp"
@@ -55,7 +54,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
                    public TNonCopyable {
     friend class TProperty;
 
-    int Locked = 0;
+    int StateLocked = 0;
+    int ActionLocked = 0;
     int SubtreeRead = 0;
     int SubtreeWrite = 0;
     bool PendingWrite = false;
@@ -101,10 +101,9 @@ public:
     const std::string Name;
     const std::string FirstName;
 
-    /* protected with exclusive lock and ContainersMutex */
     EContainerState State = EContainerState::Stopped;
-    int RunningChildren = 0;
-    int StartingChildren = 0;
+    std::atomic<int> RunningChildren;
+    std::atomic<int> StartingChildren;
 
     bool HasResources() const {
         return State == EContainerState::Running ||
@@ -250,11 +249,11 @@ public:
     TTask WaitTask;
     TTask SeizeTask;
 
-    /* Protected with container lock */
+    /* Protected with container state lock */
     std::shared_ptr<TNetwork> Net;
 
-    /* Container must be locked to stabilize Net pointer */
     inline std::unique_lock<std::mutex> LockNetState() {
+        PORTO_ASSERT(IsStateLockedRead());
         if (Net)
             return Net->LockNetState();
         return std::unique_lock<std::mutex>();
@@ -306,27 +305,32 @@ public:
 
     std::string GetPortoNamespace(bool write = false) const;
 
-    TError Lock(TScopedLock &lock, bool for_read = false, bool try_lock = false);
-    TError LockRead(TScopedLock &lock, bool try_lock = false) {
-        return Lock(lock, true, try_lock);
+    TError LockAction(std::unique_lock<std::mutex> &containers_lock, bool shared = false);
+    TError LockActionShared(std::unique_lock<std::mutex> &containers_lock) {
+        return LockAction(containers_lock, true);
     }
-    void Unlock(bool locked = false);
+    void UnlockAction(bool containers_locked = false);
+    bool IsActionLocked(bool shared = false);
+    void DowngradeActionLock();
+    void UpgradeActionLock();
+
+    void LockStateRead();
+    void LockStateWrite();
+    void DowngradeStateLock();
+    void UnlockState();
+    bool IsStateLockedRead() { return StateLocked != 0; }
+    bool IsStateLockedWrite() { return StateLocked == -1; }
+
     static void DumpLocks();
+
     TTuple Taint();
 
-    bool IsLocked(bool for_read = false);
-    bool IsReadLocked() { return IsLocked(true); }
-
-    /* Only for temporary write lock downgrade
-     * with subsequent upgrade */
-    void DowngradeLock(void);
-    void UpgradeLock(void);
 
     TUlimit GetUlimit() const;
     void SanitizeCapabilities();
 
     TError CheckMemGuarantee() const;
-    uint64_t GetTotalMemGuarantee(bool locked = false) const;
+    uint64_t GetTotalMemGuarantee(bool containers_locked = false) const;
     uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
 
     bool IsRoot() const { return !Level; }
