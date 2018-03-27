@@ -13,13 +13,13 @@ add_executable(mem_touch mem_touch.c)
 
 macro(ADD_PYTHON_TEST NAME)
          add_test(NAME ${NAME}
-                  COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -u ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
+                  COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endmacro()
 
 macro(ADD_PYTHON3_TEST NAME)
          add_test(NAME python3-${NAME}
-                  COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python3 -u ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
+                  COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python3 -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endmacro()
 
@@ -110,11 +110,11 @@ add_test(NAME leaks
 ADD_PYTHON_TEST(performance)
 
 add_test(NAME fuzzer_soft
-         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -u ${CMAKE_SOURCE_DIR}/test/fuzzer.py --no-kill
+         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/fuzzer.py --no-kill
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME fuzzer
-         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -u ${CMAKE_SOURCE_DIR}/test/fuzzer.py
+         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/fuzzer.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # tail
