@@ -5,6 +5,7 @@ def readme():
         return f.read()
 
 setup(name='portopy',
+    version='2.11',
     description='Python API for porto',
     long_description=readme(),
     url='https://github.com/yandex/porto',
@@ -15,11 +16,5 @@ setup(name='portopy',
     install_requires=[
         'protobuf',
     ],
-    use_scm_version={
-        'root': '../../..',
-        'version_scheme': 'post-release',
-        'local_scheme': 'node-and-date',
-    },
-    setup_requires=['setuptools_scm'],
     zip_safe=False)
 
