@@ -1,3 +1,14 @@
+yandex-porto (4.12.2) unstable; urgency=low
+
+  * porto: add async wait
+  * portoctl: add async wait
+  * python: add async wait
+  * test: add test for async wait
+  * python/api: get version also from PKG-INFO
+  * python/api: recompile rpc.proto at setup
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 28 Mar 2018 20:10:19 +0300
+
 yandex-porto (4.12.1) unstable; urgency=low
 
   * filesystem: mount binds after rootfs setup
