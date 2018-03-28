@@ -1,7 +1,11 @@
 from setuptools import setup
 import re
+import os
 
 def version():
+    if os.path.exists('PKG-INFO'):
+        with open("PKG-INFO") as f:
+            return re.search(r'\nVersion: (\S+)\n', f.read()).group(1)
     with open("../../../debian/changelog") as f:
         return re.search(r'.*\((.*)\).*', f.readline()).group(1)
 
