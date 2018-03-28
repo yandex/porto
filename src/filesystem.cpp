@@ -447,6 +447,14 @@ TError TMountNamespace::SetupRoot() {
             return error;
     }
 
+    error = MountTraceFs();
+    if (error)
+        L_WRN("Cannot mount tracefs: {}", error);
+
+    error = MountSystemd();
+    if (error)
+        return error;
+
     return OK;
 }
 
@@ -475,7 +483,7 @@ TError TMountNamespace::ProtectProc() {
 }
 
 TError TMountNamespace::Setup() {
-    TPath root("/"), proc("/proc"), sys("/sys");
+    TPath root("/"), proc("/proc");
     TFile rootFd;
     TError error;
 
@@ -512,7 +520,6 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    // protect sysfs
     if (Root.IsRoot()) {
         error = TPath("/sys/fs/cgroup").UmountAll();
         if (error)
@@ -534,7 +541,12 @@ TError TMountNamespace::Setup() {
         if (error)
             return error;
 
-        error = sys.Remount(MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
+        // protect sysfs
+        error = TPath("/sys").Remount(MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
+        if (error)
+            return error;
+    } else {
+        error = SetupRoot();
         if (error)
             return error;
     }
@@ -546,18 +558,6 @@ TError TMountNamespace::Setup() {
     }
 
     if (!Root.IsRoot()) {
-        error = SetupRoot();
-        if (error)
-            return error;
-
-        error = MountTraceFs();
-        if (error)
-            L_WRN("Cannot mount tracefs: {}", error);
-
-        error = MountSystemd();
-        if (error)
-            return error;
-
         error = rootFd.PivotRoot();
         if (error) {
             L_WRN("Cannot pivot root, roll back to chroot: {}", error);
