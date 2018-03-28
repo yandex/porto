@@ -1,18 +1,8 @@
-from __future__ import print_function
+from test_common import *
 
 import sys
 import os
-
-try:
-    import google.protobuf
-except ImportError as e:
-    print(e)
-    sys.exit(0)
-
 import porto
-
-import test_common
-from test_common import *
 
 AsAlice()
 

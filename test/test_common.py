@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import sys
 import os
 import signal
@@ -6,6 +8,12 @@ import grp
 import time
 import platform
 import re
+
+try:
+    import google.protobuf
+except ImportError as e:
+    print(e)
+    sys.exit(0)
 
 def Catch(func, *args, **kwargs):
     try:
