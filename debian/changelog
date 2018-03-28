@@ -1,3 +1,9 @@
+yandex-porto (4.12.1) unstable; urgency=low
+
+  * filesystem: mount binds after rootfs setup
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 28 Mar 2018 11:21:06 +0300
+
 yandex-porto (4.12.0) unstable; urgency=low
 
   * test: plug warnings in legacy tests
