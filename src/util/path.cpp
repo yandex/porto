@@ -768,8 +768,16 @@ TError TPath::Remount(uint64_t mnt_flags) const {
         for (auto &mnt: mounts) {
             if (mnt.Target.IsInside(normal) && mnt.Target != normal) {
                 error = mnt.Target.Remount(remount_flags);
-                if (error)
-                    return error;
+                if (error) {
+                    TFile dst;
+                    TError error2 = dst.OpenPath(mnt.Target);
+                    if (error2)
+                        L("cannot remount {} {} and open {}", mnt.Target, error, error2);
+                    else if (dst.GetMountId() != mnt.MountId)
+                        L("cannot remount {} {} different mount id", mnt.Target, error);
+                    else
+                        return error;
+                }
             }
         }
     }
@@ -1342,7 +1350,7 @@ TError TFile::Chattr(int fd, unsigned add_flags, unsigned del_flags) {
     return OK;
 }
 
-int TFile::GetMountId(const TPath relative) const {
+int TFile::GetMountId(const TPath &relative) const {
     FileHandle fh;
     int mnt;
     if (name_to_handle_at(Fd, relative.ToString().c_str(),
