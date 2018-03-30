@@ -2022,12 +2022,10 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         auto src = TVolume::ResolveOrigin(Parent->RootPath / bm.Source);
         bm.ControlSource = src && !CL->CanControl(src->Volume->VolumeOwner);
 
-        if (bm.Target.IsAbsolute())
-            bm.Target = TaskEnv.Mnt.Root / bm.Target;
-        else
-            bm.Target = TaskEnv.Mnt.Root / TaskEnv.Mnt.Cwd / bm.Target;
+        if (!bm.Target.IsAbsolute())
+            bm.Target = TaskEnv.Mnt.Cwd / bm.Target;
 
-        auto dst = TVolume::ResolveOrigin(Parent->RootPath / bm.Target);
+        auto dst = TVolume::ResolveOrigin(Parent->RootPath / TaskEnv.Mnt.Root / bm.Target);
         bm.ControlTarget = dst && !CL->CanControl(dst->Volume->VolumeOwner);
 
         /* allow suid inside by default */

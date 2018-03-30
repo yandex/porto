@@ -62,9 +62,6 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
         bind.Source = line[0];
         bind.Target = line[1];
 
-        bind.CreateTarget = true;
-        bind.FollowTraget = true;
-
         if (line.size() > 2) {
             uint64_t flags;
             error = TMount::ParseFlags(line[2], flags,
@@ -103,29 +100,40 @@ std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     return MergeEscapeStrings(lines, ' ', ';');
 }
 
-TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
-    bool directory = IsDirectory;
+TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
+    bool directory;
     TFile src, dst;
     TError error;
 
     error = src.OpenPath(Source);
-    if (error)
-        return error;
+    if (!error)
+        directory = src.IsDirectory();
 
-    if (!IsDirectory && !IsFile)
-        directory = Source.IsDirectoryFollow();
-
-    if (!ControlSource) {
+    if (!error && !ControlSource) {
         /* not read-only means read-write, protect system directories from dac override */
-        if (!(MntFlags & MS_RDONLY) || (directory && IsSystemPath(Source)))
+        if (!(MntFlags & MS_RDONLY) || (directory && IsSystemPath(src.RealPath())))
             error = src.WriteAccess(cred);
         else
             error = src.ReadAccess(cred);
-        if (error)
-            return TError(error, "Bindmount {}", Target);
     }
 
-    if (CreateTarget && !Target.Exists()) {
+    if (error)
+        return TError(error, "Bindmount source {}", Source);
+
+    TFile old_root, new_root;
+    if (!target_root.IsRoot()) {
+        error = old_root.OpenDir("/");
+        if (error)
+            return error;
+        error = new_root.OpenDir(target_root);
+        if (error)
+            return TError(error, "Bindmount root {}", target_root);
+        error = new_root.Chroot();
+        if (error)
+            return error;
+    }
+
+    if (!Target.Exists()) {
         TPath base = Target.DirName();
         std::list<std::string> dirs;
         TFile dir;
@@ -135,18 +143,10 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
             base = base.DirName();
         }
 
-        error = dir.OpenDir(base);
-        if (error)
-            return error;
+        if (!error)
+            error = dir.OpenDir(base);
 
-        TPath real = dir.RealPath();
-        if (!FollowTraget && base != real)
-            return TError(EError::InvalidValue, "Real target path differs: {} -> {}", base, real);
-
-        if (!root.IsRoot() && !real.IsInside(root))
-            return TError(EError::InvalidValue, "Bind mount target out of chroot: {} -> {}", base, real);
-
-        if (root.IsRoot() && !ControlTarget)
+        if (!error && target_root.IsRoot() && !ControlTarget)
             error = dir.WriteAccess(cred);
 
         for (auto &name: dirs) {
@@ -158,44 +158,43 @@ TError TBindMount::Mount(const TCred &cred, const TPath &root) const {
                 error = dir.Chown(cred);
         }
 
-        if (error)
-            return TError(error, "Bindmount {}", Target);
-
+        auto base_name = Target.BaseName();
         if (directory) {
-            error = dir.MkdirAt(Target.BaseName(), 0775);
             if (!error)
-                error = dst.OpenDir(Target);
-        } else
-            error = dst.OpenAt(dir, Target.BaseName(), O_CREAT | O_WRONLY | O_CLOEXEC |
-                               (FollowTraget ? 0 : O_NOFOLLOW), 0664);
+                error = dir.MkdirAt(base_name, 0775);
+            if (!error)
+                error = dst.OpenAt(dir, base_name, O_DIRECTORY | O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC, 0);
+        } else if (!error) {
+            error = dst.OpenAt(dir, base_name, O_CREAT | O_WRONLY | O_CLOEXEC, 0664);
+        }
         if (!error)
             error = dst.Chown(cred);
     } else {
-        if (directory)
-            error = dst.OpenDir(Target);
-        else
-            error = dst.OpenRead(Target);
+        if (!error)
+            error = directory ? dst.OpenDir(Target) : dst.OpenRead(Target);
 
         // do not override non-writable directies in host or system directories
-        if (!error && !ControlTarget && (root.IsRoot() || IsSystemPath(Target)))
+        if (!error && !ControlTarget && (target_root.IsRoot() || IsSystemPath(Target)))
             error = dst.WriteAccess(cred);
     }
+
+    if (old_root) {
+        TError error2 = old_root.Chroot();
+        PORTO_ASSERT(!error2);
+    }
+
     if (error)
-        return TError(error, "Bindmount {}", Target);
+        return TError(error, "Bindmount target {}", Target);
 
-    TPath real = dst.RealPath();
-
-    if (!FollowTraget && Target != real)
-        return TError(EError::InvalidValue, "Real target path differs: {} -> {}", Target, real);
-
-    if (!root.IsRoot() && !real.IsInside(root))
-        return TError(EError::InvalidValue, "Bind mount target out of chroot: {} -> {}", Target, real);
+    TPath real_target = dst.RealPath();
+    if (new_root && !real_target.IsInside(new_root.RealPath()))
+        return TError(EError::InvalidValue, "Bindmount real target {} out of root {}", real_target, target_root);
 
     error = dst.ProcPath().Bind(src.ProcPath(), MntFlags & MS_REC);
     if (error)
         return error;
 
-    error = Target.Remount(MS_BIND | MntFlags);
+    error = real_target.Remount(MS_BIND | MntFlags);
     if (error)
         return error;
 

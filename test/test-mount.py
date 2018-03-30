@@ -103,6 +103,21 @@ Expect('rw' in mnt['/test_ro/sub2']['flag'])
 
 a.Destroy()
 
+# bind into asbolute symlink in chroot
+os.mkdir(root_volume.path + "/symlink_dst")
+os.symlink("/symlink_dst", root_volume.path + "/symlink_src")
+
+a = c.Run("a", root=root_volume.path, bind="{0} /symlink_src".format(test_volume.path))
+mnt = ParseMountinfo(a['root_pid'])
+CheckBaseMounts(mnt)
+Expect('/' in mnt)
+
+Expect('/symlink_dst' in mnt)
+Expect('master' in mnt['/symlink_dst'])
+ExpectEq(mnt['/symlink_dst']['master'], host_mnt[test_volume.path]['shared'])
+
+a.Destroy()
+
 #backend bind and rbind
 a = c.Run("a", root=root_volume.path)
 os.mkdir(root_volume.path + "/test_rbind")

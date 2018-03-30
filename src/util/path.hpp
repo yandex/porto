@@ -284,11 +284,13 @@ public:
     TError WalkStrict(const TFile &dir, const TPath &path);
     TError Chdir() const;
     TError ClearDirectory() const;
+    bool IsDirectory() const;
     TError Stat(struct stat &st) const;
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;
     bool ExistsAt(const TPath &path) const;
 
     TError StatFS(TStatFS &result) const;
+    TError Chroot() const;
     TError PivotRoot() const;
 
     enum AccessMode {

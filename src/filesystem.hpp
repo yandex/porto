@@ -14,12 +14,8 @@ struct TBindMount {
     uint64_t MntFlags = 0;
     bool ControlSource = false;
     bool ControlTarget = false;
-    bool CreateTarget = false;
-    bool FollowTraget = false;
-    bool IsDirectory = false;
-    bool IsFile = false;
 
-    TError Mount(const TCred &cred, const TPath &root) const;
+    TError Mount(const TCred &cred, const TPath &target_root) const;
 
     static TError Parse(const std::string &str, std::vector<TBindMount> &binds);
     static std::string Format(const std::vector<TBindMount> &binds);

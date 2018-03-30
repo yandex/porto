@@ -171,6 +171,16 @@ TError TPath::Chroot() const {
     return OK;
 }
 
+TError TFile::Chroot() const {
+    if (unshare(CLONE_FS))
+        return TError::System("unshare(CLONE_FS)");
+    if (fchdir(Fd))
+        return TError::System("fchdir");
+    if (chroot("."))
+        return TError::System("chroot");
+    return OK;
+}
+
 // https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
 TError TFile::PivotRoot() const {
     TFile oldroot;
@@ -1524,6 +1534,11 @@ TError TFile::Chdir() const {
     if (fchdir(Fd))
         return TError::System("fchdir");
     return OK;
+}
+
+bool TFile::IsDirectory() const {
+    struct stat st;
+    return !fstat(Fd, &st) && S_ISDIR(st.st_mode);
 }
 
 TError TFile::Stat(struct stat &st) const {
