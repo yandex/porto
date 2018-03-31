@@ -1684,7 +1684,7 @@ public:
         if (path == "-A") {
             path = "";
         } else {
-            path = TPath(path).RealPath().ToString();
+            path = TPath(path).AbsolutePath().NormalPath().ToString();
         }
 
         for (size_t i = 1; i < args.size(); i++) {
@@ -1721,7 +1721,7 @@ public:
         const auto &args = env->GetOpts({
                 {'R', false, [&](const char *) { required = true; }},
         });
-        const auto path = TPath(args[0]).RealPath().ToString();
+        const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
         int ret = Api->LinkVolume(path,
                 (args.size() > 1) ? args[1] : "",
                 (args.size() > 2) ? args[2] : "",
@@ -1751,7 +1751,7 @@ public:
             { 'A', false, [&](const char *) { all = true; } },
             { 'S', false, [&](const char *) { strict = true; } },
         });
-        const auto path = TPath(args[0]).RealPath().ToString();
+        const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
         std::vector<Porto::Volume> vol;
         int ret;
 
@@ -1904,7 +1904,7 @@ public:
             int errors = 0;
 
             for (const auto &arg : args) {
-                const auto path = TPath(arg).RealPath().ToString();
+                const auto path = TPath(arg).AbsolutePath().NormalPath().ToString();
 
                 vlist.clear();
                 int ret = Api->ListVolumes(path, "", vlist);
@@ -1933,7 +1933,7 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         std::map<std::string, std::string> properties;
         const auto &args = env->GetArgs();
-        const auto path = TPath(args[0]).RealPath().ToString();
+        const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
 
         for (size_t i = 1; i < args.size(); i++) {
             const std::string &arg = args[i];
