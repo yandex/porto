@@ -1598,38 +1598,38 @@ TError TVolume::CheckDependencies() {
 
 TError TVolume::CheckConflicts(const TPath &path) {
     if (IsSystemPath(path))
-        return TError(EError::Busy, "Path in system directory");
+        return TError(EError::InvalidPath, "Volume path {} in system directory", path);
 
     for (auto &it : Volumes) {
         auto &vol = it.second;
 
         if (vol->Path == path)
-            return TError(EError::Busy, "Path is used by volume {}", vol->Path);
+            return TError(EError::Busy, "Volume path {} is used by volume {}", path, vol->Path);
 
         if (vol->Path.IsInside(path))
-            return TError(EError::Busy, "Path overlaps with volume {}", vol->Path);
+            return TError(EError::InvalidPath, "Volume path {} overlaps with volume {}", path, vol->Path);
 
         if (path.IsInside(vol->Path) && vol->State != EVolumeState::Ready)
-            return TError(EError::VolumeNotReady, "Path inside volume {} and it's not ready", vol->Path);
+            return TError(EError::VolumeNotReady, "Volume path {} inside volume {} and it is not ready", path, vol->Path);
 
         if (vol->Place.IsInside(path))
-            return TError(EError::Busy, "Path overlaps with place {}", vol->Place);
+            return TError(EError::InvalidPath, "Volume path {} overlaps with place {}", path, vol->Place);
 
         if (!vol->RemoteStorage() && vol->BackendType != "bind" && vol->BackendType != "rbind" &&
                 (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath)))
-            return TError(EError::Busy, "Path overlaps with storage {}", vol->StoragePath);
+            return TError(EError::InvalidPath, "Volume path {} overlaps with storage {}", path, vol->StoragePath);
 
         for (auto &l: vol->Layers) {
             TPath layer(l);
             if (layer.IsAbsolute() && (layer.IsInside(path) || path.IsInside(layer)))
-                return TError(EError::Busy, "Path overlaps with layer {}", layer);
+                return TError(EError::InvalidPath, "Volume path {} overlaps with layer {}", path, layer);
         }
 
         for (auto &link: vol->Links) {
             if (link->HostTarget == path)
-                return TError(EError::Busy, "Path is used by volume {} link {} for {}", vol->Path, link->HostTarget, link->Container->Name);
+                return TError(EError::Busy, "Volume path {} is used by volume {} for {}", path, vol->Path, link->Container->Name);
             if (link->HostTarget.IsInside(path))
-                return TError(EError::Busy, "Path overlaps with volume {} link {} for {}", vol->Path, link->HostTarget, link->Container->Name);
+                return TError(EError::InvalidPath, "Volume path {} overlaps with volume {} link {} for {}", path, vol->Path, link->HostTarget, link->Container->Name);
         }
     }
 
@@ -1713,12 +1713,12 @@ TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
         /* They use storage for own purpose */
     } else if (UserStorage()) {
         if (!StoragePath.IsNormal())
-            return TError(EError::InvalidValue, "Storage path must be normalized");
+            return TError(EError::InvalidPath, "Storage path must be normalized");
         StoragePath = CL->ResolvePath(StoragePath);
         if (!StoragePath.Exists())
-            return TError(EError::InvalidValue, "Storage path does not exist");
+            return TError(EError::InvalidPath, "Storage path does not exist");
         if (IsSystemPath(StoragePath))
-            return TError(EError::InvalidValue, "Storage in system directory");
+            return TError(EError::InvalidPath, "Storage in system directory");
         Storage = StoragePath.ToString();
         KeepStorage = true;
     } else if (!HaveStorage()) {
@@ -1751,7 +1751,7 @@ TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
     for (auto &l: Layers) {
         TPath layer(l);
         if (!layer.IsNormal())
-            return TError(EError::InvalidValue, "Layer path must be normalized");
+            return TError(EError::InvalidPath, "Layer path must be normalized");
         if (layer.IsAbsolute()) {
             layer = CL->ResolvePath(layer);
             l = layer.ToString();
@@ -1764,7 +1764,7 @@ TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
         if (!layer.Exists())
             return TError(EError::LayerNotFound, "Layer not found " + layer.ToString());
         if (!layer.IsDirectoryFollow() && BackendType != "squash")
-            return TError(EError::InvalidValue, "Layer must be a directory");
+            return TError(EError::InvalidPath, "Layer must be a directory");
         /* Permissions will be cheked during build */
     }
 
@@ -1978,7 +1978,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     L_ACT("Mount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
 
     TFile target_file;
-    TPath bound, link_mount;
+    TPath bound, link_mount, real_target;
     unsigned long flags = 0;
 
     if (target_link && !CL->CanControl(target_link->Volume->VolumeOwner)) {
@@ -1992,6 +1992,12 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     error = target_file.CreatePath(host_target, CL->Cred, bound);
     if (error)
         goto undo;
+
+    real_target = target_file.RealPath();
+    if (real_target != host_target) {
+        error = TError(EError::InvalidPath, "Volume {} link {} real path is {}", Path, host_target, real_target);
+        goto undo;
+    }
 
     if (IsReadOnly || link->ReadOnly)
         flags |= MS_RDONLY;
@@ -2466,8 +2472,12 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
 
     PORTO_ASSERT(container->IsLocked());
 
-    if (target && (!target.IsAbsolute() || !target.IsNormal()))
-        return TError(EError::InvalidValue, "Non-normalized target path {}", target);
+    if (target) {
+        if (!target.IsAbsolute())
+            return TError(EError::InvalidPath, "Volume {} link path {} must be absolute", Path, target);
+        if (!target.IsNormal())
+            return TError(EError::InvalidPath, "Volume {} link path {} must be normalized", Path, target);
+    }
 
     auto volumes_lock = LockVolumes();
     TError error;
@@ -2967,21 +2977,27 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         TPath path = cfg.at(V_PATH);
 
         if (!path.IsAbsolute())
-            return TError(EError::InvalidValue, "Volume path must be absolute");
+            return TError(EError::InvalidPath, "Volume path must be absolute");
 
         if (!path.IsNormal())
-            return TError(EError::InvalidValue, "Volume path must be normalized");
+            return TError(EError::InvalidPath, "Volume path must be normalized");
 
         path = target_root / path;
 
         if (Volumes.count(path))
             return TError(EError::VolumeAlreadyExists, "Volume already exists");
 
-        if (!path.Exists())
-            return TError(EError::InvalidValue, "Volume path does not exist");
+        TFile path_dir;
+        error = path_dir.OpenDir(path);
+        if (error)
+            return TError(EError::InvalidPath, "Cannot open volume path: {}", error);
 
-        if (!path.IsDirectoryStrict())
-            return TError(EError::InvalidValue, "Volume path must be a directory");
+        if (!path_dir.IsDirectory())
+            return TError(EError::InvalidPath, "Volume path {} must be a directory", path);
+
+        TPath real_path = path_dir.RealPath();
+        if (real_path != path)
+            return TError(EError::InvalidPath, "Volume {} real path is {}", path, real_path);
 
         error = CheckConflicts(path);
         if (error)

@@ -174,7 +174,7 @@ assert l.private_value == "AbC"
 assert Catch(c.GetLayerPrivate, "my1980") == porto.exceptions.LayerNotFound
 assert Catch(c.SetLayerPrivate, "my1980", "my1980") == porto.exceptions.LayerNotFound
 
-assert Catch(c.CreateVolume, volume_path) == porto.exceptions.InvalidValue
+assert Catch(c.CreateVolume, volume_path) == porto.exceptions.InvalidPath
 os.mkdir(volume_path)
 w = c.CreateVolume(volume_path, layers=[layer_name])
 assert w.path == volume_path

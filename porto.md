@@ -851,6 +851,7 @@ Porto never deletes old core dumps.
 
 Porto provides "volumes" abstraction to manage disk space.
 Each volume is identified by a full path.
+All paths must absolute and normalized, symlinks are not allowed.
 You can either manually declare a volume path or delegate this task to porto.
 
 A volume can be linked to one or more containers, links act as reference
@@ -858,7 +859,7 @@ counter: unlinked volume will be destroyed automatically. By default volume
 is linked to the container that created it: "self", "/" for host.
 
 Each link might define target path for exposing volume inside container
-when it stats. This path also works as alias for volume path for requests
+when it starts. This path also works as alias for volume path for requests
 from container. Link also might restrict access to read-only.
 
 By default volume unlink calls lazy **umount(2)** with flag MNT\_DETACH,

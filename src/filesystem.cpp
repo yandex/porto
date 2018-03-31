@@ -188,7 +188,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
 
     TPath real_target = dst.RealPath();
     if (new_root && !real_target.IsInside(new_root.RealPath()))
-        return TError(EError::InvalidValue, "Bindmount real target {} out of root {}", real_target, target_root);
+        return TError(EError::InvalidPath, "Bindmount real target {} out of root {}", real_target, target_root);
 
     error = dst.ProcPath().Bind(src.ProcPath(), MntFlags & MS_REC);
     if (error)
@@ -343,8 +343,8 @@ TError TMountNamespace::MountSystemd() {
 TError TMountNamespace::SetupRoot() {
     TError error;
 
-    if (!Root.Exists())
-        return TError(EError::InvalidValue, "Root path does not exist");
+    if (!Root.IsDirectoryStrict())
+        return TError(EError::InvalidPath, "Root path must be a directory");
 
     struct {
         std::string target;

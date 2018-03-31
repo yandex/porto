@@ -213,11 +213,14 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
 TError TStorage::CheckPlace(const TPath &place) {
     TError error;
 
-    if (!place.IsAbsolute() || !place.IsNormal())
-        return TError(EError::InvalidValue, "place path must be normalized");
+    if (!place.IsAbsolute())
+        return TError(EError::InvalidPath, "Place path {} must be absolute", place);
+
+    if (!place.IsNormal())
+        return TError(EError::InvalidPath, "Place path {} must be normalized", place);
 
     if (IsSystemPath(place))
-        return TError(EError::InvalidValue, "place in system directory");
+        return TError(EError::InvalidPath, "Place path {} in system directory", place);
 
     error = Cleanup(place, EStorageType::Volume, 0755);
     if (error)
