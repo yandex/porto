@@ -230,6 +230,11 @@ public:
     bool OomKilled = false;
     int ExitStatus = 0;
 
+    struct {
+        bool RootOnLoop = false;
+        bool BindWithSuid = false;
+    } TaintFlags;
+
     bool RecvOomEvents();
 
     TPath RootPath; /* path in host namespace, set at start */

@@ -2031,6 +2031,16 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         /* allow suid inside by default */
         bm.MntFlags |= MS_ALLOW_SUID;
 
+        /* this allows to inject suid binaries into host */
+        if (Parent->RootPath.IsRoot() && !TaskEnv.Mnt.Root.IsRoot() &&
+                bm.Source.IsDirectoryFollow()) {
+            TStatFS stat;
+            if (!bm.Source.StatFS(stat) && (stat.MntFlags & MS_ALLOW_SUID)) {
+                L("Bindmount source {} allows suid in host", bm.Source);
+                TaintFlags.BindWithSuid = true;
+            }
+        }
+
         if (bm.MntFlags & MS_ALLOW_DEV) {
             if (!OwnerCred.IsRootUser())
                 return TError(EError::Permission, "Not enough permissions to allow devices at bind mount");
@@ -2238,6 +2248,8 @@ TError TContainer::PrepareStart() {
 
     SanitizeCapabilities();
 
+    memset(&TaintFlags, 0, sizeof(TaintFlags));
+
     /* Check target task credentials */
     error = CL->CanControl(TaskCred);
     if (!error && !OwnerCred.IsMemberOf(TaskCred.Gid) && !CL->IsSuperUser()) {
@@ -2411,7 +2423,8 @@ TError TContainer::PrepareResources() {
         std::shared_ptr<TVolume> vol;
         TStringMap cfg;
 
-        L_WRN("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
+        L("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
+        TaintFlags.RootOnLoop = true;
 
         cfg[V_BACKEND] = "loop";
         cfg[V_STORAGE] = RootPath.ToString();
@@ -3473,6 +3486,12 @@ TTuple TContainer::Taint() {
         if (NetIsolate && !NetIpLimit)
             taint.push_back("Container could escape network namespace without ip_limit.");
     }
+
+    if (TaintFlags.RootOnLoop)
+        taint.push_back("Container with deprecated root=loop.img");
+
+    if (TaintFlags.BindWithSuid)
+        taint.push_back("Container with bind mount source which allows suid in host");
 
     return taint;
 }
