@@ -19,8 +19,7 @@ struct TStatFS {
     uint64_t SpaceAvail;
     uint64_t InodeUsage;
     uint64_t InodeAvail;
-    bool ReadOnly;
-    bool Secure; /* nodev and noexec or nosuid  */
+    uint64_t MntFlags;
 
     void Init(const struct statfs &st);
     void Reset();

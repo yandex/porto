@@ -32,13 +32,15 @@ void TStatFS::Init(const struct statfs &st) {
     SpaceAvail = (uint64_t)st.f_bavail * st.f_bsize;
     InodeUsage = st.f_files - st.f_ffree;
     InodeAvail = st.f_ffree;
-    ReadOnly   = st.f_flags & ST_RDONLY;
-    Secure     = (st.f_flags & (ST_NODEV|ST_NOSUID|ST_NOEXEC)) > ST_NODEV;
+    MntFlags = ((st.f_flags & ST_NODEV) ? MS_NODEV : MS_ALLOW_DEV) |
+               ((st.f_flags & ST_NOEXEC) ? MS_NOEXEC : MS_ALLOW_EXEC) |
+               ((st.f_flags & ST_NOSUID) ? MS_NOSUID : MS_ALLOW_SUID) |
+               ((st.f_flags & ST_RDONLY) ? MS_RDONLY : MS_ALLOW_WRITE);
 }
 
 void TStatFS::Reset() {
     SpaceUsage = SpaceAvail = InodeUsage = InodeAvail = 0;
-    ReadOnly = Secure = false;
+    MntFlags = 0;
 }
 
 struct FileHandle {
