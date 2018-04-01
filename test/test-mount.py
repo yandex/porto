@@ -253,7 +253,7 @@ Expect('/test_ro' in mnt)
 Expect('ro' in mnt['/test_ro']['flag'])
 
 Expect('nodev' in mnt['/test_ro']['flag'])
-Expect('nosuid' not in mnt['/test_ro']['flag'])
+Expect('nosuid' in mnt['/test_ro']['flag'])
 
 Expect('/test_ro/sub' not in mnt)
 Expect('/ro_vol' in mnt)

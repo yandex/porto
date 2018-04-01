@@ -505,10 +505,18 @@ TError TMountNamespace::Setup() {
             return error;
     }
 
-    // allow suid binaries inside and remount read-only if needed
-    error = Root.Remount(MS_BIND | MS_REC | (RootRo ? MS_RDONLY : 0) | MS_ALLOW_SUID);
-    if (error)
-        return error;
+    // allow suid binaries at root volume
+    if (!Root.IsRoot()) {
+        error = Root.Remount(MS_BIND | MS_ALLOW_SUID);
+        if (error)
+            return error;
+    }
+
+    if (RootRo) {
+        error = Root.Remount(MS_BIND | MS_REC | MS_RDONLY);
+        if (error)
+            return error;
+    }
 
     // mount proc so PID namespace works
     error = proc.UmountAll();
