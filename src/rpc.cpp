@@ -1261,6 +1261,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_porto_starts(Statistics->PortoStarts);
     rsp->set_porto_uptime((GetCurrentTimeMs() - Statistics->PortoStarted) / 1000);
     rsp->set_master_uptime((GetCurrentTimeMs() - Statistics->MasterStarted) / 1000);
+    rsp->set_taints(Statistics->Taints);
 
     rsp->set_verbose(Verbose);
     rsp->set_debug(Debug);
@@ -1278,6 +1279,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_container_oom(Statistics->ContainersOOM);
     rsp->set_container_buried(Statistics->RemoveDead);
     rsp->set_container_lost(Statistics->ContainerLost);
+    rsp->set_container_tainted(Statistics->ContainersTainted);
 
     rsp->set_stream_rotate_bytes(Statistics->LogRotateBytes);
     rsp->set_stream_rotate_errors(Statistics->LogRotateErrors);

@@ -231,8 +231,9 @@ public:
     int ExitStatus = 0;
 
     struct {
-        bool RootOnLoop = false;
-        bool BindWithSuid = false;
+        bool TaintCounted;
+        bool RootOnLoop;
+        bool BindWithSuid;
     } TaintFlags;
 
     bool RecvOomEvents();

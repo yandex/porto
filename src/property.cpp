@@ -3101,6 +3101,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["spawned"] = Statistics->PortoStarts;
     m["errors"] = Statistics->Errors;
     m["warnings"] = Statistics->Warns;
+    m["taints"] = Statistics->Taints;
     m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;
     m["porto_uptime"] = (GetCurrentTimeMs() - Statistics->PortoStarted) / 1000;
     m["queued_statuses"] = Statistics->QueuedStatuses;
@@ -3130,6 +3131,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["containers_started"] = Statistics->ContainersStarted;
     m["containers_failed_start"] = Statistics->ContainersFailedStart;
     m["containers_oom"] = Statistics->ContainersOOM;
+    m["containers_tainted"] = Statistics->ContainersTainted;
 
     m["running"] = RootContainer->RunningChildren;
     m["running_children"] = CT->RunningChildren;

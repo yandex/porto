@@ -390,9 +390,6 @@ TError TTaskEnv::ConfigureChild() {
             return error;
     }
 
-    for (auto &taint: CT->Taint())
-        WriteLog("TAINT", taint);
-
     error = CT->Stdin.OpenInside(*CT);
     if (error)
         return error;

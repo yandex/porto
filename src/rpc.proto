@@ -165,6 +165,7 @@ message TGetSystemResponse {
     required fixed64 porto_starts = 6;
     required fixed64 porto_uptime = 7;
     required fixed64 master_uptime = 8;
+    optional fixed64 taints = 9;
 
     required bool verbose = 100;
     required bool debug = 101;
@@ -186,6 +187,7 @@ message TGetSystemResponse {
     required fixed64 container_oom = 206;
     required fixed64 container_buried = 207;
     required fixed64 container_lost = 208;
+    optional fixed64 container_tainted = 209;
 
     required fixed64 volume_count = 300;
     required fixed64 volume_limit = 301;

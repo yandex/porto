@@ -296,6 +296,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     Statistics->ContainersCount++;
     RealCreationTime = time(nullptr);
 
+    memset(&TaintFlags, 0, sizeof(TaintFlags));
+
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
 
@@ -407,6 +409,8 @@ TContainer::~TContainer() {
     PORTO_ASSERT(Net == nullptr);
     PORTO_ASSERT(!NetClass.Registered);
     Statistics->ContainersCount--;
+    if (TaintFlags.TaintCounted && Statistics->ContainersTainted)
+        Statistics->ContainersTainted--;
 }
 
 TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &ct) {
@@ -2248,6 +2252,9 @@ TError TContainer::PrepareStart() {
 
     SanitizeCapabilities();
 
+    if (TaintFlags.TaintCounted && Statistics->ContainersTainted)
+        Statistics->ContainersTainted--;
+
     memset(&TaintFlags, 0, sizeof(TaintFlags));
 
     /* Check target task credentials */
@@ -2344,6 +2351,15 @@ TError TContainer::Start() {
     if (error) {
         SetState(EContainerState::Stopped);
         goto out;
+    }
+
+    /* Complain about insecure misconfiguration */
+    for (auto &taint: Taint()) {
+        L_TAINT(taint);
+        if (!TaintFlags.TaintCounted) {
+            TaintFlags.TaintCounted = true;
+            Statistics->ContainersTainted++;
+        }
     }
 
     CL->LockedContainer->DowngradeLock();
@@ -3439,7 +3455,7 @@ std::string TContainer::GetPortoNamespace(bool write) const {
 TTuple TContainer::Taint() {
     TTuple taint;
 
-    if (OwnerCred.IsRootUser())
+    if (OwnerCred.IsRootUser() && Level && !HasProp(EProperty::CAPABILITIES))
         taint.push_back("Container owned by root has unrestricted capabilities.");
 
     if (NetIsolate && Hostname == "")

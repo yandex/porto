@@ -58,6 +58,8 @@ struct TStatistics {
     std::atomic<uint64_t> LayerRemove;
     std::atomic<uint64_t> LogLinesLost;
     std::atomic<uint64_t> LogBytesLost;
+    std::atomic<uint64_t> Taints;
+    std::atomic<uint64_t> ContainersTainted;
 
     /* --- add new fields at the end --- */
 };
@@ -68,6 +70,7 @@ void InitStatistics();
 
 static inline void ResetStatistics() {
     Statistics->ContainersCount = 0;
+    Statistics->ContainersTainted = 0;
     Statistics->ClientsCount = 0;
     Statistics->VolumesCount = 0;
     Statistics->VolumeLinks = 0;
@@ -102,6 +105,12 @@ template <typename... Args> inline void L_ERR(const char* fmt, const Args&... ar
     WriteLog("ERR", fmt::format(fmt, args...));
     if (Verbose)
         Stacktrace();
+}
+
+inline void L_TAINT(const std::string &text) {
+    if (Statistics)
+        Statistics->Taints++;
+    WriteLog("TAINT", text);
 }
 
 template <typename... Args> inline void L_EVT(const char* fmt, const Args&... args) {
