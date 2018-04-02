@@ -1,3 +1,16 @@
+yandex-porto (4.12.3) unstable; urgency=low
+
+  * filesystem: handle races during recursive remount
+  * filesystem: resolve bind mount target inside chroot
+  * portoctl: lesser path conversion in volume commands
+  * volume: verify volume link real path
+  * path: cleanup statfs flags
+  * contianer: add taint about insecure bind mounts
+  * filesystem: in chroot allow suid binaries only on root volume
+  * porto: add counters for taints
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 02 Apr 2018 09:51:16 +0300
+
 yandex-porto (4.12.2) unstable; urgency=low
 
   * porto: add async wait
