@@ -13,9 +13,12 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
-#include "protobuf.hpp"
 #include "test.hpp"
 #include "rpc.hpp"
+
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <google/protobuf/io/coded_stream.h>
 
 const std::string TMPDIR = "/tmp/porto/selftest";
 
@@ -25,6 +28,9 @@ extern "C" {
 #include <sys/stat.h>
 #include <grp.h>
 #include <linux/capability.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <fcntl.h>
 }
 
 const std::string oomMemoryLimit = "32M";
@@ -4387,6 +4393,57 @@ static void TestVolumeImpl(Porto::Connection &api) {
 
     ExpectEq(TPath(a).Exists(), false);
     ExpectEq(TPath(b).Exists(), false);
+}
+
+bool WriteDelimitedTo(
+                      const google::protobuf::MessageLite& message,
+                      google::protobuf::io::ZeroCopyOutputStream* rawOutput) {
+    // We create a new coded stream for each message.  Don't worry, this is fast.
+    google::protobuf::io::CodedOutputStream output(rawOutput);
+
+    // Write the size.
+    const int size = message.ByteSize();
+    output.WriteVarint32(size);
+    if (output.HadError())
+        return false;
+
+    uint8_t* buffer = output.GetDirectBufferForNBytesAndAdvance(size);
+    if (buffer != NULL) {
+        // Optimization:  The message fits in one buffer, so use the faster
+        // direct-to-array serialization path.
+        message.SerializeWithCachedSizesToArray(buffer);
+    } else {
+        // Slightly-slower path when the message is multiple buffers.
+        message.SerializeWithCachedSizes(&output);
+        if (output.HadError())
+            return false;
+    }
+
+    return true;
+}
+
+TError ConnectToRpcServer(const std::string& path, int &fd)
+{
+    struct sockaddr_un peer_addr;
+    socklen_t peer_addr_size;
+
+    memset(&peer_addr, 0, sizeof(struct sockaddr_un));
+
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0)
+        return TError::System("socket()");
+
+    peer_addr.sun_family = AF_UNIX;
+    strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
+
+    peer_addr_size = sizeof(struct sockaddr_un);
+    if (connect(fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
+        close(fd);
+        fd = -1;
+        return TError::System("connect(" + path + ")");
+    }
+
+    return OK;
 }
 
 static void TestSigPipe(Porto::Connection &api) {

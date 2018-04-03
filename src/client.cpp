@@ -8,7 +8,6 @@
 #include "volume.hpp"
 #include "property.hpp"
 #include "config.hpp"
-#include "protobuf.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "portod.hpp"

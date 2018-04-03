@@ -18,7 +18,6 @@
 #include "storage.hpp"
 #include "helpers.hpp"
 #include "core.hpp"
-#include "protobuf.hpp"
 #include "util/log.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"

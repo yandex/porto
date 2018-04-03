@@ -1,8 +1,9 @@
 #include "kvalue.hpp"
 #include "config.hpp"
 #include "kv.pb.h"
-#include "protobuf.hpp"
 #include "util/log.hpp"
+
+#include <google/protobuf/io/coded_stream.h>
 
 extern "C" {
 #include <fcntl.h>

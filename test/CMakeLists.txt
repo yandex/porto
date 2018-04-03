@@ -5,7 +5,7 @@ include_directories(${libporto_SOURCE_DIR})
 include_directories(${porto_SOURCE_DIR})
 include_directories(${porto_BINARY_DIR})
 
-add_executable(portotest portotest.cpp test.cpp selftest.cpp stresstest.cpp ${porto_SOURCE_DIR}/protobuf.cpp)
+add_executable(portotest portotest.cpp test.cpp selftest.cpp stresstest.cpp)
 
 target_link_libraries(portotest version porto util config pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 

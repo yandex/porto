@@ -1,8 +1,10 @@
 #include "config.hpp"
-#include "protobuf.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
 #include "util/namespace.hpp"
+
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 extern "C" {
 #include <fcntl.h>

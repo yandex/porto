@@ -8,7 +8,6 @@
 #include "volume.hpp"
 #include "waiter.hpp"
 #include "event.hpp"
-#include "protobuf.hpp"
 #include "helpers.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -16,6 +15,8 @@
 #include "portod.hpp"
 #include "storage.hpp"
 #include "util/quota.hpp"
+
+#include <google/protobuf/descriptor.h>
 
 extern "C" {
 #include <sys/stat.h>
