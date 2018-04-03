@@ -19,6 +19,8 @@ namespace rpc {
     class TContainerRequest;
 }
 
+class TRequest;
+
 class TClient : public std::enable_shared_from_this<TClient>,
                 public TEpollSource {
 public:
@@ -31,7 +33,6 @@ public:
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;
     uint64_t ActivityTimeMs = 0;
-    uint64_t RequestTimeMs = 0;
     bool Processing = false;
     bool Sending = false;
     bool Receiving = false;
@@ -103,6 +104,7 @@ public:
 
     TError Event(uint32_t events);
     TError ReadRequest(rpc::TContainerRequest &request);
+    void QueueRequest();
     TError SendResponse(bool first);
     TError QueueResponse(rpc::TContainerResponse &response);
     TError QueueReport(const TContainerReport &report, bool async);
@@ -117,6 +119,7 @@ private:
     uint64_t Length = 0;
     uint64_t Offset = 0;
     std::vector<uint8_t> Buffer;
+    std::unique_ptr<TRequest> Request;
 };
 
 extern TClient SystemClient;

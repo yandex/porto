@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "rpc.hpp"
+#include "client.hpp"
 #include "config.hpp"
 #include "version.hpp"
 #include "property.hpp"
@@ -22,202 +23,243 @@ extern "C" {
 #include <sys/stat.h>
 }
 
-static void RequestToString(const rpc::TContainerRequest &req,
-        std::string &cmd, std::string &arg, std::string &opt) {
+void TRequest::Classify() {
+
+    /* Normally not logged in non-verbose mode */
+    RoReq =
+        Req.has_version() ||
+        Req.has_list() ||
+        Req.has_listvolumes() ||
+        Req.has_listlayers() ||
+        Req.has_liststorage() ||
+        Req.has_getlayerprivate() ||
+        Req.has_get() ||
+        Req.has_getdata() ||
+        Req.has_getproperty() ||
+        Req.has_datalist() ||
+        Req.has_propertylist() ||
+        Req.has_listvolumeproperties() ||
+        Req.has_wait() ||
+        Req.has_asyncwait() ||
+        Req.has_convertpath() ||
+        Req.has_locateprocess() ||
+        Req.has_getsystem();
+
+    IoReq =
+        Req.has_createvolume() ||
+        Req.has_tunevolume() ||
+        Req.has_linkvolume() ||
+        Req.has_unlinkvolume() ||
+        Req.has_linkvolumetarget() ||
+        Req.has_unlinkvolumetarget() ||
+        Req.has_importlayer() ||
+        Req.has_exportlayer() ||
+        Req.has_removelayer() ||
+        Req.has_importstorage() ||
+        Req.has_exportstorage() ||
+        Req.has_removestorage() ||
+        Req.has_createmetastorage() ||
+        Req.has_removemetastorage();
+}
+
+void TRequest::Parse() {
     std::vector<std::string> opts;
 
-    if (req.has_create()) {
-        cmd = "Create";
-        arg = req.create().name();
-    } else if (req.has_createweak()) {
-        cmd = "Create";
-        arg = req.createweak().name();
+    Arg = "";
+
+    if (Req.has_create()) {
+        Cmd = "Create";
+        Arg = Req.create().name();
+    } else if (Req.has_createweak()) {
+        Cmd = "Create";
+        Arg = Req.createweak().name();
         opts = { "weak=true" };
-    } else if (req.has_destroy()) {
-        cmd = "Destroy";
-        arg = req.destroy().name();
-    } else if (req.has_list()) {
-        cmd = "List";
-        if (req.list().has_mask())
-            opts = { "mas=" + req.list().mask() };
-    } else if (req.has_getproperty()) {
-        cmd = "Get";
-        arg = req.getproperty().name();
-        opts = { "property=" + req.getproperty().property() };
-        if (req.getproperty().has_sync() && req.getproperty().sync())
+    } else if (Req.has_destroy()) {
+        Cmd = "Destroy";
+        Arg = Req.destroy().name();
+    } else if (Req.has_list()) {
+        Cmd = "List";
+        if (Req.list().has_mask())
+            opts = { "mask=" + Req.list().mask() };
+    } else if (Req.has_getproperty()) {
+        Cmd = "Get";
+        Arg = Req.getproperty().name();
+        opts = { "property=" + Req.getproperty().property() };
+        if (Req.getproperty().has_sync() && Req.getproperty().sync())
             opts.push_back("sync=true");
-        if (req.getproperty().has_real() && req.getproperty().real())
+        if (Req.getproperty().has_real() && Req.getproperty().real())
             opts.push_back("real=true");
-    } else if (req.has_getdata()) {
-        cmd = "Get";
-        arg = req.getdata().name();
-        opts = { "property=" + req.getdata().data() };
-        if (req.getdata().has_sync() && req.getdata().sync())
+    } else if (Req.has_getdata()) {
+        Cmd = "Get";
+        Arg = Req.getdata().name();
+        opts = { "property=" + Req.getdata().data() };
+        if (Req.getdata().has_sync() && Req.getdata().sync())
             opts.push_back("sync=true");
-        if (req.getdata().has_real() && req.getdata().real())
+        if (Req.getdata().has_real() && Req.getdata().real())
             opts.push_back("real=true");
-    } else if (req.has_get()) {
-        cmd = "Get";
-        for (int i = 0; i < req.get().name_size(); i++)
-            opts.push_back(req.get().name(i));
+    } else if (Req.has_get()) {
+        Cmd = "Get";
+        for (int i = 0; i < Req.get().name_size(); i++)
+            opts.push_back(Req.get().name(i));
         opts.push_back("--");
-        for (int i = 0; i < req.get().variable_size(); i++)
-            opts.push_back(req.get().variable(i));
-        if (req.get().has_nonblock() && req.get().nonblock())
+        for (int i = 0; i < Req.get().variable_size(); i++)
+            opts.push_back(Req.get().variable(i));
+        if (Req.get().has_nonblock() && Req.get().nonblock())
             opts.push_back("nonblock=true");
-        if (req.get().has_sync() && req.get().sync())
+        if (Req.get().has_sync() && Req.get().sync())
             opts.push_back("sync=true");
-        if (req.get().has_real() && req.get().real())
+        if (Req.get().has_real() && Req.get().real())
             opts.push_back("real=true");
-    } else if (req.has_setproperty()) {
-        cmd = "Set";
-        arg = req.setproperty().name();
-        opts = { req.setproperty().property() + "=" + req.setproperty().value() };
-    } else if (req.has_start()) {
-        cmd = "Start";
-        arg = req.start().name();
-    } else if (req.has_stop()) {
-        cmd = "Stop";
-        arg = req.stop().name();
-        if (req.stop().has_timeout_ms())
-            opts.push_back(fmt::format("timeout={} ms", req.stop().timeout_ms()));
-    } else if (req.has_pause()) {
-        cmd = "Pause";
-        arg = req.pause().name();
-    } else if (req.has_resume()) {
-        cmd = "Resume";
-        arg = req.resume().name();
-    } else if (req.has_respawn()) {
-        cmd = "Respawn";
-        arg = req.respawn().name();
-    } else if (req.has_wait()) {
-        cmd = "Wait";
-        for (int i = 0; i < req.wait().name_size(); i++)
-            opts.push_back(req.wait().name(i));
-        if (req.wait().has_timeout_ms())
-            opts.push_back(fmt::format("timeout={} ms", req.wait().timeout_ms()));
-    } else if (req.has_asyncwait()) {
-        cmd = "AsyncWait";
-        for (int i = 0; i < req.asyncwait().name_size(); i++)
-            opts.push_back(req.asyncwait().name(i));
-        if (req.asyncwait().has_timeout_ms())
-            opts.push_back(fmt::format("timeout={} ms", req.asyncwait().timeout_ms()));
-    } else if (req.has_propertylist() || req.has_datalist()) {
-        cmd = "ListProperties";
-    } else if (req.has_kill()) {
-        cmd = "Kill";
-        arg = req.kill().name();
-        opts = { fmt::format("signal={}", req.kill().sig()) };
-    } else if (req.has_version()) {
-        cmd = "Version";
-    } else if (req.has_createvolume()) {
-        cmd = "CreateVolume";
-        arg = req.createvolume().path();
-        for (auto p: req.createvolume().properties())
+    } else if (Req.has_setproperty()) {
+        Cmd = "Set";
+        Arg = Req.setproperty().name();
+        opts = { Req.setproperty().property() + "=" + Req.setproperty().value() };
+    } else if (Req.has_start()) {
+        Cmd = "Start";
+        Arg = Req.start().name();
+    } else if (Req.has_stop()) {
+        Cmd = "Stop";
+        Arg = Req.stop().name();
+        if (Req.stop().has_timeout_ms())
+            opts.push_back(fmt::format("timeout={} ms", Req.stop().timeout_ms()));
+    } else if (Req.has_pause()) {
+        Cmd = "Pause";
+        Arg = Req.pause().name();
+    } else if (Req.has_resume()) {
+        Cmd = "Resume";
+        Arg = Req.resume().name();
+    } else if (Req.has_respawn()) {
+        Cmd = "Respawn";
+        Arg = Req.respawn().name();
+    } else if (Req.has_wait()) {
+        Cmd = "Wait";
+        for (int i = 0; i < Req.wait().name_size(); i++)
+            opts.push_back(Req.wait().name(i));
+        if (Req.wait().has_timeout_ms())
+            opts.push_back(fmt::format("timeout={} ms", Req.wait().timeout_ms()));
+    } else if (Req.has_asyncwait()) {
+        Cmd = "AsyncWait";
+        for (int i = 0; i < Req.asyncwait().name_size(); i++)
+            opts.push_back(Req.asyncwait().name(i));
+        if (Req.asyncwait().has_timeout_ms())
+            opts.push_back(fmt::format("timeout={} ms", Req.asyncwait().timeout_ms()));
+    } else if (Req.has_propertylist() || Req.has_datalist()) {
+        Cmd = "ListProperties";
+    } else if (Req.has_kill()) {
+        Cmd = "Kill";
+        Arg = Req.kill().name();
+        opts = { fmt::format("signal={}", Req.kill().sig()) };
+    } else if (Req.has_version()) {
+        Cmd = "Version";
+    } else if (Req.has_createvolume()) {
+        Cmd = "CreateVolume";
+        Arg = Req.createvolume().path();
+        for (auto p: Req.createvolume().properties())
             opts.push_back(p.name() + "=" + p.value());
-    } else if (req.has_linkvolume()) {
-        cmd = "LinkVolume";
-        arg = req.linkvolume().path();
-        opts = { "container=" + req.linkvolume().container() };
-    } else if (req.has_linkvolumetarget()) {
-        cmd = "LinkVolume";
-        arg = req.linkvolumetarget().path();
-        opts = { "container=" + req.linkvolumetarget().container() };
-        if (req.linkvolumetarget().target() != "")
-            opts.push_back("target=" + req.linkvolumetarget().target());
-        if (req.linkvolumetarget().read_only())
+    } else if (Req.has_linkvolume()) {
+        Cmd = "LinkVolume";
+        Arg = Req.linkvolume().path();
+        opts = { "container=" + Req.linkvolume().container() };
+    } else if (Req.has_linkvolumetarget()) {
+        Cmd = "LinkVolume";
+        Arg = Req.linkvolumetarget().path();
+        opts = { "container=" + Req.linkvolumetarget().container() };
+        if (Req.linkvolumetarget().target() != "")
+            opts.push_back("target=" + Req.linkvolumetarget().target());
+        if (Req.linkvolumetarget().read_only())
             opts.push_back("read_only=true");
-        if (req.linkvolumetarget().required())
-            opts.push_back("required=true");
-    } else if (req.has_unlinkvolume()) {
-        cmd = "UnlinkVolume";
-        arg = req.unlinkvolume().path();
-        opts = { "container=" + req.unlinkvolume().container() };
-        if (req.unlinkvolume().has_target())
-            opts.push_back("target=" + req.unlinkvolume().target());
-        if (req.unlinkvolume().strict())
+        if (Req.linkvolumetarget().required())
+            opts.push_back("Required=true");
+    } else if (Req.has_unlinkvolume()) {
+        Cmd = "UnlinkVolume";
+        Arg = Req.unlinkvolume().path();
+        opts = { "container=" + Req.unlinkvolume().container() };
+        if (Req.unlinkvolume().has_target())
+            opts.push_back("target=" + Req.unlinkvolume().target());
+        if (Req.unlinkvolume().strict())
             opts.push_back("strict=true");
-    } else if (req.has_unlinkvolumetarget()) {
-        cmd = "UnlinkVolume";
-        arg = req.unlinkvolumetarget().path();
-        opts = { "container=" + req.unlinkvolumetarget().container() };
-        if (req.unlinkvolumetarget().has_target())
-            opts.push_back("target=" + req.unlinkvolumetarget().target());
-        if (req.unlinkvolumetarget().strict())
+    } else if (Req.has_unlinkvolumetarget()) {
+        Cmd = "UnlinkVolume";
+        Arg = Req.unlinkvolumetarget().path();
+        opts = { "container=" + Req.unlinkvolumetarget().container() };
+        if (Req.unlinkvolumetarget().has_target())
+            opts.push_back("target=" + Req.unlinkvolumetarget().target());
+        if (Req.unlinkvolumetarget().strict())
             opts.push_back("strict=true");
-    } else if (req.has_listvolumes()) {
-        cmd = "ListVolumes";
-        if (req.listvolumes().has_path())
-            arg = req.listvolumes().path();
-        if (req.listvolumes().has_container())
-            opts = { "container=" + req.listvolumes().container() };
-    } else if (req.has_tunevolume()) {
-        cmd = "TuneVolume";
-        arg = req.tunevolume().path();
-        for (auto p: req.tunevolume().properties())
+    } else if (Req.has_listvolumes()) {
+        Cmd = "ListVolumes";
+        if (Req.listvolumes().has_path())
+            Arg = Req.listvolumes().path();
+        if (Req.listvolumes().has_container())
+            opts = { "container=" + Req.listvolumes().container() };
+    } else if (Req.has_tunevolume()) {
+        Cmd = "TuneVolume";
+        Arg = Req.tunevolume().path();
+        for (auto p: Req.tunevolume().properties())
             opts.push_back(p.name() + "=" + p.value());
-    } else if (req.has_listvolumeproperties()) {
-        cmd = "ListVolumeProperities";
-    } else if (req.has_importlayer()) {
-        cmd = "ImportLayer";
-        arg = req.importlayer().layer();
-        opts = { "tarball=" + req.importlayer().tarball() };
-        if (req.importlayer().has_compress())
-            opts.push_back("compress=" + req.importlayer().compress());
-        if (req.importlayer().has_place())
-            opts.push_back("place=" + req.importlayer().place());
-        if (req.importlayer().has_merge())
+    } else if (Req.has_listvolumeproperties()) {
+        Cmd = "ListVolumeProperities";
+    } else if (Req.has_importlayer()) {
+        Cmd = "ImportLayer";
+        Arg = Req.importlayer().layer();
+        opts = { "tarball=" + Req.importlayer().tarball() };
+        if (Req.importlayer().has_compress())
+            opts.push_back("compress=" + Req.importlayer().compress());
+        if (Req.importlayer().has_place())
+            opts.push_back("place=" + Req.importlayer().place());
+        if (Req.importlayer().has_merge())
             opts.push_back("merge=true");
-        if (req.importlayer().has_private_value())
-            opts.push_back("private=" + req.importlayer().private_value());
-    } else if (req.has_exportlayer()) {
-        if (req.exportlayer().has_layer()) {
-            cmd = "ReexportLayer";
-            arg = req.exportlayer().layer();
+        if (Req.importlayer().has_private_value())
+            opts.push_back("private=" + Req.importlayer().private_value());
+    } else if (Req.has_exportlayer()) {
+        if (Req.exportlayer().has_layer()) {
+            Cmd = "ReexportLayer";
+            Arg = Req.exportlayer().layer();
         } else {
-            cmd = "ExportLayer";
-            arg = req.exportlayer().volume();
+            Cmd = "ExportLayer";
+            Arg = Req.exportlayer().volume();
         }
-        opts = { "tarball+" + req.exportlayer().tarball() };
-        if (req.exportlayer().has_compress())
-            opts.push_back("compress=" + req.exportlayer().compress());
-        if (req.exportlayer().has_place())
-            opts.push_back("place=" + req.exportlayer().place());
-    } else if (req.has_removelayer()) {
-        cmd = "RemoveLayer";
-        arg = req.removelayer().layer();
-        if (req.removelayer().has_place())
-            opts.push_back("place=" + req.removelayer().place());
-    } else if (req.has_listlayers()) {
-        cmd = "ListLayers";
-        if (req.listlayers().has_mask())
-            opts.push_back("mask=" + req.listlayers().mask());
-        if (req.listlayers().has_place())
-            opts.push_back("place=" + req.listlayers().place());
-    } else if (req.has_getlayerprivate()) {
-        cmd = "GetLayerPrivate";
-    } else if (req.has_setlayerprivate()) {
-        cmd = "SetLayerPrivate";
-    } else if (req.has_convertpath()) {
-        cmd = "ConvertPath";
-        arg = req.convertpath().path();
-        opts = { "source=" + req.convertpath().source(), "destination=" + req.convertpath().destination() };
-    } else if (req.has_attachprocess()) {
-        cmd = "AttachProcess";
-        arg = req.attachprocess().name();
-        opts = { "pid=" + std::to_string(req.attachprocess().pid()), "comm=" + req.attachprocess().comm() };
-    } else if (req.has_locateprocess()) {
-        cmd = "LocateProcess";
-        opts = { "pid=" + std::to_string(req.locateprocess().pid()), "comm=" + req.locateprocess().comm() };
-    } else if (req.has_getsystem()) {
-        cmd = "GetSystem";
-    } else if (req.has_setsystem()) {
-        cmd = "SetSystem";
-        arg = req.ShortDebugString();
-    }
+        opts = { "tarball+" + Req.exportlayer().tarball() };
+        if (Req.exportlayer().has_compress())
+            opts.push_back("compress=" + Req.exportlayer().compress());
+        if (Req.exportlayer().has_place())
+            opts.push_back("place=" + Req.exportlayer().place());
+    } else if (Req.has_removelayer()) {
+        Cmd = "RemoveLayer";
+        Arg = Req.removelayer().layer();
+        if (Req.removelayer().has_place())
+            opts.push_back("place=" + Req.removelayer().place());
+    } else if (Req.has_listlayers()) {
+        Cmd = "ListLayers";
+        if (Req.listlayers().has_mask())
+            opts.push_back("mask=" + Req.listlayers().mask());
+        if (Req.listlayers().has_place())
+            opts.push_back("place=" + Req.listlayers().place());
+    } else if (Req.has_getlayerprivate()) {
+        Cmd = "GetLayerPrivate";
+    } else if (Req.has_setlayerprivate()) {
+        Cmd = "SetLayerPrivate";
+    } else if (Req.has_convertpath()) {
+        Cmd = "ConvertPath";
+        Arg = Req.convertpath().path();
+        opts = { "source=" + Req.convertpath().source(), "destination=" + Req.convertpath().destination() };
+    } else if (Req.has_attachprocess()) {
+        Cmd = "AttachProcess";
+        Arg = Req.attachprocess().name();
+        opts = { "pid=" + std::to_string(Req.attachprocess().pid()), "comm=" + Req.attachprocess().comm() };
+    } else if (Req.has_locateprocess()) {
+        Cmd = "LocateProcess";
+        opts = { "pid=" + std::to_string(Req.locateprocess().pid()), "comm=" + Req.locateprocess().comm() };
+    } else if (Req.has_getsystem()) {
+        Cmd = "GetSystem";
+    } else if (Req.has_setsystem()) {
+        Cmd = "SetSystem";
+        Arg = Req.ShortDebugString();
+    } else
+        Cmd = "Unknown";
 
     for (auto &o: opts)
-        opt += " " + o;
+        Opt += " " + o;
 }
 
 static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
@@ -279,41 +321,9 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     return ret;
 }
 
-/* not logged in normal mode */
-static bool SilentRequest(const rpc::TContainerRequest &req) {
-    return
-        req.has_list() ||
-        req.has_getproperty() ||
-        req.has_getdata() ||
-        req.has_get() ||
-        req.has_propertylist() ||
-        req.has_datalist() ||
-        req.has_version() ||
-        req.has_wait() ||
-        req.has_asyncwait() ||
-        req.has_listvolumeproperties() ||
-        req.has_listvolumes() ||
-        req.has_listlayers() ||
-        req.has_convertpath() ||
-        req.has_getlayerprivate() ||
-        req.has_liststorage() ||
-        req.has_locateprocess() ||
-        req.has_getsystem();
-}
-
-static TError CheckPortoWriteAccess() {
-    if (CL->AccessLevel <= EAccessLevel::ReadOnly)
-        return TError(EError::Permission, "Write access denied");
-    return OK;
-}
-
 static noinline TError CreateContainer(std::string reqName, bool weak) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     std::string name;
-    error = CL->ResolveName(reqName, name);
+    TError error = CL->ResolveName(reqName, name);
     if (error)
         return error;
 
@@ -445,7 +455,7 @@ noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &re
             property = P_MEM_LIMIT;
         } else if (property == "memory.low_limit_in_bytes") {
             property = P_MEM_GUARANTEE;
-        } else if (property == "memory.recharge_on_pgfault") {
+        } else if (property == "memory.rechArge_on_pgfault") {
             property = P_RECHARGE_ON_PGFAULT;
             value = value == "0" ? "false" : "true";
         }
@@ -799,16 +809,12 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
 }
 
 noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStringMap cfg;
     for (auto p: req.properties())
         cfg[p.name()] = p.value();
 
     std::shared_ptr<TVolume> volume;
-    error = CL->ControlVolume(req.path(), volume);
+    TError error = CL->ControlVolume(req.path(), volume);
     if (error)
         return error;
 
@@ -902,10 +908,6 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
 }
 
 noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
 
     if (req.has_private_value())
@@ -931,17 +933,12 @@ noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
 }
 
 noinline TError SetLayerPrivate(const rpc::TLayerSetPrivateRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
     TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
     return layer.SetPrivate(req.private_value());
 }
 
 noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
+    TError error;
 
     if (req.has_layer()) {
         TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
@@ -974,10 +971,6 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
 }
 
 noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
     return layer.Remove();
 }
@@ -1161,19 +1154,11 @@ noinline TError ListStorage(const rpc::TStorageListRequest &req,
 }
 
 noinline TError RemoveStorage(const rpc::TStorageRemoveRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage storage(EStorageType::Storage, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
     return storage.Remove();
 }
 
 noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage storage(EStorageType::Storage, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
     storage.Owner = CL->Cred;
     if (req.has_private_value())
@@ -1184,13 +1169,9 @@ noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
 }
 
 noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage storage(EStorageType::Storage, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
 
-    error = CL->CanControlPlace(storage.Place);
+    TError error = CL->CanControlPlace(storage.Place);
     if (error)
         return error;
 
@@ -1203,16 +1184,12 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
 }
 
 noinline TError CreateMetaStorage(const rpc::TMetaStorage &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage storage(EStorageType::Meta, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
     storage.Owner = CL->Cred;
     if (req.has_private_value())
         storage.Private = req.private_value();
 
-    error = CL->CanControlPlace(storage.Place);
+    TError error = CL->CanControlPlace(storage.Place);
     if (error)
         return error;
 
@@ -1220,12 +1197,8 @@ noinline TError CreateMetaStorage(const rpc::TMetaStorage &req) {
 }
 
 noinline TError ResizeMetaStorage(const rpc::TMetaStorage &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
-
     TStorage storage(EStorageType::Meta, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
-    error = storage.Load();
+    TError error = storage.Load();
     if (error)
         return error;
 
@@ -1245,9 +1218,6 @@ noinline TError ResizeMetaStorage(const rpc::TMetaStorage &req) {
 }
 
 noinline TError RemoveMetaStorage(const rpc::TMetaStorage &req) {
-    TError error = CheckPortoWriteAccess();
-    if (error)
-        return error;
     TStorage storage(EStorageType::Meta, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
     return storage.Remove();
 }
@@ -1263,7 +1233,7 @@ noinline TError SetSymlink(const rpc::TSetSymlinkRequest &req) {
     return ct->Save();
 }
 
-noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rpc::TGetSystemResponse *rsp) {
+noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::TGetSystemResponse *rsp) {
     rsp->set_porto_version(PORTO_VERSION);
     rsp->set_porto_revision(PORTO_REVISION);
     rsp->set_kernel_version(config().linux_version());
@@ -1314,7 +1284,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     rsp->set_request_queued(Statistics->RequestsQueued);
     rsp->set_request_completed(Statistics->RequestsCompleted);
     rsp->set_request_failed(Statistics->RequestsFailed);
-    rsp->set_request_threads(config().daemon().workers());
+    rsp->set_request_threads(config().daemon().rw_threads());
     rsp->set_request_longer_1s(Statistics->RequestsLonger1s);
     rsp->set_request_longer_3s(Statistics->RequestsLonger3s);
     rsp->set_request_longer_30s(Statistics->RequestsLonger30s);
@@ -1329,7 +1299,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *req, rp
     return OK;
 }
 
-noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rpc::TSetSystemResponse *rsp) {
+noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rpc::TSetSystemResponse *) {
     if (!CL->IsSuperUser())
         return TError(EError::Permission, "Only for super-user");
 
@@ -1346,183 +1316,285 @@ noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rp
     return OK;
 }
 
-static TError CheckRpcRequest(const rpc::TContainerRequest &req, std::string &cmd) {
-    auto req_ref = req.GetReflection();
+TError TRequest::Check() {
+    auto req_ref = Req.GetReflection();
 
     std::vector<const google::protobuf::FieldDescriptor *> req_fields;
-    req_ref->ListFields(req, &req_fields);
+    req_ref->ListFields(Req, &req_fields);
 
     if (req_fields.size() != 1)
         return TError(EError::InvalidMethod, "Request has {} known methods", req_fields.size());
 
-    auto msg = &req_ref->GetMessage(req, req_fields[0]);
+    auto msg = &req_ref->GetMessage(Req, req_fields[0]);
     auto msg_ref = msg->GetReflection();
     auto msg_unknown = &msg_ref->GetUnknownFields(*msg);
 
     if (msg_unknown->field_count() != 0)
         return TError(EError::InvalidMethod, "Request has {} unknown fields", msg_unknown->field_count());
 
-    cmd = req_fields[0]->name();
+    if (Cmd == "Unknown")
+        Cmd = req_fields[0]->name();
+
     return OK;
 }
 
-void HandleRpcRequest(const rpc::TContainerRequest &req,
-                      std::shared_ptr<TClient> client) {
+void TRequest::Handle() {
     rpc::TContainerResponse rsp;
-    std::string cmd, arg, opt;
     TError error;
 
-    client->StartRequest();
+    Client->StartRequest();
+    StartTime = GetCurrentTimeMs();
 
-    error = CheckRpcRequest(req, cmd);
+    Parse();
+    error = Check();
 
-    RequestToString(req, cmd, arg, opt);
+    if (!error && (!RoReq || Verbose))
+        L_REQ("{} {} {} from {}", Cmd, Arg, Opt, Client->Id);
 
-    bool silent = !Verbose && SilentRequest(req);
-    if (!silent)
-        L_REQ("{} {} {} from {}", cmd, arg, opt, client->Id);
-
-    L_DBG("Raw request: {}", req.ShortDebugString());
+    L_DBG("Raw request: {}", Req.ShortDebugString());
 
     if (error)
-        L_VERBOSE("Invalid request from {} : {} : {}", client->Id, error, req.ShortDebugString());
-    else if (req.has_create())
-        error = CreateContainer(req.create().name(), false);
-    else if (req.has_createweak())
-        error = CreateContainer(req.createweak().name(), true);
-    else if (req.has_destroy())
-        error = DestroyContainer(req.destroy());
-    else if (req.has_list())
-        error = ListContainers(req.list(), rsp);
-    else if (req.has_getproperty())
-        error = GetContainerProperty(req.getproperty(), rsp);
-    else if (req.has_setproperty())
-        error = SetContainerProperty(req.setproperty());
-    else if (req.has_getdata())
-        error = GetContainerData(req.getdata(), rsp);
-    else if (req.has_get())
-        error = GetContainerCombined(req.get(), rsp);
-    else if (req.has_start())
-        error = StartContainer(req.start());
-    else if (req.has_stop())
-        error = StopContainer(req.stop());
-    else if (req.has_pause())
-        error = PauseContainer(req.pause());
-    else if (req.has_resume())
-        error = ResumeContainer(req.resume());
-    else if (req.has_respawn())
-        error = RespawnContainer(req.respawn());
-    else if (req.has_propertylist())
+        L_VERBOSE("Invalid request from {} : {} : {}", Client->Id, error, Req.ShortDebugString());
+    else if (!RoReq && Client->AccessLevel <= EAccessLevel::ReadOnly)
+        error = TError(EError::Permission, "Write access denied");
+    else if (Req.has_create())
+        error = CreateContainer(Req.create().name(), false);
+    else if (Req.has_createweak())
+        error = CreateContainer(Req.createweak().name(), true);
+    else if (Req.has_destroy())
+        error = DestroyContainer(Req.destroy());
+    else if (Req.has_list())
+        error = ListContainers(Req.list(), rsp);
+    else if (Req.has_getproperty())
+        error = GetContainerProperty(Req.getproperty(), rsp);
+    else if (Req.has_setproperty())
+        error = SetContainerProperty(Req.setproperty());
+    else if (Req.has_getdata())
+        error = GetContainerData(Req.getdata(), rsp);
+    else if (Req.has_get())
+        error = GetContainerCombined(Req.get(), rsp);
+    else if (Req.has_start())
+        error = StartContainer(Req.start());
+    else if (Req.has_stop())
+        error = StopContainer(Req.stop());
+    else if (Req.has_pause())
+        error = PauseContainer(Req.pause());
+    else if (Req.has_resume())
+        error = ResumeContainer(Req.resume());
+    else if (Req.has_respawn())
+        error = RespawnContainer(Req.respawn());
+    else if (Req.has_propertylist())
         error = ListProperty(rsp);
-    else if (req.has_datalist())
+    else if (Req.has_datalist())
         error = ListDataProperty(rsp); // deprecated
-    else if (req.has_kill())
-        error = Kill(req.kill());
-    else if (req.has_version())
+    else if (Req.has_kill())
+        error = Kill(Req.kill());
+    else if (Req.has_version())
         error = Version(rsp);
-    else if (req.has_wait())
-        error = WaitContainers(req.wait(), false, rsp, client);
-    else if (req.has_asyncwait())
-        error = WaitContainers(req.asyncwait(), true, rsp, client);
-    else if (req.has_listvolumeproperties())
+    else if (Req.has_wait())
+        error = WaitContainers(Req.wait(), false, rsp, Client);
+    else if (Req.has_asyncwait())
+        error = WaitContainers(Req.asyncwait(), true, rsp, Client);
+    else if (Req.has_listvolumeproperties())
         error = ListVolumeProperties(rsp);
-    else if (req.has_createvolume())
-        error = CreateVolume(req.createvolume(), rsp);
-    else if (req.has_linkvolume())
-        error = LinkVolume(req.linkvolume());
-    else if (req.has_linkvolumetarget())
-        error = LinkVolume(req.linkvolumetarget());
-    else if (req.has_unlinkvolume())
-        error = UnlinkVolume(req.unlinkvolume());
-    else if (req.has_unlinkvolumetarget())
-        error = UnlinkVolume(req.unlinkvolumetarget());
-    else if (req.has_listvolumes())
-        error = ListVolumes(req.listvolumes(), rsp);
-    else if (req.has_tunevolume())
-        error = TuneVolume(req.tunevolume());
-    else if (req.has_importlayer())
-        error = ImportLayer(req.importlayer());
-    else if (req.has_exportlayer())
-        error = ExportLayer(req.exportlayer());
-    else if (req.has_removelayer())
-        error = RemoveLayer(req.removelayer());
-    else if (req.has_listlayers())
-        error = ListLayers(req.listlayers(), rsp);
-    else if (req.has_convertpath())
-        error = ConvertPath(req.convertpath(), rsp);
-    else if (req.has_attachprocess())
-        error = AttachProcess(req.attachprocess());
-    else if (req.has_getlayerprivate())
-        error = GetLayerPrivate(req.getlayerprivate(), rsp);
-    else if (req.has_setlayerprivate())
-        error = SetLayerPrivate(req.setlayerprivate());
-    else if (req.has_liststorage())
-        error = ListStorage(req.liststorage(), rsp);
-    else if (req.has_removestorage())
-        error = RemoveStorage(req.removestorage());
-    else if (req.has_importstorage())
-        error = ImportStorage(req.importstorage());
-    else if (req.has_exportstorage())
-        error = ExportStorage(req.exportstorage());
-    else if (req.has_createmetastorage())
-        error = CreateMetaStorage(req.createmetastorage());
-    else if (req.has_resizemetastorage())
-        error = ResizeMetaStorage(req.resizemetastorage());
-    else if (req.has_removemetastorage())
-        error = RemoveMetaStorage(req.removemetastorage());
-    else if (req.has_setsymlink())
-        error = SetSymlink(req.setsymlink());
-    else if (req.has_locateprocess())
-        error = LocateProcess(req.locateprocess(), rsp);
-    else if (req.has_getsystem())
-        error = GetSystemProperties(&req.getsystem(), rsp.mutable_getsystem());
-    else if (req.has_setsystem())
-        error = SetSystemProperties(&req.setsystem(), rsp.mutable_setsystem());
+    else if (Req.has_createvolume())
+        error = CreateVolume(Req.createvolume(), rsp);
+    else if (Req.has_linkvolume())
+        error = LinkVolume(Req.linkvolume());
+    else if (Req.has_linkvolumetarget())
+        error = LinkVolume(Req.linkvolumetarget());
+    else if (Req.has_unlinkvolume())
+        error = UnlinkVolume(Req.unlinkvolume());
+    else if (Req.has_unlinkvolumetarget())
+        error = UnlinkVolume(Req.unlinkvolumetarget());
+    else if (Req.has_listvolumes())
+        error = ListVolumes(Req.listvolumes(), rsp);
+    else if (Req.has_tunevolume())
+        error = TuneVolume(Req.tunevolume());
+    else if (Req.has_importlayer())
+        error = ImportLayer(Req.importlayer());
+    else if (Req.has_exportlayer())
+        error = ExportLayer(Req.exportlayer());
+    else if (Req.has_removelayer())
+        error = RemoveLayer(Req.removelayer());
+    else if (Req.has_listlayers())
+        error = ListLayers(Req.listlayers(), rsp);
+    else if (Req.has_convertpath())
+        error = ConvertPath(Req.convertpath(), rsp);
+    else if (Req.has_attachprocess())
+        error = AttachProcess(Req.attachprocess());
+    else if (Req.has_getlayerprivate())
+        error = GetLayerPrivate(Req.getlayerprivate(), rsp);
+    else if (Req.has_setlayerprivate())
+        error = SetLayerPrivate(Req.setlayerprivate());
+    else if (Req.has_liststorage())
+        error = ListStorage(Req.liststorage(), rsp);
+    else if (Req.has_removestorage())
+        error = RemoveStorage(Req.removestorage());
+    else if (Req.has_importstorage())
+        error = ImportStorage(Req.importstorage());
+    else if (Req.has_exportstorage())
+        error = ExportStorage(Req.exportstorage());
+    else if (Req.has_createmetastorage())
+        error = CreateMetaStorage(Req.createmetastorage());
+    else if (Req.has_resizemetastorage())
+        error = ResizeMetaStorage(Req.resizemetastorage());
+    else if (Req.has_removemetastorage())
+        error = RemoveMetaStorage(Req.removemetastorage());
+    else if (Req.has_setsymlink())
+        error = SetSymlink(Req.setsymlink());
+    else if (Req.has_locateprocess())
+        error = LocateProcess(Req.locateprocess(), rsp);
+    else if (Req.has_getsystem())
+        error = GetSystemProperties(&Req.getsystem(), rsp.mutable_getsystem());
+    else if (Req.has_setsystem())
+        error = SetSystemProperties(&Req.setsystem(), rsp.mutable_setsystem());
     else
         error = TError(EError::InvalidMethod, "invalid RPC method");
 
-    client->FinishRequest();
+    FinishTime = GetCurrentTimeMs();
+    Client->FinishRequest();
 
-    if (error != EError::Queued) {
+    Statistics->RequestsCompleted++;
+    Statistics->RequestsQueued--;
 
-        if (error) {
-            Statistics->RequestsFailed++;
-            switch (error.Error) {
-                case EError::Unknown:
-                    Statistics->FailSystem++;
-                    break;
-                case EError::InvalidValue:
-                    Statistics->FailInvalidValue++;
-                    break;
-                case EError::InvalidCommand:
-                    Statistics->FailInvalidCommand++;
-                    break;
-                default:
-                    break;
-            }
-        }
+    uint64_t RequestTime = FinishTime - QueueTime;
+    if (RequestTime > 1000)
+        Statistics->RequestsLonger1s++;
+    if (RequestTime > 3000)
+        Statistics->RequestsLonger3s++;
+    if (RequestTime > 30000)
+        Statistics->RequestsLonger30s++;
+    if (RequestTime > 300000)
+        Statistics->RequestsLonger5m++;
 
-        rsp.set_error(error.Error);
-        rsp.set_errormsg(error.Message());
-
-        /* log failed or slow silent requests */
-        if (silent && (error || client->RequestTimeMs >= 1000)) {
-            L_REQ("{} {}{} from {}", cmd, arg, opt, client->Id);
-            silent = false;
-        }
-
-        if (!silent)
-            L_RSP("{} {} {} to {} time={} ms", cmd, arg, ResponseAsString(rsp),
-                    client->Id, client->RequestTimeMs);
-
-        L_DBG("Raw response: {}", rsp.ShortDebugString());
-
-        auto lock = client->Lock();
-        client->Processing = false;
-        error = client->QueueResponse(rsp);
-        if (!error && !client->Sending)
-            error = client->SendResponse(true);
-        if (error)
-            L_WRN("Cannot send response for {} : {}", client->Id, error);
+    if (RoReq && RequestTime > Statistics->LongestRoRequest) {
+        L("Longest read request {} time={}+{} ms", Cmd,
+                StartTime - QueueTime, FinishTime - StartTime);
+        Statistics->LongestRoRequest = RequestTime;
     }
+
+    if (error == EError::Queued)
+        return;
+
+    if (error) {
+        Statistics->RequestsFailed++;
+        switch (error.Error) {
+            case EError::Unknown:
+                Statistics->FailSystem++;
+                break;
+            case EError::InvalidValue:
+                Statistics->FailInvalidValue++;
+                break;
+            case EError::InvalidCommand:
+                Statistics->FailInvalidCommand++;
+                break;
+            default:
+                break;
+        }
+    }
+
+    rsp.set_error(error.Error);
+    rsp.set_errormsg(error.Message());
+
+    if (!RoReq || Verbose) {
+        L_RSP("{} {} {} to {} time={}+{} ms", Cmd, Arg, ResponseAsString(rsp),
+                Client->Id, StartTime - QueueTime, FinishTime - StartTime);
+    } else if (error || RequestTime >= 1000) {
+        /* Log failed or slow silent requests without details */
+        L_REQ("{} {} from {}", Cmd, Arg, Client->Id);
+        L_RSP("{} {} to {} time={}+{} ms", Cmd, Arg,
+                Client->Id, StartTime - QueueTime, FinishTime - StartTime);
+    }
+
+    L_DBG("Raw response: {}", rsp.ShortDebugString());
+
+    auto lock = Client->Lock();
+    Client->Processing = false;
+    error = Client->QueueResponse(rsp);
+    if (!error && !Client->Sending)
+        error = Client->SendResponse(true);
+    if (error)
+        L_WRN("Cannot send response for {} : {}", Client->Id, error);
+}
+
+class TRequestQueue {
+    std::vector<std::unique_ptr<std::thread>> Threads;
+    std::queue<std::unique_ptr<TRequest>> Queue;
+    std::condition_variable Wakeup;
+    std::mutex Mutex;
+    bool ShouldStop = false;
+    const std::string Name;
+
+public:
+    TRequestQueue(const std::string &name) : Name(name) {}
+
+    void Start(int thread_count) {
+        for (int index = 0; index < thread_count; index++)
+            Threads.emplace_back(new std::thread(&TRequestQueue::Run, this, index));
+    }
+
+    void Stop() {
+        Mutex.lock();
+        ShouldStop = true;
+        Mutex.unlock();
+        Wakeup.notify_all();
+        for (auto &thread: Threads)
+            thread->join();
+        Threads.clear();
+        ShouldStop = false;
+    }
+
+    void Enqueue(std::unique_ptr<TRequest> &request) {
+        Mutex.lock();
+        Queue.push(std::move(request));
+        Mutex.unlock();
+        Wakeup.notify_one();
+    }
+
+    void Run(int index) {
+        SetProcessName(fmt::format("{}{}", Name, index));
+        auto lock = std::unique_lock<std::mutex>(Mutex);
+        while (true) {
+            while (Queue.empty() && !ShouldStop)
+                Wakeup.wait(lock);
+            if (ShouldStop)
+                break;
+            auto request = std::unique_ptr<TRequest>(std::move(Queue.front()));
+            Queue.pop();
+            lock.unlock();
+            request->Handle();
+            request = nullptr;
+            lock.lock();
+        }
+        lock.unlock();
+    }
+};
+
+static TRequestQueue RwQueue("portod-RW");
+static TRequestQueue RoQueue("portod-RO");
+static TRequestQueue IoQueue("portod-IO");
+
+void StartRpcQueue() {
+    RwQueue.Start(config().daemon().rw_threads());
+    RoQueue.Start(config().daemon().ro_threads());
+    IoQueue.Start(config().daemon().io_threads());
+}
+
+void StopRpcQueue() {
+    RwQueue.Stop();
+    RoQueue.Stop();
+    IoQueue.Stop();
+}
+
+void QueueRpcRequest(std::unique_ptr<TRequest> &request) {
+    Statistics->RequestsQueued++;
+    request->QueueTime = GetCurrentTimeMs();
+    request->Classify();
+    if (request->RoReq)
+        RoQueue.Enqueue(request);
+    else if (request->IoReq)
+        IoQueue.Enqueue(request);
+    else
+        RwQueue.Enqueue(request);
 }

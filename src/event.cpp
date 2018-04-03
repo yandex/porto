@@ -8,7 +8,7 @@
 
 class TEventWorker : public TWorker<TEvent, std::priority_queue<TEvent>> {
 public:
-    TEventWorker(const size_t nr) : TWorker("portod-event", nr), client("<event>") {}
+    TEventWorker(const size_t nr) : TWorker("portod-EV", nr), client("<event>") {}
 
     TClient client;
 

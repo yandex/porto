@@ -83,7 +83,7 @@ message TCfg {
         optional uint64 log_rotate_ms = 5;
         optional string sysfs_root = 6 [deprecated=true];
         optional uint64 memory_limit = 7;
-        optional uint32 workers = 8;
+        optional uint32 workers = 8 [deprecated=true];
         optional uint64 max_msg_len = 9;
         optional bool blocking_read = 10 [deprecated=true];
         optional bool blocking_write = 11 [deprecated=true];
@@ -97,6 +97,9 @@ message TCfg {
         optional uint64 client_idle_timeout = 19;
         optional uint64 helpers_dirty_limit = 20;
         optional uint32 portod_shutdown_timeout = 21;
+        optional uint32 rw_threads = 22;
+        optional uint32 ro_threads = 23;
+        optional uint32 io_threads = 24;
     }
 
     message TContainerCfg {

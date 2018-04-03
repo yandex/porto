@@ -1379,7 +1379,7 @@ void TNetwork::NetWatchdog() {
     auto LastResolvConf = LastProxyNeighbour;
     TError error;
 
-    SetProcessName("portod-network");
+    SetProcessName("portod-NET");
     while (HostNetwork) {
         auto nets = Networks();
         for (auto &net: *nets) {

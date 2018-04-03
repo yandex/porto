@@ -3174,6 +3174,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["requests_longer_3s"] = Statistics->RequestsLonger3s;
     m["requests_longer_30s"] = Statistics->RequestsLonger30s;
     m["requests_longer_5m"] = Statistics->RequestsLonger5m;
+    m["longest_read_request"] = Statistics->LongestRoRequest;
 }
 
 TError TPortoStat::Get(std::string &value) {

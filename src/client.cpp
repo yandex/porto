@@ -72,14 +72,12 @@ void TClient::CloseConnection() {
 }
 
 void TClient::StartRequest() {
-    RequestTimeMs = GetCurrentTimeMs();
-    ActivityTimeMs = RequestTimeMs;
+    ActivityTimeMs = GetCurrentTimeMs();
     PORTO_ASSERT(CL == nullptr);
     CL = this;
 }
 
 void TClient::FinishRequest() {
-    RequestTimeMs = GetCurrentTimeMs() - RequestTimeMs;
     ReleaseContainer();
     PORTO_ASSERT(CL == this);
     CL = nullptr;
@@ -591,20 +589,14 @@ TError TClient::Event(uint32_t events) {
     }
 
     if ((!Processing && !Sending) && (events & EPOLLIN)) {
-        TRequest req;
+        if (!Request)
+            Request = std::unique_ptr<TRequest>(new TRequest());
 
-        error = ReadRequest(req.Request);
+        error = ReadRequest(Request->Req);
         if (!error) {
             error = IdentifyClient(false);
-            if (!error) {
-                ClientContainer->ContainerRequests++;
-                Statistics->RequestsQueued++;
-                req.Client = shared_from_this();
-                Processing = true;
-                WaitRequest = req.Request.has_wait() ||
-                              req.Request.has_asyncwait();
-                QueueRpcRequest(req);
-            }
+            if (!error)
+                QueueRequest();
 
             if (!error && !ReportQueue.empty()) {
                 QueueReport(ReportQueue.front(), true);
@@ -621,4 +613,15 @@ TError TClient::Event(uint32_t events) {
         return TError::System("Connection lost");
 
     return OK;
+}
+
+void TClient::QueueRequest() {
+    Request->Client = shared_from_this();
+
+    ClientContainer->ContainerRequests++;
+    Processing = true;
+    WaitRequest = Request->Req.has_wait() || Request->Req.has_asyncwait();
+
+    QueueRpcRequest(Request);
+    Request = nullptr;
 }

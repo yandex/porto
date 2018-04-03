@@ -114,40 +114,6 @@ static bool SanityCheck() {
     return EXIT_SUCCESS;
 }
 
-class TRpcWorker : public TWorker<TRequest> {
-public:
-    TRpcWorker(const size_t nr) : TWorker("portod-worker", nr) {}
-
-    const TRequest &Top() override {
-        return Queue.front();
-    }
-
-    bool Handle(const TRequest &request) override {
-        HandleRpcRequest(request.Request, request.Client);
-        Statistics->RequestsCompleted++;
-        Statistics->RequestsQueued--;
-
-        auto time = request.Client->RequestTimeMs;
-        if (time > 1000)
-            Statistics->RequestsLonger1s++;
-        if (time > 3000)
-            Statistics->RequestsLonger3s++;
-        if (time > 30000)
-            Statistics->RequestsLonger30s++;
-        if (time > 300000)
-            Statistics->RequestsLonger5m++;
-
-        return true;
-    }
-};
-
-std::shared_ptr<TRpcWorker> RpcWorker;
-
-// FIXME
-void QueueRpcRequest(TRequest &req) {
-    RpcWorker->Push(req);
-}
-
 static TError CreatePortoSocket() {
     TPath path(PORTO_SOCKET_PATH);
     struct sockaddr_un addr;
@@ -393,17 +359,15 @@ static void PortodServer() {
         return;
     }
 
-    std::vector<struct epoll_event> events;
-
-    RpcWorker = std::make_shared<TRpcWorker>(config().daemon().workers());
-
-    RpcWorker->Start();
+    StartRpcQueue();
     EventQueue->Start();
 
     if (config().daemon().log_rotate_ms()) {
         TEvent ev(EEventType::RotateLogs);
         EventQueue->Add(config().daemon().log_rotate_ms(), ev);
     }
+
+    std::vector<struct epoll_event> events;
 
     while (true) {
         error = EpollLoop->GetEvents(events, 1000);
@@ -517,7 +481,7 @@ exit:
 
     L_SYS("Stop threads...");
     EventQueue->Stop();
-    RpcWorker->Stop();
+    StopRpcQueue();
 }
 
 static TError TuneLimits() {

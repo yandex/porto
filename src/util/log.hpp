@@ -60,6 +60,7 @@ struct TStatistics {
     std::atomic<uint64_t> LogBytesLost;
     std::atomic<uint64_t> Taints;
     std::atomic<uint64_t> ContainersTainted;
+    std::atomic<uint64_t> LongestRoRequest;
 
     /* --- add new fields at the end --- */
 };
@@ -77,6 +78,7 @@ static inline void ResetStatistics() {
     Statistics->VolumeLinksMounted = 0;
     Statistics->RequestsQueued = 0;
     Statistics->NetworksCount = 0;
+    Statistics->LongestRoRequest = 0;
 }
 
 template <typename... Args> inline void L_DBG(const char* fmt, const Args&... args) {

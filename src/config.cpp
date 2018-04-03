@@ -33,6 +33,10 @@ void TConfig::ReadDefaults() {
     config().set_keyvalue_limit(1 << 20);
     config().set_keyvalue_size(32 << 20);
 
+    config().mutable_daemon()->set_rw_threads(20);
+    config().mutable_daemon()->set_ro_threads(10);
+    config().mutable_daemon()->set_io_threads(5);
+
     config().mutable_daemon()->set_max_clients(1000);
     config().mutable_daemon()->set_max_clients_in_container(500);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(300);
@@ -42,7 +46,6 @@ void TConfig::ReadDefaults() {
     config().mutable_daemon()->set_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_dirty_limit(256ull << 20);
-    config().mutable_daemon()->set_workers(32);
     config().mutable_daemon()->set_max_msg_len(32 * 1024 * 1024);
     config().mutable_daemon()->set_portod_stop_timeout(300);
     config().mutable_daemon()->set_portod_start_timeout(300);
