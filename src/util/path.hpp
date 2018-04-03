@@ -257,7 +257,7 @@ public:
     TError Truncate(off_t size) const;
     TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
-    int GetMountId(const TPath relative = TPath("")) const;
+    int GetMountId(const TPath &relative = "") const;
     TError Dup(const TFile &other);
     TError OpenAt(const TFile &dir, const TPath &path, int flags, int mode);
     TError MkdirAt(const TPath &path, int mode) const;
