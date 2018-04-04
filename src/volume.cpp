@@ -442,7 +442,7 @@ static TError SetupLoopDev(const TFile &file, const TPath &path, int &loopNr) {
 
     if (config().volumes().direct_io_loop() &&
             fcntl(file.Fd, F_SETFL, fcntl(file.Fd, F_GETFL) | O_DIRECT))
-        L_WRN("Cannot enable O_DIRECT for loop {}", TError::System("fcntl"));
+        L("Cannot enable O_DIRECT for loop {}", TError::System("fcntl"));
 
     auto lock = std::unique_lock<std::mutex>(BigLoopLock);
 
