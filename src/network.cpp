@@ -1600,6 +1600,7 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
     }
 
     ct.LockStateWrite();
+    PORTO_ASSERT(!ct.Net);
     ct.Net = env.Net;
     auto lock = ct.Net->LockNetState();
     if (ct.Controllers & CGROUP_NETCLS) {

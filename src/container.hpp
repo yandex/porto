@@ -80,8 +80,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareTask(TTaskEnv &TaskEnv);
 
     TError PrepareResources();
-    void FreeRuntimeResources();
     void FreeResources();
+
+    TError PrepareRuntimeResources();
+    void FreeRuntimeResources();
 
     void Reap(bool oomKilled);
     void Exit(int status, bool oomKilled);

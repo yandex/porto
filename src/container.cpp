@@ -1802,6 +1802,10 @@ void TContainer::ShutdownOom() {
 }
 
 TError TContainer::PrepareOomMonitor() {
+
+    if (IsRoot() || !(Controllers & CGROUP_MEMORY))
+        return OK;
+
     TCgroup memoryCg = GetCgroup(MemorySubsystem);
     TError error;
 
@@ -1944,12 +1948,6 @@ TError TContainer::PrepareCgroups() {
         error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
-
-        error = PrepareOomMonitor();
-        if (error) {
-            L_ERR("Can't prepare OOM monitoring: {}", error);
-            return error;
-        }
     }
 
     if (Controllers & CGROUP_DEVICES) {
@@ -1970,12 +1968,6 @@ TError TContainer::PrepareCgroups() {
             L_ERR("Can't set classid: {}", error);
             return error;
         }
-    }
-
-    error = UpdateSoftLimit();
-    if (error) {
-        L_ERR("Cannot update memory soft limit: {}", error);
-        return error;
     }
 
     return OK;
@@ -2378,7 +2370,7 @@ TError TContainer::Start() {
     error = PrepareStart();
     if (error) {
         error = TError(error, "Cannot prepare start for container {}", Name);
-        goto out;
+        goto err_prepare;
     }
 
     L_ACT("Start CT{}:{}", Id, Name);
@@ -2390,10 +2382,12 @@ TError TContainer::Start() {
     SetProp(EProperty::START_TIME);
 
     error = PrepareResources();
-    if (error) {
-        SetState(EContainerState::Stopped);
-        goto out;
-    }
+    if (error)
+        goto err_prepare;
+
+    error = PrepareRuntimeResources();
+    if (error)
+        goto err;
 
     /* Complain about insecure misconfiguration */
     for (auto &taint: Taint()) {
@@ -2413,9 +2407,7 @@ TError TContainer::Start() {
     if (error) {
         SetState(EContainerState::Stopping);
         (void)Terminate(0);
-        FreeResources();
-        SetState(EContainerState::Stopped);
-        goto out;
+        goto err;
     }
 
     if (IsMeta())
@@ -2429,13 +2421,20 @@ TError TContainer::Start() {
     if (error) {
         L_ERR("Cannot save state after start {}", error);
         (void)Reap(false);
+        goto err;
     }
 
-out:
-    if (error)
-        Statistics->ContainersFailedStart++;
-    else
-        Statistics->ContainersStarted++;
+    Statistics->ContainersStarted++;
+
+    return OK;
+
+err:
+    TNetwork::StopNetwork(*this);
+    FreeRuntimeResources();
+    FreeResources();
+err_prepare:
+    SetState(EContainerState::Stopped);
+    Statistics->ContainersFailedStart++;
 
     return error;
 }
@@ -2501,8 +2500,6 @@ TError TContainer::PrepareResources() {
         UnlockState();
     }
 
-    PropagateCpuLimit();
-
     return OK;
 
 undo:
@@ -2511,6 +2508,27 @@ undo:
 }
 
 /* Some resources are not required in dead state */
+
+TError TContainer::PrepareRuntimeResources() {
+    TError error;
+
+    error = PrepareOomMonitor();
+    if (error) {
+        L_ERR("Cannot prepare OOM monitor: {}", error);
+        return error;
+    }
+
+    error = UpdateSoftLimit();
+    if (error) {
+        L_ERR("Cannot update memory soft limit: {}", error);
+        return error;
+    }
+
+    PropagateCpuLimit();
+
+    return OK;
+}
+
 void TContainer::FreeRuntimeResources() {
     TError error;
 
@@ -2537,10 +2555,6 @@ void TContainer::FreeRuntimeResources() {
 
 void TContainer::FreeResources() {
     TError error;
-
-    FreeRuntimeResources();
-
-    TNetwork::StopNetwork(*this);
 
     if (IsRoot())
         return;
@@ -2720,7 +2734,10 @@ TError TContainer::Stop(uint64_t timeout) {
 
         (void)ct->Save();
 
+        TNetwork::StopNetwork(*ct);
+        ct->FreeRuntimeResources();
         ct->FreeResources();
+
         ct->SetState(EContainerState::Stopped);
 
         error = Save();
