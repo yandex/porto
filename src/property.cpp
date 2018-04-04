@@ -1249,6 +1249,7 @@ public:
         }
         CT->Devices.Merge(devices, true);
         CT->SetProp(EProperty::DEVICE_CONF);
+        return OK;
     }
 } static Devices;
 
