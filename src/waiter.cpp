@@ -36,9 +36,10 @@ void TContainerWaiter::Deactivate() {
 
 bool TContainerWaiter::ShouldReport(TContainer &ct) {
 
-    /* Sync wait reports only stopped, dead, hollow meta */
+    /* Sync wait reports only stopped, dead, respawning, hollow meta */
     if (!Async && ct.State != EContainerState::Stopped &&
             ct.State != EContainerState::Dead &&
+            ct.State != EContainerState::Respawning &&
             (ct.State != EContainerState::Meta || ct.RunningChildren))
         return false;
 

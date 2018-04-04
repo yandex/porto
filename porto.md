@@ -67,13 +67,14 @@ Container "." points to parent container for current porto namespace,
 this is common parent for all visible containers.
 
 ## States
-* **stopped**   - initial state
-* **starting**  - start in progress
-* **running**   - **command** execution in progress
-* **stopping**  - stop in progress
-* **paused**    - frozen, consumes memory but no cpu
-* **dead**      - execution complete
-* **meta**      - running container without **command**
+* **stopped**    - initial state
+* **starting**   - start in progress
+* **running**    - **command** execution in progress
+* **stopping**   - stop in progress
+* **paused**     - frozen, consumes memory but no cpu
+* **dead**       - execution complete
+* **meta**       - running container without **command**
+* **respawning** - dead and will be started again
 
 ## Operations
 * **create**    - creates new container in stopped state
@@ -212,7 +213,7 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **respawn** - automatically restart container after death
 
-    Nested containers will be stopped and not respawned.
+    If set also for nested containers they will be scheduled to respawn after parent respawn.
 
 * **respawn\_count** - how many times container has been respawned
 

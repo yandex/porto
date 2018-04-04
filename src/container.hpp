@@ -31,6 +31,7 @@ struct TEnv;
 enum class EContainerState {
     Stopped,
     Dead,
+    Respawning,
     Starting,
     Running,
     Stopping,
@@ -108,12 +109,8 @@ public:
     std::atomic<int> StartingChildren;
 
     bool HasResources() const {
-        return State == EContainerState::Running ||
-               State == EContainerState::Starting ||
-               State == EContainerState::Stopping ||
-               State == EContainerState::Meta ||
-               State == EContainerState::Paused ||
-               State == EContainerState::Dead;
+        return State != EContainerState::Stopped &&
+               State != EContainerState::Destroyed;
     }
 
     /* protected with ContainersMutex */
@@ -210,14 +207,14 @@ public:
     uint64_t CpuLimitSum = 0;
     uint64_t CpuLimitCur = 0;
 
-    bool AutoRespawn;
-    int64_t RespawnLimit;
-    uint64_t RespawnCount;
+    bool AutoRespawn = false;
+    int64_t RespawnLimit = -1;
+    int64_t RespawnCount = 0;
     uint64_t RespawnDelay;
 
     TError MayRespawn();
     TError Respawn();
-    void ScheduleRespawn();
+    TError ScheduleRespawn();
 
     std::string Private;
     EAccessLevel AccessLevel;

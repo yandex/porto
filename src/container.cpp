@@ -420,9 +420,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 
     NetClass.Prio["default"] = NET_DEFAULT_PRIO;
 
-    AutoRespawn = false;
-    RespawnLimit = -1;
-    RespawnCount = 0;
     RespawnDelay = config().container().respawn_delay_ms() * 1000000;
 
     Private = "";
@@ -655,7 +652,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
             goto err;
     }
 
-    if (ct->AutoRespawn && !ct->MayRespawn())
+    if (ct->State == EContainerState::Dead && ct->AutoRespawn)
         ct->ScheduleRespawn();
 
     /* Do not apply dynamic properties to dead container */
@@ -690,6 +687,8 @@ std::string TContainer::StateName(EContainerState state) {
         return "stopped";
     case EContainerState::Dead:
         return "dead";
+    case EContainerState::Respawning:
+        return "respawning";
     case EContainerState::Starting:
         return "starting";
     case EContainerState::Running:
@@ -712,6 +711,8 @@ EContainerState TContainer::ParseState(const std::string &name) {
         return EContainerState::Stopped;
     if (name == "dead")
         return EContainerState::Dead;
+    if (name == "respawning")
+        return EContainerState::Respawning;
     if (name == "starting")
         return EContainerState::Starting;
     if (name == "running")
@@ -851,6 +852,9 @@ void TContainer::SetState(EContainerState next) {
         for (auto p = Parent; p; p = p->Parent)
             p->RunningChildren += next == EContainerState::Running ? 1 : -1;
     }
+
+    if (next == EContainerState::Dead && AutoRespawn)
+        ScheduleRespawn();
 
     DowngradeStateLock();
 
@@ -2740,7 +2744,7 @@ TError TContainer::Stop(uint64_t timeout) {
 
         ct->SetState(EContainerState::Stopped);
 
-        error = Save();
+        error = ct->Save();
         if (error)
             return error;
     }
@@ -2779,9 +2783,6 @@ void TContainer::Reap(bool oomKilled) {
     error = Save();
     if (error)
         L_WRN("Cannot save container state after exit: {}", error);
-
-    if (AutoRespawn && !MayRespawn())
-        ScheduleRespawn();
 }
 
 void TContainer::Exit(int status, bool oomKilled) {
@@ -2879,38 +2880,124 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::MayRespawn() {
-    if (State != EContainerState::Dead)
-        return TError(EError::InvalidState, "Cannot respawn non-dead container");
+    if (State != EContainerState::Dead &&
+            State != EContainerState::Respawning)
+        return TError(EError::InvalidState, "Cannot respawn: container in state={}", TContainer::StateName(State));
 
     if (Parent->State != EContainerState::Running &&
-            Parent->State != EContainerState::Meta)
-        return TError(EError::InvalidState, "Cannot respawn: parent container not running");
+            Parent->State != EContainerState::Meta &&
+            Parent->State != EContainerState::Respawning)
+        return TError(EError::InvalidState, "Cannot respawn: parent container in state={}", TContainer::StateName(Parent->State));
 
     if (RespawnLimit >= 0 && RespawnCount >= RespawnLimit)
-        return TError(EError::ResourceNotAvailable, "Cannot respawn: reached limit");
+        return TError(EError::ResourceNotAvailable, "Cannot respawn: reached max_respawns={}", RespawnLimit);
 
     return OK;
+}
+
+TError TContainer::ScheduleRespawn() {
+    TError error = MayRespawn();
+    if (!error) {
+        L_ACT("Change CT{}:{} state {} -> {}", Id, Name, StateName(State), StateName(EContainerState::Respawning));
+        State = EContainerState::Respawning;
+        if (Parent->State == EContainerState::Respawning) {
+            L_ACT("Respawn CT{}:{} after respawning parent", Id, Name);
+        } else {
+            L_ACT("Respawn CT{}:{} after {} ms", Id, Name, RespawnDelay / 1000000);
+            TEvent e(EEventType::Respawn, shared_from_this());
+            EventQueue->Add(RespawnDelay / 1000000, e);
+        }
+    }
+    return error;
 }
 
 TError TContainer::Respawn() {
     TError error;
 
     error = MayRespawn();
-    if (error)
+    if (error) {
+        if (State == EContainerState::Respawning)
+            SetState(EContainerState::Dead);
         return error;
+    }
 
-    L_ACT("Respawn CT{}:{}", Id, Name);
-
-    error = Stop(0);
-    if (error)
-        return error;
+    if (Parent->State == EContainerState::Respawning) {
+        if (State != EContainerState::Respawning)
+            SetState(EContainerState::Respawning);
+        L_ACT("Respawn CT{}:{} after respawning parent", Id, Name);
+        return OK;
+    }
 
     LockStateWrite();
     RespawnCount++;
     SetProp(EProperty::RESPAWN_COUNT);
     UnlockState();
 
-    return Start();
+    L_ACT("Respawn CT{}:{} try {}", Id, Name, RespawnCount);
+
+    TNetwork::StopNetwork(*this);
+
+    error = PrepareStart();
+    if (error) {
+        error = TError(error, "Cannot prepare respawn for container {}", Name);
+        goto err_prepare;
+    }
+
+    StartTime = GetCurrentTimeMs();
+    RealStartTime = time(nullptr);
+    SetProp(EProperty::START_TIME);
+
+    error = PrepareRuntimeResources();
+    if (error)
+        goto err;
+
+    CL->LockedContainer->DowngradeActionLock();
+
+    error = StartTask();
+
+    CL->LockedContainer->UpgradeActionLock();
+
+    if (error) {
+        (void)Terminate(0);
+        goto err;
+    }
+
+    if (IsMeta())
+        SetState(EContainerState::Meta);
+    else
+        SetState(EContainerState::Running);
+
+    SetProp(EProperty::ROOT_PID);
+
+    error = Save();
+    if (error) {
+        L_ERR("Cannot save state after respawn {}", error);
+        (void)Reap(false);
+        goto err;
+    }
+
+    Statistics->ContainersStarted++;
+
+    for (auto &child: Childs()) {
+        child->LockStateWrite();
+        if (child->State == EContainerState::Respawning || child->AutoRespawn)
+            child->ScheduleRespawn();
+        child->UnlockState();
+    }
+
+    return OK;
+
+err:
+    TNetwork::StopNetwork(*this);
+    FreeRuntimeResources();
+
+err_prepare:
+    DeathTime = GetCurrentTimeMs();
+    Statistics->ContainersFailedStart++;
+    L("Cannot respawn CT{}:{} - {}", Id, Name, error);
+    SetState(EContainerState::Dead);
+    (void)Save();
+    return error;
 }
 
 void TContainer::SyncProperty(const std::string &name) {
@@ -3108,6 +3195,11 @@ TError TContainer::Save(void) {
         if (error)
             break;
 
+        /* Temporary hack for backward migration */
+        if (knob.second->Prop == EProperty::STATE &&
+                State == EContainerState::Respawning)
+            value = "dead";
+
         node.Set(knob.first, value);
     }
 
@@ -3253,7 +3345,8 @@ void TContainer::SyncState() {
         return;
     }
 
-    if (State == EContainerState::Starting)
+    if (State == EContainerState::Starting ||
+            State == EContainerState::Respawning)
         SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
 
     if (FreezerSubsystem.IsFrozen(freezerCg)) {
@@ -3310,6 +3403,7 @@ void TContainer::SyncState() {
         case EContainerState::Meta:
         case EContainerState::Starting:
         case EContainerState::Stopping:
+        case EContainerState::Respawning:
             /* Any state is ok */
             break;
         case EContainerState::Paused:
@@ -3403,11 +3497,6 @@ bool TContainer::RecvOomEvents() {
     }
 
     return false;
-}
-
-void TContainer::ScheduleRespawn() {
-    TEvent e(EEventType::Respawn, shared_from_this());
-    EventQueue->Add(RespawnDelay / 1000000, e);
 }
 
 void TContainer::Event(const TEvent &event) {

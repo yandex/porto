@@ -147,7 +147,7 @@ def ns_escape(v):
     c.Wait(["parent"])
     output = c.Get(["parent","parent/child"], ["stdout"])
     assert output["parent"]["stdout"] == "OK\n"
-    assert output["parent/child"]["stdout"] == "OK"
+    assert output["parent/child"]["stdout"] == "OKOK"
 
     AsRoot()
 
