@@ -856,8 +856,6 @@ TError TPath::UmountAll() const {
 }
 
 TError TPath::UmountNested() const {
-    L_ACT("umount nested {}", Path);
-
     std::list<TMount> mounts;
     TError error = ListAllMounts(mounts);
     if (error)
@@ -867,11 +865,11 @@ TError TPath::UmountNested() const {
         if (it->Target.IsInside(*this)) {
             error = it->Target.UmountAll();
             if (error)
-                break;
+                L_WRN("Cannot umount {} {}", it->Target, error);
         }
     }
 
-    return error;
+    return OK;
 }
 
 TError TPath::ReadAll(std::string &text, size_t max) const {

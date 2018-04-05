@@ -2287,7 +2287,7 @@ TError TVolume::DestroyOne() {
         }
     }
 
-    error = internal.UmountAll();
+    error = internal.UmountNested();
     if (error) {
         L_ERR("Cannot umount internal: {}", error);
         if (!ret)
