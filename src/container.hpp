@@ -216,6 +216,7 @@ public:
     uint64_t CpuLimitCur = 0;
 
     bool AutoRespawn;
+    bool RetryRespawn = false;
     int64_t RespawnLimit;
     uint64_t RespawnCount;
     uint64_t RespawnDelay;

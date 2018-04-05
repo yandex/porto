@@ -2759,7 +2759,8 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::MayRespawn() {
-    if (State != EContainerState::Dead)
+    if (State != EContainerState::Dead &&
+            !(RetryRespawn && State == EContainerState::Stopped))
         return TError(EError::InvalidState, "Cannot respawn non-dead container");
 
     if (Parent->State != EContainerState::Running &&
@@ -2779,16 +2780,26 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
-    L_ACT("Respawn CT{}:{}", Id, Name);
-
-    error = Stop(0);
-    if (error)
-        return error;
-
     RespawnCount++;
     SetProp(EProperty::RESPAWN_COUNT);
 
-    return Start();
+    L_ACT("Respawn CT{}:{} try {}", Id, Name, RespawnCount);
+
+    RetryRespawn = false;
+
+    error = Stop(0);
+    if (!error)
+        error = Start();
+
+    if (error) {
+        RetryRespawn = true;
+        if (MayRespawn())
+            RetryRespawn = false;
+        else
+            ScheduleRespawn();
+    }
+
+    return error;
 }
 
 void TContainer::SyncProperty(const std::string &name) {
