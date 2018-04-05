@@ -1,3 +1,22 @@
+yandex-porto (4.12.4) unstable; urgency=low
+
+  * porto: remove legacy protobuf helpers
+  * porto: add separate locks for protecting containers state
+  * porto: split rpc threads into three pools: RW/RO/IO
+  * volume: just log if fs below loop image does not support O_DIRECT
+  * property: add missing return OK
+  * volume: at destroy umount all nested submounts
+  * volume: target path should not overlap bind mount storage
+  * container: do not apply dynamic properties to dead container
+  * container: save state=stopping before removing cgroups
+  * porto: update fd estimation after reworking thread pools
+  * porto: deprecate default_bind_dns in portod.conf
+  * test: bump previous release to 4.11.5
+  * container: split preparation runtime resources
+  * container: rework respawning state machine
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 05 Apr 2018 17:29:18 +0300
+
 yandex-porto (4.12.3) unstable; urgency=low
 
   * filesystem: handle races during recursive remount
