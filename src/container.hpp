@@ -129,7 +129,7 @@ public:
     std::string Root;
     bool RootRo;
     mode_t Umask;
-    bool BindDns;
+    bool BindDns = false;       /* deprecated */
     bool Isolate;               /* New pid/ipc/utc/env namespace */
     bool OsMode;                /* Start as init process */
     bool HostMode;              /* Preserve host capabilites */

@@ -345,7 +345,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     Isolate = true;
     OsMode = false;
     HostMode = IsRoot();
-    BindDns = config().container().default_bind_dns();
 
     NetProp = { { "inherited" } };
     NetIsolate = false;

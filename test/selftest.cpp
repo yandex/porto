@@ -188,7 +188,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "hostname", v));
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "bind_dns", v));
-    ExpectEq(v, BoolToString(config().container().default_bind_dns()));
+    ExpectEq(v, "false");
     ExpectApiSuccess(api.GetProperty(name, "devices", v));
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "capabilities", v));
