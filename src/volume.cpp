@@ -1615,9 +1615,15 @@ TError TVolume::CheckConflicts(const TPath &path) {
         if (vol->Place.IsInside(path))
             return TError(EError::InvalidPath, "Volume path {} overlaps with place {}", path, vol->Place);
 
-        if (!vol->RemoteStorage() && vol->BackendType != "bind" && vol->BackendType != "rbind" &&
-                (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath)))
-            return TError(EError::InvalidPath, "Volume path {} overlaps with storage {}", path, vol->StoragePath);
+        if (vol->RemoteStorage()) {
+
+        } else if (vol->BackendType == "bind" || vol->BackendType == "rbind") {
+            if (vol->StoragePath.IsInside(path))
+                return TError(EError::InvalidPath, "Volume path {} overlaps with volume {} storage {}", path, vol->Path, vol->StoragePath);
+        } else {
+            if (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath))
+                return TError(EError::InvalidPath, "Volume path {} overlaps with volume {} storage {}", path, vol->Path, vol->StoragePath);
+        }
 
         for (auto &l: vol->Layers) {
             TPath layer(l);
