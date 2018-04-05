@@ -495,7 +495,9 @@ static TError TuneLimits() {
      */
     int maxFd = config().container().max_total() * 2 +
                 NR_SUPERUSER_CONTAINERS * 2 +
-                config().daemon().workers() * 10 +
+                (config().daemon().ro_threads() +
+                 config().daemon().rw_threads() +
+                 config().daemon().io_threads()) * 10 +
                 config().daemon().max_clients() +
                 NR_SUPERUSER_CLIENTS +
                 1000;
