@@ -659,6 +659,10 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (ct->AutoRespawn && !ct->MayRespawn())
         ct->ScheduleRespawn();
 
+    /* Do not apply dynamic properties to dead container */
+    if (ct->State == EContainerState::Dead)
+        memset(ct->PropDirty, 0, sizeof(ct->PropDirty));
+
     error = ct->Save();
     if (error)
         goto err;
