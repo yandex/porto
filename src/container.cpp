@@ -2719,6 +2719,8 @@ TError TContainer::Stop(uint64_t timeout) {
 
         ct->UnlockState();
 
+        (void)ct->Save();
+
         ct->FreeResources();
         ct->SetState(EContainerState::Stopped);
 
@@ -3227,7 +3229,8 @@ void TContainer::SyncState() {
     L_ACT("Sync CT{}:{} state {}", Id, Name, StateName(State));
 
     if (!freezerCg.Exists()) {
-        if (State != EContainerState::Stopped)
+        if (State != EContainerState::Stopped &&
+                State != EContainerState::Stopping)
             L_WRN("Freezer not found");
         ForgetPid();
         SetState(EContainerState::Stopped);
