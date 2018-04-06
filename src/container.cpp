@@ -3355,9 +3355,10 @@ void TContainer::SyncState() {
     } else if (State == EContainerState::Paused)
         SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
 
-    if (State == EContainerState::Stopped) {
-        L("Found unexpected freezer");
-        Reap(false);
+    if (State == EContainerState::Stopped || State == EContainerState::Stopping) {
+        if (State == EContainerState::Stopped)
+            L("Found unexpected freezer");
+        Stop(0);
     } else if (State == EContainerState::Meta && !WaitTask.Pid && !Isolate) {
         /* meta container */
     } else if (!WaitTask.Exists()) {
