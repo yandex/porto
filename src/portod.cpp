@@ -1155,11 +1155,8 @@ exit:
 
     loop->RemoveSource(AckSource->Fd);
 
-    close(evtfd[0]);
     close(evtfd[1]);
-
     close(ackfd[0]);
-    close(ackfd[1]);
 }
 
 static int PortodMaster() {
