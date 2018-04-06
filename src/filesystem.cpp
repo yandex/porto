@@ -63,8 +63,7 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
         bind.Target = line[1];
 
         if (line.size() > 2) {
-            uint64_t flags;
-            error = TMount::ParseFlags(line[2], flags,
+            error = TMount::ParseFlags(line[2], bind.MntFlags,
                                        MS_RDONLY | MS_ALLOW_WRITE |
                                        MS_NODEV | MS_ALLOW_DEV |    /* check permissions at start */
                                        MS_NOSUID | MS_ALLOW_SUID |
@@ -73,18 +72,16 @@ TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds)
                                        MS_NOATIME | MS_NODIRATIME | MS_RELATIME);
             if (error)
                 return error;
-
-            // by default disable backward propagation
-            if (!(flags & (MS_PRIVATE | MS_UNBINDABLE)))
-                flags |= MS_SLAVE | MS_SHARED;
-
-            // FIXME temporary hack
-            for (auto &src: config().container().rec_bind_hack())
-                if (bind.Source == src)
-                    flags |= MS_REC;
-
-            bind.MntFlags = flags;
         }
+
+        // by default disable backward propagation
+        if (!(bind.MntFlags & (MS_PRIVATE | MS_UNBINDABLE)))
+            bind.MntFlags |= MS_SLAVE | MS_SHARED;
+
+        // FIXME temporary hack
+        for (auto &src: config().container().rec_bind_hack())
+            if (bind.Source == src)
+                bind.MntFlags |= MS_REC;
 
         binds.push_back(bind);
     }
