@@ -1,3 +1,9 @@
+yandex-porto (4.12.6) unstable; urgency=low
+
+  * porto: do not close control pipes twice
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 06 Apr 2018 19:09:01 +0300
+
 yandex-porto (4.12.5) unstable; urgency=low
 
   * container: at restore stop containers that should be stopped
