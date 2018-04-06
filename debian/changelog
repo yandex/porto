@@ -1,3 +1,13 @@
+yandex-porto (4.11.6) unstable; urgency=low
+
+  * filesystem: mount binds after rootfs setup
+  * filesystem: handle races during recursive remount
+  * filesystem: in chroot allow suid binaries only on root volume
+  * volume: just log if fs below loop image does not support O_DIRECT
+  * container: retry failed respawn
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 06 Apr 2018 15:27:36 +0300
+
 yandex-porto (4.11.5) unstable; urgency=low
 
   * porto: emulation for deprecated root on loop devices
