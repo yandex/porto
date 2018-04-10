@@ -1225,7 +1225,7 @@ public:
     }
     TError Set(const std::string &value) {
         TDevices devices;
-        TError error = devices.Parse(value);
+        TError error = devices.Parse(value, CL->Cred);
         if (error)
             return error;
         if (devices.NeedCgroup) {
@@ -1239,7 +1239,7 @@ public:
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
         TDevices devices;
-        TError error = devices.Parse(index + " " + value);
+        TError error = devices.Parse(index + " " + value, CL->Cred);
         if (error)
             return error;
         if (devices.NeedCgroup) {
