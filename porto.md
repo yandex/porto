@@ -271,7 +271,7 @@ container { default_ulimit: "type: soft hard;..." }
     "device" - device path in host (/dev/null)  
     "rwm-" - read, write, mknod, no-access  
     "path" - device path in container, defaults same as in host  
-    "mode", "user", "group" - device node permissions and owner, only host root allowed to change this, defaults are taken from host  
+    "mode", "user", "group" - device node permissions and owner, defaults are taken from host, only host root and device owner are allowed to change this  
 
     By default porto grants access to:  
     /dev/null  

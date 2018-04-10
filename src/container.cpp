@@ -1777,10 +1777,6 @@ TError TContainer::ApplyDeviceConf() const {
     if (IsRoot())
         return OK;
 
-    error = Devices.Permitted(OwnerCred);
-    if (error)
-        return error;
-
     if (Controllers & CGROUP_DEVICES) {
         TCgroup cg = GetCgroup(DevicesSubsystem);
         error = Devices.Apply(cg);

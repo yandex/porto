@@ -17,15 +17,22 @@ TError TDevice::CheckPath(const TPath &path) {
     return OK;
 }
 
-TError TDevice::Init(const TPath &path) {
-    struct stat st;
+TError TDevice::Parse(TTuple &opt, const TCred &cred) {
     TError error;
 
-    error = TDevice::CheckPath(path);
+    if (opt.size() < 2)
+        return TError(EError::InvalidValue, "Invalid device config: " +
+                      MergeEscapeStrings(opt, ' '));
+
+    /* <device> [r][w][m][-] [path] [mode] [user] [group] */
+    Path = opt[0];
+
+    error = TDevice::CheckPath(Path);
     if (error)
         return error;
 
-    error = path.StatFollow(st);
+    struct stat st;
+    error = Path.StatFollow(st);
     if (error) {
         if (error.Errno == ENOENT)
             return TError(EError::DeviceNotFound, "Device {} does not exists", Path);
@@ -33,33 +40,13 @@ TError TDevice::Init(const TPath &path) {
     }
 
     if (!S_ISCHR(st.st_mode) && !S_ISBLK(st.st_mode))
-        return TError(EError::DeviceNotFound, "Not a device node: {}", path);
+        return TError(EError::DeviceNotFound, "Not a device node: {}", Path);
 
-    Path = path;
-    PathInside = path;
     Node = st.st_rdev;
     Uid = st.st_uid;
     Gid = st.st_gid;
     Mode = st.st_mode;
-
-    MayRead = MayWrite = MayMknod = true;
-    Wildcard = Privileged = false;
-
-    return OK;
-}
-
-TError TDevice::Parse(TTuple &opt) {
-    TError error;
-
-    if (opt.size() < 2)
-        return TError(EError::InvalidValue, "Invalid device config: " +
-                      MergeEscapeStrings(opt, ' '));
-
-    error = Init(opt[0]);
-    if (error)
-        return error;
-
-    MayRead = MayWrite = MayMknod = false;
+    MayRead = MayWrite = MayMknod = Wildcard = false;
 
     for (char c: opt[1]) {
         switch (c) {
@@ -73,8 +60,9 @@ TError TDevice::Parse(TTuple &opt) {
                 MayMknod = true;
                 break;
             case '*':
+                if (!cred.IsRootUser())
+                    return TError(EError::Permission, "{} cannot setup wildcard {}", cred.ToString(), Path);
                 Wildcard = true;
-                Privileged = true;
                 break;
             case '-':
                 break;
@@ -87,12 +75,20 @@ TError TDevice::Parse(TTuple &opt) {
     if ((MayRead || MayWrite) && !Wildcard)
         MayMknod = true;
 
+    // FIXME check acl
+    if (MayRead && !TFile::Access(st, cred, TFile::R))
+        return TError(EError::Permission, "{} cannot read device {}", cred.ToString(), Path);
+
+    if (MayWrite && !TFile::Access(st, cred, TFile::W))
+        return TError(EError::Permission, "{} cannot write device {}", cred.ToString(), Path);
+
     if (opt.size() > 2) {
         error = TDevice::CheckPath(opt[2]);
         if (error)
             return error;
         PathInside = opt[2];
-    }
+    } else
+        PathInside = opt[0];
 
     if (opt.size() > 3) {
         unsigned mode;
@@ -101,8 +97,9 @@ TError TDevice::Parse(TTuple &opt) {
             return error;
         if (mode & ~0777)
             return TError(EError::InvalidValue, "invalid device mode: " + opt[3]);
-        if ((Mode & 0777) < mode)
-            Privileged = true;
+        if ((mode & ~(Mode & 0777)) && cred.Uid != Uid && !cred.IsRootUser())
+            return TError(EError::Permission, "{} cannot change device {} permissions {:#o} to {:#o}",
+                          cred.ToString(), Path, Mode & 0777, mode);
         Mode = mode | (Mode & ~0777);
     }
 
@@ -111,8 +108,9 @@ TError TDevice::Parse(TTuple &opt) {
         error = UserId(opt[4], uid);
         if (error)
             return error;
-        if (uid != Uid)
-            Privileged = true;
+        if (uid != Uid && cred.Uid != Uid && !cred.IsRootUser())
+            return TError(EError::Permission, "{} cannot change device {} uid {} to {}",
+                          cred.ToString(), Path, UserName(Uid), UserName(uid));
         Uid = uid;
     }
 
@@ -121,8 +119,9 @@ TError TDevice::Parse(TTuple &opt) {
         error = GroupId(opt[5], gid);
         if (error)
             return error;
-        if (gid != Gid)
-            Privileged = true;
+        if (gid != Gid && cred.Uid != Uid && !cred.IsRootUser())
+            return TError(EError::Permission, "{} cannot change device {} gid {} to {}",
+                          cred.ToString(), Path, GroupName(Gid), GroupName(gid));
         Gid = gid;
     }
 
@@ -176,31 +175,6 @@ std::string TDevice::CgroupRule(bool allow) const {
     return rule;
 }
 
-TError TDevice::Permitted(const TCred &cred) const {
-    struct stat st;
-
-    if (Privileged && !cred.IsRootUser())
-        return TError(EError::Permission, "{} cannot use device {}", cred.ToString(), Path);
-
-    if (Wildcard)
-        return OK;
-
-    TError error = Path.StatFollow(st);
-    if (error) {
-        if (error.Errno == ENOENT)
-            return TError(EError::DeviceNotFound, "Device {} does not exists", Path);
-        return error;
-    }
-
-    if (MayRead && !TFile::Access(st, cred, TFile::R))
-        return TError(EError::Permission, "{} cannot read device {}", cred.ToString(), Path);
-
-    if (MayWrite && !TFile::Access(st, cred, TFile::W))
-        return TError(EError::Permission, "{} cannot write device {}", cred.ToString(), Path);
-
-    return OK;
-}
-
 TError TDevice::Makedev(const TPath &root) const {
     TPath path = root / PathInside;
     struct stat st;
@@ -245,13 +219,13 @@ TError TDevice::Makedev(const TPath &root) const {
     return OK;
 }
 
-TError TDevices::Parse(const std::string &str) {
+TError TDevices::Parse(const std::string &str, const TCred &cred) {
     auto config = SplitEscapedString(str, ' ', ';');
     TError error;
 
     for (auto &cfg: config) {
         TDevice device;
-        error = device.Parse(cfg);
+        error = device.Parse(cfg, cred);
         if (error)
             return error;
         if (device.MayRead || device.MayWrite || !device.MayMknod)
@@ -267,18 +241,6 @@ std::string TDevices::Format() const {
     for (auto &device: Devices)
         str += device.Format() + "; ";
     return str;
-}
-
-TError TDevices::Permitted(const TCred &cred) const {
-    TError error;
-
-    for (auto &device: Devices) {
-        error = device.Permitted(cred);
-        if (error)
-            return error;
-    }
-
-    return OK;
 }
 
 TError TDevices::Makedev(const TPath &root) const {
@@ -353,7 +315,7 @@ TError TDevices::InitDefault() {
     Devices[8].Wildcard = true;
     Devices[8].MayMknod = false;
 
-    error = Parse(config().container().extra_devices());
+    error = Parse(config().container().extra_devices(), TCred(RootUser, RootGroup));
     if (error)
         return error;
 

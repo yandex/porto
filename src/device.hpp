@@ -21,18 +21,15 @@ struct TDevice {
     bool MayMknod = true;
 
     bool Wildcard = false;
-    bool Privileged = false;
 
     static TError CheckPath(const TPath &path);
-    TError Init(const TPath &path);
 
     TDevice() {}
     TDevice(const TPath &path, dev_t node) : Path(path), PathInside(path), Node(node) {}
 
-    TError Parse(TTuple &opt);
+    TError Parse(TTuple &opt, const TCred &cred);
     std::string Format() const;
     std::string CgroupRule(bool allow) const;
-    TError Permitted(const TCred &cred) const;
     TError Makedev(const TPath &root = "/") const;
 };
 
@@ -40,10 +37,9 @@ struct TDevices {
     std::vector<TDevice> Devices;
     bool NeedCgroup = false;
 
-    TError Parse(const std::string &str);
+    TError Parse(const std::string &str, const TCred &cred);
     std::string Format() const;
 
-    TError Permitted(const TCred &cred) const;
     TError Makedev(const TPath &root = "/") const;
     TError Apply(const TCgroup &cg, bool reset = false) const;
 
