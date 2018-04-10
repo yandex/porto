@@ -1,3 +1,9 @@
+yandex-porto (4.11.9) unstable; urgency=low
+
+  * devices: check permission only at configuration time
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 10 Apr 2018 15:16:21 +0300
+
 yandex-porto (4.11.8) unstable; urgency=low
 
   * porto: do not close control pipes twice
