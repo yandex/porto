@@ -153,6 +153,7 @@ public:
     const std::string FS_BPS_LIMIT = "memory.fs_bps_limit";
     const std::string FS_IOPS_LIMIT = "memory.fs_iops_limit";
     const std::string ANON_USAGE = "memory.anon.usage";
+    const std::string ANON_MAX_USAGE = "memory.anon.max_usage";
     const std::string ANON_LIMIT = "memory.anon.limit";
 
     TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
@@ -207,6 +208,14 @@ public:
 
     TError GetCacheUsage(TCgroup &cg, uint64_t &usage) const;
     TError GetAnonUsage(TCgroup &cg, uint64_t &usage) const;
+
+    TError GetAnonMaxUsage(TCgroup &cg, uint64_t &usage) const {
+        return cg.GetUint64(ANON_MAX_USAGE, usage);
+    }
+    TError ResetAnonMaxUsage(TCgroup &cg) const {
+        return cg.SetUint64(ANON_MAX_USAGE, 0);
+    }
+
     bool SupportAnonLimit() const;
     TError SetAnonLimit(TCgroup &cg, uint64_t limit) const;
 

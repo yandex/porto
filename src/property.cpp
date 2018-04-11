@@ -2559,6 +2559,33 @@ public:
     }
 } static AnonUsage;
 
+class TAnonMaxUsage : public TProperty {
+public:
+    TAnonMaxUsage() : TProperty(P_ANON_MAX_USAGE, EProperty::NONE,
+            "Peak anonymous memory usage [bytes]")
+    {
+        IsRuntimeOnly = true;
+        IsDynamic = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+    void Init(void) {
+        IsSupported = MemorySubsystem.SupportAnonLimit();
+    }
+    TError Get(std::string &value) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        uint64_t val;
+        TError error = MemorySubsystem.GetAnonMaxUsage(cg, val);
+        if (error)
+            return error;
+        value = std::to_string(val);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        return MemorySubsystem.ResetAnonMaxUsage(cg);
+    }
+} static AnonMaxUsage;
+
 class TCacheUsage : public TProperty {
 public:
     TCacheUsage() : TProperty(P_CACHE_USAGE, EProperty::NONE,
@@ -2643,7 +2670,7 @@ public:
 class TMaxRss : public TProperty {
 public:
     TMaxRss() : TProperty(P_MAX_RSS, EProperty::NONE,
-            "Peak anonymous memory usage [bytes]")
+            "Peak anonymous memory usage [bytes] (legacy, use anon_max_usage)")
     {
         IsReadOnly = true;
         IsRuntimeOnly = true;
@@ -2652,18 +2679,20 @@ public:
     void Init(void) {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
         TUintMap stat;
-
-        TError error = MemorySubsystem.Statistics(rootCg, stat);
-        IsSupported = !error && (stat.find("total_max_rss") != stat.end());
+        IsSupported = MemorySubsystem.SupportAnonLimit() ||
+            (!MemorySubsystem.Statistics(rootCg, stat) && stat.count("total_max_rss"));
     }
     TError Get(std::string &value) {
         auto cg = CT->GetCgroup(MemorySubsystem);
-        TUintMap stat;
-        if (MemorySubsystem.Statistics(cg, stat))
-            value = "-1";
-        else
-            value = std::to_string(stat["total_max_rss"]);
-        return OK;
+        uint64_t val;
+        TError error = MemorySubsystem.GetAnonMaxUsage(cg, val);
+        if (error) {
+            TUintMap stat;
+            error = MemorySubsystem.Statistics(cg, stat);
+            val = stat["total_max_rss"];
+        }
+        value = std::to_string(val);
+        return error;
     }
 } static MaxRss;
 

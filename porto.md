@@ -446,6 +446,10 @@ write permissions to the target or owning related volume.
     This counts physical pages that have no filesystem\disk backend:
     anonymous RSS, tmpfs\shmem.
 
+* **anon\_max\_usage** - peak **anon\_usage** (offstream kernel feature)
+
+    Set to empty for reset.
+
 * **cache\_usage** - current cache usage
 
     Physical memory pages that have filesystem\disk backend,
@@ -455,9 +459,9 @@ write permissions to the target or owning related volume.
 
 * **hugetlb\_limit** - hugetlb memory limit
 
-* **max\_rss** - peak anon memory usage (offstream kernel feature)
+* **max\_rss** - peak **anon\_usage** (offstream kernel feature)
 
-    Name is wrong for historical reasons.
+    Alias for **anon\_max\_usage** for historical reasons.
 
 * **memory\_guarantee** - guarantee for memory\_usage, default: 0
 
