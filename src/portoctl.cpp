@@ -238,7 +238,7 @@ public:
 
     TError WaitContainer(int timeout) {
         std::vector<std::string> containers = { Container };
-        std::string result;
+        std::string result, oom_killed;
         TError error;
         int status;
 
@@ -248,16 +248,23 @@ public:
         if (result == "")
             return TError(EError::Busy, "Wait timeout");
 
-        if (Api->GetProperty(Container, "exit_status", result))
+        if (Api->GetProperty(Container, "exit_status", result) ||
+                Api->GetProperty(Container, "oom_killed", oom_killed))
             return GetLastError();
 
         error = StringToInt(result, status);
         if (!error) {
-            if (WIFSIGNALED(status)) {
+            if (oom_killed == "true") {
+                ExitSignal = 9;
+                ExitCode = -99;
+                ExitMessage = "Container killed by OOM";
+            } else if (WIFSIGNALED(status)) {
                 ExitSignal = WTERMSIG(status);
-                ExitMessage = StringFormat("Container killed by signal: %d (%s)",
+                ExitCode = -ExitSignal;
+                ExitMessage = fmt::format("Container killed by signal: {} ({})",
                                             ExitSignal, strsignal(ExitSignal));
             } else if (WIFEXITED(status)) {
+                ExitSignal = 0;
                 ExitCode = WEXITSTATUS(status);
                 ExitMessage = StringFormat("Container exit code: %d", ExitCode);
             }
