@@ -2577,6 +2577,42 @@ public:
             volume_script.WriteAll("");
         }
 
+        if (scripts.size()) {
+            TLauncher executor(Api);
+
+            volume_script.WriteAll(
+                    "find root/run -xdev -mindepth 1 -delete\n"
+                    "find run -maxdepth 1 -type d | "
+                    "tar --create --no-recursion --files-from - | "
+                    "tar --verbose --extract -C root\n");
+            executor.Container = chroot.Container + "/save_run";
+            executor.ForwardStreams = true;
+            executor.WaitExit = true;
+
+            executor.SetProperty("stdin_path", "/dev/null");
+            executor.SetProperty("isolate", "false");
+            executor.SetProperty("virt_mode", "os");
+            executor.SetProperty("net", "inherited");
+            executor.SetProperty("bind", "/ root");
+            executor.SetProperty("command", build_command);
+
+            std::cout << "\nSave directories in /run\n" << std::endl;
+
+            error = executor.Launch();
+            if (error) {
+                std::cout << "Cannot start script: " << error << std::endl;
+                goto err;
+            }
+
+            if (executor.ExitCode) {
+                std::cout << "Script: " << executor.ExitMessage << std::endl;
+                goto err;
+            }
+
+            executor.Cleanup();
+            volume_script.WriteAll("");
+        }
+
         error = chroot.StopContainer();
         if (error) {
             std::cerr << "Cannot stop chroot container: " << error << std::endl;
