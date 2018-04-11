@@ -1,3 +1,13 @@
+yandex-porto (4.12.7) unstable; urgency=low
+
+  * devices: check permission only at configuration time
+  * memory: add property anon_max_usage
+  * portoctl/build: check and report oom kills
+  * portoctl/build: save directories in /run
+  * layers: iproute -> iproute2|iproute
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 11 Apr 2018 14:35:43 +0300
+
 yandex-porto (4.12.6) unstable; urgency=low
 
   * porto: do not close control pipes twice
