@@ -251,13 +251,6 @@ public:
     /* Protected with container state lock */
     std::shared_ptr<TNetwork> Net;
 
-    inline std::unique_lock<std::mutex> LockNetState() {
-        PORTO_ASSERT(IsStateLockedRead());
-        if (Net)
-            return Net->LockNetState();
-        return std::unique_lock<std::mutex>();
-    }
-
     /* Protected with NetStateMutex and container lock */
     TNetClass NetClass;
 

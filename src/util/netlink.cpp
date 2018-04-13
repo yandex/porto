@@ -840,7 +840,6 @@ TError TNlClass::Load(const TNl &nl) {
     Kind = rtnl_tc_get_kind(TC_CAST(tclass));
 
     if (Kind == "htb") {
-        Prio = rtnl_htb_get_prio(tclass);
         Rate = rtnl_htb_get_rate(tclass);
         Ceil = rtnl_htb_get_ceil(tclass);
     }
@@ -1021,7 +1020,7 @@ TError TNlClass::Create(const TNl &nl) {
          */
         rtnl_htb_set_rate(cls, std::min(Rate ?: 1, maxRate));
         rtnl_htb_set_ceil(cls, std::min(Ceil ?: maxRate, maxRate));
-        rtnl_htb_set_prio(cls, Prio);
+        rtnl_htb_set_prio(cls, 3);
 
         if (MTU)
             rtnl_tc_set_mtu(TC_CAST(cls), MTU);
@@ -1077,8 +1076,13 @@ TError TNlClass::Create(const TNl &nl) {
 
     nl.Dump("add", cls);
     ret = rtnl_class_add(nl.GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
-    if (ret < 0)
-        error = nl.Error(ret, "Cannot add traffic class");
+    if (ret < 0) {
+        (void)Delete(nl);
+        nl.Dump("add", cls);
+        ret = rtnl_class_add(nl.GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
+        if (ret < 0)
+            error = nl.Error(ret, "Cannot add traffic class");
+    }
 
 free_class:
     rtnl_class_put(cls);

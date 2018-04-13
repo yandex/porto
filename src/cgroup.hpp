@@ -279,7 +279,10 @@ public:
 
 class TNetclsSubsystem : public TSubsystem {
 public:
+    bool HasPriority;
     TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
+    TError InitializeSubsystem() override;
+    TError SetClass(TCgroup &cg, uint32_t classid) const;
 };
 
 class TBlkioSubsystem : public TSubsystem {

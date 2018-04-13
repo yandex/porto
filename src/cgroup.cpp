@@ -868,6 +868,20 @@ TError TCpusetSubsystem::InitializeCgroup(TCgroup &cg) {
 
 // Netcls
 
+TError TNetclsSubsystem::InitializeSubsystem() {
+    HasPriority = RootCgroup().Has("net_cls.priority");
+    return OK;
+}
+
+TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
+    if (HasPriority) {
+        TError error = cg.SetUint64("net_cls.priority", classid);
+        if (error)
+            return error;
+    }
+    return cg.SetUint64("net_cls.classid", classid);
+}
+
 // Blkio
 
 TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) const {

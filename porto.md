@@ -608,6 +608,17 @@ Absolute paths are resolved in host, paths starting with dot in chroot:
 Matching interfaces by name support masks '?' and '\*'.
 Interfaces aggregated into groups from /etc/iproute2/group, see **ip-link(8)**.
 
+Possible indexes for statistics and parameters:
+    - default           - all interfaces
+    - Uplink            - external links, not VLANs or tunnels
+    - \<interface\>     - particular interface
+    - group \<group\>   - group of interfaces
+    - CS0|...|CS7       - DSCP class at all uplink interfaces
+    - \<interface\> CSx - DSCP class at particular interface
+    - Leaf CSx          - leaf tc class for container
+    - Fallback CSx      - default tc class in host
+    - Saved CSx         - removed devices and containers
+
 * **net** - network namespace configuration, Syntax: \<option\> \[args\]...;...
     - *inherited*            - use parent container network namespace (default)
     - *none*                 - empty namespace, no network access (default for virt\_mode=os)
@@ -679,15 +690,15 @@ container {
 
 * **net\_rx\_limit** - maximum ingress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
-* **net\_bytes**     - traffic class counters: \<interface\>|group \<group\>: \<bytes\>;...
+* **net\_bytes**     - traffic class counters: \<interface\>|\<class\>: \<bytes\>;...
 
-* **net\_class\_id** - traffic class: \<interface\>: major:minor (hex)
+* **net\_class\_id** - traffic class: \<class\>: major:minor (hex)
 
-* **net\_drops**     - tc drops: \<interface\>|group \<group\>: \<packets\>;...
+* **net\_drops**     - tc drops: \<interface\>|\<class\>: \<packets\>;...
 
-* **net\_overlimits** - tc overlimits: \<interface\>|group \<group\>: \<packets\>;...
+* **net\_overlimits** - tc overlimits: \<interface\>|\<class\>: \<packets\>;...
 
-* **net\_packets**   - tc packets: \<interface\>|group \<group\>: \<packets\>;...
+* **net\_packets**   - tc packets: \<interface\>|\<class\>: \<packets\>;...
 
 * **net\_rx\_bytes** - device rx bytes: \<interface\>|group \<group\>: \<bytes\>;...
 
@@ -700,6 +711,27 @@ container {
 * **net\_tx\_drops** - device tx drops: \<interface\>|group \<group\>: \<packets\>;...
 
 * **net\_tx\_packets** - device tx packets: \<interface\>|group \<group\>: \<packets\>;...
+
+* **net\_tos** - default IP ToS: CS0..CS7
+
+    For now without offstream kernel patch this property defines only
+    default TC class for containers who lives in host network namespace.
+
+    Porto setup first level TC classes for each CSx.
+    Their weight could be set in portod.conf:
+```
+network {
+    dscp_class {
+        name: "CS1"
+        weight: 10
+    }
+    dscp_class {
+        name: "CS3"
+        weight: 42
+    }
+    ...
+}
+```
 
 # NETWORKING
 

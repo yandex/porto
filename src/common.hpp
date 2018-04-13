@@ -37,18 +37,18 @@ enum class EAccessLevel {
     Internal,
 };
 
-constexpr int ROOT_TC_MAJOR = 1;
-constexpr int ROOT_TC_MINOR = 0;
-constexpr int DEFAULT_TC_MINOR = 2;
-constexpr int DEFAULT_TC_MAJOR = 2;
-constexpr int CONTAINER_TC_MINOR = 0;
+constexpr uint32_t ROOT_TC_MAJOR = 0x1;
+constexpr uint32_t META_TC_MINOR = 0x8;
+constexpr uint32_t ROOT_TC_MINOR = 0x10;
+constexpr uint32_t DEFAULT_TC_MINOR = 0x20; /* fallback class */
+constexpr int NR_TC_CLASSES = 8;
 
 constexpr uint64_t CPU_POWER_PER_SEC = 1000000000ull;
 
-constexpr uint64_t NET_DEFAULT_PRIO = 3;
 constexpr uint64_t NET_MAX_RATE = 2000000000; /* 16Gbit */
 
 constexpr uint64_t ROOT_CONTAINER_ID = 1;
+constexpr uint64_t DEFAULT_CONTAINER_ID = 2;
 constexpr uint64_t LEGACY_CONTAINER_ID = 3;
 
 constexpr const char *ROOT_CONTAINER = "/";

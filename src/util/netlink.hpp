@@ -156,7 +156,6 @@ public:
     uint32_t Parent = -1;
     uint32_t Handle = -1;
     std::string Kind;
-    uint64_t Prio = 0;
     uint64_t Rate = 0;
     uint64_t defRate = 0;
     uint64_t Ceil = 0;

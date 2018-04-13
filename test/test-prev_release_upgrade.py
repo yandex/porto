@@ -106,7 +106,6 @@ def SnapshotProps(r):
               "memory_guarantee", "memory_limit", "net",
               #"net_guarantee", #FIXME enable later, "default:0" -> ""
               #"net_limit", #FIXME enable later, "default:0" -> ""
-              # "net_priority",
               "porto_namespace",
               "private", "recharge_on_pgfault",
               # "resolv_conf",

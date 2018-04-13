@@ -15,56 +15,58 @@
 #include "util/idmap.hpp"
 
 class TContainer;
+class TNetwork;
 struct TTaskEnv;
 
 struct TNetStat {
-    /* Class TX */
-    uint64_t Packets = 0lu;
-    uint64_t Bytes = 0lu;
-    uint64_t Drops = 0lu;
-    uint64_t Overlimits = 0lu;
-
-    /* Device RX */
-    uint64_t RxPackets = 0lu;
-    uint64_t RxBytes = 0lu;
-    uint64_t RxDrops = 0lu;
-
-    /* Device TX */
-    uint64_t TxPackets = 0lu;
     uint64_t TxBytes = 0lu;
+    uint64_t TxPackets = 0lu;
     uint64_t TxDrops = 0lu;
+    uint64_t TxOverruns = 0lu;
+
+    uint64_t RxBytes = 0lu;
+    uint64_t RxPackets = 0lu;
+    uint64_t RxDrops = 0lu;
+    uint64_t RxOverruns = 0lu;
 
     void operator+=(const TNetStat &a) {
-        Packets += a.Packets;
-        Bytes += a.Bytes;
-        Drops += a.Drops;
-        Overlimits += a.Overlimits;
-
-        RxPackets += a.RxPackets;
-        RxBytes += a.RxBytes;
-        RxDrops += a.RxDrops;
-
-        TxPackets += a.TxPackets;
         TxBytes += a.TxBytes;
+        TxPackets += a.TxPackets;
         TxDrops += a.TxDrops;
+        TxOverruns += a.TxOverruns;
+        RxBytes += a.RxBytes;
+        RxPackets += a.RxPackets;
+        RxDrops += a.RxDrops;
+        RxOverruns += a.RxOverruns;
+    }
+
+    void Reset() {
+        TxBytes = 0;
+        TxPackets = 0;
+        TxDrops = 0;
+        TxOverruns = 0;
+        RxBytes = 0;
+        RxPackets = 0;
+        RxDrops = 0;
+        RxOverruns = 0;
     }
 };
 
 struct TNetClass {
-    bool HostClass;
     int Registered = 0;
     int Owner = 0;
 
-    uint32_t HostParentHandle;
-    uint32_t ParentHandle;
-    uint32_t Handle;
-    uint32_t Leaf;
-    TUintMap Prio;
-    TUintMap Rate;
-    TUintMap Limit;
+    uint32_t BaseHandle;
+    uint32_t MetaHandle;
+    uint32_t LeafHandle;
+
+    int DefaultTos = 0;
+    TUintMap TxRate;
+    TUintMap TxLimit;
     TUintMap RxLimit;
 
     std::map<std::string, TNetStat> Stat;
+    std::shared_ptr<TNetwork> OriginNet;
 
     TNetClass *Fold;
     TNetClass *Parent;
@@ -82,15 +84,17 @@ public:
     int MTU;
     uint64_t Rate, Ceil;
     bool Managed;
+    bool Uplink;
     bool Prepared;
     bool Missing;
 
     TNetStat Stat;
+
     struct nl_cache *ClassCache = nullptr;
 
     TNetDevice(struct rtnl_link *);
 
-    uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0) const;
+    uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0, int cs = -1) const;
     std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
 };
 
@@ -108,6 +112,8 @@ class TNetwork : public TNonCopyable {
         return std::unique_lock<std::mutex>(NetworksMutex);
     }
 
+    static std::mutex NetStateMutex;
+
     /* Copy-on-write list of networks */
     static std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> NetworksList;
 
@@ -124,11 +130,10 @@ class TNetwork : public TNonCopyable {
     /* Protects netink socket operaions and external state */
     std::mutex NetMutex;
 
-    /* Protects internal state */
-    std::mutex NetStateMutex;
-
     /* Containers, parent before childs. Protected with NetStateMutex. */
     std::list<TNetClass *> NetClasses;
+
+    TNetClass *RootClass = nullptr;
 
     void InitStat(TNetClass &cls);
     void RegisterClass(TNetClass &cls);
@@ -152,7 +157,7 @@ class TNetwork : public TNonCopyable {
 
     void SyncStatLocked();
     TError Reconnect();
-    TError RepairLocked();
+    TError RepairLocked(bool force = false);
 
     /* Something went wrong, handled by Repair */
     TError NetError;
@@ -175,7 +180,7 @@ public:
         return std::unique_lock<std::mutex>(NetMutex);
     }
 
-    std::unique_lock<std::mutex> LockNetState() {
+    static inline std::unique_lock<std::mutex> LockNetState() {
         return std::unique_lock<std::mutex>(NetStateMutex);
     }
 
@@ -183,6 +188,8 @@ public:
     bool ManagedNamespace = false;
 
     std::vector<TNetDevice> Devices;
+
+    std::map<std::string, TNetStat> DeviceStat;
 
     std::list<TNetProxyNeighbour> Neighbours;
 
@@ -205,9 +212,8 @@ public:
 
     TError SetupClass(TNetDevice &dev, TNetClass &cls);
     TError DeleteClass(TNetDevice &dev, TNetClass &cls);
-    TError SetupIngress(TNetDevice &dev, TNetClass &cls);
-
     TError SetupClasses(TNetClass &cls);
+    TError SetupPolice(TNetDevice &dev);
 
     void SyncStat();
     static void SyncAllStat();

@@ -30,6 +30,8 @@ extern "C" {
 static std::shared_ptr<TNetwork> HostNetwork;
 
 std::mutex TNetwork::NetworksMutex;
+std::mutex TNetwork::NetStateMutex;
+
 std::unordered_map<ino_t, std::shared_ptr<TNetwork>> TNetwork::NetworksIndex;
 std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> TNetwork::NetworksList = std::make_shared<const std::list<std::shared_ptr<TNetwork>>>();
 std::atomic<int> TNetwork::GlobalStatGen;
@@ -47,6 +49,9 @@ static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
 static std::map<int, std::string> DeviceGroups;
 static int VirtualDeviceGroup = 0;
+
+static uint64_t CsWeight[NR_TC_CLASSES];
+static uint64_t CsTotalWeight;
 
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
@@ -177,11 +182,19 @@ TNetDevice::TNetDevice(struct rtnl_link *link) {
     Ceil = NET_MAX_RATE;
 
     Managed = false;
+    Uplink = false;
     Prepared = false;
     Missing = false;
 }
 
-uint64_t TNetDevice::GetConfig(const TUintMap &cfg, uint64_t def) const {
+uint64_t TNetDevice::GetConfig(const TUintMap &cfg, uint64_t def, int cs) const {
+    if (cs >= 0) {
+        auto it = cfg.find(fmt::format("{} CS{}", Name, cs));
+        if (it == cfg.end())
+            it = cfg.find(fmt::format("CS{}", cs));
+        if (it != cfg.end())
+            return it->second;
+    }
     for (auto &it: cfg) {
         if (StringMatch(Name, it.first))
             return it.second;
@@ -303,6 +316,21 @@ void TNetwork::InitializeConfig() {
             sysctl->set_val(val);
         }
     }
+
+    CsTotalWeight = 0;
+    std::string CsString;
+    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+        auto name = fmt::format("CS{}", cs);
+        CsWeight[cs] = 1;
+        for (auto &it: config().network().dscp_class())
+            if (it.name() == name)
+                CsWeight[cs] = it.weight();
+        if (CsWeight[cs] < 1)
+            CsWeight[cs] = 1;
+        CsTotalWeight += CsWeight[cs];
+        CsString += fmt::format("{} = {}, ", name, CsWeight[cs]);
+    }
+    L_NET("DSCP weight {}total = {}", CsString, CsTotalWeight);
 }
 
 std::string TNetwork::DeviceGroupName(int group) {
@@ -445,7 +473,7 @@ void TNetwork::Destroy() {
     for (auto &dev: Devices) {
         if (!dev.Managed)
             continue;
-        TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+        TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
         error = qdisc.Delete(*Nl);
         if (error)
             L_NET("Cannot remove root qdisc: {}", error);
@@ -495,42 +523,71 @@ void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
     dev.Rate = dev.GetConfig(DeviceRate, rate);
 }
 
-TError TNetwork::SetupIngress(TNetDevice &dev, TNetClass &cfg) {
+TError TNetwork::SetupPolice(TNetDevice &dev) {
     TError error;
 
-    if (cfg.RxLimit.empty() || this == HostNetwork.get())
+    if (!RootClass || this == HostNetwork.get())
         return OK;
 
-    auto rate = dev.GetConfig(cfg.RxLimit);
-
-    TNlQdisc ingress(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
-    (void)ingress.Delete(*Nl);
-
-    if (!rate)
-        return OK;
-
-    ingress.Kind = "ingress";
-
-    error = ingress.Create(*Nl);
-    if (error) {
-        if (error.Errno != ENODEV && error.Errno != ENOENT)
-            L_WRN("Cannot create ingress qdisc: {}", error);
-
-        return error;
-    }
+    auto rate = dev.GetConfig(RootClass->RxLimit);
 
     TNlPoliceFilter police(dev.Index, TC_H_INGRESS);
-    (void)police.Delete(*Nl);
-
     police.Mtu = 65536; /* maximum GRO skb */
     police.Rate = rate;
     police.Burst = dev.GetConfig(IngressBurst, std::max(rate / 10, police.Mtu * 10ul));
+    (void)police.Delete(*Nl);
 
-    error = police.Create(*Nl);
-    if (error && error.Errno != ENODEV && error.Errno != ENOENT)
-        L_WRN("Can't create ingress filter: {}", error);
+    TNlQdisc qdisc(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
+    qdisc.Kind = "ingress";
+    (void)qdisc.Delete(*Nl);
 
-    return error;
+    if (rate) {
+        error = qdisc.Create(*Nl);
+        if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
+            L_WRN("Cannot create ingress qdisc: {}", error);
+            return error;
+        }
+
+        error = police.Create(*Nl);
+        if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
+            L_WRN("Can't create ingress police filter: {}", error);
+            return error;
+        }
+    }
+
+    rate = dev.GetConfig(RootClass->TxLimit);
+
+    /* without clsact police filter requires classful qdisc,
+     * so let's install trivial hfsc instead */
+
+    qdisc.Kind = "hfsc";
+    qdisc.Parent = TC_H_ROOT;
+    qdisc.Handle = TC_HANDLE(ROOT_TC_MAJOR, 0);
+    qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, 1);
+    qdisc.Quantum = 10;
+    (void)qdisc.Delete(*Nl);
+
+    TNlClass cls(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, 0), TC_HANDLE(ROOT_TC_MAJOR, 1));
+    cls.Kind = qdisc.Kind;
+    cls.Index = dev.Index;
+    cls.Rate = cls.Ceil = rate;
+    cls.RateBurst = cls.CeilBurst = dev.MTU * 10;
+
+    if (rate) {
+        error = qdisc.Create(*Nl);
+        if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
+            L_WRN("Cannot create egress qdisc: {}", error);
+            return error;
+        }
+
+        error = cls.Create(*Nl);
+        if (error) {
+            L_ERR("Cannot create egress class: {}", error);
+            return error;
+        }
+    }
+
+    return OK;
 }
 
 TError TNetwork::SetupQueue(TNetDevice &dev) {
@@ -541,32 +598,30 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     //  |
     // 1:1 / class
     //  |
-    //  +- 1:2 default class
-    //  |   |
-    //  |   +- 2:0 default class qdisc (sfq)
-    //  |
-    //  +- 1:4 container a
-    //  |   |
-    //  |   +- 1:4004 leaf a
-    //  |   |   |
-    //  |   |   +- 4:0 qdisc a (pfifo)
-    //  |   |
-    //  |   +- 1:5 container a/b
-    //  |       |
-    //  |       +- 1:4005 leaf a/b
-    //  |           |
-    //  |           +- 5:0 qdisc a/b (pfifo)
-    //  |
-    //  +- 1:6 container b
+    //  +- 1:8..F DSCP CS0..CS7 class
     //      |
-    //      +- 1:4006 leaf b
-    //          |
-    //          +- 6:0 qdisc b (pfifo)
-
+    //      +- 1:0x10 + CSn Host CSn class
+    //      |   |
+    //      |   +- 1x10 + CSn:0 CSn Host leaf qdisc (sfq)
+    //      |
+    //      +- 1:0x20 + CSn Fallback CSn class
+    //      |   |
+    //      |   +- 1x20 + CSn:0 CSn Fallback leaf qdisc (sfq)
+    //      |
+    //      +-1:Slot + 8 + CSn slot CSn class
+    //         |
+    //         +- 1:Slot + CSn default leaf for slot CSn class
+    //         |   |
+    //         |   +- Slot + CSn:0 slot CSn default leaf qdisc (pfifo)
+    //         |
+    //         +- 1:Container + CSn container CSn class
+    //             |
+    //             +- Container + CSn:0 container CSn leaf qdisc (pfifo)
+    //
 
     L_NET("Setup queue for network {} device {}:{}", NetName, dev.Index, dev.Name);
 
-    TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+    TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
     qdisc.Kind = dev.GetConfig(DeviceQdisc);
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
@@ -584,9 +639,8 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
 
     cls.Kind = dev.GetConfig(DeviceQdisc);
     cls.Index = dev.Index;
-    cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR);
-    cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-    cls.Prio = NET_DEFAULT_PRIO;
+    cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, 0);
+    cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, 1);
     cls.Rate = dev.Rate;
     cls.Ceil = dev.Ceil;
 
@@ -596,36 +650,55 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
         return error;
     }
 
-    cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-    cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
-    cls.Rate = dev.GetConfig(DefaultClassRate);
-    cls.Ceil = dev.GetConfig(DefaultClassCeil);
+    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+        cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, 1);
+        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR + cs);
+        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
+        cls.Ceil = 0;
 
-    error = cls.Create(*Nl);
-    if (error) {
-        L_ERR("Can't create default tclass: {}", error);
-        return error;
-    }
+        error = cls.Create(*Nl);
+        if (error) {
+            L_ERR("Can't create default tclass: {}", error);
+            return error;
+        }
 
-    TNlCgFilter filter(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR), 1);
-    (void)filter.Delete(*Nl);
+        cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR + cs);
+        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR + cs);
+        cls.Rate = dev.GetConfig(DefaultClassRate);
+        cls.Ceil = dev.GetConfig(DefaultClassCeil);
 
-    error = filter.Create(*Nl);
-    if (error) {
-        L_ERR("Can't create tc filter: {}", error);
-        return error;
-    }
+        error = cls.Create(*Nl);
+        if (error) {
+            L_ERR("Can't create default tclass: {}", error);
+            return error;
+        }
 
-    if (ManagedNamespace) {
-        TNlQdisc defq(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
-                      TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR));
-        defq.Kind = dev.GetConfig(ContainerQdisc);
-        defq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
-        defq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
+        TNlQdisc defq(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR + cs),
+                                 TC_HANDLE(DEFAULT_TC_MINOR + cs, 0));
+        defq.Kind = dev.GetConfig(DefaultQdisc);
+        defq.Limit = dev.GetConfig(DefaultQdiscLimit);
+        defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
         if (!defq.Check(*Nl)) {
             error = defq.Create(*Nl);
             if (error)
                 return error;
+        }
+    }
+
+    TNlCgFilter filter(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, 0), 1);
+    (void)filter.Delete(*Nl);
+
+    /*
+     * Without cgroup priority setup classification by cgroup classid.
+     *
+     * This does not work for traffic crossing net-ns in veth,
+     * it will flow through fallback classes.
+     */
+    if (!NetclsSubsystem.HasPriority) {
+        error = filter.Create(*Nl);
+        if (error) {
+            L_ERR("Can't create tc filter: {}", error);
+            return error;
         }
     }
 
@@ -668,48 +741,57 @@ TError TNetwork::SyncDevices(bool force) {
 
         TNetDevice dev(link);
 
-        /* Ignore our veth pairs */
-        if (dev.Type == "veth" &&
-            (StringStartsWith(dev.Name, "portove-") ||
-             StringStartsWith(dev.Name, "L3-")))
-            continue;
-
         if (DeviceOwners.count(dev.Name))
             dev.Owner = DeviceOwners.at(dev.Name);
 
-        dev.Managed = true;
+        if (dev.Type == "veth") {
+            /* Ignore our veth pairs */
+            if (!ManagedNamespace &&
+                    (StringStartsWith(dev.Name, "portove-") ||
+                     StringStartsWith(dev.Name, "L3-")))
+                continue;
 
-        /* In managed namespace we control all devices */;
-        if (!ManagedNamespace) {
-            for (auto &pattern: UnmanagedDevices)
-                if (StringMatch(dev.Name, pattern))
-                    dev.Managed = false;
-            if (std::find(UnmanagedGroups.begin(),
-                          UnmanagedGroups.end(), dev.Group) != UnmanagedGroups.end())
-                dev.Managed = false;
-        }
-
-        if (dev.Type == "tun") {
+            if (ManagedNamespace)
+                dev.Uplink = true;
+        } else if (dev.Type == "macvlan" || dev.Type == "ipvlan") {
+            if (ManagedNamespace)
+                dev.Uplink = true;
+        } else if (dev.Type == "tun") {
             /* Ignore TUN/TAP without known owners */
             if (!dev.Owner)
                 continue;
-            dev.Managed = false;
+        } else if (dev.Type == "dummy") {
+            /* Do not care */
+        } else if (dev.Name == "ip6tnl0") {
+            /* Fallback tunnel for RX only */
+        } else if (ManagedNamespace) {
+            /* No qdisc in containers */
+        } else if (dev.Type == "vlan") {
+            /* TX goes via uplink */
+        } else {
+            dev.Managed = true;
+
+            for (auto &pattern: UnmanagedDevices)
+                if (StringMatch(dev.Name, pattern))
+                    dev.Managed = false;
+
+            if (std::find(UnmanagedGroups.begin(),
+                          UnmanagedGroups.end(), dev.Group) != UnmanagedGroups.end())
+                dev.Managed = false;
+
+            dev.Uplink = true;
         }
-
-        if (dev.Type == "dummy")
-            dev.Managed = false;
-
-        /* Fallback tunnel for rx only */
-        if (dev.Name == "ip6tnl0")
-            dev.Managed = false;
 
         dev.Stat.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
         dev.Stat.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
         dev.Stat.RxDrops = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
+        dev.Stat.RxOverruns = rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR) +
+                              rtnl_link_get_stat(link, RTNL_LINK_RX_ERRORS);
 
         dev.Stat.TxBytes = rtnl_link_get_stat(link, RTNL_LINK_TX_BYTES);
         dev.Stat.TxPackets = rtnl_link_get_stat(link, RTNL_LINK_TX_PACKETS);
         dev.Stat.TxDrops = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
+        dev.Stat.TxOverruns = rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS);
 
         bool found = false;
         for (auto &d: Devices) {
@@ -730,17 +812,20 @@ TError TNetwork::SyncDevices(bool force) {
         if (!found) {
             GetDeviceSpeed(dev);
 
-            L_NET("New network {} {}managed device {}:{} type={} group={} mtu={} speed={}Mbps {}iB/s",
+            L_NET("New network {} {}managed device {}:{} type={} group={} {} mtu={} speed={}Mbps {}iB/s",
                     NetName, dev.Managed ? "" : "un",
-                    dev.Index, dev.Name, dev.Type, dev.GroupName, dev.MTU,
+                    dev.Index, dev.Name, dev.Type, dev.GroupName,
+                    dev.Uplink ? "uplink" : "", dev.MTU,
                     dev.Ceil / 125000, StringFormatSize(dev.Ceil));
 
             if (dev.Managed)
                 StartRepair();
 
+            auto net_state_lock = LockNetState();
+
             if (this == HostNetwork.get()) {
-                RootContainer->NetClass.Rate[dev.Name] = dev.Rate;
-                RootContainer->NetClass.Limit[dev.Name] = dev.Ceil;
+                RootContainer->NetClass.TxRate[dev.Name] = dev.Rate;
+                RootContainer->NetClass.TxLimit[dev.Name] = dev.Ceil;
                 RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
             }
 
@@ -750,19 +835,37 @@ TError TNetwork::SyncDevices(bool force) {
 
     nl_cache_free(cache);
 
+    auto net_state_lock = LockNetState();
+
     for (auto dev = Devices.begin(); dev != Devices.end(); ) {
         if (dev->Missing) {
 
             L_NET("Forget network {} device {}:{}", NetName, dev->Index, dev->Name);
 
             if (this == HostNetwork.get()) {
-                RootContainer->NetClass.Rate.erase(dev->Name);
-                RootContainer->NetClass.Limit.erase(dev->Name);
+                RootContainer->NetClass.TxRate.erase(dev->Name);
+                RootContainer->NetClass.TxLimit.erase(dev->Name);
                 RootContainer->NetClass.RxLimit.erase(dev->Name);
+                for (auto cls: NetClasses) {
+                    cls->Stat.erase(dev->Name);
+                    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+                        auto cs_name = fmt::format("{} CS{}", dev->Name, cs);
+                        cls->Stat[fmt::format("Saved CS{}", cs)] += cls->Stat[cs_name];
+                        cls->Stat.erase(cs_name);
+                    }
+                }
             }
             dev = Devices.erase(dev);
         } else
             dev++;
+    }
+
+    DeviceStat.clear();
+    for (auto &dev: Devices) {
+        DeviceStat[dev.Name] = dev.Stat;
+        DeviceStat["group " + dev.GroupName] += dev.Stat;
+        if (dev.Uplink)
+            DeviceStat["Uplink"] += dev.Stat;
     }
 
     return OK;
@@ -1044,74 +1147,72 @@ std::string TNetwork::MatchDevice(const std::string &pattern) {
 
 TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
     TError error;
-    TNlClass cls;
 
-    if (this == HostNetwork.get())
-        cls.Parent = cfg.HostParentHandle;
-    else
-        cls.Parent = cfg.ParentHandle;
-    cls.Handle = cfg.Handle;
+    if (cfg.LeafHandle == cfg.BaseHandle)
+        return OK; /* Fold */
 
-    if (cfg.Handle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID))
-        cls.defRate = dev.Rate;
-    else
-        cls.defRate = dev.GetConfig(ContainerRate);
+    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+        TNlClass cls(dev.Index, cfg.BaseHandle + cs, cfg.MetaHandle + cs);
 
-    cls.Index = dev.Index;
-    cls.Kind = dev.GetConfig(DeviceQdisc);
-    cls.Prio = dev.GetConfig(cfg.Prio);
-    cls.Rate = dev.GetConfig(cfg.Rate);
-    cls.Ceil = dev.GetConfig(cfg.Limit);
-    cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2);
-    cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10);
-    cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10);
+        if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
+            cls.Parent = cfg.BaseHandle;
 
-    error = cls.Create(*Nl);
-    if (error) {
-        (void)cls.Delete(*Nl);
+        cls.Kind = dev.GetConfig(DeviceQdisc);
+        cls.Rate = dev.GetConfig(cfg.TxRate, 0, cs);
+        cls.Ceil = dev.GetConfig(cfg.TxLimit, 0, cs);
+        cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2, cs);
+        cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10, cs);
+        cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10, cs);
+
+        if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
+            cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
+        else
+            cls.defRate = dev.GetConfig(ContainerRate, 0, cs);
+
+        if (cfg.MetaHandle != cfg.BaseHandle) {
+            L_NET_VERBOSE("Setup CS{} meta class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
+            error = cls.Create(*Nl);
+            if (error) {
+                (void)cls.Delete(*Nl);
+                error = cls.Create(*Nl);
+            }
+            if (error)
+                return TError(error, "tc class");
+        }
+
+        TNlQdisc ctq(dev.Index, cfg.LeafHandle + cs, TC_HANDLE(TC_H_MIN(cfg.LeafHandle + cs), 0));
+
+        cls.Parent = cfg.MetaHandle + cs;
+        cls.Handle = cfg.LeafHandle + cs;
+
+        if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
+            cls.Rate = dev.GetConfig(DefaultClassRate, 0, cs);
+            cls.Ceil = dev.GetConfig(DefaultClassCeil, 0, cs);
+            cls.defRate = cls.Rate;
+
+            ctq.Kind = dev.GetConfig(DefaultQdisc);
+            ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
+            ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
+        } else {
+            ctq.Kind = dev.GetConfig(ContainerQdisc);
+            ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20, cs);
+            ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2, cs);
+        }
+
+        L_NET_VERBOSE("Setup CS{} leaf class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
+
         error = cls.Create(*Nl);
-    }
+        if (error)
+            return TError(error, "leaf tc class");
 
-    if (error)
-        return TError(error, "tc class");
-
-    if (!cfg.Leaf)
-        return OK;
-
-    TNlQdisc ctq(dev.Index, cfg.Leaf, TC_HANDLE(TC_H_MIN(cfg.Handle), CONTAINER_TC_MINOR));
-
-    cls.Parent = cfg.Handle;
-    cls.Handle = cfg.Leaf;
-
-    if (cfg.Leaf == TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR)) {
-        cls.Rate = dev.GetConfig(DefaultClassRate);
-        cls.Ceil = dev.GetConfig(DefaultClassCeil);
-        cls.defRate = cls.Rate;
-
-        ctq.Handle = TC_HANDLE(DEFAULT_TC_MAJOR, ROOT_TC_MINOR);
-        ctq.Kind = dev.GetConfig(DefaultQdisc);
-        ctq.Limit = dev.GetConfig(DefaultQdiscLimit);
-        ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
-    } else {
-        cls.Ceil = 0;
-
-        ctq.Kind = dev.GetConfig(ContainerQdisc);
-        ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
-        ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
-    }
-
-    error = cls.Create(*Nl);
-    if (error)
-        return TError(error, "leaf tc class");
-
-    error = ctq.Create(*Nl);
-    if (error) {
-        (void)ctq.Delete(*Nl);
         error = ctq.Create(*Nl);
+        if (error) {
+            (void)ctq.Delete(*Nl);
+            error = ctq.Create(*Nl);
+        }
+        if (error)
+            return TError(error, "leaf tc qdisc");
     }
-
-    if (error)
-        return TError(error, "leaf tc qdisc");
 
     return OK;
 }
@@ -1119,22 +1220,27 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
 TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg) {
     TError error;
 
-    /* default class qdisc */
-    if (cfg.Leaf == TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR))
-        return OK;
+    if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR))
+        return OK; /* Host */
 
-    TNlQdisc ctq(dev.Index, cfg.Handle, TC_HANDLE(TC_H_MIN(cfg.Handle), CONTAINER_TC_MINOR));
-    (void)ctq.Delete(*Nl);
+    if (cfg.LeafHandle == cfg.BaseHandle)
+        return OK; /* Fold */
 
-    if (cfg.Leaf) {
-        TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.Leaf);
+    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+        TNlQdisc ctq(dev.Index, cfg.LeafHandle + cs,
+                     TC_HANDLE(TC_H_MIN(cfg.LeafHandle + cs), 0));
+        (void)ctq.Delete(*Nl);
+
+        TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.LeafHandle + cs);
         (void)cls.Delete(*Nl);
-    }
 
-    TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.Handle);
-    error = cls.Delete(*Nl);
-    if (error && error.Errno != ENODEV && error.Errno != ENOENT)
-        return TError(error, "cannot remove class");
+        if (cfg.MetaHandle != cfg.BaseHandle) {
+            TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.MetaHandle + cs);
+            error = cls.Delete(*Nl);
+            if (error && error.Errno != ENODEV && error.Errno != ENOENT)
+                return TError(error, "cannot remove class");
+        }
+    }
 
     return OK;
 }
@@ -1151,10 +1257,6 @@ TError TNetwork::TrySetupClasses(TNetClass &cls) {
         error = SetupClass(dev, cls);
         if (error)
             return error;
-
-        error = SetupIngress(dev, cls);
-        if (error)
-            return error;
     }
 
     state_lock.unlock();
@@ -1165,6 +1267,15 @@ TError TNetwork::TrySetupClasses(TNetClass &cls) {
 
 TError TNetwork::SetupClasses(TNetClass &cls) {
     TError error;
+
+    if (this != HostNetwork.get()) {
+        if (&cls == RootClass) {
+            for (auto &dev: Devices)
+                if (dev.Uplink)
+                    SetupPolice(dev);
+        }
+        return HostNetwork->SetupClasses(cls);
+    }
 
     error = TrySetupClasses(cls);
     if (error) {
@@ -1180,9 +1291,6 @@ TError TNetwork::SetupClasses(TNetClass &cls) {
         }
     }
 
-    if (this != HostNetwork.get())
-        return HostNetwork->SetupClasses(cls);
-
     return OK;
 }
 
@@ -1190,30 +1298,30 @@ void TNetwork::InitClass(TContainer &ct) {
     auto &cls = ct.NetClass;
     cls.Owner = ct.Id;
     if (!ct.Parent) {
-        cls.HostParentHandle = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
-        cls.ParentHandle = TcHandle(ROOT_TC_MAJOR, ROOT_TC_MINOR);
-        cls.Handle = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        cls.Leaf = TcHandle(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
+        cls.BaseHandle = TC_HANDLE(ROOT_TC_MAJOR, 1);
+        cls.MetaHandle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR);
+        cls.LeafHandle = TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR);
         cls.Fold = &cls;
         cls.Parent = nullptr;
-    } else if (ct.Controllers & CGROUP_NETCLS) {
-        cls.HostParentHandle = ct.Parent->NetClass.Handle;
-        if (ct.NetInherit)
-            cls.ParentHandle = ct.Parent->NetClass.Handle;
-        else
-            cls.ParentHandle = TcHandle(ROOT_TC_MAJOR, ROOT_CONTAINER_ID);
-        cls.Handle = TcHandle(ROOT_TC_MAJOR, ct.Id);
-        cls.Leaf = TcHandle(ROOT_TC_MAJOR, ct.Id + CONTAINER_ID_MAX);
-        cls.Fold = &cls;
-        cls.Parent = ct.Parent->NetClass.Fold;
-    } else {
+    } else if (!(ct.Controllers & CGROUP_NETCLS)) {
         /* Fold into parent */
-        cls.HostParentHandle = ct.Parent->NetClass.HostParentHandle;
-        cls.ParentHandle = ct.Parent->NetClass.ParentHandle;
-        cls.Handle = ct.Parent->NetClass.Handle;
-        cls.Leaf = ct.Parent->NetClass.Leaf;
+        cls.BaseHandle = ct.Parent->NetClass.LeafHandle;
+        cls.MetaHandle = ct.Parent->NetClass.MetaHandle;
+        cls.LeafHandle = ct.Parent->NetClass.LeafHandle;
         cls.Fold = ct.Parent->NetClass.Fold;
         cls.Parent = ct.Parent->NetClass.Parent;
+    } else if (ct.Level == 1) {
+        cls.BaseHandle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR);
+        cls.MetaHandle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR | (ct.Id << 4));
+        cls.LeafHandle = TC_HANDLE(ROOT_TC_MAJOR, ct.Id << 4);
+        cls.Fold = &cls;
+        cls.Parent = &ct.Parent->NetClass;
+    } else {
+        cls.BaseHandle = ct.Parent->NetClass.MetaHandle;
+        cls.MetaHandle = ct.Parent->NetClass.MetaHandle;
+        cls.LeafHandle = TC_HANDLE(ROOT_TC_MAJOR, ct.Id << 4);
+        cls.Fold = &cls;
+        cls.Parent = &ct.Parent->NetClass;
     }
 }
 
@@ -1228,16 +1336,24 @@ void TNetwork::RegisterClass(TNetClass &cls) {
 
 void TNetwork::UnregisterClass(TNetClass &cls) {
     auto pos = std::find(NetClasses.begin(), NetClasses.end(), &cls);
-    if (pos != NetClasses.end()) {
-        NetClasses.erase(pos);
-        cls.Registered--;
+    if (pos == NetClasses.end())
+        return;
+
+    if (cls.Parent && (NetclsSubsystem.HasPriority || cls.OriginNet.get() == this)) {
+        for (int cs = 0; cs < NR_TC_CLASSES; cs++)
+            cls.Parent->Stat[fmt::format("Saved CS{}", cs)] += cls.Stat[fmt::format("CS{}", cs)];
     }
+
+    NetClasses.erase(pos);
+    cls.Registered--;
 }
 
 void TNetwork::FatalError(TError &error) {
-    L_ERR("Fatal network {} error: {}", NetName, error);
-    if (!NetError || NetError == EError::Queued)
+    if (!NetError || NetError == EError::Queued) {
+        L_ERR("Fatal network {} error: {}", NetName, error);
         NetError = error;
+        NetCv.notify_all();
+    }
 }
 
 TError TNetwork::Reconnect() {
@@ -1270,9 +1386,10 @@ TError TNetwork::Reconnect() {
     return error;
 }
 
-TError TNetwork::RepairLocked() {
-    bool force = NetError != EError::Queued;
+TError TNetwork::RepairLocked(bool force) {
     TError error;
+
+    L_NET("Repair network {} force={}", NetName, force);
 
     NetError = TError::Queued();
 
@@ -1284,46 +1401,38 @@ TError TNetwork::RepairLocked() {
             L_NET("Cannot reconnect network {} netlink: {}", NetName, error);
         error = SyncDevices();
     }
-    if (error) {
-        FatalError(error);
+    if (error)
         return error;
-    }
 
     auto state_lock = LockNetState();
 
     for (auto &dev: Devices) {
+        if (dev.Uplink)
+            SetupPolice(dev);
+
         if (!dev.Managed)
             continue;
 
         if (!dev.Prepared || force) {
             error = SetupQueue(dev);
-            if (error) {
-                FatalError(error);
+            if (error)
                 continue;
-            }
             dev.Prepared = true;
         }
 
         for (auto cls: NetClasses) {
             error = SetupClass(dev, *cls);
-            if (error) {
-                FatalError(error);
+            if (error)
                 break;
-            }
-            error = SetupIngress(dev, *cls);
-            if (error) {
-                FatalError(error);
-                break;
-            }
         }
     }
 
     state_lock.unlock();
 
-    if (NetError == EError::Queued)
+    if (NetError == EError::Queued) {
         NetError = OK;
-
-    NetCv.notify_all();
+        NetCv.notify_all();
+    }
 
     return NetError;
 }
@@ -1388,10 +1497,13 @@ void TNetwork::NetWatchdog() {
                 GlobalStatGen++;
                 net->SyncStatLocked();
             }
-            if (net->NetError)
-                net->RepairLocked();
-            if (net->NetError)
-                net->RepairLocked();
+            error = net->NetError;
+            if (error)
+                error = net->RepairLocked();
+            if (error)
+                error = net->RepairLocked(true);
+            if (error)
+                net->FatalError(error);
         }
         if (GetCurrentTimeMs() - LastProxyNeighbour >= NetProxyNeighbourPeriod) {
             auto lock = HostNetwork->LockNet();
@@ -1434,11 +1546,12 @@ void TNetwork::InitStat(TNetClass &cls) {
     for (auto &dev: Devices) {
         cls.Stat[dev.Name] = dev.Stat;
         cls.Stat["group " + dev.GroupName] += dev.Stat;
+        if (dev.Uplink)
+            cls.Stat["Uplink"] += dev.Stat;
     }
 }
 
 void TNetwork::SyncStatLocked() {
-    bool hostNet = this == HostNetwork.get();
     TError error;
 
     auto curTime = GetCurrentTimeMs();
@@ -1470,61 +1583,99 @@ void TNetwork::SyncStatLocked() {
     auto state_lock = LockNetState();
 
     for (auto cls: NetClasses) {
-        if (hostNet && !cls->HostClass)
-            continue;
-        cls->Stat.clear();
+        for (auto &it: cls->Stat) {
+            if (!StringStartsWith(it.first, "Saved "))
+                it.second.Reset();
+        }
+        for (int cs = 0; cs < NR_TC_CLASSES; cs++)
+            cls->Stat[fmt::format("CS{}", cs)] += cls->Stat[fmt::format("Saved CS{}", cs)];
     }
 
     for (auto &dev: Devices) {
 
+        if (!dev.ClassCache)
+            continue;
+
         for (auto cls: NetClasses) {
-            if (hostNet && !cls->HostClass)
-                continue;
 
             if (dev.Owner && dev.Owner != cls->Owner)
                 continue;
 
-            TNetStat &stat = cls->Stat[dev.Name];
-
-            stat = dev.Stat;
-
-            if (!dev.ClassCache)
+            if (!NetclsSubsystem.HasPriority && cls->OriginNet.get() != this)
                 continue;
 
-            struct rtnl_class *tc = rtnl_class_get(dev.ClassCache, dev.Index, cls->Leaf);
-            if (!tc) {
-                L_NET("Missing network {} class {} at {}:{}", NetName, cls->Leaf, dev.Index, dev.Name);
-                StartRepair();
-                continue;
+            for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+                struct rtnl_class *tc = rtnl_class_get(dev.ClassCache, dev.Index, cls->LeafHandle + cs);
+                if (!tc) {
+                    L_NET("Missing network {} class {:#x} at {}:{}", NetName, cls->LeafHandle + cs, dev.Index, dev.Name);
+                    StartRepair();
+                    continue;
+                }
+                auto cs_name = fmt::format("{} CS{}", dev.Name, cs);
+                TNetStat &stat = cls->Stat[cs_name];
+                stat.TxPackets += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_PACKETS);
+                stat.TxBytes += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_BYTES);
+                stat.TxDrops += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_DROPS);
+                stat.TxOverruns += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_OVERLIMITS);
+                rtnl_class_put(tc);
+
+                cls->Stat[fmt::format("Leaf CS{}", cs)] += stat;
+
+                if (cls->LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
+                    struct rtnl_class *tc = rtnl_class_get(dev.ClassCache, dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR) + cs);
+                    if (!tc) {
+                        L_NET("Missing network {} class {:#x} at {}:{}", NetName, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR) + cs, dev.Index, dev.Name);
+                        StartRepair();
+                        continue;
+                    }
+                    TNetStat &def_stat = cls->Stat[fmt::format("Fallback CS{}", cs)];
+                    def_stat.TxPackets += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_PACKETS);
+                    def_stat.TxBytes += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_BYTES);
+                    def_stat.TxDrops += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_DROPS);
+                    def_stat.TxOverruns += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_OVERLIMITS);
+                    rtnl_class_put(tc);
+                    stat += def_stat;
+                }
             }
-
-            stat.Packets += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_PACKETS);
-            stat.Bytes += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_BYTES);
-            stat.Drops += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_DROPS);
-            stat.Overlimits += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_OVERLIMITS);
-            rtnl_class_put(tc);
         }
 
         for (auto it = NetClasses.rbegin(); it != NetClasses.rend(); ++it) {
             auto cls = *it;
 
-            if (hostNet && !cls->HostClass)
-                continue;
-
             if (dev.Owner && dev.Owner != cls->Owner)
                 continue;
 
-            auto &stat = cls->Stat[dev.Name];
+            if (!NetclsSubsystem.HasPriority && cls->OriginNet.get() != this)
+                continue;
 
-            if (cls->Parent && dev.Managed && !dev.Owner) {
-                auto &pstat = cls->Parent->Stat[dev.Name];
-                pstat.Packets += stat.Packets;
-                pstat.Bytes += stat.Bytes;
-                pstat.Drops += stat.Drops;
-                pstat.Overlimits += stat.Overlimits;
+            for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+                auto cs_name = fmt::format("{} CS{}", dev.Name, cs);
+
+                TNetStat &stat = cls->Stat[cs_name];
+                cls->Stat[fmt::format("CS{}", cs)] += stat;
+                cls->Stat[dev.Name] += stat;
+                cls->Stat["group " + dev.GroupName] += stat;
+                if (dev.Uplink)
+                    cls->Stat["Uplink"] += stat;
+                if (cls->Parent && dev.Managed && !dev.Owner)
+                    cls->Parent->Stat[cs_name] += stat;
             }
+        }
+    }
 
-            cls->Stat["group " + dev.GroupName] += stat;
+    /* Mock statistics if traffic goes into fallback tc class in host. */
+    if (!NetclsSubsystem.HasPriority) {
+        for (auto cls: NetClasses) {
+            if (cls->OriginNet.get() != this) {
+                for (auto &dev: cls->OriginNet->Devices) {
+                    auto &stat = cls->OriginNet->DeviceStat[dev.Name];
+                    cls->Stat["CS0"] += stat;
+                    cls->Stat[dev.Name] += stat;
+                    cls->Stat["group " + dev.GroupName] += stat;
+                    if (dev.Uplink)
+                        cls->Stat["Uplink"] += stat;
+                }
+            }
         }
     }
 
@@ -1592,23 +1743,25 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
         }
     }
 
-    ct.NetClass.HostClass = env.Net == HostNetwork;
+    ct.LockStateWrite();
+    auto net_state_lock = LockNetState();
 
-    if ((ct.Controllers & CGROUP_NETCLS) && !ct.NetClass.HostClass) {
-        auto lock = HostNetwork->LockNetState();
+    PORTO_ASSERT(!ct.Net);
+    ct.Net = env.Net;
+    ct.NetClass.OriginNet = env.Net;
+
+    if (env.NetIsolate)
+        env.Net->RootClass = &ct.NetClass;
+
+    ct.Net->NetUsers.push_back(&ct);
+
+    if (ct.Controllers & CGROUP_NETCLS) {
+        ct.Net->InitStat(ct.NetClass);
         HostNetwork->RegisterClass(ct.NetClass);
     }
 
-    ct.LockStateWrite();
-    PORTO_ASSERT(!ct.Net);
-    ct.Net = env.Net;
-    auto lock = ct.Net->LockNetState();
-    if (ct.Controllers & CGROUP_NETCLS) {
-        ct.Net->RegisterClass(ct.NetClass);
-        ct.Net->InitStat(ct.NetClass);
-    }
-    ct.Net->NetUsers.push_back(&ct);
-    lock.unlock();
+    net_state_lock.unlock();
+
     ct.UnlockState();
 
     task.NetFd = std::move(env.NetNs);
@@ -1626,7 +1779,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
     TError error;
 
     ct.LockStateWrite();
-    auto state_lock = ct.LockNetState();
+
+    auto net_state_lock = LockNetState();
 
     auto net = ct.Net;
     ct.Net = nullptr;
@@ -1636,29 +1790,19 @@ void TNetwork::StopNetwork(TContainer &ct) {
         return;
 
     if (ct.Controllers & CGROUP_NETCLS)
-        net->UnregisterClass(ct.NetClass);
+        HostNetwork->UnregisterClass(ct.NetClass);
+
+    if (net->RootClass == &ct.NetClass)
+        net->RootClass = nullptr;
+
+    ct.NetClass.OriginNet = nullptr;
 
     net->NetUsers.remove(&ct);
     bool last = net->NetUsers.empty();
-    state_lock.unlock();
+
+    net_state_lock.unlock();
 
     if (ct.Controllers & CGROUP_NETCLS) {
-        auto net_lock = net->LockNet();
-        for (auto &dev: net->Devices) {
-            if (!dev.Managed || !dev.Prepared)
-                continue;
-            error = net->DeleteClass(dev, ct.NetClass);
-            if (error)
-                L_NET("Cannot delete network {} class CT{}:{}: {}",
-                  net->NetName, ct.Id, ct.Name, error);
-        }
-    }
-
-    if ((ct.Controllers & CGROUP_NETCLS) && !ct.NetClass.HostClass) {
-        state_lock = HostNetwork->LockNetState();
-        HostNetwork->UnregisterClass(ct.NetClass);
-        state_lock.unlock();
-
         auto net_lock = HostNetwork->LockNet();
         for (auto &dev: HostNetwork->Devices) {
             if (!dev.Managed || !dev.Prepared)
@@ -1726,9 +1870,9 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
     TError error;
     TNetEnv env;
 
-    if (ct.NetInherit)
+    if (ct.NetInherit) {
         net = ct.Parent->Net;
-    else if (ct.Task.Pid) {
+    } else if (ct.Task.Pid) {
         error = TNetwork::Open("/proc/" + std::to_string(ct.Task.Pid) + "/ns/net", netNs, net);
         if (error) {
             if (ct.WaitTask.IsZombie())
@@ -1759,22 +1903,22 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
 
     ct.LockStateWrite();
 
-    ct.NetClass.HostClass = net == HostNetwork;
+    auto net_state_lock = LockNetState();
 
-    if ((ct.Controllers & CGROUP_NETCLS) && !ct.NetClass.HostClass) {
-        auto state_lock = HostNetwork->LockNetState();
+    if (ct.Controllers & CGROUP_NETCLS) {
+        net->InitStat(ct.NetClass);
         HostNetwork->RegisterClass(ct.NetClass);
     }
 
-    auto state_lock = net->LockNetState();
-    if (ct.Controllers & CGROUP_NETCLS) {
-        net->RegisterClass(ct.NetClass);
-        net->InitStat(ct.NetClass);
-    }
-
     ct.Net = net;
+    ct.NetClass.OriginNet = net;
+
+    if (env.NetIsolate)
+        net->RootClass = &ct.NetClass;
+
     net->NetUsers.push_back(&ct);
-    state_lock.unlock();
+
+    net_state_lock.unlock();
 
     ct.UnlockState();
 

@@ -551,7 +551,7 @@ static TError CreateRootContainer() {
     if (error)
         return error;
 
-    error = ContainerIdMap.GetAt(DEFAULT_TC_MINOR);
+    error = ContainerIdMap.GetAt(DEFAULT_CONTAINER_ID);
     if (error)
         return error;
 

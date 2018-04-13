@@ -2578,8 +2578,7 @@ static void TestRoot(Porto::Connection &api) {
         "net_rx_bytes",
         "net_rx_packets",
         "net_rx_drops",
-        //"net_tos",
-        //"net_priority",
+        "net_tos",
     };
 
     if (KernelSupports(KernelFeature::LOW_LIMIT))

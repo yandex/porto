@@ -418,8 +418,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 
     SetProp(EProperty::CONTROLLERS);
 
-    NetClass.Prio["default"] = NET_DEFAULT_PRIO;
-
     RespawnDelay = config().container().respawn_delay_ms() * 1000000;
 
     Private = "";
@@ -1744,14 +1742,24 @@ TError TContainer::ApplyDynamicProperties() {
             return error;
     }
 
-    if (TestClearPropDirty(EProperty::NET_PRIO) |
-        TestClearPropDirty(EProperty::NET_LIMIT) |
-        TestClearPropDirty(EProperty::NET_GUARANTEE) |
-        TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
+    if (TestClearPropDirty(EProperty::NET_LIMIT) |
+            TestClearPropDirty(EProperty::NET_GUARANTEE) |
+            TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
         if (Net) {
             error = Net->SetupClasses(NetClass);
             if (error)
                 return error;
+        }
+    }
+
+
+    if ((Controllers & CGROUP_NETCLS) &&
+            TestClearPropDirty(EProperty::NET_TOS)) {
+        auto netcls = GetCgroup(NetclsSubsystem);
+        error = NetclsSubsystem.SetClass(netcls, NetClass.LeafHandle | NetClass.DefaultTos);
+        if (error) {
+            L_ERR("Can't set classid: {}", error);
+            return error;
         }
     }
 
@@ -1963,11 +1971,9 @@ TError TContainer::PrepareCgroups() {
 
     if (Controllers & CGROUP_NETCLS) {
         auto netcls = GetCgroup(NetclsSubsystem);
-        error = netcls.Set("net_cls.classid", std::to_string(NetClass.Leaf));
-        if (error) {
-            L_ERR("Can't set classid: {}", error);
+        error = NetclsSubsystem.SetClass(netcls, NetClass.LeafHandle | NetClass.DefaultTos);
+        if (error)
             return error;
-        }
     }
 
     return OK;
