@@ -91,11 +91,7 @@ ADD_PYTHON_TEST(volume-restore)
 # legacy tests
 
 add_test(NAME portotest
-         COMMAND sudo ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery leaks net_property
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-add_test(NAME networking
-         COMMAND sudo ${CMAKE_BINARY_DIR}/portotest net_property
+         COMMAND sudo ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery leaks
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # slow tests

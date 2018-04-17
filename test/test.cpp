@@ -27,7 +27,6 @@ namespace test {
 
 __thread int tid;
 std::atomic<int> done;
-std::vector<std::shared_ptr<TNlLink>> links;
 
 std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
     if (tid)
@@ -320,16 +319,6 @@ int GetVmRss(const std::string &pid) {
     return std::stoi(size);
 }
 
-bool TcClassExist(uint32_t handle) {
-    size_t nr = 0;
-    for (auto &link : links) {
-        TNlClass tclass(link->GetIndex(), -1, handle);
-        if (tclass.Exists(*link->GetNl()))
-            nr++;
-    }
-    return nr == links.size();
-}
-
 int WordCount(const std::string &path, const std::string &word) {
     int nr = 0;
 
@@ -449,10 +438,6 @@ void PrintFds(const std::string &path, struct dirent **lst, int nr) {
     }
 }
 
-bool NetworkEnabled() {
-    return links.size() != 0;
-}
-
 static size_t ChildrenNum(int pid) {
     vector<string> lines;
     ExpectOk(Popen("pgrep -P " + std::to_string(pid) + " || true", lines));
@@ -557,24 +542,6 @@ static bool HaveMaxRss() {
     return false;
 }
 
-static bool HaveIpVlan() {
-    auto nl = std::make_shared<TNl>();
-    TError error = nl->Connect();
-    if (error)
-        return false;
-
-    auto link = std::make_shared<TNlLink>(nl, "portoivcheck");
-    (void)link->Remove();
-
-    error = link->AddIpVlan(links[0]->GetName(), "l2", -1);
-    if (error) {
-        return false;
-    } else {
-        (void)link->Remove();
-        return true;
-    }
-}
-
 static bool IsCfqActive() {
     std::vector<std::string> items;
     (void)TPath("/sys/block").ReadDirectory(items);
@@ -616,7 +583,6 @@ void InitKernelFeatures() {
         HaveCgKnob("memory", "memory.low_limit_in_bytes");
     kernel_features[static_cast<int>(KernelFeature::RECHARGE_ON_PGFAULT)] =
         HaveCgKnob("memory", "memory.recharge_on_pgfault");
-    kernel_features[static_cast<int>(KernelFeature::IPVLAN)] = HaveIpVlan();
     kernel_features[static_cast<int>(KernelFeature::MAX_RSS)] = HaveMaxRss();
     kernel_features[static_cast<int>(KernelFeature::CFQ)] = IsCfqActive();
 
@@ -633,8 +599,6 @@ void InitKernelFeatures() {
         (KernelSupports(KernelFeature::LOW_LIMIT) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  RECHARGE_ON_PGFAULT" <<
         (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT) ? "yes" : "no") << std::endl;
-    std::cout << std::left << std::setw(30) << "  IPVLAN" <<
-        (KernelSupports(KernelFeature::IPVLAN) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  MAX_RSS" <<
         (KernelSupports(KernelFeature::MAX_RSS) ? "yes" : "no") << std::endl;
     std::cout << std::left << std::setw(30) << "  CFQ" <<

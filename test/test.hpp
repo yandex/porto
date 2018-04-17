@@ -19,7 +19,6 @@ class TNlLink;
 namespace test {
     extern __thread int tid;
     extern std::atomic<int> done;
-    extern std::vector<std::shared_ptr<TNlLink>> links;
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
 
@@ -64,7 +63,6 @@ namespace test {
     void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove = true);
 
     void PrintFds(const std::string &path, struct dirent **lst, int nr);
-    bool NetworkEnabled();
     void TestDaemon(Porto::Connection &api);
 
     int SelfTest(std::vector<std::string> args);
@@ -78,7 +76,6 @@ namespace test {
         CFS_BANDWIDTH,
         CFS_GROUPSCHED,
         CFS_RESERVE,
-        IPVLAN,
         MAX_RSS,
         CFQ,
         LAST

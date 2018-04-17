@@ -113,31 +113,6 @@ void TNl::Disconnect() {
     }
 }
 
-TError TNl::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all) {
-    struct nl_cache *cache;
-    int ret;
-
-    ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &cache);
-    if (ret < 0)
-        return Error(ret, "Cannot allocate link cache");
-
-    for (auto obj = nl_cache_get_first(cache); obj;
-            obj = nl_cache_get_next(obj)) {
-        auto link = (struct rtnl_link *)obj;
-
-        if (!all && ((rtnl_link_get_flags(link) &
-                        (IFF_LOOPBACK | IFF_RUNNING)) != IFF_RUNNING))
-            continue;
-
-        auto l = std::make_shared<TNlLink>(shared_from_this(), link);
-        links.push_back(l);
-    }
-
-    nl_cache_free(cache);
-
-    return OK;
-}
-
 TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
     struct rtnl_neigh *neigh;
     int ret;

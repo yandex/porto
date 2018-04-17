@@ -49,7 +49,7 @@ static int expectedRespawns;
 static int expectedErrors;
 static int expectedWarns;
 
-static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
+static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices", "net_cls" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
 static int LeakConainersNr = 1000;
@@ -230,16 +230,14 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const string &nam
     ExpectApiSuccess(api.GetData(name, "cpu_usage", v));
     ExpectApiSuccess(api.GetData(name, "memory_usage", v));
 
-    if (NetworkEnabled()) {
-        ExpectApiSuccess(api.GetData(name, "net_bytes", v));
-        ExpectApiSuccess(api.GetData(name, "net_packets", v));
-        ExpectApiSuccess(api.GetData(name, "net_drops", v));
-        ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
+    ExpectApiSuccess(api.GetData(name, "net_bytes", v));
+    ExpectApiSuccess(api.GetData(name, "net_packets", v));
+    ExpectApiSuccess(api.GetData(name, "net_drops", v));
+    ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
 
-        ExpectApiSuccess(api.GetData(name, "net_rx_bytes", v));
-        ExpectApiSuccess(api.GetData(name, "net_rx_packets", v));
-        ExpectApiSuccess(api.GetData(name, "net_rx_drops", v));
-    }
+    ExpectApiSuccess(api.GetData(name, "net_rx_bytes", v));
+    ExpectApiSuccess(api.GetData(name, "net_rx_packets", v));
+    ExpectApiSuccess(api.GetData(name, "net_rx_drops", v));
 
     int intval;
     ExpectApiSuccess(api.GetData(name, "minor_faults", v));
@@ -281,16 +279,15 @@ static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
     ExpectApiFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "memory_usage", v), EError::InvalidState);
 
-    if (NetworkEnabled()) {
-        ExpectApiFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
 
-        ExpectApiFailure(api.GetData(name, "net_rx_bytes", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_rx_packets", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_rx_drops", v), EError::InvalidState);
-    }
+    ExpectApiFailure(api.GetData(name, "net_rx_bytes", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_rx_packets", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_rx_drops", v), EError::InvalidState);
+
     ExpectApiFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
     if (KernelSupports(KernelFeature::MAX_RSS)) {
@@ -309,11 +306,6 @@ static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
     }
     ExpectApiSuccess(api.GetProperty(name, "max_respawns", v));
     ExpectEq(v, "");
-}
-
-static void ExpectTclass(string name, bool exp) {
-    string cls = GetCgKnob("net_cls", name, "net_cls.classid");
-    ExpectEq(TcClassExist(stoul(cls)), exp);
 }
 
 static void TestHolder(Porto::Connection &api) {
@@ -569,9 +561,6 @@ static void TestHolder(Porto::Connection &api) {
     ExpectEq(CgExists("memory", "a"), true);
     ExpectEq(CgExists("memory", "a/b"), false);
     ExpectEq(CgExists("memory", "a/b/c"), false);
-
-    if (NetworkEnabled())
-        ExpectTclass("a", true);
 
     WaitContainer(api, "a/b");
     ExpectApiSuccess(api.GetData("a/b", "state", state));
@@ -904,35 +893,8 @@ static void TestNsCgTc(Porto::Connection &api) {
     ExpectCorrectCgroups(pid, name, name);
     AsAlice(api);
 
-    string root_cls;
-    string leaf_cls;
-    if (NetworkEnabled()) {
-        root_cls = GetCgKnob("net_cls", "/", "net_cls.classid");
-        leaf_cls = GetCgKnob("net_cls", name, "net_cls.classid");
-
-        ExpectNeq(root_cls, "0");
-        ExpectNeq(leaf_cls, "0");
-        ExpectNeq(root_cls, leaf_cls);
-
-        ExpectEq(TcClassExist(stoul(root_cls)), true);
-        ExpectEq(TcClassExist(stoul(leaf_cls)), true);
-    }
-
     ExpectApiSuccess(api.Stop(name));
     WaitProcessExit(pid);
-
-    if (NetworkEnabled()) {
-        ExpectEq(TcClassExist(stoul(leaf_cls)), false);
-
-        Say() << "Check that destroying container removes tclass" << std::endl;
-        ExpectApiSuccess(api.Start(name));
-        ExpectEq(TcClassExist(stoul(root_cls)), true);
-        ExpectEq(TcClassExist(stoul(leaf_cls)), true);
-        ExpectApiSuccess(api.Destroy(name));
-        ExpectEq(TaskRunning(pid), false);
-        ExpectEq(TcClassExist(stoul(leaf_cls)), false);
-        ExpectApiSuccess(api.Create(name));
-    }
 
     Say() << "Check that hierarchical task cgroups are correct" << std::endl;
 
@@ -997,16 +959,6 @@ static void TestIsolateProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     Expect(std::count(ret.begin(), ret.end(), '\n') < 4);
 
-    if (NetworkEnabled()) {
-        Say() << "Make sure container has correct network class" << std::endl;
-
-        string handle = GetCgKnob("net_cls", name, "net_cls.classid");
-        ExpectNeq(handle, "0");
-
-        ExpectEq(TcClassExist(stoul(handle)), true);
-        ExpectApiSuccess(api.Stop(name));
-        ExpectEq(TcClassExist(stoul(handle)), false);
-    }
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Make sure isolate works correctly with meta parent" << std::endl;
@@ -2082,341 +2034,6 @@ static string System(const std::string &cmd) {
     return StringTrim(lines[0]);
 }
 
-static void TestXvlan(Porto::Connection &api, const std::string &name, const std::vector<std::string> &hostLink, const std::string &link, const std::string &type) {
-    bool shouldShareMac = type == "ipvlan";
-    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
-    ExpectApiFailure(api.SetProperty(name, "net", type), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", type + " " + link), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " " + link));
-    auto s = StartWaitAndGetData(api, name, "stdout");
-    auto containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(),  2);
-    Expect(containerLink != hostLink);
-    ExpectEq(ShareMacAddress(hostLink, containerLink), shouldShareMac);
-    auto linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    Expect(linkMap.find(link) != linkMap.end());
-    ExpectEq(linkMap.at(link).up, true);
-    ExpectApiSuccess(api.Stop(name));
-
-    if (type != "ipvlan") {
-        string mtu = "1400";
-        ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " eth10 bridge " + mtu));
-        s = StartWaitAndGetData(api, name, "stdout");
-        containerLink = StringToVec(s);
-        ExpectEq(containerLink.size(), 2);
-        Expect(containerLink != hostLink);
-        ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-        linkMap = IfHw(containerLink);
-        Expect(linkMap.find("lo") != linkMap.end());
-        ExpectEq(linkMap.at("lo").up, true);
-        Expect(linkMap.find("eth10") != linkMap.end());
-        ExpectEq(linkMap.at("eth10").mtu, mtu);
-        ExpectEq(linkMap.at("eth10").up, true);
-        ExpectApiSuccess(api.Stop(name));
-
-        string hw = "00:11:22:33:44:55";
-        ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " eth10 bridge -1 " + hw));
-        s = StartWaitAndGetData(api, name, "stdout");
-        containerLink = StringToVec(s);
-        ExpectEq(containerLink.size(), 2);
-        Expect(containerLink != hostLink);
-        ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-        linkMap = IfHw(containerLink);
-        Expect(linkMap.find("lo") != linkMap.end());
-        ExpectEq(linkMap.at("lo").up, true);
-        Expect(linkMap.find("eth10") != linkMap.end());
-        ExpectEq(linkMap.at("eth10").hw, hw);
-        ExpectEq(linkMap.at("eth10").up, true);
-        ExpectApiSuccess(api.Stop(name));
-    }
-}
-
-static void CreateVethPair(Porto::Connection &api) {
-    AsRoot(api);
-    if (system("ip link | grep veth0") == 0) {
-        Say() << "Delete link veth0" << std::endl;
-        ExpectEq(system("ip link delete veth0"), 0);
-    }
-    if (system("ip link | grep veth1") == 0) {
-        Say() << "Delete link veth1" << std::endl;
-        int ret = system("ip link delete veth1");
-        (void)ret;
-    }
-    ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
-    AsAlice(api);
-}
-
-static void TestNetProperty(Porto::Connection &api) {
-    if (!NetworkEnabled()) {
-        Say() << "Make sure network namespace is shared when network disabled" << std::endl;
-
-        string pid;
-
-        string name = "a";
-        ExpectApiSuccess(api.Create(name));
-
-        Say() << "Spawn long running task" << std::endl;
-        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-        ExpectApiSuccess(api.Start(name));
-        ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-        ExpectEq(TaskRunning(pid), true);
-
-        AsRoot(api);
-        ExpectEq(GetNamespace("self", "net"), GetNamespace(pid, "net"));
-
-        ExpectApiSuccess(api.Destroy(name));
-
-        return;
-    }
-
-    string name = "a";
-    ExpectApiSuccess(api.Create(name));
-
-    ExpectApiFailure(api.SetProperty(name, "net_tos", "1"), EError::NotSupported);
-
-    vector<string> hostLink;
-    ExpectOk(Popen("ip -o link show", hostLink));
-
-    string link = links[0]->GetName();
-
-    Say() << "Check net parsing" << std::endl;
-    ExpectApiFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", ""), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "net", "host"));
-    ExpectApiFailure(api.SetProperty(name, "net", "steal"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "net", "inherited"));
-    ExpectApiSuccess(api.SetProperty(name, "net", "none"));
-    ExpectApiFailure(api.SetProperty(name, "net", "none; macvlan " + link + " " + link), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "inherited; steal veth0"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "none; steal " + link), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "net", "inherited; inherited"));
-    ExpectApiFailure(api.SetProperty(name, "net", "inherited; none"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "none; inherited"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "inherited; macvlan " + link + " eth0"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "none; macvlan " + link + " eth0"), EError::InvalidValue);
-
-    Say() << "Check net=none" << std::endl;
-
-    ExpectApiSuccess(api.SetProperty(name, "net", "none"));
-    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
-    string s = StartWaitAndGetData(api, name, "stdout");
-    auto containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(), 1);
-    Expect(containerLink != hostLink);
-    ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-    auto linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    ExpectApiSuccess(api.Stop(name));
-
-    Say() << "Check net=inherited" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "net", "inherited"));
-    s = StartWaitAndGetData(api, name, "stdout");
-    containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(), hostLink.size());
-    ExpectEq(ShareMacAddress(hostLink, containerLink), true);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    ExpectApiSuccess(api.Stop(name));
-
-    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
-
-    Say() << "Check net=steal" << std::endl;
-
-    CreateVethPair(api);
-
-    ExpectApiSuccess(api.SetProperty(name, "net", "steal veth0"));
-    s = StartWaitAndGetData(api, name, "stdout");
-    containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(), 2);
-
-    ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    Expect(linkMap.find("veth0") != linkMap.end());
-    ExpectApiSuccess(api.Stop(name));
-
-    Say() << "Make sure net=steal doesn't preserve L3 address" << std::endl;
-    AsRoot(api);
-    if (system("ip link | grep veth1") == 0) {
-        Say() << "Delete link veth1" << std::endl;
-        // we may race with kernel which removes dangling veth so don't
-        // handle error
-        int ret = system("ip link delete veth1");
-        (void)ret;
-    }
-    ExpectEq(system("ip link"), 0);
-    ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
-    ExpectEq(system("ip addr add dev veth0 1.2.3.4"), 0);
-    AsAlice(api);
-
-    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o -d addr show dev veth0 to 1.2.3.4"));
-    ExpectApiSuccess(api.SetProperty(name, "net", "steal veth0"));
-    s = StartWaitAndGetData(api, name, "stdout");
-    ExpectEq(s, "");
-    ExpectApiSuccess(api.Stop(name));
-
-    Say() << "Check net=macvlan type" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o -d link show dev eth0"));
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth0"));
-    auto mode = StartWaitAndGetData(api, name, "stdout");
-    ExpectNeq(mode.find("bridge"), std::string::npos);
-    ExpectApiSuccess(api.Stop(name));
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth0 private"));
-    mode = StartWaitAndGetData(api, name, "stdout");
-    ExpectNeq(mode.find("private"), std::string::npos);
-    ExpectApiSuccess(api.Stop(name));
-
-    Say() << "Check net=macvlan" << std::endl;
-    TestXvlan(api, name, hostLink, link, "macvlan");
-
-    /*Say() << "Check net=macvlan statistics" << std::endl;
-    create macvlan on default interface and ping ya.ru
-    string uniq = "123";
-    string gw = System("ip -o route | grep default | cut -d' ' -f3");
-    string dev = System("ip -o route get " + gw + " | awk '{print $3}'");
-    string addr = System("ip -o addr show " + dev + " | grep -w inet | awk '{print $4}'");
-    string ip = System("echo " + addr + " | sed -e 's@\\([0-9]*\\.[0-9]*\\.[0-9]*\\.\\)[0-9]*\\(.*\\)@\\1" + uniq + "\\2@'");
-
-    Say() << "Using device " << dev " and ipv6ra" << std::endl;
-    Say() << "Using device " << dev << " gateway " << gw << " ip " << addr << " -> " << ip << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
-    ExpectApiSuccess(api.SetProperty(name, "command", "false"));
-    we now catch all packets (neighbor solicitation), not only ipv4, so can't expect 0 here
-    ExpectApiSuccess(api.Start(name));
-    WaitContainer(api, name);
-    ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
-    ExpectEq(s, "0");
-
-    ExpectApiSuccess(api.Stop(name));
-
-    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
-
-
-    // create macvlan on default interface and ping ya.ru
-    string dev = System("ip -6 -o route get 2a02:6b8::3 | awk '{print $7}'");
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
-    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'for i in {0..9}; do ping6 -c 1 -w 1 2a02:6b8::3 && break || sleep 1; done'"));
-    ExpectApiSuccess(api.Start(name));
-    WaitContainer(api, name, 60);
-    ExpectApiSuccess(api.GetProperty(name, "net_bytes[" + dev + "]", s, Porto::GetFlags::Sync));
-    ExpectNeq(s, "0");*/
-
-    Say() << "Check net=veth" << std::endl;
-    AsRoot(api);
-    ExpectApiSuccess(api.Destroy(name));
-    if (system("ip link | grep portobr0") == 0)
-        ExpectEq(system("ip link delete portobr0"), 0);
-    ExpectEq(system("ip link add portobr0 type bridge"), 0);
-    ExpectEq(system("ip link set portobr0 up"), 0);
-    AsAlice(api);
-
-    ExpectApiSuccess(api.Create(name));
-    ExpectApiSuccess(api.SetProperty(name, "net", "veth eth0 portobr0"));
-    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o link show'"));
-
-    vector<string> v;
-    ExpectOk(Popen("ip -o link show", v));
-    auto pre = IfHw(v);
-    ExpectApiSuccess(api.Start(name));
-    v.clear();
-    ExpectOk(Popen("ip -o link show", v));
-    auto post = IfHw(v);
-    ExpectEq(pre.size() + 1, post.size());
-    for (auto kv : pre)
-        post.erase(kv.first);
-    ExpectEq(post.size(), 1);
-    auto portove = post.begin()->first;
-    ExpectEq(post[portove].master, "portobr0");
-
-    WaitContainer(api, name);
-    ExpectApiSuccess(api.GetData(name, "stdout", s));
-    containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(), 2);
-    Expect(containerLink != hostLink);
-    ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    Expect(linkMap.find("eth0") != linkMap.end());
-    ExpectApiSuccess(api.Stop(name));
-
-    v.clear();
-    ExpectOk(Popen("ip -o link show", v));
-    post = IfHw(v);
-    Expect(post.find("portobr0") != post.end());
-    AsRoot(api);
-    ExpectEq(system("ip link delete portobr0"), 0);
-    AsAlice(api);
-
-    /* Wait until porto stop tracking portobr0  */
-    std::string tmp;
-    while (!api.GetProperty("/", "net_bytes[portobr0]", tmp, Porto::GetFlags::Sync))
-        usleep(100000);
-
-    AsRoot(api);
-    if (KernelSupports(KernelFeature::IPVLAN)) {
-        AsAlice(api);
-        Say() << "Check net=ipvlan" << std::endl;
-        AsRoot(api);
-        ExpectApiSuccess(api.SetProperty(name, "user", Alice.User()));
-        ExpectApiSuccess(api.SetProperty(name, "group", Alice.Group()));
-        AsAlice(api);
-        TestXvlan(api, name, hostLink, link, "ipvlan");
-    }
-    AsAlice(api);
-
-    ExpectApiSuccess(api.Destroy(name));
-
-    Say() << "Check net=host inheritance" << std::endl;
-    std::string aPid, abPid;
-
-    ExpectApiSuccess(api.Create("a"));
-    ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
-    ExpectApiSuccess(api.SetProperty("a", "isolate", "true"));
-    ExpectApiSuccess(api.Create("a/b"));
-    ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
-    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
-
-    ExpectApiSuccess(api.Start("a/b"));
-    ExpectApiSuccess(api.GetData("a", "root_pid", aPid));
-    ExpectApiSuccess(api.GetData("a/b", "root_pid", abPid));
-    AsRoot(api);
-    ExpectEq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
-    ExpectEq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
-    AsAlice(api);
-    ExpectApiSuccess(api.Stop("a"));
-
-    CreateVethPair(api);
-
-    ExpectApiSuccess(api.SetProperty("a", "net", "steal veth0"));
-    ExpectApiSuccess(api.SetProperty("a/b", "net", "inherited"));
-    ExpectApiSuccess(api.Start("a/b"));
-    ExpectApiSuccess(api.GetData("a", "root_pid", aPid));
-    ExpectApiSuccess(api.GetData("a/b", "root_pid", abPid));
-    AsRoot(api);
-    ExpectEq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
-    ExpectNeq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
-    AsAlice(api);
-    ExpectApiSuccess(api.Stop("a"));
-
-    CreateVethPair(api);
-
-    ExpectApiSuccess(api.SetProperty("a/b", "net", "none"));
-    ExpectApiSuccess(api.Start("a/b"));
-    ExpectApiSuccess(api.GetData("a", "root_pid", aPid));
-    ExpectApiSuccess(api.GetData("a/b", "root_pid", abPid));
-    AsRoot(api);
-    ExpectNeq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
-    ExpectNeq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
-    AsAlice(api);
-    ExpectApiSuccess(api.Destroy("a"));
-}
-
 static void TestCapabilitiesProperty(Porto::Connection &api) {
     std::string name = "a";
     std::string pid;
@@ -2945,6 +2562,24 @@ static void TestRoot(Porto::Connection &api) {
         "io_write",
         "io_ops",
         "time",
+        "net",
+        "ip",
+        "default_gw",
+        "net_guarantee",
+        "net_limit",
+        "net_rx_limit",
+        "net_bytes",
+        "net_packets",
+        "net_drops",
+        "net_overlimits",
+        "net_tx_bytes",
+        "net_tx_packets",
+        "net_tx_drops",
+        "net_rx_bytes",
+        "net_rx_packets",
+        "net_rx_drops",
+        //"net_tos",
+        //"net_priority",
     };
 
     if (KernelSupports(KernelFeature::LOW_LIMIT))
@@ -2957,30 +2592,6 @@ static void TestRoot(Porto::Connection &api) {
         properties.push_back("io_limit");
         properties.push_back("io_ops_limit");
         properties.push_back("dirty_limit");
-    }
-
-    if (NetworkEnabled()) {
-        properties.push_back("net");
-        properties.push_back("ip");
-        /*
-        properties.push_back("net_tos");
-        */
-        properties.push_back("net_guarantee");
-        properties.push_back("net_limit");
-        /*
-        properties.push_back("net_priority");
-        */
-    }
-
-    if (NetworkEnabled()) {
-        properties.push_back("net_bytes");
-        properties.push_back("net_packets");
-        properties.push_back("net_drops");
-        properties.push_back("net_overlimits");
-
-        properties.push_back("net_rx_bytes");
-        properties.push_back("net_rx_packets");
-        properties.push_back("net_rx_drops");
     }
 
     if (KernelSupports(KernelFeature::MAX_RSS))
@@ -3001,16 +2612,6 @@ static void TestRoot(Porto::Connection &api) {
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectApiSuccess(api.GetData(porto_root, "cpu_usage", v));
     ExpectApiSuccess(api.GetData(porto_root, "memory_usage", v));
-
-    for (auto &link : links) {
-        ExpectApiSuccess(api.GetData(porto_root, "net_bytes[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData(porto_root, "net_packets[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData(porto_root, "net_drops[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData(porto_root, "net_overlimits[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData(porto_root, "net_rx_bytes[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData(porto_root, "net_rx_packets[" + link->GetName() + "]", v));
-        ExpectApiSuccess(api.GetData(porto_root, "net_rx_drops[" + link->GetName() + "]", v));
-    }
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
@@ -3061,41 +2662,6 @@ static void TestRoot(Porto::Connection &api) {
 #endif
 }
 
-static void ExpectNonZeroLink(Porto::Connection &api, const std::string &name,
-                              const std::string &data) {
-    string nonzero = "0";
-    for (auto &link : links) {
-        string v;
-        ExpectApiSuccess(api.GetProperty(name, data + "[" + link->GetName() + "]", v, Porto::GetFlags::Sync));
-        if (v != "0" && v != "-1")
-            nonzero = v;
-    }
-    ExpectNeq(nonzero, "0");
-}
-
-static void ExpectLessEqLink(Porto::Connection &api, const std::string &name,
-                             const std::string &parent, const std::string &data) {
-    (void)parent;
-    for (auto &link : links) {
-        string v, rv;
-        int64_t i, ri;
-        ExpectApiSuccess(api.GetProperty(name, data + "[" + link->GetName() + "]", v, Porto::GetFlags::Sync));
-        ExpectApiSuccess(api.GetProperty("/", data + "[" + link->GetName() + "]", rv, Porto::GetFlags::Sync));
-        ExpectOk(StringToInt64(v, i));
-        ExpectOk(StringToInt64(rv, ri));
-        ExpectLessEq(i, ri);
-    }
-}
-
-static void ExpectZeroLink(Porto::Connection &api, const std::string &name,
-                           const std::string &data) {
-    for (auto &link : links) {
-        string v;
-        ExpectApiSuccess(api.GetProperty(name, data + "[" + link->GetName() + "]", v, Porto::GetFlags::Sync));
-        ExpectEq(v, "0");
-    }
-}
-
 static void TestData(Porto::Connection &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
@@ -3113,10 +2679,7 @@ static void TestData(Porto::Connection &api) {
     WaitContainer(api, noop);
 
     ExpectApiSuccess(api.Create(wget));
-    if (NetworkEnabled())
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru -O - | dd of=index.html oflag=direct'"));
-    else
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4k count=1 of=index.html oflag=direct'"));
+    ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4k count=1 of=index.html oflag=direct'"));
     ExpectApiSuccess(api.Start(wget));
     WaitContainer(api, wget, 60);
 
@@ -3171,42 +2734,6 @@ static void TestData(Porto::Connection &api) {
         TestDataMap(api, noop, "io_ops", 1);
     }
 
-    if (NetworkEnabled()) {
-        Say() << "Make sure net_bytes counters are valid" << std::endl;
-        ExpectNonZeroLink(api, wget, "net_bytes");
-        ExpectNonZeroLink(api, root, "net_bytes");
-        ExpectLessEqLink(api, wget, root, "net_bytes");
-        ExpectZeroLink(api, noop, "net_bytes");
-
-        Say() << "Make sure net_packets counters are valid" << std::endl;
-        ExpectNonZeroLink(api, wget, "net_packets");
-        ExpectNonZeroLink(api, root, "net_packets");
-        ExpectLessEqLink(api, wget, root, "net_packets");
-        ExpectZeroLink(api, noop, "net_packets");
-
-        Say() << "Make sure net_drops counters are valid" << std::endl;
-        ExpectZeroLink(api, root, "net_drops");
-        ExpectZeroLink(api, wget, "net_drops");
-        ExpectZeroLink(api, noop, "net_drops");
-
-        Say() << "Make sure net_overlimits counters are valid" << std::endl;
-        ExpectZeroLink(api, root, "net_overlimits");
-        ExpectZeroLink(api, wget, "net_overlimits");
-        ExpectZeroLink(api, noop, "net_overlimits");
-
-        Say() << "Make sure net_rx_bytes counters are valid" << std::endl;
-        ExpectNonZeroLink(api, wget, "net_rx_bytes");
-        ExpectNonZeroLink(api, root, "net_rx_bytes");
-        ExpectLessEqLink(api, wget, root, "net_rx_bytes");
-        ExpectNonZeroLink(api, noop, "net_rx_bytes");
-
-        Say() << "Make sure net_rx_packets counters are valid" << std::endl;
-        ExpectNonZeroLink(api, wget, "net_rx_packets");
-        ExpectNonZeroLink(api, root, "net_rx_packets");
-        ExpectLessEqLink(api, wget, root, "net_rx_packets");
-        ExpectNonZeroLink(api, noop, "net_rx_packets");
-    }
-
     ExpectApiSuccess(api.Destroy(wget));
     ExpectApiSuccess(api.Destroy(noop));
 }
@@ -3219,23 +2746,6 @@ static bool CanTestLimits() {
         return false;
 
     return true;
-}
-
-static TUintMap ParseMap(const std::string &s) {
-    TUintMap m;
-    for (auto &line : SplitEscapedString(s, ';')) {
-        auto nameval = SplitEscapedString(line, ':');
-        ExpectEq(nameval.size(), 2);
-
-        std::string key = StringTrim(nameval[0]);
-        uint64_t val;
-
-        ExpectOk(StringToUint64(nameval[1], val));
-
-        m[key] = val;
-    }
-
-    return m;
 }
 
 static void TestCoresConvertion(Porto::Connection &api, const std::string &name, const std::string &property) {
@@ -3439,52 +2949,6 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.Start(name));
         ExpectEq(GetCgKnob("memory", name, "memory.fs_iops_limit"), "1000");
         ExpectApiSuccess(api.Stop(name));
-    }
-
-    Say() << "Check net_cls cgroup" << std::endl;
-
-    uint32_t netGuarantee = 100000, netCeil = 200000;
-
-    uint32_t i = 0;
-    for (auto &link : links) {
-        ExpectApiSuccess(api.SetProperty(name, "net_guarantee[" + link->GetName() + "]", std::to_string(netGuarantee + i)));
-        ExpectApiSuccess(api.SetProperty(name, "net_limit[" + link->GetName() + "]", std::to_string(netCeil + i)));
-        i++;
-    }
-    ExpectApiSuccess(api.Start(name));
-
-    if (NetworkEnabled()) {
-        uint32_t handle = stoul(GetCgKnob("net_cls", name, "net_cls.classid"));
-
-        if (handle > 0x14000)
-            handle -= 0x4000;
-
-        i = 0;
-        for (auto &link : links) {
-            TNlClass tclass(link->GetIndex(), -1, handle);
-            ExpectOk(tclass.Load(*link->GetNl()));
-            ExpectEq(tclass.Rate, netGuarantee + i);
-            ExpectEq(tclass.Ceil, netCeil + i);
-
-            i++;
-        }
-
-        ExpectApiSuccess(api.Stop(name));
-
-        Say() << "Make sure we can set map properties without subscript" << std::endl;
-
-        std::string guarantee, v;
-        ExpectApiSuccess(api.GetProperty(name, "net_guarantee", guarantee));
-
-        auto m = ParseMap(guarantee);
-
-        guarantee = "";
-        for (auto pair : m)
-            guarantee += pair.first + ": 1000; ";
-        ExpectNeq(guarantee.length(), 0);
-        ExpectApiSuccess(api.SetProperty(name, "net_guarantee", guarantee));
-        ExpectApiSuccess(api.GetProperty(name, "net_guarantee", v));
-        ExpectEq(StringTrim(guarantee, " ;"), v);
     }
 
     Say() << "Make sure we have a cap for stdout_limit property" << std::endl;
@@ -3757,8 +3221,7 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
 
     ExpectNeq(parentCgmap["freezer"], childCgmap["freezer"]);
     ExpectNeq(parentCgmap["memory"], childCgmap["memory"]);
-    if (NetworkEnabled())
-        ExpectNeq(parentCgmap["net_cls"], childCgmap["net_cls"]);
+    ExpectNeq(parentCgmap["net_cls"], childCgmap["net_cls"]);
     ExpectNeq(parentCgmap["cpu"], childCgmap["cpu"]);
     ExpectNeq(parentCgmap["cpuacct"], childCgmap["cpuacct"]);
 
@@ -4003,37 +3466,8 @@ static void TestRespawnProperty(Porto::Connection &api) {
 }
 
 static void ReadPropsAndData(Porto::Connection &api, const std::string &name) {
-    static const std::set<std::string> skipNet = {
-        "net",
-        "net_tos",
-        "ip",
-        "default_gw",
-        "net_guarantee",
-        "net_limit",
-        "net_priority",
-
-        "net_bytes",
-        "net_packets",
-        "net_drops",
-        "net_overlimits",
-        "net_rx_bytes",
-        "net_rx_packets",
-        "net_rx_drops",
-    };
-
     std::vector<Porto::Property> plist;
-
     ExpectApiSuccess(api.ListProperties(plist));
-
-    if (!NetworkEnabled()) {
-        plist.erase(std::remove_if(plist.begin(),
-                                   plist.end(),
-                                   [&](Porto::Property &p){
-                                       return skipNet.find(p.Name) != skipNet.end();
-                                   }),
-                    plist.end());
-    }
-
     std::string v;
 
     for (auto p : plist)
@@ -5175,7 +4609,6 @@ int SelfTest(std::vector<std::string> args) {
         { "root_property", TestRootProperty },
         { "root_readonly", TestRootRdOnlyProperty },
         { "hostname_property", TestHostnameProperty },
-        { "net_property", TestNetProperty },
         { "capabilities_property", TestCapabilitiesProperty },
         { "enable_porto_property", TestEnablePortoProperty },
         { "limits", TestLimits },
@@ -5206,9 +4639,6 @@ int SelfTest(std::vector<std::string> args) {
 
     int ret = EXIT_SUCCESS;
     bool except = args.size() == 0 || args[0] == "--except";
-
-    if (NetworkEnabled())
-        subsystems.push_back("net_cls");
 
     TPath exe("/proc/self/exe"), path;
     exe.ReadLink(path);
@@ -5245,10 +4675,6 @@ int SelfTest(std::vector<std::string> args) {
         std::cerr << "WARNING: CFS group scheduling is not enabled, skipping cpu_guarantee tests" << std::endl;
     if (!KernelSupports(KernelFeature::CFQ))
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
-    if (!NetworkEnabled())
-        std::cerr << "WARNING: Network support is not tested" << std::endl;
-    if (links.size() == 1)
-        std::cerr << "WARNING: Multiple network support is not tested" << std::endl;
     if (!KernelSupports(KernelFeature::MAX_RSS))
         std::cerr << "WARNING: max_rss is not tested" << std::endl;
     if (!KernelSupports(KernelFeature::FSIO))

@@ -63,7 +63,6 @@ public:
     struct nl_sock *GetSock() const { return Sock; }
 
     int GetFd();
-    TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all);
 
     static TError Error(int nl_err, const std::string &desc);
     void Dump(const std::string &prefix, void *obj) const;

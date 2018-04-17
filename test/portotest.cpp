@@ -58,6 +58,7 @@ static int TestConnectivity() {
     return 0;
 }
 
+
 int main(int argc, char *argv[])
 {
     if (argc == 2 && !strcmp(argv[1], "connectivity"))
@@ -84,16 +85,6 @@ int main(int argc, char *argv[])
     ReadConfigs();
 
     test::InitUsersAndGroups();
-
-    auto nl = std::make_shared<TNl>();
-    TError error = nl->Connect();
-    if (error)
-        return EXIT_FAILURE;
-
-    error = nl->OpenLinks(test::links, false);
-    if (error)
-        return EXIT_FAILURE;
-
     test::InitKernelFeatures();
 
     string what = "";
