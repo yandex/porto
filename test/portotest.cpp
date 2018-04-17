@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    config.Read();
+    ReadConfigs();
 
     test::InitUsersAndGroups();
 

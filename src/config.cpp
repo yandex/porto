@@ -4,14 +4,36 @@
 #include "util/namespace.hpp"
 
 #include <google/protobuf/text_format.h>
+#include <google/protobuf/io/tokenizer.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
+
+#include <algorithm>
 
 extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 }
 
-TConfig config;
+class TProtobufLogger : public google::protobuf::io::ErrorCollector {
+public:
+    std::string Path;
+    TProtobufLogger(const std::string &path) : Path(path) {}
+    ~TProtobufLogger() {}
+
+    void AddError(int line, int column, const std::string& message) {
+        L_WRN("Config {} at line {} column {} {}", Path, line + 1, column + 1, message);
+    }
+
+    void AddWarning(int line, int column, const std::string& message) {
+        L_WRN("Config {} at line {} column {} {}", Path, line + 1, column + 1, message);
+    }
+};
+
+static cfg::TConfig Config;
+
+cfg::TConfig &config() {
+    return Config;
+}
 
 static void NetSysctl(const std::string &key, const std::string &val)
 {
@@ -20,9 +42,7 @@ static void NetSysctl(const std::string &key, const std::string &val)
     sysctl->set_val(val);
 }
 
-void TConfig::ReadDefaults() {
-    config().Clear();
-
+static void DefaultConfig() {
     std::string version;
     if (!GetSysctl("kernel.osrelease", version))
         config().set_linux_version(version);
@@ -141,32 +161,45 @@ void TConfig::ReadDefaults() {
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");
 }
 
-bool TConfig::ReadFile(const std::string &path) {
+static void ReadConfig(const TPath &path, bool silent) {
+    TError error;
     TFile file;
 
-    if (file.OpenRead(path))
-        return false;
-
-    google::protobuf::io::FileInputStream pist(file.Fd);
-
-    if (!google::protobuf::TextFormat::Merge(&pist, &Cfg) ||
-        !Cfg.IsInitialized()) {
-        return false;
+    error = file.OpenRead(path);
+    if (error) {
+        if (!silent && error.Errno != ENOENT)
+            L_WRN("Cannot read config {} {}", path, error);
+        return;
     }
 
-    return true;
+    google::protobuf::io::FileInputStream stream(file.Fd);
+    google::protobuf::TextFormat::Parser parser;
+    TProtobufLogger logger(path.ToString());
+
+    if (!silent) {
+        L_SYS("Read config {}", path);
+        parser.RecordErrorsTo(&logger);
+    }
+
+    parser.Merge(&stream, &Config);
 }
 
-void TConfig::Read() {
-    ReadDefaults();
+void ReadConfigs(bool silent) {
+    Config.Clear();
+    DefaultConfig();
 
-    if (!ReadFile("/etc/portod.conf"))
-        ReadFile("/etc/default/portod.conf");
+    ReadConfig("/etc/default/portod.conf", silent); /* FIXME remove */
+    ReadConfig("/etc/portod.conf", silent);
+
+    TPath config_dir = "/etc/portod.conf.d";
+    std::vector<std::string> config_names;
+    config_dir.ReadDirectory(config_names);
+    std::sort(config_names.begin(), config_names.end());
+    for (auto &name: config_names) {
+        if (StringEndsWith(name, ".conf"))
+            ReadConfig(config_dir / name, silent);
+    }
 
     Debug |= config().log().debug();
     Verbose |= Debug | config().log().verbose();
-}
-
-cfg::TCfg &TConfig::operator()() {
-    return Cfg;
 }

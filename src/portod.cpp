@@ -728,7 +728,7 @@ static int Portod() {
     if (error)
         FatalError("Cannot save pid", error);
 
-    config.Read();
+    ReadConfigs();
     InitPortoCgroups();
     InitCapabilities();
     InitIpcSysctl();
@@ -1199,6 +1199,8 @@ static int PortodMaster() {
     if (error)
         FatalError("Cannot save pid", error);
 
+    ReadConfigs();
+
     TPath pathVer(PORTO_VERSION_FILE);
 
     if (pathVer.ReadAll(PreviousVersion)) {
@@ -1630,7 +1632,7 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-    config.Read();
+    ReadConfigs(true);
 
     if (cmd == "" || cmd == "daemon")
         return PortodMaster();
