@@ -1115,8 +1115,9 @@ See **portoctl(8)** for details.
 
     Porto API protobuf.
 
+/etc/defaults/portod.conf  (deprecated)  
 /etc/portod.conf  
-/etc/defaults/portod.conf
+/etc/portod.conf.d/\*.conf  (sorted)
 
     Porto daemon configuration in protobuf text format.
     Porto merges it with hardcoded defaults and prints into log when starts.

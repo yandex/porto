@@ -1,6 +1,6 @@
 package cfg;
 
-message TCfg {
+message TConfig {
     message TNetworkCfg {
         optional bool enabled = 1 [deprecated=true];
         optional bool debug = 2 [deprecated=true];
