@@ -157,7 +157,7 @@ class TNetwork : public TNonCopyable {
 
     void SyncStatLocked();
     TError Reconnect();
-    TError RepairLocked(bool force = false);
+    TError RepairLocked();
 
     /* Something went wrong, handled by Repair */
     TError NetError;
@@ -195,18 +195,17 @@ public:
 
     std::map<std::string, int> DeviceOwners;
 
-    TError SyncDevices(bool force = false);
+    TError SyncDevices();
     std::string NewDeviceName(const std::string &prefix);
     std::string MatchDevice(const std::string &pattern);
     int DeviceIndex(const std::string &name);
     void GetDeviceSpeed(TNetDevice &dev) const;
     void SetDeviceOwner(const std::string &name, int owner);
 
-    void FatalError(TError &error);
     void StartRepair();
     TError WaitRepair();
 
-    TError SetupQueue(TNetDevice &dev);
+    TError SetupQueue(TNetDevice &dev, bool force);
 
     static void InitClass(TContainer &ct);
 

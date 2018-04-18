@@ -590,7 +590,7 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     return OK;
 }
 
-TError TNetwork::SetupQueue(TNetDevice &dev) {
+TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     TError error;
 
     //
@@ -626,7 +626,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
 
-    if (!qdisc.Check(*Nl)) {
+    if (force || !qdisc.Check(*Nl)) {
         (void)qdisc.Delete(*Nl);
         error = qdisc.Create(*Nl);
         if (error) {
@@ -716,7 +716,7 @@ void TNetwork::SetDeviceOwner(const std::string &name, int owner) {
             dev.Owner = owner;
 }
 
-TError TNetwork::SyncDevices(bool force) {
+TError TNetwork::SyncDevices() {
     struct nl_cache *cache;
     TError error;
     int ret;
@@ -802,7 +802,7 @@ TError TNetwork::SyncDevices(bool force) {
                     dev.GetConfig(DeviceQdisc)) {
                 L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
                 StartRepair();
-            } else if (!force)
+            } else
                 d.Prepared = true;
 
             found = true;
@@ -1348,14 +1348,6 @@ void TNetwork::UnregisterClass(TNetClass &cls) {
     cls.Registered--;
 }
 
-void TNetwork::FatalError(TError &error) {
-    if (!NetError || NetError == EError::Queued) {
-        L_ERR("Fatal network {} error: {}", NetName, error);
-        NetError = error;
-        NetCv.notify_all();
-    }
-}
-
 TError TNetwork::Reconnect() {
     TNamespaceFd netns, cur_ns;
     TError error;
@@ -1386,10 +1378,10 @@ TError TNetwork::Reconnect() {
     return error;
 }
 
-TError TNetwork::RepairLocked(bool force) {
+TError TNetwork::RepairLocked() {
     TError error;
 
-    L_NET("Repair network {} force={}", NetName, force);
+    L_NET("Repair network {}", NetName);
 
     NetError = TError::Queued();
 
@@ -1401,11 +1393,14 @@ TError TNetwork::RepairLocked(bool force) {
             L_NET("Cannot reconnect network {} netlink: {}", NetName, error);
         error = SyncDevices();
     }
-    if (error)
-        return error;
 
+    bool force = false;
     auto state_lock = LockNetState();
 
+    if (error)
+        goto out;
+
+retry:
     for (auto &dev: Devices) {
         if (dev.Uplink)
             SetupPolice(dev);
@@ -1414,9 +1409,9 @@ TError TNetwork::RepairLocked(bool force) {
             continue;
 
         if (!dev.Prepared || force) {
-            error = SetupQueue(dev);
+            error = SetupQueue(dev, force);
             if (error)
-                continue;
+                break;
             dev.Prepared = true;
         }
 
@@ -1425,16 +1420,24 @@ TError TNetwork::RepairLocked(bool force) {
             if (error)
                 break;
         }
+        if (error)
+            break;
     }
 
+    if (error) {
+        if (!force) {
+            force = true;
+            goto retry;
+        }
+    }
+
+out:
+    if (error)
+        L_ERR("Fatal network {} error: {}", NetName, error);
+    NetError = error;
+    NetCv.notify_all();
     state_lock.unlock();
-
-    if (NetError == EError::Queued) {
-        NetError = OK;
-        NetCv.notify_all();
-    }
-
-    return NetError;
+    return error;
 }
 
 TError TNetwork::SyncResolvConf() {
@@ -1497,13 +1500,8 @@ void TNetwork::NetWatchdog() {
                 GlobalStatGen++;
                 net->SyncStatLocked();
             }
-            error = net->NetError;
-            if (error)
-                error = net->RepairLocked();
-            if (error)
-                error = net->RepairLocked(true);
-            if (error)
-                net->FatalError(error);
+            if (net->NetError)
+                net->RepairLocked();
         }
         if (GetCurrentTimeMs() - LastProxyNeighbour >= NetProxyNeighbourPeriod) {
             auto lock = HostNetwork->LockNet();
