@@ -1980,7 +1980,7 @@ TError TContainer::GetEnvironment(TEnv &env) const {
     env.SetEnv("HOME", GetCwd().ToString());
     env.SetEnv("USER", TaskCred.User());
 
-    env.SetEnv("container", "lxc");
+    env.SetEnv("container", "porto");
 
     /* lock these */
     env.SetEnv("PORTO_NAME", Name, true, true);

@@ -1298,7 +1298,7 @@ static void TestEnvProperty(Porto::Connection &api) {
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
         "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
-        "container=lxc" + EnvSep +
+        "container=porto" + EnvSep +
         "PORTO_NAME=a" + EnvSep +
         "PORTO_HOST=" + GetHostName() + EnvSep +
         "PORTO_USER=porto-alice" + EnvSep;
@@ -1309,7 +1309,7 @@ static void TestEnvProperty(Porto::Connection &api) {
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
         "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
-        "container=lxc" + EnvSep +
+        "container=porto" + EnvSep +
         "PORTO_NAME=a" + EnvSep +
         "PORTO_HOST=" + GetHostName() + EnvSep +
         "PORTO_USER=porto-alice" + EnvSep +
@@ -1323,7 +1323,7 @@ static void TestEnvProperty(Porto::Connection &api) {
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
         "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
-        "container=lxc" + EnvSep +
+        "container=porto" + EnvSep +
         "PORTO_NAME=a" + EnvSep +
         "PORTO_HOST=" + GetHostName() + EnvSep +
         "PORTO_USER=porto-alice" + EnvSep +
