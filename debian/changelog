@@ -1,3 +1,15 @@
+yandex-porto (4.13.0) unstable; urgency=low
+
+  * porto: refactor configs
+  * debian: add etc/porto.conf.d
+  * test/tc-rebuild: get network interfaces from sysfs
+  * test: remove legacy networking test
+  * network: add DSCP traffic classes
+  * network: destroy and recreat qdisc at repair
+  * porto: max container id is 4095
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 18 Apr 2018 17:47:48 +0300
+
 yandex-porto (4.12.7) unstable; urgency=low
 
   * devices: check permission only at configuration time
