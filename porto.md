@@ -126,6 +126,16 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
     Container with **isolate**=false inherits environment variables from parent.
 
+    Default environment is:
+
+    container="porto"  
+    PORTO_NAME=_container name_  
+    PORTO_HOST=_host hostname_  
+    PORTO_USER=**owner_user**  
+    HOME=**cwd**  
+    USER=**user**  
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 * **user** - uid of container processes, default **owner\_user**
 
 * **group** - gid of container processes, default: **owner\_group**
