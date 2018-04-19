@@ -58,6 +58,7 @@ message TConfig {
             required uint32 weight = 2;
         }
         repeated TDscpClass dscp_class = 44;
+        optional string default_tos = 45;
     }
 
     message TFileCfg {

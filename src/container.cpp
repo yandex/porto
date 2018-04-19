@@ -384,6 +384,8 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     IoPolicy = "";
     IoPrio = 0;
 
+    NetClass.DefaultTos = TNetwork::DefaultTos;
+
     PressurizeOnDeath = config().container().pressurize_on_death();
     RunningChildren = 0;
     StartingChildren = 0;

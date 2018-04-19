@@ -31,6 +31,7 @@ static std::shared_ptr<TNetwork> HostNetwork;
 
 std::mutex TNetwork::NetworksMutex;
 std::mutex TNetwork::NetStateMutex;
+int TNetwork::DefaultTos = 0;
 
 std::unordered_map<ino_t, std::shared_ptr<TNetwork>> TNetwork::NetworksIndex;
 std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> TNetwork::NetworksList = std::make_shared<const std::list<std::shared_ptr<TNetwork>>>();
@@ -320,7 +321,7 @@ void TNetwork::InitializeConfig() {
     CsTotalWeight = 0;
     std::string CsString;
     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
-        auto name = fmt::format("CS{}", cs);
+        auto name = FormatTos(cs);
         CsWeight[cs] = 1;
         for (auto &it: config().network().dscp_class())
             if (it.name() == name)
@@ -330,7 +331,9 @@ void TNetwork::InitializeConfig() {
         CsTotalWeight += CsWeight[cs];
         CsString += fmt::format("{} = {}, ", name, CsWeight[cs]);
     }
-    L_NET("DSCP weight {}total = {}", CsString, CsTotalWeight);
+    if (config().network().has_default_tos())
+        ParseTos(config().network().default_tos(), DefaultTos);
+    L_NET("DSCP weight {}total = {}, default = {}", CsString, CsTotalWeight, FormatTos(DefaultTos));
 }
 
 std::string TNetwork::DeviceGroupName(int group) {
@@ -338,6 +341,17 @@ std::string TNetwork::DeviceGroupName(int group) {
     if (it != DeviceGroups.end())
         return it->second;
     return std::to_string(group);
+}
+
+TError TNetwork::ParseTos(const std::string &str, int &tos) {
+    if (str.size() != 3 || str[0] != 'C' || str[1] != 'S' || str[2] < '0' || str[2] > '7')
+        return TError(EError::InvalidValue, "Invalud ToS: {}", str);
+    tos = str[2] - '0';
+    return OK;
+}
+
+std::string TNetwork::FormatTos(int tos) {
+    return fmt::format("CS{}", tos);
 }
 
 TNetwork::TNetwork() : NatBitmap(0, 0) {

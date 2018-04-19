@@ -2826,16 +2826,17 @@ public:
         RequireControllers = CGROUP_NETCLS;
     }
     TError Get(std::string &value) {
-        value = fmt::format("CS{}", CT->NetClass.DefaultTos);
+        value = TNetwork::FormatTos(CT->NetClass.DefaultTos);
         return OK;
     }
     TError Set(const std::string &value) {
-        if (value[0] != 'C' || value[1] != 'S' ||
-                value[2] < '0' || value[2] > '7')
-            return TError(EError::InvalidValue, "Invalud ToS: {}", value);
-        CT->NetClass.DefaultTos = value[2] - '0';
-        CT->SetProp(EProperty::NET_TOS);
-        return OK;
+        int tos;
+        TError error = TNetwork::ParseTos(value, tos);
+        if (!error) {
+            CT->NetClass.DefaultTos = tos;
+            CT->SetProp(EProperty::NET_TOS);
+        }
+        return error;
     }
 } static NetTos;
 

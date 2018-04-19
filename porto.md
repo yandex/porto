@@ -728,9 +728,10 @@ container {
     default TC class for containers who lives in host network namespace.
 
     Porto setup first level TC classes for each CSx.
-    Their weight could be set in portod.conf:
+    Default class and weights could be set in portod.conf:
 ```
 network {
+    default_tos: "CS0"
     dscp_class {
         name: "CS1"
         weight: 10

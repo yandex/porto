@@ -240,6 +240,10 @@ public:
     static void InitializeConfig();
     static std::string DeviceGroupName(int group);
 
+    static int DefaultTos;
+    static TError ParseTos(const std::string &str, int &tos);
+    static std::string FormatTos(int tos);
+
     static bool NetworkSysctl(const std::string &key);
     static bool NamespaceSysctl(const std::string &key);
 
