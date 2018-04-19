@@ -1,3 +1,23 @@
+yandex-porto (4.13.1) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: set in environment container=porto
+  * config: warn about partial config parsing
+  * network: add default_tos into config
+  * network: propagate fake tc statistics into parent containers
+  * rpc: add AttachThread
+
+  [ Nikita Vetoshkin ]
+  * fix upstart job description
+
+  [ Konstantin Khlebnikov ]
+  * log: do not warn about full or broken filesystem
+  * network: add config option for disabling netcls priority
+  * network: remove qdisc from vlan devices
+  * test: add tc-classes
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 19 Apr 2018 19:45:25 +0300
+
 yandex-porto (4.13.0) unstable; urgency=low
 
   * porto: refactor configs
