@@ -1,5 +1,5 @@
 [Unit]
-Description=Porto service
+Description=Porto container management system
 After=network-online.target
 Requires=network-online.target
 ConditionVirtualization=!container

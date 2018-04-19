@@ -1,9 +1,8 @@
-# yandex-porto - Porto is component of Nirvana.
+# yandex-porto - container management system
 #
-# Porto is a service which allows to run processes in isolated namespaces.
+# Porto is a yet another Linux container management system, developed by Yandex.
 
 description	"Porto"
-author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
 
 start on static-network-up
 stop on runlevel [!2345]
