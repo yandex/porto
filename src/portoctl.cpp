@@ -2710,11 +2710,14 @@ public:
 class TAttachCmd final : public ICmd {
 public:
     TAttachCmd(Porto::Connection *api) : ICmd(api, "attach", 2,
-            "<name> <pid> [comm]", "move process into container") { }
+            "[-t] <container> <pid> [comm]", "move process or thread into container") { }
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string comm;
-        auto args = environment->GetArgs();
+        bool thread = false;
+        const auto &args = environment->GetOpts({
+                {'t', false, [&](const char *) { thread = true; }},
+        });
         auto name = args[0];
         int pid;
 
@@ -2728,7 +2731,11 @@ public:
         else
             comm = GetTaskName(pid);
 
-        auto ret = Api->AttachProcess(name, pid, comm);
+        int ret;
+        if (thread)
+            ret = Api->AttachThread(name, pid, comm);
+        else
+            ret = Api->AttachProcess(name, pid, comm);
         if (ret)
             PrintError("Cannot attach");
         return ret;

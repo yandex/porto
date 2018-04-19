@@ -120,6 +120,7 @@ message TContainerRequest {
     optional TConvertPathRequest convertPath = 200;
     optional TAttachProcessRequest attachProcess = 201;
     optional TLocateProcessRequest locateProcess = 202;
+    optional TAttachProcessRequest AttachThread = 203;
 
     optional TGetSystemRequest GetSystem = 300;
     optional TSetSystemRequest SetSystem = 301;

@@ -113,7 +113,7 @@ public:
 
     bool IsEmpty() const;
 
-    TError Attach(pid_t pid) const;
+    TError Attach(pid_t pid, bool thread = false) const;
     TError AttachAll(const TCgroup &cg) const;
 
     TPath Knob(const std::string &knob) const;

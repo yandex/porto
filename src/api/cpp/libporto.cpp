@@ -780,6 +780,15 @@ int Connection::AttachProcess(const std::string &name,
     return Impl->Rpc();
 }
 
+int Connection::AttachThread(const std::string &name,
+                              int pid, const std::string &comm) {
+    auto req = Impl->Req.mutable_attachthread();
+    req->set_name(name);
+    req->set_pid(pid);
+    req->set_comm(comm);
+    return Impl->Rpc();
+}
+
 int Connection::LocateProcess(int pid, const std::string &comm,
                               std::string &name) {
     Impl->Req.mutable_locateprocess()->set_pid(pid);
