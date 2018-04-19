@@ -1681,11 +1681,13 @@ void TNetwork::SyncStatLocked() {
             if (cls->OriginNet.get() != this) {
                 for (auto &dev: cls->OriginNet->Devices) {
                     auto &stat = cls->OriginNet->DeviceStat[dev.Name];
-                    cls->Stat["CS0"] += stat;
-                    cls->Stat[dev.Name] += stat;
-                    cls->Stat["group " + dev.GroupName] += stat;
-                    if (dev.Uplink)
-                        cls->Stat["Uplink"] += stat;
+                    for (auto c = cls; c && c->Owner != ROOT_CONTAINER_ID; c = c->Parent) {
+                        c->Stat[FormatTos(cls->DefaultTos)] += stat;
+                        c->Stat[dev.Name] += stat;
+                        c->Stat["group " + dev.GroupName] += stat;
+                        if (dev.Uplink)
+                            c->Stat["Uplink"] += stat;
+                    }
                 }
             }
         }
