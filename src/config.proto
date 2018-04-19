@@ -59,6 +59,7 @@ message TConfig {
         }
         repeated TDscpClass dscp_class = 44;
         optional string default_tos = 45;
+        optional bool enable_netcls_priority = 46;
     }
 
     message TFileCfg {
