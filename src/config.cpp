@@ -181,7 +181,9 @@ static void ReadConfig(const TPath &path, bool silent) {
         parser.RecordErrorsTo(&logger);
     }
 
-    parser.Merge(&stream, &Config);
+    bool ok = parser.Merge(&stream, &Config);
+    if (!ok && !silent)
+        L_WRN("Cannot parse config {} the rest is skipped", path);
 }
 
 void ReadConfigs(bool silent) {
