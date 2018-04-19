@@ -201,14 +201,14 @@ TError TCgroup::GetUintMap(const std::string &knob, TUintMap &value) const {
     return OK;
 }
 
-TError TCgroup::Attach(pid_t pid) const {
+TError TCgroup::Attach(pid_t pid, bool thread) const {
     if (Secondary())
         return TError("Cannot attach to secondary cgroup " + Type());
 
-    L_CG("Attach process {} to {}", pid, *this);
-    TError error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
+    L_CG("Attach {} {} to {}", thread ? "thread" : "process", pid, *this);
+    TError error = Knob(thread ? "tasks" : "cgroup.procs").WriteAll(std::to_string(pid));
     if (error)
-        L_ERR("Cannot attach process {} to {} : {}", pid, *this, error);
+        L_ERR("Cannot attach {} {} to {} : {}", thread ? "thread" : "process", pid, *this, error);
 
     return error;
 }

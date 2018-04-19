@@ -247,6 +247,10 @@ void TRequest::Parse() {
         Cmd = "AttachProcess";
         Arg = Req.attachprocess().name();
         opts = { "pid=" + std::to_string(Req.attachprocess().pid()), "comm=" + Req.attachprocess().comm() };
+    } else if (Req.has_attachthread()) {
+        Cmd = "AttachThread";
+        Arg = Req.attachthread().name();
+        opts = { "pid=" + std::to_string(Req.attachthread().pid()), "comm=" + Req.attachthread().comm() };
     } else if (Req.has_locateprocess()) {
         Cmd = "LocateProcess";
         opts = { "pid=" + std::to_string(Req.locateprocess().pid()), "comm=" + Req.locateprocess().comm() };
@@ -1004,7 +1008,7 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     return error;
 }
 
-noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
+noinline TError AttachProcess(const rpc::TAttachProcessRequest &req, bool thread) {
     std::shared_ptr<TContainer> oldCt, newCt;
     pid_t pid = req.pid();
     std::string comm;
@@ -1056,12 +1060,12 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
         if (ct->Isolate)
             return TError(EError::InvalidState, "new container must be not isolated from current");
 
-    L_ACT("Attach process {} ({}) from {} to {}", pid, comm,
-          oldCt->Name, newCt->Name);
+    L_ACT("Attach {} {} ({}) from {} to {}", thread ? "thread" : "process",
+          pid, comm, oldCt->Name, newCt->Name);
 
     for (auto hy: Hierarchies) {
         auto cg = newCt->GetCgroup(*hy);
-        error = cg.Attach(pid);
+        error = cg.Attach(pid, thread);
         if (error)
             goto undo;
     }
@@ -1071,7 +1075,7 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req) {
 undo:
     for (auto hy: Hierarchies) {
         auto cg = oldCt->GetCgroup(*hy);
-        (void)cg.Attach(pid);
+        (void)cg.Attach(pid, thread);
     }
     return error;
 }
@@ -1422,7 +1426,9 @@ void TRequest::Handle() {
     else if (Req.has_convertpath())
         error = ConvertPath(Req.convertpath(), rsp);
     else if (Req.has_attachprocess())
-        error = AttachProcess(Req.attachprocess());
+        error = AttachProcess(Req.attachprocess(), false);
+    else if (Req.has_attachthread())
+        error = AttachProcess(Req.attachthread(), true);
     else if (Req.has_getlayerprivate())
         error = GetLayerPrivate(Req.getlayerprivate(), rsp);
     else if (Req.has_setlayerprivate())

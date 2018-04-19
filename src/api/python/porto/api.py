@@ -1069,6 +1069,13 @@ class Connection(object):
         request.attachProcess.comm = comm
         self.rpc.call(request)
 
+    def AttachThread(self, name, pid, comm=""):
+        request = rpc_pb2.TContainerRequest()
+        request.AttachThread.name = name
+        request.AttachThread.pid = pid
+        request.AttachThread.comm = comm
+        self.rpc.call(request)
+
     def LocateProcess(self, pid, comm=""):
         request = rpc_pb2.TContainerRequest()
         request.locateProcess.pid = pid
