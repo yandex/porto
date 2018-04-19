@@ -78,8 +78,17 @@ void WriteLog(const char *prefix, const std::string &log_msg) {
         Statistics->LogBytes += msg.size();
     }
 
-    if (LogFile && LogFile.WriteAll(msg) && Statistics) {
-        Statistics->Warns++;
+    if (!LogFile)
+        return;
+
+    TError error = LogFile.WriteAll(msg);
+    if (error && Statistics) {
+        if (error.Errno != ENOSPC &&
+                error.Errno != EDQUOT &&
+                error.Errno != EROFS &&
+                error.Errno != EIO &&
+                error.Errno != EUCLEAN)
+            Statistics->Warns++;
         Statistics->LogLinesLost++;
         Statistics->LogBytesLost += msg.size();
     }
