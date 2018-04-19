@@ -173,6 +173,7 @@ bool TNetwork::NamespaceSysctl(const std::string &key) {
 TNetDevice::TNetDevice(struct rtnl_link *link) {
     Name = rtnl_link_get_name(link);
     Type = rtnl_link_get_type(link) ?: "";
+    Qdisc = rtnl_link_get_qdisc(link) ?: "";
     Index = rtnl_link_get_ifindex(link);
     Link = rtnl_link_get_link(link);
     Group = rtnl_link_get_group(link);
@@ -647,6 +648,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
             L_ERR("Cannot create root qdisc: {}", error);
             return error;
         }
+        dev.Qdisc = qdisc.Kind;
     }
 
     TNlClass cls;
@@ -812,8 +814,7 @@ TError TNetwork::SyncDevices() {
             if (d.Name != dev.Name || d.Index != dev.Index)
                 continue;
             d = dev;
-            if (d.Managed && std::string(rtnl_link_get_qdisc(link) ?: "") !=
-                    dev.GetConfig(DeviceQdisc)) {
+            if (d.Managed && d.Qdisc != dev.GetConfig(DeviceQdisc)) {
                 L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
                 StartRepair();
             } else
@@ -826,9 +827,9 @@ TError TNetwork::SyncDevices() {
         if (!found) {
             GetDeviceSpeed(dev);
 
-            L_NET("New network {} {}managed device {}:{} type={} group={} {} mtu={} speed={}Mbps {}iB/s",
+            L_NET("New network {} {}managed device {}:{} type={} qdisc={} group={} {} mtu={} speed={}Mbps {}iB/s",
                     NetName, dev.Managed ? "" : "un",
-                    dev.Index, dev.Name, dev.Type, dev.GroupName,
+                    dev.Index, dev.Name, dev.Type, dev.Qdisc, dev.GroupName,
                     dev.Uplink ? "uplink" : "", dev.MTU,
                     dev.Ceil / 125000, StringFormatSize(dev.Ceil));
 
@@ -1419,8 +1420,14 @@ retry:
         if (dev.Uplink)
             SetupPolice(dev);
 
-        if (!dev.Managed)
+        if (!dev.Managed) {
+            if (dev.Type == "vlan" && dev.Qdisc == "hfsc") {
+                TNlQdisc qdisc(dev.Index, TC_H_ROOT, 0);
+                (void)qdisc.Delete(*Nl);
+                dev.Qdisc = "";
+            }
             continue;
+        }
 
         if (!dev.Prepared || force) {
             error = SetupQueue(dev, force);

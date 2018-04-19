@@ -76,6 +76,7 @@ class TNetDevice {
 public:
     std::string Name;
     std::string Type;
+    std::string Qdisc;
     int Owner = 0;
     int Index;
     int Link;
