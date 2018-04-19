@@ -1,3 +1,20 @@
+yandex-porto (4.12.8) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: refactor configs
+  * config: warn about partial config parsing
+  * debian: add etc/porto.conf.d
+  * porto: set in environment container=porto
+  * rpc: add AttachThread
+
+  [ Nikita Vetoshkin ]
+  * fix upstart job description
+
+  [ Konstantin Khlebnikov ]
+  * log: do not warn about full or broken filesystem
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 19 Apr 2018 19:43:11 +0300
+
 yandex-porto (4.12.7) unstable; urgency=low
 
   * devices: check permission only at configuration time
