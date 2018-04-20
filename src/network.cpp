@@ -798,16 +798,16 @@ TError TNetwork::SyncDevices() {
             dev.Uplink = true;
         }
 
-        dev.Stat.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
-        dev.Stat.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
-        dev.Stat.RxDrops = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
-        dev.Stat.RxOverruns = rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR) +
+        dev.DeviceStat.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
+        dev.DeviceStat.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
+        dev.DeviceStat.RxDrops = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
+        dev.DeviceStat.RxOverruns = rtnl_link_get_stat(link, RTNL_LINK_RX_OVER_ERR) +
                               rtnl_link_get_stat(link, RTNL_LINK_RX_ERRORS);
 
-        dev.Stat.TxBytes = rtnl_link_get_stat(link, RTNL_LINK_TX_BYTES);
-        dev.Stat.TxPackets = rtnl_link_get_stat(link, RTNL_LINK_TX_PACKETS);
-        dev.Stat.TxDrops = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
-        dev.Stat.TxOverruns = rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS);
+        dev.DeviceStat.TxBytes = rtnl_link_get_stat(link, RTNL_LINK_TX_BYTES);
+        dev.DeviceStat.TxPackets = rtnl_link_get_stat(link, RTNL_LINK_TX_PACKETS);
+        dev.DeviceStat.TxDrops = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
+        dev.DeviceStat.TxOverruns = rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS);
 
         bool found = false;
         for (auto &d: Devices) {
@@ -821,7 +821,7 @@ TError TNetwork::SyncDevices() {
                 d.Prepared = true;
 
             found = true;
-            d.Stat = dev.Stat;
+            d.DeviceStat = dev.DeviceStat;
             break;
         }
         if (!found) {
@@ -862,11 +862,11 @@ TError TNetwork::SyncDevices() {
                 RootContainer->NetClass.TxLimit.erase(dev->Name);
                 RootContainer->NetClass.RxLimit.erase(dev->Name);
                 for (auto cls: NetClasses) {
-                    cls->Stat.erase(dev->Name);
+                    cls->ClassStat.erase(dev->Name);
                     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
                         auto cs_name = fmt::format("{} CS{}", dev->Name, cs);
-                        cls->Stat[fmt::format("Saved CS{}", cs)] += cls->Stat[cs_name];
-                        cls->Stat.erase(cs_name);
+                        cls->ClassStat[fmt::format("Saved CS{}", cs)] += cls->ClassStat[cs_name];
+                        cls->ClassStat.erase(cs_name);
                     }
                 }
             }
@@ -877,10 +877,10 @@ TError TNetwork::SyncDevices() {
 
     DeviceStat.clear();
     for (auto &dev: Devices) {
-        DeviceStat[dev.Name] = dev.Stat;
-        DeviceStat["group " + dev.GroupName] += dev.Stat;
+        DeviceStat[dev.Name] = dev.DeviceStat;
+        DeviceStat["group " + dev.GroupName] += dev.DeviceStat;
         if (dev.Uplink)
-            DeviceStat["Uplink"] += dev.Stat;
+            DeviceStat["Uplink"] += dev.DeviceStat;
     }
 
     return OK;
@@ -1356,7 +1356,7 @@ void TNetwork::UnregisterClass(TNetClass &cls) {
 
     if (cls.Parent && (NetclsSubsystem.HasPriority || cls.OriginNet.get() == this)) {
         for (int cs = 0; cs < NR_TC_CLASSES; cs++)
-            cls.Parent->Stat[fmt::format("Saved CS{}", cs)] += cls.Stat[fmt::format("CS{}", cs)];
+            cls.Parent->ClassStat[fmt::format("Saved CS{}", cs)] += cls.ClassStat[fmt::format("CS{}", cs)];
     }
 
     NetClasses.erase(pos);
@@ -1561,12 +1561,12 @@ TError TNetwork::WaitRepair() {
 }
 
 void TNetwork::InitStat(TNetClass &cls) {
-    cls.Stat.clear();
+    cls.ClassStat.clear();
     for (auto &dev: Devices) {
-        cls.Stat[dev.Name] = dev.Stat;
-        cls.Stat["group " + dev.GroupName] += dev.Stat;
+        cls.ClassStat[dev.Name] = dev.DeviceStat;
+        cls.ClassStat["group " + dev.GroupName] += dev.DeviceStat;
         if (dev.Uplink)
-            cls.Stat["Uplink"] += dev.Stat;
+            cls.ClassStat["Uplink"] += dev.DeviceStat;
     }
 }
 
@@ -1602,12 +1602,12 @@ void TNetwork::SyncStatLocked() {
     auto state_lock = LockNetState();
 
     for (auto cls: NetClasses) {
-        for (auto &it: cls->Stat) {
+        for (auto &it: cls->ClassStat) {
             if (!StringStartsWith(it.first, "Saved "))
                 it.second.Reset();
         }
         for (int cs = 0; cs < NR_TC_CLASSES; cs++)
-            cls->Stat[fmt::format("CS{}", cs)] += cls->Stat[fmt::format("Saved CS{}", cs)];
+            cls->ClassStat[fmt::format("CS{}", cs)] += cls->ClassStat[fmt::format("Saved CS{}", cs)];
     }
 
     for (auto &dev: Devices) {
@@ -1631,14 +1631,14 @@ void TNetwork::SyncStatLocked() {
                     continue;
                 }
                 auto cs_name = fmt::format("{} CS{}", dev.Name, cs);
-                TNetStat &stat = cls->Stat[cs_name];
+                TNetStat &stat = cls->ClassStat[cs_name];
                 stat.TxPackets += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_PACKETS);
                 stat.TxBytes += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_BYTES);
                 stat.TxDrops += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_DROPS);
                 stat.TxOverruns += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_OVERLIMITS);
                 rtnl_class_put(tc);
 
-                cls->Stat[fmt::format("Leaf CS{}", cs)] += stat;
+                cls->ClassStat[fmt::format("Leaf CS{}", cs)] += stat;
 
                 if (cls->LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
                     struct rtnl_class *tc = rtnl_class_get(dev.ClassCache, dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR) + cs);
@@ -1647,7 +1647,7 @@ void TNetwork::SyncStatLocked() {
                         StartRepair();
                         continue;
                     }
-                    TNetStat &def_stat = cls->Stat[fmt::format("Fallback CS{}", cs)];
+                    TNetStat &def_stat = cls->ClassStat[fmt::format("Fallback CS{}", cs)];
                     def_stat.TxPackets += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_PACKETS);
                     def_stat.TxBytes += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_BYTES);
                     def_stat.TxDrops += rtnl_tc_get_stat(TC_CAST(tc), RTNL_TC_DROPS);
@@ -1670,14 +1670,14 @@ void TNetwork::SyncStatLocked() {
             for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
                 auto cs_name = fmt::format("{} CS{}", dev.Name, cs);
 
-                TNetStat &stat = cls->Stat[cs_name];
-                cls->Stat[fmt::format("CS{}", cs)] += stat;
-                cls->Stat[dev.Name] += stat;
-                cls->Stat["group " + dev.GroupName] += stat;
+                TNetStat &stat = cls->ClassStat[cs_name];
+                cls->ClassStat[fmt::format("CS{}", cs)] += stat;
+                cls->ClassStat[dev.Name] += stat;
+                cls->ClassStat["group " + dev.GroupName] += stat;
                 if (dev.Uplink)
-                    cls->Stat["Uplink"] += stat;
+                    cls->ClassStat["Uplink"] += stat;
                 if (cls->Parent && dev.Managed && !dev.Owner)
-                    cls->Parent->Stat[cs_name] += stat;
+                    cls->Parent->ClassStat[cs_name] += stat;
             }
         }
     }
@@ -1689,11 +1689,11 @@ void TNetwork::SyncStatLocked() {
                 for (auto &dev: cls->OriginNet->Devices) {
                     auto &stat = cls->OriginNet->DeviceStat[dev.Name];
                     for (auto c = cls; c && c->Owner != ROOT_CONTAINER_ID; c = c->Parent) {
-                        c->Stat[FormatTos(cls->DefaultTos)] += stat;
-                        c->Stat[dev.Name] += stat;
-                        c->Stat["group " + dev.GroupName] += stat;
+                        c->ClassStat[FormatTos(cls->DefaultTos)] += stat;
+                        c->ClassStat[dev.Name] += stat;
+                        c->ClassStat["group " + dev.GroupName] += stat;
                         if (dev.Uplink)
-                            c->Stat["Uplink"] += stat;
+                            c->ClassStat["Uplink"] += stat;
                     }
                 }
             }
@@ -1812,6 +1812,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
 
     if (ct.Controllers & CGROUP_NETCLS)
         HostNetwork->UnregisterClass(ct.NetClass);
+
+    ct.NetClass.Fold = &ct.NetClass;
 
     if (net->RootClass == &ct.NetClass)
         net->RootClass = nullptr;

@@ -65,7 +65,7 @@ struct TNetClass {
     TUintMap TxLimit;
     TUintMap RxLimit;
 
-    std::map<std::string, TNetStat> Stat;
+    std::map<std::string, TNetStat> ClassStat;
     std::shared_ptr<TNetwork> OriginNet;
 
     TNetClass *Fold;
@@ -89,7 +89,7 @@ public:
     bool Prepared;
     bool Missing;
 
-    TNetStat Stat;
+    TNetStat DeviceStat;
 
     struct nl_cache *ClassCache = nullptr;
 

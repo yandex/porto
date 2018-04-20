@@ -2945,7 +2945,7 @@ public:
         TUintMap stat;
         auto lock = TNetwork::LockNetState();
         if (ClassStat) {
-            for (auto &it : CT->NetClass.Fold->Stat)
+            for (auto &it : CT->NetClass.Fold->ClassStat)
                 stat[it.first] = &it.second->*Member;
         } else if (CT->Net) {
             for (auto &it: CT->Net->DeviceStat)
@@ -2957,8 +2957,8 @@ public:
     TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = TNetwork::LockNetState();
         if (ClassStat) {
-            auto it = CT->NetClass.Fold->Stat.find(index);
-            if (it == CT->NetClass.Fold->Stat.end())
+            auto it = CT->NetClass.Fold->ClassStat.find(index);
+            if (it == CT->NetClass.Fold->ClassStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");
             value = std::to_string(it->second.*Member);
         } else if (CT->Net) {
