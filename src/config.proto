@@ -60,6 +60,9 @@ message TConfig {
         repeated TDscpClass dscp_class = 44;
         optional string default_tos = 45;
         optional bool enable_netcls_priority = 46;
+        optional uint32 codel_target = 47;
+        optional uint32 codel_interval = 48;
+        optional bool codel_ecn = 49;
     }
 
     message TFileCfg {

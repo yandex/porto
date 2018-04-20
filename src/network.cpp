@@ -635,21 +635,21 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     //      |
     //      +- 1:0x10 + CSn Host CSn class
     //      |   |
-    //      |   +- 1x10 + CSn:0 CSn Host leaf qdisc (sfq)
+    //      |   +- 1x10 + CSn:0 CSn Host leaf qdisc (fq_codel)
     //      |
     //      +- 1:0x20 + CSn Fallback CSn class
     //      |   |
-    //      |   +- 1x20 + CSn:0 CSn Fallback leaf qdisc (sfq)
+    //      |   +- 1x20 + CSn:0 CSn Fallback leaf qdisc (fq_codel)
     //      |
     //      +-1:Slot + 8 + CSn slot CSn class
     //         |
     //         +- 1:Slot + CSn default leaf for slot CSn class
     //         |   |
-    //         |   +- Slot + CSn:0 slot CSn default leaf qdisc (pfifo)
+    //         |   +- Slot + CSn:0 slot CSn default leaf qdisc (fq_codel)
     //         |
     //         +- 1:Container + CSn container CSn class
     //             |
-    //             +- Container + CSn:0 container CSn leaf qdisc (pfifo)
+    //             +- Container + CSn:0 container CSn leaf qdisc (fq_codel)
     //
 
     L_NET("Setup queue for network {} device {}:{}", NetName, dev.Index, dev.Name);

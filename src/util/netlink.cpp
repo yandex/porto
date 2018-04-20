@@ -5,6 +5,7 @@
 #include "netlink.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
+#include "config.hpp"
 
 // HTB shaping details:
 // http://luxik.cdi.cz/~devik/qos/htb/manual/userg.htm
@@ -913,6 +914,12 @@ TError TNlQdisc::Create(const TNl &nl) {
             rtnl_qdisc_fq_codel_set_limit(qdisc, Limit);
         if (Quantum)
             rtnl_qdisc_fq_codel_set_quantum(qdisc, Quantum);
+        if (config().network().has_codel_target())
+            rtnl_qdisc_fq_codel_set_target(qdisc, config().network().codel_target());
+        if (config().network().has_codel_interval())
+            rtnl_qdisc_fq_codel_set_interval(qdisc, config().network().codel_interval());
+        if (config().network().has_codel_ecn())
+            rtnl_qdisc_fq_codel_set_ecn(qdisc, config().network().codel_ecn());
     }
 
     nl.Dump("create", qdisc);
