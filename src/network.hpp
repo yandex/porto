@@ -96,7 +96,7 @@ public:
     TNetDevice(struct rtnl_link *);
 
     uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0, int cs = -1) const;
-    std::string GetConfig(const TStringMap &cfg, std::string def = "") const;
+    std::string GetConfig(const TStringMap &cfg, std::string def = "", int cs = -1) const;
 };
 
 struct TNetProxyNeighbour {

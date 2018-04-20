@@ -209,7 +209,14 @@ uint64_t TNetDevice::GetConfig(const TUintMap &cfg, uint64_t def, int cs) const 
     return def;
 }
 
-std::string TNetDevice::GetConfig(const TStringMap &cfg, std::string def) const {
+std::string TNetDevice::GetConfig(const TStringMap &cfg, std::string def, int cs) const {
+    if (cs >= 0) {
+        auto it = cfg.find(fmt::format("{} CS{}", Name, cs));
+        if (it == cfg.end())
+            it = cfg.find(fmt::format("CS{}", cs));
+        if (it != cfg.end())
+            return it->second;
+    }
     for (auto &it: cfg) {
         if (StringMatch(Name, it.first))
             return it.second;
@@ -588,6 +595,11 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     cls.Rate = cls.Ceil = rate;
     cls.RateBurst = cls.CeilBurst = dev.MTU * 10;
 
+    TNlQdisc leaf(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, 1), TC_HANDLE(2, 0));
+    leaf.Kind = dev.GetConfig(ContainerQdisc);
+    leaf.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
+    leaf.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
+
     if (rate) {
         error = qdisc.Create(*Nl);
         if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
@@ -598,6 +610,12 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
         error = cls.Create(*Nl);
         if (error) {
             L_ERR("Cannot create egress class: {}", error);
+            return error;
+        }
+
+        error = leaf.Create(*Nl);
+        if (error) {
+            L_ERR("Cannot create egress leaf qdisc: {}", error);
             return error;
         }
     }
@@ -691,9 +709,9 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
 
         TNlQdisc defq(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR + cs),
                                  TC_HANDLE(DEFAULT_TC_MINOR + cs, 0));
-        defq.Kind = dev.GetConfig(DefaultQdisc);
-        defq.Limit = dev.GetConfig(DefaultQdiscLimit);
-        defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+        defq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
+        defq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
+        defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
         if (!defq.Check(*Nl)) {
             error = defq.Create(*Nl);
             if (error)
@@ -1205,11 +1223,11 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
             cls.Ceil = dev.GetConfig(DefaultClassCeil, 0, cs);
             cls.defRate = cls.Rate;
 
-            ctq.Kind = dev.GetConfig(DefaultQdisc);
+            ctq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
             ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
             ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
         } else {
-            ctq.Kind = dev.GetConfig(ContainerQdisc);
+            ctq.Kind = dev.GetConfig(ContainerQdisc, "", cs);
             ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20, cs);
             ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2, cs);
         }
