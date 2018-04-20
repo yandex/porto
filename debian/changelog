@@ -1,3 +1,11 @@
+yandex-porto (4.13.2) unstable; urgency=low
+
+  * network: init/reinit netclass fold
+  * network: setup leaf qdisc in rate-limited net-ns
+  * network: use fq_codel for all leaf qdiscs
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 20 Apr 2018 14:33:22 +0300
+
 yandex-porto (4.13.1) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
