@@ -1178,79 +1178,77 @@ std::string TNetwork::MatchDevice(const std::string &pattern) {
     return pattern;
 }
 
-TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg) {
+TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     TError error;
 
     if (cfg.LeafHandle == cfg.BaseHandle)
         return OK; /* Fold */
 
-    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
-        TNlClass cls(dev.Index, cfg.BaseHandle + cs, cfg.MetaHandle + cs);
+    TNlClass cls(dev.Index, cfg.BaseHandle + cs, cfg.MetaHandle + cs);
 
-        if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
-            cls.Parent = cfg.BaseHandle;
+    if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
+        cls.Parent = cfg.BaseHandle;
 
-        cls.Kind = dev.GetConfig(DeviceQdisc);
-        cls.Rate = dev.GetConfig(cfg.TxRate, 0, cs);
-        cls.Ceil = dev.GetConfig(cfg.TxLimit, 0, cs);
-        cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2, cs);
-        cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10, cs);
-        cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10, cs);
+    cls.Kind = dev.GetConfig(DeviceQdisc);
+    cls.Rate = dev.GetConfig(cfg.TxRate, 0, cs);
+    cls.Ceil = dev.GetConfig(cfg.TxLimit, 0, cs);
+    cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2, cs);
+    cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10, cs);
+    cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10, cs);
 
-        if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
-            cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
-        else
-            cls.defRate = dev.GetConfig(ContainerRate, 0, cs);
+    if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
+        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
+    else
+        cls.defRate = dev.GetConfig(ContainerRate, 0, cs);
 
-        if (cfg.MetaHandle != cfg.BaseHandle) {
-            L_NET_VERBOSE("Setup CS{} meta class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
-            error = cls.Create(*Nl);
-            if (error) {
-                (void)cls.Delete(*Nl);
-                error = cls.Create(*Nl);
-            }
-            if (error)
-                return TError(error, "tc class");
-        }
-
-        TNlQdisc ctq(dev.Index, cfg.LeafHandle + cs, TC_HANDLE(TC_H_MIN(cfg.LeafHandle + cs), 0));
-
-        cls.Parent = cfg.MetaHandle + cs;
-        cls.Handle = cfg.LeafHandle + cs;
-
-        if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
-            cls.Rate = dev.GetConfig(DefaultClassRate, 0, cs);
-            cls.Ceil = dev.GetConfig(DefaultClassCeil, 0, cs);
-            cls.defRate = cls.Rate;
-
-            ctq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
-            ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
-            ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
-        } else {
-            ctq.Kind = dev.GetConfig(ContainerQdisc, "", cs);
-            ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20, cs);
-            ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2, cs);
-        }
-
-        L_NET_VERBOSE("Setup CS{} leaf class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
-
+    if (cfg.MetaHandle != cfg.BaseHandle) {
+        L_NET_VERBOSE("Setup CS{} meta class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
         error = cls.Create(*Nl);
-        if (error)
-            return TError(error, "leaf tc class");
-
-        error = ctq.Create(*Nl);
         if (error) {
-            (void)ctq.Delete(*Nl);
-            error = ctq.Create(*Nl);
+            (void)cls.Delete(*Nl);
+            error = cls.Create(*Nl);
         }
         if (error)
-            return TError(error, "leaf tc qdisc");
+            return TError(error, "tc class");
     }
+
+    TNlQdisc ctq(dev.Index, cfg.LeafHandle + cs, TC_HANDLE(TC_H_MIN(cfg.LeafHandle + cs), 0));
+
+    cls.Parent = cfg.MetaHandle + cs;
+    cls.Handle = cfg.LeafHandle + cs;
+
+    if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
+        cls.Rate = dev.GetConfig(DefaultClassRate, 0, cs);
+        cls.Ceil = dev.GetConfig(DefaultClassCeil, 0, cs);
+        cls.defRate = cls.Rate;
+
+        ctq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
+        ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
+        ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
+    } else {
+        ctq.Kind = dev.GetConfig(ContainerQdisc, "", cs);
+        ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20, cs);
+        ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2, cs);
+    }
+
+    L_NET_VERBOSE("Setup CS{} leaf class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
+
+    error = cls.Create(*Nl);
+    if (error)
+        return TError(error, "leaf tc class");
+
+    error = ctq.Create(*Nl);
+    if (error) {
+        (void)ctq.Delete(*Nl);
+        error = ctq.Create(*Nl);
+    }
+    if (error)
+        return TError(error, "leaf tc qdisc");
 
     return OK;
 }
 
-TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg) {
+TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     TError error;
 
     if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR))
@@ -1259,20 +1257,18 @@ TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg) {
     if (cfg.LeafHandle == cfg.BaseHandle)
         return OK; /* Fold */
 
-    for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
-        TNlQdisc ctq(dev.Index, cfg.LeafHandle + cs,
-                     TC_HANDLE(TC_H_MIN(cfg.LeafHandle + cs), 0));
-        (void)ctq.Delete(*Nl);
+    TNlQdisc ctq(dev.Index, cfg.LeafHandle + cs,
+                 TC_HANDLE(TC_H_MIN(cfg.LeafHandle + cs), 0));
+    (void)ctq.Delete(*Nl);
 
-        TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.LeafHandle + cs);
-        (void)cls.Delete(*Nl);
+    TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.LeafHandle + cs);
+    (void)cls.Delete(*Nl);
 
-        if (cfg.MetaHandle != cfg.BaseHandle) {
-            TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.MetaHandle + cs);
-            error = cls.Delete(*Nl);
-            if (error && error.Errno != ENODEV && error.Errno != ENOENT)
-                return TError(error, "cannot remove class");
-        }
+    if (cfg.MetaHandle != cfg.BaseHandle) {
+        TNlClass cls(dev.Index, TC_H_UNSPEC, cfg.MetaHandle + cs);
+        error = cls.Delete(*Nl);
+        if (error && error.Errno != ENODEV && error.Errno != ENOENT)
+            return TError(error, "cannot remove class");
     }
 
     return OK;
@@ -1287,9 +1283,11 @@ TError TNetwork::TrySetupClasses(TNetClass &cls) {
         if (!dev.Managed || !dev.Prepared)
             continue;
 
-        error = SetupClass(dev, cls);
-        if (error)
-            return error;
+        for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+            error = SetupClass(dev, cls, cs);
+            if (error)
+                return error;
+        }
     }
 
     state_lock.unlock();
@@ -1455,7 +1453,11 @@ retry:
         }
 
         for (auto cls: NetClasses) {
-            error = SetupClass(dev, *cls);
+            for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+                error = SetupClass(dev, *cls, cs);
+                if (error)
+                    break;
+            }
             if (error)
                 break;
         }
@@ -1848,10 +1850,13 @@ void TNetwork::StopNetwork(TContainer &ct) {
         for (auto &dev: HostNetwork->Devices) {
             if (!dev.Managed || !dev.Prepared)
                 continue;
-            error = HostNetwork->DeleteClass(dev, ct.NetClass);
-            if (error)
-                L_NET("Cannot delete network {} class CT{}:{}: {}",
-                  HostNetwork->NetName, ct.Id, ct.Name, error);
+
+            for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+                error = HostNetwork->DeleteClass(dev, ct.NetClass, cs);
+                if (error)
+                    L_NET("Cannot delete network {} class CT{}:{} CS{} {}",
+                          HostNetwork->NetName, ct.Id, ct.Name, cs, error);
+            }
         }
     }
 

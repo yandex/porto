@@ -210,8 +210,8 @@ public:
 
     static void InitClass(TContainer &ct);
 
-    TError SetupClass(TNetDevice &dev, TNetClass &cls);
-    TError DeleteClass(TNetDevice &dev, TNetClass &cls);
+    TError SetupClass(TNetDevice &dev, TNetClass &cls, int cs);
+    TError DeleteClass(TNetDevice &dev, TNetClass &cls, int cs);
     TError SetupClasses(TNetClass &cls);
     TError SetupPolice(TNetDevice &dev);
 
