@@ -1240,6 +1240,8 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
         ctq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
         ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
         ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
+    } else if (cls.Ceil == 1) {
+        ctq.Kind = "blackhole";
     } else {
         ctq.Kind = dev.GetConfig(ContainerQdisc, "", cs);
         ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20, cs);

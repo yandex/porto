@@ -694,11 +694,17 @@ container {
 }
 ```
 
-* **net\_guarantee** - minimum egress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
+* **net\_guarantee** - required egress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
 * **net\_limit**     - maximum egress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
+    net\_limit\[default\] = 10M"   - default limit for everything  
+    net\_limit\[veth\] = 10M       - total egress limit for net="L3 veth"  
+    net\_limit\[CS7\] = 1          - blackhole  
+
 * **net\_rx\_limit** - maximum ingress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
+
+    net\_rx\_limit\[veth\]       - total ingress limit for net="L3 veth"
 
 * **net\_bytes**     - traffic class counters: \<interface\>|\<class\>: \<bytes\>;...
 
