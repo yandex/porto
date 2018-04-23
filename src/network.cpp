@@ -554,6 +554,9 @@ void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
 TError TNetwork::SetupPolice(TNetDevice &dev) {
     TError error;
 
+    PORTO_LOCKED(NetMutex);
+    PORTO_LOCKED(NetStateMutex);
+
     if (!RootClass || this == HostNetwork.get())
         return OK;
 
@@ -631,6 +634,9 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
 
 TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     TError error;
+
+    PORTO_LOCKED(NetMutex);
+    PORTO_LOCKED(NetStateMutex);
 
     //
     // 1:0 qdisc (hfsc)
@@ -1194,6 +1200,9 @@ std::string TNetwork::MatchDevice(const std::string &pattern) {
 TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     TError error;
 
+    PORTO_LOCKED(NetMutex);
+    PORTO_LOCKED(NetStateMutex);
+
     if (cfg.LeafHandle == cfg.BaseHandle)
         return OK; /* Fold */
 
@@ -1271,6 +1280,8 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
 TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     TError error;
 
+    PORTO_LOCKED(NetMutex);
+
     if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR))
         return OK; /* Host */
 
@@ -1321,6 +1332,8 @@ TError TNetwork::SetupClasses(TNetClass &cls) {
 
     if (this != HostNetwork.get()) {
         if (&cls == RootClass) {
+            auto net_lock = LockNet();
+            auto net_state_lock = LockNetState();
             for (auto &dev: Devices)
                 if (dev.Uplink)
                     SetupPolice(dev);
