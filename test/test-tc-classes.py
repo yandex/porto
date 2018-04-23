@@ -51,8 +51,16 @@ for cs in range(0, 8):
     ExpectProp(b, 'net_bytes[CS{}]'.format(cs), '118' if cs == 0 else '0')
 b.Destroy()
 
-
 a = conn.Run("a", wait=10, command=ping(count=10), net_limit="default: 1")
+ExpectEq(a.GetProperty('net_packets[Uplink]', sync=True), '0')
+for cs in range(0, 8):
+    ExpectProp(a, 'net_packets[CS{}]'.format(cs), '0')
+    ExpectProp(a, 'net_packets[Leaf CS{}]'.format(cs), '0')
+    ExpectProp(a, 'net_bytes[CS{}]'.format(cs), '0')
+    ExpectProp(a, 'net_bytes[Leaf CS{}]'.format(cs), '0')
+a.Destroy()
+
+a = conn.Run("a", wait=10, command=ping(count=10), net_limit="default: 2")
 ExpectEq(a.GetProperty('net_packets[Uplink]', sync=True), '1')
 for cs in range(0, 8):
     ExpectProp(a, 'net_packets[CS{}]'.format(cs), '1' if cs == 0 else '0')
@@ -62,7 +70,7 @@ for cs in range(0, 8):
 a.Destroy()
 
 
-b = conn.Run("b", net_limit="CS0: 1")
+b = conn.Run("b", net_limit="CS0: 2")
 a = conn.Run("b/a", wait=10, command=ping(count=10))
 ExpectEq(a.GetProperty('net_packets[Uplink]', sync=True), '1')
 ExpectProp(b, 'net_packets[Uplink]', '1')
@@ -76,7 +84,7 @@ b.Destroy()
 
 
 b = conn.Run("b")
-a = conn.Run("b/a", wait=10, command=ping(count=10, tos='0x20'), net_tos='CS0' if has_priority else 'CS1', net_limit="CS1: 1")
+a = conn.Run("b/a", wait=10, command=ping(count=10, tos='0x20'), net_tos='CS0' if has_priority else 'CS1', net_limit="CS1: 2")
 ExpectEq(a.GetProperty('net_packets[Uplink]', sync=True), '1')
 ExpectProp(b, 'net_packets[Uplink]', '1')
 for cs in range(0, 8):
