@@ -1,3 +1,14 @@
+yandex-porto (4.13.3) unstable; urgency=low
+
+  * network: split SetupClass
+  * network: add limit for classes in BPS and percent
+  * network: handle container net_limit == 1 BPS as blackhole
+  * test: check blackhole in tc-classes
+  * network: sync device speed
+  * network: fix locking
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 23 Apr 2018 15:48:53 +0300
+
 yandex-porto (4.13.2) unstable; urgency=low
 
   * network: init/reinit netclass fold
