@@ -544,7 +544,7 @@ void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
         rate = NET_MAX_RATE;
     } else {
         ceil = speed * 125000; /* Mbit -> Bps */
-        rate = speed * 112500; /* 90% */
+        rate = ceil;
     }
 
     dev.Ceil = dev.GetConfig(DeviceCeil, ceil);
@@ -693,7 +693,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
         cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, 1);
         cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR + cs);
-        cls.Rate = (double)dev.Ceil * CsWeight[cs] / CsTotalWeight;
+        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
         cls.Ceil = 0;
         if (CsMaxPercent[cs] < 100)
             cls.Ceil = dev.Ceil * CsMaxPercent[cs] / 100;
@@ -826,6 +826,8 @@ TError TNetwork::SyncDevices() {
             dev.Uplink = true;
         }
 
+        GetDeviceSpeed(dev);
+
         dev.DeviceStat.RxBytes = rtnl_link_get_stat(link, RTNL_LINK_RX_BYTES);
         dev.DeviceStat.RxPackets = rtnl_link_get_stat(link, RTNL_LINK_RX_PACKETS);
         dev.DeviceStat.RxDrops = rtnl_link_get_stat(link, RTNL_LINK_RX_DROPPED);
@@ -837,43 +839,44 @@ TError TNetwork::SyncDevices() {
         dev.DeviceStat.TxDrops = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
         dev.DeviceStat.TxOverruns = rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS);
 
+        auto net_state_lock = LockNetState();
+
         bool found = false;
         for (auto &d: Devices) {
             if (d.Name != dev.Name || d.Index != dev.Index)
                 continue;
-            d = dev;
-            if (d.Managed && d.Qdisc != dev.GetConfig(DeviceQdisc)) {
-                L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
-                StartRepair();
-            } else
-                d.Prepared = true;
 
+            if (!d.Managed)
+                dev.Prepared = true;
+            else if (d.Qdisc != dev.GetConfig(DeviceQdisc))
+                L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
+            else if (d.Rate != dev.Rate || d.Ceil != dev.Ceil)
+                L_NET("Speed changed {}Mbps to {}Mbps in {} at {}:{}",
+                      d.Ceil / 125000, dev.Ceil / 125000, NetName, d.Index, d.Name);
+            else
+                dev.Prepared = true;
+
+            d = dev;
             found = true;
-            d.DeviceStat = dev.DeviceStat;
             break;
         }
         if (!found) {
-            GetDeviceSpeed(dev);
-
             L_NET("New network {} {}managed device {}:{} type={} qdisc={} group={} {} mtu={} speed={}Mbps {}iB/s",
                     NetName, dev.Managed ? "" : "un",
                     dev.Index, dev.Name, dev.Type, dev.Qdisc, dev.GroupName,
                     dev.Uplink ? "uplink" : "", dev.MTU,
                     dev.Ceil / 125000, StringFormatSize(dev.Ceil));
-
-            if (dev.Managed)
-                StartRepair();
-
-            auto net_state_lock = LockNetState();
-
-            if (this == HostNetwork.get()) {
-                RootContainer->NetClass.TxRate[dev.Name] = dev.Rate;
-                RootContainer->NetClass.TxLimit[dev.Name] = dev.Ceil;
-                RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
-            }
-
             Devices.push_back(dev);
         }
+
+        if (!dev.Prepared && this == HostNetwork.get()) {
+            RootContainer->NetClass.TxRate[dev.Name] = dev.Rate;
+            RootContainer->NetClass.TxLimit[dev.Name] = dev.Ceil;
+            RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
+        }
+
+        if (!dev.Prepared)
+            StartRepair();
     }
 
     nl_cache_free(cache);
@@ -1207,7 +1210,7 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10, cs);
 
     if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1)) {
-        cls.Rate = (double)dev.Ceil * CsWeight[cs] / CsTotalWeight;
+        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
         cls.Ceil = 0;
         if (CsMaxPercent[cs] < 100)
             cls.Ceil = dev.Ceil * CsMaxPercent[cs] / 100;
