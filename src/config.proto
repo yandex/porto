@@ -56,6 +56,8 @@ message TConfig {
         message TDscpClass {
             required string name = 1;
             required uint32 weight = 2;
+            optional uint64 limit = 3;
+            optional double max_percent = 4 [default = 100];
         }
         repeated TDscpClass dscp_class = 44;
         optional string default_tos = 45;

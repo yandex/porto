@@ -53,6 +53,8 @@ static int VirtualDeviceGroup = 0;
 
 static uint64_t CsWeight[NR_TC_CLASSES];
 static uint64_t CsTotalWeight;
+static uint64_t CsLimit[NR_TC_CLASSES];
+static double CsMaxPercent[NR_TC_CLASSES];
 
 static TStringMap DeviceQdisc;
 static TUintMap DeviceRate;
@@ -327,21 +329,25 @@ void TNetwork::InitializeConfig() {
     }
 
     CsTotalWeight = 0;
-    std::string CsString;
     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
         auto name = FormatTos(cs);
         CsWeight[cs] = 1;
+        CsLimit[cs] = 0;
+        CsMaxPercent[cs] = 100;
         for (auto &it: config().network().dscp_class())
-            if (it.name() == name)
+            if (it.name() == name) {
                 CsWeight[cs] = it.weight();
+                CsLimit[cs] = it.limit();
+                CsMaxPercent[cs] = it.max_percent();
+            }
         if (CsWeight[cs] < 1)
             CsWeight[cs] = 1;
         CsTotalWeight += CsWeight[cs];
-        CsString += fmt::format("{} = {}, ", name, CsWeight[cs]);
+        L_NET("DSCP {} weight = {}, limit = {}, max_percent = {}%", FormatTos(cs), CsWeight[cs], CsLimit[cs], CsMaxPercent[cs]);
     }
     if (config().network().has_default_tos())
         ParseTos(config().network().default_tos(), DefaultTos);
-    L_NET("DSCP weight {}total = {}, default = {}", CsString, CsTotalWeight, FormatTos(DefaultTos));
+    L_NET("DSCP total weight = {}, default = {}", CsTotalWeight, FormatTos(DefaultTos));
 }
 
 std::string TNetwork::DeviceGroupName(int group) {
@@ -687,8 +693,12 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
         cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, 1);
         cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR + cs);
-        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
+        cls.Rate = (double)dev.Ceil * CsWeight[cs] / CsTotalWeight;
         cls.Ceil = 0;
+        if (CsMaxPercent[cs] < 100)
+            cls.Ceil = dev.Ceil * CsMaxPercent[cs] / 100;
+        if (CsLimit[cs] && (!cls.Ceil || CsLimit[cs] < cls.Ceil))
+            cls.Ceil = CsLimit[cs];
 
         error = cls.Create(*Nl);
         if (error) {
@@ -1196,9 +1206,14 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10, cs);
     cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10, cs);
 
-    if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
-        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
-    else
+    if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1)) {
+        cls.Rate = (double)dev.Ceil * CsWeight[cs] / CsTotalWeight;
+        cls.Ceil = 0;
+        if (CsMaxPercent[cs] < 100)
+            cls.Ceil = dev.Ceil * CsMaxPercent[cs] / 100;
+        if (CsLimit[cs] && (!cls.Ceil || CsLimit[cs] < cls.Ceil))
+            cls.Ceil = CsLimit[cs];
+    } else
         cls.defRate = dev.GetConfig(ContainerRate, 0, cs);
 
     if (cfg.MetaHandle != cfg.BaseHandle) {
