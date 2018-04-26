@@ -179,12 +179,17 @@ TError TCore::Forward() {
             Conn.SetProperty(core, P_OWNER_USER, OwnerUser) ||
             Conn.SetProperty(core, P_OWNER_GROUP, OwnerGroup) ||
             Conn.SetProperty(core, P_CWD, Cwd) ||
-            Conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')) ||
-            Conn.Start(core))
-        return TError("cannot create CT:{}", core);
+            Conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')))
+        return TError("cannot setup CT:{}", core);
 
-    /* Allow poking tasks with suid and ambient capabilities */
+    /*
+     * Allow poking tasks with suid and ambient capabilities,
+     * but ignore error if feature is not supported
+     */
     Conn.SetProperty(core, P_CAPABILITIES_AMBIENT, "SYS_PTRACE");
+
+    if (Conn.Start(core))
+        return TError("cannot start CT:{}", core);
 
     L("Forwading core into CT:{}", core);
 
