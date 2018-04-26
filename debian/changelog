@@ -1,3 +1,9 @@
+yandex-porto (4.12.10) unstable; urgency=low
+
+  * core: set ambient capabilities before starting container
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 26 Apr 2018 19:23:05 +0300
+
 yandex-porto (4.12.9) unstable; urgency=low
 
   * layers: fix makedev in ubuntu xenial
