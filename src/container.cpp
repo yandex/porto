@@ -1901,7 +1901,7 @@ TError TContainer::PrepareCgroups() {
         SetProp(EProperty::CPU_SET_AFFINITY);
     }
 
-    if (OsMode && config().container().detect_systemd() &&
+    if (OsMode && Isolate && config().container().detect_systemd() &&
             SystemdSubsystem.Supported &&
             !(Controllers & CGROUP_SYSTEMD) &&
             !RootPath.IsRoot()) {
@@ -2022,7 +2022,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Mnt.BindCred = Parent->RootPath.IsRoot() ? CL->TaskCred : TCred(RootUser, RootGroup);
 
-    if (Controllers & CGROUP_SYSTEMD)
+    if (OsMode && Isolate && (Controllers & CGROUP_SYSTEMD))
         TaskEnv.Mnt.Systemd = GetCgroup(SystemdSubsystem).Name;
 
     TaskEnv.Cred = TaskCred;
@@ -2619,7 +2619,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (Task.Pid && deadline && !IsMeta()) {
         int sig = SIGTERM;
 
-        if (Isolate && OsMode) {
+        if (OsMode && Isolate) {
             uint64_t mask = TaskHandledSignals(Task.Pid);
             if (mask & BIT(SIGPWR - 1))
                 sig = SIGPWR;
@@ -3639,7 +3639,7 @@ TTuple TContainer::Taint() {
     if (!OomIsFatal)
         taint.push_back("Containers with oom_is_fatal=false oftern stuck in broken state after OOM, you have been warned.");
 
-    if (OsMode && HasProp(EProperty::COMMAND) && Command != "/sbin/init")
+    if (OsMode && Isolate && HasProp(EProperty::COMMAND) && Command != "/sbin/init")
         taint.push_back("Containers virt_mode=os and custom command often infected with zombies, use virt_mode=app user=root group=root.");
 
     if (CpuPolicy == "rt" && CpuLimit)
