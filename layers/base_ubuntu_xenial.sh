@@ -10,5 +10,8 @@ systemctl mask console-getty.service
 
 apt-get update
 
+# Do not create devices in package makedev
+cp -a /dev/null /dev/.devfsd
+
 export DEBIAN_FRONTEND="noninteractive"
 apt-get --yes --no-install-recommends dist-upgrade
