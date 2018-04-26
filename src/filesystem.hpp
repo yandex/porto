@@ -32,6 +32,7 @@ public:
     std::vector<TBindMount> BindMounts;
     std::map<TPath, TPath> Symlink;
     bool BindPortoSock;
+    bool IsolateRun;
     uint64_t RunSize;
     std::string Systemd;
 
@@ -40,6 +41,7 @@ public:
 
     TError SetupRoot();
     TError MountRun();
+    TError RemountRun();
     TError MountBinds();
     TError ProtectProc();
     TError MountTraceFs();
