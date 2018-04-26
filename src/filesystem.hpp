@@ -28,6 +28,7 @@ public:
     TPath Cwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRo;
+    TPath HostRoot;
     std::vector<TBindMount> BindMounts;
     std::map<TPath, TPath> Symlink;
     bool BindPortoSock;

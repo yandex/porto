@@ -524,7 +524,7 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    if (Root.IsRoot()) {
+    if (HostRoot.IsRoot()) {
         error = TPath("/sys/fs/cgroup").UmountAll();
         if (error)
             return error;
@@ -549,7 +549,9 @@ TError TMountNamespace::Setup() {
         error = TPath("/sys").Remount(MS_BIND | MS_RDONLY | MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_REC);
         if (error)
             return error;
-    } else {
+    }
+
+    if (!Root.IsRoot()) {
         error = SetupRoot();
         if (error)
             return error;
