@@ -397,7 +397,9 @@ TError TMountNamespace::MountSystemd() {
     TPath systemd_rw = systemd / Systemd;
     TError error;
 
-    error = tmpfs.Mount("tmpfs", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME, {"mode=755"});
+    error = tmpfs.UmountAll();
+    if (!error)
+        error = tmpfs.Mount("tmpfs", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME, {"mode=755"});
     if (!error)
         error = systemd.MkdirAll(0755);
     if (!error)
@@ -520,10 +522,6 @@ TError TMountNamespace::SetupRoot() {
     if (error)
         L_WRN("Cannot mount tracefs: {}", error);
 
-    error = MountSystemd();
-    if (error)
-        return error;
-
     return OK;
 }
 
@@ -635,6 +633,10 @@ TError TMountNamespace::Setup() {
         if (error)
             return error;
     }
+
+    error = MountSystemd();
+    if (error)
+        return error;
 
     for (const auto &bind : BindMounts) {
         error = bind.Mount(BindCred, Root);
