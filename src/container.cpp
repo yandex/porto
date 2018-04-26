@@ -2108,8 +2108,12 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
             return error;
     }
 
+    TaskEnv.Mnt.IsolateRun = TaskEnv.Mnt.Root.IsRoot() && OsMode && Isolate;
+
     // Create new mount namespaces if we have to make any changes
-    TaskEnv.NewMountNs = Isolate || (Level == 1 && !HostMode) ||
+    TaskEnv.NewMountNs = Isolate ||
+                          TaskEnv.Mnt.IsolateRun ||
+                          (Level == 1 && !HostMode) ||
                           TaskEnv.Mnt.BindMounts.size() ||
                           Hostname.size() ||
                           ResolvConf.size() ||

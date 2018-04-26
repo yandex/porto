@@ -281,6 +281,79 @@ TError TMountNamespace::MountRun() {
     return OK;
 }
 
+TError TMountNamespace::RemountRun() {
+    TPath run("/run"), tmp("/tmp");
+    TError error;
+
+    std::list<TMount> mounts;
+    error = TPath::ListAllMounts(mounts);
+    if (error)
+        return error;
+
+    error = TPath(run).MoveMount(tmp);
+    if (error)
+        return error;
+
+    error = MountRun();
+    if (error)
+        return error;
+
+    TPath run_lock("/run/lock");
+    error = run_lock.MkdirAll(01777);
+    if (error)
+        return error;
+
+    error = run_lock.BindRemount(run_lock, MS_NOSUID | MS_NODEV | MS_NOEXEC);
+    if (error)
+        return error;
+
+    TPath run_shm("/run/shm"), dev_shm("/dev/shm");
+    error = run_shm.MkdirAll(01777);
+    if (error)
+        return error;
+
+    error = dev_shm.UmountAll();
+    if (error)
+        return error;
+
+    error = dev_shm.BindRemount(run_shm, MS_NOSUID | MS_NODEV | MS_STRICTATIME);
+    if (error)
+        return error;
+
+    for (auto it = mounts.rbegin(); it != mounts.rend(); ++it) {
+        if (!it->Target.IsInside(run) ||
+                it->Target == run ||
+                it->Target == run_lock)
+            continue;
+
+        TPath src = tmp / run.InnerPath(it->Target);
+        TPath dst = it->Target;
+
+        if (src.IsDirectoryStrict()) {
+            error = dst.MkdirAll(0755);
+            if (error)
+                return error;
+        } else {
+            error = dst.DirName().MkdirAll(0755);
+            if (error)
+                return error;
+            error = dst.Mkfile(0);
+            if (error)
+                return error;
+        }
+
+        error = src.MoveMount(dst);
+        if (error)
+            return error;
+    }
+
+    error = tmp.Umount(UMOUNT_NOFOLLOW | MNT_DETACH);
+    if (error)
+        return error;
+
+    return OK;
+}
+
 TError TMountNamespace::MountTraceFs() {
     TError error;
 
@@ -551,7 +624,13 @@ TError TMountNamespace::Setup() {
             return error;
     }
 
-    if (!Root.IsRoot()) {
+    if (Root.IsRoot()) {
+        if (IsolateRun) {
+            error = RemountRun();
+            if (error)
+                return error;
+        }
+    } else {
         error = SetupRoot();
         if (error)
             return error;
