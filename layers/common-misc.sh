@@ -10,7 +10,7 @@ dnsutils \
 ethtool \
 file \
 htop \
-iproute2\|iproute \
+'^(iproute2|iproute)$' \
 iptables \
 iputils-ping \
 less \
