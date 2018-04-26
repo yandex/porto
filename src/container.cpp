@@ -2014,6 +2014,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.Mnt.Cwd = GetCwd();
 
     TaskEnv.Mnt.Root = Root;
+    TaskEnv.Mnt.HostRoot = RootPath;
 
     TaskEnv.Mnt.RootRo = RootRo;
 
