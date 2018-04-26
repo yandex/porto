@@ -155,6 +155,17 @@ container { default_ulimit: "type: soft hard;..." }
     - *os* - start **command** as init process
     - *host* - start **command** without security restrictions
 
+   Side effects of **virt\_mode**=*os*
+
+   - set default **command**="/sbin/init"
+   - set default **user**="root", **group**="root"
+   - set default **stdout\_path**="/dev/null", **stderr\_path**="/dev/null"
+   - set default **net**=*none*
+   - set default **cwd**="/"
+   - reset loginuid for container
+   - enable systemd cgroup if /sbin/init is systemd
+   - stop command will send *SIGPWR* rather than *SIGTERM*
+
 ## State
 
 * **id** - container id, 64-bit decimal
