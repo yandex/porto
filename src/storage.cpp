@@ -498,9 +498,21 @@ tar:
     option = "--no-auto-compress";
     return OK;
 gz:
+    if (!arc && config().volumes().parallel_compression()) {
+        if (TPath("/usr/bin/pigz").Exists()) {
+            option = "--use-compress-program=pigz";
+            return OK;
+        }
+    }
     option = "--gzip";
     return OK;
 xz:
+    if (!arc && config().volumes().parallel_compression()) {
+        if (TPath("/usr/bin/pixz").Exists()) {
+            option = "--use-compress-program=pixz";
+            return OK;
+        }
+    }
     option = "--xz";
     return OK;
 squash:

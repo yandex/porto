@@ -19,8 +19,8 @@ Priority: extra
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}, logrotate
 Recommends: bash-completion
-Suggests: linux-image (>=3.18), tar, xz-utils, e2fsprogs,
- squashfs-tools (>=1:4.3), lvm2, thin-provisioning-tools
+Suggests: linux-image (>=3.18), tar, xz-utils, pigz, pixz, e2fsprogs,
+ squashfs-tools (>=1:4.3), lvm2, thin-provisioning-tools,
 Description: Porto - linux container management system
  Requires Linux kernel version >= 3.18
  .
