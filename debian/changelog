@@ -1,3 +1,10 @@
+yandex-porto (4.12.11) unstable; urgency=low
+
+  * porto: use parallel gz/xz for packing tarballs
+  * volume: add backend=hugetmpfs
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Sat, 28 Apr 2018 11:35:29 +0300
+
 yandex-porto (4.12.10) unstable; urgency=low
 
   * core: set ambient capabilities before starting container
