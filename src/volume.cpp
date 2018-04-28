@@ -222,6 +222,10 @@ public:
 
     TError Configure() override {
 
+        if (Volume->BackendType == "hugetmpfs" &&
+                !TPath("/sys/kernel/mm/transparent_hugepage/shmem_enabled").Exists())
+            return TError(EError::NotSupported, "kernel does not support transparent huge pages in tmpfs");
+
         if (!Volume->SpaceLimit)
             return TError(EError::InvalidProperty, "tmpfs backend requires space_limit");
 
@@ -233,6 +237,9 @@ public:
 
     TError Build() override {
         std::vector<std::string> opts;
+
+        if (Volume->BackendType == "hugetmpfs")
+            opts.emplace_back("huge=always");
 
         if (Volume->SpaceLimit)
             opts.emplace_back("size=" + std::to_string(Volume->SpaceLimit));
@@ -246,6 +253,9 @@ public:
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         std::vector<std::string> opts;
+
+        if (Volume->BackendType == "hugetmpfs")
+            opts.emplace_back("huge=always");
 
         if (space_limit)
             opts.emplace_back("size=" + std::to_string(space_limit));
@@ -1372,7 +1382,7 @@ TError TVolume::OpenBackend() {
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeBindBackend());
     else if (BackendType == "rbind")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRBindBackend());
-    else if (BackendType == "tmpfs")
+    else if (BackendType == "tmpfs" || BackendType == "hugetmpfs")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeTmpfsBackend());
     else if (BackendType == "quota")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeQuotaBackend());
@@ -2900,7 +2910,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 }
 
 std::vector<TVolumeProperty> VolumeProperties = {
-    { V_BACKEND,     "dir|plain|bind|rbind|tmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
+    { V_BACKEND,     "dir|plain|bind|rbind|tmpfs|hugetmpfs|quota|native|overlay|squash|lvm|loop|rbd (default - autodetect)", false },
     { V_STORAGE,     "path to data storage (default - internal)", false },
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_STATE,       "volume state (ro)", true },

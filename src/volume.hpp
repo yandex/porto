@@ -240,6 +240,7 @@ public:
         return BackendType == "rbd" ||
                BackendType == "lvm" ||
                BackendType == "tmpfs" ||
+               BackendType == "hugetmpfs" ||
                BackendType == "dir" ||
                BackendType == "quota";
     }

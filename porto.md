@@ -944,6 +944,7 @@ Like for container volume configuration is a set of key-value pairs.
     - *bind*      - bind mount **storage** to volume path, requires volume path
     - *rbind*     - recursive bind mount **storage** to volume path, requires volume path
     - *tmpfs*     - mount new tmpfs instance
+    - *hugetmpfs* - tmpfs with transparent huge pages
     - *quota*     - project quota for volume path
     - *native*    - bind mount **storage** to volume path and setup project quota
     - *overlay*   - mount overlayfs and optional project quota for upper layer

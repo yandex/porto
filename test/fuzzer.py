@@ -601,6 +601,7 @@ def CreateVolume(conn, pathstr):
             (5, "bind"),
             (5, "plain"),
             (5, "tmpfs"),
+            (2, "hugetmpfs"),
             (7, "overlay"),
 #            (3, "quota"),
             (3, "native"),
