@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <functional>
 
 namespace rpc {
     class TContainerRequest;
