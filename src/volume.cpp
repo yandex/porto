@@ -3057,6 +3057,9 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         return error;
     }
 
+    /* release owner */
+    CL->ReleaseContainer();
+
     error = volume->Build();
     if (error) {
         (void)volume->Destroy();
@@ -3091,7 +3094,9 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
                 break;
         }
     } else {
-        error = volume->LinkVolume(CL->ClientContainer);
+        error = CL->LockContainer(CL->ClientContainer);
+        if (!error)
+            error = volume->LinkVolume(CL->ClientContainer);
     }
     if (error) {
         (void)volume->Destroy();
