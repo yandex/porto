@@ -155,6 +155,7 @@ public:
     const std::string ANON_USAGE = "memory.anon.usage";
     const std::string ANON_MAX_USAGE = "memory.anon.max_usage";
     const std::string ANON_LIMIT = "memory.anon.limit";
+    const std::string ANON_ONLY = "memory.anon.only";
 
     TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
 
@@ -218,6 +219,9 @@ public:
 
     bool SupportAnonLimit() const;
     TError SetAnonLimit(TCgroup &cg, uint64_t limit) const;
+
+    bool SupportAnonOnly() const;
+    TError SetAnonOnly(TCgroup &cg, bool val) const;
 
     TError SetLimit(TCgroup &cg, uint64_t limit);
     TError SetIoLimit(TCgroup &cg, uint64_t limit);

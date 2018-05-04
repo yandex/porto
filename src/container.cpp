@@ -1615,6 +1615,15 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
+    if (TestClearPropDirty(EProperty::ANON_ONLY)) {
+        error = MemorySubsystem.SetAnonOnly(memcg, AnonOnly);
+        if (error) {
+            if (error.Errno != EINVAL && error.Errno != EBUSY)
+                L_ERR("Can't set {}: {}", P_ANON_ONLY, error);
+            return error;
+        }
+    }
+
     if (TestClearPropDirty(EProperty::DIRTY_LIMIT)) {
         error = MemorySubsystem.SetDirtyLimit(memcg, DirtyMemLimit);
         if (error) {

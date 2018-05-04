@@ -1617,6 +1617,32 @@ public:
     }
 } static AnonLimit;
 
+class TAnonOnly : public TProperty {
+public:
+    TAnonOnly() : TProperty(P_ANON_ONLY, EProperty::ANON_ONLY,
+            "Keep only anon pages, allocate cache in parent")
+    {
+        IsDynamic = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+    void Init(void) {
+        IsSupported = MemorySubsystem.SupportAnonOnly();
+    }
+    TError Get(std::string &value) {
+        value = BoolToString(CT->AnonOnly);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        bool val;
+        TError error = StringToBool(value, val);
+        if (!error && val != CT->AnonOnly) {
+            CT->AnonOnly = val;
+            CT->SetProp(EProperty::ANON_ONLY);
+        }
+        return error;
+    }
+} static AnonOnly;
+
 class TDirtyLimit : public TProperty {
 public:
     TDirtyLimit() : TProperty(P_DIRTY_LIMIT, EProperty::DIRTY_LIMIT,

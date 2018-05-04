@@ -498,6 +498,16 @@ TError TMemorySubsystem::SetAnonLimit(TCgroup &cg, uint64_t limit) const {
     return OK;
 }
 
+bool TMemorySubsystem::SupportAnonOnly() const {
+    return Cgroup(PORTO_DAEMON_CGROUP).Has(ANON_ONLY);
+}
+
+TError TMemorySubsystem::SetAnonOnly(TCgroup &cg, bool val) const {
+    if (cg.Has(ANON_ONLY))
+        return cg.SetBool(ANON_ONLY, val);
+    return OK;
+}
+
 TError TMemorySubsystem::SetIoLimit(TCgroup &cg, uint64_t limit) {
     if (!SupportIoLimit())
         return OK;

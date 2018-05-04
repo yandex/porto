@@ -513,6 +513,8 @@ write permissions to the target or owning related volume.
 
 * **anon\_limit** - limit for anon\_usage, default: 0 (offstream kernel feature)
 
+* **anon\_only** - keep only anon pages, allocate cache in parent, default: false (offstream kernel feature)
+
 * **dirty\_limit** limit for dirty memory unwritten to disk, default: 0 (offstream kernel feature)
 
 * **recharge\_on\_pgfault** - if *true* immigrate cache on minor page fault, default: *false* (offstream kernel feature)

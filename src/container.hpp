@@ -173,6 +173,7 @@ public:
     int64_t HugetlbLimit = -1;
     uint64_t ThreadLimit = 0;
 
+    bool AnonOnly = false;
     bool RechargeOnPgfault = false;
     bool PressurizeOnDeath = false;
 

@@ -41,6 +41,7 @@ constexpr const char *P_MEMORY_USAGE = "memory_usage";
 constexpr const char *P_MEMORY_RECLAIMED = "memory_reclaimed";
 constexpr const char *P_ANON_USAGE = "anon_usage";
 constexpr const char *P_ANON_MAX_USAGE = "anon_max_usage";
+constexpr const char *P_ANON_ONLY = "anon_only";
 constexpr const char *P_MAX_RSS = "max_rss";
 constexpr const char *P_CACHE_USAGE = "cache_usage";
 constexpr const char *P_HUGETLB_USAGE = "hugetlb_usage";
@@ -176,6 +177,7 @@ enum class EProperty {
     MEM_LIMIT,
     DIRTY_LIMIT,
     ANON_LIMIT,
+    ANON_ONLY,
     HUGETLB_LIMIT,
     RECHARGE_ON_PGFAULT,
     PRESSURIZE_ON_DEATH,
