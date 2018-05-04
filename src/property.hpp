@@ -47,6 +47,7 @@ constexpr const char *P_CACHE_USAGE = "cache_usage";
 constexpr const char *P_HUGETLB_USAGE = "hugetlb_usage";
 constexpr const char *P_MINOR_FAULTS = "minor_faults";
 constexpr const char *P_MAJOR_FAULTS = "major_faults";
+constexpr const char *P_VIRTUAL_MEMORY = "virtual_memory";
 
 constexpr const char *P_CPU_POLICY = "cpu_policy";
 constexpr const char *P_CPU_GUARANTEE = "cpu_guarantee";

@@ -583,7 +583,8 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
          name == "place_limit" ||
          name == "io_limit" ||
          name == "io_read" ||
-         name == "io_write") {
+         name == "io_write" ||
+         name == "virtual_memory") {
         if (!StringToUintMap(val, map)) {
             std::stringstream str;
             for (auto kv : map) {

@@ -9,6 +9,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/proc.hpp"
 #include "util/cred.hpp"
 #include <sstream>
 
@@ -2751,6 +2752,40 @@ public:
         return OK;
     }
 } static MajorFaults;
+
+class TVirtualMemroy : public TProperty {
+public:
+    TVirtualMemroy() : TProperty(P_VIRTUAL_MEMORY, EProperty::NONE,
+            "Virtual mememory size: <type>: <bytes>;...")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+    }
+    TError Get(std::string &value) {
+        TError error;
+        TVmStat st;
+
+        error = CT->GetVmStat(st);
+        if (error)
+            return error;
+
+        UintMapToString(st.Stat, value);
+        return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TError error;
+        TVmStat st;
+
+        error = CT->GetVmStat(st);
+        if (error)
+            return error;
+        auto it = st.Stat.find(index);
+        if (it == st.Stat.end())
+            return TError(EError::InvalidProperty, "Unknown {}", index);
+        value = std::to_string(it->second);
+        return OK;
+    }
+} static VirtualMemory;
 
 class TMaxRss : public TProperty {
 public:

@@ -531,6 +531,10 @@ write permissions to the target or owning related volume.
 
 * **major\_faults** - count major page-faults (file cache misses, reads from disk)
 
+* **virtual\_memory** - non-recursive sum for processes in container, format: \<type\>: \<bytes\>;...
+
+   Types: count, size, max\_size, used, max\_used, anon, file, shmem, huge, swap, locked, data, stack, code, table.
+
 ## CPU
 
 * **cpu\_usage** - CPU time used in nanoseconds (1 / 1000\_000\_000s)

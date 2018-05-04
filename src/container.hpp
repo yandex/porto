@@ -25,6 +25,7 @@ class TVolume;
 class TVolumeLink;
 class TKeyValue;
 struct TBindMount;
+class TVmStat;
 
 struct TEnv;
 
@@ -340,6 +341,7 @@ public:
 
     TError GetThreadCount(uint64_t &count) const;
     TError GetProcessCount(uint64_t &count) const;
+    TError GetVmStat(TVmStat &stat) const;
 
     TError StartTask();
     TError StartParents();

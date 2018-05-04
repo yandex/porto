@@ -23,6 +23,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
+#include "util/proc.hpp"
 #include "client.hpp"
 #include "filesystem.hpp"
 #include "rpc.hpp"
@@ -1006,6 +1007,21 @@ TError TContainer::GetProcessCount(uint64_t &count) const {
         auto cg = GetCgroup(FreezerSubsystem);
         return cg.GetCount(false, count);
     }
+    return OK;
+}
+
+TError TContainer::GetVmStat(TVmStat &stat) const {
+    auto cg = GetCgroup(FreezerSubsystem);
+    std::vector<pid_t> pids;
+    TError error;
+
+    error = cg.GetProcesses(pids);
+    if (error)
+        return error;
+
+    for (auto pid: pids)
+        stat.Parse(pid);
+
     return OK;
 }
 
