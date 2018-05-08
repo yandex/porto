@@ -320,6 +320,7 @@ public:
 
     TUlimit GetUlimit() const;
     void SanitizeCapabilities();
+    void SanitizeCapabilitiesAll();
 
     TError CheckMemGuarantee() const;
     uint64_t GetTotalMemGuarantee(bool containers_locked = false) const;

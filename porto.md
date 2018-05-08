@@ -283,11 +283,20 @@ container { default_ulimit: "type: soft hard;..." }
     LEASE, SYSLOG, MAC\_OVERRIDE, MAC\_ADMIN, AUDIT\_CONTROL, AUDIT\_READ,
     NET\_BROADCAST, SYS\_PACCT, SYS\_TTY\_CONFIG, WAKE\_ALARM, BLOCK\_SUSPEND.
 
+* **capabilities\_allowed** - resulting bounding set
+
+    This read-only property shows resulting set of capabilities allowed in container.
+
 * **capabilities\_ambient** - raise ambient capabilities, syntax: CAP;... see **capabilities(7)**
 
     All tasks in container will have these capabilities.
 
     Requires Linux 4.3
+
+* **capabilities\_ambient\_allowed** - allowed ambient capabilities
+
+    Subset of **capabilities\_allowed** allowed to be set as ambient.
+    In container with chroot they are equal.
 
 * **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[path\] \[mode\] \[user\] \[group\];...
 

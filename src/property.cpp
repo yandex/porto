@@ -104,6 +104,7 @@ public:
 
         CT->CapLimit = limit;
         CT->SetProp(EProperty::CAPABILITIES);
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
 
@@ -165,6 +166,7 @@ public:
 
         CT->CapAmbient = ambient;
         CT->SetProp(EProperty::CAPABILITIES_AMBIENT);
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
 
@@ -207,6 +209,58 @@ public:
         return CommitAmbient(caps);
     }
 } static CapabilitiesAmbient;
+
+class TCapAllowed : public TProperty {
+public:
+    TCapAllowed() : TProperty(P_CAPABILITIES_ALLOWED, EProperty::NONE,
+            "Allowed capabilities in container")
+    {
+        IsReadOnly = true;
+    }
+
+    TError Get(std::string &value) {
+        value = CT->CapBound.Format();
+        return OK;
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TCapabilities caps;
+        TError error = caps.Parse(index);
+        if (error)
+            return error;
+        value = BoolToString((CT->CapBound.Permitted &
+                              caps.Permitted) == caps.Permitted);
+        return OK;
+    }
+} static CapAllowed;
+
+class TCapAmbientAllowed : public TProperty {
+public:
+    TCapAmbientAllowed() : TProperty(P_CAPABILITIES_AMBIENT_ALLOWED, EProperty::NONE,
+            "Allowed ambient capabilities in container")
+    {
+        IsReadOnly = true;
+    }
+
+    void Init(void) {
+        IsSupported = HasAmbientCapabilities;
+    }
+
+    TError Get(std::string &value) {
+        value = CT->CapAllowed.Format();
+        return OK;
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TCapabilities caps;
+        TError error = caps.Parse(index);
+        if (error)
+            return error;
+        value = BoolToString((CT->CapAllowed.Permitted &
+                              caps.Permitted) == caps.Permitted);
+        return OK;
+    }
+} static CapAmbientAllowed;
 
 class TCwd : public TProperty {
 public:
@@ -449,7 +503,7 @@ public:
 
         CT->OwnerCred = newCred;
         CT->SetProp(EProperty::OWNER_USER);
-        CT->SanitizeCapabilities();
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
 } static OwnerUser;
@@ -789,6 +843,7 @@ public:
             return error;
         CT->Isolate = val;
         CT->SetProp(EProperty::ISOLATE);
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
     TError Start(void) {
@@ -817,6 +872,7 @@ public:
 
         CT->Root = root;
         CT->SetProp(EProperty::ROOT);
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
     TError Start(void) {
@@ -865,6 +921,7 @@ public:
         CT->NetIsolate = NetEnv.NetIsolate;
         CT->NetInherit = NetEnv.NetInherit;
         CT->SetProp(EProperty::NET);
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
     TError Start(void) {
@@ -1150,6 +1207,7 @@ public:
         CT->IpLimit = list;
         CT->NetIpLimit = !list.empty() && list[0] != "any";
         CT->SetProp(EProperty::IP_LIMIT);
+        CT->SanitizeCapabilitiesAll();
 
         return OK;
     }
@@ -1523,6 +1581,7 @@ public:
         if (CT->MemLimit != new_size) {
             CT->MemLimit = new_size;
             CT->SetProp(EProperty::MEM_LIMIT);
+            CT->SanitizeCapabilitiesAll();
         }
         return OK;
     }

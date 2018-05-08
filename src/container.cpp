@@ -2182,6 +2182,11 @@ void TContainer::SanitizeCapabilities() {
         CapLimit.Permitted = CapBound.Permitted;
 }
 
+void TContainer::SanitizeCapabilitiesAll() {
+    for (auto &ct: Subtree())
+        ct->SanitizeCapabilities();
+}
+
 TUlimit TContainer::GetUlimit() const {
     TUlimit res = Ulimit;
     for (auto p = Parent.get(); p; p = p->Parent.get())
