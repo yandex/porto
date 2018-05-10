@@ -151,6 +151,7 @@ public:
     TCapabilities CapBound;     /* actual bounding set */
     TMultiTuple DefaultGw;
     TTuple ResolvConf;
+    std::string EtcHosts;
     TDevices Devices;
     TStringMap Sysctl;
 

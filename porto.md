@@ -686,6 +686,8 @@ Possible indexes for statistics and parameters:
     Inside container root /etc/hostname must be a regular file,
     porto bind-mounts temporary file over it.
 
+* **etc\_hosts**     - Override /etc/hosts content
+
 * **resolv\_conf**   - DNS resolver configuration, syntax: default|keep|\<resolv.conf option\>;...
 
     Default setting **resolv\_conf**="default" loads configuration from portod.conf:

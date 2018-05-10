@@ -309,6 +309,12 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
+    if (CT->EtcHosts.size()) {
+        error = TPath("/etc/hosts").WritePrivate(CT->EtcHosts);
+        if (error)
+            return error;
+    }
+
     error = SetHostname();
     if (error)
         return error;

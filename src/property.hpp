@@ -95,6 +95,7 @@ constexpr const char *P_VIRT_MODE = "virt_mode";
 constexpr const char *P_AGING_TIME = "aging_time";
 constexpr const char *P_ENABLE_PORTO = "enable_porto";
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
+constexpr const char *P_ETC_HOSTS = "etc_hosts";
 constexpr const char *P_WEAK = "weak";
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 constexpr const char *P_UMASK = "umask";
@@ -216,6 +217,7 @@ enum class EProperty {
     AGING_TIME,
     ENABLE_PORTO,
     RESOLV_CONF,
+    ETC_HOSTS,
     WEAK,
     STATE,
     OOM_KILLED,

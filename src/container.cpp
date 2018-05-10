@@ -2142,6 +2142,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           TaskEnv.Mnt.BindMounts.size() ||
                           Hostname.size() ||
                           ResolvConf.size() ||
+                          EtcHosts.size() ||
                           !TaskEnv.Mnt.Root.IsRoot() ||
                           TaskEnv.Mnt.RootRo ||
                           !TaskEnv.Mnt.Systemd.empty();

@@ -1271,6 +1271,22 @@ public:
     }
 } static ResolvConf;
 
+class TEtcHosts : public TProperty {
+public:
+    TEtcHosts() : TProperty(P_ETC_HOSTS, EProperty::ETC_HOSTS, "Override /etc/hosts content")
+    {
+    }
+    TError Get(std::string &value) {
+        value = CT->EtcHosts;
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        CT->EtcHosts = value;
+        CT->SetProp(EProperty::ETC_HOSTS);
+        return OK;
+    }
+} static EtcHosts;
+
 class TDevicesProperty : public TProperty {
 public:
     TDevicesProperty() : TProperty(P_DEVICES, EProperty::DEVICE_CONF,
