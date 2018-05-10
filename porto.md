@@ -672,6 +672,7 @@ Possible indexes for statistics and parameters:
     - *macvlan* \<master\> \<name\> \[bridge|private|vepa|passthru\] \[mtu\] \[hw\]
     - *ipvlan* \<master\> \<name\> \[l2|l3\] \[mtu\]
     - *veth* \<name\> \<bridge\> \[mtu\] \[hw\]
+    - *ECN* \[name\]         - enable ECN
 
 * **ip**             - ip addresses, syntax: \<interface\> \<ip\>/\<prefix\>;...
 

@@ -266,6 +266,7 @@ struct TNetDeviceConfig {
     int Mtu = -1;
     int Group = 0;
     bool Autoconf = false;
+    bool EnableECN = false;
 
     std::vector<TNlAddr> Ip;
     TNlAddr Gw;
@@ -298,6 +299,7 @@ struct TNetEnv {
 
     bool NetUp = false;
     bool SaveIp = false;
+    bool EnableECN = false;
 
     std::string Hostname;
     std::string NetNsName;

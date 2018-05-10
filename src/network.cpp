@@ -2204,6 +2204,23 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
             }
             if (!found)
                 return TError(EError::InvalidValue, "Link not found: " + settings[1]);
+        } else if (type == "ECN") {
+            if (settings.size() == 1) {
+                EnableECN = true;
+            } else if (settings.size() == 2) {
+                bool found = false;
+                for (auto &dev: Devices) {
+                    if (dev.Name == settings[1]) {
+                        dev.EnableECN = true;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    return TError(EError::InvalidValue, "Link not found: " + settings[1]);
+            } else {
+                return TError(EError::InvalidValue, "Invalid " + line);
+            }
         } else if (type == "MAC") {
             if (settings.size() != 3 || !TNlLink::ValidMacAddr(settings[2]))
                 return TError(EError::InvalidValue, "Invalid " + line);
@@ -2394,10 +2411,10 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
         error = Nl->PermanentNeighbour(link.GetIndex(), gate4, peerAddr, true);
         if (error)
             return error;
-        error = link.AddDirectRoute(gate4);
+        error = link.AddDirectRoute(gate4, EnableECN || dev.EnableECN);
         if (error)
             return error;
-        error = link.SetDefaultGw(gate4);
+        error = link.SetDefaultGw(gate4, EnableECN || dev.EnableECN);
         if (error)
             return error;
     }
@@ -2406,10 +2423,10 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
         error = Nl->PermanentNeighbour(link.GetIndex(), gate6, peerAddr, true);
         if (error)
             return error;
-        error = link.AddDirectRoute(gate6);
+        error = link.AddDirectRoute(gate6, EnableECN || dev.EnableECN);
         if (error)
             return error;
-        error = link.SetDefaultGw(gate6);
+        error = link.SetDefaultGw(gate6, EnableECN || dev.EnableECN);
         if (error)
             return error;
     }
@@ -2679,7 +2696,7 @@ TError TNetEnv::SetupInterfaces() {
         }
 
         if (!dev.Gw.IsEmpty()) {
-            error = link.SetDefaultGw(dev.Gw);
+            error = link.SetDefaultGw(dev.Gw, EnableECN || dev.EnableECN);
             if (error)
                 return error;
             DefaultRoute = false;
@@ -2688,7 +2705,7 @@ TError TNetEnv::SetupInterfaces() {
         if (dev.Type == "ipip6" && DefaultRoute) {
             TNlAddr ip;
             ip.Parse(AF_INET, "default");
-            error = link.AddDirectRoute(ip);
+            error = link.AddDirectRoute(ip, dev.EnableECN);
             if (error)
                 return error;
         }

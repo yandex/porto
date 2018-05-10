@@ -121,8 +121,8 @@ public:
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);
 
-    TError AddDirectRoute(const TNlAddr &addr);
-    TError SetDefaultGw(const TNlAddr &addr);
+    TError AddDirectRoute(const TNlAddr &addr, bool ecn = false);
+    TError SetDefaultGw(const TNlAddr &addr, bool ecn = false);
     TError AddAddress(const TNlAddr &addr);
     TError WaitAddress(int timeout_s);
     int GetMtu();
