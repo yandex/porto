@@ -397,7 +397,7 @@ Write access to container requires any of these conditions:
 
     Porto mounts: /dev, /dev/pts, /dev/hugepages, /proc, /run, /sys, /sys/kernel/tracing.
 
-    Also porto recreates in /run directories strictire from underlying filesystem.
+    Also porto recreates in /run directories structure from underlying filesystem.
 
     Porto creates in /dev nodes only for devices permitted by property **devices**.
 
