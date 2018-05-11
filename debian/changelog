@@ -1,3 +1,10 @@
+yandex-porto (4.13.8) unstable; urgency=low
+
+  * debian: /etc/porto.conf.d -> /etc/portod.conf.d
+  * Revert "porto: set in environment container=porto"
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 11 May 2018 17:25:42 +0300
+
 yandex-porto (4.13.7) unstable; urgency=low
 
   * porto: fix compilation for ubuntu bionic
