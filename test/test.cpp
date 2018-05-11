@@ -352,7 +352,7 @@ TCred Bob;
 void InitUsersAndGroups() {
     TError error;
 
-    InitPortoCgroups();
+    InitPortoGroups();
 
     error = Nobody.Init("nobody");
     ExpectOk(error);
