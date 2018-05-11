@@ -2014,7 +2014,7 @@ TError TContainer::GetEnvironment(TEnv &env) const {
     env.SetEnv("HOME", GetCwd().ToString());
     env.SetEnv("USER", TaskCred.User());
 
-    env.SetEnv("container", "porto");
+    env.SetEnv("container", "lxc");
 
     /* lock these */
     env.SetEnv("PORTO_NAME", Name, true, true);
