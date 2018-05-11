@@ -12,6 +12,12 @@ extern "C" {
 #include <linux/loop.h>
 }
 
+static void HelperError(TFile &err, const std::string &text, TError error) {
+    L_WRN("{}: {}", text, error);
+    err.WriteAll(fmt::format("{}: {}", text, error));
+    _exit(EXIT_FAILURE);
+}
+
 TError RunCommand(const std::vector<std::string> &command,
                   const TFile &dir, const TFile &in, const TFile &out,
                   const TCapabilities &caps) {
@@ -53,42 +59,70 @@ TError RunCommand(const std::vector<std::string> &command,
 
     error = memcg.Attach(GetPid());
     if (error)
-        L_WRN("Cannot attach to helper cgroup: {}", error);
+        HelperError(err, "Cannot attach to helper cgroup: {}", error);
 
     SetDieOnParentExit(SIGKILL);
 
-    LogFile.Close();
-    TFile::CloseAll({dir.Fd, in.Fd, out.Fd, err.Fd});
+    if (!in) {
+        TFile in;
+        error = in.Open("/dev/null", O_RDONLY);
+        if (error)
+            HelperError(err, "open stdin", error);
+        if (dup2(in.Fd, STDIN_FILENO) != STDIN_FILENO)
+            HelperError(err, "stdin", TError::System("dup2"));
+    } else {
+        if (dup2(in.Fd, STDIN_FILENO) != STDIN_FILENO)
+            HelperError(err, "stdin", TError::System("dup2"));
+    }
 
-    if ((in.Fd >= 0 ? dup2(in.Fd, STDIN_FILENO) : open("/dev/null", O_RDONLY)) != STDIN_FILENO)
-        _exit(EXIT_FAILURE);
-
-    if (dup2(out.Fd >= 0 ? out.Fd : err.Fd, STDOUT_FILENO) != STDOUT_FILENO)
-        _exit(EXIT_FAILURE);
+    if (dup2(out ? out.Fd : err.Fd, STDOUT_FILENO) != STDOUT_FILENO)
+        HelperError(err, "stdout", TError::System("dup2"));
 
     if (dup2(err.Fd, STDERR_FILENO) != STDERR_FILENO)
-        _exit(EXIT_FAILURE);
+        HelperError(err, "stderr", TError::System("dup2"));
 
     TPath root("/");
     TPath dot(".");
 
     if (dir && !path.IsRoot()) {
         /* Unshare and remount everything except CWD Read-Only */
-        if (dir.Chdir() ||
-                unshare(CLONE_NEWNS) ||
-                root.Remount(MS_PRIVATE | MS_REC) ||
-                root.Remount(MS_BIND | MS_REC | MS_RDONLY) ||
-                dot.Bind(dot, MS_REC) ||
-                TPath("../" + path.BaseName()).Chdir() ||
-                dot.Remount(MS_BIND | MS_REC | MS_ALLOW_WRITE))
-            _exit(EXIT_FAILURE);
+        error = dir.Chdir();
+        if (error)
+            HelperError(err, "chdir", error);
+
+        if (unshare(CLONE_NEWNS))
+            HelperError(err, "newns", TError::System("unshare"));
+
+        error = root.Remount(MS_PRIVATE | MS_REC);
+        if (error)
+            HelperError(err, "remont", error);
+
+        error = root.Remount(MS_BIND | MS_REC | MS_RDONLY);
+        if (error)
+            HelperError(err, "remont", error);
+
+        error = dot.Bind(dot, MS_REC);
+        if (error)
+            HelperError(err, "bind", error);
+
+        error = TPath("../" + path.BaseName()).Chdir();
+        if (error)
+            HelperError(err, "chdir bind", error);
+
+        error = dot.Remount(MS_BIND | MS_REC | MS_ALLOW_WRITE);
+        if (error)
+            HelperError(err, "remount bind", error);
     } else {
-        if (root.Chdir())
-            _exit(EXIT_FAILURE);
+        error =root.Chdir();
+        if (error)
+            HelperError(err, "root chdir", error);
     }
 
-    if (caps.ApplyLimit())
-        _exit(EXIT_FAILURE);
+    error = caps.ApplyLimit();
+    if (error)
+        HelperError(err, "caps", error);
+
+    TFile::CloseAll({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
     const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
     for (size_t i = 0; i < command.size(); i++)
@@ -96,7 +130,9 @@ TError RunCommand(const std::vector<std::string> &command,
     argv[command.size()] = nullptr;
 
     execvp(argv[0], (char **)argv);
-    _exit(2);
+
+    err.SetFd = STDERR_FILENO;
+    HelperError(err, fmt::format("Cannot execute {}", argv[0]), TError::System("exec"));
 }
 
 TError CopyRecursive(const TPath &src, const TPath &dst) {
