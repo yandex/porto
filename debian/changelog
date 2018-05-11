@@ -1,3 +1,12 @@
+yandex-porto (4.12.12) unstable; urgency=low
+
+  * Revert "porto: set in environment container=porto"
+  * porto: fix compilation for ubuntu bionic
+  * debian: /etc/porto.conf.d -> /etc/portod.conf.d
+  * porto: create group porto in postinst
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 11 May 2018 17:27:20 +0300
+
 yandex-porto (4.12.11) unstable; urgency=low
 
   * porto: use parallel gz/xz for packing tarballs
