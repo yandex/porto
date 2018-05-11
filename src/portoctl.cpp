@@ -618,6 +618,7 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
         name == "memory_usage" ||
         name == "memory_limit_total" ||
         name == "memory_guarantee_total" ||
+        name == "memory_reclaimed" ||
         name == "anon_usage" ||
         name == "anon_max_usage" ||
         name == "cache_usage" ||
@@ -631,7 +632,11 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
     if (name == "time" || name == "aging_time")
         return StringFormatDuration(num * 1000);
 
-    if (name == "cpu_usage" || name == "cpu_usage_system" ||  name == "cpu_wait")
+    if (name == "cpu_usage" ||
+        name == "cpu_usage_system" ||
+        name == "cpu_wait" ||
+        name == "cpu_throttled" ||
+        name == "cpu_period")
         return StringFormatDuration(num / 1000000);
 
     if (name == "exit_status")
