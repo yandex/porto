@@ -161,6 +161,7 @@ template <typename... Args> inline void L_CORE(const char* fmt, const Args&... a
 }
 
 void porto_assert(const char *msg, const char *file, size_t line);
+void FatalError(const std::string &text, TError &error);
 
 #define PORTO_ASSERT(EXPR) do { if (!(EXPR)) porto_assert(#EXPR, __FILE__, __LINE__); } while (0)
 #define PORTO_LOCKED(mutex) do { if (mutex.try_lock()) porto_assert(#mutex " not locked", __FILE__, __LINE__); } while(0)

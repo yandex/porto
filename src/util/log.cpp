@@ -99,6 +99,11 @@ void porto_assert(const char *msg, const char *file, size_t line) {
     Crash();
 }
 
+void FatalError(const std::string &text, TError &error) {
+    L_ERR("{}: {}", text, error);
+    _exit(EXIT_FAILURE);
+}
+
 // https://panthema.net/2008/0901-stacktrace-demangled/
 // stacktrace.h (c) 2008, Timo Bingmann from http://idlebox.net/
 // published under the WTFPL v2.0

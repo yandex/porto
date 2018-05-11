@@ -213,14 +213,12 @@ TError TCred::Apply() const {
     return OK;
 }
 
-void InitPortoCgroups() {
+void InitPortoGroups() {
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
-    if (error) {
-        L_WRN("Cannot find group porto: {}", error);
-        PortoGroup = RootGroup;
-    }
+    if (error)
+        FatalError("Cannot find group porto", error);
 
     if (GroupId(PORTO_CT_GROUP_NAME, PortoCtGroup))
         PortoCtGroup = NoGroup;

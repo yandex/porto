@@ -67,11 +67,6 @@ bool ShutdownPortod = false;
 static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
 
-static void FatalError(const std::string &text, TError &error) {
-    L_ERR("{}: {}", text, error);
-    _exit(EXIT_FAILURE);
-}
-
 static bool RunningInContainer() {
     if (getpid() == 1)
         return getenv("container") != nullptr;
@@ -729,7 +724,7 @@ static int Portod() {
         FatalError("Cannot save pid", error);
 
     ReadConfigs();
-    InitPortoCgroups();
+    InitPortoGroups();
     InitCapabilities();
     InitIpcSysctl();
     InitProcBaseDirs();
