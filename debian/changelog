@@ -1,3 +1,18 @@
+yandex-porto (4.13.7) unstable; urgency=low
+
+  * porto: fix compilation for ubuntu bionic
+  * volume: release owner container lock before build
+  * property: add capabilities_allowed and capabilities_ambient_allowed
+  * property: add anon_only
+  * property: add virtual_memory
+  * property: add etc_hosts
+  * network: add ECN
+  * porto: create group porto in postinst
+  * helper: report errors
+  * portoctl/get: convert some properties
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 11 May 2018 15:05:54 +0300
+
 yandex-porto (4.13.6) unstable; urgency=low
 
   * porto: use parallel gz/xz for packing tarballs
