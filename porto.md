@@ -128,7 +128,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
     Default environment is:
 
-    container="porto"  
+    container="lxc"  
     PORTO_NAME=_container name_  
     PORTO_HOST=_host hostname_  
     PORTO_USER=**owner_user**  
