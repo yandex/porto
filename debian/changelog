@@ -1,3 +1,9 @@
+yandex-porto (4.12.13) unstable; urgency=low
+
+  * device: allow write access to related sysfs nodes
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 15 May 2018 16:45:06 +0300
+
 yandex-porto (4.12.12) unstable; urgency=low
 
   * Revert "porto: set in environment container=porto"
