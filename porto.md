@@ -322,6 +322,17 @@ container { default_ulimit: "type: soft hard;..." }
 container { extra_devices: "<device> [rwm]... ;..." }
 ```
 
+    Write access to related sysfs nodes could be granted in portod.conf:
+```
+container {
+   device_sysfs {
+      device: "/dev/abc"
+      sysfs: "/sys/foo"
+      sysfs: "/sys/bar"
+   }
+}
+```
+
 * **enable\_porto** - access to porto
     - *false* | *none* - no access
     - *read-isolate*   - read-only access, show only sub-containers

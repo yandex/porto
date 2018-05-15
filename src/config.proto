@@ -153,6 +153,12 @@ message TConfig {
         repeated TSysctl ipc_sysctl = 33;
 
         repeated string rec_bind_hack = 46; /* FIXME remove */
+
+        message TDeviceSysfs {
+            required string device = 1;
+            repeated string sysfs = 2;
+        }
+        repeated TDeviceSysfs device_sysfs = 47;
     }
 
     message TPrivilegesCfg {

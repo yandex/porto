@@ -278,18 +278,30 @@ TError TTaskEnv::ConfigureChild() {
 
     umask(0);
 
+    TDevices devices = CT->Devices;
+    for (auto p = CT->Parent; p; p = p->Parent)
+        devices.Merge(p->Devices);
+
     if (NewMountNs) {
         error = Mnt.Setup();
         if (error)
             return error;
+
+        for (auto &device: devices.Devices) {
+            for (auto &device_sysfs: config().container().device_sysfs()) {
+                if (device.Path.ToString() == device_sysfs.device()) {
+                    for (auto &sysfs: device_sysfs.sysfs()) {
+                        TPath path(sysfs);
+                        error = path.BindRemount(path, MS_ALLOW_WRITE);
+                        if (error)
+                            return error;
+                    }
+                }
+            }
+        }
     }
 
     if (!Mnt.Root.IsRoot()) {
-        TDevices devices = CT->Devices;
-
-        for (auto p = CT->Parent; p; p = p->Parent)
-            devices.Merge(p->Devices);
-
         error = devices.Makedev();
         if (error)
             return error;
