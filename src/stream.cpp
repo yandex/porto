@@ -61,6 +61,12 @@ retry:
     if (fd < 0)
         return TError(EError::InvalidValue, errno, "open " + path.ToString());
 
+    if (flags != (O_RDWR | O_NOCTTY) && isatty(fd)) {
+        close(fd);
+        flags = O_RDWR | O_NOCTTY;
+        goto retry;
+    }
+
     if (fd != Stream) {
         if (dup2(fd, Stream) < 0) {
             close(fd);
