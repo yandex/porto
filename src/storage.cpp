@@ -928,7 +928,7 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
             return error;
 
         /* Handle aufs whiteouts and metadata */
-        if (StringStartsWith(walk.Path.ToString(), ".wh.")) {
+        if (StringStartsWith(walk.Name(), ".wh.")) {
 
             /* Remove it completely */
             error = walk.Path.RemoveAll();
@@ -956,7 +956,7 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
 
             if (!merge) {
                 /* Convert into overlayfs whiteout */
-                error = walk.Path.Mknod(S_IFCHR, 0);
+                error = real.Mknod(S_IFCHR, 0);
                 if (error)
                     return error;
             }
