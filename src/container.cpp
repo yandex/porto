@@ -3651,6 +3651,8 @@ void TContainer::Event(const TEvent &event) {
         if (!StdLog && LogFile && !LogFile.Stat(st) && !st.st_nlink)
             ReopenMasterLog();
 
+        CheckPortoSocket();
+
         EventQueue->Add(config().daemon().log_rotate_ms(), event);
         break;
     }

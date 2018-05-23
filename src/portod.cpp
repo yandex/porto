@@ -57,6 +57,8 @@ static pid_t MasterPid;
 static pid_t PortodPid;
 static int PortodStatus;
 
+static ino_t SocketIno = 0;
+
 static bool RespawnPortod = true;
 static bool DiscardState = false;
 
@@ -112,13 +114,12 @@ static bool SanityCheck() {
 
 static TError CreatePortoSocket() {
     TPath path(PORTO_SOCKET_PATH);
+    struct stat fd_stat, sk_stat;
     struct sockaddr_un addr;
     TError error;
     TFile sock;
 
     if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD) {
-        struct stat fd_stat, sk_stat;
-
         sock.SetFd = PORTO_SK_FD;
         if (!sock.Stat(fd_stat) && S_ISSOCK(fd_stat.st_mode) &&
                 !path.StatStrict(sk_stat) && S_ISSOCK(sk_stat.st_mode)) {
@@ -127,6 +128,7 @@ static TError CreatePortoSocket() {
                   "age {} : {}",
                   fd_stat.st_ino, sk_stat.st_ino,
                   now - fd_stat.st_ctime, now - sk_stat.st_ctime);
+            SocketIno = sk_stat.st_ino;
         } else {
             L_WRN("Unlinked porto socket. Recreating...");
             sock.SetFd = -1;
@@ -146,6 +148,11 @@ static TError CreatePortoSocket() {
 
         if (bind(sock.Fd, (struct sockaddr *) &addr, sizeof(addr)) < 0)
             return TError::System("bind()");
+
+        error = path.StatStrict(sk_stat);
+        if (error)
+            return error;
+        SocketIno = sk_stat.st_ino;
     }
 
     if (fchmod(sock.Fd, PORTO_SOCKET_MODE) < 0)
@@ -168,6 +175,25 @@ static TError CreatePortoSocket() {
         return TError::System("dup2()");
 
     return OK;
+}
+
+void CheckPortoSocket() {
+    struct stat fd_stat, sk_stat;
+    TError error;
+
+    if (fstat(PORTO_SK_FD, &fd_stat))
+        error = TError::System("socket fd stat");
+    else if (stat(PORTO_SOCKET_PATH, &sk_stat))
+        error = TError::System("socket path stat");
+    else if (!S_ISSOCK(fd_stat.st_mode) || !S_ISSOCK(sk_stat.st_mode))
+        error = TError::System("not a socket");
+    else if (sk_stat.st_ino != SocketIno)
+        error = TError::System("different inode");
+    else
+        return;
+
+    L_WRN("Porto socket: {}", error);
+    kill(MasterPid, SIGHUP);
 }
 
 void AckExitStatus(int pid) {
