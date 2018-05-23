@@ -522,7 +522,9 @@ write permissions to the target or owning related volume.
 
     Upper bound for memory usage for sub-tree.
 
-* **anon\_limit** - limit for anon\_usage, default: 0 (offstream kernel feature)
+* **anon\_limit** - limit for anon\_usage (offstream kernel feature)
+
+    Default is **memory\_limit** - min(**memory\_limit** / 4, 16M).
 
 * **anon\_only** - keep only anon pages, allocate cache in parent, default: false (offstream kernel feature)
 

@@ -1610,6 +1610,19 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
+    if (TestClearPropDirty(EProperty::ANON_LIMIT) ||
+            (TestPropDirty(EProperty::MEM_LIMIT) &&
+             !HasProp(EProperty::ANON_LIMIT) &&
+             MemorySubsystem.SupportAnonLimit() &&
+             config().container().anon_limit_margin())) {
+        error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
+        if (error) {
+            if (error.Errno != EINVAL && error.Errno != EBUSY)
+                L_ERR("Can't set {}: {}", P_ANON_LIMIT, error);
+            return error;
+        }
+    }
+
     if (TestClearPropDirty(EProperty::MEM_LIMIT)) {
         error = MemorySubsystem.SetLimit(memcg, MemLimit);
         if (error) {
@@ -1618,15 +1631,6 @@ TError TContainer::ApplyDynamicProperties() {
 
             if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_MEM_LIMIT, error);
-            return error;
-        }
-    }
-
-    if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
-        error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
-        if (error) {
-            if (error.Errno != EINVAL && error.Errno != EBUSY)
-                L_ERR("Can't set {}: {}", P_ANON_LIMIT, error);
             return error;
         }
     }

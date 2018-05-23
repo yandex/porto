@@ -98,6 +98,8 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
+    config().mutable_container()->set_anon_limit_margin(16ull << 20); /* 16Mb */
+
     config().mutable_container()->set_dead_memory_soft_limit(1 << 20); /* 1Mb */
     config().mutable_container()->set_pressurize_on_death(false);
 
