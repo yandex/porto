@@ -1,3 +1,14 @@
+yandex-porto (4.13.9) unstable; urgency=low
+
+  * device: allow write access to related sysfs nodes
+  * porto: open tty streams for read-write
+  * porto: fix aufs to overlayfs conversion
+  * porto: reopen unlinked log file
+  * porto: reload if socket was unlinked
+  * porto: setup default anon_limit to memory_limit - 16Mb
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 23 May 2018 20:30:34 +0300
+
 yandex-porto (4.13.8) unstable; urgency=low
 
   * debian: /etc/porto.conf.d -> /etc/portod.conf.d
