@@ -53,6 +53,7 @@ static TPidFile PortodPidFile(PORTO_PIDFILE, PORTOD_NAME, "portod-slave");
 std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
+static pid_t MasterPid;
 static pid_t PortodPid;
 static int PortodStatus;
 
@@ -719,7 +720,8 @@ static int Portod() {
     if (!LogFile)
         return EXIT_FAILURE;
 
-    error = PortodPidFile.Save(getpid());
+    PortodPid = getpid();
+    error = PortodPidFile.Save(PortodPid);
     if (error)
         FatalError("Cannot save pid", error);
 
@@ -1190,7 +1192,8 @@ static int PortodMaster() {
 
     CatchFatalSignals();
 
-    error = MasterPidFile.Save(getpid());
+    MasterPid = getpid();
+    error = MasterPidFile.Save(MasterPid);
     if (error)
         FatalError("Cannot save pid", error);
 
@@ -1509,6 +1512,28 @@ undo:
     return EXIT_FAILURE;
 }
 
+int ReopenLog() {
+    TError error;
+
+    error = MasterPidFile.Read();
+    if (error) {
+        std::cerr << "portod not running" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (kill(MasterPidFile.Pid, SIGUSR1) && errno != ESRCH) {
+        std::cerr << "cannot send signal to portod: " << strerror(errno) << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+void ReopenMasterLog() {
+    if (MasterPid)
+        kill(MasterPid, SIGUSR1);
+}
+
 static int GetSystemProperties() {
     Porto::Connection conn;
     std::string rsp;
@@ -1556,6 +1581,7 @@ static void Usage() {
         << "  kill            kill running portod" << std::endl
         << "  restart         stop followed by start" << std::endl
         << "  reload          reexec portod" << std::endl
+        << "  reopenlog       reopen portod.log" << std::endl
         << "  upgrade         upgrade running portod" << std::endl
         << "  dump            print internal key-value state" << std::endl
         << "  get             print system properties" << std::endl
@@ -1651,6 +1677,9 @@ int main(int argc, char **argv) {
 
     if (cmd == "upgrade")
         return UpgradePortod();
+
+    if (cmd == "reopenlog")
+        return ReopenLog();
 
     if (cmd == "dump") {
         KvDump();

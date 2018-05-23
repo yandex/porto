@@ -178,6 +178,7 @@ message TGetSystemResponse {
 
     required fixed64 log_lines_lost = 106;
     required fixed64 log_bytes_lost = 107;
+    required fixed64 log_open = 108;
 
     required fixed64 container_count = 200;
     required fixed64 container_limit = 201;
