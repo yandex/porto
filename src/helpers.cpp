@@ -12,6 +12,8 @@ extern "C" {
 #include <linux/loop.h>
 }
 
+static void HelperError(TFile &err, const std::string &text, TError error) __attribute__ ((noreturn));
+
 static void HelperError(TFile &err, const std::string &text, TError error) {
     L_WRN("{}: {}", text, error);
     err.WriteAll(fmt::format("{}: {}", text, error));
@@ -49,7 +51,7 @@ TError RunCommand(const std::vector<std::string> &command,
         error = task.Wait();
         if (error) {
             std::string text;
-            TError error2 = err.ReadEnds(text, TError::MAX - 1024);
+            TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
             if (error2)
                 text = "Cannot read stderr: " + error2.ToString();
             error = TError(error, "helper: {} stderr: {}", cmdline, text);

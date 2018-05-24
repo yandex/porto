@@ -5,6 +5,7 @@
 extern "C" {
 #include <sys/stat.h>
 #include <linux/kdev_t.h>
+#include <sys/sysmacros.h>
 }
 
 TError TDevice::CheckPath(const TPath &path) {

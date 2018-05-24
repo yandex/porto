@@ -190,7 +190,7 @@ public:
     void MarkRow();
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
-    void ChangeView(int x, int y, TConsoleScreen &screen);
+    void ChangeView(int x, int y);
     void Expand();
 
     int StartStop();

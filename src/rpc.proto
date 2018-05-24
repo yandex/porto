@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 // Portod daemon listens on /run/portod.socket unix socket.
 // Protocol: Varint length, TContainerRequest req | TContainerResponse rsp.
 

@@ -2691,7 +2691,7 @@ public:
         value = std::to_string(val);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &) {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.ResetAnonMaxUsage(cg);
     }

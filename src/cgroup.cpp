@@ -14,6 +14,7 @@ extern "C" {
 #include <unistd.h>
 #include <sys/eventfd.h>
 #include <sys/resource.h>
+#include <sys/sysmacros.h>
 }
 
 const TFlagsNames ControllersName = {

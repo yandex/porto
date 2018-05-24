@@ -24,7 +24,7 @@ std::string TError::ToString() const {
 
 TError TError::Serialize(int fd) const {
     int ret;
-    int len = Text.length();
+    unsigned len = Text.length();
 
     ret = write(fd, &Error, sizeof(Error));
     if (ret != sizeof(Error))
@@ -36,7 +36,7 @@ TError TError::Serialize(int fd) const {
     if (ret != sizeof(len))
         return System("Can't serialize length");
     ret = write(fd, Text.data(), len);
-    if (ret != len)
+    if (ret != (int)len)
         return System("Can't serialize description");
 
     return OK;
@@ -46,7 +46,7 @@ bool TError::Deserialize(int fd, TError &error) {
     EError err;
     int errno;
     int ret;
-    int len;
+    unsigned len;
 
     ret = read(fd, &err, sizeof(err));
     if (ret == 0)
@@ -66,14 +66,14 @@ bool TError::Deserialize(int fd, TError &error) {
         return true;
     }
 
-    if (len < 0 || len > TError::MAX) {
+    if (len > TError::MAX_LENGTH) {
         error = TError("Invalid error description length: {}", len);
         return true;
     }
 
     std::string desc(len, '\0');
     ret = read(fd, &desc[0], len);
-    if (ret != len) {
+    if (ret != (int)len) {
         error = System("Can't deserialize description");
         return true;
     }

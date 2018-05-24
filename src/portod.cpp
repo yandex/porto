@@ -302,11 +302,11 @@ static TError AcceptConnection(int listenFd) {
     if (error)
         return error;
 
-    int max_clients = config().daemon().max_clients_in_container();
+    unsigned max_clients = config().daemon().max_clients_in_container();
     if (client->IsSuperUser())
         max_clients += NR_SUPERUSER_CLIENTS;
 
-    if (client->ClientContainer->ClientsCount > max_clients) {
+    if (client->ClientContainer->ClientsCount > (int)max_clients) {
         error = DropIdleClient(client->ClientContainer);
         if (error)
             return error;

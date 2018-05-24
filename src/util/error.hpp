@@ -14,7 +14,7 @@ public:
     int Errno = 0;
     std::string Text;
 
-    static constexpr unsigned MAX = 65536;
+    static constexpr unsigned MAX_LENGTH = 65536;
 
     TError(): Error(EError::Success) {}
 

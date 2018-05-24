@@ -4,13 +4,16 @@ include_directories(${CURSES_INCLUDE_DIR})
 
 PROTOBUF_GENERATE_CPP(RPC_PROTO_SRCS RPC_PROTO_HDRS rpc.proto)
 add_library(rpc_proto STATIC ${RPC_PROTO_SRCS})
+set_source_files_properties(${RPC_PROTO_SRCS} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
 
 PROTOBUF_GENERATE_CPP(KV_PROTO_SRCS KV_PROTO_HDRS kv.proto)
 add_library(kv_proto STATIC ${KV_PROTO_SRCS})
+set_source_files_properties(${KV_PROTO_SRCS} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
 
 PROTOBUF_GENERATE_CPP(CONFIG_PROTO_SRCS CONFIG_PROTO_HDRS config.proto)
 add_library(config STATIC ${CONFIG_PROTO_SRCS} config.cpp)
 add_dependencies(config rpc_proto) # rpc.pp.h -> error.hpp -> config.hpp
+set_source_files_properties(${CONFIG_PROTO_SRCS} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
 
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
 

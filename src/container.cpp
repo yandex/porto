@@ -60,7 +60,7 @@ TError TContainer::ValidName(const std::string &name, bool superuser) {
     if (name.length() == 0)
         return TError(EError::InvalidValue, "container path too short");
 
-    int path_max = superuser ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
+    unsigned path_max = superuser ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
     if (name.length() > path_max)
         return TError(EError::InvalidValue, "container path too long, limit is {}", path_max);
 

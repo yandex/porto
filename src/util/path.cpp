@@ -9,6 +9,7 @@
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/sysmacros.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/statvfs.h>
@@ -1307,7 +1308,7 @@ TError TFile::ReadEnds(std::string &text, size_t max) const {
     ssize_t head = 0, tail, size;
     struct stat st;
 
-    if (Stat(st) || st.st_size <= max) {
+    if (Stat(st) || st.st_size <= (off_t)max) {
         size = st.st_size ?: max;
         text.resize(size);
         tail = pread(Fd, &text[0], size, 0);

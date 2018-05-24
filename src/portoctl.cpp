@@ -521,12 +521,6 @@ static const std::string StripIdx(const std::string &name) {
         return name;
 }
 
-static bool ValidData(const vector<Porto::Property> &dlist, const string &name) {
-    return find_if(dlist.begin(), dlist.end(),
-                   [&](const Porto::Property &i)->bool { return i.Name == StripIdx(name); })
-        != dlist.end();
-}
-
 static bool ValidProperty(const vector<Porto::Property> &plist, const string &name) {
     return find_if(plist.begin(), plist.end(),
                    [&](const Porto::Property &i)->bool { return i.Name == StripIdx(name); })
@@ -1225,7 +1219,7 @@ public:
 
         launcher.Container = ct + "/shell-" + current_user + "-" + std::to_string(GetPid());
 
-        int name_max = getuid() ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
+        unsigned name_max = getuid() ? CONTAINER_PATH_MAX_FOR_SUPERUSER : CONTAINER_PATH_MAX;
         if (launcher.Container.size() > name_max)
             launcher.Container = ct + "/shell-"+ std::to_string(GetPid());
 

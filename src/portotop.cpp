@@ -981,7 +981,7 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     }
     while (Columns[SelectedColumn].Hidden && x < 0 && SelectedColumn > 0)
         SelectedColumn--;
-    while (Columns[SelectedColumn].Hidden && SelectedColumn < Columns.size() - 1)
+    while (Columns[SelectedColumn].Hidden && SelectedColumn < (int)Columns.size() - 1)
         SelectedColumn++;
     while (Columns[SelectedColumn].Hidden && SelectedColumn > 0)
         SelectedColumn--;
@@ -1014,7 +1014,7 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     }
 }
 
-void TPortoTop::ChangeView(int x, int y, TConsoleScreen &screen) {
+void TPortoTop::ChangeView(int x, int y) {
     FirstX += x;
     if (FirstX > 0)
         FirstX = 0;
@@ -1260,10 +1260,10 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
             top.ChangeSelection(1000, 0, screen);
             break;
         case '<':
-            top.ChangeView(1, 0, screen);
+            top.ChangeView(1, 0);
             break;
         case '>':
-            top.ChangeView(-1, 0, screen);
+            top.ChangeView(-1, 0);
             break;
         case '\t':
             top.Expand();
