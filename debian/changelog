@@ -1,3 +1,9 @@
+yandex-porto (4.12.15) unstable; urgency=low
+
+  * porto: allow absolute container names as result of LocateProcess
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 24 May 2018 18:32:43 +0300
+
 yandex-porto (4.12.14) unstable; urgency=low
 
   * porto: open tty streams for read-write
