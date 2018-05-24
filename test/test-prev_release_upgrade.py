@@ -89,7 +89,9 @@ def VerifyProps(r, props):
 
 def SnapshotProps(r):
     #FIXME: add controllers, cpu_set, owner_group, owner_user, umask later
-    props = [ "aging_time", "anon_limit", "bind",
+    props = [ "aging_time",
+              # "anon_limit", FIXME
+              "bind",
               #"capabilities", #FIXME enable later, os: "<set1>" -> "<set2>" ,
                                #app: "" -> "<not empty>"
               "command", "cpu_guarantee",
