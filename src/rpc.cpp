@@ -1095,12 +1095,12 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
     if (TContainer::FindTaskContainer(pid, ct))
         return TError(EError::InvalidValue, "task not found");
 
-    if (CL->ComposeName(ct->Name, name)) {
-        if (CL->ClientContainer == ct)
-            name = SELF_CONTAINER;
-        else
-            return TError(EError::Permission, "container is unreachable");
-    }
+    if (ct->IsRoot())
+        name = ROOT_CONTAINER;
+    else if (CL->ClientContainer == ct)
+        name = SELF_CONTAINER;
+    else
+        name = CL->RelativeName(ct->Name);
 
     rsp.mutable_locateprocess()->set_name(name);
 
