@@ -2778,10 +2778,10 @@ public:
     }
 } static MajorFaults;
 
-class TVirtualMemroy : public TProperty {
+class TVirtualMemory : public TProperty {
 public:
-    TVirtualMemroy() : TProperty(P_VIRTUAL_MEMORY, EProperty::NONE,
-            "Virtual mememory size: <type>: <bytes>;...")
+    TVirtualMemory() : TProperty(P_VIRTUAL_MEMORY, EProperty::NONE,
+            "Virtual memory size: <type>: <bytes>;...")
     {
         IsReadOnly = true;
         IsRuntimeOnly = true;
