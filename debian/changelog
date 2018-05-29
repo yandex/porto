@@ -1,3 +1,20 @@
+yandex-porto (4.13.10) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * test: ignore default anon_limit
+
+  [ Andy Yankovsky ]
+  * Fix typos
+
+  [ Konstantin Khlebnikov ]
+  * porto: fix warnings
+  * porto: allow absolute container names as result of LocateProcess
+  * porto: handle aufs whiteout for dangling symlinks
+  * porto: fix conversion aufs opaque directories
+  * test: aufs import
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 29 May 2018 18:31:35 +0300
+
 yandex-porto (4.13.9) unstable; urgency=low
 
   * device: allow write access to related sysfs nodes
