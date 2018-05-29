@@ -54,6 +54,14 @@ def ExpectException(func, exc, *args):
     tmp = Catch(func, *args)
     assert tmp == exc, "method {} should throw {} not {}".format(ct, func, exc, tmp)
 
+def ExpectFile(path, mode, dev=0):
+    try:
+        st = os.lstat(path)
+        assert st.st_mode == mode, "file {} mode {} should be {}".format(path, st.st_mode, mode)
+        assert st.st_rdev == dev, "device {} {:x} should be {:x}".format(path, st.st_rdev, dev)
+    except OSError:
+        assert mode == None, "file {} not found".format(path)
+
 def ParseMountinfo(pid="self"):
     ret = {}
     for line in open("/proc/{}/mountinfo".format(pid), "r"):
