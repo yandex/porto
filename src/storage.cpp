@@ -936,14 +936,14 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
                 return error;
 
             /* Opaque directory - hide entries in lower layers */
-            if (walk.Path.ToString() == ".wh..wh..opq") {
+            if (walk.Name() == ".wh..wh..opq") {
                 error = walk.Path.DirName().SetXAttr("trusted.overlay.opaque", "y");
                 if (error)
                     return error;
             }
 
             /* Metadata is done */
-            if (StringStartsWith(walk.Path.ToString(), ".wh..wh."))
+            if (StringStartsWith(walk.Name(), ".wh..wh."))
                 continue;
 
             /* Remove whiteouted entry */
