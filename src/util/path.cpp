@@ -138,6 +138,11 @@ bool TPath::Exists() const {
     return access(Path.c_str(), F_OK) == 0;
 }
 
+bool TPath::PathExists() const {
+    struct stat st;
+    return lstat(Path.c_str(), &st) == 0;
+}
+
 std::string TPath::ToString() const {
     return Path;
 }
