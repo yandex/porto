@@ -948,7 +948,7 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
 
             /* Remove whiteouted entry */
             TPath real = walk.Path.DirName() / walk.Name().substr(4);
-            if (real.Exists()) {
+            if (real.PathExists()) {
                 error = real.RemoveAll();
                 if (error)
                     return error;

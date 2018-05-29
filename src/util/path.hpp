@@ -133,6 +133,7 @@ public:
     int64_t SinceModificationMs() const;
     std::string ToString() const;
     bool Exists() const;
+    bool PathExists() const; /* or dangling symlink */
 
     TError Chdir() const;
     TError Chroot() const;
