@@ -1659,6 +1659,9 @@ next:
     }
     switch (Ent->fts_info) {
     case FTS_DNR:
+        if (Ent->fts_errno == ENOTDIR)
+            goto next;
+        // fall through
     case FTS_ERR:
     case FTS_NS:
         if (Ent->fts_errno == ENOENT)
