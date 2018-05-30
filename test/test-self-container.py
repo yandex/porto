@@ -45,7 +45,7 @@ ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=tes
 # Find
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=',
                                 'command=' + portoctl + ' find 1'],
-                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'test\n')
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'self\n')
 
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=test/',
                                 'command=' + portoctl + ' find 1'],
@@ -53,11 +53,11 @@ ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=tes
 
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=',
                                 'command=' + portoctl + ' exec self/test porto_namespace= command=\"' + portoctl + ' find 1\"'],
-                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'test/test\n')
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'self\n')
 
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'porto_namespace=test/',
                                 'command=' + portoctl + ' exec test porto_namespace= command=\"' + portoctl + ' find 1\"'],
-                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'test\n')
+                                stdin=subprocess.PIPE, stderr=subprocess.PIPE), 'self\n')
 
 # Isolate
 ExpectEq(subprocess.check_output([portoctl, 'exec', 'test', 'enable_porto=isolate',
