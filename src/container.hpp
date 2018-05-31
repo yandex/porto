@@ -252,7 +252,7 @@ public:
     std::shared_ptr<TNetwork> Net;
 
     inline std::unique_lock<std::mutex> LockNetState() {
-        PORTO_ASSERT(IsStateLockedRead());
+        PORTO_ASSERT(IsStateLockedRead() || IsRoot());
         if (Net)
             return Net->LockNetState();
         return std::unique_lock<std::mutex>();
