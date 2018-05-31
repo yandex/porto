@@ -1,3 +1,10 @@
+yandex-porto (4.12.17) unstable; urgency=low
+
+  * path/walk: handle dir to non-dir replacement
+  * porto: fix crash at dynamic network configuration
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 31 May 2018 12:33:10 +0300
+
 yandex-porto (4.12.16) unstable; urgency=low
 
   * porto: handle aufs whiteout for dangling symlinks
