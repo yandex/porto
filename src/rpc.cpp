@@ -207,7 +207,7 @@ void TRequest::Parse() {
             opts.push_back("compress=" + Req.importlayer().compress());
         if (Req.importlayer().has_place())
             opts.push_back("place=" + Req.importlayer().place());
-        if (Req.importlayer().has_merge())
+        if (Req.importlayer().merge())
             opts.push_back("merge=true");
         if (Req.importlayer().has_private_value())
             opts.push_back("private=" + Req.importlayer().private_value());
