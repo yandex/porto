@@ -204,6 +204,13 @@ TError TTaskEnv::ChildExec() {
 
     SetDieOnParentExit(0);
     TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
+
+    /* https://bugs.launchpad.net/upstart/+bug/1582199 */
+    if (CT->OsMode && !(CT->Controllers & CGROUP_SYSTEMD)) {
+        L_VERBOSE("Reserve fd 9 for upstart JOB_PROCESS_SCRIPT_FD");
+        dup2(1, 9);
+    }
+
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
     if (errno == EAGAIN)
