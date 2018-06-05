@@ -1,3 +1,10 @@
+yandex-porto (4.12.18) unstable; urgency=low
+
+  * porto: add workaround for bug in upstart
+  * porto: write stacktrace when portod-core crashses
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 05 Jun 2018 15:55:14 +0300
+
 yandex-porto (4.12.17) unstable; urgency=low
 
   * path/walk: handle dir to non-dir replacement
