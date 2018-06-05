@@ -44,6 +44,10 @@ TError TCore::Handle(const TTuple &args) {
     if (args.size() < 7)
         return TError("should be executed via sysctl kernel.core_pattern");
 
+    SetProcessName("portod-core");
+    CatchFatalSignals();
+    OpenLog(PORTO_LOG);
+
     Pid = std::stoi(args[0]);
     Tid = std::stoi(args[1]);
     Vpid = std::stoi(args[2]);
@@ -61,9 +65,6 @@ TError TCore::Handle(const TTuple &args) {
 
     ProcessName = GetTaskName(Pid);
     ThreadName = GetTaskName(Tid);
-
-    OpenLog(PORTO_LOG);
-    SetProcessName("portod-core");
 
     error = TPath("/proc/" + std::to_string(Tid) + "/exe").ReadLink(ExePath);
     if (!error) {
