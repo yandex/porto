@@ -60,7 +60,7 @@ TError TProperty::CanGet() const {
 
     if (IsRuntimeOnly && (CT->State == EContainerState::Stopped ||
                           CT->State == EContainerState::Starting))
-        return TError(EError::InvalidState, "{} is not available in {} state", TContainer::StateName(CT->State), Name);
+        return TError(EError::InvalidState, "{} is not available in {} state", Name, TContainer::StateName(CT->State));
 
     if (IsDeadOnly && CT->State != EContainerState::Dead)
         return TError(EError::InvalidState, "{} available only in dead state", Name);
