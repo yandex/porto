@@ -2218,9 +2218,23 @@ void TContainer::SanitizeCapabilitiesAll() {
 }
 
 TUlimit TContainer::GetUlimit() const {
+    uint64_t memlimit = MemLimit, memlock = 0;
     TUlimit res = Ulimit;
-    for (auto p = Parent.get(); p; p = p->Parent.get())
+
+    for (auto p = Parent.get(); p; p = p->Parent.get()) {
         res.Merge(p->Ulimit, false);
+        if (p->MemLimit && (p->MemLimit < memlimit || !memlimit))
+            memlimit = p->MemLimit;
+    }
+
+    if (config().container().memlock_margin() &&
+            memlimit > config().container().memlock_margin())
+        memlock = memlimit - config().container().memlock_margin();
+    if (memlock < config().container().memlock_minimal())
+        memlock = config().container().memlock_minimal();
+    if (memlock)
+        res.Set(RLIMIT_MEMLOCK, memlock, RLIM_INFINITY, false);
+
     return res;
 }
 

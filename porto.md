@@ -148,7 +148,9 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 ```
 container { default_ulimit: "type: soft hard;..." }
 ```
-   Hardcoded default is "core: 0 unlimited; memlock: 8M unlimited; nofile: 8K 1M".
+   Hardcoded default is "core: 0 unlimited; nofile: 8K 1M".
+
+   Default memlock is max(**memory\_limit** - 16M, 8M), hard limit is unlimited.
 
 * **virt\_mode** - virtualization mode:
     - *app* - (default) start **command** as normal process
