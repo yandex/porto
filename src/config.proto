@@ -159,6 +159,7 @@ message TConfig {
             repeated string sysfs = 2;
         }
         repeated TDeviceSysfs device_sysfs = 47;
+        optional uint64 anon_limit_margin = 48;
     }
 
     message TPrivilegesCfg {

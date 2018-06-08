@@ -1524,6 +1524,15 @@ public:
             CT->MemLimit = new_size;
             CT->SetProp(EProperty::MEM_LIMIT);
         }
+        if (!CT->HasProp(EProperty::ANON_LIMIT) &&
+                MemorySubsystem.SupportAnonLimit() &&
+                config().container().anon_limit_margin()) {
+            if (CT->MemLimit)
+                CT->AnonMemLimit = CT->MemLimit - std::min(CT->MemLimit / 4,
+                        config().container().anon_limit_margin());
+            else
+                CT->AnonMemLimit = 0;
+        }
         return OK;
     }
 } static MemoryLimit;
