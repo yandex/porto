@@ -57,6 +57,7 @@ endif()
 
 ADD_PYTHON_TEST(ct-state)
 ADD_PYTHON_TEST(knobs)
+ADD_PYTHON_TEST(ulimit)
 ADD_PYTHON_TEST(mount)
 ADD_PYTHON_TEST(aufs)
 ADD_PYTHON_TEST(symlink)
