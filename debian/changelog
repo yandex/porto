@@ -1,3 +1,25 @@
+yandex-porto (4.12.19) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * test: locate now always returns self if task in same container
+  * porto: fix logging merge flag when importing layers
+
+  [ Andy Yankovsky ]
+  * Fix argument order
+
+  [ Gennady Lipenkov ]
+  * Fix typo
+
+  [ Konstantin Khlebnikov ]
+  * porto: fix legacy memory.recharge_on_pgfault
+  * porto: open /dev/null for upstart workaround
+  * porto: setup default anon_limit to memory_limit - 16Mb
+  * test: ignore default anon_limit
+  * porto: set default ulimit memlock to max(mem_limit - 16M, 8M)
+  * test: check ulimit
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 08 Jun 2018 20:33:23 +0300
+
 yandex-porto (4.12.18) unstable; urgency=low
 
   * porto: add workaround for bug in upstart
