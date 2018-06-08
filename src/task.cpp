@@ -206,9 +206,10 @@ TError TTaskEnv::ChildExec() {
     TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
 
     /* https://bugs.launchpad.net/upstart/+bug/1582199 */
-    if (CT->OsMode && !(CT->Controllers & CGROUP_SYSTEMD)) {
+    if (CT->Command == "/sbin/init" && CT->OsMode &&
+            !(CT->Controllers & CGROUP_SYSTEMD)) {
         L_VERBOSE("Reserve fd 9 for upstart JOB_PROCESS_SCRIPT_FD");
-        dup2(1, 9);
+        dup2(open("/dev/null", O_RDWR | O_CLOEXEC), 9);
     }
 
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
