@@ -16,6 +16,7 @@
 
 class TContainer;
 class TNetwork;
+struct TNetDeviceConfig;
 struct TTaskEnv;
 
 struct TNetStat {
@@ -218,8 +219,7 @@ public:
     void SyncStat();
     static void SyncAllStat();
 
-    TError GetGateAddress(std::vector<TNlAddr> addrs,
-                          TNlAddr &gate4, TNlAddr &gate6, int &mtu, int &group);
+    TError GetL3Gate(TNetDeviceConfig &dev);
 
     TError SetupProxyNeighbour(const std::vector <TNlAddr> &ip,
                                const std::string &master);
@@ -269,7 +269,8 @@ struct TNetDeviceConfig {
     bool EnableECN = false;
 
     std::vector<TNlAddr> Ip;
-    TNlAddr Gw;
+    TNlAddr Gate4;
+    TNlAddr Gate6;
 
     struct {
         TNlAddr Local;

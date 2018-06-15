@@ -65,6 +65,8 @@ enum EError {
 
     InvalidPath = 25;
 
+    InvalidNetworkAddress = 26;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }
