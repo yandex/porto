@@ -1,3 +1,11 @@
+yandex-porto (4.12.20) unstable; urgency=low
+
+  * porto: ignore /etc/default/portod.conf if /etc/portod.conf exists
+  * portod: dump ulimit and reset stack ulimit
+  * network: consider default gateway for L3 only within same L2 domain
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 20 Jun 2018 15:29:21 +0300
+
 yandex-porto (4.12.19) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
