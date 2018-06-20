@@ -507,7 +507,8 @@ exit:
 }
 
 static TError TuneLimits() {
-    struct rlimit rlim;
+    TUlimit ulimit;
+    TError error;
 
     /*
      * two FDs for each container: OOM event and netlink
@@ -526,12 +527,23 @@ static TError TuneLimits() {
 
     L_SYS("Estimated portod file descriptor limit: {}", maxFd);
 
-    rlim.rlim_max = maxFd;
-    rlim.rlim_cur = maxFd;
+    ulimit.Set(RLIMIT_NOFILE, maxFd, maxFd);
 
-    int ret = setrlimit(RLIMIT_NOFILE, &rlim);
-    if (ret)
-        return TError::System("sertlimit");
+    /*
+     * Old make set unlimited stack
+     */
+    ulimit.Set(RLIMIT_STACK, 8 << 20, RLIM_INFINITY);
+
+    error = ulimit.Apply();
+    if (error)
+        return error;
+
+    error = ulimit.Load();
+    if (error)
+        return error;
+
+    for (auto &res: ulimit.Resources)
+        L_SYS("Ulimit {}", res.Format());
 
     return OK;
 }

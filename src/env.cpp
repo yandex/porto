@@ -244,6 +244,17 @@ std::string TUlimit::Format() const {
     return str;
 }
 
+TError TUlimit::Load(pid_t pid) {
+    Clear();
+    for (int type = 0; type < RLIM_NLIMITS; type++) {
+        struct rlimit lim;
+        if (prlimit(pid, (enum __rlimit_resource)type, nullptr, &lim))
+            return TError::System("prlimit {} {}", pid, TUlimit::GetName(type));
+        Set(type, lim.rlim_cur, lim.rlim_max);
+    }
+    return OK;
+}
+
 TError TUlimit::Apply(pid_t pid) const {
     struct rlimit lim;
     for (auto &res: Resources) {

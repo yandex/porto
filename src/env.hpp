@@ -43,6 +43,7 @@ struct TUlimit {
     static std::string GetName(int type);
     TError Parse(const std::string &str);
     std::string Format() const;
+    TError Load(pid_t pid = 0);
     TError Apply(pid_t pid = 0) const;
     void Clear() { Resources.clear(); }
     void Set(int type, uint64_t soft, uint64_t hard, bool overwrite = true);
