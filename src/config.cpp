@@ -165,7 +165,7 @@ static void DefaultConfig() {
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");
 }
 
-static void ReadConfig(const TPath &path, bool silent) {
+static TError ReadConfig(const TPath &path, bool silent) {
     TError error;
     TFile file;
 
@@ -173,7 +173,7 @@ static void ReadConfig(const TPath &path, bool silent) {
     if (error) {
         if (!silent && error.Errno != ENOENT)
             L_WRN("Cannot read config {} {}", path, error);
-        return;
+        return error;
     }
 
     google::protobuf::io::FileInputStream stream(file.Fd);
@@ -188,14 +188,16 @@ static void ReadConfig(const TPath &path, bool silent) {
     bool ok = parser.Merge(&stream, &Config);
     if (!ok && !silent)
         L_WRN("Cannot parse config {} the rest is skipped", path);
+
+    return OK;
 }
 
 void ReadConfigs(bool silent) {
     Config.Clear();
     DefaultConfig();
 
-    ReadConfig("/etc/default/portod.conf", silent); /* FIXME remove */
-    ReadConfig("/etc/portod.conf", silent);
+    if (ReadConfig("/etc/portod.conf", silent))
+        ReadConfig("/etc/default/portod.conf", silent); /* FIXME remove */
 
     TPath config_dir = "/etc/portod.conf.d";
     std::vector<std::string> config_names;
