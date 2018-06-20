@@ -144,29 +144,32 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **ulimit** - resource limits, syntax: \<type\>: \[soft\]|unlimited \<hard\>|unlimited; ... see **getrlimit(2)**
 
-   Default ulimits could be set in portod.conf:
-```
-container { default_ulimit: "type: soft hard;..." }
-```
-   Hardcoded default is "core: 0 unlimited; nofile: 8K 1M".
+    Default ulimits could be set in portod.conf:
+    ```
+    container {
+        default_ulimit: "type: soft hard;..."
+    }
+    ```
 
-   Default memlock is max(**memory\_limit** - 16M, 8M), hard limit is unlimited.
+    Hardcoded default is "core: 0 unlimited; nofile: 8K 1M".
+
+    Default memlock is max(**memory\_limit** - 16M, 8M), hard limit is unlimited.
 
 * **virt\_mode** - virtualization mode:
     - *app* - (default) start **command** as normal process
     - *os* - start **command** as init process
     - *host* - start **command** without security restrictions
 
-   Side effects of **virt\_mode**=*os*
+    Side effects of **virt\_mode**=*os*
 
-   - set default **command**="/sbin/init"
-   - set default **user**="root", **group**="root"
-   - set default **stdout\_path**="/dev/null", **stderr\_path**="/dev/null"
-   - set default **net**=*none*
-   - set default **cwd**="/"
-   - reset loginuid for container
-   - enable systemd cgroup if /sbin/init is systemd
-   - stop command will send *SIGPWR* rather than *SIGTERM*
+    - set default **command**="/sbin/init"
+    - set default **user**="root", **group**="root"
+    - set default **stdout\_path**="/dev/null", **stderr\_path**="/dev/null"
+    - set default **net**=*none*
+    - set default **cwd**="/"
+    - reset loginuid for container
+    - enable systemd cgroup if /sbin/init is systemd
+    - stop command will send *SIGPWR* rather than *SIGTERM*
 
 ## State
 
@@ -244,7 +247,7 @@ container { default_ulimit: "type: soft hard;..." }
 
 * **max\_respawns** - limit for automatic respawns, default: -1 (unlimited)
 
-* **respawn\_delay** - delay before automaic respawn in nanoseconds, default 1s
+* **respawn\_delay** - delay before automatic respawn in nanoseconds, default 1s
 
 * **aging\_time** - time in seconds before auto-destroying dead containers, default: 1 day
 
@@ -329,20 +332,22 @@ container { default_ulimit: "type: soft hard;..." }
     Configuration could be changes in runtime.
 
     Access to devices for all containers could be also granted in portod.conf:
-```
-container { extra_devices: "<device> [rwm]... ;..." }
-```
+    ```
+    container {
+        extra_devices: "<device> [rwm]... ;..."
+    }
+    ```
 
     Write access to related sysfs nodes could be granted in portod.conf:
-```
-container {
-   device_sysfs {
-      device: "/dev/abc"
-      sysfs: "/sys/foo"
-      sysfs: "/sys/bar"
-   }
-}
-```
+    ```
+    container {
+        device_sysfs {
+            device: "/dev/abc"
+            sysfs: "/sys/foo"
+            sysfs: "/sys/bar"
+        }
+    }
+    ```
 
 * **enable\_porto** - access to porto
     - *false* | *none* - no access
@@ -548,7 +553,7 @@ write permissions to the target or owning related volume.
 
 * **virtual\_memory** - non-recursive sum for processes in container, format: \<type\>: \<bytes\>;...
 
-   Types: count, size, max\_size, used, max\_used, anon, file, shmem, huge, swap, locked, data, stack, code, table.
+    Types: count, size, max\_size, used, max\_used, anon, file, shmem, huge, swap, locked, data, stack, code, table.
 
 ## CPU
 
@@ -596,7 +601,7 @@ write permissions to the target or owning related volume.
 
 * **cpu\_period** - CPU limit accounting period
 
-   Syntax: 1ms..1s, default: 100ms \[nanoseconds\]
+    Syntax: 1ms..1s, default: 100ms \[nanoseconds\]
 
 * **cpu\_policy**  - CPU scheduler policy, see **sched(7)**
     - *normal*   - SCHED\_OTHER (default)
@@ -707,15 +712,18 @@ Possible indexes for statistics and parameters:
 * **resolv\_conf**   - DNS resolver configuration, syntax: default|keep|\<resolv.conf option\>;...
 
     Default setting **resolv\_conf**="default" loads configuration from portod.conf:
-```
-container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
-```
+    ```
+    container {
+        default_resolv_conf: "nameserver <ip>;nameserver <ip>;..."
+    }
+    ```
+
     or from host /etc/resolv.conf if option in portod.conf isn't set.
 
     Inside container root /etc/resolv.conf must be a regular file,
     porto bind-mounts temporary file over it.
 
-    Setting **resolv\_conf**="keep" keeps configuraion in container as is.
+    Setting **resolv\_conf**="keep" keeps configuration in container as is.
 
 * **sysctl**         - sysctl configuration, syntax: \<sysctl\>: \<value\>;...
 
@@ -723,20 +731,20 @@ container { default_resolv_conf: "nameserver <ip>;nameserver <ip>;..." }
 
     Default values for network and ipc sysctls are the same as in host and
     could be overriden in portod.conf:
-```
-container {
-    ipc_sysctl {
-        key: "sysctl"
-        val: "value"
-    },
-    ...
-    net_sysctl {
-        key: "sysctl"
-        val: "value"
-    },
-    ...
-}
-```
+    ```
+    container {
+        ipc_sysctl {
+            key: "sysctl"
+            val: "value"
+        },
+        ...
+        net_sysctl {
+            key: "sysctl"
+            val: "value"
+        },
+        ...
+    }
+    ```
 
 * **net\_guarantee** - required egress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
@@ -779,22 +787,22 @@ container {
 
     Porto setup first level TC classes for each CSx.
     Default class, weights and limits could be set in portod.conf:
-```
-network {
-    default_tos: "CS0"
-    dscp_class {
-        name: "CS1"
-        weight: 10
-        limit: 123456
-        max_percent: 16.5
+    ```
+    network {
+        default_tos: "CS0"
+        dscp_class {
+            name: "CS1"
+            weight: 10
+            limit: 123456
+            max_percent: 16.5
+        }
+        dscp_class {
+            name: "CS3"
+            weight: 42
+        }
+        ...
     }
-    dscp_class {
-        name: "CS3"
-        weight: 42
-    }
-    ...
-}
-```
+    ```
 
 # NETWORKING
 
@@ -821,7 +829,6 @@ net.ipv6.conf.all.accept_ra = 2
 ## NAT
 
 Mode **net**=NAT works as L3 and automatically allocates IP from pool configured in portod.conf:
-
 ```
 network {
     nat_first_ipv4: "*ip*"
@@ -850,11 +857,12 @@ ip6tables -t nat -A POSTROUTING -s fec0::42:0/120 -j MASQUERADE
 In new network namespaces porto setup **ip-addrlabel(8)** from portod.conf:
 ```
 network {
-        addrlabel {
-                prefix: "ip/mask"
-                label: number
-        },
-        ...
+    addrlabel {
+        prefix: "ip/mask"
+        label: number
+    },
+    ...
+}
 ```
 
 This helps container to choose correct source IP when it works in several networks.
@@ -919,10 +927,10 @@ otherwise crashed task could exit and dismantle pid namespace too early.
 Required setup in portod.conf:
 ```
 core {
-   enable: true
-   default_pattern: "/coredumps/%e.%p.%s"
-   space_limit_mb: 102400
-   slot_space_limit_mb: 10240
+    enable: true
+    default_pattern: "/coredumps/%e.%p.%s"
+    space_limit_mb: 102400
+    slot_space_limit_mb: 10240
 }
 ```
 
@@ -1127,7 +1135,9 @@ Backend *lvm* takes configuration from property **storage** in format: \[group\]
 
 Default volume group could be set in portod.conf
 ```
-volumes { default_lvm_group: "group" }
+volumes {
+    default_lvm_group: "group"
+}
 ```
 
 It "name" is set volume becomes persistent: porto keeps and reuse logical volume "group/name".
@@ -1211,9 +1221,9 @@ See **portoctl(8)** for details.
 
     Porto API protobuf.
 
-/etc/defaults/portod.conf  (deprecated)  
+/etc/defaults/portod.conf  (deprecated, do not use)  
 /etc/portod.conf  
-/etc/portod.conf.d/\*.conf  (sorted)
+/etc/portod.conf.d/\*.conf  (loaded in sorted order)
 
     Porto daemon configuration in protobuf text format.
     Porto merges it with hardcoded defaults and prints into log when starts.
