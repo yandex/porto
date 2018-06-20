@@ -768,11 +768,21 @@ TError TNetwork::SyncDevices(bool force) {
     return OK;
 }
 
-TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
-                                TNlAddr &gate4, TNlAddr &gate6,
-                                int &mtu, int &group) {
+TError TNetwork::GetL3Gate(TNetDeviceConfig &dev) {
     struct nl_cache *cache, *lcache;
+    int default_mtu = -1;
+    TError error;
     int ret;
+
+    bool skip = dev.Mtu > 0;
+    for (auto &ip: dev.Ip) {
+        if (ip.Family() == AF_INET ? dev.Gate4.IsEmpty() : dev.Gate6.IsEmpty()) {
+            skip = false;
+            break;
+        }
+    }
+    if (skip)
+        return OK;
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
     if (ret < 0)
@@ -785,61 +795,54 @@ TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
     }
 
     for (auto obj = nl_cache_get_first(cache); obj; obj = nl_cache_get_next(obj)) {
-         auto addr = (struct rtnl_addr *)obj;
-         auto local = rtnl_addr_get_local(addr);
+        auto addr = (struct rtnl_addr *)obj;
+        auto local = rtnl_addr_get_local(addr);
 
-         if (!local || rtnl_addr_get_scope(addr) == RT_SCOPE_HOST)
-             continue;
+        if (!local || rtnl_addr_get_scope(addr) == RT_SCOPE_HOST ||
+                rtnl_addr_get_scope(addr) == RT_SCOPE_LINK)
+            continue;
 
-         for (auto &a: addrs) {
+        for (auto &ip: dev.Ip) {
+            if (ip.Family() != nl_addr_get_family(local))
+                continue;
 
-             if (nl_addr_get_family(a.Addr) == nl_addr_get_family(local)) {
+            if (dev.Type == "L3" && dev.Mode == "NAT") {
+                /* match anything */
+            } else if (nl_addr_cmp_prefix(local, ip.Addr))
+                continue;
 
-                 /* get any gate of required family */
-                 if (nl_addr_get_family(local) == AF_INET && !gate4.Addr)
-                     gate4 = TNlAddr(local);
+            if (dev.Gate4.IsEmpty() && ip.Family() == AF_INET) {
+                dev.Gate4 = TNlAddr(local);
+                nl_addr_set_prefixlen(dev.Gate4.Addr, 32);
+            }
 
-                 if (nl_addr_get_family(local) == AF_INET6 && !gate6.Addr)
-                     gate6 = TNlAddr(local);
-             }
+            if (dev.Gate6.IsEmpty() && ip.Family() == AF_INET6) {
+                dev.Gate6 = TNlAddr(local);
+                nl_addr_set_prefixlen(dev.Gate6.Addr, 128);
+            }
 
-             if (nl_addr_cmp_prefix(local, a.Addr) == 0) {
+            auto link = rtnl_link_get(lcache, rtnl_addr_get_ifindex(addr));
+            if (link) {
+                default_mtu = std::max(default_mtu, (int)rtnl_link_get_mtu(link));
+                rtnl_link_put(link);
+            }
+        }
+    }
 
-                 /* choose best matching gate address */
-                 if (nl_addr_get_family(local) == AF_INET &&
-                         nl_addr_cmp_prefix(gate4.Addr, a.Addr) != 0)
-                     gate4 = TNlAddr(local);
-
-                 if (nl_addr_get_family(local) == AF_INET6 &&
-                         nl_addr_cmp_prefix(gate6.Addr, a.Addr) != 0)
-                     gate6 = TNlAddr(local);
-
-                 auto link = rtnl_link_get(lcache, rtnl_addr_get_ifindex(addr));
-                 if (link) {
-                     int link_mtu = rtnl_link_get_mtu(link);
-
-                     if (mtu < 0 || link_mtu < mtu)
-                         mtu = link_mtu;
-
-                     if (!group)
-                         group = rtnl_link_get_group(link);
-
-                     rtnl_link_put(link);
-                 }
-             }
-         }
+    for (auto &ip: dev.Ip) {
+        if (ip.Family() == AF_INET ? dev.Gate4.IsEmpty() : dev.Gate6.IsEmpty()) {
+            error = TError(EError::InvalidNetworkAddress, "Ip {} have no matching address in host", ip.Format());
+            break;
+        }
     }
 
     nl_cache_free(lcache);
     nl_cache_free(cache);
 
-    if (gate4.Addr)
-        nl_addr_set_prefixlen(gate4.Addr, 32);
+    if (dev.Mtu <= 0)
+        dev.Mtu = default_mtu;
 
-    if (gate6.Addr)
-        nl_addr_set_prefixlen(gate6.Addr, 128);
-
-    return OK;
+    return error;
 }
 
 TError TNetwork::SetupProxyNeighbour(const std::vector <TNlAddr> &ips,
@@ -2109,8 +2112,12 @@ TError TNetEnv::ParseGw(TMultiTuple &gw_settings) {
         if (error)
             return error;
         for (auto &dev: Devices)
-            if (dev.Name == settings[0])
-                dev.Gw = ip;
+            if (dev.Name == settings[0]) {
+                if (ip.Family() == AF_INET)
+                    dev.Gate4 = ip;
+                if (ip.Family() == AF_INET6)
+                    dev.Gate6 = ip;
+            }
     }
     return OK;
 }
@@ -2121,7 +2128,6 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     auto parentNl = HostNetwork->GetNl();
     auto Nl = Net->GetNl();
     TNlLink peer(parentNl, peerName);
-    TNlAddr gate4, gate6;
     TError error;
 
     if (dev.Mode == "NAT" && dev.Ip.empty()) {
@@ -2131,22 +2137,17 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
         SaveIp = true;
     }
 
-    error = HostNetwork->GetGateAddress(dev.Ip, gate4, gate6, dev.Mtu, dev.Group);
+    error = HostNetwork->GetL3Gate(dev);
     if (error)
         return error;
 
     std::string ipStr;
-    for (auto &ip : dev.Ip) {
-        if (ip.Family() == AF_INET && gate4.IsEmpty())
-            return TError(EError::InvalidValue, "Ipv4 gateway not found");
-        if (ip.Family() == AF_INET6 && gate6.IsEmpty())
-            return TError(EError::InvalidValue, "Ipv6 gateway not found");
+    for (auto &ip : dev.Ip)
         ipStr += fmt::format("{}={} ", ip.Family() == AF_INET ? "ip4" : "ip6", ip.Format());
-    }
 
     L_NET("Setup L3 device {} peer={} mtu={} group={} master={} {}gw4={} gw6={}",
             dev.Name, peerName, dev.Mtu, TNetwork::DeviceGroupName(dev.Group),
-            dev.Master, ipStr, gate4.Format(), gate6.Format());
+            dev.Master, ipStr, dev.Gate4.Format(), dev.Gate6.Format());
 
     error = peer.AddVeth(dev.Name, "", dev.Mtu, VirtualDeviceGroup, NetNs.GetFd());
     if (error)
@@ -2167,26 +2168,20 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
 
     auto peerAddr = peer.GetAddr();
 
-    if (!gate4.IsEmpty()) {
-        error = Nl->PermanentNeighbour(link.GetIndex(), gate4, peerAddr, true);
+    if (!dev.Gate4.IsEmpty()) {
+        error = Nl->PermanentNeighbour(link.GetIndex(), dev.Gate4, peerAddr, true);
         if (error)
             return error;
-        error = link.AddDirectRoute(gate4);
-        if (error)
-            return error;
-        error = link.SetDefaultGw(gate4);
+        error = link.AddDirectRoute(dev.Gate4);
         if (error)
             return error;
     }
 
-    if (!gate6.IsEmpty()) {
-        error = Nl->PermanentNeighbour(link.GetIndex(), gate6, peerAddr, true);
+    if (!dev.Gate6.IsEmpty()) {
+        error = Nl->PermanentNeighbour(link.GetIndex(), dev.Gate6, peerAddr, true);
         if (error)
             return error;
-        error = link.AddDirectRoute(gate6);
-        if (error)
-            return error;
-        error = link.SetDefaultGw(gate6);
+        error = link.AddDirectRoute(dev.Gate6);
         if (error)
             return error;
     }
@@ -2207,23 +2202,14 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
 }
 
 TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
-    TNlAddr gate4, gate6;
     TError error;
-    int group;
 
     if (Net != HostNetwork)
         return TError(EError::NotSupported, "Tap only for host network");
 
-    error = Net->GetGateAddress(dev.Ip, gate4, gate6, dev.Mtu, group);
+    error = Net->GetL3Gate(dev);
     if (error)
         return error;
-
-    for (auto &addr : dev.Ip) {
-        if (addr.Family() == AF_INET6 && gate6.IsEmpty())
-            return TError(EError::InvalidValue, "Ipv6 gateway not found");
-        if (addr.Family() == AF_INET && gate4.IsEmpty())
-            return TError(EError::InvalidValue, "Ipv4 gateway not found");
-    }
 
     TFile tun;
     error = tun.OpenReadWrite("/dev/net/tun");
@@ -2292,14 +2278,14 @@ TError TNetEnv::CreateTap(TNetDeviceConfig &dev) {
     if (error)
         return error;
 
-    if (!gate6.IsEmpty()) {
-        error = Nl->ProxyNeighbour(tapdev.GetIndex(), gate6, true);
+    if (!dev.Gate4.IsEmpty()) {
+        error = Nl->ProxyNeighbour(tapdev.GetIndex(), dev.Gate4, true);
         if (error)
             return error;
     }
 
-    if (!gate4.IsEmpty()) {
-        error = Nl->ProxyNeighbour(tapdev.GetIndex(), gate4, true);
+    if (!dev.Gate6.IsEmpty()) {
+        error = Nl->ProxyNeighbour(tapdev.GetIndex(), dev.Gate6, true);
         if (error)
             return error;
     }
@@ -2441,7 +2427,8 @@ TError TNetEnv::SetupInterfaces() {
                 return error;
         }
 
-        if (NetUp || !dev.Ip.empty() || !dev.Gw.IsEmpty() || dev.Autoconf) {
+        if (NetUp || !dev.Ip.empty() || dev.Autoconf ||
+                !dev.Gate4.IsEmpty() || !dev.Gate6.IsEmpty()) {
             error = link.Up();
             if (error)
                 return error;
@@ -2455,11 +2442,17 @@ TError TNetEnv::SetupInterfaces() {
             DefaultRoute |= ip.IsHost();
         }
 
-        if (!dev.Gw.IsEmpty()) {
-            error = link.SetDefaultGw(dev.Gw);
+        if (!dev.Gate4.IsEmpty()) {
+            error = link.SetDefaultGw(dev.Gate4);
             if (error)
                 return error;
             DefaultRoute = false;
+        }
+
+        if (!dev.Gate6.IsEmpty()) {
+            error = link.SetDefaultGw(dev.Gate6);
+            if (error)
+                return error;
         }
 
         if (dev.Type == "ipip6" && DefaultRoute) {
