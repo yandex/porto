@@ -298,13 +298,13 @@ TPath TClient::ResolvePath(const TPath &path) {
 }
 
 TPath TClient::DefaultPlace() {
-    if (ClientContainer->Place.size())
-        return ClientContainer->Place[0];
+    if (ClientContainer->PlacePolicy.size())
+        return ClientContainer->PlacePolicy[0];
     return PORTO_PLACE;
 }
 
 TError TClient::CanControlPlace(const TPath &place) {
-    for (auto &mask: ClientContainer->Place)
+    for (auto &mask: ClientContainer->PlacePolicy)
         if (StringMatch(place.ToString(), mask))
             return OK;
     return TError(EError::Permission, "You are not permitted to use place " + place.ToString());

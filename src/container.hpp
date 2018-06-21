@@ -240,7 +240,7 @@ public:
     bool RecvOomEvents();
 
     TPath RootPath; /* path in host namespace, set at start */
-    std::vector<std::string> Place;
+    std::vector<std::string> PlacePolicy;
 
     /* Pritected with VolumesMutex */
     TUintMap PlaceLimit;
