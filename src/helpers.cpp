@@ -59,6 +59,8 @@ TError RunCommand(const std::vector<std::string> &command,
         return error;
     }
 
+    SetProcessName("portod-" + command[0]);
+
     error = memcg.Attach(GetPid());
     if (error)
         HelperError(err, "Cannot attach to helper cgroup: {}", error);
