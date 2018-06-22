@@ -239,7 +239,7 @@ public:
 
     bool RecvOomEvents();
 
-    TPath RootPath; /* path in host namespace, set at start */
+    TPath RootPath; /* path in host namespace */
     std::vector<std::string> PlacePolicy;
 
     /* Pritected with VolumesMutex */

@@ -750,24 +750,8 @@ noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
         return OK;
     }
 
-    TPath srcRoot;
-    if (src->State == EContainerState::Stopped) {
-        for (auto ct = src; ct; ct = ct->Parent)
-            srcRoot = ct->Root / srcRoot;
-    } else
-        srcRoot = src->RootPath;
-    srcRoot = srcRoot.NormalPath();
-
-    TPath dstRoot;
-    if (dst->State == EContainerState::Stopped) {
-        for (auto ct = dst; ct; ct = ct->Parent)
-            dstRoot = ct->Root / dstRoot;
-    } else
-        dstRoot = dst->RootPath;
-    dstRoot = dstRoot.NormalPath();
-
-    TPath path(srcRoot / req.path());
-    path = dstRoot.InnerPath(path);
+    TPath path(src->RootPath / req.path());
+    path = dst->RootPath.InnerPath(path);
 
     if (path.IsEmpty())
         return TError(EError::InvalidValue, "Path is unreachable");

@@ -62,7 +62,7 @@ public:
 
     bool IsInside(const TPath &base) const;
 
-    bool IsDotDot() const {
+    bool StartsWithDotDot() const {
         return Path[0] == '.' && Path[1] == '.' &&
               (Path[2] == '/' || Path[2] == '\0');
     }

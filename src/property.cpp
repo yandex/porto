@@ -864,16 +864,25 @@ public:
         value = CT->Root;
         return OK;
     }
-    TError Set(const std::string &root) {
+    TError Set(const std::string &value) {
         TError error;
 
         error = CT->EnableControllers(CGROUP_DEVICES);
         if (error)
             return error;
 
-        CT->Root = root;
+        if (TPath(value).NormalPath().StartsWithDotDot())
+            return TError(EError::Permission, "root path starts with ..");
+
+        CT->Root = value;
         CT->SetProp(EProperty::ROOT);
         CT->SanitizeCapabilitiesAll();
+
+        auto subtree = CT->Subtree();
+        subtree.reverse();
+        for (auto &ct: subtree)
+            ct->RootPath = ct->Parent->RootPath / TPath(ct->Root).NormalPath();
+
         return OK;
     }
     TError Start(void) {

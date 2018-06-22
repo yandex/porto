@@ -340,7 +340,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     Stdout.Limit = config().container().stdout_limit();
     Stderr.Limit = config().container().stdout_limit();
     Root = "/";
-    RootPath = TPath("/");
+    RootPath = Parent ? Parent->RootPath : TPath("/");
     RootRo = false;
     Umask = 0002;
     Isolate = true;
@@ -572,8 +572,6 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     error = ct->Load(kv);
     if (error)
         goto err;
-
-    ct->RootPath = parent->RootPath / ct->Root;
 
     ct->SyncState();
 
@@ -2319,17 +2317,6 @@ TError TContainer::PrepareStart() {
     error = CL->CanControl(OwnerCred);
     if (error)
         return error;
-
-    /* Normalize root path */
-    if (Parent) {
-        TPath path(Root);
-
-        path = path.NormalPath();
-        if (path.IsDotDot())
-            return TError(EError::Permission, "root path with ..");
-
-        RootPath = Parent->RootPath / path;
-    }
 
     if (Parent) {
         CT = this;
