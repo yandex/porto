@@ -2515,12 +2515,6 @@ TError TContainer::PrepareResources() {
         goto undo;
     }
 
-    for (auto &link: VolumeLinks) {
-        error = link->Volume->MountLink(link);
-        if (error)
-            goto undo;
-    }
-
     if (RequiredVolumes.size()) {
         error = TVolume::CheckRequired(*this);
         if (error)
@@ -2616,16 +2610,6 @@ void TContainer::FreeResources() {
             (void)cg.Remove(); //Logged inside
         }
     }
-
-    std::list<std::shared_ptr<TVolume>> unlinked;
-
-    for (auto &link: VolumeLinks) {
-        error = link->Volume->UmountLink(link, unlinked);
-        if (error)
-            L_WRN("Cannot umount volume link: {}", error);
-    }
-
-    TVolume::DestroyUnlinked(unlinked);
 
     RemoveWorkDir();
 

@@ -867,6 +867,9 @@ public:
     TError Set(const std::string &value) {
         TError error;
 
+        if (CT->VolumeMounts)
+            return TError(EError::Busy, "Cannot change root path, container have volume mounts");
+
         error = CT->EnableControllers(CGROUP_DEVICES);
         if (error)
             return error;
@@ -3365,6 +3368,8 @@ void TPortoStat::Populate(TUintMap &m) {
     m["volume_links"] = Statistics->VolumeLinks;
     m["volume_links_mounted"] = Statistics->VolumeLinksMounted;
     m["volume_lost"] = Statistics->VolumeLost;
+
+    m["volume_mounts"] = CT->VolumeMounts;
 
     m["networks"] = Statistics->NetworksCount;
 

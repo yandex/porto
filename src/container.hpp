@@ -382,6 +382,7 @@ public:
 
     /* protected with VolumesLock and container lock */
     std::list<std::shared_ptr<TVolumeLink>> VolumeLinks;
+    int VolumeMounts = 0;
 
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;

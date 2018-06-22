@@ -1978,6 +1978,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     auto volumes_lock = LockVolumes();
     if (link->Volume.get() != this)
         return TError(EError::InvalidValue, "Wrong volume link");
+
     TPath host_target = link->Container->RootPath / link->Target;
     link->HostTarget = "";
     auto target_link = ResolveOriginLocked(host_target.DirNameNormal());
@@ -1986,12 +1987,14 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         if (error)
             return error;
         VolumeLinks[host_target] = link;
-        Statistics->VolumeLinksMounted++;
     }
+    for (auto ct = link->Container; ct; ct = ct->Parent)
+        ct->VolumeMounts++;
     link->HostTarget = host_target;
     volumes_lock.unlock();
 
     L_ACT("Mount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
+    Statistics->VolumeLinksMounted++;
 
     TFile target_file;
     TPath bound, link_mount, real_target;
@@ -2052,11 +2055,14 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 undo:
     link_mount.UmountAll();
     link_mount.Rmdir();
+
     volumes_lock.lock();
-    if (VolumeLinks.erase(link->HostTarget))
-        Statistics->VolumeLinksMounted--;
+    VolumeLinks.erase(link->HostTarget);
     link->HostTarget = "";
+    for (auto ct = link->Container; ct; ct = ct->Parent)
+        ct->VolumeMounts--;
     volumes_lock.unlock();
+
     (void)Save();
 
     return error;
@@ -2072,11 +2078,7 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
         return TError(EError::InvalidValue, "Wrong volume link");
     if (!link->HostTarget)
         return OK;
-    if (VolumeLinks.erase(link->HostTarget))
-        Statistics->VolumeLinksMounted--;
     TPath host_target = link->HostTarget;
-    link->HostTarget = "";
-
     volumes_lock.unlock();
 
     L_ACT("Umount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
@@ -2085,19 +2087,20 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
     if (error) {
         error = TError(error, "Cannot umount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
         if (strict)
-            goto undo;
+            return error;
+        L_WRN("{}", error.Text);
     }
 
-    /* Save changes only after umounting */
-    (void)Save();
-
-    /* Umount nested links */
     volumes_lock.lock();
+
     for (auto it = VolumeLinks.lower_bound(host_target);
             it != VolumeLinks.end() && it->first.IsInside(host_target);) {
         auto &link = it->second;
 
-        L_ACT("Umount nested volume {} link {} for CT{}:{}", link->Volume->Path, link->HostTarget, link->Container->Id, link->Container->Name);
+        if (link->HostTarget != host_target)
+            L_ACT("Umount nested volume {} link {} for CT{}:{}",
+                    link->Volume->Path, link->HostTarget,
+                    link->Container->Id, link->Container->Name);
 
         /* common link */
         if (it->first == link->Volume->Path) {
@@ -2105,20 +2108,21 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
             unlinked.emplace_back(link->Volume);
         }
 
+        for (auto ct = link->Container; ct; ct = ct->Parent) {
+            ct->VolumeMounts--;
+            if (ct->VolumeMounts < 0)
+                L_WRN("Volume mounts underflow {} at {}", ct->VolumeMounts, ct->Name);
+        }
+
         link->HostTarget = "";
         it = VolumeLinks.erase(it);
-        Statistics->VolumeLinksMounted--;
     }
+
     volumes_lock.unlock();
 
-    return error;
+    /* Save changes only after umounting */
+    (void)Save();
 
-undo:
-    volumes_lock.lock();
-    VolumeLinks[host_target] = link;
-    Statistics->VolumeLinksMounted++;
-    link->HostTarget = host_target;
-    volumes_lock.unlock();
     return error;
 }
 
@@ -2251,8 +2255,9 @@ TError TVolume::Destroy() {
         Volumes.erase(volume->Path);
 
         /* Remove common link */
-        if (VolumeLinks.erase(volume->Path))
-            Statistics->VolumeLinksMounted--;
+        if (VolumeLinks.erase(volume->Path) &&
+                volume->Path != volume->InternalPath)
+            RootContainer->VolumeMounts--;
 
         if (volume->VolumeOwnerContainer) {
             volume->VolumeOwnerContainer->OwnedVolumes.remove(volume);
@@ -2496,15 +2501,15 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
     }
 
     auto volumes_lock = LockVolumes();
-    TError error;
     TPath host_target;
+    TError error;
 
     for (auto &link: Links) {
         if (link->Container == container && link->Target == target)
             return TError(EError::VolumeAlreadyLinked, "Volume already linked");
     }
 
-    if (target && container->HasResources()) {
+    if (target) {
         host_target = container->RootPath / target;
         error = CheckConflicts(host_target);
         if (error)
@@ -3035,7 +3040,6 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     }
 
     Volumes[volume->Path] = volume;
-    Statistics->VolumeLinksMounted++;
 
     volume->VolumeOwnerContainer = owner;
     owner->OwnedVolumes.push_back(volume);
@@ -3163,7 +3167,9 @@ void TVolume::RestoreAll(void) {
         common_link->HostTarget = volume->Path;
         common_link->ReadOnly = volume->IsReadOnly;
         VolumeLinks[volume->Path] = common_link;
-        Statistics->VolumeLinksMounted++;
+
+        if (volume->Path != volume->InternalPath)
+            RootContainer->VolumeMounts++;
 
         error = volume->Save();
         if (error) {
@@ -3352,7 +3358,8 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
                     link->Required = l[3] == "!";
                 if (l.size() > 4) {
                     link->HostTarget = l[4];
-                    Statistics->VolumeLinksMounted++;
+                    for (auto c = ct; c; c = c->Parent)
+                        c->VolumeMounts++;
                 }
                 Links.emplace_back(link);
                 ct->VolumeLinks.emplace_back(link);

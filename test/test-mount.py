@@ -227,10 +227,10 @@ test_volume.Link(a, target="/test")
 test_volume.Link(a, target="/test/test")
 
 mnt = ParseMountinfo()
-Expect(root_volume.path + '/test_ro' not in mnt)
-Expect(root_volume.path + '/ro_vol' not in mnt)
-Expect(root_volume.path + '/test' not in mnt)
-Expect(root_volume.path + '/test/test' not in mnt)
+Expect(root_volume.path + '/test_ro' in mnt)
+Expect(root_volume.path + '/ro_vol' in mnt)
+Expect(root_volume.path + '/test' in mnt)
+Expect(root_volume.path + '/test/test' in mnt)
 
 # mount at start
 a.Start()
@@ -265,8 +265,8 @@ Expect('/test/test' in mnt)
 a.Stop()
 
 mnt = ParseMountinfo()
-Expect(root_volume.path + '/test_ro' not in mnt)
-Expect(root_volume.path + '/ro_vol' not in mnt)
+Expect(root_volume.path + '/test_ro' in mnt)
+Expect(root_volume.path + '/ro_vol' in mnt)
 
 a.Start()
 

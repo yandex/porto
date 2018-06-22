@@ -875,8 +875,6 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
         if (error)
             return error;
         base_path = ct->RootPath;
-        if (!ct->HasResources() || !base_path)
-            return TError(EError::InvalidState, "Requested container {} is not running", ct->Name);
     } else
         base_path = CL->ClientContainer->RootPath;
 
