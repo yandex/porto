@@ -198,7 +198,6 @@ message TConfig {
         optional bool direct_io_loop = 11;
         optional string default_lvm_group = 12;
         optional string squashfs_compression = 13;
-        optional bool owner_container_migration_hack = 14;
         optional bool parallel_compression = 15;
     }
 

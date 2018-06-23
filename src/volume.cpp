@@ -2805,29 +2805,21 @@ TError TVolume::Save() {
     node.Set(V_STORAGE, Storage);
     node.Set(V_BACKEND, BackendType);
 
-    if (VolumeOwnerContainer) {
-        /*
-         * Older porto versions afraid volumes with unknown properties.
-         * Save owner container into first word in creator.
-         */
-        if (config().volumes().owner_container_migration_hack()) {
-            auto creator = SplitEscapedString(Creator, ' ');
-            creator[0] = VolumeOwnerContainer->Name;
-            node.Set(V_CREATOR, MergeEscapeStrings(creator, ' '));
-        } else {
-            node.Set(V_CREATOR, Creator);
-            node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
-        }
-    }
+    node.Set(V_CREATOR, Creator);
+
+    if (VolumeOwnerContainer)
+        node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
 
     node.Set(V_OWNER_USER, VolumeOwner.User());
     node.Set(V_OWNER_GROUP, VolumeOwner.Group());
+
     if (VolumeCred.Uid != NoUser)
         node.Set(V_USER, VolumeCred.User());
     if (VolumeCred.Gid != NoGroup)
         node.Set(V_GROUP, VolumeCred.Group());
     if (VolumePerms)
         node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
+
     node.Set(V_READY, BoolToString(State == EVolumeState::Ready));
     node.Set(V_PRIVATE, Private);
     node.Set(V_LOOP_DEV, std::to_string(Device));
@@ -2881,7 +2873,8 @@ TError TVolume::Restore(const TKeyValue &node) {
     }
 
     error = CL->WriteContainer(node.Has(V_OWNER_CONTAINER) ?
-                               node.Get(V_OWNER_CONTAINER) : creator[0],
+                               node.Get(V_OWNER_CONTAINER) :
+                               creator.size() > 1 ? creator[0] : "",
                                VolumeOwnerContainer, true);
     if (error) {
         L_WRN("Cannot find volume owner: {}", error);
