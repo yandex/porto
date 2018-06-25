@@ -7,6 +7,7 @@
 #include "version.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
+#include "fmt/format.h"
 
 extern "C" {
 #include <unistd.h>
@@ -124,9 +125,11 @@ int THelpCmd::Execute(TCommandEnviroment *env) {
         return ret;
     }
 
-    const string &name = args[0];
+    const std::string &name = args[0];
     const auto it = Handler.GetCommands().find(name);
     if (it == Handler.GetCommands().end()) {
+        std::string helper = fmt::format("{}-{}", program_invocation_short_name, name);
+        execlp(helper.c_str(), helper.c_str(), "--help", nullptr);
         Usage();
     } else {
         it->second->PrintUsage();
@@ -203,28 +206,6 @@ bool ICmd::ValidArgs(const std::vector<std::string> &args) {
     return true;
 }
 
-int TCommandHandler::TryExec(const std::string &commandName,
-                             const std::vector<std::string> &commandArgs) {
-    const auto it = Commands.find(commandName);
-    if (it == Commands.end()) {
-        std::cerr << "Invalid command " << commandName << "!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    ICmd *cmd = it->second.get();
-    if (!cmd->ValidArgs(commandArgs)) {
-        Usage(cmd->GetName().c_str());
-        return EXIT_FAILURE;
-    }
-
-    // in case client closes pipe we are writing to in the protobuf code
-    Signal(SIGPIPE, SIG_IGN);
-
-    TCommandEnviroment commandEnv{*this, commandArgs};
-    commandEnv.NeedArgs = cmd->NeedArgs;
-    return cmd->Execute(&commandEnv);
-}
-
 TCommandHandler::TCommandHandler(Porto::Connection &api) : PortoApi(api) {
     RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this)));
 }
@@ -250,7 +231,7 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const string name(argv[1]);
+    const std::string name(argv[1]);
     if (name == "-h" || name == "--help") {
         Usage(nullptr);
         return EXIT_FAILURE;
@@ -268,10 +249,28 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
         return EXIT_SUCCESS;
     }
 
-    // Skip program name and command name to build
-    // a list of command arguments.
+    const auto it = Commands.find(name);
+    if (it == Commands.end()) {
+        std::string helper = fmt::format("{}-{}", program_invocation_short_name, name);
+        argv[1] = (char *)helper.c_str();
+        execvp(argv[1], argv + 1);
+        std::cerr << "Invalid command: " << name << std::endl;
+        return EXIT_FAILURE;
+    }
+
     const std::vector<std::string> commandArgs(argv + 2, argv + argc);
-    return TryExec(name, commandArgs);
+    ICmd *cmd = it->second.get();
+    if (!cmd->ValidArgs(commandArgs)) {
+        Usage(cmd->GetName().c_str());
+        return EXIT_FAILURE;
+    }
+
+    // in case client closes pipe we are writing to in the protobuf code
+    Signal(SIGPIPE, SIG_IGN);
+
+    TCommandEnviroment commandEnv{*this, commandArgs};
+    commandEnv.NeedArgs = cmd->NeedArgs;
+    return cmd->Execute(&commandEnv);
 }
 
 void TCommandHandler::Usage(const char *command) {

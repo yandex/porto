@@ -47,8 +47,6 @@ class TCommandHandler {
     void operator=(const TCommandHandler&) = delete;
     TCommandHandler(const TCommandHandler&) = delete;
 
-    int TryExec(const std::string &commandName, const std::vector<std::string> &commandArgs);
-
 public:
     using RegisteredCommands = std::map<std::string, std::unique_ptr<ICmd>>;
 
