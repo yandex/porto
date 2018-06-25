@@ -221,10 +221,39 @@ TError TDevice::Makedev(const TPath &root) const {
 }
 
 TError TDevices::Parse(const std::string &str, const TCred &cred) {
-    auto config = SplitEscapedString(str, ' ', ';');
+    auto devices_cfg = SplitEscapedString(str, ' ', ';');
     TError error;
 
-    for (auto &cfg: config) {
+    for (auto &cfg: devices_cfg) {
+
+        if (cfg.size() == 2 && cfg[0] == "preset") {
+            bool found = false;
+
+            for (auto &preset: config().container().device_preset()) {
+                if (preset.preset() != cfg[1])
+                    continue;
+
+                for (auto &device_cfg: preset.device()) {
+                    auto dev = SplitEscapedString(device_cfg, ' ');
+                    TDevice device;
+                    error = device.Parse(dev, cred);
+                    if (error)
+                        return error;
+                    L("Add device {} from preset {}", device.Format(), cfg[1]);
+                    Devices.push_back(device);
+                }
+
+                found = true;
+                break;
+            }
+
+            if (!found)
+                return TError(EError::InvalidValue, "Undefined device preset {}", cfg[1]);
+
+            NeedCgroup = true;
+            continue;
+        }
+
         TDevice device;
         error = device.Parse(cfg, cred);
         if (error)

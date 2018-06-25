@@ -311,7 +311,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
     Subset of **capabilities\_allowed** allowed to be set as ambient.
     In container with chroot they are equal.
 
-* **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[path\] \[mode\] \[user\] \[group\];...
+* **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[path\] \[mode\] \[user\] \[group\]|preset \<preset\>;...
 
     "device" - device path in host (/dev/null)  
     "rwm-" - read, write, mknod, no-access  
@@ -339,6 +339,18 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
     thus any additional permissions must be granted for first-level container.
     Configuration could be changes in runtime.
 
+    Device preset should be defined in portod.conf:
+    ```
+    container {
+        device_preset {
+            preset: "<preset>"
+            device: "<device> [rwm]..."
+            device: ...
+        }
+        ...
+    }
+    ```
+
     Access to devices for all containers could be also granted in portod.conf:
     ```
     container {
@@ -354,6 +366,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
             sysfs: "/sys/foo"
             sysfs: "/sys/bar"
         }
+        ...
     }
     ```
 
