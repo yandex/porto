@@ -577,7 +577,7 @@ public:
 
 class TMemTotalGuarantee : public TProperty {
 public:
-    TMemTotalGuarantee() : TProperty(P_MEM_TOTAL_GUARANTEE, EProperty::NONE,
+    TMemTotalGuarantee() : TProperty(P_MEM_GUARANTEE_TOTAL, EProperty::NONE,
             "Total memory guarantee for container hierarchy")
     {
         IsReadOnly = true;
@@ -586,9 +586,7 @@ public:
         IsSupported = MemorySubsystem.SupportGuarantee();
     }
     TError Get(std::string &value) {
-        auto val = CT->GetTotalMemGuarantee();
-        if (val)
-            value = std::to_string(val);
+        value = std::to_string(CT->GetTotalMemGuarantee());
         return OK;
     }
 } static MemTotalGuarantee;
@@ -1588,7 +1586,7 @@ public:
 class TMemoryLimit : public TProperty {
 public:
     TMemoryLimit() : TProperty(P_MEM_LIMIT, EProperty::MEM_LIMIT,
-            "Memory hard limit [bytes]")
+            "Memory limit [bytes]")
     {
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
@@ -1615,15 +1613,33 @@ public:
         if (!CT->HasProp(EProperty::ANON_LIMIT) &&
                 MemorySubsystem.SupportAnonLimit() &&
                 config().container().anon_limit_margin()) {
-            if (CT->MemLimit)
-                CT->AnonMemLimit = CT->MemLimit - std::min(CT->MemLimit / 4,
+            uint64_t new_anon = 0;
+            if (CT->MemLimit) {
+                new_anon = CT->MemLimit - std::min(CT->MemLimit / 4,
                         config().container().anon_limit_margin());
-            else
-                CT->AnonMemLimit = 0;
+                new_anon = std::max(new_anon,
+                        config().container().min_memory_limit());
+            }
+            if (CT->AnonMemLimit != new_anon) {
+                CT->AnonMemLimit = new_anon;
+                CT->SetPropDirty(EProperty::ANON_LIMIT);
+            }
         }
         return OK;
     }
 } static MemoryLimit;
+
+class TMemoryLimitTotal : public TProperty {
+public:
+    TMemoryLimitTotal() : TProperty(P_MEM_LIMIT_TOTAL, EProperty::NONE,
+            "Effective memory limit [bytes]") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->GetMemLimit());
+        return OK;
+    }
+} static MemoryLimitTotal;
 
 class TAnonLimit : public TProperty {
 public:
@@ -1654,6 +1670,21 @@ public:
         return OK;
     }
 } static AnonLimit;
+
+class TAnonLimitTotal : public TProperty {
+public:
+    TAnonLimitTotal() : TProperty(P_ANON_LIMIT_TOTAL, EProperty::NONE,
+            "Effective anonymous memory limit [bytes]") {
+        IsReadOnly = true;
+    }
+    void Init(void) {
+        IsSupported = MemorySubsystem.SupportAnonLimit();
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->GetAnonMemLimit());
+        return OK;
+    }
+} static AnonLimitTotal;
 
 class TAnonOnly : public TProperty {
 public:
@@ -3414,20 +3445,6 @@ TError TPortoStat::GetIndexed(const std::string &index,
 
     return OK;
 }
-
-class TMemTotalLimit : public TProperty {
-public:
-    TMemTotalLimit() : TProperty(P_MEM_TOTAL_LIMIT, EProperty::NONE,
-            "Total memory limit for container hierarchy") {
-        IsReadOnly = true;
-    }
-    TError Get(std::string &value) {
-        auto val = CT->GetTotalMemLimit();
-        if (val)
-            value = std::to_string(val);
-        return OK;
-    }
-} static MemTotalLimit;
 
 class TProcessCount : public TProperty {
 public:

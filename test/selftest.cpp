@@ -145,12 +145,15 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectEq(v, Alice.Group());
     ExpectApiSuccess(api.GetProperty(name, "env", v));
     ExpectEq(v, string(""));
+
+    ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
+    ExpectNeq(v, string("0"));
+
     if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
         ExpectEq(v, string("0"));
     }
-    ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
-    ExpectEq(v, string("0"));
+
     ExpectApiSuccess(api.GetProperty(name, "cpu_policy", v));
     ExpectEq(v, string("normal"));
     ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
@@ -171,12 +174,6 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
     ExpectEq(v, string("false"));
-    ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
-    ExpectEq(v, string("0"));
-    if (KernelSupports(KernelFeature::LOW_LIMIT)) {
-        ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
-        ExpectEq(v, string("0"));
-    }
     ExpectApiSuccess(api.GetProperty(name, "stdin_path", v));
     ExpectEq(v, string("/dev/null"));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));

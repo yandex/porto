@@ -176,6 +176,7 @@ message TConfig {
         optional uint64 anon_limit_margin = 48;
         optional uint64 memlock_minimal = 49;
         optional uint64 memlock_margin = 50;
+        optional uint64 memory_limit_margin = 51;
     }
 
     message TPrivilegesCfg {

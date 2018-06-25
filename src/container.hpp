@@ -287,6 +287,10 @@ public:
         PropDirty[(int)prop] = true;
     }
 
+    void SetPropDirty(EProperty prop) {
+        PropDirty[(int)prop] = true;
+    }
+
     bool TestPropDirty(EProperty prop) const {
         return PropDirty[(int)prop];
     }
@@ -327,7 +331,8 @@ public:
 
     TError CheckMemGuarantee() const;
     uint64_t GetTotalMemGuarantee(bool containers_locked = false) const;
-    uint64_t GetTotalMemLimit(const TContainer *base = nullptr) const;
+    uint64_t GetMemLimit(bool effective = true) const;
+    uint64_t GetAnonMemLimit(bool effective = true) const;
 
     bool IsRoot() const { return !Level; }
     bool IsChildOf(const TContainer &ct) const;

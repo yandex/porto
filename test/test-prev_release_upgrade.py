@@ -105,7 +105,9 @@ def SnapshotProps(r):
               "ip",
               "isolate",
               # "max_respawns",
-              "memory_guarantee", "memory_limit", "net",
+              "memory_guarantee",
+              # "memory_limit",
+              "net",
               #"net_guarantee", #FIXME enable later, "default:0" -> ""
               #"net_limit", #FIXME enable later, "default:0" -> ""
               "porto_namespace",

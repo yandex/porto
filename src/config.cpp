@@ -61,7 +61,9 @@ static void DefaultConfig() {
     config().mutable_daemon()->set_max_clients_in_container(500);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(300);
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
-    config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
+
+    config().mutable_daemon()->set_memory_guarantee_reserve(2ull << 30); /* 2Gb */
+
     config().mutable_daemon()->set_log_rotate_ms(1000);
     config().mutable_daemon()->set_memory_limit(1ull << 30);
     config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
@@ -98,13 +100,16 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
+    config().mutable_container()->set_memory_limit_margin(2ull << 30); /* 2Gb */
+
     config().mutable_container()->set_anon_limit_margin(16ull << 20); /* 16Mb */
+
+    config().mutable_container()->set_memlock_minimal(8ull << 20); /* 8Mb */
+    config().mutable_container()->set_memlock_margin(16ull << 20); /* 16Mb */
 
     config().mutable_container()->set_dead_memory_soft_limit(1 << 20); /* 1Mb */
     config().mutable_container()->set_pressurize_on_death(false);
 
-    config().mutable_container()->set_memlock_minimal(8ull << 20); /* 8Mb */
-    config().mutable_container()->set_memlock_margin(16ull << 20); /* 16Mb */
     config().mutable_container()->set_default_ulimit("core: 0 unlimited; nofile: 8K 1M");
     config().mutable_container()->set_default_thread_limit(10000);
 

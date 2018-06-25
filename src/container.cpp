@@ -411,6 +411,21 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
             Controllers |= CGROUP_HUGETLB;
     }
 
+    if (Level == 1 && config().container().memory_limit_margin()) {
+        uint64_t total = GetTotalMemory();
+
+        MemLimit = total - std::min(total / 4,
+                config().container().memory_limit_margin());
+        SetPropDirty(EProperty::MEM_LIMIT);
+
+        if (MemorySubsystem.SupportAnonLimit() &&
+                config().container().anon_limit_margin()) {
+            AnonMemLimit = MemLimit - std::min(MemLimit / 4,
+                    config().container().anon_limit_margin());
+            SetPropDirty(EProperty::ANON_LIMIT);
+        }
+    }
+
     if (Level == 1 && PidsSubsystem.Supported) {
         Controllers |= CGROUP_PIDS;
 
@@ -1056,33 +1071,31 @@ uint64_t TContainer::GetTotalMemGuarantee(bool containers_locked) const {
 
     return sum;
 }
-uint64_t TContainer::GetTotalMemLimit(const TContainer *base) const {
+
+uint64_t TContainer::GetMemLimit(bool effective) const {
     uint64_t lim = 0;
 
-    if (!base)
-        ContainersMutex.lock();
+    for (auto ct = this; ct; ct = ct->Parent.get())
+        if ((effective || ct->HasProp(EProperty::MEM_LIMIT)) &&
+                ct->MemLimit && (ct->MemLimit < lim || !lim))
+            lim = ct->MemLimit;
 
-    /* Container without load limited with total limit of childrens */
-    if (IsMeta() && !OsMode) {
-        for (auto &child : Children) {
-            if (child->State == EContainerState::Stopped)
-                continue;
-            auto child_lim = child->GetTotalMemLimit(this);
-            if (!child_lim || child_lim > UINT64_MAX - lim) {
-                lim = 0;
-                break;
-            }
-            lim += child_lim;
-        }
-    }
+    if (effective && !lim)
+        lim = GetTotalMemory();
 
-    for (auto p = this; p && p != base; p = p->Parent.get()) {
-        if (p->MemLimit && (p->MemLimit < lim || !lim))
-            lim = p->MemLimit;
-    }
+    return lim;
+}
 
-    if (!base)
-        ContainersMutex.unlock();
+uint64_t TContainer::GetAnonMemLimit(bool effective) const {
+    uint64_t lim = 0;
+
+    for (auto ct = this; ct; ct = ct->Parent.get())
+        if ((effective || ct->HasProp(EProperty::ANON_LIMIT)) &&
+                ct->AnonMemLimit && (ct->AnonMemLimit < lim || !lim))
+            lim = ct->AnonMemLimit;
+
+    if (effective && !lim)
+        lim = GetTotalMemory();
 
     return lim;
 }
@@ -1603,20 +1616,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
         if (error) {
             if (error.Errno != EINVAL)
-                L_ERR("Can't set {}: {}", P_MEM_GUARANTEE, error);
-            return error;
-        }
-    }
-
-    if (TestClearPropDirty(EProperty::ANON_LIMIT) ||
-            (TestPropDirty(EProperty::MEM_LIMIT) &&
-             !HasProp(EProperty::ANON_LIMIT) &&
-             MemorySubsystem.SupportAnonLimit() &&
-             config().container().anon_limit_margin())) {
-        error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
-        if (error) {
-            if (error.Errno != EINVAL && error.Errno != EBUSY)
-                L_ERR("Can't set {}: {}", P_ANON_LIMIT, error);
+                L_ERR("Cannot set {}: {}", P_MEM_GUARANTEE, error);
             return error;
         }
     }
@@ -1625,10 +1625,20 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.SetLimit(memcg, MemLimit);
         if (error) {
             if (error.Errno == EBUSY)
-                return TError(EError::InvalidValue, "Limit is too low: {}", MemLimit);
-
+                return TError(EError::Busy, "Memory limit is too low for current memory usage");
             if (error.Errno != EINVAL)
-                L_ERR("Can't set {}: {}", P_MEM_LIMIT, error);
+                L_ERR("Cannot set {}: {}", P_MEM_LIMIT, error);
+            return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
+        error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
+        if (error) {
+            if (error.Errno == EBUSY)
+                return TError(EError::Busy, "Memory limit is too low for current memory usage");
+            if (error.Errno != EINVAL)
+                L_ERR("Cannot set {}: {}", P_ANON_LIMIT, error);
             return error;
         }
     }
@@ -1636,8 +1646,8 @@ TError TContainer::ApplyDynamicProperties() {
     if (TestClearPropDirty(EProperty::ANON_ONLY)) {
         error = MemorySubsystem.SetAnonOnly(memcg, AnonOnly);
         if (error) {
-            if (error.Errno != EINVAL && error.Errno != EBUSY)
-                L_ERR("Can't set {}: {}", P_ANON_ONLY, error);
+            if (error.Errno != EINVAL)
+                L_ERR("Cannot set {}: {}", P_ANON_ONLY, error);
             return error;
         }
     }
@@ -1655,7 +1665,7 @@ TError TContainer::ApplyDynamicProperties() {
         error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
         if (error) {
             if (error.Errno != EINVAL)
-                L_ERR("Can't set {}: {}", P_RECHARGE_ON_PGFAULT, error);
+                L_ERR("Cannot set {}: {}", P_RECHARGE_ON_PGFAULT, error);
             return error;
         }
     }
@@ -2054,7 +2064,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Mnt.RootRo = RootRo;
 
-    TaskEnv.Mnt.RunSize = (GetTotalMemLimit() ?: GetTotalMemory()) / 2;
+    TaskEnv.Mnt.RunSize = GetMemLimit() / 2;
 
     TaskEnv.Mnt.BindCred = Parent->RootPath.IsRoot() ? CL->TaskCred : TCred(RootUser, RootGroup);
 
@@ -2179,7 +2189,7 @@ void TContainer::SanitizeCapabilities() {
         for (auto ct = this; ct; ct = ct->Parent.get()) {
             chroot |= ct->Root != "/";
             pidns |= ct->Isolate;
-            memcg |= ct->MemLimit;
+            memcg |= ct->MemLimit && ct->HasProp(EProperty::MEM_LIMIT);
             netns |= ct->NetIsolate;
             netip |= ct->NetIpLimit;
 
@@ -2216,18 +2226,16 @@ void TContainer::SanitizeCapabilitiesAll() {
 }
 
 TUlimit TContainer::GetUlimit() const {
-    uint64_t memlimit = MemLimit, memlock = 0;
     TUlimit res = Ulimit;
 
-    for (auto p = Parent.get(); p; p = p->Parent.get()) {
+    for (auto p = Parent.get(); p; p = p->Parent.get())
         res.Merge(p->Ulimit, false);
-        if (p->MemLimit && (p->MemLimit < memlimit || !memlimit))
-            memlimit = p->MemLimit;
-    }
 
-    if (config().container().memlock_margin() &&
-            memlimit > config().container().memlock_margin())
-        memlock = memlimit - config().container().memlock_margin();
+    uint64_t memlock = 0;
+    if (config().container().memlock_margin()) {
+        memlock = GetMemLimit(false); /* limit must be set explicitly */
+        memlock -= std::min(memlock, config().container().memlock_margin());
+    }
     if (memlock < config().container().memlock_minimal())
         memlock = config().container().memlock_minimal();
     if (memlock)
@@ -3683,7 +3691,7 @@ TTuple TContainer::Taint() {
         taint.push_back("RT scheduler works really badly when usage hits cpu_limit, use cpu_policy=high");
 
     if (Level == 1) {
-        if (!MemLimit)
+        if (!MemLimit || !HasProp(EProperty::MEM_LIMIT))
             taint.push_back("First level container without memory_limit.");
         if (!CpuLimit)
             taint.push_back("First level container without cpu_limit.");

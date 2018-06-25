@@ -153,7 +153,15 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
     Hardcoded default is "core: 0 unlimited; nofile: 8K 1M".
 
-    Default memlock is max(**memory\_limit** - 16M, 8M), hard limit is unlimited.
+    If **memory\_limit** is set them default memlock is max(**memory\_limit\_total** - 16M, 8M), hard limit is unlimited.
+
+    Configuration options in portod.conf:
+    ```
+    container {
+        memlock_minimal: <bytes>
+        memlock_margin: <bytes>
+    }
+    ```
 
 * **virt\_mode** - virtualization mode:
     - *app* - (default) start **command** as normal process
@@ -515,27 +523,60 @@ write permissions to the target or owning related volume.
 
     Alias for **anon\_max\_usage** for historical reasons.
 
-* **memory\_guarantee** - guarantee for memory\_usage, default: 0
+* **memory\_guarantee** - guarantee for **memory\_usage**, default: 0
 
-    Memory reclaimer skips container and it's sub-containers if current usage
-    is less than guarantee. Overcommit is forbidden, 2Gb are reserved for host system.
+    Memory reclaimer skips container and it's sub-containers if current usage is less than guarantee.
 
-* **memory\_limit** limit for memory\_usage, default: 0 (unlimited)
+    Overcommit is forbidden, 2Gb are reserved for host system.
+
+    Reserve (2Gb) is set in portod.conf:
+    ```
+    daemon {
+        memory_guarantee_reserve: <bytes>
+    }
+    ```
+
+* **memory\_guarantee\_total** -  hierarchical memory guarantee
+
+    Upper bound for guaranteed memory for container including guarantees for sub-containers.
+
+    **memory\_guarantee\_total** = max(**memory\_guarantee**, sum **memory\_guarantee\_total** for running childrens)
+
+* **memory\_limit** limit for **memory\_usage**
+
+    For first level containers default is max(Total - 2Gb, Total * 3/4),
+    for deeper levels default is 0 (unlimited).
+
+    Margin from total ram (2Gb) is set in portod.conf:
+    ```
+    container {
+        memory_limit_margin: <bytes>
+    }
+    ```
 
     Allocations over limit reclaims cache or write anon pages into swap.
     On failure syscalls returns ENOMEM\EFAULT, page fault triggers OOM.
 
-* **memory\_guarantee\_total** -  hierarchical memory guarantee
-
-    Upper bound for guaranteed memory for sub-tree.
-
 * **memory\_limit\_total** - hierarchical memory limit
 
-    Upper bound for memory usage for sub-tree.
+    Effective memory limit for container including limits for parent containers.
 
-* **anon\_limit** - limit for anon\_usage (offstream kernel feature)
+    **memory\_limit\_total** = min(**memory\_limit**, **memory\_limit\_total** for parent)
+
+* **anon\_limit** - limit for **anon\_usage** (offstream kernel feature)
 
     Default is **memory\_limit** - min(**memory\_limit** / 4, 16M).
+
+    Default margin from limit (16Mb) is set in portod.conf:
+    ```
+    container {
+        anon_limit_margin: <bytes>
+    }
+    ```
+
+* **anon\_limit\_total** - hierarchical anonymous memory limit
+
+    **anon\_limit\_total** = min(**anon\_limit**, **anon\_limit\_total** for parent)
 
 * **anon\_only** - keep only anon pages, allocate cache in parent, default: false (offstream kernel feature)
 

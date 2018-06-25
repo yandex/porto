@@ -17,22 +17,36 @@ def ValidateDefaultProp(r):
     ExpectException(r.GetProperty, porto.exceptions.InvalidValue, "command[1]")
     ExpectException(r.SetProperty, porto.exceptions.InvalidValue, "command[1]", "ls")
 
-    ref = {\
-            "command" : "", "cwd" : "/place/porto/" + r.name, "root" : "/",\
-            "user" : "porto-alice", "group" : "porto-alice", "env" : "",\
-            "memory_limit" : "0", "cpu_policy" : "normal",\
-            "cpu_limit" : "0c",\
-            "cpu_guarantee" : "0c", "net" : "inherited",\
-            "respawn" : False, "memory_limit" : "0", "stdin_path" : "/dev/null",\
-            "stdout_path" : "stdout", "stderr_path" : "stderr", "ulimit" : "",\
-            "hostname" : "", "devices" : "",\
-            "capabilities" : "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;" +\
-            "KILL;SETGID;SETUID;SETPCAP;LINUX_IMMUTABLE;NET_BIND_SERVICE;" +\
-            "NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;" +\
-            "SYS_NICE;SYS_RESOURCE;MKNOD;AUDIT_WRITE;SETFCAP",\
-            "isolate" : True, "stdout_limit" : "8388608", "private" : "",\
-            "bind" : "", "root_readonly" : False, "max_respawns" : "",\
-            "enable_porto" : True
+    ref = {
+            "command" : "",
+            "env" : "",
+            "cwd" : "/place/porto/" + r.name,
+            "root" : "/",
+            "bind" : "",
+            "root_readonly" : False,
+            "user" : "porto-alice",
+            "group" : "porto-alice",
+            "cpu_policy" : "normal",
+            "cpu_limit" : "0c",
+            "cpu_guarantee" : "0c",
+            "memory_guarantee" : "0",
+            "net" : "inherited",
+            "respawn" : False,
+            "stdin_path" : "/dev/null",
+            "stdout_path" : "stdout",
+            "stderr_path" : "stderr",
+            "stdout_limit" : "8388608",
+            "ulimit" : "",
+            "hostname" : "",
+            "devices" : "",
+            "capabilities" : "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;" +
+            "KILL;SETGID;SETUID;SETPCAP;LINUX_IMMUTABLE;NET_BIND_SERVICE;" +
+            "NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;" +
+            "SYS_NICE;SYS_RESOURCE;MKNOD;AUDIT_WRITE;SETFCAP",
+            "isolate" : True,
+            "enable_porto" : True,
+            "private" : "",
+            "max_respawns" : "",
           }
 
     for p in ref:
@@ -43,9 +57,12 @@ def ValidateDefaultProp(r):
 
     #Unsupported ones, we've already checked their existence in test_holder,
     #so let's just poke them
-    ref = { "memory_guarantee" : "0", "io_limit" : "",\
-            "io_ops_limit" : "", "memory_guarantee" : "0",\
-            "recharge_on_pgfault" : False,  }
+    ref = {
+            "io_limit" : "",
+            "io_ops_limit" : "",
+            "memory_guarantee" : "0",
+            "recharge_on_pgfault" : False,
+          }
 
     for p in ref:
         try:
