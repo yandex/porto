@@ -1550,119 +1550,96 @@ public:
 
 class TSortCmd final : public ICmd {
 public:
-    TSortCmd(Porto::Connection *api) : ICmd(api, "sort", 0, "[sort-by]", "print containers sorted by resource usage") {}
+    TSortCmd(Porto::Connection *api) : ICmd(api, "sort", 0,
+            "[container|pattern... --] [property...]",
+            "print containers sorted by resource usage",
+            ""
+            ) {}
 
     int Execute(TCommandEnviroment *env) final override {
-        vector<string> clist;
-        int ret = Api->List(clist);
-        if (ret) {
-            PrintError("Can't list containers");
+        const auto &args = env->GetArgs();
+
+        std::vector<std::string> filter;
+        std::vector<std::string> keys;
+
+        auto sep = std::find(args.begin(), args.end(), "--");
+        if (sep == args.end()) {
+            filter.push_back("***");
+            keys.insert(keys.end(), args.begin(), args.end());
+        } else {
+            filter.insert(filter.end(), args.begin(), sep);
+            keys.insert(keys.end(), sep + 1, args.end());
+        }
+
+        if (!keys.size()) {
+            keys.push_back("state");
+            keys.push_back("time");
+        }
+
+        std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
+        if (Api->Get(filter, keys, result, Porto::GetFlags::Sync)) {
+            PrintError("Cannot get data");
             return EXIT_FAILURE;
         }
 
-        vector<pair<string, map<string, string>>> containerData;
-        vector<string> showData = env->GetArgs();
+        std::vector<std::string> names;
+        for (auto &it: result)
+            names.push_back(it.first);
 
-        if (showData.empty()) {
-            showData.push_back("cpu_usage");
-            showData.push_back("memory_usage");
-            showData.push_back("major_faults");
-            showData.push_back("minor_faults");
-            showData.push_back("net_packets");
-            showData.push_back("state");
-        } else {
-            vector<Porto::Property> plist;
-            ret = Api->ListProperties(plist);
-            if (ret) {
-                PrintError("Can't list properties");
-                return EXIT_FAILURE;
-            }
-
-            for (const auto &arg : showData) {
-                if (!ValidProperty(plist, arg)) {
-                    TError error(EError::InvalidValue, "Invalid value");
-                    PrintError(error, "Can't parse argument");
-                    return EXIT_FAILURE;
-                }
-            }
-        }
-
-        string sortBy = showData[0];
-        size_t nameLen = MaxFieldLength(clist, strlen("container"));
-
-        for (auto container : clist) {
-            string state;
-            ret = Api->GetProperty(container, "state", state);
-            if (ret) {
-                PrintError("Can't get container state");
-                return EXIT_FAILURE;
-            }
-
-            if (state != "running" && state != "dead")
-                continue;
-
-            map<string, string> dataVal;
-            for (auto data : showData) {
-                string val;
-                if (Api->GetProperty(container, data, val))
-                    (void)Api->GetProperty(container, data, val);
-                dataVal[data] = val;
-            }
-
-            containerData.push_back(make_pair(container, dataVal));
-        }
-
-        std::sort(containerData.begin(), containerData.end(),
-                  [&](pair<string, map<string, string>> a,
-                     pair<string, map<string, string>> b) {
-                  string as, bs;
-                  int64_t an, bn;
-
-                  if (a.second.find(sortBy) != a.second.end())
-                      as = a.second[sortBy];
-
-                  if (b.second.find(sortBy) != b.second.end())
-                      bs = b.second[sortBy];
-
-                  TError aError = StringToInt64(as, an);
-                  TError bError = StringToInt64(bs, bn);
-                  if (aError || bError)
-                      return as > bs;
-
-                  return an > bn;
+        std::sort(names.begin(), names.end(),
+                  [&](std::string &a, std::string &b) -> bool {
+                      for (auto &key: keys) {
+                          std::string &a_str = result[a][key].Value;
+                          std::string &b_str = result[b][key].Value;
+                          if (a_str == b_str)
+                              continue;
+                          int64_t a_int, b_int;
+                          if (!StringToInt64(a_str, a_int) && !StringToInt64(b_str, b_int)) {
+                              if (a_int == b_int)
+                                  continue;
+                              return a_int > b_int;
+                          }
+                          return a_str > b_str;
+                      }
+                      return a > b;
                   });
 
-        vector<size_t> fieldLen;
-        for (auto &data : showData) {
-            vector<string> tmp;
-            tmp.push_back(data);
+        TMultiTuple text;
+        std::vector<unsigned> width;
 
-            for (auto &pair : containerData)
-                tmp.push_back(HumanValue(data, pair.second[data]));
+        text.resize(names.size() + 1);
+        text[0].resize(keys.size() + 1);
+        width.resize(keys.size() + 1);
 
-            fieldLen.push_back(MaxFieldLength(tmp));
+        text[0][0] = "container";
+        width[0] = 16;
+        for (unsigned col = 0; col < keys.size(); col++) {
+            text[0][col + 1] = keys[col];
+            width[col + 1] = std::max(8u, (unsigned)keys[col].size());
         }
 
-        std::cout << std::left << std::setw(nameLen) << "container";
-        std::cout << std::resetiosflags(std::ios::adjustfield);
-        for (size_t i = 0; i < showData.size(); i++)
-            std::cout << std::right << std::setw(fieldLen[i]) << showData[i];
-        std::cout << std::endl;
-
-        for (auto &pair : containerData) {
-            std::cout << std::left << std::setw(nameLen) << pair.first;
-            std::cout << std::resetiosflags(std::ios::adjustfield);
-
-            for (size_t i = 0; i < showData.size(); i++) {
-                std::cout << std::right << std::setw(fieldLen[i]);
-                std::cout << HumanValue(showData[i], pair.second[showData[i]]);
-                std::cout << std::resetiosflags(std::ios::adjustfield);
+        for (unsigned idx = 0; idx < names.size(); idx++) {
+            std::string &name = names[idx];
+            auto &data = result[name];
+            text[idx + 1].resize(keys.size() + 1);
+            text[idx + 1][0] = name;
+            width[0] = std::max(width[0], (unsigned)name.size());
+            for (unsigned col = 0; col < keys.size(); col++) {
+                std::string value = HumanValue(keys[col], data[keys[col]].Value);
+                text[idx + 1][col + 1] = value;
+                width[col + 1] = std::max(width[col + 1], (unsigned)value.size());
             }
-
-            std::cout << std::endl;
         }
 
-        return ret;
+        for (unsigned idx = 0; idx < names.size(); idx++) {
+            auto &line = text[idx];
+            fmt::print("{: <{}} ", line[0], width[0]);
+            for (unsigned col = 1; col < line.size(); col++)
+                fmt::print("{: >{}} ", line[col], width[col]);
+            fmt::print("\n");
+        }
+
+        return EXIT_SUCCESS;
     }
 };
 
