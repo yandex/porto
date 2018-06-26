@@ -1,2 +1,3 @@
 etc/porto
 etc/portod.conf.d
+usr/lib/porto

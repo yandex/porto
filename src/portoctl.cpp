@@ -1548,17 +1548,6 @@ public:
     }
 };
 
-extern int portotop(Porto::Connection *api, const std::vector<std::string> &args);
-class TTopCmd final : public ICmd {
-public:
-    TTopCmd(Porto::Connection *api) : ICmd(api, "top", 0, "[config]", "top-like tool for container monitoring and control") {}
-
-    int Execute(TCommandEnviroment *env) final override {
-        const auto &args = env->GetArgs();
-        return portotop(Api, args);
-    }
-};
-
 class TSortCmd final : public ICmd {
 public:
     TSortCmd(Porto::Connection *api) : ICmd(api, "sort", 0, "[sort-by]", "print containers sorted by resource usage") {}
@@ -2748,7 +2737,6 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TCreateCmd>();
     handler.RegisterCommand<TDestroyCmd>();
     handler.RegisterCommand<TListCmd>();
-    handler.RegisterCommand<TTopCmd>();
     handler.RegisterCommand<TSortCmd>();
     handler.RegisterCommand<TStartCmd>();
     handler.RegisterCommand<TStopCmd>();

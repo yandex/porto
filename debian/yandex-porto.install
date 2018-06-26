@@ -1,4 +1,5 @@
 usr/sbin/portoctl usr/sbin
 usr/sbin/portod usr/sbin
 usr/sbin/portoinit usr/sbin
+usr/lib/porto/portoctl-top usr/lib/porto
 usr/share/man/man8/porto.8 usr/share/man/man8

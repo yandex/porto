@@ -46,9 +46,12 @@ target_link_libraries(portod version porto util config
 			     rpc_proto kv_proto
 			     pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
-add_executable(portoctl portoctl.cpp cli.cpp portotop.cpp)
-target_link_libraries(portoctl version porto util
-			       rt fmt ${PB} ${CURSES_LIBRARIES} menu)
+add_executable(portoctl portoctl.cpp cli.cpp)
+target_link_libraries(portoctl version porto util rt fmt ${PB})
+
+add_executable(portoctl-top portotop.cpp)
+target_link_libraries(portoctl-top version porto util
+			       rt menu fmt ${PB} ${CURSES_LIBRARIES})
 
 add_executable(portoinit portoinit.c)
 target_link_libraries(portoinit version)
@@ -58,6 +61,11 @@ install(
 	TARGETS portod portoctl portoinit
 	RUNTIME DESTINATION sbin
 	LIBRARY DESTINATION lib
+)
+
+install(
+	TARGETS portoctl-top
+	RUNTIME DESTINATION lib/porto
 )
 
 add_custom_command(
