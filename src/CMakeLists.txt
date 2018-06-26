@@ -58,13 +58,13 @@ target_link_libraries(portoinit version)
 set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 
 install(
-	TARGETS portod portoctl portoinit
+	TARGETS portod portoctl
 	RUNTIME DESTINATION sbin
 	LIBRARY DESTINATION lib
 )
 
 install(
-	TARGETS portoctl-top
+	TARGETS portoinit portoctl-top
 	RUNTIME DESTINATION lib/porto
 )
 

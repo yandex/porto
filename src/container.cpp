@@ -2134,15 +2134,18 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
 
     if (IsMeta() || TaskEnv.TripleFork || TaskEnv.QuadroFork) {
-        TPath exe("/proc/self/exe");
-        TPath path;
-        TError error = exe.ReadLink(path);
-        if (error)
-            return error;
-        path = path.DirName() / "portoinit";
-        error = TaskEnv.PortoInit.OpenRead(path);
-        if (error)
-            return error;
+        TPath path = TPath(PORTO_HELPERS_PATH) / "portoinit";
+        TError error = TaskEnv.PortoInit.OpenRead(path);
+        if (error) {
+            TPath exe("/proc/self/exe");
+            error = exe.ReadLink(path);
+            if (error)
+                return error;
+            path = path.DirName() / "portoinit";
+            error = TaskEnv.PortoInit.OpenRead(path);
+            if (error)
+                return error;
+        }
     }
 
     TaskEnv.Mnt.IsolateRun = TaskEnv.Mnt.Root.IsRoot() && OsMode && Isolate;
@@ -3345,16 +3348,11 @@ TError TContainer::Seize() {
         pidStr.c_str(),
         NULL,
     };
-    TPath exe("/proc/self/exe");
-    TPath path;
-    TError error;
-    error = exe.ReadLink(path);
-    if (error)
-        return error;
-    path = path.DirName() / "portoinit";
-    auto cg = GetCgroup(FreezerSubsystem);
 
-    error = SeizeTask.Fork(true);
+    auto cg = GetCgroup(FreezerSubsystem);
+    TPath path = TPath(PORTO_HELPERS_PATH) / "portoinit";
+
+    TError error = SeizeTask.Fork(true);
     if (error)
         return error;
 
@@ -3365,7 +3363,18 @@ TError TContainer::Seize() {
 
     if (cg.Attach(GetPid()))
         _exit(EXIT_FAILURE);
+
     execv(path.c_str(), (char *const *)argv);
+
+    TPath exe("/proc/self/exe");
+    error = exe.ReadLink(path);
+    if (error)
+        _exit(EXIT_FAILURE);
+
+    path = path.DirName() / "portoinit";
+
+    execv(path.c_str(), (char *const *)argv);
+
     _exit(EXIT_FAILURE);
 }
 
