@@ -128,8 +128,13 @@ int THelpCmd::Execute(TCommandEnviroment *env) {
     const std::string &name = args[0];
     const auto it = Handler.GetCommands().find(name);
     if (it == Handler.GetCommands().end()) {
-        std::string helper = fmt::format("{}-{}", program_invocation_short_name, name);
+
+        std::string helper = fmt::format("{}/{}-{}", PORTO_HELPERS_PATH, program_invocation_short_name, name);
+        execl(helper.c_str(), helper.c_str(), "--help", nullptr);
+
+        helper = fmt::format("{}-{}", program_invocation_name, name);
         execlp(helper.c_str(), helper.c_str(), "--help", nullptr);
+
         Usage();
     } else {
         it->second->PrintUsage();
@@ -251,9 +256,15 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
 
     const auto it = Commands.find(name);
     if (it == Commands.end()) {
-        std::string helper = fmt::format("{}-{}", program_invocation_short_name, name);
+
+        std::string helper = fmt::format("{}/{}-{}", PORTO_HELPERS_PATH, program_invocation_short_name, name);
+        argv[1] = (char *)helper.c_str();
+        execv(argv[1], argv + 1);
+
+        helper = fmt::format("{}-{}", program_invocation_name, name);
         argv[1] = (char *)helper.c_str();
         execvp(argv[1], argv + 1);
+
         std::cerr << "Invalid command: " << name << std::endl;
         return EXIT_FAILURE;
     }

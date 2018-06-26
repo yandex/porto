@@ -102,6 +102,8 @@ constexpr const char *PORTO_STORAGE = "porto_storage";
 
 constexpr const char *PORTO_CHROOT_VOLUMES = "porto";
 
+constexpr const char *PORTO_HELPERS_PATH = "/usr/lib/porto";
+
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_PATH_MAX_FOR_SUPERUSER = 220;

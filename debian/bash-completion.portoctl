@@ -26,7 +26,9 @@ _portoctl ()
 	_get_comp_words_by_ref -n : cur prev words cword
 
 	i=$(portoctl 2>&1)
-	_porto_commands=$(echo "$i" | awk '/^Command/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }'; compgen -c portoctl- | sed -e 's/portoctl-//')
+	_porto_commands=$(echo "$i" | awk '/^Command/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }' ;
+			  ls /usr/lib/porto/portoctl-* 2>/dev/null | sed -e 's#.*/portoctl-##' ;
+			  compgen -c portoctl- | sed -e 's/portoctl-//')
 	_porto_volume_properies=$(echo "$i" | awk '/^Volume properties/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
 	_porto_properies=$(echo "$i" | awk '/^Container properties/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
 
