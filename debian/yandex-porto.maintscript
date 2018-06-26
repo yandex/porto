@@ -1,1 +1,2 @@
-rm_conffile /etc/logrotate.d/yandex-porto 1.3
+rm_conffile /etc/porto/logrotate-porto.conf 4.14.0~
+rm_conffile /etc/bash_completion.d/yandex-porto 4.14.0~
