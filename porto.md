@@ -120,7 +120,11 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **core\_command** - command for receiving core dumps
 
-    See [COREDUMPS] below.
+    Container without chroot inherits default core command from parent container.
+
+    To enable core-dumos set **ulimit\[core\]** to unlimited or anything > 1.
+
+    Also see [COREDUMPS] below.
 
 * **env** - environment of main container process, syntax: \<variable\>=\<value\>; ...
 

@@ -622,7 +622,12 @@ public:
         IsSupported = config().core().enable();
     }
     TError Get(std::string &command) {
-        command = CT->CoreCommand;
+        /* inherit default core command from parent but not across chroot */
+        for (auto ct = CT; ct; ct = ct->Parent.get()) {
+            command = ct->CoreCommand;
+            if (ct->HasProp(EProperty::CORE_COMMAND) || ct->Root != "/")
+                break;
+        }
         return OK;
     }
     TError Set(const std::string &command) {
