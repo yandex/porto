@@ -2625,17 +2625,17 @@ TError TContainer::PrepareResources() {
 
     if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
         std::shared_ptr<TVolume> vol;
-        TStringMap cfg;
+        rpc::TVolumeSpec spec;
 
         L("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
         TaintFlags.RootOnLoop = true;
 
-        cfg[V_BACKEND] = "loop";
-        cfg[V_STORAGE] = RootPath.ToString();
-        cfg[V_READ_ONLY] = BoolToString(RootRo);
-        cfg[V_CONTAINERS] = ROOT_PORTO_NAMESPACE + Name;
+        spec.set_backend("loop");
+        spec.set_storage(RootPath.ToString());
+        spec.set_read_only(RootRo);
+        spec.add_links()->set_container(ROOT_PORTO_NAMESPACE + Name);
 
-        error = TVolume::Create(cfg, vol);
+        error = TVolume::Create(spec, vol);
         if (error) {
             L_ERR("Cannot create root volume: {}", error);
             goto undo;

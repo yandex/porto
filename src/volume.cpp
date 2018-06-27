@@ -1657,32 +1657,15 @@ TError TVolume::CheckConflicts(const TPath &path) {
     return OK;
 }
 
-TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
+TError TVolume::Configure(const TPath &target_root) {
     TError error;
-
-    /* Verify properties */
-    for (auto &it: cfg) {
-        if (it.first == V_PATH)
-            continue;
-        TVolumeProperty *prop = nullptr;
-        for (auto &p: VolumeProperties) {
-            if (p.Name == it.first) {
-                prop = &p;
-                break;
-            }
-        }
-        if (!prop)
-            return TError(EError::InvalidProperty, "Unknown: " + it.first);
-        if (prop->ReadOnly)
-            return TError(EError::InvalidProperty, "Read-only: " + it.first);
-    }
 
     /* Default user:group */
     VolumeOwner = CL->Cred;
+    VolumeCred = CL->TaskCred;
     Creator = CL->ClientContainer->Name + " " + CL->Cred.User() + " " + CL->Cred.Group();
 
-    /* Apply properties */
-    error = ApplyConfig(cfg);
+    error = Load(*Spec);
     if (error)
         return error;
 
@@ -1795,12 +1778,10 @@ TError TVolume::Configure(const TPath &target_root, const TStringMap &cfg) {
     }
 
     /* Verify guarantees */
-    if (cfg.count(V_SPACE_LIMIT) && cfg.count(V_SPACE_GUARANTEE) &&
-            SpaceLimit < SpaceGuarantee)
+    if (SpaceLimit && SpaceLimit < SpaceGuarantee)
         return TError(EError::InvalidValue, "Space guarantree bigger than limit");
 
-    if (cfg.count(V_INODE_LIMIT) && cfg.count(V_INODE_GUARANTEE) &&
-            InodeLimit < InodeGuarantee)
+    if (InodeLimit && InodeLimit < InodeGuarantee)
         return TError(EError::InvalidValue, "Inode guarantree bigger than limit");
 
     error = OpenBackend();
@@ -1937,18 +1918,13 @@ TError TVolume::Build() {
 
     /* Initialize cred and perms but do not change is user havn't asked */
     if (!IsReadOnly) {
-        if (!KeepStorage || !VolumeCred.IsUnknown()) {
-            TCred cred = VolumeCred;
-            if (cred.Uid == NoUser)
-                cred.Uid = CL->TaskCred.Uid;
-            if (cred.Gid == NoGroup)
-                cred.Gid = CL->TaskCred.Gid;
-            error = InternalPath.Chown(cred);
+        if (!KeepStorage || Spec->has_cred()) {
+            error = InternalPath.Chown(VolumeCred);
             if (error)
                 return error;
         }
-        if (!KeepStorage || VolumePerms) {
-            error = InternalPath.Chmod(VolumePerms ?: 0775);
+        if (!KeepStorage || Spec->has_permissions()) {
+            error = InternalPath.Chmod(VolumePermissions);
             if (error)
                 return error;
         }
@@ -2757,7 +2733,7 @@ TError TVolume::CheckRequired(TContainer &ct) {
     return OK;
 }
 
-void TVolume::Dump(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump) {
+void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump) {
     TStringMap ret;
 
     auto volumes_lock = LockVolumes();
@@ -2780,8 +2756,7 @@ void TVolume::Dump(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription
         ret[V_USER] = VolumeCred.User();
     if (VolumeCred.Gid != NoGroup)
         ret[V_GROUP] = VolumeCred.Group();
-    if (VolumePerms)
-        ret[V_PERMISSIONS] = StringFormat("%#o", VolumePerms);
+    ret[V_PERMISSIONS] = fmt::format("{:#o}", VolumePermissions);
     ret[V_CREATOR] = Creator;
     ret[V_READY] = BoolToString(State == EVolumeState::Ready);
     if (BuildTime.size())
@@ -2880,6 +2855,7 @@ TError TVolume::Save() {
     node.Set(V_BACKEND, BackendType);
 
     node.Set(V_CREATOR, Creator);
+    node.Set(V_BUILD_TIME, BuildTime);
 
     if (VolumeOwnerContainer)
         node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
@@ -2891,9 +2867,8 @@ TError TVolume::Save() {
         node.Set(V_USER, VolumeCred.User());
     if (VolumeCred.Gid != NoGroup)
         node.Set(V_GROUP, VolumeCred.Group());
-    if (VolumePerms)
-        node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
 
+    node.Set(V_PERMISSIONS, fmt::format("{:#o}", VolumePermissions));
     node.Set(V_READY, BoolToString(State == EVolumeState::Ready));
     node.Set(V_PRIVATE, Private);
     node.Set(V_LOOP_DEV, std::to_string(Device));
@@ -2928,33 +2903,35 @@ TError TVolume::Save() {
 }
 
 TError TVolume::Restore(const TKeyValue &node) {
-    if (!node.Has(V_RAW_ID))
+    rpc::TVolumeSpec spec;
+    TError error;
+
+    error = ParseConfig(node.Data, spec);
+    if (error)
+        return error;
+
+    if (!spec.has_id())
         return TError(EError::InvalidValue, "No volume id stored");
 
-    TError error = ApplyConfig(node.Data);
+    error = Load(spec, true);
     if (error)
         return error;
 
     InternalPath = Place / PORTO_VOLUMES / Id / "volume";
 
-    auto creator = SplitEscapedString(Creator, ' ');
+    if (!spec.has_owner())
+        VolumeOwner = VolumeCred;
 
-    if (!node.Has(V_OWNER_USER)) {
-        if (creator.size() != 3 ||
-                UserId(creator[1], VolumeOwner.Uid) ||
-                GroupId(creator[2], VolumeOwner.Gid))
-            VolumeOwner = VolumeCred;
+    if (spec.has_owner_container()) {
+        error = CL->WriteContainer(spec.owner_container(), VolumeOwnerContainer, true);
+        CL->ReleaseContainer();
+        if (error)
+            L_WRN("Cannot find volume owner: {}", error);
     }
 
-    error = CL->WriteContainer(node.Has(V_OWNER_CONTAINER) ?
-                               node.Get(V_OWNER_CONTAINER) :
-                               creator.size() > 1 ? creator[0] : "",
-                               VolumeOwnerContainer, true);
-    CL->ReleaseContainer();
-    if (error) {
-        L_WRN("Cannot find volume owner: {}", error);
+    if (!VolumeOwnerContainer)
         VolumeOwnerContainer = RootContainer;
-    }
+
     VolumeOwnerContainer->OwnedVolumes.push_back(shared_from_this());
 
     if (!HaveStorage())
@@ -2991,55 +2968,51 @@ TError TVolume::Restore(const TKeyValue &node) {
     RootContainer->VolumeMounts++;
 
     /* Restore other links */
-    if (node.Has(V_RAW_CONTAINERS)) {
-        auto containers_lock = LockContainers();
+    auto containers_lock = LockContainers();
+    for (auto &l: spec.links()) {
+        std::shared_ptr<TContainer> ct;
+        bool placeholder = false;
 
-        /* container target ro|rw host-target */
-        for (auto &l: SplitEscapedString(node.Get(V_RAW_CONTAINERS), ' ', ';')) {
-            std::shared_ptr<TContainer> ct;
-
-            error = TContainer::Find(l[0], ct);
-            if (error) {
-                error = OK;
-                L("Volume is linked to missing container {}", l[0]);
-                if (l.size() > 4) {
-                    l[1] = "placeholder";
-                    ct = RootContainer;
-                } else
-                    continue;
-            }
-
-            auto link = std::make_shared<TVolumeLink>(shared_from_this(), ct);
-            if (l.size() > 1)
-                link->Target = l[1];
-            if (l.size() > 2)
-                link->ReadOnly = l[2] == "ro";
-            if (l.size() > 3)
-                link->Required = l[3] == "!";
-            if (l.size() > 4) {
-                link->HostTarget = l[4];
-
-                L("Restore volume {} link {} for CT{}:{} target {}", Path, link->HostTarget,
-                        link->Container->Id, link->Container->Name, link->Target);
-
-                TMount mount;
-                error = link->HostTarget.FindMount(mount, true);
-                if (error) {
-                    L("Link is lost: {}", error);
-                    continue;
-                }
-
-                if (VolumeLinks.find(link->HostTarget) != VolumeLinks.end())
-                    L_WRN("Duplicate volume link: {}", link->HostTarget);
-
-                VolumeLinks[link->HostTarget] = link;
-                for (auto c = ct; c; c = c->Parent)
-                    c->VolumeMounts++;
-            }
-
-            Links.emplace_back(link);
-            ct->VolumeLinks.emplace_back(link);
+        error = TContainer::Find(l.container(), ct);
+        if (error) {
+            error = OK;
+            L("Volume is linked to missing container {}", l.container());
+            if (l.has_host_target()) {
+                placeholder = true;
+                ct = RootContainer;
+            } else
+                continue;
         }
+
+        auto link = std::make_shared<TVolumeLink>(shared_from_this(), ct);
+        if (l.has_target())
+            link->Target = placeholder ? "placeholder" : l.target();
+        link->ReadOnly = l.read_only();
+        link->Required = l.required();
+
+        if (l.has_host_target()) {
+            link->HostTarget = l.host_target();
+
+            L("Restore volume {} link {} for CT{}:{} target {}", Path, link->HostTarget,
+                    link->Container->Id, link->Container->Name, link->Target);
+
+            TMount mount;
+            error = link->HostTarget.FindMount(mount, true);
+            if (error) {
+                L("Link is lost: {}", error);
+                continue;
+            }
+
+            if (VolumeLinks.find(link->HostTarget) != VolumeLinks.end())
+                L_WRN("Duplicate volume link: {}", link->HostTarget);
+
+            VolumeLinks[link->HostTarget] = link;
+            for (auto c = ct; c; c = c->Parent)
+                c->VolumeMounts++;
+        }
+
+        Links.emplace_back(link);
+        ct->VolumeLinks.emplace_back(link);
     }
 
     return OK;
@@ -3074,17 +3047,18 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_INODE_AVAILABLE,    "available disk inodes (ro)", true },
 };
 
-TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) {
+TError TVolume::Create(const rpc::TVolumeSpec &spec,
+                       std::shared_ptr<TVolume> &volume) {
     TError error;
 
     if (!CL)
         return TError("no client");
 
-    if (cfg.count(V_PLACE)) {
-        error = CL->CanControlPlace(cfg.at(V_PLACE));
+    if (spec.has_place()) {
+        error = CL->CanControlPlace(spec.place());
         if (error)
             return error;
-        error = TStorage::CheckPlace(cfg.at(V_PLACE));
+        error = TStorage::CheckPlace(spec.place());
         if (error)
             return error;
     } else {
@@ -3096,9 +3070,9 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     std::shared_ptr<TContainer> owner;
     TPath target_root;
 
-    if (cfg.count(V_TARGET_CONTAINER)) {
+    if (spec.has_container()) {
         std::shared_ptr<TContainer> target;
-        error = CL->WriteContainer(cfg.at(V_TARGET_CONTAINER), target, true);
+        error = CL->WriteContainer(spec.container(), target, true);
         if (error)
             return error;
         if (target->State == EContainerState::Stopped)
@@ -3107,8 +3081,8 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     } else
         target_root = CL->ClientContainer->RootPath;
 
-    if (cfg.count(V_OWNER_CONTAINER)) {
-        error = CL->WriteContainer(cfg.at(V_OWNER_CONTAINER), owner, true);
+    if (spec.has_owner_container()) {
+        error = CL->WriteContainer(spec.owner_container(), owner, true);
     } else {
         owner = CL->ClientContainer;
         error = CL->LockContainer(owner);
@@ -3125,8 +3099,8 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     if (Volumes.size() >= max_vol)
         return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max_vol));
 
-    if (cfg.count(V_PATH)) {
-        TPath path = cfg.at(V_PATH);
+    if (spec.has_path()) {
+        TPath path = spec.path();
 
         if (!path.IsAbsolute())
             return TError(EError::InvalidPath, "Volume path must be absolute");
@@ -3158,8 +3132,9 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
 
     volume = std::make_shared<TVolume>();
     volume->Id = std::to_string(NextId++);
+    volume->Spec = &spec;
 
-    error = volume->Configure(target_root, cfg);
+    error = volume->Configure(target_root);
     if (error)
         return error;
 
@@ -3199,20 +3174,17 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         goto undo;
 
     error = volume->Build();
+    volume->Spec = nullptr;
     if (error)
         goto undo;
 
-    if (cfg.count(V_CONTAINERS)) {
-        for (auto &link: SplitEscapedString(cfg.at(V_CONTAINERS), ' ', ';')) {
+    if (spec.links().size()) {
+        for (auto &link: spec.links()) {
             std::shared_ptr<TContainer> ct;
-            error = CL->WriteContainer(link[0], ct, true);
+            error = CL->WriteContainer(link.container(), ct, true);
             if (error)
                 goto undo;
-            auto target = link.size() > 1 ? link[1] : "";
-            bool ro = link.size() > 2 && link[2] == "ro";
-            bool required = (link.size() > 2 && link[2] == "!") ||
-                            (link.size() > 3 && link[3] == "!");
-            error = volume->LinkVolume(ct, target, ro, required);
+            error = volume->LinkVolume(ct, link.target(), link.read_only(), link.required());
             CL->ReleaseContainer();
             if (error)
                 goto undo;
@@ -3450,108 +3422,290 @@ next_link:
     }
 }
 
-TError TVolume::ApplyConfig(const TStringMap &cfg) {
-    TError error, ret;
+TError TVolume::VerifyConfig(const TStringMap &cfg) {
 
-    for (auto &prop : cfg) {
-        if (prop.first == V_PATH) {
-            Path = prop.second;
-
-        } else if (prop.first == V_AUTO_PATH) {
-            error = StringToBool(prop.second, IsAutoPath);
-
-        } else if (prop.first == V_STORAGE) {
-            Storage = prop.second;
-            StoragePath = Storage;
-            KeepStorage = HaveStorage();
-
-        } else if (prop.first == V_BACKEND) {
-            BackendType = prop.second;
-
-        } else if (prop.first == V_TARGET_CONTAINER) {
-
-        } else if (prop.first == V_OWNER_CONTAINER) {
-
-        } else if (prop.first == V_OWNER_USER) {
-            error = UserId(prop.second, VolumeOwner.Uid);
-
-        } else if (prop.first == V_OWNER_GROUP) {
-            error = GroupId(prop.second, VolumeOwner.Gid);
-
-        } else if (prop.first == V_USER) {
-            error = UserId(prop.second, VolumeCred.Uid);
-
-        } else if (prop.first == V_GROUP) {
-            error = GroupId(prop.second, VolumeCred.Gid);
-
-        } else if (prop.first == V_PERMISSIONS) {
-            error = StringToOct(prop.second, VolumePerms);
-
-        } else if (prop.first == V_CREATOR) {
-            Creator = prop.second;
-
-        } else if (prop.first == V_RAW_ID) {
-            Id = prop.second;
-
-        } else if (prop.first == V_READY) {
-            bool ready;
-            error = StringToBool(prop.second, ready);
-            if (!error)
-                SetState(ready ? EVolumeState::Ready : EVolumeState::ToDestroy);
-
-        } else if (prop.first == V_BUILD_TIME) {
-            BuildTime = prop.second;
-
-        } else if (prop.first == V_PRIVATE) {
-            Private = prop.second;
-
-        } else if (prop.first == V_RAW_CONTAINERS) {
-
-        } else if (prop.first == V_CONTAINERS) {
-
-        } else if (prop.first == V_LOOP_DEV) {
-            error = StringToInt(prop.second, Device);
-
-        } else if (prop.first == V_READ_ONLY) {
-            error = StringToBool(prop.second, IsReadOnly);
-
-        } else if (prop.first == V_LAYERS) {
-            Layers = SplitEscapedString(prop.second, ';');
-
-        } else if (prop.first == V_SPACE_LIMIT) {
-            uint64_t limit;
-            error = StringToSize(prop.second, limit);
-            if (!error)
-                SpaceLimit = limit;
-
-        } else if (prop.first == V_SPACE_GUARANTEE) {
-            uint64_t guarantee;
-            error = StringToSize(prop.second, guarantee);
-            if (!error)
-                SpaceGuarantee = guarantee;
-
-        } else if (prop.first == V_INODE_LIMIT) {
-            uint64_t limit;
-            error = StringToSize(prop.second, limit);
-            if (!error)
-                InodeLimit = limit;
-
-        } else if (prop.first == V_INODE_GUARANTEE) {
-            uint64_t guarantee;
-            error = StringToSize(prop.second, guarantee);
-            if (!error)
-                InodeGuarantee = guarantee;
-
-        } else if (prop.first == V_PLACE) {
-            Place = prop.second;
-            CustomPlace = true;
-
-        } else
-            L_WRN("Skip unknown volume property {} = {}", prop.first, prop.second);
-
-        if (error && !ret)
-            ret = error;
+    for (auto &it: cfg) {
+        if (it.first == V_PATH)
+            continue;
+        TVolumeProperty *prop = nullptr;
+        for (auto &p: VolumeProperties) {
+            if (p.Name == it.first) {
+                prop = &p;
+                break;
+            }
+        }
+        if (!prop)
+            return TError(EError::InvalidProperty, "Unknown property: " + it.first);
+        if (prop->ReadOnly)
+            return TError(EError::InvalidProperty, "Read-only property: " + it.first);
     }
 
+    return OK;
+}
+
+TError TVolume::ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec) {
+
+    for (auto &it : cfg) {
+        auto &key = it.first;
+        auto &val = it.second;
+        TError error;
+
+        if (key == V_RAW_ID) {
+            spec.set_id(val);
+        } else if (key == V_PATH) {
+            spec.set_path(val);
+        } else if (key == V_AUTO_PATH) {
+            bool v;
+            error = StringToBool(val, v);
+            spec.set_auto_path(v);
+        } else if (key == V_TARGET_CONTAINER) {
+            spec.set_container(val);
+        } else if (key == V_PLACE) {
+            spec.set_place(val);
+        } else if (key == V_STORAGE) {
+            spec.set_storage(val);
+        } else if (key == V_LOOP_DEV) {
+            int v;
+            error = StringToInt(val, v);
+            spec.set_device(v);;
+        } else if (key == V_BACKEND) {
+            spec.set_backend(val);
+        } else if (key == V_OWNER_CONTAINER) {
+            spec.set_owner_container(val);
+        } else if (key == V_OWNER_USER) {
+            spec.mutable_owner()->set_user(val);
+        } else if (key == V_OWNER_GROUP) {
+            spec.mutable_owner()->set_group(val);
+        } else if (key == V_USER) {
+            spec.mutable_cred()->set_user(val);
+        } else if (key == V_GROUP) {
+            spec.mutable_cred()->set_group(val);
+        } else if (key == V_PERMISSIONS) {
+            unsigned v;
+            error = StringToOct(val, v);
+            spec.set_permissions(v);
+        } else if (key == V_PRIVATE) {
+            spec.set_private_value(val);
+        } else if (key == V_CONTAINERS) {
+            for (auto &l: SplitEscapedString(val, ' ', ';')) {
+                auto link = spec.add_links();
+                link->set_container(l[0]);
+                if (l.size() > 1)
+                    link->set_target(l[1]);
+                if (l.size() > 2 && l[2] == "ro")
+                    link->set_read_only(true);
+                if ((l.size() > 2 && l[2] == "!") ||
+                        (l.size() > 3 && l[3] == "!"))
+                    link->set_required(true);
+            }
+        } else if (key == V_RAW_CONTAINERS) {
+            for (auto &l: SplitEscapedString(val, ' ', ';')) {
+                auto link = spec.add_links();
+                link->set_container(l[0]);
+                if (l.size() > 1)
+                    link->set_target(l[1]);
+                if (l.size() > 2 && l[2] == "ro")
+                    link->set_read_only(true);
+                if (l.size() > 3 && l[3] == "!")
+                    link->set_required(true);
+                if (l.size() > 4)
+                    link->set_host_target(l[4]);
+            }
+        } else if (key == V_READ_ONLY) {
+            bool v;
+            error = StringToBool(val, v);
+            spec.set_read_only(v);
+        } else if (key == V_LAYERS) {
+            for (auto &l: SplitEscapedString(val, ';'))
+                spec.add_layers(l);
+        } else if (key == V_SPACE_LIMIT) {
+            uint64_t v;
+            error = StringToSize(val, v);
+            spec.mutable_space()->set_limit(v);
+        } else if (key == V_SPACE_GUARANTEE) {
+            uint64_t v;
+            error = StringToSize(val, v);
+            spec.mutable_space()->set_guarantee(v);
+        } else if (key == V_INODE_LIMIT) {
+            uint64_t v;
+            error = StringToSize(val, v);
+            spec.mutable_inodes()->set_limit(v);
+        } else if (key == V_INODE_GUARANTEE) {
+            uint64_t v;
+            error = StringToSize(val, v);
+            spec.mutable_inodes()->set_guarantee(v);
+        } else if (key == V_CREATOR) {
+            spec.set_creator(val);
+        } else if (key == V_BUILD_TIME) {
+            spec.set_build_time(val);
+        } else if (key == V_READY) {
+            spec.set_state(val == "true" ? "ready" : "unknown");
+        } else if (key == V_STATE) {
+            spec.set_state(val);
+        } else
+            return TError(EError::InvalidProperty, "Unknown volume property {} = {}", key, val);
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
+TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
+    TError error, ret;
+
+    if (spec.has_id() && full)
+        Id = spec.id();
+
+    if (spec.has_path())
+        Path = spec.path();
+
+    if (spec.has_auto_path() && full)
+        IsAutoPath = spec.auto_path();
+
+    if (spec.has_storage()) {
+        Storage = spec.storage();
+        StoragePath = Storage;
+        KeepStorage = HaveStorage();
+    }
+
+    if (spec.has_backend())
+        BackendType = spec.backend();
+
+    if (spec.has_device() && full)
+        Device = spec.device();
+
+    if (spec.has_place()) {
+        Place = spec.place();
+        CustomPlace = true;
+    }
+
+    if (spec.has_owner())
+        error = VolumeOwner.Load(spec.owner());
+    if (error)
+        return error;
+
+    if (spec.has_cred())
+        error = VolumeCred.Load(spec.cred());
+    if (error)
+        return error;
+
+    if (spec.has_permissions())
+        VolumePermissions = spec.permissions();
+
+    if (spec.has_state() && full)
+        SetState(spec.state() == "ready" ? EVolumeState::Ready : EVolumeState::ToDestroy);
+
+    if (spec.has_private_value())
+        Private = spec.private_value();
+
+    if (spec.has_read_only())
+        IsReadOnly = spec.read_only();
+
+    for (auto &l: spec.layers())
+        Layers.push_back(l);
+
+    if (spec.has_space()) {
+        SpaceLimit = spec.space().limit();
+        SpaceGuarantee = spec.space().guarantee();
+    }
+
+    if (spec.has_inodes()) {
+        InodeLimit = spec.inodes().limit();
+        InodeGuarantee = spec.inodes().guarantee();
+    }
+
+    if (spec.has_build_time() && full)
+        BuildTime = spec.build_time();
+
+    if (spec.has_creator() && full)
+        Creator = spec.creator();
+
     return ret;
+}
+
+void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
+    auto volumes_lock = LockVolumes();
+
+    spec.set_path(CL->ComposePath(Path).ToString());
+    spec.set_container(CL->RelativeName(CL->ClientContainer->Name));
+
+    if (IsAutoPath)
+        spec.set_auto_path(true);
+
+    spec.set_id(Id);
+    spec.set_state(StateName(State));
+    spec.set_backend(BackendType);
+
+    if (Private.size())
+        spec.set_private_value(Private);
+
+    spec.set_creator(Creator);
+    spec.set_build_time(BuildTime);
+
+    spec.set_place(Place.ToString());
+
+    if (HaveStorage()) {
+        if (UserStorage() && !RemoteStorage())
+            spec.set_storage(CL->ComposePath(StoragePath).ToString());
+        else
+            spec.set_storage(Storage);
+    }
+
+    if (Device >= 0)
+        spec.set_device(Device);
+
+    if (VolumeOwnerContainer)
+        spec.set_owner_container(CL->RelativeName(VolumeOwnerContainer->Name));
+
+    if (!VolumeOwner.IsUnknown())
+        VolumeOwner.Dump(*spec.mutable_owner());
+
+    if (!VolumeCred.IsUnknown())
+        VolumeCred.Dump(*spec.mutable_cred());
+
+    spec.set_permissions(VolumePermissions);
+    spec.set_read_only(IsReadOnly);
+
+    if (SpaceLimit)
+        spec.mutable_space()->set_limit(SpaceLimit);
+    if (SpaceGuarantee)
+        spec.mutable_space()->set_guarantee(SpaceGuarantee);
+    if (InodeLimit)
+        spec.mutable_inodes()->set_limit(InodeLimit);
+    if (InodeGuarantee)
+        spec.mutable_inodes()->set_guarantee(InodeGuarantee);
+
+    for (auto &layer: Layers) {
+        TPath path(layer);
+        if (path.IsAbsolute())
+            path = CL->ComposePath(path);
+        spec.add_layers(path.ToString());
+    }
+
+    if (Backend)
+        spec.set_place_key(Backend->ClaimPlace());
+
+    for (auto &link: Links) {
+        auto l = spec.add_links();
+        l->set_container(CL->RelativeName(link->Container->Name));
+        if (link->Target)
+            l->set_target(link->Target.ToString());
+        if (link->ReadOnly)
+            l->set_read_only(true);
+        if (link->Required)
+            l->set_required(true);
+        if (link->HostTarget)
+            l->set_host_target(link->HostTarget.ToString());
+    }
+
+    volumes_lock.unlock();
+
+    TStatFS stat;
+    if (!full && !StatFS(stat)) {
+        spec.mutable_space()->set_usage(stat.SpaceUsage);
+        spec.mutable_space()->set_available(stat.SpaceAvail);
+        spec.mutable_inodes()->set_usage(stat.InodeUsage);
+        spec.mutable_inodes()->set_available(stat.InodeAvail);
+    }
 }

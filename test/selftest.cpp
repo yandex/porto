@@ -3613,9 +3613,9 @@ static void TestVolumeHolder(Porto::Connection &api) {
 
     ExpectEq(volumes[0].Properties.count("ready"), 1);
     ExpectEq(volumes[0].Properties.count("backend"), 1);
-    ExpectEq(volumes[0].Properties.count("user"), 0);
-    ExpectEq(volumes[0].Properties.count("group"), 0);
-    ExpectEq(volumes[0].Properties.count("permissions"), 0);
+    ExpectEq(volumes[0].Properties.count("user"), 1);
+    ExpectEq(volumes[0].Properties.count("group"), 1);
+    ExpectEq(volumes[0].Properties.count("permissions"), 1);
     ExpectEq(volumes[0].Properties.count("creator"), 1);
 
     ExpectEq(volumes[0].Properties.count("space_used"), 1);

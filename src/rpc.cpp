@@ -43,7 +43,8 @@ void TRequest::Classify() {
         Req.has_asyncwait() ||
         Req.has_convertpath() ||
         Req.has_locateprocess() ||
-        Req.has_getsystem();
+        Req.has_getsystem() ||
+        Req.has_getvolume();
 
     IoReq =
         Req.has_createvolume() ||
@@ -59,7 +60,8 @@ void TRequest::Classify() {
         Req.has_exportstorage() ||
         Req.has_removestorage() ||
         Req.has_createmetastorage() ||
-        Req.has_removemetastorage();
+        Req.has_removemetastorage() ||
+        Req.has_newvolume();
 }
 
 void TRequest::Parse() {
@@ -259,6 +261,11 @@ void TRequest::Parse() {
     } else if (Req.has_setsystem()) {
         Cmd = "SetSystem";
         Arg = Req.ShortDebugString();
+    } else if (Req.has_newvolume()) {
+        Cmd = "NewVolume";
+        Arg = Req.newvolume().volume().path();
+    } else if (Req.has_getvolume()) {
+        Cmd = "GetVolume";
     } else
         Cmd = "Unknown";
 
@@ -782,7 +789,10 @@ noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
 
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp) {
+    std::shared_ptr<TVolume> volume;
+    rpc::TVolumeSpec spec;
     TStringMap cfg;
+    TError error;
 
     for (auto p: req.properties())
         cfg[p.name()] = p.value();
@@ -795,15 +805,24 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
 
     Statistics->VolumesCreated++;
 
-    std::shared_ptr<TVolume> volume;
-    TError error = TVolume::Create(cfg, volume);
-    if (error) {
-        Statistics->VolumesFailed++;
-        return error;
-    }
+    error = TVolume::VerifyConfig(cfg);
+    if (error)
+        goto err;
 
-    volume->Dump(nullptr, volume->ComposePath(*CL->ClientContainer), rsp.mutable_volume());
+    error = TVolume::ParseConfig(cfg, spec);
+    if (error)
+        goto err;
+
+    error = TVolume::Create(spec, volume);
+    if (error)
+        goto err;
+
+    volume->DumpDescription(nullptr, volume->ComposePath(*CL->ClientContainer), rsp.mutable_volume());
     return OK;
+
+err:
+    Statistics->VolumesFailed++;
+    return error;
 }
 
 noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
@@ -873,7 +892,7 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
         auto link = TVolume::ResolveLink(CL->ClientContainer->RootPath / req.path());
         if (!link)
             return TError(EError::VolumeNotFound, "Volume {} not found", req.path());
-        link->Volume->Dump(link.get(), req.path(), rsp.mutable_volumelist()->add_volumes());
+        link->Volume->DumpDescription(link.get(), req.path(), rsp.mutable_volumelist()->add_volumes());
         return OK;
     }
 
@@ -898,7 +917,73 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
     volumes_lock.unlock();
 
     for (auto &it: map)
-        it.second->Volume->Dump(it.second.get(), it.first, rsp.mutable_volumelist()->add_volumes());
+        it.second->Volume->DumpDescription(it.second.get(), it.first, rsp.mutable_volumelist()->add_volumes());
+
+    return OK;
+}
+
+noinline TError NewVolume(const rpc::TNewVolumeRequest &req,
+                          rpc::TNewVolumeResponse &rsp) {
+    Statistics->VolumesCreated++;
+
+    std::shared_ptr<TVolume> volume;
+    TError error = TVolume::Create(req.volume(), volume);
+    if (error) {
+        Statistics->VolumesFailed++;
+        return error;
+    }
+
+    volume->Dump(*rsp.mutable_volume());
+    return OK;
+}
+
+noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
+                          rpc::TGetVolumeResponse &rsp) {
+    TError error;
+
+    std::shared_ptr<TContainer> ct;
+    std::string ct_name;
+
+    if (req.has_container()) {
+        auto lock = LockContainers();
+        error = CL->ResolveContainer(req.container(), ct);
+        if (error)
+            return error;
+        ct_name = req.container();
+    } else {
+        ct = CL->ClientContainer;
+        ct_name = CL->RelativeName(CL->ClientContainer->Name);
+    }
+
+    for (auto &path: req.path()) {
+        auto link = TVolume::ResolveLink(ct->RootPath / path);
+        if (link) {
+            auto spec = rsp.add_volume();
+            link->Volume->Dump(*spec);
+            spec->set_path(path);
+            spec->set_container(ct_name);
+        } else if (req.path().size() == 1)
+            return TError(EError::VolumeNotFound, "Volume {} not found", path);
+    }
+
+    if (req.path().size() == 0) {
+        std::map<TPath, std::shared_ptr<TVolumeLink>> map;
+
+        auto volumes_lock = LockVolumes();
+        for (auto &it: VolumeLinks) {
+            TPath path = ct->RootPath.InnerPath(it.first);
+            if (path)
+                map[path] = it.second;
+        }
+        volumes_lock.unlock();
+
+        for (auto &it: map) {
+            auto spec = rsp.add_volume();
+            it.second->Volume->Dump(*spec);
+            spec->set_path(it.first.ToString());
+            spec->set_container(ct_name);
+        }
+    }
 
     return OK;
 }
@@ -1416,6 +1501,10 @@ void TRequest::Handle() {
         error = ListVolumes(Req.listvolumes(), rsp);
     else if (Req.has_tunevolume())
         error = TuneVolume(Req.tunevolume());
+    else if (Req.has_newvolume())
+        error = NewVolume(Req.newvolume(), *rsp.mutable_newvolume());
+    else if (Req.has_getvolume())
+        error = GetVolume(Req.getvolume(), *rsp.mutable_getvolume());
     else if (Req.has_importlayer())
         error = ImportLayer(Req.importlayer());
     else if (Req.has_exportlayer())
@@ -1511,7 +1600,7 @@ void TRequest::Handle() {
     } else if (error || RequestTime >= 1000) {
         /* Log failed or slow silent requests without details */
         L_REQ("{} {} from {}", Cmd, Arg, Client->Id);
-        L_RSP("{} {} to {} time={}+{} ms", Cmd, Arg,
+        L_RSP("{} {} {} to {} time={}+{} ms", Cmd, Arg, error,
                 Client->Id, StartTime - QueueTime, FinishTime - StartTime);
     }
 

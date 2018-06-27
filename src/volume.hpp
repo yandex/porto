@@ -140,12 +140,14 @@ public:
 
     TCred VolumeOwner;
     TCred VolumeCred;
-    unsigned VolumePerms = 0;
+    unsigned VolumePermissions = 0775;
 
     std::string Creator;
     std::string Private;
 
     std::set<std::shared_ptr<TVolume>> Nested;
+
+    const rpc::TVolumeSpec *Spec; /* during build */
 
     TVolume() {
         Statistics->VolumesCount++;
@@ -158,7 +160,10 @@ public:
         return std::unique_lock<std::mutex>(Mutex);
     }
 
-    static TError Create(const TStringMap &cfg,
+    static TError VerifyConfig(const TStringMap &cfg);
+    static TError ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec);
+
+    static TError Create(const rpc::TVolumeSpec &spec,
                          std::shared_ptr<TVolume> &volume);
 
     /* link target path */
@@ -171,10 +176,12 @@ public:
 
     TPath ComposePath(const TContainer &ct) const;
 
-    TError Configure(const TPath &target_root, const TStringMap &cfg);
-    TError ApplyConfig(const TStringMap &cfg);
+    TError Configure(const TPath &target_root);
 
-    void Dump(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump);
+    TError Load(const rpc::TVolumeSpec &spec, bool full = false);
+    void Dump(rpc::TVolumeSpec &spec, bool full = false);
+
+    void DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump);
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
