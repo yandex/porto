@@ -1631,7 +1631,7 @@ public:
             }
         }
 
-        for (unsigned idx = 0; idx < names.size(); idx++) {
+        for (unsigned idx = 0; idx <= names.size(); idx++) {
             auto &line = text[idx];
             fmt::print("{: <{}} ", line[0], width[0]);
             for (unsigned col = 1; col < line.size(); col++)
