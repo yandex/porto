@@ -749,7 +749,9 @@ TError TPath::Bind(const TPath &source, uint64_t mnt_flags) const {
 }
 
 TError TPath::Remount(uint64_t mnt_flags) const {
-    L_ACT("remount {} {}", Path, TMount::FormatFlags(mnt_flags));
+
+    if (!(mnt_flags & MS_SILENT))
+        L_ACT("remount {} {}", Path, TMount::FormatFlags(mnt_flags));
 
     uint32_t recursive = mnt_flags & MS_REC;
 
@@ -784,7 +786,7 @@ TError TPath::Remount(uint64_t mnt_flags) const {
             return error;
         for (auto &mnt: mounts) {
             if (mnt.Target.IsInside(normal) && mnt.Target != normal) {
-                error = mnt.Target.Remount(remount_flags);
+                error = mnt.Target.Remount(remount_flags | MS_SILENT);
                 if (error) {
                     TFile dst;
                     TError error2 = dst.OpenPath(mnt.Target);
