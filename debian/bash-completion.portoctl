@@ -17,6 +17,18 @@ _porto_layers ()
 	COMPREPLY=( $( compgen -f -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
 }
 
+_porto_property_keys ()
+{
+	local prop="${cur%%[*}"
+	if [ "$prop" != "$cur" -a "$prop" != "" ] ; then
+		local IFS=$'\n'
+		local keys=$(portoctl get "$1" "$prop" 2>/dev/null | sed -n -E "s/(^|;)\ *([^=:;]+)[:=][^;]*/$prop\[\2\]\n/g;s/ /\\\\\\\\ /g;p")
+		COMPREPLY=( $( compgen -W "$keys" -- "$cur" ) )
+	else
+		COMPREPLY=( $( compgen -W "$2" -- "$cur" ) )
+	fi
+}
+
 _portoctl ()
 {
 	local i cur prev ct=
@@ -100,7 +112,7 @@ _portoctl ()
 		if [ -z "$ct" ] ; then
 			_porto_containers / /porto
 		else
-			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
+			_porto_property_keys "${words[$ct]}" "$_porto_properies"
 		fi
 		;;
 	set)
@@ -109,7 +121,7 @@ _portoctl ()
 			_porto_containers
 			;;
 		3)
-			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
+			_porto_property_keys "${words[$ct]}" "$_porto_properies"
 			;;
 		4)
 			compopt -o filenames
@@ -131,7 +143,7 @@ _portoctl ()
 		COMPREPLY=( $( compgen -W "-1 -f -t" -- $cur ) )
 		;;
 	sort)
-		COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
+		_porto_property_keys "/" "$_porto_properies"
 		;;
 	top)
 		_filedir
