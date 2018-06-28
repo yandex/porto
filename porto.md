@@ -445,8 +445,12 @@ Write access to container requires any of these conditions:
 
 * **place** - places allowed for volumes and layers, syntax: \[default\]\[;mask;...\]
 
-    Default is "/place;\*\*\*" (use /place by default, allow any other),
-    for container with chroot default is "/place".
+    This is paths in in _host_ or masks for them which are allowed to be
+    used as **place** property for volumes for requests from this container.
+
+    Default is "/place;\*\*\*". This means use /place by default, allow any other.
+
+    Container inherits policy from parent container and cannot surpass it.
 
 * **place\_limit** - limits sum of volume **space\_limit** owned by subtree
 

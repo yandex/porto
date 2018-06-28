@@ -366,9 +366,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     SetProp(EProperty::PORTO_NAMESPACE);
 
     if (IsRoot())
-        Place = { PORTO_PLACE, "***" };
+        PlacePolicy = { PORTO_PLACE, "***" };
     else
-        Place = Parent->Place;
+        PlacePolicy = Parent->PlacePolicy;
 
     CpuPolicy = "normal";
     ChooseSchedPolicy();
@@ -2360,19 +2360,20 @@ TError TContainer::PrepareStart() {
         return TError(EError::Permission, "Ambient capabilities out of bounds: " + cap.Format());
     }
 
-    /* Enforce place restictions */
-    if (HasProp(EProperty::PLACE) && Parent) {
-        for (auto &place: Place) {
+    if (!Parent) {
+        /* Root container */
+    } else if (!HasProp(EProperty::PLACE)) {
+        /* Inherit parent policy */
+        PlacePolicy = Parent->PlacePolicy;
+    } else {
+        /* Enforce place restictions */
+        for (auto &place: PlacePolicy) {
             bool allowed = false;
-            for (auto &pp: Parent->Place)
+            for (auto &pp: Parent->PlacePolicy)
                 allowed |= StringMatch(place, pp);
             if (!allowed)
                 return TError(EError::Permission, "Place " + place + " is not allowed by parent container");
         }
-    } else if (Parent) {
-        Place = Parent->Place;
-        if (Root != "/")
-            Place = {PORTO_PLACE};
     }
 
     return OK;
