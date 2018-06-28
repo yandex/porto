@@ -527,7 +527,8 @@ static bool ValidProperty(const vector<Porto::Property> &plist, const string &na
         != plist.end();
 }
 
-static std::string HumanValue(const std::string &name, const std::string &val) {
+static std::string HumanValue(const std::string &full_name, const std::string &val) {
+    auto name = StripIdx(full_name);
     TUintMap map;
     uint64_t num;
 
@@ -579,7 +580,9 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
          name == "io_read" ||
          name == "io_write" ||
          name == "virtual_memory") {
-        if (!StringToUintMap(val, map)) {
+        if (name != full_name && !StringToUint64(val, num)) {
+            return StringFormatSize(num);
+        } else if (!StringToUintMap(val, map)) {
             std::stringstream str;
             for (auto kv : map) {
                 if (str.str().length())
@@ -592,7 +595,9 @@ static std::string HumanValue(const std::string &name, const std::string &val) {
     }
 
     if (name == "io_time") {
-        if (!StringToUintMap(val, map)) {
+        if (name != full_name && !StringToUint64(val, num)) {
+            return StringFormatDuration(num / 1000000);
+        } else if (!StringToUintMap(val, map)) {
             std::stringstream str;
             for (auto kv : map) {
                 if (str.str().length())
