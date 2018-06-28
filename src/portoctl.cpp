@@ -1587,7 +1587,7 @@ public:
             names.push_back(it.first);
 
         std::sort(names.begin(), names.end(),
-                  [&](std::string &a, std::string &b) -> bool {
+                  [&](const std::string &a, const std::string &b) -> bool {
                       for (auto &key: keys) {
                           std::string &a_str = result[a][key].Value;
                           std::string &b_str = result[b][key].Value;
