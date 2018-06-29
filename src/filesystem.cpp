@@ -150,7 +150,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
             if (!error)
                 error = dir.MkdirAt(name, 0775);
             if (!error)
-                error = dir.WalkStrict(dir, name);
+                error = dir.OpenDirStrictAt(dir, name);
             if (!error)
                 error = dir.Chown(cred);
         }
@@ -718,9 +718,28 @@ TError TMountNamespace::CreateSymlink(const TPath &symlink, const TPath &target)
     TError error;
     TFile dir;
 
-    // in chroot allow to change anything
-    error = dir.CreatePath(sym_dir, BindCred, Root.IsRoot() ? "" : "/");
-    if (error)
+    for (auto &name: sym_dir.Components()) {
+        error = dir ? dir.OpenDirAt(dir, name) : dir.OpenDir(name);
+        if (!error)
+            continue;
+        if (error.Errno != ENOENT)
+            return error;
+        error = dir.WriteAccess(BindCred);
+        if (error && Root.IsRoot())
+            return error;
+        error = dir.MkdirAt(name, 0775);
+        if (error)
+            return error;
+        error = dir.OpenDirStrictAt(dir, name);
+        if (error)
+            return error;
+        error = dir.Chown(BindCred);
+        if (error)
+            return error;
+    }
+
+    error = dir.WriteAccess(BindCred);
+    if (error && Root.IsRoot())
         return error;
 
     TPath tgt = target.AbsolutePath(Cwd).NormalPath().RelativePath(sym_dir);

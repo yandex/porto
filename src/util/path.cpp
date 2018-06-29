@@ -162,6 +162,22 @@ TPath TPath::AddComponent(const TPath &component) const {
     return TPath(Path + "/" + component.Path);
 }
 
+std::vector<std::string> TPath::Components() const {
+    std::vector<std::string> result;
+    std::stringstream ss(Path);
+    std::string component;
+
+    if (IsAbsolute())
+        result.push_back("/");
+
+    while (std::getline(ss, component, '/')) {
+        if (component != "")
+            result.push_back(component);
+    }
+
+    return result;
+}
+
 TError TPath::Chdir() const {
     if (unshare(CLONE_FS))
         return TError::System("unshare(CLONE_FS)");
@@ -1194,57 +1210,16 @@ TError TFile::CreateTrunc(const TPath &path, int mode) {
     return Create(path, O_RDWR | O_CREAT | O_TRUNC | O_CLOEXEC, mode);
 }
 
-TError TFile::CreatePath(const TPath &path, const TCred &cred, const TPath &bound) {
-    TError error = OpenDir(path);
-
-    if (error && !path.Exists()) {
-        std::list<std::string> dirs;
-        TPath base = path;
-
-        while (!base.Exists()) {
-            dirs.push_front(base.BaseName());
-            base = base.DirName();
-        }
-
-        error = OpenDir(base);
-        if (error)
-            return error;
-
-        if (bound) {
-            TPath real = RealPath();
-            if (!bound.IsRoot() && !real.IsInside(bound))
-                error = TError(EError::Permission, "Base path {} for {} out of bound {}", real, path, bound);
-        } else
-            error = WriteAccess(cred);
-        if (error)
-            return error;
-
-        for (auto &name: dirs) {
-            if (!error)
-                error = MkdirAt(name, 0775);
-            if (!error)
-                error = WalkStrict(*this, name);
-            if (!error)
-                error = Chown(cred);
-        }
-        if (error)
-            return TError(error, "Cannot create path {}", path);
-    }
-
-    if (bound) {
-        TPath real = RealPath();
-        if (!bound.IsRoot() && !real.IsInside(bound))
-            error = TError(EError::Permission, "Real path {} for {} out of bound {}", real, path, bound);
-    } else
-        error = WriteAccess(cred);
-
-    return error;
-}
-
 void TFile::Close(void) {
     if (Fd >= 0)
         close(Fd);
     SetFd = -1;
+}
+
+void TFile::Swap(TFile &other) {
+    int tmp = Fd;
+    SetFd = other.Fd;
+    other.SetFd = tmp;
 }
 
 void TFile::CloseAll(std::vector<int> except) {
@@ -1382,7 +1357,7 @@ TError TFile::Dup(const TFile &other) {
         Close();
         SetFd = fcntl(other.Fd, F_DUPFD_CLOEXEC, 3);
         if (Fd < 0)
-            return TError::System("Cannot dup fd " + std::to_string(other.Fd));
+            return TError::System("Cannot dup fd {}", other.Fd);
     }
     return OK;
 }
@@ -1390,18 +1365,28 @@ TError TFile::Dup(const TFile &other) {
 TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags, int mode) {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+    int fd = openat(dir.Fd, path.c_str(), flags, mode);
+    if (fd < 0)
+        return TError::System("Cannot openat {} {}", dir.RealPath(), path);
     Close();
-    SetFd = openat(dir.Fd, path.c_str(), flags, mode);
-    if (Fd < 0)
-        return TError::System("Cannot open " + std::to_string(dir.Fd) + " @ " + path.Path);
+    SetFd = fd;
     return OK;
+}
+
+TError TFile::OpenDirAt(const TFile &dir, const TPath &path) {
+    return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY, 0);
+}
+
+TError TFile::OpenDirStrictAt(const TFile &dir, const TPath &path)
+{
+    return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW, 0);
 }
 
 TError TFile::MkdirAt(const TPath &path, int mode) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (mkdirat(Fd, path.c_str(), mode))
-        return TError::System("Cannot mkdir " + std::to_string(Fd) + " @ " + path.Path);
+        return TError::System("Cannot mkdirat {} {}", RealPath(), path);
     return OK;
 }
 
@@ -1409,7 +1394,7 @@ TError TFile::SymlinkAt(const TPath &path, const TPath &target) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (symlinkat(target.c_str(), Fd, path.c_str()))
-        return TError::System("Cannot symlink " + std::to_string(Fd) + " @ " + path.Path);
+        return TError::System("Cannot symlinkat {} {}", RealPath(), path);
     return OK;
 }
 
@@ -1417,7 +1402,7 @@ TError TFile::ReadlinkAt(const TPath &path, TPath &target) const {
     target.Path.resize(PATH_MAX + 1);
     ssize_t len = readlinkat(Fd, path.c_str(), &target.Path[0], PATH_MAX);
     if (len < 0)
-        return TError::System("readlinkat {} @ {}", Fd, path);
+        return TError::System("readlinkat {} {}", RealPath(), path);
     target.Path.resize(len);
     return OK;
 }
@@ -1426,7 +1411,7 @@ TError TFile::UnlinkAt(const TPath &path) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (unlinkat(Fd, path.c_str(), 0))
-        return TError::System("Cannot unlink " + std::to_string(Fd) + " @ " + path.Path);
+        return TError::System("Cannot unlinkat {} {}", RealPath(), path);
     return OK;
 }
 
@@ -1434,7 +1419,7 @@ TError TFile::RmdirAt(const TPath &path) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (unlinkat(Fd, path.c_str(), AT_REMOVEDIR))
-        return TError::System("Cannot rmdir " + std::to_string(Fd) + " @ " + path.Path);
+        return TError::System("Cannot rmdirat {} {}", RealPath(), path);
     return OK;
 }
 
@@ -1444,9 +1429,7 @@ TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
     if (newpath.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + newpath.Path);
     if (renameat(Fd, oldpath.c_str(), Fd, newpath.c_str()))
-        return TError::System("Cannot rename " +
-                std::to_string(Fd) + " @ " + oldpath.Path + " to " +
-                std::to_string(Fd) + " @ " + newpath.Path);
+        return TError::System("Cannot renameat {} {} {}", RealPath(), oldpath, newpath);
     return OK;
 }
 
@@ -1466,7 +1449,7 @@ TError TFile::ChownAt(const TPath &path, uid_t uid, gid_t gid) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchownat(Fd, path.c_str(), uid, gid, AT_SYMLINK_NOFOLLOW))
-        return TError::System("Cannot chown " + std::to_string(Fd) + " @ " + path.Path);
+        return TError::System("Cannot chownat {} {}", RealPath(), path);
     return OK;
 }
 
@@ -1474,7 +1457,7 @@ TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
     if (path.IsAbsolute())
         return TError(EError::InvalidValue, "Absolute path: " + path.Path);
     if (fchmodat(Fd, path.c_str(), mode, AT_SYMLINK_NOFOLLOW))
-        return TError::System("Cannot chmod " + std::to_string(Fd) + " @ " + path.Path);
+        return TError::System("Cannot chmodat {} {}", RealPath(), path);
     return OK;
 }
 
@@ -1500,42 +1483,6 @@ TError TFile::SetXAttr(const std::string &name, const std::string &value) const 
     return OK;
 }
 
-TError TFile::WalkFollow(const TFile &dir, const TPath &path) {
-    if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
-    TError error = Dup(dir);
-    if (error)
-        return error;
-    int next = openat(Fd, path.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY);
-    if (next < 0)
-        error = TError::System("Cannot walk path: " + path.Path);
-    close(Fd);
-    SetFd = next;
-    return error;
-}
-
-TError TFile::WalkStrict(const TFile &dir, const TPath &path) {
-    if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
-    TError error = Dup(dir);
-    if (error)
-        return error;
-    std::stringstream ss(path.Path);
-    std::string name;
-    while (std::getline(ss, name, '/')) {
-        if (name == "" || name == ".")
-            continue;
-        int next = openat(Fd, name.c_str(), O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
-        if (next < 0)
-            error = TError::System("Cannot walk: " + name + " in path " + path.Path);
-        close(Fd);
-        SetFd = next;
-        if (next < 0)
-            break;
-    }
-    return error;
-}
-
 TError TFile::Chdir() const {
     if (unshare(CLONE_FS))
         return TError::System("unshare(CLONE_FS)");
@@ -1558,7 +1505,7 @@ TError TFile::Stat(struct stat &st) const {
 TError TFile::StatAt(const TPath &path, bool follow, struct stat &st) const {
     if (fstatat(Fd, path.c_str(), &st, AT_EMPTY_PATH |
                 (follow ? 0 : AT_SYMLINK_NOFOLLOW)))
-        return TError::System("Cannot fstatat: {} @ {}", Fd, path.Path);
+        return TError::System("Cannot fstatat {} {}", RealPath(), path);
     return OK;
 }
 

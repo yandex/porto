@@ -2383,6 +2383,24 @@ static void TestPath(Porto::Connection &) {
 
     for (auto n: relative)
         ExpectEq(TPath(n[1]).RelativePath(n[0]).ToString(), n[2]);
+
+    std::vector<std::pair<std::string, std::vector<std::string>>> components = {
+        { "", {}},
+        { ".", { "." }},
+        { "..", { ".." }},
+        { "/", { "/" }},
+        { "a", { "a" }},
+        { "/a", { "/", "a" }},
+        { "a/", { "a" }},
+        { "a/b", { "a", "b" }},
+        { "a//b", { "a", "b" }},
+        { "a///b", { "a", "b" }},
+        { "/a/b", { "/", "a", "b" }},
+        { "/a/../c", { "/", "a", "..", "c" }},
+    };
+
+    for (auto n: components)
+        Expect(TPath(n.first).Components() == n.second);
 }
 
 static void TestIdmap(Porto::Connection &) {

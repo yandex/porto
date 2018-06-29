@@ -296,5 +296,12 @@ mnt = ParseMountinfo(a['root_pid'])
 Expect('/test_ro' not in mnt)
 Expect('/ro_vol' not in mnt)
 
+# volume link removes symlink and creates directories
+os.mkdir(root_volume.path + "/symlink_dst2")
+os.symlink("/symlink_dst2", root_volume.path + "/symlink_src2")
+test_volume.Link(a, target="/symlink_src2/sub_dir")
+mnt = ParseMountinfo()
+Expect(root_volume.path + '/symlink_src2/sub_dir' in mnt)
+
 a.Destroy()
 w.Destroy()

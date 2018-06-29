@@ -683,7 +683,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
                         archive.ToString() };
 
         TFile parent_dir;
-        error = parent_dir.WalkStrict(import_dir, "..");
+        error = parent_dir.OpenDirStrictAt(import_dir, "..");
         if (error)
             return error;
 

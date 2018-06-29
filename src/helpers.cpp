@@ -117,7 +117,7 @@ TError RunCommand(const std::vector<std::string> &command,
         if (error)
             HelperError(err, "remount bind", error);
     } else {
-        error =root.Chdir();
+        error = root.Chdir();
         if (error)
             HelperError(err, "root chdir", error);
     }

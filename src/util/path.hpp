@@ -68,6 +68,8 @@ public:
               (Path[2] == '/' || Path[2] == '\0');
     }
 
+    std::vector<std::string> Components() const;
+
     const char *c_str() const noexcept { return Path.c_str(); }
 
     TPath operator+(const TPath &p) const {
@@ -251,8 +253,8 @@ public:
     TError Create(const TPath &path, int flags, int mode);
     TError CreateNew(const TPath &path, int mode);
     TError CreateTrunc(const TPath &path, int mode);
-    TError CreatePath(const TPath &path, const TCred &cred, const TPath &bound = "");
     void Close(void);
+    void Swap(TFile &other);
     static void CloseAll(std::vector<int> except);
     TPath RealPath(void) const;
     TPath ProcPath(void) const;
@@ -265,6 +267,8 @@ public:
     int GetMountId(const TPath &relative = "") const;
     TError Dup(const TFile &other);
     TError OpenAt(const TFile &dir, const TPath &path, int flags, int mode);
+    TError OpenDirAt(const TFile &dir, const TPath &path);
+    TError OpenDirStrictAt(const TFile &dir, const TPath &path);
     TError MkdirAt(const TPath &path, int mode) const;
     TError UnlinkAt(const TPath &path) const;
     TError RmdirAt(const TPath &path) const;
@@ -285,8 +289,6 @@ public:
     TError Touch() const;
     TError GetXAttr(const std::string &name, std::string &value) const;
     TError SetXAttr(const std::string &name, const std::string &value) const;
-    TError WalkFollow(const TFile &dir, const TPath &path);
-    TError WalkStrict(const TFile &dir, const TPath &path);
     TError Chdir() const;
     TError ClearDirectory() const;
     bool IsDirectory() const;

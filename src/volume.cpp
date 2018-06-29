@@ -773,13 +773,13 @@ public:
         if (!error)
             Volume->KeepStorage = false; /* New storage */
 
-        error = upperFd.WalkStrict(Volume->StorageFd, "upper");
+        error = upperFd.OpenDirStrictAt(Volume->StorageFd, "upper");
         if (error)
             goto err;
 
         (void)Volume->StorageFd.MkdirAt("work", 0755);
 
-        error = workFd.WalkStrict(Volume->StorageFd, "work");
+        error = workFd.OpenDirStrictAt(Volume->StorageFd, "work");
         if (error)
             goto err;
 
@@ -890,13 +890,13 @@ public:
         if (!error)
             Volume->KeepStorage = false; /* New storage */
 
-        error = upperFd.WalkStrict(Volume->StorageFd, "upper");
+        error = upperFd.OpenDirStrictAt(Volume->StorageFd, "upper");
         if (error)
             return error;
 
         (void)Volume->StorageFd.MkdirAt("work", 0755);
 
-        error = workFd.WalkStrict(Volume->StorageFd, "work");
+        error = workFd.OpenDirStrictAt(Volume->StorageFd, "work");
         if (error)
             return error;
 
@@ -1986,7 +1986,6 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     TPath host_target = link->Container->RootPath / link->Target;
     link->HostTarget = "";
-    auto target_link = ResolveOriginLocked(host_target.DirNameNormal());
     if (host_target != link->Volume->Path) {
         error = TVolume::CheckConflicts(host_target);
         if (error)
@@ -2001,23 +2000,59 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     L_ACT("Mount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
     Statistics->VolumeLinksMounted++;
 
-    TFile target_file;
-    TPath bound, link_mount, real_target;
+    TFile target_dir;
+    TPath link_mount, real_target;
     unsigned long flags = 0;
 
-    if (target_link && !CL->CanControl(target_link->Volume->VolumeOwner)) {
-        bound = target_link->HostTarget;
-    } else {
-        bound = link->Container->RootPath;
-        if (bound.IsRoot())
-            bound = "";
-    }
-
-    error = target_file.CreatePath(host_target, CL->Cred, bound);
+    /* Prepare mountpoint */
+    error = target_dir.OpenDirStrict(link->Container->RootPath);
     if (error)
         goto undo;
 
-    real_target = target_file.RealPath();
+    for (auto &name: link->Target.Components()) {
+        if (name == "/")
+            continue;
+
+        error = target_dir.OpenDirStrictAt(target_dir, name);
+        if (!error)
+            continue;
+
+        if (error.Errno != ENOENT &&
+                error.Errno != ELOOP &&
+                error.Errno != ENOTDIR)
+            break;
+
+        /* Check permissions for change */
+        if (CL->WriteAccess(target_dir))
+            break;
+
+        /* Remove symlink */
+        if (error.Errno == ELOOP || error.Errno == ENOTDIR) {
+            TPath symlink_target;
+            if (target_dir.ReadlinkAt(name, symlink_target))
+                break; /* Not at symlink */
+            L_ACT("Remove symlink {} to {}", target_dir.RealPath() / name, symlink_target);
+            error = target_dir.UnlinkAt(name);
+            if (error)
+                break;
+        }
+
+        L_ACT("Create directory {}", target_dir.RealPath() / name);
+        error = target_dir.MkdirAt(name, 0775);
+        if (error)
+            break;
+        error = target_dir.OpenDirStrictAt(target_dir, name);
+        if (error)
+            break;
+        error = target_dir.Chown(CL->Cred);
+        if (error)
+            break;
+    }
+    if (error)
+        goto undo;
+
+    /* Sanity check */
+    real_target = target_dir.RealPath();
     if (real_target != host_target) {
         error = TError(EError::InvalidPath, "Volume {} link {} real path is {}", Path, host_target, real_target);
         goto undo;
@@ -2048,7 +2083,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         goto undo;
 
     /* Move to target path and propagate into namespaces */
-    error = link_mount.MoveMount(target_file.ProcPath());
+    error = link_mount.MoveMount(target_dir.ProcPath());
     if (error)
         goto undo;
 
