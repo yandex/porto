@@ -38,8 +38,9 @@ struct TMount;
 #define MS_ALLOW_DEV    (1ull << 63)
 
 class TPath {
-    friend class TFile;
+private:
     std::string Path;
+    friend class TFile;
 
     TPath AddComponent(const TPath &component) const;
 
@@ -223,6 +224,10 @@ struct TMount {
 };
 
 class TFile {
+private:
+    TFile(const TFile&) = delete;
+    TFile& operator=(const TFile&) = delete;
+
 public:
     union {
         const int Fd;
@@ -305,6 +310,10 @@ public:
 };
 
 class TPathWalk {
+private:
+    TPathWalk(const TPathWalk&) = delete;
+    TPathWalk& operator=(const TPathWalk&) = delete;
+
 public:
     FTS *Fts = nullptr;
     FTSENT *Ent = nullptr;

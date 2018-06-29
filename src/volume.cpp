@@ -625,8 +625,13 @@ public:
         if (!Volume->SpaceLimit) {
             Volume->SpaceLimit = st.st_size;
         } else if (!Volume->IsReadOnly && (uint64_t)st.st_size != Volume->SpaceLimit) {
-            error = ResizeImage(file, file_storage ? TFile() : Volume->StorageFd,
-                                path, st.st_size, Volume->SpaceLimit);
+            if (file_storage) {
+                error = ResizeImage(file, TFile(),
+                        path, st.st_size, Volume->SpaceLimit);
+            } else {
+                error = ResizeImage(file, Volume->StorageFd,
+                        path, st.st_size, Volume->SpaceLimit);
+            }
             if (error)
                 return error;
         }
