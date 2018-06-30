@@ -1977,7 +1977,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         return OK;
 
     auto lock = LockState();
-    if (State != EVolumeState::Ready)
+    if (State != EVolumeState::Ready && State != EVolumeState::Building)
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
     auto volumes_lock = LockVolumes();
@@ -1992,6 +1992,8 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
             return error;
         VolumeLinks[host_target] = link;
     }
+
+    /* Block changes root path */
     for (auto ct = link->Container; ct; ct = ct->Parent)
         ct->VolumeMounts++;
     link->HostTarget = host_target;
@@ -2549,15 +2551,16 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
             return TError(EError::VolumeAlreadyLinked, "Volume already linked");
     }
 
-    if (target) {
+    if (State != EVolumeState::Ready && State != EVolumeState::Building)
+        return TError(EError::VolumeNotReady, "Volume not ready: {}", Path);
+
+    /* Mount link if volume is ready */
+    if (target && State == EVolumeState::Ready) {
         host_target = container->RootPath / target;
         error = CheckConflicts(host_target);
         if (error)
             return error;
     }
-
-    if (State != EVolumeState::Ready)
-        return TError(EError::VolumeNotReady, "Volume not ready: {}", Path);
 
     L_ACT("Add volume {} link {} for CT{}:{}", Path, target, container->Id, container->Name);
 
@@ -3089,64 +3092,76 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     volumes_lock.unlock();
 
     error = volume->ClaimPlace(volume->SpaceLimit);
-    if (error) {
-        (void)volume->Destroy();
-        return error;
-    }
+    if (error)
+        goto undo;
 
     /* release owner */
     CL->ReleaseContainer();
 
     error = volume->Build();
-    if (error) {
-        (void)volume->Destroy();
-        return error;
-    }
-
-    volumes_lock.lock();
-    volume->SetState(EVolumeState::Ready);
-    volumes_lock.unlock();
-
-    /* And finally, mount common link in requested path */
-    if (volume->Path != volume->InternalPath) {
-        error = volume->MountLink(common_link);
-        if (error) {
-            (void)volume->Destroy();
-            return error;
-        }
-    }
+    if (error)
+        goto undo;
 
     if (cfg.count(V_CONTAINERS)) {
         for (auto &link: SplitEscapedString(cfg.at(V_CONTAINERS), ' ', ';')) {
             std::shared_ptr<TContainer> ct;
             error = CL->WriteContainer(link[0], ct, true);
             if (error)
-                break;
+                goto undo;
             auto target = link.size() > 1 ? link[1] : "";
             bool ro = link.size() > 2 && link[2] == "ro";
             bool required = (link.size() > 2 && link[2] == "!") ||
                             (link.size() > 3 && link[3] == "!");
             error = volume->LinkVolume(ct, target, ro, required);
             if (error)
-                break;
+                goto undo;
         }
     } else {
         error = CL->LockContainer(CL->ClientContainer);
         if (!error)
             error = volume->LinkVolume(CL->ClientContainer);
-    }
-    if (error) {
-        (void)volume->Destroy();
-        return error;
+        if (error)
+            goto undo;
     }
 
     error = volume->Save();
-    if (error) {
-        (void)volume->Destroy();
-        return error;
+    if (error)
+        goto undo;
+
+    /* Mount common link in requested path */
+    if (volume->Path != volume->InternalPath) {
+        error = volume->MountLink(common_link);
+        if (error)
+            goto undo;
     }
 
+    /* Mount other links */
+next_link:
+    volumes_lock.lock();
+    for (auto link: volume->Links) {
+        if (link->Target && !link->HostTarget) {
+            volumes_lock.unlock();
+            error = volume->MountLink(link);
+            if (error)
+                goto undo;
+            goto next_link;
+        }
+    }
+
+    /* Complete costriction */
+    volume->SetState(EVolumeState::Ready);
+    volumes_lock.unlock();
+
+    /* Final commit */
+    error = volume->Save();
+    if (error)
+        goto undo;
+
     return OK;
+
+undo:
+    volume->Destroy();
+    return error;
 }
 
 void TVolume::RestoreAll(void) {
@@ -3219,7 +3234,7 @@ void TVolume::RestoreAll(void) {
 
         error = volume->CheckDependencies();
         if (error) {
-            L_WRN("Volume {} has broken dependcies: {}", volume->Path, error);
+            L("Volume {} has broken dependcies: {}", volume->Path, error);
             broken_volumes.push_back(volume);
             continue;
         }
@@ -3231,10 +3246,25 @@ void TVolume::RestoreAll(void) {
         }
 
         if (!volume->Links.size()) {
-            L_WRN("Volume {} has no linked containers", volume->Path);
+            L("Volume {} has no linked containers", volume->Path);
             volume->SetState(EVolumeState::Unlinked);
             broken_volumes.push_back(volume);
             continue;
+        }
+
+next_link:
+        for (auto &link: volume->Links) {
+            /* remove placeholder links */
+            if (link->Container == RootContainer &&
+                    link->Target.ToString() == "placeholder") {
+                L("Remove placeholder link {} for missing container", link->HostTarget);
+                CL->LockContainer(RootContainer);
+                error = volume->UnlinkVolume(RootContainer, link->Target, broken_volumes);
+                CL->ReleaseContainer();
+                if (error)
+                    volume->Links.remove(link);
+                goto next_link;
+            }
         }
 
         L("Volume {} restored", volume->Path);
@@ -3382,10 +3412,10 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
                 error = TContainer::Find(l[0], ct);
                 if (error) {
                     error = OK;
-                    L_WRN("Missing container {}", l[0]);
+                    L("Volume is linked to missing container {}", l[0]);
                     if (l.size() > 4) {
-                        l[1] = "";
-                        ct = RootContainer; /* placeholder */
+                        l[1] = "placeholder";
+                        ct = RootContainer;
                     } else
                         continue;
                 }
