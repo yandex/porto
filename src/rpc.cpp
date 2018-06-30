@@ -1300,6 +1300,11 @@ noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rp
         Verbose |= Debug;
     }
 
+    if (req->has_frozen()) {
+        PortodFrozen = req->frozen();
+        L_SYS("{} porto", PortodFrozen ? "Freeze" : "Unfreeze");
+    }
+
     return OK;
 }
 
@@ -1344,6 +1349,8 @@ void TRequest::Handle() {
         L_VERBOSE("Invalid request from {} : {} : {}", Client->Id, error, Req.ShortDebugString());
     else if (!RoReq && Client->AccessLevel <= EAccessLevel::ReadOnly)
         error = TError(EError::Permission, "Write access denied");
+    else if (!RoReq && PortodFrozen && !Client->IsSuperUser())
+        error = TError(EError::PortoFrozen, "Porto frozen, only root user might change anything");
     else if (Req.has_create())
         error = CreateContainer(Req.create().name(), false);
     else if (Req.has_createweak())

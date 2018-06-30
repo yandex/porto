@@ -67,6 +67,8 @@ enum EError {
 
     InvalidNetworkAddress = 26;
 
+    PortoFrozen = 27;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }
@@ -172,6 +174,7 @@ message TGetSystemResponse {
     required fixed64 master_uptime = 8;
     optional fixed64 taints = 9;
 
+    optional bool frozen = 10;
     required bool verbose = 100;
     required bool debug = 101;
     required fixed64 log_lines = 102;
@@ -228,6 +231,7 @@ message TGetSystemResponse {
 }
 
 message TSetSystemRequest {
+    optional bool frozen = 10;
     optional bool verbose = 100;
     optional bool debug = 101;
 }

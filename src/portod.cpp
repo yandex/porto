@@ -66,6 +66,7 @@ static int CmdTimeout = -1;
 
 static std::map<pid_t, int> Zombies;
 
+bool PortodFrozen = false;
 bool ShutdownPortod = false;
 static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
@@ -1625,6 +1626,8 @@ static void Usage() {
         << "  dump            print internal key-value state" << std::endl
         << "  get             print system properties" << std::endl
         << "  set <key> <val> change system properties" << std::endl
+        << "  freeze          freeze changes" << std::endl
+        << "  unfreeze        unfreeze changes" << std::endl
         << "  core            receive and forward core dump" << std::endl
         << "  help            print this message" << std::endl
         << "  version         print version and revision" << std::endl
@@ -1730,6 +1733,12 @@ int main(int argc, char **argv) {
 
     if (cmd == "set")
         return SetSystemProperties(TTuple(argv + opt + 1, argv + argc));
+
+    if (cmd == "freeze")
+        return SetSystemProperties({"frozen", "true"});
+
+    if (cmd == "unfreeze")
+        return SetSystemProperties({"frozen", "false"});
 
     if (cmd == "core") {
         TCore core;
