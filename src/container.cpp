@@ -174,7 +174,7 @@ TError TContainer::LockAction(std::unique_lock<std::mutex> &containers_lock, boo
     }
     PendingWrite = false;
     ActionLocked += shared ? 1 : -1;
-    LastOwner = GetTid();
+    LastActionPid = GetTid();
     for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
         if (shared)
             ct->SubtreeRead++;
@@ -244,7 +244,7 @@ void TContainer::UpgradeActionLock() {
         ContainersCV.wait(lock);
 
     ActionLocked = -1;
-    LastOwner = GetTid();
+    LastActionPid = GetTid();
 
     PendingWrite = false;
 }
@@ -255,6 +255,7 @@ void TContainer::LockStateRead() {
     while (StateLocked < 0)
         ContainersCV.wait(lock);
     StateLocked++;
+    LastStatePid = GetTid();
 }
 
 void TContainer::LockStateWrite() {
@@ -265,6 +266,7 @@ void TContainer::LockStateWrite() {
     StateLocked = -1 - StateLocked;
     while (StateLocked != -1)
         ContainersCV.wait(lock);
+    LastStatePid = GetTid();
 }
 
 void TContainer::DowngradeStateLock() {
@@ -289,11 +291,13 @@ void TContainer::DumpLocks() {
     auto lock = LockContainers();
     for (auto &it: Containers) {
         auto &ct = it.second;
-        if (ct->ActionLocked || ct->PendingWrite || ct->SubtreeRead || ct->SubtreeWrite || ct->StateLocked)
-            L("CT{}:{} StateLocked {} ActionLocked {} by {} Read {} Write {}{}",
-                ct->Id, ct->Name, ct->StateLocked, ct->ActionLocked,
-                ct->LastOwner, ct->SubtreeRead, ct->SubtreeWrite,
-                (ct->PendingWrite ? " PendingWrite" : ""));
+        if (ct->ActionLocked || ct->PendingWrite || ct->StateLocked ||
+                ct->SubtreeRead || ct->SubtreeWrite)
+            L_SYS("CT{}:{} StateLocked {} by {} ActionLocked {} by {} Read {} Write {}{}",
+                  ct->Id, ct->Name, ct->StateLocked, ct->LastStatePid,
+                  ct->ActionLocked, ct->LastActionPid,
+                  ct->SubtreeRead, ct->SubtreeWrite,
+                  (ct->PendingWrite ? " PendingWrite" : ""));
     }
 }
 

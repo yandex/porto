@@ -490,6 +490,7 @@ static void PortodServer() {
             }
             if (int64_t(ShutdownDeadline - GetCurrentTimeMs()) < 0) {
                 L_SYS("Shutdown timeout exceeded");
+                TContainer::DumpLocks();
                 break;
             }
         }

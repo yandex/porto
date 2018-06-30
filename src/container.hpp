@@ -61,7 +61,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int SubtreeRead = 0;
     int SubtreeWrite = 0;
     bool PendingWrite = false;
-    pid_t LastOwner = 0;
+    pid_t LastStatePid = 0;
+    pid_t LastActionPid = 0;
 
     TFile OomEvent;
 
