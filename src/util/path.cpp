@@ -861,7 +861,7 @@ TError TPath::Umount(uint64_t flags) const {
     if (errno == EBUSY)
         return TError(EError::Busy, "Mount is busy: " + Path);
     if (errno == EINVAL || errno == ENOENT)
-        return TError(EError::InvalidValue, "Not a mount: " + Path);
+        return TError(EError::NotFound, "Mount not found: " + Path);
     return TError::System("umount2({}, {})", Path, UmountFlagsToString(flags));
 }
 
@@ -996,7 +996,7 @@ TError TPath::ReadInt(int &value) const {
     return error;
 }
 
-TError TPath::FindMount(TMount &mount) const {
+TError TPath::FindMount(TMount &mount, bool exact) const {
     std::vector<std::string> lines;
 
     TError error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
@@ -1005,7 +1005,7 @@ TError TPath::FindMount(TMount &mount) const {
 
     auto device = GetDev();
     if (!device)
-        return TError("device not found: {}", Path);
+        return TError(EError::NotFound, "Device not found: {}", Path);
 
     TPath normal = NormalPath();
     bool found = false;
@@ -1017,6 +1017,9 @@ TError TPath::FindMount(TMount &mount) const {
         if (error)
             return error;
 
+        if (exact && mnt.Target != normal)
+            continue;
+
         if (normal.IsInside(mnt.Target) && (mnt.Target.GetDev() == device ||
                                             mnt.Source.GetBlockDev() == device)) {
             mount = mnt;
@@ -1026,7 +1029,7 @@ TError TPath::FindMount(TMount &mount) const {
     }
 
     if (!found)
-        return TError("mountpoint not found: {}", Path);
+        return TError(EError::NotFound, "Mount not found: {}", Path);
 
     return OK;
 }

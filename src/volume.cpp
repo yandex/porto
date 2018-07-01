@@ -1986,20 +1986,27 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     TPath host_target = link->Container->RootPath / link->Target;
     link->HostTarget = "";
+
     if (host_target != link->Volume->Path) {
         error = TVolume::CheckConflicts(host_target);
         if (error)
             return error;
-        VolumeLinks[host_target] = link;
     }
 
     /* Block changes root path */
     for (auto ct = link->Container; ct; ct = ct->Parent)
         ct->VolumeMounts++;
+
     link->HostTarget = host_target;
+    VolumeLinks[host_target] = link;
+
+    if (RootContainer->VolumeMounts != (int)VolumeLinks.size())
+        L_WRN("Volume links index out of sync: {} != {}", RootContainer->VolumeMounts, VolumeLinks.size());
+
     volumes_lock.unlock();
 
-    L_ACT("Mount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
+    L_ACT("Mount volume {} link {} for CT{}:{} target {}", Path, host_target,
+            link->Container->Id, link->Container->Name, link->Target);
     Statistics->VolumeLinksMounted++;
 
     TFile target_dir;
@@ -2127,10 +2134,14 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
 
     error = host_target.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
     if (error) {
-        error = TError(error, "Cannot umount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
-        if (strict)
+        error = TError(error, "Cannot umount volume {} link {} for CT{}:{} target {}", Path,
+                host_target, link->Container->Id, link->Container->Name, link->Target);
+        if (error.Error == EError::NotFound)
+            L("{}", error.Text);
+        else if (strict)
             return error;
-        L_WRN("{}", error.Text);
+        else
+            L_WRN("{}", error.Text);
     }
 
     volumes_lock.lock();
@@ -2153,7 +2164,7 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
         for (auto ct = link->Container; ct; ct = ct->Parent) {
             ct->VolumeMounts--;
             if (ct->VolumeMounts < 0)
-                L_WRN("Volume mounts underflow {} at {}", ct->VolumeMounts, ct->Name);
+                L_WRN("Volume mounts underflow {} at {} total {}", ct->VolumeMounts, ct->Name, VolumeLinks.size());
         }
 
         link->HostTarget = "";
@@ -2297,8 +2308,7 @@ TError TVolume::Destroy() {
         Volumes.erase(volume->Path);
 
         /* Remove common link */
-        if (VolumeLinks.erase(volume->Path) &&
-                volume->Path != volume->InternalPath)
+        if (VolumeLinks.erase(volume->Path))
             RootContainer->VolumeMounts--;
 
         if (volume->VolumeOwnerContainer) {
@@ -2947,6 +2957,65 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (error)
         return error;
 
+    Volumes[Path] = shared_from_this();
+
+    /* Restore common link */
+    auto common_link = std::make_shared<TVolumeLink>(shared_from_this(), RootContainer);
+    common_link->Target = Path;
+    common_link->HostTarget = Path;
+    common_link->ReadOnly = IsReadOnly;
+    VolumeLinks[Path] = common_link;
+    RootContainer->VolumeMounts++;
+
+    /* Restore other links */
+    if (node.Has(V_RAW_CONTAINERS)) {
+        auto containers_lock = LockContainers();
+
+        /* container target ro|rw host-target */
+        for (auto &l: SplitEscapedString(node.Get(V_RAW_CONTAINERS), ' ', ';')) {
+            std::shared_ptr<TContainer> ct;
+
+            error = TContainer::Find(l[0], ct);
+            if (error) {
+                error = OK;
+                L("Volume is linked to missing container {}", l[0]);
+                if (l.size() > 4) {
+                    l[1] = "placeholder";
+                    ct = RootContainer;
+                } else
+                    continue;
+            }
+
+            auto link = std::make_shared<TVolumeLink>(shared_from_this(), ct);
+            if (l.size() > 1)
+                link->Target = l[1];
+            if (l.size() > 2)
+                link->ReadOnly = l[2] == "ro";
+            if (l.size() > 3)
+                link->Required = l[3] == "!";
+            if (l.size() > 4) {
+                link->HostTarget = l[4];
+
+                L("Restore volume {} link {} for CT{}:{} target {}", Path, link->HostTarget,
+                        link->Container->Id, link->Container->Name, link->Target);
+
+                TMount mount;
+                error = link->HostTarget.FindMount(mount, true);
+                if (error) {
+                    L("Link is lost: {}", error);
+                    continue;
+                }
+
+                VolumeLinks[link->HostTarget] = link;
+                for (auto c = ct; c; c = c->Parent)
+                    c->VolumeMounts++;
+            }
+
+            Links.emplace_back(link);
+            ct->VolumeLinks.emplace_back(link);
+        }
+    }
+
     return OK;
 }
 
@@ -3073,7 +3142,11 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     common_link->Target = volume->Path;
     common_link->HostTarget = volume->Path;
     common_link->ReadOnly = volume->IsReadOnly;
-    VolumeLinks[volume->Path] = common_link;
+
+    if (volume->Path == volume->InternalPath) {
+        VolumeLinks[volume->Path] = common_link;
+        RootContainer->VolumeMounts++;
+    }
 
     /* also check if volume depends on itself */
     error = volume->CheckDependencies();
@@ -3214,18 +3287,6 @@ void TVolume::RestoreAll(void) {
                 NextId = id + 1;
         }
 
-        Volumes[volume->Path] = volume;
-
-        /* Restore common link */
-        auto common_link = std::make_shared<TVolumeLink>(volume, RootContainer);
-        common_link->Target = volume->Path;
-        common_link->HostTarget = volume->Path;
-        common_link->ReadOnly = volume->IsReadOnly;
-        VolumeLinks[volume->Path] = common_link;
-
-        if (volume->Path != volume->InternalPath)
-            RootContainer->VolumeMounts++;
-
         error = volume->Save();
         if (error) {
             broken_volumes.push_back(volume);
@@ -3243,6 +3304,16 @@ void TVolume::RestoreAll(void) {
             L("Volume {} is not ready ({}) and will be removed", volume->Path, StateName(volume->State));
             broken_volumes.push_back(volume);
             continue;
+        }
+
+        if (volume->BackendType != "dir" && volume->BackendType != "quota") {
+            TMount mount;
+            error = volume->Path.FindMount(mount, true);
+            if (error) {
+                L("Volume {} is not mounted: {}", volume->Path, error);
+                broken_volumes.push_back(volume);
+                continue;
+            }
         }
 
         if (!volume->Links.size()) {
@@ -3266,6 +3337,9 @@ next_link:
                 goto next_link;
             }
         }
+
+        if (RootContainer->VolumeMounts != (int)VolumeLinks.size())
+            L_WRN("Volume links index out of sync: {} != {}", RootContainer->VolumeMounts, VolumeLinks.size());
 
         L("Volume {} restored", volume->Path);
     }
@@ -3403,37 +3477,6 @@ TError TVolume::ApplyConfig(const TStringMap &cfg) {
             Private = prop.second;
 
         } else if (prop.first == V_RAW_CONTAINERS) {
-            auto containers_lock = LockContainers();
-
-            /* container target ro|rw host-target */
-            for (auto &l: SplitEscapedString(prop.second, ' ', ';')) {
-                std::shared_ptr<TContainer> ct;
-
-                error = TContainer::Find(l[0], ct);
-                if (error) {
-                    error = OK;
-                    L("Volume is linked to missing container {}", l[0]);
-                    if (l.size() > 4) {
-                        l[1] = "placeholder";
-                        ct = RootContainer;
-                    } else
-                        continue;
-                }
-                auto link = std::make_shared<TVolumeLink>(shared_from_this(), ct);
-                if (l.size() > 1)
-                    link->Target = l[1];
-                if (l.size() > 2)
-                    link->ReadOnly = l[2] == "ro";
-                if (l.size() > 3)
-                    link->Required = l[3] == "!";
-                if (l.size() > 4) {
-                    link->HostTarget = l[4];
-                    for (auto c = ct; c; c = c->Parent)
-                        c->VolumeMounts++;
-                }
-                Links.emplace_back(link);
-                ct->VolumeLinks.emplace_back(link);
-            }
 
         } else if (prop.first == V_CONTAINERS) {
 

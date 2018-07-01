@@ -173,7 +173,7 @@ public:
 
     static std::string UmountFlagsToString(uint64_t flags);
 
-    TError FindMount(TMount &mount) const;
+    TError FindMount(TMount &mount, bool exact = false) const;
     static TError ListAllMounts(std::list<TMount> &list);
 
     TError Mount(const TPath &source, const std::string &type, uint64_t flags,
