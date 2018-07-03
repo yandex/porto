@@ -1,3 +1,59 @@
+yandex-porto (4.13.11) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * path/walk: handle dir to non-dir replacement
+  * test: locate now always returns self if task in same container
+  * porto: fix logging merge flag when importing layers
+
+  [ Andy Yankovsky ]
+  * Fix argument order
+
+  [ Gennady Lipenkov ]
+  * Fix typo
+
+  [ Konstantin Khlebnikov ]
+  * porto: fix legacy memory.recharge_on_pgfault
+  * porto: write stacktrace when portod-core crashses
+  * porto: add workaround for bug in upstart
+  * porto: set default ulimit memlock to max(mem_limit - 16M, 8M)
+  * test: check ulimit
+  * porto: open /dev/null for upstart workaround
+  * network: consider default gateway for L3 only within same L2 domain
+  * porto: ignore /etc/default/portod.conf if /etc/portod.conf exists
+
+  [ Andy Yankovsky ]
+  * Fix typo and code blocks indent
+
+  [ Konstantin Khlebnikov ]
+  * portod: dump ulimit and reset stack ulimit
+  * porto: remove default place restrictions for containers with chroot
+  * path: silence recursive remount
+  * helper: set process name
+  * container: keep root path always in sync
+  * volume: remove owner container migration hack
+  * volume: mount link target for stopped containers
+  * porto: set default memory_limit for first level containers
+  * porto: add devices presets
+  * portoctl: run helper portoctl-cmd for non builtin commands
+  * portoctl: first run helpers from /usr/lib/porto
+  * portoctl: split top into portoctl-top
+  * porto: move portoinit into /usr/lib/porto
+  * porto: remove deprecated conffiles
+  * coredump: inherit core_command from parent container
+  * portoctl: rewrite command sort
+  * portoctl: fix sort
+  * portoctl: fix compilation for precise
+  * portoctl: fix HumanValue
+  * portoctl: add bash-completion for property[keys]
+  * path: delete copy constructor for TFile
+  * path: refactor strict path resolving and creation
+  * porto: dump container locks if shutdown is stuck
+  * porto: add porto freeze/unfreeze
+  * volume: link and mount volumes using proper transaction sequence
+  * volume: keep volume link index in sync and verify at restore
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 03 Jul 2018 13:35:20 +0300
+
 yandex-porto (4.13.10) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
