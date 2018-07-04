@@ -293,7 +293,7 @@ def AgingTime():
                         ]
                     )
                 )
-           )
+            )
 
 def EnablePorto():
     return ("enable_porto", select_by_weight( [(2, "true"),
@@ -360,7 +360,7 @@ def CpuLimit():
                     (1, str(randf() * randint(1, sys.maxint)) + "c")
                 ] ) )
             ] )
-   )
+    )
 
 def CpuGuarantee():
     return ("cpu_guarantee",
@@ -870,7 +870,6 @@ def should_stop():
 
 def fuzzer_killer(stop, porto_reloads, porto_kills):
     random.seed(time.time() + os.getpid())
-    conn=porto.Connection(timeout=10)
     while not stop.is_set():
         target = select_by_weight([
             (90, None),
@@ -914,6 +913,10 @@ def fuzzer_thread(please_stop, iter_count, fail_count):
                 (10, volume_action),
                 (1, layer_action)
             ])(conn)
+        except porto.exceptions.SocketTimeout:
+            if please_stop.is_set():
+                break
+            fail_cnt += 1
         except porto.exceptions.PortoException:
             fail_cnt += 1
     with iter_count.get_lock():
@@ -924,7 +927,7 @@ def fuzzer_thread(please_stop, iter_count, fail_count):
 parser = argparse.ArgumentParser(description="Porto fuzzing utility")
 parser.add_argument("--time", default=60, type=int)
 parser.add_argument("--threads", default=100, type=int)
-parser.add_argument("--timeout", default=180, type=int)
+parser.add_argument("--timeout", default=10, type=int)
 parser.add_argument("--verbose", action="store_true")
 parser.add_argument("--active", action="store_true")
 parser.add_argument("--no-kill", dest="kill", action="store_false")
