@@ -20,6 +20,7 @@ struct TStatFS {
     uint64_t InodeUsage;
     uint64_t InodeAvail;
     uint64_t MntFlags;
+    uint32_t FsType;
 
     void Init(const struct statfs &st);
     void Reset();
@@ -296,6 +297,7 @@ public:
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;
     bool ExistsAt(const TPath &path) const;
 
+    uint32_t FsType() const;
     TError StatFS(TStatFS &result) const;
     TError Chroot() const;
     TError PivotRoot() const;

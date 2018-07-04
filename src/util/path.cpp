@@ -37,6 +37,7 @@ void TStatFS::Init(const struct statfs &st) {
                ((st.f_flags & ST_NOEXEC) ? MS_NOEXEC : MS_ALLOW_EXEC) |
                ((st.f_flags & ST_NOSUID) ? MS_NOSUID : MS_ALLOW_SUID) |
                ((st.f_flags & ST_RDONLY) ? MS_RDONLY : MS_ALLOW_WRITE);
+    FsType = st.f_type;
 }
 
 void TStatFS::Reset() {
@@ -752,14 +753,14 @@ TError TPath::Mount(const TPath &source, const std::string &type, uint64_t mnt_f
 }
 
 TError TPath::MoveMount(const TPath &target) const {
-    L_ACT("mount move {} to {}", RealPath(), target.RealPath());
+    L_ACT("mount move {} to {}", Path, target);
     if (mount(c_str(), target.c_str(), NULL, MS_MOVE, NULL))
         return TError::System("mount({}, {}, MS_MOVE)", Path, target);
     return OK;
 }
 
 TError TPath::Bind(const TPath &source, uint64_t mnt_flags) const {
-    L_ACT("mount bind {} {} {}", RealPath(), source.RealPath(), TMount::FormatFlags(mnt_flags));
+    L_ACT("mount bind {} {} {}", Path, source, TMount::FormatFlags(mnt_flags));
     if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | (uint32_t)mnt_flags, NULL))
         return TError::System("mount({}, {}, {})", source, Path, TMount::FormatFlags(MS_BIND | mnt_flags));
     return OK;
@@ -1523,6 +1524,13 @@ TError TFile::StatFS(TStatFS &result) const {
         return TError::System("statfs");
     result.Init(st);
     return OK;
+}
+
+uint32_t TFile::FsType() const {
+    struct statfs st;
+    if (fstatfs(Fd, &st))
+        return 0;
+    return st.f_type;
 }
 
 bool TFile::Access(const struct stat &st, const TCred &cred, enum AccessMode mode) {

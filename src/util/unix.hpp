@@ -50,6 +50,7 @@ std::string GetHostName();
 TError SetHostName(const std::string &name);
 TError GetSysctl(const std::string &name, std::string &value);
 TError SetSysctl(const std::string &name, const std::string &value);
+TError SetSysctlAt(const TFile &proc_sys, const std::string &name, const std::string &value);
 
 TError SetOomScoreAdj(int value);
 

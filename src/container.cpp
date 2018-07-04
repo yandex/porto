@@ -1245,8 +1245,7 @@ TError TContainer::ApplyResolvConf() const {
     if (error)
         return error;
 
-    struct statfs st;
-    if (fstatfs(file.Fd, &st) || st.f_type != TMPFS_MAGIC)
+    if (file.FsType() != TMPFS_MAGIC)
         return TError(EError::NotSupported, "resolv.conf not on tmpfs");
 
     L_ACT("Apply resolv_conf for CT{}:{}", Id, Name);

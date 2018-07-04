@@ -247,7 +247,7 @@ TError TTaskEnv::ApplySysctl() {
 
     if (CT->Isolate) {
         for (const auto &it: config().container().ipc_sysctl()) {
-            error = SetSysctl(it.key(), it.val());
+            error = SetSysctlAt(Mnt.ProcSysFd, it.key(), it.val());
             if (error)
                 return error;
         }
@@ -266,7 +266,7 @@ TError TTaskEnv::ApplySysctl() {
         } else
             return TError(EError::Permission, "Sysctl " + key + " is not allowed");
 
-        error = SetSysctl(key, it.second);
+        error = SetSysctlAt(Mnt.ProcSysFd, key, it.second);
         if (error)
             return error;
     }
@@ -318,12 +318,6 @@ TError TTaskEnv::ConfigureChild() {
     error = ApplySysctl();
     if (error)
         return error;
-
-    if (NewMountNs) {
-        error = Mnt.ProtectProc();
-        if (error)
-            return error;
-    }
 
     error = WriteResolvConf();
     if (error)

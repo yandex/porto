@@ -27,6 +27,9 @@ public:
     TCred BindCred;
     TPath Cwd;
     TPath Root; /* path in ParentNs.Mnt */
+    TFile RootFd;
+    TFile ProcFd;
+    TFile ProcSysFd;
     bool RootRo;
     TPath HostRoot;
     std::vector<TBindMount> BindMounts;

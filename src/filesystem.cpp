@@ -199,7 +199,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
 }
 
 TError TMountNamespace::MountRun() {
-    TPath run = Root / "run";
+    TPath run = "run";
     std::vector<std::string> run_paths, subdirs;
     std::vector<struct stat> run_paths_stat;
     TError error;
@@ -251,13 +251,15 @@ TError TMountNamespace::MountRun() {
     }
 
     error = run.MkdirAll(0755);
-    if (!error)
-        error = run.Mount("tmpfs", "tmpfs",
-                MS_NOSUID | MS_NODEV | MS_STRICTATIME,
-                { "mode=755", "size=" + std::to_string(RunSize) });
     if (error)
         return error;
 
+    error = run.Mount("tmpfs", "tmpfs", MS_NOSUID | MS_NODEV | MS_STRICTATIME,
+                      { "mode=755", "size=" + std::to_string(RunSize) });
+    if (error)
+        return error;
+
+    // recreate directories
     for (unsigned int i = 0; i < run_paths.size(); i++) {
         TPath current = run / run_paths[i];
         auto &current_stat = run_paths_stat[i];
@@ -357,20 +359,21 @@ TError TMountNamespace::RemountRun() {
 TError TMountNamespace::MountTraceFs() {
     TError error;
 
-    TPath tracefs = "/sys/kernel/tracing";
+    TPath tracefs = "sys/kernel/tracing";
+    TPath parent_tracefs = "/sys/kernel/tracing";
     if (!config().container().enable_tracefs() || !tracefs.Exists())
         return OK;
 
     struct statfs st;
-    if (statfs(tracefs.c_str(), &st) || st.f_type != TRACEFS_MAGIC)
+    if (statfs(parent_tracefs.c_str(), &st) || st.f_type != TRACEFS_MAGIC)
         return TError(EError::Unknown, "Tracefs is not mounted");
 
     /* read-only bind instead for new mount to preserve read-write in host */
-    error = (Root / tracefs).BindRemount(tracefs, MS_RDONLY);
+    error = tracefs.BindRemount(parent_tracefs, MS_RDONLY);
     if (error)
         return error;
 
-    TPath debugfs = Root / "/sys/kernel/debug";
+    TPath debugfs = "sys/kernel/debug";
     if (debugfs.Exists()) {
         TPath tracing = debugfs / "tracing";
         error = debugfs.Mount("none", "tmpfs", 0, {"mode=755", "size=0"});
@@ -392,7 +395,7 @@ TError TMountNamespace::MountSystemd() {
     if (Systemd.empty())
         return OK;
 
-    TPath tmpfs = Root / "sys/fs/cgroup";
+    TPath tmpfs = "sys/fs/cgroup";
     TPath systemd = tmpfs / "systemd";
     TPath systemd_rw = systemd / Systemd;
     TError error;
@@ -413,31 +416,58 @@ TError TMountNamespace::MountSystemd() {
 }
 
 TError TMountNamespace::SetupRoot() {
+    TPath dot(".");
     TError error;
 
-    if (!Root.IsDirectoryStrict())
-        return TError(EError::InvalidPath, "Root path must be a directory");
+    L_ACT("Setup root in {}", RootFd.RealPath());
+
+    // mount proc in root dir
+    error = ProcFd.OpenDirStrictAt(RootFd, "proc");
+    if (error) {
+        (void)RootFd.MkdirAt("proc", 0775);
+        error = ProcFd.OpenDirStrictAt(RootFd, "proc");
+    }
+    if (error)
+        return error;
+
+    error = ProcFd.Chdir();
+    if (error)
+        return error;
+
+    error = dot.Mount("proc", "proc", MS_NOSUID | MS_NOEXEC | MS_NODEV, {});
+    if (error)
+        return error;
+
+    error = ProcFd.OpenDirStrictAt(RootFd, "proc");
+    if (error)
+        return error;
+
+    if (ProcFd.FsType() != PROC_SUPER_MAGIC)
+        return TError("Cannot open procfs");
+
+    // return back to root dir
+    error = RootFd.Chdir();
+    if (error)
+        return error;
 
     struct {
-        std::string target;
+        TPath target;
         std::string type;
         unsigned long flags;
         std::vector<std::string> opts;
     } mounts[] = {
-        { "/dev", "tmpfs", MS_NOSUID | MS_STRICTATIME,
+        { "dev", "tmpfs", MS_NOSUID | MS_STRICTATIME,
             { "mode=755", "size=" + std::to_string(config().container().dev_size()) }},
-        { "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
+        { "dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
             { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5",
               "max=" + std::to_string(config().container().devpts_max()) }},
-        { "/proc", "proc", MS_NOSUID | MS_NOEXEC | MS_NODEV, {}},
-        { "/sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {}},
+        { "sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {}},
     };
 
     for (auto &m : mounts) {
-        TPath target = Root + m.target;
-        error = target.MkdirAll(0755);
+        error = m.target.MkdirAll(0755);
         if (!error)
-            error = target.Mount(m.type, m.type, m.flags, m.opts);
+            error = m.target.Mount(m.type, m.type, m.flags, m.opts);
         if (error)
             return error;
     }
@@ -448,7 +478,7 @@ TError TMountNamespace::SetupRoot() {
 
     if (BindPortoSock) {
         TPath sock(PORTO_SOCKET_PATH);
-        TPath dest = Root / sock;
+        TPath dest = dot / sock;
 
         error = dest.Mkfile(0);
         if (error)
@@ -459,39 +489,39 @@ TError TMountNamespace::SetupRoot() {
     }
 
     struct {
-        const std::string path;
+        TPath path;
         mode_t mode;
     } dirs[] = {
-        { "/run/lock",  01777 },
-        { "/run/shm",   01777 },
-        { "/dev/shm",   01777 },
+        { "run/lock",  01777 },
+        { "run/shm",   01777 },
+        { "dev/shm",   01777 },
     };
 
     for (auto &d : dirs) {
-        error = (Root + d.path).Mkdir(d.mode);
+        error = d.path.Mkdir(d.mode);
         if (error)
             return error;
     }
 
     struct {
-        const std::string path;
-        const std::string target;
+        TPath path;
+        TPath target;
     } symlinks[] = {
-        { "/dev/ptmx", "pts/ptmx" },
-        { "/dev/fd", "/proc/self/fd" },
-        { "/dev/stdin", "/proc/self/fd/0" },
-        { "/dev/stdout", "/proc/self/fd/1" },
-        { "/dev/stderr", "/proc/self/fd/2" },
+        { "dev/ptmx", "pts/ptmx" },
+        { "dev/fd", "/proc/self/fd" },
+        { "dev/stdin", "/proc/self/fd/0" },
+        { "dev/stdout", "/proc/self/fd/1" },
+        { "dev/stderr", "/proc/self/fd/2" },
     };
 
     for (auto &s : symlinks) {
-        error = (Root + s.path).Symlink(s.target);
+        error = s.path.Symlink(s.target);
         if (error)
             return error;
     }
 
     if (HugetlbSubsystem.Supported) {
-        TPath path = Root + "/dev/hugepages";
+        TPath path("dev/hugepages");
         error = path.Mkdir(0755);
         if (error)
             return error;
@@ -501,19 +531,16 @@ TError TMountNamespace::SetupRoot() {
     }
 
     struct {
-        std::string dst;
-        std::string src;
+        TPath dst;
+        TPath src;
         unsigned long flags;
     } binds[] = {
-        { "/run/lock", "/run/lock", MS_NOSUID | MS_NODEV | MS_NOEXEC },
-        { "/dev/shm", "/run/shm", MS_NOSUID | MS_NODEV | MS_STRICTATIME },
+        { "run/lock", "run/lock", MS_NOSUID | MS_NODEV | MS_NOEXEC },
+        { "dev/shm", "run/shm", MS_NOSUID | MS_NODEV | MS_STRICTATIME },
     };
 
     for (auto &b : binds) {
-        TPath dst = Root + b.dst;
-        TPath src = Root + b.src;
-
-        error = dst.BindRemount(src, b.flags);
+        error = b.dst.BindRemount(b.src, b.flags);
         if (error)
             return error;
     }
@@ -529,11 +556,15 @@ TError TMountNamespace::ProtectProc() {
     TError error;
 
     std::vector<TPath> proc_ro = {
-        "/proc/sysrq-trigger",
-        "/proc/irq",
-        "/proc/bus",
-        "/proc/sys",
+        "sysrq-trigger",
+        "irq",
+        "bus",
+        "sys",
     };
+
+    error = ProcFd.Chdir();
+    if (error)
+        return error;
 
     for (auto &path : proc_ro) {
         error = path.BindRemount(path, MS_RDONLY);
@@ -541,8 +572,11 @@ TError TMountNamespace::ProtectProc() {
             return error;
     }
 
-    TPath proc_kcore("/proc/kcore");
-    error = proc_kcore.BindRemount("/dev/null", MS_RDONLY);
+    error = TPath("kcore").BindRemount("/dev/null", MS_RDONLY);
+    if (error)
+        return error;
+
+    error = RootFd.Chdir();
     if (error)
         return error;
 
@@ -550,43 +584,51 @@ TError TMountNamespace::ProtectProc() {
 }
 
 TError TMountNamespace::Setup() {
-    TPath root("/"), proc("/proc");
-    TFile rootFd;
+    TPath dot(".");
     TError error;
 
     // remount as slave to receive propagations from parent namespace
-    error = root.Remount(MS_SLAVE | MS_REC);
+    error = TPath("/").Remount(MS_SLAVE | MS_REC);
     if (error)
         return error;
 
-    error = rootFd.OpenDir(Root);
+    error = RootFd.OpenDir(Root);
     if (error)
         return error;
 
-    /* new root must be a different mount */
-    if (!Root.IsRoot() && rootFd.GetMountId() == rootFd.GetMountId("..")) {
-        error = Root.Bind(Root, MS_REC);
+    error = RootFd.Chdir();
+    if (error)
+        return error;
+
+    // new root must be a different mounts
+    if (!Root.IsRoot() && RootFd.GetMountId() == RootFd.GetMountId("..")) {
+        error = dot.Bind(dot, MS_REC);
         if (error)
             return error;
-        error = rootFd.OpenDir(Root);
+        error = RootFd.OpenDir(Root);
+        if (error)
+            return error;
+        error = RootFd.Chdir();
         if (error)
             return error;
     }
 
     // allow suid binaries at root volume
     if (!Root.IsRoot()) {
-        error = Root.Remount(MS_BIND | MS_ALLOW_SUID);
+        error = dot.Remount(MS_BIND | MS_ALLOW_SUID);
         if (error)
             return error;
     }
 
     if (RootRo) {
-        error = Root.Remount(MS_BIND | MS_REC | MS_RDONLY);
+        error = dot.Remount(MS_BIND | MS_REC | MS_RDONLY);
         if (error)
             return error;
     }
 
-    // mount proc so PID namespace works
+    // remount proc in pid-ns
+    TPath proc("/proc");
+
     error = proc.UmountAll();
     if (error)
         return error;
@@ -594,6 +636,13 @@ TError TMountNamespace::Setup() {
     error = proc.Mount("proc", "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
     if (error)
         return error;
+
+    error = ProcFd.OpenDirStrict(proc);
+    if (error)
+        return error;
+
+    if (ProcFd.FsType() != PROC_SUPER_MAGIC)
+        return TError("Cannot open procfs");
 
     if (HostRoot.IsRoot()) {
         error = TPath("/sys/fs/cgroup").UmountAll();
@@ -634,6 +683,15 @@ TError TMountNamespace::Setup() {
             return error;
     }
 
+    /* Open writable sysctl for later setup */
+    error = ProcSysFd.OpenDirStrictAt(ProcFd, "sys");
+    if (error)
+        return error;
+
+    error = ProtectProc();
+    if (error)
+        return error;
+
     error = MountSystemd();
     if (error)
         return error;
@@ -645,15 +703,7 @@ TError TMountNamespace::Setup() {
     }
 
     if (!Root.IsRoot()) {
-        error = rootFd.PivotRoot();
-        if (error) {
-            L_WRN("Cannot pivot root, roll back to chroot: {}", error);
-            error = Root.Chroot();
-            if (error)
-                return error;
-        }
-
-        error = root.Chdir();
+        error = RootFd.PivotRoot();
         if (error)
             return error;
     }
@@ -665,7 +715,7 @@ TError TMountNamespace::Setup() {
     }
 
     // remount as shared: subcontainers will get propgation from us
-    error = root.Remount(MS_SHARED | MS_REC);
+    error = dot.Remount(MS_SHARED | MS_REC);
     if (error)
         return error;
 

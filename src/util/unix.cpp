@@ -528,6 +528,21 @@ TError SetSysctl(const std::string &name, const std::string &value) {
     return TPath(path).WriteAll(value);
 }
 
+TError SetSysctlAt(const TFile &proc_sys, const std::string &name, const std::string &value) {
+    L_ACT("Set sysctl {} = {}", name, value);
+
+    /* all . -> / so abusing /../ is impossible */
+    std::string path = name;
+    std::replace(path.begin(), path.end(), '.', '/');
+
+    TFile file;
+    TError error = file.OpenAt(proc_sys, path, O_WRONLY | O_CLOEXEC | O_NOCTTY, 0);
+    if (error)
+        return error;
+
+    return file.WriteAll(value);
+}
+
 TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
     TUnixSocket sock, sk;
     TNamespaceFd pid_ns, mnt_ns, net_ns;
