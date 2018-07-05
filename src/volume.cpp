@@ -1993,12 +1993,16 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
             return error;
     }
 
+    link->HostTarget = host_target;
+
+    if (VolumeLinks.find(link->HostTarget) != VolumeLinks.end())
+        L_WRN("Duplicate volume link: {}", link->HostTarget);
+
+    VolumeLinks[link->HostTarget] = link;
+
     /* Block changes root path */
     for (auto ct = link->Container; ct; ct = ct->Parent)
         ct->VolumeMounts++;
-
-    link->HostTarget = host_target;
-    VolumeLinks[host_target] = link;
 
     if (RootContainer->VolumeMounts != (int)VolumeLinks.size())
         L_WRN("Volume links index out of sync: {} != {}", RootContainer->VolumeMounts, VolumeLinks.size());
@@ -2106,10 +2110,14 @@ undo:
     link_mount.Rmdir();
 
     volumes_lock.lock();
-    VolumeLinks.erase(link->HostTarget);
-    link->HostTarget = "";
-    for (auto ct = link->Container; ct; ct = ct->Parent)
-        ct->VolumeMounts--;
+
+    if (link->HostTarget) {
+        VolumeLinks.erase(link->HostTarget);
+        for (auto ct = link->Container; ct; ct = ct->Parent)
+            ct->VolumeMounts--;
+        link->HostTarget = "";
+    }
+
     volumes_lock.unlock();
 
     (void)Save();
@@ -2149,6 +2157,9 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
     for (auto it = VolumeLinks.lower_bound(host_target);
             it != VolumeLinks.end() && it->first.IsInside(host_target);) {
         auto &link = it->second;
+
+        if (link->HostTarget != it->first)
+            L_WRN("Volume link out of sync: {} != {}", link->HostTarget, it->first);
 
         if (link->HostTarget != host_target)
             L_ACT("Umount nested volume {} link {} for CT{}:{}",
@@ -2957,6 +2968,12 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (error)
         return error;
 
+    if (Volumes.find(Path) != Volumes.end())
+        L_WRN("Duplicate volume: {}", Path);
+
+    if (VolumeLinks.find(Path) != VolumeLinks.end())
+        L_WRN("Duplicate volume link: {}", Path);
+
     Volumes[Path] = shared_from_this();
 
     /* Restore common link */
@@ -3005,6 +3022,9 @@ TError TVolume::Restore(const TKeyValue &node) {
                     L("Link is lost: {}", error);
                     continue;
                 }
+
+                if (VolumeLinks.find(link->HostTarget) != VolumeLinks.end())
+                    L_WRN("Duplicate volume link: {}", link->HostTarget);
 
                 VolumeLinks[link->HostTarget] = link;
                 for (auto c = ct; c; c = c->Parent)
