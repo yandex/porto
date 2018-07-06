@@ -1,3 +1,12 @@
+yandex-porto (4.13.12) unstable; urgency=low
+
+  * test/fuzzer: check test end after each socket timeout
+  * porto: enter also mnt/net ns in TranslatePid
+  * filesystem: fix races during construction
+  * volume: validate links consistency
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 06 Jul 2018 11:05:33 +0300
+
 yandex-porto (4.13.11) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
