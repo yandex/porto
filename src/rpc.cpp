@@ -1280,6 +1280,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
     rsp->set_fail_system(Statistics->FailSystem);
     rsp->set_fail_invalid_value(Statistics->FailInvalidValue);
     rsp->set_fail_invalid_command(Statistics->FailInvalidCommand);
+    rsp->set_fail_memory_guarantee(Statistics->FailMemoryGuarantee);
 
     rsp->set_network_count(Statistics->NetworksCount);
 

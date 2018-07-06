@@ -1056,12 +1056,17 @@ TError TContainer::GetVmStat(TVmStat &stat) const {
 TError TContainer::CheckMemGuarantee() const {
     uint64_t total = GetTotalMemory();
     uint64_t usage = RootContainer->GetTotalMemGuarantee();
+    uint64_t old_usage = usage - std::min(NewMemGuarantee, usage);
     uint64_t reserve = config().daemon().memory_guarantee_reserve();
 
     if (usage + reserve > total)
         return TError(EError::ResourceNotAvailable,
-                      "Memory guarantee overcommit by " +
-                      std::to_string(usage + reserve - total) + " bytes");
+                "Memory guarantee overcommit: requested {}, available {}, guaranteed {} + reserved {} of {}",
+                StringFormatSize(NewMemGuarantee),
+                StringFormatSize(total - old_usage - reserve),
+                StringFormatSize(old_usage),
+                StringFormatSize(reserve),
+                StringFormatSize(total));
 
     return OK;
 }
@@ -2525,8 +2530,10 @@ TError TContainer::PrepareResources() {
     }
 
     error = CheckMemGuarantee();
-    if (error)
+    if (error) {
+        Statistics->FailMemoryGuarantee++;
         return error;
+    }
 
     error = CreateWorkDir();
     if (error)
