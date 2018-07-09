@@ -3267,6 +3267,12 @@ TError TContainer::Load(const TKeyValue &node) {
         controllers |= prop->RequireControllers;
 
         error = prop->Set(value);
+
+        if (error.Error == EError::NotSupported) {
+            L_WRN("Unsupported property: {}, skipped", key);
+            continue;
+        }
+
         if (error) {
             L_ERR("Cannot load {} : {}", key, error);
             state = EContainerState::Dead;
