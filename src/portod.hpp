@@ -9,3 +9,4 @@ extern std::unique_ptr<TEventQueue> EventQueue;
 extern bool ShutdownPortod;
 
 void ReopenMasterLog();
+void CheckPortoSocket();
