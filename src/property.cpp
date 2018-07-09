@@ -2506,12 +2506,10 @@ public:
 
 class TOomKills : public TProperty {
 public:
-    TOomKills() : TProperty(P_OOM_KILLS, EProperty::NONE,
+    TOomKills() : TProperty(P_OOM_KILLS, EProperty::OOM_KILLS,
             "Count of tasks killed in container since start")
     {
         IsReadOnly = true;
-        IsRuntimeOnly = true;
-        RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
         auto cg = MemorySubsystem.RootCgroup();
@@ -2519,14 +2517,42 @@ public:
         IsSupported = !MemorySubsystem.GetOomKills(cg, count);
     }
     TError Get(std::string &value) {
-        auto cg = CT->GetCgroup(MemorySubsystem);
-        uint64_t count;
-        auto error = MemorySubsystem.GetOomKills(cg, count);
-        if (!error)
-            value = std::to_string(count);
+        uint64_t val = CT->GetOomKills();
+        value = std::to_string(val);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        uint64_t val;
+        TError error = StringToUint64(value, val);
+        if (!error) {
+            CT->OomKills = val;
+            CT->SetProp(EProperty::OOM_KILLS);
+        }
         return error;
     }
 } static OomKills;
+
+class TOomKillsRaw : public TProperty {
+    public:
+    TOomKillsRaw() : TProperty(P_OOM_KILLS_RAW, EProperty::OOM_KILLS_RAW, "")
+    {
+        IsReadOnly = true;
+        IsHidden = true;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->OomKillsRaw);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        uint64_t val;
+        TError error = StringToUint64(value, val);
+        if (!error) {
+            CT->OomKillsRaw = val;
+            CT->SetProp(EProperty::OOM_KILLS_RAW);
+        }
+        return error;
+    }
+} static OomKillsRaw;
 
 class TCoreDumped : public TProperty {
 public:
