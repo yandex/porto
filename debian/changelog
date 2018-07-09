@@ -1,3 +1,15 @@
+yandex-porto (4.12.21) unstable; urgency=low
+
+  * coredump: inherit core_command from parent container
+  * porto: remove default place restrictions for containers with chroot
+  * porto: enter also mnt/net ns in TranslatePid
+  * path: silence recursive remount
+  * container: skip unsupported properties at restore
+  * porto: reopen unlinked log file
+  * porto: reload if socket was unlinked
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 09 Jul 2018 19:05:48 +0300
+
 yandex-porto (4.12.20) unstable; urgency=low
 
   * porto: ignore /etc/default/portod.conf if /etc/portod.conf exists
