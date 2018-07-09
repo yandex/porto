@@ -43,6 +43,9 @@ TFile LogFile(STDOUT_FILENO);
 void OpenLog(const TPath &path) {
     int fd;
 
+    if (Statistics)
+        Statistics->LogOpen++;
+
     if (StdLog) {
         fd = STDOUT_FILENO;
     } else {

@@ -3631,6 +3631,11 @@ void TContainer::Event(const TEvent &event) {
                 ct->Stderr.Rotate(*ct);
             }
         }
+
+        struct stat st;
+        if (!StdLog && LogFile && !LogFile.Stat(st) && !st.st_nlink)
+            ReopenMasterLog();
+
         EventQueue->Add(config().daemon().log_rotate_ms(), event);
         break;
     }
