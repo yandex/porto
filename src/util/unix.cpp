@@ -530,19 +530,30 @@ TError SetSysctl(const std::string &name, const std::string &value) {
 
 TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
     TUnixSocket sock, sk;
-    TNamespaceFd ns;
+    TNamespaceFd pid_ns, mnt_ns, net_ns;
     TError error;
     TTask task;
 
     error = TUnixSocket::SocketPair(sock, sk);
     if (error)
         return error;
-    error = ns.Open(pidns, "ns/pid");
+
+    error = pid_ns.Open(pidns, "ns/pid");
     if (error)
         return error;
+
+    error = mnt_ns.Open(pidns, "ns/mnt");
+    if (error)
+        return error;
+
+    error = net_ns.Open(pidns, "ns/net");
+    if (error)
+        return error;
+
     error = task.Fork();
     if (error)
         return error;
+
     if (task.Pid) {
         sk.Close();
         if (pid > 0) {
@@ -559,14 +570,24 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
         return error;
     }
 
-    TFile::CloseAll({sk.GetFd(), ns.GetFd()});
-
-    error = ns.SetNs(CLONE_NEWPID);
+    error = pid_ns.SetNs(CLONE_NEWPID);
     if (error)
         _exit(EXIT_FAILURE);
+
+    error = mnt_ns.SetNs(CLONE_NEWNS);
+    if (error)
+        _exit(EXIT_FAILURE);
+
+    error = net_ns.SetNs(CLONE_NEWNET);
+    if (error)
+        _exit(EXIT_FAILURE);
+
+    TFile::CloseAll({sk.GetFd()});
+
     pid_t child = vfork();
     if (child < 0)
         _exit(EXIT_FAILURE);
+
     if (!child) {
         if (pid > 0) {
             sk.SendPid(pid);
