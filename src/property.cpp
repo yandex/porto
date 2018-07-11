@@ -2518,7 +2518,6 @@ public:
         IsSupported = !MemorySubsystem.GetOomKills(cg, count);
     }
     TError Get(std::string &value) {
-        CT->CollectOomKills();
         value = std::to_string(CT->OomKills);
         return OK;
     }
@@ -2536,7 +2535,7 @@ public:
 class TOomKillsTotal : public TProperty {
     public:
     TOomKillsTotal() : TProperty(P_OOM_KILLS_TOTAL, EProperty::OOM_KILLS_TOTAL,
-            "Count of tasks killed in hierarchy since start")
+            "Count of tasks killed in hierarchy since creation")
     {
         IsReadOnly = true;
     }
@@ -2546,7 +2545,6 @@ class TOomKillsTotal : public TProperty {
         IsSupported = !MemorySubsystem.GetOomKills(cg, count);
     }
     TError Get(std::string &value) {
-        CT->CollectOomKills();
         value = std::to_string(CT->OomKillsTotal);
         return OK;
     }

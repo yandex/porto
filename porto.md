@@ -199,7 +199,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **oom\_kills** - count of tasks killed in container since start (Linux 4.13 or offstream patches)
 
-* **oom\_kills\_total** - count of tasks killed in hierarchy since start (Linux 4.13 or offstream patches)
+* **oom\_kills\_total** - count of tasks killed in hierarchy since creation (Linux 4.13 or offstream patches)
 
 * **core\_dumped** - true, if main process dumped core
 
