@@ -349,11 +349,21 @@ static noinline TError CreateContainer(std::string reqName, bool weak) {
 }
 
 noinline TError DestroyContainer(const rpc::TContainerDestroyRequest &req) {
+    std::list<std::shared_ptr<TVolume>> unlinked;
     std::shared_ptr<TContainer> ct;
-    TError error = CL->WriteContainer(req.name(), ct);
+    TError error;
+
+    error = CL->WriteContainer(req.name(), ct);
     if (error)
         return error;
-    return ct->Destroy();
+
+    error = ct->Destroy(unlinked);
+
+    CL->ReleaseContainer();
+
+    TVolume::DestroyUnlinked(unlinked);
+
+    return error;
 }
 
 static noinline TError StartContainer(const rpc::TContainerStartRequest &req) {

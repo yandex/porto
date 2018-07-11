@@ -730,6 +730,8 @@ static void CleanupWorkdir() {
 }
 
 static void DestroyContainers(bool weak) {
+    std::list<std::shared_ptr<TVolume>> unlinked;
+
     SystemClient.LockContainer(RootContainer);
 
     /* leaves first */
@@ -737,12 +739,14 @@ static void DestroyContainers(bool weak) {
         if (ct->IsRoot() || (weak && !ct->IsWeak))
             continue;
 
-        TError error = ct->Destroy();
+        TError error = ct->Destroy(unlinked);
         if (error)
             L_ERR("Cannot destroy container {}: {}", ct->Name, error);
     }
 
     SystemClient.ReleaseContainer();
+
+    TVolume::DestroyUnlinked(unlinked);
 }
 
 static int Portod() {
@@ -902,11 +906,11 @@ static int Portod() {
 
         SystemClient.StartRequest();
 
-        SystemClient.LockContainer(RootContainer);
-
         L_SYS("Stop containers...");
 
+        SystemClient.LockContainer(RootContainer);
         error = RootContainer->Stop(0);
+        SystemClient.ReleaseContainer();
         if (error)
             L_ERR("Failed to stop root container and its children {}", error);
 
@@ -916,11 +920,15 @@ static int Portod() {
         L_SYS("Destroy volumes...");
         TVolume::DestroyAll();
 
-        SystemClient.LockContainer(RootContainer);
+        std::list<std::shared_ptr<TVolume>> unlinked;
 
-        error = RootContainer->Destroy();
+        SystemClient.LockContainer(RootContainer);
+        error = RootContainer->Destroy(unlinked);
+        SystemClient.ReleaseContainer();
         if (error)
             L_ERR("Cannot destroy root container{}", error);
+
+        TVolume::DestroyUnlinked(unlinked);
 
         SystemClient.FinishRequest();
 

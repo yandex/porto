@@ -364,7 +364,7 @@ public:
     TError Resume();
     TError Terminate(uint64_t deadline);
     TError Kill(int sig);
-    TError Destroy();
+    TError Destroy(std::list<std::shared_ptr<TVolume>> &unlinked);
 
     /* Refresh cached counters */
     void SyncProperty(const std::string &name);

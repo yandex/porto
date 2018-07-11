@@ -899,7 +899,7 @@ void TContainer::SetState(EContainerState next) {
     UnlockState();
 }
 
-TError TContainer::Destroy() {
+TError TContainer::Destroy(std::list<std::shared_ptr<TVolume>> &unlinked) {
     TError error;
 
     L_ACT("Destroy CT{}:{}", Id, Name);
@@ -910,13 +910,11 @@ TError TContainer::Destroy() {
             return error;
     }
 
-    std::list<std::shared_ptr<TVolume>> unlinked;
-
     if (!Children.empty()) {
         for (auto &ct: Subtree()) {
             if (ct.get() != this) {
                 TVolume::UnlinkAllVolumes(ct, unlinked);
-                error = ct->Destroy();
+                error = ct->Destroy(unlinked);
                 if (error)
                     return error;
             }
@@ -933,8 +931,6 @@ TError TContainer::Destroy() {
     auto lock = LockContainers();
     Unregister();
     lock.unlock();
-
-    TVolume::DestroyUnlinked(unlinked);
 
     TContainerWaiter::ReportAll(*this);
 
@@ -3660,60 +3656,59 @@ bool TContainer::RecvOomEvents() {
 void TContainer::Event(const TEvent &event) {
     TError error;
 
-    auto lock = LockContainers();
     auto ct = event.Container.lock();
 
     switch (event.Type) {
+
     case EEventType::OOM:
     {
-        if (ct) {
-            error = ct->LockAction(lock);
-            lock.unlock();
-            if (!error) {
-                if (ct->OomIsFatal)
-                    ct->Exit(SIGKILL, true);
-                ct->UnlockAction();
-            }
-        }
+        if (ct && !CL->LockContainer(ct) && ct->OomIsFatal)
+            ct->Exit(SIGKILL, true);
         break;
     }
+
     case EEventType::Respawn:
     {
-        lock.unlock();
         if (ct && !CL->LockContainer(ct))
             ct->Respawn();
         break;
     }
+
     case EEventType::Exit:
     case EEventType::ChildExit:
     {
         bool delivered = false;
+
+        auto lock = LockContainers();
         for (auto &it: Containers) {
-            auto ct = it.second;
-            if (ct->WaitTask.Pid != event.Exit.Pid &&
-                    ct->SeizeTask.Pid != event.Exit.Pid)
+            if (it.second->WaitTask.Pid != event.Exit.Pid &&
+                    it.second->SeizeTask.Pid != event.Exit.Pid)
                 continue;
-            error = ct->LockAction(lock);
-            lock.unlock();
-            if (!error) {
-                if (ct->WaitTask.Pid == event.Exit.Pid ||
-                        ct->SeizeTask.Pid == event.Exit.Pid) {
-                    ct->Exit(event.Exit.Status, false);
-                    delivered = true;
-                }
-                ct->UnlockAction();
-            }
+            ct = it.second;
             break;
         }
-        if (event.Type == EEventType::Exit)
+        lock.unlock();
+
+        if (ct && !CL->LockContainer(ct)) {
+            if (ct->WaitTask.Pid == event.Exit.Pid ||
+                    ct->SeizeTask.Pid == event.Exit.Pid) {
+                ct->Exit(event.Exit.Status, false);
+                delivered = true;
+            }
+            CL->ReleaseContainer();
+        }
+
+        if (event.Type == EEventType::Exit) {
             AckExitStatus(event.Exit.Pid);
-        else {
+        } else {
             if (!delivered)
                 L("Unknown zombie {} {}", event.Exit.Pid, event.Exit.Status);
             (void)waitpid(event.Exit.Pid, NULL, 0);
         }
+
         break;
     }
+
     case EEventType::WaitTimeout:
     {
         auto waiter = event.WaitTimeout.Waiter.lock();
@@ -3723,34 +3718,36 @@ void TContainer::Event(const TEvent &event) {
     }
 
     case EEventType::DestroyAgedContainer:
-        if (ct) {
-            error = ct->LockAction(lock);
-            lock.unlock();
-            if (!error) {
-                if (ct->State == EContainerState::Dead &&
-                        GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
-                    Statistics->RemoveDead++;
-                    ct->Destroy();
-                }
-                ct->UnlockAction();
+    {
+        if (ct && !CL->LockContainer(ct)) {
+            std::list<std::shared_ptr<TVolume>> unlinked;
+
+            if (ct->State == EContainerState::Dead &&
+                    GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
+                Statistics->RemoveDead++;
+                ct->Destroy(unlinked);
             }
+            CL->ReleaseContainer();
+
+            TVolume::DestroyUnlinked(unlinked);
         }
         break;
+    }
 
     case EEventType::DestroyWeakContainer:
-        if (ct) {
-            error = ct->LockAction(lock);
-            lock.unlock();
-            if (!error) {
-                if (ct->IsWeak)
-                    ct->Destroy();
-                ct->UnlockAction();
-            }
+        if (ct && !CL->LockContainer(ct)) {
+            std::list<std::shared_ptr<TVolume>> unlinked;
+
+            if (ct->IsWeak)
+                ct->Destroy(unlinked);
+            CL->ReleaseContainer();
+
+            TVolume::DestroyUnlinked(unlinked);
         }
         break;
 
     case EEventType::RotateLogs:
-        lock.unlock();
+    {
         for (auto &ct: RootContainer->Subtree()) {
             if (ct->State == EContainerState::Dead &&
                     GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
@@ -3771,6 +3768,7 @@ void TContainer::Event(const TEvent &event) {
 
         EventQueue->Add(config().daemon().log_rotate_ms(), event);
         break;
+    }
     }
 }
 

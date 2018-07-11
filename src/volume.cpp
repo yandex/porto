@@ -2207,6 +2207,12 @@ TError TVolume::Destroy() {
     std::list<std::shared_ptr<TVolume>> plan = {shared_from_this()};
     std::list<std::shared_ptr<TVolume>> work = {shared_from_this()};
 
+    if (CL->LockedContainer) {
+        L_WRN("Locked container {} in TVolume::Destroy()", CL->LockedContainer->Name);
+        Stacktrace();
+        CL->ReleaseContainer();
+    }
+
     auto volumes_lock = LockVolumes();
 
     auto cycle = shared_from_this();
@@ -2285,10 +2291,9 @@ TError TVolume::Destroy() {
             volumes_lock.unlock();
 
             error = CL->LockContainer(link->Container);
-            if (!error) {
+            if (!error)
                 error = volume->UnlinkVolume(link->Container, link->Target, plan);
-                CL->ReleaseContainer();
-            }
+            CL->ReleaseContainer();
 
             volumes_lock.lock();
             if (error && link == volume->Links.back()) {
@@ -2945,6 +2950,7 @@ TError TVolume::Restore(const TKeyValue &node) {
                                node.Get(V_OWNER_CONTAINER) :
                                creator.size() > 1 ? creator[0] : "",
                                VolumeOwnerContainer, true);
+    CL->ReleaseContainer();
     if (error) {
         L_WRN("Cannot find volume owner: {}", error);
         VolumeOwnerContainer = RootContainer;
@@ -3185,11 +3191,12 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
     volumes_lock.unlock();
 
     error = volume->ClaimPlace(volume->SpaceLimit);
-    if (error)
-        goto undo;
 
     /* release owner */
     CL->ReleaseContainer();
+
+    if (error)
+        goto undo;
 
     error = volume->Build();
     if (error)
@@ -3206,6 +3213,7 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
             bool required = (link.size() > 2 && link[2] == "!") ||
                             (link.size() > 3 && link[3] == "!");
             error = volume->LinkVolume(ct, target, ro, required);
+            CL->ReleaseContainer();
             if (error)
                 goto undo;
         }
@@ -3213,6 +3221,7 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         error = CL->LockContainer(CL->ClientContainer);
         if (!error)
             error = volume->LinkVolume(CL->ClientContainer);
+        CL->ReleaseContainer();
         if (error)
             goto undo;
     }
