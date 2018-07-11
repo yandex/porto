@@ -3280,6 +3280,7 @@ TError TContainer::Save(void) {
     node.Set(P_RAW_ID, std::to_string(Id));
     node.Set(P_RAW_NAME, Name);
 
+    auto prev_ct = CT;
     CT = this;
 
     for (auto knob : ContainerProperties) {
@@ -3301,7 +3302,7 @@ TError TContainer::Save(void) {
         node.Set(knob.first, value);
     }
 
-    CT = nullptr;
+    CT = prev_ct;
 
     if (error)
         return error;
