@@ -115,6 +115,7 @@ constexpr const char *P_ABSOLUTE_NAMESPACE = "absolute_namespace";
 constexpr const char *P_STATE = "state";
 constexpr const char *P_OOM_KILLED = "oom_killed";
 constexpr const char *P_OOM_KILLS = "oom_kills";
+constexpr const char *P_OOM_KILLS_TOTAL = "oom_kills_total";
 constexpr const char *P_CORE_DUMPED = "core_dumped";
 constexpr const char *P_PARENT = "parent";
 constexpr const char *P_ROOT_PID = "root_pid";
@@ -222,6 +223,8 @@ enum class EProperty {
     WEAK,
     STATE,
     OOM_KILLED,
+    OOM_KILLS,
+    OOM_KILLS_TOTAL,
     OOM_IS_FATAL,
     OOM_SCORE_ADJ,
     RESPAWN_COUNT,

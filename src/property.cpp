@@ -2506,11 +2506,10 @@ public:
 
 class TOomKills : public TProperty {
 public:
-    TOomKills() : TProperty(P_OOM_KILLS, EProperty::NONE,
+    TOomKills() : TProperty(P_OOM_KILLS, EProperty::OOM_KILLS,
             "Count of tasks killed in container since start")
     {
         IsReadOnly = true;
-        IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
     void Init(void) {
@@ -2519,14 +2518,48 @@ public:
         IsSupported = !MemorySubsystem.GetOomKills(cg, count);
     }
     TError Get(std::string &value) {
-        auto cg = CT->GetCgroup(MemorySubsystem);
-        uint64_t count;
-        auto error = MemorySubsystem.GetOomKills(cg, count);
-        if (!error)
-            value = std::to_string(count);
+        CT->CollectOomKills();
+        value = std::to_string(CT->OomKills);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        uint64_t val;
+        TError error = StringToUint64(value, val);
+        if (!error) {
+            CT->OomKills = val;
+            CT->SetProp(EProperty::OOM_KILLS);
+        }
         return error;
     }
 } static OomKills;
+
+class TOomKillsTotal : public TProperty {
+    public:
+    TOomKillsTotal() : TProperty(P_OOM_KILLS_TOTAL, EProperty::OOM_KILLS_TOTAL,
+            "Count of tasks killed in hierarchy since start")
+    {
+        IsReadOnly = true;
+    }
+    void Init(void) {
+        auto cg = MemorySubsystem.RootCgroup();
+        uint64_t count;
+        IsSupported = !MemorySubsystem.GetOomKills(cg, count);
+    }
+    TError Get(std::string &value) {
+        CT->CollectOomKills();
+        value = std::to_string(CT->OomKillsTotal);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        uint64_t val;
+        TError error = StringToUint64(value, val);
+        if (!error) {
+            CT->OomKillsTotal = val;
+            CT->SetProp(EProperty::OOM_KILLS_TOTAL);
+        }
+        return error;
+    }
+} static OomKillsTotal;
 
 class TCoreDumped : public TProperty {
 public:
