@@ -1,3 +1,17 @@
+yandex-porto (4.14.0) unstable; urgency=low
+
+  * porto: count and describe memory guarantee overcommits
+  * porto: make oom_kills hierarchical and persistent
+  * container: skip unsupported properties at restore
+  * Revert "porto: make oom_kills hierarchical and persistent"
+  * property: add persistent and hierarchical oom_kills_total
+  * contaner: save and restore context in Save()
+  * test: check oom
+  * porto: collect oom kills lazily
+  * volume: fix possible deadlock at parallel destruction
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 12 Jul 2018 15:08:39 +0300
+
 yandex-porto (4.13.12) unstable; urgency=low
 
   * test/fuzzer: check test end after each socket timeout
