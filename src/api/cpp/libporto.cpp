@@ -212,15 +212,13 @@ int Connection::Rpc(const rpc::TContainerRequest &req, rpc::TContainerResponse &
     return ret;
 }
 
-int Connection::Raw(const std::string &message, std::string &responce) {
-    if (!google::protobuf::TextFormat::ParseFromString(message, &Impl->Req) ||
+int Connection::Raw(const std::string &req, std::string &rsp) {
+    if (!google::protobuf::TextFormat::ParseFromString(req, &Impl->Req) ||
         !Impl->Req.IsInitialized())
         return -1;
 
     int ret = Impl->Rpc();
-    if (!ret)
-        responce = Impl->Rsp.DebugString();
-
+    rsp = Impl->Rsp.DebugString();
     return ret;
 }
 

@@ -646,19 +646,19 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
 
 class TRawCmd final : public ICmd {
 public:
-    TRawCmd(Porto::Connection *api) : ICmd(api, "raw", 1, "<message>", "send raw protobuf message") {}
+    TRawCmd(Porto::Connection *api) : ICmd(api, "raw", 1, "<request>", "send request in text protobuf") {}
 
     int Execute(TCommandEnviroment *env) final override {
-        stringstream msg;
+        stringstream req;
 
         const auto &args = env->GetArgs();
-        copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
+        copy(args.begin(), args.end(), ostream_iterator<string>(req, " "));
 
-        string resp;
-        if (!Api->Raw(msg.str(), resp))
-            std::cout << resp << std::endl;
+        std::string rsp;
+        int ret = Api->Raw(req.str(), rsp);
+        std::cout << rsp << std::endl;
 
-        return 0;
+        return ret;
     }
 };
 
