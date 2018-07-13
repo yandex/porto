@@ -23,6 +23,7 @@ constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_PLACE = "place";
 constexpr const char *P_PLACE_LIMIT = "place_limit";
 constexpr const char *P_ROOT = "root";
+constexpr const char *P_ROOT_PATH = "root_path";
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
 constexpr const char *P_CWD = "cwd";
 constexpr const char *P_STDIN_PATH = "stdin_path";

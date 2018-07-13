@@ -424,7 +424,7 @@ Write access to container requires any of these conditions:
     In host root default is temporary directory: /place/porto/*container-name*  
     In choot: '/'
 
-* **root** - container root path, default: /
+* **root** - container root path in parent namespace, default: /
 
     Porto creates new mount namespace from parent mount namespace,
     and chroot into this direcotry using **pivot_root(2)**.
@@ -436,6 +436,8 @@ Write access to container requires any of these conditions:
     Porto creates in /dev nodes only for devices permitted by property **devices**.
 
     If container should have access to porto then /run/portod.socket is binded inside.
+
+** **root\_path** - container root path in client namespace
 
 * **root\_readonly** - remount everything read-only
 

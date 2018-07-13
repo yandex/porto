@@ -863,7 +863,7 @@ public:
 
 class TRoot : public TProperty {
 public:
-    TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container root path") {}
+    TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container root path in parent namespace") {}
     TError Get(std::string &value) {
         value = CT->Root;
         return OK;
@@ -898,6 +898,19 @@ public:
         return OK;
     }
 } static Root;
+
+class TRootPath : public TProperty {
+public:
+    TRootPath() : TProperty(P_ROOT_PATH, EProperty::NONE, "Container root path in client namespace") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = CL->ComposePath(CT->RootPath).ToString();
+        if (value == "")
+            return TError(EError::Permission, "Root path is unreachable");
+        return OK;
+    }
+} static RootPath;
 
 class TNet : public TProperty {
 public:
