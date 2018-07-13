@@ -60,6 +60,9 @@ struct TCred {
     std::string ToString() const {
         return User() + ":" + Group();
     }
+
+    TError Load(const rpc::TCred &cred);
+    void Dump(rpc::TCred &cred);
 };
 
 void InitCapabilities();

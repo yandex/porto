@@ -421,6 +421,13 @@ message TLocateProcessResponse {
 
 // VolumeAPI
 
+message TCred {
+    optional string user = 1;           // requires user or uid or both
+    optional fixed32 uid = 2;
+    optional string group = 3;
+    optional fixed32 gid = 4;
+}
+
 message TVolumeProperty {
     required string name = 1;
     required string value = 2;
