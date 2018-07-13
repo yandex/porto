@@ -113,6 +113,7 @@ public:
     TPath StoragePath;
     TFile StorageFd; /* during build */
     bool KeepStorage = false;
+    bool NeedCow = false; // MOO
 
     std::string BackendType;
     std::string Id;
@@ -188,6 +189,11 @@ public:
     static TError CheckConflicts(const TPath &path);
 
     TError Build(void);
+
+    TError MergeLayers();
+    TError MakeDirectories(const TFile &base);
+    TError MakeSymlinks(const TFile &base);
+    TError MakeShares(const TFile &base, bool cow);
 
     static void DestroyAll();
     TError DestroyOne();

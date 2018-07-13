@@ -721,7 +721,7 @@ public:
         TError error;
         std::string lower;
         int layer_idx = 0;
-        TFile upperFd, workFd;
+        TFile upperFd, workFd, cowFd;
 
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
@@ -790,6 +790,30 @@ public:
         error = Volume->GetInternal("").Chdir();
         if (error)
             goto err;
+
+        error = Volume->MakeDirectories(upperFd);
+        if (error)
+            goto err;
+
+        error = Volume->MakeSymlinks(upperFd);
+        if (error)
+            goto err;
+
+        error = Volume->MakeShares(upperFd, false);
+        if (error)
+            goto err;
+
+        if (Volume->NeedCow) {
+            error = cowFd.CreateDirAllAt(Volume->StorageFd, "cow", 0755, Volume->VolumeCred);
+            if (error)
+                goto err;
+
+            error = Volume->MakeShares(cowFd, true);
+            if (error)
+                goto err;
+
+            lower = "overlay/cow:" + lower;
+        }
 
         error = Volume->InternalPath.Mount("overlay", "overlay",
                                    Volume->GetMountFlags(),
@@ -871,7 +895,7 @@ public:
 
     TError Build() override {
         TProjectQuota quota(Volume->StoragePath);
-        TFile lowerFd, upperFd, workFd;
+        TFile lowerFd, upperFd, workFd, cowFd;
         std::string lowerdir;
         int layer_idx = 0;
         TError error;
@@ -972,6 +996,30 @@ public:
 
             pin.Close();
             lowerdir += ":" + layer_id;
+        }
+
+        error = Volume->MakeDirectories(upperFd);
+        if (error)
+            goto err;
+
+        error = Volume->MakeSymlinks(upperFd);
+        if (error)
+            goto err;
+
+        error = Volume->MakeShares(upperFd, false);
+        if (error)
+            goto err;
+
+        if (Volume->NeedCow) {
+            error = cowFd.CreateDirAllAt(Volume->StorageFd, "cow", 0755, Volume->VolumeCred);
+            if (error)
+                goto err;
+
+            error = Volume->MakeShares(cowFd, true);
+            if (error)
+                goto err;
+
+            lowerdir = "squash/cow:" + lowerdir;
         }
 
         error = Volume->InternalPath.Mount("overlay", "overlay",
@@ -1777,6 +1825,12 @@ TError TVolume::Configure(const TPath &target_root) {
             return TError(EError::InvalidValue, "Cannot copy layers to read-only volume");
     }
 
+    for (auto &share: Spec->shares())
+        NeedCow |= share.cow();
+
+    if (NeedCow && BackendType != "overlay" && BackendType != "squash")
+        return TError(EError::InvalidValue, "Backend {} does not support copy-on-write shares");
+
     /* Verify guarantees */
     if (SpaceLimit && SpaceLimit < SpaceGuarantee)
         return TError(EError::InvalidValue, "Space guarantree bigger than limit");
@@ -1795,6 +1849,242 @@ TError TVolume::Configure(const TPath &target_root) {
     error = CheckGuarantee(SpaceGuarantee, InodeGuarantee);
     if (error)
         return error;
+
+    return OK;
+}
+
+TError TVolume::MergeLayers() {
+    TError error;
+
+    if (!HaveLayers())
+        return OK;
+
+    for (auto &name : Layers) {
+        L_ACT("Merge layer {} into volume: {}", name, Path);
+
+        if (name[0] == '/') {
+            TPath temp;
+            TFile pin;
+
+            error = pin.OpenDir(name);
+            if (error)
+                return error;
+
+            error = CL->WriteAccess(pin);
+            if (error)
+                return TError(error, "Layer {}", name);
+
+            temp = GetInternal("temp");
+            error = temp.Mkdir(0700);
+            if (!error)
+                error = temp.BindRemount(pin.ProcPath(), MS_RDONLY | MS_NODEV | MS_PRIVATE);
+            if (error) {
+                (void)temp.Rmdir();
+                return error;
+            }
+
+            error = CopyRecursive(temp, InternalPath);
+
+            (void)temp.UmountAll();
+            (void)temp.Rmdir();
+        } else {
+            TStorage layer(EStorageType::Layer, Place, name);
+            (void)layer.Touch();
+            /* Imported layers are available for everybody */
+            error = CopyRecursive(layer.Path, InternalPath);
+        }
+        if (error)
+            return error;
+    }
+
+    error = TStorage::SanitizeLayer(InternalPath, true);
+    if (error)
+        return error;
+
+    return OK;
+}
+
+TError TVolume::MakeDirectories(const TFile &base) {
+    TError error;
+
+    for (auto &dir_spec: Spec->directories()) {
+        int perms = dir_spec.has_permissions() ? dir_spec.permissions() : VolumePermissions;
+        TPath path = dir_spec.path();
+        TCred cred = VolumeCred;
+        TFile dir;
+
+        if (path.IsAbsolute() || !path.IsNormal() || path.StartsWithDotDot())
+            return TError(EError::InvalidPath, "directory path {}", path);
+
+        if (dir_spec.has_cred()) {
+            error = cred.Load(dir_spec.cred());
+            if (error)
+                return error;
+        }
+
+        L("Make directory {}", path);
+
+        error = dir.CreateDirAllAt(base, path, perms, cred);
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
+TError TVolume::MakeSymlinks(const TFile &base) {
+    TError error;
+
+    for (auto &sym_spec: Spec->symlinks()) {
+        TPath path = sym_spec.path();
+        TPath target = sym_spec.target_path();
+        TFile dir;
+
+        if (path.IsAbsolute() || !path.IsNormal() || path.StartsWithDotDot())
+            return TError(EError::InvalidPath, "symlink path {}", path);
+
+        L("Make symlink {} -> {}", path, target);
+
+        error = dir.CreateDirAllAt(base, path.DirName(), VolumePermissions, VolumeCred);
+        if (error)
+            return error;
+
+        TPath base_name = path.BaseName();
+        TPath old_target;
+
+        if (!dir.ReadlinkAt(base_name, old_target))
+            dir.UnlinkAt(base_name);
+
+        error = dir.SymlinkAt(base_name, target);
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
+TError TVolume::MakeShares(const TFile &base, bool cow) {
+    TFile old_cwd, old_root, new_root;
+    TError error, error2;
+
+    error = old_cwd.OpenDir(".");
+    if (error)
+        return error;
+
+    error = old_root.OpenDir("/");
+    if (error)
+        return error;
+
+    for (auto &share: Spec->shares()) {
+
+        if (share.cow() != cow)
+            continue;
+
+        TPath path = share.path();
+        TPath origin_path = share.origin_path();
+
+        if (path.IsAbsolute() || !path.IsNormal() || !path || path.StartsWithDotDot())
+            return TError(EError::InvalidPath, "share path {}", path);
+
+        if (!origin_path.IsAbsolute() || !origin_path.IsNormal())
+            return TError(EError::InvalidPath, "share origin {}", origin_path);
+
+        L("Make{} share {} -> {}", share.cow()? " cow" : "", path, origin_path);
+
+        TPath root_path = CL->ClientContainer->RootPath;
+        TFile new_root;
+        if (!root_path.IsRoot()) {
+            error = new_root.OpenDir(root_path);
+            if (error)
+                return error;
+            error = new_root.Chroot();
+            if (error)
+                return error;
+        }
+
+        TFile src;
+        CL->TaskCred.Enter();
+        error = src.OpenRead(origin_path);
+        CL->TaskCred.Leave();
+
+        if (new_root) {
+            error2 = old_root.Chroot();
+            PORTO_ASSERT(!error2);
+            error2 = old_cwd.Chdir();
+            PORTO_ASSERT(!error2);
+        }
+
+        if (error)
+            return error;
+
+        if (!share.cow() || src.IsDirectory()) {
+            error = CL->WriteAccess(src);
+            if (error)
+                return error;
+        }
+
+        // Open origin at base mount
+        error = src.OpenAtMount(base, src, O_RDONLY | O_CLOEXEC | O_NOCTTY);
+        if (error)
+            return error;
+
+        TFile dir;
+        error = dir.CreateDirAllAt(base, path.DirName(), VolumePermissions, VolumeCred);
+        if (error)
+            return error;
+
+        if (src.IsDirectory()) {
+            TPathWalk walk;
+
+            error = src.Chdir();
+            if (error)
+                return error;
+
+            error = walk.OpenList(".");
+            while (!error) {
+                error = walk.Next();
+                if (error || !walk.Path)
+                    break;
+                TPath name = walk.Level() ? walk.Name() : path.BaseName();
+                if (walk.Directory) {
+                    if (walk.Postorder) {
+                        error = dir.OpenDirStrictAt(dir, "..");
+                        if (!error && walk.Level())
+                            error = src.OpenDirStrictAt(src, "..");
+                    } else {
+                        if (!dir.MkdirAt(name, walk.Stat->st_mode & 07777))
+                            error = dir.ChownAt(name, walk.Stat->st_uid, walk.Stat->st_gid);
+                        if (!error)
+                            error = dir.OpenDirStrictAt(dir, name);
+                        if (!error && walk.Level())
+                            error = src.OpenDirStrictAt(src, name);
+                    }
+                } else if (S_ISREG(walk.Stat->st_mode)) {
+                    TProjectQuota::Toggle(dir, false);
+                    error = dir.HardlinkAt(name, src, walk.Name());
+                    TProjectQuota::Toggle(dir, true);
+                } else if (S_ISLNK(walk.Stat->st_mode)) {
+                    TPath symlink;
+                    error = src.ReadlinkAt(name, symlink);
+                    if (!error)
+                        error = dir.SymlinkAt(name, symlink);
+                } else
+                    L("Skip {}", walk.Path);
+            }
+
+            error2 = old_cwd.Chdir();
+            PORTO_ASSERT(!error2);
+
+            if (error)
+                return error;
+        } else {
+            TProjectQuota::Toggle(dir, false);
+            error = dir.HardlinkAt(path.BaseName(), src);
+            TProjectQuota::Toggle(dir, true);
+            if (error)
+                return error;
+        }
+    }
 
     return OK;
 }
@@ -1871,47 +2161,28 @@ TError TVolume::Build() {
     if (error)
         return error;
 
-    if (HaveLayers() && BackendType != "overlay" && BackendType != "squash") {
+    if (BackendType != "overlay" && BackendType != "squash") {
+        error = MergeLayers();
+        if (error)
+            return error;
 
-        L_ACT("Merge layers into volume: {}", Path);
+        TFile base;
+        if (RemoteStorage() || FileStorage())
+            error = base.OpenDirStrict(InternalPath);
+        else
+            error = base.Dup(StorageFd);
+        if (error)
+            return error;
 
-        for (auto &name : Layers) {
-            if (name[0] == '/') {
-                TPath temp;
-                TFile pin;
+        error = MakeDirectories(base);
+        if (error)
+            return error;
 
-                error = pin.OpenDir(name);
-                if (error)
-                    return error;
+        error = MakeSymlinks(base);
+        if (error)
+            return error;
 
-                error = CL->WriteAccess(pin);
-                if (error)
-                    return TError(error, "Layer {}", name);
-
-                temp = GetInternal("temp");
-                error = temp.Mkdir(0700);
-                if (!error)
-                    error = temp.BindRemount(pin.ProcPath(), MS_RDONLY | MS_NODEV | MS_PRIVATE);
-                if (error) {
-                    (void)temp.Rmdir();
-                    return error;
-                }
-
-                error = CopyRecursive(temp, InternalPath);
-
-                (void)temp.UmountAll();
-                (void)temp.Rmdir();
-            } else {
-                TStorage layer(EStorageType::Layer, Place, name);
-                (void)layer.Touch();
-                /* Imported layers are available for everybody */
-                error = CopyRecursive(layer.Path, InternalPath);
-            }
-            if (error)
-                return error;
-        }
-
-        error = TStorage::SanitizeLayer(InternalPath, true);
+        error = MakeShares(base, false);
         if (error)
             return error;
     }
