@@ -1485,6 +1485,7 @@ void TRequest::Handle() {
         return;
 
     if (error) {
+        rsp.Clear();
         Statistics->RequestsFailed++;
         switch (error.Error) {
             case EError::Unknown:
