@@ -125,6 +125,9 @@ message TContainerRequest {
 
     optional TSetSymlinkRequest SetSymlink = 125;
 
+    optional TNewVolumeRequest NewVolume = 126;
+    optional TGetVolumeRequest GetVolume = 127;
+
     optional TConvertPathRequest convertPath = 200;
     optional TAttachProcessRequest attachProcess = 201;
     optional TLocateProcessRequest locateProcess = 202;
@@ -156,6 +159,9 @@ message TContainerResponse {
     optional TStorageListResponse storageList = 17;
     optional TLocateProcessResponse locateProcess = 18;
     optional TContainerWaitResponse AsyncWait = 19;
+
+    optional TNewVolumeResponse NewVolume = 126;
+    optional TGetVolumeResponse GetVolume = 127;
 
     optional TGetSystemResponse GetSystem = 300;
     optional TSetSystemResponse SetSystem = 301;
@@ -440,9 +446,71 @@ message TVolumePropertyDescription {
 
 message TVolumeLink {
     required string container = 1;
-    optional string target = 2;
-    optional bool required = 3;
+    optional string target = 2;         // absolute path in container, default: anon
+    optional bool required = 3;         // container cannot work without it
     optional bool read_only = 4;
+    optional string host_target = 5;    // out, absolute path in host
+}
+
+message TVolumeResource {
+    optional uint64 limit = 1;
+    optional uint64 guarantee = 2;
+    optional uint64 usage = 3;          // out
+    optional uint64 available = 4;      // out
+}
+
+message TVolumeDirectory {
+    required string path = 1;           // relative path in volume
+    optional TCred cred = 2;            // default: volume cred
+    optional fixed32 permissions = 3;   // default: volume permissions
+}
+
+message TVolumeSymlink {
+    required string path = 1;           // relative path in volume
+    required string target_path = 2;
+}
+
+message TVolumeShare {
+    required string path = 1;           // relative path in volume
+    required string origin_path = 2;    // absolute path to origin
+    optional bool cow = 3;              // default: mutable
+}
+
+message TVolumeSpec {
+    optional string path = 1;               // path in container, default: auto
+    optional string container = 2;          // default: self
+    repeated TVolumeLink links = 3;         // default: anon link to self
+
+    optional string id = 4;                 // out
+    optional string state = 5;              // out
+
+    optional string private_value = 6;      // at most 4096 bytes
+
+    optional string backend = 10;           // default: auto
+    optional string place = 11;             // path in host, default: default place for self
+    optional string storage = 12;           // default: temp
+    repeated string layers = 13;
+    optional bool read_only = 14;
+
+    // defines root directory user, group and permissions
+    optional TCred cred = 20;               // default: self task cred
+    optional fixed32 permissions = 21;      // default: 0775
+
+    optional TVolumeResource space = 22;
+    optional TVolumeResource inodes = 23;
+
+    optional TCred owner = 30;              // default: self owner
+    optional string owner_container = 31;   // default: self
+    optional string place_key = 32;         // out
+    optional string creator = 33;           // out
+    optional bool auto_path = 34;           // out
+    optional uint32 device = 35;            // out
+    optional string build_time = 36;        // out
+
+    // customization at creation
+    repeated TVolumeDirectory directories = 40; // in
+    repeated TVolumeSymlink symlinks = 41;      // in
+    repeated TVolumeShare shares = 42;          // in
 }
 
 message TVolumeDescription {
@@ -606,4 +674,21 @@ message TSetSymlinkRequest {
     required string container = 1;
     required string symlink = 2;
     optional string target = 3;
+}
+
+message TNewVolumeRequest {
+    required TVolumeSpec volume = 1;
+}
+
+message TNewVolumeResponse {
+    required TVolumeSpec volume = 1;
+}
+
+message TGetVolumeRequest {
+    optional string container = 1;  // default: self
+    repeated string path = 2;       // volume path in container, default: all
+}
+
+message TGetVolumeResponse {
+    repeated TVolumeSpec volume = 1;
 }
