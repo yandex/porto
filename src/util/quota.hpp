@@ -39,4 +39,6 @@ public:
     TError Destroy();
 
     TError StatFS(TStatFS &result);
+
+    static TError Toggle(const TFile &dir, bool enabled);
 };

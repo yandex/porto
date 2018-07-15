@@ -171,6 +171,24 @@ TError TProjectQuota::GetProjectId(const TPath &path, uint32_t &id) {
     return OK;
 }
 
+// Enable/disable inheritance from directory to files
+TError TProjectQuota::Toggle(const TFile &dir, bool enabled) {
+    struct fsxattr attr;
+
+    if (ioctl(dir.Fd, FS_IOC_FSGETXATTR, &attr))
+        return TError::System("ioctl FS_IOC_FSGETXATTR {}", dir.RealPath());
+
+    if (enabled)
+        attr.fsx_xflags |= FS_XFLAG_PROJINHERIT;
+    else
+        attr.fsx_xflags &= ~FS_XFLAG_PROJINHERIT;
+
+    if (ioctl(dir.Fd, FS_IOC_FSSETXATTR, &attr))
+        return TError::System("ioctl FS_IOC_FSSETXATTR {}", dir.RealPath());
+
+    return OK;
+}
+
 TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
     struct fsxattr attr;
     int fd, ret;
