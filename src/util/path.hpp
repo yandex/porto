@@ -267,14 +267,17 @@ public:
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
     int GetMountId(const TPath &relative = "") const;
     TError Dup(const TFile &other);
-    TError OpenAt(const TFile &dir, const TPath &path, int flags, int mode);
+    TError OpenAt(const TFile &dir, const TPath &path, int flags, int mode = 0);
     TError OpenDirAt(const TFile &dir, const TPath &path);
     TError OpenDirStrictAt(const TFile &dir, const TPath &path);
+    TError OpenDirAllAt(const TFile &dir, const TPath &path);
+    TError CreateDirAllAt(const TFile &dir, const TPath &path, int mode, const TCred &cred);
     TError MkdirAt(const TPath &path, int mode) const;
     TError UnlinkAt(const TPath &path) const;
     TError RmdirAt(const TPath &path) const;
     TError RemoveAt(const TPath &path) const;
     TError RenameAt(const TPath &oldpath, const TPath &newpath) const;
+    TError HardlinkAt(const TPath &path, const TFile &target, const TPath &target_path = "") const;
     TError SymlinkAt(const TPath &path, const TPath &target) const;
     TError ReadlinkAt(const TPath &path, TPath &target) const;
     TError Chown(uid_t uid, gid_t gid) const;
@@ -331,7 +334,7 @@ public:
 
     TPathWalk() {}
     ~TPathWalk() { Close(); }
-    TError Open(const TPath &patht, int fts_flags = FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, int (*compar)(const FTSENT **, const FTSENT **) = nullptr);
+    TError Open(const TPath &path, int fts_flags = FTS_COMFOLLOW | FTS_NOCHDIR | FTS_PHYSICAL | FTS_XDEV, int (*compar)(const FTSENT **, const FTSENT **) = nullptr);
     TError OpenScan(const TPath &path);
     TError OpenList(const TPath &path);
     TError OpenNoStat(const TPath &path);

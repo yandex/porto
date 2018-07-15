@@ -183,7 +183,7 @@ TError TPath::Chdir() const {
     if (unshare(CLONE_FS))
         return TError::System("unshare(CLONE_FS)");
     if (chdir(Path.c_str()) < 0)
-        return TError(EError::InvalidValue, errno, "chdir(" + Path + ")");
+        return TError(EError::InvalidPath, errno, "Cannot chdir {}", Path);
     return OK;
 }
 
@@ -1368,7 +1368,7 @@ TError TFile::Dup(const TFile &other) {
 
 TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags, int mode) {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     int fd = openat(dir.Fd, path.c_str(), flags, mode);
     if (fd < 0)
         return TError::System("Cannot openat {} {}", dir.RealPath(), path);
@@ -1378,25 +1378,81 @@ TError TFile::OpenAt(const TFile &dir, const TPath &path, int flags, int mode) {
 }
 
 TError TFile::OpenDirAt(const TFile &dir, const TPath &path) {
-    return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY, 0);
+    return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
 }
 
 TError TFile::OpenDirStrictAt(const TFile &dir, const TPath &path)
 {
-    return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW, 0);
+    return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
 }
 
 TError TFile::MkdirAt(const TPath &path, int mode) const {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     if (mkdirat(Fd, path.c_str(), mode))
         return TError::System("Cannot mkdirat {} {}", RealPath(), path);
     return OK;
 }
 
+TError TFile::OpenDirAllAt(const TFile &dir, const TPath &path) {
+    TError error;
+
+    error = Dup(dir);
+    if (error)
+        return error;
+
+    for (auto &name: path.Components()) {
+        if (name == "..")
+            return TError(EError::InvalidPath, "Non-normal path {}", path.Path);
+        error = OpenDirStrictAt(*this, name);
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
+TError TFile::CreateDirAllAt(const TFile &dir, const TPath &path, int mode, const TCred &cred) {
+    TError error;
+
+    error = Dup(dir);
+    if (error)
+        return error;
+
+    for (auto name: path.Components()) {
+        if (name == "..")
+            return TError(EError::InvalidPath, "Non-normal path {}", path.Path);
+        error = OpenDirStrictAt(*this, name);
+        if (error && error.Errno == ENOENT) {
+            error = MkdirAt(name, mode);
+            if (!error) {
+                error = ChownAt(name, cred);
+                if (error)
+                    return error;
+            } else if (error.Errno != EEXIST)
+                return error;
+            error = OpenDirStrictAt(*this, name);
+        }
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
+TError TFile::HardlinkAt(const TPath &path, const TFile &target, const TPath &target_path) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
+    if (target_path.IsAbsolute())
+        return TError(EError::InvalidPath, "Absolute path {}", target_path.Path);
+    if (linkat(target.Fd, target_path.c_str(), Fd, path.c_str(), AT_EMPTY_PATH))
+        return TError::System("Cannot create hardlink {} {} to {} {}", RealPath(), path, target.RealPath(), target_path);
+    return OK;
+}
+
 TError TFile::SymlinkAt(const TPath &path, const TPath &target) const {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     if (symlinkat(target.c_str(), Fd, path.c_str()))
         return TError::System("Cannot symlinkat {} {}", RealPath(), path);
     return OK;
@@ -1413,7 +1469,7 @@ TError TFile::ReadlinkAt(const TPath &path, TPath &target) const {
 
 TError TFile::UnlinkAt(const TPath &path) const {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     if (unlinkat(Fd, path.c_str(), 0))
         return TError::System("Cannot unlinkat {} {}", RealPath(), path);
     return OK;
@@ -1421,7 +1477,7 @@ TError TFile::UnlinkAt(const TPath &path) const {
 
 TError TFile::RmdirAt(const TPath &path) const {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     if (unlinkat(Fd, path.c_str(), AT_REMOVEDIR))
         return TError::System("Cannot rmdirat {} {}", RealPath(), path);
     return OK;
@@ -1429,9 +1485,9 @@ TError TFile::RmdirAt(const TPath &path) const {
 
 TError TFile::RenameAt(const TPath &oldpath, const TPath &newpath) const {
     if (oldpath.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + oldpath.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", oldpath.Path);
     if (newpath.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + newpath.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", newpath.Path);
     if (renameat(Fd, oldpath.c_str(), Fd, newpath.c_str()))
         return TError::System("Cannot renameat {} {} {}", RealPath(), oldpath, newpath);
     return OK;
@@ -1451,7 +1507,7 @@ TError TFile::Chmod(mode_t mode) const {
 
 TError TFile::ChownAt(const TPath &path, uid_t uid, gid_t gid) const {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     if (fchownat(Fd, path.c_str(), uid, gid, AT_SYMLINK_NOFOLLOW))
         return TError::System("Cannot chownat {} {}", RealPath(), path);
     return OK;
@@ -1459,7 +1515,7 @@ TError TFile::ChownAt(const TPath &path, uid_t uid, gid_t gid) const {
 
 TError TFile::ChmodAt(const TPath &path, mode_t mode) const {
     if (path.IsAbsolute())
-        return TError(EError::InvalidValue, "Absolute path: " + path.Path);
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
     if (fchmodat(Fd, path.c_str(), mode, AT_SYMLINK_NOFOLLOW))
         return TError::System("Cannot chmodat {} {}", RealPath(), path);
     return OK;

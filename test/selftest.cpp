@@ -793,7 +793,7 @@ static void TestExitStatus(Porto::Connection &api) {
     Say() << "Check exit status of invalid directory" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
-    ExpectApiFailure(api.Start(name), EError::InvalidValue);
+    ExpectApiFailure(api.Start(name), EError::InvalidPath);
     ExpectApiFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
