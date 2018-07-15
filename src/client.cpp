@@ -410,7 +410,7 @@ TError TClient::WriteAccess(const TFile &file) {
         return TError(EError::Permission, "Path out of chroot " + path.ToString());
 
     /* Inside chroot everybody gain root access but fs might be read-only */
-    if (error && ClientContainer->RootPath.IsRoot())
+    if (error && !ClientContainer->RootPath.IsRoot())
         error = file.WriteAccess(TCred(RootUser, RootGroup));
 
     /* Also volume owner gains full access inside */
