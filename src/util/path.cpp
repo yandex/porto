@@ -1356,6 +1356,36 @@ int TFile::GetMountId(const TPath &relative) const {
     return mnt;
 }
 
+// Open same inode at different mount
+TError TFile::OpenAtMount(const TFile &mount, const TFile &file, int flags) {
+    struct stat mount_st, file_st;
+    FileHandle fh;
+    int mount_id;
+    TError error;
+
+    error = mount.Stat(mount_st);
+    if (error)
+        return error;
+
+    error = file.Stat(file_st);
+    if (error)
+        return error;
+
+    if (mount_st.st_dev != file_st.st_dev)
+        return TError(EError::InvalidPath, EXDEV, "Cannot open {} at {}", file.RealPath(), mount.RealPath());
+
+    if (name_to_handle_at(file.Fd, "", &fh.head, &mount_id, AT_EMPTY_PATH))
+        return TError::System("OpenAtMount name_to_handle_at {}", file.RealPath());
+
+    int fd = open_by_handle_at(mount.Fd, &fh.head, flags);
+    if (fd < 0)
+        return TError::System("OpenAtMount open_by_handle_at {}", mount.RealPath());
+
+    Close();
+    SetFd = fd;
+    return OK;
+}
+
 TError TFile::Dup(const TFile &other) {
     if (&other != this) {
         Close();

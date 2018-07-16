@@ -270,6 +270,7 @@ public:
     TError OpenAt(const TFile &dir, const TPath &path, int flags, int mode = 0);
     TError OpenDirAt(const TFile &dir, const TPath &path);
     TError OpenDirStrictAt(const TFile &dir, const TPath &path);
+    TError OpenAtMount(const TFile &mount, const TFile &file, int flags);
     TError OpenDirAllAt(const TFile &dir, const TPath &path);
     TError CreateDirAllAt(const TFile &dir, const TPath &path, int mode, const TCred &cred);
     TError MkdirAt(const TPath &path, int mode) const;
