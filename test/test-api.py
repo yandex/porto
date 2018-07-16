@@ -23,6 +23,7 @@ c.ListVolumes()
 c.ListLayers()
 c.ListStorages()
 c.ListMetaStorages()
+c.GetVolumes()
 
 c.ListStorage()
 
@@ -220,7 +221,13 @@ c.Destroy(a)
 assert Catch(c.FindVolume, w.path) == porto.exceptions.VolumeNotFound
 
 v = c.CreateVolume()
+c.GetVolume(v.path)
 c.DestroyVolume(v.path)
+
+v = c.NewVolume({})
+c.GetVolume(v['path'])
+c.GetVolumes([v['path']])
+c.DestroyVolume(v['path'])
 
 l.Remove()
 os.rmdir(volume_path)

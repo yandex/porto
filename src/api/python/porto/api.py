@@ -6,6 +6,43 @@ import threading
 from . import rpc_pb2
 from . import exceptions
 
+
+def _encode_message(msg, val, key=None):
+    msg.SetInParent()
+    if isinstance(val, dict):
+        if key is not None:
+            msg = getattr(msg, key)
+            msg.SetInParent()
+        for k, v in val.iteritems():
+            _encode_message(msg, v, k)
+    elif isinstance(val, list):
+        if key is not None:
+            msg = getattr(msg, key)
+        if isinstance(val[0], dict):
+            for item in val:
+                _encode_message(msg.add(), item)
+        else:
+            msg.extend(val)
+    else:
+        setattr(msg, key, val)
+
+
+def _decode_message(msg):
+    ret = dict()
+    for dsc, val in msg.ListFields():
+        key = dsc.name
+        if dsc.type == dsc.TYPE_MESSAGE:
+            if dsc.label == dsc.LABEL_REPEATED:
+                ret[key] = [_decode_message(v) for v in val]
+            else:
+                ret[key] = _decode_message(val)
+        elif dsc.label == dsc.LABEL_REPEATED:
+            ret[key] = list(val)
+        else:
+            ret[key] = val
+    return ret
+
+
 class _RPC(object):
     def __init__(self, socket_path, timeout, socket_constructor,
                  lock_constructor, auto_reconnect):
@@ -802,6 +839,32 @@ class Connection(object):
     def FindVolume(self, path):
         pb = self._ListVolumes(path=path)[0]
         return Volume(self, path, pb)
+
+    def NewVolume(self, spec, timeout=None):
+        req = rpc_pb2.TContainerRequest()
+        req.NewVolume.SetInParent()
+        _encode_message(req.NewVolume.volume, spec)
+        rsp = self.rpc.call(req, timeout or self.disk_timeout)
+        return _decode_message(rsp.NewVolume.volume)
+
+    def GetVolume(self, path, container=None, timeout=None):
+        req = rpc_pb2.TContainerRequest()
+        req.GetVolume.SetInParent()
+        if container is not None:
+            req.GetVolume.container = str(container)
+        req.GetVolume.path.append(path)
+        rsp = self.rpc.call(req, timeout or self.disk_timeout)
+        return _decode_message(rsp.GetVolume.volume[0])
+
+    def GetVolumes(self, paths=None, container=None, timeout=None):
+        req = rpc_pb2.TContainerRequest()
+        req.GetVolume.SetInParent()
+        if container is not None:
+            req.GetVolume.container = str(container)
+        if paths is not None:
+            req.GetVolume.path.extend(paths)
+        rsp = self.rpc.call(req, timeout or self.disk_timeout)
+        return [_decode_message(v) for v in rsp.GetVolume.volume]
 
     def LinkVolume(self, path, container, target=None, read_only=False, required=False):
         request = rpc_pb2.TContainerRequest()
