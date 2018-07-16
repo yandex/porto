@@ -162,6 +162,36 @@ TCred TCred::Current() {
     return cred;
 }
 
+void TCred::Enter() const {
+    int ret;
+
+    L_DBG("Enter cred {}:{}", Uid, Gid);
+
+    ret = syscall(SYS_setgroups, Groups.size(), Groups.data());
+    PORTO_ASSERT(!ret);
+
+    ret = syscall(SYS_setresgid, -1, Gid, -1);
+    PORTO_ASSERT(!ret);
+
+    ret = syscall(SYS_setresuid, -1, Uid, -1);
+    PORTO_ASSERT(!ret);
+}
+
+void TCred::Leave() const {
+    int ret;
+
+    L_DBG("Leave cred {}:{}", Uid, Gid);
+
+    ret = syscall(SYS_setresuid, -1, RootUser, -1);
+    PORTO_ASSERT(!ret);
+
+    ret = syscall(SYS_setresgid, -1, RootGroup, -1);
+    PORTO_ASSERT(!ret);
+
+    ret = syscall(SYS_setgroups, 0, nullptr);
+    PORTO_ASSERT(!ret);
+}
+
 TError TCred::InitGroups(const std::string &user) {
     TError error = FindGroups(user, Gid, Groups);
     if (error) {

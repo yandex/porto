@@ -35,6 +35,9 @@ struct TCred {
 
     static TCred Current();
 
+    void Enter() const;
+    void Leave() const;
+
     TError Init(const std::string &user);
     TError InitGroups(const std::string &user);
 
