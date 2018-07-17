@@ -17,6 +17,7 @@ class _RPC(object):
         self.sock_pid = None
         self.deadline = None
         self.auto_reconnect = auto_reconnect
+        self.nr_connects = 0
         self.async_wait_names = []
         self.async_wait_callback = None
         self.async_wait_timeout = None
@@ -27,6 +28,7 @@ class _RPC(object):
         self._set_socket_timeout()
         self.sock.connect(self.socket_path)
         self.sock_pid = os.getpid()
+        self.nr_connects += 1
         self._resend_async_wait()
 
     def _check_connect(self):
@@ -544,6 +546,9 @@ class Connection(object):
 
     def connect(self, timeout=None):
         self.rpc.connect(timeout)
+
+    def nr_connects(self):
+        return self.rpc.nr_connects
 
     def disconnect(self):
         self.rpc.disconnect()
