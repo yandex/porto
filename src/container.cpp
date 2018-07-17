@@ -1577,8 +1577,7 @@ TError TContainer::ApplyCpuGuarantee() {
         for (auto child: Children) {
             if (child->State == EContainerState::Running ||
                     child->State == EContainerState::Meta ||
-                    child->State == EContainerState::Starting ||
-                    child->State == EContainerState::Stopping)
+                    child->State == EContainerState::Starting)
                 CpuGuaranteeSum += std::max(child->CpuGuarantee, child->CpuGuaranteeSum);
         }
         ct_lock.unlock();
