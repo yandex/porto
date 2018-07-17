@@ -1297,6 +1297,10 @@ See **portoctl(8)** for details.
     Porto daemon configuration in protobuf text format.
     Porto merges it with hardcoded defaults and prints into log when starts.
 
+/usr/share/doc/yandex-porto/config.proto.gz
+
+    Porto configuration file protobuf.
+
 /place/porto/*container*
 
     Default current/working directories for containers.
