@@ -1085,6 +1085,8 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **private**       - user-defined property, 4k text
 
+* **device\_name**  - name of backend disk device (sda, md0, dm-0)
+
 * **owner\_container** - owner container, default: creator
 
     Used for tracking **place\_usage** and **place\_limit**.

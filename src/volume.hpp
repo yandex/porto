@@ -48,6 +48,7 @@ constexpr const char *V_INODE_AVAILABLE = "inode_available";
 
 constexpr const char *V_PLACE = "place";
 constexpr const char *V_PLACE_KEY = "place_key";
+constexpr const char *V_DEVICE_NAME = "device_name";
 
 class TVolume;
 class TContainer;
@@ -122,7 +123,8 @@ public:
     static std::string StateName(EVolumeState state);
     void SetState(EVolumeState state);
 
-    int Device = -1;
+    std::string DeviceName;
+    int DeviceIndex = -1;
     bool IsReadOnly = false;
 
     bool HasDependentContainer = false;

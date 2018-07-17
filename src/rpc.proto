@@ -486,6 +486,8 @@ message TVolumeSpec {
 
     optional string private_value = 6;      // at most 4096 bytes
 
+    optional string device_name = 7;        // out
+
     optional string backend = 10;           // default: auto
     optional string place = 11;             // path in host, default: default place for self
     optional string storage = 12;           // default: temp
@@ -504,7 +506,7 @@ message TVolumeSpec {
     optional string place_key = 32;         // out
     optional string creator = 33;           // out
     optional bool auto_path = 34;           // out
-    optional uint32 device = 35;            // out
+    optional uint32 device_index = 35;      // out
     optional string build_time = 36;        // out
 
     // customization at creation

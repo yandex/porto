@@ -532,9 +532,9 @@ public:
     }
 
     TPath GetLoopDevice() {
-        if (Volume->Device < 0)
+        if (Volume->DeviceIndex < 0)
             return TPath();
-        return TPath("/dev/loop" + std::to_string(Volume->Device));
+        return TPath("/dev/loop" + std::to_string(Volume->DeviceIndex));
     }
 
     static TError MakeImage(TFile &file, const TFile &dir, TPath &path, off_t size, off_t guarantee) {
@@ -636,15 +636,15 @@ public:
                 return error;
         }
 
-        error = SetupLoopDev(file, path, Volume->Device);
+        error = SetupLoopDev(file, path, Volume->DeviceIndex);
         if (error)
             return error;
 
         error = Volume->InternalPath.Mount(GetLoopDevice(), "ext4",
                                            Volume->GetMountFlags(), {});
         if (error) {
-            PutLoopDev(Volume->Device);
-            Volume->Device = -1;
+            PutLoopDev(Volume->DeviceIndex);
+            Volume->DeviceIndex = -1;
         }
 
         return error;
@@ -653,15 +653,15 @@ public:
     TError Destroy() override {
         TPath loop = GetLoopDevice();
 
-        if (Volume->Device < 0)
+        if (Volume->DeviceIndex < 0)
             return OK;
 
         L_ACT("Destroy loop {}", loop);
         TError error = Volume->InternalPath.UmountAll();
-        TError error2 = PutLoopDev(Volume->Device);
+        TError error2 = PutLoopDev(Volume->DeviceIndex);
         if (!error)
             error = error2;
-        Volume->Device = -1;
+        Volume->DeviceIndex = -1;
         return error;
     }
 
@@ -672,7 +672,7 @@ public:
             return TError(EError::InvalidProperty, "Refusing to online resize loop volume with initial limit < 512M (kernel bug)");
 
         (void)inode_limit;
-        return ResizeLoopDev(Volume->Device, ImagePath(Volume->StoragePath),
+        return ResizeLoopDev(Volume->DeviceIndex, ImagePath(Volume->StoragePath),
                              Volume->SpaceLimit, space_limit);
     }
 
@@ -928,11 +928,11 @@ public:
         if (error)
             return error;
 
-        error = SetupLoopDev(lowerFd, Volume->Layers[0], Volume->Device);
+        error = SetupLoopDev(lowerFd, Volume->Layers[0], Volume->DeviceIndex);
         if (error)
             return error;
 
-        error = lower.Mount("/dev/loop" + std::to_string(Volume->Device),
+        error = lower.Mount("/dev/loop" + std::to_string(Volume->DeviceIndex),
                             "squashfs", MS_RDONLY | MS_NODEV | MS_NOSUID, {});
         if (error)
             goto err;
@@ -1043,10 +1043,10 @@ err:
         if (error) {
             if (Volume->HaveQuota())
                 (void)quota.Destroy();
-            if (Volume->Device >= 0) {
+            if (Volume->DeviceIndex >= 0) {
                 lower.UmountAll();
-                PutLoopDev(Volume->Device);
-                Volume->Device = -1;
+                PutLoopDev(Volume->DeviceIndex);
+                Volume->DeviceIndex = -1;
             }
         }
 
@@ -1054,11 +1054,11 @@ err:
     }
 
     TError Destroy() override {
-        if (Volume->Device >= 0) {
+        if (Volume->DeviceIndex >= 0) {
             Volume->InternalPath.UmountAll();
             Volume->GetInternal("lower").UmountAll();
-            PutLoopDev(Volume->Device);
-            Volume->Device = -1;
+            PutLoopDev(Volume->DeviceIndex);
+            Volume->DeviceIndex = -1;
         }
 
         TProjectQuota quota(Volume->StoragePath);
@@ -1094,9 +1094,9 @@ class TVolumeRbdBackend : public TVolumeBackend {
 public:
 
     std::string GetDevice() {
-        if (Volume->Device < 0)
+        if (Volume->DeviceIndex < 0)
             return "";
-        return "/dev/rbd" + std::to_string(Volume->Device);
+        return "/dev/rbd" + std::to_string(Volume->DeviceIndex);
     }
 
     TError MapDevice(std::string id, std::string pool, std::string image,
@@ -1147,11 +1147,13 @@ public:
             return TError(EError::InvalidValue, "not rbd device: " + device);
         }
 
-        error = StringToInt(device.substr(8), Volume->Device);
+        error = StringToInt(device.substr(8), Volume->DeviceIndex);
         if (error) {
             UnmapDevice(device);
             return error;
         }
+
+        Volume->DeviceName = fmt::format("rbd{}", Volume->DeviceIndex);
 
         error = Volume->InternalPath.Mount(device, "ext4",
                                            Volume->GetMountFlags(), {});
@@ -1164,14 +1166,14 @@ public:
         std::string device = GetDevice();
         TError error, error2;
 
-        if (Volume->Device < 0)
+        if (Volume->DeviceIndex < 0)
             return OK;
 
         error = Volume->InternalPath.UmountAll();
         error2 = UnmapDevice(device);
         if (!error)
             error = error2;
-        Volume->Device = -1;
+        Volume->DeviceIndex = -1;
         return error;
     }
 
@@ -1181,6 +1183,12 @@ public:
 
     std::string ClaimPlace() override {
         return "rbd";
+    }
+
+    TError Restore() {
+        if (!Volume->DeviceName.size())
+            Volume->DeviceName = fmt::format("rbd{}", Volume->DeviceIndex);
+        return OK;
     }
 
     TError StatFS(TStatFS &result) override {
@@ -1272,7 +1280,16 @@ public:
     }
 
     TError Restore() override {
-        return Configure();
+        TError error;
+
+        error = Configure();
+        if (error)
+            return error;
+
+        if (!Volume->DeviceName.size())
+            TPath::GetDevName(TPath(Device).GetBlockDev(), Volume->DeviceName);
+
+        return OK;
     }
 
     TError Build() override {
@@ -1307,6 +1324,8 @@ public:
                     Persistent = false;
             }
         }
+
+        TPath::GetDevName(TPath(Device).GetBlockDev(), Volume->DeviceName);
 
         if (!error)
             error = Volume->InternalPath.Mount(Device, "ext4",
@@ -2201,6 +2220,10 @@ TError TVolume::Build() {
         }
     }
 
+    /* Get default device name from storage backend */
+    if (!DeviceName.size() && StoragePath)
+        TPath::GetDevName(StoragePath.GetDev(), DeviceName);
+
     /* Make sure than we saved this before publishing */
     error = Save();
     if (error)
@@ -3050,8 +3073,10 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
         ret[V_LAYERS] = MergeEscapeStrings(layers, ';');
     }
 
-    if (CustomPlace)
-        ret[V_PLACE] = Place.ToString();
+    ret[V_PLACE] = Place.ToString();
+
+    if (DeviceName.size())
+        ret[V_DEVICE_NAME] = DeviceName;
 
     if (Backend)
         ret[V_PLACE_KEY] = Backend->ClaimPlace();
@@ -3142,13 +3167,16 @@ TError TVolume::Save() {
     node.Set(V_PERMISSIONS, fmt::format("{:#o}", VolumePermissions));
     node.Set(V_READY, BoolToString(State == EVolumeState::Ready));
     node.Set(V_PRIVATE, Private);
-    node.Set(V_LOOP_DEV, std::to_string(Device));
+    node.Set(V_LOOP_DEV, std::to_string(DeviceIndex));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
     node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
     node.Set(V_SPACE_LIMIT, std::to_string(SpaceLimit));
     node.Set(V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
     node.Set(V_INODE_LIMIT, std::to_string(InodeLimit));
     node.Set(V_INODE_GUARANTEE, std::to_string(InodeGuarantee));
+
+    if (DeviceName.size())
+        node.Set(V_DEVICE_NAME, DeviceName);
 
     TMultiTuple links;
     for (auto &link: Links) {
@@ -3221,6 +3249,9 @@ TError TVolume::Restore(const TKeyValue &node) {
     error = ClaimPlace(SpaceLimit);
     if (error)
         return error;
+
+    if (!DeviceName.size() && StoragePath)
+        TPath::GetDevName(StoragePath.GetDev(), DeviceName);
 
     if (Volumes.find(Path) != Volumes.end())
         L_WRN("Duplicate volume: {}", Path);
@@ -3307,6 +3338,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_CONTAINERS,  "container [target] [ro] [!];... - initial links (default - self)", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
+    { V_DEVICE_NAME, "name of backend disk device (ro)", true },
     { V_PLACE_KEY,   "key for charging place_limit for owner_container (ro)", true },
     { V_SPACE_LIMIT, "disk space limit (dynamic, default zero - unlimited)", false },
     { V_INODE_LIMIT, "disk inode limit (dynamic, default zero - unlimited)", false },
@@ -3738,7 +3770,9 @@ TError TVolume::ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec) {
         } else if (key == V_LOOP_DEV) {
             int v;
             error = StringToInt(val, v);
-            spec.set_device(v);;
+            spec.set_device_index(v);;
+        } else if (key == V_DEVICE_NAME) {
+            spec.set_device_name(val);
         } else if (key == V_BACKEND) {
             spec.set_backend(val);
         } else if (key == V_OWNER_CONTAINER) {
@@ -3843,8 +3877,11 @@ TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
     if (spec.has_backend())
         BackendType = spec.backend();
 
-    if (spec.has_device() && full)
-        Device = spec.device();
+    if (spec.has_device_index() && full)
+        DeviceIndex = spec.device_index();
+
+    if (spec.has_device_name() && full)
+        DeviceName = spec.device_name();
 
     if (spec.has_place()) {
         Place = spec.place();
@@ -3916,6 +3953,9 @@ void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
 
     spec.set_place(Place.ToString());
 
+    if (DeviceName.size())
+        spec.set_device_name(DeviceName);
+
     if (HaveStorage()) {
         if (UserStorage() && !RemoteStorage())
             spec.set_storage(CL->ComposePath(StoragePath).ToString());
@@ -3923,8 +3963,8 @@ void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
             spec.set_storage(Storage);
     }
 
-    if (Device >= 0)
-        spec.set_device(Device);
+    if (DeviceIndex >= 0)
+        spec.set_device_index(DeviceIndex);
 
     if (VolumeOwnerContainer)
         spec.set_owner_container(CL->RelativeName(VolumeOwnerContainer->Name));

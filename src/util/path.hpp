@@ -131,8 +131,9 @@ public:
 
     bool IsSameInode(const TPath &other) const;
 
-    unsigned int GetDev() const;
-    unsigned int GetBlockDev() const;
+    dev_t GetDev() const;
+    dev_t GetBlockDev() const;
+    static TError GetDevName(dev_t dev, std::string &name);
 
     int64_t SinceModificationMs() const;
     std::string ToString() const;

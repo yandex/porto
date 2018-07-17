@@ -117,7 +117,7 @@ bool TPath::IsSameInode(const TPath &other) const {
     return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
 }
 
-unsigned int TPath::GetDev() const {
+dev_t TPath::GetDev() const {
     struct stat st;
 
     if (stat(Path.c_str(), &st))
@@ -126,13 +126,30 @@ unsigned int TPath::GetDev() const {
     return st.st_dev;
 }
 
-unsigned int TPath::GetBlockDev() const {
+dev_t TPath::GetBlockDev() const {
     struct stat st;
 
     if (stat(Path.c_str(), &st) || !S_ISBLK(st.st_mode))
         return 0;
 
     return st.st_rdev;
+}
+
+TError TPath::GetDevName(dev_t dev, std::string &name) {
+    TPath block = fmt::format("/sys/dev/block/{}:{}", major(dev), minor(dev));
+    TError error;
+    TPath link;
+
+    error = block.ReadLink(link);
+    if (error)
+        return error;
+
+    if ((block / "partition").Exists())
+        name = link.DirNameNormal().BaseNameNormal();
+    else
+        name = link.BaseNameNormal();
+
+    return OK;
 }
 
 bool TPath::Exists() const {
