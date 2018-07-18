@@ -416,6 +416,9 @@ TError TStorage::SaveOwner(const TCred &owner) {
 TError TStorage::SetPrivate(const std::string &text) {
     TError error;
 
+    if (text.size() > PRIVATE_VALUE_MAX)
+        return TError(EError::InvalidValue, "Private value too log, max {} bytes", PRIVATE_VALUE_MAX);
+
     error = CL->CanControlPlace(Place);
     if (error)
         return error;

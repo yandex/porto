@@ -122,7 +122,7 @@ message TConfig {
         optional uint32 default_aging_time_s = 3;
         optional uint32 respawn_delay_ms = 4;
         optional uint64 stdout_limit = 5;
-        optional uint32 private_max = 6;
+        optional uint32 private_max = 6 [deprecated=true];
         optional uint32 kill_timeout_ms = 8;
         optional uint32 stop_timeout_ms = 9;
         optional bool use_hierarchy = 10 [deprecated=true];

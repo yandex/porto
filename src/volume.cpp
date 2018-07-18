@@ -1727,6 +1727,9 @@ TError TVolume::CheckConflicts(const TPath &path) {
 TError TVolume::Configure(const TPath &target_root) {
     TError error;
 
+    if (Spec->private_value().size() > PRIVATE_VALUE_MAX)
+        return TError(EError::InvalidValue, "Private value too log, max {} bytes", PRIVATE_VALUE_MAX);
+
     /* Default user:group */
     VolumeOwner = CL->Cred;
     VolumeCred = CL->TaskCred;

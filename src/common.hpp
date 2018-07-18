@@ -110,6 +110,7 @@ constexpr uint64_t CONTAINER_PATH_MAX_FOR_SUPERUSER = 220;
 constexpr uint64_t CONTAINER_ID_MAX = 4095;
 constexpr uint64_t CONTAINER_LEVEL_MAX = 16;
 constexpr uint64_t RUN_SUBDIR_LIMIT = 100u;
+constexpr uint64_t PRIVATE_VALUE_MAX = 4096;
 
 constexpr const char *PORTO_NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
 

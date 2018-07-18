@@ -2294,9 +2294,8 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        uint32_t max = config().container().private_max();
-        if (value.length() > max)
-            return TError(EError::InvalidValue, "Value is too long");
+        if (value.length() > PRIVATE_VALUE_MAX)
+            return TError(EError::InvalidValue, "Private value is too long, max {} bytes", PRIVATE_VALUE_MAX);
         CT->Private = value;
         CT->SetProp(EProperty::PRIVATE);
         return OK;

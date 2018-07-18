@@ -245,7 +245,7 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **parent** - parent container absolute name
 
-* **private** - 4k text to describe container
+* **private** - 4096 bytes of user-defined text
 
 * **weak** - if true container will be destroyed when client disconnects
 
@@ -1083,7 +1083,7 @@ Like for container volume configuration is a set of key-value pairs.
     - *destroying*
     - *destroyed*
 
-* **private**       - user-defined property, 4k text
+* **private**       - 4096 bytes of user-defined text
 
 * **device\_name**  - name of backend disk device (sda, md0, dm-0)
 
