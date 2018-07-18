@@ -105,7 +105,7 @@ void WaitProcessExit(const std::string &pid, int sec) {
 
 void WaitContainer(Porto::Connection &api, const std::string &name, int sec) {
     std::string who;
-    ExpectApiSuccess(api.WaitContainers({name}, who, sec));
+    ExpectApiSuccess(api.WaitContainers({name}, {}, who, sec));
     ExpectEq(who, name);
 }
 

@@ -745,6 +745,81 @@ EContainerState TContainer::ParseState(const std::string &name) {
     return EContainerState::Destroyed;
 }
 
+TError TContainer::ValidLabel(const std::string &label, const std::string &value) {
+
+    if (label.size() > PORTO_LABEL_NAME_LEN_MAX)
+        return TError(EError::InvalidLabel, "Label name too log, max {} bytes", PORTO_LABEL_NAME_LEN_MAX);
+
+    if (value.size() > PORTO_LABEL_VALUE_LEN_MAX)
+        return TError(EError::InvalidLabel, "Label value too log, max {} bytes", PORTO_LABEL_VALUE_LEN_MAX);
+
+    auto sep = label.find('.');
+    if (sep == std::string::npos ||
+            sep < PORTO_LABEL_PREFIX_LEN_MIN ||
+            sep > PORTO_LABEL_PREFIX_LEN_MAX ||
+            label.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) < sep ||
+            label.find_first_not_of(PORTO_NAME_CHARS) != std::string::npos ||
+            StringStartsWith(label, "PORTO"))
+        return TError(EError::InvalidLabel, "Invalid label name: {}", label);
+
+    if (value.find_first_not_of(PORTO_NAME_CHARS) != std::string::npos)
+        return TError(EError::InvalidLabel, "Invalid label value: {}", value);
+
+    return OK;
+}
+
+TError TContainer::GetLabel(const std::string &label, std::string &value) const {
+    if (label[0] == '.') {
+        auto nm = label.substr(1);
+        for (auto ct = this; ct; ct = ct->Parent.get()) {
+            auto it = ct->Labels.find(nm);
+            if (it != ct->Labels.end()) {
+                value = it->second;
+                return OK;
+            }
+        }
+    } else {
+        auto it = Labels.find(label);
+        if (it != Labels.end()) {
+            value = it->second;
+            return OK;
+        }
+    }
+    return TError(EError::LabelNotFound, "Label {} is not set", label);
+}
+
+void TContainer::SetLabel(const std::string &label, const std::string &value) {
+    if (value.empty())
+        Labels.erase(label);
+    else
+        Labels[label] = value;
+    SetProp(EProperty::LABELS);
+}
+
+TError TContainer::IncLabel(const std::string &label, int64_t &result, int64_t add) {
+    result = 0;
+
+    auto it = Labels.find(label);
+    if (it == Labels.end())
+        return TError(EError::LabelNotFound, "Label {} is not set", label);
+
+    int64_t val;
+    TError error = StringToInt64(it->second, val);
+    if (error)
+        return error;
+    result = val;
+
+    if ((add > 0 && val > INT64_MAX - add) || (add < 0 && val < INT64_MIN - add))
+        return TError(EError::InvalidValue, "Label {} overflow {} + {}", label, val, add);
+
+    val += add;
+    it->second = std::to_string(val);
+    result = val;
+
+    SetProp(EProperty::LABELS);
+    return OK;
+}
+
 TPath TContainer::WorkDir() const {
     return TPath(PORTO_WORKDIR) / Name;
 }
@@ -3174,9 +3249,16 @@ TError TContainer::HasProperty(const std::string &property) const {
     if (!ParsePropertyName(name, index)) {
         auto dot = name.find('.');
         if (dot != std::string::npos) {
+            std::string type = property.substr(0, dot);
+
+            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
+                auto lock = LockContainers();
+                return GetLabel(property, type);
+            }
+
             if (State == EContainerState::Stopped)
                 return TError(EError::InvalidState, "Not available in stopped state");
-            std::string type = property.substr(0, dot);
+
             for (auto subsys: Subsystems) {
                 if (subsys->Type != type)
                     continue;
@@ -3224,6 +3306,12 @@ TError TContainer::GetProperty(const std::string &origProperty, std::string &val
 
         if (dot != std::string::npos) {
             std::string type = property.substr(0, dot);
+
+            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
+                auto lock = LockContainers();
+                return GetLabel(property, value);
+            }
+
             if (State == EContainerState::Stopped)
                 return TError(EError::InvalidState,
                         "Not available in stopped state: " + property);
@@ -3276,8 +3364,26 @@ TError TContainer::SetProperty(const std::string &origProperty,
     TError error;
 
     auto it = ContainerProperties.find(property);
-    if (it == ContainerProperties.end())
+    if (it == ContainerProperties.end()) {
+        auto dot = property.find('.');
+
+        if (dot != std::string::npos) {
+            std::string type = property.substr(0, dot);
+
+            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
+                error = TContainer::ValidLabel(property, value);
+                if (error)
+                    return error;
+                auto lock = LockContainers();
+                SetLabel(property, value);
+                lock.unlock();
+                TContainerWaiter::ReportAll(*this, property, value);
+                return Save();
+            }
+        }
+
         return TError(EError::InvalidProperty, "Invalid property " + property);
+    }
     auto prop = it->second;
 
     CT = this;

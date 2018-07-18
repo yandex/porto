@@ -24,6 +24,7 @@ c.ListLayers()
 c.ListStorages()
 c.ListMetaStorages()
 c.GetVolumes()
+c.FindLabel("TEST.test")
 
 c.ListStorage()
 

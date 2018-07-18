@@ -553,25 +553,33 @@ TError TClient::QueueReport(const TContainerReport &report, bool async) {
     wait->set_state(report.State);
     wait->set_when(report.When);
 
+    if (!report.Label.empty()) {
+        wait->set_label(report.Label);
+        if (!report.Value.empty())
+            wait->set_value(report.Value);
+    }
+
     if (Verbose)
-        L_RSP("{}Wait name={} state={} to {}", async ? "Async" : "", report.Name, report.State, Id);
+        L_RSP("{}Wait name={} state={} {}={} to {}", async ? "Async" : "", report.Name,
+                report.State, report.Label, report.Value, Id);
 
     return QueueResponse(rsp);
 }
 
-TError TClient::MakeReport(const std::string &name, const std::string &state, bool async) {
+TError TClient::MakeReport(const std::string &name, const std::string &state, bool async,
+                           const std::string &label, const std::string &value) {
     auto lock = Lock();
     TError error;
 
     if (async) {
         if (Sending || Receiving) {
-            ReportQueue.emplace_back(name, state, time(nullptr));
+            ReportQueue.emplace_back(name, state, time(nullptr), label, value);
             return OK;
         }
     } else
         Processing = false;
 
-    error = QueueReport({name, state, time(nullptr)}, async);
+    error = QueueReport({name, state, time(nullptr), label, value}, async);
     if (error)
         return error;
 

@@ -5,16 +5,19 @@
 static std::mutex ContainerWaitersLock;
 static std::list<TContainerWaiter *> ContainerWaiters;
 
+static inline std::unique_lock<std::mutex> LockWaiters() {
+    return std::unique_lock<std::mutex>(ContainerWaitersLock);
+}
+
 TContainerWaiter::~TContainerWaiter() {
     if (Active) {
-        ContainerWaitersLock.lock();
+        auto lock = LockWaiters();
         Deactivate();
-        ContainerWaitersLock.unlock();
     }
 }
 
 void TContainerWaiter::Activate(std::shared_ptr<TClient> &client) {
-    ContainerWaitersLock.lock();
+    auto lock = LockWaiters();
     Client = client;
     auto link = Async ? &client->AsyncWaiter : &client->SyncWaiter;
     if (*link) {
@@ -26,7 +29,6 @@ void TContainerWaiter::Activate(std::shared_ptr<TClient> &client) {
         Active = true;
         ContainerWaiters.push_back(this);
     }
-    ContainerWaitersLock.unlock();
 }
 
 void TContainerWaiter::Deactivate() {
@@ -48,25 +50,35 @@ bool TContainerWaiter::ShouldReport(TContainer &ct) {
             return true;
 
     for (auto &wc: Wildcards)
-        if (StringMatch(ct.Name, wc))
+        if (StringMatch(ct.Name, wc) && ct.Level)
             return true;
 
     return false;
 }
 
-void TContainerWaiter::ReportAll(TContainer &ct) {
-    ContainerWaitersLock.lock();
+bool TContainerWaiter::ShouldReportLabel(const std::string &label) {
+    for (auto &wc: Labels)
+        if (StringMatch(label, wc))
+            return true;
+    return false;
+}
+
+void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const std::string &value) {
+    auto lock = LockWaiters();
     for (auto it = ContainerWaiters.begin(); it != ContainerWaiters.end();) {
         auto waiter = *it;
-        if (waiter->ShouldReport(ct)) {
+        if (waiter->ShouldReport(ct) &&
+                (label.empty() || waiter->ShouldReportLabel(label))) {
             auto client = waiter->Client.lock();
 
             std::string name;
             if (client && !client->ComposeName(ct.Name, name)) {
-                client->MakeReport(name, TContainer::StateName(ct.State), waiter->Async);
+                client->MakeReport(name, TContainer::StateName(ct.State), waiter->Async, label, value);
                 if (!waiter->Async) {
-                    waiter->Active = false;
+                    ++it;
+                    waiter->Deactivate();
                     client->SyncWaiter.reset();
+                    continue;
                 }
             }
         }
@@ -75,11 +87,10 @@ void TContainerWaiter::ReportAll(TContainer &ct) {
         else
             it = ContainerWaiters.erase(it);
     }
-    ContainerWaitersLock.unlock();
 }
 
 void TContainerWaiter::Timeout() {
-    ContainerWaitersLock.lock();
+    auto lock = LockWaiters();
     auto client = Client.lock();
     if (client) {
         client->MakeReport("", "timeout", Async);
@@ -89,5 +100,4 @@ void TContainerWaiter::Timeout() {
         else
             client->SyncWaiter.reset();
     }
-    ContainerWaitersLock.unlock();
 }

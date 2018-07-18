@@ -220,6 +220,7 @@ public:
     TError Respawn();
     TError ScheduleRespawn();
 
+    TStringMap Labels;
     std::string Private;
     EAccessLevel AccessLevel;
     std::atomic<int> ClientsCount;
@@ -377,6 +378,12 @@ public:
     TError HasProperty(const std::string &property) const;
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
+
+    /* Protected with ContainersLock */
+    static TError ValidLabel(const std::string &label, const std::string &value);
+    TError GetLabel(const std::string &label, std::string &value) const;
+    void SetLabel(const std::string &label, const std::string &value);
+    TError IncLabel(const std::string &label, int64_t &result, int64_t add = 1);
 
     void ForgetPid();
     void SyncState();

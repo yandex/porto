@@ -80,6 +80,7 @@ constexpr const char *P_RESPAWN_LIMIT = "max_respawns";
 constexpr const char *P_RESPAWN_DELAY = "respawn_delay";
 constexpr const char *P_ISOLATE = "isolate";
 constexpr const char *P_PRIVATE = "private";
+constexpr const char *P_LABELS = "labels";
 constexpr const char *P_ULIMIT = "ulimit";
 constexpr const char *P_HOSTNAME = "hostname";
 constexpr const char *P_BIND_DNS = "bind_dns";
@@ -204,6 +205,7 @@ enum class EProperty {
     RESPAWN_DELAY,
     ISOLATE,
     PRIVATE,
+    LABELS,
     ULIMIT,
     HOSTNAME,
     BIND_DNS,

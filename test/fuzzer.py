@@ -460,6 +460,22 @@ def Net():
         ] )
     )
 
+def Label():
+    return (
+        select_by_weight( [
+            (1, "TEST.test"),
+            (1, ".TEST.test"),
+            (1, "TEST.test!"),
+            (1, "TEST." + str(randint(0, 100))),
+        ] ),
+        select_by_weight( [
+            (1, ""),
+            (1, "!"),
+            (1, "a"),
+            (1, "a" * 128),
+        ] )
+    )
+
 def Create(conn, name):
     if VERBOSE:
         print "Creating container: " + name
@@ -544,6 +560,7 @@ def SetProperty(conn,dest):
             (20, VirtMode),
             (30, Net),
             (30, Ip),
+            (50, Label),
             (20, functools.partial(Root, conn))
             ]
     )()

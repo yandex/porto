@@ -111,6 +111,35 @@ suffixes: B|K|M|G|T|P|E. Porto returns these values in bytes without suffixes.
 Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNAME:
 '\*' and '?' doesn't match '/', with extension: '\*\*\*' - matches everything.
 
+## Labels
+
+Container could have user-defined labels and associated values.
+
+Label and value may use only symbols allowed for container names.
+Spaces and '/' are not allowed.
+
+Label must be in format PREFIX.name. Label max length is 128 symbols.
+PREFIX must be 2..16 UPPERCASE A-Z chars. Prefixes PORTO\* are reserved.
+
+Value max length is 256 symbols. Empty value removes label.
+
+Each container may have up to 100 labels.
+
+Use "Y" and "N" for boolean values and "." as placeholder.
+
+For count, size, speed, time use bytes, bytes/second, seconds as decimal integers without suffixes in label and value.
+Other types must be defined by labels suffix: \_ms, \_ns, \_cores.
+
+Do not keep full file paths in label values: users could be in different chroots.
+Short file names are ok.
+
+All labeles are stored as property **labels**.
+Access via properties **labels[PREFIX.name]** and **PREFIX.name** works as well.
+
+Set and inherited labels could be read as **labels[.PREFIX.name]**
+
+Porto provides API for label lookup, atomic compare-and-set, atomic increment and notifications.
+
 ## Context
 
 * **command** - container command string
@@ -221,9 +250,9 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 * **time** - container running time in seconds
 
-* **creation\_time** - format: YYYY-MM-DD hh:mm::ss
+* **creation\_time** - format: YYYY-MM-DD hh:mm:ss
 
-* **start\_time** - format: YYYY-MM-DD hh:mm::ss
+* **start\_time** - format: YYYY-MM-DD hh:mm:ss
 
 * **absolute\_name** - full container name including porto namespaces
 
@@ -246,6 +275,10 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 * **parent** - parent container absolute name
 
 * **private** - 4096 bytes of user-defined text
+
+* **labels** - user-defined labels, syntax \<label\>: \<value\>;...
+
+   See [Labels].
 
 * **weak** - if true container will be destroyed when client disconnects
 
@@ -1072,7 +1105,7 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **ready**         - is construction complete
 
-* **build\_time**   - format: YYYY-MM-DD hh:mm::ss
+* **build\_time**   - format: YYYY-MM-DD hh:mm:ss
 
 * **state**         - volume state
     - *initial*

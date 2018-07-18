@@ -114,4 +114,11 @@ constexpr uint64_t PRIVATE_VALUE_MAX = 4096;
 
 constexpr const char *PORTO_NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
 
+constexpr unsigned PORTO_LABEL_NAME_LEN_MAX = 128;
+constexpr unsigned PORTO_LABEL_VALUE_LEN_MAX = 256;
+constexpr const char *PORTO_LABEL_PREFIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+constexpr unsigned PORTO_LABEL_PREFIX_LEN_MIN = 2;
+constexpr unsigned PORTO_LABEL_PREFIX_LEN_MAX = 16;
+constexpr unsigned PORTO_LABEL_COUNT_MAX = 100;
+
 extern void AckExitStatus(int pid);

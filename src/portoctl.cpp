@@ -242,7 +242,7 @@ public:
         TError error;
         int status;
 
-        if (Api->WaitContainers(containers, result, timeout))
+        if (Api->WaitContainers(containers, {}, result, timeout))
             return GetLastError();
 
         if (result == "")
@@ -541,6 +541,7 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
     }
 
     if (name == "env" ||
+            name == "labels" ||
             name == "net" ||
             name == "ip" ||
             name == "default_gw" ||
@@ -1375,26 +1376,32 @@ public:
              "[-A] [-T <seconds>] <container|wildcard> ...",
              "Wait for any listed container change state to dead or meta without running children",
              "    -T <seconds>  timeout\n"
+             "    -L <label>    wait for label\n"
              "    -A            async wait\n"
              ) {}
 
-    static void PrintAsyncWait(const std::string &name, const std::string &state, time_t when) {
-        fmt::print("{} {}\t{}\n", FormatTime(when), state, name);
-        if (state == "timeout")
+    static void PrintAsyncWait(Porto::AsyncWaitEvent &event) {
+        if (event.Label.empty())
+            fmt::print("{} {}\t{}\n", FormatTime(event.When), event.State, event.Name);
+        else
+            fmt::print("{} {}\t{}\t{} = {}\n", FormatTime(event.When), event.State, event.Name, event.Label, event.Value);
+        if (event.State == "timeout")
             exit(0);
     }
 
     int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
         bool async = false;
+        std::vector<std::string> labels;
         const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = (std::stoi(arg) + 999) / 1000; } },
             { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
+            { 'L', true, [&](const char *arg) { labels.push_back(arg); } },
             { 'A', false, [&](const char *) { async = true; } },
         });
 
         if (async) {
-            int ret = Api->AsyncWait(containers.empty() ? std::vector<std::string>({"***"}) : containers, PrintAsyncWait, timeout);
+            int ret = Api->AsyncWait(containers.empty() ? std::vector<std::string>({"***"}) : containers, labels, PrintAsyncWait, timeout);
             if (ret) {
                 PrintError("Can't wait for containers");
                 return ret;
@@ -1409,7 +1416,7 @@ public:
         }
 
         std::string name;
-        int ret = Api->WaitContainers(containers, name, timeout);
+        int ret = Api->WaitContainers(containers, labels, name, timeout);
         if (ret) {
             PrintError("Can't wait for containers");
             return ret;
@@ -1427,12 +1434,13 @@ public:
 class TListCmd final : public ICmd {
 public:
     TListCmd(Porto::Connection *api) : ICmd(api, "list", 0,
-            "[-1] [-f] [-r] [-t] [pattern]",
+            "[-1] [-f] [-r] [-t] [-L label[=value]] [pattern]",
             "list containers",
             "    -1        only names\n"
             "    -f        forest\n"
             "    -r        only running\n"
             "    -t        only toplevel\n"
+            "    -L        only with label\n"
             "\n"
             "patterns:\n"
             " \"***\"        all containres\n"
@@ -1462,16 +1470,39 @@ public:
         bool forest = false;
         bool toplevel = false;
         bool running = false;
+        std::string label;
         const auto &args = env->GetOpts({
             { '1', false, [&](const char *) { details = false; } },
             { 'f', false, [&](const char *) { forest = true; } },
             { 't', false, [&](const char *) { toplevel = true; } },
+            { 'L', true,  [&](const char *arg) { label = arg; } },
             { 'r', false, [&](const char *) { running = true; } },
         });
         std::string mask = args.size() ? args[0] : "";
+        int ret;
 
         vector<string> clist;
-        int ret = Api->List(clist, mask);
+        if (label != "" ) {
+            auto sep = label.find('=');
+
+            rpc::TContainerRequest req;
+            rpc::TContainerResponse rsp;
+            auto cmd = req.mutable_findlabel();
+
+            if (sep == std::string::npos) {
+                cmd->set_label(label);
+            } else {
+                cmd->set_label(label.substr(0, sep));
+                cmd->set_value(label.substr(sep + 1));
+            }
+
+            ret = Api->Rpc(req, rsp);
+            if (!ret)
+                for (auto &l: rsp.findlabel().list())
+                    clist.push_back(l.name());
+        } else
+            ret = Api->List(clist, mask);
+
         if (ret) {
             PrintError("Can't list containers");
             return ret;

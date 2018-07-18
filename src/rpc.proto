@@ -69,6 +69,10 @@ enum EError {
 
     PortoFrozen = 27;
 
+    LabelNotFound = 28;
+
+    InvalidLabel = 29;
+
     NotFound = 404;
 
     // Reserved error code used by Porto internals. Can't be returned to a user.
@@ -96,6 +100,10 @@ message TContainerRequest {
     optional TContainerCreateRequest createWeak = 17;
     optional TContainerRespawnRequest Respawn = 18;
     optional TContainerWaitRequest AsyncWait = 19;
+
+    optional TFindLabelRequest FindLabel = 20;
+    optional TSetLabelRequest SetLabel = 21;
+    optional TIncLabelRequest IncLabel = 22;
 
     optional TVolumePropertyListRequest listVolumeProperties = 103;
     optional TVolumeCreateRequest createVolume = 104;
@@ -159,6 +167,9 @@ message TContainerResponse {
     optional TStorageListResponse storageList = 17;
     optional TLocateProcessResponse locateProcess = 18;
     optional TContainerWaitResponse AsyncWait = 19;
+    optional TFindLabelResponse FindLabel = 20;
+    optional TSetLabelResponse SetLabel = 21;
+    optional TIncLabelResponse IncLabel = 22;
 
     optional TNewVolumeResponse NewVolume = 126;
     optional TGetVolumeResponse GetVolume = 127;
@@ -341,10 +352,12 @@ message TContainerGetRequest {
 
 // Wait while container(s) is/are in running state
 message TContainerWaitRequest {
-    // list of containers
+    // list of containers or wildcards
     repeated string name = 1;
     // timeout in 1/1000 seconds
     optional uint32 timeout_ms = 2;
+    // list of label names or wildcards
+    repeated string label = 3;
 }
 
 // Move process into container
@@ -412,9 +425,11 @@ message TContainerGetResponse {
 }
 
 message TContainerWaitResponse {
-    required string name = 1;
-    optional string state = 2;
-    optional uint64 when = 3;
+    required string name = 1;           // container name
+    optional string state = 2;          // container state or timeout
+    optional uint64 when = 3;           // unix time stamp in seconds
+    optional string label = 4;
+    optional string value = 5;
 }
 
 message TConvertPathResponse {
@@ -423,6 +438,46 @@ message TConvertPathResponse {
 
 message TLocateProcessResponse {
     required string name = 1;
+}
+
+message TFindLabelRequest {
+    optional string mask = 1;           // containers name or wildcard
+    optional string state = 2;          // filter by container state
+    required string label = 3;          // label name or wildcard
+    optional string value = 4;          // filter by label value
+}
+
+message TFindLabelResponse {
+    message TFindLabelEntry {
+        required string name = 1;
+        required string state = 2;
+        required string label = 3;
+        required string value = 4;
+    }
+    repeated TFindLabelEntry list = 1;
+}
+
+message TSetLabelRequest {
+    required string name = 1;
+    required string label = 2;
+    required string value = 3;
+    optional string prev_value = 4;     // fail with Busy if does not match
+    optional string state = 5;          // fail with InvalidState if not match
+}
+
+message TSetLabelResponse {
+    optional string prev_value = 1;
+    optional string state = 2;
+}
+
+message TIncLabelRequest {
+    required string name = 1;
+    required string label = 2;
+    optional int64 add = 3 [ default = 1];
+}
+
+message TIncLabelResponse {
+    required int64 result = 1;
 }
 
 // VolumeAPI

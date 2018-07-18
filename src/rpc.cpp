@@ -29,6 +29,7 @@ void TRequest::Classify() {
     RoReq =
         Req.has_version() ||
         Req.has_list() ||
+        Req.has_findlabel() ||
         Req.has_listvolumes() ||
         Req.has_listlayers() ||
         Req.has_liststorage() ||
@@ -256,6 +257,28 @@ void TRequest::Parse() {
     } else if (Req.has_locateprocess()) {
         Cmd = "LocateProcess";
         opts = { "pid=" + std::to_string(Req.locateprocess().pid()), "comm=" + Req.locateprocess().comm() };
+    } else if (Req.has_findlabel()) {
+        Cmd = "FindLabel";
+        Arg = Req.findlabel().label();
+        if (Req.findlabel().has_mask())
+            opts.push_back("maks=" + Req.findlabel().mask());
+        if (Req.findlabel().has_state())
+            opts.push_back("state=" + Req.findlabel().state());
+        if (Req.findlabel().has_value())
+            opts.push_back("value=" + Req.findlabel().value());
+    } else if (Req.has_setlabel()) {
+        Cmd = "SetLabel";
+        Arg = Req.setlabel().name();
+        opts = { Req.setlabel().label() };
+        if (Req.setlabel().has_value())
+            opts.push_back("value=" + Req.setlabel().value());
+        if (Req.setlabel().has_prev_value())
+            opts.push_back("prev_value=" + Req.setlabel().prev_value());
+    } else if (Req.has_inclabel()) {
+        Cmd = "IncLabel";
+        Arg = Req.inclabel().name();
+        if (Req.inclabel().has_add())
+            opts.push_back(fmt::format("add={}", Req.inclabel().add()));
     } else if (Req.has_getsystem()) {
         Cmd = "GetSystem";
     } else if (Req.has_setsystem()) {
@@ -428,6 +451,113 @@ noinline TError ListContainers(const rpc::TContainerListRequest &req,
             continue;
         rsp.mutable_list()->add_name(name);
     }
+    return OK;
+}
+
+noinline TError FindLabel(const rpc::TFindLabelRequest &req, rpc::TFindLabelResponse &rsp) {
+    auto label = req.label();
+    bool wild_label = label.find_first_of("*?") != std::string::npos;
+
+    auto lock = LockContainers();
+    for (auto &it: Containers) {
+        auto &ct = it.second;
+        std::string value;
+        std::string name;
+
+        if (!StringStartsWith(ct->Name, CL->PortoNamespace))
+            continue;
+
+        if (req.has_state() && TContainer::StateName(ct->State) != req.state())
+            continue;
+
+        name = ct->Name.substr(CL->PortoNamespace.length());
+        if (req.has_mask() && !StringMatch(name, req.mask()))
+            continue;
+
+        if (wild_label) {
+            for (auto &it: ct->Labels) {
+                if (StringMatch(it.first, label) &&
+                        (!req.has_value() || it.second == req.value())) {
+                    auto l = rsp.add_list();
+                    l->set_name(name);
+                    l->set_state(TContainer::StateName(ct->State));
+                    l->set_label(it.first);
+                    l->set_value(it.second);
+                }
+            }
+        } else if (!ct->GetLabel(label, value) &&
+                (!req.has_value() || value == req.value())) {
+            auto l = rsp.add_list();
+            l->set_name(name);
+            l->set_state(TContainer::StateName(ct->State));
+            l->set_label(label);
+            l->set_value(value);
+        }
+    }
+
+    return OK;
+}
+
+noinline TError SetLabel(const rpc::TSetLabelRequest &req, rpc::TSetLabelResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error;
+
+    error = TContainer::ValidLabel(req.label(), req.value());
+    if (error)
+        return error;
+
+    error = CL->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+
+    auto lock = LockContainers();
+    auto it = ct->Labels.find(req.label());
+    if (it != ct->Labels.end())
+        rsp.set_prev_value(it->second);
+    rsp.set_state(TContainer::StateName(ct->State));
+    if (req.has_prev_value()) {
+        if (it == ct->Labels.end()) {
+            if (req.prev_value() != "")
+                return TError(EError::LabelNotFound, "Container {} has no label {}", req.name(), req.label());
+        } else if (req.prev_value() != it->second)
+            return TError(EError::Busy, "Container {} label {} is {} not {}", req.name(), req.label(), it->second, req.prev_value());
+    }
+    if (req.has_state() && TContainer::StateName(ct->State) != req.state())
+        return TError(EError::InvalidState, "Container {} is {} not {}", req.name(), rsp.state(), req.state());
+    if (req.value() != "" && ct->Labels.size() >= PORTO_LABEL_COUNT_MAX)
+        return TError(EError::ResourceNotAvailable, "Too many labels");
+    ct->SetLabel(req.label(), req.value());
+    lock.unlock();
+
+    TContainerWaiter::ReportAll(*ct, req.label(), req.value());
+    ct->Save();
+
+    return OK;
+}
+
+noinline TError IncLabel(const rpc::TIncLabelRequest &req, rpc::TIncLabelResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    int64_t result = 0;
+    TError error;
+
+    error = TContainer::ValidLabel(req.label(), "");
+    if (error)
+        return error;
+
+    error = CL->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+
+    auto lock = LockContainers();
+    error = ct->IncLabel(req.label(), result, req.add());
+    rsp.set_result(result);
+    lock.unlock();
+    if (error)
+        return error;
+
+    TContainerWaiter::ReportAll(*ct, req.label(), std::to_string(result));
+    ct->Save();
+
     return OK;
 }
 
@@ -653,7 +783,6 @@ noinline TError Version(rpc::TContainerResponse &rsp) {
 
 noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async,
         rpc::TContainerResponse &rsp, std::shared_ptr<TClient> &client) {
-    auto lock = LockContainers();
     std::string name, full_name;
     TError error;
 
@@ -661,6 +790,11 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
         return TError(EError::InvalidValue, "Containers to wait are not set");
 
     auto waiter = std::make_shared<TContainerWaiter>(async);
+
+    for (auto &label: req.label())
+        waiter->Labels.push_back(label);
+
+    auto lock = LockContainers();
 
     for (int i = 0; i < req.name_size(); i++) {
         name = req.name(i);
@@ -692,15 +826,20 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
             return error;
         }
 
-        if (waiter->ShouldReport(*ct)) {
-            if (async) {
-                client->MakeReport(name, TContainer::StateName(ct->State), true);
-            } else {
-                auto wait = rsp.mutable_wait();
-                wait->set_name(name);
-                wait->set_state(TContainer::StateName(ct->State));
-                wait->set_when(time(nullptr));
-                return OK;
+        if (!waiter->ShouldReport(*ct))
+            continue;
+
+        if (waiter->Labels.empty()) {
+            client->MakeReport(name, TContainer::StateName(ct->State), async);
+            if (!async)
+                return TError::Queued();
+        } else {
+            for (auto &it: ct->Labels) {
+                if (waiter->ShouldReportLabel(it.first)) {
+                    client->MakeReport(name, TContainer::StateName(ct->State), async, it.first, it.second);
+                    if (!async)
+                        return TError::Queued();
+                }
             }
         }
     }
@@ -708,38 +847,34 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
     if (!waiter->Wildcards.empty()) {
         for (auto &it: Containers) {
             auto &ct = it.second;
-            if (waiter->ShouldReport(*ct) && !client->ComposeName(ct->Name, name)) {
-                if (async) {
-                    client->MakeReport(name, TContainer::StateName(ct->State), true);
-                } else {
-                    auto wait = rsp.mutable_wait();
-                    wait->set_name(name);
-                    wait->set_state(TContainer::StateName(ct->State));
-                    wait->set_when(time(nullptr));
-                    return OK;
+            if (!waiter->ShouldReport(*ct) || client->ComposeName(ct->Name, name))
+                continue;
+
+            if (waiter->Labels.empty()) {
+                client->MakeReport(name, TContainer::StateName(ct->State), async);
+                if (!async)
+                    return TError::Queued();
+            } else {
+                for (auto &it: ct->Labels) {
+                    if (waiter->ShouldReportLabel(it.first)) {
+                        client->MakeReport(name, TContainer::StateName(ct->State), async, it.first, it.second);
+                        if (!async)
+                            return TError::Queued();
+                    }
                 }
             }
         }
     }
 
     if (req.has_timeout_ms() && req.timeout_ms() == 0) {
-        if (async) {
-            client->MakeReport("", "timeout", true);
-        } else {
-            auto wait = rsp.mutable_wait();
-            wait->set_name("");
-            wait->set_state("timeout");
-            wait->set_when(time(nullptr));
+        client->MakeReport("", "timeout", async);
+    } else {
+        waiter->Activate(client);
+        if (req.timeout_ms()) {
+            TEvent e(EEventType::WaitTimeout, nullptr);
+            e.WaitTimeout.Waiter = waiter;
+            EventQueue->Add(req.timeout_ms(), e);
         }
-        return OK;
-    }
-
-    waiter->Activate(client);
-
-    if (req.timeout_ms()) {
-        TEvent e(EEventType::WaitTimeout, nullptr);
-        e.WaitTimeout.Waiter = waiter;
-        EventQueue->Add(req.timeout_ms(), e);
     }
 
     return async ? OK : TError::Queued();
@@ -1541,6 +1676,12 @@ void TRequest::Handle() {
         error = SetSymlink(Req.setsymlink());
     else if (Req.has_locateprocess())
         error = LocateProcess(Req.locateprocess(), rsp);
+    else if (Req.has_findlabel())
+        error = FindLabel(Req.findlabel(), *rsp.mutable_findlabel());
+    else if (Req.has_setlabel())
+        error = SetLabel(Req.setlabel(), *rsp.mutable_setlabel());
+    else if (Req.has_inclabel())
+        error = IncLabel(Req.inclabel(), *rsp.mutable_inclabel());
     else if (Req.has_getsystem())
         error = GetSystemProperties(&Req.getsystem(), rsp.mutable_getsystem());
     else if (Req.has_setsystem())

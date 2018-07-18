@@ -108,7 +108,8 @@ public:
     TError SendResponse(bool first);
     TError QueueResponse(rpc::TContainerResponse &response);
     TError QueueReport(const TContainerReport &report, bool async);
-    TError MakeReport(const std::string &name, const std::string &state, bool async);
+    TError MakeReport(const std::string &name, const std::string &state, bool async,
+                      const std::string &label = "", const std::string &value = "");
 
     std::list<std::weak_ptr<TContainer>> WeakContainers;
 

@@ -2302,6 +2302,62 @@ public:
     }
 } static Private;
 
+class TLabels : public TProperty {
+public:
+    TLabels() : TProperty(P_LABELS, EProperty::LABELS, "User-defined labels")
+    {
+        IsDynamic = true;
+        IsAnyState = true;
+    }
+    TError Get(std::string &value) {
+        auto lock = LockContainers();
+        value = StringMapToString(CT->Labels);
+        return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        auto lock = LockContainers();
+        return CT->GetLabel(index, value);
+    }
+    TError Set(const std::string &value) {
+        TStringMap map;
+        TError error = StringToStringMap(value, map);
+        if (error)
+            return error;
+        for (auto &it: map) {
+            error = TContainer::ValidLabel(it.first, it.second);
+            if (error)
+                return error;
+        }
+        auto lock = LockContainers();
+        auto count = map.size() + CT->Labels.size();
+        for (auto &it: CT->Labels)
+            if (map.find(it.first) == map.end()) {
+                map[it.first] = "";
+                count--;
+            }
+        if (count > PORTO_LABEL_COUNT_MAX)
+            return TError(EError::ResourceNotAvailable, "Too many labels");
+        for (auto &it: map)
+            CT->SetLabel(it.first, it.second);
+        lock.unlock();
+        for (auto &it: map)
+            TContainerWaiter::ReportAll(*CT, it.first, it.second);
+        return OK;
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        TError error = TContainer::ValidLabel(index, value);
+        if (error)
+            return error;
+        auto lock = LockContainers();
+        if (!value.empty() && CT->Labels.size() >= PORTO_LABEL_COUNT_MAX)
+            return TError(EError::ResourceNotAvailable, "Too many labels");
+        CT->SetLabel(index, value);
+        lock.unlock();
+        TContainerWaiter::ReportAll(*CT, index, value);
+        return OK;
+    }
+} static Labels;
+
 class TAgingTime : public TProperty {
 public:
     TAgingTime() : TProperty(P_AGING_TIME, EProperty::AGING_TIME,

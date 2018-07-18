@@ -195,7 +195,7 @@ TError TCore::Forward() {
     L("Forwading core into CT:{}", core);
 
     std::string result;
-    Conn.WaitContainers({core}, result, config().core().timeout_s());
+    Conn.WaitContainers({core}, {}, result, config().core().timeout_s());
     Conn.Destroy(core);
     return OK;
 }

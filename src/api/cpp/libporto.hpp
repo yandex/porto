@@ -56,6 +56,14 @@ struct GetResponse {
     std::string ErrorMsg;
 };
 
+struct AsyncWaitEvent {
+    time_t When;
+    std::string Name;
+    std::string State;
+    std::string Label;
+    std::string Value;
+};
+
 enum GetFlags {
     NonBlock = 1,
     Sync = 2,
@@ -93,12 +101,12 @@ public:
     int Respawn(const std::string &name);
 
     int WaitContainers(const std::vector<std::string> &containers,
+                       const std::vector<std::string> &labels,
                        std::string &name, int timeout);
 
     int AsyncWait(const std::vector<std::string> &containers,
-                  std::function<void(const std::string &name,
-                                     const std::string &state,
-                                     time_t when)> callbacks,
+                  const std::vector<std::string> &labels,
+                  std::function<void(AsyncWaitEvent &event)> callbacks,
                   int timeout = -1);
     int Recv();
 

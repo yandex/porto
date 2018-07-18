@@ -28,7 +28,7 @@ public:
 
     std::vector<std::string> AsyncWaitContainers;
     int AsyncWaitTimeout = -1;
-    std::function<void(const std::string &name, const std::string &state, time_t when)> AsyncWaitCallback;
+    std::function<void(AsyncWaitEvent &event)> AsyncWaitCallback;
 
     int LastError = 0;
     std::string LastErrorMsg;
@@ -152,8 +152,16 @@ int Connection::ConnectionImpl::Recv() {
         input.PopLimit(prev_limit);
 
         if (Rsp.has_asyncwait()) {
-            if (AsyncWaitCallback)
-                AsyncWaitCallback(Rsp.asyncwait().name(), Rsp.asyncwait().state(), Rsp.asyncwait().when());
+            if (AsyncWaitCallback) {
+                AsyncWaitEvent event = {
+                    Rsp.asyncwait().when(),
+                    Rsp.asyncwait().name(),
+                    Rsp.asyncwait().state(),
+                    Rsp.asyncwait().label(),
+                    Rsp.asyncwait().value(),
+                };
+                AsyncWaitCallback(event);
+            }
         } else
             return EError::Success;
     }
@@ -411,12 +419,16 @@ int Connection::Respawn(const std::string &name) {
 }
 
 int Connection::WaitContainers(const std::vector<std::string> &containers,
+                               const std::vector<std::string> &labels,
                                std::string &name, int timeout) {
     auto wait = Impl->Req.mutable_wait();
     int ret, recv_timeout = 0;
 
     for (const auto &c : containers)
         wait->add_name(c);
+
+    for (auto &label: labels)
+        wait->add_label(label);
 
     if (timeout >= 0) {
         wait->set_timeout_ms(timeout * 1000);
@@ -439,12 +451,16 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
 }
 
 int Connection::AsyncWait(const std::vector<std::string> &containers,
-        std::function<void(const std::string &name, const std::string &state, time_t when)> callback, int timeout) {
+                          const std::vector<std::string> &labels,
+                          std::function<void(AsyncWaitEvent &event)> callback,
+                          int timeout) {
     Impl->AsyncWaitContainers.clear();
     Impl->AsyncWaitTimeout = timeout;
     Impl->AsyncWaitCallback = callback;
     for (auto &name: containers)
         Impl->Req.mutable_asyncwait()->add_name(name);
+    for (auto &label: labels)
+        Impl->Req.mutable_asyncwait()->add_label(label);
     if (timeout >= 0)
         Impl->Req.mutable_asyncwait()->set_timeout_ms(timeout * 1000);
     int ret = Impl->Rpc();

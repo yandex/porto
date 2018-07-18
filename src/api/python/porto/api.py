@@ -42,7 +42,6 @@ def _decode_message(msg):
             ret[key] = val
     return ret
 
-
 class _RPC(object):
     def __init__(self, socket_path, timeout, socket_constructor,
                  lock_constructor, auto_reconnect):
@@ -125,7 +124,10 @@ class _RPC(object):
 
             if rsp.HasField('AsyncWait'):
                 if self.async_wait_callback is not None:
-                    self.async_wait_callback(name=rsp.AsyncWait.name, state=rsp.AsyncWait.state, when=rsp.AsyncWait.when)
+                    if rsp.AsyncWait.HasField("label"):
+                        self.async_wait_callback(name=rsp.AsyncWait.name, state=rsp.AsyncWait.state, when=rsp.AsyncWait.when, label=rsp.AsyncWait.label, value=rsp.AsyncWait.value)
+                    else:
+                        self.async_wait_callback(name=rsp.AsyncWait.name, state=rsp.AsyncWait.state, when=rsp.AsyncWait.when)
             else:
                 return rsp
 
@@ -218,7 +220,7 @@ class _RPC(object):
         if response.error != rpc_pb2.Success:
             raise exceptions.PortoException.Create(response.error, response.errorMsg)
 
-    def async_wait(self, names, callback, timeout):
+    def async_wait(self, names, labels, callback, timeout):
         with self.lock:
             self.async_wait_names = names
             self.async_wait_callback = callback
@@ -228,6 +230,8 @@ class _RPC(object):
         request.AsyncWait.name.extend(names)
         if timeout is not None:
             request.AsyncWait.timeout_ms = int(timeout * 1000)
+        if labels is not None:
+            request.AsyncWait.label.extend(labels)
 
         self.call(request)
 
@@ -284,6 +288,15 @@ class Container(object):
 
     def SetProperty(self, key, value):
         self.conn.SetProperty(self.name, key, value)
+
+    def GetLabel(self, label):
+        return self.conn.GetLabel(self.name, label)
+
+    def SetLabel(self, label, value, prev_value=None):
+        self.conn.SetLabel(self.name, label, value, prev_value)
+
+    def IncLabel(self, label, add=1):
+        return self.conn.IncLabel(self.name, label, add)
 
     def GetData(self, data, sync=False):
         return self.conn.GetData(self.name, data, sync)
@@ -609,6 +622,18 @@ class Connection(object):
     def ListContainers(self, mask=None):
         return [Container(self, name) for name in self.List(mask)]
 
+    def FindLabel(self, label, mask=None, state=None, value=None):
+        request = rpc_pb2.TContainerRequest()
+        request.FindLabel.label = label
+        if mask is not None:
+            request.FindLabel.mask = mask
+        if state is not None:
+            request.FindLabel.state = state
+        if value is not None:
+            request.FindLabel.value = value
+        list = self.rpc.call(request).FindLabel.list
+        return [{'name': l.name, 'state': l.state, 'label': l.label, 'value': l.value} for l in list]
+
     def Find(self, name):
         self.GetProperty(name, "state")
         return Container(self, name)
@@ -788,7 +813,7 @@ class Connection(object):
         result = self.rpc.call(request).volumePropertyList.properties
         return [prop.name for prop in result]
 
-    def WaitContainers(self, containers, timeout=None):
+    def WaitContainers(self, containers, timeout=None, labels=None):
         request = rpc_pb2.TContainerRequest()
         for ct in containers:
             request.wait.name.append(str(ct))
@@ -796,24 +821,65 @@ class Connection(object):
             request.wait.timeout_ms = int(timeout * 1000)
         else:
             timeout = None
+        if labels is not None:
+            request.label.extend(labels)
         resp = self.rpc.call(request, timeout)
         if resp.wait.name == "":
             raise exceptions.WaitContainerTimeout("Timeout {} exceeded".format(timeout))
         return resp.wait.name
 
     # legacy compat - timeout in ms
-    def Wait(self, containers, timeout=None, timeout_s=None):
+    def Wait(self, containers, timeout=None, timeout_s=None, labels=None):
         if timeout_s is not None:
             timeout = timeout_s
         elif timeout is not None and timeout >= 0:
             timeout = timeout / 1000.
         try:
-            return self.WaitContainers(containers, timeout)
+            return self.WaitContainers(containers, timeout, labels=labels)
         except exceptions.WaitContainerTimeout:
             return ""
 
-    def AsyncWait(self, containers, callback, timeout=None):
-        self.rpc.async_wait([str(ct) for ct in containers], callback, timeout)
+    def AsyncWait(self, containers, callback, timeout=None, labels=None):
+        self.rpc.async_wait([str(ct) for ct in containers], labels, callback, timeout)
+
+    def WaitLabels(self, containers, labels, timeout=None):
+        request = rpc_pb2.TContainerRequest()
+        for ct in containers:
+            request.wait.name.append(str(ct))
+        if timeout is not None and timeout >= 0:
+            request.wait.timeout_ms = int(timeout * 1000)
+        else:
+            timeout = None
+        request.wait.label.extend(labels)
+        resp = self.rpc.call(request, timeout)
+        if resp.wait.name == "":
+            raise exceptions.WaitContainerTimeout("Timeout {} exceeded".format(timeout))
+        return { 'when': resp.wait.when,
+                 'name': resp.wait.name,
+                 'state': resp.wait.state,
+                 'label': resp.wait.label,
+                 'value': resp.wait.value }
+
+    def GetLabel(self, container, label):
+        return self.GetProperty(container, label)
+
+    def SetLabel(self, container, label, value, prev_value=None, state=None):
+        req = rpc_pb2.TContainerRequest()
+        req.SetLabel.name = str(container)
+        req.SetLabel.label = label
+        req.SetLabel.value = value
+        if prev_value is not None:
+            req.SetLabel.prev_value = prev_value
+        if state is not None:
+            req.SetLabel.state = state
+        self.rpc.call(req)
+
+    def IncLabel(self, container, label, add=1):
+        req = rpc_pb2.TContainerRequest()
+        req.IncLabel.name = str(container)
+        req.IncLabel.label = label
+        req.IncLabel.add = add
+        return self.rpc.call(req).IncLabel.result
 
     def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
         if layers:
