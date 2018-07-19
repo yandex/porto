@@ -13,7 +13,7 @@ def _encode_message(msg, val, key=None):
         if key is not None:
             msg = getattr(msg, key)
             msg.SetInParent()
-        for k, v in val.iteritems():
+        for k, v in val.items():
             _encode_message(msg, v, k)
     elif isinstance(val, list):
         if key is not None:
