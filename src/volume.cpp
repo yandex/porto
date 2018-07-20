@@ -1851,7 +1851,7 @@ TError TVolume::Configure(const TPath &target_root) {
         NeedCow |= share.cow();
 
     if (NeedCow && BackendType != "overlay" && BackendType != "squash")
-        return TError(EError::InvalidValue, "Backend {} does not support copy-on-write shares");
+        return TError(EError::InvalidValue, "Backend {} does not support copy-on-write shares", BackendType);
 
     /* Verify guarantees */
     if (SpaceLimit && SpaceLimit < SpaceGuarantee)
