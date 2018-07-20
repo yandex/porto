@@ -1,3 +1,31 @@
+yandex-porto (4.15.0) unstable; urgency=low
+
+  * test: check downgrade to 4.12.21
+  * container: add property root_path
+  * portoctl: fix raw command
+  * rpc: clear respose in case of error
+  * porto: fix TClient::WriteAccess
+  * util/cred: add Enter/Leave
+  * util/cred: add protobuf structure
+  * util/path: add Open/CreateDirAllAt
+  * util/quota: add Toggle
+  * util/path: add OpenAtMount
+  * rpc: volume spec
+  * volume: commands NewVolume and GetVolume
+  * volume: handle customization
+  * api/python: add nr_connects
+  * api/python: add NewVolume and GetVolume
+  * volume: add property device_name
+  * container: disable cpu_guarantee for stopping container
+  * porto: add config proto into package
+  * porto: limit size of all private values with 4096 bytes
+  * porto: clear failed response only for non-initialized messages
+  * api/python: fix python3
+  * container: add user-defined labels
+  * network: set leaf qdisc limit to 10240 packets
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 20 Jul 2018 16:56:43 +0300
+
 yandex-porto (4.14.0) unstable; urgency=low
 
   * porto: count and describe memory guarantee overcommits
