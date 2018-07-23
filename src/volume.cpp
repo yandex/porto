@@ -748,7 +748,8 @@ public:
                 }
                 path = pin.ProcPath();
             } else {
-                TStorage layer(EStorageType::Layer, Volume->Place, name);
+                TStorage layer;
+                layer.Open(EStorageType::Layer, Volume->Place, name);
                 /* Imported layers are available for everybody */
                 (void)layer.Touch();
                 path = layer.Path;
@@ -979,7 +980,8 @@ public:
                 }
                 path = pin.ProcPath();
             } else {
-                TStorage layer(EStorageType::Layer, Volume->Place, name);
+                TStorage layer;
+                layer.Open(EStorageType::Layer, Volume->Place, name);
                 /* Imported layers are available for everybody */
                 (void)layer.Touch();
                 path = layer.Path;
@@ -1503,18 +1505,21 @@ unsigned long TVolume::GetMountFlags(void) const {
 TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee) {
     TStatFS current, total;
     TPath storage;
+    TError error;
 
     if (RemoteStorage() || (!space_guarantee && !inode_guarantee))
         return OK;
 
     if (UserStorage())
         storage = StoragePath;
-    else if (HaveStorage())
-        storage = TStorage(EStorageType::Storage, Place, Storage).Path.DirName();
-    else
+    else if (HaveStorage()) {
+        TStorage back;
+        back.Open(EStorageType::Storage, Place, Storage);
+        storage = back.Path.DirName();
+    } else
         storage = Place / PORTO_VOLUMES;
 
-    TError error = storage.StatFS(total);
+    error = storage.StatFS(total);
     if (error)
         return error;
 
@@ -1663,8 +1668,11 @@ TError TVolume::CheckDependencies() {
 
     for (auto &l : Layers) {
         TPath layer(l);
-        if (!layer.IsAbsolute())
-            layer = TStorage(EStorageType::Layer, Place, l).Path;
+        if (!layer.IsAbsolute()) {
+            TStorage layer_storage;
+            layer_storage.Open(EStorageType::Layer, Place, l);
+            layer = layer_storage.Path;
+        }
         if (!error)
             error = DependsOn(layer);
     }
@@ -1739,6 +1747,10 @@ TError TVolume::Configure(const TPath &target_root) {
     if (error)
         return error;
 
+    error = CL->ClientContainer->ResolvePlace(Place);
+    if (error)
+        return error;
+
     /* Verify credentials */
     error = CL->CanControl(VolumeOwner);
     if (error)
@@ -1802,7 +1814,8 @@ TError TVolume::Configure(const TPath &target_root) {
         error = TStorage::CheckName(Storage);
         if (error)
             return error;
-        TStorage storage(EStorageType::Storage, Place, Storage);
+        TStorage storage;
+        storage.Open(EStorageType::Storage, Place, Storage);
         StoragePath = storage.Path;
         KeepStorage = storage.Exists();
     }
@@ -1833,7 +1846,9 @@ TError TVolume::Configure(const TPath &target_root) {
             error = TStorage::CheckName(l);
             if (error)
                 return error;
-            layer = TStorage(EStorageType::Layer, Place, l).Path;
+            TStorage layer_storage;
+            layer_storage.Open(EStorageType::Layer, Place, l);
+            layer = layer_storage.Path;
         }
         if (!layer.Exists())
             return TError(EError::LayerNotFound, "Layer not found " + layer.ToString());
@@ -1910,10 +1925,11 @@ TError TVolume::MergeLayers() {
             (void)temp.UmountAll();
             (void)temp.Rmdir();
         } else {
-            TStorage layer(EStorageType::Layer, Place, name);
-            (void)layer.Touch();
+            TStorage layer_storage;
+            layer_storage.Open(EStorageType::Layer, Place, name);
+            (void)layer_storage.Touch();
             /* Imported layers are available for everybody */
-            error = CopyRecursive(layer.Path, InternalPath);
+            error = CopyRecursive(layer_storage.Path, InternalPath);
         }
         if (error)
             return error;
@@ -2145,7 +2161,8 @@ TError TVolume::Build() {
         if (error)
             return TError(error, "Volume {}", Path);
     } else if (HaveStorage()) {
-        TStorage storage(EStorageType::Storage, Place, Storage);
+        TStorage storage;
+        storage.Open(EStorageType::Storage, Place, Storage);
         error = storage.Load();
         if (error)
             return error;
@@ -2610,7 +2627,8 @@ TError TVolume::Destroy() {
         volumes_lock.unlock();
 
         for (auto &layer: volume->Layers) {
-            TStorage storage(EStorageType::Layer, volume->Place, layer);
+            TStorage storage;
+            storage.Open(EStorageType::Layer, volume->Place, layer);
             if (storage.Weak()) {
                 error = storage.Remove(true);
                 if (error && error != EError::Busy)
@@ -2659,7 +2677,8 @@ TError TVolume::DestroyOne() {
     StorageFd.Close();
 
     if (KeepStorage && !UserStorage() && !RemoteStorage()) {
-        TStorage storage(EStorageType::Storage, Place, Storage);
+        TStorage storage;
+        storage.Open(EStorageType::Storage, Place, Storage);
         if (storage.Weak()) {
             Storage = "";
             error = storage.Remove(true);
@@ -3194,8 +3213,7 @@ TError TVolume::Save() {
     }
     node.Set(V_RAW_CONTAINERS, MergeEscapeStrings(links, ' ', ';'));
 
-    if (CustomPlace)
-        node.Set(V_PLACE, Place.ToString());
+    node.Set(V_PLACE, Place.ToString());
 
     error = node.Save();
     if (error)
@@ -3219,6 +3237,9 @@ TError TVolume::Restore(const TKeyValue &node) {
     if (error)
         return error;
 
+    if (!spec.has_place())
+        Place = PORTO_PLACE;
+
     InternalPath = Place / PORTO_VOLUMES / Id / "volume";
 
     if (!spec.has_owner())
@@ -3238,8 +3259,11 @@ TError TVolume::Restore(const TKeyValue &node) {
 
     if (!HaveStorage())
         StoragePath = GetInternal(BackendType);
-    else if (!UserStorage() && !RemoteStorage())
-        StoragePath = TStorage(EStorageType::Storage, Place, Storage).Path;
+    else if (!UserStorage() && !RemoteStorage()) {
+        TStorage storage;
+        storage.Open(EStorageType::Storage, Place, Storage);
+        StoragePath = storage.Path;
+    }
 
     error = OpenBackend();
     if (error)
@@ -3360,18 +3384,14 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
     if (!CL)
         return TError("no client");
 
-    if (spec.has_place()) {
-        error = CL->CanControlPlace(spec.place());
-        if (error)
-            return error;
-        error = TStorage::CheckPlace(spec.place());
-        if (error)
-            return error;
-    } else {
-        error = CL->CanControlPlace(PORTO_PLACE);
-        if (error)
-            return error;
-    }
+    TPath place = spec.place();
+    error = CL->ClientContainer->ResolvePlace(place);
+    if (error)
+        return error;
+
+    error = TStorage::CheckPlace(place);
+    if (error)
+        return error;
 
     std::shared_ptr<TContainer> owner;
     TPath target_root;
@@ -3548,8 +3568,9 @@ void TVolume::RestoreAll(void) {
     std::list<TKeyValue> nodes;
     TError error;
 
-    TPath place(PORTO_PLACE);
-    error = TStorage::CheckPlace(place);
+    TStorage place;
+    place.Open(EStorageType::Place, PORTO_PLACE);
+    error = TStorage::CheckPlace(place.Path);
     if (error)
         L_ERR("Cannot prepare place: {}", error);
 
@@ -3660,7 +3681,7 @@ next_link:
             L_WRN("Volume {} destroy: {}", volume->Path, error);
     }
 
-    TPath volumes = place / PORTO_VOLUMES;
+    TPath volumes = place.Path / PORTO_VOLUMES;
 
     L_SYS("Remove stale volumes...");
 
@@ -3698,7 +3719,7 @@ next_link:
     L_SYS("Remove stale layers...");
 
     std::list<TStorage> storages;
-    error = TStorage(EStorageType::Place, place).List(EStorageType::Layer, storages);
+    error = place.List(EStorageType::Layer, storages);
     if (error) {
         L_WRN("Layers listing failed : {}", error);
     } else {
@@ -3714,7 +3735,7 @@ next_link:
     L_SYS("Remove stale storages...");
 
     storages.clear();
-    error = TStorage(EStorageType::Place, place).List(EStorageType::Storage, storages);
+    error = place.List(EStorageType::Storage, storages);
     if (error) {
         L_WRN("Storage listing failed : {}", error);
     } else {
@@ -3886,10 +3907,8 @@ TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
     if (spec.has_device_name() && full)
         DeviceName = spec.device_name();
 
-    if (spec.has_place()) {
+    if (spec.has_place())
         Place = spec.place();
-        CustomPlace = true;
-    }
 
     if (spec.has_owner())
         error = VolumeOwner.Load(spec.owner());

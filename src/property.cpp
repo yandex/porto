@@ -1454,7 +1454,7 @@ public:
 class TPlaceProperty : public TProperty {
 public:
     TPlaceProperty() : TProperty(P_PLACE, EProperty::PLACE,
-            "Places for volumes and layers: [default][;allowed...][;***]") {}
+            "Places for volumes and layers: [default][;/path...][;***][;alias=/path]") {}
     TError Get(std::string &value) {
         value = MergeEscapeStrings(CT->PlacePolicy, ';');
         return OK;

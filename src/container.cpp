@@ -2211,6 +2211,47 @@ TError TContainer::GetEnvironment(TEnv &env) const {
     return OK;
 }
 
+TError TContainer::ResolvePlace(TPath &place) const {
+    TError error;
+
+    if (place.IsAbsolute()) {
+        for (auto &policy: PlacePolicy) {
+            if (policy[0] == '/' || policy == "***") {
+                if (StringMatch(place.ToString(), policy))
+                    goto found;
+            } else {
+                auto sep = policy.find('=');
+                if (sep != std::string::npos &&
+                        StringMatch(place.ToString(), policy.substr(sep + 1)))
+                    goto found;
+            }
+        }
+    } else {
+        auto prefix = place.ToString() + "=";
+        for (const auto &policy: PlacePolicy) {
+            if (!place) {
+                place = policy;
+                goto found;
+            }
+            if (StringStartsWith(policy, prefix)) {
+                place = policy.substr(prefix.size());
+                goto found;
+            }
+        }
+    }
+
+    return TError(EError::Permission, "Place {} is not permitted", place);
+
+found:
+    if (!place.IsNormal())
+        return TError(EError::InvalidPath, "Place path {} must be normalized", place);
+
+    if (IsSystemPath(place))
+        return TError(EError::InvalidPath, "Place path {} in system directory", place);
+
+    return OK;
+}
+
 TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TError error;
 
@@ -2568,12 +2609,20 @@ TError TContainer::PrepareStart() {
         PlacePolicy = Parent->PlacePolicy;
     } else {
         /* Enforce place restictions */
-        for (auto &place: PlacePolicy) {
-            bool allowed = false;
-            for (auto &pp: Parent->PlacePolicy)
-                allowed |= StringMatch(place, pp);
-            if (!allowed)
-                return TError(EError::Permission, "Place " + place + " is not allowed by parent container");
+        for (const auto &policy: PlacePolicy) {
+            TPath place = policy;
+            if (!place.IsAbsolute()) {
+                if (policy == "***" &&
+                        std::find(Parent->PlacePolicy.begin(),
+                            Parent->PlacePolicy.end(),
+                            policy) == Parent->PlacePolicy.end())
+                    return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
+                auto sep = policy.find('=');
+                if (sep != std::string::npos && policy[sep + 1] == '/')
+                    place = policy.substr(sep + 1);
+            }
+            if (Parent->ResolvePlace(place))
+                return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
         }
     }
 

@@ -515,12 +515,15 @@ Write access to container requires any of these conditions:
 
 * **stdin\_path** - stdin file; default: "/dev/null"
 
-* **place** - places allowed for volumes and layers, syntax: \[default\]\[;mask;...\]
+* **place** - places allowed for volumes and layers, syntax: \[default\]\[;\[alias=\]path;...\]
 
     This is paths in in _host_ or masks for them which are allowed to be
     used as **place** property for volumes for requests from this container.
 
     Default is "/place;\*\*\*". This means use /place by default, allow any other.
+
+    Alias allows to address place by short keyword,
+    example: **place**="/mnt/data;slow=/mnt/hdd;fast=/mnt/ssd".
 
     Container inherits policy from parent container and cannot surpass it.
 

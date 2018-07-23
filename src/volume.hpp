@@ -107,8 +107,7 @@ public:
     bool IsAutoPath = false;
     std::string BuildTime;
 
-    TPath Place = PORTO_PLACE;
-    bool CustomPlace = false;
+    TPath Place;
 
     std::string Storage;
     TPath StoragePath;

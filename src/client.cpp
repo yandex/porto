@@ -297,19 +297,6 @@ TPath TClient::ResolvePath(const TPath &path) {
     return ClientContainer->RootPath / path;
 }
 
-TPath TClient::DefaultPlace() {
-    if (ClientContainer->PlacePolicy.size())
-        return ClientContainer->PlacePolicy[0];
-    return PORTO_PLACE;
-}
-
-TError TClient::CanControlPlace(const TPath &place) {
-    for (auto &mask: ClientContainer->PlacePolicy)
-        if (StringMatch(place.ToString(), mask))
-            return OK;
-    return TError(EError::Permission, "You are not permitted to use place " + place.ToString());
-}
-
 bool TClient::IsSuperUser(void) const {
     return AccessLevel >= EAccessLevel::SuperUser;
 }

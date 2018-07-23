@@ -95,9 +95,6 @@ public:
     TError ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volume,
                          bool read_only = false);
 
-    TPath DefaultPlace();
-    TError CanControlPlace(const TPath &place);
-
     std::shared_ptr<TContainerWaiter> SyncWaiter;
     std::shared_ptr<TContainerWaiter> AsyncWaiter;
     std::list<TContainerReport> ReportQueue;

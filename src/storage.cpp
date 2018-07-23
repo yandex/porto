@@ -42,11 +42,25 @@ static std::condition_variable StorageCv;
 static TUintMap PlaceLoad;
 static TUintMap PlaceLoadLimit;
 
-TStorage::TStorage(EStorageType type, const TPath &place, const std::string &name) {
-    Type = type;
+TError TStorage::Resolve(EStorageType type, const TPath &place, const std::string &name) {
+    TError error;
+
     Place = place;
+    error = CL->ClientContainer->ResolvePlace(Place);
+    if (error)
+        return error;
+
+    Open(type, Place, name);
+    return OK;
+}
+
+void TStorage::Open(EStorageType type, const TPath &place, const std::string &name) {
+    PORTO_ASSERT(place.IsAbsolute());
+
+    Type = type;
     Name = name;
     FirstName = name;
+    Place = place;
 
     auto sep = name.find('/');
     if (sep != std::string::npos) {
@@ -277,7 +291,8 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
 
     for (auto &name: names) {
         if (Type == EStorageType::Place && StringStartsWith(name, META_PREFIX)) {
-            TStorage meta(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
+            TStorage meta;
+            meta.Open(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
             list.push_back(meta);
             if (type == EStorageType::Storage) {
                 error = meta.List(type, list);
@@ -286,12 +301,21 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
             }
         } else if (Type == EStorageType::Meta) {
             if (StringStartsWith(name, META_LAYER)) {
-                if (type == EStorageType::Layer)
-                    list.emplace_back(EStorageType::Layer, Place, Name + "/" + name.substr(std::string(META_LAYER).size()));
-            } else if (type == EStorageType::Storage && !CheckName(name))
-                list.emplace_back(EStorageType::Storage, Place, Name + "/" + name);
-        } else if (!CheckName(name))
-            list.emplace_back(type, Place, name);
+                if (type == EStorageType::Layer) {
+                    TStorage layer;
+                    layer.Open(EStorageType::Layer, Place, Name + "/" + name.substr(std::string(META_LAYER).size()));
+                    list.push_back(layer);
+                }
+            } else if (type == EStorageType::Storage && !CheckName(name)) {
+                TStorage storage;
+                storage.Open(EStorageType::Storage, Place, Name + "/" + name);
+                list.push_back(storage);
+            }
+        } else if (!CheckName(name)) {
+            TStorage storage;
+            storage.Open(type, Place, name);
+            list.push_back(storage);
+        }
     }
 
     if (Type == EStorageType::Place && type == EStorageType::Layer) {
@@ -304,7 +328,8 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
         }
         for (auto &name: names) {
             if (StringStartsWith(name, META_PREFIX)) {
-                TStorage meta(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
+                TStorage meta;
+                meta.Open(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
                 error = meta.List(EStorageType::Layer, list);
                 if (error)
                     return error;
@@ -419,9 +444,6 @@ TError TStorage::SetPrivate(const std::string &text) {
     if (text.size() > PRIVATE_VALUE_MAX)
         return TError(EError::InvalidValue, "Private value too log, max {} bytes", PRIVATE_VALUE_MAX);
 
-    error = CL->CanControlPlace(Place);
-    if (error)
-        return error;
     error = Load();
     if (error)
         return error;
@@ -586,10 +608,6 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     if (error)
         return error;
 
-    error = CL->CanControlPlace(Place);
-    if (error)
-        return error;
-
     error = CheckPlace(Place);
     if (error)
         return error;
@@ -627,7 +645,8 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     }
 
     if (merge && Exists()) {
-        TStorage layer(Type, Place, Name);
+        TStorage layer;
+        layer.Open(Type, Place, Name);
         error = layer.Load();
         if (error)
             return error;
@@ -840,10 +859,6 @@ TError TStorage::Remove(bool weak) {
     TPath temp;
     TError error;
 
-    error = CL->CanControlPlace(Place);
-    if (error && !weak)
-        return error;
-
     error = CheckName(Name);
     if (error)
         return error;
@@ -976,10 +991,6 @@ TError TStorage::CreateMeta(uint64_t space_limit, uint64_t inode_limit) {
     if (error)
         return error;
 
-    error = CL->CanControlPlace(Place);
-    if (error)
-        return error;
-
     error = CheckPlace(Place);
     if (error)
         return error;
@@ -1023,10 +1034,6 @@ TError TStorage::ResizeMeta(uint64_t space_limit, uint64_t inode_limit) {
     TError error;
 
     error = CheckName(Name);
-    if (error)
-        return error;
-
-    error = CL->CanControlPlace(Place);
     if (error)
         return error;
 

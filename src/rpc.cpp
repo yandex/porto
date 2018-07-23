@@ -935,9 +935,6 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
     if (req.has_path() && !req.path().empty())
         cfg[V_PATH] = req.path();
 
-    if (!cfg.count(V_PLACE) && CL->DefaultPlace() != PORTO_PLACE)
-        cfg[V_PLACE] = CL->DefaultPlace().ToString();
-
     Statistics->VolumesCreated++;
 
     error = TVolume::VerifyConfig(cfg);
@@ -1124,7 +1121,12 @@ noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
 }
 
 noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
-    TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
+    TStorage layer;
+    TError error;
+
+    error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
+    if (error)
+        return error;
 
     if (req.has_private_value())
         layer.Private = req.private_value();
@@ -1138,10 +1140,13 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
 
 noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
                                 rpc::TContainerResponse &rsp) {
-    TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
-    TError error = CL->CanControlPlace(layer.Place);
+    TStorage layer;
+    TError error;
+
+    error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
     if (error)
         return error;
+
     error = layer.Load();
     if (!error)
         rsp.mutable_layer_private()->set_private_value(layer.Private);
@@ -1149,17 +1154,22 @@ noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
 }
 
 noinline TError SetLayerPrivate(const rpc::TLayerSetPrivateRequest &req) {
-    TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
+    TStorage layer;
+    TError error;
+
+    error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
+    if (error)
+        return error;
+
     return layer.SetPrivate(req.private_value());
 }
 
 noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
+    TStorage layer;
     TError error;
 
     if (req.has_layer()) {
-        TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
-
-        error = CL->CanControlPlace(layer.Place);
+        error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
         if (error)
             return error;
 
@@ -1176,7 +1186,10 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     if (error)
         return error;
 
-    TStorage layer(EStorageType::Volume, volume->Place, volume->Id);
+    error = layer.Resolve(EStorageType::Volume, volume->Place, volume->Id);
+    if (error)
+        return error;
+
     layer.Owner = volume->VolumeOwner;
     error = volume->GetUpperLayer(layer.Path);
     if (error)
@@ -1187,19 +1200,27 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
 }
 
 noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
-    TStorage layer(EStorageType::Layer, req.has_place() ? req.place() : CL->DefaultPlace(), req.layer());
+    TStorage layer;
+    TError error;
+
+    error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
+    if (error)
+        return error;
+
     return layer.Remove();
 }
 
 noinline TError ListLayers(const rpc::TLayerListRequest &req,
                            rpc::TContainerResponse &rsp) {
-    TPath place = req.has_place() ? req.place() : CL->DefaultPlace();
-    TError error = CL->CanControlPlace(place);
+    TStorage place;
+    TError error;
+
+    error = place.Resolve(EStorageType::Place, req.place());
     if (error)
         return error;
 
     std::list<TStorage> layers;
-    error = TStorage(EStorageType::Place, place).List(EStorageType::Layer, layers);
+    error = place.List(EStorageType::Layer, layers);
     if (error)
         return error;
 
@@ -1321,13 +1342,15 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
 
 noinline TError ListStorage(const rpc::TStorageListRequest &req,
                             rpc::TContainerResponse &rsp) {
-    TPath place = req.has_place() ? req.place() : CL->DefaultPlace();
-    TError error = CL->CanControlPlace(place);
+    TStorage place;
+    TError error;
+
+    error = place.Resolve(EStorageType::Place, req.place());
     if (error)
         return error;
 
     std::list<TStorage> storages;
-    error = TStorage(EStorageType::Place, place).List(EStorageType::Storage, storages);
+    error = place.List(EStorageType::Storage, storages);
     if (error)
         return error;
 
@@ -1370,12 +1393,24 @@ noinline TError ListStorage(const rpc::TStorageListRequest &req,
 }
 
 noinline TError RemoveStorage(const rpc::TStorageRemoveRequest &req) {
-    TStorage storage(EStorageType::Storage, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
+    TStorage storage;
+    TError error;
+
+    error = storage.Resolve(EStorageType::Storage, req.place(), req.name());
+    if (error)
+        return error;
+
     return storage.Remove();
 }
 
 noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
-    TStorage storage(EStorageType::Storage, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
+    TStorage storage;
+    TError error;
+
+    error = storage.Resolve(EStorageType::Storage, req.place(), req.name());
+    if (error)
+        return error;
+
     storage.Owner = CL->Cred;
     if (req.has_private_value())
         storage.Private = req.private_value();
@@ -1385,9 +1420,10 @@ noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
 }
 
 noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
-    TStorage storage(EStorageType::Storage, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
+    TStorage storage;
+    TError error;
 
-    TError error = CL->CanControlPlace(storage.Place);
+    error = storage.Resolve(EStorageType::Storage, req.place(), req.name());
     if (error)
         return error;
 
@@ -1400,21 +1436,29 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
 }
 
 noinline TError CreateMetaStorage(const rpc::TMetaStorage &req) {
-    TStorage storage(EStorageType::Meta, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
+    TStorage storage;
+    TError error;
+
+    error = storage.Resolve(EStorageType::Meta, req.place(), req.name());
+    if (error)
+        return error;
+
     storage.Owner = CL->Cred;
     if (req.has_private_value())
         storage.Private = req.private_value();
-
-    TError error = CL->CanControlPlace(storage.Place);
-    if (error)
-        return error;
 
     return storage.CreateMeta(req.space_limit(), req.inode_limit());
 }
 
 noinline TError ResizeMetaStorage(const rpc::TMetaStorage &req) {
-    TStorage storage(EStorageType::Meta, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
-    TError error = storage.Load();
+    TStorage storage;
+    TError error;
+
+    error = storage.Resolve(EStorageType::Meta, req.place(), req.name());
+    if (error)
+        return error;
+
+    error = storage.Load();
     if (error)
         return error;
 
@@ -1434,7 +1478,13 @@ noinline TError ResizeMetaStorage(const rpc::TMetaStorage &req) {
 }
 
 noinline TError RemoveMetaStorage(const rpc::TMetaStorage &req) {
-    TStorage storage(EStorageType::Meta, req.has_place() ? req.place() : CL->DefaultPlace(), req.name());
+    TStorage storage;
+    TError error;
+
+    error = storage.Resolve(EStorageType::Meta, req.place(), req.name());
+    if (error)
+        return error;
+
     return storage.Remove();
 }
 

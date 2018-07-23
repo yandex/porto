@@ -26,7 +26,8 @@ public:
     time_t LastChange = 0;
     uint64_t Size = 0;
 
-    TStorage(EStorageType type, const TPath &place, const std::string &name = "");
+    TError Resolve(EStorageType type, const TPath &place, const std::string &name = "");
+    void Open(EStorageType type, const TPath &place, const std::string &name = "");
 
     static TError CheckName(const std::string &name, bool meta=false);
     static TError CheckPlace(const TPath &place);
