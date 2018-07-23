@@ -403,7 +403,7 @@ TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
     return OK;
 }
 
-TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
+TError TNlLink::SetDefaultGw(const TNlAddr &addr, int mtu) {
     struct rtnl_route *route;
     struct rtnl_nexthop *nh;
     TError error;
@@ -433,6 +433,12 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     rtnl_route_nh_set_gateway(nh, addr.Addr);
     rtnl_route_nh_set_ifindex(nh, GetIndex());
     rtnl_route_add_nexthop(route, nh);
+
+    if (mtu > 0) {
+        ret = rtnl_route_set_metric(route, RTAX_MTU, mtu);
+        if (ret < 0)
+            return Error(ret, "Cannot set default gateway mtu");
+    }
 
     Dump("add", route);
     ret = rtnl_route_add(GetSock(), route, NLM_F_MATCH);
