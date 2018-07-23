@@ -1,3 +1,12 @@
+yandex-porto (4.16.0) unstable; urgency=low
+
+  * volume: tiny fix
+  * network: add config options for MTU to L3 ipv4/ipv6 default gateway
+  * porto: tiny fix
+  * porto: add aliases for place paths
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 23 Jul 2018 18:12:52 +0300
+
 yandex-porto (4.15.0) unstable; urgency=low
 
   * test: check downgrade to 4.12.21
