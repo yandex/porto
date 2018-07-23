@@ -1,2 +1,3 @@
 porto.md
 src/rpc.proto
+src/config.proto
