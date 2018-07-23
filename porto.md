@@ -925,6 +925,16 @@ net.ipv6.conf.all.proxy_ndp = 1
 net.ipv6.conf.all.accept_ra = 2
 ```
 
+Default MTU copied from host interface which has addresses from the same L2 domain.
+MTU for L3 device and for ipv4/ipv6 default route could be set in portod.conf:
+```
+network {
+   l3_default_mtu: <device-mtu>
+   l3_default_ipv4_mtu: <ipv4-mtu>
+   l3_default_ipv6_mtu: <ipv6-mtu>
+}
+```
+
 ## NAT
 
 Mode **net**=NAT works as L3 and automatically allocates IP from pool configured in portod.conf:

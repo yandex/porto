@@ -385,7 +385,7 @@ TError TNlLink::AddDirectRoute(const TNlAddr &addr, bool ecn) {
     return OK;
 }
 
-TError TNlLink::SetDefaultGw(const TNlAddr &addr, bool ecn) {
+TError TNlLink::SetDefaultGw(const TNlAddr &addr, bool ecn, int mtu) {
     struct rtnl_route *route;
     struct rtnl_nexthop *nh;
     TError error;
@@ -420,6 +420,12 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr, bool ecn) {
         ret = rtnl_route_set_metric(route, RTAX_FEATURES, RTAX_FEATURE_ECN);
         if (ret < 0)
             return Error(ret, "Cannot enable ECN");
+    }
+
+    if (mtu > 0) {
+        ret = rtnl_route_set_metric(route, RTAX_MTU, mtu);
+        if (ret < 0)
+            return Error(ret, "Cannot set default gateway mtu");
     }
 
     Dump("add", route);

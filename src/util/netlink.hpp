@@ -122,7 +122,7 @@ public:
     static bool ValidMacAddr(const std::string &hw);
 
     TError AddDirectRoute(const TNlAddr &addr, bool ecn = false);
-    TError SetDefaultGw(const TNlAddr &addr, bool ecn = false);
+    TError SetDefaultGw(const TNlAddr &addr, bool ecn = false, int mtu = -1);
     TError AddAddress(const TNlAddr &addr);
     TError WaitAddress(int timeout_s);
     int GetMtu();

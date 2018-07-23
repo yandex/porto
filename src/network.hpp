@@ -271,6 +271,8 @@ struct TNetDeviceConfig {
     std::vector<TNlAddr> Ip;
     TNlAddr Gate4;
     TNlAddr Gate6;
+    int GateMtu4 = -1;
+    int GateMtu6 = -1;
 
     struct {
         TNlAddr Local;

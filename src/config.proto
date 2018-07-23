@@ -53,7 +53,7 @@ message TConfig {
         optional uint32 proxy_ndp_watchdog_ms = 39;
         optional bool enable_ip6tnl0 = 40;
         optional bool enable_iproute = 41;
-        optional uint32 l3_default_mtu = 42;
+        optional uint32 l3_default_mtu = 42;        // link mtu
         optional uint32 resolv_conf_watchdog_ms = 43;
         message TDscpClass {
             required string name = 1;
@@ -67,6 +67,8 @@ message TConfig {
         optional uint32 codel_target = 47;
         optional uint32 codel_interval = 48;
         optional bool codel_ecn = 49;
+        optional uint32 l3_default_ipv4_mtu = 50;   // default route mtu
+        optional uint32 l3_default_ipv6_mtu = 51;   // default route mtu
     }
 
     message TFileCfg {

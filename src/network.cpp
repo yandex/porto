@@ -929,6 +929,7 @@ TError TNetwork::GetL3Gate(TNetDeviceConfig &dev) {
     TError error;
     int ret;
 
+    /* Skip autodetect if MTU and required gateways are set */
     bool skip = dev.Mtu > 0;
     for (auto &ip: dev.Ip) {
         if (ip.Family() == AF_INET ? dev.Gate4.IsEmpty() : dev.Gate6.IsEmpty()) {
@@ -2159,6 +2160,10 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
                 dev.Master = StringTrim(settings[2]);
             if (config().network().l3_default_mtu() > 0)
                 dev.Mtu = config().network().l3_default_mtu();
+            if (config().network().l3_default_ipv4_mtu() > 0)
+                dev.GateMtu4 = config().network().l3_default_ipv4_mtu();
+            if (config().network().l3_default_ipv6_mtu() > 0)
+                dev.GateMtu6 = config().network().l3_default_ipv6_mtu();
         } else if (type == "NAT") {
             dev.Type = "L3";
             dev.Mode = "NAT";
@@ -2167,6 +2172,10 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
                 dev.Name = StringTrim(settings[1]);
             if (config().network().l3_default_mtu() > 0)
                 dev.Mtu = config().network().l3_default_mtu();
+            if (config().network().l3_default_ipv4_mtu() > 0)
+                dev.GateMtu4 = config().network().l3_default_ipv4_mtu();
+            if (config().network().l3_default_ipv6_mtu() > 0)
+                dev.GateMtu6 = config().network().l3_default_ipv6_mtu();
         } else if (type == "ipip6") {
             if (settings.size() != 4)
                 return TError(EError::InvalidValue, "Invalid " + line);
@@ -2385,9 +2394,11 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     for (auto &ip : dev.Ip)
         ipStr += fmt::format("{}={} ", ip.Family() == AF_INET ? "ip4" : "ip6", ip.Format());
 
-    L_NET("Setup L3 device {} peer={} mtu={} group={} master={} {}gw4={} gw6={}",
+    L_NET("Setup L3 device {} peer={} mtu={} group={} master={} {}gw4={} mtu4={} gw6={} mtu6={}",
             dev.Name, peerName, dev.Mtu, TNetwork::DeviceGroupName(dev.Group),
-            dev.Master, ipStr, dev.Gate4.Format(), dev.Gate6.Format());
+            dev.Master, ipStr,
+            dev.Gate4.Format(), dev.GateMtu4,
+            dev.Gate6.Format(), dev.GateMtu6);
 
     error = peer.AddVeth(dev.Name, "", dev.Mtu, VirtualDeviceGroup, NetNs.GetFd());
     if (error)
@@ -2683,14 +2694,14 @@ TError TNetEnv::SetupInterfaces() {
         }
 
         if (!dev.Gate4.IsEmpty()) {
-            error = link.SetDefaultGw(dev.Gate4, EnableECN || dev.EnableECN);
+            error = link.SetDefaultGw(dev.Gate4, EnableECN || dev.EnableECN, dev.GateMtu4);
             if (error)
                 return error;
             DefaultRoute = false;
         }
 
         if (!dev.Gate6.IsEmpty()) {
-            error = link.SetDefaultGw(dev.Gate6, EnableECN || dev.EnableECN);
+            error = link.SetDefaultGw(dev.Gate6, EnableECN || dev.EnableECN, dev.GateMtu6);
             if (error)
                 return error;
         }
