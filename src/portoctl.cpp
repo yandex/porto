@@ -2017,7 +2017,6 @@ public:
         if (args.size() >= 2)
             archive = TPath(args[1]).AbsolutePath().ToString();
 
-        std::string storage;
         if (flush) {
             uint64_t age = 0;
             if (args.size() >= 1) {
@@ -2025,7 +2024,7 @@ public:
                     return EXIT_FAILURE;
                 age *= 60*60*24;
             }
-            auto rsp = Api->ListStorage(storage, place);
+            auto rsp = Api->ListStorage(place);
             if (!rsp) {
                 PrintError("Cannot list storage paths");
                 return EXIT_FAILURE;
@@ -2039,7 +2038,7 @@ public:
                     PrintError("Cannot remove storage");
             }
         } else if (list) {
-            auto rsp = Api->ListStorage(storage, place);
+            auto rsp = Api->ListStorage(place);
             if (!rsp) {
                 PrintError("Cannot list storage paths");
             } else {
