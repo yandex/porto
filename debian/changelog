@@ -1,3 +1,9 @@
+yandex-porto (4.16.2) unstable; urgency=low
+
+  * porto: drop duplicate volume link target
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 25 Jul 2018 12:20:08 +0300
+
 yandex-porto (4.16.1) unstable; urgency=low
 
   * portoctl/storage: fix list for custom place
