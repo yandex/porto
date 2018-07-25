@@ -1981,7 +1981,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     TPath host_target = link->Container->RootPath / link->Target;
     link->HostTarget = "";
     auto target_link = ResolveOriginLocked(host_target.DirNameNormal());
-    if (host_target != link->Volume->Path) {
+    if (host_target != link->Volume->Path || link->Container != RootContainer) {
         error = TVolume::CheckConflicts(host_target);
         if (error)
             return error;
