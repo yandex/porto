@@ -603,6 +603,7 @@ static TError CreateRootContainer() {
 }
 
 static void RestoreContainers() {
+    TIdMap ids(4, CONTAINER_ID_MAX - 4);
     std::list<TKeyValue> nodes;
 
     TError error = TKeyValue::ListAll(ContainersKV, nodes);
@@ -616,6 +617,9 @@ static void RestoreContainers() {
                 error = TError("id not found");
             if (!node->Has(P_RAW_NAME))
                 error = TError("name not found");
+            if (!error && (StringToInt(node->Get(P_RAW_ID), node->Id) ||
+                           node->Id > 3 && ids.GetAt(node->Id)))
+                node->Id = 0;
         }
         if (error) {
             L_ERR("Cannot load {}: {}", node->Path, error);
@@ -626,6 +630,20 @@ static void RestoreContainers() {
         /* key for sorting */
         node->Name = node->Get(P_RAW_NAME);
         ++node;
+    }
+
+    for (auto &node : nodes) {
+        if (node.Name[0] != '/' && !node.Id) {
+            error = ids.Get(node.Id);
+            if (!error) {
+                L("Replace container {} id {}", node.Name, node.Id);
+                TPath path = ContainersKV / std::to_string(node.Id);
+                node.Path.Rename(path);
+                node.Path = path;
+                node.Set(P_RAW_ID, std::to_string(node.Id));
+                node.Save();
+            }
+        }
     }
 
     nodes.sort();

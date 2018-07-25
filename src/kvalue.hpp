@@ -8,7 +8,8 @@
 
 class TKeyValue {
 public:
-    const TPath Path;
+    TPath Path;
+    int Id = 0;
     std::string Name;
     std::map<std::string, std::string> Data;
 
