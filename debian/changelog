@@ -1,3 +1,15 @@
+yandex-porto (4.12.22) unstable; urgency=low
+
+  * portoctl: fix raw command
+  * porto: fix TClient::WriteAccess
+  * api/python: add nr_connects
+  * container: disable cpu_guarantee for stopping container
+  * porto: add config proto into package
+  * network: add config options for MTU to L3 ipv4/ipv6 default gateway
+  * portoctl/storage: fix list for custom place
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 25 Jul 2018 08:50:52 +0300
+
 yandex-porto (4.12.21) unstable; urgency=low
 
   * coredump: inherit core_command from parent container
