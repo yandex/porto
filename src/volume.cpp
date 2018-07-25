@@ -3322,8 +3322,19 @@ TError TVolume::Restore(const TKeyValue &node) {
 
         if (link->HostTarget && VolumeLinks.find(link->HostTarget) != VolumeLinks.end()) {
             L_WRN("Drop duplicate volume target: {}", link->HostTarget);
-            link->Target = "";
+            link->Target = placeholder ? "placeholder" : "";
             link->HostTarget = "";
+        }
+
+        bool duplicate = false;
+        for (auto &l: ct->VolumeLinks) {
+            if (link->Target == l->Target)
+                duplicate = true;
+        }
+        if (duplicate) {
+            L_WRN("Duplicate volume {} link {} for CT{}:{} target {}", Path, link->HostTarget,
+                    link->Container->Id, link->Container->Name, link->Target);
+            continue;
         }
 
         if (link->HostTarget) {
