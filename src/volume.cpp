@@ -3328,7 +3328,7 @@ TError TVolume::Restore(const TKeyValue &node) {
 
         bool duplicate = false;
         for (auto &l: ct->VolumeLinks) {
-            if (link->Target == l->Target)
+            if (link->Volume == l->Volume && link->Target == l->Target)
                 duplicate = true;
         }
         if (duplicate) {
