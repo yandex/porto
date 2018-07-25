@@ -1,3 +1,10 @@
+yandex-porto (4.16.1) unstable; urgency=low
+
+  * portoctl/storage: fix list for custom place
+  * porto: replace container id at restore
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 25 Jul 2018 10:29:43 +0300
+
 yandex-porto (4.16.0) unstable; urgency=low
 
   * volume: tiny fix
