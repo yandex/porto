@@ -553,7 +553,7 @@ public:
         return OK;
     }
     TError Set(const std::string &mem_guarantee) {
-        uint64_t new_val = 0lu;
+        uint64_t new_val;
         TError error = StringToSize(mem_guarantee, new_val);
         if (error)
             return error;
@@ -562,7 +562,8 @@ public:
 
         if (CT->State != EContainerState::Stopped) {
             error = CT->CheckMemGuarantee();
-            if (error) {
+            /* always allow to decrease guarantee under overcommit */
+            if (error && new_val > CT->MemGuarantee) {
                 Statistics->FailMemoryGuarantee++;
                 CT->NewMemGuarantee = CT->MemGuarantee;
                 return error;
@@ -1611,8 +1612,8 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
     TError Get(std::string &value) {
-        if (CT->IsRoot())
-            value = std::to_string(GetTotalMemory());
+        if (!CT->Level)
+            value = std::to_string(GetTotalMemory() - GetHugetlbMemory());
         else
             value = std::to_string(CT->MemLimit);
         return OK;
@@ -1773,7 +1774,9 @@ public:
         IsSupported = HugetlbSubsystem.Supported;
     }
     TError Get(std::string &value) {
-        if (CT->HasProp(EProperty::HUGETLB_LIMIT))
+        if (!CT->Level)
+            value = std::to_string(GetHugetlbMemory());
+        else if (CT->HasProp(EProperty::HUGETLB_LIMIT))
             value = std::to_string(CT->HugetlbLimit);
         return OK;
     }

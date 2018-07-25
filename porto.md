@@ -572,9 +572,13 @@ write permissions to the target or owning related volume.
     Physical memory pages that have filesystem\disk backend,
     potentially could be reclaimed by kernel.
 
-* **hugetlb\_usage** - current hugetlb memory usage
+* **hugetlb\_usage** - current hugetlb memory usage in bytes
 
-* **hugetlb\_limit** - hugetlb memory limit
+* **hugetlb\_limit** - hugetlb memory limit in bytes
+
+    For root container shows hugetlb total size.
+
+    For now only 2Mb pages are supported.
 
 * **max\_rss** - peak **anon\_usage** (offstream kernel feature)
 
@@ -585,6 +589,11 @@ write permissions to the target or owning related volume.
     Memory reclaimer skips container and it's sub-containers if current usage is less than guarantee.
 
     Overcommit is forbidden, 2Gb are reserved for host system.
+
+    If system currenyly is under overcommit then porto allows to start only
+    containers without memory guarantee and non-root user can start only sub-containers.
+
+    Hugetlb pages are subtracted from host memory.
 
     Reserve (2Gb) is set in portod.conf:
     ```
