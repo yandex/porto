@@ -3316,12 +3316,17 @@ TError TVolume::Restore(const TKeyValue &node) {
         auto link = std::make_shared<TVolumeLink>(shared_from_this(), ct);
         if (l.has_target())
             link->Target = placeholder ? "placeholder" : l.target();
+        link->HostTarget = l.host_target();
         link->ReadOnly = l.read_only();
         link->Required = l.required();
 
-        if (l.has_host_target()) {
-            link->HostTarget = l.host_target();
+        if (link->HostTarget && VolumeLinks.find(link->HostTarget) != VolumeLinks.end()) {
+            L_WRN("Drop duplicate volume target: {}", link->HostTarget);
+            link->Target = "";
+            link->HostTarget = "";
+        }
 
+        if (link->HostTarget) {
             L("Restore volume {} link {} for CT{}:{} target {}", Path, link->HostTarget,
                     link->Container->Id, link->Container->Name, link->Target);
 
@@ -3331,9 +3336,6 @@ TError TVolume::Restore(const TKeyValue &node) {
                 L("Link is lost: {}", error);
                 continue;
             }
-
-            if (VolumeLinks.find(link->HostTarget) != VolumeLinks.end())
-                L_WRN("Duplicate volume link: {}", link->HostTarget);
 
             VolumeLinks[link->HostTarget] = link;
             for (auto c = ct; c; c = c->Parent)
