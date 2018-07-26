@@ -118,6 +118,10 @@ ExpectEq(Catch(c.Run, "m", devices="/tmp/ram0 rw"), porto.exceptions.InvalidValu
 
 ExpectEq(Catch(c.Run, "m", devices="/dev/__missing__ rw"), porto.exceptions.DeviceNotFound)
 
+m = c.Run("m", devices="/dev/__missing__ rw?")
+ExpectEq(m['devices'], "")
+m.Destroy()
+
 ExpectEq(Catch(c.Run, "m", devices="/dev/ram1 rw"), porto.exceptions.Permission)
 
 m = c.Run("m")

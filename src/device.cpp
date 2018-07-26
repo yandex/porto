@@ -25,30 +25,14 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
         return TError(EError::InvalidValue, "Invalid device config: " +
                       MergeEscapeStrings(opt, ' '));
 
-    /* <device> [r][w][m][-] [path] [mode] [user] [group] */
+    /* <device> [r][w][m][-][?] [path] [mode] [user] [group] */
     Path = opt[0];
 
     error = TDevice::CheckPath(Path);
     if (error)
         return error;
 
-    struct stat st;
-    error = Path.StatFollow(st);
-    if (error) {
-        if (error.Errno == ENOENT)
-            return TError(EError::DeviceNotFound, "Device {} does not exists", Path);
-        return error;
-    }
-
-    if (!S_ISCHR(st.st_mode) && !S_ISBLK(st.st_mode))
-        return TError(EError::DeviceNotFound, "Not a device node: {}", Path);
-
-    Node = st.st_rdev;
-    Uid = st.st_uid;
-    Gid = st.st_gid;
-    Mode = st.st_mode;
-    MayRead = MayWrite = MayMknod = Wildcard = false;
-
+    MayRead = MayWrite = MayMknod = Wildcard = Optional = false;
     for (char c: opt[1]) {
         switch (c) {
             case 'r':
@@ -67,10 +51,29 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
                 break;
             case '-':
                 break;
+            case '?':
+                Optional = true;
+                break;
             default:
                 return TError(EError::InvalidValue, "Invalid access: " + opt[1]);
         }
     }
+
+    struct stat st;
+    error = Path.StatFollow(st);
+    if (error) {
+        if (error.Errno == ENOENT)
+            return TError(EError::DeviceNotFound, "Device {} does not exists", Path);
+        return error;
+    }
+
+    if (!S_ISCHR(st.st_mode) && !S_ISBLK(st.st_mode))
+        return TError(EError::DeviceNotFound, "Not a device node: {}", Path);
+
+    Node = st.st_rdev;
+    Uid = st.st_uid;
+    Gid = st.st_gid;
+    Mode = st.st_mode;
 
     /* Initial setup is done in container */
     if ((MayRead || MayWrite) && !Wildcard)
@@ -142,6 +145,8 @@ std::string TDevice::Format() const {
         perm += "*";
     if (perm == "")
         perm = "-";
+    if (Optional)
+        perm += "?";
 
     return fmt::format("{} {} {} {:#o} {} {}", Path, perm, PathInside,
                        Mode & 0777, UserName(Uid), GroupName(Gid));
@@ -237,8 +242,13 @@ TError TDevices::Parse(const std::string &str, const TCred &cred) {
                     auto dev = SplitEscapedString(device_cfg, ' ');
                     TDevice device;
                     error = device.Parse(dev, cred);
-                    if (error)
+                    if (error) {
+                        if (error == EError::DeviceNotFound && (device.Optional || AllOptional)) {
+                            L("Skip optional device: {}", error);
+                            continue;
+                        }
                         return error;
+                    }
                     L("Add device {} from preset {}", device.Format(), cfg[1]);
                     Devices.push_back(device);
                 }
@@ -256,8 +266,13 @@ TError TDevices::Parse(const std::string &str, const TCred &cred) {
 
         TDevice device;
         error = device.Parse(cfg, cred);
-        if (error)
+        if (error) {
+            if (error == EError::DeviceNotFound && (device.Optional || AllOptional)) {
+                L("Skip optional device: {}", error);
+                continue;
+            }
             return error;
+        }
         if (device.MayRead || device.MayWrite || !device.MayMknod)
             NeedCgroup = true;
         Devices.push_back(device);
@@ -344,6 +359,8 @@ TError TDevices::InitDefault() {
     Devices[7].MayMknod = false;
     Devices[8].Wildcard = true;
     Devices[8].MayMknod = false;
+
+    AllOptional = true;
 
     error = Parse(config().container().extra_devices(), TCred(RootUser, RootGroup));
     if (error)

@@ -21,6 +21,7 @@ struct TDevice {
     bool MayMknod = true;
 
     bool Wildcard = false;
+    bool Optional = false;
 
     static TError CheckPath(const TPath &path);
 
@@ -36,6 +37,7 @@ struct TDevice {
 struct TDevices {
     std::vector<TDevice> Devices;
     bool NeedCgroup = false;
+    bool AllOptional = false;
 
     TError Parse(const std::string &str, const TCred &cred);
     std::string Format() const;

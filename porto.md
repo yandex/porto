@@ -350,10 +350,10 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     Subset of **capabilities\_allowed** allowed to be set as ambient.
     In container with chroot they are equal.
 
-* **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\] \[path\] \[mode\] \[user\] \[group\]|preset \<preset\>;...
+* **devices** - access to devices, syntax: \<device\> \[r\]\[w\]\[m\]\[-\]\[?\] \[path\] \[mode\] \[user\] \[group\]|preset \<preset\>;...
 
     "device" - device path in host (/dev/null)  
-    "rwm-" - read, write, mknod, no-access  
+    "rwm-?" - read, write, mknod, no-access, optional  
     "path" - device path in container, defaults same as in host  
     "mode", "user", "group" - device node permissions and owner, defaults are taken from host, only host root and device owner are allowed to change this  
 

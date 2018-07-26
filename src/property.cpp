@@ -1320,7 +1320,7 @@ public:
 class TDevicesProperty : public TProperty {
 public:
     TDevicesProperty() : TProperty(P_DEVICES, EProperty::DEVICE_CONF,
-            "Devices that container can access: <device> [r][w][m][-] [path] [mode] [user] [group]; ...")
+            "Devices that container can access: <device> [r][w][m][-][?] [path] [mode] [user] [group]|preset <preset>; ...")
     {
         IsDynamic = true;
     }
