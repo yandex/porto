@@ -1563,6 +1563,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
     rsp->set_fail_memory_guarantee(Statistics->FailMemoryGuarantee);
 
     rsp->set_network_count(Statistics->NetworksCount);
+    rsp->set_network_created(Statistics->NetworksCreated);
 
     return OK;
 }
