@@ -1,3 +1,14 @@
+yandex-porto (4.16.5) unstable; urgency=low
+
+  * porto: consider current hugetlb size when checking guarantee
+  * devices: add optional devices, handle all extra devices as optional
+  * portoctl: exit from shell and exec after ^X^X
+  * network: count created namespaces
+  * volume: fix guarantee accounting
+  * volume: rework locking aroung tuning operation
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 27 Jul 2018 16:25:47 +0300
+
 yandex-porto (4.16.4) unstable; urgency=low
 
   * volume: tiny fix
