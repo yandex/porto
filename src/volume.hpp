@@ -58,6 +58,7 @@ enum class EVolumeState {
     Initial,
     Building,
     Ready,
+    Tuning,
     Unlinked,
     ToDestroy,
     Destroying,
