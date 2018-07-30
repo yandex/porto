@@ -250,7 +250,10 @@ TError TClient::ReadContainer(const std::string &relative_name,
     TError error = ResolveContainer(relative_name, ct);
     if (error)
         return error;
-    ReleaseContainer(true);
+    if (LockedContainer) {
+        L_WRN("Stale locked container CT{}:{}", LockedContainer->Id, LockedContainer->Name);
+        ReleaseContainer(true);
+    }
     return OK;
 }
 
@@ -265,7 +268,10 @@ TError TClient::WriteContainer(const std::string &relative_name,
     error = CanControl(*ct, child);
     if (error)
         return error;
-    ReleaseContainer(true);
+    if (LockedContainer) {
+        L_WRN("Stale locked container CT{}:{}", LockedContainer->Id, LockedContainer->Name);
+        ReleaseContainer(true);
+    }
     error = ct->LockAction(lock);
     if (error)
         return error;
@@ -275,7 +281,10 @@ TError TClient::WriteContainer(const std::string &relative_name,
 
 TError TClient::LockContainer(std::shared_ptr<TContainer> &ct) {
     auto lock = LockContainers();
-    ReleaseContainer(true);
+    if (LockedContainer) {
+        L_WRN("Stale locked container CT{}:{}", LockedContainer->Id, LockedContainer->Name);
+        ReleaseContainer(true);
+    }
     TError error = ct->LockAction(lock);
     if (!error)
         LockedContainer = ct;
