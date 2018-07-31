@@ -366,6 +366,18 @@ int Connection::SetProperty(const std::string &name, const std::string &property
     return Impl->Rpc();
 }
 
+int Connection::IncLabel(const std::string &name, const std::string &label,
+                         int64_t add, int64_t &result) {
+    auto cmd = Impl->Req.mutable_inclabel();
+    cmd->set_name(name);
+    cmd->set_label(label);
+    cmd->set_add(add);
+    int ret = Impl->Rpc();
+    if (Impl->Rsp.has_inclabel())
+        result = Impl->Rsp.inclabel().result();
+    return ret;
+}
+
 int Connection::GetVersion(std::string &tag, std::string &revision) {
     Impl->Req.mutable_version();
 

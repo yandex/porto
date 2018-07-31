@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include "config.hpp"
+#include "container.hpp"
 #include "property.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
@@ -78,6 +79,9 @@ TError TCore::Handle(const TTuple &args) {
 
     error = Identify();
 
+    for (auto name = Container; name != "/"; name = TContainer::ParentName(name))
+        Conn.IncLabel(name, "CORE.total");
+
     if (!Ulimit || !Dumpable) {
         L_CORE("Ignore core from CT:{} {} {}:{} thread {}:{} signal {}, ulimit {} dumpable {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal,
@@ -100,6 +104,11 @@ TError TCore::Handle(const TTuple &args) {
         error = Save();
         if (error)
             L("Cannot save core from CT:{}: {}", Container, error);
+    }
+
+    if (!error) {
+        for (auto name = Container; name != "/"; name = TContainer::ParentName(name))
+            Conn.IncLabel(name, "CORE.dumped");
     }
 
     return error;

@@ -129,6 +129,15 @@ public:
         return GetProperty(name, property, value);
     }
 
+    int IncLabel(const std::string &name, const std::string &label,
+                 int64_t add, int64_t &result);
+
+    int IncLabel(const std::string &name, const std::string &label,
+                 int64_t add = 1) {
+        int64_t result;
+        return IncLabel(name, label, add, result);
+    }
+
     int GetVersion(std::string &tag, std::string &revision);
 
     int Rpc(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);

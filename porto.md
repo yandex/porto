@@ -1074,6 +1074,8 @@ after exceeding new cores are discarded.
 
 Option slot\_space\_limit\_mb limits total size for each first-level container.
 
+Total and dumped cores are counted in labels CORE.total, CORE.dumped at container and parents.
+
 Porto never deletes old core dumps.
 
 # VOLUMES
