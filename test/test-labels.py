@@ -90,10 +90,10 @@ a.SetLabel('TEST.a', '', 'Y')
 assert Catch(a.GetProperty, 'TEST.a') == porto.exceptions.LabelNotFound
 
 
-assert Catch(a.IncLabel, 'TEST.a') == porto.exceptions.LabelNotFound
+assert Catch(a.IncLabel, 'TEST.a', add=0) == porto.exceptions.LabelNotFound
 a.SetLabel('TEST.a', 'a')
 assert Catch(a.IncLabel, 'TEST.a') == porto.exceptions.InvalidValue
-a.SetLabel('TEST.a', '0')
+a.SetLabel('TEST.a', '')
 ExpectEq(a.IncLabel('TEST.a'), 1)
 ExpectEq(a.IncLabel('TEST.a', 2), 3)
 ExpectEq(a.IncLabel('TEST.a', -2), 1)

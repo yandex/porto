@@ -797,23 +797,34 @@ void TContainer::SetLabel(const std::string &label, const std::string &value) {
 }
 
 TError TContainer::IncLabel(const std::string &label, int64_t &result, int64_t add) {
+    int64_t val;
     result = 0;
 
     auto it = Labels.find(label);
-    if (it == Labels.end())
-        return TError(EError::LabelNotFound, "Label {} is not set", label);
+    if (it == Labels.end()) {
+        if (!add)
+            return TError(EError::LabelNotFound, "Label {} is not set", label);
+        if (Labels.size() >= PORTO_LABEL_COUNT_MAX)
+            return TError(EError::ResourceNotAvailable, "Too many labels");
+        val = 0;
+    } else {
+        TError error = StringToInt64(it->second, val);
+        if (error)
+            return error;
+    }
 
-    int64_t val;
-    TError error = StringToInt64(it->second, val);
-    if (error)
-        return error;
     result = val;
 
     if ((add > 0 && val > INT64_MAX - add) || (add < 0 && val < INT64_MIN - add))
         return TError(EError::InvalidValue, "Label {} overflow {} + {}", label, val, add);
 
     val += add;
-    it->second = std::to_string(val);
+
+    if (it == Labels.end())
+        Labels[label] = std::to_string(val);
+    else
+        it->second = std::to_string(val);
+
     result = val;
 
     SetProp(EProperty::LABELS);

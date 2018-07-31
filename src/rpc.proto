@@ -473,7 +473,7 @@ message TSetLabelResponse {
 
 message TIncLabelRequest {
     required string name = 1;
-    required string label = 2;
+    required string label = 2;          // missing label starts from 0
     optional int64 add = 3 [ default = 1];
 }
 

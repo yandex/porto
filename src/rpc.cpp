@@ -277,6 +277,7 @@ void TRequest::Parse() {
     } else if (Req.has_inclabel()) {
         Cmd = "IncLabel";
         Arg = Req.inclabel().name();
+        opts = { Req.inclabel().label() };
         if (Req.inclabel().has_add())
             opts.push_back(fmt::format("add={}", Req.inclabel().add()));
     } else if (Req.has_getsystem()) {
