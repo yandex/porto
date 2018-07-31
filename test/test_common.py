@@ -159,6 +159,18 @@ def ReloadPortod():
     except OSError:
         pass
 
+def ConfigurePortod(name, conf):
+    path = '/etc/portod.conf.d/{}.conf'.format(name)
+    if os.path.exists(path) and open(path).read() == conf:
+        return
+    if conf:
+        if not os.path.exists('/etc/portod.conf.d'):
+            os.mkdir('/etc/portod.conf.d', 0o775)
+        open(path, 'w').write(conf)
+    elif os.path.exists(path):
+        os.unlink(path)
+    ReloadPortod()
+
 def ProcStatus(pid, key):
     for line in open("/proc/{}/status".format(pid)).readlines():
         k, v = line.split(None, 1)
