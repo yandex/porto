@@ -19,6 +19,7 @@ struct TCore {
 	std::string ThreadName;
 
 	TPath ExePath;
+	std::string RootPath;
 	std::string ExeName;
 
 	std::string Container;

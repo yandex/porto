@@ -82,24 +82,31 @@ TError TCore::Handle(const TTuple &args) {
     for (auto name = Container; name != "/"; name = TContainer::ParentName(name))
         Conn.IncLabel(name, "CORE.total");
 
-    if (!Ulimit || !Dumpable) {
+    /* protect host suid binaries */
+    if (Dumpable != 1 && RootPath == "/")
+        CoreCommand = "";
+
+    if (!Ulimit || (Dumpable == 0 && CoreCommand == "")) {
         L_CORE("Ignore core from CT:{} {} {}:{} thread {}:{} signal {}, ulimit {} dumpable {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal,
                 Ulimit, Dumpable);
         return OK;
     }
 
-    if (!error && CoreCommand.size()) {
-        L_CORE("Forward core from CT:{} {} {}:{} thread {}:{} signal {}",
-                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
+    if (CoreCommand != "") {
+        L_CORE("Forward core from CT:{} {} {}:{} thread {}:{} signal {} dumpable {}",
+                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal, Dumpable);
+
         error = Forward();
-        if (error)
+        if (error) {
             L("Cannot forward core from CT:{}: {}", Container, error);
+            CoreCommand = "";
+        }
     }
 
-    if ((error || !CoreCommand.size()) && DefaultPattern) {
-        L_CORE("Save core from CT:{} {} {}:{} thread {}:{} signal {}",
-                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal);
+    if (CoreCommand == "" && DefaultPattern) {
+        L_CORE("Save core from CT:{} {} {}:{} thread {}:{} signal {} dumpable {}",
+                Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal, Dumpable);
 
         error = Save();
         if (error)
@@ -118,6 +125,8 @@ TError TCore::Identify() {
     TStringMap cgmap;
     TError error;
 
+    Container = "/";
+
     /* all threads except crashed are zombies */
     error = GetTaskCgroups(Tid, cgmap);
     if (!error && !cgmap.count("freezer"))
@@ -128,10 +137,8 @@ TError TCore::Identify() {
     }
 
     auto cg = cgmap["freezer"];
-    if (!StringStartsWith(cg, std::string(PORTO_CGROUP_PREFIX) + "/")) {
-        Container = "/";
+    if (!StringStartsWith(cg, std::string(PORTO_CGROUP_PREFIX) + "/"))
         return TError(EError::InvalidState, "not container");
-    }
 
     Container = cg.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
     Slot = Container.substr(0, Container.find('/'));
@@ -143,7 +150,8 @@ TError TCore::Identify() {
             Conn.GetProperty(Container, P_GROUP, Group) ||
             Conn.GetProperty(Container, P_OWNER_USER, OwnerUser) ||
             Conn.GetProperty(Container, P_OWNER_GROUP, OwnerGroup) ||
-            Conn.GetProperty(Container, P_CWD, Cwd)) {
+            Conn.GetProperty(Container, P_CWD, Cwd) ||
+            Conn.GetProperty(Container, P_ROOT_PATH, RootPath)) {
         int err;
         std::string msg;
         Conn.GetLastError(err, msg);
@@ -173,6 +181,9 @@ TError TCore::Forward() {
         {"CORE_CONTAINER", Container},
         {"CORE_OWNER_UID", std::to_string(OwnerUid)},
         {"CORE_OWNER_GID", std::to_string(OwnerGid)},
+        {"CORE_DUMPABLE", std::to_string(Dumpable)},
+        {"CORE_ULIMIT", std::to_string(Ulimit)},
+        {"CORE_DATETIME", FormatTime(time(nullptr), "%Y%m%dT%H%M%S")},
     };
 
     /* To let open /dev/stdin */
@@ -265,9 +276,11 @@ TError TCore::Save() {
     if (error)
         return error;
 
-    error = file.Chown(OwnerUid, OwnerGid);
-    if (error)
-        L("Cannot chown core: {}", error);
+    if (Dumpable != 2) {
+        error = file.Chown(OwnerUid, OwnerGid);
+        if (error)
+            L("Cannot chown core: {}", error);
+    } /* else owned by root */
 
     error = DefaultPattern.Hardlink(Pattern);
     if (error) {

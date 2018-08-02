@@ -1034,16 +1034,29 @@ Variables set in environment and substituted in core\_command:
 - CORE\_CONTAINER
 - CORE\_OWNER\_UID
 - CORE\_OWNER\_GID
+- CORE\_DUMPABLE
+- CORE\_ULIMIT
+- CORE\_DATETIME  (%Y%m%dT%H%M%S)
 
 Command executed in non-isolated sub-container and gets core dump as stdin.
 
-For example core\_command='cp --sparse=always /dev/stdin crash-\$\{CORE\_EXE\_NAME\}-\$\{CORE\_PID\}-S\$\{CORE\_SIG\}.core'
-saves core into file in container. Container ulimit\[core\] should be set to unlimited, or anything > 1.
+For example:
+```
+core_command='cp --sparse=always /dev/stdin crash-${CORE_EXE_NAME}-${CORE_PID}-S${CORE_SIG}.core'
+```
+saves core into file in container.
 
+Container ulimit\[core\] should be set to unlimited, or anything > 1.
+
+Cores from tasks with suid bit or ambiend capabilities are ignored unless
+suid core dumps are enabled via *prctl(2)* PR\_SET\_DUMPABLE or sysctl fs.suid\_dumpable
+or core\_command is set and container lives in chroot.
+
+Core command is executated in same environment as container.
 Information in proc about crashed process and thread available too.
+
 Porto makes sure that sysctl kernel.core\_pipe\_limit isn't zero,
 otherwise crashed task could exit and dismantle pid namespace too early.
-
 
 Required setup in portod.conf:
 ```
