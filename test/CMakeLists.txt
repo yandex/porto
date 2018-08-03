@@ -87,7 +87,7 @@ ADD_PYTHON_TEST(security)
 ADD_PYTHON_TEST(tc-rebuild)
 ADD_PYTHON_TEST(locate-process)
 ADD_PYTHON_TEST(prev_release_upgrade)
-ADD_PYTHON_TEST(oom_non_fatal)
+ADD_PYTHON_TEST(oom)
 
 ADD_PYTHON_TEST(volume-restore)
 
