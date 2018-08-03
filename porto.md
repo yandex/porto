@@ -252,6 +252,8 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
 * **creation\_time** - format: YYYY-MM-DD hh:mm:ss
 
+* **change\_time** - format: YYYY-MM-DD hh:mm:ss
+
 * **start\_time** - format: YYYY-MM-DD hh:mm:ss
 
 * **absolute\_name** - full container name including porto namespaces
@@ -1143,6 +1145,8 @@ Like for container volume configuration is a set of key-value pairs.
 * **ready**         - is construction complete
 
 * **build\_time**   - format: YYYY-MM-DD hh:mm:ss
+
+* **change\_time**  - format: YYYY-MM-DD hh:mm:ss
 
 * **state**         - volume state
     - *initial*

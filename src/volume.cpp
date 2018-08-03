@@ -3103,6 +3103,7 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
                                 State == EVolumeState::Tuning);
     if (BuildTime.size())
         ret[V_BUILD_TIME] = BuildTime;
+    ret[V_CHANGE_TIME] = FormatTime(ChangeTime);
     ret[V_STATE] = StateName(State);
     ret[V_PRIVATE] = Private;
     ret[V_READ_ONLY] = BoolToString(IsReadOnly);
@@ -3167,6 +3168,7 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
     }
 
     dump->set_path(path.ToString());
+    dump->set_change_time(ChangeTime);
 
     for (auto &prop: ret) {
         auto p = dump->add_properties();
@@ -3186,6 +3188,8 @@ TError TVolume::Save() {
             State == EVolumeState::Destroying ||
             State == EVolumeState::Destroyed)
         return OK;
+
+    ChangeTime = time(nullptr);
 
     /*
      * Storing all state values on save,
@@ -4012,6 +4016,7 @@ void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
 
     spec.set_creator(Creator);
     spec.set_build_time(BuildTime);
+    spec.set_change_time(ChangeTime);
 
     spec.set_place(Place.ToString());
 

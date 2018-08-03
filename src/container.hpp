@@ -162,6 +162,7 @@ public:
     uint64_t StartTime = 0;
     uint64_t DeathTime = 0;
     uint64_t AgingTime;
+    uint64_t ChangeTime = 0;
 
     TUlimit Ulimit;
 

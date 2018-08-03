@@ -13,6 +13,7 @@ constexpr const char *V_PATH = "path";
 constexpr const char *V_BACKEND = "backend";
 constexpr const char *V_READY = "ready";
 constexpr const char *V_BUILD_TIME = "build_time";
+constexpr const char *V_CHANGE_TIME = "change_time";
 constexpr const char *V_STATE = "state";
 constexpr const char *V_PRIVATE = "private";
 
@@ -107,6 +108,7 @@ public:
     TPath InternalPath;
     bool IsAutoPath = false;
     std::string BuildTime;
+    uint64_t ChangeTime = 0;
 
     TPath Place;
 

@@ -450,6 +450,8 @@ noinline TError ListContainers(const rpc::TContainerListRequest &req,
         if (ct->IsRoot() || CL->ComposeName(ct->Name, name) ||
                 !StringMatch(name, mask))
             continue;
+        if (req.has_changed_since() && ct->ChangeTime < req.changed_since())
+            continue;
         rsp.mutable_list()->add_name(name);
     }
     return OK;
@@ -666,6 +668,13 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
 
     auto entry = rsp.add_list();
     entry->set_name(name);
+    entry->set_change_time(ct->ChangeTime);
+
+    if (req.has_changed_since() && ct->ChangeTime < req.changed_since()) {
+        entry->set_no_changes(true);
+        goto out;
+    }
+
     for (int j = 0; j < req.variable_size(); j++) {
         auto var = req.variable(j);
 
@@ -687,6 +696,7 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
         }
     }
 
+out:
     if (!containerError)
         ct->UnlockState();
 }
@@ -1025,7 +1035,13 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
         auto link = TVolume::ResolveLink(CL->ClientContainer->RootPath / req.path());
         if (!link)
             return TError(EError::VolumeNotFound, "Volume {} not found", req.path());
-        link->Volume->DumpDescription(link.get(), req.path(), rsp.mutable_volumelist()->add_volumes());
+        auto entry = rsp.mutable_volumelist()->add_volumes();
+        if (req.has_changed_since() && link->Volume->ChangeTime < req.changed_since()) {
+            entry->set_path(req.path());
+            entry->set_change_time(link->Volume->ChangeTime);
+            entry->set_no_changes(true);
+        } else
+            link->Volume->DumpDescription(link.get(), req.path(), entry);
         return OK;
     }
 
@@ -1049,8 +1065,16 @@ noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
     }
     volumes_lock.unlock();
 
-    for (auto &it: map)
-        it.second->Volume->DumpDescription(it.second.get(), it.first, rsp.mutable_volumelist()->add_volumes());
+    for (auto &it: map) {
+        auto entry = rsp.mutable_volumelist()->add_volumes();
+        auto volume = it.second->Volume.get();
+        if (req.has_changed_since() && volume->ChangeTime < req.changed_since()) {
+            entry->set_path(req.path());
+            entry->set_change_time(volume->ChangeTime);
+            entry->set_no_changes(true);
+        } else
+            volume->DumpDescription(it.second.get(), it.first, entry);
+    }
 
     return OK;
 }
@@ -1091,8 +1115,13 @@ noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
     for (auto &path: req.path()) {
         auto link = TVolume::ResolveLink(ct->RootPath / path);
         if (link) {
+            auto volume = link->Volume.get();
             auto spec = rsp.add_volume();
-            link->Volume->Dump(*spec);
+            if (req.has_changed_since() && volume->ChangeTime < req.changed_since()) {
+                spec->set_change_time(volume->ChangeTime);
+                spec->set_no_changes(true);
+            } else
+                volume->Dump(*spec);
             spec->set_path(path);
             spec->set_container(ct_name);
         } else if (req.path().size() == 1)
@@ -1111,8 +1140,13 @@ noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
         volumes_lock.unlock();
 
         for (auto &it: map) {
+            auto volume = it.second->Volume.get();
             auto spec = rsp.add_volume();
-            it.second->Volume->Dump(*spec);
+            if (req.has_changed_since() && volume->ChangeTime < req.changed_since()) {
+                spec->set_change_time(volume->ChangeTime);
+                spec->set_no_changes(true);
+            } else
+                volume->Dump(*spec);
             spec->set_path(it.first.ToString());
             spec->set_container(ct_name);
         }
@@ -1619,6 +1653,7 @@ void TRequest::Handle() {
 
     Client->StartRequest();
     StartTime = GetCurrentTimeMs();
+    auto timestamp = time(nullptr);
 
     Parse();
     error = Check();
@@ -1787,6 +1822,7 @@ void TRequest::Handle() {
 
     rsp.set_error(error.Error);
     rsp.set_errormsg(error.Message());
+    rsp.set_timestamp(timestamp);
 
     if (!RoReq || Verbose) {
         L_RSP("{} {} {} to {} time={}+{} ms", Cmd, Arg, ResponseAsString(rsp),

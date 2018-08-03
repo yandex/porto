@@ -3495,6 +3495,8 @@ TError TContainer::Save(void) {
     TKeyValue node(ContainersKV / std::to_string(Id));
     TError error;
 
+    ChangeTime = time(nullptr);
+
     /* These are not properties */
     node.Set(P_RAW_ID, std::to_string(Id));
     node.Set(P_RAW_NAME, Name);

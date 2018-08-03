@@ -148,6 +148,7 @@ message TContainerRequest {
 message TContainerResponse {
     optional EError error = 1 [ default = LostError ];
     optional string errorMsg = 2;
+    optional uint64 timestamp = 1000;   // for next changed_since
 
     optional TContainerListResponse list = 3;
     optional TContainerGetPropertyResponse getProperty = 4;
@@ -270,6 +271,7 @@ message TContainerDestroyRequest {
 
 message TContainerListRequest {
     optional string mask = 1;
+    optional uint64 changed_since = 2;  // change_time >= changed_since
 }
 
 message TContainerGetPropertyRequest {
@@ -349,6 +351,7 @@ message TContainerGetRequest {
     // update cached counters
     optional bool sync = 4;
     optional bool real = 5;
+    optional uint64 changed_since = 6;  // change_time >= changed_since
 }
 
 // Wait while container(s) is/are in running state
@@ -420,6 +423,8 @@ message TContainerGetResponse {
     message TContainerGetListResponse {
         required string name = 1;
         repeated TContainerGetValueResponse keyval = 2;
+        optional uint64 change_time = 3;
+        optional bool no_changes = 4;   // change_time < changed_since
     }
 
     repeated TContainerGetListResponse list = 1;
@@ -569,6 +574,9 @@ message TVolumeSpec {
     repeated TVolumeDirectory directories = 40; // in
     repeated TVolumeSymlink symlinks = 41;      // in
     repeated TVolumeShare shares = 42;          // in
+
+    optional uint64 change_time = 50;       // out
+    optional bool no_changes = 51;          // out, change_time < changed_since
 }
 
 message TVolumeDescription {
@@ -576,6 +584,9 @@ message TVolumeDescription {
     repeated TVolumeProperty properties = 2;
     repeated string containers = 3;
     repeated TVolumeLink links = 4;
+
+    optional uint64 change_time = 5;
+    optional bool no_changes = 6;           // change_time < changed_since
 }
 
 message TVolumePropertyListRequest {
@@ -608,6 +619,7 @@ message TVolumeUnlinkRequest {
 message TVolumeListRequest {
     optional string path = 1;
     optional string container = 2;
+    optional uint64 changed_since = 3;  // change_time >= changed_since
 }
 
 message TVolumeTuneRequest {
@@ -745,6 +757,7 @@ message TNewVolumeResponse {
 message TGetVolumeRequest {
     optional string container = 1;  // default: self
     repeated string path = 2;       // volume path in container, default: all
+    optional uint64 changed_since = 3;  // change_time >= changed_since
 }
 
 message TGetVolumeResponse {

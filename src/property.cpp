@@ -3445,6 +3445,17 @@ public:
     }
 } static StartTime;
 
+class TChangeTime : public TProperty {
+public:
+    TChangeTime() : TProperty(P_CHANGE_TIME, EProperty::NONE, "Change time") {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = FormatTime(CT->ChangeTime);
+        return OK;
+    }
+} static ChangeTime;
+
 class TPortoStat : public TProperty {
 public:
     void Populate(TUintMap &m);
