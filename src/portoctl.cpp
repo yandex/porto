@@ -352,15 +352,15 @@ public:
                 }
 
                 for (int i = 0; i < nread; i++) {
-                    if (buf[i] == '\3')
+                    if (buf[i] == '\30') // ^X
                         escape++;
                     else
                         escape = 0;
                 }
 
-                if (escape >= 7) {
-                    if (Api->Kill(Container, 9))
-                        std::cerr << "Cannot kill container : " << GetLastError() << std::endl;
+                if (escape >= 2) {
+                    fmt::print(stderr, "\n\r<exit portoctl>\n\r");
+                    WaitExit = false;
                     break;
                 }
 
@@ -1111,7 +1111,7 @@ class TExecCmd final : public ICmd {
 public:
     TExecCmd(Porto::Connection *api) : ICmd(api, "exec", 2,
         "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
-        "Execute command in container, forward terminal, destroy container at the end",
+        "Execute command in container, forward terminal, destroy container at the end, exit - ^X^X",
         "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
         ) { }
 
@@ -1185,7 +1185,7 @@ class TShellCmd final : public ICmd {
 public:
     TShellCmd(Porto::Connection *api) : ICmd(api, "shell", 1,
             "[-u <user>] [-g <group>] <container> [command] [argument]...",
-            "start shell (default /bin/bash) in container") { }
+            "start shell (default /bin/bash) in container, exit - ^X^X") { }
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string current_user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
