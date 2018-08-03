@@ -91,14 +91,20 @@ b = c.Run("a/b", command="stress -m 1", memory_limit="128M", wait=1)
 ExpectEq(b['state'], 'dead')
 ExpectEq(b['exit_code'], '-99')
 ExpectEq(b['oom_killed'], True)
-ExpectEq(b['oom_kills'], '1')
-ExpectEq(b['oom_kills_total'], '1')
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['exit_code'], '-99')
 ExpectEq(a['oom_killed'], True)
-ExpectEq(a['oom_kills'], '0')
 ExpectEq(a['oom_kills_total'], '1')
+
+ExpectEq(int(a['oom_kills']) + int(b['oom_kills']), 1)
+
+# Race: Speculative OOM could be detected in a or a/b
+time.sleep(1)
+
+ExpectEq(a.GetProperty('oom_kills', sync=True), '0')
+ExpectEq(b['oom_kills'], '1')
+ExpectEq(b['oom_kills_total'], '1')
 
 total_oom += 1
 ExpectEq(r['oom_kills_total'], str(total_oom))
@@ -134,7 +140,7 @@ ExpectEq(b['state'], 'dead')
 ExpectEq(b['exit_code'], '-99')
 ExpectEq(b['oom_killed'], True)
 ExpectEq(b['oom_kills'], '1')
-ExpectEq(b['oom_kills_total'], '1')
+ExpectEq(b['oom_kills_total'], '2')
 
 ExpectEq(a['state'], 'meta')
 ExpectEq(a['oom_kills'], '0')
