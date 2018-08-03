@@ -380,6 +380,7 @@ TError TNetwork::New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net) {
     PORTO_ASSERT(!error2);
 
     auto networks_lock = LockNetworks();
+    Statistics->NetworksCreated++;
     Register(net, netns.Inode());
 
     return error;

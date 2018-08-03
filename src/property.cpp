@@ -3232,6 +3232,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["volume_lost"] = Statistics->VolumeLost;
 
     m["networks"] = Statistics->NetworksCount;
+    m["networks_created"] = Statistics->NetworksCreated;
 
     m["clients"] = Statistics->ClientsCount;
     m["clients_connected"] = Statistics->ClientsConnected;

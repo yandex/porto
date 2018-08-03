@@ -63,6 +63,7 @@ struct TStatistics {
     std::atomic<uint64_t> LongestRoRequest;
     std::atomic<uint64_t> LogOpen;
     std::atomic<uint64_t> FailMemoryGuarantee;
+    std::atomic<uint64_t> NetworksCreated;
 
     /* --- add new fields at the end --- */
 };
