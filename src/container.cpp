@@ -1087,15 +1087,26 @@ TError TContainer::CheckMemGuarantee() const {
     uint64_t usage = RootContainer->GetTotalMemGuarantee();
     uint64_t old_usage = usage - std::min(NewMemGuarantee, usage);
     uint64_t reserve = config().daemon().memory_guarantee_reserve();
+    uint64_t hugetlb = GetHugetlbMemory();
 
-    if (usage + reserve > total)
+    if (usage + reserve + hugetlb > total) {
+
+        /*
+         * under overcommit allow to start containers without guarantee
+         * for root user or nested containers
+         */
+        if (!NewMemGuarantee && (Level > 1 || CL->IsSuperUser()))
+            return OK;
+
         return TError(EError::ResourceNotAvailable,
-                "Memory guarantee overcommit: requested {}, available {}, guaranteed {} + reserved {} of {}",
+                "Memory guarantee overcommit: requested {}, available {}, guaranteed {} + reserved {} + hugetlb {} of {}",
                 StringFormatSize(NewMemGuarantee),
-                StringFormatSize(total - old_usage - reserve),
+                StringFormatSize(total - std::min(total, old_usage + reserve + hugetlb)),
                 StringFormatSize(old_usage),
                 StringFormatSize(reserve),
+                StringFormatSize(hugetlb),
                 StringFormatSize(total));
+    }
 
     return OK;
 }

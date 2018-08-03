@@ -179,6 +179,14 @@ uint64_t GetTotalMemory() {
     return (uint64_t)si.totalram * si.mem_unit;
 }
 
+/* total size in bytes, including surplus */
+uint64_t GetHugetlbMemory() {
+    int pages;
+    if (TPath("/sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages").ReadInt(pages))
+        return 0;
+    return (uint64_t)pages << 21;
+}
+
 static __thread std::string *processName;
 
 void SetProcessName(const std::string &name) {
