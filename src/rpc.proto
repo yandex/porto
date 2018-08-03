@@ -221,6 +221,7 @@ message TGetSystemResponse {
     required fixed64 fail_system = 600;
     required fixed64 fail_invalid_value = 601;
     required fixed64 fail_invalid_command = 602;
+    optional fixed64 fail_memory_guarantee = 603;
 
     optional fixed64 network_count = 700;
 }

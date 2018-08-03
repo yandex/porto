@@ -62,6 +62,7 @@ struct TStatistics {
     std::atomic<uint64_t> ContainersTainted;
     std::atomic<uint64_t> LongestRoRequest;
     std::atomic<uint64_t> LogOpen;
+    std::atomic<uint64_t> FailMemoryGuarantee;
 
     /* --- add new fields at the end --- */
 };

@@ -508,6 +508,7 @@ public:
         if (CT->State != EContainerState::Stopped) {
             error = CT->CheckMemGuarantee();
             if (error) {
+                Statistics->FailMemoryGuarantee++;
                 CT->NewMemGuarantee = CT->MemGuarantee;
                 return error;
             }
@@ -3214,6 +3215,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["fail_system"] = Statistics->FailSystem;
     m["fail_invalid_value"] = Statistics->FailInvalidValue;
     m["fail_invalid_command"] = Statistics->FailInvalidCommand;
+    m["fail_memory_guarantee"] = Statistics->FailMemoryGuarantee;
 
     m["requests_longer_1s"] = Statistics->RequestsLonger1s;
     m["requests_longer_3s"] = Statistics->RequestsLonger3s;
