@@ -1008,6 +1008,34 @@ TError TContainer::GetProcessCount(uint64_t &count) const {
     return OK;
 }
 
+void TContainer::CollectOomKills() {
+    for (auto &ct: Subtree()) {
+        if (!HasResources() || !(ct->Controllers & CGROUP_MEMORY))
+            continue;
+
+        auto cg = ct->GetCgroup(MemorySubsystem);
+        uint64_t kills = 0;
+
+        if (MemorySubsystem.GetOomKills(cg, kills) ||
+                kills == ct->OomKills)
+            continue;
+
+        auto lock = LockContainers();
+        if (kills > ct->OomKills) {
+            for (auto p = ct; p ; p = p->Parent) {
+                p->OomKillsTotal += kills - ct->OomKills;
+                p->SetProp(EProperty::OOM_KILLS_TOTAL);
+            }
+        }
+        ct->OomKills = kills;
+        ct->SetProp(EProperty::OOM_KILLS);
+        lock.unlock();
+
+        for (auto p = ct; p ; p = p->Parent)
+            p->Save();
+    }
+}
+
 TError TContainer::CheckMemGuarantee() const {
     uint64_t total = GetTotalMemory();
     uint64_t usage = RootContainer->GetTotalMemGuarantee();
@@ -2562,6 +2590,7 @@ TError TContainer::PrepareRuntimeResources() {
 void TContainer::FreeRuntimeResources() {
     TError error;
 
+    CollectOomKills();
     ShutdownOom();
 
     error = UpdateSoftLimit();
@@ -2588,6 +2617,9 @@ void TContainer::FreeResources() {
 
     if (IsRoot())
         return;
+
+    OomKills = 0;
+    ClearProp(EProperty::OOM_KILLS);
 
     for (auto hy: Hierarchies) {
         if (Controllers & hy->Controllers) {
@@ -2759,6 +2791,9 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->OomEvents = 0;
         ct->OomKilled = false;
         ct->ClearProp(EProperty::OOM_KILLED);
+
+        ct->OomKillsTotal = 0;
+        ct->ClearProp(EProperty::OOM_KILLS_TOTAL);
 
         ct->UnlockState();
 
