@@ -1353,6 +1353,8 @@ std::string TVolume::StateName(EVolumeState state) {
         return "building";
     case EVolumeState::Ready:
         return "ready";
+    case EVolumeState::Tuning:
+        return "tuning";
     case EVolumeState::Unlinked:
         return "unlinked";
     case EVolumeState::ToDestroy:
@@ -1566,7 +1568,8 @@ TError TVolume::DependsOn(const TPath &path) {
 
     auto link = ResolveOriginLocked(path);
     if (link) {
-        if (link->Volume->State != EVolumeState::Ready)
+        if (link->Volume->State != EVolumeState::Ready &&
+                link->Volume->State != EVolumeState::Tuning)
             return TError(EError::VolumeNotReady, "Volume {} depends on non-ready volume {}", Path, link->Volume->Path);
         L("Volume {} depends on volume {}", Path, link->Volume->Path);
         link->Volume->Nested.insert(shared_from_this());
@@ -1617,7 +1620,9 @@ TError TVolume::CheckConflicts(const TPath &path) {
         if (vol->Path.IsInside(path))
             return TError(EError::InvalidPath, "Volume path {} overlaps with volume {}", path, vol->Path);
 
-        if (path.IsInside(vol->Path) && vol->State != EVolumeState::Ready)
+        if (path.IsInside(vol->Path) &&
+                vol->State != EVolumeState::Ready &&
+                vol->State != EVolumeState::Tuning)
             return TError(EError::VolumeNotReady, "Volume path {} inside volume {} and it is not ready", path, vol->Path);
 
         if (vol->Place.IsInside(path))
@@ -1970,7 +1975,9 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         return OK;
 
     auto lock = LockState();
-    if (State != EVolumeState::Ready)
+    if (State != EVolumeState::Ready &&
+            State != EVolumeState::Tuning &&
+            State != EVolumeState::Building)
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
     auto volumes_lock = LockVolumes();
@@ -2383,7 +2390,9 @@ TError TVolume::DestroyOne() {
 
 TError TVolume::StatFS(TStatFS &result) {
     auto lock = LockState();
-    if (State != EVolumeState::Ready && State != EVolumeState::Unlinked) {
+    if (State != EVolumeState::Ready &&
+            State != EVolumeState::Tuning &&
+            State != EVolumeState::Unlinked) {
         result.Reset();
         return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
     }
@@ -2403,9 +2412,13 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
                               "Volume property " + p.first + " cannot be changed");
     }
 
-    auto lock = LockState();
+    auto volumes_lock = LockVolumes();
+    while (State == EVolumeState::Tuning)
+        VolumesCv.wait(volumes_lock);
     if (State != EVolumeState::Ready)
         return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
+    SetState(EVolumeState::Tuning);
+    volumes_lock.unlock();
 
     if (properties.count(V_SPACE_LIMIT) || properties.count(V_INODE_LIMIT)) {
         uint64_t spaceLimit = SpaceLimit, inodeLimit = InodeLimit;
@@ -2413,18 +2426,18 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
         if (properties.count(V_SPACE_LIMIT)) {
             error = StringToSize(properties.at(V_SPACE_LIMIT), spaceLimit);
             if (error)
-                return error;
+                goto out;
         }
         if (properties.count(V_INODE_LIMIT)) {
             error = StringToSize(properties.at(V_INODE_LIMIT), inodeLimit);
             if (error)
-                return error;
+                goto out;
         }
 
         if (!spaceLimit || spaceLimit > SpaceLimit) {
             error = ClaimPlace(spaceLimit);
             if (error)
-                return error;
+                goto out;
         }
 
         L_ACT("Resize volume: {} to bytes: {} inodes: {}",
@@ -2434,13 +2447,13 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
         if (error) {
             if (!spaceLimit || spaceLimit > SpaceLimit)
                 ClaimPlace(SpaceLimit);
-            return error;
+            goto out;
         }
 
         if (spaceLimit && spaceLimit < SpaceLimit)
             ClaimPlace(spaceLimit);
 
-        auto volumes_lock = LockVolumes();
+        volumes_lock.lock();
         SpaceLimit = spaceLimit;
         InodeLimit = inodeLimit;
         volumes_lock.unlock();
@@ -2452,25 +2465,34 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
         if (properties.count(V_SPACE_GUARANTEE)) {
             error = StringToSize(properties.at(V_SPACE_GUARANTEE), space_guarantee);
             if (error)
-                return error;
+                goto out;
         }
         if (properties.count(V_INODE_GUARANTEE)) {
             error = StringToSize(properties.at(V_INODE_GUARANTEE), inode_guarantee);
             if (error)
-                return error;
+                goto out;
         }
 
+        volumes_lock.lock();
         error = CheckGuarantee(space_guarantee, inode_guarantee);
-        if (error)
-            return error;
-
-        auto volumes_lock = LockVolumes();
-        SpaceGuarantee = space_guarantee;
-        InodeGuarantee = inode_guarantee;
+        if (!error) {
+            SpaceGuarantee = space_guarantee;
+            InodeGuarantee = inode_guarantee;
+        }
         volumes_lock.unlock();
     }
 
-    return Save();
+out:
+
+    volumes_lock.lock();
+    if (State == EVolumeState::Tuning)
+        SetState(EVolumeState::Ready);
+    volumes_lock.unlock();
+
+    if (!error)
+        Save();
+
+    return error;
 }
 
 TError TVolume::GetUpperLayer(TPath &upper) {
@@ -2615,7 +2637,8 @@ next:
     L_ACT("Del volume {} link {} for CT{}:{}", Path, link->Target, container->Id, container->Name);
 
     Links.remove(link);
-    if (Links.empty() && State == EVolumeState::Ready) {
+    if (Links.empty() && (State == EVolumeState::Ready ||
+                          State == EVolumeState::Tuning)) {
         SetState(EVolumeState::Unlinked);
         unlinked.emplace_back(shared_from_this());
     }
@@ -2674,7 +2697,8 @@ TError TVolume::CheckRequired(TContainer &ct) {
         auto link = ResolveLinkLocked(ct.RootPath / path);
         if (!link)
             return TError(EError::VolumeNotFound, "Required volume {} not found", path);
-        if (link->Volume->State != EVolumeState::Ready)
+        if (link->Volume->State != EVolumeState::Ready &&
+                link->Volume->State != EVolumeState::Tuning)
             return TError(EError::VolumeNotReady, "Required volume {} not ready", path);
         link->Volume->HasDependentContainer = true;
     }
@@ -2707,7 +2731,8 @@ void TVolume::Dump(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription
     if (VolumePerms)
         ret[V_PERMISSIONS] = StringFormat("%#o", VolumePerms);
     ret[V_CREATOR] = Creator;
-    ret[V_READY] = BoolToString(State == EVolumeState::Ready);
+    ret[V_READY] = BoolToString(State == EVolumeState::Ready ||
+                                State == EVolumeState::Tuning);
     if (BuildTime.size())
         ret[V_BUILD_TIME] = BuildTime;
     ret[V_STATE] = StateName(State);
@@ -2826,7 +2851,8 @@ TError TVolume::Save() {
         node.Set(V_GROUP, VolumeCred.Group());
     if (VolumePerms)
         node.Set(V_PERMISSIONS, StringFormat("%#o", VolumePerms));
-    node.Set(V_READY, BoolToString(State == EVolumeState::Ready));
+    node.Set(V_READY, BoolToString(State == EVolumeState::Ready ||
+                                   State == EVolumeState::Tuning));
     node.Set(V_PRIVATE, Private);
     node.Set(V_LOOP_DEV, std::to_string(Device));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
