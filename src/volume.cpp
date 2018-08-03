@@ -1450,15 +1450,15 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
 
     /* Check available space as is */
     if (total.SpaceAvail + current.SpaceUsage < space_guarantee)
-        return TError(EError::NoSpace, "Not enough space for volume guarantee: " +
-                      std::to_string(total.SpaceAvail) + " available " +
-                      std::to_string(current.SpaceUsage) + " used");
+        return TError(EError::NoSpace, "Not enough space for volume guarantee {}, avail {}, our usage {}",
+                      StringFormatSize(space_guarantee),
+                      StringFormatSize(total.SpaceAvail),
+                      StringFormatSize(current.SpaceUsage));
 
     if (total.InodeAvail + current.InodeUsage < inode_guarantee &&
             BackendType != "loop")
-        return TError(EError::NoSpace, "Not enough inodes for volume guarantee: " +
-                      std::to_string(total.InodeAvail) + " available " +
-                      std::to_string(current.InodeUsage) + " used");
+        return TError(EError::NoSpace, "Not enough inodes for volume guarantee {}, avail {}, our usage {}",
+                      inode_guarantee, total.InodeAvail, current.InodeUsage);
 
     /* Estimate unclaimed guarantees */
     uint64_t space_claimed = 0, space_guaranteed = 0;
@@ -1474,8 +1474,8 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
             continue;
 
         TStatFS stat;
-        uint64_t volume_space_guarantee = SpaceGuarantee;
-        uint64_t volume_inode_guarantee = InodeGuarantee;
+        uint64_t volume_space_guarantee = volume->SpaceGuarantee;
+        uint64_t volume_inode_guarantee = volume->InodeGuarantee;
 
         if (!volume_space_guarantee && !volume_inode_guarantee)
             continue;
@@ -1499,20 +1499,18 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
 
     if (total.SpaceAvail + current.SpaceUsage + space_claimed <
             space_guarantee + space_guaranteed)
-        return TError(EError::NoSpace, "Not enough space for volume guarantee: " +
-                      std::to_string(total.SpaceAvail) + " available " +
-                      std::to_string(current.SpaceUsage) + " used " +
-                      std::to_string(space_claimed) + " claimed " +
-                      std::to_string(space_guaranteed) + " guaranteed");
+        return TError(EError::NoSpace, "Not enough space for volume guarantee {}, avail {}, claimed {} of {}, our usage {}",
+                      StringFormatSize(space_guarantee),
+                      StringFormatSize(total.SpaceAvail),
+                      StringFormatSize(space_claimed),
+                      StringFormatSize(space_guaranteed),
+                      StringFormatSize(current.SpaceUsage));
 
     if (BackendType != "loop" &&
             total.InodeAvail + current.InodeUsage + inode_claimed <
             inode_guarantee + inode_guaranteed)
-        return TError(EError::NoSpace, "Not enough inodes for volume guarantee: " +
-                      std::to_string(total.InodeAvail) + " available " +
-                      std::to_string(current.InodeUsage) + " used " +
-                      std::to_string(inode_claimed) + " claimed " +
-                      std::to_string(inode_guaranteed) + " guaranteed");
+        return TError(EError::NoSpace, "Not enough inodes for volume guarantee {}, avail {}, claimed {} of {}, our usage {}",
+                      inode_guarantee, total.InodeAvail, inode_claimed, inode_guaranteed, current.InodeUsage);
 
     return OK;
 }
