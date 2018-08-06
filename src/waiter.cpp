@@ -68,7 +68,8 @@ void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const
     for (auto it = ContainerWaiters.begin(); it != ContainerWaiters.end();) {
         auto waiter = *it;
         if (waiter->ShouldReport(ct) &&
-                (label.empty() || waiter->ShouldReportLabel(label))) {
+                (label.empty() || (label[0] >= 'a' && label[0] <= 'z') ||
+                 waiter->ShouldReportLabel(label))) {
             auto client = waiter->Client.lock();
 
             std::string name;

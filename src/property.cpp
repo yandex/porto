@@ -2754,15 +2754,23 @@ public:
         IsDeadOnly = true;
     }
     TError Get(std::string &value) {
-        if (CT->OomKilled)
-            value = "-99";
-        else if (WIFSIGNALED(CT->ExitStatus))
-            value = std::to_string(-WTERMSIG(CT->ExitStatus));
-        else
-            value = std::to_string(WEXITSTATUS(CT->ExitStatus));
+        value = std::to_string(CT->GetExitCode());
         return OK;
     }
 } static ExitCodeProperty;
+
+class TStartErrorProperty : public TProperty {
+public:
+    TStartErrorProperty() : TProperty(P_START_ERROR, EProperty::NONE, "Last start error")
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        if (CT->StartError)
+            value = CT->StartError.ToString();
+        return OK;
+    }
+} static StartErrorProperty;
 
 class TMemUsage : public TProperty {
 public:

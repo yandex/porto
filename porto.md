@@ -224,6 +224,8 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
 * **exit\_status** - container exit status, see **wait(2)**
 
+* **start\_error** - last start error
+
 * **oom\_killed** - true, if container has been OOM killed
 
 * **oom\_kills** - count of tasks killed in container since start (Linux 4.13 or offstream patches)

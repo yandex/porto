@@ -159,6 +159,7 @@ public:
     time_t RealCreationTime;
     time_t RealStartTime = 0;
 
+    TError StartError;
     uint64_t StartTime = 0;
     uint64_t DeathTime = 0;
     uint64_t AgingTime;
@@ -264,6 +265,7 @@ public:
     TNetClass NetClass;
 
     TPath GetCwd() const;
+    int GetExitCode() const;
 
     TPath WorkDir() const;
     TError CreateWorkDir() const;

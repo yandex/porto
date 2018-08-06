@@ -919,6 +919,17 @@ TPath TContainer::GetCwd() const {
     return WorkDir();
 }
 
+int TContainer::GetExitCode() const {
+    if (State != EContainerState::Dead &&
+            State != EContainerState::Respawning)
+        return 256;
+    if (OomKilled)
+        return -99;
+    if (WIFSIGNALED(ExitStatus))
+        return -WTERMSIG(ExitStatus);
+    return WEXITSTATUS(ExitStatus);
+}
+
 TError TContainer::UpdateSoftLimit() {
     auto lock = LockContainers();
     TError error;
@@ -980,7 +991,17 @@ void TContainer::SetState(EContainerState next) {
                 TContainerWaiter::ReportAll(*p);
     }
 
-    TContainerWaiter::ReportAll(*this);
+    std::string label, value;
+
+    if (next == EContainerState::Dead || next == EContainerState::Respawning) {
+        label = P_EXIT_CODE;
+        value = std::to_string(GetExitCode());
+    } else if (next == EContainerState::Stopped && StartError) {
+        label = P_START_ERROR;
+        value = StartError.ToString();
+    }
+
+    TContainerWaiter::ReportAll(*this, label, value);
 
     UnlockState();
 }
@@ -2663,6 +2684,8 @@ TError TContainer::Start() {
 
     PORTO_ASSERT(IsActionLocked());
 
+    StartError = OK;
+
     error = PrepareStart();
     if (error) {
         error = TError(error, "Cannot prepare start for container {}", Name);
@@ -2729,6 +2752,7 @@ err:
     FreeRuntimeResources();
     FreeResources();
 err_prepare:
+    StartError = error;
     SetState(EContainerState::Stopped);
     Statistics->ContainersFailedStart++;
 

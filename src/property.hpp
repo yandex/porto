@@ -123,6 +123,7 @@ constexpr const char *P_PARENT = "parent";
 constexpr const char *P_ROOT_PID = "root_pid";
 constexpr const char *P_EXIT_STATUS = "exit_status";
 constexpr const char *P_EXIT_CODE = "exit_code";
+constexpr const char *P_START_ERROR = "start_error";
 constexpr const char *P_STDOUT = "stdout";
 constexpr const char *P_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *P_STDERR = "stderr";
