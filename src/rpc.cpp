@@ -1313,7 +1313,9 @@ noinline TError AttachProcess(const rpc::TAttachProcessRequest &req, bool thread
             pid == oldCt->SeizeTask.Pid)
         return TError(EError::Busy, "cannot move main process");
 
-    error = CL->WriteContainer(req.name(), newCt);
+    auto lock = LockContainers();
+    error = CL->ResolveContainer(req.name(), newCt);
+    lock.unlock();
     if (error)
         return error;
 
