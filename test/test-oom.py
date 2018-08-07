@@ -69,9 +69,11 @@ ExpectEq(r['oom_kills_total'], str(total_oom))
 a.Destroy()
 
 
-a = c.Run("a", command="stress -m 1", memory_limit="64M", respawn=True, max_respawns=2, respawn_delay=0.1)
+a = c.Run("a", command="stress -m 1", memory_limit="64M", respawn=True, max_respawns=2, respawn_delay='0.5s')
 
-time.sleep(1)
+while a['state'] != 'dead':
+    a.Wait()
+
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['respawn_count'], '2')
 ExpectEq(a['exit_code'], '-99')
