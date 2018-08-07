@@ -2539,6 +2539,11 @@ TError TContainer::StartTask() {
 TError TContainer::StartParents() {
     TError error;
 
+    if (ActionLocked >= 0 || CL->LockedContainer.get() != this) {
+        L_ERR("Container is not locked");
+        return TError(EError::Busy, "Caontiner is not locked");
+    }
+
     if (!Parent)
         return OK;
 
@@ -2550,12 +2555,16 @@ TError TContainer::StartParents() {
             Parent->State == EContainerState::Meta)
         return OK;
 
+    auto current = CL->LockedContainer;
+
     std::shared_ptr<TContainer> target;
     do {
         target = Parent;
         while (target->Parent && target->Parent->State != EContainerState::Running &&
                 target->Parent->State != EContainerState::Meta)
             target = target->Parent;
+
+        CL->ReleaseContainer();
 
         error = CL->LockContainer(target);
         if (error)
@@ -2566,7 +2575,9 @@ TError TContainer::StartParents() {
             return error;
     } while (target != Parent);
 
-    return OK;
+    CL->ReleaseContainer();
+
+    return CL->LockContainer(current);
 }
 
 TError TContainer::PrepareStart() {
@@ -2682,8 +2693,6 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    PORTO_ASSERT(IsActionLocked());
-
     StartError = OK;
 
     error = PrepareStart();
@@ -2717,11 +2726,11 @@ TError TContainer::Start() {
         }
     }
 
-    CL->LockedContainer->DowngradeActionLock();
+    DowngradeActionLock();
 
     error = StartTask();
 
-    CL->LockedContainer->UpgradeActionLock();
+    UpgradeActionLock();
 
     if (error) {
         SetState(EContainerState::Stopping);
