@@ -252,11 +252,23 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
 * **time** - container running time in seconds
 
+* **time\[dead\]** - time since death in seconds
+
 * **creation\_time** - format: YYYY-MM-DD hh:mm:ss
+
+* **creation\_time\[raw\]** - seconds since the epoch
 
 * **change\_time** - format: YYYY-MM-DD hh:mm:ss
 
+* **change\_time\[raw\]** - seconds since the epoch
+
 * **start\_time** - format: YYYY-MM-DD hh:mm:ss
+
+* **start\_time\[raw\]** - seconds since the epoch
+
+* **death\_time** - format: YYYY-MM-DD hh:mm:ss
+
+* **death\_time\[raw\]** - seconds since the epoch
 
 * **absolute\_name** - full container name including porto namespaces
 

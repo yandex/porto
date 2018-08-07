@@ -158,6 +158,7 @@ public:
 
     time_t RealCreationTime;
     time_t RealStartTime = 0;
+    time_t RealDeathTime = 0;
 
     TError StartError;
     uint64_t StartTime = 0;

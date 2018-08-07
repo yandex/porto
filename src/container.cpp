@@ -3041,6 +3041,7 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->ClearProp(EProperty::START_TIME);
 
         ct->DeathTime = 0;
+        ct->RealDeathTime = 0;
         ct->ClearProp(EProperty::DEATH_TIME);
 
         ct->ExitStatus = 0;
@@ -3077,8 +3078,11 @@ void TContainer::Reap(bool oomKilled) {
 
     LockStateWrite();
 
-    DeathTime = GetCurrentTimeMs();
-    SetProp(EProperty::DEATH_TIME);
+    if (!HasProp(EProperty::DEATH_TIME)) {
+        DeathTime = GetCurrentTimeMs();
+        RealDeathTime = time(nullptr);
+        SetProp(EProperty::DEATH_TIME);
+    }
 
     if (oomKilled) {
         OomKilled = oomKilled;
@@ -3309,6 +3313,9 @@ err:
 
 err_prepare:
     DeathTime = GetCurrentTimeMs();
+    RealDeathTime = time(nullptr);
+    SetProp(EProperty::DEATH_TIME);
+
     Statistics->ContainersFailedStart++;
     L("Cannot respawn CT{}:{} - {}", Id, Name, error);
     SetState(EContainerState::Dead);
@@ -3789,6 +3796,7 @@ void TContainer::SyncState() {
 
     if (State == EContainerState::Dead && !HasProp(EProperty::DEATH_TIME)) {
         DeathTime = GetCurrentTimeMs();
+        RealDeathTime = time(nullptr);
         SetProp(EProperty::DEATH_TIME);
     }
 }

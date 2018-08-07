@@ -1433,7 +1433,9 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        return StringToUint64(value, CT->DeathTime);
+        StringToUint64(value, CT->DeathTime);
+        CT->RealDeathTime = time(nullptr) - (GetCurrentTimeMs() - CT->DeathTime) / 1000;
+        return OK;
     }
 } static RawDeathTime;
 
@@ -3428,6 +3430,16 @@ public:
             value = std::to_string((GetCurrentTimeMs() - CT->StartTime) / 1000);
         return OK;
     }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index == "dead") {
+            if (CT->State == EContainerState::Dead)
+                value = std::to_string((GetCurrentTimeMs() - CT->DeathTime) / 1000);
+            else
+                return TError(EError::InvalidState, "Not dead yet");
+        } else
+            return TError(EError::InvalidValue, "What {}?", index);
+        return OK;
+    }
 } static Time;
 
 class TCreationTime : public TProperty {
@@ -3437,6 +3449,13 @@ public:
     }
     TError Get(std::string &value) {
         value = FormatTime(CT->RealCreationTime);
+        return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index == "raw")
+            value = std::to_string(CT->RealCreationTime);
+        else
+            return TError(EError::InvalidValue, "What {}?", index);
         return OK;
     }
 } static CreationTime;
@@ -3451,7 +3470,34 @@ public:
             value = FormatTime(CT->RealStartTime);
         return OK;
     }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index == "raw")
+            value = std::to_string(CT->RealStartTime);
+        else
+            return TError(EError::InvalidValue, "What {}?", index);
+        return OK;
+    }
 } static StartTime;
+
+class TDeathTime : public TProperty {
+public:
+    TDeathTime() : TProperty(P_DEATH_TIME, EProperty::NONE, "Death time") {
+        IsReadOnly = true;
+        IsDeadOnly = true;
+    }
+    TError Get(std::string &value) {
+        if (CT->RealDeathTime)
+            value = FormatTime(CT->RealDeathTime);
+        return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index == "raw")
+            value = std::to_string(CT->RealDeathTime);
+        else
+            return TError(EError::InvalidValue, "What {}?", index);
+        return OK;
+    }
+} static DeathTime;
 
 class TChangeTime : public TProperty {
 public:
@@ -3460,6 +3506,13 @@ public:
     }
     TError Get(std::string &value) {
         value = FormatTime(CT->ChangeTime);
+        return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index == "raw")
+            value = std::to_string(CT->ChangeTime);
+        else
+            return TError(EError::InvalidValue, "What {}?", index);
         return OK;
     }
 } static ChangeTime;
