@@ -2258,7 +2258,7 @@ TError TVolume::Build() {
     if (!KeepStorage && HaveStorage())
         KeepStorage = true;
 
-    BuildTime = FormatTime(time(nullptr));
+    BuildTime = time(nullptr);
 
     return OK;
 }
@@ -3101,8 +3101,8 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
     ret[V_CREATOR] = Creator;
     ret[V_READY] = BoolToString(State == EVolumeState::Ready ||
                                 State == EVolumeState::Tuning);
-    if (BuildTime.size())
-        ret[V_BUILD_TIME] = BuildTime;
+    if (BuildTime)
+        ret[V_BUILD_TIME] = FormatTime(BuildTime);
     ret[V_CHANGE_TIME] = FormatTime(ChangeTime);
     ret[V_STATE] = StateName(State);
     ret[V_PRIVATE] = Private;
@@ -3203,7 +3203,7 @@ TError TVolume::Save() {
     node.Set(V_BACKEND, BackendType);
 
     node.Set(V_CREATOR, Creator);
-    node.Set(V_BUILD_TIME, BuildTime);
+    node.Set(V_BUILD_TIME, std::to_string(BuildTime));
 
     if (VolumeOwnerContainer)
         node.Set(V_OWNER_CONTAINER, VolumeOwnerContainer->Name);
@@ -3910,7 +3910,10 @@ TError TVolume::ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec) {
         } else if (key == V_CREATOR) {
             spec.set_creator(val);
         } else if (key == V_BUILD_TIME) {
-            spec.set_build_time(val);
+            uint64_t v;
+            if (StringToUint64(val, v))
+                v = time(nullptr);
+            spec.set_build_time(v);
         } else if (key == V_READY) {
             spec.set_state(val == "true" ? "ready" : "unknown");
         } else if (key == V_STATE) {

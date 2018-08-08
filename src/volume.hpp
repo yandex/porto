@@ -107,7 +107,7 @@ public:
     TPath Path;
     TPath InternalPath;
     bool IsAutoPath = false;
-    std::string BuildTime;
+    uint64_t BuildTime = 0;
     uint64_t ChangeTime = 0;
 
     TPath Place;

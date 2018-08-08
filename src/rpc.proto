@@ -568,7 +568,7 @@ message TVolumeSpec {
     optional string creator = 33;           // out
     optional bool auto_path = 34;           // out
     optional uint32 device_index = 35;      // out
-    optional string build_time = 36;        // out
+    optional uint64 build_time = 37;        // out
 
     // customization at creation
     repeated TVolumeDirectory directories = 40; // in
