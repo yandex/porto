@@ -2286,7 +2286,7 @@ public:
 class TBuildCmd final : public ICmd {
 public:
     TBuildCmd(Porto::Connection *api) : ICmd(api, "build", 0,
-            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-Q image.squashfs] [-B|-b script] [-S script]... [properties]...",
+            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-Q image.squashfs] [-B|-b script] [-S|-s script]... [properties]...",
             "build container image",
             "    -l layer|dir|tarball       layer for bootstrap, if empty run in host\n"
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
@@ -2297,6 +2297,7 @@ public:
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
             "    -b bootstrap2              bash script runs inside before os (with root=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
+            "    -s script2                 bash script runs inside after os stop (with root=volume)\n"
             "    -M                         merge all layers together\n"
             "    -k                         keep volume and container\n"
             ) { }
@@ -2308,6 +2309,7 @@ public:
         TLauncher bootstrap(Api);
         TLauncher bootstrap2(Api);
         TLauncher chroot(Api);
+        TLauncher base(Api);
         TError error;
 
         std::string build_script = "porto_build";
@@ -2329,6 +2331,7 @@ public:
         std::vector<std::string> env;
         std::vector<std::string> layers;
         std::vector<TPath> scripts;
+        std::vector<TPath> scripts2;
         TPath bootstrap_script;
         TPath bootstrap2_script;
 
@@ -2342,6 +2345,7 @@ public:
             { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
             { 'b', true, [&](const char *arg) { bootstrap2_script = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
+            { 's', true, [&](const char *arg) { scripts2.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *) { launcher.WeakContainer = false; } },
             { 'M', false, [&](const char *) { launcher.MergeLayers = true; } },
         });
@@ -2384,6 +2388,13 @@ public:
             }
         }
 
+        for (auto &script: scripts2) {
+            if (!script.Exists()) {
+                std::cerr << "Script " << script << " not exists" << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
+
         if (!bootstrap_script.IsEmpty() && !bootstrap_script.Exists()) {
             std::cerr << "Bootstrap " << bootstrap_script << " not exists" << std::endl;
             return EXIT_FAILURE;
@@ -2414,8 +2425,8 @@ public:
             loopImage = loopStorage / "loop.img";
         }
 
-        /* Start os in chroot container */
-        chroot.VirtMode = launcher.VirtMode;
+        /* Start os in launcher/chroot/base container */
+        base.VirtMode = launcher.VirtMode;
         launcher.VirtMode = "app";
 
         std::string volume;
@@ -2529,16 +2540,76 @@ public:
         chroot.SetProperty("isolate", "true");
         chroot.SetProperty("net", "inherited");
 
-        if (chroot.VirtMode == "os")
-            std::cout << "\nStarting OS ..." << std::endl;
-
         error = chroot.Launch();
         if (error) {
-            std::cerr << "Cannot start chroot container: " << error << std::endl;
+            std::cerr << "Cannot start container: " << error << std::endl;
+            goto err;
+        }
+
+        base.Container = launcher.Container + "/chroot/base";
+        base.Environment = launcher.Environment;
+        base.SetProperty("isolate", "true");
+        base.SetProperty("net", "inherited");
+
+        if (base.VirtMode == "os")
+            std::cout << "\nStarting OS ..." << std::endl;
+
+        error = base.Launch();
+        if (error) {
+            std::cerr << "Cannot start container: " << error << std::endl;
             goto err;
         }
 
         for (auto &script: scripts) {
+            TLauncher executor(Api);
+
+            std::string script_text;
+            error = script.ReadAll(script_text);
+            if (!error)
+                error = volume_script.WriteAll(script_text);
+            if (error) {
+                std::cout << "Cannot copy script: " << error << std::endl;
+                goto err;
+            }
+
+            executor.Container = base.Container + "/script";
+            executor.ForwardStreams = true;
+            executor.WaitExit = true;
+            executor.Environment = launcher.Environment;
+
+            executor.SetProperty("stdin_path", "/dev/null");
+            executor.SetProperty("isolate", "false");
+            executor.SetProperty("virt_mode", "os");
+            executor.SetProperty("net", "inherited");
+            executor.SetProperty("command", build_command);
+
+            std::cout << "\nStarting script " << script << " ...\n" << std::endl;
+
+            error = executor.Launch();
+            if (error) {
+                std::cout << "Cannot start script: " << error << std::endl;
+                goto err;
+            }
+
+            if (executor.ExitCode) {
+                std::cout << "Script: " << executor.ExitMessage << std::endl;
+                goto err;
+            }
+
+            executor.Cleanup();
+            volume_script.WriteAll("");
+        }
+
+        if (base.VirtMode == "os")
+            std::cout << "\Stopping OS ..." << std::endl;
+
+        error = base.StopContainer();
+        if (error) {
+            std::cerr << "Cannot stop container: " << error << std::endl;
+            goto err;
+        }
+
+        for (auto &script: scripts2) {
             TLauncher executor(Api);
 
             std::string script_text;
@@ -2578,7 +2649,7 @@ public:
             volume_script.WriteAll("");
         }
 
-        if (scripts.size()) {
+        if (scripts.size() || scripts2.size()) {
             TLauncher executor(Api);
 
             volume_script.WriteAll(
