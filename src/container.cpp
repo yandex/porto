@@ -993,12 +993,15 @@ void TContainer::SetState(EContainerState next) {
 
     std::string label, value;
 
-    if (next == EContainerState::Dead || next == EContainerState::Respawning) {
-        label = P_EXIT_CODE;
-        value = std::to_string(GetExitCode());
-    } else if (next == EContainerState::Stopped && StartError) {
+    if ((State == EContainerState::Stopped ||
+         State == EContainerState::Dead ||
+         State ==  EContainerState::Respawning) && StartError) {
         label = P_START_ERROR;
         value = StartError.ToString();
+    } else if (State == EContainerState::Dead ||
+               State == EContainerState::Respawning) {
+        label = P_EXIT_CODE;
+        value = std::to_string(GetExitCode());
     }
 
     TContainerWaiter::ReportAll(*this, label, value);
@@ -3257,6 +3260,8 @@ TError TContainer::Respawn() {
 
     TNetwork::StopNetwork(*this);
 
+    StartError = OK;
+
     error = PrepareStart();
     if (error) {
         error = TError(error, "Cannot prepare respawn for container {}", Name);
@@ -3312,6 +3317,7 @@ err:
     FreeRuntimeResources();
 
 err_prepare:
+    StartError = error;
     DeathTime = GetCurrentTimeMs();
     RealDeathTime = time(nullptr);
     SetProp(EProperty::DEATH_TIME);
