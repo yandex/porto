@@ -28,6 +28,7 @@ struct TTask {
     bool IsZombie() const;
     pid_t GetPPid() const;
     TError Kill(int signal) const;
+    TError KillPg(int signal) const;
 };
 
 std::string FormatTime(time_t t, const char *fmt = "%F %T");

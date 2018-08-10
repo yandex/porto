@@ -120,7 +120,8 @@ public:
 
     bool PropSet[(int)EProperty::NR_PROPERTIES];
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
-    uint64_t Controllers, RequiredControllers;
+    uint64_t Controllers = 0;
+    uint64_t RequiredControllers = 0;
     TCred OwnerCred;
     TCred TaskCred;
     std::string Command;
@@ -132,8 +133,9 @@ public:
     mode_t Umask;
     bool BindDns = false;       /* deprecated */
     bool Isolate;               /* New pid/ipc/utc/env namespace */
-    bool OsMode;                /* Start as init process */
-    bool HostMode;              /* Preserve host capabilites */
+    bool OsMode = false;        /* Start as init process */
+    bool HostMode = false;      /* Preserve host capabilites */
+    bool JobMode = false;       /* Process group */
 
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */

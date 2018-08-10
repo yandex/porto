@@ -200,6 +200,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     - *app* - (default) start **command** as normal process
     - *os* - start **command** as init process
     - *host* - start **command** without security restrictions
+    - *job* - start **command** as process group in parent container
 
     Side effects of **virt\_mode**=*os*
 

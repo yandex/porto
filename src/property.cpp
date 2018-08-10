@@ -642,23 +642,32 @@ public:
 class TVirtMode : public TProperty {
 public:
     TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
-            "Virtualization mode: os|app|host") {}
+            "Virtualization mode: os|app|job|host") {}
     TError Get(std::string &value) {
-        value = CT->HostMode ? "host" : CT->OsMode ? "os" : "app";
+        value = CT->OsMode ? "os" :
+                CT->JobMode ? "job" :
+                CT->HostMode ? "host" : "app";
         return OK;
     }
     TError Set(const std::string &value) {
-        if (value == "app") {
-            CT->OsMode = false;
-            CT->HostMode = false;
-        } else if (value == "os") {
-            CT->OsMode = true;
-            CT->HostMode = false;
-        } else if (value == "host") {
-            CT->OsMode = false;
-            CT->HostMode = true;
-        } else
+
+        if (value != "app" &&
+                value != "os" &&
+                value != "job" &&
+                value != "host")
             return TError(EError::InvalidValue, "Unknown: {}", value);
+
+        CT->OsMode = false;
+        CT->JobMode = false;
+        CT->HostMode = false;
+
+        if (value == "os")
+            CT->OsMode = true;
+        else if (value == "job")
+            CT->JobMode = true;
+        else if (value == "host")
+            CT->HostMode = true;
+
         CT->SetProp(EProperty::VIRT_MODE);
         return OK;
     }
@@ -853,9 +862,9 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->HostMode) {
+        if (CT->HostMode || CT->JobMode) {
             if (CT->Isolate && CT->HasProp(EProperty::ISOLATE))
-                return TError(EError::InvalidValue, "isolate=true incopatible with virt_mode=host");
+                return TError(EError::InvalidValue, "isolate=true incompatible with virt_mode");
             CT->Isolate = false;
         }
         return OK;
@@ -894,8 +903,8 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->HostMode && CT->Root != "/")
-            return TError(EError::InvalidValue, "Cannot change root with virt_mode=host");
+        if ((CT->HostMode || CT->JobMode) && CT->Root != "/")
+            return TError(EError::InvalidValue, "Cannot change root in this virt_mode");
         return OK;
     }
 } static Root;

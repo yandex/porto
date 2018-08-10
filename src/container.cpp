@@ -348,7 +348,6 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     RootRo = false;
     Umask = 0002;
     Isolate = true;
-    OsMode = false;
     HostMode = IsRoot();
 
     NetProp = { { "inherited" } };
@@ -396,7 +395,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     RunningChildren = 0;
     StartingChildren = 0;
 
-    Controllers = RequiredControllers = CGROUP_FREEZER;
+    Controllers |= CGROUP_FREEZER;
 
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
         Controllers |= CGROUP_CPUACCT;
@@ -2137,6 +2136,16 @@ TError TContainer::SetSymlink(const TPath &symlink, const TPath &target) {
 TError TContainer::PrepareCgroups() {
     TError error;
 
+    if (JobMode) {
+        if (RequiredControllers)
+            return TError(EError::InvalidValue, "Cannot use cgroups in virt_mode=job");
+        Controllers = 0;
+        return OK;
+    } else {
+        Controllers |= CGROUP_FREEZER;
+        RequiredControllers |= CGROUP_FREEZER;
+    }
+
     if (!HasProp(EProperty::CPU_SET) && Parent) {
         auto lock = LockCpuAffinity();
 
@@ -2170,7 +2179,7 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto missing = Controllers;
+    auto missing = Controllers | RequiredControllers;
 
     for (auto hy: Hierarchies) {
         TCgroup cg = GetCgroup(*hy);
@@ -2333,7 +2342,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.TripleFork = Isolate && TaskEnv.PidFd.GetFd() >= 0 &&
         TaskEnv.PidFd.Inode() != TNamespaceFd::PidInode(getpid(), "ns/pid");
 
-    TaskEnv.QuadroFork = !OsMode && !IsMeta();
+    TaskEnv.QuadroFork = !JobMode && !OsMode && !IsMeta();
 
     TaskEnv.Mnt.BindMounts = BindMounts;
     TaskEnv.Mnt.Symlink = Symlink;
@@ -2412,8 +2421,8 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           TaskEnv.Mnt.RootRo ||
                           !TaskEnv.Mnt.Systemd.empty();
 
-    if (TaskEnv.NewMountNs && HostMode)
-        return TError(EError::InvalidValue, "Cannot change mount-namespace in virt_mode=host");
+    if (TaskEnv.NewMountNs && (HostMode || JobMode))
+        return TError(EError::InvalidValue, "Cannot change mount-namespace in this virt_mode");
 
     return OK;
 }
@@ -2646,6 +2655,12 @@ TError TContainer::PrepareStart() {
         if (!CL->ClientContainer->HostMode)
             return TError(EError::Permission, "For virt_mode=host client must be in the same mode");
     }
+
+    if (JobMode && Level == 1)
+        return TError(EError::InvalidValue, "Container in virt_mode=job without parent");
+
+    if (Parent && Parent->JobMode)
+        return TError(EError::InvalidValue, "Parent container in virt_mode=job");
 
     if (CapLimit.Permitted & ~CapBound.Permitted) {
         TCapabilities cap = CapLimit;
@@ -2922,7 +2937,7 @@ TError TContainer::Terminate(uint64_t deadline) {
 
     L_ACT("Terminate tasks in CT{}:{}", Id, Name);
 
-    if (!(Controllers & CGROUP_FREEZER)) {
+    if (!(Controllers & CGROUP_FREEZER) && !JobMode) {
         if (Task.Pid)
             return TError(EError::NotSupported, "Cannot terminate without freezer");
         return OK;
@@ -2931,7 +2946,7 @@ TError TContainer::Terminate(uint64_t deadline) {
     if (cg.IsEmpty())
         return OK;
 
-    if (FreezerSubsystem.IsFrozen(cg))
+    if (FreezerSubsystem.IsFrozen(cg) && !JobMode)
         return cg.KillAll(SIGKILL);
 
     if (Task.Pid && deadline && !IsMeta()) {
@@ -2946,7 +2961,10 @@ TError TContainer::Terminate(uint64_t deadline) {
         }
 
         if (sig) {
-            error = Task.Kill(sig);
+            if (JobMode)
+                error = Task.KillPg(sig);
+            else
+                error = Task.Kill(sig);
             if (!error) {
                 L_ACT("Wait task {} after signal {} in CT{}:{}", Task.Pid, sig, Id, Name);
                 while (Task.Exists() && !Task.IsZombie() &&
@@ -2954,6 +2972,9 @@ TError TContainer::Terminate(uint64_t deadline) {
             }
         }
     }
+
+    if (JobMode)
+        return WaitTask.KillPg(SIGKILL);
 
     if (WaitTask.Pid && Isolate) {
         error = WaitTask.Kill(SIGKILL);
@@ -2988,7 +3009,7 @@ TError TContainer::Stop(uint64_t timeout) {
     if (State == EContainerState::Stopped)
         return OK;
 
-    if (!(Controllers & CGROUP_FREEZER)) {
+    if (!(Controllers & CGROUP_FREEZER) && !JobMode) {
         if (Task.Pid)
             return TError(EError::NotSupported, "Cannot stop without freezer");
     } else if (FreezerSubsystem.IsParentFreezing(freezer))
@@ -3018,7 +3039,7 @@ TError TContainer::Stop(uint64_t timeout) {
         if (error)
             L_ERR("Cannot terminate tasks in CT{}:{}: {}", ct->Id, ct->Name, error);
 
-        if (FreezerSubsystem.IsSelfFreezing(cg)) {
+        if (FreezerSubsystem.IsSelfFreezing(cg) && !JobMode) {
             L_ACT("Thaw terminated paused CT{}:{}", ct->Id, ct->Name);
             error = FreezerSubsystem.Thaw(cg, false);
             if (error)
@@ -3810,6 +3831,10 @@ void TContainer::SyncState() {
 TError TContainer::SyncCgroups() {
     TError error;
 
+    /* Sync by parent container */
+    if (JobMode)
+        return OK;
+
     if (!(Controllers & CGROUP_FREEZER))
         return TError(EError::NotSupported, "Cannot sync cgroups without freezer");
 
@@ -3829,8 +3854,11 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     if (IsRoot())
         return subsystem.RootCgroup();
 
-    if (subsystem.Controllers & CGROUP_FREEZER)
+    if (subsystem.Controllers & CGROUP_FREEZER) {
+        if (JobMode)
+            return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Parent->Name);
         return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Name);
+    }
 
     if (subsystem.Controllers & CGROUP_SYSTEMD) {
         if (Controllers & CGROUP_SYSTEMD)

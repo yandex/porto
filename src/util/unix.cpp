@@ -49,6 +49,15 @@ TError TTask::Kill(int signal) const {
     return OK;
 }
 
+TError TTask::KillPg(int signal) const {
+    if (!Pid)
+        return TError("Task is not running");
+    L_ACT("killpg {} {}", signal, Pid);
+    if (killpg(Pid, signal))
+        return TError::System("killpg(" + std::to_string(Pid) + ")");
+    return OK;
+}
+
 bool TTask::IsZombie() const {
     std::string path = "/proc/" + std::to_string(Pid) + "/stat";
     FILE *file;

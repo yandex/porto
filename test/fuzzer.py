@@ -432,7 +432,15 @@ def Hostname():
     return ("hostname", get_random_str(32) )
 
 def VirtMode():
-    return ("virt_mode", select_by_weight([ (2, "false"), (1, "true") ]) )
+    return ("virt_mode",
+            select_by_weight([
+                (40, "app"),
+                (20, "os"),
+                (10, "job"),
+                (10, "host"),
+                (1, "false"),
+                (1, "true"),
+            ]))
 
 def Root(conn):
     vol = select_by_weight( [
