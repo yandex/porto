@@ -132,7 +132,7 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
     return OK;
 }
 
-std::string TDevice::Format() const {
+std::string TDevice::FormatAccess() const {
     std::string perm;
 
     if (MayRead)
@@ -148,8 +148,22 @@ std::string TDevice::Format() const {
     if (Optional)
         perm += "?";
 
-    return fmt::format("{} {} {} {:#o} {} {}", Path, perm, PathInside,
+    return perm;
+}
+
+std::string TDevice::Format() const {
+    return fmt::format("{} {} {} {:#o} {} {}", Path, FormatAccess(), PathInside,
                        Mode & 0777, UserName(Uid), GroupName(Gid));
+}
+
+TError TDevice::Load(const rpc::TContainerDevice &dev, const TCred &cred) {
+    TTuple cfg = {dev.device(), dev.access()};
+    return Parse(cfg, cred);
+}
+
+void TDevice::Dump(rpc::TContainerDevice &dev) const {
+    dev.set_device(Path.ToString());
+    dev.set_access(FormatAccess());
 }
 
 std::string TDevice::CgroupRule(bool allow) const {

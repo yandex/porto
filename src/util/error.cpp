@@ -82,6 +82,11 @@ bool TError::Deserialize(int fd, TError &error) {
     return true;
 }
 
+void TError::Dump(rpc::TError &error) const {
+    error.set_error(Error);
+    error.set_msg(Message());
+}
+
 std::ostream &operator<<(std::ostream &os, const TError &err) {
     os << err.ToString();
     return os;

@@ -70,6 +70,7 @@ void InitCapabilities();
 struct TCapabilities {
     uint64_t Permitted = 0;
 
+    TError Change(const std::string &name, bool set);
     TError Parse(const std::string &str);
     std::string Format() const;
     TError Apply(int mask) const;
@@ -82,6 +83,9 @@ struct TCapabilities {
         return os << c.Format();
     }
     bool HasSetUidGid() const;
+
+    TError Load(const rpc::TCapabilities &cap);
+    void Dump(rpc::TCapabilities &cap) const;
 };
 
 extern bool HasAmbientCapabilities;

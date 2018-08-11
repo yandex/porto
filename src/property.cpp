@@ -44,6 +44,17 @@ TError TProperty::SetIndexed(const std::string &, const std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
+bool TProperty::Has(const rpc::TContainerSpec &) {
+    return false;
+}
+
+TError TProperty::Load(const rpc::TContainerSpec &) {
+    return OK;
+}
+
+void TProperty::Dump(rpc::TContainerSpec &) {
+}
+
 std::string TProperty::GetDesc() const {
     auto desc = Desc;
     if (IsReadOnly)
@@ -147,6 +158,21 @@ public:
             return error;
         return Set(val);
     }
+    void DumpMap(rpc::TUintMap *dump) {
+        for (auto &it: Get()) {
+            auto kv = dump->add_map();
+            kv->set_key(it.first);
+            kv->set_val(it.second);
+        }
+    }
+    TError LoadMap(const rpc::TUintMap &dump) {
+        TUintMap map;
+        if (dump.merge())
+            map = Get();
+        for (auto &kv: dump.map())
+            map[kv.key()] = kv.val();
+        return Set(map);
+    }
 };
 
 class TConfigProperty : public TReferenceProperty<TMultiTuple> {
@@ -210,6 +236,22 @@ public:
         if (error)
             return error;
         return Set(index, val);
+    }
+    virtual void Dump(rpc::TContainerSpec &spec, T val) = 0;
+    virtual void Dump(rpc::TContainerSpec &spec) {
+        T value;
+        if (!Get(value))
+            Dump(spec, value);
+    }
+    virtual bool Has(const rpc::TContainerSpec &) {
+        return false;
+    }
+    virtual void Load(const rpc::TContainerSpec &, T &) {
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        T val;
+        Load(spec, val);
+        return Set(val);
     }
 };
 
@@ -369,6 +411,19 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        CT->CapLimit.Dump(*spec.mutable_capabilities());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_capabilities();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TCapabilities caps;
+        TError error = caps.Load(spec.capabilities());
+        if (error)
+            return error;
+        return Set(caps);
+    }
 } static Capabilities;
 
 class TCapAmbient : public TCapProperty {
@@ -392,6 +447,19 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        CT->CapAmbient.Dump(*spec.mutable_capabilities_ambient());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_capabilities_ambient();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TCapabilities caps;
+        TError error = caps.Load(spec.capabilities_ambient());
+        if (error)
+            return error;
+        return Set(caps);
+    }
 } static CapabilitiesAmbient;
 
 class TCapAllowed : public TCapProperty {
@@ -403,6 +471,9 @@ public:
     }
     TCapabilities & Get() {
         return CT->CapBound;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        CT->CapLimit.Dump(*spec.mutable_capabilities_allowed());
     }
 } static CapAllowed;
 
@@ -418,6 +489,9 @@ public:
     }
     TCapabilities &Get() {
         return CT->CapAllowed;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        CT->CapLimit.Dump(*spec.mutable_capabilities_ambient_allowed());
     }
 } static CapAmbientAllowed;
 
@@ -437,6 +511,15 @@ public:
         if (CT->OsMode && !CT->HasProp(EProperty::CWD))
             CT->Cwd = "/";
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_cwd(CT->GetCwd().ToString());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cwd();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.cwd());
     }
 } static Cwd;
 
@@ -482,6 +565,40 @@ public:
         return OK;
     }
 
+    void Dump(rpc::TContainerSpec &spec) {
+        TUlimit ulimit = CT->GetUlimit();
+        auto map = spec.mutable_ulimit();
+        for (auto &res: ulimit.Resources) {
+            auto u = map->add_ulimit();
+            u->set_type(TUlimit::GetName(res.Type));
+            if (res.Soft < RLIM_INFINITY)
+                u->set_soft(res.Soft);
+            else
+                u->set_unlimited(true);
+            if (res.Hard < RLIM_INFINITY)
+                u->set_hard(res.Hard);
+            if (!res.Overwritten)
+                u->set_inherited(true);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_ulimit();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TUlimit ulimit;
+        if (spec.ulimit().merge())
+            ulimit = CT->Ulimit;
+        for (auto u: spec.ulimit().ulimit()) {
+            auto type = TUlimit::GetType(u.type());
+            if (type < 0)
+                return TError(EError::InvalidValue, "Invalid ulimit: {}", u.type());
+            ulimit.Set(type, u.has_soft() ? u.soft() : RLIM_INFINITY,
+                       u.has_hard() ? u.hard() : RLIM_INFINITY, true);
+        }
+        CT->Ulimit = ulimit;
+        CT->SetProp(EProperty::ULIMIT);
+        return OK;
+    }
 } static Ulimit;
 
 class TCpuPolicy : public TProperty {
@@ -505,6 +622,15 @@ public:
             CT->ChooseSchedPolicy();
         }
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_cpu_policy(CT->CpuPolicy);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cpu_policy();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.cpu_policy());
     }
 } static CpuPolicy;
 
@@ -545,6 +671,15 @@ public:
 
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_io_policy(CT->IoPolicy);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_io_policy();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.io_policy());
+    }
 } static IoPolicy;
 
 class TIoWeight : public TWeightProperty {
@@ -569,6 +704,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, double val) {
+        spec.set_io_weight(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_io_weight();
+    }
+    void Load(const rpc::TContainerSpec &spec, double &val) {
+        val = spec.io_weight();
+    }
 } static IoWeight;
 
 class TTaskCred : public TProperty {
@@ -591,6 +735,15 @@ public:
         CT->SetProp(EProperty::USER);
         CT->SetProp(EProperty::GROUP);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        CT->TaskCred.Dump(*spec.mutable_task_cred());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_task_cred();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return CT->TaskCred.Load(spec.task_cred());
     }
 } static TaskCred;
 
@@ -621,6 +774,15 @@ public:
             CT->TaskCred.Uid = RootUser;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_user(CT->TaskCred.User());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_user();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.user());
+    }
 } static User;
 
 class TGroup : public TProperty {
@@ -643,6 +805,15 @@ public:
         if (CT->OsMode)
             CT->TaskCred.Gid = RootGroup;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_group(CT->TaskCred.Group());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_group();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.group());
     }
 } static Group;
 
@@ -670,6 +841,15 @@ public:
         CT->SetProp(EProperty::OWNER_GROUP);
         CT->SanitizeCapabilitiesAll();
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        CT->OwnerCred.Dump(*spec.mutable_owner_cred());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_owner_cred();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return CT->OwnerCred.Load(spec.owner_cred());
     }
 } static OwnerCred;
 
@@ -705,6 +885,15 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_owner_user(CT->OwnerCred.User());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_owner_user();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.owner_user());
+    }
 } static OwnerUser;
 
 class TOwnerGroup : public TProperty {
@@ -732,6 +921,15 @@ public:
         CT->OwnerCred.Gid = newGid;
         CT->SetProp(EProperty::OWNER_GROUP);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_owner_group(CT->OwnerCred.Group());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_owner_group();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.owner_group());
     }
 } static OwnerGroup;
 
@@ -767,6 +965,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_memory_guarantee(value);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_memory_guarantee();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.memory_guarantee();
+    }
 } static MemoryGuarantee;
 
 class TMemTotalGuarantee : public TSizeProperty {
@@ -782,6 +989,9 @@ public:
     TError Get(uint64_t &val) {
         val = CT->GetTotalMemGuarantee();
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_memory_guarantee_total(value);
     }
 } static MemTotalGuarantee;
 
@@ -802,6 +1012,15 @@ public:
         if (CT->OsMode && !CT->HasProp(EProperty::COMMAND))
             CT->Command = "/sbin/init";
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_command(CT->Command);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_command();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.command());
     }
 } static Command;
 
@@ -828,6 +1047,17 @@ public:
         CT->CoreCommand = command;
         CT->SetProp(EProperty::CORE_COMMAND);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        std::string command;
+        Get(command);
+        spec.set_core_command(command);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_core_command();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.core_command());
     }
 } static CoreCommand;
 
@@ -863,6 +1093,17 @@ public:
         CT->SetProp(EProperty::VIRT_MODE);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        std::string val;
+        Get(val);
+        spec.set_virt_mode(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_virt_mode();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.virt_mode());
+    }
 } static VirtMode;
 
 class TStdinPath : public TProperty {
@@ -878,7 +1119,15 @@ public:
         CT->SetProp(EProperty::STDIN);
         return OK;
     }
-
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_stdin_path(CT->Stdin.Path.ToString());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_stdin_path();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.stdin_path());
+    }
 } static StdinPath;
 
 class TStdoutPath : public TProperty {
@@ -899,6 +1148,15 @@ public:
             CT->Stdout.SetOutside("/dev/null");
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_stdout_path(CT->Stdout.Path.ToString());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_stdout_path();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.stdout_path());
+    }
 } static StdoutPath;
 
 class TStderrPath : public TProperty {
@@ -918,6 +1176,15 @@ public:
          if (CT->OsMode && !CT->HasProp(EProperty::STDERR))
             CT->Stderr.SetOutside("/dev/null");
          return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_stderr_path(CT->Stderr.Path.ToString());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_stderr_path();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.stderr_path());
     }
 } static StderrPath;
 
@@ -943,6 +1210,15 @@ public:
         CT->SetProp(EProperty::STDOUT_LIMIT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_stdout_limit(value);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_stdout_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.stdout_limit();
+    }
 } static StdoutLimit;
 
 class TStdoutOffset : public TSizeProperty {
@@ -957,6 +1233,9 @@ public:
         val = CT->Stdout.Offset;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_stdout_offset(value);
+    }
 } static StdoutOffset;
 
 class TStderrOffset : public TSizeProperty {
@@ -970,6 +1249,9 @@ public:
     TError Get(uint64_t &val) {
         val = CT->Stderr.Offset;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_stderr_offset(value);
     }
 } static StderrOffset;
 
@@ -1026,6 +1308,7 @@ public:
             CT->BindDns = false;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &, bool) { }
 } static BindDns;
 
 class TIsolate : public TBoolProperty {
@@ -1049,6 +1332,15 @@ public:
             CT->Isolate = false;
         }
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_isolate(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_isolate();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.isolate();
     }
 } static Isolate;
 
@@ -1088,6 +1380,15 @@ public:
             return TError(EError::InvalidValue, "Cannot change root in this virt_mode");
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_root(CT->Root);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_root();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.root());
+    }
 } static Root;
 
 class TRootPath : public TProperty {
@@ -1100,6 +1401,11 @@ public:
         if (value == "")
             return TError(EError::Permission, "Root path is unreachable");
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        TPath root = CL->ComposePath(CT->RootPath);
+        if (root)
+            spec.set_root_path(root.ToString());
     }
 } static RootPath;
 
@@ -1151,6 +1457,32 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_net();
+        for (auto &line: CT->NetProp) {
+            auto cfg = out->add_cfg();
+            cfg->set_opt(line[0]);
+            bool first = true;
+            for (auto &word: line) {
+                if (!first)
+                    cfg->add_arg(word);
+                first = false;
+            }
+            out->set_inherited(CT->NetInherit);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_net();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TMultiTuple net;
+        for (auto &cfg: spec.net().cfg()) {
+            net.push_back({cfg.opt()});
+            for (auto &arg: cfg.arg())
+                net.back().push_back(arg);
+        }
+        return Set(net);
+    }
 } static Net;
 
 class TRootRo : public TBoolProperty {
@@ -1165,6 +1497,15 @@ public:
         CT->RootRo = val;
         CT->SetProp(EProperty::ROOT_RDONLY);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_root_readonly(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_root_readonly();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.root_readonly();
     }
 } static RootRo;
 
@@ -1186,6 +1527,15 @@ public:
     }
     TError Parse(const std::string &str, unsigned &val) {
         return StringToOct(str, val);
+    }
+    void Dump(rpc::TContainerSpec &spec, unsigned val) {
+        spec.set_umask(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_umask();
+    }
+    void Load(const rpc::TContainerSpec &spec, unsigned &val) {
+        val = spec.umask();
     }
 } static Umask;
 
@@ -1235,6 +1585,29 @@ public:
         CT->SetProp(EProperty::CONTROLLERS);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_controllers();
+        for (auto &it: ControllersName)
+            if (CT->Controllers & it.first)
+                out->add_controller(it.second);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_controllers();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        uint64_t controllers = 0, val;
+        for (auto &name: spec.controllers().controller()) {
+            TError error = StringParseFlags(name, ControllersName, val, ';');
+            if (error)
+                return error;
+            controllers |= val;
+        }
+        if ((controllers & CT->RequiredControllers) != CT->RequiredControllers)
+            return TError(EError::InvalidValue, "Cannot disable required controllers");
+        CT->Controllers = controllers;
+        CT->SetProp(EProperty::CONTROLLERS);
+        return OK;
+    }
 } static Controllers;
 
 class TCgroups : public TProperty {
@@ -1258,6 +1631,16 @@ public:
         }
         return TError(EError::InvalidProperty, "Unknown cgroup subststem: " + index);
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_cgroups();
+        for (auto &subsys: Subsystems) {
+            auto cg = out->add_cgroup();
+            cg->set_controller(subsys->Type);
+            cg->set_path(CT->GetCgroup(*subsys).Path().ToString());
+            if (!(CT->Controllers & subsys->Controllers))
+                cg->set_inherited(true);
+        }
+    }
 } static Cgroups;
 
 class THostname : public TProperty {
@@ -1272,6 +1655,15 @@ public:
         CT->Hostname = hostname;
         CT->SetProp(EProperty::HOSTNAME);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_hostname(CT->Hostname);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_hostname();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.hostname());
     }
 } static Hostname;
 
@@ -1313,6 +1705,46 @@ public:
         CT->SetProp(EProperty::ENV);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        TEnv env;
+        if (CT->GetEnvironment(env))
+            return;
+        auto e = spec.mutable_env();
+        for (auto &var: env.Vars) {
+            if (var.Overwritten) {
+                auto v = e->add_var();
+                v->set_name(var.Name);
+                if (var.Set)
+                    v->set_value(var.Value);
+                else
+                    v->set_unset(true);
+            }
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_env();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TEnv env;
+        TError error;
+
+        if (spec.env().merge()) {
+            error = env.Parse(CT->EnvCfg, true);
+            if (error)
+                return error;
+        }
+        for (auto &var: spec.env().var()) {
+            if (var.has_value())
+                error = env.SetEnv(var.name(), var.value());
+            else
+                error = env.UnsetEnv(var.name());
+            if (error)
+                return error;
+        }
+        env.Format(CT->EnvCfg);
+        CT->SetProp(EProperty::ENV);
+        return OK;
+    }
 } static EnvProperty;
 
 class TBind : public TProperty {
@@ -1328,6 +1760,26 @@ public:
         TError error = TBindMount::Parse(value, result);
         if (error)
             return error;
+        CT->BindMounts = result;
+        CT->SetProp(EProperty::BIND);
+        return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_bind();
+        for (auto &bind: CT->BindMounts)
+            bind.Dump(*out->add_bind());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_bind();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        std::vector<TBindMount> result;
+        result.resize(spec.bind().bind_size());
+        for (int i = 0; i < spec.bind().bind_size(); i++) {
+            TError error = result[i].Load(spec.bind().bind(i));
+            if (error)
+                return error;
+        }
         CT->BindMounts = result;
         CT->SetProp(EProperty::BIND);
         return OK;
@@ -1380,6 +1832,37 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_symlink();
+        for (auto &link: CT->Symlink) {
+            auto sym = out->add_map();
+            sym->set_key(link.first.ToString());
+            sym->set_val(link.second.ToString());
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_symlink();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TStringMap map;
+        TError error;
+
+        for (auto &sym: spec.symlink().map())
+            map[sym.key()] = sym.val();
+
+        if (!spec.symlink().merge())
+            for (auto &sym: CT->Symlink)
+                if (!map.count(sym.first.ToString()))
+                        map[sym.first.ToString()] = "";
+
+        for (auto &sym: map) {
+            error = CT->SetSymlink(sym.first, sym.second);
+            if (error)
+                return error;
+        }
+
+        return OK;
+    }
 } static Symlink;
 
 class TIp : public TConfigProperty {
@@ -1397,6 +1880,23 @@ public:
         CT->IpList = val;
         CT->SetProp(EProperty::IP);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_ip();
+        for (auto &line: CT->IpList) {
+            auto ip = out->add_cfg();
+            ip->set_dev(line[0]);
+            ip->set_ip(line[1]);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_ip();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TMultiTuple cfg;
+        for (auto &line: spec.ip().cfg())
+            cfg.push_back({line.dev(), line.ip()});
+        return Set(cfg);
     }
 } static Ip;
 
@@ -1438,6 +1938,24 @@ public:
 
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto cfg = spec.mutable_ip_limit();
+        cfg->set_policy(CT->IpPolicy);
+        if (CT->IpPolicy == "some")
+            for (auto &line: CT->IpLimit)
+                cfg->add_ip(line[0]);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_ip_limit();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TMultiTuple cfg;
+        for (auto &ip: spec.ip_limit().ip())
+            cfg.push_back({ip});
+        if (cfg.empty())
+            cfg.push_back({spec.ip_limit().policy()});
+        return Set(cfg);
+    }
 } static IpLimit;
 
 class TDefaultGw : public TConfigProperty {
@@ -1455,6 +1973,23 @@ public:
         CT->DefaultGw = val;
         CT->SetProp(EProperty::DEFAULT_GW);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_default_gw();
+        for (auto &line: CT->DefaultGw) {
+            auto ip = out->add_cfg();
+            ip->set_dev(line[0]);
+            ip->set_ip(line[1]);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_default_gw();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TMultiTuple cfg;
+        for (auto &line: spec.default_gw().cfg())
+            cfg.push_back({line.dev(), line.ip()});
+        return Set(cfg);
     }
 } static DefaultGw;
 
@@ -1493,6 +2028,22 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        if (CT->ResolvConf.size() || CT->IsRoot())
+            spec.set_resolv_conf(CT->ResolvConf);
+        else if (CT->HasProp(EProperty::RESOLV_CONF))
+            spec.set_resolv_conf("keep");
+        else if (CT->Root == "/")
+            spec.set_resolv_conf("inherit");
+        else
+            spec.set_resolv_conf("default");
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_resolv_conf();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.resolv_conf());
+    }
 } static ResolvConf;
 
 class TEtcHosts : public TProperty {
@@ -1508,6 +2059,15 @@ public:
         CT->EtcHosts = value;
         CT->SetProp(EProperty::ETC_HOSTS);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_etc_hosts(CT->EtcHosts);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_etc_hosts();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.etc_hosts());
     }
 } static EtcHosts;
 
@@ -1547,6 +2107,31 @@ public:
                 return error;
         }
         CT->Devices.Merge(devices, true);
+        CT->SetProp(EProperty::DEVICE_CONF);
+        return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_devices();
+        for (auto dev: CT->Devices.Devices)
+            dev.Dump(*out->add_device());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_devices();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TDevices devices;
+        TError error;
+        error = CT->EnableControllers(CGROUP_DEVICES);
+        if (error)
+            return error;
+        devices.NeedCgroup = true;
+        devices.Devices.resize(spec.devices().device_size());
+        for (int i = 0; i < spec.devices().device_size(); i++) {
+            error = devices.Devices[i].Load(spec.devices().device(i), CL->Cred);
+            if (error)
+                return error;
+        }
+        CT->Devices.Merge(devices, true, !spec.devices().merge());
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
     }
@@ -1598,6 +2183,7 @@ public:
         CT->SeizeTask.Pid = val;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &, int64_t) { }
 } static SeizePid;
 
 class TRawStartTime : public TIntProperty {
@@ -1615,6 +2201,7 @@ public:
         CT->RealStartTime = time(nullptr) - (GetCurrentTimeMs() - CT->StartTime) / 1000;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &, int64_t) { }
 } static RawStartTime;
 
 class TRawDeathTime : public TIntProperty {
@@ -1632,6 +2219,7 @@ public:
         CT->RealDeathTime = time(nullptr) - (GetCurrentTimeMs() - CT->DeathTime) / 1000;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &, int64_t) { }
 } static RawDeathTime;
 
 class TPortoNamespace : public TProperty {
@@ -1647,6 +2235,15 @@ public:
         CT->SetProp(EProperty::PORTO_NAMESPACE);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_porto_namespace(CT->NsName);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_porto_namespace();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.porto_namespace());
+    }
 } static PortoNamespace;
 
 class TPlaceProperty : public TProperty {
@@ -1659,6 +2256,33 @@ public:
     }
     TError Set(const std::string &value) {
         CT->PlacePolicy = SplitEscapedString(value, ';');
+        CT->SetProp(EProperty::PLACE);
+        return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto cfg = spec.mutable_place();
+        for (auto &place: CT->PlacePolicy) {
+            auto p = cfg->add_cfg();
+            auto sep = place.find('=');
+            if (place[0] == '/' || place == "***" || sep == std::string::npos) {
+                p->set_place(place);
+            } else {
+                p->set_place(place.substr(sep + 1));
+                p->set_alias(place.substr(0, sep));
+            }
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_place();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        CT->PlacePolicy.clear();
+        for (auto &p: spec.place().cfg()) {
+            if (p.has_alias())
+                CT->PlacePolicy.push_back(p.alias() + "=" + p.place());
+            else
+                CT->PlacePolicy.push_back(p.place());
+        }
         CT->SetProp(EProperty::PLACE);
         return OK;
     }
@@ -1681,6 +2305,15 @@ public:
         CT->SetProp(EProperty::PLACE_LIMIT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(spec.mutable_place_limit());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_place_limit();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return LoadMap(spec.place_limit());
+    }
 } static PlaceLimit;
 
 class TPlaceUsage : public TUintMapProperty {
@@ -1691,6 +2324,9 @@ public:
     }
     TUintMap &Get() {
         return CT->PlaceUsage;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(spec.mutable_place_usage());
     }
 } static PlaceUsage;
 
@@ -1712,6 +2348,15 @@ public:
 
         value = MergeEscapeStrings(paths, ';');
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_volumes_owned();
+        for (auto &vol: CT->OwnedVolumes) {
+            TPath path = CL->ComposePath(vol->Path);
+            if (!path)
+                path = "@" + vol->Path.ToString();
+            out->add_volume(path.ToString());
+        }
     }
 } OwnedVolumes;
 
@@ -1739,6 +2384,23 @@ public:
 
         value = MergeEscapeStrings(links, ' ', ';');
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_volumes_linked();
+        for (auto &link: CT->VolumeLinks) {
+            auto l = out->add_link();
+
+            TPath path = link->Volume->ComposePath(*CL->ClientContainer);
+            if (!path)
+                path = "%" + link->Volume->Path.ToString();
+            l->set_volume(path.ToString());
+            if (link->Target)
+                l->set_target(link->Target.ToString());
+            if (link->ReadOnly)
+                l->set_read_only(true);
+            if (link->Required)
+                l->set_required(true);
+        }
     }
 } LinkedVolumes;
 
@@ -1768,6 +2430,11 @@ public:
         }
         CT->SetProp(EProperty::REQUIRED_VOLUMES);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_volumes_required();
+        for (auto &path: CT->RequiredVolumes)
+            out->add_volume(path);
     }
 } static RequiredVolumes;
 
@@ -1811,6 +2478,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_memory_limit(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_memory_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.memory_limit();
+    }
 } static MemoryLimit;
 
 class TMemoryLimitTotal : public TSizeProperty {
@@ -1822,6 +2498,9 @@ public:
     TError Get(uint64_t &value) {
         value = CT->GetMemLimit();
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_memory_limit_total(value);
     }
 } static MemoryLimitTotal;
 
@@ -1849,6 +2528,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_anon_limit(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_anon_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.anon_limit();
+    }
 } static AnonLimit;
 
 class TAnonLimitTotal : public TSizeProperty {
@@ -1863,6 +2551,9 @@ public:
     TError Get(uint64_t &val) {
         val = CT->GetAnonMemLimit();
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_anon_limit_total(value);
     }
 } static AnonLimitTotal;
 
@@ -1885,6 +2576,15 @@ public:
         CT->AnonOnly = val;
         CT->SetProp(EProperty::ANON_ONLY);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_anon_only(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_anon_only();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.anon_only();
     }
 } static AnonOnly;
 
@@ -1911,6 +2611,15 @@ public:
             CT->SetProp(EProperty::DIRTY_LIMIT);
         }
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_dirty_limit(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_dirty_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.dirty_limit();
     }
 } static DirtyLimit;
 
@@ -1943,6 +2652,15 @@ public:
         CT->SetProp(EProperty::HUGETLB_LIMIT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_hugetlb_limit(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_hugetlb_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.hugetlb_limit();
+    }
 } static HugetlbLimit;
 
 class TRechargeOnPgfault : public TBoolProperty {
@@ -1965,6 +2683,15 @@ public:
         CT->SetProp(EProperty::RECHARGE_ON_PGFAULT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_recharge_on_pgfault(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_recharge_on_pgfault();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.recharge_on_pgfault();
+    }
 } static RechargeOnPgfault;
 
 class TPressurizeOnDeath : public TBoolProperty {
@@ -1983,6 +2710,15 @@ public:
         CT->PressurizeOnDeath = value;
         CT->SetProp(EProperty::PRESSURIZE_ON_DEATH);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_pressurize_on_death(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_pressurize_on_death();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.pressurize_on_death();
     }
 } static PressurizeOnDeath;
 
@@ -2006,6 +2742,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, double val) {
+        spec.set_cpu_limit(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cpu_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, double &val) {
+        val = spec.cpu_limit();
+    }
 } static CpuLimit;
 
 class TCpuLimitTotal : public TCpuPowerProperty {
@@ -2018,6 +2763,9 @@ public:
     TError Get(double &val) {
         val = (double)CT->CpuLimitSum / CPU_POWER_PER_SEC;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, double val) {
+        spec.set_cpu_limit_total(val);
     }
 } static CpuLimitTotal;
 
@@ -2041,6 +2789,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, double val) {
+        spec.set_cpu_guarantee(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cpu_guarantee();
+    }
+    void Load(const rpc::TContainerSpec &spec, double &val) {
+        val = spec.cpu_guarantee();
+    }
 } static CpuGuarantee;
 
 class TCpuGuaranteeTotal : public TCpuPowerProperty {
@@ -2053,6 +2810,9 @@ public:
     TError Get(double &val) {
         val = (double)std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum) / CPU_POWER_PER_SEC; 
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, double val) {
+        spec.set_cpu_guarantee_total(val);
     }
 } static CpuGuaranteeTotal;
 
@@ -2077,6 +2837,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_period(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cpu_period();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.cpu_period();
+    }
 } static CpuPeriod;
 
 class TCpuWeight : public TWeightProperty {
@@ -2097,6 +2866,15 @@ public:
             CT->ChooseSchedPolicy();
         }
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, double val) {
+        spec.set_cpu_weight(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cpu_weight();
+    }
+    void Load(const rpc::TContainerSpec &spec, double &val) {
+        val = spec.cpu_weight();
     }
 } static CpuWeight;
 
@@ -2141,7 +2919,7 @@ public:
         ECpuSetType type;
         int arg = !CT->CpuSetArg;
 
-        if (cfg.size() == 0 || cfg[0] == "all") {
+        if (cfg.size() == 0 || cfg[0] == "all" || cfg[0] == "inherit") {
             type = ECpuSetType::Inherit;
         } else if (cfg.size() == 1) {
             TBitMap map;
@@ -2172,10 +2950,91 @@ public:
                 return TError(EError::InvalidValue, "wrong format");
 
             if (arg < 0 || (!arg && type != ECpuSetType::Node))
-             return TError(EError::InvalidValue, "wrong format");
+                return TError(EError::InvalidValue, "wrong format");
 
         } else
             return TError(EError::InvalidValue, "wrong format");
+
+        if (CT->CpuSetType != type || CT->CpuSetArg != arg) {
+            CT->CpuSetType = type;
+            CT->CpuSetArg = arg;
+            CT->SetProp(EProperty::CPU_SET);
+        }
+
+        return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto cfg = spec.mutable_cpu_set();
+        switch (CT->CpuSetType) {
+        case ECpuSetType::Inherit:
+            cfg->set_policy("inherit");
+            break;
+        case ECpuSetType::Absolute:
+            cfg->set_policy("set");
+            for (auto cpu = 0u; cpu < CT->CpuAffinity.Size(); cpu++)
+                if (CT->CpuAffinity.Get(cpu))
+                    cfg->add_cpu(cpu);
+            cfg->set_list(CT->CpuAffinity.Format());
+            cfg->set_count(CT->CpuAffinity.Weight());
+            break;
+        case ECpuSetType::Node:
+            cfg->set_policy("node");
+            cfg->set_arg(CT->CpuSetArg);
+            break;
+        case ECpuSetType::Reserve:
+            cfg->set_policy("reserve");
+            cfg->set_arg(CT->CpuSetArg);
+            break;
+        case ECpuSetType::Threads:
+            cfg->set_policy("threads");
+            cfg->set_arg(CT->CpuSetArg);
+            break;
+        case ECpuSetType::Cores:
+            cfg->set_policy("cores");
+            cfg->set_arg(CT->CpuSetArg);
+            break;
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_cpu_set();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        auto cfg = spec.cpu_set();
+        int arg = cfg.arg();
+        ECpuSetType type;
+        TError error;
+
+        if (cfg.policy() == "inherit" || cfg.policy() == "") {
+            type = ECpuSetType::Inherit;
+        } else if (cfg.policy() == "set") {
+            TBitMap map;
+
+            if (cfg.has_list()) {
+                error = map.Parse(cfg.list());
+                if (error)
+                    return error;
+            } else {
+                for (auto cpu: cfg.cpu())
+                    map.Set(cpu);
+            }
+
+            type = ECpuSetType::Absolute;
+            if (!CT->CpuAffinity.IsEqual(map)) {
+                CT->CpuAffinity.Clear();
+                CT->CpuAffinity.Set(map);
+                CT->SetProp(EProperty::CPU_SET);
+                CT->SetProp(EProperty::CPU_SET_AFFINITY);
+            }
+        } else if (cfg.policy() == "node") {
+            type = ECpuSetType::Node;
+        } else if (cfg.policy() == "threads") {
+            type = ECpuSetType::Threads;
+        } else if (cfg.policy() == "cores") {
+            type = ECpuSetType::Cores;
+        } else if (cfg.policy() == "reserve") {
+            type = ECpuSetType::Reserve;
+        } else
+            return TError(EError::InvalidValue, "unknown cpu_set policy: {}", cfg.policy());
 
         if (CT->CpuSetType != type || CT->CpuSetArg != arg) {
             CT->CpuSetType = type;
@@ -2197,6 +3056,15 @@ public:
         auto lock = LockCpuAffinity();
         value = CT->CpuAffinity.Format();
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto lock = LockCpuAffinity();
+        auto cfg = spec.mutable_cpu_set_affinity();
+        for (auto cpu = 0u; cpu < CT->CpuAffinity.Size(); cpu++)
+            if (CT->CpuAffinity.Get(cpu))
+                cfg->add_cpu(cpu);
+        cfg->set_list(CT->CpuAffinity.Format());
+        cfg->set_count(CT->CpuAffinity.Weight());
     }
 } static CpuSetAffinity;
 
@@ -2233,6 +3101,15 @@ public:
         CT->SetProp(EProperty::IO_LIMIT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(spec.mutable_io_limit());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_io_limit();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return LoadMap(spec.io_limit());
+    }
 } static IoBpsLimit;
 
 class TIoOpsLimit : public TUintMapProperty {
@@ -2268,6 +3145,15 @@ public:
         CT->SetProp(EProperty::IO_OPS_LIMIT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(spec.mutable_io_ops_limit());
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_io_ops_limit();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return LoadMap(spec.io_ops_limit());
+    }
 } static IoOpsLimit;
 
 class TRespawn : public TBoolProperty {
@@ -2287,6 +3173,15 @@ public:
         CT->SetProp(EProperty::RESPAWN);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_respawn(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_respawn();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.respawn();
+    }
 } static Respawn;
 
 class TRespawnCount : public TSizeProperty {
@@ -2305,6 +3200,15 @@ public:
         CT->RespawnCount = val;
         CT->SetProp(EProperty::RESPAWN_COUNT);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_respawn_count(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_respawn_count();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.respawn_count();
     }
 } static RespawnCount;
 
@@ -2334,6 +3238,15 @@ public:
             CT->ClearProp(EProperty::RESPAWN_LIMIT);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_max_respawns(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_max_respawns();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.max_respawns();
+    }
 } static RespawnLimit;
 
 class TRespawnDelay : public TNsecProperty {
@@ -2352,6 +3265,15 @@ public:
         CT->RespawnDelay = val;
         CT->ClearProp(EProperty::RESPAWN_DELAY);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_respawn_delay(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_respawn_delay();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.respawn_delay();
     }
 } static RespawnDelay;
 
@@ -2374,6 +3296,15 @@ public:
         CT->SetProp(EProperty::PRIVATE);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_private_(CT->Private);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_private_();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.private_());
+    }
 } static Private;
 
 class TLabels : public TProperty {
@@ -2392,10 +3323,10 @@ public:
         auto lock = LockContainers();
         return CT->GetLabel(index, value);
     }
-    TError Merge(const TStringMap &map) {
+    TError Set(TStringMap &map, bool merge) {
         TError error;
         for (auto &it: map) {
-            error = TContainer::ValidLabel(it.first, it.second);
+            TError error = TContainer::ValidLabel(it.first, it.second);
             if (error)
                 return error;
         }
@@ -2410,6 +3341,12 @@ public:
         }
         if (count > PORTO_LABEL_COUNT_MAX)
             return TError(EError::ResourceNotAvailable, "Too many labels");
+        if (!merge) {
+            for (auto &it: CT->Labels) {
+                if (map.find(it.first) == map.end())
+                    map[it.first] = "";
+            }
+        }
         for (auto &it: map)
             CT->SetLabel(it.first, it.second);
         lock.unlock();
@@ -2422,7 +3359,7 @@ public:
         TError error = StringToStringMap(value, map);
         if (error)
             return error;
-        return Merge(map);
+        return Set(map, true);
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
         TError error = TContainer::ValidLabel(index, value);
@@ -2435,6 +3372,24 @@ public:
         lock.unlock();
         TContainerWaiter::ReportAll(*CT, index, value);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        auto lock = LockContainers();
+        auto map = spec.mutable_labels();
+        for (auto &it: CT->Labels) {
+            auto l = map->add_map();
+            l->set_key(it.first);
+            l->set_val(it.second);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_labels();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TStringMap map;
+        for (auto &label: spec.labels().map())
+            map[label.key()] = label.val();
+        return Set(map, spec.labels().merge());
     }
 } static Labels;
 
@@ -2454,6 +3409,15 @@ public:
         CT->AgingTime = val * 1000;
         CT->SetProp(EProperty::AGING_TIME);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+        spec.set_aging_time(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_aging_time();
+    }
+    void Load(const rpc::TContainerSpec &spec, int64_t &val) {
+        val = spec.aging_time();
     }
 } static AgingTime;
 
@@ -2540,6 +3504,17 @@ public:
             CT->AccessLevel = parent->AccessLevel;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        std::string val;
+        Get(val);
+        spec.set_enable_porto(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_enable_porto();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.enable_porto());
+    }
 } static EnablePorto;
 
 class TWeak : public TBoolProperty {
@@ -2559,6 +3534,15 @@ public:
         CT->SetProp(EProperty::WEAK);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_weak(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_weak();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.weak();
+    }
 } static Weak;
 
 class TIdProperty : public TIntProperty {
@@ -2572,6 +3556,9 @@ public:
         val = CT->Id;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+        spec.set_id(val);
+    }
 } static IdProperty;
 
 class TLevelProperty : public TIntProperty {
@@ -2584,6 +3571,9 @@ public:
     TError Get(int64_t &val) {
         val = CT->Level;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+        spec.set_level(val);
     }
 } static LevelProperty;
 
@@ -2600,6 +3590,11 @@ public:
             value = ROOT_PORTO_NAMESPACE + CT->Name;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        std::string val;
+        Get(val);
+        spec.set_absolute_name(val);
+    }
 } static AbsoluteName;
 
 class TAbsoluteNamespace : public TProperty {
@@ -2612,6 +3607,11 @@ public:
         value = ROOT_PORTO_NAMESPACE + CT->GetPortoNamespace();
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        std::string val;
+        Get(val);
+        spec.set_absolute_namespace(val);
+    }
 } static AbsoluteNamespace;
 
 class TState : public TProperty {
@@ -2623,6 +3623,9 @@ public:
     TError Get(std::string &value) {
         value = TContainer::StateName(CT->State);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_state(TContainer::StateName(CT->State));
     }
 } static State;
 
@@ -2641,6 +3644,9 @@ public:
         CT->OomKilled = val;
         CT->SetProp(EProperty::OOM_KILLED);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_oom_killed(val);
     }
 } static OomKilled;
 
@@ -2666,6 +3672,9 @@ public:
         CT->SetProp(EProperty::OOM_KILLS);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_oom_kills(value);
+    }
 } static OomKills;
 
 class TOomKillsTotal : public TSizeProperty {
@@ -2689,6 +3698,9 @@ class TOomKillsTotal : public TSizeProperty {
         CT->SetProp(EProperty::OOM_KILLS_TOTAL);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_oom_kills_total(value);
+    }
 } static OomKillsTotal;
 
 class TCoreDumped : public TBoolProperty {
@@ -2702,6 +3714,9 @@ public:
     TError Get(bool &val) {
         val = WIFSIGNALED(CT->ExitStatus) && WCOREDUMP(CT->ExitStatus);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_core_dumped(val);
     }
 } static CoreDumped;
 
@@ -2720,6 +3735,15 @@ public:
         CT->OomIsFatal = val;
         CT->SetProp(EProperty::OOM_IS_FATAL);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, bool val) {
+        spec.set_oom_is_fatal(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_oom_is_fatal();
+    }
+    void Load(const rpc::TContainerSpec &spec, bool &val) {
+        val = spec.oom_is_fatal();
     }
 } static OomIsFatal;
 
@@ -2740,6 +3764,15 @@ public:
         }
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+        spec.set_oom_score_adj(val);
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_oom_score_adj();
+    }
+    void Load(const rpc::TContainerSpec &spec, int64_t &val) {
+        val = spec.oom_score_adj();
+    }
 } static OomScoreAdj;
 
 class TParent : public TProperty {
@@ -2757,6 +3790,12 @@ public:
         else
             value = ROOT_PORTO_NAMESPACE + CT->Parent->Name;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        if (CT->Level == 1)
+            spec.set_parent(ROOT_CONTAINER);
+        else if (CT->Level > 1)
+            spec.set_parent(ROOT_PORTO_NAMESPACE + CT->Parent->Name);
     }
 } static Parent;
 
@@ -2778,6 +3817,9 @@ public:
             val = pid;
         return error;
     }
+    void Dump(rpc::TContainerSpec &spec, int64_t value) {
+        spec.set_root_pid(value);
+    }
 } static RootPid;
 
 class TExitStatusProperty : public TIntProperty {
@@ -2797,6 +3839,9 @@ public:
         CT->SetProp(EProperty::EXIT_STATUS);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, int64_t value) {
+        spec.set_exit_status(value);
+    }
 } static ExitStatusProperty;
 
 class TExitCodeProperty : public TIntProperty {
@@ -2811,6 +3856,9 @@ public:
         val = CT->GetExitCode();
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, int64_t value) {
+        spec.set_exit_code(value);
+    }
 } static ExitCodeProperty;
 
 class TStartErrorProperty : public TProperty {
@@ -2823,6 +3871,10 @@ public:
         if (CT->StartError)
             value = CT->StartError.ToString();
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        if (CT->StartError)
+            CT->StartError.Dump(*spec.mutable_start_error());
     }
 } static StartErrorProperty;
 
@@ -2839,6 +3891,9 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.Usage(cg, val);
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_memory_usage(value);
+    }
 } static MemUsage;
 
 class TMemReclaimed : public TSizeProperty {
@@ -2854,6 +3909,9 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetReclaimed(cg, val);
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_memory_reclaimed(value);
+    }
 } static MemReclaimed;
 
 class TAnonUsage : public TSizeProperty {
@@ -2868,6 +3926,9 @@ public:
     TError Get(uint64_t &val) {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetAnonUsage(cg, val);
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_anon_usage(value);
     }
 } static AnonUsage;
 
@@ -2891,6 +3952,9 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.ResetAnonMaxUsage(cg);
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_anon_max_usage(value);
+    }
 } static AnonMaxUsage;
 
 class TCacheUsage : public TSizeProperty {
@@ -2905,6 +3969,9 @@ public:
     TError Get(uint64_t &val) {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetCacheUsage(cg, val);
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_cache_usage(value);
     }
 } static CacheUsage;
 
@@ -2923,6 +3990,9 @@ public:
     TError Get(uint64_t &val) {
         auto cg = CT->GetCgroup(HugetlbSubsystem);
         return HugetlbSubsystem.GetHugeUsage(cg, val);
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_hugetlb_usage(value);
     }
 } static HugetlbUsage;
 
@@ -2944,6 +4014,9 @@ public:
         val = stat["total_pgfault"] - stat["total_pgmajfault"];
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_minor_faults(value);
+    }
 } static MinorFaults;
 
 class TMajorFaults : public TSizeProperty {
@@ -2963,6 +4036,9 @@ public:
             return error;
         val = stat["total_pgmajfault"];
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_major_faults(value);
     }
 } static MajorFaults;
 
@@ -2998,6 +4074,12 @@ public:
         value = std::to_string(it->second);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        TVmStat st;
+        if (CT->GetVmStat(st))
+            return;
+        st.Dump(*spec.mutable_virtual_memory());
+    }
 } static VirtualMemory;
 
 class TMaxRss : public TSizeProperty {
@@ -3025,6 +4107,7 @@ public:
         }
         return error;
     }
+    void Dump(rpc::TContainerSpec &, uint64_t) { }
 } static MaxRss;
 
 class TCpuUsage : public TNsecProperty {
@@ -3040,6 +4123,9 @@ public:
         auto cg = CT->GetCgroup(CpuacctSubsystem);
         return CpuacctSubsystem.Usage(cg, val);
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_usage(val);
+    }
 } static CpuUsage;
 
 class TCpuSystem : public TNsecProperty {
@@ -3054,6 +4140,9 @@ public:
     TError Get(uint64_t &val) {
         auto cg = CT->GetCgroup(CpuacctSubsystem);
         return CpuacctSubsystem.SystemUsage(cg, val);
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_usage_system(val);
     }
 } static CpuSystem;
 
@@ -3072,6 +4161,9 @@ public:
     TError Get(uint64_t &val) {
         auto cg = CT->GetCgroup(CpuacctSubsystem);
         return cg.GetUint64("cpuacct.wait", val);
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_wait(val);
     }
 } static CpuWait;
 
@@ -3095,6 +4187,9 @@ public:
         if (!error)
             val = stat["throttled_time"];
         return error;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_throttled(val);
     }
 } static CpuThrottled;
 
@@ -3136,6 +4231,23 @@ public:
         }
         return TError(EError::InvalidProperty, "Unknown network class");
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        if (!CT->Net)
+            return;
+        auto map = spec.mutable_net_class_id();
+        uint32_t id = CT->NetClass.MetaHandle;
+        for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+            auto kv = map->add_map();
+            kv->set_key(fmt::format("CS{}", cs));
+            kv->set_val(id + cs);
+        }
+        id = CT->NetClass.LeafHandle;
+        for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+            auto kv = map->add_map();
+            kv->set_key(fmt::format("Leaf CS{}", cs));
+            kv->set_val(id + cs);
+        }
+    }
 } NetClassId;
 
 class TNetTos : public TProperty {
@@ -3158,6 +4270,15 @@ public:
         }
         return error;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        spec.set_net_tos(TNetwork::FormatTos(CT->NetClass.DefaultTos));
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_net_tos();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        return Set(spec.net_tos());
+    }
 } static NetTos;
 
 class TNetProperty : public TProperty {
@@ -3169,20 +4290,23 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_NETCLS;
     }
-    TError Set(const std::string &value) {
-        TUintMap map;
-        TError error = StringToUintMap(value, map);
-        if (error)
-            return error;
 
+    TError Set(TUintMap &map) {
         auto lock = TNetwork::LockNetState();
         auto &cur = CT->NetClass.*Member;
         if (cur != map) {
             CT->SetProp(Prop);
             cur = map;
         }
-
         return OK;
+    }
+
+    TError Set(const std::string &value) {
+        TUintMap map;
+        TError error = StringToUintMap(value, map);
+        if (error)
+            return error;
+        return Set(map);
     }
 
     TError Get(std::string &value) {
@@ -3222,6 +4346,53 @@ public:
             return TError(EError::InvalidValue, "Net rx limit requires isolated network");
         return OK;
     }
+
+    void Dump(rpc::TContainerSpec &spec) {
+        rpc::TUintMap *map;
+
+        if (Name == P_NET_GUARANTEE)
+            map = spec.mutable_net_guarantee();
+        else if (Name == P_NET_LIMIT)
+            map = spec.mutable_net_limit();
+        else if (Name == P_NET_RX_LIMIT)
+            map = spec.mutable_net_rx_limit();
+        else
+            return;
+
+        auto lock = TNetwork::LockNetState();
+        for (auto &it : CT->NetClass.*Member) {
+            auto kv = map->add_map();
+            kv->set_key(it.first);
+            kv->set_val(it.second);
+        }
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) {
+        if (Name == P_NET_GUARANTEE)
+            return spec.has_net_guarantee();
+        if (Name == P_NET_LIMIT)
+            return spec.has_net_limit();
+        if (Name == P_NET_RX_LIMIT)
+            return spec.has_net_rx_limit();
+        return false;
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) {
+        TUintMap map;
+        if (Name == P_NET_GUARANTEE)
+            for (auto &kv: spec.net_guarantee().map())
+                map[kv.key()] = kv.val();
+        else if (Name == P_NET_LIMIT)
+            for (auto &kv: spec.net_limit().map())
+                map[kv.key()] = kv.val();
+        else if (Name == P_NET_RX_LIMIT)
+            for (auto &kv: spec.net_rx_limit().map())
+                map[kv.key()] = kv.val();
+        else
+            return OK;
+        return Set(map);
+    }
+
 };
 
 TNetProperty NetGuarantee(P_NET_GUARANTEE, &TNetClass::TxRate, EProperty::NET_GUARANTEE,
@@ -3289,6 +4460,51 @@ public:
         }
         return OK;
     }
+
+    void Dump(rpc::TContainerSpec &spec) {
+        rpc::TUintMap *map;
+        TUintMap stat;
+
+        // FIXME
+        if (Name == P_NET_BYTES)
+            map = spec.mutable_net_bytes();
+        else if (Name == P_NET_PACKETS)
+            map = spec.mutable_net_packets();
+        else if (Name == P_NET_OVERLIMITS)
+            map = spec.mutable_net_overlimits();
+        else if (Name == P_NET_DROPS)
+            map = spec.mutable_net_drops();
+        else if (Name == P_NET_TX_BYTES)
+            map = spec.mutable_net_tx_bytes();
+        else if (Name == P_NET_TX_PACKETS)
+            map = spec.mutable_net_tx_packets();
+        else if (Name == P_NET_TX_DROPS)
+            map = spec.mutable_net_tx_drops();
+        else if (Name == P_NET_RX_BYTES)
+            map = spec.mutable_net_rx_bytes();
+        else if (Name == P_NET_RX_PACKETS)
+            map = spec.mutable_net_rx_packets();
+        else if (Name == P_NET_RX_DROPS)
+            map = spec.mutable_net_rx_drops();
+        else
+            return;
+
+        auto lock = TNetwork::LockNetState();
+        if (ClassStat) {
+            for (auto &it : CT->NetClass.Fold->ClassStat)
+                stat[it.first] = &it.second->*Member;
+        } else if (CT->Net) {
+            for (auto &it: CT->Net->DeviceStat)
+                stat[it.first] = &it.second->*Member;
+        }
+        lock.unlock();
+
+        for (auto &it: stat) {
+            auto kv = map->add_map();
+            kv->set_key(it.first);
+            kv->set_val(it.second);
+        }
+    }
 };
 
 TNetStatProperty NetBytes(P_NET_BYTES, &TNetStat::TxBytes,
@@ -3352,6 +4568,15 @@ public:
 
         return OK;
     }
+    void DumpMap(rpc::TUintMap &dump) {
+        TUintMap map;
+        GetMap(map);
+        for (auto &it: map) {
+            auto kv = dump.add_map();
+            kv->set_key(it.first);
+            kv->set_val(it.second);
+        }
+    }
 };
 
 class TIoReadStat : public TIoStat {
@@ -3370,6 +4595,9 @@ public:
         }
 
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(*spec.mutable_io_read());
     }
 } static IoReadStat;
 
@@ -3390,6 +4618,9 @@ public:
 
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(*spec.mutable_io_write());
+    }
 } static IoWriteStat;
 
 class TIoOpsStat : public TIoStat {
@@ -3409,6 +4640,9 @@ public:
 
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(*spec.mutable_io_ops());
+    }
 } static IoOpsStat;
 
 class TIoTimeStat : public TIoStat {
@@ -3419,6 +4653,9 @@ public:
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        DumpMap(*spec.mutable_io_time());
     }
 } static IoTimeStat;
 
@@ -3454,6 +4691,11 @@ public:
             return TError(EError::InvalidValue, "What {}?", index);
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+        spec.set_time(val);
+        if (CT->State == EContainerState::Dead)
+            spec.set_dead_time((GetCurrentTimeMs() - CT->DeathTime) / 1000);
+    }
 } static Time;
 
 class TCreationTime : public TDateTimeProperty {
@@ -3465,6 +4707,9 @@ public:
         val = CT->RealCreationTime;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_creation_time(value);
+    }
 } static CreationTime;
 
 class TStartTime : public TDateTimeProperty {
@@ -3475,6 +4720,9 @@ public:
     TError Get(uint64_t &value) {
         value = CT->RealStartTime;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_start_time(value);
     }
 } static StartTime;
 
@@ -3488,6 +4736,9 @@ public:
         val = CT->RealDeathTime;
         return OK;
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_death_time(value);
+    }
 } static DeathTime;
 
 class TChangeTime : public TDateTimeProperty {
@@ -3498,6 +4749,9 @@ public:
     TError Get(uint64_t &val) {
         val = CT->ChangeTime;
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_change_time(value);
     }
 } static ChangeTime;
 
@@ -3624,6 +4878,9 @@ public:
     TError Get(uint64_t &val) {
         return CT->GetProcessCount(val);
     }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_process_count(value);
+    }
 } static ProcessCount;
 
 class TThreadCount : public TSizeProperty {
@@ -3637,6 +4894,9 @@ public:
     }
     TError Get(uint64_t &val) {
         return CT->GetThreadCount(val);
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+        spec.set_thread_count(value);
     }
 } static ThreadCount;
 
@@ -3657,6 +4917,15 @@ public:
         CT->ThreadLimit = val;
         CT->SetProp(EProperty::THREAD_LIMIT);
         return OK;
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_thread_limit();
+    }
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.thread_limit();
+    }
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_thread_limit(val);
     }
 } static ThreadLimit;
 
@@ -3698,6 +4967,29 @@ public:
         return OK;
     }
 
+    void Dump(rpc::TContainerSpec &spec) {
+        auto out = spec.mutable_sysctl();
+        for (auto &it: CT->Sysctl) {
+            auto s = out->add_map();
+            s->set_key(it.first);
+            s->set_val(it.second);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_sysctl();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        if (!spec.sysctl().merge())
+            CT->Sysctl.clear();
+        for (auto &it: spec.sysctl().map()) {
+            if (it.has_val())
+                CT->Sysctl[it.key()] = it.val();
+            else
+                CT->Sysctl.erase(it.key());
+        }
+        CT->SetProp(EProperty::SYSCTL);
+        return OK;
+    }
 } static SysctlProperty;
 
 class TTaint : public TProperty {
@@ -3709,6 +5001,13 @@ public:
         for (auto &taint: CT->Taint())
             value += taint + "\n";
         return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        for (auto &taint: CT->Taint()) {
+            auto t = spec.add_taint();
+            t->set_error(EError::Taint);
+            t->set_msg(taint);
+        }
     }
 } static Taint;
 

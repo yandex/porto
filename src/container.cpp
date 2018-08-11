@@ -2244,16 +2244,16 @@ TError TContainer::PrepareCgroups() {
 TError TContainer::GetEnvironment(TEnv &env) const {
     env.ClearEnv();
 
-    env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    env.SetEnv("HOME", GetCwd().ToString());
-    env.SetEnv("USER", TaskCred.User());
+    env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", false, false);
+    env.SetEnv("HOME", GetCwd().ToString(), false, false);
+    env.SetEnv("USER", TaskCred.User(), false, false);
 
-    env.SetEnv("container", "lxc");
+    env.SetEnv("container", "lxc", false, false);
 
     /* lock these */
-    env.SetEnv("PORTO_NAME", Name, true, true);
-    env.SetEnv("PORTO_HOST", GetHostName(), true, true);
-    env.SetEnv("PORTO_USER", OwnerCred.User(), true, true);
+    env.SetEnv("PORTO_NAME", Name, false, true);
+    env.SetEnv("PORTO_HOST", GetHostName(), false, true);
+    env.SetEnv("PORTO_USER", OwnerCred.User(), false, true);
 
     /* Inherit environment from containts in isolation domain */
     bool overwrite = true;
@@ -3560,6 +3560,57 @@ TError TContainer::SetProperty(const std::string &origProperty,
         error = Save();
 
     return error;
+}
+
+TError TContainer::Load(const rpc::TContainerSpec &spec) {
+    TError error;
+
+    PORTO_ASSERT(!CT);
+    CT = this;
+    LockStateWrite();
+    ChangeTime = time(nullptr);
+    for (auto &it :ContainerProperties) {
+        auto prop = it.second;
+        if (!prop->Has(spec))
+            continue;
+        error = prop->CanSet();
+        if (error)
+            break;
+        error = prop->Load(spec);
+        if (error)
+            break;
+    }
+    SanitizeCapabilities();
+    UnlockState();
+    CT = nullptr;
+
+    return error;
+}
+
+void TContainer::Dump(const std::vector<std::string> &props, rpc::TContainerSpec &spec) {
+    PORTO_ASSERT(!CT);
+    CT = this;
+    LockStateRead();
+    if (props.empty()) {
+        for (auto &it :ContainerProperties) {
+            auto prop = it.second;
+            if (!prop->CanGet())
+                prop->Dump(spec);
+        }
+    } else {
+        for (auto &p: props) {
+            auto it = ContainerProperties.find(p);
+            if (it == ContainerProperties.end()) {
+                TError(EError::InvalidProperty, "Unknown property {}", p).Dump(*spec.add_error());
+                continue;
+            }
+            auto prop = it->second;
+            if (!prop->CanGet())
+                prop->Dump(spec);
+        }
+    }
+    UnlockState();
+    CT = nullptr;
 }
 
 TError TContainer::Save(void) {

@@ -387,6 +387,9 @@ public:
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
 
+    TError Load(const rpc::TContainerSpec &spec);
+    void Dump(const std::vector<std::string> &props, rpc::TContainerSpec &spec);
+
     /* Protected with ContainersLock */
     static TError ValidLabel(const std::string &label, const std::string &value);
     TError GetLabel(const std::string &label, std::string &value) const;

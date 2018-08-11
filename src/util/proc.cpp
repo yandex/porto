@@ -36,6 +36,24 @@ void TVmStat::Add(const TVmStat &other) {
         Stat[it.first] += it.second;
 }
 
+void TVmStat::Dump(rpc::TVmStat &s) {
+    s.set_count(Stat["count"]);
+    s.set_size(Stat["size"]);
+    s.set_max_size(Stat["max_size"]);
+    s.set_used(Stat["used"]);
+    s.set_max_used(Stat["max_used"]);
+    s.set_anon(Stat["anon"]);
+    s.set_file(Stat["file"]);
+    s.set_shmem(Stat["shmem"]);
+    s.set_huge(Stat["huge"]);
+    s.set_swap(Stat["swap"]);
+    s.set_data(Stat["data"]);
+    s.set_stack(Stat["stack"]);
+    s.set_code(Stat["code"]);
+    s.set_locked(Stat["locked"]);
+    s.set_table(Stat["table"]);
+}
+
 TError TVmStat::Parse(pid_t pid) {
     std::string text, line;
     TError error;

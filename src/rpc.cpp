@@ -45,6 +45,7 @@ void TRequest::Classify() {
         Req.has_convertpath() ||
         Req.has_locateprocess() ||
         Req.has_getsystem() ||
+        Req.has_getcontainer() ||
         Req.has_getvolume();
 
     IoReq =
@@ -288,6 +289,16 @@ void TRequest::Parse() {
     } else if (Req.has_newvolume()) {
         Cmd = "NewVolume";
         Arg = Req.newvolume().volume().path();
+    } else if (Req.has_newcontainer()) {
+        Cmd = "NewContainer";
+        Arg = Req.newcontainer().container().name();
+        Opt = Req.newcontainer().ShortDebugString();
+    } else if (Req.has_setcontainer()) {
+        Cmd = "SetContainer";
+        Arg = Req.setcontainer().container().name();
+        Opt = Req.setcontainer().ShortDebugString();
+    } else if (Req.has_getcontainer()) {
+        Cmd = "GetContainer";
     } else if (Req.has_getvolume()) {
         Cmd = "GetVolume";
     } else
@@ -354,6 +365,189 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
         ret = "Ok";
 
     return ret;
+}
+
+noinline TError NewContainer(rpc::TNewContainerRequest &req,
+                             rpc::TNewContainerResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    std::string name;
+    TError error;
+
+    error = CL->ResolveName(req.container().name(), name);
+    if (error)
+        return error;
+
+    /* link volumes with container */
+    for (auto volume_spec: *req.mutable_volume()) {
+        bool linked = false;
+        for (auto &link: *volume_spec.mutable_links())
+            linked |= link.container() == req.container().name();
+        if (!linked) {
+            auto link = volume_spec.add_links();
+            link->set_container(req.container().name());
+        }
+    }
+
+    error = TContainer::Create(name, ct);
+    if (error)
+        return error;
+
+    error = CL->LockContainer(ct);
+    if (error)
+        return error;
+
+    if (req.container().weak()) {
+        ct->IsWeak = true;
+        ct->SetProp(EProperty::WEAK);
+        CL->WeakContainers.emplace_back(ct);
+    }
+
+    auto container_spec = rsp.mutable_container();
+
+    error = ct->Load(req.container());
+    if (error)
+        goto undo;
+
+    CL->ReleaseContainer();
+
+    for (auto volume_spec: req.volume()) {
+        std::shared_ptr<TVolume> volume;
+
+        error = TVolume::Create(volume_spec, volume);
+        if (error) {
+            Statistics->VolumesFailed++;
+            goto undo;
+        }
+
+        volume->Dump(*rsp.add_volume());
+    }
+
+    error = CL->LockContainer(ct);
+    if (error)
+        return error;
+
+    if (req.start()) {
+        error = ct->Start();
+        if (error)
+            goto undo;
+    }
+
+    container_spec->set_name(CL->RelativeName(name));
+    ct->Dump({}, *container_spec);
+
+    CL->ReleaseContainer();
+
+    return OK;
+
+undo:
+    std::list<std::shared_ptr<TVolume>> unlinked;
+    (void)ct->Destroy(unlinked);
+    CL->ReleaseContainer();
+    TVolume::DestroyUnlinked(unlinked);
+    rsp.Clear();
+    return error;
+}
+
+noinline TError SetContainer(const rpc::TSetContainerRequest &req,
+                             rpc::TSetContainerResponse &) {
+    std::shared_ptr<TContainer> ct;
+    TError error;
+
+    error = CL->WriteContainer(req.container().name(), ct);
+    if (error)
+        return error;
+
+    error = ct->Load(req.container());
+    CL->ReleaseContainer();
+
+    return error;
+}
+
+noinline TError GetContainer(const rpc::TGetContainerRequest &req,
+                             rpc::TGetContainerResponse &rsp) {
+    std::list<std::string> masks, names;
+    std::vector<std::string> props;
+    TError error;
+
+    for(auto &prop: req.property())
+        props.push_back(prop);
+
+    for (auto &name: req.name()) {
+        if (name.find_first_of("*?") == std::string::npos)
+            names.push_back(name);
+        else
+            masks.push_back(name);
+    }
+
+    if (names.empty() && masks.empty())
+        masks.push_back("***");
+
+    if (!masks.empty()) {
+        auto lock = LockContainers();
+        for (auto &it: Containers) {
+            auto &ct = it.second;
+            std::string name;
+            if (CL->ComposeName(ct->Name, name))
+                continue;
+            if (masks.empty())
+                names.push_back(name);
+            for (auto &mask: masks) {
+                if (StringMatch(name, mask)) {
+                    names.push_back(name);
+                    break;
+                }
+            }
+        }
+    }
+
+    for (auto &name: names) {
+        std::shared_ptr<TContainer> ct;
+
+        auto lock = LockContainers();
+
+        error = CL->ResolveContainer(name, ct);
+
+        if (!error && req.label_size()) {
+            bool match = false;
+            for (auto &label: req.label()) {
+                if (label.find_first_of("*?") == std::string::npos) {
+                    match = ct->Labels.find(label) != ct->Labels.end();
+                } else {
+                    for (auto &it: ct->Labels) {
+                        match = StringMatch(it.first, label);
+                        if (match)
+                            break;
+                    }
+                }
+                if (match)
+                    break;
+            }
+            if (!match)
+                continue;
+        }
+
+        lock.unlock();
+
+        if (error && names.size() == 1)
+            return error;
+
+        auto spec = rsp.add_container();
+        spec->set_name(name);
+        if (error) {
+            error.Dump(*spec->add_error());
+            continue;
+        }
+
+        if (req.has_changed_since() && ct->ChangeTime < req.changed_since()) {
+            spec->set_change_time(ct->ChangeTime);
+            spec->set_no_changes(true);
+            continue;
+        }
+
+        ct->Dump(props, *spec);
+    }
+
+    return OK;
 }
 
 static noinline TError CreateContainer(std::string reqName, bool weak) {
@@ -1673,6 +1867,12 @@ void TRequest::Handle() {
         error = TError(EError::Permission, "Write access denied");
     else if (!RoReq && PortodFrozen && !Client->IsSuperUser())
         error = TError(EError::PortoFrozen, "Porto frozen, only root user might change anything");
+    else if (Req.has_newcontainer())
+        error = NewContainer(*Req.mutable_newcontainer(), *rsp.mutable_newcontainer());
+    else if (Req.has_setcontainer())
+        error = SetContainer(Req.setcontainer(), *rsp.mutable_setcontainer());
+    else if (Req.has_getcontainer())
+        error = GetContainer(Req.getcontainer(), *rsp.mutable_getcontainer());
     else if (Req.has_create())
         error = CreateContainer(Req.create().name(), false);
     else if (Req.has_createweak())

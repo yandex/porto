@@ -277,6 +277,10 @@ public:
     virtual TError GetIndexed(const std::string &index, std::string &value);
     virtual TError SetIndexed(const std::string &index, const std::string &value);
 
+    virtual bool Has(const rpc::TContainerSpec &spec);
+    virtual TError Load(const rpc::TContainerSpec &spec);
+    virtual void Dump(rpc::TContainerSpec &spec);
+
     virtual TError Start(void);
 };
 
