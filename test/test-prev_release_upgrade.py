@@ -202,7 +202,6 @@ app_knobs = [
     ("net_limit", "default: 0"),
     ("cpu_guarantee", "0.01c"),
     ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
-    ("io_limit", "300000"),
     ("isolate", False),
     ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
 ]
