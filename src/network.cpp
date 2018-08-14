@@ -1800,7 +1800,7 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
     if (error)
         return error;
 
-    error = env.OpenNetwork();
+    error = env.OpenNetwork(ct);
     if (error)
         return error;
 
@@ -2810,26 +2810,18 @@ TError TNetEnv::Open(TContainer &ct) {
     return TError(EError::InvalidValue, "Cannot open netns: container not running");
 }
 
-TError TNetEnv::OpenNetwork() {
+TError TNetEnv::OpenNetwork(TContainer &ct) {
     TError error;
 
-    if (NetIsolate && L3Only && config().network().l3_migration_hack() &&
-            Devices.size() && Devices[0].Type == "L3" && Devices[0].Ip.size()) {
+    /* Share L3 network with same config and ip */
+    if (NetIsolate && L3Only && config().network().l3_migration_hack()) {
         auto lock = LockContainers();
-
         for (auto &it: Containers) {
-            auto &ct = it.second;
-            if (!ct->Net || ct->IpList.empty())
-                continue;
-
-            for (auto cfg: ct->IpList) {
-                TNlAddr addr;
-                if (cfg.size() == 2 && !addr.Parse(AF_UNSPEC, cfg[1]) &&
-                        addr.IsMatch(Devices[0].Ip[0])) {
-                    L_ACT("Reuse L3 addr {} network {}", addr.Format(), ct->Name);
-                    lock.unlock();
-                    return Open(*ct);
-                }
+            auto &c = it.second;
+            if (c->Net && c->NetProp == ct.NetProp && c->IpList == ct.IpList) {
+                L_NET("Share network {}", c->Name);
+                lock.unlock();
+                return Open(*c);
             }
         }
     }
