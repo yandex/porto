@@ -1444,11 +1444,9 @@ TError TContainer::ApplyResolvConf() const {
         return TError(EError::NotSupported, "resolv.conf not on tmpfs");
 
     L_ACT("Apply resolv_conf for CT{}:{}", Id, Name);
-    std::string cfg = MergeEscapeStrings(ResolvConf.size() ? ResolvConf :
-                                         RootContainer->ResolvConf, '\n');
     error = file.Truncate(0);
     if (!error)
-        error = file.WriteAll(cfg);
+        error = file.WriteAll(ResolvConf.size() ? ResolvConf : RootContainer->ResolvConf);
     return error;
 }
 

@@ -42,8 +42,8 @@ static std::condition_variable NetThreadCv;
 static uint64_t NetWatchdogPeriod;
 static uint64_t NetProxyNeighbourPeriod;
 
-static TTuple ResolvConfCurrent;
-static TTuple ResolvConfPrev;
+static std::string ResolvConfCurrent;
+static std::string ResolvConfPrev;
 static uint64_t ResolvConfPeriod = 0;
 
 static std::vector<std::string> UnmanagedDevices;
@@ -1520,13 +1520,13 @@ out:
 }
 
 TError TNetwork::SyncResolvConf() {
-    TTuple conf;
+    std::string conf;
     TError error;
 
     if (!config().container().default_resolv_conf().empty()) {
-        conf = SplitEscapedString(config().container().default_resolv_conf(), ';');
+        conf = StringReplaceAll(config().container().default_resolv_conf(), ";", "\n");
     } else {
-        error = TPath("/etc/resolv.conf").ReadLines(conf);
+        error = TPath("/etc/resolv.conf").ReadAll(conf);
         if (error)
             return error;
 
@@ -1545,7 +1545,7 @@ TError TNetwork::SyncResolvConf() {
     if (error)
         return error;
 
-    L_ACT("Set default resolv_conf:\n{}\n", MergeEscapeStrings(conf, '\n'));
+    L_ACT("Set default resolv_conf:\n{}\n", conf);
 
     ResolvConfCurrent = conf;
     RootContainer->ResolvConf = conf;

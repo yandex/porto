@@ -1282,7 +1282,7 @@ public:
     }
     TError Get(std::string &value) {
         if (CT->ResolvConf.size() || CT->IsRoot())
-            value = MergeEscapeStrings(CT->ResolvConf, ';');
+            value = StringReplaceAll(CT->ResolvConf, "\n", ";");
         else if (CT->HasProp(EProperty::RESOLV_CONF))
             value = "keep";
         else if (CT->Root == "/")
@@ -1303,7 +1303,7 @@ public:
             CT->ResolvConf.clear();
             CT->SetProp(EProperty::RESOLV_CONF);
         } else {
-            CT->ResolvConf = SplitEscapedString(value, ';');
+            CT->ResolvConf = StringReplaceAll(value, ";", "\n");
             CT->SetProp(EProperty::RESOLV_CONF);
         }
         return OK;
