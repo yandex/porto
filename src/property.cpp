@@ -2336,23 +2336,22 @@ public:
         auto lock = LockContainers();
         return CT->GetLabel(index, value);
     }
-    TError Set(const std::string &value) {
-        TStringMap map;
-        TError error = StringToStringMap(value, map);
-        if (error)
-            return error;
+    TError Merge(const TStringMap &map) {
+        TError error;
         for (auto &it: map) {
             error = TContainer::ValidLabel(it.first, it.second);
             if (error)
                 return error;
         }
         auto lock = LockContainers();
-        auto count = map.size() + CT->Labels.size();
-        for (auto &it: CT->Labels)
-            if (map.find(it.first) == map.end()) {
-                map[it.first] = "";
+        auto count = CT->Labels.size();
+        for (auto &it: map) {
+            if (CT->Labels.find(it.first) == CT->Labels.end()) {
+                if (it.second.size())
+                    count++;
+            } else if (!it.second.size())
                 count--;
-            }
+        }
         if (count > PORTO_LABEL_COUNT_MAX)
             return TError(EError::ResourceNotAvailable, "Too many labels");
         for (auto &it: map)
@@ -2361,6 +2360,13 @@ public:
         for (auto &it: map)
             TContainerWaiter::ReportAll(*CT, it.first, it.second);
         return OK;
+    }
+    TError Set(const std::string &value) {
+        TStringMap map;
+        TError error = StringToStringMap(value, map);
+        if (error)
+            return error;
+        return Merge(map);
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
         TError error = TContainer::ValidLabel(index, value);
