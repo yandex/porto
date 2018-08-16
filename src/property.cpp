@@ -1097,8 +1097,8 @@ class TEnvProperty : public TProperty {
 public:
     TEnvProperty() : TProperty(P_ENV, EProperty::ENV,
             "Container environment variables: <name>=<value>; ...") {}
-    TError Get(std::string &value) {
-        value = MergeEscapeStrings(CT->EnvCfg, ';');
+    TError Get(std::string &val) {
+        val = CT->EnvCfg;
         return OK;
     }
     TError GetIndexed(const std::string &index, std::string &value) {
@@ -1110,22 +1110,21 @@ public:
             return TError(EError::InvalidValue, "Variable " + index + " not defined");
         return OK;
     }
-    TError Set(const std::string &env_val) {
-        auto envs = SplitEscapedString(env_val, ';');
+    TError Set(const std::string &val) {
         TEnv env;
-        TError error =  env.Parse(envs, true);
+        TError error =  env.Parse(val, true);
         if (error)
             return error;
         env.Format(CT->EnvCfg);
         CT->SetProp(EProperty::ENV);
         return OK;
     }
-    TError SetIndexed(const std::string &index, const std::string &env_val) {
+    TError SetIndexed(const std::string &index, const std::string &val) {
         TEnv env;
         TError error = env.Parse(CT->EnvCfg, true);
         if (error)
             return error;
-        error = env.Parse({index + "=" + env_val}, true);
+        error = env.SetEnv(index, val);
         if (error)
             return error;
         env.Format(CT->EnvCfg);

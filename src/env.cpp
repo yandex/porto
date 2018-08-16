@@ -60,8 +60,8 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
     return OK;
 }
 
-TError TEnv::Parse(const std::vector<std::string> &cfg, bool overwrite) {
-    for (auto &str: cfg) {
+TError TEnv::Parse(const std::string &cfg, bool overwrite) {
+    for (auto &str: SplitEscapedString(cfg, ';')) {
         auto sep = str.find('=');
         TError error;
 
@@ -76,14 +76,15 @@ TError TEnv::Parse(const std::vector<std::string> &cfg, bool overwrite) {
     return OK;
 }
 
-void TEnv::Format(std::vector<std::string> &cfg) const {
-    cfg.clear();
+void TEnv::Format(std::string &cfg) const {
+    TTuple tuple;
     for (const auto &var: Vars) {
         if (var.Set)
-            cfg.push_back(var.Name + "=" + var.Value);
+            tuple.push_back(var.Name + "=" + var.Value);
         else
-            cfg.push_back(var.Name);
+            tuple.push_back(var.Name);
     }
+    cfg = MergeEscapeStrings(tuple, ';');
 }
 
 TError TEnv::Apply() const {

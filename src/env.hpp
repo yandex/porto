@@ -22,8 +22,8 @@ struct TEnv {
     TError UnsetEnv(const std::string &name, bool overwrite = true);
     char **Envp();
 
-    TError Parse(const std::vector<std::string> &cfg, bool overwrite);
-    void Format(std::vector<std::string> &cfg) const;
+    TError Parse(const std::string &cfg, bool overwrite);
+    void Format(std::string &cfg) const;
     TError Apply() const;
 };
 

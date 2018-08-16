@@ -143,7 +143,7 @@ public:
     bool NetIpLimit;            /* Cannot use arbitrary IP */
 
     std::string Hostname;
-    TTuple EnvCfg;
+    std::string EnvCfg;
     std::vector<TBindMount> BindMounts;
     std::map<TPath, TPath> Symlink;
     TMultiTuple IpList;
