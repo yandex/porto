@@ -36,9 +36,10 @@ TError TEnv::SetEnv(const std::string &name, const std::string &value,
         var.Value = value;
         var.Set = true;
         var.Locked = lock;
+        var.Overwritten = overwrite;
         return OK;
     }
-    Vars.push_back({name, value, true, lock, ""});
+    Vars.push_back({name, value, true, lock, overwrite, ""});
     return OK;
 }
 
@@ -54,9 +55,10 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
         }
         var.Value = "";
         var.Set = false;
+        var.Overwritten = overwrite;
         return OK;
     }
-    Vars.push_back({name, "", false, false, ""});
+    Vars.push_back({name, "", false, false, overwrite, ""});
     return OK;
 }
 

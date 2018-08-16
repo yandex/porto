@@ -10,6 +10,7 @@ struct TEnv {
         std::string Value;
         bool Set;
         bool Locked;
+        bool Overwritten;
         std::string Data;
     };
     std::vector<TEnvVar> Vars;
