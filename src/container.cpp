@@ -353,7 +353,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     NetProp = { { "inherited" } };
     NetIsolate = false;
     NetInherit = true;
-    NetIpLimit = false;
+
+    IpLimit = { { "any" } };
+    IpPolicy = "any";
 
     Hostname = "";
     CapAmbient = NoCapabilities;
@@ -2451,7 +2453,7 @@ void TContainer::SanitizeCapabilities() {
             pidns |= ct->Isolate;
             memcg |= ct->MemLimit && ct->HasProp(EProperty::MEM_LIMIT);
             netns |= ct->NetIsolate;
-            netip |= ct->NetIpLimit;
+            netip |= ct->IpPolicy != "any";
 
             if (ct->HasProp(EProperty::CAPABILITIES))
                 CapBound.Permitted &= ct->CapLimit.Permitted;
@@ -4083,7 +4085,7 @@ TTuple TContainer::Taint() {
     }
 
     if (AccessLevel > EAccessLevel::ReadOnly) {
-        if (NetIsolate && !NetIpLimit)
+        if (NetIsolate && IpPolicy == "any")
             taint.push_back("Container could escape network namespace without ip_limit.");
     }
 

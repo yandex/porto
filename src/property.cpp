@@ -1225,26 +1225,36 @@ public:
     TIpLimit() : TProperty(P_IP_LIMIT, EProperty::IP_LIMIT,
             "IP allowed for sub-containers: none|any|<ip>[/<mask>]; ...") {}
     TError Get(std::string &value) {
-        value = MergeEscapeStrings(CT->IpLimit, ';');
+        value = MergeEscapeStrings(CT->IpLimit, ';', ' ');
         return OK;
     }
     TError Set(const std::string &value) {
-        auto list = SplitEscapedString(value, ';');
+        auto cfg = SplitEscapedString(value, ';', ' ');
         TError error;
 
-        for (auto &str: list) {
-            if (str == "any" || str == "none")
+        if (cfg.empty())
+            CT->IpPolicy = "any";
+
+        for (auto &line: cfg) {
+            if (line.size() != 1)
+                return TError(EError::InvalidValue, "wrong format");
+            if (line[0] == "any" || line[0] == "none") {
+                if (cfg.size() != 1)
+                    return TError(EError::InvalidValue, "more than one ip policy");
+                CT->IpPolicy = line[0];
                 continue;
+            } else
+                CT->IpPolicy = "some";
+
             TNlAddr addr;
-            error = addr.Parse(AF_UNSPEC, str);
+            error = addr.Parse(AF_UNSPEC, line[0]);
             if (error)
                 return error;
             if (addr.Family() != AF_INET && addr.Family() != AF_INET6)
                 return TError(EError::InvalidValue, "wrong address");
         }
 
-        CT->IpLimit = list;
-        CT->NetIpLimit = !list.empty() && list[0] != "any";
+        CT->IpLimit = cfg;
         CT->SetProp(EProperty::IP_LIMIT);
         CT->SanitizeCapabilitiesAll();
 

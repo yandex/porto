@@ -140,14 +140,16 @@ public:
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */
     bool NetInherit;            /* Use parent network namespace */
-    bool NetIpLimit;            /* Cannot use arbitrary IP */
 
     std::string Hostname;
     std::string EnvCfg;
     std::vector<TBindMount> BindMounts;
     std::map<TPath, TPath> Symlink;
     TMultiTuple IpList;
-    TTuple IpLimit;
+
+    TMultiTuple IpLimit;
+    std::string IpPolicy;
+
     TCapabilities CapAmbient;   /* get at start */
     TCapabilities CapAllowed;   /* can be set as ambient */
     TCapabilities CapLimit;     /* upper limit */

@@ -2294,12 +2294,10 @@ TError TNetEnv::CheckIpLimit() {
     for (auto ct = Parent; ct; ct = ct->Parent) {
 
         /* empty means no limit */
-        if (ct->IpLimit.empty() ||
-                (ct->IpLimit.size() == 1 &&
-                 ct->IpLimit[0] == "any"))
+        if (ct->IpPolicy == "any")
             continue;
 
-        if (ct->IpLimit.size() == 1 && ct->IpLimit[0] == "none")
+        if (ct->IpPolicy == "none")
             return TError(EError::Permission, "Parent container " + ct->Name + " forbid IP changing");
 
         if (!L3Only)
@@ -2308,9 +2306,9 @@ TError TNetEnv::CheckIpLimit() {
         for (auto &dev: Devices) {
             for (auto &ip: dev.Ip) {
                 bool allow = false;
-                for (auto &str: ct->IpLimit) {
+                for (auto &line: ct->IpLimit) {
                     TNlAddr mask;
-                    if (mask.Parse(AF_UNSPEC, str) || mask.Family() != ip.Family())
+                    if (mask.Parse(AF_UNSPEC, line[0]) || mask.Family() != ip.Family())
                         continue;
                     if (mask.IsMatch(ip)) {
                         allow = true;
