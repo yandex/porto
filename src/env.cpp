@@ -234,7 +234,7 @@ TError TUlimit::Parse(const std::string &str) {
         if (error)
             return error;
 
-        Set(res.Type, res.Soft, res.Hard);
+        Set(res.Type, res.Soft, res.Hard, true);
     }
 
     return OK;
@@ -253,7 +253,7 @@ TError TUlimit::Load(pid_t pid) {
         struct rlimit lim;
         if (prlimit(pid, (enum __rlimit_resource)type, nullptr, &lim))
             return TError::System("prlimit {} {}", pid, TUlimit::GetName(type));
-        Set(type, lim.rlim_cur, lim.rlim_max);
+        Set(type, lim.rlim_cur, lim.rlim_max, true);
     }
     return OK;
 }
@@ -277,12 +277,12 @@ void TUlimit::Set(int type, uint64_t soft, uint64_t hard, bool overwrite) {
         if (res.Type == type) {
             found = true;
             if (overwrite)
-                res = {type, soft, hard};
+                res = {type, soft, hard, overwrite};
             break;
         }
     }
     if (!found)
-        Resources.push_back({type, soft, hard});
+        Resources.push_back({type, soft, hard, overwrite});
 }
 
 void TUlimit::Merge(const TUlimit &ulimit, bool overwrite) {

@@ -32,6 +32,7 @@ struct TUlimitResource {
     int Type;
     uint64_t Soft;
     uint64_t Hard;
+    bool Overwritten;
 
     TError Parse(const std::string &str);
     std::string Format() const;
