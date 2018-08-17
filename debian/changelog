@@ -1,3 +1,25 @@
+yandex-porto (4.12.23) unstable; urgency=low
+
+  * volume: check duplicate volume link target
+  * test: check upgrade from 4.12.21
+  * porto: count and describe memory guarantee overcommits
+  * property: add persistent and hierarchical oom_kills_total
+  * contaner: save and restore context in Save()
+  * test: check oom
+  * porto: collect oom kills lazily
+  * porto: consider current hugetlb size when checking guarantee
+  * network: count created namespaces
+  * volume: fix guarantee accounting
+  * volume: rework locking aroung tuning operation
+  * portoctl: exit from shell and exec after ^X^X
+  * test/oom: fix race
+  * network: fix l3_migration_hack
+  * portoinit: ignore SIGCHLD without target pid
+  * hugetlb: handle limit in the same way as other limits
+  * volume: allow creation with stopped target container
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 17 Aug 2018 15:36:10 +0300
+
 yandex-porto (4.12.22) unstable; urgency=low
 
   * portoctl: fix raw command
