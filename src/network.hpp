@@ -317,5 +317,5 @@ struct TNetEnv {
     TError DestroyTap(TNetDeviceConfig &dev);
 
     TError Open(TContainer &ct);
-    TError OpenNetwork();
+    TError OpenNetwork(TContainer &ct);
 };
