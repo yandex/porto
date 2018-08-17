@@ -1,3 +1,27 @@
+yandex-porto (4.17.0) unstable; urgency=low
+
+  * labels: inc starts missing label from 0
+  * coredump: count cores in labels
+  * core: forward cores into core_command with any dumpable in chroot
+  * test: check coredump
+  * porto: add change time
+  * porto: send exit_code ad start_error in wait response
+  * test/oom: fix race
+  * porto: warn about unexpected locked containers
+  * porto: attach should keep write lock on source container
+  * porto: sanitize locking around recursive start
+  * porto: rework time properties
+  * volume: keep build time as timestamp
+  * portoctl build: add cleanup scripts for running after os stop
+  * porto: report start_error at respawn
+  * network: fix l3_migration_hack
+  * portoinit: ignore SIGCHLD without target pid
+  * porto: add virt_mode=job
+  * hugetlb: handle limit in the same way as other limits
+  * volume: allow creation with stopped target container
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 17 Aug 2018 09:36:13 +0300
+
 yandex-porto (4.16.5) unstable; urgency=low
 
   * porto: consider current hugetlb size when checking guarantee
