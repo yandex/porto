@@ -36,7 +36,7 @@ a = conn.Run('a', command="fallocate -l 2m /dev/hugepages/dummy", wait=1)
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['exit_code'], '0')
 
-ExpectEq(a['hugetlb_limit'], '')
+ExpectEq(a['hugetlb_limit'], '0')
 ExpectEq(a['hugetlb_usage'], '2097152')
 
 ExpectEq(root['hugetlb_limit'], '2097152')
@@ -59,12 +59,12 @@ os.unlink('/dev/hugepages/dummy')
 ExpectEq(root['hugetlb_limit'], '2097152')
 ExpectEq(root['hugetlb_usage'], '0')
 
-a = conn.Run('a', command="fallocate -l 2m /dev/hugepages/dummy", wait=1, hugetlb_limit=0)
+a = conn.Run('a', command="fallocate -l 2m /dev/hugepages/dummy", wait=1, hugetlb_limit=1)
 
 ExpectEq(a['state'], 'dead')
 ExpectNe(a['exit_code'], '0')
 
-ExpectEq(a['hugetlb_limit'], '0')
+ExpectEq(a['hugetlb_limit'], '1')
 ExpectEq(a['hugetlb_usage'], '0')
 
 ExpectEq(root['hugetlb_limit'], '2097152')

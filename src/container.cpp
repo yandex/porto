@@ -1784,7 +1784,7 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestClearPropDirty(EProperty::HUGETLB_LIMIT)) {
         auto cg = GetCgroup(HugetlbSubsystem);
-        error = HugetlbSubsystem.SetHugeLimit(cg, HugetlbLimit);
+        error = HugetlbSubsystem.SetHugeLimit(cg, HugetlbLimit ?: -1);
         if (error) {
             if (error.Errno != EINVAL)
                 L_ERR("Can't set {}: {}", P_HUGETLB_LIMIT, error);

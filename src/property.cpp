@@ -1616,30 +1616,25 @@ public:
     TError Get(std::string &value) {
         if (!CT->Level)
             value = std::to_string(GetHugetlbMemory());
-        else if (CT->HasProp(EProperty::HUGETLB_LIMIT))
+        else
             value = std::to_string(CT->HugetlbLimit);
         return OK;
     }
     TError Set(const std::string &value) {
         TError error;
 
-        if (value.empty()) {
-            CT->HugetlbLimit = -1;
-            CT->ClearProp(EProperty::HUGETLB_LIMIT);
-        } else {
-            uint64_t limit;
-            error = StringToSize(value, limit);
-            if (error)
-                return error;
+        uint64_t limit;
+        error = StringToSize(value, limit);
+        if (error)
+            return error;
 
-            auto cg = CT->GetCgroup(HugetlbSubsystem);
-            uint64_t usage;
-            if (!HugetlbSubsystem.GetHugeUsage(cg, usage) && limit < usage)
-                return TError(EError::InvalidValue, "current hugetlb usage is greater than limit");
+        auto cg = CT->GetCgroup(HugetlbSubsystem);
+        uint64_t usage;
+        if (!HugetlbSubsystem.GetHugeUsage(cg, usage) && limit < usage)
+            return TError(EError::InvalidValue, "current hugetlb usage is greater than limit");
 
-            CT->HugetlbLimit = limit;
-            CT->SetProp(EProperty::HUGETLB_LIMIT);
-        }
+        CT->HugetlbLimit = limit;
+        CT->SetProp(EProperty::HUGETLB_LIMIT);
         return OK;
     }
 } static HugetlbLimit;
