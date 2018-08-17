@@ -1603,11 +1603,11 @@ TError TVolume::ClaimPlace(uint64_t size) {
     if (place == "")
         return OK;
 
-    auto lock = LockVolumes();
-
     if ((!size || size > ClaimedSpace) && !CL->IsInternalUser() &&
             State != EVolumeState::Destroying) {
         for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
+            ct->LockStateWrite();
+
             uint64_t total_limit = ct->PlaceLimit.count("total") ?
                                    ct->PlaceLimit.at("total") : UINT64_MAX;
             uint64_t place_limit = ct->PlaceLimit.count(place) ?
@@ -1624,16 +1624,29 @@ TError TVolume::ClaimPlace(uint64_t size) {
                     (total_usage - ClaimedSpace > UINT64_MAX - size) ||
                     (total_limit < total_usage - ClaimedSpace + size) ||
                     (place_usage - ClaimedSpace > UINT64_MAX - size) ||
-                    (place_limit < place_usage - ClaimedSpace + size))
-                return TError(EError::ResourceNotAvailable, "Not enough place limit in " + ct->Name);
+                    (place_limit < place_usage - ClaimedSpace + size)) {
+
+                ct->UnlockState();
+
+                // Undo
+                for (auto c = VolumeOwnerContainer; c && c != ct; c = c->Parent) {
+                    c->LockStateWrite();
+                    c->PlaceUsage["total"] -= size - ClaimedSpace;
+                    c->PlaceUsage[place] -= size - ClaimedSpace;
+                    c->UnlockState();
+                }
+
+                return TError(EError::ResourceNotAvailable, "Not enough place limit in {}", ct->Name);
+            }
+
+            ct->PlaceUsage["total"] += size - ClaimedSpace;
+            ct->PlaceUsage[place] += size - ClaimedSpace;
+
+            ct->UnlockState();
         }
     }
 
-    for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
-        ct->PlaceUsage["total"] += size - ClaimedSpace;
-        ct->PlaceUsage[place] += size - ClaimedSpace;
-    }
-
+    auto volumes_lock = LockVolumes();
     ClaimedSpace = size;
 
     return OK;
