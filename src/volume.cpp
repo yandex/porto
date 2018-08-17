@@ -2989,9 +2989,8 @@ TError TVolume::Create(const TStringMap &cfg, std::shared_ptr<TVolume> &volume) 
         error = CL->WriteContainer(cfg.at(V_TARGET_CONTAINER), target, true);
         if (error)
             return error;
-        if (target->State == EContainerState::Stopped)
-            return TError(EError::InvalidState, "Target container is stopped");
         target_root = target->RootPath;
+        CL->ReleaseContainer();
     } else
         target_root = CL->ClientContainer->RootPath;
 
