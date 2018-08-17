@@ -48,6 +48,8 @@ int main(int argc, char *argv[]) {
         signal(SIGINT, forward);
         signal(SIGQUIT, forward);
         signal(SIGTERM, forward);
+    } else {
+        signal(SIGCHLD, SIG_IGN);
     }
 
     if (seize) {
@@ -60,7 +62,7 @@ int main(int argc, char *argv[]) {
         pid_t pid = wait(&status);
         if (target < 0) {
             if (pid < 0 && errno == ECHILD)
-                sleep(5 * 60);
+                pause();
         } else {
             if (pid < 0) {
                 if (errno == ECHILD)
