@@ -663,16 +663,18 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
     TError containerError = CL->ResolveContainer(name, ct);
     lock.unlock();
 
-    if (!containerError)
-        ct->LockStateRead();
-
     auto entry = rsp.add_list();
     entry->set_name(name);
-    entry->set_change_time(ct->ChangeTime);
 
-    if (req.has_changed_since() && ct->ChangeTime < req.changed_since()) {
-        entry->set_no_changes(true);
-        goto out;
+    if (!containerError) {
+        ct->LockStateRead();
+
+        entry->set_change_time(ct->ChangeTime);
+
+        if (req.has_changed_since() && ct->ChangeTime < req.changed_since()) {
+            entry->set_no_changes(true);
+            goto out;
+        }
     }
 
     for (int j = 0; j < req.variable_size(); j++) {
