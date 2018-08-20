@@ -1550,7 +1550,9 @@ uint64_t TNlAddr::GetOffset(const TNlAddr &base) const {
 }
 
 bool TNlAddr::IsMatch(const TNlAddr &addr) const {
-    return Addr && addr.Addr && nl_addr_cmp_prefix(Addr, addr.Addr) == 0;
+    return Addr && addr.Addr &&
+        nl_addr_get_prefixlen(Addr) <= nl_addr_get_prefixlen(addr.Addr) &&
+        nl_addr_cmp_prefix(Addr, addr.Addr) == 0;
 }
 
 bool TNlAddr::IsEqual(const TNlAddr &addr) const {
