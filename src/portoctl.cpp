@@ -703,9 +703,9 @@ public:
                 return ret;
             }
             if (printKey)
-                PrintPair(args[i], value);
+                fmt::print("{} = {}\n", args[i], value);
             else
-                Print(value);
+                fmt::print("{}\n", value);
         }
 
         return 0;
@@ -755,9 +755,9 @@ public:
                 return ret;
             }
             if (printKey)
-                PrintPair(args[i], value);
+                fmt::print("{} = {}\n", args[i], value);
             else
-                Print(value);
+                fmt::print("{}\n", value);
         }
 
         return 0;
@@ -1036,7 +1036,7 @@ public:
             auto &data = it.second;
 
             if (multiGet)
-                Print(it.first + ":");
+                fmt::print("{}:\n", it.first);
 
             for (const auto &key : vars) {
                 if (data[key].Error) {
@@ -1056,13 +1056,13 @@ public:
                     val = HumanValue(key, val);
 
                 if (printKey)
-                    PrintPair(key, val);
+                    fmt::print("{} = {}\n", key, val);
                 else
-                    Print(val);
+                    fmt::print("{}\n", val);
             }
 
             if (multiGet)
-                Print("");
+                fmt::print("\n");
         }
 
         return ret;
@@ -1346,7 +1346,7 @@ public:
             return ret;
         }
 
-        Print(name);
+        fmt::print("{}\n", name);
 
         return EXIT_SUCCESS;
     }

@@ -1,6 +1,4 @@
 #include <csignal>
-#include <iostream>
-#include <iomanip>
 #include <climits>
 
 #include "cli.hpp"
@@ -36,15 +34,10 @@ void PrintAligned(const std::string &name, const std::string &desc,
     if (last.length())
         v.push_back(last);
 
-    std::cout << "  " << std::left << std::setw(nameWidth) << name
-              << v[0] << std::endl;
-    std::cout << std::resetiosflags(std::ios::adjustfield);
+    fmt::print("  {:<{}}{}\n", name, nameWidth, v[0]);
 
-    for (size_t i = 1; i < v.size(); i++) {
-        std::cout << "  " << std::left << std::setw(nameWidth) << " "
-                  << v[i] << std::endl;
-        std::cout << std::resetiosflags(std::ios::adjustfield);
-    }
+    for (size_t i = 1; i < v.size(); i++)
+        fmt::print("  {:<{}}{}\n", "", nameWidth, v[i]);
 }
 
 template <typename Collection, typename MapFunction>
@@ -79,9 +72,16 @@ void THelpCmd::Usage() {
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
         termWidth = w.ws_col;
 
-    std::cout << "Usage: " << program_invocation_short_name << " [-t|--timeout <seconds>] <command> [<args>]" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Command list:" << std::endl;
+    fmt::print("Usage: {} [option]... <command> [argument]...\n"
+               "\n"
+               "Options:\n"
+               "  -t, --timeout=<seconds>    rpc timeout ({} seconds)\n"
+               "  -h, --help\n"
+               "  -v, --version\n"
+               "\n"
+               "Commands:\n",
+               program_invocation_short_name,
+               Api->GetTimeout());
 
     using CmdPair = TCommandHandler::RegisteredCommands::value_type;
     int nameWidth = MaxFieldLength(Handler.GetCommands(), [](const CmdPair &p) { return p.first; });
@@ -89,7 +89,7 @@ void THelpCmd::Usage() {
     for (const auto &i : Handler.GetCommands())
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
-    std::cout << std::endl << "Volume properties:" << std::endl;
+    fmt::print("\nVolume properties:\n");
     vector<Porto::Property> vlist;
     int ret = Api->ListVolumeProperties(vlist);
     if (ret) {
@@ -101,7 +101,7 @@ void THelpCmd::Usage() {
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
-    std::cout << std::endl << "Container properties:" << std::endl;
+    fmt::print("\nContainer properties:\n");
     vector<Porto::Property> plist;
     ret = Api->ListProperties(plist);
     if (ret) {
@@ -113,7 +113,7 @@ void THelpCmd::Usage() {
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
-    std::cout << std::endl;
+    fmt::print("\n");
 }
 
 int THelpCmd::Execute(TCommandEnviroment *env) {
@@ -157,27 +157,6 @@ const string &ICmd::GetUsage() const { return Usage; }
 const string &ICmd::GetDescription() const { return Desc; }
 const string &ICmd::GetHelp() const { return Help; }
 
-const string &ICmd::ErrorName(int err) {
-    if (err == INT_MAX) {
-        static const string error = "portod unavailable";
-        return error;
-    }
-    return rpc::EError_Name(static_cast<rpc::EError>(err));
-}
-
-void ICmd::Print(const std::string &val) {
-    std::cout << val;
-
-    if (!val.length() || val[val.length() - 1] != '\n')
-        std::cout << std::endl;
-    else
-        std::cout << std::flush;
-}
-
-void ICmd::PrintPair(const std::string &key, const std::string &val) {
-    Print(key + " = " + val);
-}
-
 void ICmd::PrintError(const string &prefix) {
     fmt::print(stderr, "{}: {}\n", prefix, Api->GetLastError());
 }
@@ -187,9 +166,10 @@ void ICmd::PrintError(const string &prefix, const TError &error) {
 }
 
 void ICmd::PrintUsage() {
-    std::cout << "Usage: " << program_invocation_short_name
-              << " " << Name << " " << Usage << std::endl
-              << std::endl << Desc << std::endl << Help;
+    fmt::print("Usage: {} {} {}\n\n{}\n\n{}\n",
+               program_invocation_short_name, Name, Usage,
+               Desc,
+               Help);
 }
 
 bool ICmd::ValidArgs(const std::vector<std::string> &args) {
@@ -225,6 +205,8 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
         argv += 2;
     }
 
+    setvbuf(stdout, nullptr, _IOLBF, 0);
+
     if (argc <= 1) {
         Usage(nullptr);
         return EXIT_FAILURE;
@@ -239,12 +221,12 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
     if (name == "-v" || name == "--version") {
         std::string version, revision;
 
-        std::cout << "client: " << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
+        fmt::print("client: {} {}\n", PORTO_VERSION, PORTO_REVISION);
 
         if (PortoApi.GetVersion(version, revision))
             return EXIT_FAILURE;
 
-        std::cout << "server: " << version << " " << revision << std::endl;
+        fmt::print("server: {} {}\n", version, revision);
         return EXIT_SUCCESS;
     }
 
@@ -259,7 +241,7 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
         argv[1] = (char *)helper.c_str();
         execvp(argv[1], argv + 1);
 
-        std::cerr << "Invalid command: " << name << std::endl;
+        fmt::print(stderr,"Invalid command: {}\n", name);
         return EXIT_FAILURE;
     }
 

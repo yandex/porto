@@ -27,9 +27,6 @@ public:
     const std::string &GetDescription() const;
     const std::string &GetHelp() const;
 
-    const std::string &ErrorName(int err);
-    void Print(const std::string &val);
-    void PrintPair(const std::string &key, const std::string &val);
     void PrintError(const std::string &prefix);
     void PrintError(const std::string &prefix, const TError &error);
     void PrintUsage();
