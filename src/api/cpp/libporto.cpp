@@ -220,6 +220,10 @@ int Connection::Connect() {
     return Impl->Connect();
 }
 
+int Connection::GetTimeout() const {
+    return Impl->Timeout;
+}
+
 int Connection::SetTimeout(int timeout) {
     Impl->Timeout = timeout;
     if (Impl->Fd >= 0)

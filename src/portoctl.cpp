@@ -2816,6 +2816,9 @@ public:
 
 int main(int argc, char *argv[]) {
     Porto::Connection api;
+
+    api.SetTimeout(Porto::SANE_TIMEOUT);
+
     TCommandHandler handler(api);
     handler.RegisterCommand<TCreateCmd>();
     handler.RegisterCommand<TDestroyCmd>();

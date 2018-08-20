@@ -14,6 +14,10 @@ namespace rpc {
 
 namespace Porto {
 
+constexpr int NO_TIMEOUT = 0;       // default
+constexpr int SANE_TIMEOUT = 300;   // 5min
+constexpr int DISK_TIMEOUT = 600;   // 10min
+
 struct Property {
     std::string Name;
     std::string Description;
@@ -87,6 +91,7 @@ public:
     void Close();
 
     /* request timeout in seconds */
+    int GetTimeout() const;
     int SetTimeout(int timeout);
 
     std::string GetLastError() const;
