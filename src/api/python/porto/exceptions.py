@@ -22,14 +22,6 @@ class PortoException(Exception):
         return '{}: {}'.format(self.__class__.__name__, self.message)
 
 
-class SocketError(PortoException):
-    pass
-
-
-class SocketTimeout(PortoException):
-    pass
-
-
 class WaitContainerTimeout(PortoException):
     pass
 

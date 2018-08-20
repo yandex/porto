@@ -75,6 +75,12 @@ enum EError {
 
     NotFound = 404;
 
+    SocketError = 502;
+
+    SocketUnavailable = 503;
+
+    SocketTimeout = 504;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }

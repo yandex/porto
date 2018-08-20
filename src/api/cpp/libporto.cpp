@@ -34,7 +34,20 @@ public:
     std::string LastErrorMsg;
 
     int Error(int err, const std::string &prefix) {
-        LastError = EError::Unknown;
+        switch (err) {
+        case ENOENT:
+            LastError = EError::SocketUnavailable;
+            break;
+        case EAGAIN:
+            LastError = EError::SocketTimeout;
+            break;
+        case EIO:
+            LastError = EError::SocketError;
+            break;
+        default:
+            LastError = EError::Unknown;
+            break;
+        }
         LastErrorMsg = std::string(prefix + ": " + strerror(err));
         Close();
         return LastError;
