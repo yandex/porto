@@ -30,8 +30,8 @@ public:
     const std::string &ErrorName(int err);
     void Print(const std::string &val);
     void PrintPair(const std::string &key, const std::string &val);
-    void PrintError(const TError &error, const std::string &str);
-    void PrintError(const std::string &str);
+    void PrintError(const std::string &prefix);
+    void PrintError(const std::string &prefix, const TError &error);
     void PrintUsage();
     bool ValidArgs(const std::vector<std::string> &args);
     virtual int Execute(TCommandEnviroment *env) = 0;

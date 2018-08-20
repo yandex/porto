@@ -178,18 +178,12 @@ void ICmd::PrintPair(const std::string &key, const std::string &val) {
     Print(key + " = " + val);
 }
 
-void ICmd::PrintError(const TError &error, const string &str) {
-    std::cerr << str << ": " << error.ToString() << std::endl;
+void ICmd::PrintError(const string &prefix) {
+    fmt::print(stderr, "{}: {}\n", prefix, Api->GetLastError());
 }
 
-void ICmd::PrintError(const string &str) {
-    int num;
-    string msg;
-
-    Api->GetLastError(num, msg);
-
-    TError error((EError)num, msg);
-    PrintError(error, str);
+void ICmd::PrintError(const string &prefix, const TError &error) {
+    fmt::print(stderr, "{}: {}\n", prefix, error.ToString());
 }
 
 void ICmd::PrintUsage() {

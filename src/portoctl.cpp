@@ -656,7 +656,7 @@ public:
         copy(args.begin(), args.end(), ostream_iterator<string>(req, " "));
 
         std::string rsp;
-        int ret = Api->Raw(req.str(), rsp);
+        int ret = Api->Call(req.str(), rsp);
         std::cout << rsp << std::endl;
 
         return ret;
@@ -846,7 +846,7 @@ public:
             } else {
                 TError error = StringToInt(sigName, sig);
                 if (error) {
-                    PrintError(error, "Invalid signal");
+                    PrintError("Invalid signal", error);
                     return EXIT_FAILURE;
                 }
             }
@@ -1042,7 +1042,7 @@ public:
                 if (data[key].Error) {
                     if (printErrors || key == "state") {
                         TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
-                        PrintError(error, "Can't get " + key);
+                        PrintError("Cannot get " + key, error);
                         ret = EXIT_FAILURE;
                     }
                     continue;
@@ -1496,7 +1496,7 @@ public:
                 cmd->set_value(label.substr(sep + 1));
             }
 
-            ret = Api->Rpc(req, rsp);
+            ret = Api->Call(req, rsp);
             if (!ret)
                 for (auto &l: rsp.findlabel().list())
                     clist.push_back(l.name());
@@ -2108,7 +2108,7 @@ public:
                 s->set_inode_limit(inode_limit);
             if (space_limit)
                 s->set_space_limit(space_limit);
-            ret = Api->Rpc(req, rsp);
+            ret = Api->Call(req, rsp);
             if (ret)
                 PrintError("");
         } else if (remove) {

@@ -89,6 +89,12 @@ public:
     /* request timeout in seconds */
     int SetTimeout(int timeout);
 
+    std::string GetLastError() const;
+    void GetLastError(int &error, std::string &msg) const;
+
+    int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
+    int Call(const std::string &req, std::string &rsp);
+
     int Create(const std::string &name);
     int CreateWeakContainer(const std::string &name);
     int Destroy(const std::string &name);
@@ -139,11 +145,6 @@ public:
     }
 
     int GetVersion(std::string &tag, std::string &revision);
-
-    int Rpc(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
-    int Raw(const std::string &message, std::string &response);
-    void GetLastError(int &error, std::string &msg) const;
-    std::string TextError() const;
 
     int ListVolumeProperties(std::vector<Property> &list);
     int CreateVolume(const std::string &path,
