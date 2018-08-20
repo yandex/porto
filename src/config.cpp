@@ -142,6 +142,7 @@ static void DefaultConfig() {
 
     config().mutable_network()->set_autoconf_timeout_s(120);
     config().mutable_network()->set_proxy_ndp(true);
+    config().mutable_network()->set_proxy_ndp_max_range(16);
     config().mutable_network()->set_proxy_ndp_watchdog_ms(60000);
     config().mutable_network()->set_watchdog_ms(5000);
     config().mutable_network()->set_resolv_conf_watchdog_ms(5000);

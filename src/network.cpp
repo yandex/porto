@@ -1066,10 +1066,19 @@ TError TNetwork::AddProxyNeightbour(const std::vector<TNlAddr> &ips,
                                     const std::string &master) {
     TError error;
     if (config().network().proxy_ndp()) {
-        error = SetupProxyNeighbour(ips, master);
+        std::vector<TNlAddr> addrs;
+
+        for (auto &ip: ips) {
+            error = ip.GetRange(addrs, config().network().proxy_ndp_max_range());
+            if (error)
+                return error;
+        }
+
+        error = SetupProxyNeighbour(addrs, master);
         if (error)
             return error;
-        for (auto ip: ips)
+
+        for (auto ip: addrs)
             Neighbours.emplace_back(TNetProxyNeighbour{ip, master});
     }
     return error;
@@ -1078,7 +1087,14 @@ TError TNetwork::AddProxyNeightbour(const std::vector<TNlAddr> &ips,
 void TNetwork::DelProxyNeightbour(const std::vector<TNlAddr> &ips) {
     TError error;
     if (config().network().proxy_ndp()) {
+        std::vector<TNlAddr> addrs;
+
         for (auto &ip: ips) {
+            if (ip.GetRange(addrs, config().network().proxy_ndp_max_range()))
+                addrs.emplace_back(ip);
+        }
+
+        for (auto &ip: addrs) {
             for (auto &dev: Devices) {
                 error = Nl->ProxyNeighbour(dev.Index, ip, false);
                 if (error)

@@ -1549,6 +1549,36 @@ uint64_t TNlAddr::GetOffset(const TNlAddr &base) const {
     return offset;
 }
 
+void TNlAddr::GetRange(TNlAddr &base, uint64_t &count) const {
+    int len = nl_addr_get_len(Addr);
+    int bits = len * 8 - nl_addr_get_prefixlen(Addr);
+    count = bits < 64 ? (1ull << bits) : 0;
+
+    base = *this;
+    uint8_t *byte = (uint8_t *)nl_addr_get_binary_addr(base.Addr);
+
+    byte += len - 1 - bits / 8;
+    if (bits % 8)
+        *byte &= 0xff << (bits % 8);
+    memset(byte + 1, 0, bits / 8);
+}
+
+TError TNlAddr::GetRange(std::vector<TNlAddr> &addrs, int max) const {
+    TNlAddr base;
+    uint64_t count;
+
+    GetRange(base, count);
+    if (count > max)
+        return TError(EError::ResourceNotAvailable, "Too many ip in subnet {}, max {}", Format(), max);
+
+    while (count--) {
+        addrs.push_back(base);
+        base.AddOffset(1);
+    }
+
+    return OK;
+}
+
 bool TNlAddr::IsMatch(const TNlAddr &addr) const {
     return Addr && addr.Addr &&
         nl_addr_get_prefixlen(Addr) <= nl_addr_get_prefixlen(addr.Addr) &&

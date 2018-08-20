@@ -69,6 +69,7 @@ message TConfig {
         optional bool codel_ecn = 49;
         optional uint32 l3_default_ipv4_mtu = 50;   // default route mtu
         optional uint32 l3_default_ipv6_mtu = 51;   // default route mtu
+        optional uint32 proxy_ndp_max_range = 52;
     }
 
     message TFileCfg {

@@ -822,7 +822,9 @@ Possible indexes for statistics and parameters:
     - *veth* \<name\> \<bridge\> \[mtu\] \[hw\]
     - *ECN* \[name\]         - enable ECN
 
-* **ip**             - ip addresses, syntax: \<interface\> \<ip\>/\<prefix\>;...
+* **ip**             - ip addresses, syntax: \<interface\> \<ip\>\[/\<prefix\>\];...
+
+    For L3 devices whole prefix is routed inside, see [L3].
 
 * **ip\_limit**      - ip allowed for sub-containers: none|any|\<ip\>\[/\<mask\>\];...
 
@@ -942,9 +944,18 @@ creates isolated netns with macvlan eth0 at device eth0. See man **ip-link(8)**.
 ## L3
 
 Mode net=L3 connects host and container netns with veth pair and configures
-routing in both directions. Also it adds neighbour/arp proxy entries to
-interfaces with addresses from the same network, this way container becomes
-reachable from the outside.
+routing in both directions.
+
+L3 adds neighbour/arp proxy entries to interfaces with addresses from
+the same network, this way container becomes reachable from the outside.
+For ip with prefix proxy entry is added for each address in range but range is limited.
+```
+network {
+    proxy_ndp: true                 (disable proxy entries)
+    proxy_ndp_watchdog_ms: 60000    (reconstruction period)
+    proxy_ndp_max_range: 16         (limit for subnet size)
+}
+```
 
 Host sysctl configuration:
 ```
