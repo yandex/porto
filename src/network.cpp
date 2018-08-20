@@ -2864,8 +2864,12 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
         return OK;
     }
 
-    if (NetInherit)
-        return Open(*Parent);
+    if (NetInherit) {
+        auto p = Parent.get();
+        while (p->Parent && !p->Task.Pid && p->Net == p->Parent->Net)
+            p = p->Parent.get();
+        return Open(*p);
+    }
 
     if (NetIsolate) {
         error = TNetwork::New(NetNs, Net);
