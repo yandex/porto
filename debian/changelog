@@ -1,3 +1,25 @@
+yandex-porto (4.18.0) unstable; urgency=low
+
+  * container: store resolv_conf as single string
+  * container: store env as single string
+  * env: track overwritten variables
+  * ulimit: track overwrite
+  * container: keep separate ip policy string
+  * labels: merge labels at setting whole map
+  * volume: rework locking around place space accounting
+  * rpc: shuffle protobuf for better readability
+  * network: fix ip_limit for ip networks
+  * network: setup bunch of ndp proxies for L3 ip with prefix
+  * network: fix namespace inheritance over isolate=false parent
+  * test: net
+  * porto: fix crash in combined get
+  * porto: add codes for socket errors
+  * api/cpp: refactor raw call interface
+  * portoctl: set default timeout to 5 minutes
+  * portoctl: set stdout line-buffered
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 21 Aug 2018 07:38:47 +0300
+
 yandex-porto (4.17.0) unstable; urgency=low
 
   * labels: inc starts missing label from 0
