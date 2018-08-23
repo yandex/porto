@@ -21,7 +21,8 @@ static const char PortoSocket[] = "/run/portod.socket";
 class Connection::ConnectionImpl {
 public:
     int Fd = -1;
-    int Timeout = 0;
+    int Timeout = DEFAULT_TIMEOUT;
+    int DiskTimeout = DISK_TIMEOUT;
 
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
@@ -71,8 +72,9 @@ public:
 
     int Send(const rpc::TContainerRequest &req);
     int Recv(rpc::TContainerResponse &rsp);
-    int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
-    int Call();
+    int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp,
+             int extra_timeout = -1);
+    int Call(int extra_timeout = -1);
 };
 
 int Connection::ConnectionImpl::Connect()
@@ -87,7 +89,7 @@ int Connection::ConnectionImpl::Connect()
     if (Fd < 0)
         return Error(errno, "socket");
 
-    if (Timeout && SetTimeout(3, Timeout))
+    if (Timeout > 0 && SetTimeout(3, Timeout))
         return LastError;
 
     memset(&peer_addr, 0, sizeof(struct sockaddr_un));
@@ -113,6 +115,9 @@ int Connection::ConnectionImpl::Connect()
 int Connection::ConnectionImpl::SetTimeout(int direction, int timeout)
 {
     struct timeval tv;
+
+    if (timeout < 0 || Fd < 0)
+        return EError::Success;
 
     tv.tv_sec = timeout;
     tv.tv_usec = 0;
@@ -169,7 +174,7 @@ int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp) {
         if (rsp.has_asyncwait()) {
             if (AsyncWaitCallback) {
                 AsyncWaitEvent event = {
-                    rsp.asyncwait().when(),
+                    (time_t)rsp.asyncwait().when(),
                     rsp.asyncwait().name(),
                     rsp.asyncwait().state(),
                     rsp.asyncwait().label(),
@@ -184,7 +189,8 @@ int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp) {
 
 
 int Connection::ConnectionImpl::Call(const rpc::TContainerRequest &req,
-                                     rpc::TContainerResponse &rsp) {
+                                     rpc::TContainerResponse &rsp,
+                                     int extra_timeout) {
     int ret = 0;
 
     if (Fd < 0)
@@ -193,19 +199,25 @@ int Connection::ConnectionImpl::Call(const rpc::TContainerRequest &req,
     if (!ret)
         ret = Send(req);
 
+    if (!ret && extra_timeout >= 0 && Timeout)
+        ret = SetTimeout(2, extra_timeout ? (extra_timeout + Timeout) : 0);
+
     if (!ret)
         ret = Recv(rsp);
 
+    if (extra_timeout >= 0 && Timeout)
+        SetTimeout(2, Timeout);
+
     if (!ret) {
-        LastErrorMsg = rsp.errormsg();
         ret = LastError = (int)rsp.error();
+        LastErrorMsg = rsp.errormsg();
     }
 
     return ret;
 }
 
-int Connection::ConnectionImpl::Call() {
-    int ret = Call(Req, Rsp);
+int Connection::ConnectionImpl::Call(int extra_timeout) {
+    int ret = Call(Req, Rsp, extra_timeout);
     Req.Clear();
     return ret;
 }
@@ -225,9 +237,16 @@ int Connection::GetTimeout() const {
 }
 
 int Connection::SetTimeout(int timeout) {
-    Impl->Timeout = timeout;
-    if (Impl->Fd >= 0)
-        return Impl->SetTimeout(3, timeout);
+    Impl->Timeout = timeout >= 0 ? timeout : DEFAULT_TIMEOUT;
+    return Impl->SetTimeout(3, Impl->Timeout);
+}
+
+int Connection::GetDiskTimeout() const {
+    return Impl->DiskTimeout;
+}
+
+int Connection::SetDiskTimeout(int disk_timeout) {
+    Impl->DiskTimeout = disk_timeout;
     return EError::Success;
 }
 
@@ -235,7 +254,9 @@ void Connection::Close() {
     Impl->Close();
 }
 
-int Connection::Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+int Connection::Call(const rpc::TContainerRequest &req,
+                     rpc::TContainerResponse &rsp,
+                     int extra_timeout) {
 
     if (!req.IsInitialized()) {
         Impl->LastError = EError::InvalidMethod;
@@ -243,10 +264,12 @@ int Connection::Call(const rpc::TContainerRequest &req, rpc::TContainerResponse 
         return (int)EError::InvalidMethod;
     }
 
-    return Impl->Call(req, rsp);
+    return Impl->Call(req, rsp, extra_timeout);
 }
 
-int Connection::Call(const std::string &req, std::string &rsp) {
+int Connection::Call(const std::string &req,
+                     std::string &rsp,
+                     int extra_timeout) {
 
     if (!google::protobuf::TextFormat::ParseFromString(req, &Impl->Req)) {
         Impl->LastError = EError::InvalidMethod;
@@ -254,7 +277,7 @@ int Connection::Call(const std::string &req, std::string &rsp) {
         return (int)EError::InvalidMethod;
     }
 
-    int ret = Call(Impl->Req, Impl->Rsp);
+    int ret = Call(Impl->Req, Impl->Rsp, extra_timeout);
     Impl->Req.Clear();
     rsp = Impl->Rsp.DebugString();
 
@@ -434,7 +457,7 @@ int Connection::Stop(const std::string &name, int timeout) {
     if (timeout >= 0)
         stop->set_timeout_ms(timeout * 1000);
 
-    return Impl->Call();
+    return Impl->Call(timeout);
 }
 
 int Connection::Kill(const std::string &name, int sig) {
@@ -465,7 +488,7 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
                                const std::vector<std::string> &labels,
                                std::string &name, int timeout) {
     auto wait = Impl->Req.mutable_wait();
-    int ret, recv_timeout = 0;
+    int ret;
 
     for (const auto &c : containers)
         wait->add_name(c);
@@ -473,21 +496,13 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
     for (auto &label: labels)
         wait->add_label(label);
 
-    if (timeout >= 0) {
+    if (timeout >= 0)
         wait->set_timeout_ms(timeout * 1000);
-        recv_timeout = timeout + (Impl->Timeout ?: timeout);
-    }
 
     if (Impl->Fd < 0 && Connect())
         return Impl->LastError;
 
-    if (timeout && Impl->SetTimeout(2, recv_timeout))
-        return Impl->LastError;
-
-    ret = Impl->Call();
-
-    if (timeout && Impl->Fd >= 0)
-        Impl->SetTimeout(2, Impl->Timeout);
+    ret = Impl->Call(timeout);
 
     name.assign(Impl->Rsp.wait().name());
     return ret;
@@ -556,7 +571,7 @@ int Connection::CreateVolume(const std::string &path,
         prop->set_value(kv.second);
     }
 
-    int ret = Impl->Call();
+    int ret = Impl->Call(Impl->DiskTimeout);
     if (!ret) {
         const auto &volume = Impl->Rsp.volume();
         result.Path = volume.path();
@@ -606,7 +621,7 @@ int Connection::UnlinkVolume(const std::string &path,
     if (strict)
         req->set_strict(strict);
 
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ListVolumes(const std::string &path,
@@ -665,7 +680,7 @@ int Connection::TuneVolume(const std::string &path,
         prop->set_value(kv.second);
     }
 
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ImportLayer(const std::string &layer,
@@ -681,7 +696,7 @@ int Connection::ImportLayer(const std::string &layer,
         req->set_place(place);
     if (private_value.size())
         req->set_private_value(private_value);
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ExportLayer(const std::string &volume,
@@ -693,7 +708,7 @@ int Connection::ExportLayer(const std::string &volume,
     req->set_tarball(tarball);
     if (compress.size())
         req->set_compress(compress);
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::RemoveLayer(const std::string &layer, const std::string &place) {
@@ -702,7 +717,7 @@ int Connection::RemoveLayer(const std::string &layer, const std::string &place) 
     req->set_layer(layer);
     if (place.size())
         req->set_place(place);
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ListLayers(std::vector<Layer> &layers,
@@ -779,7 +794,7 @@ int Connection::RemoveStorage(const std::string &name,
     req->set_name(name);
     if (place.size())
         req->set_place(place);
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ImportStorage(const std::string &name,
@@ -797,7 +812,7 @@ int Connection::ImportStorage(const std::string &name,
         req->set_compress(compression);
     if (private_value.size())
         req->set_private_value(private_value);
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ExportStorage(const std::string &name,
@@ -812,7 +827,7 @@ int Connection::ExportStorage(const std::string &name,
         req->set_place(place);
     if (compression.size())
         req->set_compress(compression);
-    return Impl->Call();
+    return Impl->Call(Impl->DiskTimeout);
 }
 
 int Connection::ConvertPath(const std::string &path, const std::string &src,

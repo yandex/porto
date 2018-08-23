@@ -14,9 +14,9 @@ namespace rpc {
 
 namespace Porto {
 
-constexpr int NO_TIMEOUT = 0;       // default
-constexpr int SANE_TIMEOUT = 300;   // 5min
-constexpr int DISK_TIMEOUT = 600;   // 10min
+constexpr int INFINITE_TIMEOUT = 0;
+constexpr int DEFAULT_TIMEOUT = 300;    // 5min
+constexpr int DISK_TIMEOUT = 900;       // 15min
 
 struct Property {
     std::string Name;
@@ -90,15 +90,20 @@ public:
     int Connect();
     void Close();
 
-    /* request timeout in seconds */
+    /* request and response timeout in seconds */
     int GetTimeout() const;
     int SetTimeout(int timeout);
+
+    /* extra timeout for disk operations in seconds */
+    int GetDiskTimeout() const;
+    int SetDiskTimeout(int timeout);
 
     std::string GetLastError() const;
     void GetLastError(int &error, std::string &msg) const;
 
-    int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
-    int Call(const std::string &req, std::string &rsp);
+    int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp,
+             int extra_timeout = -1);
+    int Call(const std::string &req, std::string &rsp, int extra_timeout = -1);
 
     int Create(const std::string &name);
     int CreateWeakContainer(const std::string &name);
@@ -113,7 +118,7 @@ public:
 
     int WaitContainers(const std::vector<std::string> &containers,
                        const std::vector<std::string> &labels,
-                       std::string &name, int timeout);
+                       std::string &name, int timeout = -1);
 
     int AsyncWait(const std::vector<std::string> &containers,
                   const std::vector<std::string> &labels,
