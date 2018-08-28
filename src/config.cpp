@@ -119,6 +119,7 @@ static void DefaultConfig() {
     config().mutable_container()->set_detect_systemd(true);
 
     config().mutable_volumes()->set_enable_quota(true);
+    config().mutable_volumes()->set_keep_project_quota_id(true);
 
     if (CompareVersions(config().linux_version(), "4.4") >= 0)
         config().mutable_volumes()->set_direct_io_loop(true);

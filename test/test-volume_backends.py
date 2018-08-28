@@ -211,8 +211,9 @@ def check_projid_is_set(c, path, **args):
 
     v.Unlink("/")
 
-    assert get_quota_fs_projid(path) == 0
-    assert get_quota_fs_projid(path + "/file.txt") == 0
+    # FIXME keep_project_quota_id
+    assert get_quota_fs_projid(path) == projid
+    assert get_quota_fs_projid(path + "/file.txt") == projid
 
     os.unlink(path + "/file.txt")
 

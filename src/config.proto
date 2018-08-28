@@ -210,6 +210,7 @@ message TConfig {
         optional string default_lvm_group = 12;
         optional string squashfs_compression = 13;
         optional bool parallel_compression = 15;
+        optional bool keep_project_quota_id = 16;
     }
 
     message TCoreCfg {
