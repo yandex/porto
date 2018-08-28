@@ -106,12 +106,15 @@ TError TCgroup::RemoveOne() {
     /* workaround for bad synchronization */
     if (error && error.Errno == EBUSY && !Path().StatStrict(st) && st.st_nlink == 2) {
         uint64_t deadline = GetCurrentTimeMs() + config().daemon().cgroup_remove_timeout_s() * 1000;
+        uint64_t interval = 1;
         do {
             (void)KillAll(SIGKILL);
             error = Path().Rmdir();
             if (!error || error.Errno != EBUSY)
                 break;
-        } while (!WaitDeadline(deadline));
+            if (interval < 1000)
+                interval *= 10;
+        } while (!WaitDeadline(deadline, interval));
     }
 
     if (error && (error.Errno != ENOENT || Exists())) {
