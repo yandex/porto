@@ -684,7 +684,7 @@ again:
                 continue;
 
             if (cg->Name == PORTO_DAEMON_CGROUP &&
-                    (hy->Controllers & (CGROUP_MEMORY | CGROUP_CPUACCT)))
+                    (hy->Controllers & (CGROUP_FREEZER | CGROUP_MEMORY | CGROUP_CPUACCT)))
                 continue;
 
             if (cg->Name == PORTO_HELPERS_CGROUP &&
@@ -962,6 +962,9 @@ static int Portod() {
     }
 
     PortodPidFile.Remove();
+
+    // move master to root, otherwise older version will kill itself
+    FreezerSubsystem.RootCgroup().Attach(MasterPid);
 
     L_SYS("Shutdown complete. time={} ms", GetCurrentTimeMs() - ShutdownStart);
 

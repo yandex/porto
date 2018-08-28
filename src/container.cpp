@@ -138,6 +138,9 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
     if (error)
         return error;
 
+    if (cg.Name == PORTO_DAEMON_CGROUP)
+        return TError(EError::NotSupported, "Recursion?");
+
     std::string prefix = std::string(PORTO_CGROUP_PREFIX) + "/";
     std::string name = cg.Name;
     std::replace(name.begin(), name.end(), '%', '/');

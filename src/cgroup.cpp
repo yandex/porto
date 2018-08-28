@@ -1303,6 +1303,7 @@ TError InitializeCgroups() {
 
 TError InitializeDaemonCgroups() {
     std::vector<TSubsystem *> DaemonSubsystems = {
+        &FreezerSubsystem,
         &MemorySubsystem,
         &CpuacctSubsystem,
     };
