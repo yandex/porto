@@ -824,9 +824,11 @@ public:
             error = Volume->MakeShares(cowFd, true);
             if (error)
                 goto err;
+        } else
+            (void)cowFd.OpenDirAt(Volume->StorageFd, "cow");
 
-            lower = "overlay/cow:" + lower;
-        }
+        if (cowFd)
+            lower = cowFd.ProcPath().ToString() + ":" + lower;
 
         error = Volume->InternalPath.Mount("overlay", "overlay",
                                    Volume->GetMountFlags(),
@@ -1032,9 +1034,11 @@ public:
             error = Volume->MakeShares(cowFd, true);
             if (error)
                 goto err;
+        } else
+            (void)cowFd.OpenDirAt(Volume->StorageFd, "cow");
 
-            lowerdir = "squash/cow:" + lowerdir;
-        }
+        if (cowFd)
+            lowerdir = cowFd.ProcPath().ToString() + ":" + lowerdir;
 
         error = Volume->InternalPath.Mount("overlay", "overlay",
                                    Volume->GetMountFlags(),
@@ -2127,13 +2131,16 @@ TError TVolume::MakeShares(const TFile &base, bool cow) {
                     }
                 } else if (S_ISREG(walk.Stat->st_mode)) {
                     TProjectQuota::Toggle(dir, false);
+                    (void)dir.UnlinkAt(name);
                     error = dir.HardlinkAt(name, src, walk.Name());
                     TProjectQuota::Toggle(dir, true);
                 } else if (S_ISLNK(walk.Stat->st_mode)) {
                     TPath symlink;
                     error = src.ReadlinkAt(name, symlink);
-                    if (!error)
+                    if (!error) {
+                        (void)dir.UnlinkAt(name);
                         error = dir.SymlinkAt(name, symlink);
+                    }
                 } else
                     L("Skip {}", walk.Path);
             }
@@ -2144,8 +2151,10 @@ TError TVolume::MakeShares(const TFile &base, bool cow) {
             if (error)
                 return error;
         } else {
+            auto name = path.BaseName();
             TProjectQuota::Toggle(dir, false);
-            error = dir.HardlinkAt(path.BaseName(), src);
+            (void)dir.UnlinkAt(name);
+            error = dir.HardlinkAt(name, src);
             TProjectQuota::Toggle(dir, true);
             if (error)
                 return error;
