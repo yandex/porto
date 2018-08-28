@@ -1168,6 +1168,9 @@ Like for container volume configuration is a set of key-value pairs.
 
     Some backends (*rbd*, *lvm*) expects configuration in special format.
 
+    Storage directory must be writeable for user (or readable for read-only volume).
+    Loop image file is read-only, parent directory must be writable.
+
 * **ready**         - is construction complete
 
 * **build\_time**   - format: YYYY-MM-DD hh:mm:ss

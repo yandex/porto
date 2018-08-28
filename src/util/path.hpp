@@ -297,6 +297,7 @@ public:
     TError SetXAttr(const std::string &name, const std::string &value) const;
     TError Chdir() const;
     TError ClearDirectory() const;
+    bool IsRegular() const;
     bool IsDirectory() const;
     TError Stat(struct stat &st) const;
     TError StatAt(const TPath &path, bool follow, struct stat &st) const;

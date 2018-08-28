@@ -1598,6 +1598,11 @@ TError TFile::Chdir() const {
     return OK;
 }
 
+bool TFile::IsRegular() const {
+    struct stat st;
+    return !fstat(Fd, &st) && S_ISREG(st.st_mode);
+}
+
 bool TFile::IsDirectory() const {
     struct stat st;
     return !fstat(Fd, &st) && S_ISDIR(st.st_mode);

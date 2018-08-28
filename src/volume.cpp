@@ -600,13 +600,13 @@ public:
         TFile file;
         bool file_storage = false;
 
-        if (!Volume->StorageFd.Stat(st) && S_ISREG(st.st_mode)) {
+        if (Volume->StorageFd.IsRegular()) {
             error = file.Dup(Volume->StorageFd);
             file_storage = true;
-        } else if (!Volume->StorageFd.StatAt(AutoImage, true, st) && S_ISREG(st.st_mode)) {
+        } else if (Volume->StorageFd.ExistsAt(AutoImage)) {
             error = file.OpenAt(Volume->StorageFd, AutoImage,
                                 (Volume->IsReadOnly ? O_RDONLY : O_RDWR) |
-                                O_CLOEXEC | O_NOCTTY, 0);
+                                O_CLOEXEC | O_NOCTTY | O_NOFOLLOW, 0);
         } else {
             error = file.OpenAt(Volume->StorageFd, AutoImage,
                                 O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
@@ -616,11 +616,23 @@ public:
                 if (error)
                     Volume->StorageFd.UnlinkAt(AutoImage);
             }
-            if (!error)
-                error = file.Stat(st);
         }
+        if (!error)
+            error = file.Stat(st);
         if (error)
             return error;
+        if (!S_ISREG(st.st_mode))
+            return TError(EError::InvalidData, "loop image should be a regular file");
+
+        /* Protect image from concurrent changes */
+        if (st.st_uid != RootUser || st.st_gid != RootGroup || (st.st_mode & 2)) {
+            error = file.Chown(RootUser, RootGroup);
+            if (error)
+                return error;
+            error = file.Chmod(0644);
+            if (error)
+                return error;
+        }
 
         if (!Volume->SpaceLimit) {
             Volume->SpaceLimit = st.st_size;
@@ -2158,10 +2170,20 @@ TError TVolume::Build() {
     }
 
     if (FileStorage() && UserStorage() && StoragePath.IsRegularFollow()) {
-        if (IsReadOnly)
-            error = StorageFd.OpenRead(StoragePath);
-        else
-            error = StorageFd.OpenReadWrite(StoragePath);
+        TFile dir;
+
+        error = dir.OpenDir(StoragePath.DirNameNormal());
+        if (error)
+            return error;
+
+        /* Loop image is read-only for user, but directory must be writable */
+        error = CL->WriteAccess(dir);
+        if (error)
+            return error;
+
+        error = StorageFd.OpenAt(dir, StoragePath.BaseNameNormal(),
+                                 (IsReadOnly ? O_RDONLY : O_RDWR) |
+                                 O_CLOEXEC | O_NOCTTY | O_NOFOLLOW);
     } else if (!RemoteStorage())
         error = StorageFd.OpenDir(StoragePath);
     if (error)
@@ -2170,7 +2192,7 @@ TError TVolume::Build() {
     if (RemoteStorage()) {
         /* Nothing to check */
     } else if (UserStorage()) {
-        if (IsReadOnly)
+        if (IsReadOnly || StorageFd.IsRegular())
             error = CL->ReadAccess(StorageFd);
         else
             error = CL->WriteAccess(StorageFd);
