@@ -1,3 +1,14 @@
+yandex-porto (4.18.1) unstable; urgency=low
+
+  * api/cpp: add extra timeout for disk related operations
+  * cgroup: increase interval between kills
+  * volume: keep loop image read-only for user
+  * volume: handle cow layer in persistent storage
+  * volume: keep project quota id at inodes
+  * portod: forbid connections from portod freezer cgroup
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 28 Aug 2018 18:03:09 +0300
+
 yandex-porto (4.18.0) unstable; urgency=low
 
   * container: store resolv_conf as single string
