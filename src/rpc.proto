@@ -215,6 +215,7 @@ message TCred {
     optional fixed32 uid = 2;
     optional string group = 3;
     optional fixed32 gid = 4;
+    repeated fixed32 grp = 5;           // out, supplementary groups
 }
 
 
