@@ -1380,12 +1380,14 @@ public:
              "    -A            async wait\n"
              ) {}
 
-    static void PrintAsyncWait(Porto::AsyncWaitEvent &event) {
-        if (event.Label.empty())
-            fmt::print("{} {}\t{}\n", FormatTime(event.When), event.State, event.Name);
+    static void PrintAsyncWait(const Porto::rpc::TContainerWaitResponse &event) {
+        if (event.has_label())
+            fmt::print("{} {}\t{}\t{} = {}\n", FormatTime(event.when()),
+                       event.state(), event.name(), event.label(), event.value());
         else
-            fmt::print("{} {}\t{}\t{} = {}\n", FormatTime(event.When), event.State, event.Name, event.Label, event.Value);
-        if (event.State == "timeout")
+            fmt::print("{} {}\t{}\n", FormatTime(event.when()),
+                       event.state(), event.name());
+        if (event.state() == "timeout")
             exit(0);
     }
 

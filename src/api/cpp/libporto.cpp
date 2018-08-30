@@ -25,7 +25,7 @@ public:
 
     std::vector<std::string> AsyncWaitContainers;
     int AsyncWaitTimeout = -1;
-    std::function<void(AsyncWaitEvent &event)> AsyncWaitCallback;
+    TWaitCallback AsyncWaitCallback;
 
     int LastError = 0;
     std::string LastErrorMsg;
@@ -168,16 +168,8 @@ int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp) {
         input.PopLimit(prev_limit);
 
         if (rsp.has_asyncwait()) {
-            if (AsyncWaitCallback) {
-                AsyncWaitEvent event = {
-                    (time_t)rsp.asyncwait().when(),
-                    rsp.asyncwait().name(),
-                    rsp.asyncwait().state(),
-                    rsp.asyncwait().label(),
-                    rsp.asyncwait().value(),
-                };
-                AsyncWaitCallback(event);
-            }
+            if (AsyncWaitCallback)
+                AsyncWaitCallback(rsp.asyncwait());
         } else
             return EError::Success;
     }
@@ -506,7 +498,7 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
 
 int Connection::AsyncWait(const std::vector<std::string> &containers,
                           const std::vector<std::string> &labels,
-                          std::function<void(AsyncWaitEvent &event)> callback,
+                          TWaitCallback callback,
                           int timeout) {
     Impl->AsyncWaitContainers.clear();
     Impl->AsyncWaitTimeout = timeout;

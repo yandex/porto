@@ -58,13 +58,7 @@ struct GetResponse {
     std::string ErrorMsg;
 };
 
-struct AsyncWaitEvent {
-    time_t When;
-    std::string Name;
-    std::string State;
-    std::string Label;
-    std::string Value;
-};
+typedef std::function<void(const rpc::TContainerWaitResponse &event)> TWaitCallback;
 
 enum GetFlags {
     NonBlock = 1,
@@ -120,8 +114,7 @@ public:
 
     int AsyncWait(const std::vector<std::string> &containers,
                   const std::vector<std::string> &labels,
-                  std::function<void(AsyncWaitEvent &event)> callbacks,
-                  int timeout = -1);
+                  TWaitCallback callbacks, int timeout = -1);
     int Recv();
 
     int List(std::vector<std::string> &list,
