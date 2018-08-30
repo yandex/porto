@@ -6,13 +6,11 @@
 #include <memory>
 #include <functional>
 
-namespace rpc {
-    class TContainerRequest;
-    class TContainerResponse;
-    class TStorageListResponse;
-}
+#include "rpc.pb.h"
 
 namespace Porto {
+
+using Porto::rpc::EError;
 
 constexpr int INFINITE_TIMEOUT = 0;
 constexpr int DEFAULT_TIMEOUT = 300;    // 5min

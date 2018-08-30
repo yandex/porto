@@ -3,7 +3,7 @@ syntax = "proto2";
 // Portod daemon listens on /run/portod.socket unix socket.
 // Protocol: Varint length, TContainerRequest req | TContainerResponse rsp.
 
-package rpc;
+package Porto.rpc;
 
 // List of error codes
 enum EError {

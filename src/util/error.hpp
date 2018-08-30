@@ -6,7 +6,8 @@
 
 #include "rpc.pb.h"
 
-using ::rpc::EError;
+using namespace Porto;
+using Porto::rpc::EError;
 
 class TError {
 public:

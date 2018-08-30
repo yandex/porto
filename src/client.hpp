@@ -15,10 +15,6 @@
 
 class TEpollLoop;
 
-namespace rpc {
-    class TContainerRequest;
-}
-
 class TRequest;
 
 class TClient : public std::enable_shared_from_this<TClient>,
