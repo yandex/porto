@@ -205,7 +205,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "root_readonly", v));
     ExpectEq(v, "false");
     ExpectApiSuccess(api.GetProperty(name, "max_respawns", v));
-    ExpectEq(v, "");
+    ExpectEq(v, "0");
     ExpectApiSuccess(api.GetProperty(name, "enable_porto", v));
     ExpectEq(v, "true");
 }
@@ -302,7 +302,7 @@ static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
         ExpectApiFailure(api.GetData(name, "io_ops", v), EError::InvalidState);
     }
     ExpectApiSuccess(api.GetProperty(name, "max_respawns", v));
-    ExpectEq(v, "");
+    ExpectEq(v, "0");
 }
 
 static void TestHolder(Porto::Connection &api) {

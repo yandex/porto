@@ -46,7 +46,7 @@ def ValidateDefaultProp(r):
             "isolate" : True,
             "enable_porto" : True,
             "private" : "",
-            "max_respawns" : "",
+            # "max_respawns" : "0",
           }
 
     for p in ref:
@@ -76,7 +76,7 @@ def ValidateDefaultProp(r):
 def ValidateDefaultData(r):
     ExpectException(r.GetData, porto.exceptions.InvalidProperty, "__invalid_data__")
 
-    ref = { "state" : "stopped", "max_respawns" : "", "parent" : "/" }
+    ref = { "state" : "stopped", "parent" : "/" }
     for d in ref:
         ExpectProp(r, d, ref[d])
 

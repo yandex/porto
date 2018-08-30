@@ -2305,20 +2305,17 @@ public:
         IsAnyState = true;
     }
     TError Get(std::string &value) {
-        if (CT->HasProp(EProperty::RESPAWN_LIMIT))
-            value = std::to_string(CT->RespawnLimit);
+        value = std::to_string(CT->RespawnLimit);
         return OK;
     }
     TError Set(const std::string &value) {
         TError error;
         int64_t val;
-        if (value != "") {
-            error = StringToInt64(value, val);
-            if (error)
-                return error;
-        }
-        CT->RespawnLimit = val;
-        if (val >= 0)
+        error = StringToInt64(value, val);
+        if (error)
+            return error;
+        CT->RespawnLimit = val > 0 ? val : 0;
+        if (val > 0)
             CT->SetProp(EProperty::RESPAWN_LIMIT);
         else
             CT->ClearProp(EProperty::RESPAWN_LIMIT);

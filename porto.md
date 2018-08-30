@@ -311,7 +311,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
     Could be reset at any time.
 
-* **max\_respawns** - limit for automatic respawns, default: -1 (unlimited)
+* **max\_respawns** - limit for automatic respawns, default: 0 (unlimited)
 
 * **respawn\_delay** - delay before automatic respawn in nanoseconds, default 1s
 

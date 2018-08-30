@@ -3237,7 +3237,7 @@ TError TContainer::MayRespawn() {
             Parent->State != EContainerState::Respawning)
         return TError(EError::InvalidState, "Cannot respawn: parent container in state={}", TContainer::StateName(Parent->State));
 
-    if (RespawnLimit >= 0 && RespawnCount >= RespawnLimit)
+    if (RespawnLimit && RespawnCount >= RespawnLimit)
         return TError(EError::ResourceNotAvailable, "Cannot respawn: reached max_respawns={}", RespawnLimit);
 
     return OK;
