@@ -521,12 +521,6 @@ static const std::string StripIdx(const std::string &name) {
         return name;
 }
 
-static bool ValidProperty(const vector<Porto::Property> &plist, const string &name) {
-    return find_if(plist.begin(), plist.end(),
-                   [&](const Porto::Property &i)->bool { return i.Name == StripIdx(name); })
-        != plist.end();
-}
-
 static std::string HumanValue(const std::string &full_name, const std::string &val) {
     auto name = StripIdx(full_name);
     TUintMap map;
@@ -2603,7 +2597,7 @@ public:
         }
 
         if (base.VirtMode == "os")
-            std::cout << "\Stopping OS ..." << std::endl;
+            std::cout << "Stopping OS ..." << std::endl;
 
         error = base.StopContainer();
         if (error) {
