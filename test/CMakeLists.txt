@@ -56,6 +56,7 @@ set_tests_properties(go_api
 endif()
 
 ADD_PYTHON_TEST(ct-state)
+ADD_PYTHON_TEST(properties)
 ADD_PYTHON_TEST(knobs)
 ADD_PYTHON_TEST(labels)
 ADD_PYTHON_TEST(ulimit)
