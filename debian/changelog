@@ -1,3 +1,9 @@
+yandex-porto (4.18.2) unstable; urgency=low
+
+  * network: fix L3 migration/sharing
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 04 Sep 2018 09:45:25 +0300
+
 yandex-porto (4.18.1) unstable; urgency=low
 
   * api/cpp: add extra timeout for disk related operations
