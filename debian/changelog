@@ -1,3 +1,18 @@
+yandex-porto (4.19.0) unstable; urgency=low
+
+  * property: add task_cred and owner_cred
+  * property: unify max_respawns with other limits, 0 - unlimited
+  * network: fix L3 migration/sharing
+  * porto: move namespace rpc into namespace Porto
+  * rpc/cpp: remove struct AsyncWaitEvent
+  * api/python: add Call
+  * porto: fix some warnings
+  * property: refactoring
+  * porto: container spec
+  * test: test new spec and properties
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 04 Sep 2018 15:36:10 +0300
+
 yandex-porto (4.18.1) unstable; urgency=low
 
   * api/cpp: add extra timeout for disk related operations
