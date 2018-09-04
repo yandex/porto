@@ -2821,20 +2821,23 @@ TError TNetEnv::Open(TContainer &ct) {
         return TNetwork::Open("/proc/" + std::to_string(ct.Task.Pid) + "/ns/net", NetNs, Net);
     if (ct.Net == HostNetwork)
         return TNetwork::Open("/proc/thread-self/ns/net", NetNs, Net);
-    return TError(EError::InvalidValue, "Cannot open netns: container not running");
+    return TError(EError::InvalidValue, "Cannot open network of container {}", ct.Name);
 }
 
 TError TNetEnv::OpenNetwork(TContainer &ct) {
     TError error;
 
     /* Share L3 network with same config and ip */
-    if (NetIsolate && L3Only && config().network().l3_migration_hack()) {
+    if (config().network().l3_migration_hack() &&
+            NetIsolate && L3Only && ct.IpList.size()) {
         auto lock = LockContainers();
         for (auto &it: Containers) {
-            auto &c = it.second;
-            if (c->Net && c->NetProp == ct.NetProp && c->IpList == ct.IpList) {
-                L_NET("Share network {}", c->Name);
+            auto c = it.second;
+            if (c->Net && c->Task.Pid &&
+                    c->NetProp == ct.NetProp &&
+                    c->IpList == ct.IpList) {
                 lock.unlock();
+                L_NET("Share network {}", c->Name);
                 return Open(*c);
             }
         }
