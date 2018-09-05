@@ -147,6 +147,13 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     Environment variables $VAR are expanded using **wordexp(3)**.
     Container with empty command is a _meta_ container.
 
+* **command\_argv** - verbatim command line
+
+    List of tab separated arguments, overrides **command**.
+    Could be get and set via index: **command\_argv\[index]**.
+
+    Set **command** to space separated \'${ARGV/\'/\'\\\'\'}\'.
+
 * **core\_command** - command for receiving core dumps
 
     Container without chroot inherits default core command from parent container.

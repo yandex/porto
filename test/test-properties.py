@@ -348,6 +348,7 @@ skip_tests = {
 "stderr": [],
 "porto_stat": [],
 "start_error": [],
+"command_argv": [],
 }
 
 ConfigurePortod('test-coredump', """
@@ -453,6 +454,46 @@ ExpectEq(get_sub('ulimit', 'ulimit', 'type', 'core'), {'type': 'core', 'unlimite
 ExpectEq(get_old('ulimit[core]'), 'core: unlimited unlimited')
 
 ct.Destroy()
+
+
+print " -  command_argv"
+
+ct = conn.Create(ct_name, weak=True);
+
+set_old('command', 'a b c')
+ExpectEq(get_old('command'), 'a b c')
+ExpectEq(get_new('command'), 'a b c')
+ExpectEq(get_old('command_argv'), '')
+ExpectEq(get_new('command_argv'), {})
+
+set_old('command_argv', "a\t'b\tc'\td'd")
+ExpectEq(get_old('command'), "'a' ''\\''b' 'c'\\''' 'd'\\''d' ")
+ExpectEq(get_new('command'), "'a' ''\\''b' 'c'\\''' 'd'\\''d' ")
+ExpectEq(get_old('command_argv'), "a\t'b\tc'\td'd")
+ExpectEq(get_new('command_argv'), {'argv': ["a", "'b", "c'", "d'd"]})
+
+ExpectEq(get_old('command_argv[3]'), "d'd")
+set_old('command_argv[4]', 'x x')
+ExpectEq(get_old('command'), "'a' ''\\''b' 'c'\\''' 'd'\\''d' 'x x' ")
+ExpectEq(get_new('command'), "'a' ''\\''b' 'c'\\''' 'd'\\''d' 'x x' ")
+ExpectEq(get_old('command_argv'), "a\t'b\tc'\td'd\tx x")
+ExpectEq(get_new('command_argv'), {'argv': ["a", "'b", "c'", "d'd", "x x"]})
+
+set_new('command', 'xxx')
+ExpectEq(get_old('command'), 'xxx')
+ExpectEq(get_new('command'), 'xxx')
+ExpectEq(get_old('command_argv'), '')
+ExpectEq(get_new('command_argv'), {})
+
+set_new('command_argv', {'argv': ["a", "'b", "c'", "d'd"]})
+ExpectEq(get_old('command'), "'a' ''\\''b' 'c'\\''' 'd'\\''d' ")
+ExpectEq(get_new('command'), "'a' ''\\''b' 'c'\\''' 'd'\\''d' ")
+ExpectEq(get_old('command_argv'), "a\t'b\tc'\td'd")
+ExpectEq(get_new('command_argv'), {'argv': ["a", "'b", "c'", "d'd"]})
+
+ct.Destroy()
+
+
 
 for name in conn.Plist():
     assert name in  tests.keys() + ro_tests.keys() + dead_tests.keys() + skip_tests.keys(), "property {} is not tested".format(name)

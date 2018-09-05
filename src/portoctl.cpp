@@ -1150,6 +1150,8 @@ public:
                     return EXIT_FAILURE;
                 }
             }
+            if (StringStartsWith(kv.first, "command_argv"))
+                command_found = true;
         }
 
         if (!command_found) {
