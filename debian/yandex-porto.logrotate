@@ -5,6 +5,7 @@
 	compress
 	notifempty
 	nocreate
+	su root syslog
 
 	postrotate
 		[ -f /run/portod.pid ] && kill -USR1 `cat /run/portod.pid`
