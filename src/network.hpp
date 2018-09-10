@@ -200,7 +200,7 @@ public:
     void StartRepair();
     TError WaitRepair();
 
-    TError SetupQueue(TNetDevice &dev);
+    TError SetupQueue(TNetDevice &dev, bool force);
 
     static void InitClass(TContainer &ct);
 

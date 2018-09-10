@@ -534,7 +534,7 @@ TError TNetwork::SetupIngress(TNetDevice &dev, TNetClass &cfg) {
     return error;
 }
 
-TError TNetwork::SetupQueue(TNetDevice &dev) {
+TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     TError error;
 
     //
@@ -572,7 +572,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev) {
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
 
-    if (!qdisc.Check(*Nl)) {
+    if (force || !qdisc.Check(*Nl)) {
         (void)qdisc.Delete(*Nl);
         error = qdisc.Create(*Nl);
         if (error) {
@@ -1301,7 +1301,7 @@ TError TNetwork::RepairLocked() {
             continue;
 
         if (!dev.Prepared || force) {
-            error = SetupQueue(dev);
+            error = SetupQueue(dev, force);
             if (error) {
                 FatalError(error);
                 continue;
