@@ -452,7 +452,7 @@ static void PortodServer() {
                 }
             } else if (source->Fd == PORTO_SK_FD) {
                 error = AcceptConnection(source->Fd);
-                if (error)
+                if (error && Verbose)
                     L_SYS("Cannot accept connection: {}", error);
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
