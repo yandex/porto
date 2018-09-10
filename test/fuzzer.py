@@ -633,6 +633,15 @@ def CreateVolume(conn, pathstr):
             (3, "loop"),
         ] )
 
+    def select_size():
+        return select_by_weight( [
+            (80, None),
+            (5, "0"),
+            (5, "1M"),
+            (5, "1073741824"),
+            (5, "1P"),
+        ] )
+
     if VERBOSE:
         print "Creating volume: {}".format(pathstr)
 
@@ -653,9 +662,10 @@ def CreateVolume(conn, pathstr):
     if layers is not None:
         kwargs["layers"] = layers
 
-    if "ubuntu-precise" in layers and backend != "overlay":
-        #Skip operation
-        return
+    for prop in ['space_limit', 'inode_limit', 'space_guarantee', 'inode_guarantee']:
+        size = select_size()
+        if size is not None:
+            kwargs[prop] = size
 
     kwargs['private'] = FUZZER_PRIVATE
 
