@@ -94,6 +94,7 @@ class _RPC(object):
 
     def _check_deadline(self):
         if self.deadline is not None and self.deadline < time.time():
+            self.sock = None
             raise exceptions.SocketTimeout("Porto connection timeout")
 
     def _set_socket_timeout(self):
@@ -104,6 +105,7 @@ class _RPC(object):
             if timeout > 0.001:
                 self.sock.settimeout(timeout)
             else:
+                self.sock = None
                 raise exceptions.SocketTimeout("Porto connection timeout")
 
     def _recv_data(self, count):
@@ -203,8 +205,10 @@ class _RPC(object):
             try:
                 self._connect()
             except socket.timeout as e:
+                self.sock = None
                 raise exceptions.SocketTimeout("Porto connection timeout: {}".format(e))
             except socket.error as e:
+                self.sock = None
                 raise exceptions.SocketError("Porto connection error: {}".format(e))
 
     def disconnect(self):
