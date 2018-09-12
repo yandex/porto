@@ -217,6 +217,10 @@ class _RPC(object):
                 self.sock.close()
                 self.sock = None
 
+    def connected(self):
+        with self.lock:
+            return self.sock is not None
+
     def _resend_async_wait(self):
         if not self.async_wait_names:
             return
@@ -615,6 +619,9 @@ class Connection(object):
 
     def disconnect(self):
         self.rpc.disconnect()
+
+    def connected(self):
+        return self.rpc.connected()
 
     def Connect(self, timeout=None):
         self.rpc.connect(timeout)

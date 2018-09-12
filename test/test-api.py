@@ -7,7 +7,14 @@ import porto
 AsAlice()
 
 c = porto.Connection()
+
+assert c.connected() == False
+assert c.nr_connects() == 0
+
 c.connect()
+
+assert c.connected() == True
+assert c.nr_connects() == 1
 
 c.List()
 c.Plist()
@@ -343,6 +350,7 @@ except porto.exceptions.SocketError:
 else:
     assert False
 
+assert c.connected() == False
 assert c.nr_connects() == 1
 assert time.time() - start < 0.1
 
@@ -358,5 +366,6 @@ except porto.exceptions.SocketTimeout:
 else:
     assert False
 
+assert c.connected() == False
 assert c.nr_connects() == 2
 assert time.time() - start > 0.9
