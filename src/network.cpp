@@ -370,6 +370,12 @@ std::string TNetwork::FormatTos(int tos) {
 
 TNetwork::TNetwork() : NatBitmap(0, 0) {
     Nl = std::make_shared<TNl>();
+
+    DefaultClass.BaseHandle = TC_HANDLE(ROOT_TC_MAJOR, 1);
+    DefaultClass.MetaHandle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR);
+    DefaultClass.LeafHandle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
+    DefaultClass.Fold = &DefaultClass;
+    DefaultClass.Parent = nullptr;
 }
 
 TNetwork::~TNetwork() {
@@ -709,30 +715,14 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
 
         error = cls.Create(*Nl);
         if (error) {
-            L_ERR("Can't create default tclass: {}", error);
+            L_ERR("Cannot setup dscp meta tclass: {}", error);
             return error;
         }
 
-        cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR + cs);
-        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR + cs);
-        cls.Rate = dev.GetConfig(DefaultClassRate);
-        cls.Ceil = dev.GetConfig(DefaultClassCeil);
-
-        error = cls.Create(*Nl);
+        error = SetupClass(dev, DefaultClass, cs);
         if (error) {
-            L_ERR("Can't create default tclass: {}", error);
+            L_ERR("Canot setup default tclass: {}", error);
             return error;
-        }
-
-        TNlQdisc defq(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR + cs),
-                                 TC_HANDLE(DEFAULT_TC_MINOR + cs, 0));
-        defq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
-        defq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
-        defq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
-        if (!defq.Check(*Nl)) {
-            error = defq.Create(*Nl);
-            if (error)
-                return error;
         }
     }
 
@@ -1265,7 +1255,8 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     cls.Parent = cfg.MetaHandle + cs;
     cls.Handle = cfg.LeafHandle + cs;
 
-    if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
+    if (cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR) ||
+            cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR)) {
         cls.Rate = dev.GetConfig(DefaultClassRate, 0, cs);
         cls.Ceil = dev.GetConfig(DefaultClassCeil, 0, cs);
         cls.defRate = cls.Rate;
@@ -1504,6 +1495,12 @@ retry:
             if (error)
                 break;
             dev.Prepared = true;
+        }
+
+        for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+            error = SetupClass(dev, DefaultClass, cs);
+            if (error)
+                break;
         }
 
         for (auto cls: NetClasses) {
