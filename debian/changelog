@@ -1,3 +1,26 @@
+yandex-porto (4.19.1) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add property command_argv
+  * test/fuzzer: check volume limits
+
+  [ Michael Samoglyadov ]
+  * per-hour portod.log rotation fixed
+
+  [ Konstantin Khlebnikov ]
+  * porto: silence log messages about not accepted client connections
+  * api/python: limit (re)connection rate with 2 per second
+  * api/python: close socket at fatal exceptions
+  * api/python: add method connected()
+  * porto: deprecate cpu_weight effect on rt priority
+  * network: count problems and repairs
+  * network: recreate missing default clases
+  * test/upgrade: check network problems
+  * volume: fix locking round guarantee
+  * volume: deprecate layers over tmpfs
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 12 Sep 2018 15:07:44 +0300
+
 yandex-porto (4.19.0) unstable; urgency=low
 
   * property: add task_cred and owner_cred
