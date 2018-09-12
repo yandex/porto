@@ -632,6 +632,16 @@ class Connection(object):
     def Disconnect(self):
         self.rpc.disconnect()
 
+    def Call(self, command_name, response_name=None, **kwargs):
+        req = rpc_pb2.TContainerRequest()
+        cmd = getattr(req, command_name)
+        cmd.SetInParent()
+        _encode_message(cmd, kwargs)
+        rsp = self.rpc.call(req)
+        if hasattr(rsp, response_name or command_name):
+            return _decode_message(getattr(rsp, response_name or command_name))
+        return None
+
     def List(self, mask=None):
         request = rpc_pb2.TContainerRequest()
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
