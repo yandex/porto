@@ -44,7 +44,7 @@ def _decode_message(msg):
 
 class _RPC(object):
     def __init__(self, socket_path, timeout, socket_constructor,
-                 lock_constructor, auto_reconnect):
+                 lock_constructor, auto_reconnect, reconnect_interval):
         self.lock = lock_constructor()
         self.socket_path = socket_path
         self.timeout = timeout
@@ -53,18 +53,25 @@ class _RPC(object):
         self.sock_pid = None
         self.deadline = None
         self.auto_reconnect = auto_reconnect
+        self.reconnect_interval = reconnect_interval
         self.nr_connects = 0
+        self.connect_time = None
         self.async_wait_names = []
         self.async_wait_callback = None
         self.async_wait_timeout = None
 
     def _connect(self):
+        if self.connect_time:
+            diff = time.time() - self.connect_time
+            if 0 < diff < self.reconnect_interval:
+                time.sleep(self.reconnect_interval - diff)
         SOCK_CLOEXEC = 0o2000000
         self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM | SOCK_CLOEXEC)
         self._set_socket_timeout()
+        self.nr_connects += 1
+        self.connect_time = time.time()
         self.sock.connect(self.socket_path)
         self.sock_pid = os.getpid()
-        self.nr_connects += 1
         self._resend_async_wait()
 
     def _check_connect(self):
@@ -198,7 +205,7 @@ class _RPC(object):
             except socket.timeout as e:
                 raise exceptions.SocketTimeout("Porto connection timeout: {}".format(e))
             except socket.error as e:
-                raise exceptions.SocketError("Socket error: {}".format(e))
+                raise exceptions.SocketError("Porto connection error: {}".format(e))
 
     def disconnect(self):
         with self.lock:
@@ -586,12 +593,14 @@ class Connection(object):
                  disk_timeout=600,
                  socket_constructor=socket.socket,
                  lock_constructor=threading.Lock,
-                 auto_reconnect=True):
+                 auto_reconnect=True,
+                 reconnect_interval=0.5):
         self.rpc = _RPC(socket_path=socket_path,
                         timeout=timeout,
                         socket_constructor=socket_constructor,
                         lock_constructor=lock_constructor,
-                        auto_reconnect=auto_reconnect)
+                        auto_reconnect=auto_reconnect,
+                        reconnect_interval=reconnect_interval)
         self.disk_timeout = disk_timeout
 
     def connect(self, timeout=None):

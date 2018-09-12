@@ -330,3 +330,33 @@ else:
 c2.disconnect()
 
 c.disconnect()
+
+
+# TRY CONNECT
+
+c = porto.Connection(socket_path='/run/portod.socket.not.found', timeout=1)
+start = time.time()
+try:
+    c.TryConnect()
+except porto.exceptions.SocketError:
+    pass
+else:
+    assert False
+
+assert c.nr_connects() == 1
+assert time.time() - start < 0.1
+
+
+# RETRY CONNECT
+
+c = porto.Connection(socket_path='/run/portod.socket.not.found', timeout=1)
+start = time.time()
+try:
+    c.Connect()
+except porto.exceptions.SocketTimeout:
+    pass
+else:
+    assert False
+
+assert c.nr_connects() == 2
+assert time.time() - start > 0.9
