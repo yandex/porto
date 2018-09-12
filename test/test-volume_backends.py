@@ -281,8 +281,8 @@ def backend_tmpfs(c):
         check_destroy_linked_non_root(c, path, **args)
         check_tune_space_limit(c, path, **args)
         check_tune_inode_limit(c, path, **args)
-        args["space_limit"] = "512M"
-        check_layers(c, path, **args)
+
+    assert Catch(check_layers, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
 
     os.rmdir(TMPDIR)
 
