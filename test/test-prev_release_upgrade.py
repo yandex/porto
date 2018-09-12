@@ -130,6 +130,15 @@ def VerifySnapshot(r, props):
     for i in props:
         assert PropTrim(props[i]) == PropTrim(props2[i]), "{} property {} should be {} not {}".format(r, i, props[i], props2[i])
 
+
+def CheckNetworkProblems():
+    conn = porto.Connection(timeout=3)
+    a = conn.Call('GetSystem')
+    conn.Get(['/'], ['net_bytes'], sync=True)
+    b = conn.Call('GetSystem')
+    assert a.get('network_problems') == b.get('network_problems'), "Network problems detected"
+
+
 c = porto.Connection(timeout=3)
 
 #Check  working with older version
@@ -164,6 +173,7 @@ subprocess.check_call([prev_portod, "start"])
 
 ver, rev = c.Version()
 ExpectEq(ver, PREV_VERSION)
+CheckNetworkProblems()
 
 AsAlice()
 
@@ -295,6 +305,7 @@ c = porto.Connection(timeout=3)
 
 ver, rev = c.Version()
 ExpectNe(ver, PREV_VERSION)
+CheckNetworkProblems()
 
 c.Wait(["test"])
 
@@ -360,6 +371,7 @@ c = porto.Connection(timeout=3)
 
 ver, rev = c.Version()
 ExpectEq(ver, PREV_VERSION)
+CheckNetworkProblems()
 
 r = c.Find("test2")
 assert r.Wait() == "test2"
@@ -406,5 +418,6 @@ subprocess.check_call([portod, "restart"])
 
 ver, rev = c.Version()
 ExpectNe(ver, PREV_VERSION)
+CheckNetworkProblems()
 
 shutil.rmtree(TMPDIR)
