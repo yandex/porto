@@ -135,6 +135,7 @@ class TNetwork : public TNonCopyable {
     /* Containers, parent before childs. Protected with NetStateMutex. */
     std::list<TNetClass *> NetClasses;
 
+    TNetClass DefaultClass;
     TNetClass *RootClass = nullptr;
 
     void InitStat(TNetClass &cls);
