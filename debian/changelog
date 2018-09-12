@@ -1,3 +1,10 @@
+yandex-porto (4.12.24) unstable; urgency=low
+
+  * network: fix L3 migration/sharing
+  * network: destroy and recreat qdisc at repair
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 12 Sep 2018 13:13:25 +0300
+
 yandex-porto (4.12.23) unstable; urgency=low
 
   * volume: check duplicate volume link target
