@@ -232,6 +232,9 @@ public:
         if (Volume->HaveStorage())
             return TError(EError::InvalidProperty, "tmpfs backed doesn't support storage");
 
+        if (Volume->HaveLayers())
+            return TError(EError::InvalidProperty, "tmpfs backed doesn't support layers");
+
         return OK;
     }
 
