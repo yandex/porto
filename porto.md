@@ -1225,7 +1225,7 @@ Like for container volume configuration is a set of key-value pairs.
 
     Backend *squash* expects path to a squashfs image as top-layer.
 
-    Other backends copy layers' files into volume during construction.
+    Some backends (plain, native, loop, lvm, rbd) copy layers into volume during construction.
 
 * **place**         - place for layers and default storage
 
