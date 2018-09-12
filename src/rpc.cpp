@@ -1603,6 +1603,8 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
 
     rsp->set_network_count(Statistics->NetworksCount);
     rsp->set_network_created(Statistics->NetworksCreated);
+    rsp->set_network_problems(Statistics->NetworkProblems);
+    rsp->set_network_repairs(Statistics->NetworkRepairs);
 
     return OK;
 }

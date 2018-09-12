@@ -1527,8 +1527,11 @@ retry:
     }
 
 out:
-    if (error)
+    Statistics->NetworkRepairs++;
+    if (error) {
         L_ERR("Fatal network {} error: {}", NetName, error);
+        Statistics->NetworkProblems++;
+    }
     NetError = error;
     NetCv.notify_all();
     state_lock.unlock();
@@ -1613,6 +1616,7 @@ void TNetwork::NetWatchdog() {
 }
 
 void TNetwork::StartRepair() {
+    Statistics->NetworkProblems++;
     if (!NetError)
         L_NET_VERBOSE("Start network {} repair", NetName);
     if (!NetError)
