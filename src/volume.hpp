@@ -101,8 +101,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();
 
-    std::mutex Mutex;
-
 public:
     TPath Path;
     TPath InternalPath;
@@ -159,10 +157,6 @@ public:
     }
     ~TVolume() {
         Statistics->VolumesCount--;
-    }
-
-    std::unique_lock<std::mutex> LockState() {
-        return std::unique_lock<std::mutex>(Mutex);
     }
 
     static TError VerifyConfig(const TStringMap &cfg);

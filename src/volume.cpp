@@ -1520,6 +1520,7 @@ unsigned long TVolume::GetMountFlags(void) const {
     return flags;
 }
 
+/* Called under VolumesMutex */
 TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee) {
     TStatFS current, total;
     TPath storage;
@@ -1558,37 +1559,27 @@ TError TVolume::CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarante
     /* Estimate unclaimed guarantees */
     uint64_t space_claimed = 0, space_guaranteed = 0;
     uint64_t inode_claimed = 0, inode_guaranteed = 0;
+
     for (auto &it: Volumes) {
         auto volume = it.second;
-        if (volume.get() == this ||
-                volume->StoragePath.GetDev() != storage.GetDev())
-            continue;
 
         /* data stored remotely, plain cannot provide usage */
-        if (volume->RemoteStorage() || volume->BackendType == "plain")
+        if (volume.get() == this ||
+                volume->RemoteStorage() ||
+                volume->BackendType == "plain" ||
+                volume->StoragePath.GetDev() != storage.GetDev() ||
+                (!volume->SpaceGuarantee && !volume->InodeGuarantee))
             continue;
 
         TStatFS stat;
-        uint64_t volume_space_guarantee = volume->SpaceGuarantee;
-        uint64_t volume_inode_guarantee = volume->InodeGuarantee;
-
-        if (!volume_space_guarantee && !volume_inode_guarantee)
-            continue;
-
         volume->StatFS(stat);
 
-        space_guaranteed += volume_space_guarantee;
-        if (stat.SpaceUsage < volume_space_guarantee)
-            space_claimed += stat.SpaceUsage;
-        else
-            space_claimed += volume_space_guarantee;
+        space_guaranteed += volume->SpaceGuarantee;
+        space_claimed += std::min(stat.SpaceUsage, volume->SpaceGuarantee);
 
         if (volume->BackendType != "loop") {
-            inode_guaranteed += volume_inode_guarantee;
-            if (stat.InodeUsage < volume_inode_guarantee)
-                inode_claimed += stat.InodeUsage;
-            else
-                inode_claimed += volume_inode_guarantee;
+            inode_guaranteed += volume->InodeGuarantee;
+            inode_claimed += std::min(stat.InodeUsage, volume->InodeGuarantee);
         }
     }
 
@@ -2313,13 +2304,12 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     if (!link->Target)
         return OK;
 
-    auto lock = LockState();
+    auto volumes_lock = LockVolumes();
     if (State != EVolumeState::Ready &&
             State != EVolumeState::Tuning &&
             State != EVolumeState::Building)
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
-    auto volumes_lock = LockVolumes();
     if (link->Volume.get() != this)
         return TError(EError::InvalidValue, "Wrong volume link");
 
@@ -2643,10 +2633,6 @@ TError TVolume::Destroy() {
 
         volumes_lock.unlock();
 
-        /* wait in-progress operations */
-        auto state_lock = volume->LockState();
-        state_lock.unlock();
-
         error = volume->DestroyOne();
         if (error && !ret)
             ret = error;
@@ -2798,12 +2784,11 @@ TError TVolume::DestroyOne() {
 }
 
 TError TVolume::StatFS(TStatFS &result) {
-    auto lock = LockState();
     if (State != EVolumeState::Ready &&
             State != EVolumeState::Tuning &&
             State != EVolumeState::Unlinked) {
         result.Reset();
-        return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
+        return TError(EError::VolumeNotReady, "Volume {} is not ready", Path);
     }
     return Backend->StatFS(result);
 }
