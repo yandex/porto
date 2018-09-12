@@ -433,6 +433,8 @@ message TGetSystemResponse {
 
     optional fixed64 network_count = 700;
     optional fixed64 network_created = 701;
+    optional fixed64 network_problems = 702;
+    optional fixed64 network_repairs = 703;
 }
 
 
