@@ -64,6 +64,8 @@ struct TStatistics {
     std::atomic<uint64_t> LogOpen;
     std::atomic<uint64_t> FailMemoryGuarantee;
     std::atomic<uint64_t> NetworksCreated;
+    std::atomic<uint64_t> NetworkProblems;
+    std::atomic<uint64_t> NetworkRepairs;
 
     /* --- add new fields at the end --- */
 };
