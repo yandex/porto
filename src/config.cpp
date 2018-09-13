@@ -99,7 +99,7 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
-    config().mutable_container()->set_memory_limit_margin(2ull << 30); /* 2Gb */
+    // config().mutable_container()->set_memory_limit_margin(2ull << 30); /* 2Gb */
 
     config().mutable_container()->set_anon_limit_margin(16ull << 20); /* 16Mb */
 
