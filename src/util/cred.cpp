@@ -209,14 +209,20 @@ TError TCred::Init(const std::string &user) {
     return error;
 }
 
-TError TCred::Load(const rpc::TCred &cred) {
+TError TCred::Load(const rpc::TCred &cred, bool strict) {
     TError error;
 
-    if (cred.has_user())
+    if (cred.has_user()) {
         error = FindUser(cred.user(), Uid, Gid);
-    else if (cred.has_uid())
+        if (error && !strict)
+            error = UserId(cred.user(), Uid);
+    } else if (cred.has_uid()) {
         error = FindUser(std::to_string(cred.uid()), Uid, Gid);
-    else
+        if (error && !strict) {
+            Uid = cred.uid();
+            error = OK;
+        }
+    } else if (!strict && Uid == NoUser)
         error = TError(EError::InvalidValue, "user is not defined");
     if (error)
         return error;
@@ -226,7 +232,7 @@ TError TCred::Load(const rpc::TCred &cred) {
 
     (void)InitGroups(cred.has_user() ? cred.user() : User());
 
-    gid_t new_gid;
+    gid_t new_gid = Gid;
 
     if (cred.has_group()) {
         error = GroupId(cred.group(), new_gid);
@@ -237,7 +243,7 @@ TError TCred::Load(const rpc::TCred &cred) {
     } else if (cred.has_gid())
         new_gid = cred.gid();
 
-    if (!IsRootUser() && !IsMemberOf(new_gid))
+    if (strict && !IsRootUser() && !IsMemberOf(new_gid))
         return TError(EError::InvalidValue, "user {} not in group {}", User(), GroupName(new_gid));
 
     Gid = new_gid;
