@@ -400,6 +400,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     RunningChildren = 0;
     StartingChildren = 0;
 
+    if (IsRoot()) {
+        for (auto &extra: config().container().extra_env())
+            EnvCfg += fmt::format("{}={};", extra.name(), extra.value());
+    }
+
     Controllers |= CGROUP_FREEZER;
 
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
@@ -2253,6 +2258,9 @@ TError TContainer::GetEnvironment(TEnv &env) const {
     env.SetEnv("PORTO_NAME", Name, true, true);
     env.SetEnv("PORTO_HOST", GetHostName(), true, true);
     env.SetEnv("PORTO_USER", OwnerCred.User(), true, true);
+
+    for (auto &extra: config().container().extra_env())
+        env.SetEnv(extra.name(), extra.value(), true, false);
 
     /* Inherit environment from containts in isolation domain */
     bool overwrite = true;

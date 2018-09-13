@@ -187,6 +187,12 @@ message TConfig {
         optional uint64 memlock_minimal = 49;
         optional uint64 memlock_margin = 50;
         optional uint64 memory_limit_margin = 51;
+
+        message TContainerExtraEnv {
+            required string name = 1;
+            required string value = 2;
+        }
+        repeated TContainerExtraEnv extra_env = 53;
     }
 
     message TPrivilegesCfg {

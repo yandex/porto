@@ -169,6 +169,16 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     USER=**user**  
     PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
+    Default environment could be configured in in portod.conf:
+    ```
+    container {
+        extra_env {
+            name: "NAME"
+            value: "VALUE"
+       }
+    }
+    ```
+
 * **user** - uid of container processes, default **owner\_user**
 
 * **group** - gid of container processes, default: **owner\_group**
