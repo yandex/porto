@@ -180,3 +180,22 @@ assert re.search("Permission", r.GetProperty("stderr"))
 
 r.Destroy()
 v.Unlink("/")
+
+#Create volume for non-existing user
+AsAlice()
+c.connect()
+
+v = c.CreateVolume(None, user="999")
+ExpectEq(os.stat(v.path).st_uid, 999)
+ExpectEq(os.stat(v.path).st_gid, alice_gid)
+v.Unlink()
+
+v = c.CreateVolume(None, group="999")
+ExpectEq(os.stat(v.path).st_uid, alice_uid)
+ExpectEq(os.stat(v.path).st_gid, 999)
+v.Unlink()
+
+v = c.CreateVolume(None, user="999", group="999")
+ExpectEq(os.stat(v.path).st_uid, 999)
+ExpectEq(os.stat(v.path).st_gid, 999)
+v.Unlink()

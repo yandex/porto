@@ -61,7 +61,7 @@ struct TCred {
         return User() + ":" + Group();
     }
 
-    TError Load(const rpc::TCred &cred);
+    TError Load(const rpc::TCred &cred, bool strict = true);
     void Dump(rpc::TCred &cred);
 };
 

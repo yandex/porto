@@ -1981,7 +1981,7 @@ TError TVolume::MakeDirectories(const TFile &base) {
             return TError(EError::InvalidPath, "directory path {}", path);
 
         if (dir_spec.has_cred()) {
-            error = cred.Load(dir_spec.cred());
+            error = cred.Load(dir_spec.cred(), false);
             if (error)
                 return error;
         }
@@ -3460,6 +3460,8 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
     if (!CL)
         return TError("no client");
 
+    L_VERBOSE("Volume spec: {}", spec.ShortDebugString());
+
     TPath place = spec.place();
     error = CL->ClientContainer->ResolvePlace(place);
     if (error)
@@ -3994,7 +3996,7 @@ TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
         return error;
 
     if (spec.has_cred())
-        error = VolumeCred.Load(spec.cred());
+        error = VolumeCred.Load(spec.cred(), false);
     if (error)
         return error;
 
