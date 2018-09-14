@@ -104,9 +104,9 @@ void WaitProcessExit(const std::string &pid, int sec) {
 }
 
 void WaitContainer(Porto::Connection &api, const std::string &name, int sec) {
-    std::string who;
-    ExpectApiSuccess(api.WaitContainers({name}, {}, who, sec));
-    ExpectEq(who, name);
+    std::string state;
+    ExpectApiSuccess(api.WaitContainer(name, state, sec));
+    ExpectNeq(state, "timeout");
 }
 
 void WaitState(Porto::Connection &api, const std::string &name, const std::string &state, int sec) {
@@ -121,7 +121,7 @@ void WaitState(Porto::Connection &api, const std::string &name, const std::strin
 
         usleep(100000);
 
-        (void)api.GetData(name, "state", ret);
+        (void)api.GetProperty(name, "state", ret);
     } while (ret != state);
 
     if (times <= 0)
@@ -515,11 +515,11 @@ void TestDaemon(Porto::Connection &api) {
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
-    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
+    ExpectApiSuccess(api.GetProperty("/", "porto_stat[queued_statuses]", v));
     Expect(v == std::to_string(0));
 
     Say() << "Check portod queue size" << std::endl;
-    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_events]", v));
+    ExpectApiSuccess(api.GetProperty("/", "porto_stat[queued_events]", v));
     Expect(v != std::to_string(0)); // RotateLogs
 
     // TODO: check rtnl classes

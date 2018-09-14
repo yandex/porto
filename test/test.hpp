@@ -98,4 +98,4 @@ namespace test {
 #define ExpectEq(a, b) ExpectOp(a, ==, b)
 #define ExpectNeq(a, b) ExpectOp(a, !=, b)
 #define ExpectLessEq(a, b) ExpectOp(a, <=, b)
-#define ExpectState(api, name, state) do { std::string __state; if (api.GetData(name, "state", __state)) Fail(api.GetLastError()); ExpectEq(__state, state); } while (0)
+#define ExpectState(api, name, state) do { std::string __state; if (api.GetProperty(name, "state", __state)) Fail(api.GetLastError()); ExpectEq(__state, state); } while (0)

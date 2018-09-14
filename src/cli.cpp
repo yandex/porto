@@ -90,27 +90,25 @@ void THelpCmd::Usage() {
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
     fmt::print("\nVolume properties:\n");
-    vector<Porto::Property> vlist;
-    int ret = Api->ListVolumeProperties(vlist);
-    if (ret) {
+    auto vlist = Api->ListVolumeProperties();
+    if (!vlist) {
         PrintError("Volume properties unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist, [](const Porto::Property &p) { return p.Name; });
+        nameWidth = MaxFieldLength(vlist->properties(), [](const rpc::TVolumePropertyListResponse_TVolumePropertyDescription &p) { return p.name(); });
 
-        for (const auto &p : vlist)
-            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+        for (const auto &p : vlist->properties())
+            PrintAligned(p.name(), p.desc(), nameWidth, termWidth);
     }
 
     fmt::print("\nContainer properties:\n");
-    vector<Porto::Property> plist;
-    ret = Api->ListProperties(plist);
-    if (ret) {
+    auto plist = Api->ListProperties();
+    if (!plist) {
         PrintError("Properties unavailable");
     } else {
-        nameWidth = MaxFieldLength(plist, [](const Porto::Property &p) { return p.Name; });
+        nameWidth = MaxFieldLength(plist->list(), [](const rpc::TContainerPropertyListResponse_TContainerPropertyListEntry &p) { return p.name(); });
 
-        for (const auto &p : plist)
-            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+        for (const auto &p : plist->list())
+            PrintAligned(p.name(), p.desc(), nameWidth, termWidth);
     }
 
     fmt::print("\n");

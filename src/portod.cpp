@@ -1605,24 +1605,21 @@ void ReopenMasterLog() {
 
 static int GetSystemProperties() {
     Porto::Connection conn;
-    std::string rsp;
-    int ret = conn.Call("GetSystem {}", rsp);
-    if (ret) {
-        std::cerr << conn.GetLastError() << std::endl;
+    auto rsp = conn.GetSystem();
+    if (!rsp) {
+        fmt::print(stderr, "{}\n", conn.GetLastError());
         return EXIT_FAILURE;
     }
-    std::cout << rsp << std::endl;
+    fmt::print("{}\n", rsp->DebugString());
     return EXIT_SUCCESS;
 }
 
 static int SetSystemProperties(TTuple arg) {
     Porto::Connection conn;
-    std::string rsp;
     if (arg.size() != 2)
         return EXIT_FAILURE;
-    int ret = conn.Call(fmt::format("SetSystem {{ {}: {} }}", arg[0], arg[1]), rsp);
-    if (ret) {
-        std::cerr << conn.GetLastError() << std::endl;
+    if (conn.SetSystem(arg[0], arg[1])) {
+        fmt::print(stderr, "{}\n", conn.GetLastError());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

@@ -97,7 +97,7 @@ private:
     std::unordered_map<std::string, unsigned long> Containers;
     std::unordered_map<std::string, unsigned long> Variables;
     bool CacheSelector = false;
-    std::map<std::string, std::map<std::string, Porto::GetResponse>> Cache[2];
+    std::map<std::string, std::map<std::string, std::string>> Cache[2];
     uint64_t Time[2] = {0, 0};
 };
 

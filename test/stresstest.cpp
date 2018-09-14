@@ -96,7 +96,7 @@ static void Start(Porto::Connection &api, std::string name) {
     Say() << "Start container: " << name << std::endl;
 
     (void)api.Start(name);
-    ExpectApiSuccess(api.GetData(name, "state", ret));
+    ExpectApiSuccess(api.GetProperty(name, "state", ret));
     Expect(ret == "dead" || ret == "running");
 }
 
@@ -106,7 +106,7 @@ static void PauseResume(Porto::Connection &api, const std::string &name) {
     std::string ret;
     int err = api.Pause(name);
     if (err) {
-        ExpectApiSuccess(api.GetData(name, "state", ret));
+        ExpectApiSuccess(api.GetProperty(name, "state", ret));
         if (ret == "dead")
             return;
         else
@@ -115,7 +115,7 @@ static void PauseResume(Porto::Connection &api, const std::string &name) {
     usleep(1000000);
     err = api.Resume(name);
     if (err) {
-        ExpectApiSuccess(api.GetData(name, "state", ret));
+        ExpectApiSuccess(api.GetProperty(name, "state", ret));
         if (ret != "dead" && ret != "running")
             Fail("Wrong state " + ret);
     }
@@ -130,7 +130,7 @@ static void WaitDead(Porto::Connection &api, std::string name, std::string timeo
 
     StringToInt(timeout, t);
     while (t--) {
-        ExpectApiSuccess(api.GetData(name, "state", ret));
+        ExpectApiSuccess(api.GetProperty(name, "state", ret));
         Say() << "Poll " << name << ": "<< ret << std::endl;
         if (ret == "dead")
             return;
@@ -146,7 +146,7 @@ static void CheckStdout(Porto::Connection &api, std::string name, std::string st
 
     Say() << "CheckStdout container: " << name << std::endl;
 
-    api.GetData(name, "stdout", ret);
+    api.GetProperty(name, "stdout", ret);
     ExpectEq(ret, stream);
 }
 
@@ -155,14 +155,14 @@ static void CheckStderr(Porto::Connection &api, std::string name, std::string st
 
     Say() << "CheckStderr container: " << name << std::endl;
 
-    api.GetData(name, "stderr", ret);
+    api.GetProperty(name, "stderr", ret);
     ExpectEq(ret, stream);
 }
 
 static void CheckExit(Porto::Connection &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
-    ExpectApiSuccess(api.GetData(name, "exit_status", ret));
+    ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
     if (ret != "-1")
         ExpectEq(ret, stream);
 }

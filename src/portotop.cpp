@@ -162,15 +162,7 @@ int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &but
     return selected;
 }
 void TConsoleScreen::ErrorDialog(Porto::Connection &api) {
-    std::string message;
-    int error;
-
-    api.GetLastError(error, message);
-
-    if (error)
-        Dialog(message, {"Ok"});
-    else
-        Dialog("Unknown error occured (probably, simple you aren't root)", {"Ok"});
+    Dialog(api.GetLastError(), {"Ok"});
 }
 void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
     unsigned int w = 0;
@@ -388,7 +380,7 @@ void TPortoValueCache::Unregister(const std::string &container,
 std::string TPortoValueCache::GetValue(const std::string &container,
                                        const std::string &variable,
                                        bool prev) {
-    return Cache[CacheSelector ^ prev][container][variable].Value;
+    return Cache[CacheSelector ^ prev][container][variable];
 }
 
 uint64_t TPortoValueCache::GetDt() {
@@ -402,17 +394,21 @@ int TPortoValueCache::Update(Porto::Connection &api) {
 
     std::vector<std::string> _variables;
     for (auto &iter : Variables)
-        _variables.push_back(iter.first);
+        _variables.push_back(iter.first);;
 
     CacheSelector = !CacheSelector;
     Cache[CacheSelector].clear();
-    int ret = api.Get(_containers, _variables, Cache[CacheSelector],
-                      Porto::GetFlags::Sync | Porto::GetFlags::Real);
+    auto rsp = api.Get(_containers, _variables, Porto::GET_SYNC | Porto::GET_REAL);
+    if (rsp) {
+        for (auto &ct: rsp->list()) {
+            auto &ct_cache = Cache[CacheSelector][ct.name()];
+            for (auto &kv: ct.keyval())
+                ct_cache[kv.variable()] = kv.value();
+        }
+    }
     Time[CacheSelector] = GetCurrentTimeMs();
 
-    api.GetVersion(Version, Revision);
-
-    return ret;
+    return api.GetVersion(Version, Revision);
 }
 
 TPortoValue::TPortoValue() : Cache(nullptr), Container(nullptr), Flags(ValueFlags::Raw) {

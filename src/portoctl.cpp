@@ -70,7 +70,7 @@ public:
 
     std::string Private;
 
-    Porto::Volume Volume;
+    std::string VolumePath;
     std::string SpaceLimit;
     std::string VolumeBackend;
     std::string VolumeStorage;
@@ -97,10 +97,9 @@ public:
     }
 
     TError GetLastError() {
-        int error;
         std::string msg;
-        Api->GetLastError(error, msg);
-        return TError((EError)error, msg);
+        auto error = Api->GetLastError(msg);
+        return TError(error, msg);
     }
 
     TError SetProperty(const std::string &key, const std::string &val) {
@@ -155,7 +154,7 @@ public:
     }
 
     TError ImportLayers() {
-        std::vector<Porto::Layer> known;
+        std::vector<string> known;
         TError error;
 
         if (Api->ListLayers(known, Place))
@@ -164,7 +163,7 @@ public:
         for (auto &layer : Layers) {
             bool found = false;
             for (auto &l: known) {
-                if (l.Name == layer) {
+                if (l == layer) {
                     found = true;
                     break;
                 }
@@ -221,14 +220,14 @@ public:
         if (Private != "")
             config["private"] = Private;
 
-        if (Api->CreateVolume("", config, Volume))
+        if (Api->CreateVolume(VolumePath, config))
             return GetLastError();
         VolumeLinked = true;
 
         if (Container != "") {
-            if (Api->LinkVolume(Volume.Path, Container))
+            if (Api->LinkVolume(VolumePath, Container))
                 return GetLastError();
-            if (Api->UnlinkVolume(Volume.Path))
+            if (Api->UnlinkVolume(VolumePath))
                 return GetLastError();
             VolumeLinked = false;
         }
@@ -237,15 +236,14 @@ public:
     }
 
     TError WaitContainer(int timeout) {
-        std::vector<std::string> containers = { Container };
         std::string result, oom_killed;
         TError error;
         int status;
 
-        if (Api->WaitContainers(containers, {}, result, timeout))
+        if (Api->WaitContainer(Container, result, timeout))
             return GetLastError();
 
-        if (result == "")
+        if (result == "timeout")
             return TError(EError::Busy, "Wait timeout");
 
         if (Api->GetProperty(Container, "exit_status", result) ||
@@ -399,9 +397,9 @@ public:
         }
 
         if (NeedVolume) {
-            if (Api->SetProperty(Container, "root", ChrootVolume ? Volume.Path : "/"))
+            if (Api->SetProperty(Container, "root", ChrootVolume ? VolumePath : "/"))
                 goto err;
-            if (Api->SetProperty(Container, "cwd", ChrootVolume ? "/" : Volume.Path))
+            if (Api->SetProperty(Container, "cwd", ChrootVolume ? "/" : VolumePath))
                 goto err;
         }
 
@@ -497,8 +495,8 @@ err:
         }
 
         if (VolumeLinked) {
-            if (Api->UnlinkVolume(Volume.Path))
-                std::cerr << "Cannot unlink volume " << Volume.Path << " : " << GetLastError() << std::endl;
+            if (Api->UnlinkVolume(VolumePath))
+                std::cerr << "Cannot unlink volume " << VolumePath << " : " << GetLastError() << std::endl;
             VolumeLinked = false;
         }
 
@@ -692,7 +690,7 @@ public:
 
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *) { printKey = true; } },
-            { 's', false, [&](const char *) { flags |= Porto::GetFlags::Sync; } },
+            { 's', false, [&](const char *) { flags |= Porto::GET_SYNC; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
@@ -744,7 +742,7 @@ public:
 
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *) { printKey = true; } },
-            { 's', false, [&](const char *) { flags |= Porto::GetFlags::Sync; } },
+            { 's', false, [&](const char *) { flags |= Porto::GET_SYNC; } },
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
@@ -978,9 +976,9 @@ public:
         int ret;
 
         const auto &args = env->GetOpts({
-                {'n', false, [&](const char *) { flags |= Porto::GetFlags::NonBlock; }},
-                {'s', false, [&](const char *) { flags |= Porto::GetFlags::Sync; }},
-                {'r', false, [&](const char *) { flags |= Porto::GetFlags::Real; }},
+                {'n', false, [&](const char *) { flags |= Porto::GET_NONBLOCK; }},
+                {'s', false, [&](const char *) { flags |= Porto::GET_SYNC; }},
+                {'r', false, [&](const char *) { flags |= Porto::GET_REAL; }},
         });
 
         int sep = -1;
@@ -1009,47 +1007,45 @@ public:
             printEmpty = true;
             printHuman = false;
         } else {
-            vector<Porto::Property> plist;
-            ret = Api->ListProperties(plist);
-            if (ret) {
+            auto plist = Api->ListProperties();
+            if (!plist) {
                 PrintError("Can't list properties");
                 return EXIT_FAILURE;
             }
-            vars.reserve(plist.size());
-            for (auto p : plist)
-                vars.push_back(p.Name);
+            vars.reserve(plist->list_size());
+            for (auto p : plist->list())
+                vars.push_back(p.name());
             std::sort(vars.begin(), vars.end());
         }
 
-        std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-        ret = Api->Get(list, vars, result, flags);
-        if (ret) {
+        auto result = Api->Get(list, vars, flags);
+        if (!result) {
             PrintError("Can't get containers' data");
             return ret;
         }
 
-        if (result.size() > 1)
+        if (result->list_size() > 1)
             multiGet = true;
 
         ret = EXIT_SUCCESS;
 
-        for (auto &it: result) {
-            auto &data = it.second;
+        for (auto &ct: result->list()) {
 
             if (multiGet)
-                fmt::print("{}:\n", it.first);
+                fmt::print("{}:\n", ct.name());
 
-            for (const auto &key : vars) {
-                if (data[key].Error) {
+            for (const auto &kv : ct.keyval()) {
+                auto &key = kv.variable();
+                if (kv.error()) {
                     if (printErrors || key == "state") {
-                        TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
+                        TError error(kv.error(), kv.errormsg());
                         PrintError("Cannot get " + key, error);
                         ret = EXIT_FAILURE;
                     }
                     continue;
                 }
 
-                auto val = data[key].Value;
+                auto val = kv.value();
                 if (val.empty() && !printEmpty)
                 continue;
 
@@ -1341,12 +1337,9 @@ public:
             comm = GetTaskName(pid);
 
         std::string name;
-
-        int ret = Api->LocateProcess(pid, comm, name);
-
-        if (ret) {
+        if (Api->LocateProcess(pid, comm, name)) {
             PrintError("Cannot find container by pid");
-            return ret;
+            return EXIT_FAILURE;
         }
 
         fmt::print("{}\n", name);
@@ -1411,7 +1404,7 @@ public:
                 PrintError("Can't wait for containers");
                 return ret;
             }
-            Api->Recv();
+            Api->RecvAsyncWait();
             return 0;
         }
 
@@ -1420,17 +1413,17 @@ public:
             return EXIT_FAILURE;
         }
 
-        std::string name;
-        int ret = Api->WaitContainers(containers, labels, name, timeout);
-        if (ret) {
+        std::string name, state;
+        auto rsp = Api->Wait(containers, labels, timeout);
+        if (!rsp) {
             PrintError("Can't wait for containers");
-            return ret;
+            return EXIT_FAILURE;
         }
 
-        if (name.empty())
+        if (rsp->name() == "")
             std::cerr << "timeout" << std::endl;
         else
-            std::cout << name << std::endl;
+            std::cout << rsp->name() << std::endl;
 
         return 0;
     }
@@ -1534,9 +1527,8 @@ public:
             }
 
         const std::vector<std::string> vars = { "state", "time" };
-        std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-        ret = Api->Get(clist, vars, result);
-        if (ret) {
+        auto result = Api->Get(clist, vars);
+        if (!result) {
             PrintError("Can't get containers' data");
             return ret;
         }
@@ -1547,17 +1539,18 @@ public:
         size_t timeLen = 12;
         for (size_t i = 0; i < clist.size(); i++) {
             auto c = clist[i];
+            auto &ct_state = result->list(i).keyval(0);
+            auto &ct_time = result->list(i).keyval(1);
             if (c == "/")
                 continue;
 
-            auto state = result[c]["state"];
-            if (state.Error == EError::ContainerDoesNotExist)
+            if (ct_state.error() == EError::ContainerDoesNotExist)
                 continue;
 
             if (toplevel && CountChar(c, '/'))
                 continue;
 
-            if (running && state.Value != "running")
+            if (running && ct_state.value() != "running")
                 continue;
 
             if (details)
@@ -1566,20 +1559,19 @@ public:
             std::cout << displayName[i];
 
             if (details) {
-                if (state.Error == EError::Busy)
+                if (ct_state.error() == EError::Busy)
                     std::cout << std::right << std::setw(stateLen) << "busy";
-                else if (state.Error)
-                    std::cout << std::right << std::setw(stateLen) << state.ErrorMsg;
+                else if (ct_state.error())
+                    std::cout << std::right << std::setw(stateLen) << ct_state.errormsg();
                 else
-                    std::cout << std::right << std::setw(stateLen) << state.Value;
+                    std::cout << std::right << std::setw(stateLen) << ct_state.value();
 
-                auto time = result[c]["time"];
-                bool showTime = state.Value == "running" ||
-                                state.Value == "meta" ||
-                                state.Value == "dead";
-                if (showTime && !time.Error)
+                bool showTime = ct_state.value() == "running" ||
+                                ct_state.value() == "meta" ||
+                                ct_state.value() == "dead";
+                if (showTime && !ct_time.error())
                     std::cout << std::right << std::setw(timeLen)
-                              << HumanValue("time", time.Value);
+                              << HumanValue("time", ct_time.value());
             }
 
             std::cout << std::endl;
@@ -1617,21 +1609,22 @@ public:
             keys.push_back("time");
         }
 
-        std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
-        if (Api->Get(filter, keys, result, Porto::GetFlags::Sync)) {
+        auto result = Api->Get(filter, keys, Porto::GET_SYNC);
+        if (!result) {
             PrintError("Cannot get data");
             return EXIT_FAILURE;
         }
 
-        std::vector<std::string> names;
-        for (auto &it: result)
-            names.push_back(it.first);
+        std::vector<unsigned> index;
+        index.resize(result->list_size());
+        for (unsigned i = 0; i < result->list_size(); i++)
+            index[i] = i;
 
-        std::sort(names.begin(), names.end(),
-                  [&](const std::string &a, const std::string &b) -> bool {
-                      for (auto &key: keys) {
-                          std::string &a_str = result[a][key].Value;
-                          std::string &b_str = result[b][key].Value;
+        std::sort(index.begin(), index.end(),
+                  [&](unsigned a, unsigned b) -> bool {
+                      for (unsigned key = 0; key < keys.size(); key++) {
+                          auto &a_str = result->list(a).keyval(key).value();
+                          auto &b_str = result->list(b).keyval(key).value();
                           if (a_str == b_str)
                               continue;
                           int64_t a_int, b_int;
@@ -1648,7 +1641,7 @@ public:
         TMultiTuple text;
         std::vector<unsigned> width;
 
-        text.resize(names.size() + 1);
+        text.resize(index.size() + 1);
         text[0].resize(keys.size() + 1);
         width.resize(keys.size() + 1);
 
@@ -1659,20 +1652,20 @@ public:
             width[col + 1] = std::max(8u, (unsigned)keys[col].size());
         }
 
-        for (unsigned idx = 0; idx < names.size(); idx++) {
-            std::string &name = names[idx];
-            auto &data = result[name];
+        for (unsigned idx = 0; idx < index.size(); idx++) {
+            auto &data = result->list(index[idx]);
+            auto &name = data.name();
             text[idx + 1].resize(keys.size() + 1);
             text[idx + 1][0] = name;
             width[0] = std::max(width[0], (unsigned)name.size());
             for (unsigned col = 0; col < keys.size(); col++) {
-                std::string value = HumanValue(keys[col], data[keys[col]].Value);
+                std::string value = HumanValue(keys[col], data.keyval(col).value());
                 text[idx + 1][col + 1] = value;
                 width[col + 1] = std::max(width[col + 1], (unsigned)value.size());
             }
         }
 
-        for (unsigned idx = 0; idx <= names.size(); idx++) {
+        for (unsigned idx = 0; idx <= index.size(); idx++) {
             auto &line = text[idx];
             fmt::print("{: <{}} ", line[0], width[0]);
             for (unsigned col = 1; col < line.size(); col++)
@@ -1711,15 +1704,14 @@ public:
                 properties[arg.substr(0, sep)] = arg.substr(sep + 1);
         }
 
-        Porto::Volume volume;
-        int ret = Api->CreateVolume(path, properties, volume);
+        int ret = Api->CreateVolume(path, properties);
         if (ret) {
             PrintError("Can't create volume");
             return ret;
         }
 
-        if (path == "")
-            std::cout << volume.Path << std::endl;
+        if (args[0] == "-A")
+            fmt::print("{}\n", path);
 
         return 0;
     }
@@ -1767,7 +1759,6 @@ public:
             { 'S', false, [&](const char *) { strict = true; } },
         });
         const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
-        std::vector<Porto::Volume> vol;
         int ret;
 
         ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : all ? "***" : "",
@@ -1792,95 +1783,104 @@ public:
         "    -c <ct>   list volumes linked to container\n"
         ) {}
 
-    void ShowSizeProperty(Porto::Volume &v, const char *p, int w, bool raw = false) {
-      uint64_t val;
-
-      if (!v.Properties.count(std::string(p)))
-          std::cout << std::setw(w) << "-";
-      else if (StringToUint64(v.Properties.at(std::string(p)), val))
-          std::cout << std::setw(w) << "err";
-      else if (raw)
-          std::cout << std::setw(w) << val;
-      else
-          std::cout << std::setw(w) << StringFormatSize(val);
+    std::string GetProp(const rpc::TVolumeDescription &v, const std::string &n) {
+        for (auto &p: v.properties()) {
+            if (p.name() == n)
+                return p.value();
+        }
+        return "-";
     }
 
-    void ShowPercent(Porto::Volume &v, const char *u, const char *a, int w) {
-      uint64_t used, avail;
-
-      if (!v.Properties.count(std::string(u)) |
-          !v.Properties.count(std::string(a)))
-          std::cout << std::setw(w) << "-";
-      else if (StringToUint64(v.Properties.at(std::string(u)), used) ||
-               StringToUint64(v.Properties.at(std::string(a)), avail))
-          std::cout << std::setw(w) << "err";
-      else if (used + avail)
-          std::cout << std::setw(w - 1) << std::llround(100. * used / (used + avail)) << "%";
-      else
-          std::cout << std::setw(w) << "inf";
+    std::string GetSize(const rpc::TVolumeDescription &v, const std::string &n) {
+        uint64_t val;
+        for (auto &p: v.properties()) {
+            if (p.name() == n) {
+                if (StringToUint64(p.value(), val))
+                    return "err";
+                return StringFormatSize(val);
+            }
+        }
+        return "-";
     }
 
-    void ShowVolume(Porto::Volume &v) {
+    double GetPerc(const rpc::TVolumeDescription &v, const std::string &n, const std::string &d) {
+        uint64_t val = 0;
+        uint64_t div = 0;
+
+        for (auto &p: v.properties()) {
+            if (p.name() == n) {
+                if (StringToUint64(p.value(), val))
+                    return -1;
+            }
+            if (p.name() == d) {
+                if (StringToUint64(p.value(), div))
+                    return -1;
+            }
+        }
+
+        if (val + div == 0)
+            return -1;
+
+        return 100. * val / (val + div);
+    }
+
+    void ShowVolume(const rpc::TVolumeDescription &v) {
         if (!details) {
-            std::cout << v.Path << std::endl;
+            fmt::print("{}\n", v.path());
         } else {
-            std::cout << std::left << std::setw(40) << v.Path;
-            if (v.Path.length() > 40)
-                std::cout << std::endl << std::setw(40) << " ";
-            std::cout << std::setw(8) << v.Properties[V_ID];
-            std::cout << std::setw(8) << v.Properties[V_BACKEND];
-            std::cout << std::right;
+            fmt::print("{:<40}", v.path());
+            if (v.path().length() > 40)
+                fmt::print("\n{:<40}", "");
+
+            fmt::print(" {:>7} {:<7}", GetProp(v, V_ID), GetProp(v, V_BACKEND));
+
             if (inodes) {
-                ShowSizeProperty(v, V_INODE_LIMIT, 10, true);
-                ShowSizeProperty(v, V_INODE_USED, 10, true);
-                ShowSizeProperty(v, V_INODE_AVAILABLE, 10, true);
-                ShowPercent(v, V_INODE_USED, V_INODE_AVAILABLE, 5);
+                fmt::print(" {:>9} {:>9} {:>9} {:>3.0f}%",
+                           GetProp(v, V_INODE_LIMIT),
+                           GetProp(v, V_INODE_USED),
+                           GetProp(v, V_INODE_AVAILABLE),
+                           GetPerc(v, V_INODE_USED, V_INODE_AVAILABLE));
             } else {
-                ShowSizeProperty(v, V_SPACE_LIMIT, 10);
-                ShowSizeProperty(v, V_SPACE_USED, 10);
-                ShowSizeProperty(v, V_SPACE_AVAILABLE, 10);
-                ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
+                fmt::print(" {:>9} {:>9} {:>9} {:>3.0f}%",
+                           GetSize(v, V_SPACE_LIMIT),
+                           GetSize(v, V_SPACE_USED),
+                           GetSize(v, V_SPACE_AVAILABLE),
+                           GetPerc(v, V_SPACE_USED, V_SPACE_AVAILABLE));
             }
 
-            for (auto link: v.Links) {
-                std::cout << " " << link.Container;
-                if (link.Target != "")
-                    std::cout << "(" << link.Target << (link.ReadOnly ? " ro" : "") << (link.Required ? " !" : "") << ")";
+            for (auto link: v.links()) {
+                fmt::print(" {}", link.container());
+                if (link.has_target())
+                    fmt::print("({}{}{})", link.target(),
+                               link.read_only() ? " ro" : "",
+                               link.required() ? " !" : "");
             }
 
-            std::cout << std::endl;
+            fmt::print("\n");
 
-            if (v.Path.length() > 40)
-                std::cout << std::endl;
+            if (v.path().length() > 40)
+                fmt::print("\n");
         }
 
         if (!verbose)
             return;
 
-        std::cout << "  " << std::left << std::setw(20) << "containers";
-        for (auto link: v.Links)
-            std::cout << " " << link.Container;
-        std::cout << std::endl;
+        fmt::print("  {:<20}", "containers");
+        for (auto link: v.links())
+            fmt::print(" {}", link.container());
+        fmt::print("\n");
 
-        for (auto link: v.Links)
-            if (link.Target != "")
-                std::cout << "  " << std::left << std::setw(20) << "link" << " "
-                    << link.Container << " " << link.Target
-                    << (link.ReadOnly ? " ro" : "")
-                    << (link.Required ? " !" : "")
-                    << std::endl;
+        for (auto link: v.links())
+            if (link.has_target())
+                    fmt::print("  {:<20} {} {}{}{}\n",
+                               link.container(), link.target(),
+                               link.read_only() ? " ro" : "",
+                               link.required() ? " !" : "");
 
-        std::cout << std::resetiosflags(std::ios::adjustfield);
+        for (auto kv: v.properties())
+            fmt::print("  {:<20} {}\n", kv.name(), kv.value());
 
-        for (auto kv: v.Properties) {
-             std::cout << "  " << std::left << std::setw(20) << kv.first;
-             if (kv.second.length())
-                  std::cout << " " << kv.second;
-
-             std::cout << std::resetiosflags(std::ios::adjustfield);
-             std::cout << std::endl;
-        }
-        std::cout << std::endl;
+        fmt::print("\n");
     }
 
     int Execute(TCommandEnviroment *env) final override {
@@ -1892,43 +1892,33 @@ public:
             { 'c', true , [&](const char *arg) { container = arg; } },
         });
 
-        vector<Porto::Volume> vlist;
-
-        if (details) {
-            std::cout << std::left << std::setw(40) << "Volume";
-            std::cout << std::setw(8) << "ID";
-            std::cout << std::setw(8) << "Backend";
-            std::cout << std::right;
-            std::cout << std::setw(10) << "Limit";
-            std::cout << std::setw(10) << "Used";
-            std::cout << std::setw(10) << "Avail";
-            std::cout << std::setw(5) << "Use%";
-            std::cout << std::left << " Containers" << std::endl;
-        }
+        if (details)
+            fmt::print("{:<40} {:>7} {:<7} {:>9} {:>9} {:>9} {:>4} {}\n",
+                       "Volume", "ID", "Backend", "Limit", "Used", "Avail",
+                       "Use%", "Containers");
 
         if (args.empty()) {
-          int ret = Api->ListVolumes("", container, vlist);
-          if (ret) {
-              PrintError("Can't list volumes");
-              return ret;
-          }
+            auto vlist = Api->ListVolumes("", container);
+            if (!vlist) {
+                PrintError("Can't list volumes");
+                return EXIT_FAILURE;
+            }
 
-          for (auto &v : vlist)
-              ShowVolume(v);
+            for (auto &v : vlist->volumes())
+                ShowVolume(v);
         } else {
             int errors = 0;
 
             for (const auto &arg : args) {
                 const auto path = TPath(arg).AbsolutePath().NormalPath().ToString();
 
-                vlist.clear();
-                int ret = Api->ListVolumes(path, "", vlist);
-                if (ret) {
+                auto vlist = Api->ListVolumes(path, "");
+                if (!vlist) {
                     PrintError(arg);
                     errors++;
                     continue;
                 }
-                for (auto &v : vlist)
+                for (auto &v : vlist->volumes())
                     ShowVolume(v);
             }
 
@@ -2029,7 +2019,7 @@ public:
                     return EXIT_FAILURE;
                 age *= 60*60*24;
             }
-            auto rsp = Api->ListStorage(place);
+            auto rsp = Api->ListStorages(place);
             if (!rsp) {
                 PrintError("Cannot list storage paths");
                 return EXIT_FAILURE;
@@ -2043,7 +2033,7 @@ public:
                     PrintError("Cannot remove storage");
             }
         } else if (list) {
-            auto rsp = Api->ListStorage(place);
+            auto rsp = Api->ListStorages(place);
             if (!rsp) {
                 PrintError("Cannot list storage paths");
             } else {
@@ -2229,38 +2219,35 @@ public:
                     return EXIT_FAILURE;
                 age *= 60*60*24;
             }
-            std::vector<Porto::Layer> layers;
-            ret = Api->ListLayers(layers, place);
-            if (ret) {
+            auto list = Api->ListLayers(place);
+            if (!list) {
                 PrintError("Can't list layers");
                 return EXIT_FAILURE;
             } else {
-                for (const auto &l: layers) {
-                    if (l.LastUsage < age)
+                for (const auto &l: list->layers()) {
+                    if (l.last_usage() < age)
                         continue;
                     if (verbose)
-                        std::cout << "remove " << l.Name << std::endl;
-                    ret = Api->RemoveLayer(l.Name, place);
-                    if (ret)
+                        std::cout << "remove " << l.name() << std::endl;
+                    if (Api->RemoveLayer(l.name(), place))
                         PrintError("Cannot remove layer");
                 }
             }
         } else if (list) {
-            std::vector<Porto::Layer> layers;
-            ret = Api->ListLayers(layers, place);
-            if (ret) {
+            auto list = Api->ListLayers(place);
+            if (!list) {
                 PrintError("Can't list layers");
             } else {
-                for (const auto &l: layers) {
-                    std::cout << l.Name << std::endl;
+                for (const auto &l: list->layers()) {
+                    std::cout << l.name() << std::endl;
                     if (!verbose)
                         continue;
-                    if (l.OwnerUser.size())
-                        std::cout << "\towner\t" << l.OwnerUser << ":" << l.OwnerGroup << std::endl;
-                    if (l.LastUsage)
-                        std::cout << "\tused\t" << StringFormatDuration(l.LastUsage * 1000) << " ago" << std::endl;
-                    if (l.PrivateValue.size())
-                        std::cout << "\tprivate\t" << l.PrivateValue << std::endl;
+                    if (l.owner_user().size())
+                        std::cout << "\towner\t" << l.owner_user() << ":" << l.owner_group() << std::endl;
+                    if (l.last_usage())
+                        std::cout << "\tused\t" << StringFormatDuration(l.last_usage() * 1000) << " ago" << std::endl;
+                    if (l.private_value().size())
+                        std::cout << "\tprivate\t" << l.private_value() << std::endl;
                     std::cout << std::endl;
                 }
             }
@@ -2443,7 +2430,7 @@ public:
             goto err;
         }
 
-        volume = launcher.Volume.Path;
+        volume = launcher.VolumePath;
 
         volume_script = volume + "/" + build_script;
         volume_script.Unlink();

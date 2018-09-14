@@ -152,10 +152,9 @@ TError TCore::Identify() {
             Conn.GetProperty(Container, P_OWNER_GROUP, OwnerGroup) ||
             Conn.GetProperty(Container, P_CWD, Cwd) ||
             Conn.GetProperty(Container, P_ROOT_PATH, RootPath)) {
-        int err;
         std::string msg;
-        Conn.GetLastError(err, msg);
-        error = TError((EError)err, msg);
+        auto err = Conn.GetLastError(msg);
+        error = TError(err, msg);
         L_ERR("Cannot get CT:{} properties: {}", Container, error);
         return error;
     }
@@ -215,7 +214,7 @@ TError TCore::Forward() {
     L("Forwading core into CT:{}", core);
 
     std::string result;
-    Conn.WaitContainers({core}, {}, result, config().core().timeout_s());
+    Conn.WaitContainer(core, result, config().core().timeout_s());
     Conn.Destroy(core);
     return OK;
 }
