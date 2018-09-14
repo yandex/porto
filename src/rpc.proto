@@ -854,6 +854,7 @@ message TGetContainerRequest {
 
 message TGetContainerResponse {
     repeated TContainerSpec container = 1;
+    optional string absolute_namespace = 2;
 }
 
 // List available properties
@@ -904,6 +905,7 @@ message TContainerListRequest {
 
 message TContainerListResponse {
     repeated string name = 1;
+    optional string absolute_namespace = 2;
 }
 
 

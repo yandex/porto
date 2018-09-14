@@ -547,6 +547,8 @@ noinline TError GetContainer(const rpc::TGetContainerRequest &req,
         ct->Dump(props, *spec);
     }
 
+    rsp.set_absolute_namespace(ROOT_PORTO_NAMESPACE + CL->PortoNamespace);
+
     return OK;
 }
 
@@ -637,7 +639,10 @@ noinline TError RespawnContainer(const rpc::TContainerRespawnRequest &req) {
 noinline TError ListContainers(const rpc::TContainerListRequest &req,
                                rpc::TContainerResponse &rsp) {
     std::string mask = req.has_mask() ? req.mask() : "***";
+    auto out = rsp.mutable_list();
+
     auto lock = LockContainers();
+
     for (auto &it: Containers) {
         auto &ct = it.second;
         std::string name;
@@ -646,8 +651,11 @@ noinline TError ListContainers(const rpc::TContainerListRequest &req,
             continue;
         if (req.has_changed_since() && ct->ChangeTime < req.changed_since())
             continue;
-        rsp.mutable_list()->add_name(name);
+        out->add_name(name);
     }
+
+    out->set_absolute_namespace(ROOT_PORTO_NAMESPACE + CL->PortoNamespace);
+
     return OK;
 }
 
