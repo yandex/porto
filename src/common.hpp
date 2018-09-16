@@ -43,7 +43,7 @@ constexpr uint32_t ROOT_TC_MINOR = 0x10;
 constexpr uint32_t DEFAULT_TC_MINOR = 0x20; /* fallback class */
 constexpr int NR_TC_CLASSES = 8;
 
-constexpr uint64_t CPU_POWER_PER_SEC = 1000000000ull;
+constexpr uint64_t NSEC_PER_SEC = 1000000000ull;
 
 constexpr uint64_t NET_MAX_RATE = 2000000000; /* 16Gbit */
 

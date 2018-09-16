@@ -385,7 +385,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     CpuPeriod = config().container().cpu_period();
 
     if (IsRoot()) {
-        CpuLimit = GetNumCores() * CPU_POWER_PER_SEC;
+        CpuLimit = GetNumCores() * NSEC_PER_SEC;
         SetProp(EProperty::CPU_LIMIT);
         SetProp(EProperty::MEM_LIMIT);
     }
@@ -1636,7 +1636,7 @@ TError TContainer::DistributeCpus() {
             }
         }
 
-        if (vacantGuarantee > parent->CpuVacant.Weight() * CPU_POWER_PER_SEC) {
+        if (vacantGuarantee > parent->CpuVacant.Weight() * NSEC_PER_SEC) {
             if (!parent->CpuVacant.IsEqual(parent->CpuAffinity))
                 return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in CT{}:{}", parent->Id, Parent->Name);
             L("CPU guarantee overcommit in CT{}:{}", parent->Id, parent->Name);

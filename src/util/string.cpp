@@ -452,9 +452,9 @@ TError StringToCpuPower(const std::string &str, uint64_t &power) {
         return TError(EError::InvalidValue, "Invalid cpu power value " + str);
 
     if (unit == "")
-        power = val * CPU_POWER_PER_SEC / 100 * GetNumCores();
+        power = val * NSEC_PER_SEC / 100 * GetNumCores();
     else if (unit == "c")
-        power = val * CPU_POWER_PER_SEC;
+        power = val * NSEC_PER_SEC;
     else if (unit == "ns")
         power = val;
     else
@@ -464,7 +464,7 @@ TError StringToCpuPower(const std::string &str, uint64_t &power) {
 }
 
 std::string CpuPowerToString(uint64_t nsec) {
-    return fmt::format("{:g}c", (double)nsec / CPU_POWER_PER_SEC);
+    return fmt::format("{:g}c", (double)nsec / NSEC_PER_SEC);
 }
 
 TError UintMapToString(const TUintMap &map, std::string &value) {

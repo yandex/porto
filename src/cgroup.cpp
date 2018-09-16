@@ -673,7 +673,7 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     period = period / 1000; /* ns -> us */
 
     if (HasQuota) {
-        int64_t quota = std::ceil((double)limit * period / CPU_POWER_PER_SEC);
+        int64_t quota = std::ceil((double)limit * period / NSEC_PER_SEC);
 
         if (quota < 1000) /* 1ms */
             quota = 1000;
@@ -699,7 +699,7 @@ TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
     period = period / 1000; /* ns -> us */
 
     if (HasReserve && config().container().enable_cpu_reserve()) {
-        uint64_t reserve = std::floor((double)guarantee * period / CPU_POWER_PER_SEC);
+        uint64_t reserve = std::floor((double)guarantee * period / NSEC_PER_SEC);
         uint64_t shares = BaseShares, reserve_shares = BaseShares;
 
         shares *= weight;
@@ -730,7 +730,7 @@ TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
             return error;
 
     } else if (HasShares) {
-        uint64_t shares = std::floor((double)guarantee * BaseShares / CPU_POWER_PER_SEC);
+        uint64_t shares = std::floor((double)guarantee * BaseShares / NSEC_PER_SEC);
 
         /* default cpu_guarantee is 1c, shares < 1024 are broken */
         shares = std::max(shares, BaseShares);
@@ -760,7 +760,7 @@ TError TCpuSubsystem::SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     period = period / 1000; /* ns -> us */
 
     if (HasRtGroup && config().container().rt_priority()) {
-        uint64_t max = GetNumCores() * CPU_POWER_PER_SEC;
+        uint64_t max = GetNumCores() * NSEC_PER_SEC;
         int64_t root_runtime, root_period, runtime;
 
         if (RootCgroup().GetInt64("cpu.rt_period_us", root_period))

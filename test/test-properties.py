@@ -451,6 +451,16 @@ for name in ['creation_time', 'change_time', 'start_time', 'death_time']:
 
 ct.Destroy()
 
+
+ct = conn.Run(ct_name, command="sleep 1000", cpu_limit="0.6c", cpu_guarantee="0.5c")
+
+for name in ['cpu_limit', 'cpu_limit_total', 'cpu_guarantee', 'cpu_guarantee_total']:
+    print " - ", name + '[ns]'
+    ExpectEq(int(get_old(name + '[ns]')), get_new(name) * 1e9)
+
+ct.Destroy()
+
+
 ct = conn.Run(ct_name)
 
 print " -  ulimit core"

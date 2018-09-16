@@ -748,6 +748,14 @@ write permissions to the target or owning related volume.
 
     For root contianer this shows total CPU commitment.
 
+* **cpu\_guarantee\[ns\]** - cpu guarantee in nanosecons per second
+
+* **cpu\_guarantee\_total\[ns\]** - effective cpu guarantee in nanosecons per second
+
+* **cpu\_limit\[ns\]** - cpu limit in nanosecons per second
+
+* **cpu\_limit\_total\[ns\]** - total cpu limit in nanosecons per second
+
 * **cpu\_period** - CPU limit accounting period
 
     Syntax: 1ms..1s, default: 100ms \[nanoseconds\]

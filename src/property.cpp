@@ -316,30 +316,49 @@ public:
     }
 };
 
-class TCpuPowerProperty : public TTypedProperty<double> {
+class TCpuPowerProperty : public TTypedProperty<uint64_t> {
 public:
     TCpuPowerProperty(std::string name, EProperty prop, std::string desc) :
-        TTypedProperty<double>(name, prop, desc) {}
-    std::string Format(double val) {
-        return fmt::format("{:g}c", val);
+        TTypedProperty<uint64_t>(name, prop, desc) {}
+    std::string Format(uint64_t val) {
+        return fmt::format("{:g}c", (double)val / NSEC_PER_SEC);
     }
-    TError Parse(const std::string &str, double &val) {
+    TError Parse(const std::string &str, uint64_t &value) {
         std::string unit;
+        double val;
         TError error = StringToValue(str, val, unit);
         if (error || val < 0)
             return TError(EError::InvalidValue, "Invalid cpu power value {}", str);
 
-        if (unit == "c")
-            return OK;
-
-        if (unit == "") {
-            val = val * GetNumCores() / 100;
+        if (unit == "c") {
+            value = val * NSEC_PER_SEC;
+        } else if (unit == "") {
+            value = val * NSEC_PER_SEC * GetNumCores() / 100;
         } else if (unit == "ns") {
-            val /= CPU_POWER_PER_SEC;
+            value = val;
         } else
             return TError(EError::InvalidValue, "Invalid cpu power unit {}", str);
 
         return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index != "ns")
+            return TError(EError::InvalidValue, "Invalid index: {}", index);
+        uint64_t val;
+        TError error = Get(val);
+        if (error)
+            return error;
+        value = fmt::format("{}", val);
+        return OK;
+    }
+    TError SetIndexed(const std::string &index, const std::string &str) {
+        if (index != "ns")
+            return TError(EError::InvalidValue, "Invalid index: {}", index);
+        uint64_t val;
+        TError error = StringToUint64(str, val);
+        if (error)
+            return error;
+        return Set(val);
     }
 };
 
@@ -2822,26 +2841,25 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
-    TError Get(double &val) {
-        val = (double)CT->CpuLimit / CPU_POWER_PER_SEC;
+    TError Get(uint64_t &val) {
+        val = CT->CpuLimit;
         return OK;
     }
-    TError Set(double val) {
-        uint64_t power = val * CPU_POWER_PER_SEC;
-        if (CT->CpuLimit != power) {
-            CT->CpuLimit = power;
+    TError Set(uint64_t val) {
+        if (CT->CpuLimit != val) {
+            CT->CpuLimit = val;
             CT->SetProp(EProperty::CPU_LIMIT);
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, double val) {
-        spec.set_cpu_limit(val);
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_limit((double)val / NSEC_PER_SEC);
     }
     bool Has(const rpc::TContainerSpec &spec) {
         return spec.has_cpu_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, double &val) {
-        val = spec.cpu_limit();
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.cpu_limit() * NSEC_PER_SEC;
     }
 } static CpuLimit;
 
@@ -2852,12 +2870,12 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(double &val) {
-        val = (double)CT->CpuLimitSum / CPU_POWER_PER_SEC;
+    TError Get(uint64_t &val) {
+        val = CT->CpuLimitSum;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, double val) {
-        spec.set_cpu_limit_total(val);
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_limit_total((double)val / NSEC_PER_SEC);
     }
 } static CpuLimitTotal;
 
@@ -2869,26 +2887,25 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
-    TError Get(double &val) {
-        val = (double)CT->CpuGuarantee / CPU_POWER_PER_SEC;
+    TError Get(uint64_t &val) {
+        val = CT->CpuGuarantee;
         return OK;
     }
-    TError Set(double val) {
-        uint64_t power = val * CPU_POWER_PER_SEC;
-        if (CT->CpuGuarantee != power) {
-            CT->CpuGuarantee = power;
+    TError Set(uint64_t val) {
+        if (CT->CpuGuarantee != val) {
+            CT->CpuGuarantee = val;
             CT->SetProp(EProperty::CPU_GUARANTEE);
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, double val) {
-        spec.set_cpu_guarantee(val);
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_guarantee((double)val / NSEC_PER_SEC);
     }
     bool Has(const rpc::TContainerSpec &spec) {
         return spec.has_cpu_guarantee();
     }
-    void Load(const rpc::TContainerSpec &spec, double &val) {
-        val = spec.cpu_guarantee();
+    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+        val = spec.cpu_guarantee() * NSEC_PER_SEC;
     }
 } static CpuGuarantee;
 
@@ -2899,12 +2916,12 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(double &val) {
-        val = (double)std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum) / CPU_POWER_PER_SEC; 
+    TError Get(uint64_t &val) {
+        val = std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, double val) {
-        spec.set_cpu_guarantee_total(val);
+    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+        spec.set_cpu_guarantee_total((double)val / NSEC_PER_SEC);
     }
 } static CpuGuaranteeTotal;
 
