@@ -304,6 +304,16 @@ public:
     TError Parse(const std::string &str, uint64_t &val) {
         return StringToUint64(str, val);
     }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        if (index != "raw")
+            return TError(EError::InvalidValue, "Invalid index: {}", index);
+        uint64_t val;
+        TError error = Get(val);
+        if (error)
+            return error;
+        value = std::to_string(val);
+        return OK;
+    }
 };
 
 class TCpuPowerProperty : public TTypedProperty<double> {

@@ -1,4 +1,5 @@
 import porto
+import datetime
 from test_common import *
 
 size_test =  [
@@ -380,6 +381,9 @@ def set_old(name, value):
 def set_new(name, value):
     conn.Call('SetContainer', container={'name': ct_name, name: value})
 
+def format_time(ts):
+    return datetime.datetime.fromtimestamp(int(ts)).isoformat(' ')
+
 for name, cases in tests.iteritems():
     print " - ", name
 
@@ -439,6 +443,11 @@ for name, cases in dead_tests.iteritems():
     init_new = get_new(name)
     ExpectNe(init_new, None)
     # print "   ", init_old, init_new
+
+for name in ['creation_time', 'change_time', 'start_time', 'death_time']:
+    print " - ", name + '[raw]'
+    ExpectEq(get_old(name), format_time(get_old(name + '[raw]')))
+    ExpectEq(int(get_old(name + '[raw]')), get_new(name))
 
 ct.Destroy()
 
