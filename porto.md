@@ -48,8 +48,8 @@ works as _meta_ container for nested sub-containers.
 Container name could contains only these characters: 'a'..'z', 'A'..'Z', '0'..'9',
 '\_', '\-', '@', ':', '.'. Slash '/' separates nested container: "parent/child".
 
-Each container name component should not exceed 128 characters.
-Whole name is limited to 200 characters (220 for superuser).
+Each container name component (part) should not exceed 128 characters.
+The whole container name (absolute, see below) is limited to 200 characters (220 for superuser).
 Also porto limits nesting to 16 levels.
 
 Container could be addressed in two ways: either in a relative way — using short name relative to current porto
