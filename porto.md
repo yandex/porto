@@ -45,26 +45,31 @@ works as _meta_ container for nested sub-containers.
 
 ## Name
 
-Container name could contains only these characters: 'a'..'z', 'A'..'Z', '0'..'9',
-'\_', '\-', '@', ':', '.'. Slash '/' separates nested container: "parent/child".
+Container name could contains only these characters: 'a'..'z', 'A'..'Z', '0'..'9', '\_', '\-', '@', ':', '.'.
 
-Each container name component should not exceed 128 characters.
-Whole name is limited with 200 characters and 220 for superuser.
-Also porto limits nesting with 16 levels.
+Slash '/' separates nested container: "parent/child".
 
-Container could be addressed using short name relative current porto
-namespaces: "name", or absolute name "/porto/name" which stays the
-same regardless of porto namespace.
-See **absolute\_name**, **absolute\_namespace**,
-**enable\_porto** and **porto\_namespace** below.
+Each container name component (parts "parent", "child" above) should not exceed 128 characters.
 
-Host is a pseudo-container "/".
+The whole container name (i.e. "parent/child") is limited to 200 characters (220 for superuser).
 
-"self" points to current container where current task lives and
-could be used for relative requests "self/child" or "self/..".
+Also porto limits nesting to 16 levels.
 
-Container "." points to parent container for current porto namespace,
-this is common parent for all visible containers.
+Porto implements namespaces for container names: text prefixes for names in requests.
+See **enable\_porto**, **porto\_namespace**, **absolute\_name**, **absolute\_namespace** below.
+
+Host is a root pseudo-container with name "/".
+
+"self" points to the current container, in which current task lives.
+And it could be used for relative requests, like, "self/child" or "self/..".
+
+Container "." points to the parent container of current porto namespace,
+this is a common parent for all visible containers.
+
+Thus container could be addressed in several ways:
+— "name" (relative to current porto namespace)
+- "/porto/name" (absolute name, always the same)
+- "self/..." (relative to current container)
 
 ## States
 * **stopped**    - initial state
