@@ -1,3 +1,17 @@
+yandex-porto (4.19.2) unstable; urgency=low
+
+  * porto: add config option for default environment
+  * volume: allow non-existing user and group as directory owners
+  * porto: add absolute_namespace into response of list/GetContainer
+  * portoctl get: keep values single-line if stdout is not tty
+  * api/python: pass strict into UnlinkVolume as named argument
+  * property: restore 'raw' index to data-time properties
+  * property: add "ns" index for cpu-power properties
+  * volume: add "build_time[raw]" and "change_time[raw]" into old description
+  * api/cpp: refactoring
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 17 Sep 2018 16:36:03 +0300
+
 yandex-porto (4.19.1) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
