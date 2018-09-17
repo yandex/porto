@@ -1204,7 +1204,11 @@ Like for container volume configuration is a set of key-value pairs.
 
 * **build\_time**   - format: YYYY-MM-DD hh:mm:ss
 
+* **build\_time\[raw\]**   - seconds since the epoch
+
 * **change\_time**  - format: YYYY-MM-DD hh:mm:ss
+
+* **change\_time\[raw\]**  - seconds since the epoch
 
 * **state**         - volume state
     - *initial*

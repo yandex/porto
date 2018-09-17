@@ -3133,9 +3133,13 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
     ret[V_CREATOR] = Creator;
     ret[V_READY] = BoolToString(State == EVolumeState::Ready ||
                                 State == EVolumeState::Tuning);
-    if (BuildTime)
-        ret[V_BUILD_TIME] = FormatTime(BuildTime);
+
+    ret[V_BUILD_TIME] = FormatTime(BuildTime);
+    ret["build_time[raw]"] = std::to_string(BuildTime);
+
     ret[V_CHANGE_TIME] = FormatTime(ChangeTime);
+    ret["change_time[raw]"] = std::to_string(ChangeTime);
+
     ret[V_STATE] = StateName(State);
     ret[V_PRIVATE] = Private;
     ret[V_READ_ONLY] = BoolToString(IsReadOnly);

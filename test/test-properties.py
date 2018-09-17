@@ -384,6 +384,8 @@ def set_new(name, value):
 def format_time(ts):
     return datetime.datetime.fromtimestamp(int(ts)).isoformat(' ')
 
+print "CONTAINER"
+
 for name, cases in tests.iteritems():
     print " - ", name
 
@@ -519,3 +521,127 @@ for name in conn.Plist():
 
 ConfigurePortod('test-coredump', "")
 
+
+
+print "VOLUME"
+
+volume_properties = {
+'backend': 'overlay',
+'build_time': None,
+'build_time[raw]': None,
+'change_time': None,
+'change_time[raw]': None,
+'creator': '/ root root',
+'device_name': None,
+'group': 'root',
+'id': None,
+'inode_available': None,
+'inode_guarantee': None,
+'inode_limit': '0',
+'inode_used': None,
+'owner_container': '/',
+'owner_group': 'root',
+'owner_user': 'root',
+'permissions': '0775',
+'place': '/place',
+'place_key': '/place',
+'private': '',
+'read_only': 'false',
+'ready': 'true',
+'space_available': None,
+'space_guarantee': '0',
+'space_limit': '1073741824',
+'space_used': None,
+'state': 'ready',
+'storage': '',
+'user': 'root',
+}
+
+volume_config = [
+'containers',
+'target_container',
+'layers',
+]
+
+volume_spec = [
+'layers',
+'read_only',
+'change_time',
+'container',
+'links',
+'space',
+'place_key',
+'owner_container',
+'creator',
+'auto_path',
+'build_time',
+'device_name',
+'state',
+'place',
+'owner',
+'path',
+'permissions',
+'cred',
+'id',
+'inodes',
+'backend',
+]
+
+ct = conn.Run(ct_name)
+
+v = conn.CreateVolume(layers=['ubuntu-precise'], space_limit='1G', containers=ct_name)
+
+p = conn.GetVolume(v.path)
+
+ExpectEq(len(v.layers), 1)
+ExpectEq(v.layers[0].name, 'ubuntu-precise')
+
+ExpectEq(len(v.containers), 1)
+ExpectEq(v.containers[0].name, ct_name)
+
+for name, val in volume_properties.iteritems():
+    print ' - ', name
+    Expect(name in v.properties)
+    if val is not None:
+        ExpectEq(v.properties[name], val)
+
+for name in conn.Vlist():
+    assert name in volume_properties.keys() + volume_config, "property {} is not tested".format(name)
+
+ExpectEq(v.properties['build_time'], format_time(v.properties['build_time[raw]']))
+ExpectEq(v.properties['change_time'], format_time(v.properties['change_time[raw]']))
+
+for name in volume_spec:
+    assert name in p, "property {} is not found".format(name)
+
+for name in p.keys():
+    assert name in volume_spec, "property {} is not tested".format(name)
+
+ExpectEq(p['path'], v.path)
+ExpectEq(p['id'], v.properties['id'])
+ExpectEq(p['backend'], 'overlay')
+ExpectEq(p['layers'], ['ubuntu-precise'])
+ExpectEq(p['read_only'], False)
+ExpectEq(p['build_time'], int(v.properties['build_time[raw]']))
+ExpectEq(p['change_time'], int(v.properties['change_time[raw]']))
+ExpectEq(p['links'], [{'container': 'a'}])
+ExpectEq(p['space']['limit'], 1073741824)
+ExpectEq(p['space']['usage'], int(v.properties['space_used']))
+ExpectEq(p['space']['available'], int(v.properties['space_available']))
+ExpectEq(p['inodes'].get('limit'), None)
+ExpectEq(p['inodes']['usage'], int(v.properties['inode_used']))
+ExpectEq(p['inodes']['available'], int(v.properties['inode_available']))
+ExpectEq(p['owner_container'], v.properties['owner_container'])
+ExpectEq(p['creator'], v.properties['creator'])
+ExpectEq(p['place'], v.properties['place'])
+ExpectEq(p['place_key'], v.properties['place_key'])
+ExpectEq(p['device_name'], v.properties['device_name'])
+ExpectEq(p['auto_path'], True)
+ExpectEq(p['state'], 'ready')
+ExpectEq(p['owner']['user'], v.properties['owner_user'])
+ExpectEq(p['owner']['group'], v.properties['owner_group'])
+ExpectEq(p['cred']['user'], v.properties['user'])
+ExpectEq(p['cred']['group'], v.properties['group'])
+ExpectEq(p['permissions'], 0o775)
+
+ct.Destroy()
