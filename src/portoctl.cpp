@@ -521,13 +521,7 @@ static const std::string StripIdx(const std::string &name) {
         return name;
 }
 
-static bool ValidProperty(const vector<Porto::Property> &plist, const string &name) {
-    return find_if(plist.begin(), plist.end(),
-                   [&](const Porto::Property &i)->bool { return i.Name == StripIdx(name); })
-        != plist.end();
-}
-
-static std::string HumanValue(const std::string &full_name, const std::string &val) {
+static std::string HumanValue(const std::string &full_name, const std::string &val, bool multiline = false) {
     auto name = StripIdx(full_name);
     TUintMap map;
     uint64_t num;
@@ -551,8 +545,6 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
             name == "ulimit" ||
             name == "cgroups" ||
             name == "controllers" ||
-            name == "capabilities" ||
-            name == "capabilities_ambient" ||
             name == "resolv_conf" ||
             name == "volumes_owned" ||
             name == "volumes_linked" ||
@@ -566,8 +558,12 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
             name == "net_tx_packets" ||
             name == "net_class_id" ||
             name == "io_ops_limit" ||
-            name == "io_ops")
-        return StringReplaceAll(val, ";", ";\n      ");
+            name == "io_ops" ||
+            StringStartsWith(name, "capabilities")) {
+                if (multiline)
+                    return StringReplaceAll(val, ";", ";\n      ");
+                return val;
+    }
 
     if (name == "net_limit" ||
          name == "net_rx_limit" ||
@@ -587,12 +583,13 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
             std::stringstream str;
             for (auto kv : map) {
                 if (str.str().length())
-                    str << ";\n       ";
+                    str << ( multiline ? ";\n       " : "; " );
                 str << kv.first << ": " << StringFormatSize(kv.second);
             }
             return str.str();
-        } else
+        } else if (multiline)
             return StringReplaceAll(val, ";", ";\n      ");
+        return val;
     }
 
     if (name == "io_time") {
@@ -602,12 +599,13 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
             std::stringstream str;
             for (auto kv : map) {
                 if (str.str().length())
-                    str << ";\n       ";
+                    str << (multiline ? ";\n       " : "; ");
                 str << kv.first << ": " << StringFormatDuration(kv.second / 1000000);
             }
             return str.str();
-        } else
+        } else if (multiline)
             return StringReplaceAll(val, ";", ";\n      ");
+        return val;
     }
 
     if (val == "" || StringToUint64(val, num))
@@ -623,6 +621,7 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
         name == "anon_max_usage" ||
         name == "cache_usage" ||
         name == "anon_limit" ||
+        name == "anon_limit_total" ||
         name == "max_rss" ||
         name == "stdout_limit" ||
         name == "hugetlb_limit" ||
@@ -636,7 +635,8 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
         name == "cpu_usage_system" ||
         name == "cpu_wait" ||
         name == "cpu_throttled" ||
-        name == "cpu_period")
+        name == "cpu_period" ||
+        name == "respawn_delay")
         return StringFormatDuration(num / 1000000);
 
     if (name == "exit_status")
@@ -966,6 +966,7 @@ public:
             "   -r   only real values\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
+        bool multiline = isatty(STDOUT_FILENO);
         bool printKey = true;
         bool printErrors = false;
         bool printEmpty = false;
@@ -1053,7 +1054,7 @@ public:
                 continue;
 
                 if (printHuman)
-                    val = HumanValue(key, val);
+                    val = HumanValue(key, val, multiline);
 
                 if (printKey)
                     fmt::print("{} = {}\n", key, val);
