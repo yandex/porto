@@ -147,7 +147,10 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectEq(v, string(""));
 
     ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
-    ExpectNeq(v, string("0"));
+    if (config().container().memory_limit_margin())
+        ExpectNeq(v, string("0"));
+    else
+        ExpectEq(v, string("0"));
 
     if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
