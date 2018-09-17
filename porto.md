@@ -705,7 +705,7 @@ write permissions to the target or owning related volume.
 
 * **cpu\_weight** - CPU weight, syntax: 0.01..100, default: 1
 
-    Multiplies cpu.shares and increase task priority/nice.
+    Multiplies cpu.shares and +10% cpu\_weight is -1 nice.
 
 * **cpu\_guarantee** - desired CPU power
 
