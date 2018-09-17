@@ -1358,10 +1358,6 @@ void TContainer::ChooseSchedPolicy() {
         if (config().container().rt_priority()) {
             SchedPolicy = SCHED_RR;
             SchedPrio = config().container().rt_priority();
-            /* x2 weight is +1 rt priority */
-            SchedPrio += std::log2(CpuWeight);
-            SchedPrio = std::max(SchedPrio, sched_get_priority_min(SCHED_RR));
-            SchedPrio = std::min(SchedPrio, sched_get_priority_max(SCHED_RR));
         }
     } else if (CpuPolicy == "high") {
         SchedNice = config().container().high_nice();
