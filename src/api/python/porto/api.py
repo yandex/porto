@@ -570,7 +570,7 @@ class Volume(object):
     def Unlink(self, container=None, strict=None, timeout=None):
         if isinstance(container, Container):
             container = container.name
-        self.conn.UnlinkVolume(self.path, container, strict, timeout=timeout)
+        self.conn.UnlinkVolume(self.path, container, strict=strict, timeout=timeout)
 
     def Tune(self, **properties):
         self.conn.TuneVolume(self.path, **properties)
@@ -578,8 +578,8 @@ class Volume(object):
     def Export(self, tarball, compress=None, timeout=None):
         self.conn.ExportLayer(self.path, place=self.place, tarball=tarball, compress=compress, timeout=timeout)
 
-    def Destroy(self, timeout=None):
-        self.conn.UnlinkVolume(self.path, '***', timeout=timeout)
+    def Destroy(self, strict=None, timeout=None):
+        self.conn.UnlinkVolume(self.path, '***', strict=strict, timeout=timeout)
 
 class Property(object):
     def __init__(self, name, desc, read_only, dynamic):
@@ -993,8 +993,8 @@ class Connection(object):
             command.strict = strict
         self.rpc.call(request, timeout or self.disk_timeout)
 
-    def DestroyVolume(self, volume, timeout=None):
-        self.UnlinkVolume(volume.path if isinstance(volume, Volume) else volume, '***', timeout=timeout)
+    def DestroyVolume(self, volume, strict=None, timeout=None):
+        self.UnlinkVolume(volume.path if isinstance(volume, Volume) else volume, '***', strict=strict, timeout=timeout)
 
     def _ListVolumes(self, path=None, container=None):
         if isinstance(container, Container):
