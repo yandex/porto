@@ -7,7 +7,7 @@
 #include "util/unix.hpp"
 #include "util/path.hpp"
 
-class TNamespaceFd : public TNonCopyable {
+class TNamespaceFd : public TPortoNonCopyable {
     int Fd;
 public:
     TNamespaceFd() : Fd(-1) {}

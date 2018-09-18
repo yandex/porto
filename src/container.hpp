@@ -53,7 +53,7 @@ enum class ECpuSetType {
 class TProperty;
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
-                   public TNonCopyable {
+                   public TPortoNonCopyable {
     friend class TProperty;
 
     int StateLocked = 0;

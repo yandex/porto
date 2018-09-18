@@ -96,7 +96,7 @@ public:
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
-                public TNonCopyable {
+                public TPortoNonCopyable {
 
     std::unique_ptr<TVolumeBackend> Backend;
     TError OpenBackend();

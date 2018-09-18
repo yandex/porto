@@ -105,7 +105,7 @@ struct TNetProxyNeighbour {
     std::string Master;
 };
 
-class TNetwork : public TNonCopyable {
+class TNetwork : public TPortoNonCopyable {
     friend struct TNetEnv;
 
     static std::mutex NetworksMutex;

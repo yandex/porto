@@ -11,7 +11,7 @@ constexpr int EPOLL_EVENT_OOM = 1;
 class TContainer;
 class TEpollLoop;
 
-class TEpollSource : public TNonCopyable {
+class TEpollSource : public TPortoNonCopyable {
 public:
     int Fd;
     int Flags;
@@ -23,7 +23,7 @@ public:
     TEpollSource() : Fd(-1), Flags(0), Container() {}
 };
 
-class TEpollLoop : public TLockable, public TNonCopyable {
+class TEpollLoop : public TLockable, public TPortoNonCopyable {
     int EpollFd = -1;
 
     size_t MaxEvents = 0;

@@ -63,7 +63,7 @@ int GetNumCores();
 
 int SetIoPrio(pid_t pid, int ioprio);
 
-class TUnixSocket : public TNonCopyable {
+class TUnixSocket : public TPortoNonCopyable {
     int SockFd;
 public:
     static TError SocketPair(TUnixSocket &sock1, TUnixSocket &sock2);

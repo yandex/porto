@@ -51,7 +51,7 @@ public:
 uint32_t TcHandle(uint16_t maj, uint16_t min);
 
 class TNl : public std::enable_shared_from_this<TNl>,
-            public TNonCopyable {
+            public TPortoNonCopyable {
     struct nl_sock *Sock = nullptr;
 
 public:
@@ -76,7 +76,7 @@ public:
     TError AddrLabel(const TNlAddr &prefix, uint32_t label);
 };
 
-class TNlLink : public TNonCopyable {
+class TNlLink : public TPortoNonCopyable {
     std::shared_ptr<TNl> Nl;
     struct rtnl_link *Link = nullptr;
 
@@ -176,7 +176,7 @@ public:
     bool Exists(const TNl &nl);
 };
 
-class TNlCgFilter : public TNonCopyable {
+class TNlCgFilter : public TPortoNonCopyable {
     const int Index;
     const int FilterPrio = 10;
     const char *FilterType = "cgroup";

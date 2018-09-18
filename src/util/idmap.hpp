@@ -6,7 +6,7 @@
 #include "common.hpp"
 #include "log.hpp"
 
-class TIdMap : public TNonCopyable {
+class TIdMap : public TPortoNonCopyable {
 private:
     int Base;
     int Last = -1;

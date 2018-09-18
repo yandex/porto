@@ -14,15 +14,15 @@
 # define __has_feature(__x) 0
 #endif
 
-class TNonCopyable {
+class TPortoNonCopyable {
 protected:
-    TNonCopyable() = default;
-    ~TNonCopyable() = default;
+    TPortoNonCopyable() = default;
+    ~TPortoNonCopyable() = default;
 private:
-    TNonCopyable(TNonCopyable const&) = delete;
-    TNonCopyable& operator= (TNonCopyable const&) = delete;
-    TNonCopyable(TNonCopyable const&&) = delete;
-    TNonCopyable& operator= (TNonCopyable const&&) = delete;
+    TPortoNonCopyable(TPortoNonCopyable const&) = delete;
+    TPortoNonCopyable& operator= (TPortoNonCopyable const&) = delete;
+    TPortoNonCopyable(TPortoNonCopyable const&&) = delete;
+    TPortoNonCopyable& operator= (TPortoNonCopyable const&&) = delete;
 };
 
 enum class EAccessLevel {
