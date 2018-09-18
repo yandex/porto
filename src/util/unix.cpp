@@ -288,20 +288,6 @@ int GetNumCores() {
     return ncores;
 }
 
-void DumpMallocInfo() {
-    struct mallinfo mi = mallinfo();
-    L("Total non-mapped bytes (arena):\t{}", mi.arena);
-    L("# of free chunks (ordblks):\t{}", mi.ordblks);
-    L("# of free fastbin blocks (smblks):\t{}", mi.smblks);
-    L("# of mapped regions (hblks):\t{}",  mi.hblks);
-    L("Bytes in mapped regions (hblkhd):\t{}",  mi.hblkhd);
-    L("Max. total allocated space (usmblks):\t{}",  mi.usmblks);
-    L("Free bytes held in fastbins (fsmblks):\t{}",  mi.fsmblks);
-    L("Total allocated space (uordblks):\t{}",  mi.uordblks);
-    L("Total free space (fordblks):\t{}",  mi.fordblks);
-    L("Topmost releasable block (keepcost):\t{}",  mi.keepcost);
-}
-
 void TUnixSocket::Close() {
     if (SockFd >= 0)
         close(SockFd);

@@ -60,7 +60,6 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result);
 
 std::string FormatExitStatus(int status);
 int GetNumCores();
-void DumpMallocInfo();
 
 int SetIoPrio(pid_t pid, int ioprio);
 

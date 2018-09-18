@@ -5,6 +5,7 @@
 #include <google/protobuf/io/coded_stream.h>
 
 extern "C" {
+#include <errno.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>

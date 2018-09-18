@@ -435,7 +435,6 @@ static void PortodServer() {
                         OpenLog(PORTO_LOG);
                         break;
                     case SIGUSR2:
-                        DumpMallocInfo();
                         TContainer::DumpLocks();
                         break;
                     case SIGCHLD:
@@ -1174,7 +1173,6 @@ static void SpawnPortod(std::shared_ptr<TEpollLoop> loop) {
                 break;
             }
             case SIGUSR2:
-                DumpMallocInfo();
                 break;
             case SIGHUP:
                 UpgradeMaster();

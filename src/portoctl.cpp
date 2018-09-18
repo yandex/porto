@@ -817,7 +817,9 @@ static const map<string, int> sigMap = {
 #endif
     { "SIGSTKFLT",  SIGSTKFLT },
     { "SIGIO",      SIGIO },
+#ifdef SIGCLD
     { "SIGCLD",     SIGCLD },
+#endif
     { "SIGPWR",     SIGPWR },
 #ifdef SIGINFO
     { "SIGINFO",    SIGINFO },
