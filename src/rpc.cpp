@@ -164,6 +164,12 @@ void TRequest::Parse() {
         Cmd = "LinkVolume";
         Arg = Req.linkvolume().path();
         opts = { "container=" + Req.linkvolume().container() };
+        if (Req.linkvolume().target() != "")
+            opts.push_back("target=" + Req.linkvolume().target());
+        if (Req.linkvolume().read_only())
+            opts.push_back("read_only=true");
+        if (Req.linkvolume().required())
+            opts.push_back("Required=true");
     } else if (Req.has_linkvolumetarget()) {
         Cmd = "LinkVolume";
         Arg = Req.linkvolumetarget().path();
