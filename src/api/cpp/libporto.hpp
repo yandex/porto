@@ -35,8 +35,8 @@ private:
     EError LastError = EError::Success;
     std::string LastErrorMsg;
 
-    rpc::TContainerRequest Req;
-    rpc::TContainerResponse Rsp;
+    rpc::TPortoRequest Req;
+    rpc::TPortoResponse Rsp;
 
     std::vector<std::string> AsyncWaitNames;
     std::vector<std::string> AsyncWaitLabels;
@@ -47,9 +47,9 @@ private:
 
     EError SetSocketTimeout(int direction, int timeout);
 
-    EError Send(const rpc::TContainerRequest &req);
+    EError Send(const rpc::TPortoRequest &req);
 
-    EError Recv(rpc::TContainerResponse &rsp);
+    EError Recv(rpc::TPortoResponse &rsp);
 
     EError Call(int extra_timeout = -1);
 
@@ -84,8 +84,8 @@ public:
     std::string GetLastRequest() const { return Req.DebugString(); }
     std::string GetLastResponse() const { return Rsp.DebugString(); }
 
-    EError Call(const rpc::TContainerRequest &req,
-                rpc::TContainerResponse &rsp,
+    EError Call(const rpc::TPortoRequest &req,
+                rpc::TPortoResponse &rsp,
                 int extra_timeout = -1);
 
     EError Call(const std::string &req,

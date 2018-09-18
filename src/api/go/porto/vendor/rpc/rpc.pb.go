@@ -27,7 +27,7 @@ It has these top-level messages:
 	TContainerGetRequest
 	TContainerWaitRequest
 	TAttachProcessRequest
-	TContainerRequest
+	TPortoRequest
 	TContainerListResponse
 	TContainerGetPropertyResponse
 	TContainerGetDataResponse
@@ -37,7 +37,7 @@ It has these top-level messages:
 	TContainerGetResponse
 	TContainerWaitResponse
 	TConvertPathResponse
-	TContainerResponse
+	TPortoResponse
 	TVolumeProperty
 	TVolumePropertyDescription
 	TVolumeDescription
@@ -566,7 +566,7 @@ func (m *TAttachProcessRequest) GetComm() string {
 	return ""
 }
 
-type TContainerRequest struct {
+type TPortoRequest struct {
 	Create               *TContainerCreateRequest       `protobuf:"bytes,1,opt,name=create" json:"create,omitempty"`
 	Destroy              *TContainerDestroyRequest      `protobuf:"bytes,2,opt,name=destroy" json:"destroy,omitempty"`
 	List                 *TContainerListRequest         `protobuf:"bytes,3,opt,name=list" json:"list,omitempty"`
@@ -605,249 +605,249 @@ type TContainerRequest struct {
 	XXX_unrecognized     []byte                         `json:"-"`
 }
 
-func (m *TContainerRequest) Reset()         { *m = TContainerRequest{} }
-func (m *TContainerRequest) String() string { return proto.CompactTextString(m) }
-func (*TContainerRequest) ProtoMessage()    {}
+func (m *TPortoRequest) Reset()         { *m = TPortoRequest{} }
+func (m *TPortoRequest) String() string { return proto.CompactTextString(m) }
+func (*TPortoRequest) ProtoMessage()    {}
 
-func (m *TContainerRequest) GetCreate() *TContainerCreateRequest {
+func (m *TPortoRequest) GetCreate() *TContainerCreateRequest {
 	if m != nil {
 		return m.Create
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetDestroy() *TContainerDestroyRequest {
+func (m *TPortoRequest) GetDestroy() *TContainerDestroyRequest {
 	if m != nil {
 		return m.Destroy
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetList() *TContainerListRequest {
+func (m *TPortoRequest) GetList() *TContainerListRequest {
 	if m != nil {
 		return m.List
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetGetProperty() *TContainerGetPropertyRequest {
+func (m *TPortoRequest) GetGetProperty() *TContainerGetPropertyRequest {
 	if m != nil {
 		return m.GetProperty
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetSetProperty() *TContainerSetPropertyRequest {
+func (m *TPortoRequest) GetSetProperty() *TContainerSetPropertyRequest {
 	if m != nil {
 		return m.SetProperty
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetGetData() *TContainerGetDataRequest {
+func (m *TPortoRequest) GetGetData() *TContainerGetDataRequest {
 	if m != nil {
 		return m.GetData
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetStart() *TContainerStartRequest {
+func (m *TPortoRequest) GetStart() *TContainerStartRequest {
 	if m != nil {
 		return m.Start
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetStop() *TContainerStopRequest {
+func (m *TPortoRequest) GetStop() *TContainerStopRequest {
 	if m != nil {
 		return m.Stop
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetPause() *TContainerPauseRequest {
+func (m *TPortoRequest) GetPause() *TContainerPauseRequest {
 	if m != nil {
 		return m.Pause
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetResume() *TContainerResumeRequest {
+func (m *TPortoRequest) GetResume() *TContainerResumeRequest {
 	if m != nil {
 		return m.Resume
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetPropertyList() *TContainerPropertyListRequest {
+func (m *TPortoRequest) GetPropertyList() *TContainerPropertyListRequest {
 	if m != nil {
 		return m.PropertyList
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetDataList() *TContainerDataListRequest {
+func (m *TPortoRequest) GetDataList() *TContainerDataListRequest {
 	if m != nil {
 		return m.DataList
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetKill() *TContainerKillRequest {
+func (m *TPortoRequest) GetKill() *TContainerKillRequest {
 	if m != nil {
 		return m.Kill
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetVersion() *TVersionRequest {
+func (m *TPortoRequest) GetVersion() *TVersionRequest {
 	if m != nil {
 		return m.Version
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetGet() *TContainerGetRequest {
+func (m *TPortoRequest) GetGet() *TContainerGetRequest {
 	if m != nil {
 		return m.Get
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetWait() *TContainerWaitRequest {
+func (m *TPortoRequest) GetWait() *TContainerWaitRequest {
 	if m != nil {
 		return m.Wait
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetCreateWeak() *TContainerCreateRequest {
+func (m *TPortoRequest) GetCreateWeak() *TContainerCreateRequest {
 	if m != nil {
 		return m.CreateWeak
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetListVolumeProperties() *TVolumePropertyListRequest {
+func (m *TPortoRequest) GetListVolumeProperties() *TVolumePropertyListRequest {
 	if m != nil {
 		return m.ListVolumeProperties
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetCreateVolume() *TVolumeCreateRequest {
+func (m *TPortoRequest) GetCreateVolume() *TVolumeCreateRequest {
 	if m != nil {
 		return m.CreateVolume
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetLinkVolume() *TVolumeLinkRequest {
+func (m *TPortoRequest) GetLinkVolume() *TVolumeLinkRequest {
 	if m != nil {
 		return m.LinkVolume
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetUnlinkVolume() *TVolumeUnlinkRequest {
+func (m *TPortoRequest) GetUnlinkVolume() *TVolumeUnlinkRequest {
 	if m != nil {
 		return m.UnlinkVolume
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetListVolumes() *TVolumeListRequest {
+func (m *TPortoRequest) GetListVolumes() *TVolumeListRequest {
 	if m != nil {
 		return m.ListVolumes
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetTuneVolume() *TVolumeTuneRequest {
+func (m *TPortoRequest) GetTuneVolume() *TVolumeTuneRequest {
 	if m != nil {
 		return m.TuneVolume
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetImportLayer() *TLayerImportRequest {
+func (m *TPortoRequest) GetImportLayer() *TLayerImportRequest {
 	if m != nil {
 		return m.ImportLayer
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetRemoveLayer() *TLayerRemoveRequest {
+func (m *TPortoRequest) GetRemoveLayer() *TLayerRemoveRequest {
 	if m != nil {
 		return m.RemoveLayer
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetListLayers() *TLayerListRequest {
+func (m *TPortoRequest) GetListLayers() *TLayerListRequest {
 	if m != nil {
 		return m.ListLayers
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetExportLayer() *TLayerExportRequest {
+func (m *TPortoRequest) GetExportLayer() *TLayerExportRequest {
 	if m != nil {
 		return m.ExportLayer
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetGetlayerprivate() *TLayerGetPrivateRequest {
+func (m *TPortoRequest) GetGetlayerprivate() *TLayerGetPrivateRequest {
 	if m != nil {
 		return m.Getlayerprivate
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetSetlayerprivate() *TLayerSetPrivateRequest {
+func (m *TPortoRequest) GetSetlayerprivate() *TLayerSetPrivateRequest {
 	if m != nil {
 		return m.Setlayerprivate
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetListStorage() *TStorageListRequest {
+func (m *TPortoRequest) GetListStorage() *TStorageListRequest {
 	if m != nil {
 		return m.ListStorage
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetRemoveStorage() *TStorageRemoveRequest {
+func (m *TPortoRequest) GetRemoveStorage() *TStorageRemoveRequest {
 	if m != nil {
 		return m.RemoveStorage
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetImportStorage() *TStorageImportRequest {
+func (m *TPortoRequest) GetImportStorage() *TStorageImportRequest {
 	if m != nil {
 		return m.ImportStorage
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetExportStorage() *TStorageExportRequest {
+func (m *TPortoRequest) GetExportStorage() *TStorageExportRequest {
 	if m != nil {
 		return m.ExportStorage
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetConvertPath() *TConvertPathRequest {
+func (m *TPortoRequest) GetConvertPath() *TConvertPathRequest {
 	if m != nil {
 		return m.ConvertPath
 	}
 	return nil
 }
 
-func (m *TContainerRequest) GetAttachProcess() *TAttachProcessRequest {
+func (m *TPortoRequest) GetAttachProcess() *TAttachProcessRequest {
 	if m != nil {
 		return m.AttachProcess
 	}
@@ -1138,7 +1138,7 @@ func (m *TConvertPathResponse) GetPath() string {
 	return ""
 }
 
-type TContainerResponse struct {
+type TPortoResponse struct {
 	Error *EError `protobuf:"varint,1,req,name=error,enum=rpc.EError" json:"error,omitempty"`
 	// Optional error message
 	ErrorMsg           *string                         `protobuf:"bytes,2,opt,name=errorMsg" json:"errorMsg,omitempty"`
@@ -1160,123 +1160,123 @@ type TContainerResponse struct {
 	XXX_unrecognized   []byte                          `json:"-"`
 }
 
-func (m *TContainerResponse) Reset()         { *m = TContainerResponse{} }
-func (m *TContainerResponse) String() string { return proto.CompactTextString(m) }
-func (*TContainerResponse) ProtoMessage()    {}
+func (m *TPortoResponse) Reset()         { *m = TPortoResponse{} }
+func (m *TPortoResponse) String() string { return proto.CompactTextString(m) }
+func (*TPortoResponse) ProtoMessage()    {}
 
-func (m *TContainerResponse) GetError() EError {
+func (m *TPortoResponse) GetError() EError {
 	if m != nil && m.Error != nil {
 		return *m.Error
 	}
 	return EError_Success
 }
 
-func (m *TContainerResponse) GetErrorMsg() string {
+func (m *TPortoResponse) GetErrorMsg() string {
 	if m != nil && m.ErrorMsg != nil {
 		return *m.ErrorMsg
 	}
 	return ""
 }
 
-func (m *TContainerResponse) GetList() *TContainerListResponse {
+func (m *TPortoResponse) GetList() *TContainerListResponse {
 	if m != nil {
 		return m.List
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetGetProperty() *TContainerGetPropertyResponse {
+func (m *TPortoResponse) GetGetProperty() *TContainerGetPropertyResponse {
 	if m != nil {
 		return m.GetProperty
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetGetData() *TContainerGetDataResponse {
+func (m *TPortoResponse) GetGetData() *TContainerGetDataResponse {
 	if m != nil {
 		return m.GetData
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetPropertyList() *TContainerPropertyListResponse {
+func (m *TPortoResponse) GetPropertyList() *TContainerPropertyListResponse {
 	if m != nil {
 		return m.PropertyList
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetDataList() *TContainerDataListResponse {
+func (m *TPortoResponse) GetDataList() *TContainerDataListResponse {
 	if m != nil {
 		return m.DataList
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetVersion() *TVersionResponse {
+func (m *TPortoResponse) GetVersion() *TVersionResponse {
 	if m != nil {
 		return m.Version
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetVolumeList() *TVolumeListResponse {
+func (m *TPortoResponse) GetVolumeList() *TVolumeListResponse {
 	if m != nil {
 		return m.VolumeList
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetGet() *TContainerGetResponse {
+func (m *TPortoResponse) GetGet() *TContainerGetResponse {
 	if m != nil {
 		return m.Get
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetWait() *TContainerWaitResponse {
+func (m *TPortoResponse) GetWait() *TContainerWaitResponse {
 	if m != nil {
 		return m.Wait
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetVolumePropertyList() *TVolumePropertyListResponse {
+func (m *TPortoResponse) GetVolumePropertyList() *TVolumePropertyListResponse {
 	if m != nil {
 		return m.VolumePropertyList
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetVolume() *TVolumeDescription {
+func (m *TPortoResponse) GetVolume() *TVolumeDescription {
 	if m != nil {
 		return m.Volume
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetLayers() *TLayerListResponse {
+func (m *TPortoResponse) GetLayers() *TLayerListResponse {
 	if m != nil {
 		return m.Layers
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetConvertPath() *TConvertPathResponse {
+func (m *TPortoResponse) GetConvertPath() *TConvertPathResponse {
 	if m != nil {
 		return m.ConvertPath
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetLayerPrivate() *TLayerGetPrivateResponse {
+func (m *TPortoResponse) GetLayerPrivate() *TLayerGetPrivateResponse {
 	if m != nil {
 		return m.LayerPrivate
 	}
 	return nil
 }
 
-func (m *TContainerResponse) GetStorageList() *TStorageListResponse {
+func (m *TPortoResponse) GetStorageList() *TStorageListResponse {
 	if m != nil {
 		return m.StorageList
 	}

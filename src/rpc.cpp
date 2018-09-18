@@ -314,7 +314,7 @@ void TRequest::Parse() {
         Opt += " " + o;
 }
 
-static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
+static std::string ResponseAsString(const rpc::TPortoResponse &resp) {
     std::string ret;
 
     if (resp.error()) {
@@ -643,7 +643,7 @@ noinline TError RespawnContainer(const rpc::TContainerRespawnRequest &req) {
 }
 
 noinline TError ListContainers(const rpc::TContainerListRequest &req,
-                               rpc::TContainerResponse &rsp) {
+                               rpc::TPortoResponse &rsp) {
     std::string mask = req.has_mask() ? req.mask() : "***";
     auto out = rsp.mutable_list();
 
@@ -773,7 +773,7 @@ noinline TError IncLabel(const rpc::TIncLabelRequest &req, rpc::TIncLabelRespons
 }
 
 noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &req,
-                                     rpc::TContainerResponse &rsp) {
+                                     rpc::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
@@ -836,7 +836,7 @@ noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &re
 }
 
 noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
-                                 rpc::TContainerResponse &rsp) {
+                                 rpc::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
@@ -912,7 +912,7 @@ out:
 }
 
 noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
-                                     rpc::TContainerResponse &rsp) {
+                                     rpc::TPortoResponse &rsp) {
     auto get = rsp.mutable_get();
     std::list <std::string> masks, names;
 
@@ -951,7 +951,7 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
     return OK;
 }
 
-noinline TError ListProperty(rpc::TContainerResponse &rsp) {
+noinline TError ListProperty(rpc::TPortoResponse &rsp) {
     auto list = rsp.mutable_propertylist();
     for (auto &elem : ContainerProperties) {
         auto &prop = elem.second;
@@ -966,7 +966,7 @@ noinline TError ListProperty(rpc::TContainerResponse &rsp) {
     return OK;
 }
 
-noinline TError ListDataProperty(rpc::TContainerResponse &rsp) {
+noinline TError ListDataProperty(rpc::TPortoResponse &rsp) {
     auto list = rsp.mutable_datalist();
     for (auto &elem : ContainerProperties) {
         auto &prop = elem.second;
@@ -993,7 +993,7 @@ noinline TError Kill(const rpc::TContainerKillRequest &req) {
     return error;
 }
 
-noinline TError Version(rpc::TContainerResponse &rsp) {
+noinline TError Version(rpc::TPortoResponse &rsp) {
     auto ver = rsp.mutable_version();
 
     ver->set_tag(PORTO_VERSION);
@@ -1003,7 +1003,7 @@ noinline TError Version(rpc::TContainerResponse &rsp) {
 }
 
 noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async,
-        rpc::TContainerResponse &rsp, std::shared_ptr<TClient> &client) {
+        rpc::TPortoResponse &rsp, std::shared_ptr<TClient> &client) {
     std::string name, full_name;
     TError error;
 
@@ -1102,7 +1102,7 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
 }
 
 noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
-                            rpc::TContainerResponse &rsp) {
+                            rpc::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> src, dst;
     TError error;
 
@@ -1132,7 +1132,7 @@ noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
     return OK;
 }
 
-noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
+noinline TError ListVolumeProperties(rpc::TPortoResponse &rsp) {
     auto list = rsp.mutable_volumepropertylist();
     for (auto &prop: VolumeProperties) {
         auto p = list->add_properties();
@@ -1144,7 +1144,7 @@ noinline TError ListVolumeProperties(rpc::TContainerResponse &rsp) {
 }
 
 noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
-                             rpc::TContainerResponse &rsp) {
+                             rpc::TPortoResponse &rsp) {
     std::shared_ptr<TVolume> volume;
     rpc::TVolumeSpec spec;
     TStringMap cfg;
@@ -1238,7 +1238,7 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
 }
 
 noinline TError ListVolumes(const rpc::TVolumeListRequest &req,
-                            rpc::TContainerResponse &rsp) {
+                            rpc::TPortoResponse &rsp) {
     TError error;
 
     if (req.has_path() && !req.path().empty()) {
@@ -1384,7 +1384,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
 }
 
 noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,
-                                rpc::TContainerResponse &rsp) {
+                                rpc::TPortoResponse &rsp) {
     TStorage layer;
     TError error;
 
@@ -1456,7 +1456,7 @@ noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
 }
 
 noinline TError ListLayers(const rpc::TLayerListRequest &req,
-                           rpc::TContainerResponse &rsp) {
+                           rpc::TPortoResponse &rsp) {
     TStorage place;
     TError error;
 
@@ -1561,7 +1561,7 @@ undo:
 }
 
 noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
-                              rpc::TContainerResponse &rsp) {
+                              rpc::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     pid_t pid = req.pid();
     std::string name;
@@ -1588,7 +1588,7 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
 }
 
 noinline TError ListStorage(const rpc::TStorageListRequest &req,
-                            rpc::TContainerResponse &rsp) {
+                            rpc::TPortoResponse &rsp) {
     TStorage place;
     TError error;
 
@@ -1862,7 +1862,7 @@ TError TRequest::Check() {
 }
 
 void TRequest::Handle() {
-    rpc::TContainerResponse rsp;
+    rpc::TPortoResponse rsp;
     TError error;
 
     Client->StartRequest();

@@ -1,7 +1,7 @@
 syntax = "proto2";
 
 // Portod daemon listens on /run/portod.socket unix socket.
-// Protocol: Varint length, TContainerRequest req | TContainerResponse rsp.
+// Protocol: Varint length, TPortoRequest req | TPortoResponse rsp.
 
 package Porto.rpc;
 
@@ -117,7 +117,7 @@ enum EError {
 }
 
 
-message TContainerRequest {
+message TPortoRequest {
     optional TContainerCreateRequest create = 1;
     optional TContainerDestroyRequest destroy = 2;
     optional TContainerListRequest list = 3;
@@ -194,7 +194,7 @@ message TContainerRequest {
 }
 
 
-message TContainerResponse {
+message TPortoResponse {
     // Actually always set, hack for adding new error codes
     optional EError error = 1 [ default = LostError ];
 

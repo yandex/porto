@@ -3549,7 +3549,7 @@ static void TestSigPipe(Porto::Connection &api) {
     int fd;
     ExpectOk(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
 
-    rpc::TContainerRequest req;
+    rpc::TPortoRequest req;
     req.mutable_list();
 
     google::protobuf::io::FileOutputStream post(fd);
@@ -4057,7 +4057,7 @@ static void TestBadClient(Porto::Connection &api) {
     alarm(sec);
     size_t nr = 1000000;
     while (nr--) {
-        rpc::TContainerRequest req;
+        rpc::TPortoRequest req;
         req.mutable_propertylist();
         api.Send(req);
 

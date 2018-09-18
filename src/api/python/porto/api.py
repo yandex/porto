@@ -119,7 +119,7 @@ class _RPC(object):
         return msg
 
     def _recv_response(self):
-        rsp = rpc_pb2.TContainerResponse()
+        rsp = rpc_pb2.TPortoResponse()
         while True:
             length = shift = 0
             while True:
@@ -225,7 +225,7 @@ class _RPC(object):
         if not self.async_wait_names:
             return
 
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.AsyncWait.name.extend(self.async_wait_names)
         if self.async_wait_timeout is not None:
             request.AsyncWait.timeout_ms = int(self.async_wait_timeout * 1000)
@@ -241,7 +241,7 @@ class _RPC(object):
             self.async_wait_callback = callback
             self.async_wait_timeout = timeout
 
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.AsyncWait.name.extend(names)
         if timeout is not None:
             request.AsyncWait.timeout_ms = int(timeout * 1000)
@@ -633,7 +633,7 @@ class Connection(object):
         self.rpc.disconnect()
 
     def Call(self, command_name, response_name=None, **kwargs):
-        req = rpc_pb2.TContainerRequest()
+        req = rpc_pb2.TPortoRequest()
         cmd = getattr(req, command_name)
         cmd.SetInParent()
         _encode_message(cmd, kwargs)
@@ -643,7 +643,7 @@ class Connection(object):
         return None
 
     def List(self, mask=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
         if mask is not None:
             request.list.mask = mask
@@ -653,7 +653,7 @@ class Connection(object):
         return [Container(self, name) for name in self.List(mask)]
 
     def FindLabel(self, label, mask=None, state=None, value=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.FindLabel.label = label
         if mask is not None:
             request.FindLabel.mask = mask
@@ -669,7 +669,7 @@ class Connection(object):
         return Container(self, name)
 
     def Create(self, name, weak=False):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         if weak:
             request.createWeak.name = name
         else:
@@ -707,17 +707,17 @@ class Connection(object):
     def Destroy(self, container):
         if isinstance(container, Container):
             container = container.name
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.destroy.name = container
         self.rpc.call(request)
 
     def Start(self, name, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.start.name = name
         self.rpc.call(request, timeout)
 
     def Stop(self, name, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.stop.name = name
         if timeout is not None and timeout >= 0:
             request.stop.timeout_ms = timeout * 1000
@@ -726,23 +726,23 @@ class Connection(object):
         self.rpc.call(request, timeout)
 
     def Kill(self, name, sig):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.kill.name = name
         request.kill.sig = sig
         self.rpc.call(request)
 
     def Pause(self, name):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.pause.name = name
         self.rpc.call(request)
 
     def Resume(self, name):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.resume.name = name
         self.rpc.call(request)
 
     def Get(self, containers, variables, nonblock=False, sync=False):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.get.name.extend(containers)
         request.get.variable.extend(variables)
         request.get.sync = sync
@@ -767,7 +767,7 @@ class Connection(object):
         return res
 
     def GetProperty(self, name, key, sync=False):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.getProperty.name = name
         request.getProperty.property = key
         request.getProperty.sync = sync
@@ -788,7 +788,7 @@ class Connection(object):
         else:
             value = str(value)
 
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.setProperty.name = name
         request.setProperty.property = key
         request.setProperty.value = value
@@ -799,7 +799,7 @@ class Connection(object):
             self.SetProperty(container, name, value)
 
     def GetData(self, name, data, sync=False):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.getData.name = name
         request.getData.data = data
         request.getData.sync = sync
@@ -811,7 +811,7 @@ class Connection(object):
         return res
 
     def ContainerProperties(self):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
         res = {}
         for prop in self.rpc.call(request).propertyList.list:
@@ -819,7 +819,7 @@ class Connection(object):
         return res
 
     def VolumeProperties(self):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.listVolumeProperties.CopyFrom(rpc_pb2.TVolumePropertyListRequest())
         res = {}
         for prop in self.rpc.call(request).volumePropertyList.properties:
@@ -827,24 +827,24 @@ class Connection(object):
         return res
 
     def Plist(self):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
         return [item.name for item in self.rpc.call(request).propertyList.list]
 
     # deprecated - now they properties
     def Dlist(self):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.dataList.CopyFrom(rpc_pb2.TContainerDataListRequest())
         return [item.name for item in self.rpc.call(request).dataList.list]
 
     def Vlist(self):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.listVolumeProperties.CopyFrom(rpc_pb2.TVolumePropertyListRequest())
         result = self.rpc.call(request).volumePropertyList.properties
         return [prop.name for prop in result]
 
     def WaitContainers(self, containers, timeout=None, labels=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         for ct in containers:
             request.wait.name.append(str(ct))
         if timeout is not None and timeout >= 0:
@@ -873,7 +873,7 @@ class Connection(object):
         self.rpc.async_wait([str(ct) for ct in containers], labels, callback, timeout)
 
     def WaitLabels(self, containers, labels, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         for ct in containers:
             request.wait.name.append(str(ct))
         if timeout is not None and timeout >= 0:
@@ -894,7 +894,7 @@ class Connection(object):
         return self.GetProperty(container, label)
 
     def SetLabel(self, container, label, value, prev_value=None, state=None):
-        req = rpc_pb2.TContainerRequest()
+        req = rpc_pb2.TPortoRequest()
         req.SetLabel.name = str(container)
         req.SetLabel.label = label
         req.SetLabel.value = value
@@ -905,7 +905,7 @@ class Connection(object):
         self.rpc.call(req)
 
     def IncLabel(self, container, label, add=1):
-        req = rpc_pb2.TContainerRequest()
+        req = rpc_pb2.TPortoRequest()
         req.IncLabel.name = str(container)
         req.IncLabel.label = label
         req.IncLabel.add = add
@@ -922,7 +922,7 @@ class Connection(object):
         if private_value is not None:
             properties['private'] = private_value
 
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.createVolume.CopyFrom(rpc_pb2.TVolumeCreateRequest())
         if path:
             request.createVolume.path = path
@@ -937,14 +937,14 @@ class Connection(object):
         return Volume(self, path, pb)
 
     def NewVolume(self, spec, timeout=None):
-        req = rpc_pb2.TContainerRequest()
+        req = rpc_pb2.TPortoRequest()
         req.NewVolume.SetInParent()
         _encode_message(req.NewVolume.volume, spec)
         rsp = self.rpc.call(req, timeout or self.disk_timeout)
         return _decode_message(rsp.NewVolume.volume)
 
     def GetVolume(self, path, container=None, timeout=None):
-        req = rpc_pb2.TContainerRequest()
+        req = rpc_pb2.TPortoRequest()
         req.GetVolume.SetInParent()
         if container is not None:
             req.GetVolume.container = str(container)
@@ -953,7 +953,7 @@ class Connection(object):
         return _decode_message(rsp.GetVolume.volume[0])
 
     def GetVolumes(self, paths=None, container=None, timeout=None):
-        req = rpc_pb2.TContainerRequest()
+        req = rpc_pb2.TPortoRequest()
         req.GetVolume.SetInParent()
         if container is not None:
             req.GetVolume.container = str(container)
@@ -963,7 +963,7 @@ class Connection(object):
         return [_decode_message(v) for v in rsp.GetVolume.volume]
 
     def LinkVolume(self, path, container, target=None, read_only=False, required=False):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         if target is not None or required:
             command = request.LinkVolumeTarget
         else:
@@ -979,7 +979,7 @@ class Connection(object):
         self.rpc.call(request)
 
     def UnlinkVolume(self, path, container=None, target=None, strict=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         if target is not None:
             command = request.UnlinkVolumeTarget
         else:
@@ -999,7 +999,7 @@ class Connection(object):
     def _ListVolumes(self, path=None, container=None):
         if isinstance(container, Container):
             container = container.name
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.listVolumes.CopyFrom(rpc_pb2.TVolumeListRequest())
         if path:
             request.listVolumes.path = path
@@ -1021,7 +1021,7 @@ class Connection(object):
         return {p.name: p.value for p in self._ListVolumes(path=path)[0].properties}
 
     def TuneVolume(self, path, **properties):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.tuneVolume.CopyFrom(rpc_pb2.TVolumeTuneRequest())
         request.tuneVolume.path = path
         for name, value in properties.items():
@@ -1030,7 +1030,7 @@ class Connection(object):
         self.rpc.call(request)
 
     def ImportLayer(self, layer, tarball, place=None, private_value=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
         request.importLayer.merge = False
@@ -1043,7 +1043,7 @@ class Connection(object):
         return Layer(self, layer, place)
 
     def MergeLayer(self, layer, tarball, place=None, private_value=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
         request.importLayer.merge = True
@@ -1055,21 +1055,21 @@ class Connection(object):
         return Layer(self, layer, place)
 
     def RemoveLayer(self, layer, place=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.removeLayer.layer = layer
         if place is not None:
             request.removeLayer.place = place
         self.rpc.call(request, timeout or self.disk_timeout)
 
     def GetLayerPrivate(self, layer, place=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.getlayerprivate.layer = layer
         if place is not None:
             request.getlayerprivate.place = place
         return self.rpc.call(request).layer_private.private_value
 
     def SetLayerPrivate(self, layer, private_value, place=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.setlayerprivate.layer = layer
         request.setlayerprivate.private_value = private_value
 
@@ -1078,7 +1078,7 @@ class Connection(object):
         self.rpc.call(request)
 
     def ExportLayer(self, volume, tarball, place=None, compress=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.exportLayer.volume = volume
         request.exportLayer.tarball = tarball
         if place is not None:
@@ -1088,7 +1088,7 @@ class Connection(object):
         self.rpc.call(request, timeout or self.disk_timeout)
 
     def ReExportLayer(self, layer, tarball, place=None, compress=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.exportLayer.volume = ""
         request.exportLayer.layer = layer
         request.exportLayer.tarball = tarball
@@ -1099,7 +1099,7 @@ class Connection(object):
         self.rpc.call(request, timeout or self.disk_timeout)
 
     def _ListLayers(self, place=None, mask=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
         if place is not None:
             request.listLayers.place = place
@@ -1122,7 +1122,7 @@ class Connection(object):
         return Layer(self, layer, place)
 
     def _ListStorages(self, place=None, mask=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.listStorage.CopyFrom(rpc_pb2.TStorageListRequest())
         if place is not None:
             request.listStorage.place = place
@@ -1153,14 +1153,14 @@ class Connection(object):
         return MetaStorage(self, name, place, response.meta_storages[0])
 
     def RemoveStorage(self, name, place=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.removeStorage.name = name
         if place is not None:
             request.removeStorage.place = place
         self.rpc.call(request, timeout or self.disk_timeout)
 
     def ImportStorage(self, name, tarball, place=None, private_value=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.importStorage.name = name
         request.importStorage.tarball = tarball
         if place is not None:
@@ -1171,7 +1171,7 @@ class Connection(object):
         return Storage(self, name, place)
 
     def ExportStorage(self, name, tarball, place=None, timeout=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.exportStorage.name = name
         request.exportStorage.tarball = tarball
         if place is not None:
@@ -1179,7 +1179,7 @@ class Connection(object):
         self.rpc.call(request, timeout or self.disk_timeout)
 
     def CreateMetaStorage(self, name, place=None, private_value=None, space_limit=None, inode_limit=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.CreateMetaStorage.name = name
         if place is not None:
             request.CreateMetaStorage.place = place
@@ -1193,7 +1193,7 @@ class Connection(object):
         return MetaStorage(self, name, place)
 
     def ResizeMetaStorage(self, name, place=None, private_value=None, space_limit=None, inode_limit=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.ResizeMetaStorage.name = name
         if place is not None:
             request.ResizeMetaStorage.place = place
@@ -1206,49 +1206,49 @@ class Connection(object):
         self.rpc.call(request)
 
     def RemoveMetaStorage(self, name, place=None):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.RemoveMetaStorage.name = name
         if place is not None:
             request.RemoveMetaStorage.place = place
         self.rpc.call(request)
 
     def ConvertPath(self, path, source, destination):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.convertPath.path = path
         request.convertPath.source = source
         request.convertPath.destination = destination
         return self.rpc.call(request).convertPath.path
 
     def SetSymlink(self, name, symlink, target):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.SetSymlink.container = name
         request.SetSymlink.symlink = symlink
         request.SetSymlink.target = target
         self.rpc.call(request)
 
     def AttachProcess(self, name, pid, comm=""):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.attachProcess.name = name
         request.attachProcess.pid = pid
         request.attachProcess.comm = comm
         self.rpc.call(request)
 
     def AttachThread(self, name, pid, comm=""):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.AttachThread.name = name
         request.AttachThread.pid = pid
         request.AttachThread.comm = comm
         self.rpc.call(request)
 
     def LocateProcess(self, pid, comm=""):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.locateProcess.pid = pid
         request.locateProcess.comm = comm
         name = self.rpc.call(request).locateProcess.name
         return Container(self, name)
 
     def Version(self):
-        request = rpc_pb2.TContainerRequest()
+        request = rpc_pb2.TPortoRequest()
         request.version.CopyFrom(rpc_pb2.TVersionRequest())
         response = self.rpc.call(request)
         return (response.version.tag, response.version.revision)

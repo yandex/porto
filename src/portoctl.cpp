@@ -1483,8 +1483,8 @@ public:
         if (label != "" ) {
             auto sep = label.find('=');
 
-            rpc::TContainerRequest req;
-            rpc::TContainerResponse rsp;
+            rpc::TPortoRequest req;
+            rpc::TPortoResponse rsp;
             auto cmd = req.mutable_findlabel();
 
             if (sep == std::string::npos) {
@@ -2083,8 +2083,8 @@ public:
         } else if (meta) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
-            rpc::TContainerRequest req;
-            rpc::TContainerResponse rsp;
+            rpc::TPortoRequest req;
+            rpc::TPortoResponse rsp;
             rpc::TMetaStorage *s;
 
             if (remove)

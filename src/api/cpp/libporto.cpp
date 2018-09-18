@@ -109,7 +109,7 @@ EError Connection::SetDiskTimeout(int timeout) {
     return EError::Success;
 }
 
-EError Connection::Send(const rpc::TContainerRequest &req) {
+EError Connection::Send(const rpc::TPortoRequest &req) {
     google::protobuf::io::FileOutputStream raw(Fd);
 
     if (!req.IsInitialized()) {
@@ -134,7 +134,7 @@ EError Connection::Send(const rpc::TContainerRequest &req) {
     return EError::Success;
 }
 
-EError Connection::Recv(rpc::TContainerResponse &rsp) {
+EError Connection::Recv(rpc::TPortoResponse &rsp) {
     google::protobuf::io::FileInputStream raw(Fd);
     google::protobuf::io::CodedInputStream input(&raw);
 
@@ -163,8 +163,8 @@ EError Connection::Recv(rpc::TContainerResponse &rsp) {
     }
 }
 
-EError Connection::Call(const rpc::TContainerRequest &req,
-                        rpc::TContainerResponse &rsp,
+EError Connection::Call(const rpc::TPortoRequest &req,
+                        rpc::TPortoResponse &rsp,
                         int extra_timeout) {
     EError err = EError::Success;
 
@@ -299,8 +299,8 @@ const rpc::TContainerPropertyListResponse *Connection::ListProperties() {
     }
 
     if (!has_data) {
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
+        rpc::TPortoRequest req;
+        rpc::TPortoResponse rsp;
 
         req.mutable_datalist();
         if (!Call(req, rsp)) {

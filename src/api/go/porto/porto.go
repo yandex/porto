@@ -207,7 +207,7 @@ func (conn *portoConnection) GetLastErrorMessage() string {
 }
 
 func (conn *portoConnection) GetVersion() (string, string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Version: new(rpc.TVersionRequest),
 	}
 	resp, err := conn.performRequest(req)
@@ -218,7 +218,7 @@ func (conn *portoConnection) GetVersion() (string, string, error) {
 	return resp.GetVersion().GetTag(), resp.GetVersion().GetRevision(), nil
 }
 
-func (conn *portoConnection) performRequest(req *rpc.TContainerRequest) (*rpc.TContainerResponse, error) {
+func (conn *portoConnection) performRequest(req *rpc.TPortoRequest) (*rpc.TPortoResponse, error) {
 	conn.err = 0
 	conn.msg = ""
 
@@ -237,7 +237,7 @@ func (conn *portoConnection) performRequest(req *rpc.TContainerRequest) (*rpc.TC
 		return nil, err
 	}
 
-	resp := new(rpc.TContainerResponse)
+	resp := new(rpc.TPortoResponse)
 
 	err = proto.Unmarshal(data, resp)
 	if err != nil {
@@ -260,7 +260,7 @@ func (conn *portoConnection) performRequest(req *rpc.TContainerRequest) (*rpc.TC
 
 // ContainerAPI
 func (conn *portoConnection) Create(name string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Create: &rpc.TContainerCreateRequest{
 			Name: &name,
 		},
@@ -270,7 +270,7 @@ func (conn *portoConnection) Create(name string) error {
 }
 
 func (conn *portoConnection) CreateWeak(name string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		CreateWeak: &rpc.TContainerCreateRequest{
 			Name: &name,
 		},
@@ -280,7 +280,7 @@ func (conn *portoConnection) CreateWeak(name string) error {
 }
 
 func (conn *portoConnection) Destroy(name string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Destroy: &rpc.TContainerDestroyRequest{
 			Name: &name,
 		},
@@ -290,7 +290,7 @@ func (conn *portoConnection) Destroy(name string) error {
 }
 
 func (conn *portoConnection) Start(name string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Start: &rpc.TContainerStartRequest{
 			Name: &name,
 		},
@@ -304,7 +304,7 @@ func (conn *portoConnection) Stop(name string) error {
 }
 
 func (conn *portoConnection) Stop2(name string, timeout time.Duration) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Stop: &rpc.TContainerStopRequest{
 			Name: &name,
 		},
@@ -325,7 +325,7 @@ func (conn *portoConnection) Stop2(name string, timeout time.Duration) error {
 
 func (conn *portoConnection) Kill(name string, sig syscall.Signal) error {
 	signum := int32(sig)
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Kill: &rpc.TContainerKillRequest{
 			Name: &name,
 			Sig:  &signum,
@@ -336,7 +336,7 @@ func (conn *portoConnection) Kill(name string, sig syscall.Signal) error {
 }
 
 func (conn *portoConnection) Pause(name string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Pause: &rpc.TContainerPauseRequest{
 			Name: &name,
 		},
@@ -347,7 +347,7 @@ func (conn *portoConnection) Pause(name string) error {
 }
 
 func (conn *portoConnection) Resume(name string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Resume: &rpc.TContainerResumeRequest{
 			Name: &name,
 		},
@@ -357,7 +357,7 @@ func (conn *portoConnection) Resume(name string) error {
 }
 
 func (conn *portoConnection) Wait(containers []string, timeout time.Duration) (string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Wait: &rpc.TContainerWaitRequest{
 			Name: containers,
 		},
@@ -385,7 +385,7 @@ func (conn *portoConnection) List() ([]string, error) {
 }
 
 func (conn *portoConnection) List1(mask string) ([]string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		List: &rpc.TContainerListRequest{},
 	}
 
@@ -402,7 +402,7 @@ func (conn *portoConnection) List1(mask string) ([]string, error) {
 }
 
 func (conn *portoConnection) Plist() (ret []TProperty, err error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		PropertyList: new(rpc.TContainerPropertyListRequest),
 	}
 	resp, err := conn.performRequest(req)
@@ -417,7 +417,7 @@ func (conn *portoConnection) Plist() (ret []TProperty, err error) {
 }
 
 func (conn *portoConnection) Dlist() (ret []TData, err error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		DataList: new(rpc.TContainerDataListRequest),
 	}
 	resp, err := conn.performRequest(req)
@@ -442,7 +442,7 @@ func (conn *portoConnection) Get(containers []string, variables []string) (ret m
 
 func (conn *portoConnection) Get3(containers []string, variables []string, nonblock bool) (ret map[string]map[string]TPortoGetResponse, err error) {
 	ret = make(map[string]map[string]TPortoGetResponse)
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Get: &rpc.TContainerGetRequest{
 			Name:     containers,
 			Variable: variables,
@@ -474,7 +474,7 @@ func (conn *portoConnection) Get3(containers []string, variables []string, nonbl
 }
 
 func (conn *portoConnection) GetProperty(name string, property string) (string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		GetProperty: &rpc.TContainerGetPropertyRequest{
 			Name:     &name,
 			Property: &property,
@@ -490,7 +490,7 @@ func (conn *portoConnection) GetProperty(name string, property string) (string, 
 }
 
 func (conn *portoConnection) SetProperty(name string, property string, value string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		SetProperty: &rpc.TContainerSetPropertyRequest{
 			Name:     &name,
 			Property: &property,
@@ -502,7 +502,7 @@ func (conn *portoConnection) SetProperty(name string, property string, value str
 }
 
 func (conn *portoConnection) GetData(name string, data string) (string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		GetData: &rpc.TContainerGetDataRequest{
 			Name: &name,
 			Data: &data,
@@ -519,7 +519,7 @@ func (conn *portoConnection) GetData(name string, data string) (string, error) {
 
 // VolumeAPI
 func (conn *portoConnection) ListVolumeProperties() (ret []TProperty, err error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ListVolumeProperties: &rpc.TVolumePropertyListRequest{},
 	}
 
@@ -550,7 +550,7 @@ func (conn *portoConnection) CreateVolume(path string, config map[string]string)
 		properties = append(properties, prop)
 	}
 
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		CreateVolume: &rpc.TVolumeCreateRequest{
 			Properties: properties,
 		},
@@ -586,7 +586,7 @@ func (conn *portoConnection) TuneVolume(path string, config map[string]string) e
 		prop := &rpc.TVolumeProperty{Name: &name, Value: &value}
 		properties = append(properties, prop)
 	}
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		TuneVolume: &rpc.TVolumeTuneRequest{
 			Path:       &path,
 			Properties: properties,
@@ -597,7 +597,7 @@ func (conn *portoConnection) TuneVolume(path string, config map[string]string) e
 }
 
 func (conn *portoConnection) LinkVolume(path string, container string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		LinkVolume: &rpc.TVolumeLinkRequest{
 			Path:      &path,
 			Container: &container,
@@ -612,7 +612,7 @@ func (conn *portoConnection) UnlinkVolume(path string, container string) error {
 }
 
 func (conn *portoConnection) UnlinkVolume3(path string, container string, strict bool) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		UnlinkVolume: &rpc.TVolumeUnlinkRequest{
 			Path:      &path,
 			Container: &container,
@@ -627,7 +627,7 @@ func (conn *portoConnection) UnlinkVolume3(path string, container string, strict
 }
 
 func (conn *portoConnection) ListVolumes(path string, container string) (ret []TVolumeDescription, err error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ListVolumes: &rpc.TVolumeListRequest{
 			Path:      &path,
 			Container: &container,
@@ -669,7 +669,7 @@ func (conn *portoConnection) ImportLayer(layer string, tarball string, merge boo
 
 func (conn *portoConnection) ImportLayer4(layer string, tarball string, merge bool,
 										 place string, privateValue string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ImportLayer: &rpc.TLayerImportRequest{
 			Layer:        &layer,
 			Tarball:      &tarball,
@@ -687,7 +687,7 @@ func (conn *portoConnection) ImportLayer4(layer string, tarball string, merge bo
 }
 
 func (conn *portoConnection) ExportLayer(volume string, tarball string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ExportLayer: &rpc.TLayerExportRequest{
 			Volume:  &volume,
 			Tarball: &tarball,
@@ -702,7 +702,7 @@ func (conn *portoConnection) RemoveLayer(layer string) error {
 }
 
 func (conn *portoConnection) RemoveLayer2(layer string, place string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		RemoveLayer: &rpc.TLayerRemoveRequest{
 			Layer: &layer,
 		},
@@ -717,7 +717,7 @@ func (conn *portoConnection) RemoveLayer2(layer string, place string) error {
 }
 
 func (conn *portoConnection) ListLayers() ([]string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ListLayers: &rpc.TLayerListRequest{},
 	}
 
@@ -730,7 +730,7 @@ func (conn *portoConnection) ListLayers() ([]string, error) {
 }
 
 func (conn *portoConnection) ListLayers2(place string, mask string) (ret []TLayerDescription, err error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ListLayers: &rpc.TLayerListRequest{},
 	}
 
@@ -763,7 +763,7 @@ func (conn *portoConnection) ListLayers2(place string, mask string) (ret []TLaye
 }
 
 func (conn *portoConnection) GetLayerPrivate(layer string, place string) (string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Getlayerprivate: &rpc.TLayerGetPrivateRequest{
 			Layer: &layer,
 		},
@@ -783,7 +783,7 @@ func (conn *portoConnection) GetLayerPrivate(layer string, place string) (string
 
 func (conn *portoConnection) SetLayerPrivate(layer string, place string,
 											 privateValue string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		Setlayerprivate: &rpc.TLayerSetPrivateRequest{
 			Layer:        &layer,
 			PrivateValue: &privateValue,
@@ -799,7 +799,7 @@ func (conn *portoConnection) SetLayerPrivate(layer string, place string,
 }
 
 func (conn *portoConnection) ListStorage(place string, mask string) (ret []TStorageDescription, err error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ListStorage: &rpc.TStorageListRequest{},
 	}
 
@@ -832,7 +832,7 @@ func (conn *portoConnection) ListStorage(place string, mask string) (ret []TStor
 }
 
 func (conn *portoConnection) RemoveStorage(name string, place string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		RemoveStorage: &rpc.TStorageRemoveRequest{
 			Name:  &name,
 		},
@@ -847,7 +847,7 @@ func (conn *portoConnection) RemoveStorage(name string, place string) error {
 }
 
 func (conn *portoConnection) ConvertPath(path string, src string, dest string) (string, error) {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		ConvertPath: &rpc.TConvertPathRequest{
 			Path:        &path,
 			Source:      &src,
@@ -864,7 +864,7 @@ func (conn *portoConnection) ConvertPath(path string, src string, dest string) (
 }
 
 func (conn *portoConnection) AttachProcess(name string, pid uint32, comm string) error {
-	req := &rpc.TContainerRequest{
+	req := &rpc.TPortoRequest{
 		AttachProcess: &rpc.TAttachProcessRequest{
 			Name: &name,
 			Pid:  &pid,
