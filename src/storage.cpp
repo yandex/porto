@@ -42,7 +42,7 @@ static std::condition_variable StorageCv;
 static TUintMap PlaceLoad;
 static TUintMap PlaceLoadLimit;
 
-TError TStorage::Resolve(EStorageType type, const TPath &place, const std::string &name) {
+TError TStorage::Resolve(EStorageType type, const TPath &place, const TString &name) {
     TError error;
 
     Place = place;
@@ -54,7 +54,7 @@ TError TStorage::Resolve(EStorageType type, const TPath &place, const std::strin
     return OK;
 }
 
-void TStorage::Open(EStorageType type, const TPath &place, const std::string &name) {
+void TStorage::Open(EStorageType type, const TPath &place, const TString &name) {
     PORTO_ASSERT(place.IsAbsolute());
 
     Type = type;
@@ -63,7 +63,7 @@ void TStorage::Open(EStorageType type, const TPath &place, const std::string &na
     Place = place;
 
     auto sep = name.find('/');
-    if (sep != std::string::npos) {
+    if (sep != TString::npos) {
         Meta = name.substr(0, sep);
         FirstName = name.substr(sep + 1);
     }
@@ -73,13 +73,13 @@ void TStorage::Open(EStorageType type, const TPath &place, const std::string &na
         Path = Place;
         break;
     case EStorageType::Layer:
-        if (sep == std::string::npos)
+        if (sep == TString::npos)
             Path = Place / PORTO_LAYERS / Name;
         else
             Path = place / PORTO_STORAGE / fmt::format("{}{}/{}{}", META_PREFIX, Meta, META_LAYER, name.substr(sep + 1));
         break;
     case EStorageType::Storage:
-        if (sep == std::string::npos)
+        if (sep == TString::npos)
             Path = Place / PORTO_STORAGE / Name;
         else
             Path = place / PORTO_STORAGE / fmt::format("{}{}/{}", META_PREFIX, Meta, name.substr(sep + 1));
@@ -165,7 +165,7 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
             return error;
     }
 
-    std::vector<std::string> list;
+    std::vector<TString> list;
     error = base.ReadDirectory(list);
     if (error)
         return error;
@@ -199,9 +199,9 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
 
         } else if (path.IsRegularStrict()) {
             if (type != EStorageType::Volume && StringStartsWith(name, PRIVATE_PREFIX)) {
-                std::string tail = name.substr(std::string(PRIVATE_PREFIX).size());
+                TString tail = name.substr(TString(PRIVATE_PREFIX).size());
                 if ((base / tail).IsDirectoryStrict() ||
-                        (base / (std::string(IMPORT_PREFIX) + tail)).IsDirectoryStrict())
+                        (base / (TString(IMPORT_PREFIX) + tail)).IsDirectoryStrict())
                     continue;
             }
 
@@ -251,16 +251,16 @@ TError TStorage::CheckPlace(const TPath &place) {
     return OK;
 }
 
-TError TStorage::CheckName(const std::string &name, bool meta) {
+TError TStorage::CheckName(const TString &name, bool meta) {
     auto sep = name.find('/');
-    if (!meta && sep != std::string::npos) {
+    if (!meta && sep != TString::npos) {
         TError error = CheckName(name.substr(0, sep), true);
         if (error)
             return error;
         return CheckName(name.substr(sep + 1), true);
     }
     auto pos = name.find_first_not_of(PORTO_NAME_CHARS);
-    if (pos != std::string::npos)
+    if (pos != TString::npos)
         return TError(EError::InvalidValue, "forbidden character " +
                       StringFormat("%#x", (unsigned char)name[pos]));
     if (name == "" || name == "." || name == ".."||
@@ -275,7 +275,7 @@ TError TStorage::CheckName(const std::string &name, bool meta) {
 }
 
 TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
-    std::vector<std::string> names;
+    std::vector<TString> names;
     TPath path = Path;
 
     if (Type == EStorageType::Place) {
@@ -292,7 +292,7 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     for (auto &name: names) {
         if (Type == EStorageType::Place && StringStartsWith(name, META_PREFIX)) {
             TStorage meta;
-            meta.Open(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
+            meta.Open(EStorageType::Meta, Place, name.substr(TString(META_PREFIX).size()));
             list.push_back(meta);
             if (type == EStorageType::Storage) {
                 error = meta.List(type, list);
@@ -303,7 +303,7 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
             if (StringStartsWith(name, META_LAYER)) {
                 if (type == EStorageType::Layer) {
                     TStorage layer;
-                    layer.Open(EStorageType::Layer, Place, Name + "/" + name.substr(std::string(META_LAYER).size()));
+                    layer.Open(EStorageType::Layer, Place, Name + "/" + name.substr(TString(META_LAYER).size()));
                     list.push_back(layer);
                 }
             } else if (type == EStorageType::Storage && !CheckName(name)) {
@@ -329,7 +329,7 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
         for (auto &name: names) {
             if (StringStartsWith(name, META_PREFIX)) {
                 TStorage meta;
-                meta.Open(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
+                meta.Open(EStorageType::Meta, Place, name.substr(TString(META_PREFIX).size()));
                 error = meta.List(EStorageType::Layer, list);
                 if (error)
                     return error;
@@ -386,7 +386,7 @@ TError TStorage::CheckUsage() {
     return OK;
 }
 
-TPath TStorage::TempPath(const std::string &kind) {
+TPath TStorage::TempPath(const TString &kind) {
     return Path.DirNameNormal() / kind + Path.BaseNameNormal();
 }
 
@@ -438,7 +438,7 @@ TError TStorage::SaveOwner(const TCred &owner) {
     return error;
 }
 
-TError TStorage::SetPrivate(const std::string &text) {
+TError TStorage::SetPrivate(const TString &text) {
     TError error;
 
     if (text.size() > PRIVATE_VALUE_MAX)
@@ -453,7 +453,7 @@ TError TStorage::SetPrivate(const std::string &text) {
     return SavePrivate(text);
 }
 
-TError TStorage::SavePrivate(const std::string &text) {
+TError TStorage::SavePrivate(const TString &text) {
     TPath priv = TempPath(PRIVATE_PREFIX);
     if (!priv.Exists())
         (void)priv.Mkfile(0644);
@@ -471,9 +471,9 @@ TError TStorage::Touch() {
 }
 
 static TError Compression(const TPath &archive, const TFile &arc,
-                             const std::string &compress,
-                             std::string &format, std::string &option) {
-    std::string name = archive.BaseName();
+                             const TString &compress,
+                             TString &format, TString &option) {
+    TString name = archive.BaseName();
 
     format = "tar";
     if (compress != "") {
@@ -543,7 +543,7 @@ xz:
 squash:
     format = "squashfs";
     auto sep = compress.find('.');
-    if (sep != std::string::npos)
+    if (sep != TString::npos)
         option = compress.substr(0, sep);
     else
         option = config().volumes().squashfs_compression();
@@ -587,7 +587,7 @@ TError TStorage::SaveChecksums() {
         error = file.OpenRead(walk.Path);
         if (error)
             return error;
-        std::string sum;
+        TString sum;
         error = Md5Sum(file, sum);
         if (error)
             return error;
@@ -599,7 +599,7 @@ TError TStorage::SaveChecksums() {
     return OK;
 }
 
-TError TStorage::ImportArchive(const TPath &archive, const std::string &compress, bool merge) {
+TError TStorage::ImportArchive(const TPath &archive, const TString &compress, bool merge) {
     TPath temp = TempPath(IMPORT_PREFIX);
     TError error;
     TFile arc;
@@ -629,7 +629,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     if (error)
         return TError(error, "Cannot import {} from {}", Name, archive);
 
-    std::string compress_format, compress_option;
+    TString compress_format, compress_option;
     error = Compression(archive, arc, compress, compress_format, compress_option);
     if (error)
         return error;
@@ -764,7 +764,7 @@ err:
     return error;
 }
 
-TError TStorage::ExportArchive(const TPath &archive, const std::string &compress) {
+TError TStorage::ExportArchive(const TPath &archive, const TString &compress) {
     TFile dir, arc;
     TError error;
 
@@ -782,7 +782,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
     if (archive.Exists())
         return TError(EError::InvalidValue, "archive already exists");
 
-    std::string compress_format, compress_option;
+    TString compress_format, compress_option;
     error = Compression(archive, TFile(), compress, compress_format, compress_option);
     if (error)
         return error;

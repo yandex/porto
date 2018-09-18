@@ -10,8 +10,8 @@ class TKeyValue {
 public:
     TPath Path;
     int Id = 0;
-    std::string Name;
-    std::map<std::string, std::string> Data;
+    TString Name;
+    std::map<TString, TString> Data;
 
     TKeyValue(const TPath &path) : Path(path) { }
 
@@ -19,20 +19,20 @@ public:
         return lhs.Name < rhs.Name;
     }
 
-    bool Has(const std::string &key) const {
+    bool Has(const TString &key) const {
         return Data.count(key);
     }
 
-    std::string Get(const std::string &key) const {
+    TString Get(const TString &key) const {
         auto it = Data.find(key);
         return it == Data.end() ? "" : it->second;
     }
 
-    void Set(const std::string &key, const std::string &val) {
+    void Set(const TString &key, const TString &val) {
         Data[key] = val;
     }
 
-    void Del(const std::string &key) {
+    void Del(const TString &key) {
         Data.erase(key);
     }
 

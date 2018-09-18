@@ -10,7 +10,7 @@
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 
-using std::string;
+using TString;
 using std::vector;
 
 extern "C" {
@@ -35,7 +35,7 @@ std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
         return std::cerr << "- ";
 }
 
-int ReadPid(const std::string &path) {
+int ReadPid(const TString &path) {
     int pid = 0;
 
     TError error = TPath(path).ReadInt(pid);
@@ -44,7 +44,7 @@ int ReadPid(const std::string &path) {
     return pid;
 }
 
-TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
+TError Popen(const TString &cmd, std::vector<TString> &lines) {
     FILE *f = popen(cmd.c_str(), "r");
     if (f == nullptr)
         return TError::System("Can't execute " + cmd);
@@ -64,14 +64,14 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     return OK;
 }
 
-int Pgrep(const std::string &name) {
-    vector<string> lines;
+int Pgrep(const TString &name) {
+    vector<TString> lines;
     ExpectOk(Popen("pgrep -x " + name + " || true", lines));
     return lines.size();
 }
 
-string GetRlimit(const std::string &pid, const std::string &type, const bool soft) {
-    const std::unordered_map<std::string, enum __rlimit_resource> resources = {
+TString GetRlimit(const TString &pid, const TString &type, const bool soft) {
+    const std::unordered_map<TString, enum __rlimit_resource> resources = {
         {"nproc", RLIMIT_NPROC},
         {"nofile", RLIMIT_NOFILE},
         {"data", RLIMIT_DATA},
@@ -84,13 +84,13 @@ string GetRlimit(const std::string &pid, const std::string &type, const bool sof
     return std::to_string(soft ? limit.rlim_cur : limit.rlim_max);
 }
 
-void WaitProcessExit(const std::string &pid, int sec) {
+void WaitProcessExit(const TString &pid, int sec) {
     Say() << "Waiting for " << pid << " to exit" << std::endl;
 
     int times = sec * 10;
     int pidVal = stoi(pid);
 
-    std::string ret;
+    TString ret;
     do {
         if (times-- <= 0)
             break;
@@ -103,18 +103,18 @@ void WaitProcessExit(const std::string &pid, int sec) {
         Fail("Waited too long for process to exit");
 }
 
-void WaitContainer(Porto::Connection &api, const std::string &name, int sec) {
-    std::string state;
+void WaitContainer(Porto::Connection &api, const TString &name, int sec) {
+    TString state;
     ExpectApiSuccess(api.WaitContainer(name, state, sec));
     ExpectNeq(state, "timeout");
 }
 
-void WaitState(Porto::Connection &api, const std::string &name, const std::string &state, int sec) {
+void WaitState(Porto::Connection &api, const TString &name, const TString &state, int sec) {
     Say() << "Waiting for " << name << " to be in state " << state << std::endl;
 
     int times = sec * 10;
 
-    std::string ret;
+    TString ret;
     do {
         if (times-- <= 0)
             break;
@@ -131,7 +131,7 @@ void WaitState(Porto::Connection &api, const std::string &name, const std::strin
 void WaitPortod(Porto::Connection &api, int times) {
     Say() << "Waiting for portod startup" << std::endl;
 
-    std::vector<std::string> clist;
+    std::vector<TString> clist;
     do {
         if (times-- <= 0)
             break;
@@ -144,7 +144,7 @@ void WaitPortod(Porto::Connection &api, int times) {
         Fail("Waited too long for portod startup");
 }
 
-std::string ReadLink(const std::string &path) {
+TString ReadLink(const TString &path) {
     TPath lnk;
 
     TPath f(path);
@@ -154,21 +154,21 @@ std::string ReadLink(const std::string &path) {
     return lnk.ToString();
 }
 
-std::string GetCwd(const std::string &pid) {
+TString GetCwd(const TString &pid) {
     return ReadLink("/proc/" + pid + "/cwd");
 }
 
-std::string GetRoot(const std::string &pid) {
+TString GetRoot(const TString &pid) {
     return ReadLink("/proc/" + pid + "/root");
 }
 
-std::string GetNamespace(const std::string &pid, const std::string &ns) {
+TString GetNamespace(const TString &pid, const TString &ns) {
     return ReadLink("/proc/" + pid + "/ns/" + ns);
 }
 
-std::map<std::string, std::string> GetCgroups(const std::string &pid) {
-    std::map<std::string, std::string> cgmap;
-    std::vector<std::string> lines;
+std::map<TString, TString> GetCgroups(const TString &pid) {
+    std::map<TString, TString> cgmap;
+    std::vector<TString> lines;
     TError error = TPath("/proc/" + pid + "/cgroup").ReadLines(lines);
     ExpectOk(error);
 
@@ -182,8 +182,8 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
     return cgmap;
 }
 
-std::string GetStatusLine(const std::string &pid, const std::string &prefix) {
-    std::vector<std::string> st;
+TString GetStatusLine(const TString &pid, const TString &prefix) {
+    std::vector<TString> st;
     if (TPath("/proc/" + pid + "/status").ReadLines(st))
         return "";
 
@@ -195,10 +195,10 @@ std::string GetStatusLine(const std::string &pid, const std::string &prefix) {
 }
 
 //FIXME ugly and racy
-std::string GetState(const std::string &pid) {
+TString GetState(const TString &pid) {
     std::stringstream ss(GetStatusLine(pid, "State:"));
 
-    std::string name, state, desc;
+    TString name, state, desc;
 
     ss>> name;
     ss>> state;
@@ -213,7 +213,7 @@ std::string GetState(const std::string &pid) {
     return state;
 }
 
-uint64_t GetCap(const std::string &pid, const std::string &type) {
+uint64_t GetCap(const TString &pid, const TString &type) {
     auto status = GetStatusLine(pid, type + ":");
 
     auto fields = SplitString(status, ':');
@@ -223,9 +223,9 @@ uint64_t GetCap(const std::string &pid, const std::string &type) {
     Fail("PARSING ERROR");
 }
 
-void GetUidGid(const std::string &pid, int &uid, int &gid) {
-    std::string name;
-    std::string stuid = GetStatusLine(pid, "Uid:");
+void GetUidGid(const TString &pid, int &uid, int &gid) {
+    TString name;
+    TString stuid = GetStatusLine(pid, "Uid:");
     std::stringstream ssuid(stuid);
 
     int euid, suid, fsuid;
@@ -238,7 +238,7 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
     if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
         Fail("Invalid uid");
 
-    std::string stgid = GetStatusLine(pid, "Gid:");
+    TString stgid = GetStatusLine(pid, "Gid:");
     std::stringstream ssgid(stgid);
 
     int egid, sgid, fsgid;
@@ -252,19 +252,19 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
         Fail("Invalid gid");
 }
 
-std::string GetEnv(const std::string &pid) {
-    std::string env;
+TString GetEnv(const TString &pid) {
+    TString env;
     TError error = TPath("/proc/" + pid + "/environ").ReadAll(env);
     ExpectOk(error);
 
     return env;
 }
 
-bool CgExists(const std::string &subsystem, const std::string &name) {
+bool CgExists(const TString &subsystem, const TString &name) {
     return TPath(CgRoot(subsystem, name)).Exists();
 }
 
-std::string CgRoot(const std::string &subsystem, const std::string &name) {
+TString CgRoot(const TString &subsystem, const TString &name) {
     if (name == "/")
         return "/sys/fs/cgroup/" + subsystem + "/";
     if (subsystem == "freezer")
@@ -272,14 +272,14 @@ std::string CgRoot(const std::string &subsystem, const std::string &name) {
     return "/sys/fs/cgroup/" + subsystem + "/porto%" + name + "/";
 }
 
-std::string GetFreezer(const std::string &name) {
-    std::string state;
+TString GetFreezer(const TString &name) {
+    TString state;
     TError error = TPath(CgRoot("freezer", name) + "freezer.state").ReadAll(state);
     ExpectOk(error);
     return state;
 }
 
-void SetFreezer(const std::string &name, const std::string &state) {
+void SetFreezer(const TString &name, const TString &state) {
     TError error = TPath(CgRoot("freezer", name) + "freezer.state").WriteAll(state);
     ExpectOk(error);
 
@@ -291,8 +291,8 @@ void SetFreezer(const std::string &name, const std::string &state) {
     Fail("Can't set freezer state");
 }
 
-std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob) {
-    std::string val;
+TString GetCgKnob(const TString &subsys, const TString &name, const TString &knob) {
+    TString val;
     if (TPath(CgRoot(subsys, name) + knob).ReadAll(val)) {
         Say() << "No " << subsys << " " << name << " " << knob << std::endl;
         return "(none)";
@@ -300,14 +300,14 @@ std::string GetCgKnob(const std::string &subsys, const std::string &name, const 
     return StringTrim(val, "\n");
 }
 
-bool HaveCgKnob(const std::string &subsys, const std::string &knob) {
+bool HaveCgKnob(const TString &subsys, const TString &knob) {
     return TPath(CgRoot(subsys, "") + knob).Exists();
 }
 
-int GetVmRss(const std::string &pid) {
+int GetVmRss(const TString &pid) {
     std::stringstream ss(GetStatusLine(pid, "VmRSS:"));
 
-    std::string name, size, unit;
+    TString name, size, unit;
 
     ss>> name;
     ss>> size;
@@ -319,15 +319,15 @@ int GetVmRss(const std::string &pid) {
     return std::stoi(size);
 }
 
-int WordCount(const std::string &path, const std::string &word) {
+int WordCount(const TString &path, const TString &word) {
     int nr = 0;
 
-    std::vector<std::string> lines;
+    std::vector<TString> lines;
     TError error = TPath(path).ReadLines(lines, 1 << 30);
     ExpectOk(error);
 
     for (auto s : lines) {
-        if (s.find(word) != std::string::npos)
+        if (s.find(word) != TString::npos)
             nr++;
     }
 
@@ -388,11 +388,11 @@ void AsBob(Porto::Connection &api) {
     AsUser(api, Bob);
 }
 
-void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
+void BootstrapCommand(const TString &cmd, const TPath &path, bool remove) {
     if (remove)
         (void)path.RemoveAll();
 
-    vector<string> lines;
+    vector<TString> lines;
     ExpectOk(Popen("ldd " + cmd, lines));
 
     for (auto &line : lines) {
@@ -400,7 +400,7 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
         TError error;
 
         TPath from;
-        string name;
+        TString name;
         if (tokens.size() == 2) {
             from = StringTrim(tokens[0]);
             TPath p(tokens[0]);
@@ -426,10 +426,10 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     Expect(system(("cp " + cmd + " " + path.ToString()).c_str()) == 0);
 }
 
-void PrintFds(const std::string &path, struct dirent **lst, int nr) {
+void PrintFds(const TString &path, struct dirent **lst, int nr) {
     for (int i = 0; i < nr; i++) {
-        if (lst[i]->d_name == string(".") ||
-            lst[i]->d_name == string("..")) {
+        if (lst[i]->d_name == TString(".") ||
+            lst[i]->d_name == TString("..")) {
             Say() << "[" << i << "] " << lst[i]->d_name << std::endl;
         } else {
             Say() << "[" << i << "] " << lst[i]->d_name
@@ -439,7 +439,7 @@ void PrintFds(const std::string &path, struct dirent **lst, int nr) {
 }
 
 static size_t ChildrenNum(int pid) {
-    vector<string> lines;
+    vector<TString> lines;
     ExpectOk(Popen("pgrep -P " + std::to_string(pid) + " || true", lines));
     return lines.size();
 }
@@ -459,7 +459,7 @@ void TestDaemon(Porto::Connection &api) {
 
     Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
 
-    std::string path = ("/proc/" + std::to_string(pid) + "/fd");
+    TString path = ("/proc/" + std::to_string(pid) + "/fd");
 
     // when sssd is running getgrnam opens unix socket to read database
     int sssFd = 0;
@@ -514,7 +514,7 @@ void TestDaemon(Porto::Connection &api) {
     ExpectLessEq(11, nr);
 
     Say() << "Check portod-master queue size" << std::endl;
-    std::string v;
+    TString v;
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[queued_statuses]", v));
     Expect(v == std::to_string(0));
 
@@ -526,7 +526,7 @@ void TestDaemon(Porto::Connection &api) {
 }
 
 static bool HaveMaxRss() {
-    std::vector<std::string> lines;
+    std::vector<TString> lines;
     TError error = TPath(CgRoot("memory", "") + "memory.stat").ReadLines(lines);
     if (error)
         return false;
@@ -543,18 +543,18 @@ static bool HaveMaxRss() {
 }
 
 static bool IsCfqActive() {
-    std::vector<std::string> items;
+    std::vector<TString> items;
     (void)TPath("/sys/block").ReadDirectory(items);
     for (auto d : items) {
-        if ( (d.find(std::string("loop")) != std::string::npos) || (d.find(std::string("ram")) != std::string::npos) )
+        if ( (d.find(TString("loop")) != TString::npos) || (d.find(TString("ram")) != TString::npos) )
             continue;
-        std::string data;
+        TString data;
 
         TError error = TPath("/sys/block/" + d + "/queue/scheduler").ReadAll(data);
         ExpectOk(error);
         bool cfqEnabled = false;
         for (auto t : SplitString(data, ' ')) {
-            if (t == std::string("[cfq]"))
+            if (t == TString("[cfq]"))
                 cfqEnabled = true;
         }
         if (!cfqEnabled) {

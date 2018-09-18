@@ -11,7 +11,7 @@ extern bool Debug;
 extern TFile LogFile;
 
 void OpenLog(const TPath &path);
-void WriteLog(const char *prefix, const std::string &log_msg);
+void WriteLog(const char *prefix, const TString &log_msg);
 void Stacktrace();
 
 struct TStatistics {
@@ -114,7 +114,7 @@ template <typename... Args> inline void L_ERR(const char* fmt, const Args&... ar
         Stacktrace();
 }
 
-inline void L_TAINT(const std::string &text) {
+inline void L_TAINT(const TString &text) {
     if (Statistics)
         Statistics->Taints++;
     WriteLog("TAINT", text);
@@ -166,7 +166,7 @@ template <typename... Args> inline void L_CORE(const char* fmt, const Args&... a
 }
 
 void porto_assert(const char *msg, const char *file, size_t line);
-void FatalError(const std::string &text, TError &error);
+void FatalError(const TString &text, TError &error);
 
 #define PORTO_ASSERT(EXPR) do { if (!(EXPR)) porto_assert(#EXPR, __FILE__, __LINE__); } while (0)
 #define PORTO_LOCKED(mutex) do { if (mutex.try_lock()) porto_assert(#mutex " not locked", __FILE__, __LINE__); } while(0)

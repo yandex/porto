@@ -162,9 +162,9 @@ TError TStdStream::Rotate(const TContainer &container) {
     return OK;
 }
 
-TError TStdStream::Read(const TContainer &container, std::string &text,
-                        const std::string &range) const {
-    std::string off = "", lim = "";
+TError TStdStream::Read(const TContainer &container, TString &text,
+                        const TString &range) const {
+    TString off = "", lim = "";
     uint64_t offset, limit;
     TError error;
     TPath path = ResolveOutside(container);
@@ -179,7 +179,7 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
     /* [offset][:limit] */
     if (range.size()) {
         auto sep = range.find(':');
-        if (sep != std::string::npos) {
+        if (sep != TString::npos) {
             off = range.substr(0, sep);
             lim = range.substr(sep + 1);
         } else

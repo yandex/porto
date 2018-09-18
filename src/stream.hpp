@@ -16,12 +16,12 @@ public:
 
     TStdStream(int stream): Stream(stream) { }
 
-    void SetOutside(const std::string &path) {
+    void SetOutside(const TString &path) {
         Path = path;
         Outside = true;
     }
 
-    void SetInside(const std::string &path) {
+    void SetInside(const TString &path) {
         Path = path;
         Outside = false;
     }
@@ -37,6 +37,6 @@ public:
     TError Remove(const TContainer &container);
 
     TError Rotate(const TContainer &container);
-    TError Read(const TContainer &container, std::string &text,
-                const std::string &range = "") const;
+    TError Read(const TContainer &container, TString &text,
+                const TString &range = "") const;
 };

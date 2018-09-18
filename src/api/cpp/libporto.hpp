@@ -33,17 +33,17 @@ private:
     int DiskTimeout = DEFAULT_DISK_TIMEOUT;
 
     EError LastError = EError::Success;
-    std::string LastErrorMsg;
+    TString LastErrorMsg;
 
     rpc::TPortoRequest Req;
     rpc::TPortoResponse Rsp;
 
-    std::vector<std::string> AsyncWaitNames;
-    std::vector<std::string> AsyncWaitLabels;
+    std::vector<TString> AsyncWaitNames;
+    std::vector<TString> AsyncWaitLabels;
     int AsyncWaitTimeout = -1;
     TWaitCallback AsyncWaitCallback;
 
-    EError SetError(const std::string &prefix, int _errno);
+    EError SetError(const TString &prefix, int _errno);
 
     EError SetSocketTimeout(int direction, int timeout);
 
@@ -72,77 +72,77 @@ public:
 
     EError Error() const { return LastError; }
 
-    EError GetLastError(std::string &msg) const {
+    EError GetLastError(TString &msg) const {
         msg = LastErrorMsg;
         return LastError;
     }
 
     /* Returns "LastError:(LastErrorMsg)" */
-    std::string GetLastError() const;
+    TString GetLastError() const;
 
     /* Returns text protobuf */
-    std::string GetLastRequest() const { return Req.DebugString(); }
-    std::string GetLastResponse() const { return Rsp.DebugString(); }
+    TString GetLastRequest() const { return Req.DebugString(); }
+    TString GetLastResponse() const { return Rsp.DebugString(); }
 
     EError Call(const rpc::TPortoRequest &req,
                 rpc::TPortoResponse &rsp,
                 int extra_timeout = -1);
 
-    EError Call(const std::string &req,
-                std::string &rsp,
+    EError Call(const TString &req,
+                TString &rsp,
                 int extra_timeout = -1);
 
     /* System */
 
-    EError GetVersion(std::string &tag, std::string &revision);
+    EError GetVersion(TString &tag, TString &revision);
 
     const rpc::TGetSystemResponse *GetSystem();
 
-    EError SetSystem(const std::string &key, const std::string &val);
+    EError SetSystem(const TString &key, const TString &val);
 
     /* Container */
 
     const rpc::TContainerPropertyListResponse *ListProperties();
 
-    EError ListProperties(std::vector<std::string> &properties);
+    EError ListProperties(std::vector<TString> &properties);
 
-    const rpc::TContainerListResponse *List(const std::string &mask = "");
+    const rpc::TContainerListResponse *List(const TString &mask = "");
 
-    EError List(std::vector<std::string> &names, const std::string &mask = "");
+    EError List(std::vector<TString> &names, const TString &mask = "");
 
-    EError Create(const std::string &name);
+    EError Create(const TString &name);
 
-    EError CreateWeakContainer(const std::string &name);
+    EError CreateWeakContainer(const TString &name);
 
-    EError Destroy(const std::string &name);
+    EError Destroy(const TString &name);
 
-    EError Start(const std::string &name);
+    EError Start(const TString &name);
 
-    EError Stop(const std::string &name, int stop_timeout = -1);
+    EError Stop(const TString &name, int stop_timeout = -1);
 
-    EError Kill(const std::string &name, int sig = 9);
+    EError Kill(const TString &name, int sig = 9);
 
-    EError Pause(const std::string &name);
+    EError Pause(const TString &name);
 
-    EError Resume(const std::string &name);
+    EError Resume(const TString &name);
 
-    EError Respawn(const std::string &name);
+    EError Respawn(const TString &name);
 
-    EError WaitContainer(const std::string &name,
-                         std::string &result_state,
+    EError WaitContainer(const TString &name,
+                         TString &result_state,
                          int wait_timeout = -1);
 
-    EError WaitContainers(const std::vector<std::string> &names,
-                          std::string &result_name,
-                          std::string &result_state,
+    EError WaitContainers(const std::vector<TString> &names,
+                          TString &result_name,
+                          TString &result_state,
                           int wait_timeout = -1);
 
-    const rpc::TContainerWaitResponse *Wait(const std::vector<std::string> &names,
-                                            const std::vector<std::string> &labels,
+    const rpc::TContainerWaitResponse *Wait(const std::vector<TString> &names,
+                                            const std::vector<TString> &labels,
                                             int wait_timeout = -1);
 
-    EError AsyncWait(const std::vector<std::string> &names,
-                     const std::vector<std::string> &labels,
+    EError AsyncWait(const std::vector<TString> &names,
+                     const std::vector<TString> &labels,
                      TWaitCallback callbacks,
                      int wait_timeout = -1);
 
@@ -150,142 +150,142 @@ public:
         Recv(Rsp);
     }
 
-    const rpc::TContainerGetResponse *Get(const std::vector<std::string> &names,
-                                          const std::vector<std::string> &properties,
+    const rpc::TContainerGetResponse *Get(const std::vector<TString> &names,
+                                          const std::vector<TString> &properties,
                                           int flags = 0);
 
     /* Porto v5 api */
-    const rpc::TContainerSpec *GetContainerSpec(const std::string &name);
+    const rpc::TContainerSpec *GetContainerSpec(const TString &name);
 
-    EError GetProperty(const std::string &name,
-                       const std::string &property,
-                       std::string &value,
+    EError GetProperty(const TString &name,
+                       const TString &property,
+                       TString &value,
                        int flags = 0);
 
-    EError GetProperty(const std::string &name,
-                       const std::string &property,
+    EError GetProperty(const TString &name,
+                       const TString &property,
                        uint64_t &value,
                        int flags = 0);
 
-    EError SetProperty(const std::string &name,
-                       const std::string &property,
-                       const std::string &value);
+    EError SetProperty(const TString &name,
+                       const TString &property,
+                       const TString &value);
 
-    EError IncLabel(const std::string &name,
-                    const std::string &label,
+    EError IncLabel(const TString &name,
+                    const TString &label,
                     int64_t add,
                     int64_t &result);
 
-    EError IncLabel(const std::string &name,
-                    const std::string &label,
+    EError IncLabel(const TString &name,
+                    const TString &label,
                     int64_t add = 1) {
         int64_t result;
         return IncLabel(name, label, add, result);
     }
 
-    EError ConvertPath(const std::string &path,
-                       const std::string &src_name,
-                       const std::string &dst_name,
-                       std::string &result_path);
+    EError ConvertPath(const TString &path,
+                       const TString &src_name,
+                       const TString &dst_name,
+                       TString &result_path);
 
-    EError AttachProcess(const std::string &name, int pid,
-                         const std::string &comm = "");
+    EError AttachProcess(const TString &name, int pid,
+                         const TString &comm = "");
 
-    EError AttachThread(const std::string &name, int pid,
-                        const std::string &comm = "");
+    EError AttachThread(const TString &name, int pid,
+                        const TString &comm = "");
 
-    EError LocateProcess(int pid, const std::string &comm /* = "" */,
-                         std::string &name);
+    EError LocateProcess(int pid, const TString &comm /* = "" */,
+                         TString &name);
 
     /* Volume */
 
     const rpc::TVolumePropertyListResponse *ListVolumeProperties();
 
-    EError ListVolumeProperties(std::vector<std::string> &properties);
+    EError ListVolumeProperties(std::vector<TString> &properties);
 
-    const rpc::TVolumeListResponse *ListVolumes(const std::string &path = "",
-                                                const std::string &container = "");
+    const rpc::TVolumeListResponse *ListVolumes(const TString &path = "",
+                                                const TString &container = "");
 
-    EError ListVolumes(std::vector<std::string> &paths);
+    EError ListVolumes(std::vector<TString> &paths);
 
-    const rpc::TVolumeDescription *GetVolume(const std::string &path);
+    const rpc::TVolumeDescription *GetVolume(const TString &path);
 
     /* Porto v5 api */
-    const rpc::TVolumeSpec *GetVolumeSpec(const std::string &path);
+    const rpc::TVolumeSpec *GetVolumeSpec(const TString &path);
 
-    EError CreateVolume(std::string &path,
-                        const std::map<std::string, std::string> &config);
+    EError CreateVolume(TString &path,
+                        const std::map<TString, TString> &config);
 
-    EError LinkVolume(const std::string &path,
-                      const std::string &container = "",
-                      const std::string &target = "",
+    EError LinkVolume(const TString &path,
+                      const TString &container = "",
+                      const TString &target = "",
                       bool read_only = false,
                       bool required = false);
 
-    EError UnlinkVolume(const std::string &path,
-                        const std::string &container = "",
-                        const std::string &target = "***",
+    EError UnlinkVolume(const TString &path,
+                        const TString &container = "",
+                        const TString &target = "***",
                         bool strict = false);
 
-    EError TuneVolume(const std::string &path,
-                      const std::map<std::string, std::string> &config);
+    EError TuneVolume(const TString &path,
+                      const std::map<TString, TString> &config);
 
     /* Layer */
 
-    const rpc::TLayerListResponse *ListLayers(const std::string &place = "",
-                                              const std::string &mask = "");
+    const rpc::TLayerListResponse *ListLayers(const TString &place = "",
+                                              const TString &mask = "");
 
-    EError ListLayers(std::vector<std::string> layers,
-                      const std::string &place = "",
-                      const std::string &mask = "");
+    EError ListLayers(std::vector<TString> layers,
+                      const TString &place = "",
+                      const TString &mask = "");
 
-    EError ImportLayer(const std::string &layer,
-                       const std::string &tarball,
+    EError ImportLayer(const TString &layer,
+                       const TString &tarball,
                        bool merge = false,
-                       const std::string &place = "",
-                       const std::string &private_value = "");
+                       const TString &place = "",
+                       const TString &private_value = "");
 
-    EError ExportLayer(const std::string &volume,
-                       const std::string &tarball,
-                       const std::string &compress = "");
+    EError ExportLayer(const TString &volume,
+                       const TString &tarball,
+                       const TString &compress = "");
 
-    EError ReExportLayer(const std::string &layer,
-                         const std::string &tarball,
-                         const std::string &compress = "");
+    EError ReExportLayer(const TString &layer,
+                         const TString &tarball,
+                         const TString &compress = "");
 
-    EError RemoveLayer(const std::string &layer,
-                       const std::string &place = "");
+    EError RemoveLayer(const TString &layer,
+                       const TString &place = "");
 
-    EError GetLayerPrivate(std::string &private_value,
-                           const std::string &layer,
-                           const std::string &place = "");
+    EError GetLayerPrivate(TString &private_value,
+                           const TString &layer,
+                           const TString &place = "");
 
-    EError SetLayerPrivate(const std::string &private_value,
-                           const std::string &layer,
-                           const std::string &place = "");
+    EError SetLayerPrivate(const TString &private_value,
+                           const TString &layer,
+                           const TString &place = "");
 
     /* Storage */
 
-    const rpc::TStorageListResponse *ListStorages(const std::string &place = "",
-                                                  const std::string &mask = "");
+    const rpc::TStorageListResponse *ListStorages(const TString &place = "",
+                                                  const TString &mask = "");
 
-    EError ListStorages(std::vector<std::string> &storages,
-                        const std::string &place = "",
-                        const std::string &mask = "");
+    EError ListStorages(std::vector<TString> &storages,
+                        const TString &place = "",
+                        const TString &mask = "");
 
-    EError RemoveStorage(const std::string &storage,
-                         const std::string &place = "");
+    EError RemoveStorage(const TString &storage,
+                         const TString &place = "");
 
-    EError ImportStorage(const std::string &storage,
-                         const std::string &archive,
-                         const std::string &place = "",
-                         const std::string &compression = "",
-                         const std::string &private_value = "");
+    EError ImportStorage(const TString &storage,
+                         const TString &archive,
+                         const TString &place = "",
+                         const TString &compression = "",
+                         const TString &private_value = "");
 
-    EError ExportStorage(const std::string &storage,
-                         const std::string &archive,
-                         const std::string &place = "",
-                         const std::string &compression = "");
+    EError ExportStorage(const TString &storage,
+                         const TString &archive,
+                         const TString &place = "",
+                         const TString &compression = "");
 };
 
 } /* namespace Porto */

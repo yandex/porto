@@ -23,7 +23,7 @@ void FatalSignal(int sig) {
     /* don't hang */
     alarm(5);
 
-    L_ERR("Fatal signal: {}", std::string(strsignal(sig)));
+    L_ERR("Fatal signal: {}", TString(strsignal(sig)));
     Stacktrace();
 
     /* ok, die */

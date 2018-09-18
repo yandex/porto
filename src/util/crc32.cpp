@@ -100,6 +100,6 @@ static uint32_t ssh_crc32(const char *buf, uint32_t size) {
     return crc;
 }
 
-uint32_t Crc32(const std::string &s) {
+uint32_t Crc32(const TString &s) {
     return ssh_crc32(s.c_str(), s.length());
 }

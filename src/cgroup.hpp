@@ -27,17 +27,17 @@ class TSubsystem {
 public:
     const uint64_t Kind = 0x0ull;
     uint64_t Controllers = 0x0ull;
-    const std::string Type;
+    const TString Type;
     const TSubsystem *Hierarchy = nullptr;
     TPath Root;
     TFile Base;
     bool Supported = false;
 
-    TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
+    TSubsystem(uint64_t kind, const TString &type) : Kind(kind), Type(type) { }
     virtual bool IsDisabled() { return false; }
     virtual bool IsOptional() { return false; }
-    virtual std::string TestOption() { return Type; }
-    virtual std::vector<std::string> MountOptions() { return {Type}; }
+    virtual TString TestOption() { return Type; }
+    virtual std::vector<TString> MountOptions() { return {Type}; }
 
     virtual TError InitializeSubsystem() {
         return OK;
@@ -49,12 +49,12 @@ public:
     }
 
     TCgroup RootCgroup() const;
-    TCgroup Cgroup(const std::string &name) const;
+    TCgroup Cgroup(const TString &name) const;
 
     TError TaskCgroup(pid_t pid, TCgroup &cgroup) const;
     bool IsBound(const TCgroup &cgroup) const;
 
-    static std::string Format(uint64_t controllers) {
+    static TString Format(uint64_t controllers) {
         return StringFormatFlags(controllers, ControllersName, ";");
     }
 };
@@ -62,17 +62,17 @@ public:
 class TCgroup {
 public:
     const TSubsystem *Subsystem = nullptr;
-    std::string Name;
+    TString Name;
 
     TCgroup() { }
-    TCgroup(const TSubsystem *subsystem, const std::string &name) :
+    TCgroup(const TSubsystem *subsystem, const TString &name) :
         Subsystem(subsystem), Name(name) { }
 
     bool Secondary() const {
         return !Subsystem || Subsystem->Hierarchy != Subsystem;
     }
 
-    std::string Type() const {
+    TString Type() const {
         return Subsystem ? Subsystem->Type : "(null)";
     }
 
@@ -88,7 +88,7 @@ public:
         return lhs.Name != rhs.Name;
     }
 
-    TCgroup Child(const std::string& name) const;
+    TCgroup Child(const TString& name) const;
     TError ChildsAll(std::vector<TCgroup> &cgroups) const;
 
     TPath Path() const;
@@ -116,46 +116,46 @@ public:
     TError Attach(pid_t pid, bool thread = false) const;
     TError AttachAll(const TCgroup &cg) const;
 
-    TPath Knob(const std::string &knob) const;
-    bool Has(const std::string &knob) const;
-    TError Get(const std::string &knob, std::string &value) const;
-    TError Set(const std::string &knob, const std::string &value) const;
+    TPath Knob(const TString &knob) const;
+    bool Has(const TString &knob) const;
+    TError Get(const TString &knob, TString &value) const;
+    TError Set(const TString &knob, const TString &value) const;
 
-    TError GetPids(const std::string &knob, std::vector<pid_t> &pids) const;
+    TError GetPids(const TString &knob, std::vector<pid_t> &pids) const;
 
-    TError GetInt64(const std::string &knob, int64_t &value) const;
-    TError SetInt64(const std::string &knob, int64_t value) const;
+    TError GetInt64(const TString &knob, int64_t &value) const;
+    TError SetInt64(const TString &knob, int64_t value) const;
 
-    TError GetUint64(const std::string &knob, uint64_t &value) const;
-    TError SetUint64(const std::string &knob, uint64_t value) const;
+    TError GetUint64(const TString &knob, uint64_t &value) const;
+    TError SetUint64(const TString &knob, uint64_t value) const;
 
-    TError GetBool(const std::string &knob, bool &value) const;
-    TError SetBool(const std::string &knob, bool value) const;
+    TError GetBool(const TString &knob, bool &value) const;
+    TError SetBool(const TString &knob, bool value) const;
 
-    TError GetUintMap(const std::string &knob, TUintMap &value) const;
-    TError SetSuffix(const std::string suffix);
+    TError GetUintMap(const TString &knob, TUintMap &value) const;
+    TError SetSuffix(const TString suffix);
 };
 
 class TMemorySubsystem : public TSubsystem {
 public:
-    const std::string STAT = "memory.stat";
-    const std::string OOM_CONTROL = "memory.oom_control";
-    const std::string EVENT_CONTROL = "cgroup.event_control";
-    const std::string USE_HIERARCHY = "memory.use_hierarchy";
-    const std::string RECHARGE_ON_PAGE_FAULT = "memory.recharge_on_pgfault";
-    const std::string USAGE = "memory.usage_in_bytes";
-    const std::string LIMIT = "memory.limit_in_bytes";
-    const std::string SOFT_LIMIT = "memory.soft_limit_in_bytes";
-    const std::string LOW_LIMIT = "memory.low_limit_in_bytes";
-    const std::string MEM_SWAP_LIMIT = "memory.memsw.limit_in_bytes";
-    const std::string DIRTY_LIMIT = "memory.dirty_limit_in_bytes";
-    const std::string DIRTY_RATIO = "memory.dirty_ratio";
-    const std::string FS_BPS_LIMIT = "memory.fs_bps_limit";
-    const std::string FS_IOPS_LIMIT = "memory.fs_iops_limit";
-    const std::string ANON_USAGE = "memory.anon.usage";
-    const std::string ANON_MAX_USAGE = "memory.anon.max_usage";
-    const std::string ANON_LIMIT = "memory.anon.limit";
-    const std::string ANON_ONLY = "memory.anon.only";
+    const TString STAT = "memory.stat";
+    const TString OOM_CONTROL = "memory.oom_control";
+    const TString EVENT_CONTROL = "cgroup.event_control";
+    const TString USE_HIERARCHY = "memory.use_hierarchy";
+    const TString RECHARGE_ON_PAGE_FAULT = "memory.recharge_on_pgfault";
+    const TString USAGE = "memory.usage_in_bytes";
+    const TString LIMIT = "memory.limit_in_bytes";
+    const TString SOFT_LIMIT = "memory.soft_limit_in_bytes";
+    const TString LOW_LIMIT = "memory.low_limit_in_bytes";
+    const TString MEM_SWAP_LIMIT = "memory.memsw.limit_in_bytes";
+    const TString DIRTY_LIMIT = "memory.dirty_limit_in_bytes";
+    const TString DIRTY_RATIO = "memory.dirty_ratio";
+    const TString FS_BPS_LIMIT = "memory.fs_bps_limit";
+    const TString FS_IOPS_LIMIT = "memory.fs_iops_limit";
+    const TString ANON_USAGE = "memory.anon.usage";
+    const TString ANON_MAX_USAGE = "memory.anon.max_usage";
+    const TString ANON_LIMIT = "memory.anon.limit";
+    const TString ANON_ONLY = "memory.anon.only";
 
     TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
 
@@ -237,7 +237,7 @@ class TFreezerSubsystem : public TSubsystem {
 public:
     TFreezerSubsystem() : TSubsystem(CGROUP_FREEZER, "freezer") {}
 
-    TError WaitState(const TCgroup &cg, const std::string &state) const;
+    TError WaitState(const TCgroup &cg, const TString &state) const;
     TError Freeze(const TCgroup &cg, bool wait = true) const;
     TError Thaw(const TCgroup &cg, bool wait = true) const;
     bool IsFrozen(const TCgroup &cg) const;
@@ -261,7 +261,7 @@ public:
     TError InitializeCgroup(TCgroup &cg) override;
     TError SetLimit(TCgroup &cg, uint64_t period, uint64_t limit);
     TError SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit);
-    TError SetGuarantee(TCgroup &cg, const std::string &policy, double weight, uint64_t period, uint64_t guarantee);
+    TError SetGuarantee(TCgroup &cg, const TString &policy, double weight, uint64_t period, uint64_t guarantee);
 };
 
 class TCpuacctSubsystem : public TSubsystem {
@@ -277,8 +277,8 @@ public:
     bool IsOptional() override { return true; }
     TError InitializeCgroup(TCgroup &cg) override;
 
-    TError SetCpus(TCgroup &cg, const std::string &cpus) const;
-    TError SetMems(TCgroup &cg, const std::string &mems) const;
+    TError SetCpus(TCgroup &cg, const TString &cpus) const;
+    TError SetMems(TCgroup &cg, const TString &mems) const;
 };
 
 class TNetclsSubsystem : public TSubsystem {
@@ -311,11 +311,11 @@ public:
         Time = 8,
     };
     TError GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const;
-    TError SetIoWeight(TCgroup &cg, const std::string &policy, double weight) const;
+    TError SetIoWeight(TCgroup &cg, const TString &policy, double weight) const;
     TError SetIoLimit(TCgroup &cg, const TPath &root, const TUintMap &map, bool iops = false);
 
-    TError DiskName(const std::string &disk, std::string &name) const;
-    TError ResolveDisk(const TPath &root, const std::string &key, std::string &disk) const;
+    TError DiskName(const TString &disk, TString &name) const;
+    TError ResolveDisk(const TPath &root, const TString &key, TString &disk) const;
 };
 
 class TDevicesSubsystem : public TSubsystem {
@@ -325,10 +325,10 @@ public:
 
 class THugetlbSubsystem : public TSubsystem {
 public:
-    const std::string HUGE_USAGE = "hugetlb.2MB.usage_in_bytes";
-    const std::string HUGE_LIMIT = "hugetlb.2MB.limit_in_bytes";
-    const std::string GIGA_USAGE = "hugetlb.1GB.usage_in_bytes";
-    const std::string GIGA_LIMIT = "hugetlb.1GB.limit_in_bytes";
+    const TString HUGE_USAGE = "hugetlb.2MB.usage_in_bytes";
+    const TString HUGE_LIMIT = "hugetlb.2MB.limit_in_bytes";
+    const TString GIGA_USAGE = "hugetlb.1GB.usage_in_bytes";
+    const TString GIGA_LIMIT = "hugetlb.1GB.limit_in_bytes";
     THugetlbSubsystem() : TSubsystem(CGROUP_HUGETLB, "hugetlb") {}
     bool IsDisabled() override { return !config().container().enable_hugetlb(); }
     bool IsOptional() override { return true; }
@@ -370,8 +370,8 @@ public:
     TSystemdSubsystem() : TSubsystem(CGROUP_SYSTEMD, "systemd") {}
     bool IsDisabled() override { return !config().container().enable_systemd(); }
     bool IsOptional() override { return true; }
-    std::string TestOption() override { return "name=" + Type; }
-    std::vector<std::string> MountOptions() override { return { "none", "name=" + Type }; }
+    TString TestOption() override { return "name=" + Type; }
+    std::vector<TString> MountOptions() override { return { "none", "name=" + Type }; }
 };
 
 extern TMemorySubsystem     MemorySubsystem;

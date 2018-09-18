@@ -40,7 +40,7 @@ public:
     void SetTimeout(int ms);
     template<class T>
     void PrintAt(T arg, int x, int y, int width, bool leftaligned = false, int attr = 0);
-    void PrintAt(std::string str0, int x0, int y0, int w0, bool leftaligned = false,
+    void PrintAt(TString str0, int x0, int y0, int w0, bool leftaligned = false,
                  int attr = 0);
     void Refresh();
     void Erase();
@@ -48,9 +48,9 @@ public:
     int Getch();
     void Save();
     void Restore();
-    int Dialog(std::string text, const std::vector<std::string> &buttons);
+    int Dialog(TString text, const std::vector<TString> &buttons);
     void ErrorDialog(Porto::Connection &api);
-    void InfoDialog(std::vector<std::string> lines);
+    void InfoDialog(std::vector<TString> lines);
     void HelpDialog();
     void ColumnsMenu(std::vector<TColumn> &columns);
 private:
@@ -64,40 +64,40 @@ namespace PortoTreeTags {
 
 class TPortoContainer : public std::enable_shared_from_this<TPortoContainer> {
 public:
-    TPortoContainer(std::string container);
+    TPortoContainer(TString container);
     static std::shared_ptr<TPortoContainer> ContainerTree(Porto::Connection &api);
-    std::string GetName();
+    TString GetName();
     int GetLevel();
     void ForEach(std::function<void (std::shared_ptr<TPortoContainer> &)> fn,
                  int maxlevel);
     void SortTree(TColumn &column);
     int GetMaxLevel();
     int ChildrenCount();
-    std::string ContainerAt(int n, int max_level);
+    TString ContainerAt(int n, int max_level);
     uint64_t Tag = PortoTreeTags::None;
     std::list<std::shared_ptr<TPortoContainer>> Children;
 private:
     std::shared_ptr<TPortoContainer> GetParent(int level);
     std::weak_ptr<TPortoContainer> Root;
     std::weak_ptr<TPortoContainer> Parent;
-    std::string Container;
+    TString Container;
     int Level = 0;
 };
 
 class TPortoValueCache {
 public:
-    void Register(const std::string &container, const std::string &variable);
-    void Unregister(const std::string &container, const std::string &variable);
-    std::string GetValue(const std::string &container, const std::string &variable,
+    void Register(const TString &container, const TString &variable);
+    void Unregister(const TString &container, const TString &variable);
+    TString GetValue(const TString &container, const TString &variable,
                          bool prev);
     uint64_t GetDt();
     int Update(Porto::Connection &api);
-    std::string Version, Revision;
+    TString Version, Revision;
 private:
-    std::unordered_map<std::string, unsigned long> Containers;
-    std::unordered_map<std::string, unsigned long> Variables;
+    std::unordered_map<TString, unsigned long> Containers;
+    std::unordered_map<TString, unsigned long> Variables;
     bool CacheSelector = false;
-    std::map<std::string, std::map<std::string, std::string>> Cache[2];
+    std::map<TString, std::map<TString, TString>> Cache[2];
     uint64_t Time[2] = {0, 0};
 };
 
@@ -121,31 +121,31 @@ public:
     TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container);
     TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
                 std::shared_ptr<TPortoContainer> &container,
-                const std::string &variable, int flags, double multiplier = 1);
+                const TString &variable, int flags, double multiplier = 1);
     ~TPortoValue();
     void Process();
-    std::string GetValue() const;
+    TString GetValue() const;
     int GetLength() const;
     bool operator< (const TPortoValue &v);
 private:
     std::shared_ptr<TPortoValueCache> Cache;
     std::shared_ptr<TPortoContainer> Container;
-    std::string Variable; // property or data
+    TString Variable; // property or data
 
     int Flags;
 
-    std::string AsString;
+    TString AsString;
     double AsNumber = 0.0;
     double Multiplier = 0.0;
 };
 
 class TCommonValue {
 public:
-    TCommonValue(const std::string &label, const TPortoValue &val);
-    std::string GetLabel();
+    TCommonValue(const TString &label, const TPortoValue &val);
+    TString GetLabel();
     TPortoValue& GetValue();
 private:
-    std::string Label;
+    TString Label;
     TPortoValue Value;
 };
 
@@ -154,17 +154,17 @@ private:
     TPortoValue RootValue;
 
     int Width;
-    std::unordered_map<std::string, TPortoValue> Cache;
+    std::unordered_map<TString, TPortoValue> Cache;
     bool Selected = false;
     bool LeftAligned;
 
 public:
-    TColumn(std::string title, std::string desc,
+    TColumn(TString title, TString desc,
             TPortoValue var, bool left_aligned, bool hidden);
 
     bool Hidden;
-    std::string Title;
-    std::string Description;
+    TString Title;
+    TString Description;
 
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, int attr);
@@ -179,13 +179,13 @@ public:
 
 class TPortoTop {
 public:
-    TPortoTop(Porto::Connection *api, const std::vector<std::string> &args);
+    TPortoTop(Porto::Connection *api, const std::vector<TString> &args);
     void Update();
     void Process();
     void Sort();
     void Print(TConsoleScreen &screen);
 
-    bool AddColumn(std::string title, std::string signal, std::string desc,
+    bool AddColumn(TString title, TString signal, TString desc,
                    bool hidden = false);
     void MarkRow();
 
@@ -197,9 +197,9 @@ public:
     int PauseResume();
     int Kill(int signal);
     int Destroy();
-    void LessPortoctl(std::string container, std::string cmd);
-    int RunCmdInContainer(TConsoleScreen &screen, std::string cmd);
-    std::string SelectedContainer;
+    void LessPortoctl(TString container, TString cmd);
+    int RunCmdInContainer(TConsoleScreen &screen, TString cmd);
+    TString SelectedContainer;
 
     int Delay = 3000;
     int FirstDelay = 300;
@@ -208,7 +208,7 @@ public:
     int SelectedColumn = 0;
 
 private:
-    void AddCommon(int row, const std::string &title, const std::string &var,
+    void AddCommon(int row, const TString &title, const TString &var,
                    std::shared_ptr<TPortoContainer> &container,
                    int flags, double multiplier = 1.0);
     void AddColumn(const TColumn &c);
@@ -229,6 +229,6 @@ private:
     int MaxLevel = 100;
 
     int NextColor = 1;
-    std::map<std::string, int> RowColor;
+    std::map<TString, int> RowColor;
 };
 

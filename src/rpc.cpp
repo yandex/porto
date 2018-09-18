@@ -67,7 +67,7 @@ void TRequest::Classify() {
 }
 
 void TRequest::Parse() {
-    std::vector<std::string> opts;
+    std::vector<TString> opts;
 
     Arg = "";
 
@@ -314,8 +314,8 @@ void TRequest::Parse() {
         Opt += " " + o;
 }
 
-static std::string ResponseAsString(const rpc::TPortoResponse &resp) {
-    std::string ret;
+static TString ResponseAsString(const rpc::TPortoResponse &resp) {
+    TString ret;
 
     if (resp.error()) {
         ret = fmt::format("Error {}:{}({})", resp.error(),
@@ -376,7 +376,7 @@ static std::string ResponseAsString(const rpc::TPortoResponse &resp) {
 noinline TError NewContainer(rpc::TNewContainerRequest &req,
                              rpc::TNewContainerResponse &rsp) {
     std::shared_ptr<TContainer> ct;
-    std::string name;
+    TString name;
     TError error;
 
     error = CL->ResolveName(req.container().name(), name);
@@ -471,15 +471,15 @@ noinline TError SetContainer(const rpc::TSetContainerRequest &req,
 
 noinline TError GetContainer(const rpc::TGetContainerRequest &req,
                              rpc::TGetContainerResponse &rsp) {
-    std::list<std::string> masks, names;
-    std::vector<std::string> props;
+    std::list<TString> masks, names;
+    std::vector<TString> props;
     TError error;
 
     for(auto &prop: req.property())
         props.push_back(prop);
 
     for (auto &name: req.name()) {
-        if (name.find_first_of("*?") == std::string::npos)
+        if (name.find_first_of("*?") == TString::npos)
             names.push_back(name);
         else
             masks.push_back(name);
@@ -492,7 +492,7 @@ noinline TError GetContainer(const rpc::TGetContainerRequest &req,
         auto lock = LockContainers();
         for (auto &it: Containers) {
             auto &ct = it.second;
-            std::string name;
+            TString name;
             if (CL->ComposeName(ct->Name, name))
                 continue;
             if (masks.empty())
@@ -516,7 +516,7 @@ noinline TError GetContainer(const rpc::TGetContainerRequest &req,
         if (!error && req.label_size()) {
             bool match = false;
             for (auto &label: req.label()) {
-                if (label.find_first_of("*?") == std::string::npos) {
+                if (label.find_first_of("*?") == TString::npos) {
                     match = ct->Labels.find(label) != ct->Labels.end();
                 } else {
                     for (auto &it: ct->Labels) {
@@ -558,8 +558,8 @@ noinline TError GetContainer(const rpc::TGetContainerRequest &req,
     return OK;
 }
 
-static noinline TError CreateContainer(std::string reqName, bool weak) {
-    std::string name;
+static noinline TError CreateContainer(TString reqName, bool weak) {
+    TString name;
     TError error = CL->ResolveName(reqName, name);
     if (error)
         return error;
@@ -644,14 +644,14 @@ noinline TError RespawnContainer(const rpc::TContainerRespawnRequest &req) {
 
 noinline TError ListContainers(const rpc::TContainerListRequest &req,
                                rpc::TPortoResponse &rsp) {
-    std::string mask = req.has_mask() ? req.mask() : "***";
+    TString mask = req.has_mask() ? req.mask() : "***";
     auto out = rsp.mutable_list();
 
     auto lock = LockContainers();
 
     for (auto &it: Containers) {
         auto &ct = it.second;
-        std::string name;
+        TString name;
         if (ct->IsRoot() || CL->ComposeName(ct->Name, name) ||
                 !StringMatch(name, mask))
             continue;
@@ -667,13 +667,13 @@ noinline TError ListContainers(const rpc::TContainerListRequest &req,
 
 noinline TError FindLabel(const rpc::TFindLabelRequest &req, rpc::TFindLabelResponse &rsp) {
     auto label = req.label();
-    bool wild_label = label.find_first_of("*?") != std::string::npos;
+    bool wild_label = label.find_first_of("*?") != TString::npos;
 
     auto lock = LockContainers();
     for (auto &it: Containers) {
         auto &ct = it.second;
-        std::string value;
-        std::string name;
+        TString value;
+        TString name;
 
         if (!StringStartsWith(ct->Name, CL->PortoNamespace))
             continue;
@@ -777,7 +777,7 @@ noinline TError GetContainerProperty(const rpc::TContainerGetPropertyRequest &re
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
-        std::string value;
+        TString value;
 
         ct->LockStateRead();
 
@@ -800,11 +800,11 @@ out:
 }
 
 noinline TError SetContainerProperty(const rpc::TContainerSetPropertyRequest &req) {
-    std::string property = req.property();
-    std::string value = req.value();
+    TString property = req.property();
+    TString value = req.value();
 
     /* legacy kludge */
-    if (property.find('.') != std::string::npos) {
+    if (property.find('.') != TString::npos) {
         if (property == "cpu.smart") {
             if (value == "0") {
                 property = P_CPU_POLICY;
@@ -840,7 +840,7 @@ noinline TError GetContainerData(const rpc::TContainerGetDataRequest &req,
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
-        std::string value;
+        TString value;
 
         ct->LockStateRead();
 
@@ -864,7 +864,7 @@ out:
 
 static void FillGetResponse(const rpc::TContainerGetRequest &req,
                             rpc::TContainerGetResponse &rsp,
-                            std::string &name) {
+                            TString &name) {
     std::shared_ptr<TContainer> ct;
 
     auto lock = LockContainers();
@@ -889,7 +889,7 @@ static void FillGetResponse(const rpc::TContainerGetRequest &req,
         auto var = req.variable(j);
 
         auto keyval = entry->add_keyval();
-        std::string value;
+        TString value;
 
         TError error = containerError;
         if (!error && req.has_real() && req.real())
@@ -914,11 +914,11 @@ out:
 noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
                                      rpc::TPortoResponse &rsp) {
     auto get = rsp.mutable_get();
-    std::list <std::string> masks, names;
+    std::list <TString> masks, names;
 
     for (int i = 0; i < req.name_size(); i++) {
         auto name = req.name(i);
-        if (name.find_first_of("*?") == std::string::npos)
+        if (name.find_first_of("*?") == TString::npos)
             names.push_back(name);
         else
             masks.push_back(name);
@@ -928,7 +928,7 @@ noinline TError GetContainerCombined(const rpc::TContainerGetRequest &req,
         auto lock = LockContainers();
         for (auto &it: Containers) {
             auto &ct = it.second;
-            std::string name;
+            TString name;
             if (ct->IsRoot() || CL->ComposeName(ct->Name, name))
                 continue;
             if (masks.empty())
@@ -1004,7 +1004,7 @@ noinline TError Version(rpc::TPortoResponse &rsp) {
 
 noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async,
         rpc::TPortoResponse &rsp, std::shared_ptr<TClient> &client) {
-    std::string name, full_name;
+    TString name, full_name;
     TError error;
 
     if (!req.name_size() && !async)
@@ -1031,7 +1031,7 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
             return error;
         }
 
-        if (name.find_first_of("*?") != std::string::npos) {
+        if (name.find_first_of("*?") != TString::npos) {
             waiter->Wildcards.push_back(full_name);
             continue;
         }
@@ -1309,7 +1309,7 @@ noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
     TError error;
 
     std::shared_ptr<TContainer> ct;
-    std::string ct_name;
+    TString ct_name;
 
     if (req.has_container()) {
         auto lock = LockContainers();
@@ -1489,7 +1489,7 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
 noinline TError AttachProcess(const rpc::TAttachProcessRequest &req, bool thread) {
     std::shared_ptr<TContainer> oldCt, newCt;
     pid_t pid = req.pid();
-    std::string comm;
+    TString comm;
     TError error;
 
     if (pid <= 0)
@@ -1564,7 +1564,7 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
                               rpc::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     pid_t pid = req.pid();
-    std::string name;
+    TString name;
 
     if (pid <= 0 || TranslatePid(pid, CL->Pid, pid))
         return TError(EError::InvalidValue, "wrong pid");
@@ -2071,10 +2071,10 @@ class TRequestQueue {
     std::condition_variable Wakeup;
     std::mutex Mutex;
     bool ShouldStop = false;
-    const std::string Name;
+    const TString Name;
 
 public:
-    TRequestQueue(const std::string &name) : Name(name) {}
+    TRequestQueue(const TString &name) : Name(name) {}
 
     void Start(int thread_count) {
         for (int index = 0; index < thread_count; index++)

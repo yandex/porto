@@ -24,7 +24,7 @@ extern "C" {
 #include <poll.h>
 }
 
-using std::string;
+using TString;
 using std::vector;
 using std::stringstream;
 using std::ostream_iterator;
@@ -59,25 +59,25 @@ public:
     bool NeedVolume = false;
     bool ChrootVolume = true;
     bool MergeLayers = false;
-    std::string VirtMode = "app";
+    TString VirtMode = "app";
     bool ForwardTerminal = false;
     bool ForwardStreams = false;
     bool WaitExit = false;
 
-    std::string Container;
-    std::vector<std::pair<std::string, std::string>> Properties;
-    std::vector<std::string> Environment;
+    TString Container;
+    std::vector<std::pair<TString, TString>> Properties;
+    std::vector<TString> Environment;
 
-    std::string Private;
+    TString Private;
 
-    std::string VolumePath;
-    std::string SpaceLimit;
-    std::string VolumeBackend;
-    std::string VolumeStorage;
-    std::string Place;
-    std::vector<std::string> Layers;
-    std::vector<std::string> VolumeLayers;
-    std::vector<std::string> ImportedLayers;
+    TString VolumePath;
+    TString SpaceLimit;
+    TString VolumeBackend;
+    TString VolumeStorage;
+    TString Place;
+    std::vector<TString> Layers;
+    std::vector<TString> VolumeLayers;
+    std::vector<TString> ImportedLayers;
     bool ContainerCreated = false;
     bool VolumeLinked = false;
     int LayerIndex = 0;
@@ -89,7 +89,7 @@ public:
 
     int ExitCode = -1;
     int ExitSignal = -1;
-    std::string ExitMessage = "";
+    TString ExitMessage = "";
 
     ~TLauncher() {
         CloseSlavePty();
@@ -97,12 +97,12 @@ public:
     }
 
     TError GetLastError() {
-        std::string msg;
+        TString msg;
         auto error = Api->GetLastError(msg);
         return TError(error, msg);
     }
 
-    TError SetProperty(const std::string &key, const std::string &val) {
+    TError SetProperty(const TString &key, const TString &val) {
 
         if (key == "virt_mode")
             VirtMode = val;
@@ -134,16 +134,16 @@ public:
         return OK;
     }
 
-    TError SetProperty(const std::string &prop) {
-        std::string::size_type n = prop.find('=');
-        if (n == std::string::npos)
+    TError SetProperty(const TString &prop) {
+        TString::size_type n = prop.find('=');
+        if (n == TString::npos)
             return TError(EError::InvalidValue, "Invalid value: " + prop);
-        std::string key = prop.substr(0, n);
-        std::string val = prop.substr(n + 1);
+        TString key = prop.substr(0, n);
+        TString val = prop.substr(n + 1);
         return SetProperty(key, val);
     }
 
-    TError ImportLayer(const TPath &path, std::string &id) {
+    TError ImportLayer(const TPath &path, TString &id) {
         id = "_weak_portoctl-" + std::to_string(GetPid()) + "-" +
              std::to_string(LayerIndex++) + "-" + path.BaseName();
         std::cout << "Importing layer " << path << " as " << id << std::endl;
@@ -154,7 +154,7 @@ public:
     }
 
     TError ImportLayers() {
-        std::vector<string> known;
+        std::vector<TString> known;
         TError error;
 
         if (Api->ListLayers(known, Place))
@@ -178,7 +178,7 @@ public:
             if (path.IsDirectoryFollow() || VolumeBackend == "squash") {
                 VolumeLayers.push_back(path.ToString());
             } else if (path.IsRegularFollow()) {
-                std::string id;
+                TString id;
                 error = ImportLayer(path, id);
                 if (error)
                     break;
@@ -191,7 +191,7 @@ public:
     }
 
     TError CreateVolume() {
-        std::map<std::string, std::string> config;
+        std::map<TString, TString> config;
         TError error;
 
         if (SpaceLimit != "")
@@ -236,7 +236,7 @@ public:
     }
 
     TError WaitContainer(int timeout) {
-        std::string result, oom_killed;
+        TString result, oom_killed;
         TError error;
         int status;
 
@@ -384,7 +384,7 @@ public:
     TError ApplyConfig() {
 
         if (ForwardTerminal) {
-            std::string tty = "/dev/fd/" + std::to_string(SlavePty);
+            TString tty = "/dev/fd/" + std::to_string(SlavePty);
             if (Api->SetProperty(Container, "stdin_path", tty) ||
                     Api->SetProperty(Container, "stdout_path", tty) ||
                     Api->SetProperty(Container, "stderr_path", tty))
@@ -445,7 +445,7 @@ err:
             error = OpenPty();
             if (error)
                 goto err;
-            std::string term = getenv("TERM") ?: "xterm";
+            TString term = getenv("TERM") ?: "xterm";
             Environment.push_back("TERM=" + term);
         }
 
@@ -511,15 +511,15 @@ err:
     }
 };
 
-static const std::string StripIdx(const std::string &name) {
+static const TString StripIdx(const TString &name) {
     auto idx = name.find('[');
-    if (idx != std::string::npos)
-        return std::string(name.c_str(), idx);
+    if (idx != TString::npos)
+        return TString(name.c_str(), idx);
     else
         return name;
 }
 
-static std::string HumanValue(const std::string &full_name, const std::string &val, bool multiline = false) {
+static TString HumanValue(const TString &full_name, const TString &val, bool multiline = false) {
     auto name = StripIdx(full_name);
     TUintMap map;
     uint64_t num;
@@ -651,9 +651,9 @@ public:
         stringstream req;
 
         const auto &args = env->GetArgs();
-        copy(args.begin(), args.end(), ostream_iterator<string>(req, " "));
+        copy(args.begin(), args.end(), ostream_iterator<TString>(req, " "));
 
-        std::string rsp;
+        TString rsp;
         int ret = Api->Call(req.str(), rsp);
         std::cout << rsp << std::endl;
 
@@ -694,7 +694,7 @@ public:
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
-            string value;
+            TString value;
             int ret = Api->GetProperty(args[0], args[i], value, flags);
             if (ret) {
                 PrintError("Can't get property");
@@ -716,7 +716,7 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        string val = args[2];
+        TString val = args[2];
         for (size_t i = 3; i < args.size(); ++i) {
             val += " ";
             val += args[i];
@@ -746,7 +746,7 @@ public:
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
-            string value;
+            TString value;
             int ret = Api->GetProperty(args[0], args[i], value, flags);
             if (ret) {
                 PrintError("Can't get data");
@@ -779,7 +779,7 @@ public:
     }
 };
 
-static const map<string, int> sigMap = {
+static const map<TString, int> sigMap = {
     { "SIGHUP",     SIGHUP },
     { "SIGINT",     SIGINT },
     { "SIGQUIT",    SIGQUIT },
@@ -839,7 +839,7 @@ public:
         int sig = SIGTERM;
         const auto &args = env->GetArgs();
         if (args.size() >= 2) {
-            const string &sigName = args[1];
+            const TString &sigName = args[1];
 
             if (sigMap.find(sigName) != sigMap.end()) {
                 sig = sigMap.at(sigName);
@@ -973,8 +973,8 @@ public:
         bool printHuman = true;
         bool multiGet = false;
         int flags = 0;
-        std::vector<std::string> list;
-        std::vector<std::string> vars;
+        std::vector<TString> list;
+        std::vector<TString> vars;
         int ret;
 
         const auto &args = env->GetOpts({
@@ -1195,9 +1195,9 @@ public:
             "start shell (default /bin/bash) in container, exit - ^X^X") { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        std::string current_user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
-        std::string command = "/bin/bash";
-        std::string user, group;
+        TString current_user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
+        TString command = "/bin/bash";
+        TString user, group;
 
         const auto &args = environment->GetOpts({
             { 'u', true, [&](const char *arg) { user = arg; } },
@@ -1287,7 +1287,7 @@ public:
     TGcCmd(Porto::Connection *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
 
     int Execute(TCommandEnviroment *) final override {
-        vector<string> clist;
+        vector<TString> clist;
         int ret = Api->List(clist);
         if (ret) {
             PrintError("Can't list containers");
@@ -1298,7 +1298,7 @@ public:
             if (c == "/")
                 continue;
 
-            string state;
+            TString state;
             ret = Api->GetProperty(c, "state", state);
             if (ret) {
                 PrintError("Can't get container state");
@@ -1327,7 +1327,7 @@ public:
         int pid;
         const auto &args = env->GetArgs();
         TError error = StringToInt(args[0], pid);
-        std::string comm;
+        TString comm;
         if (error) {
             std::cerr << "Can't parse pid " << args[0] << std::endl;
             return EXIT_FAILURE;
@@ -1338,7 +1338,7 @@ public:
         else
             comm = GetTaskName(pid);
 
-        std::string name;
+        TString name;
         if (Api->LocateProcess(pid, comm, name)) {
             PrintError("Cannot find container by pid");
             return EXIT_FAILURE;
@@ -1392,7 +1392,7 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
         bool async = false;
-        std::vector<std::string> labels;
+        std::vector<TString> labels;
         const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = (std::stoi(arg) + 999) / 1000; } },
             { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
@@ -1401,7 +1401,7 @@ public:
         });
 
         if (async) {
-            int ret = Api->AsyncWait(containers.empty() ? std::vector<std::string>({"***"}) : containers, labels, PrintAsyncWait, timeout);
+            int ret = Api->AsyncWait(containers.empty() ? std::vector<TString>({"***"}) : containers, labels, PrintAsyncWait, timeout);
             if (ret) {
                 PrintError("Can't wait for containers");
                 return ret;
@@ -1415,7 +1415,7 @@ public:
             return EXIT_FAILURE;
         }
 
-        std::string name, state;
+        TString name, state;
         auto rsp = Api->Wait(containers, labels, timeout);
         if (!rsp) {
             PrintError("Can't wait for containers");
@@ -1449,7 +1449,7 @@ public:
             "\n"
             ) {}
 
-    size_t CountChar(const std::string &s, const char ch) {
+    size_t CountChar(const TString &s, const char ch) {
         size_t count = 0;
         for (size_t i = 0; i < s.length(); i++)
             if (s[i] == ch)
@@ -1457,9 +1457,9 @@ public:
         return count;
     }
 
-    std::string GetParent(const std::string &child) {
+    TString GetParent(const TString &child) {
         auto lastSlash = child.rfind("/");
-        if (lastSlash == std::string::npos)
+        if (lastSlash == TString::npos)
             return "/";
         else
             return child.substr(0, lastSlash);
@@ -1470,7 +1470,7 @@ public:
         bool forest = false;
         bool toplevel = false;
         bool running = false;
-        std::string label;
+        TString label;
         const auto &args = env->GetOpts({
             { '1', false, [&](const char *) { details = false; } },
             { 'f', false, [&](const char *) { forest = true; } },
@@ -1478,10 +1478,10 @@ public:
             { 'L', true,  [&](const char *arg) { label = arg; } },
             { 'r', false, [&](const char *) { running = true; } },
         });
-        std::string mask = args.size() ? args[0] : "";
+        TString mask = args.size() ? args[0] : "";
         int ret;
 
-        vector<string> clist;
+        vector<TString> clist;
         if (label != "" ) {
             auto sep = label.find('=');
 
@@ -1489,7 +1489,7 @@ public:
             rpc::TPortoResponse rsp;
             auto cmd = req.mutable_findlabel();
 
-            if (sep == std::string::npos) {
+            if (sep == TString::npos) {
                 cmd->set_label(label);
             } else {
                 cmd->set_label(label.substr(0, sep));
@@ -1511,16 +1511,16 @@ public:
         if (clist.empty())
             return EXIT_SUCCESS;
 
-        vector<string> displayName;
+        vector<TString> displayName;
         std::copy(clist.begin(), clist.end(), std::back_inserter(displayName));
 
         if (forest)
             for (size_t i = 0; i < clist.size(); i++) {
                 auto c = clist[i];
 
-                string parent = GetParent(c);
+                TString parent = GetParent(c);
                 if (parent != "/") {
-                    string prefix = " ";
+                    TString prefix = " ";
                     for (size_t j = 1; j < CountChar(displayName[i], '/'); j++)
                             prefix = prefix + "   ";
 
@@ -1528,14 +1528,14 @@ public:
                 }
             }
 
-        const std::vector<std::string> vars = { "state", "time" };
+        const std::vector<TString> vars = { "state", "time" };
         auto result = Api->Get(clist, vars);
         if (!result) {
             PrintError("Can't get containers' data");
             return ret;
         }
 
-        vector<string> states = { "running", "dead", "meta", "stopped", "paused" };
+        vector<TString> states = { "running", "dead", "meta", "stopped", "paused" };
         size_t stateLen = MaxFieldLength(states);
         size_t nameLen = MaxFieldLength(displayName);
         size_t timeLen = 12;
@@ -1594,8 +1594,8 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
 
-        std::vector<std::string> filter;
-        std::vector<std::string> keys;
+        std::vector<TString> filter;
+        std::vector<TString> keys;
 
         auto sep = std::find(args.begin(), args.end(), "--");
         if (sep == args.end()) {
@@ -1661,7 +1661,7 @@ public:
             text[idx + 1][0] = name;
             width[0] = std::max(width[0], (unsigned)name.size());
             for (unsigned col = 0; col < keys.size(); col++) {
-                std::string value = HumanValue(keys[col], data.keyval(col).value());
+                TString value = HumanValue(keys[col], data.keyval(col).value());
                 text[idx + 1][col + 1] = value;
                 width[col + 1] = std::max(width[col + 1], (unsigned)value.size());
             }
@@ -1687,9 +1687,9 @@ public:
         ) {}
 
     int Execute(TCommandEnviroment *env) final override {
-        std::map<std::string, std::string> properties;
+        std::map<TString, TString> properties;
         const auto &args = env->GetArgs();
-        std::string path = args[0];
+        TString path = args[0];
 
         if (path == "-A") {
             path = "";
@@ -1698,9 +1698,9 @@ public:
         }
 
         for (size_t i = 1; i < args.size(); i++) {
-            const std::string &arg = args[i];
+            const TString &arg = args[i];
             std::size_t sep = arg.find('=');
-            if (sep == string::npos)
+            if (sep == TString::npos)
                 properties[arg] = "";
             else
                 properties[arg.substr(0, sep)] = arg.substr(sep + 1);
@@ -1785,7 +1785,7 @@ public:
         "    -c <ct>   list volumes linked to container\n"
         ) {}
 
-    std::string GetProp(const rpc::TVolumeDescription &v, const std::string &n) {
+    TString GetProp(const rpc::TVolumeDescription &v, const TString &n) {
         for (auto &p: v.properties()) {
             if (p.name() == n)
                 return p.value();
@@ -1793,7 +1793,7 @@ public:
         return "-";
     }
 
-    std::string GetSize(const rpc::TVolumeDescription &v, const std::string &n) {
+    TString GetSize(const rpc::TVolumeDescription &v, const TString &n) {
         uint64_t val;
         for (auto &p: v.properties()) {
             if (p.name() == n) {
@@ -1805,7 +1805,7 @@ public:
         return "-";
     }
 
-    double GetPerc(const rpc::TVolumeDescription &v, const std::string &n, const std::string &d) {
+    double GetPerc(const rpc::TVolumeDescription &v, const TString &n, const TString &d) {
         uint64_t val = 0;
         uint64_t div = 0;
 
@@ -1886,7 +1886,7 @@ public:
     }
 
     int Execute(TCommandEnviroment *env) final override {
-        std::string container;
+        TString container;
         const auto &args = env->GetOpts({
             { '1', false, [&](const char *) { details = false; } },
             { 'i', false, [&](const char *) { inodes = true; } },
@@ -1938,14 +1938,14 @@ public:
         ICmd(api, "vtune", 1, "<path> [property=value...]", "tune volume") { }
 
     int Execute(TCommandEnviroment *env) final override {
-        std::map<std::string, std::string> properties;
+        std::map<TString, TString> properties;
         const auto &args = env->GetArgs();
         const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
 
         for (size_t i = 1; i < args.size(); i++) {
-            const std::string &arg = args[i];
+            const TString &arg = args[i];
             std::size_t sep = arg.find('=');
-            if (sep == string::npos)
+            if (sep == TString::npos)
                 properties[arg] = "";
             else
                 properties[arg.substr(0, sep)] = arg.substr(sep + 1);
@@ -1988,9 +1988,9 @@ public:
     bool export_ = false;
     bool meta = false;
     bool resize = false;
-    std::string place;
-    std::string private_;
-    std::string compression;
+    TString place;
+    TString private_;
+    TString compression;
     uint64_t space_limit = 0;
     uint64_t inode_limit = 0;
 
@@ -2010,7 +2010,7 @@ public:
             { 'Q', true, [&](const char * arg) { StringToSize(arg, space_limit); } },
         });
 
-        std::string archive;
+        TString archive;
         if (args.size() >= 2)
             archive = TPath(args[1]).AbsolutePath().ToString();
 
@@ -2153,9 +2153,9 @@ public:
     bool flush = false;
     bool get_private = false;
     bool set_private = false;
-    std::string place;
-    std::string private_value;
-    std::string compression;
+    TString place;
+    TString private_value;
+    TString compression;
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
@@ -2177,7 +2177,7 @@ public:
         if (squash && compression.empty())
             compression = "squashfs";
 
-        std::string path;
+        TString path;
         if (args.size() >= 2)
             path = TPath(args[1]).AbsolutePath().ToString();
 
@@ -2306,8 +2306,8 @@ public:
         TLauncher base(Api);
         TError error;
 
-        std::string build_script = "porto_build";
-        std::string build_command = "/bin/bash -ex porto_build";
+        TString build_script = "porto_build";
+        TString build_command = "/bin/bash -ex porto_build";
 
         launcher.Container = "portoctl-build-" + std::to_string(GetPid());
         launcher.SetProperty("isolate", "false");
@@ -2320,10 +2320,10 @@ public:
         TPath output;
         TPath outputImage;
         bool squash = false;
-        std::string compression;
+        TString compression;
         TPath loopStorage, loopImage;
-        std::vector<std::string> env;
-        std::vector<std::string> layers;
+        std::vector<TString> env;
+        std::vector<TString> layers;
         std::vector<TPath> scripts;
         std::vector<TPath> scripts2;
         TPath bootstrap_script;
@@ -2423,7 +2423,7 @@ public:
         base.VirtMode = launcher.VirtMode;
         launcher.VirtMode = "app";
 
-        std::string volume;
+        TString volume;
         TPath volume_script;
 
         error = launcher.Launch();
@@ -2449,7 +2449,7 @@ public:
             bootstrap.VirtMode = "os";
             bootstrap.Environment = launcher.Environment;
 
-            std::string script_text;
+            TString script_text;
             error = bootstrap_script.ReadAll(script_text);
             if (!error)
                 error = volume_script.WriteAll(script_text);
@@ -2497,7 +2497,7 @@ public:
             bootstrap2.VirtMode = "os";
             bootstrap2.Environment = launcher.Environment;
 
-            std::string script_text;
+            TString script_text;
             error = bootstrap2_script.ReadAll(script_text);
             if (!error)
                 error = volume_script.WriteAll(script_text);
@@ -2557,7 +2557,7 @@ public:
         for (auto &script: scripts) {
             TLauncher executor(Api);
 
-            std::string script_text;
+            TString script_text;
             error = script.ReadAll(script_text);
             if (!error)
                 error = volume_script.WriteAll(script_text);
@@ -2606,7 +2606,7 @@ public:
         for (auto &script: scripts2) {
             TLauncher executor(Api);
 
-            std::string script_text;
+            TString script_text;
             error = script.ReadAll(script_text);
             if (!error)
                 error = volume_script.WriteAll(script_text);
@@ -2750,7 +2750,7 @@ public:
                                            "    -d container    destination container (client container if omitted)\n") { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        std::string path, src, dest;
+        TString path, src, dest;
         auto args  = environment->GetOpts({
                 {'s', true, [&](const char *arg) { src = arg; }},
                 {'d', true, [&](const char *arg) { dest = arg; }}
@@ -2763,7 +2763,7 @@ public:
 
         path = args[0];
 
-        std::string converted;
+        TString converted;
         auto ret = Api->ConvertPath(path, src, dest, converted);
         if (ret)
             PrintError("Can't convert path");
@@ -2779,7 +2779,7 @@ public:
             "[-t] <container> <pid> [comm]", "move process or thread into container") { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        std::string comm;
+        TString comm;
         bool thread = false;
         const auto &args = environment->GetOpts({
                 {'t', false, [&](const char *) { thread = true; }},

@@ -20,11 +20,11 @@ class TRequest;
 class TClient : public std::enable_shared_from_this<TClient>,
                 public TEpollSource {
 public:
-    std::string Id;
+    TString Id;
     TCred Cred;
     TCred TaskCred;
     pid_t Pid = 0;
-    std::string Comm;
+    TString Comm;
     gid_t UserCtGroup = 0;
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;
@@ -36,7 +36,7 @@ public:
     bool InEpoll = false;
 
     TClient(int fd);
-    TClient(const std::string &special);
+    TClient(const TString &special);
     ~TClient();
 
     std::unique_lock<std::mutex> Lock() {
@@ -44,8 +44,8 @@ public:
     }
 
     EAccessLevel AccessLevel = EAccessLevel::None;
-    std::string PortoNamespace;
-    std::string WriteNamespace;
+    TString PortoNamespace;
+    TString WriteNamespace;
 
     bool IsSuperUser(void) const;
 
@@ -70,16 +70,16 @@ public:
     void FinishRequest();
 
     TError IdentifyClient(bool initial);
-    std::string RelativeName(const std::string &name) const;
-    TError ComposeName(const std::string &name, std::string &relative_name) const;
-    TError ResolveName(const std::string &relative_name, std::string &name) const;
+    TString RelativeName(const TString &name) const;
+    TError ComposeName(const TString &name, TString &relative_name) const;
+    TError ResolveName(const TString &relative_name, TString &name) const;
 
-    TError ResolveContainer(const std::string &relative_name,
+    TError ResolveContainer(const TString &relative_name,
                             std::shared_ptr<TContainer> &ct) const;
 
-    TError ReadContainer(const std::string &relative_name,
+    TError ReadContainer(const TString &relative_name,
                          std::shared_ptr<TContainer> &ct);
-    TError WriteContainer(const std::string &relative_name,
+    TError WriteContainer(const TString &relative_name,
                           std::shared_ptr<TContainer> &ct, bool child = false);
 
     TError LockContainer(std::shared_ptr<TContainer> &ct);
@@ -101,8 +101,8 @@ public:
     TError SendResponse(bool first);
     TError QueueResponse(rpc::TPortoResponse &response);
     TError QueueReport(const TContainerReport &report, bool async);
-    TError MakeReport(const std::string &name, const std::string &state, bool async,
-                      const std::string &label = "", const std::string &value = "");
+    TError MakeReport(const TString &name, const TString &state, bool async,
+                      const TString &label = "", const TString &value = "");
 
     std::list<std::weak_ptr<TContainer>> WeakContainers;
 

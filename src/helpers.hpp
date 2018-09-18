@@ -3,7 +3,7 @@
 #include <vector>
 #include "util/path.hpp"
 
-TError RunCommand(const std::vector<std::string> &command,
+TError RunCommand(const std::vector<TString> &command,
                   const TFile &dir = TFile(),
                   const TFile &input = TFile(),
                   const TFile &output = TFile(),

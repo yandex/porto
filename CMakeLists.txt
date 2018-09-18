@@ -28,6 +28,8 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -std=c++11 -fno-exceptions -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -pedantic -std=c99 -g")
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DTString=std::string")
+
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer -gdwarf-4")
 set(CMAKE_C_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer -gdwarf-4")
 

@@ -12,7 +12,7 @@ extern "C" {
 }
 
 TError TCore::Register(const TPath &portod) {
-    std::string limit, pattern;
+    TString limit, pattern;
     TError error;
 
     if (!config().core().enable())
@@ -137,7 +137,7 @@ TError TCore::Identify() {
     }
 
     auto cg = cgmap["freezer"];
-    if (!StringStartsWith(cg, std::string(PORTO_CGROUP_PREFIX) + "/"))
+    if (!StringStartsWith(cg, TString(PORTO_CGROUP_PREFIX) + "/"))
         return TError(EError::InvalidState, "not container");
 
     Container = cg.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
@@ -152,7 +152,7 @@ TError TCore::Identify() {
             Conn.GetProperty(Container, P_OWNER_GROUP, OwnerGroup) ||
             Conn.GetProperty(Container, P_CWD, Cwd) ||
             Conn.GetProperty(Container, P_ROOT_PATH, RootPath)) {
-        std::string msg;
+        TString msg;
         auto err = Conn.GetLastError(msg);
         error = TError(err, msg);
         L_ERR("Cannot get CT:{} properties: {}", Container, error);
@@ -169,7 +169,7 @@ TError TCore::Identify() {
 }
 
 TError TCore::Forward() {
-    std::string core = Container + "/core-" + std::to_string(Pid);
+    TString core = Container + "/core-" + std::to_string(Pid);
     TMultiTuple env = {
         {"CORE_PID", std::to_string(Vpid)},
         {"CORE_TID", std::to_string(Vtid)},
@@ -213,7 +213,7 @@ TError TCore::Forward() {
 
     L("Forwading core into CT:{}", core);
 
-    std::string result;
+    TString result;
     Conn.WaitContainer(core, result, config().core().timeout_s());
     Conn.Destroy(core);
     return OK;
@@ -221,7 +221,7 @@ TError TCore::Forward() {
 
 TError TCore::Save() {
     TPath dir = DefaultPattern.DirName();
-    std::vector<std::string> names;
+    std::vector<TString> names;
     TError error;
 
     error = dir.ReadDirectory(names);
@@ -238,7 +238,7 @@ TError TCore::Save() {
             TotalSize += st.st_blocks * 512 / st.st_nlink;
 
             auto sep = name.find('%');
-            if (sep != std::string::npos && name.substr(0, sep) == Slot)
+            if (sep != TString::npos && name.substr(0, sep) == Slot)
                 SlotSize += st.st_blocks * 512;
         }
 
@@ -253,8 +253,8 @@ TError TCore::Save() {
                         Slot, SlotSize >> 20, config().core().slot_space_limit_mb()));
     }
 
-    std::string filter = "";
-    std::string format = ".core";
+    TString filter = "";
+    TString format = ".core";
 
     if (StringEndsWith(DefaultPattern.ToString(), ".gz")) {
         filter = "gzip";

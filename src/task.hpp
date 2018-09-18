@@ -31,7 +31,7 @@ struct TTaskEnv {
     TEnv Env;
     bool TripleFork;
     bool QuadroFork;
-    std::vector<std::string> Autoconf;
+    std::vector<TString> Autoconf;
     bool NewMountNs;
     std::vector<TCgroup> Cgroups;
     TCred Cred;
@@ -58,7 +58,7 @@ struct TTaskEnv {
     void Abort(const TError &error);
 };
 
-extern std::list<std::string> IpcSysctls;
+extern std::list<TString> IpcSysctls;
 void InitIpcSysctl();
 
 extern unsigned ProcBaseDirs;

@@ -19,12 +19,12 @@ public:
         return *this;
     }
     TError Open(TPath path);
-    TError Open(pid_t pid, std::string type);
+    TError Open(pid_t pid, TString type);
     int GetFd() const { return Fd; }
     void Close();
     TError SetNs(int type = 0) const;
     TError Chroot() const;
     TError Chdir() const;
     ino_t Inode() const;
-    static ino_t PidInode(pid_t pid, std::string type);
+    static ino_t PidInode(pid_t pid, TString type);
 };

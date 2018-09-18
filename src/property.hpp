@@ -252,9 +252,9 @@ enum class EProperty {
 
 class TProperty {
 public:
-    std::string Name;
+    TString Name;
     EProperty Prop;
-    std::string Desc;
+    TString Desc;
     uint64_t RequireControllers = 0;
     bool IsSupported = true;
     bool IsReadOnly = false;
@@ -264,20 +264,20 @@ public:
     bool IsDeadOnly = false;
     bool IsAnyState = false;
 
-    std::string GetDesc() const;
+    TString GetDesc() const;
 
     TError CanGet() const;
     TError CanSet() const;
-    TProperty(std::string name, EProperty prop, std::string desc);
+    TProperty(TString name, EProperty prop, TString desc);
 
     virtual void Init(void) {}
 
     virtual TError Has();
-    virtual TError Get(std::string &value) = 0;
-    virtual TError Set(const std::string &value);
+    virtual TError Get(TString &value) = 0;
+    virtual TError Set(const TString &value);
 
-    virtual TError GetIndexed(const std::string &index, std::string &value);
-    virtual TError SetIndexed(const std::string &index, const std::string &value);
+    virtual TError GetIndexed(const TString &index, TString &value);
+    virtual TError SetIndexed(const TString &index, const TString &value);
 
     virtual bool Has(const rpc::TContainerSpec &spec);
     virtual TError Load(const rpc::TContainerSpec &spec);
@@ -290,4 +290,4 @@ void InitContainerProperties(void);
 
 class TContainer;
 extern __thread TContainer *CT;
-extern std::map<std::string, TProperty*> ContainerProperties;
+extern std::map<TString, TProperty*> ContainerProperties;

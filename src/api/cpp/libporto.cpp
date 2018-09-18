@@ -17,7 +17,7 @@ Connection::~Connection() {
     Close();
 }
 
-EError Connection::SetError(const std::string &prefix, int _errno) {
+EError Connection::SetError(const TString &prefix, int _errno) {
     switch (_errno) {
         case ENOENT:
             LastError = EError::SocketUnavailable;
@@ -37,7 +37,7 @@ EError Connection::SetError(const std::string &prefix, int _errno) {
     return LastError;
 }
 
-std::string Connection::GetLastError() const {
+TString Connection::GetLastError() const {
     return rpc::EError_Name(LastError) + ":(" + LastErrorMsg + ")";
 }
 
@@ -197,8 +197,8 @@ EError Connection::Call(int extra_timeout) {
     return LastError;
 }
 
-EError Connection::Call(const std::string &req,
-                        std::string &rsp,
+EError Connection::Call(const TString &req,
+                        TString &rsp,
                         int extra_timeout) {
     Req.Clear();
     if (!google::protobuf::TextFormat::ParseFromString(req, &Req)) {
@@ -213,7 +213,7 @@ EError Connection::Call(const std::string &req,
     return LastError;
 }
 
-EError Connection::GetVersion(std::string &tag, std::string &revision) {
+EError Connection::GetVersion(TString &tag, TString &revision) {
     Req.Clear();
     Req.mutable_version();
 
@@ -233,35 +233,35 @@ const rpc::TGetSystemResponse *Connection::GetSystem() {
     return nullptr;
 }
 
-EError Connection::SetSystem(const std::string &key, const std::string &val) {
-    std::string rsp;
+EError Connection::SetSystem(const TString &key, const TString &val) {
+    TString rsp;
     return Call("SetSystem {" + key + ":" + val + "}", rsp);
 }
 
 /* Container */
 
-EError Connection::Create(const std::string &name) {
+EError Connection::Create(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_create();
     req->set_name(name);
     return Call();
 }
 
-EError Connection::CreateWeakContainer(const std::string &name) {
+EError Connection::CreateWeakContainer(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_createweak();
     req->set_name(name);
     return Call();
 }
 
-EError Connection::Destroy(const std::string &name) {
+EError Connection::Destroy(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_destroy();
     req->set_name(name);
     return Call();
 }
 
-const rpc::TContainerListResponse *Connection::List(const std::string &mask) {
+const rpc::TContainerListResponse *Connection::List(const TString &mask) {
     auto req = Req.mutable_list();
 
     if(!mask.empty())
@@ -273,13 +273,13 @@ const rpc::TContainerListResponse *Connection::List(const std::string &mask) {
     return nullptr;
 }
 
-EError Connection::List(std::vector<std::string> &list, const std::string &mask) {
+EError Connection::List(std::vector<TString> &list, const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_list();
     if(!mask.empty())
         req->set_mask(mask);
     if (!Call())
-        list = std::vector<std::string>(std::begin(Rsp.list().name()),
+        list = std::vector<TString>(std::begin(Rsp.list().name()),
                                         std::end(Rsp.list().name()));
     return LastError;
 }
@@ -317,7 +317,7 @@ const rpc::TContainerPropertyListResponse *Connection::ListProperties() {
     return &Rsp.propertylist();
 }
 
-EError Connection::ListProperties(std::vector<std::string> &properties) {
+EError Connection::ListProperties(std::vector<TString> &properties) {
     properties.clear();
     auto rsp = ListProperties();
     if (rsp) {
@@ -327,8 +327,8 @@ EError Connection::ListProperties(std::vector<std::string> &properties) {
     return LastError;
 }
 
-const rpc::TContainerGetResponse *Connection::Get(const std::vector<std::string> &names,
-                                                  const std::vector<std::string> &vars,
+const rpc::TContainerGetResponse *Connection::Get(const std::vector<TString> &names,
+                                                  const std::vector<TString> &vars,
                                                   int flags) {
     Req.Clear();
     auto get = Req.mutable_get();
@@ -352,7 +352,7 @@ const rpc::TContainerGetResponse *Connection::Get(const std::vector<std::string>
     return nullptr;
 }
 
-const rpc::TContainerSpec *Connection::GetContainerSpec(const std::string &name) {
+const rpc::TContainerSpec *Connection::GetContainerSpec(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_getcontainer();
 
@@ -364,9 +364,9 @@ const rpc::TContainerSpec *Connection::GetContainerSpec(const std::string &name)
     return nullptr;
 }
 
-EError Connection::GetProperty(const std::string &name,
-                               const std::string &property,
-                               std::string &value,
+EError Connection::GetProperty(const TString &name,
+                               const TString &property,
+                               TString &value,
                                int flags) {
     Req.Clear();
     auto req = Req.mutable_getproperty();
@@ -384,11 +384,11 @@ EError Connection::GetProperty(const std::string &name,
     return LastError;
 }
 
-EError Connection::GetProperty(const std::string &name,
-                               const std::string &property,
+EError Connection::GetProperty(const TString &name,
+                               const TString &property,
                                uint64_t &value,
                                int flags) {
-    std::string str;
+    TString str;
     if (!GetProperty(name, property, str, flags)) {
         const char *ptr = str.c_str();
         char *end;
@@ -403,9 +403,9 @@ EError Connection::GetProperty(const std::string &name,
     return LastError;
 }
 
-EError Connection::SetProperty(const std::string &name,
-                               const std::string &property,
-                               const std::string &value) {
+EError Connection::SetProperty(const TString &name,
+                               const TString &property,
+                               const TString &value) {
     Req.Clear();
     auto req = Req.mutable_setproperty();
 
@@ -416,8 +416,8 @@ EError Connection::SetProperty(const std::string &name,
     return Call();
 }
 
-EError Connection::IncLabel(const std::string &name,
-                            const std::string &label,
+EError Connection::IncLabel(const TString &name,
+                            const TString &label,
                             int64_t add,
                             int64_t &result) {
     Req.Clear();
@@ -434,7 +434,7 @@ EError Connection::IncLabel(const std::string &name,
 
     return LastError;
 }
-EError Connection::Start(const std::string &name) {
+EError Connection::Start(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_start();
 
@@ -443,7 +443,7 @@ EError Connection::Start(const std::string &name) {
     return Call();
 }
 
-EError Connection::Stop(const std::string &name, int timeout) {
+EError Connection::Stop(const TString &name, int timeout) {
     Req.Clear();
     auto req = Req.mutable_stop();
 
@@ -454,7 +454,7 @@ EError Connection::Stop(const std::string &name, int timeout) {
     return Call(timeout);
 }
 
-EError Connection::Kill(const std::string &name, int sig) {
+EError Connection::Kill(const TString &name, int sig) {
     Req.Clear();
     auto req = Req.mutable_kill();
 
@@ -464,7 +464,7 @@ EError Connection::Kill(const std::string &name, int sig) {
     return Call();
 }
 
-EError Connection::Pause(const std::string &name) {
+EError Connection::Pause(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_pause();
 
@@ -473,7 +473,7 @@ EError Connection::Pause(const std::string &name) {
     return Call();
 }
 
-EError Connection::Resume(const std::string &name) {
+EError Connection::Resume(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_resume();
 
@@ -482,7 +482,7 @@ EError Connection::Resume(const std::string &name) {
     return Call();
 }
 
-EError Connection::Respawn(const std::string &name) {
+EError Connection::Respawn(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_respawn();
 
@@ -491,8 +491,8 @@ EError Connection::Respawn(const std::string &name) {
     return Call();
 }
 
-EError Connection::WaitContainer(const std::string &name,
-                                 std::string &result_state,
+EError Connection::WaitContainer(const TString &name,
+                                 TString &result_state,
                                  int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
@@ -514,9 +514,9 @@ EError Connection::WaitContainer(const std::string &name,
     return LastError;
 }
 
-EError Connection::WaitContainers(const std::vector<std::string> &names,
-                                  std::string &result_name,
-                                  std::string &result_state,
+EError Connection::WaitContainers(const std::vector<TString> &names,
+                                  TString &result_name,
+                                  TString &result_state,
                                   int timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
@@ -542,8 +542,8 @@ EError Connection::WaitContainers(const std::vector<std::string> &names,
 }
 
 const rpc::TContainerWaitResponse *
-Connection::Wait(const std::vector<std::string> &names,
-                 const std::vector<std::string> &labels,
+Connection::Wait(const std::vector<TString> &names,
+                 const std::vector<TString> &labels,
                  int timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
@@ -564,8 +564,8 @@ Connection::Wait(const std::vector<std::string> &names,
     return nullptr;
 }
 
-EError Connection::AsyncWait(const std::vector<std::string> &names,
-                             const std::vector<std::string> &labels,
+EError Connection::AsyncWait(const std::vector<TString> &names,
+                             const std::vector<TString> &labels,
                              TWaitCallback callback,
                              int timeout) {
     Req.Clear();
@@ -593,10 +593,10 @@ EError Connection::AsyncWait(const std::vector<std::string> &names,
     return LastError;
 }
 
-EError Connection::ConvertPath(const std::string &path,
-                               const std::string &src,
-                               const std::string &dest,
-                               std::string &res) {
+EError Connection::ConvertPath(const TString &path,
+                               const TString &src,
+                               const TString &dest,
+                               TString &res) {
     Req.Clear();
     auto req = Req.mutable_convertpath();
 
@@ -610,8 +610,8 @@ EError Connection::ConvertPath(const std::string &path,
     return LastError;
 }
 
-EError Connection::AttachProcess(const std::string &name, int pid,
-                                 const std::string &comm) {
+EError Connection::AttachProcess(const TString &name, int pid,
+                                 const TString &comm) {
     Req.Clear();
     auto req = Req.mutable_attachprocess();
 
@@ -622,8 +622,8 @@ EError Connection::AttachProcess(const std::string &name, int pid,
     return Call();
 }
 
-EError Connection::AttachThread(const std::string &name, int pid,
-                                const std::string &comm) {
+EError Connection::AttachThread(const TString &name, int pid,
+                                const TString &comm) {
     Req.Clear();
     auto req = Req.mutable_attachthread();
 
@@ -634,8 +634,8 @@ EError Connection::AttachThread(const std::string &name, int pid,
     return Call();
 }
 
-EError Connection::LocateProcess(int pid, const std::string &comm,
-                                 std::string &name) {
+EError Connection::LocateProcess(int pid, const TString &comm,
+                                 TString &name) {
     Req.Clear();
     auto req = Req.mutable_locateprocess();
 
@@ -660,7 +660,7 @@ const rpc::TVolumePropertyListResponse *Connection::ListVolumeProperties() {
     return nullptr;
 }
 
-EError Connection::ListVolumeProperties(std::vector<std::string> &properties) {
+EError Connection::ListVolumeProperties(std::vector<TString> &properties) {
     properties.clear();
     auto rsp = ListVolumeProperties();
     if (rsp) {
@@ -670,8 +670,8 @@ EError Connection::ListVolumeProperties(std::vector<std::string> &properties) {
     return LastError;
 }
 
-EError Connection::CreateVolume(std::string &path,
-                                const std::map<std::string, std::string> &config) {
+EError Connection::CreateVolume(TString &path,
+                                const std::map<TString, TString> &config) {
     Req.Clear();
     auto req = Req.mutable_createvolume();
 
@@ -689,8 +689,8 @@ EError Connection::CreateVolume(std::string &path,
     return LastError;
 }
 
-EError Connection::TuneVolume(const std::string &path,
-                              const std::map<std::string, std::string> &config) {
+EError Connection::TuneVolume(const TString &path,
+                              const std::map<TString, TString> &config) {
     Req.Clear();
     auto req = Req.mutable_tunevolume();
 
@@ -705,9 +705,9 @@ EError Connection::TuneVolume(const std::string &path,
     return Call(DiskTimeout);
 }
 
-EError Connection::LinkVolume(const std::string &path,
-                              const std::string &container,
-                              const std::string &target,
+EError Connection::LinkVolume(const TString &path,
+                              const TString &container,
+                              const TString &target,
                               bool read_only,
                               bool required) {
     Req.Clear();
@@ -727,9 +727,9 @@ EError Connection::LinkVolume(const std::string &path,
     return Call();
 }
 
-EError Connection::UnlinkVolume(const std::string &path,
-                                const std::string &container,
-                                const std::string &target,
+EError Connection::UnlinkVolume(const TString &path,
+                                const TString &container,
+                                const TString &target,
                                 bool strict) {
     Req.Clear();
     auto req = (target == "***") ? Req.mutable_unlinkvolume() :
@@ -747,8 +747,8 @@ EError Connection::UnlinkVolume(const std::string &path,
 }
 
 const rpc::TVolumeListResponse *
-Connection::ListVolumes(const std::string &path,
-                        const std::string &container) {
+Connection::ListVolumes(const TString &path,
+                        const TString &container) {
     Req.Clear();
     auto req = Req.mutable_listvolumes();
 
@@ -774,7 +774,7 @@ Connection::ListVolumes(const std::string &path,
     return list;
 }
 
-EError Connection::ListVolumes(std::vector<std::string> &paths) {
+EError Connection::ListVolumes(std::vector<TString> &paths) {
     Req.Clear();
     auto rsp = ListVolumes();
     paths.clear();
@@ -785,7 +785,7 @@ EError Connection::ListVolumes(std::vector<std::string> &paths) {
     return LastError;
 }
 
-const rpc::TVolumeDescription *Connection::GetVolume(const std::string &path) {
+const rpc::TVolumeDescription *Connection::GetVolume(const TString &path) {
     Req.Clear();
     auto rsp = ListVolumes(path);
 
@@ -795,7 +795,7 @@ const rpc::TVolumeDescription *Connection::GetVolume(const std::string &path) {
     return nullptr;
 }
 
-const rpc::TVolumeSpec *Connection::GetVolumeSpec(const std::string &path) {
+const rpc::TVolumeSpec *Connection::GetVolumeSpec(const TString &path) {
     Req.Clear();
     auto req = Req.mutable_getvolume();
 
@@ -809,11 +809,11 @@ const rpc::TVolumeSpec *Connection::GetVolumeSpec(const std::string &path) {
 
 /* Layer*/
 
-EError Connection::ImportLayer(const std::string &layer,
-                               const std::string &tarball,
+EError Connection::ImportLayer(const TString &layer,
+                               const TString &tarball,
                                bool merge,
-                               const std::string &place,
-                               const std::string &private_value) {
+                               const TString &place,
+                               const TString &private_value) {
     Req.Clear();
     auto req = Req.mutable_importlayer();
 
@@ -828,9 +828,9 @@ EError Connection::ImportLayer(const std::string &layer,
     return Call(DiskTimeout);
 }
 
-EError Connection::ExportLayer(const std::string &volume,
-                               const std::string &tarball,
-                               const std::string &compress) {
+EError Connection::ExportLayer(const TString &volume,
+                               const TString &tarball,
+                               const TString &compress) {
     Req.Clear();
     auto req = Req.mutable_exportlayer();
 
@@ -842,9 +842,9 @@ EError Connection::ExportLayer(const std::string &volume,
     return Call(DiskTimeout);
 }
 
-EError Connection::ReExportLayer(const std::string &layer,
-                                 const std::string &tarball,
-                                 const std::string &compress) {
+EError Connection::ReExportLayer(const TString &layer,
+                                 const TString &tarball,
+                                 const TString &compress) {
     Req.Clear();
     auto req = Req.mutable_exportlayer();
 
@@ -857,8 +857,8 @@ EError Connection::ReExportLayer(const std::string &layer,
     return Call(DiskTimeout);
 }
 
-EError Connection::RemoveLayer(const std::string &layer,
-                               const std::string &place) {
+EError Connection::RemoveLayer(const TString &layer,
+                               const TString &place) {
     Req.Clear();
     auto req = Req.mutable_removelayer();
 
@@ -869,8 +869,8 @@ EError Connection::RemoveLayer(const std::string &layer,
     return Call(DiskTimeout);
 }
 
-const rpc::TLayerListResponse *Connection::ListLayers(const std::string &place,
-                                                      const std::string &mask) {
+const rpc::TLayerListResponse *Connection::ListLayers(const TString &place,
+                                                      const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_listlayers();
 
@@ -899,9 +899,9 @@ const rpc::TLayerListResponse *Connection::ListLayers(const std::string &place,
     return list;
 }
 
-EError Connection::ListLayers(std::vector<std::string> layers,
-                              const std::string &place,
-                              const std::string &mask) {
+EError Connection::ListLayers(std::vector<TString> layers,
+                              const TString &place,
+                              const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_listlayers();
 
@@ -911,15 +911,15 @@ EError Connection::ListLayers(std::vector<std::string> layers,
         req->set_mask(mask);
 
     if (!Call())
-        layers = std::vector<std::string>(std::begin(Rsp.layers().layer()),
+        layers = std::vector<TString>(std::begin(Rsp.layers().layer()),
                                           std::end(Rsp.layers().layer()));
 
     return LastError;
 }
 
-EError Connection::GetLayerPrivate(std::string &private_value,
-                                   const std::string &layer,
-                                   const std::string &place) {
+EError Connection::GetLayerPrivate(TString &private_value,
+                                   const TString &layer,
+                                   const TString &place) {
     Req.Clear();
     auto req = Req.mutable_getlayerprivate();
 
@@ -933,9 +933,9 @@ EError Connection::GetLayerPrivate(std::string &private_value,
     return LastError;
 }
 
-EError Connection::SetLayerPrivate(const std::string &private_value,
-                                   const std::string &layer,
-                                   const std::string &place) {
+EError Connection::SetLayerPrivate(const TString &private_value,
+                                   const TString &layer,
+                                   const TString &place) {
     Req.Clear();
     auto req = Req.mutable_setlayerprivate();
 
@@ -950,8 +950,8 @@ EError Connection::SetLayerPrivate(const std::string &private_value,
 /* Storage */
 
 const rpc::TStorageListResponse *
-Connection::ListStorages(const std::string &place,
-                         const std::string &mask) {
+Connection::ListStorages(const TString &place,
+                         const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_liststorage();
 
@@ -966,9 +966,9 @@ Connection::ListStorages(const std::string &place,
     return &Rsp.storagelist();
 }
 
-EError Connection::ListStorages(std::vector<std::string> &storages,
-                                const std::string &place,
-                                const std::string &mask) {
+EError Connection::ListStorages(std::vector<TString> &storages,
+                                const TString &place,
+                                const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_listlayers();
 
@@ -986,8 +986,8 @@ EError Connection::ListStorages(std::vector<std::string> &storages,
     return LastError;
 }
 
-EError Connection::RemoveStorage(const std::string &storage,
-                                 const std::string &place) {
+EError Connection::RemoveStorage(const TString &storage,
+                                 const TString &place) {
     Req.Clear();
     auto req = Req.mutable_removestorage();
 
@@ -998,11 +998,11 @@ EError Connection::RemoveStorage(const std::string &storage,
     return Call(DiskTimeout);
 }
 
-EError Connection::ImportStorage(const std::string &storage,
-                                 const std::string &archive,
-                                 const std::string &place,
-                                 const std::string &compression,
-                                 const std::string &private_value) {
+EError Connection::ImportStorage(const TString &storage,
+                                 const TString &archive,
+                                 const TString &place,
+                                 const TString &compression,
+                                 const TString &private_value) {
     Req.Clear();
     auto req = Req.mutable_importstorage();
 
@@ -1018,10 +1018,10 @@ EError Connection::ImportStorage(const std::string &storage,
     return Call(DiskTimeout);
 }
 
-EError Connection::ExportStorage(const std::string &storage,
-                                 const std::string &archive,
-                                 const std::string &place,
-                                 const std::string &compression) {
+EError Connection::ExportStorage(const TString &storage,
+                                 const TString &archive,
+                                 const TString &place,
+                                 const TString &compression) {
     Req.Clear();
     auto req = Req.mutable_exportstorage();
 

@@ -17,7 +17,7 @@ TError TNamespaceFd::Open(TPath path) {
     return OK;
 }
 
-TError TNamespaceFd::Open(pid_t pid, std::string type) {
+TError TNamespaceFd::Open(pid_t pid, TString type) {
     return Open("/proc/" + std::to_string(pid) + "/" + type);
 }
 
@@ -64,7 +64,7 @@ ino_t TNamespaceFd::Inode() const {
     return -1;
 }
 
-ino_t TNamespaceFd::PidInode(pid_t pid, std::string type) {
+ino_t TNamespaceFd::PidInode(pid_t pid, TString type) {
     struct stat st;
     if (TPath("/proc/" + std::to_string(pid) + "/" + type).StatFollow(st))
         return 0;

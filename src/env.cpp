@@ -12,7 +12,7 @@ void TEnv::ClearEnv() {
     Environ.clear();
 }
 
-bool TEnv::GetEnv(const std::string &name, std::string &value) const {
+bool TEnv::GetEnv(const TString &name, TString &value) const {
     for (const auto &var: Vars) {
         if (var.Set && var.Name == name) {
             value = var.Value;
@@ -22,7 +22,7 @@ bool TEnv::GetEnv(const std::string &name, std::string &value) const {
     return false;
 }
 
-TError TEnv::SetEnv(const std::string &name, const std::string &value,
+TError TEnv::SetEnv(const TString &name, const TString &value,
                     bool overwrite /* true */, bool lock /* false */) {
     for (auto &var: Vars) {
         if (var.Name != name)
@@ -43,7 +43,7 @@ TError TEnv::SetEnv(const std::string &name, const std::string &value,
     return OK;
 }
 
-TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
+TError TEnv::UnsetEnv(const TString &name, bool overwrite /* true */) {
     for (auto &var: Vars) {
         if (var.Name != name)
             continue;
@@ -62,12 +62,12 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
     return OK;
 }
 
-TError TEnv::Parse(const std::string &cfg, bool overwrite) {
+TError TEnv::Parse(const TString &cfg, bool overwrite) {
     for (auto &str: SplitEscapedString(cfg, ';')) {
         auto sep = str.find('=');
         TError error;
 
-        if (sep == std::string::npos)
+        if (sep == TString::npos)
             error = UnsetEnv(str, overwrite);
         else
             error = SetEnv(str.substr(0, sep),
@@ -78,7 +78,7 @@ TError TEnv::Parse(const std::string &cfg, bool overwrite) {
     return OK;
 }
 
-void TEnv::Format(std::string &cfg) const {
+void TEnv::Format(TString &cfg) const {
     TTuple tuple;
     for (const auto &var: Vars) {
         if (var.Set)
@@ -114,11 +114,11 @@ char **TEnv::Envp() {
 }
 
 /* <type>: <soft>|unlimited [hard] */
-TError TUlimitResource::Parse(const std::string &str) {
+TError TUlimitResource::Parse(const TString &str) {
     auto col = str.find(':');
     TError error;
 
-    if (col == std::string::npos)
+    if (col == TString::npos)
         return TError(EError::InvalidValue, "Invalid ulimit: {}", str);
 
     auto name = StringTrim(str.substr(0, col));
@@ -137,7 +137,7 @@ TError TUlimitResource::Parse(const std::string &str) {
             return TError(error, "Invalid ulimit: {}", str);
     }
 
-    val = sep == std::string::npos ? "" : StringTrim(arg.substr(sep));
+    val = sep == TString::npos ? "" : StringTrim(arg.substr(sep));
     if (val == "") {
         Hard = Soft;
     } else if (val == "unlimited" || val == "unlim" || val == "inf" || val == "-1") {
@@ -151,14 +151,14 @@ TError TUlimitResource::Parse(const std::string &str) {
     return OK;
 }
 
-std::string TUlimitResource::Format() const {
+TString TUlimitResource::Format() const {
     auto soft = Soft < RLIM_INFINITY ? fmt::format("{}", Soft) : "unlimited";
     auto hard = Hard < RLIM_INFINITY ? fmt::format("{}", Hard) : "unlimited";
     return fmt::format("{}: {} {}", TUlimit::GetName(Type), soft, hard);
 }
 
-int TUlimit::GetType(const std::string &name) {
-    static const std::map<std::string, int> types = {
+int TUlimit::GetType(const TString &name) {
+    static const std::map<TString, int> types = {
         { "as", RLIMIT_AS },
         { "core", RLIMIT_CORE },
         { "cpu", RLIMIT_CPU },
@@ -180,7 +180,7 @@ int TUlimit::GetType(const std::string &name) {
     return idx == types.end() ? -1 : idx->second;
 }
 
-std::string TUlimit::GetName(int type) {
+TString TUlimit::GetName(int type) {
     switch (type) {
     case RLIMIT_AS:
         return "as";
@@ -219,9 +219,9 @@ std::string TUlimit::GetName(int type) {
     }
 }
 
-TError TUlimit::Parse(const std::string &str) {
+TError TUlimit::Parse(const TString &str) {
     std::istringstream ss(str);
-    std::string lim;
+    TString lim;
     TError error;
 
     while(std::getline(ss, lim, ';')) {
@@ -240,8 +240,8 @@ TError TUlimit::Parse(const std::string &str) {
     return OK;
 }
 
-std::string TUlimit::Format() const {
-    std::string str;
+TString TUlimit::Format() const {
+    TString str;
     for (auto &res: Resources)
         str += res.Format() + "; ";
     return str;

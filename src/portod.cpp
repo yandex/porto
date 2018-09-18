@@ -45,7 +45,7 @@ extern "C" {
 #include <sys/resource.h>
 }
 
-std::string PreviousVersion;
+TString PreviousVersion;
 
 static TPidFile MasterPidFile(PORTO_MASTER_PIDFILE, PORTOD_MASTER_NAME, "portod");
 static TPidFile PortodPidFile(PORTO_PIDFILE, PORTOD_NAME, "portod-slave");
@@ -74,18 +74,18 @@ static uint64_t ShutdownDeadline = 0;
 static bool RunningInContainer() {
     if (getpid() == 1)
         return getenv("container") != nullptr;
-    std::string env;
+    TString env;
     if (TPath("/proc/1/environ").ReadAll(env))
         return false;
     return StringStartsWith(env, "container=") ||
-        env.find(std::string("\0container=", 11)) != std::string::npos;
+        env.find(TString("\0container=", 11)) != TString::npos;
 }
 
 static bool CheckPortoAlive() {
     Porto::Connection conn;
     if (conn.SetTimeout(1) != EError::Success)
         return false;
-    std::string ver, rev;
+    TString ver, rev;
     return !conn.GetVersion(ver, rev);
 }
 
@@ -566,7 +566,7 @@ static TError CreateRootContainer() {
         return error;
 
     uint64_t pids_max, threads_max;
-    std::string str;
+    TString str;
     if (!GetSysctl("kernel.pid_max", str) && !StringToUint64(str, pids_max) &&
             !GetSysctl("kernel.threads-max", str) && !StringToUint64(str, threads_max)) {
         uint64_t lim = std::min(pids_max, threads_max) / 2;
@@ -723,7 +723,7 @@ again:
 
 static void CleanupWorkdir() {
     TPath temp(PORTO_WORKDIR);
-    std::vector<std::string> list;
+    std::vector<TString> list;
     TError error;
 
     error = temp.ReadDirectory(list);
@@ -1290,10 +1290,10 @@ static int PortodMaster() {
         (void)pathBin.Unlink();
         error = pathBin.Symlink(thisBin);
         if (error)
-            FatalError("Cannot update " + std::string(PORTO_BINARY_PATH), error);
+            FatalError("Cannot update " + TString(PORTO_BINARY_PATH), error);
     }
 
-    L_SYS("{}", std::string(80, '-'));
+    L_SYS("{}", TString(80, '-'));
     L_SYS("Started {} {} {} {}", PORTO_VERSION, PORTO_REVISION, GetPid(), thisBin);
     L_SYS("Previous version: {} {}", PreviousVersion, prevBin);
 
@@ -1378,7 +1378,7 @@ static void PrintVersion() {
     std::cout << "version: " << PORTO_VERSION << " " << PORTO_REVISION << " " << thisBin << std::endl;
 
     Porto::Connection conn;
-    std::string ver, rev;
+    TString ver, rev;
     if (!conn.GetVersion(ver, rev))
         std::cout << "running: " <<  ver + " " + rev << " " << currBin << std::endl;
 }
@@ -1662,7 +1662,7 @@ int main(int argc, char **argv) {
     int opt = 0;
 
     while (++opt < argc && argv[opt][0] == '-') {
-        std::string arg(argv[opt]);
+        TString arg(argv[opt]);
 
         if (arg == "-v" || arg == "--version") {
             PrintVersion();
@@ -1694,7 +1694,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    std::string cmd(argv[opt] ?: "");
+    TString cmd(argv[opt] ?: "");
 
     if (cmd == "status") {
         if (!MasterPidFile.Path.Exists()) {

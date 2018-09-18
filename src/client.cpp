@@ -34,7 +34,7 @@ TClient::TClient(int fd) : TEpollSource(fd) {
         Statistics->ClientsCount++;
 }
 
-TClient::TClient(const std::string &special) {
+TClient::TClient(const TString &special) {
     Cred = TCred(RootUser, RootGroup);
     TaskCred = TCred(RootUser, RootGroup);
     Comm = special;
@@ -163,7 +163,7 @@ TError TClient::IdentifyClient(bool initial) {
     return OK;
 }
 
-std::string TClient::RelativeName(const std::string &name) const {
+TString TClient::RelativeName(const TString &name) const {
     if (name == ROOT_CONTAINER)
         return ROOT_CONTAINER;
     if (PortoNamespace == "")
@@ -173,7 +173,7 @@ std::string TClient::RelativeName(const std::string &name) const {
     return ROOT_PORTO_NAMESPACE + name;
 }
 
-TError TClient::ComposeName(const std::string &name, std::string &relative_name) const {
+TError TClient::ComposeName(const TString &name, TString &relative_name) const {
     if (name == ROOT_CONTAINER) {
         relative_name = ROOT_CONTAINER;
         return OK;
@@ -192,14 +192,14 @@ TError TClient::ComposeName(const std::string &name, std::string &relative_name)
     return OK;
 }
 
-TError TClient::ResolveName(const std::string &relative_name, std::string &name) const {
+TError TClient::ResolveName(const TString &relative_name, TString &name) const {
     if (relative_name == ROOT_CONTAINER)
         name = ROOT_CONTAINER;
     else if (relative_name == SELF_CONTAINER)
         name = ClientContainer->Name;
     else if (relative_name == DOT_CONTAINER)
         name = TContainer::ParentName(PortoNamespace);
-    else if (StringStartsWith(relative_name, SELF_CONTAINER + std::string("/"))) {
+    else if (StringStartsWith(relative_name, SELF_CONTAINER + TString("/"))) {
         name = relative_name.substr(strlen(SELF_CONTAINER) + 1);
         if (!ClientContainer->IsRoot())
             name = ClientContainer->Name + "/" + name;
@@ -221,9 +221,9 @@ TError TClient::ResolveName(const std::string &relative_name, std::string &name)
     return TError(EError::Permission, "container name out of namespace: " + relative_name);
 }
 
-TError TClient::ResolveContainer(const std::string &relative_name,
+TError TClient::ResolveContainer(const TString &relative_name,
                                  std::shared_ptr<TContainer> &ct) const {
-    std::string name;
+    TString name;
     TError error = ResolveName(relative_name, name);
     if (error)
         return error;
@@ -244,7 +244,7 @@ TError TClient::ControlVolume(const TPath &path, std::shared_ptr<TVolume> &volum
     return OK;
 }
 
-TError TClient::ReadContainer(const std::string &relative_name,
+TError TClient::ReadContainer(const TString &relative_name,
                               std::shared_ptr<TContainer> &ct) {
     auto lock = LockContainers();
     TError error = ResolveContainer(relative_name, ct);
@@ -257,7 +257,7 @@ TError TClient::ReadContainer(const std::string &relative_name,
     return OK;
 }
 
-TError TClient::WriteContainer(const std::string &relative_name,
+TError TClient::WriteContainer(const TString &relative_name,
                                std::shared_ptr<TContainer> &ct, bool child) {
     if (AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "Write access denied");
@@ -562,8 +562,8 @@ TError TClient::QueueReport(const TContainerReport &report, bool async) {
     return QueueResponse(rsp);
 }
 
-TError TClient::MakeReport(const std::string &name, const std::string &state, bool async,
-                           const std::string &label, const std::string &value) {
+TError TClient::MakeReport(const TString &name, const TString &state, bool async,
+                           const TString &label, const TString &value) {
     auto lock = Lock();
     TError error;
 

@@ -66,7 +66,7 @@ struct TNetClass {
     TUintMap TxLimit;
     TUintMap RxLimit;
 
-    std::map<std::string, TNetStat> ClassStat;
+    std::map<TString, TNetStat> ClassStat;
     std::shared_ptr<TNetwork> OriginNet;
 
     TNetClass *Fold;
@@ -75,14 +75,14 @@ struct TNetClass {
 
 class TNetDevice {
 public:
-    std::string Name;
-    std::string Type;
-    std::string Qdisc;
+    TString Name;
+    TString Type;
+    TString Qdisc;
     int Owner = 0;
     int Index;
     int Link;
     int Group;
-    std::string GroupName;
+    TString GroupName;
     int MTU;
     uint64_t Rate, Ceil;
     bool Managed;
@@ -97,12 +97,12 @@ public:
     TNetDevice(struct rtnl_link *);
 
     uint64_t GetConfig(const TUintMap &cfg, uint64_t def = 0, int cs = -1) const;
-    std::string GetConfig(const TStringMap &cfg, std::string def = "", int cs = -1) const;
+    TString GetConfig(const TStringMap &cfg, TString def = "", int cs = -1) const;
 };
 
 struct TNetProxyNeighbour {
     TNlAddr Ip;
-    std::string Master;
+    TString Master;
 };
 
 class TNetwork : public TPortoNonCopyable {
@@ -172,7 +172,7 @@ public:
     std::shared_ptr<TNl> GetNl() { return Nl; }
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
 
-    std::string NetName;
+    TString NetName;
 
     static TError New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net);
     static TError Open(const TPath &path, TNamespaceFd &netns,
@@ -192,18 +192,18 @@ public:
 
     std::vector<TNetDevice> Devices;
 
-    std::map<std::string, TNetStat> DeviceStat;
+    std::map<TString, TNetStat> DeviceStat;
 
     std::list<TNetProxyNeighbour> Neighbours;
 
-    std::map<std::string, int> DeviceOwners;
+    std::map<TString, int> DeviceOwners;
 
     TError SyncDevices();
-    std::string NewDeviceName(const std::string &prefix);
-    std::string MatchDevice(const std::string &pattern);
-    int DeviceIndex(const std::string &name);
+    TString NewDeviceName(const TString &prefix);
+    TString MatchDevice(const TString &pattern);
+    int DeviceIndex(const TString &name);
     void GetDeviceSpeed(TNetDevice &dev) const;
-    void SetDeviceOwner(const std::string &name, int owner);
+    void SetDeviceOwner(const TString &name, int owner);
 
     void StartRepair();
     TError WaitRepair();
@@ -223,10 +223,10 @@ public:
     TError GetL3Gate(TNetDeviceConfig &dev);
 
     TError SetupProxyNeighbour(const std::vector <TNlAddr> &ip,
-                               const std::string &master);
+                               const TString &master);
 
     TError AddProxyNeightbour(const std::vector<TNlAddr> &ip,
-                              const std::string &master);
+                              const TString &master);
     void DelProxyNeightbour(const std::vector<TNlAddr> &ip);
     void RepairProxyNeightbour();
 
@@ -240,14 +240,14 @@ public:
     TError SetupAddrLabel();
 
     static void InitializeConfig();
-    static std::string DeviceGroupName(int group);
+    static TString DeviceGroupName(int group);
 
     static int DefaultTos;
-    static TError ParseTos(const std::string &str, int &tos);
-    static std::string FormatTos(int tos);
+    static TError ParseTos(const TString &str, int &tos);
+    static TString FormatTos(int tos);
 
-    static bool NetworkSysctl(const std::string &key);
-    static bool NamespaceSysctl(const std::string &key);
+    static bool NetworkSysctl(const TString &key);
+    static bool NamespaceSysctl(const TString &key);
 
     static TError StartNetwork(TContainer &ct, TTaskEnv &task);
     static void StopNetwork(TContainer &ct);
@@ -259,11 +259,11 @@ public:
 };
 
 struct TNetDeviceConfig {
-    std::string Name;
-    std::string Type;
-    std::string Mode;
-    std::string Mac;
-    std::string Master;
+    TString Name;
+    TString Type;
+    TString Mode;
+    TString Mac;
+    TString Master;
     int Mtu = -1;
     int Group = 0;
     bool Autoconf = false;
@@ -288,7 +288,7 @@ struct TNetDeviceConfig {
 
 struct TNetEnv {
     unsigned Id;
-    std::string Name;
+    TString Name;
     TCred TaskCred;
 
     std::shared_ptr<TContainer> Parent;
@@ -305,9 +305,9 @@ struct TNetEnv {
     bool SaveIp = false;
     bool EnableECN = false;
 
-    std::string Hostname;
-    std::string NetNsName;
-    std::string NetCtName;
+    TString Hostname;
+    TString NetNsName;
+    TString NetCtName;
     TMultiTuple IpRoute;
     TStringMap NetSysctl;
 
@@ -321,7 +321,7 @@ struct TNetEnv {
 
     TError CheckIpLimit();
 
-    std::string GenerateHw(const std::string &name);
+    TString GenerateHw(const TString &name);
     TError ConfigureL3(TNetDeviceConfig &dev);
     TError SetupInterfaces();
     TError ApplySysctl();

@@ -15,26 +15,26 @@ class TStorage {
 public:
     enum EStorageType Type;
     TPath Place;
-    std::string Name;
+    TString Name;
 
     TPath Path;
-    std::string Meta;
-    std::string FirstName;
+    TString Meta;
+    TString FirstName;
 
     TCred Owner;
-    std::string Private;
+    TString Private;
     time_t LastChange = 0;
     uint64_t Size = 0;
 
-    TError Resolve(EStorageType type, const TPath &place, const std::string &name = "");
-    void Open(EStorageType type, const TPath &place, const std::string &name = "");
+    TError Resolve(EStorageType type, const TPath &place, const TString &name = "");
+    void Open(EStorageType type, const TPath &place, const TString &name = "");
 
-    static TError CheckName(const std::string &name, bool meta=false);
+    static TError CheckName(const TString &name, bool meta=false);
     static TError CheckPlace(const TPath &place);
     static TError SanitizeLayer(const TPath &layer, bool merge);
     TError List(enum EStorageType type, std::list<TStorage> &list);
-    TError ImportArchive(const TPath &archive, const std::string &compress = "", bool merge = false);
-    TError ExportArchive(const TPath &archive, const std::string &compress = "");
+    TError ImportArchive(const TPath &archive, const TString &compress = "", bool merge = false);
+    TError ExportArchive(const TPath &archive, const TString &compress = "");
     bool Exists() const;
     bool Weak() const;
     uint64_t LastUsage() const;
@@ -42,8 +42,8 @@ public:
     TError Remove(bool weak = false);
     TError Touch();
     TError SaveOwner(const TCred &owner);
-    TError SetPrivate(const std::string &text);
-    TError SavePrivate(const std::string &text);
+    TError SetPrivate(const TString &text);
+    TError SavePrivate(const TString &text);
     TError SaveChecksums();
 
     TError CreateMeta(uint64_t space_limit, uint64_t inode_limit);
@@ -56,6 +56,6 @@ public:
 
 private:
     static TError Cleanup(const TPath &place, EStorageType type, unsigned perms);
-    TPath TempPath(const std::string &kind);
+    TPath TempPath(const TString &kind);
     TError CheckUsage();
 };

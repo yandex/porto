@@ -2,4 +2,4 @@
 
 #include "util/path.hpp"
 
-TError Md5Sum(TFile &file, std::string &sum);
+TError Md5Sum(TFile &file, TString &sum);

@@ -15,25 +15,25 @@ struct TCore {
 	TPath DefaultPattern;
 	TPath Pattern;
 
-	std::string ProcessName;
-	std::string ThreadName;
+	TString ProcessName;
+	TString ThreadName;
 
 	TPath ExePath;
-	std::string RootPath;
-	std::string ExeName;
+	TString RootPath;
+	TString ExeName;
 
-	std::string Container;
-	std::string CoreCommand;
-	std::string User;
-	std::string Group;
-	std::string Cwd;
-	std::string OwnerUser;
-	std::string OwnerGroup;
+	TString Container;
+	TString CoreCommand;
+	TString User;
+	TString Group;
+	TString Cwd;
+	TString OwnerUser;
+	TString OwnerGroup;
 
 	uid_t OwnerUid = -1;
 	gid_t OwnerGid = -1;
-	std::string Prefix;
-	std::string Slot;
+	TString Prefix;
+	TString Slot;
 
 	Porto::Connection Conn;
 

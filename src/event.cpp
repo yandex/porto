@@ -46,7 +46,7 @@ public:
     }
 };
 
-std::string TEvent::GetMsg() const {
+TString TEvent::GetMsg() const {
     switch (Type) {
         case EEventType::ChildExit:
             return "exit status " + std::to_string(Exit.Status)

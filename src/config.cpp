@@ -16,15 +16,15 @@ extern "C" {
 
 class TProtobufLogger : public google::protobuf::io::ErrorCollector {
 public:
-    std::string Path;
-    TProtobufLogger(const std::string &path) : Path(path) {}
+    TString Path;
+    TProtobufLogger(const TString &path) : Path(path) {}
     ~TProtobufLogger() {}
 
-    void AddError(int line, int column, const std::string& message) {
+    void AddError(int line, int column, const TString& message) {
         L_WRN("Config {} at line {} column {} {}", Path, line + 1, column + 1, message);
     }
 
-    void AddWarning(int line, int column, const std::string& message) {
+    void AddWarning(int line, int column, const TString& message) {
         L_WRN("Config {} at line {} column {} {}", Path, line + 1, column + 1, message);
     }
 };
@@ -35,7 +35,7 @@ cfg::TConfig &config() {
     return Config;
 }
 
-static void NetSysctl(const std::string &key, const std::string &val)
+static void NetSysctl(const TString &key, const TString &val)
 {
     auto sysctl = config().mutable_container()->add_net_sysctl();
     sysctl->set_key(key);
@@ -43,7 +43,7 @@ static void NetSysctl(const std::string &key, const std::string &val)
 }
 
 static void DefaultConfig() {
-    std::string version;
+    TString version;
     if (!GetSysctl("kernel.osrelease", version))
         config().set_linux_version(version);
 
@@ -205,7 +205,7 @@ void ReadConfigs(bool silent) {
         ReadConfig("/etc/default/portod.conf", silent); /* FIXME remove */
 
     TPath config_dir = "/etc/portod.conf.d";
-    std::vector<std::string> config_names;
+    std::vector<TString> config_names;
     config_dir.ReadDirectory(config_names);
     std::sort(config_names.begin(), config_names.end());
     for (auto &name: config_names) {
