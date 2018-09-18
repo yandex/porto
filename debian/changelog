@@ -1,3 +1,32 @@
+yandex-porto (4.20.0) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add config option for default environment
+  * volume: allow non-existing user and group as directory owners
+  * porto: add absolute_namespace into response of list/GetContainer
+  * portoctl get: keep values single-line if stdout is not tty
+  * api/python: pass strict into UnlinkVolume as named argument
+  * property: restore 'raw' index to data-time properties
+  * property: add "ns" index for cpu-power properties
+  * volume: add "build_time[raw]" and "change_time[raw]" into old description
+  * api/cpp: refactoring
+
+  [ Pavel T from okmeter.io ]
+  * Update porto.md
+
+  [ Konstantin Khlebnikov ]
+  * rpc: log target for LinkVolume
+  * porto: update rpc.proto comments
+  * porto: TContainerRequest/Response -> TPortoRequest/Response
+  * porto: fixes for musl
+
+  [ Anton Samokhvalov ]
+  * porto: TBitMap -> TPortoBitMap
+  * porto: TNonCopyable -> TPortoNonCopyable
+  * porto: std::string -> TString
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 18 Sep 2018 18:59:43 +0300
+
 yandex-porto (4.19.1) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
