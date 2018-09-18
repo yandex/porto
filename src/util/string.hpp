@@ -65,12 +65,12 @@ int CompareVersions(const std::string &a, const std::string &b);
 
 class TPath;
 
-class TBitMap {
+class TPortoBitMap {
 private:
     std::vector<bool> bits;
 public:
-    TBitMap() {}
-    ~TBitMap() {}
+    TPortoBitMap() {}
+    ~TPortoBitMap() {}
     TError Parse(const std::string &text);
     std::string Format() const;
     TError Read(const TPath &path);
@@ -97,7 +97,7 @@ public:
         bits[index] = val;
     }
 
-    void Set(const TBitMap &map, bool val = true) {
+    void Set(const TPortoBitMap &map, bool val = true) {
         for (unsigned i = 0; i < map.Size(); i++)
             if (map.Get(i))
                 Set(i, val);
@@ -107,14 +107,14 @@ public:
         bits.clear();
     }
 
-    bool IsSubsetOf(const TBitMap &map) const {
+    bool IsSubsetOf(const TPortoBitMap &map) const {
         for (unsigned i = 0; i < Size(); i++)
             if (Get(i) && !map.Get(i))
                 return false;
         return true;
     }
 
-    bool IsEqual(const TBitMap &map) const {
+    bool IsEqual(const TPortoBitMap &map) const {
         for (unsigned i = 0; i < std::max(Size(), map.Size()); i++)
             if (Get(i) != map.Get(i))
                 return false;

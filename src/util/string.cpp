@@ -535,7 +535,7 @@ int CompareVersions(const std::string &a, const std::string &b) {
 }
 
 /* first[-last], ... */
-TError TBitMap::Parse(const std::string &text) {
+TError TPortoBitMap::Parse(const std::string &text) {
     TError error;
     int first, last;
 
@@ -562,7 +562,7 @@ TError TBitMap::Parse(const std::string &text) {
     return OK;
 }
 
-std::string TBitMap::Format() const {
+std::string TPortoBitMap::Format() const {
     bool prev = false, curr, sep = false, range = false;
     std::stringstream ss;
 
@@ -584,7 +584,7 @@ std::string TBitMap::Format() const {
     return ss.str();
 }
 
-TError TBitMap::Read(const TPath &path) {
+TError TPortoBitMap::Read(const TPath &path) {
     std::string text;
     TError error = path.ReadAll(text, 4096);
     if (error)
@@ -592,6 +592,6 @@ TError TBitMap::Read(const TPath &path) {
     return Parse(text);
 }
 
-TError TBitMap::Write(const TPath &path) const {
+TError TPortoBitMap::Write(const TPath &path) const {
     return path.WriteAll(Format());
 }

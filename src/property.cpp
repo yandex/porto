@@ -3031,7 +3031,7 @@ public:
         if (cfg.size() == 0 || cfg[0] == "all" || cfg[0] == "inherit") {
             type = ECpuSetType::Inherit;
         } else if (cfg.size() == 1) {
-            TBitMap map;
+            TPortoBitMap map;
             error = map.Parse(cfg[0]);
             if (error)
                 return error;
@@ -3116,7 +3116,7 @@ public:
         if (cfg.policy() == "inherit" || cfg.policy() == "") {
             type = ECpuSetType::Inherit;
         } else if (cfg.policy() == "set") {
-            TBitMap map;
+            TPortoBitMap map;
 
             if (cfg.has_list()) {
                 error = map.Parse(cfg.list());

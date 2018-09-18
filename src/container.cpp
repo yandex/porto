@@ -50,10 +50,10 @@ TPath ContainersKV;
 TIdMap ContainerIdMap(1, CONTAINER_ID_MAX);
 
 std::mutex CpuAffinityMutex;
-static std::vector<TBitMap> CoreThreads;
+static std::vector<TPortoBitMap> CoreThreads;
 
-static TBitMap NumaNodes;
-static std::vector<TBitMap> NodeThreads;
+static TPortoBitMap NumaNodes;
+static std::vector<TPortoBitMap> NodeThreads;
 
 TError TContainer::ValidName(const std::string &name, bool superuser) {
 
@@ -1458,7 +1458,7 @@ TError TContainer::ApplyResolvConf() const {
 }
 
 TError TContainer::ReserveCpus(unsigned nr_threads, unsigned nr_cores,
-                               TBitMap &threads, TBitMap &cores) {
+                               TPortoBitMap &threads, TPortoBitMap &cores) {
     bool try_thread = true;
 
     threads.Clear();
@@ -1580,7 +1580,7 @@ TError TContainer::DistributeCpus() {
                 ct->CpuVacant.Clear();
                 ct->CpuReserve.Clear();
 
-                TBitMap affinity;
+                TPortoBitMap affinity;
 
                 switch (type) {
                 case ECpuSetType::Inherit:

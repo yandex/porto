@@ -92,7 +92,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void Exit(int status, bool oomKilled);
 
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
-                       TBitMap &threads, TBitMap &cores);
+                       TPortoBitMap &threads, TPortoBitMap &cores);
     TError DistributeCpus();
     TError SetCpuLimit(uint64_t limit);
     TError ApplyCpuLimit();
@@ -209,9 +209,9 @@ public:
     /* Under CpuAffinityMutex */
     ECpuSetType CpuSetType = ECpuSetType::Inherit;
     int CpuSetArg = 0;
-    TBitMap CpuAffinity;
-    TBitMap CpuVacant;
-    TBitMap CpuReserve;
+    TPortoBitMap CpuAffinity;
+    TPortoBitMap CpuVacant;
+    TPortoBitMap CpuReserve;
 
     /* Under CpuAffinityMutex */
     uint64_t CpuGuaranteeSum = 0;
