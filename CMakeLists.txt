@@ -72,8 +72,8 @@ else()
 	find_package(FLEX REQUIRED)
 
 	ExternalProject_Add(libnl
-		URL https://github.com/thom311/libnl/releases/download/libnl3_2_27/libnl-3.2.27.tar.gz
-		URL_MD5 cec19f941b79a38d9eb92dbc171d6dbd
+		URL https://github.com/thom311/libnl/releases/download/libnl3_4_0/libnl-3.4.0.tar.gz
+		URL_MD5 8f71910c03db363b41e2ea62057a4311
 		UPDATE_COMMAND autoreconf -fi
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-cli --disable-pthreads
 		BUILD_COMMAND $(MAKE)
