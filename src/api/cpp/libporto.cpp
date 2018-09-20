@@ -970,7 +970,7 @@ EError Connection::ListStorages(std::vector<TString> &storages,
                                 const TString &place,
                                 const TString &mask) {
     Req.Clear();
-    auto req = Req.mutable_listlayers();
+    auto req = Req.mutable_liststorage();
 
     if (place.size())
         req->set_place(place);
