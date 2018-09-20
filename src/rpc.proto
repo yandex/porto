@@ -118,79 +118,126 @@ enum EError {
 
 
 message TPortoRequest {
-    optional TContainerCreateRequest create = 1;
-    optional TContainerDestroyRequest destroy = 2;
-    optional TContainerListRequest list = 3;
-    optional TContainerGetPropertyRequest getProperty = 4;
-    optional TContainerSetPropertyRequest setProperty = 5;
-    optional TContainerGetDataRequest getData = 6;  // deprecated
 
-    optional TContainerStartRequest start = 7;
-    optional TContainerStopRequest stop = 8;
-    optional TContainerPauseRequest pause = 9;
-    optional TContainerResumeRequest resume = 10;
+    // System
 
-    optional TContainerPropertyListRequest propertyList = 11;
-    optional TContainerDataListRequest dataList = 12; // deprecated
+    optional TVersionRequest Version = 14;
 
-    optional TContainerKillRequest kill = 13;
+    optional TGetSystemRequest GetSystem = 300;
+    optional TSetSystemRequest SetSystem = 301;
 
-    optional TVersionRequest version = 14;
+    // Container
 
-    optional TContainerGetRequest get = 15;
+    optional TCreateRequest Create = 1;
 
-    optional TContainerWaitRequest wait = 16;
+    // Auto destroy container when client disconnects
+    optional TCreateRequest CreateWeak = 17;
 
-    optional TContainerCreateRequest createWeak = 17;
-    optional TContainerRespawnRequest Respawn = 18;
-    optional TContainerWaitRequest AsyncWait = 19;
+    optional TDestroyRequest Destroy = 2;
 
-    optional TFindLabelRequest FindLabel = 20;
-    optional TSetLabelRequest SetLabel = 21;
-    optional TIncLabelRequest IncLabel = 22;
+    optional TListRequest List = 3;
 
+    optional TStartRequest Start = 7;
+
+    optional TStopRequest Stop = 8;
+
+    optional TPauseRequest Pause = 9;
+
+    optional TResumeRequest Resume = 10;
+
+    optional TKillRequest Kill = 13;
+
+    optional TRespawnRequest Respawn = 18;
+
+    optional TWaitRequest Wait = 16;
+
+    // Subscrive to push notifictaions
+    optional TWaitRequest AsyncWait = 19;
+
+    // Container properties
+
+    optional TListPropertiesRequest ListProperties = 11;
+    optional TGetPropertyRequest GetProperty = 4;
+    optional TSetPropertyRequest SetProperty = 5;
+
+    // Deprecated, read-only data properties now normal properties
+    optional TListDataPropertiesRequest ListDataProperties = 12;
+    optional TGetDataPropertyRequest GetDataProperty = 6;
+
+    // Get multiple properties for multiple containers
+    optional TGetRequest Get = 15;
+
+    // Container API based on TContainerSpec
     optional TNewContainerRequest NewContainer = 23;
     optional TSetContainerRequest SetContainer = 24;
     optional TGetContainerRequest GetContainer = 25;
 
-    optional TVolumePropertyListRequest listVolumeProperties = 103;
-    optional TVolumeCreateRequest createVolume = 104;
-    optional TVolumeLinkRequest linkVolume = 105;
-    optional TVolumeLinkRequest LinkVolumeTarget = 120;     // fails if target is not supported
-    optional TVolumeUnlinkRequest unlinkVolume = 106;
-    optional TVolumeUnlinkRequest UnlinkVolumeTarget = 121; // fails if target is not supported
-    optional TVolumeListRequest listVolumes = 107;
-    optional TVolumeTuneRequest tuneVolume = 108;
+    // Modify symlink in container
+    optional TSetSymlinkRequest SetSymlink = 125;
 
-    optional TLayerImportRequest importLayer = 110;
-    optional TLayerRemoveRequest removeLayer = 111;
-    optional TLayerListRequest listLayers = 112;
-    optional TLayerExportRequest exportLayer = 113;
+    // Container labels
+    optional TFindLabelRequest FindLabel = 20;
+    optional TSetLabelRequest SetLabel = 21;
+    optional TIncLabelRequest IncLabel = 22;
 
-    optional TLayerGetPrivateRequest getlayerprivate = 114;
-    optional TLayerSetPrivateRequest setlayerprivate = 115;
+    // Volume
 
-    optional TStorageListRequest listStorage = 116;
-    optional TStorageRemoveRequest removeStorage = 117;
-    optional TStorageImportRequest importStorage = 118;
-    optional TStorageExportRequest exportStorage = 119;
+    optional TListVolumePropertiesRequest ListVolumeProperties = 103;
+
+    optional TListVolumesRequest ListVolumes = 107;
+
+    optional TCreateVolumeRequest CreateVolume = 104;
+
+    // Change volume properties - for now only resize
+    optional TTuneVolumeRequest TuneVolume = 108;
+
+    // Volume API based on TVolumeSpec
+    optional TNewVolumeRequest NewVolume = 126;
+    optional TGetVolumeRequest GetVolume = 127;
+
+    // Add link between container and volume
+    optional TLinkVolumeRequest LinkVolume = 105;
+
+    // Same as LinkVolume but fails if target is not supported
+    optional TLinkVolumeRequest LinkVolumeTarget = 120;
+
+    // Del link between container and volume
+    optional TUnlinkVolumeRequest UnlinkVolume = 106;
+
+    // Same as UnlinkVolume but fails if target is not supported
+    optional TUnlinkVolumeRequest UnlinkVolumeTarget = 121;
+
+    // Layer
+
+    optional TImportLayerRequest ImportLayer = 110;
+    optional TRemoveLayerRequest RemoveLayer = 111;
+    optional TListLayersRequest ListLayers = 112;
+    optional TExportLayerRequest ExportLayer = 113;
+
+    optional TGetLayerPrivateRequest GetLayerPrivate = 114;
+    optional TSetLayerPrivateRequest SetLayerPrivate = 115;
+
+    // Storage
+
+    optional TListStoragesRequest ListStorages = 116;
+    optional TRemoveStorageRequest RemoveStorage = 117;
+    optional TImportStorageRequest ImportStorage = 118;
+    optional TExportStorageRequest ExportStorage = 119;
+
+    // Meta storage (bundle for storages and layers)
 
     optional TMetaStorage CreateMetaStorage = 122;
     optional TMetaStorage ResizeMetaStorage = 123;
     optional TMetaStorage RemoveMetaStorage = 124;
 
-    optional TSetSymlinkRequest SetSymlink = 125;
+    // Convert path between containers
+    optional TConvertPathRequest ConvertPath = 200;
 
-    optional TNewVolumeRequest NewVolume = 126;
-    optional TGetVolumeRequest GetVolume = 127;
+    // Process
 
-    optional TConvertPathRequest convertPath = 200;
-    optional TAttachProcessRequest attachProcess = 201;
-    optional TLocateProcessRequest locateProcess = 202;
+    optional TAttachProcessRequest AttachProcess = 201;
+    optional TLocateProcessRequest LocateProcess = 202;
     optional TAttachProcessRequest AttachThread = 203;
-
-    optional TGetSystemRequest GetSystem = 300;
-    optional TSetSystemRequest SetSystem = 301;
 }
 
 
@@ -203,46 +250,70 @@ message TPortoResponse {
 
     optional uint64 timestamp = 1000;       // for next changed_since
 
-    optional TContainerListResponse list = 3;
+    // System
 
-    optional TContainerGetPropertyResponse getProperty = 4;
-    optional TContainerGetDataResponse getData = 5;     // deprecated
+    optional TVersionResponse Version = 8;
 
-    optional TContainerPropertyListResponse propertyList = 6;
-    optional TContainerDataListResponse dataList = 7;   // deprecated
+    optional TGetSystemResponse GetSystem = 300;
+    optional TSetSystemResponse SetSystem = 301;
 
-    optional TVersionResponse version = 8;
+    // Container
 
-    optional TVolumeListResponse volumeList = 9;
+    optional TListResponse List = 3;
 
-    optional TContainerGetResponse get = 10;
-    optional TContainerWaitResponse wait = 11;
+    optional TWaitResponse Wait = 11;
 
-    optional TVolumePropertyListResponse volumePropertyList = 12;
+    optional TWaitResponse AsyncWait = 19;
 
-    optional TVolumeDescription volume = 13;        // reponse to createVolume
-    optional TLayerListResponse layers = 14;
-    optional TConvertPathResponse convertPath = 15;
-    optional TLayerGetPrivateResponse layer_private = 16;
-    optional TStorageListResponse storageList = 17;
+    // Container properties
 
-    optional TLocateProcessResponse locateProcess = 18;
+    optional TListPropertiesResponse ListProperties = 6;
 
-    optional TContainerWaitResponse AsyncWait = 19;
+    optional TGetPropertyResponse GetProperty = 4;
+
+    // Deprecated
+    optional TListDataPropertiesResponse ListDataProperties = 7;
+    optional TGetDataPropertyResponse GetDataProperty = 5;
+
+    optional TGetResponse Get = 10;
+
+    // Container API based on TContainerSpec
+    optional TNewContainerResponse NewContainer = 23;
+    optional TSetContainerResponse SetContainer = 24;
+    optional TGetContainerResponse GetContainer = 25;
+
+    // Labels
 
     optional TFindLabelResponse FindLabel = 20;
     optional TSetLabelResponse SetLabel = 21;
     optional TIncLabelResponse IncLabel = 22;
 
-    optional TNewContainerResponse NewContainer = 23;
-    optional TSetContainerResponse SetContainer = 24;
-    optional TGetContainerResponse GetContainer = 25;
+    optional TConvertPathResponse ConvertPath = 15;
 
+    // Volume
+
+    optional TListVolumePropertiesResponse ListVolumeProperties = 12;
+
+    optional TListVolumesResponse ListVolumes = 9;
+
+    optional TVolumeDescription CreateVolume = 13;
+
+    // Create volume in form TVolumeSpec
     optional TNewVolumeResponse NewVolume = 126;
+
+    // List volumes in form TVolumeSpec
     optional TGetVolumeResponse GetVolume = 127;
 
-    optional TGetSystemResponse GetSystem = 300;
-    optional TSetSystemResponse SetSystem = 301;
+    optional TListLayersResponse ListLayers = 14;
+
+    optional TGetLayerPrivateResponse GetLayerPrivate = 16;
+
+    // List storages and meta storages
+    optional TListStoragesResponse ListStorages = 17;
+
+    // Process
+
+    optional TLocateProcessResponse LocateProcess = 18;
 }
 
 
@@ -888,10 +959,10 @@ message TGetContainerResponse {
 }
 
 // List available properties
-message TContainerPropertyListRequest {
+message TListPropertiesRequest {
 }
 
-message TContainerPropertyListResponse {
+message TListPropertiesResponse {
     message TContainerPropertyListEntry {
         required string name = 1;
         required string desc = 2;
@@ -902,11 +973,11 @@ message TContainerPropertyListResponse {
 }
 
 
-// deprecated, use PropertyList
-message TContainerDataListRequest {
+// deprecated, use ListProperties
+message TListDataPropertiesRequest {
 }
 
-message TContainerDataListResponse {
+message TListDataPropertiesResponse {
     message TContainerDataListEntry {
         required string name = 1;
         required string desc = 2;
@@ -916,31 +987,31 @@ message TContainerDataListResponse {
 
 
 // Create stopped container
-message TContainerCreateRequest {
+message TCreateRequest {
     required string name = 1;
 }
 
 
 // Stop and destroy container
-message TContainerDestroyRequest {
+message TDestroyRequest {
     required string name = 1;
 }
 
 
 // List container names
-message TContainerListRequest {
+message TListRequest {
     optional string mask = 1;
     optional uint64 changed_since = 2;  // change_time >= changed_since
 }
 
-message TContainerListResponse {
+message TListResponse {
     repeated string name = 1;
     optional string absolute_namespace = 2;
 }
 
 
 // Read one property
-message TContainerGetPropertyRequest {
+message TGetPropertyRequest {
     required string name = 1;
     required string property = 2;
     // update cached counters
@@ -948,13 +1019,13 @@ message TContainerGetPropertyRequest {
     optional bool real = 4;
 }
 
-message TContainerGetPropertyResponse {
+message TGetPropertyResponse {
     required string value = 1;
 }
 
 
 // Alias for GetProperty, deprecated
-message TContainerGetDataRequest {
+message TGetDataPropertyRequest {
     required string name = 1;
     required string data = 2;
     // update cached counters
@@ -962,13 +1033,13 @@ message TContainerGetDataRequest {
     optional bool real = 4;
 }
 
-message TContainerGetDataResponse {
+message TGetDataPropertyResponse {
     required string value = 1;
 }
 
 
 // Change one property
-message TContainerSetPropertyRequest {
+message TSetPropertyRequest {
     required string name = 1;
     required string property = 2;
     required string value = 3;
@@ -976,7 +1047,7 @@ message TContainerSetPropertyRequest {
 
 
 // Get multiple properties/data of many containers with one request
-message TContainerGetRequest {
+message TGetRequest {
     // list of containers or wildcards, "***" - all
     repeated string name = 1;
 
@@ -994,7 +1065,7 @@ message TContainerGetRequest {
     optional uint64 changed_since = 6;
 }
 
-message TContainerGetResponse {
+message TGetResponse {
     message TContainerGetValueResponse {
         required string variable = 1;
         optional EError error = 2;
@@ -1015,19 +1086,19 @@ message TContainerGetResponse {
 
 
 // Start stopped container
-message TContainerStartRequest {
+message TStartRequest {
     required string name = 1;
 }
 
 
 // Restart dead container
-message TContainerRespawnRequest {
+message TRespawnRequest {
     required string name = 1;
 }
 
 
 // Stop dead or running container
-message TContainerStopRequest {
+message TStopRequest {
     required string name = 1;
     // Timeout in 1/1000 seconds between SIGTERM and SIGKILL, default 30s
     optional uint32 timeout_ms = 2;
@@ -1035,13 +1106,13 @@ message TContainerStopRequest {
 
 
 // Freeze running container
-message TContainerPauseRequest {
+message TPauseRequest {
     required string name = 1;
 }
 
 
 // Unfreeze paused container
-message TContainerResumeRequest {
+message TResumeRequest {
     required string name = 1;
 }
 
@@ -1059,7 +1130,7 @@ message TConvertPathResponse {
 
 
 // Wait while container(s) is/are in running state
-message TContainerWaitRequest {
+message TWaitRequest {
     // list of containers or wildcards, "***" - all
     repeated string name = 1;
 
@@ -1070,7 +1141,7 @@ message TContainerWaitRequest {
     repeated string label = 3;
 }
 
-message TContainerWaitResponse {
+message TWaitResponse {
     required string name = 1;           // container name
     optional string state = 2;          // container state or timeout
     optional uint64 when = 3;           // unix time stamp in seconds
@@ -1080,7 +1151,7 @@ message TContainerWaitResponse {
 
 
 // Send signal main process in container
-message TContainerKillRequest {
+message TKillRequest {
     required string name = 1;
     required int32 sig = 2;
 }
@@ -1182,27 +1253,27 @@ message TGetVolumeResponse {
 
 
 // List available volume properties
-message TVolumePropertyListRequest {
+message TListVolumePropertiesRequest {
 }
 
-message TVolumePropertyListResponse {
+message TListVolumePropertiesResponse {
     message TVolumePropertyDescription {
         required string name = 1;
         required string desc = 2;
     }
-    repeated TVolumePropertyDescription properties = 1;
+    repeated TVolumePropertyDescription list = 1;
 }
 
 
 // Create new volume
 // "createVolume" returns TVolumeDescription in "volume"
-message TVolumeCreateRequest {
+message TCreateVolumeRequest {
     optional string path = 1;
     repeated TVolumeProperty properties = 2;
 }
 
 
-message TVolumeLinkRequest {
+message TLinkVolumeRequest {
     required string path = 1;
     optional string container = 2;      // default - self
     optional string target = 3;         // path in container, "" - anon
@@ -1211,7 +1282,7 @@ message TVolumeLinkRequest {
 }
 
 
-message TVolumeUnlinkRequest {
+message TUnlinkVolumeRequest {
     required string path = 1;
     optional string container = 2;      // default - self, "***" - all
     optional bool strict = 3;           // non-lazy umount
@@ -1219,18 +1290,18 @@ message TVolumeUnlinkRequest {
 }
 
 
-message TVolumeListRequest {
+message TListVolumesRequest {
     optional string path = 1;
     optional string container = 2;
     optional uint64 changed_since = 3;  // change_time >= changed_since
 }
 
-message TVolumeListResponse {
+message TListVolumesResponse {
     repeated TVolumeDescription volumes = 1;
 }
 
 
-message TVolumeTuneRequest {
+message TTuneVolumeRequest {
     required string path = 1;
     repeated TVolumeProperty properties = 2;
 }
@@ -1239,18 +1310,18 @@ message TVolumeTuneRequest {
 // Layers
 
 
-message TLayerListRequest {
+message TListLayersRequest {
     optional string place = 1;
     optional string mask = 2;
 }
 
-message TLayerListResponse {
+message TListLayersResponse {
     repeated string layer = 1;              // layer names (legacy)
     repeated TLayerDescription layers = 2;  // layer with description
 }
 
 
-message TLayerImportRequest {
+message TImportLayerRequest {
     required string layer = 1;
     required string tarball = 2;
     required bool merge = 3;
@@ -1260,7 +1331,7 @@ message TLayerImportRequest {
 }
 
 
-message TLayerExportRequest {
+message TExportLayerRequest {
     required string volume = 1;
     required string tarball = 2;
     optional string layer = 3;
@@ -1269,23 +1340,23 @@ message TLayerExportRequest {
 }
 
 
-message TLayerRemoveRequest {
+message TRemoveLayerRequest {
     required string layer = 1;
     optional string place = 2;
 }
 
 
-message TLayerGetPrivateRequest {
+message TGetLayerPrivateRequest {
     required string layer = 1;
     optional string place = 2;
 }
 
-message TLayerGetPrivateResponse {
+message TGetLayerPrivateResponse {
     optional string private_value = 1;
 }
 
 
-message TLayerSetPrivateRequest {
+message TSetLayerPrivateRequest {
     required string layer = 1;
     optional string place = 2;
     required string private_value = 3;
@@ -1295,24 +1366,24 @@ message TLayerSetPrivateRequest {
 // Storages
 
 
-message TStorageListRequest {
+message TListStoragesRequest {
     optional string place = 1;
     optional string mask = 2;
 }
 
-message TStorageListResponse {
+message TListStoragesResponse {
     repeated TStorageDescription storages = 1;
     repeated TMetaStorage meta_storages = 2;
 }
 
 
-message TStorageRemoveRequest {
+message TRemoveStorageRequest {
     required string name = 1;
     optional string place = 2;
 }
 
 
-message TStorageImportRequest {
+message TImportStorageRequest {
     required string name = 1;
     required string tarball = 2;
     optional string place = 3;
@@ -1321,7 +1392,7 @@ message TStorageImportRequest {
 }
 
 
-message TStorageExportRequest {
+message TExportStorageRequest {
     required string name = 1;
     required string tarball = 2;
     optional string place = 3;

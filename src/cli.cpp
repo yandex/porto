@@ -94,9 +94,9 @@ void THelpCmd::Usage() {
     if (!vlist) {
         PrintError("Volume properties unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist->properties(), [](const rpc::TVolumePropertyListResponse_TVolumePropertyDescription &p) { return p.name(); });
+        nameWidth = MaxFieldLength(vlist->list(), [](const rpc::TListVolumePropertiesResponse_TVolumePropertyDescription &p) { return p.name(); });
 
-        for (const auto &p : vlist->properties())
+        for (const auto &p : vlist->list())
             PrintAligned(p.name(), p.desc(), nameWidth, termWidth);
     }
 
@@ -105,7 +105,7 @@ void THelpCmd::Usage() {
     if (!plist) {
         PrintError("Properties unavailable");
     } else {
-        nameWidth = MaxFieldLength(plist->list(), [](const rpc::TContainerPropertyListResponse_TContainerPropertyListEntry &p) { return p.name(); });
+        nameWidth = MaxFieldLength(plist->list(), [](const rpc::TListPropertiesResponse_TContainerPropertyListEntry &p) { return p.name(); });
 
         for (const auto &p : plist->list())
             PrintAligned(p.name(), p.desc(), nameWidth, termWidth);

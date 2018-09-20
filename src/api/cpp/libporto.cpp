@@ -261,7 +261,7 @@ EError Connection::Destroy(const TString &name) {
     return Call();
 }
 
-const rpc::TContainerListResponse *Connection::List(const TString &mask) {
+const rpc::TListResponse *Connection::List(const TString &mask) {
     auto req = Req.mutable_list();
 
     if(!mask.empty())
@@ -284,15 +284,15 @@ EError Connection::List(std::vector<TString> &list, const TString &mask) {
     return LastError;
 }
 
-const rpc::TContainerPropertyListResponse *Connection::ListProperties() {
+const rpc::TListPropertiesResponse *Connection::ListProperties() {
     Req.Clear();
-    Req.mutable_propertylist();
+    Req.mutable_listproperties();
 
     if (Call())
         return nullptr;
 
     bool has_data = false;
-    for (const auto &prop: Rsp.propertylist().list()) {
+    for (const auto &prop: Rsp.listproperties().list()) {
         if (prop.read_only()) {
             has_data = true;
             break;
@@ -303,10 +303,10 @@ const rpc::TContainerPropertyListResponse *Connection::ListProperties() {
         rpc::TPortoRequest req;
         rpc::TPortoResponse rsp;
 
-        req.mutable_datalist();
+        req.mutable_listdataproperties();
         if (!Call(req, rsp)) {
-            for (const auto &data: rsp.datalist().list()) {
-                auto d = Rsp.mutable_propertylist()->add_list();
+            for (const auto &data: rsp.listdataproperties().list()) {
+                auto d = Rsp.mutable_listproperties()->add_list();
                 d->set_name(data.name());
                 d->set_desc(data.desc());
                 d->set_read_only(true);
@@ -314,7 +314,7 @@ const rpc::TContainerPropertyListResponse *Connection::ListProperties() {
         }
     }
 
-    return &Rsp.propertylist();
+    return &Rsp.listproperties();
 }
 
 EError Connection::ListProperties(std::vector<TString> &properties) {
@@ -327,9 +327,9 @@ EError Connection::ListProperties(std::vector<TString> &properties) {
     return LastError;
 }
 
-const rpc::TContainerGetResponse *Connection::Get(const std::vector<TString> &names,
-                                                  const std::vector<TString> &vars,
-                                                  int flags) {
+const rpc::TGetResponse *Connection::Get(const std::vector<TString> &names,
+                                         const std::vector<TString> &vars,
+                                         int flags) {
     Req.Clear();
     auto get = Req.mutable_get();
 
@@ -520,7 +520,6 @@ EError Connection::WaitContainers(const std::vector<TString> &names,
                                   int timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
-    int ret;
 
     for (auto &c : names)
         req->add_name(c);
@@ -541,13 +540,12 @@ EError Connection::WaitContainers(const std::vector<TString> &names,
     return LastError;
 }
 
-const rpc::TContainerWaitResponse *
+const rpc::TWaitResponse *
 Connection::Wait(const std::vector<TString> &names,
                  const std::vector<TString> &labels,
                  int timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
-    int ret;
 
     for (auto &c : names)
         req->add_name(c);
@@ -650,12 +648,12 @@ EError Connection::LocateProcess(int pid, const TString &comm,
 
 /* Volume */
 
-const rpc::TVolumePropertyListResponse *Connection::ListVolumeProperties() {
+const rpc::TListVolumePropertiesResponse *Connection::ListVolumeProperties() {
     Req.Clear();
     Req.mutable_listvolumeproperties();
 
     if (!Call())
-        return &Rsp.volumepropertylist();
+        return &Rsp.listvolumeproperties();
 
     return nullptr;
 }
@@ -664,7 +662,7 @@ EError Connection::ListVolumeProperties(std::vector<TString> &properties) {
     properties.clear();
     auto rsp = ListVolumeProperties();
     if (rsp) {
-        for (auto &prop: rsp->properties())
+        for (auto &prop: rsp->list())
             properties.push_back(prop.name());
     }
     return LastError;
@@ -684,7 +682,7 @@ EError Connection::CreateVolume(TString &path,
     }
 
     if (!Call(DiskTimeout) && path.empty())
-        path = Rsp.volume().path();
+        path = Rsp.createvolume().path();
 
     return LastError;
 }
@@ -746,7 +744,7 @@ EError Connection::UnlinkVolume(const TString &path,
     return Call(DiskTimeout);
 }
 
-const rpc::TVolumeListResponse *
+const rpc::TListVolumesResponse *
 Connection::ListVolumes(const TString &path,
                         const TString &container) {
     Req.Clear();
@@ -761,7 +759,7 @@ Connection::ListVolumes(const TString &path,
     if (Call())
         return nullptr;
 
-    auto list = Rsp.mutable_volumelist();
+    auto list = Rsp.mutable_listvolumes();
 
     /* compat */
     for (auto v: *list->mutable_volumes()) {
@@ -869,8 +867,9 @@ EError Connection::RemoveLayer(const TString &layer,
     return Call(DiskTimeout);
 }
 
-const rpc::TLayerListResponse *Connection::ListLayers(const TString &place,
-                                                      const TString &mask) {
+const rpc::TListLayersResponse *
+Connection::ListLayers(const TString &place,
+                       const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_listlayers();
 
@@ -882,7 +881,7 @@ const rpc::TLayerListResponse *Connection::ListLayers(const TString &place,
     if (Call())
         return nullptr;
 
-    auto list = Rsp.mutable_layers();
+    auto list = Rsp.mutable_listlayers();
 
     /* compat conversion */
     if (!list->layers().size() && list->layer().size()) {
@@ -911,8 +910,8 @@ EError Connection::ListLayers(std::vector<TString> layers,
         req->set_mask(mask);
 
     if (!Call())
-        layers = std::vector<TString>(std::begin(Rsp.layers().layer()),
-                                          std::end(Rsp.layers().layer()));
+        layers = std::vector<TString>(std::begin(Rsp.listlayers().layer()),
+                                      std::end(Rsp.listlayers().layer()));
 
     return LastError;
 }
@@ -928,7 +927,7 @@ EError Connection::GetLayerPrivate(TString &private_value,
         req->set_place(place);
 
     if (!Call())
-        private_value = Rsp.layer_private().private_value();
+        private_value = Rsp.getlayerprivate().private_value();
 
     return LastError;
 }
@@ -949,11 +948,11 @@ EError Connection::SetLayerPrivate(const TString &private_value,
 
 /* Storage */
 
-const rpc::TStorageListResponse *
+const rpc::TListStoragesResponse *
 Connection::ListStorages(const TString &place,
                          const TString &mask) {
     Req.Clear();
-    auto req = Req.mutable_liststorage();
+    auto req = Req.mutable_liststorages();
 
     if (place.size())
         req->set_place(place);
@@ -963,14 +962,14 @@ Connection::ListStorages(const TString &place,
     if (Call())
         return nullptr;
 
-    return &Rsp.storagelist();
+    return &Rsp.liststorages();
 }
 
 EError Connection::ListStorages(std::vector<TString> &storages,
                                 const TString &place,
                                 const TString &mask) {
     Req.Clear();
-    auto req = Req.mutable_liststorage();
+    auto req = Req.mutable_liststorages();
 
     if (place.size())
         req->set_place(place);
@@ -979,7 +978,7 @@ EError Connection::ListStorages(std::vector<TString> &storages,
 
     if (!Call()) {
         storages.clear();
-        for (auto &storage: Rsp.storagelist().storages())
+        for (auto &storage: Rsp.liststorages().storages())
             storages.push_back(storage.name());
     }
 

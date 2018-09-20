@@ -18,7 +18,7 @@ constexpr int DEFAULT_DISK_TIMEOUT = 900;   // 15min
 
 constexpr char SOCKET_PATH[] = "/run/portod.socket";
 
-typedef std::function<void(const rpc::TContainerWaitResponse &event)> TWaitCallback;
+typedef std::function<void(const rpc::TWaitResponse &event)> TWaitCallback;
 
 enum {
     GET_NONBLOCK = 1,
@@ -102,11 +102,11 @@ public:
 
     /* Container */
 
-    const rpc::TContainerPropertyListResponse *ListProperties();
+    const rpc::TListPropertiesResponse *ListProperties();
 
     EError ListProperties(std::vector<TString> &properties);
 
-    const rpc::TContainerListResponse *List(const TString &mask = "");
+    const rpc::TListResponse *List(const TString &mask = "");
 
     EError List(std::vector<TString> &names, const TString &mask = "");
 
@@ -137,9 +137,9 @@ public:
                           TString &result_state,
                           int wait_timeout = -1);
 
-    const rpc::TContainerWaitResponse *Wait(const std::vector<TString> &names,
-                                            const std::vector<TString> &labels,
-                                            int wait_timeout = -1);
+    const rpc::TWaitResponse *Wait(const std::vector<TString> &names,
+                                   const std::vector<TString> &labels,
+                                   int wait_timeout = -1);
 
     EError AsyncWait(const std::vector<TString> &names,
                      const std::vector<TString> &labels,
@@ -150,9 +150,9 @@ public:
         Recv(Rsp);
     }
 
-    const rpc::TContainerGetResponse *Get(const std::vector<TString> &names,
-                                          const std::vector<TString> &properties,
-                                          int flags = 0);
+    const rpc::TGetResponse *Get(const std::vector<TString> &names,
+                                 const std::vector<TString> &properties,
+                                 int flags = 0);
 
     /* Porto v5 api */
     const rpc::TContainerSpec *GetContainerSpec(const TString &name);
@@ -199,12 +199,12 @@ public:
 
     /* Volume */
 
-    const rpc::TVolumePropertyListResponse *ListVolumeProperties();
+    const rpc::TListVolumePropertiesResponse *ListVolumeProperties();
 
     EError ListVolumeProperties(std::vector<TString> &properties);
 
-    const rpc::TVolumeListResponse *ListVolumes(const TString &path = "",
-                                                const TString &container = "");
+    const rpc::TListVolumesResponse *ListVolumes(const TString &path = "",
+                                                 const TString &container = "");
 
     EError ListVolumes(std::vector<TString> &paths);
 
@@ -232,8 +232,8 @@ public:
 
     /* Layer */
 
-    const rpc::TLayerListResponse *ListLayers(const TString &place = "",
-                                              const TString &mask = "");
+    const rpc::TListLayersResponse *ListLayers(const TString &place = "",
+                                               const TString &mask = "");
 
     EError ListLayers(std::vector<TString> layers,
                       const TString &place = "",
@@ -266,8 +266,8 @@ public:
 
     /* Storage */
 
-    const rpc::TStorageListResponse *ListStorages(const TString &place = "",
-                                                  const TString &mask = "");
+    const rpc::TListStoragesResponse *ListStorages(const TString &place = "",
+                                                   const TString &mask = "");
 
     EError ListStorages(std::vector<TString> &storages,
                         const TString &place = "",

@@ -1378,7 +1378,7 @@ public:
              "    -A            async wait\n"
              ) {}
 
-    static void PrintAsyncWait(const Porto::rpc::TContainerWaitResponse &event) {
+    static void PrintAsyncWait(const Porto::rpc::TWaitResponse &event) {
         if (event.has_label())
             fmt::print("{} {}\t{}\t{} = {}\n", FormatTime(event.when()),
                        event.state(), event.name(), event.label(), event.value());
