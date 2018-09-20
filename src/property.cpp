@@ -1065,11 +1065,12 @@ public:
         val = MergeEscapeStrings(CT->CommandArgv, '\t');
         return OK;
     }
-    void SetCommand() {
+    TError SetCommand() {
         CT->Command = "";
         for (auto &argv: CT->CommandArgv)
             CT->Command += "'" + StringReplaceAll(argv, "'", "'\\''") + "' ";
         CT->SetProp(EProperty::COMMAND);
+        return OK;
     }
     TError Set(const TString &val) {
         if (val.size() > CONTAINER_COMMAND_MAX)
@@ -1079,8 +1080,7 @@ public:
             CT->SetProp(EProperty::COMMAND_ARGV);
         else
             CT->ClearProp(EProperty::COMMAND_ARGV);
-        SetCommand();
-        return OK;
+        return SetCommand();
     }
     TError GetIndexed(const TString &index, TString &value) {
         uint64_t i;
@@ -1107,8 +1107,7 @@ public:
 
         CT->CommandArgv[i] = value;
         CT->SetProp(EProperty::COMMAND_ARGV);
-        SetCommand();
-        return OK;
+        return SetCommand();
     }
     void Dump(rpc::TContainerSpec &spec) {
         auto cmd = spec.mutable_command_argv();
@@ -1131,7 +1130,7 @@ public:
             CT->SetProp(EProperty::COMMAND_ARGV);
         else
             CT->ClearProp(EProperty::COMMAND_ARGV);
-        SetCommand();
+        return SetCommand();
     }
 } static CommandArgv;
 
