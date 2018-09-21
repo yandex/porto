@@ -375,7 +375,7 @@ message TContainerCommandArgv {
 
 
 message TContainerEnvVar {
-    required string name = 1;
+    optional string name = 1;
     optional string value = 2;
     optional bool unset = 3;        // out
 }
@@ -387,7 +387,7 @@ message TContainerEnv {
 
 
 message TContainerUlimit {
-    required string type = 1;
+    optional string type = 1;
     optional bool unlimited = 2;
     optional uint64 soft = 3;
     optional uint64 hard = 4;
@@ -406,8 +406,8 @@ message TContainerControllers {
 
 
 message TContainerCgroup {
-    required string controller = 1;
-    required string path = 2;       // "/sys/fs/cgroup/memory/..."
+    optional string controller = 1;
+    optional string path = 2;       // "/sys/fs/cgroup/memory/..."
     optional bool inherited = 3;
 }
 
@@ -426,8 +426,8 @@ message TContainerCpuSet {
 
 
 message TContainerBindMount {
-    required string source = 1;     // path in client container namespace
-    required string target = 2;     // path in container namespace
+    optional string source = 1;     // path in client container namespace
+    optional string target = 2;     // path in container namespace
     repeated string flag = 3;       // "ro", "rec", ...
 }
 
@@ -437,7 +437,7 @@ message TContainerBindMounts {
 
 
 message TContainerVolumeLink {
-    required string volume = 1;     // path client container namespace
+    optional string volume = 1;     // path client container namespace
     optional string target = 2;     // absolute path in container chroot
     optional bool required = 3;     // cantainer cannot work without it
     optional bool read_only = 4;
@@ -454,7 +454,7 @@ message TContainerVolumes {
 
 
 message TContainerPlace {
-    required string place = 1;      // path in host namespace or "***"
+    optional string place = 1;      // path in host namespace or "***"
     optional string alias = 2;      // single word name
 }
 
@@ -464,8 +464,8 @@ message TContainerPlaceConfig {
 
 
 message TContainerDevice {
-    required string device = 1;     // "/dev/foo"
-    required string access = 2;     // "[r][w][m][-][?]"
+    optional string device = 1;     // "/dev/foo"
+    optional string access = 2;     // "[r][w][m][-][?]"
 }
 
 message TContainerDevices {
@@ -475,7 +475,7 @@ message TContainerDevices {
 
 
 message TContainerNetOption {
-    required string opt = 1;
+    optional string opt = 1;
     repeated string arg = 2;
 }
 
@@ -486,15 +486,15 @@ message TContainerNetConfig {
 
 
 message TContainerIpLimit {
-    required string policy = 1;     // any|none|some
+    optional string policy = 1;     // any|none|some
     repeated string ip = 2;         // <ipv4|ipv6>[/<mask>]
 }
 
 
 message TContainerIpConfig {
     message TContainerIp {
-        required string dev = 1;
-        required string ip = 2;     // ipv4|ipv6
+        optional string dev = 1;
+        optional string ip = 2;     // ipv4|ipv6
     }
     repeated TContainerIp cfg = 1;
 }
@@ -520,7 +520,7 @@ message TVmStat {
 
 
 message TContainerSpec {
-    required string name = 1;           // in client namespace
+    optional string name = 1;           // in client namespace
     optional string absolute_name = 2;  // out, "/porto/..."
     optional string state = 3;          // out
     optional uint64 id = 4;             // out
@@ -702,12 +702,12 @@ message TContainerSpec {
 
 // FIXME replace with map<string, string>
 message TVolumeProperty {
-    required string name = 1;
-    required string value = 2;
+    optional string name = 1;
+    optional string value = 2;
 }
 
 message TVolumeDescription {
-    required string path = 1;           // path in client namespace
+    optional string path = 1;           // path in client namespace
     repeated TVolumeProperty properties = 2;
     repeated string containers = 3;     // linked containers (legacy)
     repeated TVolumeLink links = 4;     // linked containers with details
@@ -718,7 +718,7 @@ message TVolumeDescription {
 
 
 message TVolumeLink {
-    required string container = 1;
+    optional string container = 1;
     optional string target = 2;         // absolute path in container, default: anon
     optional bool required = 3;         // container cannot work without it
     optional bool read_only = 4;
@@ -733,19 +733,19 @@ message TVolumeResource {
 }
 
 message TVolumeDirectory {
-    required string path = 1;           // relative path in volume
+    optional string path = 1;           // relative path in volume
     optional TCred cred = 2;            // default: volume cred
     optional fixed32 permissions = 3;   // default: volume permissions
 }
 
 message TVolumeSymlink {
-    required string path = 1;           // relative path in volume
-    required string target_path = 2;
+    optional string path = 1;           // relative path in volume
+    optional string target_path = 2;
 }
 
 message TVolumeShare {
-    required string path = 1;           // relative path in volume
-    required string origin_path = 2;    // absolute path to origin
+    optional string path = 1;           // relative path in volume
+    optional string origin_path = 2;    // absolute path to origin
     optional bool cow = 3;              // default: mutable share
 }
 
@@ -793,25 +793,25 @@ message TVolumeSpec {
 
 
 message TLayerDescription {
-    required string name = 1;           // name or meta/name
-    required string owner_user = 2;
-    required string owner_group = 3;
-    required uint64 last_usage = 4;     // out, sec since last usage
-    required string private_value = 5;
+    optional string name = 1;           // name or meta/name
+    optional string owner_user = 2;
+    optional string owner_group = 3;
+    optional uint64 last_usage = 4;     // out, sec since last usage
+    optional string private_value = 5;
 }
 
 
 message TStorageDescription {
-    required string name = 1;           // name or meta/name
-    required string owner_user = 2;
-    required string owner_group = 3;
-    required uint64 last_usage = 4;     // out, sec since last usage
-    required string private_value = 5;
+    optional string name = 1;           // name or meta/name
+    optional string owner_user = 2;
+    optional string owner_group = 3;
+    optional uint64 last_usage = 4;     // out, sec since last usage
+    optional string private_value = 5;
 }
 
 
 message TMetaStorage {
-    required string name = 1;
+    optional string name = 1;
     optional string place = 2;
     optional string private_value = 3;
     optional uint64 space_limit = 4;        // bytes
@@ -836,8 +836,8 @@ message TVersionRequest {
 }
 
 message TVersionResponse {
-    required string tag = 1;
-    required string revision = 2;
+    optional string tag = 1;
+    optional string revision = 2;
 }
 
 
@@ -846,69 +846,69 @@ message TGetSystemRequest {
 }
 
 message TGetSystemResponse {
-    required string porto_version = 1;
-    required string porto_revision = 2;
-    required string kernel_version = 3;
+    optional string porto_version = 1;
+    optional string porto_revision = 2;
+    optional string kernel_version = 3;
 
-    required fixed64 errors = 4;
-    required fixed64 warnings = 5;
-    required fixed64 porto_starts = 6;
-    required fixed64 porto_uptime = 7;
-    required fixed64 master_uptime = 8;
+    optional fixed64 errors = 4;
+    optional fixed64 warnings = 5;
+    optional fixed64 porto_starts = 6;
+    optional fixed64 porto_uptime = 7;
+    optional fixed64 master_uptime = 8;
     optional fixed64 taints = 9;
 
     optional bool frozen = 10;
-    required bool verbose = 100;
-    required bool debug = 101;
-    required fixed64 log_lines = 102;
-    required fixed64 log_bytes = 103;
+    optional bool verbose = 100;
+    optional bool debug = 101;
+    optional fixed64 log_lines = 102;
+    optional fixed64 log_bytes = 103;
 
-    required fixed64 stream_rotate_bytes = 104;
-    required fixed64 stream_rotate_errors = 105;
+    optional fixed64 stream_rotate_bytes = 104;
+    optional fixed64 stream_rotate_errors = 105;
 
-    required fixed64 log_lines_lost = 106;
-    required fixed64 log_bytes_lost = 107;
-    required fixed64 log_open = 108;
+    optional fixed64 log_lines_lost = 106;
+    optional fixed64 log_bytes_lost = 107;
+    optional fixed64 log_open = 108;
 
-    required fixed64 container_count = 200;
-    required fixed64 container_limit = 201;
-    required fixed64 container_running = 202;
-    required fixed64 container_created = 203;
-    required fixed64 container_started = 204;
-    required fixed64 container_start_failed = 205;
-    required fixed64 container_oom = 206;
-    required fixed64 container_buried = 207;
-    required fixed64 container_lost = 208;
+    optional fixed64 container_count = 200;
+    optional fixed64 container_limit = 201;
+    optional fixed64 container_running = 202;
+    optional fixed64 container_created = 203;
+    optional fixed64 container_started = 204;
+    optional fixed64 container_start_failed = 205;
+    optional fixed64 container_oom = 206;
+    optional fixed64 container_buried = 207;
+    optional fixed64 container_lost = 208;
     optional fixed64 container_tainted = 209;
 
-    required fixed64 volume_count = 300;
-    required fixed64 volume_limit = 301;
-    required fixed64 volume_created = 303;
-    required fixed64 volume_failed = 304;
-    required fixed64 volume_links = 305;
-    required fixed64 volume_links_mounted = 306;
-    required fixed64 volume_lost = 307;
+    optional fixed64 volume_count = 300;
+    optional fixed64 volume_limit = 301;
+    optional fixed64 volume_created = 303;
+    optional fixed64 volume_failed = 304;
+    optional fixed64 volume_links = 305;
+    optional fixed64 volume_links_mounted = 306;
+    optional fixed64 volume_lost = 307;
 
-    required fixed64 layer_import = 390;
-    required fixed64 layer_export = 391;
-    required fixed64 layer_remove = 392;
+    optional fixed64 layer_import = 390;
+    optional fixed64 layer_export = 391;
+    optional fixed64 layer_remove = 392;
 
-    required fixed64 client_count = 400;
-    required fixed64 client_max = 401;
-    required fixed64 client_connected = 402;
+    optional fixed64 client_count = 400;
+    optional fixed64 client_max = 401;
+    optional fixed64 client_connected = 402;
 
-    required fixed64 request_queued = 500;
-    required fixed64 request_completed = 501;
-    required fixed64 request_failed = 502;
-    required fixed64 request_threads = 503;
-    required fixed64 request_longer_1s = 504;
-    required fixed64 request_longer_3s = 505;
-    required fixed64 request_longer_30s = 506;
-    required fixed64 request_longer_5m = 507;
+    optional fixed64 request_queued = 500;
+    optional fixed64 request_completed = 501;
+    optional fixed64 request_failed = 502;
+    optional fixed64 request_threads = 503;
+    optional fixed64 request_longer_1s = 504;
+    optional fixed64 request_longer_3s = 505;
+    optional fixed64 request_longer_30s = 506;
+    optional fixed64 request_longer_5m = 507;
 
-    required fixed64 fail_system = 600;
-    required fixed64 fail_invalid_value = 601;
-    required fixed64 fail_invalid_command = 602;
+    optional fixed64 fail_system = 600;
+    optional fixed64 fail_invalid_value = 601;
+    optional fixed64 fail_invalid_command = 602;
     optional fixed64 fail_memory_guarantee = 603;
 
     optional fixed64 network_count = 700;
@@ -929,18 +929,18 @@ message TSetSystemResponse {
 }
 
 message TNewContainerRequest {
-    required TContainerSpec container = 1;
+    optional TContainerSpec container = 1;
     repeated TVolumeSpec volume = 2;
     optional bool start = 3;
 }
 
 message TNewContainerResponse {
-    required TContainerSpec container = 1;
+    optional TContainerSpec container = 1;
     repeated TVolumeSpec volume = 2;
 }
 
 message TSetContainerRequest {
-    required TContainerSpec container = 1;
+    optional TContainerSpec container = 1;
 }
 
 message TSetContainerResponse {
@@ -964,8 +964,8 @@ message TListPropertiesRequest {
 
 message TListPropertiesResponse {
     message TContainerPropertyListEntry {
-        required string name = 1;
-        required string desc = 2;
+        optional string name = 1;
+        optional string desc = 2;
         optional bool read_only = 3;
         optional bool dynamic = 4;
     }
@@ -979,8 +979,8 @@ message TListDataPropertiesRequest {
 
 message TListDataPropertiesResponse {
     message TContainerDataListEntry {
-        required string name = 1;
-        required string desc = 2;
+        optional string name = 1;
+        optional string desc = 2;
     }
     repeated TContainerDataListEntry list = 1;
 }
@@ -988,13 +988,13 @@ message TListDataPropertiesResponse {
 
 // Create stopped container
 message TCreateRequest {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
 // Stop and destroy container
 message TDestroyRequest {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
@@ -1012,37 +1012,37 @@ message TListResponse {
 
 // Read one property
 message TGetPropertyRequest {
-    required string name = 1;
-    required string property = 2;
+    optional string name = 1;
+    optional string property = 2;
     // update cached counters
     optional bool sync = 3;
     optional bool real = 4;
 }
 
 message TGetPropertyResponse {
-    required string value = 1;
+    optional string value = 1;
 }
 
 
 // Alias for GetProperty, deprecated
 message TGetDataPropertyRequest {
-    required string name = 1;
-    required string data = 2;
+    optional string name = 1;
+    optional string data = 2;
     // update cached counters
     optional bool sync = 3;
     optional bool real = 4;
 }
 
 message TGetDataPropertyResponse {
-    required string value = 1;
+    optional string value = 1;
 }
 
 
 // Change one property
 message TSetPropertyRequest {
-    required string name = 1;
-    required string property = 2;
-    required string value = 3;
+    optional string name = 1;
+    optional string property = 2;
+    optional string value = 3;
 }
 
 
@@ -1067,14 +1067,14 @@ message TGetRequest {
 
 message TGetResponse {
     message TContainerGetValueResponse {
-        required string variable = 1;
+        optional string variable = 1;
         optional EError error = 2;
         optional string errorMsg = 3;
         optional string value = 4;
     }
 
     message TContainerGetListResponse {
-        required string name = 1;
+        optional string name = 1;
         repeated TContainerGetValueResponse keyval = 2;
 
         optional uint64 change_time = 3;
@@ -1087,19 +1087,19 @@ message TGetResponse {
 
 // Start stopped container
 message TStartRequest {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
 // Restart dead container
 message TRespawnRequest {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
 // Stop dead or running container
 message TStopRequest {
-    required string name = 1;
+    optional string name = 1;
     // Timeout in 1/1000 seconds between SIGTERM and SIGKILL, default 30s
     optional uint32 timeout_ms = 2;
 }
@@ -1107,25 +1107,25 @@ message TStopRequest {
 
 // Freeze running container
 message TPauseRequest {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
 // Unfreeze paused container
 message TResumeRequest {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
 // Translate filesystem path between containers
 message TConvertPathRequest {
-    required string path = 1;
-    required string source = 2;
-    required string destination = 3;
+    optional string path = 1;
+    optional string source = 2;
+    optional string destination = 3;
 }
 
 message TConvertPathResponse {
-    required string path = 1;
+    optional string path = 1;
 }
 
 
@@ -1142,7 +1142,7 @@ message TWaitRequest {
 }
 
 message TWaitResponse {
-    required string name = 1;           // container name
+    optional string name = 1;           // container name
     optional string state = 2;          // container state or timeout
     optional uint64 when = 3;           // unix time stamp in seconds
     optional string label = 4;
@@ -1152,27 +1152,27 @@ message TWaitResponse {
 
 // Send signal main process in container
 message TKillRequest {
-    required string name = 1;
-    required int32 sig = 2;
+    optional string name = 1;
+    optional int32 sig = 2;
 }
 
 
 // Move process into container
 message TAttachProcessRequest {
-    required string name = 1;
-    required uint32 pid = 2;
-    required string comm = 3; // ignored if empty
+    optional string name = 1;
+    optional uint32 pid = 2;
+    optional string comm = 3; // ignored if empty
 }
 
 
 // Determine container by pid
 message TLocateProcessRequest {
-    required uint32 pid = 1;
-    required string comm = 2; // ignored if empty
+    optional uint32 pid = 1;
+    optional string comm = 2; // ignored if empty
 }
 
 message TLocateProcessResponse {
-    required string name = 1;
+    optional string name = 1;
 }
 
 
@@ -1182,25 +1182,25 @@ message TLocateProcessResponse {
 message TFindLabelRequest {
     optional string mask = 1;           // containers name or wildcard
     optional string state = 2;          // filter by container state
-    required string label = 3;          // label name or wildcard
+    optional string label = 3;          // label name or wildcard
     optional string value = 4;          // filter by label value
 }
 
 message TFindLabelResponse {
     message TFindLabelEntry {
-        required string name = 1;
-        required string state = 2;
-        required string label = 3;
-        required string value = 4;
+        optional string name = 1;
+        optional string state = 2;
+        optional string label = 3;
+        optional string value = 4;
     }
     repeated TFindLabelEntry list = 1;
 }
 
 
 message TSetLabelRequest {
-    required string name = 1;
-    required string label = 2;
-    required string value = 3;
+    optional string name = 1;
+    optional string label = 2;
+    optional string value = 3;
     optional string prev_value = 4;     // fail with Busy if does not match
     optional string state = 5;          // fail with InvalidState if not match
 }
@@ -1212,19 +1212,19 @@ message TSetLabelResponse {
 
 
 message TIncLabelRequest {
-    required string name = 1;
-    required string label = 2;          // missing label starts from 0
+    optional string name = 1;
+    optional string label = 2;          // missing label starts from 0
     optional int64 add = 3 [ default = 1];
 }
 
 message TIncLabelResponse {
-    required int64 result = 1;
+    optional int64 result = 1;
 }
 
 
 message TSetSymlinkRequest {
-    required string container = 1;
-    required string symlink = 2;
+    optional string container = 1;
+    optional string symlink = 2;
     optional string target = 3;
 }
 
@@ -1233,11 +1233,11 @@ message TSetSymlinkRequest {
 
 
 message TNewVolumeRequest {
-    required TVolumeSpec volume = 1;
+    optional TVolumeSpec volume = 1;
 }
 
 message TNewVolumeResponse {
-    required TVolumeSpec volume = 1;
+    optional TVolumeSpec volume = 1;
 }
 
 
@@ -1258,8 +1258,8 @@ message TListVolumePropertiesRequest {
 
 message TListVolumePropertiesResponse {
     message TVolumePropertyDescription {
-        required string name = 1;
-        required string desc = 2;
+        optional string name = 1;
+        optional string desc = 2;
     }
     repeated TVolumePropertyDescription list = 1;
 }
@@ -1274,7 +1274,7 @@ message TCreateVolumeRequest {
 
 
 message TLinkVolumeRequest {
-    required string path = 1;
+    optional string path = 1;
     optional string container = 2;      // default - self
     optional string target = 3;         // path in container, "" - anon
     optional bool required = 4;         // stop container at fail
@@ -1283,7 +1283,7 @@ message TLinkVolumeRequest {
 
 
 message TUnlinkVolumeRequest {
-    required string path = 1;
+    optional string path = 1;
     optional string container = 2;      // default - self, "***" - all
     optional bool strict = 3;           // non-lazy umount
     optional string target = 4;         // path in container, "" - anon, default - "***" - all
@@ -1302,7 +1302,7 @@ message TListVolumesResponse {
 
 
 message TTuneVolumeRequest {
-    required string path = 1;
+    optional string path = 1;
     repeated TVolumeProperty properties = 2;
 }
 
@@ -1322,9 +1322,9 @@ message TListLayersResponse {
 
 
 message TImportLayerRequest {
-    required string layer = 1;
-    required string tarball = 2;
-    required bool merge = 3;
+    optional string layer = 1;
+    optional string tarball = 2;
+    optional bool merge = 3;
     optional string place = 4;
     optional string private_value = 5;
     optional string compress = 6;
@@ -1332,8 +1332,8 @@ message TImportLayerRequest {
 
 
 message TExportLayerRequest {
-    required string volume = 1;
-    required string tarball = 2;
+    optional string volume = 1;
+    optional string tarball = 2;
     optional string layer = 3;
     optional string place = 4;
     optional string compress = 5;
@@ -1341,13 +1341,13 @@ message TExportLayerRequest {
 
 
 message TRemoveLayerRequest {
-    required string layer = 1;
+    optional string layer = 1;
     optional string place = 2;
 }
 
 
 message TGetLayerPrivateRequest {
-    required string layer = 1;
+    optional string layer = 1;
     optional string place = 2;
 }
 
@@ -1357,9 +1357,9 @@ message TGetLayerPrivateResponse {
 
 
 message TSetLayerPrivateRequest {
-    required string layer = 1;
+    optional string layer = 1;
     optional string place = 2;
-    required string private_value = 3;
+    optional string private_value = 3;
 }
 
 
@@ -1378,14 +1378,14 @@ message TListStoragesResponse {
 
 
 message TRemoveStorageRequest {
-    required string name = 1;
+    optional string name = 1;
     optional string place = 2;
 }
 
 
 message TImportStorageRequest {
-    required string name = 1;
-    required string tarball = 2;
+    optional string name = 1;
+    optional string tarball = 2;
     optional string place = 3;
     optional string private_value = 5;
     optional string compress = 6;
@@ -1393,8 +1393,8 @@ message TImportStorageRequest {
 
 
 message TExportStorageRequest {
-    required string name = 1;
-    required string tarball = 2;
+    optional string name = 1;
+    optional string tarball = 2;
     optional string place = 3;
     optional string compress = 4;
 }

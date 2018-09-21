@@ -299,11 +299,13 @@ void TRequest::Parse() {
         Arg = Req.newvolume().volume().path();
     } else if (Req.has_newcontainer()) {
         Cmd = "NewContainer";
-        Arg = Req.newcontainer().container().name();
+        if (Req.newcontainer().has_container())
+            Arg = Req.newcontainer().container().name();
         Opt = Req.newcontainer().ShortDebugString();
     } else if (Req.has_setcontainer()) {
         Cmd = "SetContainer";
-        Arg = Req.setcontainer().container().name();
+        if (Req.setcontainer().has_container())
+            Arg = Req.setcontainer().container().name();
         Opt = Req.setcontainer().ShortDebugString();
     } else if (Req.has_getcontainer()) {
         Cmd = "GetContainer";
@@ -380,6 +382,9 @@ noinline TError NewContainer(rpc::TNewContainerRequest &req,
     std::shared_ptr<TContainer> ct;
     TString name;
     TError error;
+
+    if (!req.has_container())
+        return TError(EError::InvalidMethod, "No container name");
 
     error = CL->ResolveName(req.container().name(), name);
     if (error)
@@ -460,6 +465,9 @@ noinline TError SetContainer(const rpc::TSetContainerRequest &req,
                              rpc::TSetContainerResponse &) {
     std::shared_ptr<TContainer> ct;
     TError error;
+
+    if (!req.has_container())
+        return TError(EError::InvalidMethod, "No container name");
 
     error = CL->WriteContainer(req.container().name(), ct);
     if (error)
