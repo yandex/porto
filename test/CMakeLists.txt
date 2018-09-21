@@ -11,6 +11,9 @@ target_link_libraries(portotest version porto util config pthread rt fmt ${PB} $
 
 add_executable(mem_touch mem_touch.c)
 
+add_executable(test-api test-api.cpp)
+target_link_libraries(test-api porto pthread ${PB})
+
 macro(ADD_PYTHON_TEST NAME)
          add_test(NAME ${NAME}
                   COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
@@ -42,6 +45,10 @@ add_test(NAME portod_start
 ADD_PYTHON_TEST(api)
 
 ADD_PYTHON3_TEST(api)
+
+add_test(NAME cpp-api
+         COMMAND sudo ${CMAKE_BINARY_DIR}/test-api
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 ADD_PYTHON_TEST(wait)
 ADD_PYTHON3_TEST(wait)
