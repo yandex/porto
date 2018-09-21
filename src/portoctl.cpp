@@ -2021,67 +2021,78 @@ public:
                     return EXIT_FAILURE;
                 age *= 60*60*24;
             }
+
             auto rsp = Api->ListStorages(place);
             if (!rsp) {
                 PrintError("Cannot list storage paths");
                 return EXIT_FAILURE;
             }
+
+            std::vector<TString> list;
             for (const auto &s: rsp->storages()) {
-                if (s.last_usage() < age)
-                    continue;
-                std::cout << "remove " << s.name() << std::endl;
-                ret = Api->RemoveStorage(s.name(), place);
-                if (ret)
-                    PrintError("Cannot remove storage");
+                if (s.last_usage() >= age)
+                    list.push_back(s.name());
             }
+
+            ret = EXIT_SUCCESS;
+            for (auto &name: list) {
+                fmt::print("remove {}\n", name);
+                if (Api->RemoveStorage(name, place)) {
+                    PrintError("Cannot remove storage");
+                    if (Api->Error() != EError::Busy)
+                        ret = EXIT_FAILURE;
+                }
+            }
+
         } else if (list) {
             auto rsp = Api->ListStorages(place);
             if (!rsp) {
-                PrintError("Cannot list storage paths");
-            } else {
-
-                for (const auto &s: rsp->meta_storages()) {
-                    std::cout << "meta " << s.name() << std::endl;
-                    if (s.has_owner_user())
-                        std::cout << "\towner\t" << s.owner_user() << ":" << s.owner_group() << std::endl;
-                    if (s.has_last_usage())
-                        std::cout << "\tusage\t" << StringFormatDuration(s.last_usage() * 1000) << " ago" << std::endl;
-                    if (s.has_private_value())
-                        std::cout << "\tprivate\t" << s.private_value() << std::endl;
-
-                    std::cout << "\tspace_limit\t" << StringFormatSize(s.space_limit()) << std::endl;
-                    std::cout << "\tspace_used\t" << StringFormatSize(s.space_used()) << std::endl;
-                    std::cout << "\tspace_available\t" << StringFormatSize(s.space_available()) << std::endl;
-                    std::cout << "\tinode_limit\t" << s.inode_limit() << std::endl;
-                    std::cout << "\tinode_used\t" << s.inode_used() << std::endl;
-                    std::cout << "\tinode_available\t" << s.inode_available() << std::endl;
-
-                    std::cout << std::endl;
-                }
-
-                for (const auto &s: rsp->storages()) {
-                    std::cout << s.name() << std::endl;
-                    if (s.has_owner_user())
-                        std::cout << "\towner\t" << s.owner_user() << ":" << s.owner_group() << std::endl;
-                    if (s.has_last_usage())
-                        std::cout << "\tusage\t" << StringFormatDuration(s.last_usage() * 1000) << " ago" << std::endl;
-                    if (s.has_private_value())
-                        std::cout << "\tprivate\t" << s.private_value() << std::endl;
-                    std::cout << std::endl;
-                }
+                PrintError("Cannot list storages");
+                return EXIT_FAILURE;
             }
+
+            for (const auto &s: rsp->meta_storages()) {
+                fmt::print("meta {}\n", s.name());
+                if (s.has_private_value())
+                    fmt::print("\tprivate\t{}\n", s.private_value());
+                if (s.has_owner_user())
+                    fmt::print("\towner\t{}:{}\n", s.owner_user(), s.owner_group());
+                if (s.has_last_usage())
+                    fmt::print("\tusage\t{} ago\n", StringFormatDuration(s.last_usage() * 1000));
+                fmt::print("\tspace_limit\t{}\n", StringFormatSize(s.space_limit()));
+                fmt::print("\tspace_used\t{}\n", StringFormatSize(s.space_used()));
+                fmt::print("\tspace_available\t{}\n", StringFormatSize(s.space_available()));
+                fmt::print("\tinode_limit\t{}\n", s.inode_limit());;
+                fmt::print("\tinode_used\t{}\n", s.inode_used());
+                fmt::print("\tinode_available\t{}\n", s.inode_available());
+                fmt::print("\n");
+            }
+
+            for (const auto &s: rsp->storages()) {
+                fmt::print("{}\n", s.name());
+                if (s.has_private_value())
+                    fmt::print("\tprivate\t{}\n", s.private_value());
+                if (s.has_owner_user())
+                    fmt::print("\towner\t{}:{}\n", s.owner_user(), s.owner_group());
+                if (s.has_last_usage())
+                    fmt::print("\tusage\t{} ago\n", StringFormatDuration(s.last_usage() * 1000));
+                fmt::print("\n");
+            }
+
         } else if (import) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
             ret = Api->ImportStorage(args[0], archive, place, compression, private_);
             if (ret)
                 PrintError("Cannot import storage");
+
         } else if (export_) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
             ret = Api->ExportStorage(args[0], archive, place, compression);
             if (ret)
                 PrintError("Cannot export storage");
+
         } else if (meta) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
@@ -2105,16 +2116,18 @@ public:
                 s->set_inode_limit(inode_limit);
             if (space_limit)
                 s->set_space_limit(space_limit);
+
             ret = Api->Call(req, rsp);
             if (ret)
                 PrintError("");
+
         } else if (remove) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
-
             ret = Api->RemoveStorage(args[0], place);
             if (ret)
                 PrintError("Cannot remove storage");
+
         } else {
             PrintUsage();
             return EXIT_FAILURE;
@@ -2186,34 +2199,33 @@ public:
                 return EXIT_FAILURE;
             ret = Api->ImportLayer(args[0], path, false, place, private_value);
             if (ret)
-                PrintError("Can't import layer");
-        } else if (export_) {
+                PrintError("Cannot import layer");
+
+        } else if (export_ || squash) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
             ret = Api->ExportLayer(args[0], path, compression);
             if (ret)
-                PrintError("Can't export layer");
-        } else if (squash) {
-            if (args.size() < 2)
-                return EXIT_FAILURE;
-            ret = Api->ExportLayer(args[0], path, compression);
-            if (ret)
-                PrintError("Can't export layer");
+                PrintError("Cannot export layer");
+
         } else if (merge) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
             ret = Api->ImportLayer(args[0], path, true, place, private_value);
             if (ret)
-                PrintError("Can't merge layer");
+                PrintError("Cannot merge layer");
+
         } else if (remove) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
 
             for (const auto &arg : args) {
-                ret = Api->RemoveLayer(arg, place);
-                if (ret)
-                    PrintError("Can't remove layer");
+                if (Api->RemoveLayer(arg, place)) {
+                    PrintError("Cannot remove layer");
+                    ret = Api->Error();
+                }
             }
+
         } else if (flush) {
             uint64_t age = 0;
             if (args.size() >= 1) {
@@ -2221,53 +2233,64 @@ public:
                     return EXIT_FAILURE;
                 age *= 60*60*24;
             }
-            auto list = Api->ListLayers(place);
-            if (!list) {
-                PrintError("Can't list layers");
+
+            std::vector<TString> list;
+            auto rsp = Api->ListLayers(place);
+            if (!rsp) {
+                PrintError("Cannot list layers");
                 return EXIT_FAILURE;
-            } else {
-                for (const auto &l: list->layers()) {
-                    if (l.last_usage() < age)
-                        continue;
-                    if (verbose)
-                        std::cout << "remove " << l.name() << std::endl;
-                    if (Api->RemoveLayer(l.name(), place))
-                        PrintError("Cannot remove layer");
+            }
+
+            for (const auto &l: rsp->layers()) {
+                if (l.last_usage() >= age)
+                    list.push_back(l.name());
+            }
+
+            for (auto &name: list) {
+                fmt::print("remove {}\n", name);
+                if (Api->RemoveLayer(name, place)) {
+                    PrintError("Cannot remove layer");
+                    if (Api->Error() != EError::Busy)
+                        ret = Api->Error();
                 }
             }
+
         } else if (list) {
-            auto list = Api->ListLayers(place);
-            if (!list) {
-                PrintError("Can't list layers");
-            } else {
-                for (const auto &l: list->layers()) {
-                    std::cout << l.name() << std::endl;
-                    if (!verbose)
-                        continue;
-                    if (l.owner_user().size())
-                        std::cout << "\towner\t" << l.owner_user() << ":" << l.owner_group() << std::endl;
-                    if (l.last_usage())
-                        std::cout << "\tused\t" << StringFormatDuration(l.last_usage() * 1000) << " ago" << std::endl;
-                    if (l.private_value().size())
-                        std::cout << "\tprivate\t" << l.private_value() << std::endl;
-                    std::cout << std::endl;
-                }
+            auto rsp = Api->ListLayers(place);
+            if (!rsp) {
+                PrintError("Cannot list layers");
+                return EXIT_FAILURE;
             }
+
+            for (const auto &l: rsp->layers()) {
+                fmt::print("{}\n", l.name());
+                if (!verbose)
+                    continue;
+                if (l.private_value().size())
+                    fmt::print("\tprivate\t{}\n", l.private_value());
+                if (l.owner_user().size())
+                    fmt::print("\towner\t{}:{}\n", l.owner_user(), l.owner_group());
+                if (l.last_usage())
+                    fmt::print("\tused\t{} ago\n", StringFormatDuration(l.last_usage() * 1000));;
+                fmt::print("\n");
+            }
+
         } else if (get_private) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
             ret = Api->GetLayerPrivate(private_value, args[0], place);
-
             if (ret)
-                PrintError("Can't get layer private value");
+                PrintError("Cannot get layer private value");
             else
-                std::cout << private_value << std::endl;
+                fmt::print("{}\n", private_value);
+
         } else if (set_private) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
             ret = Api->SetLayerPrivate(private_value, args[0], place);
             if (ret)
-                PrintError("Can't set layer private value");
+                PrintError("Cannot set layer private value");
+
         } else {
             PrintUsage();
             return EXIT_FAILURE;
