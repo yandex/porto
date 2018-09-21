@@ -2030,11 +2030,14 @@ public:
                 PrintError("Cannot list storage paths");
                 return EXIT_FAILURE;
             }
+            std::vector<std::string> list;
             for (const auto &s: rsp->storages()) {
-                if (s.last_usage() < age)
-                    continue;
-                std::cout << "remove " << s.name() << std::endl;
-                ret = Api->RemoveStorage(s.name(), place);
+                if (s.last_usage() >= age)
+                    list.push_back(s.name());
+            }
+            for (auto &name: list) {
+                std::cout << "remove " << name << std::endl;
+                ret = Api->RemoveStorage(name, place);
                 if (ret)
                     PrintError("Cannot remove storage");
             }
