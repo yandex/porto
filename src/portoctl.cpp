@@ -24,15 +24,6 @@ extern "C" {
 #include <poll.h>
 }
 
-using std::string;
-using std::vector;
-using std::stringstream;
-using std::ostream_iterator;
-using std::map;
-using std::pair;
-using std::set;
-using std::shared_ptr;
-
 static int ForwardPtyMaster;
 
 static void ForwardWinch(int) {
@@ -648,10 +639,10 @@ public:
     TRawCmd(Porto::Connection *api) : ICmd(api, "raw", 1, "<request>", "send request in text protobuf") {}
 
     int Execute(TCommandEnviroment *env) final override {
-        stringstream req;
+        std::stringstream req;
 
         const auto &args = env->GetArgs();
-        copy(args.begin(), args.end(), ostream_iterator<string>(req, " "));
+        copy(args.begin(), args.end(), std::ostream_iterator<std::string>(req, " "));
 
         std::string rsp;
         int ret = Api->Call(req.str(), rsp);
@@ -694,7 +685,7 @@ public:
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
-            string value;
+            std::string value;
             int ret = Api->GetProperty(args[0], args[i], value, flags);
             if (ret) {
                 PrintError("Can't get property");
@@ -716,7 +707,7 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        string val = args[2];
+        std::string val = args[2];
         for (size_t i = 3; i < args.size(); ++i) {
             val += " ";
             val += args[i];
@@ -746,7 +737,7 @@ public:
         });
 
         for (size_t i = 1; i < args.size(); ++i) {
-            string value;
+            std::string value;
             int ret = Api->GetProperty(args[0], args[i], value, flags);
             if (ret) {
                 PrintError("Can't get data");
@@ -779,7 +770,7 @@ public:
     }
 };
 
-static const map<string, int> sigMap = {
+static const std::map<std::string, int> sigMap = {
     { "SIGHUP",     SIGHUP },
     { "SIGINT",     SIGINT },
     { "SIGQUIT",    SIGQUIT },
@@ -839,7 +830,7 @@ public:
         int sig = SIGTERM;
         const auto &args = env->GetArgs();
         if (args.size() >= 2) {
-            const string &sigName = args[1];
+            const std::string &sigName = args[1];
 
             if (sigMap.find(sigName) != sigMap.end()) {
                 sig = sigMap.at(sigName);
@@ -1287,7 +1278,7 @@ public:
     TGcCmd(Porto::Connection *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
 
     int Execute(TCommandEnviroment *) final override {
-        vector<string> clist;
+        std::vector<std::string> clist;
         int ret = Api->List(clist);
         if (ret) {
             PrintError("Can't list containers");
@@ -1298,7 +1289,7 @@ public:
             if (c == "/")
                 continue;
 
-            string state;
+            std::string state;
             ret = Api->GetProperty(c, "state", state);
             if (ret) {
                 PrintError("Can't get container state");
@@ -1481,7 +1472,7 @@ public:
         std::string mask = args.size() ? args[0] : "";
         int ret;
 
-        vector<string> clist;
+        std::vector<std::string> clist;
         if (label != "" ) {
             auto sep = label.find('=');
 
@@ -1511,16 +1502,16 @@ public:
         if (clist.empty())
             return EXIT_SUCCESS;
 
-        vector<string> displayName;
+        std::vector<std::string> displayName;
         std::copy(clist.begin(), clist.end(), std::back_inserter(displayName));
 
         if (forest)
             for (size_t i = 0; i < clist.size(); i++) {
                 auto c = clist[i];
 
-                string parent = GetParent(c);
+                std::string parent = GetParent(c);
                 if (parent != "/") {
-                    string prefix = " ";
+                    std::string prefix = " ";
                     for (size_t j = 1; j < CountChar(displayName[i], '/'); j++)
                             prefix = prefix + "   ";
 
@@ -1535,7 +1526,7 @@ public:
             return ret;
         }
 
-        vector<string> states = { "running", "dead", "meta", "stopped", "paused" };
+        std::vector<std::string> states = { "running", "dead", "meta", "stopped", "paused" };
         size_t stateLen = MaxFieldLength(states);
         size_t nameLen = MaxFieldLength(displayName);
         size_t timeLen = 12;
@@ -1700,7 +1691,7 @@ public:
         for (size_t i = 1; i < args.size(); i++) {
             const std::string &arg = args[i];
             std::size_t sep = arg.find('=');
-            if (sep == string::npos)
+            if (sep == std::string::npos)
                 properties[arg] = "";
             else
                 properties[arg.substr(0, sep)] = arg.substr(sep + 1);
@@ -1945,7 +1936,7 @@ public:
         for (size_t i = 1; i < args.size(); i++) {
             const std::string &arg = args[i];
             std::size_t sep = arg.find('=');
-            if (sep == string::npos)
+            if (sep == std::string::npos)
                 properties[arg] = "";
             else
                 properties[arg.substr(0, sep)] = arg.substr(sep + 1);
@@ -2006,7 +1997,7 @@ public:
             { 'M', false, [&](const char *) { meta = true;   } },
             { 'r', false, [&](const char *) { resize = true;   } },
             { 'c', true, [&](const char * arg) { compression = arg; } },
-            { 'q', true, [&](const char * arg) {  StringToSize(arg, inode_limit); } },
+            { 'q', true, [&](const char * arg) { StringToSize(arg, inode_limit); } },
             { 'Q', true, [&](const char * arg) { StringToSize(arg, space_limit); } },
         });
 

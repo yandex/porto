@@ -12,10 +12,6 @@ extern "C" {
 #include <sys/ioctl.h>
 }
 
-using std::string;
-using std::map;
-using std::vector;
-
 namespace {
 
 void PrintAligned(const std::string &name, const std::string &desc,
@@ -143,23 +139,23 @@ int THelpCmd::Execute(TCommandEnviroment *env) {
 }  // namespace
 
 size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
-    return MaxFieldLength(vec, [](const string &s) { return s; }, min);
+    return MaxFieldLength(vec, [](const std::string &s) { return s; }, min);
 }
 
-ICmd::ICmd(Porto::Connection *api, const string &name, int args,
-           const string &usage, const string &desc, const string &help) :
+ICmd::ICmd(Porto::Connection *api, const std::string &name, int args,
+           const std::string &usage, const std::string &desc, const std::string &help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
-const string &ICmd::GetName() const { return Name; }
-const string &ICmd::GetUsage() const { return Usage; }
-const string &ICmd::GetDescription() const { return Desc; }
-const string &ICmd::GetHelp() const { return Help; }
+const std::string &ICmd::GetName() const { return Name; }
+const std::string &ICmd::GetUsage() const { return Usage; }
+const std::string &ICmd::GetDescription() const { return Desc; }
+const std::string &ICmd::GetHelp() const { return Help; }
 
-void ICmd::PrintError(const string &prefix) {
+void ICmd::PrintError(const std::string &prefix) {
     fmt::print(stderr, "{}: {}\n", prefix, Api->GetLastError());
 }
 
-void ICmd::PrintError(const string &prefix, const TError &error) {
+void ICmd::PrintError(const std::string &prefix, const TError &error) {
     fmt::print(stderr, "{}: {}\n", prefix, error.ToString());
 }
 
@@ -175,7 +171,7 @@ bool ICmd::ValidArgs(const std::vector<std::string> &args) {
         return false;
 
     if (args.size() >= 1) {
-        const string &arg = args[0];
+        const std::string &arg = args[0];
         if (arg == "-h" || arg == "--help" || arg == "help")
             return false;;
     }
@@ -268,7 +264,7 @@ void TCommandHandler::Usage(const char *command) {
     cmd->Execute(&commandEnv);
 }
 
-vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
+std::vector<std::string> TCommandEnviroment::GetOpts(const std::vector<Option> &options) {
     std::string optstring = "+";
     for (const auto &o : options) {
         optstring += o.key;
@@ -277,8 +273,8 @@ vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
     }
 
     int opt;
-    vector<string> mutableBuffer = Arguments;
-    vector<const char*> rawArgs;
+    std::vector<std::string> mutableBuffer = Arguments;
+    std::vector<const char*> rawArgs;
     rawArgs.reserve(mutableBuffer.size() + 2);
     std::string fakeCmd = "portoctl";
     rawArgs.push_back(fakeCmd.c_str());
@@ -307,5 +303,5 @@ vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
             exit(EXIT_FAILURE);
     }
 
-    return vector<string>(Arguments.begin() + optind - 1, Arguments.end());
+    return std::vector<std::string>(Arguments.begin() + optind - 1, Arguments.end());
 }
