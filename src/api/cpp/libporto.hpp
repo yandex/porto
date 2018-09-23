@@ -86,6 +86,9 @@ public:
     TString GetLastRequest() const { return Req.DebugString(); }
     TString GetLastResponse() const { return Rsp.DebugString(); }
 
+    /* To be used for next changed_since */
+    uint64_t ResponseTimestamp() const { return Rsp.timestamp(); }
+
     EError Call(const rpc::TPortoRequest &req,
                 rpc::TPortoResponse &rsp,
                 int extra_timeout = -1);
@@ -159,10 +162,16 @@ public:
     /* Porto v5 api */
     const rpc::TContainerSpec *GetContainerSpec(const TString &name);
 
+    const rpc::TGetContainerResponse *GetContainersSpec(uint64_t changed_since = 0);
+
     EError GetProperty(const TString &name,
                        const TString &property,
                        TString &value,
                        int flags = 0);
+
+    EError SetProperty(const TString &name,
+                       const TString &property,
+                       const TString &value);
 
     EError GetProperty(const TString &name,
                        const TString &property,
@@ -171,7 +180,9 @@ public:
 
     EError SetProperty(const TString &name,
                        const TString &property,
-                       const TString &value);
+                       uint64_t value) {
+        return SetProperty(name, property, std::to_string(value));
+    }
 
     EError IncLabel(const TString &name,
                     const TString &label,
@@ -214,6 +225,8 @@ public:
 
     /* Porto v5 api */
     const rpc::TVolumeSpec *GetVolumeSpec(const TString &path);
+
+    const rpc::TGetVolumeResponse *GetVolumesSpec(uint64_t changed_since = 0);
 
     EError CreateVolume(TString &path,
                         const std::map<TString, TString> &config);

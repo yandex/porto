@@ -364,6 +364,19 @@ const rpc::TContainerSpec *Connection::GetContainerSpec(const TString &name) {
     return nullptr;
 }
 
+const rpc::TGetContainerResponse *Connection::GetContainersSpec(uint64_t changed_since) {
+    Req.Clear();
+    auto req = Req.mutable_getcontainer();
+
+    if (changed_since)
+        req->set_changed_since(changed_since);
+
+    if (!Call() && Rsp.has_getcontainer())
+        return &Rsp.getcontainer();
+
+    return nullptr;
+}
+
 EError Connection::GetProperty(const TString &name,
                                const TString &property,
                                TString &value,
@@ -805,7 +818,20 @@ const rpc::TVolumeSpec *Connection::GetVolumeSpec(const TString &path) {
     return nullptr;
 }
 
-/* Layer*/
+const rpc::TGetVolumeResponse *Connection::GetVolumesSpec(uint64_t changed_since) {
+    Req.Clear();
+    auto req = Req.mutable_getvolume();
+
+    if (changed_since)
+        req->set_changed_since(changed_since);
+
+    if (!Call() && Rsp.has_getvolume())
+        return &Rsp.getvolume();
+
+    return nullptr;
+}
+
+/* Layer */
 
 EError Connection::ImportLayer(const TString &layer,
                                const TString &tarball,
