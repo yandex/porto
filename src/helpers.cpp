@@ -12,15 +12,15 @@ extern "C" {
 #include <linux/loop.h>
 }
 
-static void HelperError(TFile &err, const TString &text, TError error) __attribute__ ((noreturn));
+static void HelperError(TFile &err, const std::string &text, TError error) __attribute__ ((noreturn));
 
-static void HelperError(TFile &err, const TString &text, TError error) {
+static void HelperError(TFile &err, const std::string &text, TError error) {
     L_WRN("{}: {}", text, error);
     err.WriteAll(fmt::format("{}: {}", text, error));
     _exit(EXIT_FAILURE);
 }
 
-TError RunCommand(const std::vector<TString> &command,
+TError RunCommand(const std::vector<std::string> &command,
                   const TFile &dir, const TFile &in, const TFile &out,
                   const TCapabilities &caps) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
@@ -36,7 +36,7 @@ TError RunCommand(const std::vector<TString> &command,
     if (error)
         return error;
 
-    TString cmdline;
+    std::string cmdline;
 
     for (auto &arg : command)
         cmdline += arg + " ";
@@ -50,7 +50,7 @@ TError RunCommand(const std::vector<TString> &command,
     if (task.Pid) {
         error = task.Wait();
         if (error) {
-            TString text;
+            std::string text;
             TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
             if (error2)
                 text = "Cannot read stderr: " + error2.ToString();

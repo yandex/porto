@@ -56,16 +56,16 @@ struct FileHandle {
 
 TPath TPath::DirNameNormal() const {
     auto sep = Path.rfind('/');
-    if (sep == TString::npos)
+    if (sep == std::string::npos)
         return Path.empty() ? "" : ".";
     if (sep == 0)
         return "/";
     return Path.substr(0, sep);
 }
 
-TString TPath::BaseNameNormal() const {
+std::string TPath::BaseNameNormal() const {
     auto sep = Path.rfind('/');
-    if (sep == TString::npos || Path.size() == 1)
+    if (sep == std::string::npos || Path.size() == 1)
         return Path;
     return Path.substr(sep + 1);
 }
@@ -74,7 +74,7 @@ TPath TPath::DirName() const {
     return NormalPath().DirNameNormal();
 }
 
-TString TPath::BaseName() const {
+std::string TPath::BaseName() const {
     return NormalPath().BaseNameNormal();
 }
 
@@ -135,7 +135,7 @@ dev_t TPath::GetBlockDev() const {
     return st.st_rdev;
 }
 
-TError TPath::GetDevName(dev_t dev, TString &name) {
+TError TPath::GetDevName(dev_t dev, std::string &name) {
     TPath block = fmt::format("/sys/dev/block/{}:{}", major(dev), minor(dev));
     TError error;
     TPath link;
@@ -161,7 +161,7 @@ bool TPath::PathExists() const {
     return lstat(Path.c_str(), &st) == 0;
 }
 
-TString TPath::ToString() const {
+std::string TPath::ToString() const {
     return Path;
 }
 
@@ -180,10 +180,10 @@ TPath TPath::AddComponent(const TPath &component) const {
     return TPath(Path + "/" + component.Path);
 }
 
-std::vector<TString> TPath::Components() const {
-    std::vector<TString> result;
+std::vector<std::string> TPath::Components() const {
+    std::vector<std::string> result;
     std::stringstream ss(Path);
-    TString component;
+    std::string component;
 
     if (IsAbsolute())
         result.push_back("/");
@@ -309,7 +309,7 @@ TError TPath::Mkfile(unsigned int mode) const {
 
 TPath TPath::NormalPath() const {
     std::stringstream ss(Path);
-    TString component, path;
+    std::string component, path;
 
     if (IsEmpty())
         return TPath();
@@ -325,13 +325,13 @@ TPath TPath::NormalPath() const {
         if (component == "..") {
             auto last = path.rfind('/');
 
-            if (last == TString::npos) {
+            if (last == std::string::npos) {
                 /* a/.. */
                 if (!path.empty() && path != "..") {
                     path = "";
                     continue;
                 }
-            } else if (path.compare(last + 1, TString::npos, "..") != 0) {
+            } else if (path.compare(last + 1, std::string::npos, "..") != 0) {
                 if (last == 0)
                     path.erase(last + 1);   /* /.. or /a/.. */
                 else
@@ -369,21 +369,21 @@ TPath TPath::RelativePath(const TPath &base) const {
     if (!IsAbsolute() || !base.IsAbsolute())
         return TPath();
 
-    TString rel = NormalPath().Path;
-    TString pre = base.NormalPath().Path;
+    std::string rel = NormalPath().Path;
+    std::string pre = base.NormalPath().Path;
 
     while (pre.size()) {
         auto a = pre.find('/');
         auto b = rel.find('/');
         if (pre.substr(0, a) != rel.substr(0, b))
             break;
-        pre = a != TString::npos ? pre.substr(a + 1) : "";
-        rel = b != TString::npos ? rel.substr(b + 1) : "";
+        pre = a != std::string::npos ? pre.substr(a + 1) : "";
+        rel = b != std::string::npos ? rel.substr(b + 1) : "";
     }
 
     while (pre.size()) {
         auto a = pre.find('/');
-        pre = a != TString::npos ? pre.substr(a + 1) : "";
+        pre = a != std::string::npos ? pre.substr(a + 1) : "";
         rel = rel.size() ? "../" + rel : "..";
     }
 
@@ -493,7 +493,7 @@ TError TPath::MkdirAll(unsigned int mode) const {
     return OK;
 }
 
-TError TPath::MkdirTmp(const TPath &parent, const TString &prefix, unsigned int mode) {
+TError TPath::MkdirTmp(const TPath &parent, const std::string &prefix, unsigned int mode) {
     Path = (parent / (prefix + "XXXXXX")).Path;
     if (!mkdtemp(&Path[0]))
         return TError::System("mkdtemp(" + Path + ")");
@@ -570,7 +570,7 @@ TError TPath::RemoveAll() const {
     return Unlink();
 }
 
-TError TPath::ReadDirectory(std::vector<TString> &result) const {
+TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     struct dirent *de;
     DIR *dir;
 
@@ -581,13 +581,13 @@ TError TPath::ReadDirectory(std::vector<TString> &result) const {
 
     while ((de = readdir(dir))) {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, ".."))
-            result.push_back(TString(de->d_name));
+            result.push_back(std::string(de->d_name));
     }
     closedir(dir);
     return OK;
 }
 
-TError TPath::ListSubdirs(std::vector<TString> &result) const {
+TError TPath::ListSubdirs(std::vector<std::string> &result) const {
     struct dirent *de;
     DIR *dir;
 
@@ -600,8 +600,8 @@ TError TPath::ListSubdirs(std::vector<TString> &result) const {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, "..") &&
             (de->d_type == DT_DIR ||
              (de->d_type == DT_UNKNOWN &&
-              (*this / TString(de->d_name)).IsDirectoryStrict())))
-            result.push_back(TString(de->d_name));
+              (*this / std::string(de->d_name)).IsDirectoryStrict())))
+            result.push_back(std::string(de->d_name));
     }
     closedir(dir);
     return OK;
@@ -620,7 +620,7 @@ int64_t TPath::SinceModificationMs() const {
            (int64_t)st.st_mtim.tv_sec * 1000 - st.st_mtim.tv_nsec / 1000000;
 }
 
-TError TPath::GetXAttr(const TString &name, TString &value) const {
+TError TPath::GetXAttr(const std::string &name, std::string &value) const {
     ssize_t size = syscall(SYS_lgetxattr, Path.c_str(), name.c_str(), nullptr, 0);
     if (size >= 0) {
         value.resize(size);
@@ -630,7 +630,7 @@ TError TPath::GetXAttr(const TString &name, TString &value) const {
     return TError::System("getxattr(" + Path + ", " + name + ")");
 }
 
-TError TPath::SetXAttr(const TString &name, const TString &value) const {
+TError TPath::SetXAttr(const std::string &name, const std::string &value) const {
     if (syscall(SYS_setxattr, Path.c_str(), name.c_str(),
                 value.c_str(), value.length(), 0))
         return TError::System("setxattr {} {}", Path, name);
@@ -735,7 +735,7 @@ static const TFlagsNames UmountFlags = {
     { UMOUNT_NOFOLLOW,  "nofollow" },
 };
 
-TError TMount::ParseFlags(const TString &str, uint64_t &mnt_flags, uint64_t allowed)
+TError TMount::ParseFlags(const std::string &str, uint64_t &mnt_flags, uint64_t allowed)
 {
     TError error = StringParseFlags(str, MountFlags, mnt_flags);
     if (error)
@@ -745,17 +745,17 @@ TError TMount::ParseFlags(const TString &str, uint64_t &mnt_flags, uint64_t allo
     return OK;
 }
 
-TString TMount::FormatFlags(uint64_t mnt_flags) {
+std::string TMount::FormatFlags(uint64_t mnt_flags) {
     return StringFormatFlags(mnt_flags, MountFlags);
 }
 
-TString TPath::UmountFlagsToString(uint64_t mnt_flags) {
+std::string TPath::UmountFlagsToString(uint64_t mnt_flags) {
     return StringFormatFlags(mnt_flags, UmountFlags);
 }
 
-TError TPath::Mount(const TPath &source, const TString &type, uint64_t mnt_flags,
-                    const std::vector<TString> &options) const {
-    TString data = MergeEscapeStrings(options, ',');
+TError TPath::Mount(const TPath &source, const std::string &type, uint64_t mnt_flags,
+                    const std::vector<std::string> &options) const {
+    std::string data = MergeEscapeStrings(options, ',');
 
     if (data.length() >= 4096)
         return TError(EError::Unknown, E2BIG, "mount option too big: " +
@@ -914,7 +914,7 @@ TError TPath::UmountNested() const {
     return OK;
 }
 
-TError TPath::ReadAll(TString &text, size_t max) const {
+TError TPath::ReadAll(std::string &text, size_t max) const {
     TError error;
     TFile file;
 
@@ -929,7 +929,7 @@ TError TPath::ReadAll(TString &text, size_t max) const {
     return OK;
 }
 
-TError TPath::WriteAll(const TString &text) const {
+TError TPath::WriteAll(const std::string &text) const {
     TError error;
     TFile file;
 
@@ -944,7 +944,7 @@ TError TPath::WriteAll(const TString &text) const {
     return OK;
 }
 
-TError TPath::WriteAtomic(const TString &text) const {
+TError TPath::WriteAtomic(const std::string &text) const {
     TError error;
     TFile file;
 
@@ -962,7 +962,7 @@ TError TPath::WriteAtomic(const TString &text) const {
     return error;
 }
 
-TError TPath::WritePrivate(const TString &text) const {
+TError TPath::WritePrivate(const std::string &text) const {
     TError error;
     TFile file;
 
@@ -991,8 +991,8 @@ TError TPath::WritePrivate(const TString &text) const {
     return error;
 }
 
-TError TPath::ReadLines(std::vector<TString> &lines, size_t max) const {
-    TString text, line;
+TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
+    std::string text, line;
 
     TError error = ReadAll(text, max);
     if (error)
@@ -1007,7 +1007,7 @@ TError TPath::ReadLines(std::vector<TString> &lines, size_t max) const {
 }
 
 TError TPath::ReadInt(int &value) const {
-    TString text;
+    std::string text;
     TError error = ReadAll(text);
     if (!error)
         error = StringToInt(text, value);
@@ -1015,7 +1015,7 @@ TError TPath::ReadInt(int &value) const {
 }
 
 TError TPath::FindMount(TMount &mount, bool exact) const {
-    std::vector<TString> lines;
+    std::vector<std::string> lines;
 
     TError error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
     if (error)
@@ -1053,7 +1053,7 @@ TError TPath::FindMount(TMount &mount, bool exact) const {
 }
 
 TError TPath::ListAllMounts(std::list<TMount> &list) {
-    std::vector<TString> lines;
+    std::vector<std::string> lines;
 
     TError error = TPath("/proc/self/mountinfo").ReadLines(lines, MOUNT_INFO_LIMIT);
     if (error)
@@ -1072,8 +1072,8 @@ TError TPath::ListAllMounts(std::list<TMount> &list) {
     return OK;
 }
 
-TString TMount::Demangle(const TString &s) {
-    TString demangled;
+std::string TMount::Demangle(const std::string &s) {
+    std::string demangled;
 
     for (unsigned int i = 0; i < s.size();) {
         if (s[i] == '\\' && (i + 3 < s.size()) &&
@@ -1093,7 +1093,7 @@ TString TMount::Demangle(const TString &s) {
     return demangled;
 }
 
-TError TMount::ParseMountinfo(const TString &line) {
+TError TMount::ParseMountinfo(const std::string &line) {
     auto tokens = SplitString(line, ' ', 7);
     TError error;
 
@@ -1120,7 +1120,7 @@ TError TMount::ParseMountinfo(const TString &line) {
     if (error)
         return TError(error, "while parsing mountinfo flags");
 
-    TString opt;
+    std::string opt;
     std::stringstream ss(tokens[6]);
 
     OptFields.clear();
@@ -1144,10 +1144,10 @@ TError TMount::ParseMountinfo(const TString &line) {
     return OK;
 }
 
-bool TMount::HasOption(const TString &option) const {
-    TString options = "," + Options + ",";
-    TString mask = "," + option + ",";
-    return options.find(mask) != TString::npos;
+bool TMount::HasOption(const std::string &option) const {
+    std::string options = "," + Options + ",";
+    std::string mask = "," + option + ",";
+    return options.find(mask) != std::string::npos;
 }
 
 TError TFile::Open(const TPath &path, int flags) {
@@ -1264,7 +1264,7 @@ TPath TFile::ProcPath(void) const {
     return TPath("/proc/self/fd/" + std::to_string(Fd));
 }
 
-TError TFile::Read(TString &text) const {
+TError TFile::Read(std::string &text) const {
     if (!text.size())
         text.resize(16<<10);
     ssize_t ret = read(Fd, &text[0], text.size());
@@ -1274,7 +1274,7 @@ TError TFile::Read(TString &text) const {
     return OK;
 }
 
-TError TFile::ReadAll(TString &text, size_t max) const {
+TError TFile::ReadAll(std::string &text, size_t max) const {
     struct stat st;
     if (fstat(Fd, &st) < 0)
         return TError::System("fstat");
@@ -1307,7 +1307,7 @@ TError TFile::ReadAll(TString &text, size_t max) const {
     return OK;
 }
 
-TError TFile::ReadEnds(TString &text, size_t max) const {
+TError TFile::ReadEnds(std::string &text, size_t max) const {
     ssize_t head = 0, tail, size;
     struct stat st;
 
@@ -1316,7 +1316,7 @@ TError TFile::ReadEnds(TString &text, size_t max) const {
         text.resize(size);
         tail = pread(Fd, &text[0], size, 0);
     } else {
-        TString cut = fmt::format("\n--cut {}--\n", StringFormatSize(st.st_size));
+        std::string cut = fmt::format("\n--cut {}--\n", StringFormatSize(st.st_size));
         size = (max - cut.size()) / 2;
         text.resize(max);
         head = pread(Fd, &text[0], size, 0);
@@ -1339,7 +1339,7 @@ TError TFile::Truncate(off_t size) const {
     return OK;
 }
 
-TError TFile::WriteAll(const TString &text) const {
+TError TFile::WriteAll(const std::string &text) const {
     size_t len = text.length(), off = 0;
     do {
         ssize_t ret = write(Fd, &text[off], len - off);
@@ -1574,7 +1574,7 @@ TError TFile::Touch() const {
     return OK;
 }
 
-TError TFile::GetXAttr(const TString &name, TString &value) const {
+TError TFile::GetXAttr(const std::string &name, std::string &value) const {
     ssize_t size = syscall(SYS_fgetxattr, Fd, name.c_str(), nullptr, 0);
     if (size >= 0) {
         value.resize(size);
@@ -1584,7 +1584,7 @@ TError TFile::GetXAttr(const TString &name, TString &value) const {
     return TError::System("getxattr {}", name);
 }
 
-TError TFile::SetXAttr(const TString &name, const TString &value) const {
+TError TFile::SetXAttr(const std::string &name, const std::string &value) const {
     if (syscall(SYS_fsetxattr, Fd, name.c_str(), value.c_str(), value.length(), 0))
         return TError::System("setxattr {}", name);
     return OK;

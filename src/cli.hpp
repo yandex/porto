@@ -14,23 +14,23 @@ class TCommandEnviroment;
 class ICmd {
 protected:
     Porto::Connection *Api;
-    TString Name, Usage, Desc, Help;
+    std::string Name, Usage, Desc, Help;
     sig_atomic_t Interrupted = 0;
 public:
     int NeedArgs;
 
-    ICmd(Porto::Connection *api, const TString &name, int args,
-         const TString &usage, const TString &desc, const TString &help = "");
+    ICmd(Porto::Connection *api, const std::string &name, int args,
+         const std::string &usage, const std::string &desc, const std::string &help = "");
     virtual ~ICmd() {}
-    const TString &GetName() const;
-    const TString &GetUsage() const;
-    const TString &GetDescription() const;
-    const TString &GetHelp() const;
+    const std::string &GetName() const;
+    const std::string &GetUsage() const;
+    const std::string &GetDescription() const;
+    const std::string &GetHelp() const;
 
-    void PrintError(const TString &prefix);
-    void PrintError(const TString &prefix, const TError &error);
+    void PrintError(const std::string &prefix);
+    void PrintError(const std::string &prefix, const TError &error);
     void PrintUsage();
-    bool ValidArgs(const std::vector<TString> &args);
+    bool ValidArgs(const std::vector<std::string> &args);
     virtual int Execute(TCommandEnviroment *env) = 0;
 };
 
@@ -45,7 +45,7 @@ class TCommandHandler {
     TCommandHandler(const TCommandHandler&) = delete;
 
 public:
-    using RegisteredCommands = std::map<TString, std::unique_ptr<ICmd>>;
+    using RegisteredCommands = std::map<std::string, std::unique_ptr<ICmd>>;
 
     explicit TCommandHandler(Porto::Connection &api);
     ~TCommandHandler();
@@ -69,7 +69,7 @@ private:
 
 class TCommandEnviroment {
     TCommandHandler &Handler;
-    const std::vector<TString> &Arguments;
+    const std::vector<std::string> &Arguments;
 
     TCommandEnviroment() = delete;
     TCommandEnviroment(const TCommandEnviroment &) = delete;
@@ -77,18 +77,18 @@ class TCommandEnviroment {
 public:
     int NeedArgs = 0;
     TCommandEnviroment(TCommandHandler &handler,
-                       const std::vector<TString> &arguments)
+                       const std::vector<std::string> &arguments)
         : Handler(handler),
           Arguments(arguments) {}
 
     TCommandEnviroment(TCommandEnviroment *env,
-                       const std::vector<TString> &arguments)
+                       const std::vector<std::string> &arguments)
         : Handler(env->Handler),
           Arguments(arguments) {}
 
-    std::vector<TString> GetOpts(const std::vector<Option> &options);
-    const std::vector<TString> &GetArgs() const { return Arguments; }
+    std::vector<std::string> GetOpts(const std::vector<Option> &options);
+    const std::vector<std::string> &GetArgs() const { return Arguments; }
 };
 
 constexpr size_t MIN_FIELD_LENGTH = 8;
-size_t MaxFieldLength(const std::vector<TString> &vec, size_t min = MIN_FIELD_LENGTH);
+size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min = MIN_FIELD_LENGTH);

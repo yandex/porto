@@ -3,11 +3,11 @@
 #include "portotop.hpp"
 #include "version.hpp"
 
-static double ParseNumber(const TString &str) {
+static double ParseNumber(const std::string &str) {
     return strtod(str.c_str(), nullptr);
 }
 
-static double ParseValue(const TString &value, bool map) {
+static double ParseValue(const std::string &value, bool map) {
     if (!map)
         return ParseNumber(value);
 
@@ -66,7 +66,7 @@ template<class T>
 void TConsoleScreen::PrintAt(T arg, int x, int y, int width, bool leftaligned, int attr) {
     PrintAt(std::to_string(arg), x, y, width, leftaligned, attr);
 }
-void TConsoleScreen::PrintAt(TString str0, int x0, int y0, int w0, bool leftaligned,
+void TConsoleScreen::PrintAt(std::string str0, int x0, int y0, int w0, bool leftaligned,
              int attr) {
     if (x0 + w0 < 0 || x0 >= Width())
         return;
@@ -76,11 +76,11 @@ void TConsoleScreen::PrintAt(TString str0, int x0, int y0, int w0, bool leftalig
     if (x + w >= Width())
         w = Width() - x;
 
-    TString str;
+    std::string str;
     if ((int)str0.length() > x - x0)
         str = str0.substr(x - x0, w);
     else
-        str = TString(w, ' ');
+        str = std::string(w, ' ');
 
     if (attr)
         attron(attr);
@@ -113,7 +113,7 @@ void TConsoleScreen::Restore() {
     reset_prog_mode();
     refresh();
 }
-int TConsoleScreen::Dialog(TString text, const std::vector<TString> &buttons) {
+int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &buttons) {
     int selected = 0;
     bool done = false;
 
@@ -164,7 +164,7 @@ int TConsoleScreen::Dialog(TString text, const std::vector<TString> &buttons) {
 void TConsoleScreen::ErrorDialog(Porto::Connection &api) {
     Dialog(api.GetLastError(), {"Ok"});
 }
-void TConsoleScreen::InfoDialog(std::vector<TString> lines) {
+void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
     unsigned int w = 0;
     unsigned int h = lines.size();
     for (auto &l : lines)
@@ -201,8 +201,8 @@ void TConsoleScreen::InfoDialog(std::vector<TString> lines) {
 }
 
 void TConsoleScreen::HelpDialog() {
-    std::vector<TString> help =
-        {TString("portoctl top ") + PORTO_VERSION + " " + PORTO_REVISION,
+    std::vector<std::string> help =
+        {std::string("portoctl top ") + PORTO_VERSION + " " + PORTO_REVISION,
          "",
          "left, right, home, end - change sorting/scroll",
          "up, down, page up, page down - select container/scroll",
@@ -348,8 +348,8 @@ void TConsoleScreen::ColumnsMenu(std::vector<TColumn> &columns) {
 
 ///////////////////////////////////////////////////////
 
-void TPortoValueCache::Register(const TString &container,
-                                const TString &variable) {
+void TPortoValueCache::Register(const std::string &container,
+                                const std::string &variable) {
     if (Containers.find(container) == Containers.end())
         Containers[container] = 1;
     else
@@ -359,8 +359,8 @@ void TPortoValueCache::Register(const TString &container,
     else
         Variables[variable]++;
 }
-void TPortoValueCache::Unregister(const TString &container,
-                                  const TString &variable) {
+void TPortoValueCache::Unregister(const std::string &container,
+                                  const std::string &variable) {
     auto c = Containers.find(container);
     if (c != Containers.end()) {
         if (c->second == 1)
@@ -377,8 +377,8 @@ void TPortoValueCache::Unregister(const TString &container,
     }
 }
 
-TString TPortoValueCache::GetValue(const TString &container,
-                                       const TString &variable,
+std::string TPortoValueCache::GetValue(const std::string &container,
+                                       const std::string &variable,
                                        bool prev) {
     return Cache[CacheSelector ^ prev][container][variable];
 }
@@ -388,11 +388,11 @@ uint64_t TPortoValueCache::GetDt() {
 }
 
 int TPortoValueCache::Update(Porto::Connection &api) {
-    std::vector<TString> _containers;
+    std::vector<std::string> _containers;
     for (auto &iter : Containers)
         _containers.push_back(iter.first);
 
-    std::vector<TString> _variables;
+    std::vector<std::string> _variables;
     for (auto &iter : Variables)
         _variables.push_back(iter.first);;
 
@@ -430,7 +430,7 @@ TPortoValue::TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer
 
 TPortoValue::TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
                          std::shared_ptr <TPortoContainer> &container,
-                         const TString &variable, int flags, double multiplier) :
+                         const std::string &variable, int flags, double multiplier) :
     Cache(cache), Container(container), Variable(variable), Flags(flags),
     Multiplier(multiplier) {
     if (Cache && Container)
@@ -451,15 +451,15 @@ void TPortoValue::Process() {
     }
 
     if (Flags == ValueFlags::Container) {
-        TString name = Container->GetName();
-        TString tab = "", tag = "";
+        std::string name = Container->GetName();
+        std::string tab = "", tag = "";
 
         int level = Container->GetLevel();
 
         if (name != "/")
             name = name.substr(1 + name.rfind('/'));
 
-        tab = TString(level, ' ');
+        tab = std::string(level, ' ');
 
         if (Container->Tag & PortoTreeTags::Self)
             tag = "@ ";
@@ -499,20 +499,20 @@ void TPortoValue::Process() {
     AsNumber = ParseValue(AsString, Flags & ValueFlags::Map);
 
     if (Flags & ValueFlags::DfDt) {
-        TString old = Cache->GetValue(Container->GetName(), Variable, true);
+        std::string old = Cache->GetValue(Container->GetName(), Variable, true);
         if (old.length() == 0)
             old = AsString;
         AsNumber = DfDt(AsNumber, ParseValue(old, Flags & ValueFlags::Map), Cache->GetDt());
     }
 
     if (Flags & ValueFlags::PartOfRoot) {
-        TString root_raw = Cache->GetValue("/", Variable, false);
+        std::string root_raw = Cache->GetValue("/", Variable, false);
         double root_number;
 
         root_number = ParseValue(root_raw, Flags & ValueFlags::Map);
 
         if (Flags & ValueFlags::DfDt) {
-            TString old = Cache->GetValue("/", Variable, true);
+            std::string old = Cache->GetValue("/", Variable, true);
             if (old.length() == 0)
                 old = root_raw;
             root_number = DfDt(root_number, ParseValue(old, Flags & ValueFlags::Map), Cache->GetDt());
@@ -533,7 +533,7 @@ void TPortoValue::Process() {
     else
         AsString = StringFormat("%g", AsNumber);
 }
-TString TPortoValue::GetValue() const {
+std::string TPortoValue::GetValue() const {
     return AsString;
 }
 int TPortoValue::GetLength() const {
@@ -548,17 +548,17 @@ bool TPortoValue::operator< (const TPortoValue &v) {
         return AsNumber > v.AsNumber;
 }
 
-TCommonValue::TCommonValue(const TString &label, const TPortoValue &val) :
+TCommonValue::TCommonValue(const std::string &label, const TPortoValue &val) :
     Label(label), Value(val) {
 }
-TString TCommonValue::GetLabel() {
+std::string TCommonValue::GetLabel() {
     return Label;
 }
 TPortoValue& TCommonValue::GetValue() {
     return Value;
 }
 
-TPortoContainer::TPortoContainer(TString container) : Container(container) {
+TPortoContainer::TPortoContainer(std::string container) : Container(container) {
     if (Container == "/") {
         Level = 0;
     } else {
@@ -578,7 +578,7 @@ std::shared_ptr<TPortoContainer> TPortoContainer::GetParent(int level) {
 }
 
 std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connection &api) {
-    std::vector<TString> containers;
+    std::vector<std::string> containers;
     int ret = api.List(containers);
     if (ret)
         return nullptr;
@@ -588,12 +588,12 @@ std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connectio
     std::shared_ptr<TPortoContainer> prev = nullptr;
     int level = 0;
 
-    TString self_absolute_name;
+    std::string self_absolute_name;
     ret = api.GetProperty("self", "absolute_name", self_absolute_name);
     if (ret)
         return nullptr;
 
-    TString self_porto_ns;
+    std::string self_porto_ns;
     ret = api.GetProperty("self", "absolute_namespace", self_porto_ns);
     if (ret)
         return nullptr;
@@ -615,8 +615,8 @@ std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connectio
                 containers.push_back(self_parent);
             }
 
-            pos = pos ? parent.rfind("/", pos - 1) : TString::npos;
-        } while (pos != TString::npos && pos);
+            pos = pos ? parent.rfind("/", pos - 1) : std::string::npos;
+        } while (pos != std::string::npos && pos);
     }
 
     std::sort(containers.begin(), containers.end());
@@ -653,7 +653,7 @@ std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connectio
 
     return root;
 }
-TString TPortoContainer::GetName() {
+std::string TPortoContainer::GetName() {
     return Container;
 }
 int TPortoContainer::GetLevel() {
@@ -677,7 +677,7 @@ int TPortoContainer::GetMaxLevel() {
             level = c->GetMaxLevel();
     return level;
 }
-TString TPortoContainer::ContainerAt(int n, int max_level) {
+std::string TPortoContainer::ContainerAt(int n, int max_level) {
     auto ret = shared_from_this();
     int i = 0;
     ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
@@ -691,7 +691,7 @@ int TPortoContainer::ChildrenCount() {
 }
 
 
-TColumn::TColumn(TString title, TString desc,
+TColumn::TColumn(std::string title, std::string desc,
                  TPortoValue var, bool left_aligned, bool hidden) :
 
     RootValue(var), LeftAligned(left_aligned), Hidden(hidden),
@@ -705,7 +705,7 @@ int TColumn::PrintTitle(int x, int y, TConsoleScreen &screen) {
     return Width;
 }
 int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, int attr) {
-    TString p = At(row).GetValue();
+    std::string p = At(row).GetValue();
     screen.PrintAt(p, x, y, Width, LeftAligned, attr);
     return Width;
 }
@@ -759,7 +759,7 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
     int y = 0;
     for (auto &line : Common) {
         for (auto &item : line) {
-            TString p = item.GetLabel();
+            std::string p = item.GetLabel();
             screen.PrintAt(p, x, y, p.length());
             x += p.length();
             p = item.GetValue().GetValue();
@@ -768,7 +768,7 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
         }
 
         if (!y) {
-            TString p = "Version: ";
+            std::string p = "Version: ";
             screen.PrintAt(p, x, y, p.length());
             x += p.length();
             p = Cache->Version;
@@ -882,28 +882,28 @@ void TPortoTop::MarkRow() {
 void TPortoTop::AddColumn(const TColumn &c) {
     Columns.push_back(c);
 }
-bool TPortoTop::AddColumn(TString title, TString signal,
-                          TString desc, bool hidden) {
+bool TPortoTop::AddColumn(std::string title, std::string signal,
+                          std::string desc, bool hidden) {
 
     int flags = ValueFlags::Raw;
     size_t off = 0;
-    TString data;
+    std::string data;
 
     if (signal == "state")
         flags = ValueFlags::State;
 
     if (signal.length() > 4 && signal[0] == 'S' && signal[1] == '(') {
         off = signal.find(')');
-        data = signal.substr(2, off == TString::npos ?
-                           TString::npos : off - 2);
+        data = signal.substr(2, off == std::string::npos ?
+                           std::string::npos : off - 2);
         flags |= ValueFlags::Map;
-        if (off != TString::npos)
+        if (off != std::string::npos)
             off++;
     } else {
         off = signal.find('\'');
-        if (off == TString::npos)
+        if (off == std::string::npos)
             off = signal.rfind(' ');
-        if (off == TString::npos)
+        if (off == std::string::npos)
             off = signal.find('%');
 
         data = signal.substr(0, off);
@@ -911,7 +911,7 @@ bool TPortoTop::AddColumn(TString title, TString signal,
 
     double multiplier = 1;
 
-    if (off != TString::npos) {
+    if (off != std::string::npos) {
         for (; off < signal.length(); off++) {
             switch (signal[off]) {
             case 'b':
@@ -1027,7 +1027,7 @@ void TPortoTop::Expand() {
     Update();
 }
 int TPortoTop::StartStop() {
-    TString state;
+    std::string state;
     int ret = Api->GetProperty(SelectedContainer, "state", state);
     if (ret)
         return ret;
@@ -1037,7 +1037,7 @@ int TPortoTop::StartStop() {
         return Api->Start(SelectedContainer);
 }
 int TPortoTop::PauseResume() {
-    TString state;
+    std::string state;
     int ret = Api->GetProperty(SelectedContainer, "state", state);
     if (ret)
         return ret;
@@ -1052,14 +1052,14 @@ int TPortoTop::Kill(int signal) {
 int TPortoTop::Destroy() {
     return Api->Destroy(SelectedContainer);
 }
-void TPortoTop::LessPortoctl(TString container, TString cmd) {
-    TString s(program_invocation_name);
+void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
+    std::string s(program_invocation_name);
     s += " get " + container + " " + cmd + " | less";
     int status = system(s.c_str());
     (void)status;
 }
 
-int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, TString cmd) {
+int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     bool enter = (SelectedContainer != "/" && SelectedContainer != "self");
     int ret = -1;
 
@@ -1090,14 +1090,14 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, TString cmd) {
 
     return ret;
 }
-void TPortoTop::AddCommon(int row, const TString &title, const TString &var,
+void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var,
                           std::shared_ptr<TPortoContainer> &container,
                           int flags, double multiplier) {
     Common.resize(row + 1);
     TPortoValue v(Cache, container, var, flags, multiplier);
     Common[row].push_back(TCommonValue(title, v));
 }
-TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<TString> &args) :
+TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &args) :
     Api(api),
     Cache(std::make_shared<TPortoValueCache>()),
     RootContainer(std::make_shared<TPortoContainer>("/")) {
@@ -1196,7 +1196,7 @@ void exit_handler(int) {
     exit_immediatly = true;
 }
 
-int portotop(Porto::Connection *api, const std::vector<TString> &args) {
+int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
     Signal(SIGINT, exit_handler);
     Signal(SIGTERM, exit_handler);
     Signal(SIGTTOU, SIG_IGN);
@@ -1397,7 +1397,7 @@ int portotop(Porto::Connection *api, const std::vector<TString> &args) {
 }
 
 int main(int argc, char *argv[]) {
-    const std::vector<TString> args(argv + 1, argv + argc);
+    const std::vector<std::string> args(argv + 1, argv + argc);
     Porto::Connection api;
 
     return portotop(&api, args);

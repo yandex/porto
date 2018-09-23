@@ -6,25 +6,25 @@
 
 struct TEnv {
     struct TEnvVar {
-        TString Name;
-        TString Value;
+        std::string Name;
+        std::string Value;
         bool Set;
         bool Locked;
         bool Overwritten;
-        TString Data;
+        std::string Data;
     };
     std::vector<TEnvVar> Vars;
     std::vector<char *> Environ;
 
     void ClearEnv();
-    bool GetEnv(const TString &name, TString &value) const;
-    TError SetEnv(const TString &name, const TString &value,
+    bool GetEnv(const std::string &name, std::string &value) const;
+    TError SetEnv(const std::string &name, const std::string &value,
                   bool overwrite = true, bool lock = false);
-    TError UnsetEnv(const TString &name, bool overwrite = true);
+    TError UnsetEnv(const std::string &name, bool overwrite = true);
     char **Envp();
 
-    TError Parse(const TString &cfg, bool overwrite);
-    void Format(TString &cfg) const;
+    TError Parse(const std::string &cfg, bool overwrite);
+    void Format(std::string &cfg) const;
     TError Apply() const;
 };
 
@@ -34,17 +34,17 @@ struct TUlimitResource {
     uint64_t Hard;
     bool Overwritten;
 
-    TError Parse(const TString &str);
-    TString Format() const;
+    TError Parse(const std::string &str);
+    std::string Format() const;
 };
 
 struct TUlimit {
     std::vector<TUlimitResource> Resources;
 
-    static int GetType(const TString &name);
-    static TString GetName(int type);
-    TError Parse(const TString &str);
-    TString Format() const;
+    static int GetType(const std::string &name);
+    static std::string GetName(int type);
+    TError Parse(const std::string &str);
+    std::string Format() const;
     TError Load(pid_t pid = 0);
     TError Apply(pid_t pid = 0) const;
     void Clear() { Resources.clear(); }

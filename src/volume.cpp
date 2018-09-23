@@ -49,7 +49,7 @@ TError TVolumeBackend::Resize(uint64_t, uint64_t) {
     return TError(EError::NotSupported, "not implemented");
 }
 
-TString TVolumeBackend::ClaimPlace() {
+std::string TVolumeBackend::ClaimPlace() {
     return Volume->UserStorage() ? "" : Volume->Place.ToString();
 }
 
@@ -97,7 +97,7 @@ public:
         return OK;
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "";
     }
 
@@ -128,7 +128,7 @@ public:
                 Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "";
     }
 
@@ -165,7 +165,7 @@ public:
                 Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "";
     }
 
@@ -202,7 +202,7 @@ public:
                 Volume->GetMountFlags() | MS_REC | MS_SLAVE | MS_SHARED);
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "";
     }
 
@@ -239,7 +239,7 @@ public:
     }
 
     TError Build() override {
-        std::vector<TString> opts;
+        std::vector<std::string> opts;
 
         if (Volume->BackendType == "hugetmpfs")
             opts.emplace_back("huge=always");
@@ -255,7 +255,7 @@ public:
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        std::vector<TString> opts;
+        std::vector<std::string> opts;
 
         if (Volume->BackendType == "hugetmpfs")
             opts.emplace_back("huge=always");
@@ -271,7 +271,7 @@ public:
                                           opts);
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "tmpfs";
     }
 
@@ -334,7 +334,7 @@ public:
         return quota.Create();
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "";
     }
 
@@ -558,7 +558,7 @@ public:
 
     static TError ResizeImage(const TFile &file, const TFile &dir, const TPath &path,
                               off_t current, off_t target) {
-        TString size = std::to_string(target >> 10) + "K";
+        std::string size = std::to_string(target >> 10) + "K";
         TError error;
 
         if (current < target && ftruncate(file.Fd, target))
@@ -734,7 +734,7 @@ public:
     TError Build() override {
         TProjectQuota quota(Volume->StoragePath);
         TError error;
-        TString lower;
+        std::string lower;
         int layer_idx = 0;
         TFile upperFd, workFd, cowFd;
 
@@ -770,7 +770,7 @@ public:
                 path = layer.Path;
             }
 
-            TString layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
+            std::string layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
             temp = Volume->GetInternal(layer_id);
             error = temp.Mkdir(700);
             if (!error)
@@ -914,7 +914,7 @@ public:
     TError Build() override {
         TProjectQuota quota(Volume->StoragePath);
         TFile lowerFd, upperFd, workFd, cowFd;
-        TString lowerdir;
+        std::string lowerdir;
         int layer_idx = 0;
         TError error;
         TPath lower;
@@ -1004,7 +1004,7 @@ public:
                 path = layer.Path;
             }
 
-            TString layer_id = "L" + std::to_string(Volume->Layers.size() -
+            std::string layer_id = "L" + std::to_string(Volume->Layers.size() -
                                                         ++layer_idx - 1);
             temp = Volume->GetInternal(layer_id);
             error = temp.Mkdir(700);
@@ -1114,14 +1114,14 @@ err:
 class TVolumeRbdBackend : public TVolumeBackend {
 public:
 
-    TString GetDevice() {
+    std::string GetDevice() {
         if (Volume->DeviceIndex < 0)
             return "";
         return "/dev/rbd" + std::to_string(Volume->DeviceIndex);
     }
 
-    TError MapDevice(TString id, TString pool, TString image,
-                     TString &device) {
+    TError MapDevice(std::string id, std::string pool, std::string image,
+                     std::string &device) {
         L_ACT("Map rbd device {}@{}/{}", id, pool, image);
         TError error;
         TFile out;
@@ -1139,13 +1139,13 @@ public:
         return OK;
     }
 
-    TError UnmapDevice(TString device) {
+    TError UnmapDevice(std::string device) {
         L_ACT("Unmap rbd device {}", device);
         return RunCommand({"rbd", "unmap", device});
     }
 
     TError Build() override {
-        TString id, pool, image, device;
+        std::string id, pool, image, device;
         TError error, error2;
 
         auto tok = SplitEscapedString(Volume->Storage, '@');
@@ -1184,7 +1184,7 @@ public:
     }
 
     TError Destroy() override {
-        TString device = GetDevice();
+        std::string device = GetDevice();
         TError error, error2;
 
         if (Volume->DeviceIndex < 0)
@@ -1202,7 +1202,7 @@ public:
         return TError(EError::NotSupported, "rbd backend doesn't suppport resize");
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "rbd";
     }
 
@@ -1224,15 +1224,15 @@ class TVolumeLvmBackend : public TVolumeBackend {
 public:
 
     bool Persistent;
-    TString Group;
-    TString Name;
-    TString Thin;
-    TString Origin;
-    TString Device;
+    std::string Group;
+    std::string Name;
+    std::string Thin;
+    std::string Origin;
+    std::string Device;
 
-    static TError CheckName(const TString &name) {
+    static TError CheckName(const std::string &name) {
         auto pos = name.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+_.-");
-        if (pos != TString::npos)
+        if (pos != std::string::npos)
             return TError(EError::InvalidValue, "lvm character {:#x} in name", name[pos]);
         return OK;
     }
@@ -1243,17 +1243,17 @@ public:
         // storage=[Group][/Name][@Thin][:Origin]
 
         auto col = Volume->Storage.find(':');
-        if (col != TString::npos)
+        if (col != std::string::npos)
             Origin = Volume->Storage.substr(col + 1);
 
         auto at = Volume->Storage.find('@');
-        if (at != TString::npos && at < col)
+        if (at != std::string::npos && at < col)
             Thin = Volume->Storage.substr(at + 1, col - at - 1);
         else
             at = col;
 
         auto sep = Volume->Storage.find('/');
-        if (sep != TString::npos && sep < at)
+        if (sep != std::string::npos && sep < at)
             Name = Volume->Storage.substr(sep + 1, at - sep - 1);
         else
             sep = at;
@@ -1339,7 +1339,7 @@ public:
 
             if (Origin.empty()) {
                 error = RunCommand({ "mkfs.ext4", "-q", "-m", "0",
-                                     "-O", TString(Persistent ? "" : "^") + "has_journal",
+                                     "-O", std::string(Persistent ? "" : "^") + "has_journal",
                                      Device});
                 if (error)
                     Persistent = false;
@@ -1377,7 +1377,7 @@ public:
                            Device}, TFile(), TFile(), TFile(), HostCapBound);
     }
 
-    TString ClaimPlace() override {
+    std::string ClaimPlace() override {
         return "lvm " + Group;
     }
 
@@ -1438,7 +1438,7 @@ TPath TVolume::ComposePath(const TContainer &ct) const {
     return ct.RootPath.InnerPath(Path);
 }
 
-TString TVolume::StateName(EVolumeState state) {
+std::string TVolume::StateName(EVolumeState state) {
     switch (state) {
     case EVolumeState::Initial:
         return "initial";
@@ -1502,7 +1502,7 @@ TError TVolume::OpenBackend() {
 }
 
 /* /place/porto_volumes/<id>/<type> */
-TPath TVolume::GetInternal(const TString &type) const {
+TPath TVolume::GetInternal(const std::string &type) const {
 
     TPath base = Place / PORTO_VOLUMES / Id;
     if (type.size())
@@ -2796,7 +2796,7 @@ TError TVolume::StatFS(TStatFS &result) {
     return Backend->StatFS(result);
 }
 
-TError TVolume::Tune(const std::map<TString, TString> &properties) {
+TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
     TError error;
 
     for (auto &p : properties) {
@@ -3149,7 +3149,7 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
     ret[V_INODE_GUARANTEE] = std::to_string(InodeGuarantee);
 
     if (HaveLayers()) {
-        std::vector<TString> layers = Layers;
+        std::vector<std::string> layers = Layers;
         for (auto &l: layers) {
             TPath path(l);
             if (path.IsAbsolute())
@@ -3216,7 +3216,7 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
 TError TVolume::Save() {
     TKeyValue node(VolumesKV / Id);
     TError error;
-    TString tmp;
+    std::string tmp;
 
     auto volumes_lock = LockVolumes();
 
@@ -3766,7 +3766,7 @@ next_link:
 
     L_SYS("Remove stale volumes...");
 
-    std::vector<TString> subdirs;
+    std::vector<std::string> subdirs;
     error = volumes.ReadDirectory(subdirs);
     if (error)
         L_ERR("Cannot list {}", volumes);

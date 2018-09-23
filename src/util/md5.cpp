@@ -294,10 +294,10 @@ static void MD5_Final(unsigned char *result, MD5_CTX *ctx)
     memset(ctx, 0, sizeof(*ctx));
 }
 
-TError Md5Sum(TFile &file, TString &sum) {
+TError Md5Sum(TFile &file, std::string &sum) {
     MD5_CTX ctx;
     unsigned char bin[16];
-    TString buf;
+    std::string buf;
     TError error;
 
     MD5_Init(&ctx);

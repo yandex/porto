@@ -42,13 +42,13 @@ static std::condition_variable NetThreadCv;
 static uint64_t NetWatchdogPeriod;
 static uint64_t NetProxyNeighbourPeriod;
 
-static TString ResolvConfCurrent;
-static TString ResolvConfPrev;
+static std::string ResolvConfCurrent;
+static std::string ResolvConfPrev;
 static uint64_t ResolvConfPeriod = 0;
 
-static std::vector<TString> UnmanagedDevices;
+static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
-static std::map<int, TString> DeviceGroups;
+static std::map<int, std::string> DeviceGroups;
 static int VirtualDeviceGroup = 0;
 
 static uint64_t CsWeight[NR_TC_CLASSES];
@@ -77,7 +77,7 @@ static TUintMap ContainerQdiscQuantum;
 
 static TUintMap IngressBurst;
 
-static std::list<std::pair<TString, TString>> NetSysctls = {
+static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.core.somaxconn", "128" },
 
     { "net.unix.max_dgram_qlen", "10" },
@@ -150,11 +150,11 @@ static std::list<std::pair<TString, TString>> NetSysctls = {
     { "net.ipv6.route.gc_min_interval_ms", "500" },
 };
 
-bool TNetwork::NetworkSysctl(const TString &key) {
+bool TNetwork::NetworkSysctl(const std::string &key) {
     return StringStartsWith(key, "net.");
 }
 
-bool TNetwork::NamespaceSysctl(const TString &key) {
+bool TNetwork::NamespaceSysctl(const std::string &key) {
     for (auto &pair: NetSysctls) {
         if (pair.first == key)
             return true;
@@ -211,7 +211,7 @@ uint64_t TNetDevice::GetConfig(const TUintMap &cfg, uint64_t def, int cs) const 
     return def;
 }
 
-TString TNetDevice::GetConfig(const TStringMap &cfg, TString def, int cs) const {
+std::string TNetDevice::GetConfig(const TStringMap &cfg, std::string def, int cs) const {
     if (cs >= 0) {
         auto it = cfg.find(fmt::format("{} CS{}", Name, cs));
         if (it == cfg.end())
@@ -234,8 +234,8 @@ TString TNetDevice::GetConfig(const TStringMap &cfg, TString def, int cs) const 
 void TNetwork::InitializeConfig() {
     std::ifstream groupCfg("/etc/iproute2/group");
     int id;
-    TString name;
-    std::map<TString, int> groupMap;
+    std::string name;
+    std::map<std::string, int> groupMap;
 
     DeviceGroups[0] = "default";
 
@@ -319,7 +319,7 @@ void TNetwork::InitializeConfig() {
         bool set = false;
         for (const auto &it: config().container().net_sysctl())
             set |= it.key() == key;
-        TString val;
+        std::string val;
         if (!set && !GetSysctl(key, val) && val != def) {
             L_NET("Init sysctl {} = {} (default is {})", key, val, def);
             auto sysctl = config().mutable_container()->add_net_sysctl();
@@ -350,21 +350,21 @@ void TNetwork::InitializeConfig() {
     L_NET("DSCP total weight = {}, default = {}", CsTotalWeight, FormatTos(DefaultTos));
 }
 
-TString TNetwork::DeviceGroupName(int group) {
+std::string TNetwork::DeviceGroupName(int group) {
     auto it = DeviceGroups.find(group);
     if (it != DeviceGroups.end())
         return it->second;
     return std::to_string(group);
 }
 
-TError TNetwork::ParseTos(const TString &str, int &tos) {
+TError TNetwork::ParseTos(const std::string &str, int &tos) {
     if (str.size() != 3 || str[0] != 'C' || str[1] != 'S' || str[2] < '0' || str[2] > '7')
         return TError(EError::InvalidValue, "Invalud ToS: {}", str);
     tos = str[2] - '0';
     return OK;
 }
 
-TString TNetwork::FormatTos(int tos) {
+std::string TNetwork::FormatTos(int tos) {
     return fmt::format("CS{}", tos);
 }
 
@@ -538,7 +538,7 @@ TError TNetwork::SetupAddrLabel() {
 void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
     TPath knob("/sys/class/net/" + dev.Name + "/speed");
     uint64_t speed, rate, ceil;
-    TString text;
+    std::string text;
 
     if (ManagedNamespace) {
         dev.Ceil = NET_MAX_RATE;
@@ -746,7 +746,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     return OK;
 }
 
-void TNetwork::SetDeviceOwner(const TString &name, int owner) {
+void TNetwork::SetDeviceOwner(const std::string &name, int owner) {
     if (owner)
         DeviceOwners[name] = owner;
     else
@@ -993,7 +993,7 @@ TError TNetwork::GetL3Gate(TNetDeviceConfig &dev) {
 }
 
 TError TNetwork::SetupProxyNeighbour(const std::vector <TNlAddr> &ips,
-                                     const TString &master) {
+                                     const std::string &master) {
     struct nl_cache *cache;
     TError error;
     int ret;
@@ -1053,7 +1053,7 @@ err:
 }
 
 TError TNetwork::AddProxyNeightbour(const std::vector<TNlAddr> &ips,
-                                    const TString &master) {
+                                    const std::string &master) {
     TError error;
     if (config().network().proxy_ndp()) {
         std::vector<TNlAddr> addrs;
@@ -1183,9 +1183,9 @@ TError TNetwork::PutNatAddress(const std::vector<TNlAddr> &addrs) {
     return OK;
 }
 
-TString TNetwork::NewDeviceName(const TString &prefix) {
+std::string TNetwork::NewDeviceName(const std::string &prefix) {
     for (int retry = 0; retry < 100; retry++) {
-        TString name = prefix + std::to_string(IfaceSeq++);
+        std::string name = prefix + std::to_string(IfaceSeq++);
         TNlLink link(Nl, name);
         if (link.Load())
             return name;
@@ -1193,14 +1193,14 @@ TString TNetwork::NewDeviceName(const TString &prefix) {
     return prefix + "0";
 }
 
-int TNetwork::DeviceIndex(const TString &name) {
+int TNetwork::DeviceIndex(const std::string &name) {
     for (auto &dev: Devices)
         if (dev.Name == name)
             return dev.Index;
     return 0;
 }
 
-TString TNetwork::MatchDevice(const TString &pattern) {
+std::string TNetwork::MatchDevice(const std::string &pattern) {
     for (auto &dev: Devices) {
         if (StringMatch(dev.Name, pattern))
             return dev.Name;
@@ -1536,7 +1536,7 @@ out:
 }
 
 TError TNetwork::SyncResolvConf() {
-    TString conf;
+    std::string conf;
     TError error;
 
     if (!config().container().default_resolv_conf().empty()) {
@@ -2030,7 +2030,7 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
 // TNetEnv - container network configuration
 //
 
-TString TNetEnv::GenerateHw(const TString &name) {
+std::string TNetEnv::GenerateHw(const std::string &name) {
     uint32_t n = Crc32(name);
     uint32_t h = Crc32(Hostname);
 
@@ -2083,7 +2083,7 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
         } else if (type == "netns") {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid " + line);
-            TString name = StringTrim(settings[1]);
+            std::string name = StringTrim(settings[1]);
             TPath path("/var/run/netns/" + name);
             if (!path.Exists())
                 return TError(EError::InvalidValue, "net namespace not found: " + name);
@@ -2389,7 +2389,7 @@ TError TNetEnv::ParseGw(TMultiTuple &gw_settings) {
 
 TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     auto lock = HostNetwork->LockNet();
-    TString peerName = HostNetwork->NewDeviceName("L3-");
+    std::string peerName = HostNetwork->NewDeviceName("L3-");
     auto parentNl = HostNetwork->GetNl();
     auto Nl = Net->GetNl();
     TNlLink peer(parentNl, peerName);
@@ -2406,7 +2406,7 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     if (error)
         return error;
 
-    TString ipStr;
+    std::string ipStr;
     for (auto &ip : dev.Ip)
         ipStr += fmt::format("{}={} ", ip.Family() == AF_INET ? "ip4" : "ip6", ip.Format());
 
@@ -2589,7 +2589,7 @@ TError TNetEnv::SetupInterfaces() {
             if (error)
                 return error;
         } else if (dev.Type == "ipvlan") {
-            TString master = ParentNet->MatchDevice(dev.Master);
+            std::string master = ParentNet->MatchDevice(dev.Master);
 
             TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
             error = link.AddIpVlan(master, dev.Mode, dev.Mtu);
@@ -2602,7 +2602,7 @@ TError TNetEnv::SetupInterfaces() {
                 return error;
             }
         } else if (dev.Type == "macvlan") {
-            TString master = ParentNet->MatchDevice(dev.Master);
+            std::string master = ParentNet->MatchDevice(dev.Master);
 
             TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
             error = link.AddMacVlan(master, dev.Mode, dev.Mac, dev.Mtu);

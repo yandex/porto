@@ -55,7 +55,7 @@ void TVmStat::Dump(rpc::TVmStat &s) {
 }
 
 TError TVmStat::Parse(pid_t pid) {
-    TString text, line;
+    std::string text, line;
     TError error;
 
     error = TPath(fmt::format("/proc/{}/status", pid)).ReadAll(text, 64 << 10);

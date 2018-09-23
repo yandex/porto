@@ -13,7 +13,7 @@ class TError {
 public:
     EError Error;
     int Errno = 0;
-    TString Text;
+    std::string Text;
 
     static constexpr unsigned MAX_LENGTH = 65536;
 
@@ -21,11 +21,11 @@ public:
 
     TError(EError err): Error(err) {}
 
-    TError(const TString &text): Error(EError::Unknown), Text(text) {}
+    TError(const std::string &text): Error(EError::Unknown), Text(text) {}
 
-    TError(EError err, const TString &text): Error(err), Text(text) {}
+    TError(EError err, const std::string &text): Error(err), Text(text) {}
 
-    TError(EError err, int eno, const TString &text): Error(err), Errno(eno), Text(text) {}
+    TError(EError err, int eno, const std::string &text): Error(err), Errno(eno), Text(text) {}
 
     template <typename... Args> TError(EError err,  int eno, const char* fmt, const Args&... args):
         Error(err), Errno(eno), Text(fmt::format(fmt, args...)) {}
@@ -57,12 +57,12 @@ public:
         return Error != error;
     }
 
-    static TString ErrorName(EError error);
+    static std::string ErrorName(EError error);
 
-    TString Message() const;
-    TString ToString() const;
+    std::string Message() const;
+    std::string ToString() const;
 
-    static TError System(const TString &text) {
+    static TError System(const std::string &text) {
         return TError(EError::Unknown, errno, text);
     }
 

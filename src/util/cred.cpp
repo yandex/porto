@@ -19,7 +19,7 @@ gid_t PortoCtGroup;
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
 
-TError FindUser(const TString &user, uid_t &uid, gid_t &gid) {
+TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
     struct passwd pwd, *ptr;
     std::vector<char> buf(PwdBufSize, '\0');
     int id, err;
@@ -44,7 +44,7 @@ TError FindUser(const TString &user, uid_t &uid, gid_t &gid) {
     return OK;
 }
 
-TError FindGroups(const TString &user, gid_t gid, std::vector<gid_t> &groups) {
+TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups) {
     int ngroups = 32;
 
     for (int retry = 0; retry < 3; retry++) {
@@ -58,7 +58,7 @@ TError FindGroups(const TString &user, gid_t gid, std::vector<gid_t> &groups) {
     return TError("Cannot list groups for " + user);
 }
 
-TError UserId(const TString &user, uid_t &uid) {
+TError UserId(const std::string &user, uid_t &uid) {
     struct passwd pwd, *ptr;
     std::vector<char> buf(PwdBufSize, '\0');
     int id;
@@ -83,7 +83,7 @@ TError UserId(const TString &user, uid_t &uid) {
     return OK;
 }
 
-TString UserName(uid_t uid) {
+std::string UserName(uid_t uid) {
     struct passwd pwd, *ptr;
     std::vector<char> buf(PwdBufSize, '\0');
 
@@ -99,13 +99,13 @@ TString UserName(uid_t uid) {
     }
     if (!ptr)
         return std::to_string(uid);
-    return TString(pwd.pw_name);
+    return std::string(pwd.pw_name);
 }
 
 static size_t GrpBufSize = sysconf(_SC_GETGR_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETGR_R_SIZE_MAX) : 16384;
 
-TError GroupId(const TString &group, gid_t &gid) {
+TError GroupId(const std::string &group, gid_t &gid) {
     struct group grp, *ptr;
     std::vector<char> buf(GrpBufSize, '\0');
     int id;
@@ -130,7 +130,7 @@ TError GroupId(const TString &group, gid_t &gid) {
     return OK;
 }
 
-TString GroupName(gid_t gid) {
+std::string GroupName(gid_t gid) {
     struct group grp, *ptr;
     std::vector<char> buf(GrpBufSize, '\0');
 
@@ -146,7 +146,7 @@ TString GroupName(gid_t gid) {
     }
     if (!ptr)
         return std::to_string(gid);
-    return TString(grp.gr_name);
+    return std::string(grp.gr_name);
 }
 
 TCred TCred::Current() {
@@ -192,7 +192,7 @@ void TCred::Leave() const {
     PORTO_ASSERT(!ret);
 }
 
-TError TCred::InitGroups(const TString &user) {
+TError TCred::InitGroups(const std::string &user) {
     TError error = FindGroups(user, Gid, Groups);
     if (error) {
         L("Cannot load groups for {}", user);
@@ -202,7 +202,7 @@ TError TCred::InitGroups(const TString &user) {
     return error;
 }
 
-TError TCred::Init(const TString &user) {
+TError TCred::Init(const std::string &user) {
     TError error = FindUser(user, Uid, Gid);
     if (!error)
         (void)InitGroups(user);
@@ -371,15 +371,15 @@ static int LastCapability;
 
 bool HasAmbientCapabilities = false;
 
-TString TCapabilities::Format() const {
+std::string TCapabilities::Format() const {
     return StringFormatFlags(Permitted, CapNames, ";");
 }
 
-TError TCapabilities::Parse(const TString &string) {
+TError TCapabilities::Parse(const std::string &string) {
     return StringParseFlags(string, CapNames, Permitted, ';');
 }
 
-TError TCapabilities::Change(const TString &name, bool set) {
+TError TCapabilities::Change(const std::string &name, bool set) {
     for (auto &it: CapNames) {
         if (it.second == name) {
             if (set)

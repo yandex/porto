@@ -59,7 +59,7 @@ TError TTask::KillPg(int signal) const {
 }
 
 bool TTask::IsZombie() const {
-    TString path = "/proc/" + std::to_string(Pid) + "/stat";
+    std::string path = "/proc/" + std::to_string(Pid) + "/stat";
     FILE *file;
     char state;
     int res;
@@ -75,7 +75,7 @@ bool TTask::IsZombie() const {
 }
 
 pid_t TTask::GetPPid() const {
-    TString path = "/proc/" + std::to_string(Pid) + "/stat";
+    std::string path = "/proc/" + std::to_string(Pid) + "/stat";
     int res, ppid;
     FILE *file;
 
@@ -90,7 +90,7 @@ pid_t TTask::GetPPid() const {
 }
 
 uint64_t TaskHandledSignals(pid_t pid) {
-    TString path = "/proc/" + std::to_string(pid) + "/stat";
+    std::string path = "/proc/" + std::to_string(pid) + "/stat";
     unsigned long mask;
     FILE *file;
     int res;
@@ -129,7 +129,7 @@ TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens) {
 
     while ((de = readdir(dir))) {
         file = fopen(("/proc/" + std::to_string(pid) + "/task/" +
-                      TString(de->d_name) + "/children").c_str(), "r");
+                      std::string(de->d_name) + "/children").c_str(), "r");
         if (!file) {
             if (atoi(de->d_name) != pid)
                 continue;
@@ -151,7 +151,7 @@ full_scan:
         return TError::System("Cannot open /proc");
 
     while ((de = readdir(dir))) {
-        file = fopen(("/proc/" + TString(de->d_name) + "/stat").c_str(), "r");
+        file = fopen(("/proc/" + std::string(de->d_name) + "/stat").c_str(), "r");
         if (!file)
             continue;
 
@@ -196,9 +196,9 @@ uint64_t GetHugetlbMemory() {
     return (uint64_t)pages << 21;
 }
 
-static __thread TString *processName;
+static __thread std::string *processName;
 
-void SetProcessName(const TString &name) {
+void SetProcessName(const std::string &name) {
     delete processName;
     processName = nullptr;
     prctl(PR_SET_NAME, (void *)name.c_str());
@@ -208,9 +208,9 @@ void SetDieOnParentExit(int sig) {
     (void)prctl(PR_SET_PDEATHSIG, sig, 0, 0, 0);
 }
 
-TString GetTaskName(pid_t pid) {
+std::string GetTaskName(pid_t pid) {
     if (pid) {
-        TString name;
+        std::string name;
         if (TPath("/proc/" + std::to_string(pid) + "/comm").ReadAll(name, 32))
             return "???";
         return name.substr(0, name.length() - 1);
@@ -226,19 +226,19 @@ TString GetTaskName(pid_t pid) {
         if (prctl(PR_GET_NAME, (void *)name) < 0)
             strncpy(name, program_invocation_short_name, sizeof(name) - 1);
 
-        processName = new TString(name);
+        processName = new std::string(name);
     }
 
     return *processName;
 }
 
-TError GetTaskCgroups(const int pid, std::map<TString, TString> &cgmap) {
-    std::vector<TString> lines;
+TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) {
+    std::vector<std::string> lines;
     TError error = TPath("/proc/" + std::to_string(pid) + "/cgroup").ReadLines(lines);
     if (error)
         return error;
 
-    std::vector<TString> tokens;
+    std::vector<std::string> tokens;
     for (auto l : lines) {
         tokens = SplitString(l, ':', 3);
         if (tokens.size() > 2)
@@ -248,7 +248,7 @@ TError GetTaskCgroups(const int pid, std::map<TString, TString> &cgmap) {
     return OK;
 }
 
-TString GetHostName() {
+std::string GetHostName() {
     char buf[HOST_NAME_MAX + 1];
     int ret = gethostname(buf, sizeof(buf));
     if (ret < 0)
@@ -257,7 +257,7 @@ TString GetHostName() {
     return buf;
 }
 
-TError SetHostName(const TString &name) {
+TError SetHostName(const std::string &name) {
     int ret = sethostname(name.c_str(), name.length());
     if (ret < 0)
         return TError::System("sethostname(" + name + ")");
@@ -269,7 +269,7 @@ TError SetOomScoreAdj(int value) {
     return TPath("/proc/self/oom_score_adj").WriteAll(std::to_string(value));
 }
 
-TString FormatExitStatus(int status) {
+std::string FormatExitStatus(int status) {
     if (WIFSIGNALED(status))
         return StringFormat("exit signal: %d (%s)%s", WTERMSIG(status),
                             strsignal(WTERMSIG(status)),
@@ -513,8 +513,8 @@ TError TUnixSocket::SetRecvTimeout(int timeout_ms) const {
     return OK;
 }
 
-TError GetSysctl(const TString &name, TString &value) {
-    TString path = "/proc/sys/" + name;
+TError GetSysctl(const std::string &name, std::string &value) {
+    std::string path = "/proc/sys/" + name;
     /* all . -> / so abusing /../ is impossible */
     std::replace(path.begin() + 10, path.end(), '.', '/');
     TError error = TPath(path).ReadAll(value);
@@ -523,19 +523,19 @@ TError GetSysctl(const TString &name, TString &value) {
     return error;
 }
 
-TError SetSysctl(const TString &name, const TString &value) {
-    TString path = "/proc/sys/" + name;
+TError SetSysctl(const std::string &name, const std::string &value) {
+    std::string path = "/proc/sys/" + name;
     /* all . -> / so abusing /../ is impossible */
     std::replace(path.begin() + 10, path.end(), '.', '/');
     L_ACT("Set sysctl {} = {}", name, value);
     return TPath(path).WriteAll(value);
 }
 
-TError SetSysctlAt(const TFile &proc_sys, const TString &name, const TString &value) {
+TError SetSysctlAt(const TFile &proc_sys, const std::string &name, const std::string &value) {
     L_ACT("Set sysctl {} = {}", name, value);
 
     /* all . -> / so abusing /../ is impossible */
-    TString path = name;
+    std::string path = name;
     std::replace(path.begin(), path.end(), '.', '/');
 
     TFile file;
@@ -730,7 +730,7 @@ void LocalTime(const time_t *time, struct tm &tm) {
     }
 }
 
-TString FormatTime(time_t t, const char *fmt) {
+std::string FormatTime(time_t t, const char *fmt) {
     std::stringstream ss;
     struct tm tm;
 
@@ -747,7 +747,7 @@ TString FormatTime(time_t t, const char *fmt) {
 }
 
 TError TPidFile::Read() {
-    TString str;
+    std::string str;
     TError error;
     int pid;
 
@@ -769,7 +769,7 @@ TError TPidFile::Read() {
 
 bool TPidFile::Running() {
     if (Pid && (!kill(Pid, 0) || errno != ESRCH)) {
-        TString name = GetTaskName(Pid);
+        std::string name = GetTaskName(Pid);
         if (name == Name || name == AltName)
             return true;
     }

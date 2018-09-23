@@ -103,8 +103,8 @@ public:
     const std::shared_ptr<TContainer> Parent;
     const int Level; // 0 for root
     const int Id;
-    const TString Name;
-    const TString FirstName;
+    const std::string Name;
+    const std::string FirstName;
 
     EContainerState State = EContainerState::Stopped;
     std::atomic<int> RunningChildren;
@@ -124,12 +124,12 @@ public:
     uint64_t RequiredControllers = 0;
     TCred OwnerCred;
     TCred TaskCred;
-    TString Command;
+    std::string Command;
     TTuple CommandArgv;
-    TString CoreCommand;
+    std::string CoreCommand;
     TPath Cwd;
     TStdStream Stdin, Stdout, Stderr;
-    TString Root;
+    std::string Root;
     bool RootRo;
     mode_t Umask;
     bool BindDns = false;       /* deprecated */
@@ -142,22 +142,22 @@ public:
     bool NetIsolate;            /* Create new network namespace */
     bool NetInherit;            /* Use parent network namespace */
 
-    TString Hostname;
-    TString EnvCfg;
+    std::string Hostname;
+    std::string EnvCfg;
     std::vector<TBindMount> BindMounts;
     std::map<TPath, TPath> Symlink;
     TMultiTuple IpList;
 
     TMultiTuple IpLimit;
-    TString IpPolicy;
+    std::string IpPolicy;
 
     TCapabilities CapAmbient;   /* get at start */
     TCapabilities CapAllowed;   /* can be set as ambient */
     TCapabilities CapLimit;     /* upper limit */
     TCapabilities CapBound;     /* actual bounding set */
     TMultiTuple DefaultGw;
-    TString ResolvConf;
-    TString EtcHosts;
+    std::string ResolvConf;
+    std::string EtcHosts;
     TDevices Devices;
     TStringMap Sysctl;
 
@@ -173,7 +173,7 @@ public:
 
     TUlimit Ulimit;
 
-    TString NsName;
+    std::string NsName;
 
     uint64_t MemLimit = 0;
     uint64_t MemGuarantee = 0;
@@ -188,14 +188,14 @@ public:
     bool RechargeOnPgfault = false;
     bool PressurizeOnDeath = false;
 
-    TString IoPolicy;
+    std::string IoPolicy;
     int IoPrio;
     double IoWeight = 1;
 
     TUintMap IoBpsLimit;
     TUintMap IoOpsLimit;
 
-    TString CpuPolicy;
+    std::string CpuPolicy;
 
     int SchedPolicy;
     int SchedPrio;
@@ -229,7 +229,7 @@ public:
     TError ScheduleRespawn();
 
     TStringMap Labels;
-    TString Private;
+    std::string Private;
     EAccessLevel AccessLevel;
     std::atomic<int> ClientsCount;
     std::atomic<uint64_t> ContainerRequests;
@@ -253,7 +253,7 @@ public:
     bool RecvOomEvents();
 
     TPath RootPath; /* path in host namespace */
-    std::vector<TString> PlacePolicy;
+    std::vector<std::string> PlacePolicy;
 
     /* Pritected with VolumesMutex */
     TUintMap PlaceLimit;
@@ -281,7 +281,7 @@ public:
         return Command.empty() && !HasProp(EProperty::COMMAND_ARGV);
     }
 
-    TContainer(std::shared_ptr<TContainer> parent, int id, const TString &name);
+    TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name);
     ~TContainer();
 
     void Register();
@@ -316,7 +316,7 @@ public:
         return true;
     }
 
-    TString GetPortoNamespace(bool write = false) const;
+    std::string GetPortoNamespace(bool write = false) const;
 
     TError LockAction(std::unique_lock<std::mutex> &containers_lock, bool shared = false);
     TError LockActionShared(std::unique_lock<std::mutex> &containers_lock) {
@@ -377,25 +377,25 @@ public:
     TError Destroy(std::list<std::shared_ptr<TVolume>> &unlinked);
 
     /* Refresh cached counters */
-    void SyncProperty(const TString &name);
+    void SyncProperty(const std::string &name);
     static void SyncPropertiesAll();
 
     TError ApplyResolvConf() const;
     TError SetSymlink(const TPath &symlink, const TPath &target);
 
     TError EnableControllers(uint64_t controllers);
-    TError HasProperty(const TString &property) const;
-    TError GetProperty(const TString &property, TString &value) const;
-    TError SetProperty(const TString &property, const TString &value);
+    TError HasProperty(const std::string &property) const;
+    TError GetProperty(const std::string &property, std::string &value) const;
+    TError SetProperty(const std::string &property, const std::string &value);
 
     TError Load(const rpc::TContainerSpec &spec);
-    void Dump(const std::vector<TString> &props, rpc::TContainerSpec &spec);
+    void Dump(const std::vector<std::string> &props, rpc::TContainerSpec &spec);
 
     /* Protected with ContainersLock */
-    static TError ValidLabel(const TString &label, const TString &value);
-    TError GetLabel(const TString &label, TString &value) const;
-    void SetLabel(const TString &label, const TString &value);
-    TError IncLabel(const TString &label, int64_t &result, int64_t add = 1);
+    static TError ValidLabel(const std::string &label, const std::string &value);
+    TError GetLabel(const std::string &label, std::string &value) const;
+    void SetLabel(const std::string &label, const std::string &value);
+    TError IncLabel(const std::string &label, int64_t &result, int64_t add = 1);
 
     void ForgetPid();
     void SyncState();
@@ -415,23 +415,23 @@ public:
 
     /* protected with VolumesLock */
     std::list<std::shared_ptr<TVolume>> OwnedVolumes;
-    std::vector<TString> RequiredVolumes;
+    std::vector<std::string> RequiredVolumes;
 
     TError GetEnvironment(TEnv &env) const;
 
     TError ResolvePlace(TPath &place) const;
 
-    static TError ValidName(const TString &name, bool superuser);
-    static TString ParentName(const TString &name);
+    static TError ValidName(const std::string &name, bool superuser);
+    static std::string ParentName(const std::string &name);
 
-    static TString StateName(EContainerState state);
-    static EContainerState ParseState(const TString &name);
+    static std::string StateName(EContainerState state);
+    static EContainerState ParseState(const std::string &name);
 
-    static std::shared_ptr<TContainer> Find(const TString &name);
-    static TError Find(const TString &name, std::shared_ptr<TContainer> &ct);
+    static std::shared_ptr<TContainer> Find(const std::string &name);
+    static TError Find(const std::string &name, std::shared_ptr<TContainer> &ct);
     static TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct);
 
-    static TError Create(const TString &name, std::shared_ptr<TContainer> &ct);
+    static TError Create(const std::string &name, std::shared_ptr<TContainer> &ct);
     static TError Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct);
 
     static void Event(const TEvent &event);
@@ -439,7 +439,7 @@ public:
 
 extern std::mutex ContainersMutex;
 extern std::shared_ptr<TContainer> RootContainer;
-extern std::map<TString, std::shared_ptr<TContainer>> Containers;
+extern std::map<std::string, std::shared_ptr<TContainer>> Containers;
 extern TPath ContainersKV;
 extern TIdMap ContainerIdMap;
 

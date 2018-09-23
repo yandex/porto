@@ -27,7 +27,7 @@ extern "C" {
 #include <net/if.h>
 }
 
-std::list<TString> IpcSysctls = {
+std::list<std::string> IpcSysctls = {
     "fs.mqueue.queues_max",
     "fs.mqueue.msg_max",
     "fs.mqueue.msgsize_max",
@@ -51,7 +51,7 @@ void InitIpcSysctl() {
         bool set = false;
         for (const auto &it: config().container().ipc_sysctl())
             set |= it.key() == key;
-        TString val;
+        std::string val;
         /* load default ipc sysctl from host config */
         if (!set && !GetSysctl(key, val)) {
             auto sysctl = config().mutable_container()->add_ipc_sysctl();
@@ -64,7 +64,7 @@ void InitIpcSysctl() {
 unsigned ProcBaseDirs;
 
 void InitProcBaseDirs() {
-    std::vector<TString> dirs;
+    std::vector<std::string> dirs;
     TPath("/proc").ListSubdirs(dirs);
     for (auto &dir: dirs)
         if (!StringOnlyDigits(dir))

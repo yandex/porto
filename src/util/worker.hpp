@@ -17,10 +17,10 @@ protected:
     std::condition_variable Cv;
     std::vector<std::shared_ptr<std::thread>> Threads;
     size_t Seq = 0;
-    const TString Name;
+    const std::string Name;
     const size_t Nr;
 public:
-    TWorker(const TString &name, size_t nr) : Name(name), Nr(nr) {}
+    TWorker(const std::string &name, size_t nr) : Name(name), Nr(nr) {}
 
     void Start() {
         for (size_t i = 0; i < Nr; i++)
@@ -54,7 +54,7 @@ public:
         Cv.wait(lock);
     }
 
-    void WorkerFn(const TString &name) {
+    void WorkerFn(const std::string &name) {
         SetProcessName(name);
         auto lock = ScopedLock();
         while (Valid) {

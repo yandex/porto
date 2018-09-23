@@ -56,14 +56,14 @@ bool TContainerWaiter::ShouldReport(TContainer &ct) {
     return false;
 }
 
-bool TContainerWaiter::ShouldReportLabel(const TString &label) {
+bool TContainerWaiter::ShouldReportLabel(const std::string &label) {
     for (auto &wc: Labels)
         if (StringMatch(label, wc))
             return true;
     return false;
 }
 
-void TContainerWaiter::ReportAll(TContainer &ct, const TString &label, const TString &value) {
+void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const std::string &value) {
     auto lock = LockWaiters();
     for (auto it = ContainerWaiters.begin(); it != ContainerWaiters.end();) {
         auto waiter = *it;
@@ -72,7 +72,7 @@ void TContainerWaiter::ReportAll(TContainer &ct, const TString &label, const TSt
                  waiter->ShouldReportLabel(label))) {
             auto client = waiter->Client.lock();
 
-            TString name;
+            std::string name;
             if (client && !client->ComposeName(ct.Name, name)) {
                 client->MakeReport(name, TContainer::StateName(ct.State), waiter->Async, label, value);
                 if (!waiter->Async) {

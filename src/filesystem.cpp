@@ -49,7 +49,7 @@ bool IsSystemPath(const TPath &path) {
     return false;
 }
 
-TError TBindMount::Parse(const TString &str, std::vector<TBindMount> &binds) {
+TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds) {
     auto lines = SplitEscapedString(str, ' ', ';');
     TError error;
 
@@ -89,7 +89,7 @@ TError TBindMount::Parse(const TString &str, std::vector<TBindMount> &binds) {
     return OK;
 }
 
-TString TBindMount::Format(const std::vector<TBindMount> &binds) {
+std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     TMultiTuple lines;
     for (auto &bind: binds)
         lines.push_back({bind.Source.ToString(), bind.Target.ToString(),
@@ -174,7 +174,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
 
     if (!Target.Exists()) {
         TPath base = Target.DirName();
-        std::list<TString> dirs;
+        std::list<std::string> dirs;
         TFile dir;
 
         while (!base.Exists()) {
@@ -242,7 +242,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
 
 TError TMountNamespace::MountRun() {
     TPath run = "run";
-    std::vector<TString> run_paths, subdirs;
+    std::vector<std::string> run_paths, subdirs;
     std::vector<struct stat> run_paths_stat;
     TError error;
 
@@ -494,9 +494,9 @@ TError TMountNamespace::SetupRoot() {
 
     struct {
         TPath target;
-        TString type;
+        std::string type;
         unsigned long flags;
-        std::vector<TString> opts;
+        std::vector<std::string> opts;
     } mounts[] = {
         { "dev", "tmpfs", MS_NOSUID | MS_STRICTATIME,
             { "mode=755", "size=" + std::to_string(config().container().dev_size()) }},

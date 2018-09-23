@@ -55,8 +55,8 @@ uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
 
-TError TNl::Error(int nl_err, const TString &prefix) {
-    TString desc = prefix + ": " + TString(nl_geterror(nl_err));
+TError TNl::Error(int nl_err, const std::string &prefix) {
+    std::string desc = prefix + ": " + std::string(nl_geterror(nl_err));
 
     switch (abs(nl_err)) {
         case NLE_OBJ_NOTFOUND:
@@ -68,7 +68,7 @@ TError TNl::Error(int nl_err, const TString &prefix) {
     }
 }
 
-void TNl::Dump(const TString &prefix, void *obj) const {
+void TNl::Dump(const std::string &prefix, void *obj) const {
     std::stringstream ss;
     struct nl_dump_params dp = {};
 
@@ -76,7 +76,7 @@ void TNl::Dump(const TString &prefix, void *obj) const {
     dp.dp_data = &ss;
     dp.dp_cb = [](struct nl_dump_params *dp, char *buf) {
             auto ss = (std::stringstream *)dp->dp_data;
-            *ss << TString(buf);
+            *ss << std::string(buf);
     };
     nl_object_dump(OBJ_CAST(obj), &dp);
     L_NL("{} {}", prefix, StringReplaceAll(ss.str(), "\n", " "));
@@ -234,7 +234,7 @@ int TNl::GetFd() {
 }
 
 
-TNlLink::TNlLink(std::shared_ptr<TNl> sock, const TString &name, int index) {
+TNlLink::TNlLink(std::shared_ptr<TNl> sock, const std::string &name, int index) {
     Nl = sock;
     Link = rtnl_link_alloc();
     PORTO_ASSERT(Link);
@@ -279,15 +279,15 @@ TNlAddr TNlLink::GetAddr() const {
     return TNlAddr(rtnl_link_get_addr(Link));
 }
 
-TString TNlLink::GetName() const {
-    return TString(rtnl_link_get_name(Link) ?: "???");
+std::string TNlLink::GetName() const {
+    return std::string(rtnl_link_get_name(Link) ?: "???");
 }
 
-TString TNlLink::GetType() const {
-    return TString(rtnl_link_get_type(Link) ?: "");
+std::string TNlLink::GetType() const {
+    return std::string(rtnl_link_get_type(Link) ?: "");
 }
 
-TString TNlLink::GetDesc() const {
+std::string TNlLink::GetDesc() const {
     return std::to_string(GetIndex()) + ":" + GetName();
 }
 
@@ -299,11 +299,11 @@ bool TNlLink::IsRunning() const {
     return rtnl_link_get_flags(Link) & IFF_RUNNING;
 }
 
-TError TNlLink::Error(int nl_err, const TString &desc) const {
+TError TNlLink::Error(int nl_err, const std::string &desc) const {
     return TNl::Error(nl_err, GetDesc() + " " + desc);
 }
 
-void TNlLink::Dump(const TString &prefix, void *obj) const {
+void TNlLink::Dump(const std::string &prefix, void *obj) const {
     if (obj)
         Nl->Dump(GetDesc() + " " + prefix, obj);
     else
@@ -332,7 +332,7 @@ TError TNlLink::Remove() {
     return OK;
 }
 
-TError TNlLink::ChangeNs(const TString &newName, int nsFd) {
+TError TNlLink::ChangeNs(const std::string &newName, int nsFd) {
     auto change = rtnl_link_alloc();
     if (!change)
         return Error(-NLE_NOMEM, "Cannot allocate link");
@@ -502,23 +502,23 @@ TError TNlLink::WaitAddress(int timeout_s) {
 }
 
 #ifdef IFLA_IPVLAN_MAX
-static const std::map<TString, int> ipvlanMode = {
+static const std::map<std::string, int> ipvlanMode = {
     { "l2", IPVLAN_MODE_L2 },
     { "l3", IPVLAN_MODE_L3 },
 };
 #endif
 
-static const std::map<TString, int> macvlanType = {
+static const std::map<std::string, int> macvlanType = {
     { "private", MACVLAN_MODE_PRIVATE },
     { "vepa", MACVLAN_MODE_VEPA },
     { "bridge", MACVLAN_MODE_BRIDGE },
     { "passthru", MACVLAN_MODE_PASSTHRU },
 };
 
-TError TNlLink::AddXVlan(const TString &vlantype,
-                         const TString &master,
+TError TNlLink::AddXVlan(const std::string &vlantype,
+                         const std::string &master,
                          uint32_t type,
-                         const TString &hw,
+                         const std::string &hw,
                          int mtu) {
     TError error = OK;
     int ret;
@@ -552,26 +552,26 @@ TError TNlLink::AddXVlan(const TString &vlantype,
     /* link configuration */
     ret = nla_put(msg, IFLA_LINK, sizeof(uint32_t), &masterIdx);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to put IFLA_LINK: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_LINK: ") + nl_geterror(ret));
         goto free_msg;
     }
     ret = nla_put(msg, IFLA_IFNAME, Name.length() + 1, Name.c_str());
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to put IFLA_IFNAME: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_IFNAME: ") + nl_geterror(ret));
         goto free_msg;
     }
 
     if (mtu > 0) {
         ret = nla_put(msg, IFLA_MTU, sizeof(int), &mtu);
         if (ret < 0) {
-            error = TError(EError::Unknown, TString("Unable to put IFLA_MTU: ") + nl_geterror(ret));
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_MTU: ") + nl_geterror(ret));
             goto free_msg;
         }
     }
 
     ret = nla_put(msg, IFLA_GROUP, sizeof(int), &masterGroup);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to put IFLA_GROUP: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_GROUP: ") + nl_geterror(ret));
         goto free_msg;
     }
 
@@ -579,7 +579,7 @@ TError TNlLink::AddXVlan(const TString &vlantype,
         struct nl_addr *addr = nl_addr_build(AF_LLC, &ea, ETH_ALEN);
         ret = nla_put(msg, IFLA_ADDRESS, nl_addr_get_len(addr), nl_addr_get_binary_addr(addr));
         if (ret < 0) {
-            error = TError(EError::Unknown, TString("Unable to put IFLA_ADDRESS: ") + nl_geterror(ret));
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_ADDRESS: ") + nl_geterror(ret));
             goto free_msg;
         }
         nl_addr_put(addr);
@@ -593,7 +593,7 @@ TError TNlLink::AddXVlan(const TString &vlantype,
     }
     ret = nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to put IFLA_INFO_KIND: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_INFO_KIND: ") + nl_geterror(ret));
         goto free_msg;
     }
 
@@ -607,7 +607,7 @@ TError TNlLink::AddXVlan(const TString &vlantype,
     if (vlantype == "macvlan") {
         ret = nla_put(msg, IFLA_MACVLAN_MODE, sizeof(uint32_t), &type);
         if (ret < 0) {
-            error = TError(EError::Unknown, TString("Unable to put IFLA_MACVLAN_MODE: ") + nl_geterror(ret));
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_MACVLAN_MODE: ") + nl_geterror(ret));
             goto free_msg;
         }
 #ifdef IFLA_IPVLAN_MAX
@@ -615,7 +615,7 @@ TError TNlLink::AddXVlan(const TString &vlantype,
         uint16_t mode = type;
         ret = nla_put(msg, IFLA_IPVLAN_MODE, sizeof(uint16_t), &mode);
         if (ret < 0) {
-            error = TError(EError::Unknown, TString("Unable to put IFLA_IPVLAN_MODE: ") + nl_geterror(ret));
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_IPVLAN_MODE: ") + nl_geterror(ret));
             goto free_msg;
         }
 #endif
@@ -638,8 +638,8 @@ free_msg:
 
 }
 
-TError TNlLink::AddIpVlan(const TString &master,
-                          const TString &mode, int mtu) {
+TError TNlLink::AddIpVlan(const std::string &master,
+                          const std::string &mode, int mtu) {
 #ifdef IFLA_IPVLAN_MAX
     return AddXVlan("ipvlan", master, ipvlanMode.at(mode), "", mtu);
 #else
@@ -647,13 +647,13 @@ TError TNlLink::AddIpVlan(const TString &master,
 #endif
 }
 
-TError TNlLink::AddMacVlan(const TString &master,
-                           const TString &type, const TString &hw,
+TError TNlLink::AddMacVlan(const std::string &master,
+                           const std::string &type, const std::string &hw,
                            int mtu) {
     return AddXVlan("macvlan", master, macvlanType.at(type), hw, mtu);
 }
 
-TError TNlLink::Enslave(const TString &name) {
+TError TNlLink::Enslave(const std::string &name) {
     struct rtnl_link *link;
     int ret;
 
@@ -676,8 +676,8 @@ TError TNlLink::Enslave(const TString &name) {
     return OK;
 }
 
-TError TNlLink::AddVeth(const TString &name,
-                        const TString &hw,
+TError TNlLink::AddVeth(const std::string &name,
+                        const std::string &hw,
                         int mtu, int group, int nsFd) {
     struct rtnl_link *veth, *peer;
     int ret;
@@ -729,7 +729,7 @@ TError TNlLink::AddVeth(const TString &name,
     return Load();
 }
 
-TError TNlLink::AddIp6Tnl(const TString &name,
+TError TNlLink::AddIp6Tnl(const std::string &name,
                           const TNlAddr &remote, const TNlAddr &local,
                           int type, int mtu, int encap_limit, int ttl) {
 
@@ -788,7 +788,7 @@ TError TNlLink::SetGroup(int group) {
     return OK;
 }
 
-TError TNlLink::SetMacAddr(const TString &mac) {
+TError TNlLink::SetMacAddr(const std::string &mac) {
     TNlAddr addr;
     TError error = addr.Parse(AF_LLC, mac);
     if (error)
@@ -807,7 +807,7 @@ TError TNlLink::SetMacAddr(const TString &mac) {
     return OK;
 }
 
-bool TNlLink::ValidIpVlanMode(const TString &mode) {
+bool TNlLink::ValidIpVlanMode(const std::string &mode) {
 #ifdef IFLA_IPVLAN_MAX
     return ipvlanMode.find(mode) != ipvlanMode.end();
 #else
@@ -815,11 +815,11 @@ bool TNlLink::ValidIpVlanMode(const TString &mode) {
 #endif
 }
 
-bool TNlLink::ValidMacVlanType(const TString &type) {
+bool TNlLink::ValidMacVlanType(const std::string &type) {
     return macvlanType.find(type) != macvlanType.end();
 }
 
-bool TNlLink::ValidMacAddr(const TString &hw) {
+bool TNlLink::ValidMacAddr(const std::string &hw) {
     struct ether_addr ea;
     return ether_aton_r(hw.c_str(), &ea) != nullptr;
 }
@@ -891,7 +891,7 @@ TError TNlQdisc::Create(const TNl &nl) {
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
-        return TError(EError::Unknown, TString("Unable to allocate qdisc object"));
+        return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
     rtnl_tc_set_ifindex(TC_CAST(qdisc), Index);
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
@@ -958,7 +958,7 @@ TError TNlQdisc::Delete(const TNl &nl) {
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
-        return TError(EError::Unknown, TString("Unable to allocate qdisc object"));
+        return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
     rtnl_tc_set_ifindex(TC_CAST(qdisc), Index);
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
@@ -1197,14 +1197,14 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to add u32: ") +
+        error = TError(EError::Unknown, std::string("Unable to add u32: ") +
                                         nl_geterror(ret));
         goto free_msg;
     }
 
     ret = nla_put(msg, TCA_KIND, strlen(FilterType) + 1, FilterType);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to add u32: ") +
+        error = TError(EError::Unknown, std::string("Unable to add u32: ") +
                                         nl_geterror(ret));
         goto free_msg;
     }
@@ -1214,7 +1214,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     sel.flags = TC_U32_TERMINAL;
     ret = nla_put(msg, TCA_U32_SEL, sizeof(sel), &sel);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to add u32 sel: ") +
+        error = TError(EError::Unknown, std::string("Unable to add u32 sel: ") +
                                         nl_geterror(ret));
         goto free_msg;
     }
@@ -1223,7 +1223,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     u32_police = nla_nest_start(msg, TCA_U32_POLICE);
 
     if (!u32_police) {
-        error = TError(EError::Unknown, TString("cannot create nested attrs: ") +
+        error = TError(EError::Unknown, std::string("cannot create nested attrs: ") +
                                         nl_geterror(ret));
         goto free_msg;
 
@@ -1254,7 +1254,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     ret = nla_put(msg, TCA_POLICE_TBF, sizeof(parm), &parm);
     if (ret < 0) {
         error = TError(EError::Unknown,
-                       TString("Unable to add policer: nla_put(TCA_POLICE_AVRATE): ") +
+                       std::string("Unable to add policer: nla_put(TCA_POLICE_AVRATE): ") +
                        nl_geterror(ret));
         goto free_msg;
     }
@@ -1262,7 +1262,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     ret = nla_put(msg, TCA_POLICE_RATE, sizeof(table), table);
     if (ret < 0) {
         error = TError(EError::Unknown,
-                       TString("Unable to add policer: nl_put(TCA_POLICE_RATE): ") +
+                       std::string("Unable to add policer: nl_put(TCA_POLICE_RATE): ") +
                        nl_geterror(ret));
         goto free_msg;
     }
@@ -1271,7 +1271,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
         ret = nla_put(msg, TCA_POLICE_PEAKRATE, sizeof(table), table);
         if (ret < 0) {
             error = TError(EError::Unknown,
-                           TString("Unable to add policer: nl_put(TCA_POLICE_RATE): ") +
+                           std::string("Unable to add policer: nl_put(TCA_POLICE_RATE): ") +
                            nl_geterror(ret));
             goto free_msg;
         }
@@ -1287,7 +1287,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
         error = TError(EError::Unknown,
-                       TString("Unable to add filter: nl_send_sync(): ") +
+                       std::string("Unable to add filter: nl_send_sync(): ") +
                        nl_geterror(ret));
 
     return error;
@@ -1316,21 +1316,21 @@ TError TNlPoliceFilter::Delete(const TNl &nl) {
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to del policer: ") +
+        error = TError(EError::Unknown, std::string("Unable to del policer: ") +
                                         nl_geterror(ret));
         goto free_msg;
     }
 
     ret = nla_put(msg, TCA_OPTIONS, 0, NULL);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to del policer: ") +
+        error = TError(EError::Unknown, std::string("Unable to del policer: ") +
                                         nl_geterror(ret));
         goto free_msg;
     }
 
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
-        error = TError(EError::Unknown, TString("Unable to del policer: ") +
+        error = TError(EError::Unknown, std::string("Unable to del policer: ") +
                                         nl_geterror(ret));
     return error;
 
@@ -1357,19 +1357,19 @@ TError TNlCgFilter::Create(const TNl &nl) {
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
         goto free_msg;
     }
 
     ret = nla_put(msg, TCA_KIND, strlen(FilterType) + 1, FilterType);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
         goto free_msg;
     }
 
     ret = nla_put(msg, TCA_OPTIONS, 0, NULL);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
         goto free_msg;
     }
 
@@ -1377,7 +1377,7 @@ TError TNlCgFilter::Create(const TNl &nl) {
 
     ret = nl_send_sync(nl.GetSock(), msg);
     if (ret)
-        error = TError(EError::Unknown, TString("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 
     if (!error && !Exists(nl))
         error = TError("BUG: created filter doesn't exist");
@@ -1426,13 +1426,13 @@ TError TNlCgFilter::Delete(const TNl &nl) {
 
     cls = rtnl_cls_alloc();
     if (!cls)
-        return TError(EError::Unknown, TString("Unable to allocate filter object"));
+        return TError(EError::Unknown, std::string("Unable to allocate filter object"));
 
     rtnl_tc_set_ifindex(TC_CAST(cls), Index);
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
-        error = TError(EError::Unknown, TString("Unable to set filter type: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to set filter type: ") + nl_geterror(ret));
         goto free_cls;
     }
 
@@ -1510,7 +1510,7 @@ unsigned int TNlAddr::Prefix() const {
     return Addr ? nl_addr_get_prefixlen(Addr) : 0;
 }
 
-TError TNlAddr::Parse(int family, const TString &string) {
+TError TNlAddr::Parse(int family, const std::string &string) {
     Forget();
 
     int ret = nl_addr_parse(string.c_str(), family, &Addr);
@@ -1520,9 +1520,9 @@ TError TNlAddr::Parse(int family, const TString &string) {
     return OK;
 }
 
-TString TNlAddr::Format() const {
+std::string TNlAddr::Format() const {
     char buf[128];
-    return TString(nl_addr2str(Addr, buf, sizeof(buf)));
+    return std::string(nl_addr2str(Addr, buf, sizeof(buf)));
 }
 
 void TNlAddr::AddOffset(uint64_t offset) {

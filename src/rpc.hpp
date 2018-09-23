@@ -16,9 +16,9 @@ public:
     bool RoReq;
     bool IoReq;
 
-    TString Cmd;
-    TString Arg;
-    TString Opt;
+    std::string Cmd;
+    std::string Arg;
+    std::string Opt;
 
     void Classify();
     void Parse();

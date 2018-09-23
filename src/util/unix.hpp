@@ -31,7 +31,7 @@ struct TTask {
     TError KillPg(int signal) const;
 };
 
-TString FormatTime(time_t t, const char *fmt = "%F %T");
+std::string FormatTime(time_t t, const char *fmt = "%F %T");
 void LocalTime(const time_t *time, struct tm &tm);
 
 pid_t GetPid();
@@ -43,22 +43,22 @@ uint64_t GetCurrentTimeMs();
 bool WaitDeadline(uint64_t deadline, uint64_t sleep = 10);
 uint64_t GetTotalMemory();
 uint64_t GetHugetlbMemory();
-void SetProcessName(const TString &name);
+void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
-TString GetTaskName(pid_t pid = 0);
+std::string GetTaskName(pid_t pid = 0);
 uint64_t TaskHandledSignals(pid_t pid);
-TError GetTaskCgroups(const int pid, std::map<TString, TString> &cgmap);
-TString GetHostName();
-TError SetHostName(const TString &name);
-TError GetSysctl(const TString &name, TString &value);
-TError SetSysctl(const TString &name, const TString &value);
-TError SetSysctlAt(const TFile &proc_sys, const TString &name, const TString &value);
+TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
+std::string GetHostName();
+TError SetHostName(const std::string &name);
+TError GetSysctl(const std::string &name, std::string &value);
+TError SetSysctl(const std::string &name, const std::string &value);
+TError SetSysctlAt(const TFile &proc_sys, const std::string &name, const std::string &value);
 
 TError SetOomScoreAdj(int value);
 
 TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result);
 
-TString FormatExitStatus(int status);
+std::string FormatExitStatus(int status);
 int GetNumCores();
 
 int SetIoPrio(pid_t pid, int ioprio);
@@ -89,11 +89,11 @@ public:
 class TPidFile {
 public:
     TPath Path;
-    TString Name;
-    TString AltName;
+    std::string Name;
+    std::string AltName;
     pid_t Pid = 0;
 
-    TPidFile(const TString &path, const TString &name, const TString &altname): Path(path), Name(name), AltName(altname) { }
+    TPidFile(const std::string &path, const std::string &name, const std::string &altname): Path(path), Name(name), AltName(altname) { }
     TError Read();
     bool Running();
     TError Save(pid_t pid);

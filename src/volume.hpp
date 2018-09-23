@@ -75,7 +75,7 @@ public:
     virtual TError Destroy(void) =0;
     virtual TError StatFS(TStatFS &result) =0;
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
-    virtual TString ClaimPlace();
+    virtual std::string ClaimPlace();
 };
 
 class TVolumeLink {
@@ -110,26 +110,26 @@ public:
 
     TPath Place;
 
-    TString Storage;
+    std::string Storage;
     TPath StoragePath;
     TFile StorageFd; /* during build */
     bool KeepStorage = false;
     bool NeedCow = false; // MOO
 
-    TString BackendType;
-    TString Id;
+    std::string BackendType;
+    std::string Id;
 
     EVolumeState State = EVolumeState::Initial;
-    static TString StateName(EVolumeState state);
+    static std::string StateName(EVolumeState state);
     void SetState(EVolumeState state);
 
-    TString DeviceName;
+    std::string DeviceName;
     int DeviceIndex = -1;
     bool IsReadOnly = false;
 
     bool HasDependentContainer = false;
 
-    std::vector<TString> Layers;
+    std::vector<std::string> Layers;
     std::list<std::shared_ptr<TVolumeLink>> Links;
 
     uint64_t ClaimedSpace = 0;
@@ -145,8 +145,8 @@ public:
     TCred VolumeCred;
     unsigned VolumePermissions = 0775;
 
-    TString Creator;
-    TString Private;
+    std::string Creator;
+    std::string Private;
 
     std::set<std::shared_ptr<TVolume>> Nested;
 
@@ -226,7 +226,7 @@ public:
 
     TError ClaimPlace(uint64_t size);
 
-    TPath GetInternal(const TString &type) const;
+    TPath GetInternal(const std::string &type) const;
     unsigned long GetMountFlags(void) const;
 
     TError Tune(const TStringMap &cfg);
@@ -276,8 +276,8 @@ public:
 };
 
 struct TVolumeProperty {
-    TString Name;
-    TString Desc;
+    std::string Name;
+    std::string Desc;
     bool ReadOnly;
 };
 

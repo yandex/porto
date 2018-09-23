@@ -72,8 +72,8 @@ void OpenLog(const TPath &path) {
     }
 }
 
-void WriteLog(const char *prefix, const TString &log_msg) {
-    TString msg = fmt::format("{} {}[{}]: {} {}\n",
+void WriteLog(const char *prefix, const std::string &log_msg) {
+    std::string msg = fmt::format("{} {}[{}]: {} {}\n",
             FormatTime(time(nullptr)), GetTaskName(), GetTid(), prefix, log_msg);
 
     if (Statistics) {
@@ -102,7 +102,7 @@ void porto_assert(const char *msg, const char *file, size_t line) {
     Crash();
 }
 
-void FatalError(const TString &text, TError &error) {
+void FatalError(const std::string &text, TError &error) {
     L_ERR("{}: {}", text, error);
     _exit(EXIT_FAILURE);
 }

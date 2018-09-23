@@ -2,4 +2,4 @@
 
 #include <string>
 
-uint32_t Crc32(const TString &s);
+uint32_t Crc32(const std::string &s);

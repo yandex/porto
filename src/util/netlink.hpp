@@ -29,8 +29,8 @@ public:
 
     void Forget();
 
-    TError Parse(int family, const TString &string);
-    TString Format() const;
+    TError Parse(int family, const std::string &string);
+    std::string Format() const;
 
     int Family() const;
     bool IsEmpty() const;
@@ -66,8 +66,8 @@ public:
 
     int GetFd();
 
-    static TError Error(int nl_err, const TString &desc);
-    void Dump(const TString &prefix, void *obj) const;
+    static TError Error(int nl_err, const std::string &desc);
+    void Dump(const std::string &prefix, void *obj) const;
     void DumpCache(struct nl_cache *cache) const;
 
     TError ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add);
@@ -80,15 +80,15 @@ class TNlLink : public TPortoNonCopyable {
     std::shared_ptr<TNl> Nl;
     struct rtnl_link *Link = nullptr;
 
-    TError AddXVlan(const TString &vlantype,
-                    const TString &master,
+    TError AddXVlan(const std::string &vlantype,
+                    const std::string &master,
                     uint32_t type,
-                    const TString &hw,
+                    const std::string &hw,
                     int mtu);
 
 public:
 
-    TNlLink(std::shared_ptr<TNl> sock, const TString &name, int index = 0);
+    TNlLink(std::shared_ptr<TNl> sock, const std::string &name, int index = 0);
     TNlLink(std::shared_ptr<TNl> sock, struct rtnl_link *link);
     ~TNlLink();
     TError Load();
@@ -96,32 +96,32 @@ public:
     int GetIndex() const;
     int GetGroup() const;
     TNlAddr GetAddr() const;
-    TString GetName() const;
-    TString GetType() const;
-    TString GetDesc() const;
+    std::string GetName() const;
+    std::string GetType() const;
+    std::string GetDesc() const;
     bool IsLoopback() const;
     bool IsRunning() const;
-    TError Error(int nl_err, const TString &desc) const;
-    void Dump(const TString &prefix, void *obj = nullptr) const;
+    TError Error(int nl_err, const std::string &desc) const;
+    void Dump(const std::string &prefix, void *obj = nullptr) const;
 
     TError Remove();
     TError Up();
-    TError Enslave(const TString &name);
-    TError ChangeNs(const TString &newName, int nsFd);
-    TError AddIpVlan(const TString &master,
-                     const TString &mode, int mtu);
-    TError AddMacVlan(const TString &master,
-                      const TString &type, const TString &hw,
+    TError Enslave(const std::string &name);
+    TError ChangeNs(const std::string &newName, int nsFd);
+    TError AddIpVlan(const std::string &master,
+                     const std::string &mode, int mtu);
+    TError AddMacVlan(const std::string &master,
+                      const std::string &type, const std::string &hw,
                       int mtu);
-    TError AddVeth(const TString &name, const TString &hw, int mtu,
+    TError AddVeth(const std::string &name, const std::string &hw, int mtu,
                    int group, int nsFd);
-    TError AddIp6Tnl(const TString &name,
+    TError AddIp6Tnl(const std::string &name,
                      const TNlAddr &remote, const TNlAddr &local,
                      int type, int mtu, int encap_limit, int ttl);
 
-    static bool ValidIpVlanMode(const TString &mode);
-    static bool ValidMacVlanType(const TString &type);
-    static bool ValidMacAddr(const TString &hw);
+    static bool ValidIpVlanMode(const std::string &mode);
+    static bool ValidMacVlanType(const std::string &type);
+    static bool ValidMacAddr(const std::string &hw);
 
     TError AddDirectRoute(const TNlAddr &addr, bool ecn = false);
     TError SetDefaultGw(const TNlAddr &addr, bool ecn = false, int mtu = -1);
@@ -130,7 +130,7 @@ public:
     int GetMtu();
     TError SetMtu(int mtu);
     TError SetGroup(int group);
-    TError SetMacAddr(const TString &mac);
+    TError SetMacAddr(const std::string &mac);
 
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };
@@ -140,7 +140,7 @@ class TNlQdisc {
 public:
     int Index;
     uint32_t Parent, Handle;
-    TString Kind;
+    std::string Kind;
     uint32_t Default = 0;
     uint32_t Limit = 0;
     uint32_t Quantum = 0;
@@ -157,7 +157,7 @@ public:
     int Index = 0;
     uint32_t Parent = -1;
     uint32_t Handle = -1;
-    TString Kind;
+    std::string Kind;
     uint64_t Rate = 0;
     uint64_t defRate = 0;
     uint64_t Ceil = 0;

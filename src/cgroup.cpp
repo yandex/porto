@@ -37,7 +37,7 @@ TPath TCgroup::Path() const {
     return Subsystem->Root / Name;
 }
 
-TPath TCgroup::Knob(const TString &knob) const {
+TPath TCgroup::Knob(const std::string &knob) const {
     if (!Subsystem)
         return TPath();
     return Subsystem->Root / Name / knob;
@@ -127,19 +127,19 @@ TError TCgroup::RemoveOne() {
     return error;
 }
 
-bool TCgroup::Has(const TString &knob) const {
+bool TCgroup::Has(const std::string &knob) const {
     if (!Subsystem)
         return false;
     return Knob(knob).IsRegularStrict();
 }
 
-TError TCgroup::Get(const TString &knob, TString &value) const {
+TError TCgroup::Get(const std::string &knob, std::string &value) const {
     if (!Subsystem)
         return TError("Cannot get from null cgroup");
     return Knob(knob).ReadAll(value);
 }
 
-TError TCgroup::Set(const TString &knob, const TString &value) const {
+TError TCgroup::Set(const std::string &knob, const std::string &value) const {
     if (!Subsystem)
         return TError("Cannot set to null cgroup");
     L_CG("Set {} {} = {}", *this, knob, value);
@@ -149,43 +149,43 @@ TError TCgroup::Set(const TString &knob, const TString &value) const {
     return error;
 }
 
-TError TCgroup::GetInt64(const TString &knob, int64_t &value) const {
-    TString string;
+TError TCgroup::GetInt64(const std::string &knob, int64_t &value) const {
+    std::string string;
     TError error = Get(knob, string);
     if (!error)
         error = StringToInt64(string, value);
     return error;
 }
 
-TError TCgroup::SetInt64(const TString &knob, int64_t value) const {
+TError TCgroup::SetInt64(const std::string &knob, int64_t value) const {
     return Set(knob, std::to_string(value));
 }
 
-TError TCgroup::GetUint64(const TString &knob, uint64_t &value) const {
-    TString string;
+TError TCgroup::GetUint64(const std::string &knob, uint64_t &value) const {
+    std::string string;
     TError error = Get(knob, string);
     if (!error)
         error = StringToUint64(string, value);
     return error;
 }
 
-TError TCgroup::SetUint64(const TString &knob, uint64_t value) const {
+TError TCgroup::SetUint64(const std::string &knob, uint64_t value) const {
     return Set(knob, std::to_string(value));
 }
 
-TError TCgroup::GetBool(const TString &knob, bool &value) const {
-    TString string;
+TError TCgroup::GetBool(const std::string &knob, bool &value) const {
+    std::string string;
     TError error = Get(knob, string);
     if (!error)
         value = StringTrim(string) != "0";
     return error;
 }
 
-TError TCgroup::SetBool(const TString &knob, bool value) const {
+TError TCgroup::SetBool(const std::string &knob, bool value) const {
     return Set(knob, value ? "1" : "0");
 }
 
-TError TCgroup::GetUintMap(const TString &knob, TUintMap &value) const {
+TError TCgroup::GetUintMap(const std::string &knob, TUintMap &value) const {
     if (!Subsystem)
         return TError("Cannot get from null cgroup");
 
@@ -197,7 +197,7 @@ TError TCgroup::GetUintMap(const TString &knob, TUintMap &value) const {
         return TError::System("Cannot open knob " + knob);
 
     while (fscanf(file, "%ms %llu\n", &key, &val) == 2) {
-        value[TString(key)] = val;
+        value[std::string(key)] = val;
         free(key);
     }
 
@@ -243,7 +243,7 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
     return OK;
 }
 
-TCgroup TCgroup::Child(const TString& name) const {
+TCgroup TCgroup::Child(const std::string& name) const {
     PORTO_ASSERT(name[0] != '/');
     if (IsRoot())
         return TCgroup(Subsystem, "/" + name);
@@ -271,7 +271,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
         if (!S_ISDIR(walk.Stat->st_mode) || walk.Postorder || walk.Level() == 0)
             continue;
 
-        TString name = Subsystem->Root.InnerPath(walk.Path).ToString();
+        std::string name = Subsystem->Root.InnerPath(walk.Path).ToString();
 
         /* Ignore non-proto cgroups */
         if (!StringStartsWith(name, PORTO_CGROUP_PREFIX))
@@ -283,7 +283,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
     return OK;
 }
 
-TError TCgroup::GetPids(const TString &knob, std::vector<pid_t> &pids) const {
+TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const {
     FILE *file;
     int pid;
 
@@ -376,13 +376,13 @@ TCgroup TSubsystem::RootCgroup() const {
     return TCgroup(this, "/");
 }
 
-TCgroup TSubsystem::Cgroup(const TString &name) const {
+TCgroup TSubsystem::Cgroup(const std::string &name) const {
     PORTO_ASSERT(name[0] == '/');
     return TCgroup(this, name);
 }
 
 TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
-    std::vector<TString> lines;
+    std::vector<std::string> lines;
     auto cg_file = TPath("/proc/" + std::to_string(pid) + "/cgroup");
 
     TError error = cg_file.ReadLines(lines);
@@ -581,9 +581,9 @@ TError TMemorySubsystem::GetReclaimed(TCgroup &cg, uint64_t &count) const {
 }
 
 // Freezer
-TError TFreezerSubsystem::WaitState(const TCgroup &cg, const TString &state) const {
+TError TFreezerSubsystem::WaitState(const TCgroup &cg, const std::string &state) const {
     uint64_t deadline = GetCurrentTimeMs() + config().daemon().freezer_wait_timeout_s() * 1000;
-    TString cur;
+    std::string cur;
     TError error;
 
     do {
@@ -615,7 +615,7 @@ TError TFreezerSubsystem::Thaw(const TCgroup &cg, bool wait) const {
 }
 
 bool TFreezerSubsystem::IsFrozen(const TCgroup &cg) const {
-    TString state;
+    std::string state;
     return !cg.Get("freezer.state", state) && StringTrim(state) != "THAWED";
 }
 
@@ -692,7 +692,7 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     return OK;
 }
 
-TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const TString &policy,
+TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
         double weight, uint64_t period, uint64_t guarantee) {
     TError error;
 
@@ -797,7 +797,7 @@ TError TCpuSubsystem::SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
 
 // Cpuacct
 TError TCpuacctSubsystem::Usage(TCgroup &cg, uint64_t &value) const {
-    TString s;
+    std::string s;
     TError error = cg.Get("cpuacct.usage", s);
     if (error)
         return error;
@@ -814,8 +814,8 @@ TError TCpuacctSubsystem::SystemUsage(TCgroup &cg, uint64_t &value) const {
 }
 
 // Cpuset
-TError TCpusetSubsystem::SetCpus(TCgroup &cg, const TString &cpus) const {
-    TString val;
+TError TCpusetSubsystem::SetCpus(TCgroup &cg, const std::string &cpus) const {
+    std::string val;
     TError error;
     TPath copy;
 
@@ -844,8 +844,8 @@ TError TCpusetSubsystem::SetCpus(TCgroup &cg, const TString &cpus) const {
     return cg.Set("cpuset.cpus", val);
 }
 
-TError TCpusetSubsystem::SetMems(TCgroup &cg, const TString &mems) const {
-    TString val;
+TError TCpusetSubsystem::SetMems(TCgroup &cg, const std::string &mems) const {
+    std::string val;
     TError error;
     TPath copy;
 
@@ -909,7 +909,7 @@ TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
 
 // Blkio
 
-TError TBlkioSubsystem::DiskName(const TString &disk, TString &name) const {
+TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) const {
     TPath sym("/sys/dev/block/" + disk), dev;
     TError error = sym.ReadLink(dev);
     if (!error)
@@ -918,7 +918,7 @@ TError TBlkioSubsystem::DiskName(const TString &disk, TString &name) const {
 }
 
 /* converts absolule path or disk or partition name into "major:minor" */
-TError TBlkioSubsystem::ResolveDisk(const TPath &root, const TString &key, TString &disk) const {
+TError TBlkioSubsystem::ResolveDisk(const TPath &root, const std::string &key, std::string &disk) const {
     TError error;
     int tmp = 0;
 
@@ -957,8 +957,8 @@ TError TBlkioSubsystem::ResolveDisk(const TPath &root, const TString &key, TStri
 }
 
 TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const {
-    std::vector<TString> lines;
-    TString knob, prev, name;
+    std::vector<std::string> lines;
+    std::string knob, prev, name;
     bool summ = false, hide = false;
     bool recursive = true;
     TError error;
@@ -1037,24 +1037,24 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
 
 TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
                                    const TUintMap &map, bool iops) {
-    TString knob[2] = {
+    std::string knob[2] = {
         iops ? "blkio.throttle.read_iops_device" : "blkio.throttle.read_bps_device",
         iops ? "blkio.throttle.write_iops_device" : "blkio.throttle.write_bps_device",
     };
     TError error, result;
     TUintMap plan[2];
-    TString disk;
+    std::string disk;
     int dir;
 
     /* load current limits */
     for (dir = 0; dir < 2; dir++) {
-        std::vector<TString> lines;
+        std::vector<std::string> lines;
         error = cg.Knob(knob[dir]).ReadLines(lines);
         if (error)
             return error;
         for (auto &line: lines) {
             auto sep = line.find(' ');
-            if (sep != TString::npos)
+            if (sep != std::string::npos)
                 plan[dir][line.substr(0, sep)] = 0;
         }
     }
@@ -1064,7 +1064,7 @@ TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
         auto sep = key.rfind(' ');
 
         dir = 2;
-        if (sep != TString::npos) {
+        if (sep != std::string::npos) {
             if (sep != key.size() - 2 || ( key[sep+1] != 'r' && key[sep+1] != 'w'))
                 return TError(EError::InvalidValue, "Invalid io limit key: " + key);
             dir = key[sep+1] == 'r' ? 0 : 1;
@@ -1095,7 +1095,7 @@ TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
     return result;
 }
 
-TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const TString &policy,
+TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
                                     double weight) const {
     if (!HasWeight)
         return OK;

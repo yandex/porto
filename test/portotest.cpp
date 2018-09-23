@@ -9,7 +9,7 @@
 #include "test.hpp"
 #include "netlink.hpp"
 
-using TString;
+using std::string;
 
 extern "C" {
 #include <sys/types.h>
@@ -17,7 +17,7 @@ extern "C" {
 }
 
 static int Selftest(int argc, char *argv[]) {
-    std::vector<TString> args;
+    std::vector<std::string> args;
 
     for (int i = 0; i < argc; i++)
         args.push_back(argv[i]);
@@ -48,10 +48,10 @@ static int TestConnectivity() {
 
     Porto::Connection api;
 
-    std::vector<TString> containers;
+    std::vector<std::string> containers;
     ExpectApiSuccess(api.List(containers));
 
-    TString name = "a";
+    std::string name = "a";
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.Destroy(name));
 
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     umask(0);
 
     if (argc >= 2) {
-        TString name(argv[1]);
+        string name(argv[1]);
         if (name == "-h" || name == "--help") {
             Usage();
             return EXIT_FAILURE;
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     test::InitUsersAndGroups();
     test::InitKernelFeatures();
 
-    TString what = "";
+    string what = "";
     if (argc >= 2)
         what = argv[1];
 

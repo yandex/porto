@@ -8,8 +8,8 @@
 #define ExpectSuccess(ret) assert((ret) == Porto::EError::Success)
 
 int main(int, char **) {
-    std::vector<TString> list;
-    TString str, path;
+    std::vector<Porto::TString> list;
+    Porto::TString str, path;
     uint64_t val;
 
     Porto::Connection api;

@@ -40,19 +40,19 @@ struct TMount;
 
 class TPath {
 private:
-    TString Path;
+    std::string Path;
     friend class TFile;
 
     TPath AddComponent(const TPath &component) const;
 
 public:
-    TPath(const TString &path) : Path(path) {}
+    TPath(const std::string &path) : Path(path) {}
     TPath(const char *path) : Path(path) {}
     TPath() : Path("") {}
 
     bool IsAbsolute() const { return Path[0] == '/'; }
 
-    bool IsSimple() const { return Path.find('/') == TString::npos; }
+    bool IsSimple() const { return Path.find('/') == std::string::npos; }
 
     bool IsRoot() const { return Path == "/"; }
 
@@ -69,7 +69,7 @@ public:
               (Path[2] == '/' || Path[2] == '\0');
     }
 
-    std::vector<TString> Components() const;
+    std::vector<std::string> Components() const;
 
     const char *c_str() const noexcept { return Path.c_str(); }
 
@@ -109,10 +109,10 @@ public:
     TPath NormalPath() const;
 
     TPath DirNameNormal() const;
-    TString BaseNameNormal() const;
+    std::string BaseNameNormal() const;
 
     TPath DirName() const;
-    TString BaseName() const;
+    std::string BaseName() const;
 
     TPath AbsolutePath(const TPath &base = "") const;
     TPath RelativePath(const TPath &base) const;
@@ -133,10 +133,10 @@ public:
 
     dev_t GetDev() const;
     dev_t GetBlockDev() const;
-    static TError GetDevName(dev_t dev, TString &name);
+    static TError GetDevName(dev_t dev, std::string &name);
 
     int64_t SinceModificationMs() const;
-    TString ToString() const;
+    std::string ToString() const;
     bool Exists() const;
     bool PathExists() const; /* or dangling symlink */
 
@@ -157,29 +157,29 @@ public:
     TError Mkfile(unsigned int mode) const;
     TError Mkdir(unsigned int mode) const;
     TError MkdirAll(unsigned int mode) const;
-    TError MkdirTmp(const TPath &parent, const TString &prefix, unsigned int mode);
+    TError MkdirTmp(const TPath &parent, const std::string &prefix, unsigned int mode);
     TError Rmdir() const;
     TError Unlink() const;
     TError RemoveAll() const;
     TError Rename(const TPath &dest) const;
-    TError ReadDirectory(std::vector<TString> &result) const;
-    TError ListSubdirs(std::vector<TString> &result) const;
+    TError ReadDirectory(std::vector<std::string> &result) const;
+    TError ListSubdirs(std::vector<std::string> &result) const;
     TError ClearDirectory() const;
     TError StatFS(TStatFS &result) const;
-    TError GetXAttr(const TString &name, TString &value) const;
-    TError SetXAttr(const TString &name, const TString &value) const;
+    TError GetXAttr(const std::string &name, std::string &value) const;
+    TError SetXAttr(const std::string &name, const std::string &value) const;
     TError Truncate(off_t size) const;
     TError RotateLog(off_t max_disk_usage, off_t &loss) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
     TError Touch() const;
 
-    static TString UmountFlagsToString(uint64_t flags);
+    static std::string UmountFlagsToString(uint64_t flags);
 
     TError FindMount(TMount &mount, bool exact = false) const;
     static TError ListAllMounts(std::list<TMount> &list);
 
-    TError Mount(const TPath &source, const TString &type, uint64_t flags,
-                 const std::vector<TString> &options) const;
+    TError Mount(const TPath &source, const std::string &type, uint64_t flags,
+                 const std::vector<std::string> &options) const;
     TError Bind(const TPath &source, uint64_t flags = 0) const;
     TError MoveMount(const TPath &target) const;
     TError Remount(uint64_t flags) const;
@@ -188,13 +188,13 @@ public:
     TError UmountAll() const;
     TError UmountNested() const;
 
-    TError ReadAll(TString &text, size_t max = 1048576) const;
-    TError ReadLines(std::vector<TString> &lines, size_t max = 1048576) const;
+    TError ReadAll(std::string &text, size_t max = 1048576) const;
+    TError ReadLines(std::vector<std::string> &lines, size_t max = 1048576) const;
     TError ReadInt(int &value) const;
 
-    TError WriteAll(const TString &text) const;
-    TError WriteAtomic(const TString &text) const;
-    TError WritePrivate(const TString &text) const;
+    TError WriteAll(const std::string &text) const;
+    TError WriteAtomic(const std::string &text) const;
+    TError WritePrivate(const std::string &text) const;
 };
 
 // FIXME replace with streaming someday
@@ -203,19 +203,19 @@ constexpr const size_t MOUNT_INFO_LIMIT = 64 << 20;
 struct TMount {
     TPath Source;
     TPath Target;
-    TString Type;
-    TString Options;
+    std::string Type;
+    std::string Options;
 
     int MountId;
     int ParentId;
     dev_t Device;
     TPath BindPath; /* path within filesystem */
     uint64_t MntFlags;
-    std::vector<TString> OptFields;
+    std::vector<std::string> OptFields;
 
-    static TString Demangle(const TString &s);
-    TError ParseMountinfo(const TString &line);
-    bool HasOption(const TString &option) const;
+    static std::string Demangle(const std::string &s);
+    TError ParseMountinfo(const std::string &line);
+    bool HasOption(const std::string &option) const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
         stream << mount.Source << " " << mount.Target
@@ -223,8 +223,8 @@ struct TMount {
         return stream;
     }
 
-    static TError ParseFlags(const TString &str, uint64_t &flags, uint64_t allowed = -1);
-    static TString FormatFlags(uint64_t flags);
+    static TError ParseFlags(const std::string &str, uint64_t &flags, uint64_t allowed = -1);
+    static std::string FormatFlags(uint64_t flags);
 };
 
 class TFile {
@@ -260,11 +260,11 @@ public:
     static void CloseAll(std::vector<int> except);
     TPath RealPath(void) const;
     TPath ProcPath(void) const;
-    TError Read(TString &text) const;
-    TError ReadAll(TString &text, size_t max) const;
-    TError ReadEnds(TString &text, size_t max) const;
+    TError Read(std::string &text) const;
+    TError ReadAll(std::string &text, size_t max) const;
+    TError ReadEnds(std::string &text, size_t max) const;
     TError Truncate(off_t size) const;
-    TError WriteAll(const TString &text) const;
+    TError WriteAll(const std::string &text) const;
     static TError Chattr(int fd, unsigned add_flags, unsigned del_flags);
     int GetMountId(const TPath &relative = "") const;
     TError Dup(const TFile &other);
@@ -293,8 +293,8 @@ public:
     }
     TError ChmodAt(const TPath &path, mode_t mode) const;
     TError Touch() const;
-    TError GetXAttr(const TString &name, TString &value) const;
-    TError SetXAttr(const TString &name, const TString &value) const;
+    TError GetXAttr(const std::string &name, std::string &value) const;
+    TError SetXAttr(const std::string &name, const std::string &value) const;
     TError Chdir() const;
     TError ClearDirectory() const;
     bool IsRegular() const;
@@ -342,7 +342,7 @@ public:
     TError OpenList(const TPath &path);
     TError OpenNoStat(const TPath &path);
     TError Next();
-    TString Name() { return Ent ? Ent->fts_name : ""; }
+    std::string Name() { return Ent ? Ent->fts_name : ""; }
     int Level() { return Ent ? Ent->fts_level : -2; }
     void Close();
 };

@@ -4,17 +4,17 @@ extern "C" {
 #include <unistd.h>
 }
 
-TString TError::ErrorName(EError error) {
+std::string TError::ErrorName(EError error) {
     return rpc::EError_Name(error);
 }
 
-TString TError::Message() const {
+std::string TError::Message() const {
     if (Errno)
         return fmt::format("{}: {}", strerror(Errno), Text);
     return Text;
 }
 
-TString TError::ToString() const {
+std::string TError::ToString() const {
     if (Errno)
         return fmt::format("{}:({}: {})", ErrorName(Error), strerror(Errno), Text);
     if (Text.length())
@@ -71,7 +71,7 @@ bool TError::Deserialize(int fd, TError &error) {
         return true;
     }
 
-    TString desc(len, '\0');
+    std::string desc(len, '\0');
     ret = read(fd, &desc[0], len);
     if (ret != (int)len) {
         error = System("Can't deserialize description");

@@ -19,9 +19,9 @@ extern "C" {
 }
 
 __thread TContainer *CT = nullptr;
-std::map<TString, TProperty*> ContainerProperties;
+std::map<std::string, TProperty*> ContainerProperties;
 
-TProperty::TProperty(TString name, EProperty prop, TString desc) {
+TProperty::TProperty(std::string name, EProperty prop, std::string desc) {
     Name = name;
     Prop = prop;
     Desc = desc;
@@ -32,15 +32,15 @@ TError TProperty::Has() {
     return OK;
 }
 
-TError TProperty::Set(const TString &) {
+TError TProperty::Set(const std::string &) {
     return TError(EError::NotSupported, "Not implemented: " + Name);
 }
 
-TError TProperty::GetIndexed(const TString &, TString &) {
+TError TProperty::GetIndexed(const std::string &, std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
-TError TProperty::SetIndexed(const TString &, const TString &) {
+TError TProperty::SetIndexed(const std::string &, const std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
@@ -55,7 +55,7 @@ TError TProperty::Load(const rpc::TContainerSpec &) {
 void TProperty::Dump(rpc::TContainerSpec &) {
 }
 
-TString TProperty::GetDesc() const {
+std::string TProperty::GetDesc() const {
     auto desc = Desc;
     if (IsReadOnly)
         desc += " (ro)";
@@ -105,19 +105,19 @@ TError TProperty::Start(void) {
 template <typename T>
 class TReferenceProperty : public TProperty {
 public:
-    TReferenceProperty(TString name, EProperty prop, TString desc) :
+    TReferenceProperty(std::string name, EProperty prop, std::string desc) :
         TProperty(name, prop, desc) {}
     virtual const T &Get() = 0;
     virtual TError Set(T&) {
         return TError(EError::NotSupported, "Not implemented: {}", Name);
     }
-    virtual TString Format(const T &val) = 0;
-    virtual TError Parse(const TString &str, T &val) = 0;
-    TError Get(TString &str) {
+    virtual std::string Format(const T &val) = 0;
+    virtual TError Parse(const std::string &str, T &val) = 0;
+    TError Get(std::string &str) {
         str = Format(Get());
         return OK;
     }
-    TError Set(const TString &str) {
+    TError Set(const std::string &str) {
         T val;
         TError error = Parse(str, val);
         if (error)
@@ -128,22 +128,22 @@ public:
 
 class TUintMapProperty : public TReferenceProperty<TUintMap> {
 public:
-    TString Def;
+    std::string Def;
 
-    TUintMapProperty(TString name, EProperty prop, TString desc,
-                     TString def = "") :
+    TUintMapProperty(std::string name, EProperty prop, std::string desc,
+                     std::string def = "") :
         TReferenceProperty<TUintMap> (name, prop, desc), Def(def) {}
-    TString Format(const TUintMap &val) {
-        TString str;
+    std::string Format(const TUintMap &val) {
+        std::string str;
         UintMapToString(val, str);
         return str;
     }
-    TError Parse(const TString &str, TUintMap &val) {
-        if (str.size() && Def.size() && str.find(':') == TString::npos)
+    TError Parse(const std::string &str, TUintMap &val) {
+        if (str.size() && Def.size() && str.find(':') == std::string::npos)
             return StringToSize(str, val[Def]);
         return StringToUintMap(str, val);
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         const TUintMap &val = Get();
         auto it = val.find(index);
         if (it == val.end())
@@ -151,7 +151,7 @@ public:
         value = std::to_string(it->second);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         TUintMap val = Get();
         TError error = StringToSize(value, val[index]);
         if (error)
@@ -177,12 +177,12 @@ public:
 
 class TConfigProperty : public TReferenceProperty<TMultiTuple> {
 public:
-    TConfigProperty(TString name, EProperty prop, TString desc) :
+    TConfigProperty(std::string name, EProperty prop, std::string desc) :
         TReferenceProperty<TMultiTuple> (name, prop, desc) {}
-    TString Format(const TMultiTuple &val) {
+    std::string Format(const TMultiTuple &val) {
         return MergeEscapeStrings(val, ' ', ';');
     }
-    TError Parse(const TString &str, TMultiTuple &val) {
+    TError Parse(const std::string &str, TMultiTuple &val) {
         val = SplitEscapedString(str, ' ', ';');
         return OK;
     }
@@ -191,23 +191,23 @@ public:
 template <typename T>
 class TTypedProperty : public TProperty {
 public:
-    TTypedProperty(TString name, EProperty prop, TString desc) :
+    TTypedProperty(std::string name, EProperty prop, std::string desc) :
         TProperty(name, prop, desc) {}
-    virtual TString Format(T val) {
+    virtual std::string Format(T val) {
         return std::to_string(val);
     }
-    virtual TError Parse(const TString &str, T &val) = 0;
+    virtual TError Parse(const std::string &str, T &val) = 0;
     virtual TError Get(T &val) = 0;
     virtual TError Set(T) {
         return TError(EError::NotSupported, "Not implemented: " + Name);
     }
-    virtual TError Get(const TString &, T &) {
+    virtual TError Get(const std::string &, T &) {
         return TError(EError::InvalidValue, "Invalid subscript for property");
     }
-    virtual TError Set(const TString &, T) {
+    virtual TError Set(const std::string &, T) {
         return TError(EError::InvalidValue, "Invalid subscript for property");
     }
-    TError Get(TString &str) {
+    TError Get(std::string &str) {
         T val;
         TError error = Get(val);
         if (error)
@@ -215,14 +215,14 @@ public:
         str = Format(val);
         return OK;
     }
-    TError Set(const TString &str) {
+    TError Set(const std::string &str) {
         T val;
         TError error = Parse(str, val);
         if (error)
             return error;
         return Set(val);
     }
-    TError GetIndexed(const TString &index, TString &str) {
+    TError GetIndexed(const std::string &index, std::string &str) {
         T val;
         TError error = Get(index, val);
         if (error)
@@ -230,7 +230,7 @@ public:
         str = Format(val);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &str) {
+    TError SetIndexed(const std::string &index, const std::string &str) {
         T val;
         TError error = Parse(str, val);
         if (error)
@@ -257,54 +257,54 @@ public:
 
 class TIntProperty : public TTypedProperty<int64_t> {
 public:
-    TIntProperty(TString name, EProperty prop, TString desc) :
+    TIntProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<int64_t> (name, prop, desc) {}
-    TError Parse(const TString &str, int64_t &val) {
+    TError Parse(const std::string &str, int64_t &val) {
         return StringToInt64(str, val);
     }
 };
 
 class TBoolProperty : public TTypedProperty<bool> {
 public:
-    TBoolProperty(TString name, EProperty prop, TString desc) :
+    TBoolProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<bool> (name, prop, desc) {}
-    TString Format(bool val) {
+    std::string Format(bool val) {
         return BoolToString(val);
     }
-    TError Parse(const TString &str, bool &val) {
+    TError Parse(const std::string &str, bool &val) {
         return StringToBool(str, val);
     }
 };
 
 class TSizeProperty : public TTypedProperty<uint64_t> {
 public:
-    TSizeProperty(TString name, EProperty prop, TString desc) :
+    TSizeProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<uint64_t> (name, prop, desc) {}
-    TError Parse(const TString &str, uint64_t &val) {
+    TError Parse(const std::string &str, uint64_t &val) {
         return StringToSize(str, val);
     }
 };
 
 class TNsecProperty : public TTypedProperty<uint64_t> {
 public:
-    TNsecProperty(TString name, EProperty prop, TString desc) :
+    TNsecProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<uint64_t>(name, prop, desc) {}
-    TError Parse(const TString &str, uint64_t &val) {
+    TError Parse(const std::string &str, uint64_t &val) {
         return StringToNsec(str, val);
     }
 };
 
 class TDateTimeProperty : public TTypedProperty<uint64_t> {
 public:
-    TDateTimeProperty(TString name, EProperty prop, TString desc) :
+    TDateTimeProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<uint64_t>(name, prop, desc) {}
-    TString Format(uint64_t val) {
+    std::string Format(uint64_t val) {
         return val ? FormatTime(val) : "";
     }
-    TError Parse(const TString &str, uint64_t &val) {
+    TError Parse(const std::string &str, uint64_t &val) {
         return StringToUint64(str, val);
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         if (index != "raw")
             return TError(EError::InvalidValue, "Invalid index: {}", index);
         uint64_t val;
@@ -318,13 +318,13 @@ public:
 
 class TCpuPowerProperty : public TTypedProperty<uint64_t> {
 public:
-    TCpuPowerProperty(TString name, EProperty prop, TString desc) :
+    TCpuPowerProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<uint64_t>(name, prop, desc) {}
-    TString Format(uint64_t val) {
+    std::string Format(uint64_t val) {
         return fmt::format("{:g}c", (double)val / NSEC_PER_SEC);
     }
-    TError Parse(const TString &str, uint64_t &value) {
-        TString unit;
+    TError Parse(const std::string &str, uint64_t &value) {
+        std::string unit;
         double val;
         TError error = StringToValue(str, val, unit);
         if (error || val < 0)
@@ -341,7 +341,7 @@ public:
 
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         if (index != "ns")
             return TError(EError::InvalidValue, "Invalid index: {}", index);
         uint64_t val;
@@ -351,7 +351,7 @@ public:
         value = fmt::format("{}", val);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &str) {
+    TError SetIndexed(const std::string &index, const std::string &str) {
         if (index != "ns")
             return TError(EError::InvalidValue, "Invalid index: {}", index);
         uint64_t val;
@@ -364,13 +364,13 @@ public:
 
 class TWeightProperty : public TTypedProperty<double> {
 public:
-    TWeightProperty(TString name, EProperty prop, TString desc) :
+    TWeightProperty(std::string name, EProperty prop, std::string desc) :
         TTypedProperty<double>(name, prop, desc) {}
-    TString Format(double val) {
+    std::string Format(double val) {
         return fmt::format("{:g}", val);
     }
-    TError Parse(const TString &str, double &val) {
-        TString unit;
+    TError Parse(const std::string &str, double &val) {
+        std::string unit;
         TError error = StringToValue(str, val, unit);
         if (error)
             return error;
@@ -382,15 +382,15 @@ public:
 
 class TCapProperty : public TReferenceProperty<TCapabilities> {
 public:
-    TCapProperty(TString name, EProperty prop, TString desc) :
+    TCapProperty(std::string name, EProperty prop, std::string desc) :
         TReferenceProperty<TCapabilities>(name, prop, desc) {}
-    TString Format(const TCapabilities &val) {
+    std::string Format(const TCapabilities &val) {
         return val.Format();
     }
-    TError Parse(const TString &str, TCapabilities &val) {
+    TError Parse(const std::string &str, TCapabilities &val) {
         return val.Parse(str);
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         TCapabilities caps;
         TError error;
 
@@ -402,7 +402,7 @@ public:
         value = BoolToString((val.Permitted & caps.Permitted) == caps.Permitted);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         TCapabilities caps;
         TError error;
         bool set;
@@ -527,11 +527,11 @@ public:
 class TCwd : public TProperty {
 public:
     TCwd() : TProperty(P_CWD, EProperty::CWD, "Container working directory") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->GetCwd().ToString();
         return OK;
     }
-    TError Set(const TString &cwd) {
+    TError Set(const std::string &cwd) {
         CT->Cwd = cwd;
         CT->SetProp(EProperty::CWD);
         return OK;
@@ -560,12 +560,12 @@ public:
         IsDynamic = true;
     }
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Ulimit.Format();
         return OK;
     }
 
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         auto type = TUlimit::GetType(index);
         for (auto &res: CT->Ulimit.Resources) {
             if (res.Type == type)
@@ -574,7 +574,7 @@ public:
         return OK;
     }
 
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TUlimit lim;
         TError error = lim.Parse(value);
         if (error)
@@ -584,7 +584,7 @@ public:
         return OK;
     }
 
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         TUlimit lim;
         TError error = lim.Parse(index + ":" + value);
         if (error)
@@ -637,11 +637,11 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->CpuPolicy;
         return OK;
     }
-    TError Set(const TString &policy) {
+    TError Set(const std::string &policy) {
         if (policy != "rt" && policy != "high" && policy != "normal" &&
                 policy != "batch"  && policy != "idle" && policy != "iso")
             return TError(EError::InvalidValue, "Unknown cpu policy: " + policy);
@@ -670,11 +670,11 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->IoPolicy;
         return OK;
     }
-    TError Set(const TString &policy) {
+    TError Set(const std::string &policy) {
         int ioprio;
 
         if (policy == "" || policy == "none")
@@ -748,13 +748,13 @@ class TTaskCred : public TProperty {
 public:
     TTaskCred() : TProperty(P_TASK_CRED, EProperty::NONE,
             "Credentials: uid gid groups...") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = fmt::format("{} {}", CT->TaskCred.Uid, CT->TaskCred.Gid);
         for (auto gid: CT->TaskCred.Groups)
             value += fmt::format(" {}", gid);
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TError error;
         TCred cred;
         error = cred.Init(value);
@@ -780,11 +780,11 @@ class TUser : public TProperty {
 public:
     TUser() : TProperty(P_USER, EProperty::USER,
             "Start command with given user") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = UserName(CT->TaskCred.Uid);
         return OK;
     }
-    TError Set(const TString &username) {
+    TError Set(const std::string &username) {
         TCred cred;
         TError error = cred.Init(username);
         if (error) {
@@ -817,11 +817,11 @@ public:
 class TGroup : public TProperty {
 public:
     TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = GroupName(CT->TaskCred.Gid);
         return OK;
     }
-    TError Set(const TString &groupname) {
+    TError Set(const std::string &groupname) {
         gid_t newGid;
         TError error = GroupId(groupname, newGid);
         if (error)
@@ -850,13 +850,13 @@ class TOwnerCred : public TProperty {
 public:
     TOwnerCred() : TProperty(P_OWNER_CRED, EProperty::NONE,
             "Owner credentials: uid gid groups...") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = fmt::format("{} {}", CT->OwnerCred.Uid, CT->OwnerCred.Gid);
         for (auto gid: CT->OwnerCred.Groups)
             value += fmt::format(" {}", gid);
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TError error;
         TCred cred;
         error = cred.Init(value);
@@ -887,12 +887,12 @@ public:
     TOwnerUser() : TProperty(P_OWNER_USER, EProperty::OWNER_USER,
             "Container owner user") {}
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = UserName(CT->OwnerCred.Uid);
         return OK;
     }
 
-    TError Set(const TString &username) {
+    TError Set(const std::string &username) {
         TCred newCred;
         gid_t oldGid = CT->OwnerCred.Gid;
         TError error = newCred.Init(username);
@@ -930,12 +930,12 @@ public:
     TOwnerGroup() : TProperty(P_OWNER_GROUP, EProperty::OWNER_GROUP,
             "Container owner group") {}
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = GroupName(CT->OwnerCred.Gid);
         return OK;
     }
 
-    TError Set(const TString &groupname) {
+    TError Set(const std::string &groupname) {
         gid_t newGid;
         TError error = GroupId(groupname, newGid);
         if (error)
@@ -1028,11 +1028,11 @@ class TCommand : public TProperty {
 public:
     TCommand() : TProperty(P_COMMAND, EProperty::COMMAND,
             "Command executed upon container start") {}
-    TError Get(TString &command) {
+    TError Get(std::string &command) {
         command = CT->Command;
         return OK;
     }
-    TError Set(const TString &command) {
+    TError Set(const std::string &command) {
         if (command.size() > CONTAINER_COMMAND_MAX)
             return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
         CT->Command = command;
@@ -1061,7 +1061,7 @@ class TCommandArgv : public TProperty {
 public:
     TCommandArgv() : TProperty(P_COMMAND_ARGV, EProperty::COMMAND_ARGV,
             "Verbatim command line, format: argv0\\targv1\\t...") {}
-    TError Get(TString &val) {
+    TError Get(std::string &val) {
         val = MergeEscapeStrings(CT->CommandArgv, '\t');
         return OK;
     }
@@ -1072,7 +1072,7 @@ public:
         CT->SetProp(EProperty::COMMAND);
         return OK;
     }
-    TError Set(const TString &val) {
+    TError Set(const std::string &val) {
         if (val.size() > CONTAINER_COMMAND_MAX)
             return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
         CT->CommandArgv = SplitEscapedString(val, '\t');
@@ -1082,14 +1082,14 @@ public:
             CT->ClearProp(EProperty::COMMAND_ARGV);
         return SetCommand();
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         uint64_t i;
         if (StringToUint64(index, i) || i >= CT->CommandArgv.size())
             return TError(EError::InvalidProperty, "Invalid index");
         value = CT->CommandArgv[i];
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         uint64_t i;
         if (StringToUint64(index, i))
             return TError(EError::InvalidProperty, "Invalid index");
@@ -1144,7 +1144,7 @@ public:
     void Init(void) {
         IsSupported = config().core().enable();
     }
-    TError Get(TString &command) {
+    TError Get(std::string &command) {
         /* inherit default core command from parent but not across chroot */
         for (auto ct = CT; ct; ct = ct->Parent.get()) {
             command = ct->CoreCommand;
@@ -1153,13 +1153,13 @@ public:
         }
         return OK;
     }
-    TError Set(const TString &command) {
+    TError Set(const std::string &command) {
         CT->CoreCommand = command;
         CT->SetProp(EProperty::CORE_COMMAND);
         return OK;
     }
     void Dump(rpc::TContainerSpec &spec) {
-        TString command;
+        std::string command;
         Get(command);
         spec.set_core_command(command);
     }
@@ -1175,13 +1175,13 @@ class TVirtMode : public TProperty {
 public:
     TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
             "Virtualization mode: os|app|job|host") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->OsMode ? "os" :
                 CT->JobMode ? "job" :
                 CT->HostMode ? "host" : "app";
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
 
         if (value != "app" &&
                 value != "os" &&
@@ -1204,7 +1204,7 @@ public:
         return OK;
     }
     void Dump(rpc::TContainerSpec &spec) {
-        TString val;
+        std::string val;
         Get(val);
         spec.set_virt_mode(val);
     }
@@ -1220,11 +1220,11 @@ class TStdinPath : public TProperty {
 public:
     TStdinPath() : TProperty(P_STDIN_PATH, EProperty::STDIN,
             "Container standard input path") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Stdin.Path.ToString();
         return OK;
     }
-    TError Set(const TString &path) {
+    TError Set(const std::string &path) {
         CT->Stdin.SetInside(path);
         CT->SetProp(EProperty::STDIN);
         return OK;
@@ -1244,11 +1244,11 @@ class TStdoutPath : public TProperty {
 public:
     TStdoutPath() : TProperty(P_STDOUT_PATH, EProperty::STDOUT,
             "Container standard output path") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value =  CT->Stdout.Path.ToString();
         return OK;
     }
-    TError Set(const TString &path) {
+    TError Set(const std::string &path) {
         CT->Stdout.SetInside(path);
         CT->SetProp(EProperty::STDOUT);
         return OK;
@@ -1273,11 +1273,11 @@ class TStderrPath : public TProperty {
 public:
     TStderrPath() : TProperty(P_STDERR_PATH, EProperty::STDERR,
             "Container standard error path") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Stderr.Path.ToString();
         return OK;
     }
-    TError Set(const TString &path) {
+    TError Set(const std::string &path) {
         CT->Stderr.SetInside(path);
         CT->SetProp(EProperty::STDERR);
         return OK;
@@ -1373,10 +1373,10 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         return CT->Stdout.Read(*CT, value);
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         return CT->Stdout.Read(*CT, value, index);
     }
 } static Stdout;
@@ -1389,10 +1389,10 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         return CT->Stderr.Read(*CT, value);
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         return CT->Stderr.Read(*CT, value, index);
     }
 } static Stderr;
@@ -1457,11 +1457,11 @@ public:
 class TRoot : public TProperty {
 public:
     TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container root path in parent namespace") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Root;
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TError error;
 
         if (CT->VolumeMounts)
@@ -1506,7 +1506,7 @@ public:
     TRootPath() : TProperty(P_ROOT_PATH, EProperty::NONE, "Container root path in client namespace") {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CL->ComposePath(CT->RootPath).ToString();
         if (value == "")
             return TError(EError::Permission, "Root path is unreachable");
@@ -1632,10 +1632,10 @@ public:
         CT->SetProp(EProperty::UMASK);
         return OK;
     }
-    TString Format(unsigned val) {
+    std::string Format(unsigned val) {
         return fmt::format("{:#o}", val);
     }
-    TError Parse(const TString &str, unsigned &val) {
+    TError Parse(const std::string &str, unsigned &val) {
         return StringToOct(str, val);
     }
     void Dump(rpc::TContainerSpec &spec, unsigned val) {
@@ -1653,11 +1653,11 @@ class TControllers : public TProperty {
 public:
     TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS,
             "Cgroup controllers") { }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = StringFormatFlags(CT->Controllers, ControllersName, ";");
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         uint64_t val;
         TError error = StringParseFlags(value, ControllersName, val, ';');
         if (error)
@@ -1668,7 +1668,7 @@ public:
         CT->SetProp(EProperty::CONTROLLERS);
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         uint64_t val;
         TError error = StringParseFlags(index, ControllersName, val, ';');
         if (error)
@@ -1676,7 +1676,7 @@ public:
         value = BoolToString((CT->Controllers & val) == val);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         uint64_t val;
         bool enable;
         TError error = StringParseFlags(index, ControllersName, val, ';');
@@ -1725,14 +1725,14 @@ public:
     TCgroups() : TProperty(P_CGROUPS, EProperty::NONE, "Cgroups") {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         TStringMap map;
         for (auto &subsys: Subsystems)
             map[subsys->Type] = CT->GetCgroup(*subsys).Path().ToString();
         value = StringMapToString(map);
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         for (auto &subsys: Subsystems) {
             if (subsys->Type != index)
                 continue;
@@ -1757,11 +1757,11 @@ class THostname : public TProperty {
 public:
     THostname() : TProperty(P_HOSTNAME, EProperty::HOSTNAME,
             "Container hostname") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Hostname;
         return OK;
     }
-    TError Set(const TString &hostname) {
+    TError Set(const std::string &hostname) {
         CT->Hostname = hostname;
         CT->SetProp(EProperty::HOSTNAME);
         return OK;
@@ -1781,11 +1781,11 @@ class TEnvProperty : public TProperty {
 public:
     TEnvProperty() : TProperty(P_ENV, EProperty::ENV,
             "Container environment variables: <name>=<value>; ...") {}
-    TError Get(TString &val) {
+    TError Get(std::string &val) {
         val = CT->EnvCfg;
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         TEnv env;
         TError error = CT->GetEnvironment(env);
         if (error)
@@ -1794,7 +1794,7 @@ public:
             return TError(EError::InvalidValue, "Variable " + index + " not defined");
         return OK;
     }
-    TError Set(const TString &val) {
+    TError Set(const std::string &val) {
         TEnv env;
         TError error =  env.Parse(val, true);
         if (error)
@@ -1803,7 +1803,7 @@ public:
         CT->SetProp(EProperty::ENV);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &val) {
+    TError SetIndexed(const std::string &index, const std::string &val) {
         TEnv env;
         TError error = env.Parse(CT->EnvCfg, true);
         if (error)
@@ -1861,11 +1861,11 @@ class TBind : public TProperty {
 public:
     TBind() : TProperty(P_BIND, EProperty::BIND,
             "Bind mounts: <source> <target> [ro|rw|<flag>],... ;...") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = TBindMount::Format(CT->BindMounts);
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         std::vector<TBindMount> result;
         TError error = TBindMount::Parse(value, result);
         if (error)
@@ -1902,12 +1902,12 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         for (auto &link: CT->Symlink)
             value += fmt::format("{}: {}; ", link.first, link.second);
         return OK;
     }
-    TError GetIndexed(const TString &key, TString &value) {
+    TError GetIndexed(const std::string &key, std::string &value) {
         TPath sym = TPath(key).NormalPath();
         auto it = CT->Symlink.find(sym);
         if (it == CT->Symlink.end())
@@ -1915,12 +1915,12 @@ public:
         value = it->second.ToString();
         return OK;
     }
-    TError SetIndexed(const TString &key, const TString &value) {
+    TError SetIndexed(const std::string &key, const std::string &value) {
         auto sym = TPath(key).NormalPath();
         auto tgt = TPath(value).NormalPath();
         return CT->SetSymlink(sym, tgt);
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TStringMap map;
         TError error = StringToStringMap(value, map);
         if (error)
@@ -2110,7 +2110,7 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         if (CT->ResolvConf.size() || CT->IsRoot())
             value = StringReplaceAll(CT->ResolvConf, "\n", ";");
         else if (CT->HasProp(EProperty::RESOLV_CONF))
@@ -2121,7 +2121,7 @@ public:
             value = "default";
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         if (CT->State != EContainerState::Stopped &&
             ((CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/") !=
              (value == "keep" || value == "" || (CT->Root == "/" && value == "inherit"))))
@@ -2161,11 +2161,11 @@ public:
     TEtcHosts() : TProperty(P_ETC_HOSTS, EProperty::ETC_HOSTS, "Override /etc/hosts content")
     {
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->EtcHosts;
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         CT->EtcHosts = value;
         CT->SetProp(EProperty::ETC_HOSTS);
         return OK;
@@ -2188,11 +2188,11 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Devices.Format();
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TDevices devices;
         TError error = devices.Parse(value, CL->Cred);
         if (error)
@@ -2206,7 +2206,7 @@ public:
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
     }
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         TDevices devices;
         TError error = devices.Parse(index + " " + value, CL->Cred);
         if (error)
@@ -2253,13 +2253,13 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = StringFormat("%d;%d;%d", CT->Task.Pid,
                                          CT->TaskVPid,
                                          CT->WaitTask.Pid);
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TError error;
 
         auto val = SplitEscapedString(value, ';');
@@ -2336,11 +2336,11 @@ class TPortoNamespace : public TProperty {
 public:
     TPortoNamespace() : TProperty(P_PORTO_NAMESPACE, EProperty::PORTO_NAMESPACE,
             "Porto containers namespace (container name prefix) (deprecated, use enable_porto=isolate instead)") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->NsName;
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         CT->NsName = value;
         CT->SetProp(EProperty::PORTO_NAMESPACE);
         return OK;
@@ -2360,11 +2360,11 @@ class TPlaceProperty : public TProperty {
 public:
     TPlaceProperty() : TProperty(P_PLACE, EProperty::PLACE,
             "Places for volumes and layers: [default][;/path...][;***][;alias=/path]") {}
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = MergeEscapeStrings(CT->PlacePolicy, ';');
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         CT->PlacePolicy = SplitEscapedString(value, ';');
         CT->SetProp(EProperty::PLACE);
         return OK;
@@ -2374,7 +2374,7 @@ public:
         for (auto &place: CT->PlacePolicy) {
             auto p = cfg->add_cfg();
             auto sep = place.find('=');
-            if (place[0] == '/' || place == "***" || sep == TString::npos) {
+            if (place[0] == '/' || place == "***" || sep == std::string::npos) {
                 p->set_place(place);
             } else {
                 p->set_place(place.substr(sep + 1));
@@ -2446,7 +2446,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         TTuple paths;
 
         for (auto &vol: CT->OwnedVolumes) {
@@ -2476,7 +2476,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         TMultiTuple links;
 
         for (auto &link: CT->VolumeLinks) {
@@ -2521,11 +2521,11 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = MergeEscapeStrings(CT->RequiredVolumes, ';');
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         auto volumes_lock = LockVolumes();
         auto prev = CT->RequiredVolumes;
         CT->RequiredVolumes = SplitEscapedString(value, ';');
@@ -2994,7 +2994,7 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_CPUSET;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
 
         switch (CT->CpuSetType) {
@@ -3019,7 +3019,7 @@ public:
         }
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         auto cfg = SplitEscapedString(value, ' ');
         auto lock = LockCpuAffinity();
         TError error;
@@ -3160,7 +3160,7 @@ public:
             "Resulting CPU affinity: [N,N-M,]...") {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
         value = CT->CpuAffinity.Format();
         return OK;
@@ -3328,7 +3328,7 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Parse(const TString &str, uint64_t &val) {
+    TError Parse(const std::string &str, uint64_t &val) {
         int64_t v;
         TError error = StringToInt64(str, v);
         val = v > 0 ? v : 0;
@@ -3393,11 +3393,11 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = CT->Private;
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         if (value.length() > PRIVATE_VALUE_MAX)
             return TError(EError::InvalidValue, "Private value is too long, max {} bytes", PRIVATE_VALUE_MAX);
         CT->Private = value;
@@ -3422,12 +3422,12 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         auto lock = LockContainers();
         value = StringMapToString(CT->Labels);
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = LockContainers();
         return CT->GetLabel(index, value);
     }
@@ -3462,14 +3462,14 @@ public:
             TContainerWaiter::ReportAll(*CT, it.first, it.second);
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TStringMap map;
         TError error = StringToStringMap(value, map);
         if (error)
             return error;
         return Set(map, true);
     }
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         TError error = TContainer::ValidLabel(index, value);
         if (error)
             return error;
@@ -3549,7 +3549,7 @@ public:
         }
     }
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         switch (CT->AccessLevel) {
             case EAccessLevel::None:
                 value = "false";
@@ -3576,7 +3576,7 @@ public:
         return OK;
     }
 
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         EAccessLevel level;
 
         if (value == "false" || value == "none")
@@ -3613,7 +3613,7 @@ public:
         return OK;
     }
     void Dump(rpc::TContainerSpec &spec) {
-        TString val;
+        std::string val;
         Get(val);
         spec.set_enable_porto(val);
     }
@@ -3691,7 +3691,7 @@ public:
             "Container name including porto namespaces") {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         if (CT->IsRoot())
             value = ROOT_CONTAINER;
         else
@@ -3699,7 +3699,7 @@ public:
         return OK;
     }
     void Dump(rpc::TContainerSpec &spec) {
-        TString val;
+        std::string val;
         Get(val);
         spec.set_absolute_name(val);
     }
@@ -3711,12 +3711,12 @@ public:
             "Container namespace including parent namespaces") {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = ROOT_PORTO_NAMESPACE + CT->GetPortoNamespace();
         return OK;
     }
     void Dump(rpc::TContainerSpec &spec) {
-        TString val;
+        std::string val;
         Get(val);
         spec.set_absolute_namespace(val);
     }
@@ -3728,7 +3728,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = TContainer::StateName(CT->State);
         return OK;
     }
@@ -3890,7 +3890,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         if (CT->Level == 0)
             value = "";
         else if (CT->Level == 1)
@@ -3975,7 +3975,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         if (CT->StartError)
             value = CT->StartError.ToString();
         return OK;
@@ -4158,7 +4158,7 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         TError error;
         TVmStat st;
 
@@ -4169,7 +4169,7 @@ public:
         UintMapToString(st.Stat, value);
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         TError error;
         TVmStat st;
 
@@ -4309,7 +4309,7 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
         TStringMap map;
@@ -4322,7 +4322,7 @@ public:
         value = StringMapToString(map);
         return OK;
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
         for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
@@ -4365,11 +4365,11 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_NETCLS;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = TNetwork::FormatTos(CT->NetClass.DefaultTos);
         return OK;
     }
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         int tos;
         TError error = TNetwork::ParseTos(value, tos);
         if (!error) {
@@ -4392,7 +4392,7 @@ public:
 class TNetProperty : public TProperty {
     TUintMap TNetClass:: *Member;
 public:
-    TNetProperty(TString name, TUintMap TNetClass:: *member, EProperty prop, TString desc) :
+    TNetProperty(std::string name, TUintMap TNetClass:: *member, EProperty prop, std::string desc) :
         TProperty(name, prop, desc), Member(member)
     {
         IsDynamic = true;
@@ -4409,7 +4409,7 @@ public:
         return OK;
     }
 
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TUintMap map;
         TError error = StringToUintMap(value, map);
         if (error)
@@ -4417,12 +4417,12 @@ public:
         return Set(map);
     }
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         auto lock = TNetwork::LockNetState();
         return UintMapToString(CT->NetClass.*Member, value);
     }
 
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         uint64_t val;
         TError error = StringToSize(value, val);
         if (error)
@@ -4438,7 +4438,7 @@ public:
         return OK;
     }
 
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = TNetwork::LockNetState();
         auto &cur = CT->NetClass.*Member;
         auto it = cur.find(index);
@@ -4517,8 +4517,8 @@ public:
     uint64_t TNetStat:: *Member;
     bool ClassStat;
 
-    TNetStatProperty(TString name, uint64_t TNetStat:: *member,
-                     TString desc) : TProperty(name, EProperty::NONE, desc) {
+    TNetStatProperty(std::string name, uint64_t TNetStat:: *member,
+                     std::string desc) : TProperty(name, EProperty::NONE, desc) {
         Member = member;
         IsReadOnly = true;
         IsRuntimeOnly = true;
@@ -4540,7 +4540,7 @@ public:
         return TError(EError::ResourceNotAvailable, "Shared network");
     }
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         TUintMap stat;
         auto lock = TNetwork::LockNetState();
         if (ClassStat) {
@@ -4553,7 +4553,7 @@ public:
         return UintMapToString(stat, value);
     }
 
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = TNetwork::LockNetState();
         if (ClassStat) {
             auto it = CT->NetClass.Fold->ClassStat.find(index);
@@ -4640,20 +4640,20 @@ TNetStatProperty NetTxDrops(P_NET_TX_DROPS, &TNetStat::TxDrops,
 
 class TIoStat : public TProperty {
 public:
-    TIoStat(TString name, EProperty prop, TString desc) : TProperty(name, prop, desc) {
+    TIoStat(std::string name, EProperty prop, std::string desc) : TProperty(name, prop, desc) {
         IsReadOnly = true;
         IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY | CGROUP_BLKIO;
     }
     virtual TError GetMap(TUintMap &map) = 0;
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         TUintMap map;
         TError error = GetMap(map);
         if (error)
             return error;
         return UintMapToString(map, value);
     }
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         TUintMap map;
         TError error = GetMap(map);
         if (error)
@@ -4662,7 +4662,7 @@ public:
         if (map.find(index) != map.end()) {
             value = std::to_string(map[index]);
         } else {
-            TString disk, name;
+            std::string disk, name;
 
             error = BlkioSubsystem.ResolveDisk(CL->ClientContainer->RootPath,
                                                index, disk);
@@ -4789,7 +4789,7 @@ public:
             val = (GetCurrentTimeMs() - CT->StartTime) / 1000;
         return OK;
     }
-    TError Get(const TString &index, int64_t &val) {
+    TError Get(const std::string &index, int64_t &val) {
         if (index == "dead") {
             if (CT->State == EContainerState::Dead)
                 val = (GetCurrentTimeMs() - CT->DeathTime) / 1000;
@@ -4866,8 +4866,8 @@ public:
 class TPortoStat : public TProperty {
 public:
     void Populate(TUintMap &m);
-    TError Get(TString &value);
-    TError GetIndexed(const TString &index, TString &value);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
     TPortoStat() : TProperty(P_PORTO_STAT, EProperty::NONE, "Porto statistics") {
         IsReadOnly = true;
         IsHidden = true;
@@ -4956,15 +4956,15 @@ void TPortoStat::Populate(TUintMap &m) {
     m["longest_read_request"] = Statistics->LongestRoRequest;
 }
 
-TError TPortoStat::Get(TString &value) {
+TError TPortoStat::Get(std::string &value) {
     TUintMap m;
     Populate(m);
 
     return UintMapToString(m, value);
 }
 
-TError TPortoStat::GetIndexed(const TString &index,
-                                       TString &value) {
+TError TPortoStat::GetIndexed(const std::string &index,
+                                       std::string &value) {
     TUintMap m;
     Populate(m);
 
@@ -5044,12 +5044,12 @@ public:
     TSysctlProperty() : TProperty(P_SYSCTL, EProperty::SYSCTL,
             "Sysctl, format: name: value;...") {}
 
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         value = StringMapToString(CT->Sysctl);
         return OK;
     }
 
-    TError GetIndexed(const TString &index, TString &value) {
+    TError GetIndexed(const std::string &index, std::string &value) {
         auto it = CT->Sysctl.find(index);
         if (it != CT->Sysctl.end())
             value = it->second;
@@ -5058,7 +5058,7 @@ public:
         return OK;
     }
 
-    TError Set(const TString &value) {
+    TError Set(const std::string &value) {
         TStringMap map;
         TError error = StringToStringMap(value, map);
         if (error)
@@ -5068,7 +5068,7 @@ public:
         return OK;
     }
 
-    TError SetIndexed(const TString &index, const TString &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) {
         if (value == "")
             CT->Sysctl.erase(index);
         else
@@ -5107,7 +5107,7 @@ public:
     TTaint() : TProperty(P_TAINT, EProperty::NONE, "Container problems") {
         IsReadOnly = true;
     }
-    TError Get(TString &value) {
+    TError Get(std::string &value) {
         for (auto &taint: CT->Taint())
             value += taint + "\n";
         return OK;

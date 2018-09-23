@@ -10,7 +10,7 @@ extern "C" {
 #include <fnmatch.h>
 }
 
-TError StringToUint64(const TString &str, uint64_t &value) {
+TError StringToUint64(const std::string &str, uint64_t &value) {
     const char *ptr = str.c_str();
     char *end;
 
@@ -25,7 +25,7 @@ TError StringToUint64(const TString &str, uint64_t &value) {
     return OK;
 }
 
-TError StringToInt64(const TString &str, int64_t &value) {
+TError StringToInt64(const std::string &str, int64_t &value) {
     const char *ptr = str.c_str();
     char *end;
 
@@ -40,7 +40,7 @@ TError StringToInt64(const TString &str, int64_t &value) {
     return OK;
 }
 
-TError StringToInt(const TString &str, int &value) {
+TError StringToInt(const std::string &str, int &value) {
     int64_t val;
     if (StringToInt64(str, val) || val < INT32_MIN || val > INT32_MAX)
         return TError(EError::InvalidValue, "Bad int value: " + str);
@@ -48,7 +48,7 @@ TError StringToInt(const TString &str, int &value) {
     return OK;
 }
 
-TError StringToOct(const TString &str, unsigned &value) {
+TError StringToOct(const std::string &str, unsigned &value) {
     const char *ptr = str.c_str();
     char *end;
 
@@ -64,7 +64,7 @@ TError StringToOct(const TString &str, unsigned &value) {
     return OK;
 }
 
-TError StringToBool(const TString &str, bool &value) {
+TError StringToBool(const std::string &str, bool &value) {
     if (str == "true")
         value = true;
     else if (str == "false")
@@ -74,11 +74,11 @@ TError StringToBool(const TString &str, bool &value) {
     return OK;
 }
 
-TString BoolToString(bool value) {
+std::string BoolToString(bool value) {
     return value ? "true" : "false";
 }
 
-TError StringToValue(const TString &str, double &value, TString &unit) {
+TError StringToValue(const std::string &str, double &value, std::string &unit) {
     const char *ptr = str.c_str();
     char *end;
 
@@ -92,14 +92,14 @@ TError StringToValue(const TString &str, double &value, TString &unit) {
     size_t len = strlen(end);
     while (len && isspace(end[len-1]))
         len--;
-    unit = TString(end, len);
+    unit = std::string(end, len);
     return OK;
 }
 
 static char size_unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 0};
 
-TError StringToSize(const TString &str, uint64_t &size) {
-    TString unit;
+TError StringToSize(const std::string &str, uint64_t &size) {
+    std::string unit;
     uint64_t mult = 1;
     double value;
     TError error;
@@ -148,7 +148,7 @@ ok:
     return OK;
 }
 
-TString StringFormatSize(uint64_t value)
+std::string StringFormatSize(uint64_t value)
 {
     int i = 0;
 
@@ -164,7 +164,7 @@ TString StringFormatSize(uint64_t value)
 }
 
 /* 10.123s or H:MM:SS or Dd H:MM */
-TString StringFormatDuration(uint64_t msec) {
+std::string StringFormatDuration(uint64_t msec) {
     if (msec < 60000)
         return StringFormat("%gs", msec / 1000.);
     int seconds = msec / 1000 % 60;
@@ -176,8 +176,8 @@ TString StringFormatDuration(uint64_t msec) {
     return StringFormat("%dd %2d:%02d", days, hours, minutes);
 }
 
-TError StringToNsec(const TString &str, uint64_t &nsec) {
-    TString unit;
+TError StringToNsec(const std::string &str, uint64_t &nsec) {
+    std::string unit;
     uint64_t mult = 1;
     double value;
     TError error;
@@ -215,14 +215,14 @@ ok:
     return OK;
 }
 
-TTuple SplitString(const TString &str, const char sep, int max) {
-    std::vector<TString> tokens;
+TTuple SplitString(const std::string &str, const char sep, int max) {
+    std::vector<std::string> tokens;
     std::istringstream ss(str);
-    TString tok;
+    std::string tok;
 
     while(std::getline(ss, tok, sep)) {
         if (max && !--max) {
-            TString rem;
+            std::string rem;
             std::getline(ss, rem);
             if (rem.length()) {
                 tok += sep;
@@ -235,7 +235,7 @@ TTuple SplitString(const TString &str, const char sep, int max) {
     return tokens;
 }
 
-TMultiTuple SplitEscapedString(const TString &str, char sep_inner, char sep_outer) {
+TMultiTuple SplitEscapedString(const std::string &str, char sep_inner, char sep_outer) {
     std::stringstream ss;
     TMultiTuple tuples;
 
@@ -277,17 +277,17 @@ TMultiTuple SplitEscapedString(const TString &str, char sep_inner, char sep_oute
     return tuples;
 }
 
-TTuple SplitEscapedString(const TString &str, char sep) {
+TTuple SplitEscapedString(const std::string &str, char sep) {
     auto tuples = SplitEscapedString(str, sep, 0);
     if (tuples.size())
         return tuples.front();
     return TTuple();
 }
 
-TString MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
-    auto ssp_inner = TString(1, sep_inner);
+std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
+    auto ssp_inner = std::string(1, sep_inner);
     auto rep_inner = "\\" + ssp_inner;
-    auto spp_outer = TString(1, sep_outer);
+    auto spp_outer = std::string(1, sep_outer);
     auto rep_outer = "\\" + spp_outer;
     std::stringstream ss;
     bool first_outer = true;
@@ -307,7 +307,7 @@ TString MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_o
 
                 first_inner = false;
 
-                TString escaped = StringReplaceAll(str, "\\", "\\\\");
+                std::string escaped = StringReplaceAll(str, "\\", "\\\\");
                 escaped = StringReplaceAll(escaped, ssp_inner, rep_inner);
 
                 if (sep_outer)
@@ -324,30 +324,30 @@ TString MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_o
     return ss.str();
 }
 
-TString MergeEscapeStrings(const TTuple &tuple, char sep) {
+std::string MergeEscapeStrings(const TTuple &tuple, char sep) {
     TMultiTuple tuples = { tuple };
     return MergeEscapeStrings(tuples, sep, 0);
 }
 
-TString StringTrim(const TString& s, const TString &what) {
+std::string StringTrim(const std::string& s, const std::string &what) {
     std::size_t first = s.find_first_not_of(what);
     std::size_t last  = s.find_last_not_of(what);
 
-    if (first == TString::npos || last == TString::npos)
+    if (first == std::string::npos || last == std::string::npos)
         return "";
 
     return s.substr(first, last - first + 1);
 }
 
-bool StringOnlyDigits(const TString &s) {
-    return s.find_first_not_of("0123456789") == TString::npos;
+bool StringOnlyDigits(const std::string &s) {
+    return s.find_first_not_of("0123456789") == std::string::npos;
 }
 
-TString StringReplaceAll(const TString &str, const TString &from, const TString &to) {
-    TString copy(str);
+std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to) {
+    std::string copy(str);
 
-    TString::size_type n = 0;
-    while ((n = copy.find(from, n)) != TString::npos) {
+    std::string::size_type n = 0;
+    while ((n = copy.find(from, n)) != std::string::npos) {
         copy.replace(n, from.size(), to);
         n += to.size();
     }
@@ -355,29 +355,29 @@ TString StringReplaceAll(const TString &str, const TString &from, const TString 
     return copy;
 }
 
-bool StringStartsWith(const TString &str, const TString &prefix) {
+bool StringStartsWith(const std::string &str, const std::string &prefix) {
     if (str.length() < prefix.length())
         return false;
 
     return !str.compare(0, prefix.length(), prefix);
 }
 
-bool StringEndsWith(const TString &str, const TString &sfx) {
+bool StringEndsWith(const std::string &str, const std::string &sfx) {
     if (str.length() < sfx.length())
         return false;
 
     return !str.compare(str.length() - sfx.length(), sfx.length(), sfx);
 }
 
-bool StringMatch(const TString &str, const TString &pattern) {
+bool StringMatch(const std::string &str, const std::string &pattern) {
     if (pattern == "***")
         return true;
     return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
 }
 
-TString StringFormatFlags(uint64_t flags,
+std::string StringFormatFlags(uint64_t flags,
                               const TFlagsNames &names,
-                              const TString sep) {
+                              const std::string sep) {
     std::stringstream result;
     bool first = true;
 
@@ -401,10 +401,10 @@ TString StringFormatFlags(uint64_t flags,
     return result.str();
 }
 
-TError StringParseFlags(const TString &str, const TFlagsNames &names,
+TError StringParseFlags(const std::string &str, const TFlagsNames &names,
                         uint64_t &result, const char sep) {
     std::stringstream ss(str);
-    TString name;
+    std::string name;
 
     result = 0;
     while (std::getline(ss, name, sep)) {
@@ -425,8 +425,8 @@ TError StringParseFlags(const TString &str, const TFlagsNames &names,
     return OK;
 }
 
-TString StringFormat(const char *format, ...) {
-    TString result;
+std::string StringFormat(const char *format, ...) {
+    std::string result;
     int length;
     va_list ap;
 
@@ -443,9 +443,9 @@ TString StringFormat(const char *format, ...) {
     return result;
 }
 
-TError StringToCpuPower(const TString &str, uint64_t &power) {
+TError StringToCpuPower(const std::string &str, uint64_t &power) {
     double val;
-    TString unit;
+    std::string unit;
 
     TError error = StringToValue(str, val, unit);
     if (error || val < 0)
@@ -463,11 +463,11 @@ TError StringToCpuPower(const TString &str, uint64_t &power) {
     return OK;
 }
 
-TString CpuPowerToString(uint64_t nsec) {
+std::string CpuPowerToString(uint64_t nsec) {
     return fmt::format("{:g}c", (double)nsec / NSEC_PER_SEC);
 }
 
-TError UintMapToString(const TUintMap &map, TString &value) {
+TError UintMapToString(const TUintMap &map, std::string &value) {
     std::stringstream str;
 
     for (auto kv : map) {
@@ -481,7 +481,7 @@ TError UintMapToString(const TUintMap &map, TString &value) {
     return OK;
 }
 
-TError StringToUintMap(const TString &value, TUintMap &result) {
+TError StringToUintMap(const std::string &value, TUintMap &result) {
     TError error;
 
     for (auto &line : SplitEscapedString(value, ';')) {
@@ -489,7 +489,7 @@ TError StringToUintMap(const TString &value, TUintMap &result) {
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid format");
 
-        TString key = StringTrim(nameval[0]);
+        std::string key = StringTrim(nameval[0]);
         uint64_t val;
 
         error = StringToSize(nameval[1], val);
@@ -502,7 +502,7 @@ TError StringToUintMap(const TString &value, TUintMap &result) {
     return OK;
 }
 
-TString StringMapToString(const TStringMap &map) {
+std::string StringMapToString(const TStringMap &map) {
     std::stringstream str;
 
     for (auto kv : map) {
@@ -514,7 +514,7 @@ TString StringMapToString(const TStringMap &map) {
     return str.str();
 }
 
-TError StringToStringMap(const TString &value, TStringMap &result) {
+TError StringToStringMap(const std::string &value, TStringMap &result) {
     TError error;
 
     for (auto &line : SplitEscapedString(value, ';')) {
@@ -522,20 +522,20 @@ TError StringToStringMap(const TString &value, TStringMap &result) {
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid format");
 
-        TString key = StringTrim(nameval[0]);
-        TString val = StringTrim(nameval[1]);
+        std::string key = StringTrim(nameval[0]);
+        std::string val = StringTrim(nameval[1]);
         result[key] = val;
     }
 
     return OK;
 }
 
-int CompareVersions(const TString &a, const TString &b) {
+int CompareVersions(const std::string &a, const std::string &b) {
     return strverscmp(a.c_str(), b.c_str());
 }
 
 /* first[-last], ... */
-TError TPortoBitMap::Parse(const TString &text) {
+TError TPortoBitMap::Parse(const std::string &text) {
     TError error;
     int first, last;
 
@@ -562,7 +562,7 @@ TError TPortoBitMap::Parse(const TString &text) {
     return OK;
 }
 
-TString TPortoBitMap::Format() const {
+std::string TPortoBitMap::Format() const {
     bool prev = false, curr, sep = false, range = false;
     std::stringstream ss;
 
@@ -585,7 +585,7 @@ TString TPortoBitMap::Format() const {
 }
 
 TError TPortoBitMap::Read(const TPath &path) {
-    TString text;
+    std::string text;
     TError error = path.ReadAll(text, 4096);
     if (error)
         return error;

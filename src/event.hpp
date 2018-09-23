@@ -42,7 +42,7 @@ public:
 
     bool operator<(const TEvent& rhs) const;
 
-    TString GetMsg() const;
+    std::string GetMsg() const;
 };
 
 class TEventQueue {

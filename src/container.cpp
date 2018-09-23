@@ -45,7 +45,7 @@ extern "C" {
 std::mutex ContainersMutex;
 static std::condition_variable ContainersCV;
 std::shared_ptr<TContainer> RootContainer;
-std::map<TString, std::shared_ptr<TContainer>> Containers;
+std::map<std::string, std::shared_ptr<TContainer>> Containers;
 TPath ContainersKV;
 TIdMap ContainerIdMap(1, CONTAINER_ID_MAX);
 
@@ -55,7 +55,7 @@ static std::vector<TPortoBitMap> CoreThreads;
 static TPortoBitMap NumaNodes;
 static std::vector<TPortoBitMap> NodeThreads;
 
-TError TContainer::ValidName(const TString &name, bool superuser) {
+TError TContainer::ValidName(const std::string &name, bool superuser) {
 
     if (name.length() == 0)
         return TError(EError::InvalidValue, "container path too short");
@@ -70,7 +70,7 @@ TError TContainer::ValidName(const TString &name, bool superuser) {
         return TError(EError::InvalidValue, "container path starts with '/': " + name);
     }
 
-    for (TString::size_type first = 0, i = 0; i <= name.length(); i++) {
+    for (std::string::size_type first = 0, i = 0; i <= name.length(); i++) {
         switch (name[i]) {
             case '/':
             case '\0':
@@ -108,14 +108,14 @@ TError TContainer::ValidName(const TString &name, bool superuser) {
     return OK;
 }
 
-TString TContainer::ParentName(const TString &name) {
+std::string TContainer::ParentName(const std::string &name) {
     auto sep = name.rfind('/');
-    if (sep == TString::npos)
+    if (sep == std::string::npos)
         return ROOT_CONTAINER;
     return name.substr(0, sep);
 }
 
-std::shared_ptr<TContainer> TContainer::Find(const TString &name) {
+std::shared_ptr<TContainer> TContainer::Find(const std::string &name) {
     PORTO_LOCKED(ContainersMutex);
     auto it = Containers.find(name);
     if (it == Containers.end())
@@ -123,7 +123,7 @@ std::shared_ptr<TContainer> TContainer::Find(const TString &name) {
     return it->second;
 }
 
-TError TContainer::Find(const TString &name, std::shared_ptr<TContainer> &ct) {
+TError TContainer::Find(const std::string &name, std::shared_ptr<TContainer> &ct) {
     ct = Find(name);
     if (ct)
         return OK;
@@ -141,8 +141,8 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
     if (cg.Name == PORTO_DAEMON_CGROUP)
         return TError(EError::NotSupported, "Recursion?");
 
-    TString prefix = TString(PORTO_CGROUP_PREFIX) + "/";
-    TString name = cg.Name;
+    std::string prefix = std::string(PORTO_CGROUP_PREFIX) + "/";
+    std::string name = cg.Name;
     std::replace(name.begin(), name.end(), '%', '/');
 
     auto containers_lock = LockContainers();
@@ -326,7 +326,7 @@ void TContainer::Unregister() {
     State = EContainerState::Destroyed;
 }
 
-TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const TString &name) :
+TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name) :
     Parent(parent), Level(parent ? parent->Level + 1 : 0), Id(id), Name(name),
     FirstName(!parent ? "" : parent->IsRoot() ? name : name.substr(parent->Name.length() + 1)),
     Stdin(0), Stdout(1), Stderr(2),
@@ -472,7 +472,7 @@ TContainer::~TContainer() {
         Statistics->ContainersTainted--;
 }
 
-TError TContainer::Create(const TString &name, std::shared_ptr<TContainer> &ct) {
+TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &ct) {
     auto max_ct = config().container().max_total();
     TError error;
     int id = -1;
@@ -710,7 +710,7 @@ err:
     return error;
 }
 
-TString TContainer::StateName(EContainerState state) {
+std::string TContainer::StateName(EContainerState state) {
     switch (state) {
     case EContainerState::Stopped:
         return "stopped";
@@ -735,7 +735,7 @@ TString TContainer::StateName(EContainerState state) {
     }
 }
 
-EContainerState TContainer::ParseState(const TString &name) {
+EContainerState TContainer::ParseState(const std::string &name) {
     if (name == "stopped")
         return EContainerState::Stopped;
     if (name == "dead")
@@ -755,7 +755,7 @@ EContainerState TContainer::ParseState(const TString &name) {
     return EContainerState::Destroyed;
 }
 
-TError TContainer::ValidLabel(const TString &label, const TString &value) {
+TError TContainer::ValidLabel(const std::string &label, const std::string &value) {
 
     if (label.size() > PORTO_LABEL_NAME_LEN_MAX)
         return TError(EError::InvalidLabel, "Label name too log, max {} bytes", PORTO_LABEL_NAME_LEN_MAX);
@@ -764,21 +764,21 @@ TError TContainer::ValidLabel(const TString &label, const TString &value) {
         return TError(EError::InvalidLabel, "Label value too log, max {} bytes", PORTO_LABEL_VALUE_LEN_MAX);
 
     auto sep = label.find('.');
-    if (sep == TString::npos ||
+    if (sep == std::string::npos ||
             sep < PORTO_LABEL_PREFIX_LEN_MIN ||
             sep > PORTO_LABEL_PREFIX_LEN_MAX ||
             label.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) < sep ||
-            label.find_first_not_of(PORTO_NAME_CHARS) != TString::npos ||
+            label.find_first_not_of(PORTO_NAME_CHARS) != std::string::npos ||
             StringStartsWith(label, "PORTO"))
         return TError(EError::InvalidLabel, "Invalid label name: {}", label);
 
-    if (value.find_first_not_of(PORTO_NAME_CHARS) != TString::npos)
+    if (value.find_first_not_of(PORTO_NAME_CHARS) != std::string::npos)
         return TError(EError::InvalidLabel, "Invalid label value: {}", value);
 
     return OK;
 }
 
-TError TContainer::GetLabel(const TString &label, TString &value) const {
+TError TContainer::GetLabel(const std::string &label, std::string &value) const {
     if (label[0] == '.') {
         auto nm = label.substr(1);
         for (auto ct = this; ct; ct = ct->Parent.get()) {
@@ -798,7 +798,7 @@ TError TContainer::GetLabel(const TString &label, TString &value) const {
     return TError(EError::LabelNotFound, "Label {} is not set", label);
 }
 
-void TContainer::SetLabel(const TString &label, const TString &value) {
+void TContainer::SetLabel(const std::string &label, const std::string &value) {
     if (value.empty())
         Labels.erase(label);
     else
@@ -806,7 +806,7 @@ void TContainer::SetLabel(const TString &label, const TString &value) {
     SetProp(EProperty::LABELS);
 }
 
-TError TContainer::IncLabel(const TString &label, int64_t &result, int64_t add) {
+TError TContainer::IncLabel(const std::string &label, int64_t &result, int64_t add) {
     int64_t val;
     result = 0;
 
@@ -1001,7 +1001,7 @@ void TContainer::SetState(EContainerState next) {
                 TContainerWaiter::ReportAll(*p);
     }
 
-    TString label, value;
+    std::string label, value;
 
     if ((State == EContainerState::Stopped ||
          State == EContainerState::Dead ||
@@ -2208,7 +2208,7 @@ TError TContainer::PrepareCgroups() {
     }
 
     if (missing) {
-        TString types;
+        std::string types;
         for (auto subsys: Subsystems)
             if (subsys->Kind & missing)
                 types += " " + subsys->Type;
@@ -2284,7 +2284,7 @@ TError TContainer::ResolvePlace(TPath &place) const {
                     goto found;
             } else {
                 auto sep = policy.find('=');
-                if (sep != TString::npos &&
+                if (sep != std::string::npos &&
                         StringMatch(place.ToString(), policy.substr(sep + 1)))
                     goto found;
             }
@@ -2698,7 +2698,7 @@ TError TContainer::PrepareStart() {
                             policy) == Parent->PlacePolicy.end())
                     return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
                 auto sep = policy.find('=');
-                if (sep != TString::npos && policy[sep + 1] == '/')
+                if (sep != std::string::npos && policy[sep + 1] == '/')
                     place = policy.substr(sep + 1);
             }
             if (Parent->ResolvePlace(place))
@@ -3358,7 +3358,7 @@ err_prepare:
     return error;
 }
 
-void TContainer::SyncProperty(const TString &name) {
+void TContainer::SyncProperty(const std::string &name) {
     PORTO_ASSERT(IsStateLockedRead());
     if (StringStartsWith(name, "net_") && Net)
         Net->SyncStat();
@@ -3372,11 +3372,11 @@ void TContainer::SyncPropertiesAll() {
 }
 
 /* return true if index specified for property */
-static bool ParsePropertyName(TString &name, TString &idx) {
+static bool ParsePropertyName(std::string &name, std::string &idx) {
     if (name.size() && name.back() == ']') {
         auto lb = name.find('[');
 
-        if (lb != TString::npos) {
+        if (lb != std::string::npos) {
             idx = name.substr(lb + 1);
             idx.pop_back();
             name = name.substr(0, lb);
@@ -3388,16 +3388,16 @@ static bool ParsePropertyName(TString &name, TString &idx) {
     return false;
 }
 
-TError TContainer::HasProperty(const TString &property) const {
-    TString name = property, index;
+TError TContainer::HasProperty(const std::string &property) const {
+    std::string name = property, index;
     TError error;
 
     if (!ParsePropertyName(name, index)) {
         auto dot = name.find('.');
-        if (dot != TString::npos) {
-            TString type = property.substr(0, dot);
+        if (dot != std::string::npos) {
+            std::string type = property.substr(0, dot);
 
-            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == TString::npos) {
+            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
                 auto lock = LockContainers();
                 return GetLabel(property, type);
             }
@@ -3442,18 +3442,18 @@ TError TContainer::HasProperty(const TString &property) const {
     return error;
 }
 
-TError TContainer::GetProperty(const TString &origProperty, TString &value) const {
+TError TContainer::GetProperty(const std::string &origProperty, std::string &value) const {
     TError error;
-    TString property = origProperty;
-    TString idx;
+    std::string property = origProperty;
+    std::string idx;
 
     if (!ParsePropertyName(property, idx)) {
         auto dot = property.find('.');
 
-        if (dot != TString::npos) {
-            TString type = property.substr(0, dot);
+        if (dot != std::string::npos) {
+            std::string type = property.substr(0, dot);
 
-            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == TString::npos) {
+            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
                 auto lock = LockContainers();
                 return GetLabel(property, value);
             }
@@ -3495,28 +3495,28 @@ TError TContainer::GetProperty(const TString &origProperty, TString &value) cons
     return error;
 }
 
-TError TContainer::SetProperty(const TString &origProperty,
-                               const TString &origValue) {
+TError TContainer::SetProperty(const std::string &origProperty,
+                               const std::string &origValue) {
     if (IsRoot())
         return TError(EError::Permission, "System containers are read only");
 
-    TString property = origProperty;
-    TString idx;
+    std::string property = origProperty;
+    std::string idx;
 
     if (ParsePropertyName(property, idx) && !idx.length())
         return TError(EError::InvalidProperty, "Empty property index");
 
-    TString value = StringTrim(origValue);
+    std::string value = StringTrim(origValue);
     TError error;
 
     auto it = ContainerProperties.find(property);
     if (it == ContainerProperties.end()) {
         auto dot = property.find('.');
 
-        if (dot != TString::npos) {
-            TString type = property.substr(0, dot);
+        if (dot != std::string::npos) {
+            std::string type = property.substr(0, dot);
 
-            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == TString::npos) {
+            if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
                 error = TContainer::ValidLabel(property, value);
                 if (error)
                     return error;
@@ -3539,7 +3539,7 @@ TError TContainer::SetProperty(const TString &origProperty,
     if (!error && prop->RequireControllers)
         error = EnableControllers(prop->RequireControllers);
 
-    TString oldValue;
+    std::string oldValue;
     if (!error)
         error = prop->Get(oldValue);
 
@@ -3591,7 +3591,7 @@ TError TContainer::Load(const rpc::TContainerSpec &spec) {
     return error;
 }
 
-void TContainer::Dump(const std::vector<TString> &props, rpc::TContainerSpec &spec) {
+void TContainer::Dump(const std::vector<std::string> &props, rpc::TContainerSpec &spec) {
     PORTO_ASSERT(!CT);
     CT = this;
     LockStateRead();
@@ -3631,7 +3631,7 @@ TError TContainer::Save(void) {
     CT = this;
 
     for (auto knob : ContainerProperties) {
-        TString value;
+        std::string value;
 
         /* Skip knobs without a value */
         if (knob.second->Prop == EProperty::NONE || !HasProp(knob.second->Prop))
@@ -3668,8 +3668,8 @@ TError TContainer::Load(const TKeyValue &node) {
     OwnerCred = CL->Cred;
 
     for (auto &kv: node.Data) {
-        TString key = kv.first;
-        TString value = kv.second;
+        std::string key = kv.first;
+        std::string value = kv.second;
 
         if (key == P_STATE) {
             /*
@@ -3915,18 +3915,18 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
 
     if (subsystem.Controllers & CGROUP_FREEZER) {
         if (JobMode)
-            return subsystem.Cgroup(TString(PORTO_CGROUP_PREFIX) + "/" + Parent->Name);
-        return subsystem.Cgroup(TString(PORTO_CGROUP_PREFIX) + "/" + Name);
+            return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Parent->Name);
+        return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Name);
     }
 
     if (subsystem.Controllers & CGROUP_SYSTEMD) {
         if (Controllers & CGROUP_SYSTEMD)
-            return subsystem.Cgroup(TString(PORTO_CGROUP_PREFIX) + "%" +
+            return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" +
                                     StringReplaceAll(Name, "/", "%"));
         return subsystem.RootCgroup();
     }
 
-    TString cg;
+    std::string cg;
     for (auto ct = this; !ct->IsRoot(); ct = ct->Parent.get()) {
         auto enabled = ct->Controllers & subsystem.Controllers;
 
@@ -3939,7 +3939,7 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     if (cg.empty())
         return subsystem.RootCgroup();
 
-    return subsystem.Cgroup(TString(PORTO_CGROUP_PREFIX) + "%" + cg);
+    return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" + cg);
 }
 
 TError TContainer::EnableControllers(uint64_t controllers) {
@@ -4084,8 +4084,8 @@ void TContainer::Event(const TEvent &event) {
     }
 }
 
-TString TContainer::GetPortoNamespace(bool write) const {
-    TString ns;
+std::string TContainer::GetPortoNamespace(bool write) const {
+    std::string ns;
     for (auto ct = this; ct && !ct->IsRoot() ; ct = ct->Parent.get()) {
         if (ct->AccessLevel == EAccessLevel::Isolate ||
                 ct->AccessLevel == EAccessLevel::ReadIsolate ||

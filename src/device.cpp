@@ -132,8 +132,8 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
     return OK;
 }
 
-TString TDevice::FormatAccess() const {
-    TString perm;
+std::string TDevice::FormatAccess() const {
+    std::string perm;
 
     if (MayRead)
         perm += "r";
@@ -151,7 +151,7 @@ TString TDevice::FormatAccess() const {
     return perm;
 }
 
-TString TDevice::Format() const {
+std::string TDevice::Format() const {
     return fmt::format("{} {} {} {:#o} {} {}", Path, FormatAccess(), PathInside,
                        Mode & 0777, UserName(Uid), GroupName(Gid));
 }
@@ -166,8 +166,8 @@ void TDevice::Dump(rpc::TContainerDevice &dev) const {
     dev.set_access(FormatAccess());
 }
 
-TString TDevice::CgroupRule(bool allow) const {
-    TString rule;
+std::string TDevice::CgroupRule(bool allow) const {
+    std::string rule;
 
     /* cgroup cannot parse rules with empty permissions */
     if (MayRead != allow && MayWrite != allow && MayMknod != allow)
@@ -239,7 +239,7 @@ TError TDevice::Makedev(const TPath &root) const {
     return OK;
 }
 
-TError TDevices::Parse(const TString &str, const TCred &cred) {
+TError TDevices::Parse(const std::string &str, const TCred &cred) {
     auto devices_cfg = SplitEscapedString(str, ' ', ';');
     TError error;
 
@@ -295,8 +295,8 @@ TError TDevices::Parse(const TString &str, const TCred &cred) {
     return OK;
 }
 
-TString TDevices::Format() const {
-    TString str;
+std::string TDevices::Format() const {
+    std::string str;
     for (auto &device: Devices)
         str += device.Format() + "; ";
     return str;
@@ -331,7 +331,7 @@ TError TDevices::Apply(const TCgroup &cg, bool reset) const {
     }
 
     for (auto &device: Devices) {
-        TString rule;
+        std::string rule;
 
         rule = device.CgroupRule(true);
         if (rule != "") {

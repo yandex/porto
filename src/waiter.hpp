@@ -9,22 +9,22 @@ class TClient;
 class TContainer;
 
 struct TContainerReport {
-    TString Name;
-    TString State;
-    TString Label, Value;
+    std::string Name;
+    std::string State;
+    std::string Label, Value;
     time_t When;
 
-    TContainerReport(const TString &name, const TString &state, time_t when,
-                     const TString &label, const TString &value):
+    TContainerReport(const std::string &name, const std::string &state, time_t when,
+                     const std::string &label, const std::string &value):
         Name(name), State(state), Label(label), Value(value), When(when) {}
 };
 
 class TContainerWaiter : public std::enable_shared_from_this<TContainerWaiter> {
 public:
     std::weak_ptr<TClient> Client;
-    std::vector<TString> Names;
-    std::vector<TString> Wildcards;
-    std::vector<TString> Labels;
+    std::vector<std::string> Names;
+    std::vector<std::string> Wildcards;
+    std::vector<std::string> Labels;
     bool Async;
     bool Active = false;
 
@@ -35,8 +35,8 @@ public:
     void Deactivate();
 
     bool ShouldReport(TContainer &ct);
-    bool ShouldReportLabel(const TString &label);
+    bool ShouldReportLabel(const std::string &label);
     void Timeout();
 
-    static void ReportAll(TContainer &ct, const TString &label = "", const TString &value = "");
+    static void ReportAll(TContainer &ct, const std::string &label = "", const std::string &value = "");
 };

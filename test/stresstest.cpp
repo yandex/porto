@@ -17,7 +17,7 @@ extern "C" {
 
 namespace test {
 
-static std::vector<std::map<TString, TString>> vtasks =
+static std::vector<std::map<std::string, std::string>> vtasks =
 {
     {
         { "command", "bash -ec 'sleep $N'" },
@@ -56,8 +56,8 @@ static std::vector<std::map<TString, TString>> vtasks =
     }
 };
 
-static void Create(Porto::Connection &api, const TString &name, const TString &cwd) {
-    std::vector<TString> containers;
+static void Create(Porto::Connection &api, const std::string &name, const std::string &cwd) {
+    std::vector<std::string> containers;
 
     Say() << "Create container: " << name << std::endl;
 
@@ -79,8 +79,8 @@ static void Create(Porto::Connection &api, const TString &name, const TString &c
     }
 }
 
-static void SetProperty(Porto::Connection &api, TString name, TString type, TString value) {
-    TString res_value;
+static void SetProperty(Porto::Connection &api, std::string name, std::string type, std::string value) {
+    std::string res_value;
 
     Say() << "SetProperty container: " << name << std::endl;
 
@@ -89,9 +89,9 @@ static void SetProperty(Porto::Connection &api, TString name, TString type, TStr
     ExpectEq(res_value, value);
 }
 
-static void Start(Porto::Connection &api, TString name) {
-    TString pid;
-    TString ret;
+static void Start(Porto::Connection &api, std::string name) {
+    std::string pid;
+    std::string ret;
 
     Say() << "Start container: " << name << std::endl;
 
@@ -100,10 +100,10 @@ static void Start(Porto::Connection &api, TString name) {
     Expect(ret == "dead" || ret == "running");
 }
 
-static void PauseResume(Porto::Connection &api, const TString &name) {
+static void PauseResume(Porto::Connection &api, const std::string &name) {
     Say() << "PauseResume container: " << name << std::endl;
 
-    TString ret;
+    std::string ret;
     int err = api.Pause(name);
     if (err) {
         ExpectApiSuccess(api.GetProperty(name, "state", ret));
@@ -121,9 +121,9 @@ static void PauseResume(Porto::Connection &api, const TString &name) {
     }
 }
 
-static void WaitDead(Porto::Connection &api, TString name, TString timeout) {
-    TString pid;
-    TString ret;
+static void WaitDead(Porto::Connection &api, std::string name, std::string timeout) {
+    std::string pid;
+    std::string ret;
     int t;
 
     Say() << "WaitDead container: " << name << std::endl;
@@ -141,8 +141,8 @@ static void WaitDead(Porto::Connection &api, TString name, TString timeout) {
     Fail("Wait timeout");
 }
 
-static void CheckStdout(Porto::Connection &api, TString name, TString stream) {
-    TString ret;
+static void CheckStdout(Porto::Connection &api, std::string name, std::string stream) {
+    std::string ret;
 
     Say() << "CheckStdout container: " << name << std::endl;
 
@@ -150,8 +150,8 @@ static void CheckStdout(Porto::Connection &api, TString name, TString stream) {
     ExpectEq(ret, stream);
 }
 
-static void CheckStderr(Porto::Connection &api, TString name, TString stream) {
-    TString ret;
+static void CheckStderr(Porto::Connection &api, std::string name, std::string stream) {
+    std::string ret;
 
     Say() << "CheckStderr container: " << name << std::endl;
 
@@ -159,16 +159,16 @@ static void CheckStderr(Porto::Connection &api, TString name, TString stream) {
     ExpectEq(ret, stream);
 }
 
-static void CheckExit(Porto::Connection &api, TString name, TString stream) {
-    TString ret;
+static void CheckExit(Porto::Connection &api, std::string name, std::string stream) {
+    std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
     if (ret != "-1")
         ExpectEq(ret, stream);
 }
 
-static void Destroy(Porto::Connection &api, const TString &name, const TString &cwd) {
-    std::vector<TString> containers;
+static void Destroy(Porto::Connection &api, const std::string &name, const std::string &cwd) {
+    std::vector<std::string> containers;
 
     Say() << "Destroy container: " << name << std::endl;
 
@@ -198,11 +198,11 @@ static void Tasks(int n, int iter) {
         if (iter % 10 == 0)
             Say() << std::to_string(iter) << " iterations left" << std::endl;
         for (unsigned int t = 0; t < vtasks.size(); t++) {
-            TString name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
+            std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
             if (vtasks[t].find("name") != vtasks[t].end())
                 name = vtasks[t]["name"];
 
-            TString parent;
+            std::string parent;
             if (vtasks[t].find("parent") != vtasks[t].end()) {
                 parent = vtasks[t]["parent"] + std::to_string(n) + "_" + std::to_string(t);
                 name = parent + "/" + name;
@@ -211,7 +211,7 @@ static void Tasks(int n, int iter) {
             if (parent.length())
                 Create(api, parent, "");
 
-            TString cwd = "/tmp/stresstest/" + name;
+            std::string cwd = "/tmp/stresstest/" + name;
             Create(api, name, cwd);
             SetProperty(api, name, "env", vtasks[t]["env"]);
             SetProperty(api, name, "command", vtasks[t]["command"]);
@@ -237,7 +237,7 @@ static void StressKill() {
     while (!done) {
         usleep(1000000);
         int pid;
-        std::vector<TString> containers;
+        std::vector<std::string> containers;
         if (api.List(containers) != 0)
             continue;
         if (TPath(PORTO_PIDFILE).ReadInt(pid))

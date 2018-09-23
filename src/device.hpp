@@ -29,9 +29,9 @@ struct TDevice {
     TDevice(const TPath &path, dev_t node) : Path(path), PathInside(path), Node(node) {}
 
     TError Parse(TTuple &opt, const TCred &cred);
-    TString FormatAccess() const;
-    TString Format() const;
-    TString CgroupRule(bool allow) const;
+    std::string FormatAccess() const;
+    std::string Format() const;
+    std::string CgroupRule(bool allow) const;
     TError Makedev(const TPath &root = "/") const;
 
     TError Load(const rpc::TContainerDevice &dev, const TCred &cred);
@@ -43,8 +43,8 @@ struct TDevices {
     bool NeedCgroup = false;
     bool AllOptional = false;
 
-    TError Parse(const TString &str, const TCred &cred);
-    TString Format() const;
+    TError Parse(const std::string &str, const TCred &cred);
+    std::string Format() const;
 
     TError Makedev(const TPath &root = "/") const;
     TError Apply(const TCgroup &cg, bool reset = false) const;

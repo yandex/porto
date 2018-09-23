@@ -5,14 +5,14 @@
 #include "util/error.hpp"
 
 /* Allows numeric user prepresentation */
-TError FindUser(const TString &user, uid_t &uid, gid_t &gid);
-TError UserId(const TString &user, uid_t &uid);
-TString UserName(uid_t uid);
+TError FindUser(const std::string &user, uid_t &uid, gid_t &gid);
+TError UserId(const std::string &user, uid_t &uid);
+std::string UserName(uid_t uid);
 
-TError FindGroups(const TString &user, gid_t gid, std::vector<gid_t> &groups);
+TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups);
 
-TError GroupId(const TString &group, gid_t &gid);
-TString GroupName(gid_t gid);
+TError GroupId(const std::string &group, gid_t &gid);
+std::string GroupName(gid_t gid);
 
 void InitPortoGroups();
 
@@ -38,16 +38,16 @@ struct TCred {
     void Enter() const;
     void Leave() const;
 
-    TError Init(const TString &user);
-    TError InitGroups(const TString &user);
+    TError Init(const std::string &user);
+    TError InitGroups(const std::string &user);
 
     TError Apply() const;
 
-    TString User() const {
+    std::string User() const {
         return UserName(Uid);
     }
 
-    TString Group() const {
+    std::string Group() const {
         return GroupName(Gid);
     }
 
@@ -57,7 +57,7 @@ struct TCred {
 
     bool IsMemberOf(gid_t group) const;
 
-    TString ToString() const {
+    std::string ToString() const {
         return User() + ":" + Group();
     }
 
@@ -70,9 +70,9 @@ void InitCapabilities();
 struct TCapabilities {
     uint64_t Permitted = 0;
 
-    TError Change(const TString &name, bool set);
-    TError Parse(const TString &str);
-    TString Format() const;
+    TError Change(const std::string &name, bool set);
+    TError Parse(const std::string &str);
+    std::string Format() const;
     TError Apply(int mask) const;
     TError ApplyLimit() const;
     TError ApplyAmbient() const;

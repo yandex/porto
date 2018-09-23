@@ -11,7 +11,7 @@ extern "C" {
 }
 
 TError TKeyValue::Load() {
-    TString buf;
+    std::string buf;
     kv::TNode node;
     TError error;
 
@@ -47,7 +47,7 @@ TError TKeyValue::Load() {
 }
 
 TError TKeyValue::Save() {
-    TString buf;
+    std::string buf;
     kv::TNode node;
     TError error;
 
@@ -109,7 +109,7 @@ TError TKeyValue::Mount(const TPath &root) {
     } else if (mount.Type != "tmpfs")
         return TError("KeyValue: found non-tmpfs mount at " + root.ToString());
 
-    std::vector<TString> names;
+    std::vector<std::string> names;
     error = root.ReadDirectory(names);
     if (!error) {
         for (auto &name : names) {
@@ -122,7 +122,7 @@ TError TKeyValue::Mount(const TPath &root) {
 }
 
 TError TKeyValue::ListAll(const TPath &root, std::list<TKeyValue> &nodes) {
-    std::vector<TString> names;
+    std::vector<std::string> names;
     TError error = root.ReadDirectory(names);
     if (!error) {
         for (auto &name : names) {
@@ -134,7 +134,7 @@ TError TKeyValue::ListAll(const TPath &root, std::list<TKeyValue> &nodes) {
 }
 
 void TKeyValue::DumpAll(const TPath &root) {
-    std::vector<TString> names;
+    std::vector<std::string> names;
     TError error;
 
     error = root.ReadDirectory(names);

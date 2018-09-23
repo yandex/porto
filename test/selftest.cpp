@@ -20,7 +20,7 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/io/coded_stream.h>
 
-const TString TMPDIR = "/tmp/porto/selftest";
+const std::string TMPDIR = "/tmp/porto/selftest";
 
 extern "C" {
 #include <unistd.h>
@@ -33,12 +33,12 @@ extern "C" {
 #include <fcntl.h>
 }
 
-const TString oomMemoryLimit = "32M";
-const TString oomCommand = "sort -S 1G /dev/urandom";
-TString portoctl;
-TString portoinit;
+const std::string oomMemoryLimit = "32M";
+const std::string oomCommand = "sort -S 1G /dev/urandom";
+std::string portoctl;
+std::string portoinit;
 
-using TString;
+using std::string;
 using std::vector;
 using std::map;
 using std::pair;
@@ -49,13 +49,13 @@ static int expectedRespawns;
 static int expectedErrors;
 static int expectedWarns;
 
-static vector<TString> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices", "net_cls" };
-static vector<TString> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
+static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices", "net_cls" };
+static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
 static int LeakConainersNr = 1000;
 
-static TString StartWaitAndGetProperty(Porto::Connection &api, const TString &name, const TString &data) {
-    TString v;
+static std::string StartWaitAndGetProperty(Porto::Connection &api, const std::string &name, const std::string &data) {
+    string v;
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, data, v));
@@ -74,7 +74,7 @@ static void RemakeDir(Porto::Connection &api, const TPath &path) {
     ExpectOk(path.MkdirAll(0755));
 }
 
-static void ExpectCorrectCgroups(const TString &pid, const TString &name, const TString &name2) {
+static void ExpectCorrectCgroups(const string &pid, const string &name, const string &name2) {
     auto cgmap = GetCgroups(pid);
 
     for (auto &subsys : subsystems) {
@@ -88,15 +88,15 @@ static void ExpectCorrectCgroups(const TString &pid, const TString &name, const 
 }
 
 static void ShouldHaveOnlyRoot(Porto::Connection &api) {
-    std::vector<TString> containers;
+    std::vector<std::string> containers;
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 0);
 }
 
-static void TestDataMap(Porto::Connection &api, const TString &name, const TString &data, int zero) {
-    TString full;
+static void TestDataMap(Porto::Connection &api, const std::string &name, const std::string &data, int zero) {
+    std::string full;
     int nr_nonzero = 0;
 
     Say() << "Test " << name << " data map " << data << " zero:" << zero << std::endl;
@@ -110,7 +110,7 @@ static void TestDataMap(Porto::Connection &api, const TString &name, const TStri
     }
 
     for (auto line: lines) {
-        TString tmp;
+        string tmp;
         auto tokens = SplitString(line, ':');
         ExpectApiSuccess(api.GetProperty(name, data + "[" + StringTrim(tokens[0]) + "]", tmp));
         ExpectEq(tmp, StringTrim(tokens[1]));
@@ -127,16 +127,16 @@ static void TestDataMap(Porto::Connection &api, const TString &name, const TStri
     ExpectApiFailure(api.GetProperty(name, data + "[invalid]", full), EError::InvalidValue);
 }
 
-static void ShouldHaveValidProperties(Porto::Connection &api, const TString &name) {
-    TString v;
+static void ShouldHaveValidProperties(Porto::Connection &api, const string &name) {
+    string v;
 
     ExpectApiFailure(api.GetProperty(name, "command[1]", v), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "command[1]", "ls"), EError::InvalidValue);
 
     ExpectApiSuccess(api.GetProperty(name, "command", v));
-    ExpectEq(v, TString(""));
+    ExpectEq(v, string(""));
     ExpectApiSuccess(api.GetProperty(name, "cwd", v));
-    ExpectEq(v, TString(PORTO_WORKDIR) + "/" + name);
+    ExpectEq(v, std::string(PORTO_WORKDIR) + "/" + name);
     ExpectApiSuccess(api.GetProperty(name, "root", v));
     ExpectEq(v, "/");
     ExpectApiSuccess(api.GetProperty(name, "user", v));
@@ -144,18 +144,18 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const TString &nam
     ExpectApiSuccess(api.GetProperty(name, "group", v));
     ExpectEq(v, Alice.Group());
     ExpectApiSuccess(api.GetProperty(name, "env", v));
-    ExpectEq(v, TString(""));
+    ExpectEq(v, string(""));
 
     ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
-    ExpectNeq(v, TString("0"));
+    ExpectNeq(v, string("0"));
 
     if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
-        ExpectEq(v, TString("0"));
+        ExpectEq(v, string("0"));
     }
 
     ExpectApiSuccess(api.GetProperty(name, "cpu_policy", v));
-    ExpectEq(v, TString("normal"));
+    ExpectEq(v, string("normal"));
     ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
     ExpectEq(v, "0c");
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
@@ -173,9 +173,9 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const TString &nam
     ExpectEq(v, "inherited");
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
-    ExpectEq(v, TString("false"));
+    ExpectEq(v, string("false"));
     ExpectApiSuccess(api.GetProperty(name, "stdin_path", v));
-    ExpectEq(v, TString("/dev/null"));
+    ExpectEq(v, string("/dev/null"));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
     ExpectEq(v, "stdout");
     ExpectApiSuccess(api.GetProperty(name, "stderr_path", v));
@@ -210,13 +210,13 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const TString &nam
     ExpectEq(v, "true");
 }
 
-static void ShouldHaveValidRunningData(Porto::Connection &api, const TString &name) {
-    TString v;
+static void ShouldHaveValidRunningData(Porto::Connection &api, const string &name) {
+    string v;
 
     ExpectApiFailure(api.GetProperty(name, "__invalid_data__", v), EError::InvalidProperty);
 
     ExpectApiSuccess(api.GetProperty(name, "state", v));
-    ExpectEq(v, TString("running"));
+    ExpectEq(v, string("running"));
     ExpectApiFailure(api.GetProperty(name, "exit_status", v), EError::InvalidState);
 
     ExpectApiSuccess(api.GetProperty(name, "root_pid", v));
@@ -251,9 +251,9 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const TString &na
 
     ExpectApiFailure(api.GetProperty(name, "oom_killed", v), EError::InvalidState);
     ExpectApiSuccess(api.GetProperty(name, "respawn_count", v));
-    ExpectEq(v, TString("0"));
+    ExpectEq(v, string("0"));
     ExpectApiSuccess(api.GetProperty(name, "parent", v));
-    ExpectEq(v, TString("/"));
+    ExpectEq(v, string("/"));
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetProperty(name, "io_read", v));
@@ -262,13 +262,13 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const TString &na
     }
 }
 
-static void ShouldHaveValidData(Porto::Connection &api, const TString &name) {
-    TString v;
+static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
+    string v;
 
     ExpectApiFailure(api.GetProperty(name, "__invalid_data__", v), EError::InvalidProperty);
 
     ExpectApiSuccess(api.GetProperty(name, "state", v));
-    ExpectEq(v, TString("stopped"));
+    ExpectEq(v, string("stopped"));
     ExpectApiFailure(api.GetProperty(name, "exit_status", v), EError::InvalidState);
     ExpectApiFailure(api.GetProperty(name, "root_pid", v), EError::InvalidState);
     ExpectApiFailure(api.GetProperty(name, "stdout", v), EError::InvalidState);
@@ -294,7 +294,7 @@ static void ShouldHaveValidData(Porto::Connection &api, const TString &name) {
     ExpectApiFailure(api.GetProperty(name, "oom_killed", v), EError::InvalidState);
     ExpectApiSuccess(api.GetProperty(name, "respawn_count", v));
     ExpectApiSuccess(api.GetProperty(name, "parent", v));
-    ExpectEq(v, TString("/"));
+    ExpectEq(v, string("/"));
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
         ExpectApiFailure(api.GetProperty(name, "io_read", v), EError::InvalidState);
@@ -308,14 +308,14 @@ static void ShouldHaveValidData(Porto::Connection &api, const TString &name) {
 static void TestHolder(Porto::Connection &api) {
     ShouldHaveOnlyRoot(api);
 
-    std::vector<TString> containers;
+    std::vector<std::string> containers;
 
     Say() << "Create container A" << std::endl;
     ExpectApiSuccess(api.Create("a"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 1);
-    ExpectEq(containers[0], TString("a"));
+    ExpectEq(containers[0], string("a"));
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
@@ -324,7 +324,7 @@ static void TestHolder(Porto::Connection &api) {
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 1);
-    ExpectEq(containers[0], TString("a"));
+    ExpectEq(containers[0], string("a"));
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
@@ -333,8 +333,8 @@ static void TestHolder(Porto::Connection &api) {
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], TString("a"));
-    ExpectEq(containers[1], TString("b"));
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("b"));
     ShouldHaveValidProperties(api, "b");
     ShouldHaveValidData(api, "b");
 
@@ -343,7 +343,7 @@ static void TestHolder(Porto::Connection &api) {
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 1);
-    ExpectEq(containers[0], TString("b"));
+    ExpectEq(containers[0], string("b"));
 
     Say() << "Remove container B" << std::endl;
     ExpectApiSuccess(api.Destroy("b"));
@@ -354,7 +354,7 @@ static void TestHolder(Porto::Connection &api) {
     ExpectApiFailure(api.Pause("a"), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.Resume("a"), EError::ContainerDoesNotExist);
 
-    TString name, value;
+    string name, value;
     ExpectApiFailure(api.GetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.SetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.GetProperty("a", "root_pid", value), EError::ContainerDoesNotExist);
@@ -375,35 +375,35 @@ static void TestHolder(Porto::Connection &api) {
     name = "/invalid";
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
-    name = TString(128, 'a');
+    name = string(128, 'a');
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.Destroy(name));
 
-    name = TString(128, 'z');
+    name = string(128, 'z');
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.Destroy(name));
 
-    name = TString(129, 'z');
+    name = string(129, 'z');
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
-    name = TString(129, 'z') + "/z";
+    name = string(129, 'z') + "/z";
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
-    name = "z/" + TString(129, 'z');
+    name = "z/" + string(129, 'z');
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
-    name = "z/" + TString(129, 'z') + "/z";
+    name = "z/" + string(129, 'z') + "/z";
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
     Say() << "Test hierarchy" << std::endl;
 
-    TString parent = "a";
-    TString child = "a/b";
+    string parent = "a";
+    string child = "a/b";
     ExpectApiFailure(api.Create(child), EError::ContainerDoesNotExist);
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.Create(child));
     ExpectApiSuccess(api.Destroy(parent));
-    TString v;
+    string v;
     ExpectApiFailure(api.GetProperty(child, "state", v), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.GetProperty(parent, "state", v), EError::ContainerDoesNotExist);
 
@@ -411,21 +411,21 @@ static void TestHolder(Porto::Connection &api) {
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 1);
-    ExpectEq(containers[0], TString("a"));
+    ExpectEq(containers[0], string("a"));
 
     ExpectApiSuccess(api.Create("a/b"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], TString("a"));
-    ExpectEq(containers[1], TString("a/b"));
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("a/b"));
 
     Say() << "Try to create long container path" << std::endl;
 
-    name = TString(128, 'a');
+    name = string(128, 'a');
     ExpectApiSuccess(api.Create(name));
 
-    name += "/" + TString(200 - 128 - 1, 'a');
+    name += "/" + string(200 - 128 - 1, 'a');
     ExpectEq(name.length(), 200);
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.Destroy(name));
@@ -433,7 +433,7 @@ static void TestHolder(Porto::Connection &api) {
     name += "a";
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
-    name = TString(128, 'a');
+    name = string(128, 'a');
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check meta soft limits" << std::endl;
@@ -442,13 +442,13 @@ static void TestHolder(Porto::Connection &api) {
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 3);
-    ExpectEq(containers[0], TString("a"));
-    ExpectEq(containers[1], TString("a/b"));
-    ExpectEq(containers[2], TString("a/b/c"));
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("a/b"));
+    ExpectEq(containers[2], string("a/b/c"));
 
     ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
 
-    TString customLimit = std::to_string(1 * 1024 * 1024);
+    std::string customLimit = std::to_string(1 * 1024 * 1024);
 
     ExpectApiSuccess(api.Start("a/b/c"));
     ExpectApiSuccess(api.GetProperty("a/b/c", "state", v));
@@ -529,7 +529,7 @@ static void TestHolder(Porto::Connection &api) {
 
     Say() << "Make sure when parent stops/dies children are stopped" << std::endl;
 
-    TString state;
+    string state;
 
     ExpectApiSuccess(api.Start("a"));
     ExpectApiSuccess(api.Start("a/b"));
@@ -615,10 +615,10 @@ static void TestHolder(Porto::Connection &api) {
 }
 
 static void TestMeta(Porto::Connection &api) {
-    TString state;
+    std::string state;
     ShouldHaveOnlyRoot(api);
 
-    std::vector<TString> isolateVals = { "true", "false" };
+    std::vector<std::string> isolateVals = { "true", "false" };
 
     for (auto isolate : isolateVals) {
         Say() << "Test meta state machine with isolate = " << isolate << std::endl;
@@ -669,7 +669,7 @@ static void TestEmpty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("b"));
 }
 
-static bool TaskRunning(const TString &pid) {
+static bool TaskRunning(const string &pid) {
     int p = stoi(pid);
     if (kill(p, 0))
         return false;
@@ -677,15 +677,15 @@ static bool TaskRunning(const TString &pid) {
     return state != "Z" && state != "X";
 }
 
-static bool TaskZombie(const TString &pid) {
+static bool TaskZombie(const string &pid) {
     return GetState(pid) == "Z";
 }
 
 static void TestExitStatus(Porto::Connection &api) {
-    TString pid;
-    TString ret;
+    string pid;
+    string ret;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check exit status of 'false'" << std::endl;
@@ -693,9 +693,9 @@ static void TestExitStatus(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
-    ExpectEq(ret, TString("256"));
+    ExpectEq(ret, string("256"));
     ExpectApiSuccess(api.GetProperty(name, "oom_killed", ret));
-    ExpectEq(ret, TString("false"));
+    ExpectEq(ret, string("false"));
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check exit status of 'true'" << std::endl;
@@ -703,9 +703,9 @@ static void TestExitStatus(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
-    ExpectEq(ret, TString("0"));
+    ExpectEq(ret, string("0"));
     ExpectApiSuccess(api.GetProperty(name, "oom_killed", ret));
-    ExpectEq(ret, TString("false"));
+    ExpectEq(ret, string("false"));
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check exit status of invalid command" << std::endl;
@@ -734,9 +734,9 @@ static void TestExitStatus(Porto::Connection &api) {
     WaitContainer(api, name);
     WaitProcessExit(pid);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
-    ExpectEq(ret, TString("9"));
+    ExpectEq(ret, string("9"));
     ExpectApiSuccess(api.GetProperty(name, "oom_killed", ret));
-    ExpectEq(ret, TString("false"));
+    ExpectEq(ret, string("false"));
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check oom_killed property" << std::endl;
@@ -748,17 +748,17 @@ static void TestExitStatus(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name, 60);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
-    ExpectEq(ret, TString("9"));
+    ExpectEq(ret, string("9"));
     ExpectApiSuccess(api.GetProperty(name, "oom_killed", ret));
-    ExpectEq(ret, TString("true"));
+    ExpectEq(ret, string("true"));
 
     ExpectApiSuccess(api.Destroy(name));
 }
 
 static void TestStreams(Porto::Connection &api) {
-    TString ret;
+    string ret;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Make sure stdout works" << std::endl;
@@ -766,9 +766,9 @@ static void TestStreams(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "stdout", ret));
-    ExpectEq(ret, TString("out\n"));
+    ExpectEq(ret, string("out\n"));
     ExpectApiSuccess(api.GetProperty(name, "stderr", ret));
-    ExpectEq(ret, TString(""));
+    ExpectEq(ret, string(""));
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Make sure stderr works" << std::endl;
@@ -776,18 +776,18 @@ static void TestStreams(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "stdout", ret));
-    ExpectEq(ret, TString(""));
+    ExpectEq(ret, string(""));
     ExpectApiSuccess(api.GetProperty(name, "stderr", ret));
-    ExpectEq(ret, TString("err\n"));
+    ExpectEq(ret, string("err\n"));
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.Destroy(name));
 }
 
 static void TestNsCgTc(Porto::Connection &api) {
-    TString pid;
+    string pid;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Spawn long running task" << std::endl;
@@ -799,7 +799,7 @@ static void TestNsCgTc(Porto::Connection &api) {
     AsRoot(api);
     Say() << "Check that portod doesn't leak fds" << std::endl;
     struct dirent **lst;
-    TString path = "/proc/" + pid + "/fd/";
+    std::string path = "/proc/" + pid + "/fd/";
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
     ExpectEq(nr, 2 + 3);
@@ -821,7 +821,7 @@ static void TestNsCgTc(Porto::Connection &api) {
 
     Say() << "Check that hierarchical task cgroups are correct" << std::endl;
 
-    TString child = name + "/b";
+    string child = name + "/b";
     ExpectApiSuccess(api.Create(child));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -834,7 +834,7 @@ static void TestNsCgTc(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(child, "root_pid", pid));
     ExpectCorrectCgroups(pid, child, name);
 
-    TString parent;
+    string parent;
     ExpectApiSuccess(api.GetProperty(child, "parent", parent));
     ExpectEq(parent, "/porto/" + name);
 
@@ -845,9 +845,9 @@ static void TestNsCgTc(Porto::Connection &api) {
 }
 
 static void TestIsolateProperty(Porto::Connection &api) {
-    TString ret;
+    string ret;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Make sure PID isolation works" << std::endl;
@@ -857,7 +857,7 @@ static void TestIsolateProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "stdout", ret));
-    ExpectNeq(ret, TString("1\n"));
+    ExpectNeq(ret, string("1\n"));
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ps aux"));
@@ -885,7 +885,7 @@ static void TestIsolateProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Make sure isolate works correctly with meta parent" << std::endl;
-    TString pid;
+    string pid;
 
     ExpectApiSuccess(api.Create("meta"));
     ExpectApiSuccess(api.SetProperty("meta", "isolate", "false"));
@@ -959,11 +959,11 @@ static void TestIsolateProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Start("iss/container/hook1"));
     ExpectApiSuccess(api.Start("iss/container/hook2"));
 
-    TString rootPid, hook1Pid, hook2Pid;
+    std::string rootPid, hook1Pid, hook2Pid;
     ExpectApiSuccess(api.GetProperty("iss/container/hook1", "root_pid", hook1Pid));
     ExpectApiSuccess(api.GetProperty("iss/container/hook2", "root_pid", hook2Pid));
 
-    TString state;
+    std::string state;
     ExpectApiSuccess(api.GetProperty("iss/container", "state", state));
     ExpectEq(state, "meta");
 
@@ -1039,7 +1039,7 @@ static void TestIsolateProperty(Porto::Connection &api) {
 
 static void TestContainerNamespaces(Porto::Connection &api) {
     bool def = config().container().default_porto_namespace();
-    TString val;
+    std::string val;
 
     Say() << "Test container namespaces" << std::endl;
 
@@ -1094,8 +1094,8 @@ static void TestContainerNamespaces(Porto::Connection &api) {
 }
 
 static void TestEnvTrim(Porto::Connection &api) {
-    TString val;
-    TString name = "a";
+    string val;
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check property trimming" << std::endl;
@@ -1135,33 +1135,33 @@ static void TestEnvTrim(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(name, "env", val));
     ExpectEq(val, "f");
 
-    TString longProperty = TString(10 * 1024, 'x');
+    string longProperty = string(10 * 1024, 'x');
     ExpectApiSuccess(api.SetProperty(name, "env", longProperty));
     ExpectApiSuccess(api.GetProperty(name, "env", val));
 
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static TString EnvSep(1, '\0');
+static std::string EnvSep(1, '\0');
 
 static void ExpectEnv(Porto::Connection &api,
-                      const TString &name,
-                      const TString &env,
-                      const TString expected) {
-    TString pid;
+                      const std::string &name,
+                      const std::string &env,
+                      const std::string expected) {
+    string pid;
 
     ExpectApiSuccess(api.SetProperty(name, "env", env));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetProperty(name, "root_pid", pid));
 
-    TString ret = GetEnv(pid);
+    string ret = GetEnv(pid);
 
     Expect(ret == expected);
     ExpectApiSuccess(api.Stop(name));
 }
 
 static void TestEnvProperty(Porto::Connection &api) {
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
@@ -1169,7 +1169,7 @@ static void TestEnvProperty(Porto::Connection &api) {
 
     Say() << "Check default environment" << std::endl;
 
-    static const TString empty_env =
+    static const std::string empty_env =
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
         "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
@@ -1180,7 +1180,7 @@ static void TestEnvProperty(Porto::Connection &api) {
     ExpectEnv(api, name, "", empty_env);
 
     Say() << "Check user-defined environment" << std::endl;
-    static const TString ab_env =
+    static const std::string ab_env =
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
         "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
@@ -1194,7 +1194,7 @@ static void TestEnvProperty(Porto::Connection &api) {
     ExpectEnv(api, name, "a=b;c=d;", ab_env);
     ExpectEnv(api, name, "a=b;;c=d;", ab_env);
 
-    static const TString asb_env =
+    static const std::string asb_env =
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
         "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
@@ -1216,9 +1216,9 @@ static void TestEnvProperty(Porto::Connection &api) {
 
 static void TestUserGroupProperty(Porto::Connection &api) {
     int uid, gid;
-    TString pid;
+    string pid;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check default user & group" << std::endl;
@@ -1251,7 +1251,7 @@ static void TestUserGroupProperty(Porto::Connection &api) {
     ExpectApiFailure(api.SetProperty(name, "owner_user", Bob.User()), EError::Permission);
     ExpectApiFailure(api.SetProperty(name, "owner_group", Bob.Group()), EError::Permission);
 
-    TString user, group;
+    string user, group;
     ExpectApiSuccess(api.GetProperty(name, "user", user));
     ExpectApiSuccess(api.GetProperty(name, "group", group));
     ExpectEq(user, Alice.User());
@@ -1291,13 +1291,13 @@ static void TestUserGroupProperty(Porto::Connection &api) {
 }
 
 static void TestCwdProperty(Porto::Connection &api) {
-    TString pid;
-    TString cwd;
-    TString portodPid, portodCwd;
+    string pid;
+    string cwd;
+    string portodPid, portodCwd;
 
     AsRoot(api);
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     (void)TPath(PORTO_PIDFILE).ReadAll(portodPid);
@@ -1309,7 +1309,7 @@ static void TestCwdProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(name, "root_pid", pid));
     cwd = GetCwd(pid);
 
-    TString prefix = PORTO_WORKDIR;
+    string prefix = PORTO_WORKDIR;
 
     ExpectNeq(cwd, portodCwd);
     ExpectEq(cwd, prefix + "/" + name);
@@ -1323,7 +1323,7 @@ static void TestCwdProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty("b", "command", "sleep 1000"));
     ExpectApiSuccess(api.Start("b"));
     ExpectApiSuccess(api.GetProperty("b", "root_pid", pid));
-    TString bcwd = GetCwd(pid);
+    string bcwd = GetCwd(pid);
     ExpectApiSuccess(api.Destroy("b"));
 
     ExpectNeq(bcwd, portodCwd);
@@ -1347,7 +1347,7 @@ static void TestCwdProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check working directory of meta parent/child" << std::endl;
-    TString parent = "parent", child = "parent/child";
+    std::string parent = "parent", child = "parent/child";
 
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.Create(child));
@@ -1362,9 +1362,9 @@ static void TestCwdProperty(Porto::Connection &api) {
 }
 
 static void TestStdPathProperty(Porto::Connection &api) {
-    TString pid;
-    TString name = "a";
-    TString cwd, stdinName, stdoutName, stderrName;
+    string pid;
+    string name = "a";
+    std::string cwd, stdinName, stdoutName, stderrName;
     TPath stdinPath, stdoutPath, stderrPath;
 
     AsRoot(api); // FIXME
@@ -1429,12 +1429,12 @@ static void TestStdPathProperty(Porto::Connection &api) {
     Expect(stderrPath.Exists());
 
     Say() << "Make sure custom stdin is not removed" << std::endl;
-    TString ret;
+    string ret;
     ExpectApiSuccess(api.SetProperty(name, "command", "cat"));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "stdout", ret));
-    ExpectEq(ret, TString("hi"));
+    ExpectEq(ret, string("hi"));
 
     ExpectApiSuccess(api.Destroy(name));
 
@@ -1448,12 +1448,12 @@ static void TestStdPathProperty(Porto::Connection &api) {
 }
 
 struct TMountInfo {
-    TString flags;
-    TString source;
+    std::string flags;
+    std::string source;
 };
 
-static map<TString, TMountInfo> ParseMountinfo(std::vector<TString> lines) {
-    map<TString, TMountInfo> m;
+static map<string, TMountInfo> ParseMountinfo(std::vector<std::string> lines) {
+    map<string, TMountInfo> m;
 
     for (auto &line : lines) {
         auto tok = SplitString(line, ' ');
@@ -1475,10 +1475,10 @@ static map<TString, TMountInfo> ParseMountinfo(std::vector<TString> lines) {
 }
 
 static void TestRootRdOnlyProperty(Porto::Connection &api) {
-    TString name = "a";
+    string name = "a";
     TPath path(TMPDIR + "/" + name);
-    TString ROnly;
-    TString ret;
+    string ROnly;
+    string ret;
 
     RemakeDir(api, path);
 
@@ -1499,7 +1499,7 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
-    ExpectEq(ret, TString("0"));
+    ExpectEq(ret, string("0"));
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
@@ -1507,11 +1507,11 @@ static void TestRootRdOnlyProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
-    ExpectNeq(ret, TString("0"));
+    ExpectNeq(ret, string("0"));
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Make sure pivot_root works and we don't leak host mount points" << std::endl;
-    std::set<TString> expected = {
+    std::set<std::string> expected = {
         "/run/lock",
         // restricted proc
         "/proc/sysrq-trigger",
@@ -1567,11 +1567,11 @@ unsigned long GetInode(const TPath &path) {
 }
 
 static void TestRootProperty(Porto::Connection &api) {
-    TString pid;
-    TString v;
+    string pid;
+    string v;
 
-    TString name = "a";
-    TString path = TMPDIR + "/" + name;
+    string name = "a";
+    string path = TMPDIR + "/" + name;
 
     Say() << "Make sure root is empty" << std::endl;
 
@@ -1596,11 +1596,11 @@ static void TestRootProperty(Porto::Connection &api) {
     AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/sleep 1000"));
-    TString bindDns;
+    string bindDns;
 
     ExpectApiSuccess(api.SetProperty(name, "root", path));
 
-    TString cwd;
+    string cwd;
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
     ExpectEq(cwd, "/");
 
@@ -1621,7 +1621,7 @@ static void TestRootProperty(Porto::Connection &api) {
     WaitContainer(api, name);
 
     ExpectApiSuccess(api.GetProperty(name, "stdout", v));
-    ExpectEq(v, TString("/\n"));
+    ExpectEq(v, string("/\n"));
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check /dev layout" << std::endl;
@@ -1629,7 +1629,7 @@ static void TestRootProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "/ls -1 /dev"));
     v = StartWaitAndGetProperty(api, name, "stdout");
 
-    vector<TString> devs = { "null", "zero", "full", "urandom",
+    vector<string> devs = { "null", "zero", "full", "urandom",
                             "random", "console", "tty", "stdin", "stdout",
                             "stderr", "ptmx", "pts", "shm", "fd" };
     auto tokens = SplitString(v, '\n');
@@ -1655,17 +1655,17 @@ static void TestRootProperty(Porto::Connection &api) {
 
     auto lines = SplitString(v, '\n');
     auto m = ParseMountinfo(lines);
-    ExpectNeq(m["/sys"].flags.find("ro,"), TString::npos);
-    ExpectNeq(m["/proc/sys"].flags.find("ro,"), TString::npos);
-    ExpectNeq(m["/proc/sysrq-trigger"].flags.find("ro,"), TString::npos);
-    ExpectNeq(m["/proc/irq"].flags.find("ro,"), TString::npos);
-    ExpectNeq(m["/proc/bus"].flags.find("ro,"), TString::npos);
+    ExpectNeq(m["/sys"].flags.find("ro,"), string::npos);
+    ExpectNeq(m["/proc/sys"].flags.find("ro,"), string::npos);
+    ExpectNeq(m["/proc/sysrq-trigger"].flags.find("ro,"), string::npos);
+    ExpectNeq(m["/proc/irq"].flags.find("ro,"), string::npos);
+    ExpectNeq(m["/proc/bus"].flags.find("ro,"), string::npos);
 
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Make sure /dev /sys /proc are not mounted when root is not isolated " << std::endl;
 
-    cwd = TString(PORTO_WORKDIR) + "/" + name;
+    cwd = std::string(PORTO_WORKDIR) + "/" + name;
 
     TPath f(cwd);
     AsRoot(api);
@@ -1685,15 +1685,15 @@ static void TestRootProperty(Porto::Connection &api) {
 }
 
 static bool TestPathsHelper(Porto::Connection &api,
-                            const TString &cmd,
-                            const TString &root,
-                            const TString &cwd,
-                            const TString &bind,
-                            const TString &cout_path,
-                            const TString &cerr_path) {
-    static const TString name = "paths_test_container";
-    TString state;
-    TString log = "Paths test: cmd=" + cmd;
+                            const std::string &cmd,
+                            const std::string &root,
+                            const std::string &cwd,
+                            const std::string &bind,
+                            const std::string &cout_path,
+                            const std::string &cerr_path) {
+    static const std::string name = "paths_test_container";
+    std::string state;
+    std::string log = "Paths test: cmd=" + cmd;
 
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", cmd));
@@ -1721,7 +1721,7 @@ static bool TestPathsHelper(Porto::Connection &api,
 
     Say() << log << std::endl;
 
-    TString ret;
+    std::string ret;
     ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.WaitContainer(name, state, -1));
@@ -1767,16 +1767,16 @@ static void TestPaths(Porto::Connection &api) {
     AsAlice(api);
 }
 
-static TString GetHostname() {
+static string GetHostname() {
     char buf[1024];
     ExpectEq(gethostname(buf, sizeof(buf)), 0);
     return buf;
 }
 
 static void TestHostnameProperty(Porto::Connection &api) {
-    TString pid, v;
-    TString name = "a";
-    TString host = "porto_" + name;
+    string pid, v;
+    string name = "a";
+    string host = "porto_" + name;
     TPath path(TMPDIR + "/" + name);
 
     ExpectApiSuccess(api.Create(name));
@@ -1872,8 +1872,8 @@ static void TestHostnameProperty(Porto::Connection &api) {
 }
 
 static void TestCapabilitiesProperty(Porto::Connection &api) {
-    TString name = "a";
-    TString pid;
+    std::string name = "a";
+    std::string pid;
 
     int lastCap;
     TError error = TPath("/proc/sys/kernel/cap_last_cap").ReadInt(lastCap);
@@ -1933,9 +1933,9 @@ static void TestCapabilitiesProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void CheckConnectivity(Porto::Connection &api, const TString &name,
+static void CheckConnectivity(Porto::Connection &api, const std::string &name,
                               bool enabled, bool disabled) {
-    TString v;
+    string v;
 
     if (disabled) {
         ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
@@ -1957,8 +1957,8 @@ static void CheckConnectivity(Porto::Connection &api, const TString &name,
 }
 
 static void TestEnablePortoProperty(Porto::Connection &api) {
-    TString name = "a";
-    TString name2 = "a/b";
+    string name = "a";
+    string name2 = "a/b";
     TPath path(TMPDIR + "/" + name);
 
     RemakeDir(api, path);
@@ -2028,9 +2028,9 @@ static void TestEnablePortoProperty(Porto::Connection &api) {
 }
 
 static void TestStateMachine(Porto::Connection &api) {
-    TString name = "a";
-    TString pid;
-    TString v;
+    string name = "a";
+    string pid;
+    string v;
 
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.GetProperty(name, "state", v));
@@ -2122,7 +2122,7 @@ static void TestStateMachine(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(name, "state", v));
     ExpectEq(v, "dead");
     ExpectApiSuccess(api.GetProperty(name, "exit_status", v));
-    ExpectEq(v, TString("15"));
+    ExpectEq(v, string("15"));
     ExpectApiSuccess(api.Destroy(name));
 
     // if container init process doesn't have custom handler for a signal
@@ -2145,7 +2145,7 @@ static void TestStateMachine(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(name, "state", v));
     ExpectEq(v, "dead");
     ExpectApiSuccess(api.GetProperty(name, "exit_status", v));
-    ExpectEq(v, TString("9"));
+    ExpectEq(v, string("9"));
 
     // we can't kill root or non-running container
     ExpectApiFailure(api.Kill(name, SIGKILL), EError::InvalidState);
@@ -2156,7 +2156,7 @@ static void TestStateMachine(Porto::Connection &api) {
 }
 
 static void TestPath(Porto::Connection &) {
-    vector<pair<TString, TString>> normalize = {
+    vector<pair<string, string>> normalize = {
         { "",   "" },
         { ".",  "." },
         { "..", ".." },
@@ -2223,7 +2223,7 @@ static void TestPath(Porto::Connection &) {
         {"abc/../../././../def", "../../def"},
     };
 
-    vector<vector<TString>> inner = {
+    vector<vector<string>> inner = {
         { "/", "/", ".", "/" },
         { "/", "a", "", "" },
         { "a", "/", "", "" },
@@ -2242,7 +2242,7 @@ static void TestPath(Porto::Connection &) {
     };
 
     /* path, dirname, basename */
-    std::vector<std::vector<TString>> split = {
+    std::vector<std::vector<std::string>> split = {
         { "/usr/lib", "/usr", "lib" },
         { "/usr/", "/", "usr" },
         { "usr", ".", "usr" },
@@ -2271,7 +2271,7 @@ static void TestPath(Porto::Connection &) {
     };
 
     /* base, path, relative */
-    std::vector<std::vector<TString>> relative = {
+    std::vector<std::vector<std::string>> relative = {
         { "/a", "/a/b", "b" },
         { "/a", "/a", "." },
         { "/a/b", "/a", ".." },
@@ -2301,7 +2301,7 @@ static void TestPath(Porto::Connection &) {
     for (auto n: relative)
         ExpectEq(TPath(n[1]).RelativePath(n[0]).ToString(), n[2]);
 
-    std::vector<std::pair<TString, std::vector<TString>>> components = {
+    std::vector<std::pair<std::string, std::vector<std::string>>> components = {
         { "", {}},
         { ".", { "." }},
         { "..", { ".." }},
@@ -2367,10 +2367,10 @@ static void TestFormat(Porto::Connection &) {
 }
 
 static void TestRoot(Porto::Connection &api) {
-    TString v;
-    TString root = "/";
-    TString porto_root = "/porto";
-    vector<TString> properties = {
+    string v;
+    string root = "/";
+    string porto_root = "/porto";
+    vector<string> properties = {
         "command",
         "user",
         "group",
@@ -2451,7 +2451,7 @@ static void TestRoot(Porto::Connection &api) {
     if (KernelSupports(KernelFeature::MAX_RSS))
         properties.push_back("max_rss");
 
-    std::vector<TString> plist;
+    std::vector<std::string> plist;
 
     ExpectApiSuccess(api.ListProperties(plist));
 
@@ -2479,7 +2479,7 @@ static void TestRoot(Porto::Connection &api) {
         ExpectApiSuccess(api.GetProperty(root, p, v));
 
     ExpectApiSuccess(api.GetProperty(root, "state", v));
-    ExpectEq(v, TString("meta"));
+    ExpectEq(v, string("meta"));
 
     ExpectApiFailure(api.GetProperty(root, "exit_status", v), EError::InvalidState);
     ExpectApiFailure(api.GetProperty(root, "oom_killed", v), EError::InvalidState);
@@ -2519,9 +2519,9 @@ static void TestRoot(Porto::Connection &api) {
 static void TestData(Porto::Connection &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
-    TString root = "/";
-    TString wget = "wget";
-    TString noop = "noop";
+    string root = "/";
+    string wget = "wget";
+    string noop = "noop";
 
     ExpectApiSuccess(api.Create(noop));
     // this will cause io read and noop will not have io_read
@@ -2537,7 +2537,7 @@ static void TestData(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(wget));
     WaitContainer(api, wget, 60);
 
-    TString v, rv;
+    string v, rv;
     ExpectApiSuccess(api.GetProperty(wget, "exit_status", v));
     ExpectEq(v, "0");
 
@@ -2602,9 +2602,9 @@ static bool CanTestLimits() {
     return true;
 }
 
-static void TestCoresConvertion(Porto::Connection &api, const TString &name, const TString &property) {
+static void TestCoresConvertion(Porto::Connection &api, const std::string &name, const std::string &property) {
     auto cores = GetNumCores();
-    TString v;
+    std::string v;
 
     ExpectApiSuccess(api.SetProperty(name, property, "100"));
     ExpectApiSuccess(api.GetProperty(name, property, v));
@@ -2616,11 +2616,11 @@ static void TestCoresConvertion(Porto::Connection &api, const TString &name, con
 }
 
 static void TestLimits(Porto::Connection &api) {
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check default limits" << std::endl;
-    TString current;
+    string current;
 
 #if 0
     current = GetCgKnob("memory", "", "memory.use_hierarchy");
@@ -2645,8 +2645,8 @@ static void TestLimits(Porto::Connection &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check custom limits" << std::endl;
-    TString exp_limit = "134217728";
-    TString exp_guar = "16384";
+    string exp_limit = "134217728";
+    string exp_guar = "16384";
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", "1g"));
@@ -2812,14 +2812,14 @@ static void TestLimits(Porto::Connection &api) {
                      EError::Permission);
 
     Say() << "Make sure we have a cap for private property" << std::endl;
-    TString tooLong = TString(PRIVATE_VALUE_MAX + 1, 'a');
+    std::string tooLong = std::string(PRIVATE_VALUE_MAX + 1, 'a');
     ExpectApiFailure(api.SetProperty(name, "private", tooLong), EError::InvalidValue);
 
     ExpectApiSuccess(api.Destroy(name));
 }
 
 static void TestUlimitProperty(Porto::Connection &api) {
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check rlimits parsing" << std::endl;
@@ -2837,7 +2837,7 @@ static void TestUlimitProperty(Porto::Connection &api) {
 
     Say() << "Check rlimits" << std::endl;
 
-    map<TString, pair<TString, TString>> rlim = {
+    map<string, pair<string, string>> rlim = {
         { "nproc", { "20480", "30720" } },
         { "nofile", { "819200", "1024000" } },
         /* RLIMIT_DATA breaks asan build for kernels >= 4.6 */
@@ -2845,7 +2845,7 @@ static void TestUlimitProperty(Porto::Connection &api) {
         { "memlock", { "41943040000", "41943040000" } },
     };
 
-    TString ulimit;
+    string ulimit;
     for (auto &lim : rlim)
         ulimit += lim.first + ": " + lim.second.first + " " + lim.second.second + "; ";
 
@@ -2853,7 +2853,7 @@ static void TestUlimitProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
 
-    TString pid;
+    string pid;
     ExpectApiSuccess(api.GetProperty(name, "root_pid", pid));
 
     AsRoot(api);
@@ -2877,7 +2877,7 @@ static void TestAlias(Porto::Connection &api) {
     if (!KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         return;
 
-    TString name = "a", current, alias, real;
+    std::string name = "a", current, alias, real;
 
     ExpectApiSuccess(api.Create(name));
 
@@ -2896,8 +2896,8 @@ static void TestAlias(Porto::Connection &api) {
     ExpectEq(current, "0");
 
     Say() << "Check custom limits" << std::endl;
-    TString exp_limit = "52428800";
-    TString exp_guar = "16384";
+    string exp_limit = "52428800";
+    string exp_guar = "16384";
 
     ExpectApiSuccess(api.SetProperty(name, "memory.limit_in_bytes", "12m"));
     ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
@@ -2941,18 +2941,18 @@ static void TestAlias(Porto::Connection &api) {
 }
 
 static void TestDynamic(Porto::Connection &api) {
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
 
-    TString current;
+    string current;
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX) ||
            current == std::to_string(LLONG_MAX - 4095));
 
-    TString exp_limit = "268435456";
+    string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", exp_limit));
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     ExpectEq(current, exp_limit);
@@ -2984,12 +2984,12 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     //                    +-- slot2
     //
 
-    TString box = "box";
-    TString prod = "box/production";
-    TString slot1 = "box/production/slot1";
-    TString slot2 = "box/production/slot2";
-    TString system = "box/system";
-    TString monit = "box/monitoring";
+    string box = "box";
+    string prod = "box/production";
+    string slot1 = "box/production/slot1";
+    string slot2 = "box/production/slot2";
+    string system = "box/system";
+    string monit = "box/monitoring";
 
     ExpectApiSuccess(api.Create(box));
     ExpectApiSuccess(api.Create(prod));
@@ -3025,8 +3025,8 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
 
     Say() << "Test child-parent isolation" << std::endl;
 
-    TString parent = "parent";
-    TString child = "parent/child";
+    string parent = "parent";
+    string child = "parent/child";
 
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.SetProperty(parent, "command", "sleep 1000"));
@@ -3036,7 +3036,7 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(child, "isolate", "false"));
     ExpectApiSuccess(api.SetProperty(child, "command", "sleep 1000"));
 
-    TString exp_limit = "268435456";
+    string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(child, "memory_limit", exp_limit));
     ExpectApiSuccess(api.SetProperty(child, "cpu_limit", "10"));
     ExpectApiSuccess(api.SetProperty(child, "cpu_guarantee", "10"));
@@ -3044,18 +3044,18 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
 
     ExpectApiSuccess(api.Start(child));
 
-    TString v;
+    string v;
     ExpectApiSuccess(api.GetProperty(parent, "state", v));
     ExpectEq(v, "running");
     ExpectApiSuccess(api.GetProperty(child, "state", v));
     ExpectEq(v, "running");
 
-    TString current = GetCgKnob("memory", child, "memory.limit_in_bytes");
+    string current = GetCgKnob("memory", child, "memory.limit_in_bytes");
     ExpectEq(current, exp_limit);
     current = GetCgKnob("memory", parent, "memory.limit_in_bytes");
     ExpectNeq(current, exp_limit);
 
-    TString parentProperty, childProperty;
+    string parentProperty, childProperty;
     ExpectApiSuccess(api.GetProperty(parent, "stdout_path", parentProperty));
     ExpectApiSuccess(api.GetProperty(child, "stdout_path", childProperty));
     ExpectEq(parentProperty, childProperty);
@@ -3063,7 +3063,7 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     ExpectApiSuccess(api.GetProperty(child, "stderr_path", childProperty));
     ExpectEq(parentProperty, childProperty);
 
-    TString parentPid, childPid;
+    string parentPid, childPid;
 
     ExpectApiSuccess(api.GetProperty(parent, "root_pid", parentPid));
     ExpectApiSuccess(api.GetProperty(child, "root_pid", childPid));
@@ -3096,7 +3096,7 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(child, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(child));
 
-    TString parentState, childState;
+    std::string parentState, childState;
     ExpectApiSuccess(api.Pause(parent));
     ExpectApiSuccess(api.GetProperty(parent, "state", parentState));
     ExpectApiSuccess(api.GetProperty(child, "state", childState));
@@ -3151,7 +3151,7 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("a"));
 
     Say() << "Test property propagation" << std::endl;
-    TString val;
+    std::string val;
 
     ExpectApiSuccess(api.Create("a"));
     ExpectApiSuccess(api.Create("a/b"));
@@ -3177,9 +3177,9 @@ static void TestLimitsHierarchy(Porto::Connection &api) {
 
 static void TestPermissions(Porto::Connection &api) {
     struct stat st;
-    TString path;
+    string path;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -3199,7 +3199,7 @@ static void TestPermissions(Porto::Connection &api) {
 
     Say() << "Only user that created container can start/stop/destroy/etc it" << std::endl;
 
-    TString s;
+    string s;
 
     AsAlice(api);
 
@@ -3262,8 +3262,8 @@ static void TestPermissions(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void WaitRespawn(Porto::Connection &api, const TString &name, int expected, int maxTries = 10) {
-    TString respawnCount;
+static void WaitRespawn(Porto::Connection &api, const std::string &name, int expected, int maxTries = 10) {
+    std::string respawnCount;
     int successRespawns = 0;
     for(int i = 0; i < maxTries; i++) {
         sleep(config().container().respawn_delay_ms() / 1000);
@@ -3278,10 +3278,10 @@ static void WaitRespawn(Porto::Connection &api, const TString &name, int expecte
 }
 
 static void TestRespawnProperty(Porto::Connection &api) {
-    TString pid, respawnPid;
-    TString ret;
+    string pid, respawnPid;
+    string ret;
 
-    TString name = "a";
+    string name = "a";
     ExpectApiSuccess(api.Create(name));
     ExpectApiFailure(api.SetProperty(name, "max_respawns", "true"), EError::InvalidValue);
 
@@ -3290,11 +3290,11 @@ static void TestRespawnProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.SetProperty(name, "respawn", "false"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetProperty(name, "respawn_count", ret));
-    ExpectEq(ret, TString("0"));
+    ExpectEq(ret, string("0"));
     WaitContainer(api, name);
     sleep(config().container().respawn_delay_ms() / 1000);
     ExpectApiSuccess(api.GetProperty(name, "respawn_count", ret));
-    ExpectEq(ret, TString("0"));
+    ExpectEq(ret, string("0"));
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "respawn", "true"));
@@ -3319,18 +3319,18 @@ static void TestRespawnProperty(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void ReadPropsAndData(Porto::Connection &api, const TString &name) {
-    std::vector<TString> plist;
+static void ReadPropsAndData(Porto::Connection &api, const std::string &name) {
+    std::vector<std::string> plist;
     ExpectApiSuccess(api.ListProperties(plist));
-    TString v;
+    std::string v;
 
     for (auto p : plist)
         (void)api.GetProperty(name, p, v);
 }
 
 static void TestLeaks(Porto::Connection &api) {
-    TString slavePid, masterPid;
-    TString name;
+    string slavePid, masterPid;
+    string name;
     int slack = 4096 * 2;
     int perct = 64;
     uint64_t time;
@@ -3518,7 +3518,7 @@ bool WriteDelimitedTo(
     return true;
 }
 
-TError ConnectToRpcServer(const TString& path, int &fd)
+TError ConnectToRpcServer(const std::string& path, int &fd)
 {
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -3543,7 +3543,7 @@ TError ConnectToRpcServer(const TString& path, int &fd)
 }
 
 static void TestSigPipe(Porto::Connection &api) {
-    TString before;
+    std::string before;
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[spawned]", before));
 
     int fd;
@@ -3559,13 +3559,13 @@ static void TestSigPipe(Porto::Connection &api) {
     close(fd);
     WaitPortod(api);
 
-    TString after;
+    std::string after;
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[spawned]", after));
     ExpectEq(before, after);
 }
 
 static void InitErrorCounters(Porto::Connection &api) {
-    TString v;
+    std::string v;
 
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[spawned]", v));
     StringToInt(v, expectedRespawns);
@@ -3578,7 +3578,7 @@ static void InitErrorCounters(Porto::Connection &api) {
 }
 
 static void CheckErrorCounters(Porto::Connection &api) {
-    TString v;
+    std::string v;
 
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[spawned]", v));
     ExpectEq(v, std::to_string(expectedRespawns));
@@ -3611,8 +3611,8 @@ static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
     CheckErrorCounters(api);
 }
 
-static bool RespawnTicks(Porto::Connection &api, const TString &name, int maxTries = 3) {
-    TString respawnCount, v;
+static bool RespawnTicks(Porto::Connection &api, const std::string &name, int maxTries = 3) {
+    std::string respawnCount, v;
     ExpectApiSuccess(api.GetProperty(name, "respawn_count", respawnCount));
     for(int i = 0; i < maxTries; i++) {
         sleep(config().container().respawn_delay_ms() / 1000);
@@ -3625,9 +3625,9 @@ static bool RespawnTicks(Porto::Connection &api, const TString &name, int maxTri
 }
 
 static void TestWait(Porto::Connection &api) {
-    TString c = "aaa";
-    TString d = "aaa/bbb";
-    TString tmp, tmp_state;
+    std::string c = "aaa";
+    std::string d = "aaa/bbb";
+    std::string tmp, tmp_state;
 
     Say() << "Check wait for / container" << std::endl;
     ExpectApiSuccess(api.WaitContainer("/", tmp, 0));
@@ -3673,7 +3673,7 @@ static void TestWait(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(c));
 
     Say() << "Check wait for large number of containers" << std::endl;
-    std::vector<TString> containers;
+    std::vector<std::string> containers;
     for (int i = 0; i < 100; i++)
         containers.push_back(c + std::to_string(i));
     for (auto &name : containers) {
@@ -3716,9 +3716,9 @@ static void TestWait(Porto::Connection &api) {
 }
 
 static void TestWaitRecovery(Porto::Connection &api) {
-    TString c = "aaa";
-    TString d = "aaa/bbb";
-    TString tmp, tmp_state;
+    std::string c = "aaa";
+    std::string d = "aaa/bbb";
+    std::string tmp, tmp_state;
 
     Say() << "Check wait for restored container" << std::endl;
 
@@ -3749,11 +3749,11 @@ static void TestWaitRecovery(Porto::Connection &api) {
 }
 
 static void TestRecovery(Porto::Connection &api) {
-    TString pid, v;
-    TString name = "a:b";
-    std::vector<TString> containers;
+    string pid, v;
+    string name = "a:b";
+    std::vector<std::string> containers;
 
-    map<TString, TString> props = {
+    map<string,string> props = {
         { "command", "sleep 1000" },
         { "user", Alice.User() },
         { "group", Bob.Group() },
@@ -3775,8 +3775,8 @@ static void TestRecovery(Porto::Connection &api) {
 
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], TString("parent"));
-    ExpectEq(containers[1], TString("parent/child"));
+    ExpectEq(containers[0], string("parent"));
+    ExpectEq(containers[1], string("parent/child"));
 
     ExpectApiSuccess(api.Destroy("parent"));
 
@@ -3816,7 +3816,7 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectEq(TaskZombie(pid), false);
 
     for (auto &pair : props) {
-        TString v;
+        string v;
         ExpectApiSuccess(api.GetProperty(name, pair.first, v));
         ExpectEq(v, pair.second);
     }
@@ -3825,8 +3825,8 @@ static void TestRecovery(Porto::Connection &api) {
     AsAlice(api);
 
     Say() << "Make sure meta gets correct state upon recovery" << std::endl;
-    TString parent = "a";
-    TString child = "a/b";
+    string parent = "a";
+    string child = "a/b";
 
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.Create(child));
@@ -3858,8 +3858,8 @@ static void TestRecovery(Porto::Connection &api) {
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 2);
-    ExpectEq(containers[0], TString("a"));
-    ExpectEq(containers[1], TString("a/b"));
+    ExpectEq(containers[0], string("a"));
+    ExpectEq(containers[1], string("a/b"));
     ExpectApiSuccess(api.GetProperty(parent, "state", v));
     ExpectEq(v, "meta");
 
@@ -3899,14 +3899,14 @@ static void TestRecovery(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", v));
-    ExpectEq(v, TString("9"));
+    ExpectEq(v, string("9"));
     ExpectApiSuccess(api.GetProperty(name, "oom_killed", v));
-    ExpectEq(v, TString("true"));
+    ExpectEq(v, string("true"));
     KillSlave(api, SIGKILL);
     ExpectApiSuccess(api.GetProperty(name, "exit_status", v));
-    ExpectEq(v, TString("9"));
+    ExpectEq(v, string("9"));
     ExpectApiSuccess(api.GetProperty(name, "oom_killed", v));
-    ExpectEq(v, TString("true"));
+    ExpectEq(v, string("true"));
     ExpectApiSuccess(api.Stop(name));
 
     int expected = 1;
@@ -4037,7 +4037,7 @@ static void TestCgroups(Porto::Connection &api) {
 }
 
 static void TestVersion(Porto::Connection &api) {
-    TString version, revision;
+    string version, revision;
     ExpectApiSuccess(api.GetVersion(version, revision));
 
     ExpectEq(version, PORTO_VERSION);
@@ -4045,7 +4045,7 @@ static void TestVersion(Porto::Connection &api) {
 }
 
 static void TestBadClient(Porto::Connection &api) {
-    std::vector<TString> clist;
+    std::vector<std::string> clist;
     int sec = 120;
 
     //FIXME lol
@@ -4070,7 +4070,7 @@ static void TestBadClient(Porto::Connection &api) {
     Say() << "Check client that does partial write" << std::endl;
 
     int fd;
-    TString buf = "xyz";
+    string buf = "xyz";
     alarm(sec);
     ExpectOk(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
     int ret = write(fd, buf.c_str(), buf.length());
@@ -4085,11 +4085,11 @@ static void TestBadClient(Porto::Connection &api) {
 }
 
 static void TestRemoveDead(Porto::Connection &api) {
-    TString v;
+    std::string v;
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[remove_dead]", v));
     ExpectEq(v, std::to_string(0));
 
-    TString name = "dead";
+    std::string name = "dead";
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "true"));
     ExpectApiSuccess(api.SetProperty(name, "aging_time", "1"));
@@ -4097,7 +4097,7 @@ static void TestRemoveDead(Porto::Connection &api) {
     WaitContainer(api, name);
 
     usleep((config().daemon().log_rotate_ms() + 1000) * 1000);
-    TString state;
+    std::string state;
     ExpectApiFailure(api.GetProperty(name, "state", state), EError::ContainerDoesNotExist);
 
     ExpectApiSuccess(api.GetProperty("/", "porto_stat[remove_dead]", v));
@@ -4105,11 +4105,11 @@ static void TestRemoveDead(Porto::Connection &api) {
 }
 
 static void TestStdoutLimit(Porto::Connection &api) {
-    TString v, cwd, limitStr;
+    std::string v, cwd, limitStr;
     struct stat st;
     uint64_t limit;
 
-    TString name = "biglog";
+    std::string name = "biglog";
     ExpectApiSuccess(api.Create(name));
 
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
@@ -4150,7 +4150,7 @@ static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("abc/def/gik"));
     ExpectApiSuccess(api.SetProperty("abc/def/gik", "root", "/root_gik"));
 
-    TString res;
+    std::string res;
 
     ExpectApiSuccess(api.ConvertPath("/", "/", "", res));
     ExpectEq(res, "/");
@@ -4181,8 +4181,8 @@ static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("abc"));
 }
 
-int SelfTest(std::vector<TString> args) {
-    pair<TString, std::function<void(Porto::Connection &)>> tests[] = {
+int SelfTest(std::vector<std::string> args) {
+    pair<string, std::function<void(Porto::Connection &)>> tests[] = {
         { "path", TestPath },
         { "idmap", TestIdmap },
         { "format", TestFormat },

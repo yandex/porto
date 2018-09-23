@@ -18,6 +18,8 @@ constexpr int DEFAULT_DISK_TIMEOUT = 900;   // 15min
 
 constexpr char SOCKET_PATH[] = "/run/portod.socket";
 
+typedef std::string TString;
+
 typedef std::function<void(const rpc::TWaitResponse &event)> TWaitCallback;
 
 enum {
