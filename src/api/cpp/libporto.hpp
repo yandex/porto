@@ -252,7 +252,7 @@ public:
     const TListLayersResponse *ListLayers(const TString &place = "",
                                           const TString &mask = "");
 
-    EError ListLayers(std::vector<TString> layers,
+    EError ListLayers(std::vector<TString> &layers,
                       const TString &place = "",
                       const TString &mask = "");
 

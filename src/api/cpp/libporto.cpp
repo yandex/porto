@@ -922,7 +922,7 @@ const TListLayersResponse *TPortoApi::ListLayers(const TString &place,
     return list;
 }
 
-EError TPortoApi::ListLayers(std::vector<TString> layers,
+EError TPortoApi::ListLayers(std::vector<TString> &layers,
                              const TString &place,
                              const TString &mask) {
     Req.Clear();
