@@ -3106,7 +3106,7 @@ TError TVolume::CheckRequired(TContainer &ct) {
     return OK;
 }
 
-void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump) {
+void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, Porto::TVolumeDescription *dump) {
     TStringMap ret;
 
     auto volumes_lock = LockVolumes();
@@ -3290,7 +3290,7 @@ TError TVolume::Save() {
 }
 
 TError TVolume::Restore(const TKeyValue &node) {
-    rpc::TVolumeSpec spec;
+    Porto::TVolume spec;
     TError error;
 
     error = ParseConfig(node.Data, spec);
@@ -3457,7 +3457,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_INODE_AVAILABLE,    "available disk inodes (ro)", true },
 };
 
-TError TVolume::Create(const rpc::TVolumeSpec &spec,
+TError TVolume::Create(const Porto::TVolume &spec,
                        std::shared_ptr<TVolume> &volume) {
     TError error;
 
@@ -3851,7 +3851,7 @@ TError TVolume::VerifyConfig(const TStringMap &cfg) {
     return OK;
 }
 
-TError TVolume::ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec) {
+TError TVolume::ParseConfig(const TStringMap &cfg, Porto::TVolume &spec) {
 
     for (auto &it : cfg) {
         auto &key = it.first;
@@ -3964,7 +3964,7 @@ TError TVolume::ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec) {
     return OK;
 }
 
-TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
+TError TVolume::Load(const Porto::TVolume &spec, bool full) {
     TError error, ret;
 
     if (spec.has_id() && full)
@@ -4038,7 +4038,7 @@ TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
     return ret;
 }
 
-void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
+void TVolume::Dump(Porto::TVolume &spec, bool full) {
     auto volumes_lock = LockVolumes();
 
     spec.set_path(CL->ComposePath(Path).ToString());

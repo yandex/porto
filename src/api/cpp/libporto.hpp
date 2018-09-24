@@ -3,14 +3,11 @@
 #include <map>
 #include <vector>
 #include <string>
-#include <memory>
 #include <functional>
 
 #include "rpc.pb.h"
 
 namespace Porto {
-
-using Porto::rpc::EError;
 
 constexpr int INFINITE_TIMEOUT = 0;
 constexpr int DEFAULT_TIMEOUT = 300;        // 5min
@@ -20,7 +17,7 @@ constexpr char SOCKET_PATH[] = "/run/portod.socket";
 
 typedef std::string TString;
 
-typedef std::function<void(const rpc::TWaitResponse &event)> TWaitCallback;
+typedef std::function<void(const TWaitResponse &event)> TWaitCallback;
 
 enum {
     GET_NONBLOCK = 1,
@@ -28,7 +25,7 @@ enum {
     GET_REAL = 4,
 };
 
-class Connection {
+class TPortoApi {
 private:
     int Fd = -1;
     int Timeout = DEFAULT_TIMEOUT;
@@ -37,8 +34,12 @@ private:
     EError LastError = EError::Success;
     TString LastErrorMsg;
 
-    rpc::TPortoRequest Req;
-    rpc::TPortoResponse Rsp;
+    /*
+     * These keep last request and response. Method might return
+     * pointers to Rsp innards -> pointers valid until next call.
+     */
+    TPortoRequest Req;
+    TPortoResponse Rsp;
 
     std::vector<TString> AsyncWaitNames;
     std::vector<TString> AsyncWaitLabels;
@@ -49,15 +50,15 @@ private:
 
     EError SetSocketTimeout(int direction, int timeout);
 
-    EError Send(const rpc::TPortoRequest &req);
+    EError Send(const TPortoRequest &req);
 
-    EError Recv(rpc::TPortoResponse &rsp);
+    EError Recv(TPortoResponse &rsp);
 
     EError Call(int extra_timeout = -1);
 
 public:
-    Connection() { }
-    ~Connection();
+    TPortoApi() { }
+    ~TPortoApi();
 
     int GetFd() const { return Fd; }
 
@@ -89,8 +90,8 @@ public:
     /* To be used for next changed_since */
     uint64_t ResponseTimestamp() const { return Rsp.timestamp(); }
 
-    EError Call(const rpc::TPortoRequest &req,
-                rpc::TPortoResponse &rsp,
+    EError Call(const TPortoRequest &req,
+                TPortoResponse &rsp,
                 int extra_timeout = -1);
 
     EError Call(const TString &req,
@@ -101,17 +102,17 @@ public:
 
     EError GetVersion(TString &tag, TString &revision);
 
-    const rpc::TGetSystemResponse *GetSystem();
+    const TGetSystemResponse *GetSystem();
 
     EError SetSystem(const TString &key, const TString &val);
 
     /* Container */
 
-    const rpc::TListPropertiesResponse *ListProperties();
+    const TListPropertiesResponse *ListProperties();
 
     EError ListProperties(std::vector<TString> &properties);
 
-    const rpc::TListResponse *List(const TString &mask = "");
+    const TListResponse *List(const TString &mask = "");
 
     EError List(std::vector<TString> &names, const TString &mask = "");
 
@@ -142,9 +143,9 @@ public:
                           TString &result_state,
                           int wait_timeout = -1);
 
-    const rpc::TWaitResponse *Wait(const std::vector<TString> &names,
-                                   const std::vector<TString> &labels,
-                                   int wait_timeout = -1);
+    const TWaitResponse *Wait(const std::vector<TString> &names,
+                              const std::vector<TString> &labels,
+                              int wait_timeout = -1);
 
     EError AsyncWait(const std::vector<TString> &names,
                      const std::vector<TString> &labels,
@@ -155,14 +156,14 @@ public:
         Recv(Rsp);
     }
 
-    const rpc::TGetResponse *Get(const std::vector<TString> &names,
-                                 const std::vector<TString> &properties,
-                                 int flags = 0);
+    const TGetResponse *Get(const std::vector<TString> &names,
+                            const std::vector<TString> &properties,
+                            int flags = 0);
 
     /* Porto v5 api */
-    const rpc::TContainerSpec *GetContainerSpec(const TString &name);
+    const TContainer *GetContainer(const TString &name);
 
-    const rpc::TGetContainerResponse *GetContainersSpec(uint64_t changed_since = 0);
+    const TGetContainerResponse *GetContainers(uint64_t changed_since = 0);
 
     EError GetProperty(const TString &name,
                        const TString &property,
@@ -207,26 +208,27 @@ public:
     EError AttachThread(const TString &name, int pid,
                         const TString &comm = "");
 
-    EError LocateProcess(int pid, const TString &comm /* = "" */,
+    EError LocateProcess(int pid,
+                         const TString &comm /* = "" */,
                          TString &name);
 
     /* Volume */
 
-    const rpc::TListVolumePropertiesResponse *ListVolumeProperties();
+    const TListVolumePropertiesResponse *ListVolumeProperties();
 
     EError ListVolumeProperties(std::vector<TString> &properties);
 
-    const rpc::TListVolumesResponse *ListVolumes(const TString &path = "",
-                                                 const TString &container = "");
+    const TListVolumesResponse *ListVolumes(const TString &path = "",
+                                            const TString &container = "");
 
     EError ListVolumes(std::vector<TString> &paths);
 
-    const rpc::TVolumeDescription *GetVolume(const TString &path);
+    const TVolumeDescription *GetVolumeDesc(const TString &path);
 
     /* Porto v5 api */
-    const rpc::TVolumeSpec *GetVolumeSpec(const TString &path);
+    const TVolume *GetVolume(const TString &path);
 
-    const rpc::TGetVolumeResponse *GetVolumesSpec(uint64_t changed_since = 0);
+    const TGetVolumeResponse *GetVolumes(uint64_t changed_since = 0);
 
     EError CreateVolume(TString &path,
                         const std::map<TString, TString> &config);
@@ -247,8 +249,8 @@ public:
 
     /* Layer */
 
-    const rpc::TListLayersResponse *ListLayers(const TString &place = "",
-                                               const TString &mask = "");
+    const TListLayersResponse *ListLayers(const TString &place = "",
+                                          const TString &mask = "");
 
     EError ListLayers(std::vector<TString> layers,
                       const TString &place = "",
@@ -281,8 +283,8 @@ public:
 
     /* Storage */
 
-    const rpc::TListStoragesResponse *ListStorages(const TString &place = "",
-                                                   const TString &mask = "");
+    const TListStoragesResponse *ListStorages(const TString &place = "",
+                                              const TString &mask = "");
 
     EError ListStorages(std::vector<TString> &storages,
                         const TString &place = "",

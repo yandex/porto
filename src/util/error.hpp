@@ -6,8 +6,7 @@
 
 #include "rpc.pb.h"
 
-using namespace Porto;
-using Porto::rpc::EError;
+using Porto::EError;
 
 class TError {
 public:
@@ -79,7 +78,7 @@ public:
     TError Serialize(int fd) const;
     static bool Deserialize(int fd, TError &error);
 
-    void Dump(rpc::TError &error) const;
+    void Dump(Porto::TError &error) const;
 };
 
 extern const TError OK;

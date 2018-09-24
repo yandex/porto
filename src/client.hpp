@@ -96,10 +96,10 @@ public:
     std::list<TContainerReport> ReportQueue;
 
     TError Event(uint32_t events);
-    TError ReadRequest(rpc::TPortoRequest &request);
+    TError ReadRequest(Porto::TPortoRequest &request);
     void QueueRequest();
     TError SendResponse(bool first);
-    TError QueueResponse(rpc::TPortoResponse &response);
+    TError QueueResponse(Porto::TPortoResponse &response);
     TError QueueReport(const TContainerReport &report, bool async);
     TError MakeReport(const std::string &name, const std::string &state, bool async,
                       const std::string &label = "", const std::string &value = "");

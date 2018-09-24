@@ -20,8 +20,8 @@ struct TBindMount {
     static TError Parse(const std::string &str, std::vector<TBindMount> &binds);
     static std::string Format(const std::vector<TBindMount> &binds);
 
-    TError Load(const rpc::TContainerBindMount &spec);
-    void Dump(rpc::TContainerBindMount &spec);
+    TError Load(const Porto::TContainerBindMount &spec);
+    void Dump(Porto::TContainerBindMount &spec);
 };
 
 struct TMountNamespace {

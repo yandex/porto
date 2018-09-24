@@ -44,15 +44,15 @@ TError TProperty::SetIndexed(const std::string &, const std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
-bool TProperty::Has(const rpc::TContainerSpec &) {
+bool TProperty::Has(const Porto::TContainer &) {
     return false;
 }
 
-TError TProperty::Load(const rpc::TContainerSpec &) {
+TError TProperty::Load(const Porto::TContainer &) {
     return OK;
 }
 
-void TProperty::Dump(rpc::TContainerSpec &) {
+void TProperty::Dump(Porto::TContainer &) {
 }
 
 std::string TProperty::GetDesc() const {
@@ -158,14 +158,14 @@ public:
             return error;
         return Set(val);
     }
-    void DumpMap(rpc::TUintMap *dump) {
+    void DumpMap(Porto::TUintMap *dump) {
         for (auto &it: Get()) {
             auto kv = dump->add_map();
             kv->set_key(it.first);
             kv->set_val(it.second);
         }
     }
-    TError LoadMap(const rpc::TUintMap &dump) {
+    TError LoadMap(const Porto::TUintMap &dump) {
         TUintMap map;
         if (dump.merge())
             map = Get();
@@ -237,18 +237,18 @@ public:
             return error;
         return Set(index, val);
     }
-    virtual void Dump(rpc::TContainerSpec &spec, T val) = 0;
-    virtual void Dump(rpc::TContainerSpec &spec) {
+    virtual void Dump(Porto::TContainer &spec, T val) = 0;
+    virtual void Dump(Porto::TContainer &spec) {
         T value;
         if (!Get(value))
             Dump(spec, value);
     }
-    virtual bool Has(const rpc::TContainerSpec &) {
+    virtual bool Has(const Porto::TContainer &) {
         return false;
     }
-    virtual void Load(const rpc::TContainerSpec &, T &) {
+    virtual void Load(const Porto::TContainer &, T &) {
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         T val;
         Load(spec, val);
         return Set(val);
@@ -440,13 +440,13 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         CT->CapLimit.Dump(*spec.mutable_capabilities());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_capabilities();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TCapabilities caps;
         TError error = caps.Load(spec.capabilities());
         if (error)
@@ -476,13 +476,13 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         CT->CapAmbient.Dump(*spec.mutable_capabilities_ambient());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_capabilities_ambient();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TCapabilities caps;
         TError error = caps.Load(spec.capabilities_ambient());
         if (error)
@@ -501,7 +501,7 @@ public:
     TCapabilities & Get() {
         return CT->CapBound;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         CT->CapLimit.Dump(*spec.mutable_capabilities_allowed());
     }
 } static CapAllowed;
@@ -519,7 +519,7 @@ public:
     TCapabilities &Get() {
         return CT->CapAllowed;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         CT->CapLimit.Dump(*spec.mutable_capabilities_ambient_allowed());
     }
 } static CapAmbientAllowed;
@@ -541,13 +541,13 @@ public:
             CT->Cwd = "/";
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_cwd(CT->GetCwd().ToString());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cwd();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.cwd());
     }
 } static Cwd;
@@ -594,7 +594,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         TUlimit ulimit = CT->GetUlimit();
         auto map = spec.mutable_ulimit();
         for (auto &res: ulimit.Resources) {
@@ -610,10 +610,10 @@ public:
                 u->set_inherited(true);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_ulimit();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TUlimit ulimit;
         if (spec.ulimit().merge())
             ulimit = CT->Ulimit;
@@ -652,13 +652,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_cpu_policy(CT->CpuPolicy);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cpu_policy();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.cpu_policy());
     }
 } static CpuPolicy;
@@ -700,13 +700,13 @@ public:
 
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_io_policy(CT->IoPolicy);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_io_policy();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.io_policy());
     }
 } static IoPolicy;
@@ -733,13 +733,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, double val) {
+    void Dump(Porto::TContainer &spec, double val) {
         spec.set_io_weight(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_io_weight();
     }
-    void Load(const rpc::TContainerSpec &spec, double &val) {
+    void Load(const Porto::TContainer &spec, double &val) {
         val = spec.io_weight();
     }
 } static IoWeight;
@@ -765,13 +765,13 @@ public:
         CT->SetProp(EProperty::GROUP);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         CT->TaskCred.Dump(*spec.mutable_task_cred());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_task_cred();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return CT->TaskCred.Load(spec.task_cred());
     }
 } static TaskCred;
@@ -803,13 +803,13 @@ public:
             CT->TaskCred.Uid = RootUser;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_user(CT->TaskCred.User());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_user();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.user());
     }
 } static User;
@@ -835,13 +835,13 @@ public:
             CT->TaskCred.Gid = RootGroup;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_group(CT->TaskCred.Group());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_group();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.group());
     }
 } static Group;
@@ -871,13 +871,13 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         CT->OwnerCred.Dump(*spec.mutable_owner_cred());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_owner_cred();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return CT->OwnerCred.Load(spec.owner_cred());
     }
 } static OwnerCred;
@@ -914,13 +914,13 @@ public:
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_owner_user(CT->OwnerCred.User());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_owner_user();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.owner_user());
     }
 } static OwnerUser;
@@ -951,13 +951,13 @@ public:
         CT->SetProp(EProperty::OWNER_GROUP);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_owner_group(CT->OwnerCred.Group());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_owner_group();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.owner_group());
     }
 } static OwnerGroup;
@@ -994,13 +994,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_memory_guarantee(value);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_memory_guarantee();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.memory_guarantee();
     }
 } static MemoryGuarantee;
@@ -1019,7 +1019,7 @@ public:
         val = CT->GetTotalMemGuarantee();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_memory_guarantee_total(value);
     }
 } static MemTotalGuarantee;
@@ -1046,13 +1046,13 @@ public:
             CT->Command = "/sbin/init";
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_command(CT->Command);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_command();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.command());
     }
 } static Command;
@@ -1109,15 +1109,15 @@ public:
         CT->SetProp(EProperty::COMMAND_ARGV);
         return SetCommand();
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto cmd = spec.mutable_command_argv();
         for (auto &argv: CT->CommandArgv)
             cmd->add_argv(argv);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_command_argv();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         size_t size = 0;
         for (auto &argv: spec.command_argv().argv())
             size += argv.size() + 3;
@@ -1158,15 +1158,15 @@ public:
         CT->SetProp(EProperty::CORE_COMMAND);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         std::string command;
         Get(command);
         spec.set_core_command(command);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_core_command();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.core_command());
     }
 } static CoreCommand;
@@ -1203,15 +1203,15 @@ public:
         CT->SetProp(EProperty::VIRT_MODE);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         std::string val;
         Get(val);
         spec.set_virt_mode(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_virt_mode();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.virt_mode());
     }
 } static VirtMode;
@@ -1229,13 +1229,13 @@ public:
         CT->SetProp(EProperty::STDIN);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_stdin_path(CT->Stdin.Path.ToString());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_stdin_path();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.stdin_path());
     }
 } static StdinPath;
@@ -1258,13 +1258,13 @@ public:
             CT->Stdout.SetOutside("/dev/null");
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_stdout_path(CT->Stdout.Path.ToString());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_stdout_path();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.stdout_path());
     }
 } static StdoutPath;
@@ -1287,13 +1287,13 @@ public:
             CT->Stderr.SetOutside("/dev/null");
          return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_stderr_path(CT->Stderr.Path.ToString());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_stderr_path();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.stderr_path());
     }
 } static StderrPath;
@@ -1320,13 +1320,13 @@ public:
         CT->SetProp(EProperty::STDOUT_LIMIT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_stdout_limit(value);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_stdout_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.stdout_limit();
     }
 } static StdoutLimit;
@@ -1343,7 +1343,7 @@ public:
         val = CT->Stdout.Offset;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_stdout_offset(value);
     }
 } static StdoutOffset;
@@ -1360,7 +1360,7 @@ public:
         val = CT->Stderr.Offset;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_stderr_offset(value);
     }
 } static StderrOffset;
@@ -1418,7 +1418,7 @@ public:
             CT->BindDns = false;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &, bool) { }
+    void Dump(Porto::TContainer &, bool) { }
 } static BindDns;
 
 class TIsolate : public TBoolProperty {
@@ -1443,13 +1443,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_isolate(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_isolate();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.isolate();
     }
 } static Isolate;
@@ -1490,13 +1490,13 @@ public:
             return TError(EError::InvalidValue, "Cannot change root in this virt_mode");
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_root(CT->Root);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_root();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.root());
     }
 } static Root;
@@ -1512,7 +1512,7 @@ public:
             return TError(EError::Permission, "Root path is unreachable");
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         TPath root = CL->ComposePath(CT->RootPath);
         if (root)
             spec.set_root_path(root.ToString());
@@ -1567,7 +1567,7 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_net();
         for (auto &line: CT->NetProp) {
             auto cfg = out->add_cfg();
@@ -1581,10 +1581,10 @@ public:
             out->set_inherited(CT->NetInherit);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_net();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TMultiTuple net;
         for (auto &cfg: spec.net().cfg()) {
             net.push_back({cfg.opt()});
@@ -1608,13 +1608,13 @@ public:
         CT->SetProp(EProperty::ROOT_RDONLY);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_root_readonly(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_root_readonly();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.root_readonly();
     }
 } static RootRo;
@@ -1638,13 +1638,13 @@ public:
     TError Parse(const std::string &str, unsigned &val) {
         return StringToOct(str, val);
     }
-    void Dump(rpc::TContainerSpec &spec, unsigned val) {
+    void Dump(Porto::TContainer &spec, unsigned val) {
         spec.set_umask(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_umask();
     }
-    void Load(const rpc::TContainerSpec &spec, unsigned &val) {
+    void Load(const Porto::TContainer &spec, unsigned &val) {
         val = spec.umask();
     }
 } static Umask;
@@ -1695,16 +1695,16 @@ public:
         CT->SetProp(EProperty::CONTROLLERS);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_controllers();
         for (auto &it: ControllersName)
             if (CT->Controllers & it.first)
                 out->add_controller(it.second);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_controllers();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         uint64_t controllers = 0, val;
         for (auto &name: spec.controllers().controller()) {
             TError error = StringParseFlags(name, ControllersName, val, ';');
@@ -1741,7 +1741,7 @@ public:
         }
         return TError(EError::InvalidProperty, "Unknown cgroup subststem: " + index);
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_cgroups();
         for (auto &subsys: Subsystems) {
             auto cg = out->add_cgroup();
@@ -1766,13 +1766,13 @@ public:
         CT->SetProp(EProperty::HOSTNAME);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_hostname(CT->Hostname);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_hostname();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.hostname());
     }
 } static Hostname;
@@ -1815,7 +1815,7 @@ public:
         CT->SetProp(EProperty::ENV);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         TEnv env;
         if (CT->GetEnvironment(env))
             return;
@@ -1831,10 +1831,10 @@ public:
             }
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_env();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TEnv env;
         TError error;
 
@@ -1874,15 +1874,15 @@ public:
         CT->SetProp(EProperty::BIND);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_bind();
         for (auto &bind: CT->BindMounts)
             bind.Dump(*out->add_bind());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_bind();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         std::vector<TBindMount> result;
         result.resize(spec.bind().bind_size());
         for (int i = 0; i < spec.bind().bind_size(); i++) {
@@ -1942,7 +1942,7 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_symlink();
         for (auto &link: CT->Symlink) {
             auto sym = out->add_map();
@@ -1950,10 +1950,10 @@ public:
             sym->set_val(link.second.ToString());
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_symlink();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TStringMap map;
         TError error;
 
@@ -1991,7 +1991,7 @@ public:
         CT->SetProp(EProperty::IP);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_ip();
         for (auto &line: CT->IpList) {
             auto ip = out->add_cfg();
@@ -1999,10 +1999,10 @@ public:
             ip->set_ip(line[1]);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_ip();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TMultiTuple cfg;
         for (auto &line: spec.ip().cfg())
             cfg.push_back({line.dev(), line.ip()});
@@ -2048,17 +2048,17 @@ public:
 
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto cfg = spec.mutable_ip_limit();
         cfg->set_policy(CT->IpPolicy);
         if (CT->IpPolicy == "some")
             for (auto &line: CT->IpLimit)
                 cfg->add_ip(line[0]);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_ip_limit();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TMultiTuple cfg;
         for (auto &ip: spec.ip_limit().ip())
             cfg.push_back({ip});
@@ -2084,7 +2084,7 @@ public:
         CT->SetProp(EProperty::DEFAULT_GW);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_default_gw();
         for (auto &line: CT->DefaultGw) {
             auto ip = out->add_cfg();
@@ -2092,10 +2092,10 @@ public:
             ip->set_ip(line[1]);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_default_gw();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TMultiTuple cfg;
         for (auto &line: spec.default_gw().cfg())
             cfg.push_back({line.dev(), line.ip()});
@@ -2138,7 +2138,7 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         if (CT->ResolvConf.size() || CT->IsRoot())
             spec.set_resolv_conf(CT->ResolvConf);
         else if (CT->HasProp(EProperty::RESOLV_CONF))
@@ -2148,10 +2148,10 @@ public:
         else
             spec.set_resolv_conf("default");
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_resolv_conf();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.resolv_conf());
     }
 } static ResolvConf;
@@ -2170,13 +2170,13 @@ public:
         CT->SetProp(EProperty::ETC_HOSTS);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_etc_hosts(CT->EtcHosts);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_etc_hosts();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.etc_hosts());
     }
 } static EtcHosts;
@@ -2220,15 +2220,15 @@ public:
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_devices();
         for (auto dev: CT->Devices.Devices)
             dev.Dump(*out->add_device());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_devices();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TDevices devices;
         TError error;
         error = CT->EnableControllers(CGROUP_DEVICES);
@@ -2293,7 +2293,7 @@ public:
         CT->SeizeTask.Pid = val;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &, int64_t) { }
+    void Dump(Porto::TContainer &, int64_t) { }
 } static SeizePid;
 
 class TRawStartTime : public TIntProperty {
@@ -2311,7 +2311,7 @@ public:
         CT->RealStartTime = time(nullptr) - (GetCurrentTimeMs() - CT->StartTime) / 1000;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &, int64_t) { }
+    void Dump(Porto::TContainer &, int64_t) { }
 } static RawStartTime;
 
 class TRawDeathTime : public TIntProperty {
@@ -2329,7 +2329,7 @@ public:
         CT->RealDeathTime = time(nullptr) - (GetCurrentTimeMs() - CT->DeathTime) / 1000;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &, int64_t) { }
+    void Dump(Porto::TContainer &, int64_t) { }
 } static RawDeathTime;
 
 class TPortoNamespace : public TProperty {
@@ -2345,13 +2345,13 @@ public:
         CT->SetProp(EProperty::PORTO_NAMESPACE);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_porto_namespace(CT->NsName);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_porto_namespace();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.porto_namespace());
     }
 } static PortoNamespace;
@@ -2369,7 +2369,7 @@ public:
         CT->SetProp(EProperty::PLACE);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto cfg = spec.mutable_place();
         for (auto &place: CT->PlacePolicy) {
             auto p = cfg->add_cfg();
@@ -2382,10 +2382,10 @@ public:
             }
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_place();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         CT->PlacePolicy.clear();
         for (auto &p: spec.place().cfg()) {
             if (p.has_alias())
@@ -2415,13 +2415,13 @@ public:
         CT->SetProp(EProperty::PLACE_LIMIT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(spec.mutable_place_limit());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_place_limit();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return LoadMap(spec.place_limit());
     }
 } static PlaceLimit;
@@ -2435,7 +2435,7 @@ public:
     TUintMap &Get() {
         return CT->PlaceUsage;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(spec.mutable_place_usage());
     }
 } static PlaceUsage;
@@ -2459,7 +2459,7 @@ public:
         value = MergeEscapeStrings(paths, ';');
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_volumes_owned();
         for (auto &vol: CT->OwnedVolumes) {
             TPath path = CL->ComposePath(vol->Path);
@@ -2495,7 +2495,7 @@ public:
         value = MergeEscapeStrings(links, ' ', ';');
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_volumes_linked();
         for (auto &link: CT->VolumeLinks) {
             auto l = out->add_link();
@@ -2541,7 +2541,7 @@ public:
         CT->SetProp(EProperty::REQUIRED_VOLUMES);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_volumes_required();
         for (auto &path: CT->RequiredVolumes)
             out->add_volume(path);
@@ -2588,13 +2588,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_memory_limit(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_memory_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.memory_limit();
     }
 } static MemoryLimit;
@@ -2609,7 +2609,7 @@ public:
         value = CT->GetMemLimit();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_memory_limit_total(value);
     }
 } static MemoryLimitTotal;
@@ -2638,13 +2638,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_anon_limit(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_anon_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.anon_limit();
     }
 } static AnonLimit;
@@ -2662,7 +2662,7 @@ public:
         val = CT->GetAnonMemLimit();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_anon_limit_total(value);
     }
 } static AnonLimitTotal;
@@ -2687,13 +2687,13 @@ public:
         CT->SetProp(EProperty::ANON_ONLY);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_anon_only(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_anon_only();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.anon_only();
     }
 } static AnonOnly;
@@ -2722,13 +2722,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_dirty_limit(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_dirty_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.dirty_limit();
     }
 } static DirtyLimit;
@@ -2762,13 +2762,13 @@ public:
         CT->SetProp(EProperty::HUGETLB_LIMIT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_hugetlb_limit(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_hugetlb_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.hugetlb_limit();
     }
 } static HugetlbLimit;
@@ -2793,13 +2793,13 @@ public:
         CT->SetProp(EProperty::RECHARGE_ON_PGFAULT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_recharge_on_pgfault(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_recharge_on_pgfault();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.recharge_on_pgfault();
     }
 } static RechargeOnPgfault;
@@ -2821,13 +2821,13 @@ public:
         CT->SetProp(EProperty::PRESSURIZE_ON_DEATH);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_pressurize_on_death(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_pressurize_on_death();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.pressurize_on_death();
     }
 } static PressurizeOnDeath;
@@ -2851,13 +2851,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_limit((double)val / NSEC_PER_SEC);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cpu_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.cpu_limit() * NSEC_PER_SEC;
     }
 } static CpuLimit;
@@ -2873,7 +2873,7 @@ public:
         val = CT->CpuLimitSum;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_limit_total((double)val / NSEC_PER_SEC);
     }
 } static CpuLimitTotal;
@@ -2897,13 +2897,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_guarantee((double)val / NSEC_PER_SEC);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cpu_guarantee();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.cpu_guarantee() * NSEC_PER_SEC;
     }
 } static CpuGuarantee;
@@ -2919,7 +2919,7 @@ public:
         val = std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_guarantee_total((double)val / NSEC_PER_SEC);
     }
 } static CpuGuaranteeTotal;
@@ -2945,13 +2945,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_period(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cpu_period();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.cpu_period();
     }
 } static CpuPeriod;
@@ -2975,13 +2975,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, double val) {
+    void Dump(Porto::TContainer &spec, double val) {
         spec.set_cpu_weight(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cpu_weight();
     }
-    void Load(const rpc::TContainerSpec &spec, double &val) {
+    void Load(const Porto::TContainer &spec, double &val) {
         val = spec.cpu_weight();
     }
 } static CpuWeight;
@@ -3071,7 +3071,7 @@ public:
 
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto cfg = spec.mutable_cpu_set();
         switch (CT->CpuSetType) {
         case ECpuSetType::Inherit:
@@ -3103,10 +3103,10 @@ public:
             break;
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_cpu_set();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         auto cfg = spec.cpu_set();
         int arg = cfg.arg();
         ECpuSetType type;
@@ -3165,7 +3165,7 @@ public:
         value = CT->CpuAffinity.Format();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto lock = LockCpuAffinity();
         auto cfg = spec.mutable_cpu_set_affinity();
         for (auto cpu = 0u; cpu < CT->CpuAffinity.Size(); cpu++)
@@ -3209,13 +3209,13 @@ public:
         CT->SetProp(EProperty::IO_LIMIT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(spec.mutable_io_limit());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_io_limit();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return LoadMap(spec.io_limit());
     }
 } static IoBpsLimit;
@@ -3253,13 +3253,13 @@ public:
         CT->SetProp(EProperty::IO_OPS_LIMIT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(spec.mutable_io_ops_limit());
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_io_ops_limit();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return LoadMap(spec.io_ops_limit());
     }
 } static IoOpsLimit;
@@ -3281,13 +3281,13 @@ public:
         CT->SetProp(EProperty::RESPAWN);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_respawn(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_respawn();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.respawn();
     }
 } static Respawn;
@@ -3309,13 +3309,13 @@ public:
         CT->SetProp(EProperty::RESPAWN_COUNT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_respawn_count(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_respawn_count();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.respawn_count();
     }
 } static RespawnCount;
@@ -3346,13 +3346,13 @@ public:
             CT->ClearProp(EProperty::RESPAWN_LIMIT);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_max_respawns(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_max_respawns();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.max_respawns();
     }
 } static RespawnLimit;
@@ -3374,13 +3374,13 @@ public:
         CT->ClearProp(EProperty::RESPAWN_DELAY);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_respawn_delay(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_respawn_delay();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.respawn_delay();
     }
 } static RespawnDelay;
@@ -3404,13 +3404,13 @@ public:
         CT->SetProp(EProperty::PRIVATE);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_private_(CT->Private);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_private_();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.private_());
     }
 } static Private;
@@ -3481,7 +3481,7 @@ public:
         TContainerWaiter::ReportAll(*CT, index, value);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto lock = LockContainers();
         auto map = spec.mutable_labels();
         for (auto &it: CT->Labels) {
@@ -3490,10 +3490,10 @@ public:
             l->set_val(it.second);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_labels();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TStringMap map;
         for (auto &label: spec.labels().map())
             map[label.key()] = label.val();
@@ -3518,13 +3518,13 @@ public:
         CT->SetProp(EProperty::AGING_TIME);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+    void Dump(Porto::TContainer &spec, int64_t val) {
         spec.set_aging_time(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_aging_time();
     }
-    void Load(const rpc::TContainerSpec &spec, int64_t &val) {
+    void Load(const Porto::TContainer &spec, int64_t &val) {
         val = spec.aging_time();
     }
 } static AgingTime;
@@ -3612,15 +3612,15 @@ public:
             CT->AccessLevel = parent->AccessLevel;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         std::string val;
         Get(val);
         spec.set_enable_porto(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_enable_porto();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.enable_porto());
     }
 } static EnablePorto;
@@ -3642,13 +3642,13 @@ public:
         CT->SetProp(EProperty::WEAK);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_weak(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_weak();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.weak();
     }
 } static Weak;
@@ -3664,7 +3664,7 @@ public:
         val = CT->Id;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+    void Dump(Porto::TContainer &spec, int64_t val) {
         spec.set_id(val);
     }
 } static IdProperty;
@@ -3680,7 +3680,7 @@ public:
         val = CT->Level;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+    void Dump(Porto::TContainer &spec, int64_t val) {
         spec.set_level(val);
     }
 } static LevelProperty;
@@ -3698,7 +3698,7 @@ public:
             value = ROOT_PORTO_NAMESPACE + CT->Name;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         std::string val;
         Get(val);
         spec.set_absolute_name(val);
@@ -3715,7 +3715,7 @@ public:
         value = ROOT_PORTO_NAMESPACE + CT->GetPortoNamespace();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         std::string val;
         Get(val);
         spec.set_absolute_namespace(val);
@@ -3732,7 +3732,7 @@ public:
         value = TContainer::StateName(CT->State);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_state(TContainer::StateName(CT->State));
     }
 } static State;
@@ -3753,7 +3753,7 @@ public:
         CT->SetProp(EProperty::OOM_KILLED);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_oom_killed(val);
     }
 } static OomKilled;
@@ -3780,7 +3780,7 @@ public:
         CT->SetProp(EProperty::OOM_KILLS);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_oom_kills(value);
     }
 } static OomKills;
@@ -3806,7 +3806,7 @@ class TOomKillsTotal : public TSizeProperty {
         CT->SetProp(EProperty::OOM_KILLS_TOTAL);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_oom_kills_total(value);
     }
 } static OomKillsTotal;
@@ -3823,7 +3823,7 @@ public:
         val = WIFSIGNALED(CT->ExitStatus) && WCOREDUMP(CT->ExitStatus);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_core_dumped(val);
     }
 } static CoreDumped;
@@ -3844,13 +3844,13 @@ public:
         CT->SetProp(EProperty::OOM_IS_FATAL);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, bool val) {
+    void Dump(Porto::TContainer &spec, bool val) {
         spec.set_oom_is_fatal(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_oom_is_fatal();
     }
-    void Load(const rpc::TContainerSpec &spec, bool &val) {
+    void Load(const Porto::TContainer &spec, bool &val) {
         val = spec.oom_is_fatal();
     }
 } static OomIsFatal;
@@ -3872,13 +3872,13 @@ public:
         }
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+    void Dump(Porto::TContainer &spec, int64_t val) {
         spec.set_oom_score_adj(val);
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_oom_score_adj();
     }
-    void Load(const rpc::TContainerSpec &spec, int64_t &val) {
+    void Load(const Porto::TContainer &spec, int64_t &val) {
         val = spec.oom_score_adj();
     }
 } static OomScoreAdj;
@@ -3899,7 +3899,7 @@ public:
             value = ROOT_PORTO_NAMESPACE + CT->Parent->Name;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         if (CT->Level == 1)
             spec.set_parent(ROOT_CONTAINER);
         else if (CT->Level > 1)
@@ -3925,7 +3925,7 @@ public:
             val = pid;
         return error;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t value) {
+    void Dump(Porto::TContainer &spec, int64_t value) {
         spec.set_root_pid(value);
     }
 } static RootPid;
@@ -3947,7 +3947,7 @@ public:
         CT->SetProp(EProperty::EXIT_STATUS);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t value) {
+    void Dump(Porto::TContainer &spec, int64_t value) {
         spec.set_exit_status(value);
     }
 } static ExitStatusProperty;
@@ -3964,7 +3964,7 @@ public:
         val = CT->GetExitCode();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t value) {
+    void Dump(Porto::TContainer &spec, int64_t value) {
         spec.set_exit_code(value);
     }
 } static ExitCodeProperty;
@@ -3980,7 +3980,7 @@ public:
             value = CT->StartError.ToString();
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         if (CT->StartError)
             CT->StartError.Dump(*spec.mutable_start_error());
     }
@@ -3999,7 +3999,7 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.Usage(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_memory_usage(value);
     }
 } static MemUsage;
@@ -4017,7 +4017,7 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetReclaimed(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_memory_reclaimed(value);
     }
 } static MemReclaimed;
@@ -4035,7 +4035,7 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetAnonUsage(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_anon_usage(value);
     }
 } static AnonUsage;
@@ -4060,7 +4060,7 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.ResetAnonMaxUsage(cg);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_anon_max_usage(value);
     }
 } static AnonMaxUsage;
@@ -4078,7 +4078,7 @@ public:
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetCacheUsage(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_cache_usage(value);
     }
 } static CacheUsage;
@@ -4099,7 +4099,7 @@ public:
         auto cg = CT->GetCgroup(HugetlbSubsystem);
         return HugetlbSubsystem.GetHugeUsage(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_hugetlb_usage(value);
     }
 } static HugetlbUsage;
@@ -4122,7 +4122,7 @@ public:
         val = stat["total_pgfault"] - stat["total_pgmajfault"];
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_minor_faults(value);
     }
 } static MinorFaults;
@@ -4145,7 +4145,7 @@ public:
         val = stat["total_pgmajfault"];
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_major_faults(value);
     }
 } static MajorFaults;
@@ -4182,7 +4182,7 @@ public:
         value = std::to_string(it->second);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         TVmStat st;
         if (CT->GetVmStat(st))
             return;
@@ -4215,7 +4215,7 @@ public:
         }
         return error;
     }
-    void Dump(rpc::TContainerSpec &, uint64_t) { }
+    void Dump(Porto::TContainer &, uint64_t) { }
 } static MaxRss;
 
 class TCpuUsage : public TNsecProperty {
@@ -4231,7 +4231,7 @@ public:
         auto cg = CT->GetCgroup(CpuacctSubsystem);
         return CpuacctSubsystem.Usage(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_usage(val);
     }
 } static CpuUsage;
@@ -4249,7 +4249,7 @@ public:
         auto cg = CT->GetCgroup(CpuacctSubsystem);
         return CpuacctSubsystem.SystemUsage(cg, val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_usage_system(val);
     }
 } static CpuSystem;
@@ -4270,7 +4270,7 @@ public:
         auto cg = CT->GetCgroup(CpuacctSubsystem);
         return cg.GetUint64("cpuacct.wait", val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_wait(val);
     }
 } static CpuWait;
@@ -4296,7 +4296,7 @@ public:
             val = stat["throttled_time"];
         return error;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_cpu_throttled(val);
     }
 } static CpuThrottled;
@@ -4339,7 +4339,7 @@ public:
         }
         return TError(EError::InvalidProperty, "Unknown network class");
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         if (!CT->Net)
             return;
         auto map = spec.mutable_net_class_id();
@@ -4378,13 +4378,13 @@ public:
         }
         return error;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         spec.set_net_tos(TNetwork::FormatTos(CT->NetClass.DefaultTos));
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_net_tos();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         return Set(spec.net_tos());
     }
 } static NetTos;
@@ -4455,8 +4455,8 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) {
-        rpc::TUintMap *map;
+    void Dump(Porto::TContainer &spec) {
+        Porto::TUintMap *map;
 
         if (Name == P_NET_GUARANTEE)
             map = spec.mutable_net_guarantee();
@@ -4475,7 +4475,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         if (Name == P_NET_GUARANTEE)
             return spec.has_net_guarantee();
         if (Name == P_NET_LIMIT)
@@ -4485,7 +4485,7 @@ public:
         return false;
     }
 
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         TUintMap map;
         if (Name == P_NET_GUARANTEE)
             for (auto &kv: spec.net_guarantee().map())
@@ -4569,8 +4569,8 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) {
-        rpc::TUintMap *map;
+    void Dump(Porto::TContainer &spec) {
+        Porto::TUintMap *map;
         TUintMap stat;
 
         // FIXME
@@ -4676,7 +4676,7 @@ public:
 
         return OK;
     }
-    void DumpMap(rpc::TUintMap &dump) {
+    void DumpMap(Porto::TUintMap &dump) {
         TUintMap map;
         GetMap(map);
         for (auto &it: map) {
@@ -4704,7 +4704,7 @@ public:
 
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(*spec.mutable_io_read());
     }
 } static IoReadStat;
@@ -4726,7 +4726,7 @@ public:
 
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(*spec.mutable_io_write());
     }
 } static IoWriteStat;
@@ -4748,7 +4748,7 @@ public:
 
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(*spec.mutable_io_ops());
     }
 } static IoOpsStat;
@@ -4762,7 +4762,7 @@ public:
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         DumpMap(*spec.mutable_io_time());
     }
 } static IoTimeStat;
@@ -4799,7 +4799,7 @@ public:
             return TError(EError::InvalidValue, "What {}?", index);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, int64_t val) {
+    void Dump(Porto::TContainer &spec, int64_t val) {
         spec.set_time(val);
         if (CT->State == EContainerState::Dead)
             spec.set_dead_time((GetCurrentTimeMs() - CT->DeathTime) / 1000);
@@ -4815,7 +4815,7 @@ public:
         val = CT->RealCreationTime;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_creation_time(value);
     }
 } static CreationTime;
@@ -4829,7 +4829,7 @@ public:
         value = CT->RealStartTime;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_start_time(value);
     }
 } static StartTime;
@@ -4844,7 +4844,7 @@ public:
         val = CT->RealDeathTime;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_death_time(value);
     }
 } static DeathTime;
@@ -4858,7 +4858,7 @@ public:
         val = CT->ChangeTime;
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_change_time(value);
     }
 } static ChangeTime;
@@ -4988,7 +4988,7 @@ public:
     TError Get(uint64_t &val) {
         return CT->GetProcessCount(val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_process_count(value);
     }
 } static ProcessCount;
@@ -5005,7 +5005,7 @@ public:
     TError Get(uint64_t &val) {
         return CT->GetThreadCount(val);
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t value) {
+    void Dump(Porto::TContainer &spec, uint64_t value) {
         spec.set_thread_count(value);
     }
 } static ThreadCount;
@@ -5028,13 +5028,13 @@ public:
         CT->SetProp(EProperty::THREAD_LIMIT);
         return OK;
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_thread_limit();
     }
-    void Load(const rpc::TContainerSpec &spec, uint64_t &val) {
+    void Load(const Porto::TContainer &spec, uint64_t &val) {
         val = spec.thread_limit();
     }
-    void Dump(rpc::TContainerSpec &spec, uint64_t val) {
+    void Dump(Porto::TContainer &spec, uint64_t val) {
         spec.set_thread_limit(val);
     }
 } static ThreadLimit;
@@ -5077,7 +5077,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         auto out = spec.mutable_sysctl();
         for (auto &it: CT->Sysctl) {
             auto s = out->add_map();
@@ -5085,10 +5085,10 @@ public:
             s->set_val(it.second);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const Porto::TContainer &spec) {
         return spec.has_sysctl();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const Porto::TContainer &spec) {
         if (!spec.sysctl().merge())
             CT->Sysctl.clear();
         for (auto &it: spec.sysctl().map()) {
@@ -5112,7 +5112,7 @@ public:
             value += taint + "\n";
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(Porto::TContainer &spec) {
         for (auto &taint: CT->Taint()) {
             auto t = spec.add_taint();
             t->set_error(EError::Taint);

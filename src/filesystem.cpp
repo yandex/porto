@@ -97,7 +97,7 @@ std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     return MergeEscapeStrings(lines, ' ', ';');
 }
 
-TError TBindMount::Load(const rpc::TContainerBindMount &spec) {
+TError TBindMount::Load(const Porto::TContainerBindMount &spec) {
     TError error;
     uint64_t flag;
 
@@ -131,7 +131,7 @@ TError TBindMount::Load(const rpc::TContainerBindMount &spec) {
     return OK;
 }
 
-void TBindMount::Dump(rpc::TContainerBindMount &spec) {
+void TBindMount::Dump(Porto::TContainerBindMount &spec) {
     spec.set_source(Source.ToString());
     spec.set_target(Target.ToString());
     for (uint64_t flag = 1; flag <= MntFlags && flag; flag <<= 1)

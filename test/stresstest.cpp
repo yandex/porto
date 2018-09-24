@@ -56,7 +56,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
     }
 };
 
-static void Create(Porto::Connection &api, const std::string &name, const std::string &cwd) {
+static void Create(Porto::TPortoApi &api, const std::string &name, const std::string &cwd) {
     std::vector<std::string> containers;
 
     Say() << "Create container: " << name << std::endl;
@@ -79,7 +79,7 @@ static void Create(Porto::Connection &api, const std::string &name, const std::s
     }
 }
 
-static void SetProperty(Porto::Connection &api, std::string name, std::string type, std::string value) {
+static void SetProperty(Porto::TPortoApi &api, std::string name, std::string type, std::string value) {
     std::string res_value;
 
     Say() << "SetProperty container: " << name << std::endl;
@@ -89,7 +89,7 @@ static void SetProperty(Porto::Connection &api, std::string name, std::string ty
     ExpectEq(res_value, value);
 }
 
-static void Start(Porto::Connection &api, std::string name) {
+static void Start(Porto::TPortoApi &api, std::string name) {
     std::string pid;
     std::string ret;
 
@@ -100,7 +100,7 @@ static void Start(Porto::Connection &api, std::string name) {
     Expect(ret == "dead" || ret == "running");
 }
 
-static void PauseResume(Porto::Connection &api, const std::string &name) {
+static void PauseResume(Porto::TPortoApi &api, const std::string &name) {
     Say() << "PauseResume container: " << name << std::endl;
 
     std::string ret;
@@ -121,7 +121,7 @@ static void PauseResume(Porto::Connection &api, const std::string &name) {
     }
 }
 
-static void WaitDead(Porto::Connection &api, std::string name, std::string timeout) {
+static void WaitDead(Porto::TPortoApi &api, std::string name, std::string timeout) {
     std::string pid;
     std::string ret;
     int t;
@@ -141,7 +141,7 @@ static void WaitDead(Porto::Connection &api, std::string name, std::string timeo
     Fail("Wait timeout");
 }
 
-static void CheckStdout(Porto::Connection &api, std::string name, std::string stream) {
+static void CheckStdout(Porto::TPortoApi &api, std::string name, std::string stream) {
     std::string ret;
 
     Say() << "CheckStdout container: " << name << std::endl;
@@ -150,7 +150,7 @@ static void CheckStdout(Porto::Connection &api, std::string name, std::string st
     ExpectEq(ret, stream);
 }
 
-static void CheckStderr(Porto::Connection &api, std::string name, std::string stream) {
+static void CheckStderr(Porto::TPortoApi &api, std::string name, std::string stream) {
     std::string ret;
 
     Say() << "CheckStderr container: " << name << std::endl;
@@ -159,7 +159,7 @@ static void CheckStderr(Porto::Connection &api, std::string name, std::string st
     ExpectEq(ret, stream);
 }
 
-static void CheckExit(Porto::Connection &api, std::string name, std::string stream) {
+static void CheckExit(Porto::TPortoApi &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
     ExpectApiSuccess(api.GetProperty(name, "exit_status", ret));
@@ -167,7 +167,7 @@ static void CheckExit(Porto::Connection &api, std::string name, std::string stre
         ExpectEq(ret, stream);
 }
 
-static void Destroy(Porto::Connection &api, const std::string &name, const std::string &cwd) {
+static void Destroy(Porto::TPortoApi &api, const std::string &name, const std::string &cwd) {
     std::vector<std::string> containers;
 
     Say() << "Destroy container: " << name << std::endl;
@@ -193,7 +193,7 @@ static void Tasks(int n, int iter) {
     Say() << "Run task" << std::to_string(n) << std::endl;
     usleep(10000 * n);
 
-    Porto::Connection api;
+    Porto::TPortoApi api;
     for (; iter; iter--) {
         if (iter % 10 == 0)
             Say() << std::to_string(iter) << " iterations left" << std::endl;
@@ -232,7 +232,7 @@ static void Tasks(int n, int iter) {
 }
 
 static void StressKill() {
-    Porto::Connection api;
+    Porto::TPortoApi api;
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
@@ -261,7 +261,7 @@ int StressTest(int threads, int iter, bool killPorto) {
     (void)signal(SIGPIPE, SIG_IGN);
 
     ReadConfigs();
-    Porto::Connection api;
+    Porto::TPortoApi api;
 
     for (i = 1; i <= threads; i++)
         thrTasks.push_back(std::thread(Tasks, i, iter));

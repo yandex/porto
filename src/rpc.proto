@@ -3,7 +3,7 @@ syntax = "proto2";
 // Portod daemon listens on /run/portod.socket unix socket.
 // Protocol: Varint length, TPortoRequest req | TPortoResponse rsp.
 
-package Porto.rpc;
+package Porto;
 
 // List of error codes
 enum EError {
@@ -167,7 +167,7 @@ message TPortoRequest {
     // Get multiple properties for multiple containers
     optional TGetRequest Get = 15;
 
-    // Container API based on TContainerSpec
+    // Container API based on TContainer
     optional TNewContainerRequest NewContainer = 23;
     optional TSetContainerRequest SetContainer = 24;
     optional TGetContainerRequest GetContainer = 25;
@@ -191,7 +191,7 @@ message TPortoRequest {
     // Change volume properties - for now only resize
     optional TTuneVolumeRequest TuneVolume = 108;
 
-    // Volume API based on TVolumeSpec
+    // Volume API based on TVolume
     optional TNewVolumeRequest NewVolume = 126;
     optional TGetVolumeRequest GetVolume = 127;
 
@@ -277,7 +277,7 @@ message TPortoResponse {
 
     optional TGetResponse Get = 10;
 
-    // Container API based on TContainerSpec
+    // Container API based on TContainer
     optional TNewContainerResponse NewContainer = 23;
     optional TSetContainerResponse SetContainer = 24;
     optional TGetContainerResponse GetContainer = 25;
@@ -298,10 +298,10 @@ message TPortoResponse {
 
     optional TVolumeDescription CreateVolume = 13;
 
-    // Create volume in form TVolumeSpec
+    // Create volume in form TVolume
     optional TNewVolumeResponse NewVolume = 126;
 
-    // List volumes in form TVolumeSpec
+    // List volumes in form TVolume
     optional TGetVolumeResponse GetVolume = 127;
 
     optional TListLayersResponse ListLayers = 14;
@@ -519,7 +519,7 @@ message TVmStat {
 }
 
 
-message TContainerSpec {
+message TContainer {
     optional string name = 1;           // in client namespace
     optional string absolute_name = 2;  // out, "/porto/..."
     optional string state = 3;          // out
@@ -700,7 +700,6 @@ message TContainerSpec {
 
 // Volumes
 
-// FIXME replace with map<string, string>
 message TVolumeProperty {
     optional string name = 1;
     optional string value = 2;
@@ -709,6 +708,8 @@ message TVolumeProperty {
 message TVolumeDescription {
     optional string path = 1;           // path in client namespace
     repeated TVolumeProperty properties = 2;
+    // TODO replace with map
+    // map<string, string> properties = 2;
     repeated string containers = 3;     // linked containers (legacy)
     repeated TVolumeLink links = 4;     // linked containers with details
 
@@ -749,7 +750,7 @@ message TVolumeShare {
     optional bool cow = 3;              // default: mutable share
 }
 
-message TVolumeSpec {
+message TVolume {
     optional string path = 1;               // path in container, default: auto
     optional string container = 2;          // default: self
     repeated TVolumeLink links = 3;         // default: anon link to self
@@ -792,7 +793,7 @@ message TVolumeSpec {
 }
 
 
-message TLayerDescription {
+message TLayer {
     optional string name = 1;           // name or meta/name
     optional string owner_user = 2;
     optional string owner_group = 3;
@@ -801,7 +802,7 @@ message TLayerDescription {
 }
 
 
-message TStorageDescription {
+message TStorage {
     optional string name = 1;           // name or meta/name
     optional string owner_user = 2;
     optional string owner_group = 3;
@@ -929,18 +930,18 @@ message TSetSystemResponse {
 }
 
 message TNewContainerRequest {
-    optional TContainerSpec container = 1;
-    repeated TVolumeSpec volume = 2;
+    optional TContainer container = 1;
+    repeated TVolume volume = 2;
     optional bool start = 3;
 }
 
 message TNewContainerResponse {
-    optional TContainerSpec container = 1;
-    repeated TVolumeSpec volume = 2;
+    optional TContainer container = 1;
+    repeated TVolume volume = 2;
 }
 
 message TSetContainerRequest {
-    optional TContainerSpec container = 1;
+    optional TContainer container = 1;
 }
 
 message TSetContainerResponse {
@@ -954,7 +955,7 @@ message TGetContainerRequest {
 }
 
 message TGetContainerResponse {
-    repeated TContainerSpec container = 1;
+    repeated TContainer container = 1;
     optional string absolute_namespace = 2;
 }
 
@@ -1233,11 +1234,11 @@ message TSetSymlinkRequest {
 
 
 message TNewVolumeRequest {
-    optional TVolumeSpec volume = 1;
+    optional TVolume volume = 1;
 }
 
 message TNewVolumeResponse {
-    optional TVolumeSpec volume = 1;
+    optional TVolume volume = 1;
 }
 
 
@@ -1248,7 +1249,7 @@ message TGetVolumeRequest {
 }
 
 message TGetVolumeResponse {
-    repeated TVolumeSpec volume = 1;
+    repeated TVolume volume = 1;
 }
 
 
@@ -1270,6 +1271,8 @@ message TListVolumePropertiesResponse {
 message TCreateVolumeRequest {
     optional string path = 1;
     repeated TVolumeProperty properties = 2;
+    // TODO replace with map
+    // map<string, string> properties = 2;
 }
 
 
@@ -1304,6 +1307,8 @@ message TListVolumesResponse {
 message TTuneVolumeRequest {
     optional string path = 1;
     repeated TVolumeProperty properties = 2;
+    // TODO replace with map
+    // map<string, string> properties = 2;
 }
 
 
@@ -1316,8 +1321,8 @@ message TListLayersRequest {
 }
 
 message TListLayersResponse {
-    repeated string layer = 1;              // layer names (legacy)
-    repeated TLayerDescription layers = 2;  // layer with description
+    repeated string layer = 1;  // layer names (legacy)
+    repeated TLayer layers = 2; // layer with description
 }
 
 
@@ -1372,7 +1377,7 @@ message TListStoragesRequest {
 }
 
 message TListStoragesResponse {
-    repeated TStorageDescription storages = 1;
+    repeated TStorage storages = 1;
     repeated TMetaStorage meta_storages = 2;
 }
 

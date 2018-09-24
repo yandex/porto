@@ -35,7 +35,7 @@ struct TCore {
 	std::string Prefix;
 	std::string Slot;
 
-	Porto::Connection Conn;
+	Porto::TPortoApi Conn;
 
 	static TError Register(const TPath &portod);
 	static TError Unregister();

@@ -36,7 +36,7 @@ void TVmStat::Add(const TVmStat &other) {
         Stat[it.first] += it.second;
 }
 
-void TVmStat::Dump(rpc::TVmStat &s) {
+void TVmStat::Dump(Porto::TVmStat &s) {
     s.set_count(Stat["count"]);
     s.set_size(Stat["size"]);
     s.set_max_size(Stat["max_size"]);

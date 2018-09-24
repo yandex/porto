@@ -61,8 +61,8 @@ struct TCred {
         return User() + ":" + Group();
     }
 
-    TError Load(const rpc::TCred &cred, bool strict = true);
-    void Dump(rpc::TCred &cred);
+    TError Load(const Porto::TCred &cred, bool strict = true);
+    void Dump(Porto::TCred &cred);
 };
 
 void InitCapabilities();
@@ -84,8 +84,8 @@ struct TCapabilities {
     }
     bool HasSetUidGid() const;
 
-    TError Load(const rpc::TCapabilities &cap);
-    void Dump(rpc::TCapabilities &cap) const;
+    TError Load(const Porto::TCapabilities &cap);
+    void Dump(Porto::TCapabilities &cap) const;
 };
 
 extern bool HasAmbientCapabilities;

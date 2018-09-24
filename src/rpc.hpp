@@ -7,7 +7,7 @@ class TClient;
 class TRequest {
 public:
     std::shared_ptr<TClient> Client;
-    rpc::TPortoRequest Req;
+    Porto::TPortoRequest Req;
 
     uint64_t QueueTime;
     uint64_t StartTime;

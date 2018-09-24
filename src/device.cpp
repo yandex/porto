@@ -156,12 +156,12 @@ std::string TDevice::Format() const {
                        Mode & 0777, UserName(Uid), GroupName(Gid));
 }
 
-TError TDevice::Load(const rpc::TContainerDevice &dev, const TCred &cred) {
+TError TDevice::Load(const Porto::TContainerDevice &dev, const TCred &cred) {
     TTuple cfg = {dev.device(), dev.access()};
     return Parse(cfg, cred);
 }
 
-void TDevice::Dump(rpc::TContainerDevice &dev) const {
+void TDevice::Dump(Porto::TContainerDevice &dev) const {
     dev.set_device(Path.ToString());
     dev.set_access(FormatAccess());
 }

@@ -209,7 +209,7 @@ TError TCred::Init(const std::string &user) {
     return error;
 }
 
-TError TCred::Load(const rpc::TCred &cred, bool strict) {
+TError TCred::Load(const Porto::TCred &cred, bool strict) {
     TError error;
 
     if (cred.has_user()) {
@@ -251,7 +251,7 @@ TError TCred::Load(const rpc::TCred &cred, bool strict) {
     return OK;
 }
 
-void TCred::Dump(rpc::TCred &cred) {
+void TCred::Dump(Porto::TCred &cred) {
     cred.Clear();
     if (Uid != NoUser) {
         cred.set_uid(Uid);
@@ -392,7 +392,7 @@ TError TCapabilities::Change(const std::string &name, bool set) {
     return TError(EError::InvalidValue, "Unknown capability {}", name);
 }
 
-TError TCapabilities::Load(const rpc::TCapabilities &cap) {
+TError TCapabilities::Load(const Porto::TCapabilities &cap) {
     Permitted = 0;
     for (auto name: cap.cap()) {
         TError error = Change(name, true);
@@ -402,7 +402,7 @@ TError TCapabilities::Load(const rpc::TCapabilities &cap) {
     return OK;
 }
 
-void TCapabilities::Dump(rpc::TCapabilities &cap) const {
+void TCapabilities::Dump(Porto::TCapabilities &cap) const {
     for (auto &it: CapNames) {
         if (Permitted & it.first)
             cap.add_cap(it.second);

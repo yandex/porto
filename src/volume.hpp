@@ -150,7 +150,7 @@ public:
 
     std::set<std::shared_ptr<TVolume>> Nested;
 
-    const rpc::TVolumeSpec *Spec; /* during build */
+    const Porto::TVolume *Spec; /* during build */
 
     TVolume() {
         Statistics->VolumesCount++;
@@ -160,9 +160,9 @@ public:
     }
 
     static TError VerifyConfig(const TStringMap &cfg);
-    static TError ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec);
+    static TError ParseConfig(const TStringMap &cfg, Porto::TVolume &spec);
 
-    static TError Create(const rpc::TVolumeSpec &spec,
+    static TError Create(const Porto::TVolume &spec,
                          std::shared_ptr<TVolume> &volume);
 
     /* link target path */
@@ -177,10 +177,10 @@ public:
 
     TError Configure(const TPath &target_root);
 
-    TError Load(const rpc::TVolumeSpec &spec, bool full = false);
-    void Dump(rpc::TVolumeSpec &spec, bool full = false);
+    TError Load(const Porto::TVolume &spec, bool full = false);
+    void Dump(Porto::TVolume &spec, bool full = false);
 
-    void DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump);
+    void DumpDescription(TVolumeLink *link, const TPath &path, Porto::TVolumeDescription *dump);
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();

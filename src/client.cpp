@@ -419,7 +419,7 @@ TError TClient::WriteAccess(const TFile &file) {
     return error;
 }
 
-TError TClient::ReadRequest(rpc::TPortoRequest &request) {
+TError TClient::ReadRequest(Porto::TPortoRequest &request) {
     if (Fd < 0)
         return TError("Connection closed");
 
@@ -519,7 +519,7 @@ next:
     return TError::Queued();
 }
 
-TError TClient::QueueResponse(rpc::TPortoResponse &response) {
+TError TClient::QueueResponse(Porto::TPortoResponse &response) {
 
     if (Receiving)
         return TError(EError::Busy, "QueueResponse while Receiving");
@@ -541,7 +541,7 @@ TError TClient::QueueResponse(rpc::TPortoResponse &response) {
 }
 
 TError TClient::QueueReport(const TContainerReport &report, bool async) {
-    rpc::TPortoResponse rsp;
+    Porto::TPortoResponse rsp;
 
     rsp.set_error(EError::Success);
     auto wait = async ? rsp.mutable_asyncwait() : rsp.mutable_wait();

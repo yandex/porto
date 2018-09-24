@@ -90,7 +90,7 @@ void THelpCmd::Usage() {
     if (!vlist) {
         PrintError("Volume properties unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist->list(), [](const rpc::TListVolumePropertiesResponse_TVolumePropertyDescription &p) { return p.name(); });
+        nameWidth = MaxFieldLength(vlist->list(), [](const Porto::TListVolumePropertiesResponse_TVolumePropertyDescription &p) { return p.name(); });
 
         for (const auto &p : vlist->list())
             PrintAligned(p.name(), p.desc(), nameWidth, termWidth);
@@ -101,7 +101,7 @@ void THelpCmd::Usage() {
     if (!plist) {
         PrintError("Properties unavailable");
     } else {
-        nameWidth = MaxFieldLength(plist->list(), [](const rpc::TListPropertiesResponse_TContainerPropertyListEntry &p) { return p.name(); });
+        nameWidth = MaxFieldLength(plist->list(), [](const Porto::TListPropertiesResponse_TContainerPropertyListEntry &p) { return p.name(); });
 
         for (const auto &p : plist->list())
             PrintAligned(p.name(), p.desc(), nameWidth, termWidth);
@@ -142,7 +142,7 @@ size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
     return MaxFieldLength(vec, [](const std::string &s) { return s; }, min);
 }
 
-ICmd::ICmd(Porto::Connection *api, const std::string &name, int args,
+ICmd::ICmd(Porto::TPortoApi *api, const std::string &name, int args,
            const std::string &usage, const std::string &desc, const std::string &help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
@@ -179,7 +179,7 @@ bool ICmd::ValidArgs(const std::vector<std::string> &args) {
     return true;
 }
 
-TCommandHandler::TCommandHandler(Porto::Connection &api) : PortoApi(api) {
+TCommandHandler::TCommandHandler(Porto::TPortoApi &api) : PortoApi(api) {
     RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this)));
 }
 

@@ -161,7 +161,7 @@ int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &but
 
     return selected;
 }
-void TConsoleScreen::ErrorDialog(Porto::Connection &api) {
+void TConsoleScreen::ErrorDialog(Porto::TPortoApi &api) {
     Dialog(api.GetLastError(), {"Ok"});
 }
 void TConsoleScreen::InfoDialog(std::vector<std::string> lines) {
@@ -387,7 +387,7 @@ uint64_t TPortoValueCache::GetDt() {
     return Time[CacheSelector] - Time[!CacheSelector];
 }
 
-int TPortoValueCache::Update(Porto::Connection &api) {
+int TPortoValueCache::Update(Porto::TPortoApi &api) {
     std::vector<std::string> _containers;
     for (auto &iter : Containers)
         _containers.push_back(iter.first);
@@ -577,7 +577,7 @@ std::shared_ptr<TPortoContainer> TPortoContainer::GetParent(int level) {
         return nullptr;
 }
 
-std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connection &api) {
+std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::TPortoApi &api) {
     std::vector<std::string> containers;
     int ret = api.List(containers);
     if (ret)
@@ -1097,7 +1097,7 @@ void TPortoTop::AddCommon(int row, const std::string &title, const std::string &
     TPortoValue v(Cache, container, var, flags, multiplier);
     Common[row].push_back(TCommonValue(title, v));
 }
-TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &args) :
+TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args) :
     Api(api),
     Cache(std::make_shared<TPortoValueCache>()),
     RootContainer(std::make_shared<TPortoContainer>("/")) {
@@ -1196,7 +1196,7 @@ void exit_handler(int) {
     exit_immediatly = true;
 }
 
-int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
+int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
     Signal(SIGINT, exit_handler);
     Signal(SIGTERM, exit_handler);
     Signal(SIGTTOU, SIG_IGN);
@@ -1398,7 +1398,7 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
 
 int main(int argc, char *argv[]) {
     const std::vector<std::string> args(argv + 1, argv + argc);
-    Porto::Connection api;
+    Porto::TPortoApi api;
 
     return portotop(&api, args);
 }

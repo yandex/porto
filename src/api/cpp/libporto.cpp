@@ -13,11 +13,11 @@ extern "C" {
 
 namespace Porto {
 
-Connection::~Connection() {
+TPortoApi::~TPortoApi() {
     Close();
 }
 
-EError Connection::SetError(const TString &prefix, int _errno) {
+EError TPortoApi::SetError(const TString &prefix, int _errno) {
     switch (_errno) {
         case ENOENT:
             LastError = EError::SocketUnavailable;
@@ -37,11 +37,11 @@ EError Connection::SetError(const TString &prefix, int _errno) {
     return LastError;
 }
 
-TString Connection::GetLastError() const {
-    return rpc::EError_Name(LastError) + ":(" + LastErrorMsg + ")";
+TString TPortoApi::GetLastError() const {
+    return EError_Name(LastError) + ":(" + LastErrorMsg + ")";
 }
 
-EError Connection::Connect(const char *socket_path) {
+EError TPortoApi::Connect(const char *socket_path) {
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
 
@@ -76,13 +76,13 @@ EError Connection::Connect(const char *socket_path) {
     return EError::Success;
 }
 
-void Connection::Close() {
+void TPortoApi::Close() {
     if (Fd >= 0)
         close(Fd);
     Fd = -1;
 }
 
-EError Connection::SetSocketTimeout(int direction, int timeout) {
+EError TPortoApi::SetSocketTimeout(int direction, int timeout) {
     struct timeval tv;
 
     if (timeout < 0 || Fd < 0)
@@ -100,17 +100,17 @@ EError Connection::SetSocketTimeout(int direction, int timeout) {
     return EError::Success;
 }
 
-EError Connection::SetTimeout(int timeout) {
+EError TPortoApi::SetTimeout(int timeout) {
     Timeout = timeout >= 0 ? timeout : DEFAULT_TIMEOUT;
     return SetSocketTimeout(3, Timeout);
 }
 
-EError Connection::SetDiskTimeout(int timeout) {
+EError TPortoApi::SetDiskTimeout(int timeout) {
     DiskTimeout = timeout >= 0 ? timeout : DEFAULT_DISK_TIMEOUT;
     return EError::Success;
 }
 
-EError Connection::Send(const rpc::TPortoRequest &req) {
+EError TPortoApi::Send(const TPortoRequest &req) {
     google::protobuf::io::FileOutputStream raw(Fd);
 
     if (!req.IsInitialized()) {
@@ -135,7 +135,7 @@ EError Connection::Send(const rpc::TPortoRequest &req) {
     return EError::Success;
 }
 
-EError Connection::Recv(rpc::TPortoResponse &rsp) {
+EError TPortoApi::Recv(TPortoResponse &rsp) {
     google::protobuf::io::FileInputStream raw(Fd);
     google::protobuf::io::CodedInputStream input(&raw);
 
@@ -164,8 +164,8 @@ EError Connection::Recv(rpc::TPortoResponse &rsp) {
     }
 }
 
-EError Connection::Call(const rpc::TPortoRequest &req,
-                        rpc::TPortoResponse &rsp,
+EError TPortoApi::Call(const TPortoRequest &req,
+                        TPortoResponse &rsp,
                         int extra_timeout) {
     EError err = EError::Success;
 
@@ -192,12 +192,12 @@ EError Connection::Call(const rpc::TPortoRequest &req,
     return err;
 }
 
-EError Connection::Call(int extra_timeout) {
+EError TPortoApi::Call(int extra_timeout) {
     Call(Req, Rsp, extra_timeout);
     return LastError;
 }
 
-EError Connection::Call(const TString &req,
+EError TPortoApi::Call(const TString &req,
                         TString &rsp,
                         int extra_timeout) {
     Req.Clear();
@@ -213,7 +213,7 @@ EError Connection::Call(const TString &req,
     return LastError;
 }
 
-EError Connection::GetVersion(TString &tag, TString &revision) {
+EError TPortoApi::GetVersion(TString &tag, TString &revision) {
     Req.Clear();
     Req.mutable_version();
 
@@ -225,7 +225,7 @@ EError Connection::GetVersion(TString &tag, TString &revision) {
     return LastError;
 }
 
-const rpc::TGetSystemResponse *Connection::GetSystem() {
+const TGetSystemResponse *TPortoApi::GetSystem() {
     Req.Clear();
     Req.mutable_getsystem();
     if (!Call())
@@ -233,35 +233,35 @@ const rpc::TGetSystemResponse *Connection::GetSystem() {
     return nullptr;
 }
 
-EError Connection::SetSystem(const TString &key, const TString &val) {
+EError TPortoApi::SetSystem(const TString &key, const TString &val) {
     TString rsp;
     return Call("SetSystem {" + key + ":" + val + "}", rsp);
 }
 
 /* Container */
 
-EError Connection::Create(const TString &name) {
+EError TPortoApi::Create(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_create();
     req->set_name(name);
     return Call();
 }
 
-EError Connection::CreateWeakContainer(const TString &name) {
+EError TPortoApi::CreateWeakContainer(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_createweak();
     req->set_name(name);
     return Call();
 }
 
-EError Connection::Destroy(const TString &name) {
+EError TPortoApi::Destroy(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_destroy();
     req->set_name(name);
     return Call();
 }
 
-const rpc::TListResponse *Connection::List(const TString &mask) {
+const TListResponse *TPortoApi::List(const TString &mask) {
     auto req = Req.mutable_list();
 
     if(!mask.empty())
@@ -273,7 +273,7 @@ const rpc::TListResponse *Connection::List(const TString &mask) {
     return nullptr;
 }
 
-EError Connection::List(std::vector<TString> &list, const TString &mask) {
+EError TPortoApi::List(std::vector<TString> &list, const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_list();
     if(!mask.empty())
@@ -284,7 +284,7 @@ EError Connection::List(std::vector<TString> &list, const TString &mask) {
     return LastError;
 }
 
-const rpc::TListPropertiesResponse *Connection::ListProperties() {
+const TListPropertiesResponse *TPortoApi::ListProperties() {
     Req.Clear();
     Req.mutable_listproperties();
 
@@ -300,8 +300,8 @@ const rpc::TListPropertiesResponse *Connection::ListProperties() {
     }
 
     if (!has_data) {
-        rpc::TPortoRequest req;
-        rpc::TPortoResponse rsp;
+        TPortoRequest req;
+        TPortoResponse rsp;
 
         req.mutable_listdataproperties();
         if (!Call(req, rsp)) {
@@ -317,7 +317,7 @@ const rpc::TListPropertiesResponse *Connection::ListProperties() {
     return &Rsp.listproperties();
 }
 
-EError Connection::ListProperties(std::vector<TString> &properties) {
+EError TPortoApi::ListProperties(std::vector<TString> &properties) {
     properties.clear();
     auto rsp = ListProperties();
     if (rsp) {
@@ -327,9 +327,9 @@ EError Connection::ListProperties(std::vector<TString> &properties) {
     return LastError;
 }
 
-const rpc::TGetResponse *Connection::Get(const std::vector<TString> &names,
-                                         const std::vector<TString> &vars,
-                                         int flags) {
+const TGetResponse *TPortoApi::Get(const std::vector<TString> &names,
+                                   const std::vector<TString> &vars,
+                                   int flags) {
     Req.Clear();
     auto get = Req.mutable_get();
 
@@ -352,7 +352,7 @@ const rpc::TGetResponse *Connection::Get(const std::vector<TString> &names,
     return nullptr;
 }
 
-const rpc::TContainerSpec *Connection::GetContainerSpec(const TString &name) {
+const TContainer *TPortoApi::GetContainer(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_getcontainer();
 
@@ -364,7 +364,7 @@ const rpc::TContainerSpec *Connection::GetContainerSpec(const TString &name) {
     return nullptr;
 }
 
-const rpc::TGetContainerResponse *Connection::GetContainersSpec(uint64_t changed_since) {
+const TGetContainerResponse *TPortoApi::GetContainers(uint64_t changed_since) {
     Req.Clear();
     auto req = Req.mutable_getcontainer();
 
@@ -377,10 +377,10 @@ const rpc::TGetContainerResponse *Connection::GetContainersSpec(uint64_t changed
     return nullptr;
 }
 
-EError Connection::GetProperty(const TString &name,
-                               const TString &property,
-                               TString &value,
-                               int flags) {
+EError TPortoApi::GetProperty(const TString &name,
+                              const TString &property,
+                              TString &value,
+                              int flags) {
     Req.Clear();
     auto req = Req.mutable_getproperty();
 
@@ -397,7 +397,7 @@ EError Connection::GetProperty(const TString &name,
     return LastError;
 }
 
-EError Connection::GetProperty(const TString &name,
+EError TPortoApi::GetProperty(const TString &name,
                                const TString &property,
                                uint64_t &value,
                                int flags) {
@@ -416,9 +416,9 @@ EError Connection::GetProperty(const TString &name,
     return LastError;
 }
 
-EError Connection::SetProperty(const TString &name,
-                               const TString &property,
-                               const TString &value) {
+EError TPortoApi::SetProperty(const TString &name,
+                              const TString &property,
+                              const TString &value) {
     Req.Clear();
     auto req = Req.mutable_setproperty();
 
@@ -429,10 +429,10 @@ EError Connection::SetProperty(const TString &name,
     return Call();
 }
 
-EError Connection::IncLabel(const TString &name,
-                            const TString &label,
-                            int64_t add,
-                            int64_t &result) {
+EError TPortoApi::IncLabel(const TString &name,
+                           const TString &label,
+                           int64_t add,
+                           int64_t &result) {
     Req.Clear();
     auto req = Req.mutable_inclabel();
 
@@ -447,7 +447,7 @@ EError Connection::IncLabel(const TString &name,
 
     return LastError;
 }
-EError Connection::Start(const TString &name) {
+EError TPortoApi::Start(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_start();
 
@@ -456,7 +456,7 @@ EError Connection::Start(const TString &name) {
     return Call();
 }
 
-EError Connection::Stop(const TString &name, int timeout) {
+EError TPortoApi::Stop(const TString &name, int timeout) {
     Req.Clear();
     auto req = Req.mutable_stop();
 
@@ -467,7 +467,7 @@ EError Connection::Stop(const TString &name, int timeout) {
     return Call(timeout);
 }
 
-EError Connection::Kill(const TString &name, int sig) {
+EError TPortoApi::Kill(const TString &name, int sig) {
     Req.Clear();
     auto req = Req.mutable_kill();
 
@@ -477,7 +477,7 @@ EError Connection::Kill(const TString &name, int sig) {
     return Call();
 }
 
-EError Connection::Pause(const TString &name) {
+EError TPortoApi::Pause(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_pause();
 
@@ -486,7 +486,7 @@ EError Connection::Pause(const TString &name) {
     return Call();
 }
 
-EError Connection::Resume(const TString &name) {
+EError TPortoApi::Resume(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_resume();
 
@@ -495,7 +495,7 @@ EError Connection::Resume(const TString &name) {
     return Call();
 }
 
-EError Connection::Respawn(const TString &name) {
+EError TPortoApi::Respawn(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_respawn();
 
@@ -504,9 +504,9 @@ EError Connection::Respawn(const TString &name) {
     return Call();
 }
 
-EError Connection::WaitContainer(const TString &name,
-                                 TString &result_state,
-                                 int wait_timeout) {
+EError TPortoApi::WaitContainer(const TString &name,
+                                TString &result_state,
+                                int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
 
@@ -527,10 +527,10 @@ EError Connection::WaitContainer(const TString &name,
     return LastError;
 }
 
-EError Connection::WaitContainers(const std::vector<TString> &names,
-                                  TString &result_name,
-                                  TString &result_state,
-                                  int timeout) {
+EError TPortoApi::WaitContainers(const std::vector<TString> &names,
+                                 TString &result_name,
+                                 TString &result_state,
+                                 int timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
 
@@ -553,10 +553,9 @@ EError Connection::WaitContainers(const std::vector<TString> &names,
     return LastError;
 }
 
-const rpc::TWaitResponse *
-Connection::Wait(const std::vector<TString> &names,
-                 const std::vector<TString> &labels,
-                 int timeout) {
+const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
+                                     const std::vector<TString> &labels,
+                                     int timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
 
@@ -575,7 +574,7 @@ Connection::Wait(const std::vector<TString> &names,
     return nullptr;
 }
 
-EError Connection::AsyncWait(const std::vector<TString> &names,
+EError TPortoApi::AsyncWait(const std::vector<TString> &names,
                              const std::vector<TString> &labels,
                              TWaitCallback callback,
                              int timeout) {
@@ -604,10 +603,10 @@ EError Connection::AsyncWait(const std::vector<TString> &names,
     return LastError;
 }
 
-EError Connection::ConvertPath(const TString &path,
-                               const TString &src,
-                               const TString &dest,
-                               TString &res) {
+EError TPortoApi::ConvertPath(const TString &path,
+                              const TString &src,
+                              const TString &dest,
+                              TString &res) {
     Req.Clear();
     auto req = Req.mutable_convertpath();
 
@@ -621,8 +620,8 @@ EError Connection::ConvertPath(const TString &path,
     return LastError;
 }
 
-EError Connection::AttachProcess(const TString &name, int pid,
-                                 const TString &comm) {
+EError TPortoApi::AttachProcess(const TString &name, int pid,
+                                const TString &comm) {
     Req.Clear();
     auto req = Req.mutable_attachprocess();
 
@@ -633,8 +632,8 @@ EError Connection::AttachProcess(const TString &name, int pid,
     return Call();
 }
 
-EError Connection::AttachThread(const TString &name, int pid,
-                                const TString &comm) {
+EError TPortoApi::AttachThread(const TString &name, int pid,
+                               const TString &comm) {
     Req.Clear();
     auto req = Req.mutable_attachthread();
 
@@ -645,8 +644,8 @@ EError Connection::AttachThread(const TString &name, int pid,
     return Call();
 }
 
-EError Connection::LocateProcess(int pid, const TString &comm,
-                                 TString &name) {
+EError TPortoApi::LocateProcess(int pid, const TString &comm,
+                                TString &name) {
     Req.Clear();
     auto req = Req.mutable_locateprocess();
 
@@ -661,7 +660,7 @@ EError Connection::LocateProcess(int pid, const TString &comm,
 
 /* Volume */
 
-const rpc::TListVolumePropertiesResponse *Connection::ListVolumeProperties() {
+const TListVolumePropertiesResponse *TPortoApi::ListVolumeProperties() {
     Req.Clear();
     Req.mutable_listvolumeproperties();
 
@@ -671,7 +670,7 @@ const rpc::TListVolumePropertiesResponse *Connection::ListVolumeProperties() {
     return nullptr;
 }
 
-EError Connection::ListVolumeProperties(std::vector<TString> &properties) {
+EError TPortoApi::ListVolumeProperties(std::vector<TString> &properties) {
     properties.clear();
     auto rsp = ListVolumeProperties();
     if (rsp) {
@@ -681,8 +680,8 @@ EError Connection::ListVolumeProperties(std::vector<TString> &properties) {
     return LastError;
 }
 
-EError Connection::CreateVolume(TString &path,
-                                const std::map<TString, TString> &config) {
+EError TPortoApi::CreateVolume(TString &path,
+                               const std::map<TString, TString> &config) {
     Req.Clear();
     auto req = Req.mutable_createvolume();
 
@@ -700,8 +699,8 @@ EError Connection::CreateVolume(TString &path,
     return LastError;
 }
 
-EError Connection::TuneVolume(const TString &path,
-                              const std::map<TString, TString> &config) {
+EError TPortoApi::TuneVolume(const TString &path,
+                             const std::map<TString, TString> &config) {
     Req.Clear();
     auto req = Req.mutable_tunevolume();
 
@@ -716,11 +715,11 @@ EError Connection::TuneVolume(const TString &path,
     return Call(DiskTimeout);
 }
 
-EError Connection::LinkVolume(const TString &path,
-                              const TString &container,
-                              const TString &target,
-                              bool read_only,
-                              bool required) {
+EError TPortoApi::LinkVolume(const TString &path,
+                             const TString &container,
+                             const TString &target,
+                             bool read_only,
+                             bool required) {
     Req.Clear();
     auto req = (target.empty() && !required) ? Req.mutable_linkvolume() :
                                                Req.mutable_linkvolumetarget();
@@ -738,10 +737,10 @@ EError Connection::LinkVolume(const TString &path,
     return Call();
 }
 
-EError Connection::UnlinkVolume(const TString &path,
-                                const TString &container,
-                                const TString &target,
-                                bool strict) {
+EError TPortoApi::UnlinkVolume(const TString &path,
+                               const TString &container,
+                               const TString &target,
+                               bool strict) {
     Req.Clear();
     auto req = (target == "***") ? Req.mutable_unlinkvolume() :
                                    Req.mutable_unlinkvolumetarget();
@@ -757,9 +756,9 @@ EError Connection::UnlinkVolume(const TString &path,
     return Call(DiskTimeout);
 }
 
-const rpc::TListVolumesResponse *
-Connection::ListVolumes(const TString &path,
-                        const TString &container) {
+const TListVolumesResponse *
+TPortoApi::ListVolumes(const TString &path,
+                       const TString &container) {
     Req.Clear();
     auto req = Req.mutable_listvolumes();
 
@@ -785,7 +784,7 @@ Connection::ListVolumes(const TString &path,
     return list;
 }
 
-EError Connection::ListVolumes(std::vector<TString> &paths) {
+EError TPortoApi::ListVolumes(std::vector<TString> &paths) {
     Req.Clear();
     auto rsp = ListVolumes();
     paths.clear();
@@ -796,7 +795,7 @@ EError Connection::ListVolumes(std::vector<TString> &paths) {
     return LastError;
 }
 
-const rpc::TVolumeDescription *Connection::GetVolume(const TString &path) {
+const TVolumeDescription *TPortoApi::GetVolumeDesc(const TString &path) {
     Req.Clear();
     auto rsp = ListVolumes(path);
 
@@ -806,7 +805,7 @@ const rpc::TVolumeDescription *Connection::GetVolume(const TString &path) {
     return nullptr;
 }
 
-const rpc::TVolumeSpec *Connection::GetVolumeSpec(const TString &path) {
+const TVolume *TPortoApi::GetVolume(const TString &path) {
     Req.Clear();
     auto req = Req.mutable_getvolume();
 
@@ -818,7 +817,7 @@ const rpc::TVolumeSpec *Connection::GetVolumeSpec(const TString &path) {
     return nullptr;
 }
 
-const rpc::TGetVolumeResponse *Connection::GetVolumesSpec(uint64_t changed_since) {
+const TGetVolumeResponse *TPortoApi::GetVolumes(uint64_t changed_since) {
     Req.Clear();
     auto req = Req.mutable_getvolume();
 
@@ -833,11 +832,11 @@ const rpc::TGetVolumeResponse *Connection::GetVolumesSpec(uint64_t changed_since
 
 /* Layer */
 
-EError Connection::ImportLayer(const TString &layer,
-                               const TString &tarball,
-                               bool merge,
-                               const TString &place,
-                               const TString &private_value) {
+EError TPortoApi::ImportLayer(const TString &layer,
+                              const TString &tarball,
+                              bool merge,
+                              const TString &place,
+                              const TString &private_value) {
     Req.Clear();
     auto req = Req.mutable_importlayer();
 
@@ -852,9 +851,9 @@ EError Connection::ImportLayer(const TString &layer,
     return Call(DiskTimeout);
 }
 
-EError Connection::ExportLayer(const TString &volume,
-                               const TString &tarball,
-                               const TString &compress) {
+EError TPortoApi::ExportLayer(const TString &volume,
+                              const TString &tarball,
+                              const TString &compress) {
     Req.Clear();
     auto req = Req.mutable_exportlayer();
 
@@ -866,9 +865,9 @@ EError Connection::ExportLayer(const TString &volume,
     return Call(DiskTimeout);
 }
 
-EError Connection::ReExportLayer(const TString &layer,
-                                 const TString &tarball,
-                                 const TString &compress) {
+EError TPortoApi::ReExportLayer(const TString &layer,
+                                const TString &tarball,
+                                const TString &compress) {
     Req.Clear();
     auto req = Req.mutable_exportlayer();
 
@@ -881,8 +880,8 @@ EError Connection::ReExportLayer(const TString &layer,
     return Call(DiskTimeout);
 }
 
-EError Connection::RemoveLayer(const TString &layer,
-                               const TString &place) {
+EError TPortoApi::RemoveLayer(const TString &layer,
+                              const TString &place) {
     Req.Clear();
     auto req = Req.mutable_removelayer();
 
@@ -893,9 +892,8 @@ EError Connection::RemoveLayer(const TString &layer,
     return Call(DiskTimeout);
 }
 
-const rpc::TListLayersResponse *
-Connection::ListLayers(const TString &place,
-                       const TString &mask) {
+const TListLayersResponse *TPortoApi::ListLayers(const TString &place,
+                                                 const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_listlayers();
 
@@ -924,9 +922,9 @@ Connection::ListLayers(const TString &place,
     return list;
 }
 
-EError Connection::ListLayers(std::vector<TString> layers,
-                              const TString &place,
-                              const TString &mask) {
+EError TPortoApi::ListLayers(std::vector<TString> layers,
+                             const TString &place,
+                             const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_listlayers();
 
@@ -942,9 +940,9 @@ EError Connection::ListLayers(std::vector<TString> layers,
     return LastError;
 }
 
-EError Connection::GetLayerPrivate(TString &private_value,
-                                   const TString &layer,
-                                   const TString &place) {
+EError TPortoApi::GetLayerPrivate(TString &private_value,
+                                  const TString &layer,
+                                  const TString &place) {
     Req.Clear();
     auto req = Req.mutable_getlayerprivate();
 
@@ -958,9 +956,9 @@ EError Connection::GetLayerPrivate(TString &private_value,
     return LastError;
 }
 
-EError Connection::SetLayerPrivate(const TString &private_value,
-                                   const TString &layer,
-                                   const TString &place) {
+EError TPortoApi::SetLayerPrivate(const TString &private_value,
+                                  const TString &layer,
+                                  const TString &place) {
     Req.Clear();
     auto req = Req.mutable_setlayerprivate();
 
@@ -974,9 +972,8 @@ EError Connection::SetLayerPrivate(const TString &private_value,
 
 /* Storage */
 
-const rpc::TListStoragesResponse *
-Connection::ListStorages(const TString &place,
-                         const TString &mask) {
+const TListStoragesResponse *TPortoApi::ListStorages(const TString &place,
+                                                     const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_liststorages();
 
@@ -991,9 +988,9 @@ Connection::ListStorages(const TString &place,
     return &Rsp.liststorages();
 }
 
-EError Connection::ListStorages(std::vector<TString> &storages,
-                                const TString &place,
-                                const TString &mask) {
+EError TPortoApi::ListStorages(std::vector<TString> &storages,
+                               const TString &place,
+                               const TString &mask) {
     Req.Clear();
     auto req = Req.mutable_liststorages();
 
@@ -1011,8 +1008,8 @@ EError Connection::ListStorages(std::vector<TString> &storages,
     return LastError;
 }
 
-EError Connection::RemoveStorage(const TString &storage,
-                                 const TString &place) {
+EError TPortoApi::RemoveStorage(const TString &storage,
+                                const TString &place) {
     Req.Clear();
     auto req = Req.mutable_removestorage();
 
@@ -1023,11 +1020,11 @@ EError Connection::RemoveStorage(const TString &storage,
     return Call(DiskTimeout);
 }
 
-EError Connection::ImportStorage(const TString &storage,
-                                 const TString &archive,
-                                 const TString &place,
-                                 const TString &compression,
-                                 const TString &private_value) {
+EError TPortoApi::ImportStorage(const TString &storage,
+                                const TString &archive,
+                                const TString &place,
+                                const TString &compression,
+                                const TString &private_value) {
     Req.Clear();
     auto req = Req.mutable_importstorage();
 
@@ -1043,10 +1040,10 @@ EError Connection::ImportStorage(const TString &storage,
     return Call(DiskTimeout);
 }
 
-EError Connection::ExportStorage(const TString &storage,
-                                 const TString &archive,
-                                 const TString &place,
-                                 const TString &compression) {
+EError TPortoApi::ExportStorage(const TString &storage,
+                                const TString &archive,
+                                const TString &place,
+                                const TString &compression) {
     Req.Clear();
     auto req = Req.mutable_exportstorage();
 

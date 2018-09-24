@@ -42,8 +42,8 @@ static void CatchChild(int) {
 
 class TLauncher {
 public:
-    Porto::Connection *Api;
-    TLauncher(Porto::Connection *api) : Api(api) {}
+    Porto::TPortoApi *Api;
+    TLauncher(Porto::TPortoApi *api) : Api(api) {}
 
     bool WeakContainer = false;
     bool StartContainer = true;
@@ -636,7 +636,7 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
 
 class TRawCmd final : public ICmd {
 public:
-    TRawCmd(Porto::Connection *api) : ICmd(api, "raw", 1, "<request>", "send request in text protobuf") {}
+    TRawCmd(Porto::TPortoApi *api) : ICmd(api, "raw", 1, "<request>", "send request in text protobuf") {}
 
     int Execute(TCommandEnviroment *env) final override {
         std::stringstream req;
@@ -654,7 +654,7 @@ public:
 
 class TCreateCmd final : public ICmd {
 public:
-    TCreateCmd(Porto::Connection *api) : ICmd(api, "create", 1, "<container1> [container2...]", "create container") {}
+    TCreateCmd(Porto::TPortoApi *api) : ICmd(api, "create", 1, "<container1> [container2...]", "create container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         for (const auto &arg : env->GetArgs()) {
@@ -671,7 +671,7 @@ public:
 
 class TGetPropertyCmd final : public ICmd {
 public:
-    TGetPropertyCmd(Porto::Connection *api) : ICmd(api, "pget", 2,
+    TGetPropertyCmd(Porto::TPortoApi *api) : ICmd(api, "pget", 2,
             "[-s] [-k] <container> <property> [property...]",
             "get raw container property") {}
 
@@ -703,7 +703,7 @@ public:
 
 class TSetPropertyCmd final : public ICmd {
 public:
-    TSetPropertyCmd(Porto::Connection *api) : ICmd(api, "set", 3, "<container> <property>", "set container property") {}
+    TSetPropertyCmd(Porto::TPortoApi *api) : ICmd(api, "set", 3, "<container> <property>", "set container property") {}
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
@@ -723,7 +723,7 @@ public:
 
 class TGetDataCmd final : public ICmd {
 public:
-    TGetDataCmd(Porto::Connection *api) : ICmd(api, "dget", 2,
+    TGetDataCmd(Porto::TPortoApi *api) : ICmd(api, "dget", 2,
             "[-s] [-k] <container> <property>...",
             "get raw container property") {}
 
@@ -755,7 +755,7 @@ public:
 
 class TStartCmd final : public ICmd {
 public:
-    TStartCmd(Porto::Connection *api) : ICmd(api, "start", 1, "<container1> [container2...]", "start container") {}
+    TStartCmd(Porto::TPortoApi *api) : ICmd(api, "start", 1, "<container1> [container2...]", "start container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         for (const auto &arg : env->GetArgs()) {
@@ -824,7 +824,7 @@ static const std::map<std::string, int> sigMap = {
 
 class TKillCmd final : public ICmd {
 public:
-    TKillCmd(Porto::Connection *api) : ICmd(api, "kill", 1, "<container> [signal]", "send signal to container") {}
+    TKillCmd(Porto::TPortoApi *api) : ICmd(api, "kill", 1, "<container> [signal]", "send signal to container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         int sig = SIGTERM;
@@ -853,7 +853,7 @@ public:
 
 class TStopCmd final : public ICmd {
 public:
-    TStopCmd(Porto::Connection *api) : ICmd(api, "stop", 1, "[-T <seconds>] <container1> [container2...]", "stop container",
+    TStopCmd(Porto::TPortoApi *api) : ICmd(api, "stop", 1, "[-T <seconds>] <container1> [container2...]", "stop container",
              "    -T <seconds> per-container stop timeout\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
@@ -877,7 +877,7 @@ public:
 
 class TRestartCmd final : public ICmd {
 public:
-    TRestartCmd(Porto::Connection *api) : ICmd(api, "restart", 1, "<container1> [container2...]", "restart container") {}
+    TRestartCmd(Porto::TPortoApi *api) : ICmd(api, "restart", 1, "<container1> [container2...]", "restart container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         for (const auto &arg : env->GetArgs()) {
@@ -900,7 +900,7 @@ public:
 
 class TPauseCmd final : public ICmd {
 public:
-    TPauseCmd(Porto::Connection *api) : ICmd(api, "pause", 1, "<container> [name...]", "pause container") {}
+    TPauseCmd(Porto::TPortoApi *api) : ICmd(api, "pause", 1, "<container> [name...]", "pause container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         for (const auto &arg : env->GetArgs()) {
@@ -917,7 +917,7 @@ public:
 
 class TResumeCmd final : public ICmd {
 public:
-    TResumeCmd(Porto::Connection *api) : ICmd(api, "resume", 1, "<container1> [container2...]", "resume container") {}
+    TResumeCmd(Porto::TPortoApi *api) : ICmd(api, "resume", 1, "<container1> [container2...]", "resume container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         for (const auto &arg : env->GetArgs()) {
@@ -934,7 +934,7 @@ public:
 
 class TRespawnCmd final : public ICmd {
 public:
-    TRespawnCmd(Porto::Connection *api) : ICmd(api, "respawn", 1, "<container1> [container2...]", "respawn container") {}
+    TRespawnCmd(Porto::TPortoApi *api) : ICmd(api, "respawn", 1, "<container1> [container2...]", "respawn container") {}
     int Execute(TCommandEnviroment *env) final override {
         for (const auto &arg : env->GetArgs()) {
             int ret = Api->Respawn(arg);
@@ -949,7 +949,7 @@ public:
 
 class TGetCmd final : public ICmd {
 public:
-    TGetCmd(Porto::Connection *api) : ICmd(api, "get", 1,
+    TGetCmd(Porto::TPortoApi *api) : ICmd(api, "get", 1,
             "[-n] [-s] [-r] [container|pattern]... [--] [property]...",
             "get container properties",
             "   -n   non-blocking\n"
@@ -1061,7 +1061,7 @@ public:
 
 class TRunCmd final : public ICmd {
 public:
-    TRunCmd(Porto::Connection *api) : ICmd(api, "run", 2,
+    TRunCmd(Porto::TPortoApi *api) : ICmd(api, "run", 2,
             "[-L layer] [-W] ... <container> [properties]",
             "create and start container with given properties",
             "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
@@ -1105,7 +1105,7 @@ public:
 
 class TExecCmd final : public ICmd {
 public:
-    TExecCmd(Porto::Connection *api) : ICmd(api, "exec", 2,
+    TExecCmd(Porto::TPortoApi *api) : ICmd(api, "exec", 2,
         "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
         "Execute command in container, forward terminal, destroy container at the end, exit - ^X^X",
         "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
@@ -1181,7 +1181,7 @@ public:
 
 class TShellCmd final : public ICmd {
 public:
-    TShellCmd(Porto::Connection *api) : ICmd(api, "shell", 1,
+    TShellCmd(Porto::TPortoApi *api) : ICmd(api, "shell", 1,
             "[-u <user>] [-g <group>] <container> [command] [argument]...",
             "start shell (default /bin/bash) in container, exit - ^X^X") { }
 
@@ -1275,7 +1275,7 @@ public:
 
 class TGcCmd final : public ICmd {
 public:
-    TGcCmd(Porto::Connection *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
+    TGcCmd(Porto::TPortoApi *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
 
     int Execute(TCommandEnviroment *) final override {
         std::vector<std::string> clist;
@@ -1312,7 +1312,7 @@ public:
 
 class TFindCmd final : public ICmd {
 public:
-    TFindCmd(Porto::Connection *api) : ICmd(api, "find", 1, "<pid> [comm]", "find container for given process id") {}
+    TFindCmd(Porto::TPortoApi *api) : ICmd(api, "find", 1, "<pid> [comm]", "find container for given process id") {}
 
     int Execute(TCommandEnviroment *env) final override {
         int pid;
@@ -1343,7 +1343,7 @@ public:
 
 class TDestroyCmd final : public ICmd {
 public:
-    TDestroyCmd(Porto::Connection *api) : ICmd(api, "destroy", 1, "<container1> [container2...]", "destroy container") {}
+    TDestroyCmd(Porto::TPortoApi *api) : ICmd(api, "destroy", 1, "<container1> [container2...]", "destroy container") {}
 
     int Execute(TCommandEnviroment *env) final override {
         int exitStatus = EXIT_SUCCESS;
@@ -1361,7 +1361,7 @@ public:
 
 class TWaitCmd final : public ICmd {
 public:
-    TWaitCmd(Porto::Connection *api) : ICmd(api, "wait", 0,
+    TWaitCmd(Porto::TPortoApi *api) : ICmd(api, "wait", 0,
              "[-A] [-T <seconds>] <container|wildcard> ...",
              "Wait for any listed container change state to dead or meta without running children",
              "    -T <seconds>  timeout\n"
@@ -1369,7 +1369,7 @@ public:
              "    -A            async wait\n"
              ) {}
 
-    static void PrintAsyncWait(const Porto::rpc::TWaitResponse &event) {
+    static void PrintAsyncWait(const Porto::TWaitResponse &event) {
         if (event.has_label())
             fmt::print("{} {}\t{}\t{} = {}\n", FormatTime(event.when()),
                        event.state(), event.name(), event.label(), event.value());
@@ -1424,7 +1424,7 @@ public:
 
 class TListCmd final : public ICmd {
 public:
-    TListCmd(Porto::Connection *api) : ICmd(api, "list", 0,
+    TListCmd(Porto::TPortoApi *api) : ICmd(api, "list", 0,
             "[-1] [-f] [-r] [-t] [-L label[=value]] [pattern]",
             "list containers",
             "    -1        only names\n"
@@ -1476,8 +1476,8 @@ public:
         if (label != "" ) {
             auto sep = label.find('=');
 
-            rpc::TPortoRequest req;
-            rpc::TPortoResponse rsp;
+            Porto::TPortoRequest req;
+            Porto::TPortoResponse rsp;
             auto cmd = req.mutable_findlabel();
 
             if (sep == std::string::npos) {
@@ -1576,7 +1576,7 @@ public:
 
 class TSortCmd final : public ICmd {
 public:
-    TSortCmd(Porto::Connection *api) : ICmd(api, "sort", 0,
+    TSortCmd(Porto::TPortoApi *api) : ICmd(api, "sort", 0,
             "[container|pattern... --] [property...]",
             "print containers sorted by resource usage",
             ""
@@ -1672,7 +1672,7 @@ public:
 
 class TCreateVolumeCmd final : public ICmd {
 public:
-    TCreateVolumeCmd(Porto::Connection *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]",
+    TCreateVolumeCmd(Porto::TPortoApi *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]",
         "create volume",
         "    -A        choose path automatically\n"
         ) {}
@@ -1712,7 +1712,7 @@ public:
 
 class TLinkVolumeCmd final : public ICmd {
 public:
-    TLinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vlink", 1,
+    TLinkVolumeCmd(Porto::TPortoApi *api) : ICmd(api, "vlink", 1,
             "[-R] <path> [container] [target] [ro|rw]",
             "link volume to container", "default container - self\n") {}
 
@@ -1735,7 +1735,7 @@ public:
 
 class TUnlinkVolumeCmd final : public ICmd {
 public:
-    TUnlinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vunlink", 1,
+    TUnlinkVolumeCmd(Porto::TPortoApi *api) : ICmd(api, "vunlink", 1,
                     "[-A] [-S] <path> [<container>|self|***] [<target>|***]",
                     "unlink volume from container",
                     "    -A        unlink from all containers, same as ***\n"
@@ -1768,7 +1768,7 @@ class TListVolumesCmd final : public ICmd {
     bool inodes = false;
 
 public:
-    TListVolumesCmd(Porto::Connection *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [-c <ct>] [volume]...",
+    TListVolumesCmd(Porto::TPortoApi *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [-c <ct>] [volume]...",
         "list volumes",
         "    -1        list only paths\n"
         "    -i        list inode information\n"
@@ -1776,7 +1776,7 @@ public:
         "    -c <ct>   list volumes linked to container\n"
         ) {}
 
-    std::string GetProp(const rpc::TVolumeDescription &v, const std::string &n) {
+    std::string GetProp(const Porto::TVolumeDescription &v, const std::string &n) {
         for (auto &p: v.properties()) {
             if (p.name() == n)
                 return p.value();
@@ -1784,7 +1784,7 @@ public:
         return "-";
     }
 
-    std::string GetSize(const rpc::TVolumeDescription &v, const std::string &n) {
+    std::string GetSize(const Porto::TVolumeDescription &v, const std::string &n) {
         uint64_t val;
         for (auto &p: v.properties()) {
             if (p.name() == n) {
@@ -1796,7 +1796,7 @@ public:
         return "-";
     }
 
-    double GetPerc(const rpc::TVolumeDescription &v, const std::string &n, const std::string &d) {
+    double GetPerc(const Porto::TVolumeDescription &v, const std::string &n, const std::string &d) {
         uint64_t val = 0;
         uint64_t div = 0;
 
@@ -1817,7 +1817,7 @@ public:
         return 100. * val / (val + div);
     }
 
-    void ShowVolume(const rpc::TVolumeDescription &v) {
+    void ShowVolume(const Porto::TVolumeDescription &v) {
         if (!details) {
             fmt::print("{}\n", v.path());
         } else {
@@ -1925,7 +1925,7 @@ public:
 
 class TTuneVolumeCmd final : public ICmd {
 public:
-    TTuneVolumeCmd(Porto::Connection *api) :
+    TTuneVolumeCmd(Porto::TPortoApi *api) :
         ICmd(api, "vtune", 1, "<path> [property=value...]", "tune volume") { }
 
     int Execute(TCommandEnviroment *env) final override {
@@ -1954,7 +1954,7 @@ public:
 
 class TStorageCmd final : public ICmd {
 public:
-    TStorageCmd(Porto::Connection *api) : ICmd(api, "storage", 0,
+    TStorageCmd(Porto::TPortoApi *api) : ICmd(api, "storage", 0,
         "[-P <place>] [-M] -L|-R|-F [meta/][storage]",
         "Manage internal persistent volume storage",
         "    -P <place>               optional path to place\n"
@@ -2087,9 +2087,9 @@ public:
         } else if (meta) {
             if (args.size() < 1)
                 return EXIT_FAILURE;
-            rpc::TPortoRequest req;
-            rpc::TPortoResponse rsp;
-            rpc::TMetaStorage *s;
+            Porto::TPortoRequest req;
+            Porto::TPortoResponse rsp;
+            Porto::TMetaStorage *s;
 
             if (remove)
                 s = req.mutable_removemetastorage();
@@ -2130,7 +2130,7 @@ public:
 
 class TLayerCmd final : public ICmd {
 public:
-    TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
+    TLayerCmd(Porto::TPortoApi *api) : ICmd(api, "layer", 0,
         "[-P <place>] [-S <private>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball]",
         "Manage overlayfs layers in internal storage",
         "    -P <place>               optional path to place\n"
@@ -2293,7 +2293,7 @@ public:
 
 class TBuildCmd final : public ICmd {
 public:
-    TBuildCmd(Porto::Connection *api) : ICmd(api, "build", 0,
+    TBuildCmd(Porto::TPortoApi *api) : ICmd(api, "build", 0,
             "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-Q image.squashfs] [-B|-b script] [-S|-s script]... [properties]...",
             "build container image",
             "    -l layer|dir|tarball       layer for bootstrap, if empty run in host\n"
@@ -2757,7 +2757,7 @@ err:
 class TConvertPathCmd final : public ICmd {
 
 public:
-    TConvertPathCmd(Porto::Connection *api) : ICmd(api, "convert", 1,
+    TConvertPathCmd(Porto::TPortoApi *api) : ICmd(api, "convert", 1,
                                            "[-s container] [-d container] <path>",
                                            "convert paths between different containers",
                                            "    -s container    source container (client container if omitted)\n"
@@ -2789,7 +2789,7 @@ public:
 
 class TAttachCmd final : public ICmd {
 public:
-    TAttachCmd(Porto::Connection *api) : ICmd(api, "attach", 2,
+    TAttachCmd(Porto::TPortoApi *api) : ICmd(api, "attach", 2,
             "[-t] <container> <pid> [comm]", "move process or thread into container") { }
 
     int Execute(TCommandEnviroment *environment) final override {
@@ -2823,7 +2823,7 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    Porto::Connection api;
+    Porto::TPortoApi api;
 
     TCommandHandler handler(api);
     handler.RegisterCommand<TCreateCmd>();

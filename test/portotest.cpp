@@ -46,7 +46,7 @@ static void Usage() {
 static int TestConnectivity() {
     using namespace test;
 
-    Porto::Connection api;
+    Porto::TPortoApi api;
 
     std::vector<std::string> containers;
     ExpectApiSuccess(api.List(containers));

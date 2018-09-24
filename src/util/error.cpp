@@ -5,7 +5,7 @@ extern "C" {
 }
 
 std::string TError::ErrorName(EError error) {
-    return rpc::EError_Name(error);
+    return Porto::EError_Name(error);
 }
 
 std::string TError::Message() const {
@@ -82,7 +82,7 @@ bool TError::Deserialize(int fd, TError &error) {
     return true;
 }
 
-void TError::Dump(rpc::TError &error) const {
+void TError::Dump(Porto::TError &error) const {
     error.set_error(Error);
     error.set_msg(Message());
 }

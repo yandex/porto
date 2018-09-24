@@ -82,7 +82,7 @@ static bool RunningInContainer() {
 }
 
 static bool CheckPortoAlive() {
-    Porto::Connection conn;
+    Porto::TPortoApi conn;
     if (conn.SetTimeout(1) != EError::Success)
         return false;
     std::string ver, rev;
@@ -1377,7 +1377,7 @@ static void PrintVersion() {
 
     std::cout << "version: " << PORTO_VERSION << " " << PORTO_REVISION << " " << thisBin << std::endl;
 
-    Porto::Connection conn;
+    Porto::TPortoApi conn;
     std::string ver, rev;
     if (!conn.GetVersion(ver, rev))
         std::cout << "running: " <<  ver + " " + rev << " " << currBin << std::endl;
@@ -1602,7 +1602,7 @@ void ReopenMasterLog() {
 }
 
 static int GetSystemProperties() {
-    Porto::Connection conn;
+    Porto::TPortoApi conn;
     auto rsp = conn.GetSystem();
     if (!rsp) {
         fmt::print(stderr, "{}\n", conn.GetLastError());
@@ -1613,7 +1613,7 @@ static int GetSystemProperties() {
 }
 
 static int SetSystemProperties(TTuple arg) {
-    Porto::Connection conn;
+    Porto::TPortoApi conn;
     if (arg.size() != 2)
         return EXIT_FAILURE;
     if (conn.SetSystem(arg[0], arg[1])) {

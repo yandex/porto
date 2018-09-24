@@ -26,9 +26,9 @@ namespace test {
     int Pgrep(const std::string &name);
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitProcessExit(const std::string &pid, int sec = 10);
-    void WaitState(Porto::Connection &api, const std::string &name, const std::string &state, int sec = 10);
-    void WaitContainer(Porto::Connection &api, const std::string &name, int sec = 10);
-    void WaitPortod(Porto::Connection &api, int times = 10);
+    void WaitState(Porto::TPortoApi &api, const std::string &name, const std::string &state, int sec = 10);
+    void WaitContainer(Porto::TPortoApi &api, const std::string &name, int sec = 10);
+    void WaitPortod(Porto::TPortoApi &api, int times = 10);
     std::string GetCwd(const std::string &pid);
     std::string GetRoot(const std::string &pid);
     std::string GetNamespace(const std::string &pid, const std::string &ns);
@@ -55,15 +55,15 @@ namespace test {
     extern TCred Alice;
     extern TCred Bob;
 
-    void AsRoot(Porto::Connection &api);
-    void AsNobody(Porto::Connection &api);
-    void AsAlice(Porto::Connection &api);
-    void AsBob(Porto::Connection &api);
+    void AsRoot(Porto::TPortoApi &api);
+    void AsNobody(Porto::TPortoApi &api);
+    void AsAlice(Porto::TPortoApi &api);
+    void AsBob(Porto::TPortoApi &api);
 
     void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove = true);
 
     void PrintFds(const std::string &path, struct dirent **lst, int nr);
-    void TestDaemon(Porto::Connection &api);
+    void TestDaemon(Porto::TPortoApi &api);
 
     int SelfTest(std::vector<std::string> args);
     int StressTest(int threads, int iter, bool killPorto);

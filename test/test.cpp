@@ -103,13 +103,13 @@ void WaitProcessExit(const std::string &pid, int sec) {
         Fail("Waited too long for process to exit");
 }
 
-void WaitContainer(Porto::Connection &api, const std::string &name, int sec) {
+void WaitContainer(Porto::TPortoApi &api, const std::string &name, int sec) {
     std::string state;
     ExpectApiSuccess(api.WaitContainer(name, state, sec));
     ExpectNeq(state, "timeout");
 }
 
-void WaitState(Porto::Connection &api, const std::string &name, const std::string &state, int sec) {
+void WaitState(Porto::TPortoApi &api, const std::string &name, const std::string &state, int sec) {
     Say() << "Waiting for " << name << " to be in state " << state << std::endl;
 
     int times = sec * 10;
@@ -128,7 +128,7 @@ void WaitState(Porto::Connection &api, const std::string &name, const std::strin
         Fail("Waited too long for task to change state");
 }
 
-void WaitPortod(Porto::Connection &api, int times) {
+void WaitPortod(Porto::TPortoApi &api, int times) {
     Say() << "Waiting for portod startup" << std::endl;
 
     std::vector<std::string> clist;
@@ -360,7 +360,7 @@ void InitUsersAndGroups() {
     Expect(Bob.IsMemberOf(PortoGroup));
 }
 
-void AsRoot(Porto::Connection &api) {
+void AsRoot(Porto::TPortoApi &api) {
     api.Close();
 
     ExpectEq(seteuid(0), 0);
@@ -368,7 +368,7 @@ void AsRoot(Porto::Connection &api) {
     ExpectEq(setgroups(0, nullptr), 0);
 }
 
-void AsUser(Porto::Connection &api, TCred &cred) {
+void AsUser(Porto::TPortoApi &api, TCred &cred) {
     AsRoot(api);
 
     ExpectEq(setgroups(cred.Groups.size(), cred.Groups.data()), 0);
@@ -376,15 +376,15 @@ void AsUser(Porto::Connection &api, TCred &cred) {
     ExpectEq(setreuid(0, cred.Uid), 0);
 }
 
-void AsNobody(Porto::Connection &api) {
+void AsNobody(Porto::TPortoApi &api) {
     AsUser(api, Nobody);
 }
 
-void AsAlice(Porto::Connection &api) {
+void AsAlice(Porto::TPortoApi &api) {
     AsUser(api, Alice);
 }
 
-void AsBob(Porto::Connection &api) {
+void AsBob(Porto::TPortoApi &api) {
     AsUser(api, Bob);
 }
 
@@ -444,7 +444,7 @@ static size_t ChildrenNum(int pid) {
     return lines.size();
 }
 
-void TestDaemon(Porto::Connection &api) {
+void TestDaemon(Porto::TPortoApi &api) {
     struct dirent **lst;
     int pid;
 

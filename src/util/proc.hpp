@@ -10,5 +10,5 @@ public:
    void Reset();
    TError Parse(pid_t pid);
    void Add(const TVmStat &a);
-   void Dump(rpc::TVmStat &s);
+   void Dump(Porto::TVmStat &s);
 };

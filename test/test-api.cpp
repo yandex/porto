@@ -12,7 +12,7 @@ int main(int, char **) {
     Porto::TString str, path;
     uint64_t val;
 
-    Porto::Connection api;
+    Porto::TPortoApi api;
 
     ExpectSuccess(api.Connect());
 
@@ -39,7 +39,7 @@ int main(int, char **) {
     ExpectSuccess(api.GetProperty("/", "state", str));
     ExpectEq(str, "meta");
 
-    auto ct = api.GetContainerSpec("/");
+    auto ct = api.GetContainer("/");
     Expect(ct != nullptr);
     ExpectEq(ct->name(), "/");
 
@@ -51,7 +51,7 @@ int main(int, char **) {
     ExpectEq(api.Error(), Porto::EError::InvalidProperty);
     ExpectEq(api.GetLastError(str), Porto::EError::InvalidProperty);
 
-    ct = api.GetContainerSpec("a");
+    ct = api.GetContainer("a");
     Expect(ct == nullptr);
     ExpectEq(api.Error(), Porto::EError::ContainerDoesNotExist);
 
@@ -61,7 +61,7 @@ int main(int, char **) {
     ExpectSuccess(api.GetProperty("a", "memory_limit", val));
     ExpectEq(val, 1 << 20);
 
-    ct = api.GetContainerSpec("a");
+    ct = api.GetContainer("a");
     Expect(ct != nullptr);
     ExpectEq(ct->memory_limit(), 1 << 20);
 
@@ -74,11 +74,11 @@ int main(int, char **) {
                 {"space_limit", "1G"}}));
     ExpectNeq(path, "");
 
-    auto vd = api.GetVolume(path);
+    auto vd = api.GetVolumeDesc(path);
     Expect(vd != nullptr);
     ExpectEq(vd->path(), path);
 
-    auto vs = api.GetVolumeSpec(path);
+    auto vs = api.GetVolume(path);
     Expect(vs != nullptr);
     ExpectEq(vs->path(), path);
 

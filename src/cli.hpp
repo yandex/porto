@@ -13,13 +13,13 @@ class TCommandEnviroment;
 
 class ICmd {
 protected:
-    Porto::Connection *Api;
+    Porto::TPortoApi *Api;
     std::string Name, Usage, Desc, Help;
     sig_atomic_t Interrupted = 0;
 public:
     int NeedArgs;
 
-    ICmd(Porto::Connection *api, const std::string &name, int args,
+    ICmd(Porto::TPortoApi *api, const std::string &name, int args,
          const std::string &usage, const std::string &desc, const std::string &help = "");
     virtual ~ICmd() {}
     const std::string &GetName() const;
@@ -47,14 +47,14 @@ class TCommandHandler {
 public:
     using RegisteredCommands = std::map<std::string, std::unique_ptr<ICmd>>;
 
-    explicit TCommandHandler(Porto::Connection &api);
+    explicit TCommandHandler(Porto::TPortoApi &api);
     ~TCommandHandler();
 
     void RegisterCommand(std::unique_ptr<ICmd> cmd);
     int HandleCommand(int argc, char *argv[]);
     void Usage(const char *command);
 
-    Porto::Connection &GetPortoApi() { return PortoApi; }
+    Porto::TPortoApi &GetPortoApi() { return PortoApi; }
     const RegisteredCommands &GetCommands() const { return Commands; }
 
     template <typename TCommand>
@@ -64,7 +64,7 @@ public:
 
 private:
     RegisteredCommands Commands;
-    Porto::Connection &PortoApi;
+    Porto::TPortoApi &PortoApi;
 };
 
 class TCommandEnviroment {

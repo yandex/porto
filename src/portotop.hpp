@@ -49,7 +49,7 @@ public:
     void Save();
     void Restore();
     int Dialog(std::string text, const std::vector<std::string> &buttons);
-    void ErrorDialog(Porto::Connection &api);
+    void ErrorDialog(Porto::TPortoApi &api);
     void InfoDialog(std::vector<std::string> lines);
     void HelpDialog();
     void ColumnsMenu(std::vector<TColumn> &columns);
@@ -65,7 +65,7 @@ namespace PortoTreeTags {
 class TPortoContainer : public std::enable_shared_from_this<TPortoContainer> {
 public:
     TPortoContainer(std::string container);
-    static std::shared_ptr<TPortoContainer> ContainerTree(Porto::Connection &api);
+    static std::shared_ptr<TPortoContainer> ContainerTree(Porto::TPortoApi &api);
     std::string GetName();
     int GetLevel();
     void ForEach(std::function<void (std::shared_ptr<TPortoContainer> &)> fn,
@@ -91,7 +91,7 @@ public:
     std::string GetValue(const std::string &container, const std::string &variable,
                          bool prev);
     uint64_t GetDt();
-    int Update(Porto::Connection &api);
+    int Update(Porto::TPortoApi &api);
     std::string Version, Revision;
 private:
     std::unordered_map<std::string, unsigned long> Containers;
@@ -179,7 +179,7 @@ public:
 
 class TPortoTop {
 public:
-    TPortoTop(Porto::Connection *api, const std::vector<std::string> &args);
+    TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args);
     void Update();
     void Process();
     void Sort();
@@ -215,7 +215,7 @@ private:
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
 
-    Porto::Connection *Api;
+    Porto::TPortoApi *Api;
     std::shared_ptr<TPortoValueCache> Cache;
     std::shared_ptr<TPortoContainer> RootContainer;
     std::vector<std::vector<TCommonValue>> Common;

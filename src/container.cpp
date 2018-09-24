@@ -2829,7 +2829,7 @@ TError TContainer::PrepareResources() {
 
     if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
         std::shared_ptr<TVolume> vol;
-        rpc::TVolumeSpec spec;
+        Porto::TVolume spec;
 
         L("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
         TaintFlags.RootOnLoop = true;
@@ -3566,7 +3566,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
     return error;
 }
 
-TError TContainer::Load(const rpc::TContainerSpec &spec) {
+TError TContainer::Load(const Porto::TContainer &spec) {
     TError error;
 
     PORTO_ASSERT(!CT);
@@ -3591,7 +3591,7 @@ TError TContainer::Load(const rpc::TContainerSpec &spec) {
     return error;
 }
 
-void TContainer::Dump(const std::vector<std::string> &props, rpc::TContainerSpec &spec) {
+void TContainer::Dump(const std::vector<std::string> &props, Porto::TContainer &spec) {
     PORTO_ASSERT(!CT);
     CT = this;
     LockStateRead();

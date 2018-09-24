@@ -318,12 +318,12 @@ void TRequest::Parse() {
         Opt += " " + o;
 }
 
-static std::string ResponseAsString(const rpc::TPortoResponse &resp) {
+static std::string ResponseAsString(const Porto::TPortoResponse &resp) {
     std::string ret;
 
     if (resp.error()) {
         ret = fmt::format("Error {}:{}({})", resp.error(),
-                          rpc::EError_Name(resp.error()), resp.errormsg());
+                          Porto::EError_Name(resp.error()), resp.errormsg());
     } else if (resp.has_list()) {
         for (int i = 0; i < resp.list().name_size(); i++)
             ret += resp.list().name(i) + " ";
@@ -351,7 +351,7 @@ static std::string ResponseAsString(const rpc::TPortoResponse &resp) {
                 ret += " " + val.variable() + "=";
                 if (val.has_error())
                     ret += fmt::format("{}:{}({})", val.error(),
-                                       rpc::EError_Name(val.error()),
+                                       Porto::EError_Name(val.error()),
                                        val.errormsg());
                 else if (val.has_value())
                     ret += val.value();
@@ -377,8 +377,8 @@ static std::string ResponseAsString(const rpc::TPortoResponse &resp) {
     return ret;
 }
 
-noinline TError NewContainer(rpc::TNewContainerRequest &req,
-                             rpc::TNewContainerResponse &rsp) {
+noinline TError NewContainer(Porto::TNewContainerRequest &req,
+                             Porto::TNewContainerResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     std::string name;
     TError error;
@@ -461,8 +461,8 @@ undo:
     return error;
 }
 
-noinline TError SetContainer(const rpc::TSetContainerRequest &req,
-                             rpc::TSetContainerResponse &) {
+noinline TError SetContainer(const Porto::TSetContainerRequest &req,
+                             Porto::TSetContainerResponse &) {
     std::shared_ptr<TContainer> ct;
     TError error;
 
@@ -479,8 +479,8 @@ noinline TError SetContainer(const rpc::TSetContainerRequest &req,
     return error;
 }
 
-noinline TError GetContainer(const rpc::TGetContainerRequest &req,
-                             rpc::TGetContainerResponse &rsp) {
+noinline TError GetContainer(const Porto::TGetContainerRequest &req,
+                             Porto::TGetContainerResponse &rsp) {
     std::list<std::string> masks, names;
     std::vector<std::string> props;
     TError error;
@@ -591,7 +591,7 @@ static noinline TError CreateContainer(std::string reqName, bool weak) {
     return error;
 }
 
-noinline TError DestroyContainer(const rpc::TDestroyRequest &req) {
+noinline TError DestroyContainer(const Porto::TDestroyRequest &req) {
     std::list<std::shared_ptr<TVolume>> unlinked;
     std::shared_ptr<TContainer> ct;
     TError error;
@@ -609,7 +609,7 @@ noinline TError DestroyContainer(const rpc::TDestroyRequest &req) {
     return error;
 }
 
-static noinline TError StartContainer(const rpc::TStartRequest &req) {
+static noinline TError StartContainer(const Porto::TStartRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -617,7 +617,7 @@ static noinline TError StartContainer(const rpc::TStartRequest &req) {
     return ct->Start();
 }
 
-noinline TError StopContainer(const rpc::TStopRequest &req) {
+noinline TError StopContainer(const Porto::TStopRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -627,7 +627,7 @@ noinline TError StopContainer(const rpc::TStopRequest &req) {
     return ct->Stop(timeout_ms);
 }
 
-noinline TError PauseContainer(const rpc::TPauseRequest &req) {
+noinline TError PauseContainer(const Porto::TPauseRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -636,7 +636,7 @@ noinline TError PauseContainer(const rpc::TPauseRequest &req) {
     return ct->Pause();
 }
 
-noinline TError ResumeContainer(const rpc::TResumeRequest &req) {
+noinline TError ResumeContainer(const Porto::TResumeRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -644,7 +644,7 @@ noinline TError ResumeContainer(const rpc::TResumeRequest &req) {
     return ct->Resume();
 }
 
-noinline TError RespawnContainer(const rpc::TRespawnRequest &req) {
+noinline TError RespawnContainer(const Porto::TRespawnRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.name(), ct);
     if (error)
@@ -652,8 +652,8 @@ noinline TError RespawnContainer(const rpc::TRespawnRequest &req) {
     return ct->Respawn();
 }
 
-noinline TError ListContainers(const rpc::TListRequest &req,
-                               rpc::TPortoResponse &rsp) {
+noinline TError ListContainers(const Porto::TListRequest &req,
+                               Porto::TPortoResponse &rsp) {
     std::string mask = req.has_mask() ? req.mask() : "***";
     auto out = rsp.mutable_list();
 
@@ -675,7 +675,7 @@ noinline TError ListContainers(const rpc::TListRequest &req,
     return OK;
 }
 
-noinline TError FindLabel(const rpc::TFindLabelRequest &req, rpc::TFindLabelResponse &rsp) {
+noinline TError FindLabel(const Porto::TFindLabelRequest &req, Porto::TFindLabelResponse &rsp) {
     auto label = req.label();
     bool wild_label = label.find_first_of("*?") != std::string::npos;
 
@@ -719,7 +719,7 @@ noinline TError FindLabel(const rpc::TFindLabelRequest &req, rpc::TFindLabelResp
     return OK;
 }
 
-noinline TError SetLabel(const rpc::TSetLabelRequest &req, rpc::TSetLabelResponse &rsp) {
+noinline TError SetLabel(const Porto::TSetLabelRequest &req, Porto::TSetLabelResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     TError error;
 
@@ -756,7 +756,7 @@ noinline TError SetLabel(const rpc::TSetLabelRequest &req, rpc::TSetLabelRespons
     return OK;
 }
 
-noinline TError IncLabel(const rpc::TIncLabelRequest &req, rpc::TIncLabelResponse &rsp) {
+noinline TError IncLabel(const Porto::TIncLabelRequest &req, Porto::TIncLabelResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     int64_t result = 0;
     TError error;
@@ -782,8 +782,8 @@ noinline TError IncLabel(const rpc::TIncLabelRequest &req, rpc::TIncLabelRespons
     return OK;
 }
 
-noinline TError GetContainerProperty(const rpc::TGetPropertyRequest &req,
-                                     rpc::TPortoResponse &rsp) {
+noinline TError GetContainerProperty(const Porto::TGetPropertyRequest &req,
+                                     Porto::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
@@ -809,7 +809,7 @@ out:
     return error;
 }
 
-noinline TError SetContainerProperty(const rpc::TSetPropertyRequest &req) {
+noinline TError SetContainerProperty(const Porto::TSetPropertyRequest &req) {
     std::string property = req.property();
     std::string value = req.value();
 
@@ -845,8 +845,8 @@ noinline TError SetContainerProperty(const rpc::TSetPropertyRequest &req) {
     return error;
 }
 
-noinline TError GetDataProperty(const rpc::TGetDataPropertyRequest &req,
-                                rpc::TPortoResponse &rsp) {
+noinline TError GetDataProperty(const Porto::TGetDataPropertyRequest &req,
+                                Porto::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (!error) {
@@ -872,8 +872,8 @@ out:
     return error;
 }
 
-static void FillGetResponse(const rpc::TGetRequest &req,
-                            rpc::TGetResponse &rsp,
+static void FillGetResponse(const Porto::TGetRequest &req,
+                            Porto::TGetResponse &rsp,
                             std::string &name) {
     std::shared_ptr<TContainer> ct;
 
@@ -921,8 +921,8 @@ out:
         ct->UnlockState();
 }
 
-noinline TError GetContainerCombined(const rpc::TGetRequest &req,
-                                     rpc::TPortoResponse &rsp) {
+noinline TError GetContainerCombined(const Porto::TGetRequest &req,
+                                     Porto::TPortoResponse &rsp) {
     auto get = rsp.mutable_get();
     std::list <std::string> masks, names;
 
@@ -961,7 +961,7 @@ noinline TError GetContainerCombined(const rpc::TGetRequest &req,
     return OK;
 }
 
-noinline TError ListProperties(rpc::TPortoResponse &rsp) {
+noinline TError ListProperties(Porto::TPortoResponse &rsp) {
     auto list = rsp.mutable_listproperties();
     for (auto &elem : ContainerProperties) {
         auto &prop = elem.second;
@@ -976,7 +976,7 @@ noinline TError ListProperties(rpc::TPortoResponse &rsp) {
     return OK;
 }
 
-noinline TError ListDataProperties(rpc::TPortoResponse &rsp) {
+noinline TError ListDataProperties(Porto::TPortoResponse &rsp) {
     auto list = rsp.mutable_listdataproperties();
     for (auto &elem : ContainerProperties) {
         auto &prop = elem.second;
@@ -989,7 +989,7 @@ noinline TError ListDataProperties(rpc::TPortoResponse &rsp) {
      return OK;
 }
 
-noinline TError Kill(const rpc::TKillRequest &req) {
+noinline TError Kill(const Porto::TKillRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->ReadContainer(req.name(), ct);
     if (error)
@@ -1003,7 +1003,7 @@ noinline TError Kill(const rpc::TKillRequest &req) {
     return error;
 }
 
-noinline TError Version(rpc::TPortoResponse &rsp) {
+noinline TError Version(Porto::TPortoResponse &rsp) {
     auto ver = rsp.mutable_version();
 
     ver->set_tag(PORTO_VERSION);
@@ -1012,8 +1012,8 @@ noinline TError Version(rpc::TPortoResponse &rsp) {
     return OK;
 }
 
-noinline TError WaitContainers(const rpc::TWaitRequest &req, bool async,
-        rpc::TPortoResponse &rsp, std::shared_ptr<TClient> &client) {
+noinline TError WaitContainers(const Porto::TWaitRequest &req, bool async,
+        Porto::TPortoResponse &rsp, std::shared_ptr<TClient> &client) {
     std::string name, full_name;
     TError error;
 
@@ -1111,8 +1111,8 @@ noinline TError WaitContainers(const rpc::TWaitRequest &req, bool async,
     return async ? OK : TError::Queued();
 }
 
-noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
-                            rpc::TPortoResponse &rsp) {
+noinline TError ConvertPath(const Porto::TConvertPathRequest &req,
+                            Porto::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> src, dst;
     TError error;
 
@@ -1142,7 +1142,7 @@ noinline TError ConvertPath(const rpc::TConvertPathRequest &req,
     return OK;
 }
 
-noinline TError ListVolumeProperties(rpc::TPortoResponse &rsp) {
+noinline TError ListVolumeProperties(Porto::TPortoResponse &rsp) {
     auto list = rsp.mutable_listvolumeproperties();
     for (auto &prop: VolumeProperties) {
         auto p = list->add_list();
@@ -1153,10 +1153,10 @@ noinline TError ListVolumeProperties(rpc::TPortoResponse &rsp) {
     return OK;
 }
 
-noinline TError CreateVolume(const rpc::TCreateVolumeRequest &req,
-                             rpc::TPortoResponse &rsp) {
+noinline TError CreateVolume(const Porto::TCreateVolumeRequest &req,
+                             Porto::TPortoResponse &rsp) {
     std::shared_ptr<TVolume> volume;
-    rpc::TVolumeSpec spec;
+    Porto::TVolume spec;
     TStringMap cfg;
     TError error;
 
@@ -1188,7 +1188,7 @@ err:
     return error;
 }
 
-noinline TError TuneVolume(const rpc::TTuneVolumeRequest &req) {
+noinline TError TuneVolume(const Porto::TTuneVolumeRequest &req) {
     TStringMap cfg;
     for (auto p: req.properties())
         cfg[p.name()] = p.value();
@@ -1201,7 +1201,7 @@ noinline TError TuneVolume(const rpc::TTuneVolumeRequest &req) {
     return volume->Tune(cfg);
 }
 
-noinline TError LinkVolume(const rpc::TLinkVolumeRequest &req) {
+noinline TError LinkVolume(const Porto::TLinkVolumeRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.container() != "" ? req.container() : SELF_CONTAINER, ct, true);
     if (error)
@@ -1219,7 +1219,7 @@ noinline TError LinkVolume(const rpc::TLinkVolumeRequest &req) {
     return OK;
 }
 
-noinline TError UnlinkVolume(const rpc::TUnlinkVolumeRequest &req) {
+noinline TError UnlinkVolume(const Porto::TUnlinkVolumeRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error;
 
@@ -1247,8 +1247,8 @@ noinline TError UnlinkVolume(const rpc::TUnlinkVolumeRequest &req) {
     return error;
 }
 
-noinline TError ListVolumes(const rpc::TListVolumesRequest &req,
-                            rpc::TPortoResponse &rsp) {
+noinline TError ListVolumes(const Porto::TListVolumesRequest &req,
+                            Porto::TPortoResponse &rsp) {
     TError error;
 
     if (req.has_path() && !req.path().empty()) {
@@ -1299,8 +1299,8 @@ noinline TError ListVolumes(const rpc::TListVolumesRequest &req,
     return OK;
 }
 
-noinline TError NewVolume(const rpc::TNewVolumeRequest &req,
-                          rpc::TNewVolumeResponse &rsp) {
+noinline TError NewVolume(const Porto::TNewVolumeRequest &req,
+                          Porto::TNewVolumeResponse &rsp) {
     Statistics->VolumesCreated++;
 
     std::shared_ptr<TVolume> volume;
@@ -1314,8 +1314,8 @@ noinline TError NewVolume(const rpc::TNewVolumeRequest &req,
     return OK;
 }
 
-noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
-                          rpc::TGetVolumeResponse &rsp) {
+noinline TError GetVolume(const Porto::TGetVolumeRequest &req,
+                          Porto::TGetVolumeResponse &rsp) {
     TError error;
 
     std::shared_ptr<TContainer> ct;
@@ -1375,7 +1375,7 @@ noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
     return OK;
 }
 
-noinline TError ImportLayer(const rpc::TImportLayerRequest &req) {
+noinline TError ImportLayer(const Porto::TImportLayerRequest &req) {
     TStorage layer;
     TError error;
 
@@ -1393,8 +1393,8 @@ noinline TError ImportLayer(const rpc::TImportLayerRequest &req) {
                                req.merge());
 }
 
-noinline TError GetLayerPrivate(const rpc::TGetLayerPrivateRequest &req,
-                                rpc::TPortoResponse &rsp) {
+noinline TError GetLayerPrivate(const Porto::TGetLayerPrivateRequest &req,
+                                Porto::TPortoResponse &rsp) {
     TStorage layer;
     TError error;
 
@@ -1408,7 +1408,7 @@ noinline TError GetLayerPrivate(const rpc::TGetLayerPrivateRequest &req,
     return error;
 }
 
-noinline TError SetLayerPrivate(const rpc::TSetLayerPrivateRequest &req) {
+noinline TError SetLayerPrivate(const Porto::TSetLayerPrivateRequest &req) {
     TStorage layer;
     TError error;
 
@@ -1419,7 +1419,7 @@ noinline TError SetLayerPrivate(const rpc::TSetLayerPrivateRequest &req) {
     return layer.SetPrivate(req.private_value());
 }
 
-noinline TError ExportLayer(const rpc::TExportLayerRequest &req) {
+noinline TError ExportLayer(const Porto::TExportLayerRequest &req) {
     TStorage layer;
     TError error;
 
@@ -1454,7 +1454,7 @@ noinline TError ExportLayer(const rpc::TExportLayerRequest &req) {
                                req.has_compress() ? req.compress() : "");
 }
 
-noinline TError RemoveLayer(const rpc::TRemoveLayerRequest &req) {
+noinline TError RemoveLayer(const Porto::TRemoveLayerRequest &req) {
     TStorage layer;
     TError error;
 
@@ -1465,8 +1465,8 @@ noinline TError RemoveLayer(const rpc::TRemoveLayerRequest &req) {
     return layer.Remove();
 }
 
-noinline TError ListLayers(const rpc::TListLayersRequest &req,
-                           rpc::TPortoResponse &rsp) {
+noinline TError ListLayers(const Porto::TListLayersRequest &req,
+                           Porto::TPortoResponse &rsp) {
     TStorage place;
     TError error;
 
@@ -1496,7 +1496,7 @@ noinline TError ListLayers(const rpc::TListLayersRequest &req,
     return error;
 }
 
-noinline TError AttachProcess(const rpc::TAttachProcessRequest &req, bool thread) {
+noinline TError AttachProcess(const Porto::TAttachProcessRequest &req, bool thread) {
     std::shared_ptr<TContainer> oldCt, newCt;
     pid_t pid = req.pid();
     std::string comm;
@@ -1570,8 +1570,8 @@ undo:
     return error;
 }
 
-noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
-                              rpc::TPortoResponse &rsp) {
+noinline TError LocateProcess(const Porto::TLocateProcessRequest &req,
+                              Porto::TPortoResponse &rsp) {
     std::shared_ptr<TContainer> ct;
     pid_t pid = req.pid();
     std::string name;
@@ -1597,8 +1597,8 @@ noinline TError LocateProcess(const rpc::TLocateProcessRequest &req,
     return OK;
 }
 
-noinline TError ListStorages(const rpc::TListStoragesRequest &req,
-                             rpc::TPortoResponse &rsp) {
+noinline TError ListStorages(const Porto::TListStoragesRequest &req,
+                             Porto::TPortoResponse &rsp) {
     TStorage place;
     TError error;
 
@@ -1649,7 +1649,7 @@ noinline TError ListStorages(const rpc::TListStoragesRequest &req,
     return error;
 }
 
-noinline TError RemoveStorage(const rpc::TRemoveStorageRequest &req) {
+noinline TError RemoveStorage(const Porto::TRemoveStorageRequest &req) {
     TStorage storage;
     TError error;
 
@@ -1660,7 +1660,7 @@ noinline TError RemoveStorage(const rpc::TRemoveStorageRequest &req) {
     return storage.Remove();
 }
 
-noinline TError ImportStorage(const rpc::TImportStorageRequest &req) {
+noinline TError ImportStorage(const Porto::TImportStorageRequest &req) {
     TStorage storage;
     TError error;
 
@@ -1676,7 +1676,7 @@ noinline TError ImportStorage(const rpc::TImportStorageRequest &req) {
                                  req.has_compress() ? req.compress() : "");
 }
 
-noinline TError ExportStorage(const rpc::TExportStorageRequest &req) {
+noinline TError ExportStorage(const Porto::TExportStorageRequest &req) {
     TStorage storage;
     TError error;
 
@@ -1692,7 +1692,7 @@ noinline TError ExportStorage(const rpc::TExportStorageRequest &req) {
                                  req.has_compress() ? req.compress() : "");
 }
 
-noinline TError CreateMetaStorage(const rpc::TMetaStorage &req) {
+noinline TError CreateMetaStorage(const Porto::TMetaStorage &req) {
     TStorage storage;
     TError error;
 
@@ -1707,7 +1707,7 @@ noinline TError CreateMetaStorage(const rpc::TMetaStorage &req) {
     return storage.CreateMeta(req.space_limit(), req.inode_limit());
 }
 
-noinline TError ResizeMetaStorage(const rpc::TMetaStorage &req) {
+noinline TError ResizeMetaStorage(const Porto::TMetaStorage &req) {
     TStorage storage;
     TError error;
 
@@ -1734,7 +1734,7 @@ noinline TError ResizeMetaStorage(const rpc::TMetaStorage &req) {
     return OK;
 }
 
-noinline TError RemoveMetaStorage(const rpc::TMetaStorage &req) {
+noinline TError RemoveMetaStorage(const Porto::TMetaStorage &req) {
     TStorage storage;
     TError error;
 
@@ -1745,7 +1745,7 @@ noinline TError RemoveMetaStorage(const rpc::TMetaStorage &req) {
     return storage.Remove();
 }
 
-noinline TError SetSymlink(const rpc::TSetSymlinkRequest &req) {
+noinline TError SetSymlink(const Porto::TSetSymlinkRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.container(), ct);
     if (error)
@@ -1756,7 +1756,7 @@ noinline TError SetSymlink(const rpc::TSetSymlinkRequest &req) {
     return ct->Save();
 }
 
-noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::TGetSystemResponse *rsp) {
+noinline static TError GetSystemProperties(const Porto::TGetSystemRequest *, Porto::TGetSystemResponse *rsp) {
     rsp->set_porto_version(PORTO_VERSION);
     rsp->set_porto_revision(PORTO_REVISION);
     rsp->set_kernel_version(config().linux_version());
@@ -1827,7 +1827,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
     return OK;
 }
 
-noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rpc::TSetSystemResponse *) {
+noinline static TError SetSystemProperties(const Porto::TSetSystemRequest *req, Porto::TSetSystemResponse *) {
     if (!CL->IsSuperUser())
         return TError(EError::Permission, "Only for super-user");
 
@@ -1872,7 +1872,7 @@ TError TRequest::Check() {
 }
 
 void TRequest::Handle() {
-    rpc::TPortoResponse rsp;
+    Porto::TPortoResponse rsp;
     TError error;
 
     Client->StartRequest();

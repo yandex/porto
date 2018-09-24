@@ -34,8 +34,8 @@ struct TDevice {
     std::string CgroupRule(bool allow) const;
     TError Makedev(const TPath &root = "/") const;
 
-    TError Load(const rpc::TContainerDevice &dev, const TCred &cred);
-    void Dump(rpc::TContainerDevice &dev) const;
+    TError Load(const Porto::TContainerDevice &dev, const TCred &cred);
+    void Dump(Porto::TContainerDevice &dev) const;
 };
 
 struct TDevices {
