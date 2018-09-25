@@ -545,7 +545,8 @@ volume_properties = {
 'permissions': '0775',
 'place': '/place',
 'place_key': '/place',
-'private': '',
+'private': 'test',
+'labels': '',
 'read_only': 'false',
 'ready': 'true',
 'space_available': None,
@@ -585,11 +586,13 @@ volume_spec = [
 'id',
 'inodes',
 'backend',
+'private_value',
+'labels',
 ]
 
 ct = conn.Run(ct_name)
 
-v = conn.CreateVolume(layers=['ubuntu-precise'], space_limit='1G', containers=ct_name)
+v = conn.CreateVolume(layers=['ubuntu-precise'], space_limit='1G', containers=ct_name, private='test')
 
 p = conn.GetVolume(v.path)
 
@@ -643,5 +646,7 @@ ExpectEq(p['owner']['group'], v.properties['owner_group'])
 ExpectEq(p['cred']['user'], v.properties['user'])
 ExpectEq(p['cred']['group'], v.properties['group'])
 ExpectEq(p['permissions'], 0o775)
+ExpectEq(p['private_value'], 'test')
+ExpectEq(p['labels'], {})
 
 ct.Destroy()

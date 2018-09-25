@@ -61,6 +61,8 @@ int main(int, char **) {
     ExpectSuccess(api.GetProperty("a", "memory_limit", val));
     ExpectEq(val, 1 << 20);
 
+    ExpectSuccess(api.SetLabel("a", "TEST.a", "."));
+
     ct = api.GetContainer("a");
     Expect(ct != nullptr);
     ExpectEq(ct->memory_limit(), 1 << 20);
@@ -81,6 +83,8 @@ int main(int, char **) {
     auto vs = api.GetVolume(path);
     Expect(vs != nullptr);
     ExpectEq(vs->path(), path);
+
+    ExpectSuccess(api.SetVolumeLabel(path, "TEST.a", "."));
 
     ExpectSuccess(api.SetProperty("a", "command", "sleep 1000"));
     ExpectSuccess(api.Start("a"));

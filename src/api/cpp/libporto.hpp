@@ -185,6 +185,11 @@ public:
         return SetProperty(name, property, std::to_string(value));
     }
 
+    EError SetLabel(const TString &name,
+                    const TString &label,
+                    const TString &value,
+                    const TString &prev_value = " ");
+
     EError IncLabel(const TString &name,
                     const TString &label,
                     int64_t add,
@@ -246,6 +251,11 @@ public:
 
     EError TuneVolume(const TString &path,
                       const std::map<TString, TString> &config);
+
+    EError SetVolumeLabel(const TString &path,
+                          const TString &label,
+                          const TString &value,
+                          const TString &prev_value = " ");
 
     /* Layer */
 

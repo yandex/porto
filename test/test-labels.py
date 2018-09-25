@@ -13,6 +13,7 @@ ExpectProp(a, 'labels', '')
 
 assert Catch(c.SetLabel, 'a', '!', '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'TEST.!', '.') == porto.exceptions.InvalidLabel
+assert Catch(c.SetLabel, 'a', 'TEST./', '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'a', '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'a.a', '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'A.a', '.') == porto.exceptions.InvalidLabel
@@ -22,6 +23,7 @@ assert Catch(c.SetLabel, 'a', 'AAAAAAAA.a', ' ') == porto.exceptions.InvalidLabe
 assert Catch(c.SetLabel, 'a', 'AAAAAAAA.a', 'a' * 300) == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'PORTO.a', '.') == porto.exceptions.InvalidLabel
 
+c.SetLabel('a', 'A' * 16 + '.a', '/')
 c.SetLabel('a', 'A' * 16 + '.a', '.')
 c.SetLabel('a', 'A' * 16 + '.a', '')
 
@@ -131,3 +133,60 @@ ExpectEq(c.FindLabel('TEST.b'), [{'name':'a/b', 'label':'TEST.b', 'value':'b', '
 ExpectEq(c.FindLabel('.TEST.*'), [])
 
 a.Destroy()
+
+# Volume Labels
+
+ExpectEq(c.GetVolumes(labels=['TEST.a']), [])
+ExpectEq(c.GetVolumes(labels=['TEST.b']), [])
+
+v = c.CreateVolume(labels='TEST.a: a; TEST.b: b')
+ExpectEq(v.GetProperty('labels'), 'TEST.a: a; TEST.b: b')
+ExpectEq(v.GetLabel('TEST.a'), 'a')
+ExpectEq(v.GetLabel('TEST.b'), 'b')
+ExpectEq(len(c.GetVolumes(labels=['TEST.a'])), 1)
+ExpectEq(len(c.GetVolumes(labels=['TEST.b'])), 1)
+ReloadPortod()
+ExpectEq(v.GetProperty('labels'), 'TEST.a: a; TEST.b: b')
+v.Destroy()
+
+v = c.CreateVolume()
+
+ExpectEq(v.GetProperty('labels'), '')
+
+assert Catch(v.SetLabel, '!', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'TEST.!', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'TEST./', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'a', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'a.a', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'A.a', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'A' * 17 + '.a', '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'AAAAAAAA.' + 'a' * 150, '.') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'AAAAAAAA.a', ' ') == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'AAAAAAAA.a', 'a' * 300) == porto.exceptions.InvalidLabel
+assert Catch(v.SetLabel, 'PORTO.a', '.') == porto.exceptions.InvalidLabel
+
+v.SetLabel('A' * 16 + '.a', '.')
+v.SetLabel('A' * 16 + '.a', '')
+
+v.SetLabel('A' * 16 + '.' + 'a' * 111, '.')
+v.SetLabel('A' * 16 + '.' + 'a' * 111, '')
+
+for i in range(100):
+    v.SetLabel('TEST.' + str(i), '.')
+
+assert Catch(v.SetLabel, 'TEST.a', '.') == porto.exceptions.ResourceNotAvailable
+
+for i in range(100):
+    v.SetLabel('TEST.' + str(i), '')
+
+ExpectEq(v.GetProperty('labels'), '')
+
+assert Catch(v.GetLabel, 'TEST.a') == porto.exceptions.LabelNotFound
+
+c.SetVolumeLabel(v.path, 'TEST.a', '/')
+ExpectEq(v.GetLabel('TEST.a'), '/')
+ExpectEq(v.GetProperty('labels'), 'TEST.a: /')
+v.SetLabel('TEST.b', 'b')
+ExpectEq(v.GetProperty('labels'), 'TEST.a: /; TEST.b: b')
+
+v.Destroy()

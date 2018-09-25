@@ -575,6 +575,15 @@ class Volume(object):
     def Tune(self, **properties):
         self.conn.TuneVolume(self.path, **properties)
 
+    def GetLabel(self, label):
+        for kv in self.conn.GetVolume(self.path)['labels'].get('map', []):
+            if kv['key'] == label:
+                return kv['val']
+        raise exceptions.LabelNotFound("Label {} is not set at Volume {}".format(label, self))
+
+    def SetLabel(self, label, value, prev_value=None):
+        return self.conn.SetVolumeLabel(self.path, label, value, prev_value)
+
     def Export(self, tarball, compress=None, timeout=None):
         self.conn.ExportLayer(self.path, place=self.place, tarball=tarball, compress=compress, timeout=timeout)
 
@@ -948,13 +957,15 @@ class Connection(object):
         rsp = self.rpc.call(req, timeout or self.disk_timeout)
         return _decode_message(rsp.GetVolume.volume[0])
 
-    def GetVolumes(self, paths=None, container=None, timeout=None):
+    def GetVolumes(self, paths=None, container=None, labels=None, timeout=None):
         req = rpc_pb2.TPortoRequest()
         req.GetVolume.SetInParent()
         if container is not None:
             req.GetVolume.container = str(container)
         if paths is not None:
             req.GetVolume.path.extend(paths)
+        if labels is not None:
+            req.GetVolume.label.extend(labels)
         rsp = self.rpc.call(req, timeout or self.disk_timeout)
         return [_decode_message(v) for v in rsp.GetVolume.volume]
 
@@ -1024,6 +1035,15 @@ class Connection(object):
             prop = request.TuneVolume.properties.add()
             prop.name, prop.value = name, value
         self.rpc.call(request)
+
+    def SetVolumeLabel(self, path, label, value, prev_value=None):
+        req = rpc_pb2.TPortoRequest()
+        req.SetVolumeLabel.path = path
+        req.SetVolumeLabel.label = label
+        req.SetVolumeLabel.value = value
+        if prev_value is not None:
+            req.SetVolumeLabel.prev_value = prev_value
+        self.rpc.call(req).SetVolumeLabel.prev_value
 
     def ImportLayer(self, layer, tarball, place=None, private_value=None, timeout=None):
         request = rpc_pb2.TPortoRequest()

@@ -429,6 +429,22 @@ EError TPortoApi::SetProperty(const TString &name,
     return Call();
 }
 
+EError TPortoApi::SetLabel(const TString &name,
+                           const TString &label,
+                           const TString &value,
+                           const TString &prev_value) {
+    Req.Clear();
+    auto req = Req.mutable_setlabel();
+
+    req->set_name(name);
+    req->set_label(label);
+    req->set_value(value);
+    if (prev_value != " ")
+        req->set_prev_value(prev_value);
+
+    return Call();
+}
+
 EError TPortoApi::IncLabel(const TString &name,
                            const TString &label,
                            int64_t add,
@@ -713,6 +729,22 @@ EError TPortoApi::TuneVolume(const TString &path,
     }
 
     return Call(DiskTimeout);
+}
+
+EError TPortoApi::SetVolumeLabel(const TString &path,
+                                 const TString &label,
+                                 const TString &value,
+                                 const TString &prev_value) {
+    Req.Clear();
+    auto req = Req.mutable_setvolumelabel();
+
+    req->set_path(path);
+    req->set_label(label);
+    req->set_value(value);
+    if (prev_value != " ")
+        req->set_prev_value(prev_value);
+
+    return Call();
 }
 
 EError TPortoApi::LinkVolume(const TString &path,

@@ -114,6 +114,7 @@ constexpr uint64_t PRIVATE_VALUE_MAX = 4096;
 constexpr uint64_t CONTAINER_COMMAND_MAX = 128 * 1024;
 
 constexpr const char *PORTO_NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
+constexpr const char *PORTO_PATH_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:./";
 
 constexpr unsigned PORTO_LABEL_NAME_LEN_MAX = 128;
 constexpr unsigned PORTO_LABEL_VALUE_LEN_MAX = 256;

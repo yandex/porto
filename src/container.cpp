@@ -772,7 +772,7 @@ TError TContainer::ValidLabel(const std::string &label, const std::string &value
             StringStartsWith(label, "PORTO"))
         return TError(EError::InvalidLabel, "Invalid label name: {}", label);
 
-    if (value.find_first_not_of(PORTO_NAME_CHARS) != std::string::npos)
+    if (value.find_first_not_of(PORTO_PATH_CHARS) != std::string::npos)
         return TError(EError::InvalidLabel, "Invalid label value: {}", value);
 
     return OK;

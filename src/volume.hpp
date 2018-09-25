@@ -16,6 +16,7 @@ constexpr const char *V_BUILD_TIME = "build_time";
 constexpr const char *V_CHANGE_TIME = "change_time";
 constexpr const char *V_STATE = "state";
 constexpr const char *V_PRIVATE = "private";
+constexpr const char *V_LABELS = "labels";
 
 constexpr const char *V_RAW_ID = "_id";
 constexpr const char *V_RAW_CONTAINERS = "_containers";
@@ -147,6 +148,7 @@ public:
 
     std::string Creator;
     std::string Private;
+    TStringMap Labels;
 
     std::set<std::shared_ptr<TVolume>> Nested;
 

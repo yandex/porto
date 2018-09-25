@@ -120,15 +120,17 @@ Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNA
 
 Container could have user-defined labels and associated values.
 
-Label and value may use only symbols allowed for container names.
-Spaces and '/' are not allowed.
+Label and value may use only symbols allowed for container names: [a-zA-Z0-9\_-@:.].
+Spaces are not allowed. Slash '/' is allowed only in value.
 
 Label must be in format PREFIX.name. Label max length is 128 symbols.
-PREFIX must be 2..16 UPPERCASE A-Z chars. Prefixes PORTO\* are reserved.
+PREFIX must be 2..16 UPPERCASE [A-Z] symbols. Prefixes PORTO\* are reserved.
 
-Value max length is 256 symbols. Empty value removes label.
+Value max length is 256 symbols.
 
 Each container may have up to 100 labels.
+
+Setting empty value removes label.
 
 Use "Y" and "N" for boolean values and "." as placeholder.
 
@@ -136,7 +138,7 @@ For count, size, speed, time use bytes, bytes/second, seconds as decimal integer
 Other types must be defined by labels suffix: \_ms, \_ns, \_cores.
 
 Do not keep full file paths in label values: users could be in different chroots.
-Short file names are ok.
+Short relative file names are ok.
 
 All labeles are stored as property **labels**.
 Access via properties **labels[PREFIX.name]** and **PREFIX.name** works as well.
@@ -1225,6 +1227,8 @@ Like for container volume configuration is a set of key-value pairs.
     - *destroyed*
 
 * **private**       - 4096 bytes of user-defined text
+
+* **labels**        - user-defined labels, syntax \<label\>: \<value\>;...
 
 * **device\_name**  - name of backend disk device (sda, md0, dm-0)
 

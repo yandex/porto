@@ -289,6 +289,14 @@ void TRequest::Parse() {
         opts = { Req.inclabel().label() };
         if (Req.inclabel().has_add())
             opts.push_back(fmt::format("add={}", Req.inclabel().add()));
+    } else if (Req.has_setvolumelabel()) {
+        Cmd = "SetVolumeLabel";
+        Arg = Req.setvolumelabel().path();
+        opts = { Req.setvolumelabel().label() };
+        if (Req.setvolumelabel().has_value())
+            opts.push_back("value=" + Req.setvolumelabel().value());
+        if (Req.setvolumelabel().has_prev_value())
+            opts.push_back("prev_value=" + Req.setvolumelabel().prev_value());
     } else if (Req.has_getsystem()) {
         Cmd = "GetSystem";
     } else if (Req.has_setsystem()) {
@@ -1201,6 +1209,42 @@ noinline TError TuneVolume(const Porto::TTuneVolumeRequest &req) {
     return volume->Tune(cfg);
 }
 
+noinline TError SetVolumeLabel(const Porto::TSetVolumeLabelRequest &req, Porto::TSetVolumeLabelResponse &rsp) {
+    std::shared_ptr<TVolume> volume;
+    TError error;
+
+    error = TContainer::ValidLabel(req.label(), req.value());
+    if (error)
+        return error;
+
+    error = CL->ControlVolume(req.path(), volume);
+    if (error)
+        return error;
+
+    auto volumes_lock = LockVolumes();
+    auto it = volume->Labels.find(req.label());
+    if (it != volume->Labels.end())
+        rsp.set_prev_value(it->second);
+    if (req.has_prev_value()) {
+        if (it == volume->Labels.end()) {
+            if (req.prev_value() != "")
+                return TError(EError::LabelNotFound, "Volume {} has no label {}", req.path(), req.label());
+        } else if (req.prev_value() != it->second)
+            return TError(EError::Busy, "Volume {} label {} is {} not {}", req.path(), req.label(), it->second, req.prev_value());
+    }
+    if (req.value() != "" && volume->Labels.size() >= PORTO_LABEL_COUNT_MAX)
+        return TError(EError::ResourceNotAvailable, "Too many labels");
+    if (req.value() == "")
+        volume->Labels.erase(req.label());
+    else
+        volume->Labels[req.label()] = req.value();
+    volumes_lock.unlock();
+
+    volume->Save();
+
+    return OK;
+}
+
 noinline TError LinkVolume(const Porto::TLinkVolumeRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.container() != "" ? req.container() : SELF_CONTAINER, ct, true);
@@ -1353,6 +1397,28 @@ noinline TError GetVolume(const Porto::TGetVolumeRequest &req,
 
         auto volumes_lock = LockVolumes();
         for (auto &it: VolumeLinks) {
+            auto volume = it.second->Volume.get();
+
+            if (req.label_size()) {
+                bool match = false;
+
+                for (auto &label: req.label()) {
+                    if (label.find_first_of("*?") == std::string::npos) {
+                        match = volume->Labels.find(label) != volume->Labels.end();
+                    } else {
+                        for (auto &it: volume->Labels) {
+                            match = StringMatch(it.first, label);
+                            if (match)
+                                break;
+                        }
+                    }
+                    if (match)
+                        break;
+                }
+                if (!match)
+                    continue;
+            }
+
             TPath path = ct->RootPath.InnerPath(it.first);
             if (path)
                 map[path] = it.second;
@@ -1999,6 +2065,8 @@ void TRequest::Handle() {
         error = SetLabel(Req.setlabel(), *rsp.mutable_setlabel());
     else if (Req.has_inclabel())
         error = IncLabel(Req.inclabel(), *rsp.mutable_inclabel());
+    else if (Req.has_setvolumelabel())
+        error = SetVolumeLabel(Req.setvolumelabel(), *rsp.mutable_setvolumelabel());
     else if (Req.has_getsystem())
         error = GetSystemProperties(&Req.getsystem(), rsp.mutable_getsystem());
     else if (Req.has_setsystem())

@@ -1764,6 +1764,14 @@ TError TVolume::Configure(const TPath &target_root) {
     if (Spec->private_value().size() > PRIVATE_VALUE_MAX)
         return TError(EError::InvalidValue, "Private value too log, max {} bytes", PRIVATE_VALUE_MAX);
 
+    if (Spec->has_labels()) {
+        for (auto &l: Spec->labels().map()) {
+            error = TContainer::ValidLabel(l.key(), l.val());
+            if (error)
+                return error;
+        }
+    }
+
     /* Default user:group */
     VolumeOwner = CL->Cred;
     VolumeCred = CL->TaskCred;
@@ -3142,6 +3150,7 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, Porto::TVolu
 
     ret[V_STATE] = StateName(State);
     ret[V_PRIVATE] = Private;
+    ret[V_LABELS] = StringMapToString(Labels);
     ret[V_READ_ONLY] = BoolToString(IsReadOnly);
     ret[V_SPACE_LIMIT] = std::to_string(SpaceLimit);
     ret[V_INODE_LIMIT] = std::to_string(InodeLimit);
@@ -3256,6 +3265,8 @@ TError TVolume::Save() {
     node.Set(V_READY, BoolToString(State == EVolumeState::Ready ||
                                    State == EVolumeState::Tuning));
     node.Set(V_PRIVATE, Private);
+    if (!Labels.empty())
+        node.Set(V_LABELS, StringMapToString(Labels));
     node.Set(V_LOOP_DEV, std::to_string(DeviceIndex));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
     node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
@@ -3433,6 +3444,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_READY,       "true|false - contruction complete (ro)", true },
     { V_STATE,       "volume state (ro)", true },
     { V_PRIVATE,     "user-defined property", false },
+    { V_LABELS,      "user-defined labels", false },
     { V_TARGET_CONTAINER, "target container (default - self)", false },
     { V_OWNER_CONTAINER, "owner container (default - self)", false },
     { V_OWNER_USER,  "owner user (default - creator)", false },
@@ -3896,6 +3908,15 @@ TError TVolume::ParseConfig(const TStringMap &cfg, Porto::TVolume &spec) {
             spec.set_permissions(v);
         } else if (key == V_PRIVATE) {
             spec.set_private_value(val);
+        } else if (key == V_LABELS) {
+            TStringMap map;
+            error = StringToStringMap(val, map);
+            auto labels = spec.mutable_labels();
+            for (auto &it: map) {
+                auto l = labels->add_map();
+                l->set_key(it.first);
+                l->set_val(it.second);
+            }
         } else if (key == V_CONTAINERS) {
             for (auto &l: SplitEscapedString(val, ' ', ';')) {
                 auto link = spec.add_links();
@@ -4013,6 +4034,11 @@ TError TVolume::Load(const Porto::TVolume &spec, bool full) {
     if (spec.has_private_value())
         Private = spec.private_value();
 
+    if (spec.has_labels()) {
+        for (auto &l: spec.labels().map())
+            Labels[l.key()] = l.val();
+    }
+
     if (spec.has_read_only())
         IsReadOnly = spec.read_only();
 
@@ -4053,6 +4079,13 @@ void TVolume::Dump(Porto::TVolume &spec, bool full) {
 
     if (Private.size())
         spec.set_private_value(Private);
+
+    auto labels_spec = spec.mutable_labels();
+    for (auto &it: Labels) {
+        auto l = labels_spec->add_map();
+        l->set_key(it.first);
+        l->set_val(it.second);
+    }
 
     spec.set_creator(Creator);
     spec.set_build_time(BuildTime);

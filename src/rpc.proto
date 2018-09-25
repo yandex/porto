@@ -240,6 +240,8 @@ message TPortoRequest {
     optional TNewVolumeRequest NewVolume = 126;
     optional TGetVolumeRequest GetVolume = 127;
 
+    optional TSetVolumeLabelRequest SetVolumeLabel = 128;
+
     // Add link between container and volume
     optional TLinkVolumeRequest LinkVolume = 105;
 
@@ -366,6 +368,8 @@ message TPortoResponse {
     optional TNewVolumeResponse NewVolume = 126;
 
     optional TGetVolumeResponse GetVolume = 127;
+
+    optional TSetVolumeLabelResponse SetVolumeLabel = 128;
 
     optional TListLayersResponse ListLayers = 14;
 
@@ -832,6 +836,7 @@ message TVolume {
     optional string storage = 12;           // persistent storage, path or name, default: non-persistent
     repeated string layers = 13;            // name or path
     optional bool read_only = 14;
+    optional TStringMap labels = 15;
 
     // defines root directory user, group and permissions
     optional TCred cred = 20;               // default: self task cred
@@ -1311,6 +1316,7 @@ message TGetVolumeRequest {
     optional string container = 1;  // get paths in container, default: self (client container)
     repeated string path = 2;       // volume path in container, default: all
     optional uint64 changed_since = 3;  // change_time >= changed_since
+    repeated string label = 4;      // labels or wildcards
 }
 
 message TGetVolumeResponse {
@@ -1376,6 +1382,17 @@ message TTuneVolumeRequest {
     // map<string, string> properties = 2;
 }
 
+
+message TSetVolumeLabelRequest {
+    optional string path = 1;
+    optional string label = 2;
+    optional string value = 3;
+    optional string prev_value = 4;     // fail with Busy if does not match
+}
+
+message TSetVolumeLabelResponse {
+    optional string prev_value = 1;
+}
 
 // Layers
 
