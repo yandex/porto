@@ -1,22 +1,34 @@
 syntax = "proto2";
 
-// Portod daemon listens on /run/portod.socket unix socket.
-// Protocol: Varint length, TPortoRequest req | TPortoResponse rsp.
+/*
+   Portod daemon listens on /run/portod.socket unix socket.
+
+   Request:    Varint32 length, TPortoRequest  request
+   Response:   Varint32 length, TPortoResponse response
+
+   Command is defined by optional nested message field.
+   Result will be in nested message with the same name.
+
+   Push notification is send as out of order response.
+
+   Access level depends on client container and uid.
+
+   See defails in porto.md or manpage porto
+*/
 
 package Porto;
 
-// List of error codes
 enum EError {
-    // Request executed successfully. No errors occured.
+    // No errors occured.
     Success = 0;
 
-    // Unknown critical error.
+    // Unclassified error, usually unexpected syscall fail.
     Unknown = 1;
 
-    // Unknown or bad request.
+    // Unknown method or bad request.
     InvalidMethod = 2;
 
-    // Container with specified name already exists. Can't create a new one.
+    // Container with specified name already exists.
     ContainerAlreadyExists = 3;
 
     // Container with specified name doesn't exist.
@@ -112,80 +124,113 @@ enum EError {
     // Reserved error code for taints.
     Taint = 666;
 
-    // Reserved error code used by Porto internals. Can't be returned to a user.
+    // Internal error code, not for users.
     Queued = 1000;
 }
 
 
 message TPortoRequest {
 
-    // System
+    /* System methods */
 
+    // Get portod version
     optional TVersionRequest Version = 14;
 
+    // Get portod statistics
     optional TGetSystemRequest GetSystem = 300;
+
+    // Change portod state (for host root user only)
     optional TSetSystemRequest SetSystem = 301;
 
-    // Container
+    /* Container methods */
 
+    // Create new container
     optional TCreateRequest Create = 1;
 
-    // Auto destroy container when client disconnects
+    // Create new contaienr and auto destroy when client disconnects
     optional TCreateRequest CreateWeak = 17;
 
+    // Force kill all and destroy container and nested containers
     optional TDestroyRequest Destroy = 2;
 
+    // List container names in current namespace
     optional TListRequest List = 3;
 
+    // Start contianer and parents if needed
     optional TStartRequest Start = 7;
 
+    // Kill all and stop container
     optional TStopRequest Stop = 8;
 
+    // Freeze execution
     optional TPauseRequest Pause = 9;
 
+    // Resume execution
     optional TResumeRequest Resume = 10;
 
+    // Send signal to main process
     optional TKillRequest Kill = 13;
 
+    // Restart dead container
     optional TRespawnRequest Respawn = 18;
 
+    // Wait for process finish or change of labels
     optional TWaitRequest Wait = 16;
 
-    // Subscrive to push notifictaions
+    // Subscribe to push notifictaions
     optional TWaitRequest AsyncWait = 19;
 
-    // Container properties
+    /* Container properties */
 
+    // List supported container properties
     optional TListPropertiesRequest ListProperties = 11;
+
+    // Get one property
     optional TGetPropertyRequest GetProperty = 4;
+
+    // Set one property
     optional TSetPropertyRequest SetProperty = 5;
 
-    // Deprecated, read-only data properties now normal properties
+    // Deprecated, now data properties are also read-only properties
     optional TListDataPropertiesRequest ListDataProperties = 12;
     optional TGetDataPropertyRequest GetDataProperty = 6;
 
     // Get multiple properties for multiple containers
     optional TGetRequest Get = 15;
 
-    // Container API based on TContainer
+    /* Container API based on TContainer */
+
+    // Create, configure and start container with volumes
     optional TNewContainerRequest NewContainer = 23;
+
+    // Set multiple container properties
     optional TSetContainerRequest SetContainer = 24;
+
+    // Get multiple properties for multiple containers
     optional TGetContainerRequest GetContainer = 25;
 
     // Modify symlink in container
     optional TSetSymlinkRequest SetSymlink = 125;
 
-    // Container labels
+    /* Container labels - user defined key-value */
+
+    // Find containers with labels
     optional TFindLabelRequest FindLabel = 20;
+
+    // Atomic compare and set for label
     optional TSetLabelRequest SetLabel = 21;
+
+    // Atomic add and return for counter in label
     optional TIncLabelRequest IncLabel = 22;
 
-    // Volume
+    /* Volume methods */
 
     optional TListVolumePropertiesRequest ListVolumeProperties = 103;
 
+    // List layers and their properties
     optional TListVolumesRequest ListVolumes = 107;
 
+    // Create, configure and build volume
     optional TCreateVolumeRequest CreateVolume = 104;
 
     // Change volume properties - for now only resize
@@ -207,21 +252,37 @@ message TPortoRequest {
     // Same as UnlinkVolume but fails if target is not supported
     optional TUnlinkVolumeRequest UnlinkVolumeTarget = 121;
 
-    // Layer
+    /* Layer methods */
 
+    // Import layer from tarball
     optional TImportLayerRequest ImportLayer = 110;
+
+    // Remove layer
     optional TRemoveLayerRequest RemoveLayer = 111;
+
+    // List layers
     optional TListLayersRequest ListLayers = 112;
+
+    // Export volume or layer into tarball
     optional TExportLayerRequest ExportLayer = 113;
 
+    // Get/set layer private (user defined string)
     optional TGetLayerPrivateRequest GetLayerPrivate = 114;
     optional TSetLayerPrivateRequest SetLayerPrivate = 115;
 
-    // Storage
+    /* Storage methods */
 
+    // Volume creation creates required storage if missing
+
+    // List storages and meta storages
     optional TListStoragesRequest ListStorages = 116;
+
     optional TRemoveStorageRequest RemoveStorage = 117;
+
+    // Import storage from tarball
     optional TImportStorageRequest ImportStorage = 118;
+
+    // Export storage into tarball
     optional TExportStorageRequest ExportStorage = 119;
 
     // Meta storage (bundle for storages and layers)
@@ -233,10 +294,15 @@ message TPortoRequest {
     // Convert path between containers
     optional TConvertPathRequest ConvertPath = 200;
 
-    // Process
+    /* Process methods */
 
+    // Attach process to nested container
     optional TAttachProcessRequest AttachProcess = 201;
+
+    // Find container for process
     optional TLocateProcessRequest LocateProcess = 202;
+
+    // Attach one thread to nexted container
     optional TAttachProcessRequest AttachThread = 203;
 }
 
@@ -250,14 +316,14 @@ message TPortoResponse {
 
     optional uint64 timestamp = 1000;       // for next changed_since
 
-    // System
+    /* System methods */
 
     optional TVersionResponse Version = 8;
 
     optional TGetSystemResponse GetSystem = 300;
     optional TSetSystemResponse SetSystem = 301;
 
-    // Container
+    /* Container methods */
 
     optional TListResponse List = 3;
 
@@ -265,7 +331,7 @@ message TPortoResponse {
 
     optional TWaitResponse AsyncWait = 19;
 
-    // Container properties
+    /* Container properties */
 
     optional TListPropertiesResponse ListProperties = 6;
 
@@ -277,20 +343,19 @@ message TPortoResponse {
 
     optional TGetResponse Get = 10;
 
-    // Container API based on TContainer
+    /* Container API based on TContainer */
+
     optional TNewContainerResponse NewContainer = 23;
     optional TSetContainerResponse SetContainer = 24;
     optional TGetContainerResponse GetContainer = 25;
 
-    // Labels
+    /* Container Labels */
 
     optional TFindLabelResponse FindLabel = 20;
     optional TSetLabelResponse SetLabel = 21;
     optional TIncLabelResponse IncLabel = 22;
 
-    optional TConvertPathResponse ConvertPath = 15;
-
-    // Volume
+    /* Volume methods */
 
     optional TListVolumePropertiesResponse ListVolumeProperties = 12;
 
@@ -298,10 +363,8 @@ message TPortoResponse {
 
     optional TVolumeDescription CreateVolume = 13;
 
-    // Create volume in form TVolume
     optional TNewVolumeResponse NewVolume = 126;
 
-    // List volumes in form TVolume
     optional TGetVolumeResponse GetVolume = 127;
 
     optional TListLayersResponse ListLayers = 14;
@@ -310,6 +373,8 @@ message TPortoResponse {
 
     // List storages and meta storages
     optional TListStoragesResponse ListStorages = 17;
+
+    optional TConvertPathResponse ConvertPath = 15;
 
     // Process
 
@@ -752,7 +817,7 @@ message TVolumeShare {
 
 message TVolume {
     optional string path = 1;               // path in container, default: auto
-    optional string container = 2;          // default: self
+    optional string container = 2;          // defaultL self (client container)
     repeated TVolumeLink links = 3;         // default: anon link to self
 
     optional string id = 4;                 // out
@@ -763,7 +828,7 @@ message TVolume {
     optional string device_name = 7;        // out
 
     optional string backend = 10;           // default: auto
-    optional string place = 11;             // path in host or alias, default depends on current container config
+    optional string place = 11;             // path in host or alias, default from client container
     optional string storage = 12;           // persistent storage, path or name, default: non-persistent
     repeated string layers = 13;            // name or path
     optional bool read_only = 14;
@@ -1243,7 +1308,7 @@ message TNewVolumeResponse {
 
 
 message TGetVolumeRequest {
-    optional string container = 1;  // get paths in container, default: self
+    optional string container = 1;  // get paths in container, default: self (client container)
     repeated string path = 2;       // volume path in container, default: all
     optional uint64 changed_since = 3;  // change_time >= changed_since
 }
@@ -1278,7 +1343,7 @@ message TCreateVolumeRequest {
 
 message TLinkVolumeRequest {
     optional string path = 1;
-    optional string container = 2;      // default - self
+    optional string container = 2;      // default - self (client container)
     optional string target = 3;         // path in container, "" - anon
     optional bool required = 4;         // stop container at fail
     optional bool read_only = 5;
@@ -1316,7 +1381,7 @@ message TTuneVolumeRequest {
 
 
 message TListLayersRequest {
-    optional string place = 1;
+    optional string place = 1;  // default from client container
     optional string mask = 2;
 }
 
