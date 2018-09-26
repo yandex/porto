@@ -11,7 +11,6 @@ import random
 import subprocess
 import multiprocessing
 import argparse
-import subprocess
 import signal
 import functools
 import tarfile
@@ -893,6 +892,7 @@ def cleanup_fuzzer():
 
     if (os.path.ismount(FUZZER_MNT)):
         subprocess.check_call(["umount", '-l', FUZZER_MNT])
+        subprocess.call('losetup -a | grep "{}/" | cut -d: -f 1 | xargs losetup -d'.format(FUZZER_MNT), shell=True)
 
     if (os.path.exists(FUZZER_MNT)):
         os.rmdir(FUZZER_MNT)
