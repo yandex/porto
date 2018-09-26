@@ -65,10 +65,8 @@ public:
     bool WaitExit = false;
 
     std::string Container;
-    std::vector<std::pair<std::string, std::string>> Properties;
+    std::map<std::string, std::string> Properties;
     std::vector<std::string> Environment;
-
-    std::string Private;
 
     Porto::Volume Volume;
     std::string SpaceLimit;
@@ -108,6 +106,9 @@ public:
         if (key == "virt_mode")
             VirtMode = val;
 
+        if (key == "place")
+            Place = val;
+
         if (key == "env") {
             auto list = SplitEscapedString(val, ';');
             Environment.insert(Environment.end(), list.begin(), list.end());
@@ -123,14 +124,8 @@ public:
         } else if (key == "layers") {
             NeedVolume = true;
             Layers = SplitEscapedString(val, ';');
-        } else if (key == "place") {
-            Place = val;
-            Properties.emplace_back(key, val);
-        } else if (key == "private") {
-            Private = val;
-            Properties.emplace_back(key, val);
         } else
-            Properties.emplace_back(key, val);
+            Properties[key] = val;
 
         return OK;
     }
@@ -215,11 +210,11 @@ public:
         if (VolumeStorage != "")
             config["storage"] = VolumeStorage;
 
-        if (Place != "")
-            config["place"] = Place;
+        if (Properties.count("place"))
+            config["place"] = Properties["place"];
 
-        if (Private != "")
-            config["private"] = Private;
+        if (Properties.count("private"))
+            config["private"] = Properties["private"];
 
         if (Api->CreateVolume("", config, Volume))
             return GetLastError();
@@ -2416,6 +2411,12 @@ public:
                 std::cerr << "Cannot set property: " << error << std::endl;
                 return EXIT_FAILURE;
             }
+        }
+
+        /* move resolv_conf to chroot level */
+        if (launcher.Properties.count("resolv_conf")) {
+            chroot.SetProperty("resolv_conf", launcher.Properties["resolv_conf"]);
+            launcher.Properties.erase("resolv_conf");
         }
 
         if (!outputImage.IsEmpty() && !squash) {
