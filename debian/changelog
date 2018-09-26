@@ -1,3 +1,17 @@
+yandex-porto (4.18.5) unstable; urgency=low
+
+  * test: fix mem_limit_total
+  * test: fix default memory_limit check
+  * porto: deprecate cpu_weight effect on rt priority
+  * portoctl get: keep values single-line if stdout is not tty
+  * api/python: pass strict into UnlinkVolume as named argument
+  * portoctl: fix command storage -F
+  * test/fuzzer: detach loop devices
+  * portoctl/build: move resolv_conf to chroot level
+  * log: tiny fix
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 26 Sep 2018 18:01:06 +0300
+
 yandex-porto (4.18.4) unstable; urgency=low
 
   * porto: add config option for default environment
