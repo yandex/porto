@@ -174,7 +174,7 @@ void Stacktrace() {
             }
         } else {
             // couldn't parse the line? print the whole line.
-            L_STK(symbollist[i]);
+            L_STK("{}", symbollist[i]);
         }
     }
 
