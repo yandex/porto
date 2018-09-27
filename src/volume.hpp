@@ -87,6 +87,7 @@ public:
     TPath HostTarget;       /* mounted path in host namespace */
     bool ReadOnly = false;
     bool Required = false;
+    bool Busy = false;
 
     TVolumeLink(std::shared_ptr<TVolume> v, std::shared_ptr<TContainer> c) : Volume(v), Container(c) {
         Statistics->VolumeLinks++;
