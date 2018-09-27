@@ -1,3 +1,25 @@
+yandex-porto (4.20.1) unstable; urgency=low
+
+  * libnl: 3.2.27 -> 3.4.0
+  * log: tiny fix
+  * property: fix command_argv
+  * cpi/cpp: fix ListStorages
+  * portoctl: fix commands layer -F and storage -F
+  * proto: rename rpc methods
+  * proto: required -> optional
+  * test: add test-api.cpp
+  * Revert "porto: std::string -> TString"
+  * portoctl: remove using std:...
+  * api/cpp: add GetContainersSpec and GetVolumesSpec
+  * porto: collect API in namespace Porto
+  * api/cpp: fix ListLayers
+  * porto: update comments in rpc.proto
+  * test/fuzzer: detach loop devices
+  * volume: add labels
+  * portoctl/build: move resolv_conf to chroot level
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 27 Sep 2018 13:06:12 +0300
+
 yandex-porto (4.20.0) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
