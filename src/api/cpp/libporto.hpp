@@ -14,7 +14,7 @@ namespace rpc {
 
 namespace Porto {
 
-constexpr int INFINITE_TIMEOUT = 0;
+constexpr int INFINITE_TIMEOUT = -1;
 constexpr int DEFAULT_TIMEOUT = 300;    // 5min
 constexpr int DISK_TIMEOUT = 900;       // 15min
 
@@ -102,8 +102,8 @@ public:
     void GetLastError(int &error, std::string &msg) const;
 
     int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp,
-             int extra_timeout = -1);
-    int Call(const std::string &req, std::string &rsp, int extra_timeout = -1);
+             int extra_timeout = 0);
+    int Call(const std::string &req, std::string &rsp, int extra_timeout = 0);
 
     int Create(const std::string &name);
     int CreateWeakContainer(const std::string &name);
@@ -118,12 +118,12 @@ public:
 
     int WaitContainers(const std::vector<std::string> &containers,
                        const std::vector<std::string> &labels,
-                       std::string &name, int timeout = -1);
+                       std::string &name, int timeout = INFINITE_TIMEOUT);
 
     int AsyncWait(const std::vector<std::string> &containers,
                   const std::vector<std::string> &labels,
                   std::function<void(AsyncWaitEvent &event)> callbacks,
-                  int timeout = -1);
+                  int timeout = INFINITE_TIMEOUT);
     int Recv();
 
     int List(std::vector<std::string> &list,

@@ -116,10 +116,10 @@ int Connection::ConnectionImpl::SetTimeout(int direction, int timeout)
 {
     struct timeval tv;
 
-    if (timeout < 0 || Fd < 0)
+    if (Fd < 0)
         return EError::Success;
 
-    tv.tv_sec = timeout;
+    tv.tv_sec = timeout > 0 ? timeout : 0;
     tv.tv_usec = 0;
 
     if ((direction & 1) && setsockopt(Fd, SOL_SOCKET,
@@ -199,13 +199,13 @@ int Connection::ConnectionImpl::Call(const rpc::TContainerRequest &req,
     if (!ret)
         ret = Send(req);
 
-    if (!ret && extra_timeout >= 0 && Timeout)
-        ret = SetTimeout(2, extra_timeout ? (extra_timeout + Timeout) : 0);
+    if (!ret && extra_timeout && Timeout > 0)
+        ret = SetTimeout(2, extra_timeout > 0 ? (extra_timeout + Timeout) : -1);
 
     if (!ret)
         ret = Recv(rsp);
 
-    if (extra_timeout >= 0 && Timeout)
+    if (extra_timeout && Timeout > 0)
         SetTimeout(2, Timeout);
 
     if (!ret) {
@@ -457,7 +457,7 @@ int Connection::Stop(const std::string &name, int timeout) {
     if (timeout >= 0)
         stop->set_timeout_ms(timeout * 1000);
 
-    return Impl->Call(timeout);
+    return Impl->Call(timeout > 0 ? timeout : 0);
 }
 
 int Connection::Kill(const std::string &name, int sig) {
