@@ -1,3 +1,11 @@
+yandex-porto (4.18.6) unstable; urgency=low
+
+  * volume: protect links under construction
+  * porto: cleanup legacy hfsc setup from containers
+  * api/cpp: handle timeout -1 as infinite
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 28 Sep 2018 16:47:43 +0300
+
 yandex-porto (4.18.5) unstable; urgency=low
 
   * test: fix mem_limit_total
