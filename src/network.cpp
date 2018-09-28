@@ -801,12 +801,14 @@ TError TNetwork::SyncDevices() {
             /* Ignore TUN/TAP without known owners */
             if (!dev.Owner)
                 continue;
+        } else if (ManagedNamespace) {
+            /* No qdisc in containers except police at uplink */
         } else if (dev.Type == "dummy") {
             /* Do not care */
         } else if (dev.Name == "ip6tnl0") {
             /* Fallback tunnel for RX only */
-        } else if (ManagedNamespace) {
-            /* No qdisc in containers */
+        } else if (dev.Type == "ip6tnl") {
+            /* TX goes via uplink */
         } else if (dev.Type == "vlan") {
             /* TX goes via uplink */
         } else {
@@ -1482,7 +1484,8 @@ retry:
             SetupPolice(dev);
 
         if (!dev.Managed) {
-            if (dev.Type == "vlan" && dev.Qdisc == "hfsc") {
+            /* cleanup legacy hfsc setup from containers */
+            if (ManagedNamespace && !dev.Uplink && dev.Qdisc == "hfsc") {
                 TNlQdisc qdisc(dev.Index, TC_H_ROOT, 0);
                 (void)qdisc.Delete(*Nl);
                 dev.Qdisc = "";
@@ -1971,6 +1974,8 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
     TError error;
     TNetEnv env;
 
+    L_ACT("Restore network {}", ct.Name);
+
     if (ct.NetInherit) {
         net = ct.Parent->Net;
     } else if (ct.Task.Pid) {
@@ -2014,8 +2019,11 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
     ct.Net = net;
     ct.NetClass.OriginNet = net;
 
-    if (env.NetIsolate)
+    if (env.NetIsolate) {
         net->RootClass = &ct.NetClass;
+        net->ManagedNamespace = true;
+        net->NetName = ct.Name;
+    }
 
     net->NetUsers.push_back(&ct);
 
