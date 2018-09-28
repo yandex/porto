@@ -624,7 +624,7 @@ message TContainerWaitRequest {
     // list of containers or wildcards, "***" - all
     repeated string name = 1;
 
-    // timeout in 1/1000 seconds
+    // timeout in 1/1000 seconds, 0 - nonblock
     optional uint32 timeout_ms = 2;
 
     // list of label names or wildcards
