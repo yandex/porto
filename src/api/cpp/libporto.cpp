@@ -85,10 +85,10 @@ void TPortoApi::Close() {
 EError TPortoApi::SetSocketTimeout(int direction, int timeout) {
     struct timeval tv;
 
-    if (timeout < 0 || Fd < 0)
+    if (Fd < 0)
         return EError::Success;
 
-    tv.tv_sec = timeout;
+    tv.tv_sec = timeout > 0 ? timeout : 0;
     tv.tv_usec = 0;
 
     if ((direction & 1) && setsockopt(Fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv))
@@ -101,12 +101,12 @@ EError TPortoApi::SetSocketTimeout(int direction, int timeout) {
 }
 
 EError TPortoApi::SetTimeout(int timeout) {
-    Timeout = timeout >= 0 ? timeout : DEFAULT_TIMEOUT;
+    Timeout = timeout ? timeout : DEFAULT_TIMEOUT;
     return SetSocketTimeout(3, Timeout);
 }
 
 EError TPortoApi::SetDiskTimeout(int timeout) {
-    DiskTimeout = timeout >= 0 ? timeout : DEFAULT_DISK_TIMEOUT;
+    DiskTimeout = timeout ? timeout : DEFAULT_DISK_TIMEOUT;
     return EError::Success;
 }
 
@@ -175,13 +175,13 @@ EError TPortoApi::Call(const TPortoRequest &req,
     if (!err)
         err = Send(req);
 
-    if (!err && extra_timeout >= 0 && Timeout)
-        err = SetSocketTimeout(2, extra_timeout ? (extra_timeout + Timeout) : 0);
+    if (!err && extra_timeout && Timeout > 0)
+        err = SetSocketTimeout(2, extra_timeout > 0 ? (extra_timeout + Timeout) : -1);
 
     if (!err)
         err = Recv(rsp);
 
-    if (extra_timeout >= 0 && Timeout)
+    if (extra_timeout && Timeout > 0)
         SetSocketTimeout(2, Timeout);
 
     if (!err) {
@@ -472,15 +472,15 @@ EError TPortoApi::Start(const TString &name) {
     return Call();
 }
 
-EError TPortoApi::Stop(const TString &name, int timeout) {
+EError TPortoApi::Stop(const TString &name, int stop_timeout) {
     Req.Clear();
     auto req = Req.mutable_stop();
 
     req->set_name(name);
-    if (timeout >= 0)
-        req->set_timeout_ms(timeout * 1000);
+    if (stop_timeout >= 0)
+        req->set_timeout_ms(stop_timeout * 1000);
 
-    return Call(timeout);
+    return Call(stop_timeout > 0 ? stop_timeout : 0);
 }
 
 EError TPortoApi::Kill(const TString &name, int sig) {
@@ -546,16 +546,16 @@ EError TPortoApi::WaitContainer(const TString &name,
 EError TPortoApi::WaitContainers(const std::vector<TString> &names,
                                  TString &result_name,
                                  TString &result_state,
-                                 int timeout) {
+                                 int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
 
     for (auto &c : names)
         req->add_name(c);
-    if (timeout >= 0)
-        req->set_timeout_ms(timeout * 1000);
+    if (wait_timeout >= 0)
+        req->set_timeout_ms(wait_timeout * 1000);
 
-    if (!Call(timeout)) {
+    if (!Call(wait_timeout)) {
         if (Rsp.wait().has_state())
             result_state = Rsp.wait().state();
         else if (Rsp.wait().name() == "")
@@ -571,7 +571,7 @@ EError TPortoApi::WaitContainers(const std::vector<TString> &names,
 
 const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
                                      const std::vector<TString> &labels,
-                                     int timeout) {
+                                     int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
 
@@ -579,10 +579,10 @@ const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
         req->add_name(c);
     for (auto &label: labels)
         req->add_label(label);
-    if (timeout >= 0)
-        req->set_timeout_ms(timeout * 1000);
+    if (wait_timeout >= 0)
+        req->set_timeout_ms(wait_timeout * 1000);
 
-    Call(timeout);
+    Call(wait_timeout);
 
     if (Rsp.has_wait())
         return &Rsp.wait();
@@ -593,21 +593,21 @@ const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
 EError TPortoApi::AsyncWait(const std::vector<TString> &names,
                              const std::vector<TString> &labels,
                              TWaitCallback callback,
-                             int timeout) {
+                             int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_asyncwait();
 
     AsyncWaitNames.clear();
     AsyncWaitLabels.clear();
-    AsyncWaitTimeout = timeout;
+    AsyncWaitTimeout = wait_timeout;
     AsyncWaitCallback = callback;
 
     for (auto &name: names)
         req->add_name(name);
     for (auto &label: labels)
         req->add_label(label);
-    if (timeout >= 0)
-        req->set_timeout_ms(timeout * 1000);
+    if (wait_timeout >= 0)
+        req->set_timeout_ms(wait_timeout * 1000);
 
     if (Call()) {
         AsyncWaitCallback = nullptr;

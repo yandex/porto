@@ -9,7 +9,7 @@
 
 namespace Porto {
 
-constexpr int INFINITE_TIMEOUT = 0;
+constexpr int INFINITE_TIMEOUT = -1;
 constexpr int DEFAULT_TIMEOUT = 300;        // 5min
 constexpr int DEFAULT_DISK_TIMEOUT = 900;   // 15min
 
@@ -43,7 +43,7 @@ private:
 
     std::vector<TString> AsyncWaitNames;
     std::vector<TString> AsyncWaitLabels;
-    int AsyncWaitTimeout = -1;
+    int AsyncWaitTimeout = INFINITE_TIMEOUT;
     TWaitCallback AsyncWaitCallback;
 
     EError SetError(const TString &prefix, int _errno);
@@ -54,7 +54,7 @@ private:
 
     EError Recv(TPortoResponse &rsp);
 
-    EError Call(int extra_timeout = -1);
+    EError Call(int extra_timeout = 0);
 
 public:
     TPortoApi() { }
@@ -90,13 +90,14 @@ public:
     /* To be used for next changed_since */
     uint64_t ResponseTimestamp() const { return Rsp.timestamp(); }
 
+    // extra_timeout: 0 - none, -1 - infinite
     EError Call(const TPortoRequest &req,
                 TPortoResponse &rsp,
-                int extra_timeout = -1);
+                int extra_timeout = 0);
 
     EError Call(const TString &req,
                 TString &rsp,
-                int extra_timeout = -1);
+                int extra_timeout = 0);
 
     /* System */
 
@@ -124,6 +125,7 @@ public:
 
     EError Start(const TString &name);
 
+    // stop_timeout: time between SIGTERM and SIGKILL, -1 - default
     EError Stop(const TString &name, int stop_timeout = -1);
 
     EError Kill(const TString &name, int sig = 9);
@@ -134,23 +136,24 @@ public:
 
     EError Respawn(const TString &name);
 
+    // wait_timeout: 0 - nonblock, -1 - infinite
     EError WaitContainer(const TString &name,
                          TString &result_state,
-                         int wait_timeout = -1);
+                         int wait_timeout = INFINITE_TIMEOUT);
 
     EError WaitContainers(const std::vector<TString> &names,
                           TString &result_name,
                           TString &result_state,
-                          int wait_timeout = -1);
+                          int wait_timeout = INFINITE_TIMEOUT);
 
     const TWaitResponse *Wait(const std::vector<TString> &names,
                               const std::vector<TString> &labels,
-                              int wait_timeout = -1);
+                              int wait_timeout = INFINITE_TIMEOUT);
 
     EError AsyncWait(const std::vector<TString> &names,
                      const std::vector<TString> &labels,
                      TWaitCallback callbacks,
-                     int wait_timeout = -1);
+                     int wait_timeout = INFINITE_TIMEOUT);
 
     void RecvAsyncWait() {
         Recv(Rsp);
