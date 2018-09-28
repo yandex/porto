@@ -2339,6 +2339,9 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     if (RootContainer->VolumeMounts != (int)VolumeLinks.size())
         L_WRN("Volume links index out of sync: {} != {}", RootContainer->VolumeMounts, VolumeLinks.size());
 
+    if (!link->Busy)
+        L_WRN("Link mount without protection: {}", host_target);
+
     volumes_lock.unlock();
 
     L_ACT("Mount volume {} link {} for CT{}:{} target {}", Path, host_target,
@@ -2958,6 +2961,8 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
     if (link->Required && !HasDependentContainer)
         HasDependentContainer = true;
 
+    link->Busy = true;
+
     volumes_lock.unlock();
 
     error = Save();
@@ -2975,10 +2980,13 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
         (void)container->Save();
     }
 
+    link->Busy = false;
+
     return OK;
 
 undo:
     volumes_lock.lock();
+    link->Busy = false;
     Links.remove(link);
     container->VolumeLinks.remove(link);
     if (required && !was_required) {
@@ -3024,9 +3032,14 @@ next:
     if (strict && !Nested.empty())
         return TError(EError::Busy, "Volume {} has sub-volumes", Path);
 
+    if (link->Busy)
+        return TError(EError::Busy, "Volume {} link {} is busy", Path, target);
+
     if (link->HostTarget) {
+        link->Busy = true;
         volumes_lock.unlock();
         error = UmountLink(link, unlinked, strict);
+        link->Busy = false;
         if (error) {
             if (strict)
                 return error;
@@ -3546,6 +3559,7 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
     common_link->Target = volume->Path;
     common_link->HostTarget = volume->Path;
     common_link->ReadOnly = volume->IsReadOnly;
+    common_link->Busy = true;
 
     if (volume->Path == volume->InternalPath) {
         VolumeLinks[volume->Path] = common_link;
@@ -3617,8 +3631,10 @@ next_link:
     volumes_lock.lock();
     for (auto link: volume->Links) {
         if (link->Target && !link->HostTarget) {
+            link->Busy = true;
             volumes_lock.unlock();
             error = volume->MountLink(link);
+            link->Busy = false;
             if (error)
                 goto undo;
             goto next_link;
@@ -3627,6 +3643,7 @@ next_link:
 
     /* Complete costriction */
     volume->SetState(EVolumeState::Ready);
+    common_link->Busy = false;
     volumes_lock.unlock();
 
     /* Final commit */
@@ -3637,6 +3654,7 @@ next_link:
     return OK;
 
 undo:
+    common_link->Busy = false;
     volume->Destroy();
     return error;
 }
