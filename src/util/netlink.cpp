@@ -1008,6 +1008,11 @@ bool TNlQdisc::Check(const TNl &nl) {
             goto out;
     }
 
+    if (Kind == "hfsc") {
+        if (rtnl_qdisc_hfsc_get_defcls(qdisc) != TC_H_MIN(Default))
+            goto out;
+    }
+
     result = true;
 
 out:

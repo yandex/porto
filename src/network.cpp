@@ -845,15 +845,18 @@ TError TNetwork::SyncDevices() {
             if (d.Name != dev.Name || d.Index != dev.Index)
                 continue;
 
-            if (!d.Managed)
+            dev.Prepared = d.Prepared;
+
+            if (!d.Managed) {
                 dev.Prepared = true;
-            else if (d.Qdisc != dev.GetConfig(DeviceQdisc))
+            } else if (d.Qdisc != dev.GetConfig(DeviceQdisc)) {
                 L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
-            else if (d.Rate != dev.Rate || d.Ceil != dev.Ceil)
+                dev.Prepared = false;
+            } else if (d.Rate != dev.Rate || d.Ceil != dev.Ceil) {
                 L_NET("Speed changed {}Mbps to {}Mbps in {} at {}:{}",
                       d.Ceil / 125000, dev.Ceil / 125000, NetName, d.Index, d.Name);
-            else
-                dev.Prepared = true;
+                dev.Prepared = false;
+            }
 
             d = dev;
             found = true;
