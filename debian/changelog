@@ -1,3 +1,10 @@
+yandex-porto (4.18.7) unstable; urgency=low
+
+  * network: check hfsc default class
+  * network: do not setup class for net=none
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Sun, 30 Sep 2018 13:23:37 +0300
+
 yandex-porto (4.18.6) unstable; urgency=low
 
   * volume: protect links under construction
