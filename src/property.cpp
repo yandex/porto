@@ -952,7 +952,7 @@ public:
         TError error = NetEnv.ParseNet(new_net_desc);
         if (error)
             return error;
-        if (!NetEnv.NetInherit) {
+        if (!NetEnv.NetInherit && !NetEnv.NetNone) {
             error = CT->EnableControllers(CGROUP_NETCLS);
             if (error)
                 return error;

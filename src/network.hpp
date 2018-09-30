@@ -299,6 +299,7 @@ struct TNetEnv {
 
     bool NetInherit = false;
     bool NetIsolate = false;
+    bool NetNone = false;
     bool L3Only = true;
 
     bool NetUp = false;
