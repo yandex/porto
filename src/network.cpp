@@ -2062,6 +2062,7 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
 
     NetIsolate = false;
     NetInherit = false;
+    NetNone = false;
     L3Only = true;
 
     if (config().network().enable_ip6tnl0()) {
@@ -2084,6 +2085,7 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
             NetInherit = true;
         } else if (type == "none") {
             NetIsolate = true;
+            NetNone = true;
             if (net_settings.size() != 1)
                 return TError(EError::InvalidValue, "net=none must be the only option");
         } else if (type == "container") {
