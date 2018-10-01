@@ -1,3 +1,13 @@
+yandex-porto (4.20.2) unstable; urgency=low
+
+  * volume: protect links under construction
+  * porto: cleanup legacy hfsc setup from containers
+  * api/cpp: handle timeout -1 as infinite
+  * networtk: check hfsc default class
+  * network: do not setup class for net=none
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 01 Oct 2018 13:44:21 +0300
+
 yandex-porto (4.20.1) unstable; urgency=low
 
   * libnl: 3.2.27 -> 3.4.0
