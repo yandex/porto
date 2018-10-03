@@ -3923,7 +3923,7 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
         if (Controllers & CGROUP_SYSTEMD)
             return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" +
                                     StringReplaceAll(Name, "/", "%"));
-        return subsystem.RootCgroup();
+        return SystemdSubsystem.PortoService;
     }
 
     std::string cg;
