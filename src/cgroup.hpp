@@ -36,7 +36,7 @@ public:
     TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
     virtual bool IsDisabled() { return false; }
     virtual bool IsOptional() { return false; }
-    virtual std::string TestOption() { return Type; }
+    virtual std::string TestOption() const { return Type; }
     virtual std::vector<std::string> MountOptions() { return {Type}; }
 
     virtual TError InitializeSubsystem() {
@@ -367,10 +367,12 @@ public:
 
 class TSystemdSubsystem : public TSubsystem {
 public:
+    TCgroup PortoService;
     TSystemdSubsystem() : TSubsystem(CGROUP_SYSTEMD, "systemd") {}
+    TError InitializeSubsystem() override;
     bool IsDisabled() override { return !config().container().enable_systemd(); }
     bool IsOptional() override { return true; }
-    std::string TestOption() override { return "name=" + Type; }
+    std::string TestOption() const override { return "name=" + Type; }
     std::vector<std::string> MountOptions() override { return { "none", "name=" + Type }; }
 };
 

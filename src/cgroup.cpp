@@ -384,6 +384,7 @@ TCgroup TSubsystem::Cgroup(const std::string &name) const {
 TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
     std::vector<std::string> lines;
     auto cg_file = TPath("/proc/" + std::to_string(pid) + "/cgroup");
+    auto type = TestOption();
 
     TError error = cg_file.ReadLines(lines);
     if (error)
@@ -398,7 +399,7 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
 
         bool found = false;
         for (auto &cg : cgroups)
-            if (cg == Type)
+            if (cg == type)
                 found = true;
 
         if (found) {
@@ -1126,6 +1127,14 @@ TError TPidsSubsystem::SetLimit(TCgroup &cg, uint64_t limit) const {
     return cg.SetUint64("pids.max", limit);
 }
 
+// Systemd
+
+TError TSystemdSubsystem::InitializeSubsystem() {
+    TError error = TaskCgroup(getpid(), PortoService);
+    if (!error)
+        L_CG("porto service: {}", PortoService);
+    return error;
+}
 
 TMemorySubsystem    MemorySubsystem;
 TFreezerSubsystem   FreezerSubsystem;
