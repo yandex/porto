@@ -1,3 +1,10 @@
+yandex-porto (4.18.8) unstable; urgency=low
+
+  * cgroup: use porto systemd service cgroup for containers without systemd
+  * test: check systemd upgrade
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 05 Oct 2018 10:38:16 +0300
+
 yandex-porto (4.18.7) unstable; urgency=low
 
   * network: check hfsc default class
