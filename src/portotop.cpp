@@ -1060,8 +1060,7 @@ int TPortoTop::Destroy() {
     return Api->Destroy(SelectedContainer);
 }
 void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
-    std::string s(program_invocation_name);
-    s += " get " + container + " " + cmd + " | less";
+    std::string s = "portoctl get " + container + " " + cmd + " | less";
     int status = system(s.c_str());
     (void)status;
 }
@@ -1078,7 +1077,7 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     case 0:
     {
         if (enter)
-            exit(execlp(program_invocation_name, program_invocation_name,
+            exit(execlp("portoctl", "portoctl",
                         "shell", SelectedContainer.c_str(), cmd.c_str(), nullptr));
         else
             exit(execlp(cmd.c_str(), cmd.c_str(), nullptr));
