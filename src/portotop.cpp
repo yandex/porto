@@ -497,6 +497,19 @@ void TPortoValue::Process() {
         return;
     }
 
+    if (Flags & ValueFlags::NetState) {
+        auto sep = AsString.find(' ');
+        if (sep != std::string::npos)
+            AsString = AsString.substr(0, sep);
+        if (AsString == "L3")
+            AsNumber = 2;
+        else if (AsString != "")
+            AsNumber = 1;
+        else
+            AsNumber = 0;
+        return;
+    }
+
     if ((Flags & ValueFlags::Raw) || AsString.length() == 0) {
         AsNumber = -1;
         return;
@@ -1166,7 +1179,7 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee", ValueFlags::Mem);
 
     AddColumn("OOM", "porto_stat[container_oom]", "OOM count", ValueFlags::Mem);
-    AddColumn("O-F", "oom_is_fatal", "OOM is fatal", ValueFlags::Raw | ValueFlags::Mem | ValueFlags::Porto);
+    AddColumn("OOM-F", "oom_is_fatal", "OOM is fatal", ValueFlags::Raw | ValueFlags::Mem | ValueFlags::Porto);
 
     /* I/O */
     AddColumn("Maj/s", "major_faults'", "Major page fault count", ValueFlags::Mem | ValueFlags::Io);
@@ -1185,6 +1198,8 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs", ValueFlags::Io);
 
     /* Network */
+    AddColumn("Net", "net", "Network config", ValueFlags::NetState | ValueFlags::Net | ValueFlags::Porto);
+
     AddColumn("Net TC", "net_bytes[Uplink]' b", "Uplink bytes transmitted at tc", ValueFlags::Net);
     AddColumn("Net TX", "net_tx_bytes[Uplink]' b", "Uplink bytes transmitted", ValueFlags::Net);
     AddColumn("Net RX", "net_rx_bytes[Uplink]' b", "Uplink bytes received", ValueFlags::Net);

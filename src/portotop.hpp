@@ -115,6 +115,7 @@ namespace ValueFlags {
 
     static const int Container = 0x1000;
     static const int State = 0x2000;
+    static const int NetState = 0x4000;
 
     static const int Porto   = 0x10000;
     static const int Cpu     = 0x20000;
