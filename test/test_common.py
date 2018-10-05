@@ -78,6 +78,19 @@ def ParseMountinfo(pid="self"):
         ret[m['target']] = m
     return ret
 
+def ParseCgroup(pid):
+    ret = {}
+    for line in open("/proc/{}/cgroup".format(pid), "r"):
+        l = line.split(':')
+        ret[l[1]] = l[2].strip()
+    return ret
+
+def WithSystemd():
+    return os.path.islink("/sbin/init") and os.readlink("/sbin/init").endswith("/systemd")
+
+def GetSystemdCg(pid):
+    return ParseCgroup(pid).get('name=systemd')
+
 def MemoryStat(ct, stat):
     for line in ct.GetProperty("memory.stat").splitlines():
         k, v = line.split()
