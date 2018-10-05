@@ -218,6 +218,12 @@ void TConsoleScreen::HelpDialog() {
          "d, del - disable column",
          "backspace - move column left",
          "f - choose columns",
+         "a - show all",
+         "c - show cpu",
+         "m - show memory",
+         "n - show network",
+         "i - show disk io",
+         "p - show policy and porto",
          "",
          "g - get properties",
          "o - show stdout",
@@ -411,18 +417,18 @@ int TPortoValueCache::Update(Porto::TPortoApi &api) {
     return api.GetVersion(Version, Revision);
 }
 
-TPortoValue::TPortoValue() : Cache(nullptr), Container(nullptr), Flags(ValueFlags::Raw) {
+TPortoValue::TPortoValue() : Flags(ValueFlags::Raw), Cache(nullptr), Container(nullptr) {
 }
 
-TPortoValue::TPortoValue(const TPortoValue &src) :
-    Cache(src.Cache), Container(src.Container), Variable(src.Variable), Flags(src.Flags),
+TPortoValue::TPortoValue(const TPortoValue &src) :  Flags(src.Flags),
+    Cache(src.Cache), Container(src.Container), Variable(src.Variable),
     Multiplier(src.Multiplier) {
     if (Cache && Container)
         Cache->Register(Container->GetName(), Variable);
 }
 
 TPortoValue::TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container) :
-    Cache(src.Cache), Container(container), Variable(src.Variable), Flags(src.Flags),
+    Flags(src.Flags), Cache(src.Cache), Container(container), Variable(src.Variable),
     Multiplier(src.Multiplier) {
     if (Cache && Container)
         Cache->Register(Container->GetName(), Variable);
@@ -431,7 +437,7 @@ TPortoValue::TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer
 TPortoValue::TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
                          std::shared_ptr <TPortoContainer> &container,
                          const std::string &variable, int flags, double multiplier) :
-    Cache(cache), Container(container), Variable(variable), Flags(flags),
+    Flags(flags), Cache(cache), Container(container), Variable(variable),
     Multiplier(multiplier) {
     if (Cache && Container)
         Cache->Register(Container->GetName(), Variable);
@@ -450,7 +456,7 @@ void TPortoValue::Process() {
         return;
     }
 
-    if (Flags == ValueFlags::Container) {
+    if (Flags & ValueFlags::Container) {
         std::string name = Container->GetName();
         std::string tab = "", tag = "";
 
@@ -473,7 +479,7 @@ void TPortoValue::Process() {
 
     AsString = Cache->GetValue(Container->GetName(), Variable, false);
 
-    if (Flags == ValueFlags::State) {
+    if (Flags & ValueFlags::State) {
         AsNumber = 0;
         if (AsString == "running")
             AsNumber = 1000;
@@ -491,7 +497,7 @@ void TPortoValue::Process() {
         return;
     }
 
-    if (Flags == ValueFlags::Raw || AsString.length() == 0) {
+    if ((Flags & ValueFlags::Raw) || AsString.length() == 0) {
         AsNumber = -1;
         return;
     }
@@ -540,9 +546,9 @@ int TPortoValue::GetLength() const {
     return AsString.length();
 }
 bool TPortoValue::operator< (const TPortoValue &v) {
-    if (Flags == ValueFlags::Raw)
+    if (Flags & ValueFlags::Raw)
         return AsString < v.AsString;
-    else if (Flags == ValueFlags::Container)
+    else if (Flags & ValueFlags::Container)
         return Container->GetName() < v.Container->GetName();
     else
         return AsNumber > v.AsNumber;
@@ -691,11 +697,14 @@ int TPortoContainer::ChildrenCount() {
 }
 
 
-TColumn::TColumn(std::string title, std::string desc,
-                 TPortoValue var, bool left_aligned, bool hidden) :
+TColumn::TColumn(std::string title, std::string desc, TPortoValue var) :
 
-    RootValue(var), LeftAligned(left_aligned), Hidden(hidden),
-    Title(title), Description(desc) {
+    RootValue(var),
+    LeftAligned(var.Flags & ValueFlags::Left),
+    Hidden(var.Flags & ValueFlags::Hidden),
+    Title(title),
+    Description(desc),
+    Flags(var.Flags) {
 
     Width = title.length();
 }
@@ -883,14 +892,12 @@ void TPortoTop::AddColumn(const TColumn &c) {
     Columns.push_back(c);
 }
 bool TPortoTop::AddColumn(std::string title, std::string signal,
-                          std::string desc, bool hidden) {
-
-    int flags = ValueFlags::Raw;
+                          std::string desc, int flags) {
     size_t off = 0;
     std::string data;
 
     if (signal == "state")
-        flags = ValueFlags::State;
+        flags |= ValueFlags::State;
 
     if (signal.length() > 4 && signal[0] == 'S' && signal[1] == '(') {
         off = signal.find(')');
@@ -946,7 +953,7 @@ bool TPortoTop::AddColumn(std::string title, std::string signal,
     }
 
     TPortoValue v(Cache, RootContainer, data, flags, multiplier);
-    Columns.push_back(TColumn(title, desc, v, false, hidden));
+    Columns.push_back(TColumn(title, desc, v));
     return true;
 }
 
@@ -1124,71 +1131,89 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddCommon(1, "CMD: ", "porto_stat[fail_invalid_command]", RootContainer, ValueFlags::Raw);
 
     AddColumn(TColumn("Container", "Container name",
-              TPortoValue(Cache, ContainerTree, "absolute_name", ValueFlags::Container), true, false));
+              TPortoValue(Cache, ContainerTree, "absolute_name", ValueFlags::Container | ValueFlags::Left | ValueFlags::Always)));
 
-    AddColumn("State", "state", "Current state");
-    AddColumn("Time", "time s", "Time elapsed since start or death");
+    AddColumn("State", "state", "Current state", ValueFlags::State | ValueFlags::Porto | ValueFlags::Always);
+    AddColumn("Time", "time s", "Time elapsed since start or death", ValueFlags::Porto);
 
     /* CPU */
-    AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
-    AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
-    AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
-    AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%");
+    AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%", ValueFlags::Cpu);
+    AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%", ValueFlags::Cpu);
+    AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%", ValueFlags::Cpu);
+    AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%", ValueFlags::Cpu);
 
-    AddColumn("C pol", "cpu_policy", "Cpu scheduler policy");
-    AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores");
-    AddColumn("C lim", "cpu_limit", "Cpu limit in cores");
+    AddColumn("C pol", "cpu_policy", "Cpu scheduler policy", ValueFlags::Raw | ValueFlags::Cpu | ValueFlags::Porto);
+    AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores", ValueFlags::Cpu);
+    AddColumn("C lim", "cpu_limit", "Cpu limit in cores", ValueFlags::Cpu);
 
-    AddColumn("Ct lim", "cpu_limit_total", "Cpu total limit in cores");
-    AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores");
+    AddColumn("Ct lim", "cpu_limit_total", "Cpu total limit in cores", ValueFlags::Cpu);
+    AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores", ValueFlags::Cpu);
 
-    AddColumn("Threads", "thread_count", "Threads count");
+    AddColumn("Threads", "thread_count", "Threads count", ValueFlags::Cpu);
+    AddColumn("Th Lim", "thread_limit", "Threads limit", ValueFlags::Cpu);
 
     /* Memory */
-    AddColumn("Memory", "memory_usage b", "Memory usage");
-    AddColumn("M g-e", "memory_guarantee b", "Memory guarantee");
-    AddColumn("M lim", "memory_limit b", "Memory limit");
-    AddColumn("M r-d/s", "memory_reclaimed' b", "Memory reclaimed");
+    AddColumn("Memory", "memory_usage b", "Memory usage", ValueFlags::Mem);
+    AddColumn("M g-e", "memory_guarantee b", "Memory guarantee", ValueFlags::Mem);
+    AddColumn("M lim", "memory_limit b", "Memory limit", ValueFlags::Mem);
+    AddColumn("M r-d/s", "memory_reclaimed' b", "Memory reclaimed", ValueFlags::Mem);
 
-    AddColumn("Anon", "anon_usage b", "Anonymous memory usage");
-    AddColumn("A lim", "anon_limit b", "Anonymous memory limit");
+    AddColumn("Anon", "anon_usage b", "Anonymous memory usage", ValueFlags::Mem);
+    AddColumn("A lim", "anon_limit b", "Anonymous memory limit", ValueFlags::Mem);
 
-    AddColumn("Cache", "cache_usage b", "Cache memory usage");
+    AddColumn("Cache", "cache_usage b", "Cache memory usage", ValueFlags::Mem);
 
-    AddColumn("Mt lim", "memory_limit_total b", "Memory total limit");
-    AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee");
+    AddColumn("Mt lim", "memory_limit_total b", "Memory total limit", ValueFlags::Mem);
+    AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee", ValueFlags::Mem);
 
-    AddColumn("OOM", "porto_stat[container_oom]", "OOM count");
+    AddColumn("OOM", "porto_stat[container_oom]", "OOM count", ValueFlags::Mem);
+    AddColumn("O-F", "oom_is_fatal", "OOM is fatal", ValueFlags::Raw | ValueFlags::Mem | ValueFlags::Porto);
 
     /* I/O */
-    AddColumn("Maj/s", "major_faults'", "Major page fault count");
-    AddColumn("Min/s", "minor_faults'", "Minor page fault count");
+    AddColumn("Maj/s", "major_faults'", "Major page fault count", ValueFlags::Mem | ValueFlags::Io);
+    AddColumn("Min/s", "minor_faults'", "Minor page fault count", ValueFlags::Mem | ValueFlags::Io);
 
-    AddColumn("IO load", "io_time[hw]' 1e9", "Average disk queue depth");
+    AddColumn("IO pol", "io_policy", "IO policy", ValueFlags::Raw | ValueFlags::Io | ValueFlags::Porto);
 
-    AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second");
-    AddColumn("IO Read b/s", "io_read[hw]' b", "IO bytes read from disk");
-    AddColumn("IO Write b/s", "io_write[hw]' b", "IO bytes written to disk");
+    AddColumn("IO load", "io_time[hw]' 1e9", "Average disk queue depth", ValueFlags::Io);
 
-    AddColumn("FS op/s", "io_ops[fs]'", "IO operations by fs");
-    AddColumn("FS read b/s", "io_read[fs]' b", "IO bytes read by fs");
-    AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs");
+    AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second", ValueFlags::Io);
+    AddColumn("IO read b/s", "io_read[hw]' b", "IO bytes read from disk", ValueFlags::Io);
+    AddColumn("IO write b/s", "io_write[hw]' b", "IO bytes written to disk", ValueFlags::Io);
+
+    AddColumn("FS op/s", "io_ops[fs]'", "IO operations by fs", ValueFlags::Io);
+    AddColumn("FS read b/s", "io_read[fs]' b", "IO bytes read by fs", ValueFlags::Io);
+    AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs", ValueFlags::Io);
 
     /* Network */
+    AddColumn("Net TC", "net_bytes[Uplink]' b", "Uplink bytes transmitted at tc", ValueFlags::Net);
+    AddColumn("Net TX", "net_tx_bytes[Uplink]' b", "Uplink bytes transmitted", ValueFlags::Net);
+    AddColumn("Net RX", "net_rx_bytes[Uplink]' b", "Uplink bytes received", ValueFlags::Net);
 
-    AddColumn("RX Lim", "net_rx_limit[default] b", "Default network RX limit");
-    AddColumn("TX g-e", "net_guarantee[default] b", "Default network TX guarantee");
-    AddColumn("TX lim", "net_limit[default] b", "Default network TX limit");
+    AddColumn("Pkt TC", "net_packets[Uplink]'", "Uplink packets transmitted at tc", ValueFlags::Net);
+    AddColumn("Pkt TX", "net_tx_packets[Uplink]'", "Uplink packets transmitted", ValueFlags::Net);
+    AddColumn("Pkt RX", "net_rx_packets[Uplink]'", "Uplink packets received", ValueFlags::Net);
 
-    AddColumn("Net RX", "net_rx_bytes[Uplink]' b", "Uplink bytes received");
-    AddColumn("Net TX", "net_bytes[Uplink]' b", "Uplink bytes transmitted");
-    AddColumn("Pkt RX", "net_rx_packets[Uplink]'", "Uplink packets received");
-    AddColumn("Pkt TX", "net_packets[Uplink]'", "Uplink packets transmitted");
+    AddColumn("Drop TC", "net_drops[Uplink]'", "Uplink TC dropped packets", ValueFlags::Net);
+    AddColumn("Drop TX", "net_tx_drops[Uplink]'", "Uplink TX dropped packets", ValueFlags::Net);
+    AddColumn("Drop RX", "net_rx_drops[Uplink]'", "Uplink RX dropped packets", ValueFlags::Net);
+
+    AddColumn("ToS", "net_tos", "Default traffic class selector", ValueFlags::Raw | ValueFlags::Net | ValueFlags::Porto);
+    AddColumn("TX g-e", "net_guarantee[default] b", "Default network TX guarantee", ValueFlags::Net);
+    AddColumn("TX lim", "net_limit[default] b", "Default network TX limit", ValueFlags::Net);
+    AddColumn("RX lim", "net_rx_limit[default] b", "Default network RX limit", ValueFlags::Net);
+
+    for (int i = 0; i<8; i++) {
+        std::string cs = "CS" + std::to_string(i);
+        AddColumn("Net " + cs, "net_bytes[" + cs + "]' b", "Uplink bytes transmitted " + cs, ValueFlags::Net);
+        AddColumn("Pkt " + cs, "net_packets[" + cs + "]'", "Uplink packets transmitted " + cs, ValueFlags::Net);
+        AddColumn("Drop "+ cs, "net_drops[" + cs + "]'", "Uplink dropped packets " + cs, ValueFlags::Net);
+    }
 
     /* Porto */
-    AddColumn("Porto", "enable_porto", "Porto access level");
-    AddColumn("Cli", "porto_stat[container_clients]", "Porto clients");
-    AddColumn("RPS", "porto_stat[container_requests]'", "Porto requests/s");
+    AddColumn("Porto", "enable_porto", "Porto access level", ValueFlags::Raw | ValueFlags::Porto);
+    AddColumn("Cli", "porto_stat[container_clients]", "Porto clients", ValueFlags::Porto);
+    AddColumn("RPS", "porto_stat[container_requests]'", "Porto requests/s", ValueFlags::Porto);
 }
 
 static bool exit_immediatly = false;
@@ -1274,6 +1299,30 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
         case 'd':
             if (top.SelectedColumn > 0)
                 top.Columns[top.SelectedColumn].Hidden ^= true;
+            break;
+        case 'a':
+            for (auto &c: top.Columns)
+                c.Hidden = false;
+            break;
+        case 'c':
+            for (auto &c: top.Columns)
+                c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Cpu));
+            break;
+        case 'm':
+            for (auto &c: top.Columns)
+                c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Mem));
+            break;
+        case 'i':
+            for (auto &c: top.Columns)
+                c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Io));
+            break;
+        case 'n':
+            for (auto &c: top.Columns)
+                c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Net));
+            break;
+        case 'p':
+            for (auto &c: top.Columns)
+                c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Porto));
             break;
         case KEY_BACKSPACE:
             if (top.SelectedColumn > 1) {
