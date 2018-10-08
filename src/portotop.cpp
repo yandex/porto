@@ -204,10 +204,11 @@ void TConsoleScreen::HelpDialog() {
     std::vector<std::string> help =
         {std::string("portoctl top ") + PORTO_VERSION + " " + PORTO_REVISION,
          "",
-         "left, right, home, end - change sorting/scroll",
+         "left, right, home, end - select column/scroll",
          "up, down, page up, page down - select container/scroll",
-         "<, > - scroll without chaning sorting",
-         "tab - expand conteainers tree: first, second, all",
+         "<, > - horizontal scroll without changing selection",
+         "tab - expand containers tree: first, second, all",
+         "s - sort/invert selected column",
          "@ - go to self container",
          "! - mark selected container",
          "",
@@ -734,7 +735,9 @@ TColumn::TColumn(std::string title, std::string desc, TPortoValue var) :
 }
 int TColumn::PrintTitle(int x, int y, TConsoleScreen &screen) {
     screen.PrintAt(Title, x, y, Width, LeftAligned,
-                   A_BOLD | (Selected ? A_STANDOUT : 0));
+                   A_BOLD |
+                   (Selected ? A_STANDOUT : 0) |
+                   (Sorted ? A_UNDERLINE : 0));
     return Width;
 }
 int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, int attr) {
@@ -750,9 +753,6 @@ void TColumn::Update(std::shared_ptr<TPortoContainer> &tree, int maxlevel) {
 }
 TPortoValue& TColumn::At(TPortoContainer &row) {
     return Cache[row.GetName()];
-}
-void TColumn::Highlight(bool enable) {
-    Selected = enable;
 }
 void TColumn::Process() {
     for (auto &iter : Cache) {
@@ -772,13 +772,14 @@ void TColumn::SetWidth(int width) {
 void TColumn::ClearCache() {
     Cache.clear();
 }
-void TPortoContainer::SortTree(TColumn &column) {
+void TPortoContainer::SortTree(TColumn &column, bool invert) {
     Children.sort([&] (std::shared_ptr<TPortoContainer> &row1,
                        std::shared_ptr<TPortoContainer> &row2) {
-            return column.At(*row1) < column.At(*row2);
+            return invert ? (column.At(*row2) < column.At(*row1)) :
+                            (column.At(*row1) < column.At(*row2));
         });
     for (auto &c : Children)
-        c->SortTree(column);
+        c->SortTree(column, invert);
 }
 
 void TPortoTop::PrintTitle(int y, TConsoleScreen &screen) {
@@ -844,7 +845,7 @@ void TPortoTop::Process() {
 
 void TPortoTop::Sort() {
     if (ContainerTree)
-        ContainerTree->SortTree(Columns[SelectedColumn]);
+        ContainerTree->SortTree(Columns[SortColumn], Invert);
 }
 
 void TPortoTop::Print(TConsoleScreen &screen) {
@@ -999,7 +1000,8 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     if (FirstRow + DisplayRows > MaxRows)
         FirstRow = MaxRows - DisplayRows;
 
-    Columns[SelectedColumn].Highlight(false);
+    Columns[SelectedColumn].Selected = false;
+
     SelectedColumn += x;
     if (SelectedColumn < 0) {
         SelectedColumn = 0;
@@ -1012,10 +1014,8 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
         SelectedColumn++;
     while (Columns[SelectedColumn].Hidden && SelectedColumn > 0)
         SelectedColumn--;
-    Columns[SelectedColumn].Highlight(true);
 
-    if (x)
-        Sort();
+    Columns[SelectedColumn].Selected = true;
 
     if (y)
         SelectedContainer = "";
@@ -1271,6 +1271,8 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
     TPortoTop top(api, args);
 
     top.SelectedContainer = "self";
+    top.Columns[top.SelectedColumn].Selected = true;
+    top.Columns[top.SortColumn].Sorted = true;
 
     top.Update();
 
@@ -1338,8 +1340,10 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
             break;
         case KEY_DC:
         case 'd':
-            if (top.SelectedColumn > 0)
+            if (top.SelectedColumn > 0) {
                 top.Columns[top.SelectedColumn].Hidden ^= true;
+                top.ChangeSelection(1, 0, screen);
+            }
             break;
         case 'a':
             for (auto &c: top.Columns)
@@ -1371,6 +1375,17 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
                 std::swap(top.Columns[top.SelectedColumn],
                           top.Columns[top.SelectedColumn + 1]);
             }
+            break;
+        case 's':
+            if (top.SortColumn != top.SelectedColumn) {
+                top.Columns[top.SortColumn].Sorted = false;
+                top.SortColumn = top.SelectedColumn;
+                top.Columns[top.SortColumn].Sorted = true;
+                top.Invert = false;
+            } else {
+                top.Invert = !top.Invert;
+            }
+            top.Sort();
             break;
         case 'S':
             if (screen.Dialog("Start/stop container " + top.SelectedContainer,

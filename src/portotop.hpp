@@ -70,7 +70,7 @@ public:
     int GetLevel();
     void ForEach(std::function<void (std::shared_ptr<TPortoContainer> &)> fn,
                  int maxlevel);
-    void SortTree(TColumn &column);
+    void SortTree(TColumn &column, bool invert);
     int GetMaxLevel();
     int ChildrenCount();
     std::string ContainerAt(int n, int max_level);
@@ -168,7 +168,6 @@ private:
 
     int Width;
     std::unordered_map<std::string, TPortoValue> Cache;
-    bool Selected = false;
     bool LeftAligned;
 
 public:
@@ -178,6 +177,8 @@ public:
     std::string Title;
     std::string Description;
     int Flags;
+    bool Selected = false;
+    bool Sorted = false;
 
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, int attr);
@@ -185,7 +186,6 @@ public:
     void Update(std::shared_ptr<TPortoContainer> &tree, int maxlevel);
     void Process();
     TPortoValue& At(TPortoContainer &row);
-    void Highlight(bool enable);
     int GetWidth();
     void SetWidth(int width);
 };
@@ -218,6 +218,8 @@ public:
     bool Paused = false;
     std::vector<TColumn> Columns;
     int SelectedColumn = 0;
+    int SortColumn = 0;
+    bool Invert = false;
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
