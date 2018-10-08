@@ -893,6 +893,8 @@ void TPortoTop::Print(TConsoleScreen &screen) {
                     attr |= COLOR_PAIR(col->second);
 
                 for (auto &c : Columns) {
+                    if (!(c.Flags & ValueFlags::Container) && row->GetLevel() == 1)
+                        attr |= A_BOLD;
                     if (!c.Hidden)
                         x += 1 + c.Print(*row, x, at_row + y - FirstRow,
                                          screen, attr);
