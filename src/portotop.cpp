@@ -510,6 +510,17 @@ void TPortoValue::Process() {
         return;
     }
 
+    if (Flags & ValueFlags::Chroot) {
+        if (AsString == "" || AsString == "/") {
+            AsString = "";
+            AsNumber = 0;
+        } else {
+            AsString = "true";
+            AsNumber = 1;
+        }
+        return;
+    }
+
     if ((Flags & ValueFlags::Raw) || AsString.length() == 0) {
         AsNumber = -1;
         return;
@@ -1152,6 +1163,7 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%", ValueFlags::Cpu);
     AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%", ValueFlags::Cpu);
     AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%", ValueFlags::Cpu);
+    AddColumn("IO-W%", "io_time[hw]'% 1e9", "Cpu waiting for disk IO", ValueFlags::Cpu);
     AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%", ValueFlags::Cpu);
 
     AddColumn("C pol", "cpu_policy", "Cpu scheduler policy", ValueFlags::Raw | ValueFlags::Cpu | ValueFlags::Porto);
@@ -1162,23 +1174,27 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores", ValueFlags::Cpu);
 
     AddColumn("Threads", "thread_count", "Threads count", ValueFlags::Cpu);
-    AddColumn("Th Lim", "thread_limit", "Threads limit", ValueFlags::Cpu);
+    AddColumn("Th lim", "thread_limit", "Threads limit", ValueFlags::Cpu);
 
     /* Memory */
     AddColumn("Memory", "memory_usage b", "Memory usage", ValueFlags::Mem);
     AddColumn("M g-e", "memory_guarantee b", "Memory guarantee", ValueFlags::Mem);
     AddColumn("M lim", "memory_limit b", "Memory limit", ValueFlags::Mem);
-    AddColumn("M r-d/s", "memory_reclaimed' b", "Memory reclaimed", ValueFlags::Mem);
+    AddColumn("Free/s", "memory_reclaimed' b", "Memory freed", ValueFlags::Mem);
 
     AddColumn("Anon", "anon_usage b", "Anonymous memory usage", ValueFlags::Mem);
-    AddColumn("A lim", "anon_limit b", "Anonymous memory limit", ValueFlags::Mem);
+    AddColumn("Alim", "anon_limit b", "Anonymous memory limit", ValueFlags::Mem);
 
     AddColumn("Cache", "cache_usage b", "Cache memory usage", ValueFlags::Mem);
+
+    AddColumn("Htlb", "hugetlb_usage b", "HugeTLB memory usage", ValueFlags::Mem);
+    AddColumn("Hlim", "hugetlb_limit b", "HugeTLB memory limit", ValueFlags::Mem);
 
     AddColumn("Mt lim", "memory_limit_total b", "Memory total limit", ValueFlags::Mem);
     AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee", ValueFlags::Mem);
 
-    AddColumn("OOM", "porto_stat[container_oom]", "OOM count", ValueFlags::Mem);
+    AddColumn("OOM", "porto_stat[container_oom]", "Count of OOM events", ValueFlags::Mem);
+    AddColumn("OOM-K", "", "Count of OOM kills", ValueFlags::Mem);
     AddColumn("OOM-F", "oom_is_fatal", "OOM is fatal", ValueFlags::Raw | ValueFlags::Mem | ValueFlags::Porto);
 
     /* I/O */
@@ -1208,26 +1224,37 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("Pkt TX", "net_tx_packets[Uplink]'", "Uplink packets transmitted", ValueFlags::Net);
     AddColumn("Pkt RX", "net_rx_packets[Uplink]'", "Uplink packets received", ValueFlags::Net);
 
-    AddColumn("Drop TC", "net_drops[Uplink]'", "Uplink TC dropped packets", ValueFlags::Net);
-    AddColumn("Drop TX", "net_tx_drops[Uplink]'", "Uplink TX dropped packets", ValueFlags::Net);
-    AddColumn("Drop RX", "net_rx_drops[Uplink]'", "Uplink RX dropped packets", ValueFlags::Net);
+    AddColumn("Drp TC", "net_drops[Uplink]'", "Uplink TC dropped packets", ValueFlags::Net);
+    AddColumn("Drp TX", "net_tx_drops[Uplink]'", "Uplink TX dropped packets", ValueFlags::Net);
+    AddColumn("Drp RX", "net_rx_drops[Uplink]'", "Uplink RX dropped packets", ValueFlags::Net);
 
-    AddColumn("ToS", "net_tos", "Default traffic class selector", ValueFlags::Raw | ValueFlags::Net | ValueFlags::Porto);
     AddColumn("TX g-e", "net_guarantee[default] b", "Default network TX guarantee", ValueFlags::Net);
     AddColumn("TX lim", "net_limit[default] b", "Default network TX limit", ValueFlags::Net);
     AddColumn("RX lim", "net_rx_limit[default] b", "Default network RX limit", ValueFlags::Net);
 
+    AddColumn("ToS", "net_tos", "Default traffic class selector", ValueFlags::Raw | ValueFlags::Net | ValueFlags::Porto);
+
     for (int i = 0; i<8; i++) {
-        std::string cs = "CS" + std::to_string(i);
-        AddColumn("Net " + cs, "net_bytes[" + cs + "]' b", "Uplink bytes transmitted " + cs, ValueFlags::Net);
-        AddColumn("Pkt " + cs, "net_packets[" + cs + "]'", "Uplink packets transmitted " + cs, ValueFlags::Net);
-        AddColumn("Drop "+ cs, "net_drops[" + cs + "]'", "Uplink dropped packets " + cs, ValueFlags::Net);
+        std::string cs = std::to_string(i);
+        AddColumn("CS" + cs, "net_bytes[CS" + cs + "]' b", "Uplink bytes CS" + cs, ValueFlags::Net);
+        AddColumn("Pk" + cs, "net_packets[CS" + cs + "]'", "Uplink packets CS" + cs, ValueFlags::Net);
+        AddColumn("Dp" + cs, "net_drops[CS" + cs + "]'", "Uplink dropped CS" + cs, ValueFlags::Net);
     }
 
     /* Porto */
+    AddColumn("ID", "id", "Container id", ValueFlags::Raw | ValueFlags::Porto);
+    AddColumn("L", "level", "Container level", ValueFlags::Raw | ValueFlags::Porto);
+
+    AddColumn("Isolate", "isolate", "Container with pid-namespace", ValueFlags::Raw | ValueFlags::Porto);
+    AddColumn("VMode", "virt_mode", "Porto virt mode", ValueFlags::Raw | ValueFlags::Porto);
+    AddColumn("Chroot", "root", "Container with chroot", ValueFlags::Chroot | ValueFlags::Porto);
+
     AddColumn("Porto", "enable_porto", "Porto access level", ValueFlags::Raw | ValueFlags::Porto);
     AddColumn("Cli", "porto_stat[container_clients]", "Porto clients", ValueFlags::Porto);
     AddColumn("RPS", "porto_stat[container_requests]'", "Porto requests/s", ValueFlags::Porto);
+
+    AddColumn("Core", "CORE.dumped", "Cores dumped", ValueFlags::Porto);
+    AddColumn("Respawn", "respawn_count", "Respawn count", ValueFlags::Porto);
 }
 
 static bool exit_immediatly = false;
