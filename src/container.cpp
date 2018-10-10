@@ -2620,6 +2620,38 @@ TError TContainer::PrepareStart() {
             return error;
     }
 
+    if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
+        std::shared_ptr<TVolume> vol;
+        rpc::TVolumeSpec spec;
+
+        L("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
+        TaintFlags.RootOnLoop = true;
+
+        spec.set_backend("loop");
+        spec.set_storage(RootPath.ToString());
+        spec.set_read_only(RootRo);
+        spec.add_links()->set_container(ROOT_PORTO_NAMESPACE + Name);
+
+        auto current = CL->LockedContainer;
+        CL->ReleaseContainer();
+
+        error = TVolume::Create(spec, vol);
+        if (error) {
+            L_ERR("Cannot create root volume: {}", error);
+            return error;
+        }
+
+        error = CL->LockContainer(current);
+        if (error)
+            return error;
+
+        L("Replace root={} with volume {}", Root, vol->Path);
+        LockStateWrite();
+        RootPath = vol->Path;
+        Root = vol->Path.ToString();
+        UnlockState();
+    }
+
     (void)TaskCred.InitGroups(TaskCred.User());
 
     SanitizeCapabilities();
@@ -2824,30 +2856,6 @@ TError TContainer::PrepareResources() {
         error = TVolume::CheckRequired(*this);
         if (error)
             goto undo;
-    }
-
-    if (HasProp(EProperty::ROOT) && RootPath.IsRegularFollow()) {
-        std::shared_ptr<TVolume> vol;
-        rpc::TVolumeSpec spec;
-
-        L("Emulate deprecated loop root={} for CT{}:{}", RootPath, Id, Name);
-        TaintFlags.RootOnLoop = true;
-
-        spec.set_backend("loop");
-        spec.set_storage(RootPath.ToString());
-        spec.set_read_only(RootRo);
-        spec.add_links()->set_container(ROOT_PORTO_NAMESPACE + Name);
-
-        error = TVolume::Create(spec, vol);
-        if (error) {
-            L_ERR("Cannot create root volume: {}", error);
-            goto undo;
-        }
-
-        LockStateWrite();
-        RootPath = vol->Path;
-        Root = vol->Path.ToString();
-        UnlockState();
     }
 
     return OK;
