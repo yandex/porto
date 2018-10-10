@@ -796,20 +796,44 @@ Statistics and limits could be requested for filesystem path.
 Absolute paths are resolved in host, paths starting with dot in chroot:
 **io\_read\[/\]**, **io\_read\[.\]**.
 
-* **io\_read** - bytes read from disk, syntax: \<disk\>: \<bytes\>;...
+* **io\_read** - bytes read from disk, syntax: \<disk\>|hw: \<bytes\>;...
 
-* **io\_write** - bytes written to disk, syntax: \<disk\>: \<bytes\>;...
+    Works with blk-throttler or CFQ group scheduler.
 
-* **io\_ops** - disk operations: \<disk\>: \<count\>;...
+* **io\_write** - bytes written to disk, syntax: \<disk\>|hw: \<bytes\>;...
 
-* **io\_time** - total io time: \<disk\>: \<nanoseconds\>;...
+    Works with blk-throttler or CFQ group scheduler.
+
+* **io\_ops** - disk operations: \<disk\>|hw: \<count\>;...
+
+    Works with blk-throttler or CFQ group scheduler.
+
+* **io\_time** - total io execution time: \<disk\>|hw: \<nanoseconds\>;...
+
+   Total time spent in hardware queues.
+   Works for CFQ group or with offstream patch.
+
+   Rate of change is a average queue depth.
+
+* **io\_wait** - total io wait time: \<disk\>|hw: \<nanoseconds\>;...
+
+   Total time spent in scheduler queues.
+   Works for CFQ group or with offstream patch.
+
+   Rate of change is a average queue depth.
 
 * **io\_limit** - IO bandwidth limit, syntax: fs|\<path\>|\<disk\> \[r|w\]: \<bytes/s\>;...
     - fs \[r|w\]: \<bytes\>     - filesystem level limit (offstream kernel feature)
     - \<path\> \[r|w\]: \<bytes\> - setup blkio limit for disk used by this filesystem
     - \<disk\> \[r|w\]: \<bytes\> - setup blkio limit for disk
 
+    Works with block layer throttling.
+    VFS layer limit is offstream feature.
+
 * **io\_ops\_limit**  - IOPS limit: fs|\<path\>|\<disk\> \[r|w\]: \<iops\>;...
+
+    Works with block layer throttling.
+    VFS layer limit is offstream feature.
 
 * **io\_policy** IO scheduler policy, see **ioprio\_set(2)**
     - *none*    - set by **cpu\_policy**, blkio.weight = 500 (default)
@@ -1491,6 +1515,9 @@ CONFIG_IPV6
 ```
 CONFIG_CGROUP_PIDS
 CONFIG_BLK_CGROUP
+CONFIG_CFQ_GROUP_IOSCHED
+CONFIG_BFQ_GROUP_IOSCHED
+CONFIG_BLK_DEV_THROTTLING
 CONFIG_RT_GROUP_SCHED
 CONFIG_CPUSETS
 CONFIG_CGROUP_HUGETLB

@@ -965,7 +965,15 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     TError error;
 
     if (stat & IoStat::Time)
-        knob = "blkio.io_service_time_recursive";
+        if (HasThrottlerTime)
+            knob = "blkio.throttle.io_service_time_recursive";
+        else
+            knob = "blkio.io_service_time_recursive"; /* cfq only */
+    else if (stat & IoStat::Wait)
+        if (HasThrottlerTime)
+            knob = "blkio.throttle.io_wait_time_recursive";
+        else
+            knob = "blkio.io_wait_time_recursive"; /* cfq only */
     else if (HasThrottler && (HasSaneBehavior || !cg.IsRoot())) {
         /* get statistics from throttler if possible, it has couners for raids */
         knob = (stat & IoStat::Iops) ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";

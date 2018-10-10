@@ -1168,8 +1168,10 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%", ValueFlags::Cpu);
     AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%", ValueFlags::Cpu);
     AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%", ValueFlags::Cpu);
-    AddColumn("IO-W%", "io_time[hw]'% 1e9", "Cpu waiting for disk IO", ValueFlags::Cpu);
     AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%", ValueFlags::Cpu);
+
+    AddColumn("IO-D%", "io_time[hw]'% 1e9", "Waiting for disk IO completion", ValueFlags::Cpu);
+    AddColumn("IO-W%", "io_wait[hw]'% 1e9", "Waiting for disk IO start", ValueFlags::Cpu);
 
     AddColumn("C pol", "cpu_policy", "Cpu scheduler policy", ValueFlags::Raw | ValueFlags::Cpu | ValueFlags::Porto);
     AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores", ValueFlags::Cpu);
@@ -1208,7 +1210,8 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
 
     AddColumn("IO pol", "io_policy", "IO policy", ValueFlags::Raw | ValueFlags::Io | ValueFlags::Porto);
 
-    AddColumn("IO load", "io_time[hw]' 1e9", "Average disk queue depth", ValueFlags::Io);
+    AddColumn("IO depth", "io_time[hw]' 1e9", "Average hardware queue depth", ValueFlags::Io);
+    AddColumn("IO wait", "io_wait[hw]' 1e9", "Average scheduler queue depth", ValueFlags::Io);
 
     AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second", ValueFlags::Io);
     AddColumn("IO read b/s", "io_read[hw]' b", "IO bytes read from disk", ValueFlags::Io);

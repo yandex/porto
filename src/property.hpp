@@ -147,6 +147,7 @@ constexpr const char *P_IO_READ = "io_read";
 constexpr const char *P_IO_WRITE = "io_write";
 constexpr const char *P_IO_OPS = "io_ops";
 constexpr const char *P_IO_TIME = "io_time";
+constexpr const char *P_IO_WAIT = "io_wait";
 constexpr const char *P_TIME = "time";
 constexpr const char *P_CREATION_TIME = "creation_time";
 constexpr const char *P_START_TIME = "start_time";

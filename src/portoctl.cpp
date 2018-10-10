@@ -576,7 +576,7 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
         return val;
     }
 
-    if (name == "io_time") {
+    if (name == "io_time" || name == "io_wait") {
         if (name != full_name && !StringToUint64(val, num)) {
             return StringFormatDuration(num / 1000000);
         } else if (!StringToUintMap(val, map)) {

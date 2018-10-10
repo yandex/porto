@@ -321,6 +321,7 @@ ro_tests = {
 "io_write": [],
 "io_ops": [],
 "io_time": [],
+"io_wait": [],
 "time": [],
 "creation_time": [],
 "start_time": [],

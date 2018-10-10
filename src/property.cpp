@@ -4767,6 +4767,20 @@ public:
     }
 } static IoTimeStat;
 
+class TIoWaitStat : public TIoStat {
+public:
+    TIoWaitStat() : TIoStat(P_IO_WAIT, EProperty::NONE,
+            "IO wait: hw|<disk>|<path>: <nanoseconds>;...") {}
+    TError GetMap(TUintMap &map) {
+        auto blkCg = CT->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Wait, map);
+        return OK;
+    }
+    void Dump(Porto::TContainer &spec) {
+        DumpMap(*spec.mutable_io_wait());
+    }
+} static IoWaitStat;
+
 class TTime : public TIntProperty {
 public:
     TTime() : TIntProperty(P_TIME, EProperty::NONE, "Running time [seconds]")

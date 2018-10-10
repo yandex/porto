@@ -697,6 +697,7 @@ message TContainer {
     optional TUintMap io_write = 207;       // out, bytes
     optional TUintMap io_ops = 208;         // out, operations
     optional TUintMap io_time = 209;        // out, nsec
+    optional TUintMap io_wait = 210;        // out, nsec
 
     optional uint64 memory_usage = 340;         // out, bytes
 
