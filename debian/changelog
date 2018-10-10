@@ -1,3 +1,10 @@
+yandex-porto (4.18.9) unstable; urgency=low
+
+  * test: add legacy-root-loop
+  * porto: fix legacy root loop
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 10 Oct 2018 19:53:12 +0300
+
 yandex-porto (4.18.8) unstable; urgency=low
 
   * cgroup: use porto systemd service cgroup for containers without systemd
