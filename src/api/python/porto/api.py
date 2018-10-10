@@ -708,7 +708,7 @@ class Connection(object):
         except exceptions.PortoException as e:
             try:
                 ct.Destroy()
-            except exceptions.PortoException.ContainerDoesNotExist:
+            except exceptions.ContainerDoesNotExist:
                 pass
             raise e
         return ct
