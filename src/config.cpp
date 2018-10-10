@@ -62,12 +62,14 @@ static void DefaultConfig() {
     config().mutable_daemon()->set_cgroup_remove_timeout_s(300);
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
 
-    config().mutable_daemon()->set_memory_guarantee_reserve(2ull << 30); /* 2Gb */
+    unsigned long long mem = GetTotalMemory();
+
+    config().mutable_daemon()->set_memory_guarantee_reserve(std::min(2ull << 30, mem / 4)); /* 2Gb */
 
     config().mutable_daemon()->set_log_rotate_ms(1000);
     config().mutable_daemon()->set_memory_limit(1ull << 30);
-    config().mutable_daemon()->set_helpers_memory_limit(1ull << 30);
-    config().mutable_daemon()->set_helpers_dirty_limit(256ull << 20);
+    config().mutable_daemon()->set_helpers_memory_limit(std::min(1ull << 30, mem / 2)); /* 1Gb */
+    config().mutable_daemon()->set_helpers_dirty_limit(std::min(256ull << 20, mem / 4)); /* 256Mb */
     config().mutable_daemon()->set_max_msg_len(32 * 1024 * 1024);
     config().mutable_daemon()->set_portod_stop_timeout(300);
     config().mutable_daemon()->set_portod_start_timeout(300);
@@ -99,7 +101,7 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
-    config().mutable_container()->set_memory_limit_margin(2ull << 30); /* 2Gb */
+    config().mutable_container()->set_memory_limit_margin(std::min(2ull << 30, mem / 4)); /* 2Gb */
 
     config().mutable_container()->set_anon_limit_margin(16ull << 20); /* 16Mb */
 
