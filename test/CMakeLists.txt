@@ -103,6 +103,8 @@ add_test(NAME portotest
          COMMAND sudo ${CMAKE_BINARY_DIR}/portotest --except recovery wait_recovery volume_recovery leaks
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+ADD_PYTHON_TEST(legacy-root-loop)
+
 # slow tests
 
 ADD_PYTHON_TEST(mem_limit)
