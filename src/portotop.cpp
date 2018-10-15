@@ -208,7 +208,7 @@ void TConsoleScreen::HelpDialog() {
          "up, down, page up, page down - select container/scroll",
          "<, > - horizontal scroll without changing selection",
          "tab - expand containers tree: first, second, all",
-         "s - sort/invert selected column",
+         "s, enter - sort/invert selected column",
          "@ - go to self container",
          "! - mark selected container",
          "",
@@ -1379,6 +1379,7 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
             }
             break;
         case 's':
+        case '\n':
             if (top.SortColumn != top.SelectedColumn) {
                 top.Columns[top.SortColumn].Sorted = false;
                 top.SortColumn = top.SelectedColumn;
