@@ -29,7 +29,7 @@ Porto requires Linux kernel 3.18 and optionally some offstream patches.
 # BUILDING #
 
 ```
-$ dpkg-buildpackage -b
+$ dpkg-buildpackage -b -uc -us
 $ sudo dpkg -i ../yandex-porto_*.deb
 ```
 or
