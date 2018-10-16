@@ -4,17 +4,17 @@
 #include <vector>
 
 #include "common.hpp"
+#include "container.hpp"
 
 class TClient;
-class TContainer;
 
 struct TContainerReport {
     std::string Name;
-    std::string State;
+    EContainerState State;
     std::string Label, Value;
     time_t When;
 
-    TContainerReport(const std::string &name, const std::string &state, time_t when,
+    TContainerReport(const std::string &name, EContainerState state, time_t when,
                      const std::string &label, const std::string &value):
         Name(name), State(state), Label(label), Value(value), When(when) {}
 };

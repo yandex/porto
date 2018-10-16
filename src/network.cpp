@@ -1574,8 +1574,8 @@ TError TNetwork::SyncResolvConf() {
 
     for (auto &ct: RootContainer->Subtree()) {
         if (ct->Root != "/" && !ct->HasProp(EProperty::RESOLV_CONF) &&
-                ct->State != EContainerState::Dead &&
-                ct->State != EContainerState::Stopped) {
+                !(ct->State & (EContainerState::Dead |
+                               EContainerState::Stopped))) {
             error = ct->ApplyResolvConf();
             if (error)
                 L_WRN("Cannot apply resolv_conf CT{}:{} : {}", ct->Id, ct->Name, error);

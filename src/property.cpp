@@ -70,8 +70,8 @@ TError TProperty::CanGet() const {
     if (!IsSupported)
         return TError(EError::NotSupported, "{} is not supported", Name);
 
-    if (IsRuntimeOnly && (CT->State == EContainerState::Stopped ||
-                          CT->State == EContainerState::Starting))
+    if (IsRuntimeOnly && (CT->State & (EContainerState::Stopped |
+                                       EContainerState::Starting)))
         return TError(EError::InvalidState, "{} is not available in {} state", Name, TContainer::StateName(CT->State));
 
     if (IsDeadOnly && CT->State != EContainerState::Dead)
@@ -3736,6 +3736,21 @@ public:
         spec.set_state(TContainer::StateName(CT->State));
     }
 } static State;
+
+class TStateId : public TProperty {
+public:
+    TStateId() : TProperty(P_STATE_ID, EProperty::NONE, "container state id")
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string((unsigned)CT->State);
+        return OK;
+    }
+    void Dump(Porto::TContainer &spec) {
+        spec.set_st(CT->State);
+    }
+} static StateId;
 
 class TOomKilled : public TBoolProperty {
 public:

@@ -65,6 +65,8 @@ int main(int, char **) {
 
     ct = api.GetContainer("a");
     Expect(ct != nullptr);
+    ExpectEq(ct->st(), Porto::EContainerState::Stopped);
+    ExpectEq(ct->state(), "stopped");
     ExpectEq(ct->memory_limit(), 1 << 20);
 
     ExpectSuccess(api.WaitContainer("a", str));

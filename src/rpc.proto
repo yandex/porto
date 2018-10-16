@@ -438,6 +438,20 @@ message TCapabilities {
 // Container
 
 
+enum EContainerState {
+    Undefined = 0;   // internal state
+    Stopped = 1;     // "stopped"
+    Running = 2;     // "running"
+    Dead = 4;        // "dead"
+    Meta = 8;        // "meta"
+    Starting = 16;   // "starting"
+    Stopping = 32;   // "stopping"
+    Respawning = 64; // "respawning"
+    Paused = 128;    // "paused"
+    Destroyed = 256; // internal state
+
+}
+
 message TContainerCommandArgv {
     repeated string argv = 1;
 }
@@ -592,6 +606,7 @@ message TContainer {
     optional string name = 1;           // in client namespace
     optional string absolute_name = 2;  // out, "/porto/..."
     optional string state = 3;          // out
+    optional EContainerState st = 200;  // out
     optional uint64 id = 4;             // out
     optional uint32 level = 5;          // out
     optional string parent = 6;         // out, "/porto/..."
@@ -1219,6 +1234,7 @@ message TWaitResponse {
     optional uint64 when = 3;           // unix time stamp in seconds
     optional string label = 4;
     optional string value = 5;
+    optional EContainerState st = 6;
 }
 
 

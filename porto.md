@@ -72,14 +72,14 @@ Thus container could be addressed in several ways:
 - "self/..." (relative to current container)
 
 ## States
-* **stopped**    - initial state
-* **starting**   - start in progress
-* **running**    - **command** execution in progress
-* **stopping**   - stop in progress
-* **paused**     - frozen, consumes memory but no cpu
-* **dead**       - execution complete
-* **meta**       - running container without **command**
-* **respawning** - dead and will be started again
+* **stopped**    - initial state (1)
+* **starting**   - start in progress (16)
+* **running**    - **command** execution in progress (2)
+* **stopping**   - stop in progress (32)
+* **paused**     - frozen, consumes memory but no cpu (128)
+* **dead**       - execution complete (4)
+* **meta**       - running container without **command** (8)
+* **respawning** - dead and will be started again (64)
 
 ## Operations
 * **create**    - creates new container in stopped state
@@ -244,6 +244,8 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 * **id** - container id, 64-bit decimal
 
 * **level** - container level, 0 for root, 1 for first level
+
+* **st** - current state id 1..128, see [States]
 
 * **state** - current state, see [States]
 

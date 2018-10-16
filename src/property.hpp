@@ -118,6 +118,7 @@ constexpr const char *P_LEVEL = "level";
 constexpr const char *P_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *P_ABSOLUTE_NAMESPACE = "absolute_namespace";
 constexpr const char *P_STATE = "state";
+constexpr const char *P_STATE_ID = "st";
 constexpr const char *P_OOM_KILLED = "oom_killed";
 constexpr const char *P_OOM_KILLS = "oom_kills";
 constexpr const char *P_OOM_KILLS_TOTAL = "oom_kills_total";

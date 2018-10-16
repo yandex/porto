@@ -610,8 +610,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     ct->TestClearPropDirty(EProperty::RESOLV_CONF);
 
     /* Restore cgroups only for running containers */
-    if (ct->State != EContainerState::Stopped &&
-            ct->State != EContainerState::Dead) {
+    if (!(ct->State & (EContainerState::Stopped | EContainerState::Dead))) {
 
         error = TNetwork::RestoreNetwork(*ct);
         if (error)
@@ -930,8 +929,7 @@ TPath TContainer::GetCwd() const {
 }
 
 int TContainer::GetExitCode() const {
-    if (State != EContainerState::Dead &&
-            State != EContainerState::Respawning)
+    if (!(State & (EContainerState::Dead | EContainerState::Respawning)))
         return 256;
     if (OomKilled)
         return -99;
@@ -1003,13 +1001,14 @@ void TContainer::SetState(EContainerState next) {
 
     std::string label, value;
 
-    if ((State == EContainerState::Stopped ||
-         State == EContainerState::Dead ||
-         State ==  EContainerState::Respawning) && StartError) {
+    if ((State & (EContainerState::Stopped |
+                  EContainerState::Dead |
+                  EContainerState::Respawning)) &&
+                StartError) {
         label = P_START_ERROR;
         value = StartError.ToString();
-    } else if (State == EContainerState::Dead ||
-               State == EContainerState::Respawning) {
+    } else if (State & (EContainerState::Dead |
+                        EContainerState::Respawning)) {
         label = P_EXIT_CODE;
         value = std::to_string(GetExitCode());
     }
@@ -1558,8 +1557,8 @@ TError TContainer::DistributeCpus() {
     subtree.reverse();
 
     for (auto &parent: subtree) {
-        if (parent->State == EContainerState::Stopped ||
-                parent->State == EContainerState::Dead)
+        if (parent->State & (EContainerState::Stopped |
+                             EContainerState::Dead))
             continue;
 
         auto childs = parent->Childs();
@@ -1573,8 +1572,8 @@ TError TContainer::DistributeCpus() {
         for (auto type: order) {
             for (auto &ct: childs) {
                 if (ct->CpuSetType != type ||
-                        ct->State == EContainerState::Stopped ||
-                        ct->State == EContainerState::Dead)
+                        (ct->State & (EContainerState::Stopped |
+                                      EContainerState::Dead)))
                     continue;
 
                 ct->CpuVacant.Clear();
@@ -1646,8 +1645,8 @@ TError TContainer::DistributeCpus() {
     for (auto &ct: subtree) {
         if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
                 !ct->TestPropDirty(EProperty::CPU_SET_AFFINITY) ||
-                ct->State == EContainerState::Stopped ||
-                ct->State == EContainerState::Dead)
+                (ct->State & (EContainerState::Stopped |
+                              EContainerState::Dead)))
             continue;
 
         auto cg = ct->GetCgroup(CpusetSubsystem);
@@ -1667,8 +1666,8 @@ TError TContainer::DistributeCpus() {
     for (auto &ct: subtree) {
         if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
                 !ct->TestClearPropDirty(EProperty::CPU_SET_AFFINITY) ||
-                ct->State == EContainerState::Stopped ||
-                ct->State == EContainerState::Dead)
+                (ct->State & (EContainerState::Stopped |
+                              EContainerState::Dead)))
             continue;
 
         auto cg = ct->GetCgroup(CpusetSubsystem);
@@ -1700,9 +1699,9 @@ TError TContainer::ApplyCpuGuarantee() {
         auto ct_lock = LockContainers();
         CpuGuaranteeSum = 0;
         for (auto child: Children) {
-            if (child->State == EContainerState::Running ||
-                    child->State == EContainerState::Meta ||
-                    child->State == EContainerState::Starting)
+            if (child->State & (EContainerState::Running |
+                                EContainerState::Meta |
+                                EContainerState::Starting))
                 CpuGuaranteeSum += std::max(child->CpuGuarantee, child->CpuGuaranteeSum);
         }
         ct_lock.unlock();
@@ -2018,8 +2017,8 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestClearPropDirty(EProperty::ULIMIT)) {
         for (auto &ct: Subtree()) {
-            if (ct->State == EContainerState::Stopped ||
-                    ct->State == EContainerState::Dead)
+            if (ct->State & (EContainerState::Stopped |
+                             EContainerState::Dead))
                 continue;
             error = ct->ApplyUlimits();
             if (error) {
@@ -2571,8 +2570,8 @@ TError TContainer::StartParents() {
     if (FreezerSubsystem.IsFrozen(cg))
         return TError(EError::InvalidState, "Parent container is frozen");
 
-    if (Parent->State == EContainerState::Running ||
-            Parent->State == EContainerState::Meta)
+    if (Parent->State & (EContainerState::Running |
+                         EContainerState::Meta))
         return OK;
 
     auto current = CL->LockedContainer;
@@ -3195,8 +3194,7 @@ TError TContainer::Pause() {
         return error;
 
     for (auto &ct: Subtree()) {
-        if (ct->State == EContainerState::Running ||
-                ct->State == EContainerState::Meta) {
+        if (ct->State & (EContainerState::Running | EContainerState::Meta)) {
             ct->SetState(EContainerState::Paused);
             ct->PropagateCpuLimit();
             error = ct->Save();
@@ -3240,13 +3238,13 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::MayRespawn() {
-    if (State != EContainerState::Dead &&
-            State != EContainerState::Respawning)
+    if (!(State & (EContainerState::Dead |
+                   EContainerState::Respawning)))
         return TError(EError::InvalidState, "Cannot respawn: container in state={}", TContainer::StateName(State));
 
-    if (Parent->State != EContainerState::Running &&
-            Parent->State != EContainerState::Meta &&
-            Parent->State != EContainerState::Respawning)
+    if (!(Parent->State & (EContainerState::Running |
+                           EContainerState::Meta |
+                           EContainerState::Respawning)))
         return TError(EError::InvalidState, "Cannot respawn: parent container in state={}", TContainer::StateName(Parent->State));
 
     if (RespawnLimit && RespawnCount >= RespawnLimit)
@@ -3811,8 +3809,8 @@ void TContainer::SyncState() {
         return;
     }
 
-    if (State == EContainerState::Starting ||
-            State == EContainerState::Respawning)
+    if (State & (EContainerState::Starting |
+                 EContainerState::Respawning))
         SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
 
     if (FreezerSubsystem.IsFrozen(freezerCg)) {
@@ -3821,7 +3819,8 @@ void TContainer::SyncState() {
     } else if (State == EContainerState::Paused)
         SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
 
-    if (State == EContainerState::Stopped || State == EContainerState::Stopping) {
+    if (State & (EContainerState::Stopped |
+                 EContainerState::Stopping)) {
         if (State == EContainerState::Stopped)
             L("Found unexpected freezer");
         Stop(0);

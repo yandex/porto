@@ -1069,13 +1069,13 @@ noinline TError WaitContainers(const Porto::TWaitRequest &req, bool async,
             continue;
 
         if (waiter->Labels.empty()) {
-            client->MakeReport(name, TContainer::StateName(ct->State), async);
+            client->MakeReport(name, ct->State, async);
             if (!async)
                 return TError::Queued();
         } else {
             for (auto &it: ct->Labels) {
                 if (waiter->ShouldReportLabel(it.first)) {
-                    client->MakeReport(name, TContainer::StateName(ct->State), async, it.first, it.second);
+                    client->MakeReport(name, ct->State, async, it.first, it.second);
                     if (!async)
                         return TError::Queued();
                 }
@@ -1090,13 +1090,13 @@ noinline TError WaitContainers(const Porto::TWaitRequest &req, bool async,
                 continue;
 
             if (waiter->Labels.empty()) {
-                client->MakeReport(name, TContainer::StateName(ct->State), async);
+                client->MakeReport(name, ct->State, async);
                 if (!async)
                     return TError::Queued();
             } else {
                 for (auto &it: ct->Labels) {
                     if (waiter->ShouldReportLabel(it.first)) {
-                        client->MakeReport(name, TContainer::StateName(ct->State), async, it.first, it.second);
+                        client->MakeReport(name, ct->State, async, it.first, it.second);
                         if (!async)
                             return TError::Queued();
                     }
@@ -1106,7 +1106,7 @@ noinline TError WaitContainers(const Porto::TWaitRequest &req, bool async,
     }
 
     if (req.has_timeout_ms() && req.timeout_ms() == 0) {
-        client->MakeReport("", "timeout", async);
+        client->MakeReport("", EContainerState::Undefined, async);
     } else {
         waiter->Activate(client);
         if (req.timeout_ms()) {
@@ -1608,8 +1608,8 @@ noinline TError AttachProcess(const Porto::TAttachProcessRequest &req, bool thre
     if (!newCt->IsChildOf(*oldCt))
         return TError(EError::Permission, "new container must be child of current");
 
-    if (newCt->State != EContainerState::Running &&
-            newCt->State != EContainerState::Meta)
+    if (!(newCt->State & (EContainerState::Running |
+                          EContainerState::Meta)))
         return TError(EError::InvalidState, "new container is not running");
 
     for (auto ct = newCt; ct && ct != oldCt; ct = ct->Parent)

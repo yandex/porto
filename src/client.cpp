@@ -95,10 +95,10 @@ TError TClient::IdentifyClient(bool initial) {
     /* check that request from the same pid and container is still here */
     if (!initial && Pid == cr.pid && TaskCred.Uid == cr.uid &&
             TaskCred.Gid == cr.gid && ClientContainer &&
-            (ClientContainer->State == EContainerState::Running ||
-             ClientContainer->State == EContainerState::Starting ||
-             ClientContainer->State == EContainerState::Stopping ||
-             ClientContainer->State == EContainerState::Meta))
+            (ClientContainer->State & (EContainerState::Running |
+                                       EContainerState::Starting |
+                                       EContainerState::Stopping |
+                                       EContainerState::Meta)))
         return OK;
 
     TaskCred.Uid = cr.uid;
@@ -125,10 +125,10 @@ TError TClient::IdentifyClient(bool initial) {
     if (AccessLevel == EAccessLevel::None)
         return TError(EError::Permission, "Porto disabled in container " + ct->Name);
 
-    if (ct->State != EContainerState::Running &&
-            ct->State != EContainerState::Starting &&
-            ct->State != EContainerState::Stopping &&
-            ct->State != EContainerState::Meta)
+    if (!(ct->State & (EContainerState::Running |
+                       EContainerState::Starting |
+                       EContainerState::Stopping |
+                       EContainerState::Meta)))
         return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
 
     if (ct->ClientsCount < 0)
@@ -546,7 +546,12 @@ TError TClient::QueueReport(const TContainerReport &report, bool async) {
     rsp.set_error(EError::Success);
     auto wait = async ? rsp.mutable_asyncwait() : rsp.mutable_wait();
     wait->set_name(report.Name);
-    wait->set_state(report.State);
+    if (report.State == EContainerState::Undefined) {
+        wait->set_state("timeout");
+    } else {
+        wait->set_state(TContainer::StateName(report.State));
+        wait->set_st(report.State);
+    }
     wait->set_when(report.When);
 
     if (!report.Label.empty()) {
@@ -557,12 +562,12 @@ TError TClient::QueueReport(const TContainerReport &report, bool async) {
 
     if (Verbose)
         L_RSP("{}Wait name={} state={} {}={} to {}", async ? "Async" : "", report.Name,
-                report.State, report.Label, report.Value, Id);
+                wait->state(), report.Label, report.Value, Id);
 
     return QueueResponse(rsp);
 }
 
-TError TClient::MakeReport(const std::string &name, const std::string &state, bool async,
+TError TClient::MakeReport(const std::string &name, EContainerState state, bool async,
                            const std::string &label, const std::string &value) {
     auto lock = Lock();
     TError error;

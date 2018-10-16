@@ -39,9 +39,10 @@ void TContainerWaiter::Deactivate() {
 bool TContainerWaiter::ShouldReport(TContainer &ct) {
 
     /* Sync wait reports only stopped, dead, respawning, hollow meta */
-    if (!Async && ct.State != EContainerState::Stopped &&
-            ct.State != EContainerState::Dead &&
-            ct.State != EContainerState::Respawning &&
+    if (!Async &&
+        !(ct.State & (EContainerState::Stopped |
+                      EContainerState::Dead |
+                      EContainerState::Respawning)) &&
             (ct.State != EContainerState::Meta || ct.RunningChildren))
         return false;
 
@@ -74,7 +75,7 @@ void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const
 
             std::string name;
             if (client && !client->ComposeName(ct.Name, name)) {
-                client->MakeReport(name, TContainer::StateName(ct.State), waiter->Async, label, value);
+                client->MakeReport(name, ct.State, waiter->Async, label, value);
                 if (!waiter->Async) {
                     ++it;
                     waiter->Deactivate();
@@ -94,7 +95,7 @@ void TContainerWaiter::Timeout() {
     auto lock = LockWaiters();
     auto client = Client.lock();
     if (client) {
-        client->MakeReport("", "timeout", Async);
+        client->MakeReport("", EContainerState::Undefined, Async);
         Deactivate();
         if (Async)
             client->AsyncWaiter.reset();

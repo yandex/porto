@@ -297,6 +297,7 @@ ro_tests = {
 "level": [],
 "absolute_name":[],
 "absolute_namespace":[],
+"st": [],
 "state": [],
 "oom_kills": [],
 "oom_kills_total": [],
@@ -427,6 +428,12 @@ for name, cases in tests.iteritems():
 
 ct = conn.Run(ct_name)
 
+print " - state"
+ExpectEq(get_old("state"), "meta")
+ExpectEq(get_new("state"), "meta")
+ExpectEq(get_old("st"), "8")
+ExpectEq(get_new("st"), 8)
+
 for name, cases in ro_tests.iteritems():
     print " - ", name
     init_old = get_old(name)
@@ -438,6 +445,11 @@ for name, cases in ro_tests.iteritems():
 ct.Destroy()
 
 ct = conn.Run(ct_name, wait=1, command="true")
+
+ExpectEq(get_old("state"), "dead")
+ExpectEq(get_new("state"), "dead")
+ExpectEq(get_old("st"), "4")
+ExpectEq(get_new("st"), 4)
 
 for name, cases in dead_tests.iteritems():
     print " - ", name

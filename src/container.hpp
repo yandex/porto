@@ -29,17 +29,7 @@ class TVmStat;
 
 struct TEnv;
 
-enum class EContainerState {
-    Stopped,
-    Dead,
-    Respawning,
-    Starting,
-    Running,
-    Stopping,
-    Paused,
-    Meta,
-    Destroyed,
-};
+using Porto::EContainerState;
 
 enum class ECpuSetType {
     Inherit,
@@ -111,8 +101,8 @@ public:
     std::atomic<int> StartingChildren;
 
     bool HasResources() const {
-        return State != EContainerState::Stopped &&
-               State != EContainerState::Destroyed;
+        return !(State & (EContainerState::Stopped |
+                          EContainerState::Destroyed));
     }
 
     /* protected with ContainersMutex */
