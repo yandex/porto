@@ -1098,19 +1098,28 @@ TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
 
 TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
                                     double weight) const {
-    if (!HasWeight)
-        return OK;
+    double bfq_weight = weight;
+    TError error;
 
-    if (policy == "rt" || policy == "high")
+    if (policy == "rt" || policy == "high") {
         weight *= 1000;
-    else if (policy == "" || policy == "none" || policy == "normal")
+        bfq_weight *= 1000;
+    } else if (policy == "" || policy == "none" || policy == "normal") {
         weight *= 500;
-    else if (policy == "batch" || policy == "idle")
+        bfq_weight *= 100;
+    } else if (policy == "batch" || policy == "idle") {
         weight *= 10;
-    else
+        bfq_weight *= 1;
+    } else
         return TError(EError::InvalidValue, "unknown policy: " + policy);
 
-    return cg.SetUint64("blkio.weight", std::min(std::max(weight, 10.), 1000.));
+    if (HasWeight)
+        error = cg.SetUint64("blkio.weight", std::min(std::max(weight, 10.), 1000.));
+
+    if (!error && HasBfqWeight)
+        error = cg.SetUint64("blkio.bfq.weight", std::min(std::max(bfq_weight, 1.), 1000.));
+
+    return error;
 }
 
 // Devices
