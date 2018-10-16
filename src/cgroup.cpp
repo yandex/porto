@@ -964,23 +964,36 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     bool recursive = true;
     TError error;
 
-    if (stat & IoStat::Time)
-        if (HasThrottlerTime)
+    if (HasThrottlerRec) {
+        /* offstream patch */
+        if (stat & IoStat::Time)
             knob = "blkio.throttle.io_service_time_recursive";
-        else
-            knob = "blkio.io_service_time_recursive"; /* cfq only */
-    else if (stat & IoStat::Wait)
-        if (HasThrottlerTime)
+        else if (stat & IoStat::Wait)
             knob = "blkio.throttle.io_wait_time_recursive";
+        else if (stat & IoStat::Iops)
+            knob = "blkio.throttle.io_serviced_recursive";
         else
-            knob = "blkio.io_wait_time_recursive"; /* cfq only */
-    else if (HasThrottler && (HasSaneBehavior || !cg.IsRoot())) {
-        /* get statistics from throttler if possible, it has couners for raids */
-        knob = (stat & IoStat::Iops) ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";
-        /* throtter is recurisve only in sane behavior */
-        recursive = HasSaneBehavior;
-    } else
-        knob = (stat & IoStat::Iops) ? "blkio.io_serviced_recursive" : "blkio.io_service_bytes_recursive";
+            knob = "blkio.throttle.io_service_bytes_recursive";
+    } else if (stat & IoStat::Time) {
+        /* cfq only */
+        knob = "blkio.io_service_time_recursive";
+    } else if (stat & IoStat::Wait) {
+        /* cfq only */
+        knob = "blkio.io_wait_time_recursive";
+    } else if (HasThrottler && !cg.IsRoot()) {
+        /* throttler has couners for raids */
+        if (stat & IoStat::Iops)
+            knob = "blkio.throttle.io_serviced";
+        else
+            knob = "blkio.throttle.io_service_bytes";
+        /* recursive only for removed sane behavior */
+        recursive = false;
+    } else {
+        if (stat & IoStat::Iops)
+            knob = "blkio.io_serviced_recursive";
+        else
+            knob = "blkio.io_service_bytes_recursive";
+    }
 
     error = cg.Knob(knob).ReadLines(lines);
     if (error)
@@ -990,17 +1003,13 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
         std::vector<TCgroup> list;
 
         error = cg.ChildsAll(list);
-        if (error) {
-            L_WRN("Cannot get io stat {}", error);
+        if (error)
             return error;
-        }
 
         for (auto &child_cg: list) {
             error = child_cg.Knob(knob).ReadLines(lines);
-            if (error && error.Errno != ENOENT) {
-                L_WRN("Cannot get io stat {}", error);
+            if (error && error.Errno != ENOENT)
                 return error;
-            }
         }
     }
 

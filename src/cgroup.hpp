@@ -293,17 +293,14 @@ class TBlkioSubsystem : public TSubsystem {
 public:
     bool HasWeight = false;
     bool HasThrottler = false;
-    bool HasThrottlerTime = false;
-    bool HasSaneBehavior = false;
+    bool HasThrottlerRec = false;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
     bool IsDisabled() override { return !config().container().enable_blkio(); }
     bool IsOptional() override { return true; }
     TError InitializeSubsystem() override {
         HasWeight = RootCgroup().Has("blkio.weight");
         HasThrottler = RootCgroup().Has("blkio.throttle.read_bps_device");
-        HasThrottlerTime = RootCgroup().Has("blkio.throttle.io_service_time_recursive");
-        if (RootCgroup().GetBool("cgroup.sane_behavior", HasSaneBehavior))
-            HasSaneBehavior = false;
+        HasThrottlerRec = RootCgroup().Has("blkio.throttle.io_service_time_recursive");
         return OK;
     }
     enum IoStat {
