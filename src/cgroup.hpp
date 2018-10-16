@@ -294,6 +294,7 @@ public:
     bool HasWeight = false;
     bool HasThrottler = false;
     bool HasThrottlerRec = false;
+    bool HasBfqWeight = false;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
     bool IsDisabled() override { return !config().container().enable_blkio(); }
     bool IsOptional() override { return true; }
@@ -301,6 +302,7 @@ public:
         HasWeight = RootCgroup().Has("blkio.weight");
         HasThrottler = RootCgroup().Has("blkio.throttle.read_bps_device");
         HasThrottlerRec = RootCgroup().Has("blkio.throttle.io_service_time_recursive");
+        HasBfqWeight = RootCgroup().Has("blkio.bfq.io_serviced");
         return OK;
     }
     enum IoStat {
