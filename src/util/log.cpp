@@ -38,7 +38,7 @@ void InitStatistics() {
     PORTO_ASSERT(Statistics != nullptr);
 }
 
-TFile LogFile(STDOUT_FILENO);
+TFile LogFile(STDERR_FILENO);
 
 void OpenLog(const TPath &path) {
     int fd;
@@ -47,7 +47,7 @@ void OpenLog(const TPath &path) {
         Statistics->LogOpen++;
 
     if (StdLog) {
-        fd = STDOUT_FILENO;
+        fd = STDERR_FILENO;
     } else {
         struct stat st;
         fd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC |
@@ -60,7 +60,7 @@ void OpenLog(const TPath &path) {
         fd = fcntl(fd, F_DUPFD_CLOEXEC, 3);
 
     if (fd >= 0) {
-        if (LogFile.Fd != STDOUT_FILENO)
+        if (LogFile.Fd != STDERR_FILENO)
             LogFile.Close();
         LogFile.SetFd = fd;
     }

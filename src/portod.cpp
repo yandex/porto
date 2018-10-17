@@ -1631,7 +1631,7 @@ static void Usage() {
         << "Option: " << std::endl
         << "  -h | --help     print this message" << std::endl
         << "  -v | --version  print version and revision" << std::endl
-        << "  --stdlog        print log into stdout" << std::endl
+        << "  --stdlog        print log into stderr" << std::endl
         << "  --norespawn     exit after failure" << std::endl
         << "  --verbose       verbose logging" << std::endl
         << "  --debug         debug logging" << std::endl
