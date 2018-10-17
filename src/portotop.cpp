@@ -565,7 +565,7 @@ void TPortoValue::Process() {
     else if (Flags & ValueFlags::Bytes)
         AsString = StringFormatSize(AsNumber);
     else
-        AsString = StringFormat("%g", AsNumber);
+        AsString = StringFormat("%.1f", AsNumber);
 }
 std::string TPortoValue::GetValue() const {
     return AsString;
