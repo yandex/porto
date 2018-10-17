@@ -411,6 +411,10 @@ int TPortoValueCache::Update(Porto::TPortoApi &api) {
             auto &ct_cache = Cache[CacheSelector][ct.name()];
             for (auto &kv: ct.keyval())
                 ct_cache[kv.variable()] = kv.value();
+
+            auto &prev = Cache[!CacheSelector][ct.name()];
+            if (ct_cache.count("id") && prev.count("id") && ct_cache["id"] != prev["id"])
+                prev.clear();
         }
     }
     Time[CacheSelector] = GetCurrentTimeMs();
@@ -531,9 +535,8 @@ void TPortoValue::Process() {
 
     if (Flags & ValueFlags::DfDt) {
         std::string old = Cache->GetValue(Container->GetName(), Variable, true);
-        if (old.length() == 0)
-            old = AsString;
-        AsNumber = DfDt(AsNumber, ParseValue(old, Flags & ValueFlags::Map), Cache->GetDt());
+        double prev = old.size() ? ParseValue(old, Flags & ValueFlags::Map) : 0;
+        AsNumber = DfDt(AsNumber, prev, Cache->GetDt());
     }
 
     if (Flags & ValueFlags::PartOfRoot) {
