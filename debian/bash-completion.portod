@@ -4,7 +4,7 @@ _portod ()
 {
 	local cur prev words cword
 	_get_comp_words_by_ref -n : cur prev words cword
-	COMPREPLY=( $(compgen -W "-h --help -v --version --stdlog --norespawn --verbose status daemon start stop restart reload reopenlog upgrade dump get set freeze unfreeze testconfig help version" -- $cur) )
+	COMPREPLY=( $(compgen -W "-h --help -v --version --stdlog --norespawn --verbose status daemon start stop restart reload reopenlog upgrade dump get set freeze unfreeze testconfig getconfig help version" -- $cur) )
 }
 
 complete -F _portod portod

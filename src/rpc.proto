@@ -142,6 +142,9 @@ message TPortoRequest {
     // Change portod state (for host root user only)
     optional TSetSystemRequest SetSystem = 301;
 
+    // Get porto daemon config
+    optional TGetSystemConfigRequest GetSystemConfig = 302;
+
     /* Container methods */
 
     // Create new container
@@ -324,6 +327,7 @@ message TPortoResponse {
 
     optional TGetSystemResponse GetSystem = 300;
     optional TSetSystemResponse SetSystem = 301;
+    optional TGetSystemConfigResponse GetSystemConfig = 302;
 
     /* Container methods */
 
@@ -1014,6 +1018,16 @@ message TSetSystemRequest {
 
 message TSetSystemResponse {
 }
+
+
+// Get porto daemon config
+message TGetSystemConfigRequest {
+}
+
+message TGetSystemConfigResponse {
+   optional string config = 1;
+}
+
 
 message TNewContainerRequest {
     optional TContainer container = 1;

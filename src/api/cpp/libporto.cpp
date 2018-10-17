@@ -238,6 +238,14 @@ EError TPortoApi::SetSystem(const TString &key, const TString &val) {
     return Call("SetSystem {" + key + ":" + val + "}", rsp);
 }
 
+const TGetSystemConfigResponse *TPortoApi::GetSystemConfig() {
+    Req.Clear();
+    Req.mutable_getsystemconfig();
+    if (!Call())
+        return &Rsp.getsystemconfig();
+    return nullptr;
+}
+
 /* Container */
 
 EError TPortoApi::Create(const TString &name) {

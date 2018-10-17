@@ -45,6 +45,7 @@ void TRequest::Classify() {
         Req.has_convertpath() ||
         Req.has_locateprocess() ||
         Req.has_getsystem() ||
+        Req.has_getsystemconfig() ||
         Req.has_getcontainer() ||
         Req.has_getvolume();
 
@@ -302,6 +303,8 @@ void TRequest::Parse() {
     } else if (Req.has_setsystem()) {
         Cmd = "SetSystem";
         Arg = Req.ShortDebugString();
+    } else if (Req.has_getsystemconfig()) {
+        Cmd = "GetSystemConfig";
     } else if (Req.has_newvolume()) {
         Cmd = "NewVolume";
         Arg = Req.newvolume().volume().path();
@@ -1915,6 +1918,12 @@ noinline static TError SetSystemProperties(const Porto::TSetSystemRequest *req, 
     return OK;
 }
 
+noinline static TError GetSystemConfig(const Porto::TGetSystemConfigRequest *,
+                                       Porto::TGetSystemConfigResponse *rsp) {
+    rsp->set_config(config().DebugString());
+    return OK;
+}
+
 TError TRequest::Check() {
     auto req_ref = Req.GetReflection();
 
@@ -2071,6 +2080,8 @@ void TRequest::Handle() {
         error = GetSystemProperties(&Req.getsystem(), rsp.mutable_getsystem());
     else if (Req.has_setsystem())
         error = SetSystemProperties(&Req.setsystem(), rsp.mutable_setsystem());
+    else if (Req.has_getsystemconfig())
+        error = GetSystemConfig(&Req.getsystemconfig(), rsp.mutable_getsystemconfig());
     else
         error = TError(EError::InvalidMethod, "invalid RPC method");
 

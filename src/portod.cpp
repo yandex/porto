@@ -1654,6 +1654,7 @@ static void Usage() {
         << "  unfreeze        unfreeze changes" << std::endl
         << "  core            receive and forward core dump" << std::endl
         << "  testconfig      check portod config files, merge and print" << std::endl
+        << "  getconfig       print active portod config" << std::endl
         << "  help            print this message" << std::endl
         << "  version         print version and revision" << std::endl
         << std::endl;
@@ -1724,6 +1725,15 @@ int main(int argc, char **argv) {
         int warns = ReadConfigs(false);
         std::cout << config().DebugString() << std::endl;
         return warns ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+
+    if (cmd == "getconfig") {
+        Porto::TPortoApi conn;
+        auto res = conn.GetSystemConfig();
+        if (!res)
+            return EXIT_FAILURE;
+        std::cout << res->config() << std::endl;
+        return EXIT_SUCCESS;
     }
 
     ReadConfigs(true);

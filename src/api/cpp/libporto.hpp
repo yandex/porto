@@ -107,6 +107,8 @@ public:
 
     EError SetSystem(const TString &key, const TString &val);
 
+    const TGetSystemConfigResponse *GetSystemConfig();
+
     /* Container */
 
     const TListPropertiesResponse *ListProperties();
