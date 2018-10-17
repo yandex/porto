@@ -10,4 +10,4 @@
 #undef PROTOBUF_DEPRECATED
 
 extern cfg::TConfig &config();
-void ReadConfigs(bool silent = false);
+int ReadConfigs(bool silent = false);

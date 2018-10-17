@@ -16,16 +16,19 @@ extern "C" {
 
 class TProtobufLogger : public google::protobuf::io::ErrorCollector {
 public:
+    int Warns = 0;
     std::string Path;
     TProtobufLogger(const std::string &path) : Path(path) {}
     ~TProtobufLogger() {}
 
     void AddError(int line, int column, const std::string& message) {
         L_WRN("Config {} at line {} column {} {}", Path, line + 1, column + 1, message);
+        Warns++;
     }
 
     void AddWarning(int line, int column, const std::string& message) {
         L_WRN("Config {} at line {} column {} {}", Path, line + 1, column + 1, message);
+        Warns++;
     }
 };
 
@@ -172,7 +175,7 @@ static void DefaultConfig() {
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");
 }
 
-static TError ReadConfig(const TPath &path, bool silent) {
+static int ReadConfig(const TPath &path, bool silent) {
     TError error;
     TFile file;
 
@@ -180,31 +183,34 @@ static TError ReadConfig(const TPath &path, bool silent) {
     if (error) {
         if (!silent && error.Errno != ENOENT)
             L_WRN("Cannot read config {} {}", path, error);
-        return error;
+        return -1;
     }
 
     google::protobuf::io::FileInputStream stream(file.Fd);
     google::protobuf::TextFormat::Parser parser;
     TProtobufLogger logger(path.ToString());
 
-    if (!silent) {
+    if (!silent)
         L_SYS("Read config {}", path);
-        parser.RecordErrorsTo(&logger);
-    }
+
+    parser.RecordErrorsTo(&logger);
 
     bool ok = parser.Merge(&stream, &Config);
-    if (!ok && !silent)
+    if (!ok && !silent) {
         L_WRN("Cannot parse config {} the rest is skipped", path);
+        logger.Warns++;
+    }
 
-    return OK;
+    return logger.Warns;
 }
 
-void ReadConfigs(bool silent) {
+int ReadConfigs(bool silent) {
     Config.Clear();
     DefaultConfig();
 
-    if (ReadConfig("/etc/portod.conf", silent))
-        ReadConfig("/etc/default/portod.conf", silent); /* FIXME remove */
+    int ret = ReadConfig("/etc/portod.conf", silent);
+    if (ret < 0)
+        ret = ReadConfig("/etc/default/portod.conf", silent); /* FIXME remove */
 
     TPath config_dir = "/etc/portod.conf.d";
     std::vector<std::string> config_names;
@@ -212,9 +218,13 @@ void ReadConfigs(bool silent) {
     std::sort(config_names.begin(), config_names.end());
     for (auto &name: config_names) {
         if (StringEndsWith(name, ".conf"))
-            ReadConfig(config_dir / name, silent);
+            ret += !!ReadConfig(config_dir / name, silent);
+        else if (!silent)
+            L_SYS("Skip config {}", config_dir / name);
     }
 
     Debug |= config().log().debug();
     Verbose |= Debug | config().log().verbose();
+
+    return ret;
 }

@@ -1653,7 +1653,7 @@ static void Usage() {
         << "  freeze          freeze changes" << std::endl
         << "  unfreeze        unfreeze changes" << std::endl
         << "  core            receive and forward core dump" << std::endl
-        << "  showconf        print portod config" << std::endl
+        << "  testconfig      check portod config files, merge and print" << std::endl
         << "  help            print this message" << std::endl
         << "  version         print version and revision" << std::endl
         << std::endl;
@@ -1720,6 +1720,12 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
+    if (cmd == "testconfig") {
+        int warns = ReadConfigs(false);
+        std::cout << config().DebugString() << std::endl;
+        return warns ? EXIT_FAILURE : EXIT_SUCCESS;
+    }
+
     ReadConfigs(true);
 
     if (cmd == "" || cmd == "daemon")
@@ -1770,11 +1776,6 @@ int main(int argc, char **argv) {
         TError error = core.Handle(TTuple(argv + opt + 1, argv + argc));
         if (error)
             return EXIT_FAILURE;
-        return EXIT_SUCCESS;
-    }
-
-    if (cmd == "showconf") {
-        std::cout << config().DebugString() << std::endl;
         return EXIT_SUCCESS;
     }
 
