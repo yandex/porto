@@ -1013,19 +1013,13 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
         }
     }
 
-    uint64_t total = 0;
+    uint64_t hw_read = 0;
+    uint64_t hw_write = 0;
+    uint64_t hw_sync = 0;
+
     for (auto &line: lines) {
         auto word = SplitString(line, ' ');
         if (word.size() != 3)
-            continue;
-
-        if (word[1] == "Read") {
-            if (stat & IoStat::Write)
-                continue;
-        } else if (word[1] == "Write") {
-            if (stat & IoStat::Read)
-                continue;
-        } else
             continue;
 
         if (word[0] != prev) {
@@ -1042,13 +1036,39 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
             continue;
 
         uint64_t val;
-        if (!StringToUint64(word[2], val) && val) {
-            map[name] += val;
+        if (StringToUint64(word[2], val) || !val)
+            continue;
+
+        if (word[1] == "Read") {
+            if (stat & IoStat::Read)
+                map[name] += val;
             if (summ)
-                total += val;
+                hw_read += val;
+        } else if (word[1] == "Write") {
+            if (stat & IoStat::Write)
+                map[name] += val;
+            if (summ)
+                hw_write += val;
+        } else if (word[1] == "Sync") {
+            if (stat & IoStat::Sync)
+                map[name] += val;
+            if (summ)
+                hw_sync += val;
         }
     }
-    map["hw"] = total;
+
+    if (stat & IoStat::Read) {
+        map["hw"] = hw_read;
+    } else if (stat & IoStat::Write) {
+        map["hw"] = hw_write;
+    } else if (stat & IoStat::Sync) {
+        map["hw"] = hw_sync;
+    } else {
+        map["hw"] = hw_read + hw_write;
+        map["hw read"] = hw_read;
+        map["hw write"] = hw_write;
+        map["hw sync"] = hw_sync;
+    }
 
     return OK;
 }

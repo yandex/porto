@@ -1205,21 +1205,26 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("OOM-F", "oom_is_fatal", "OOM is fatal", ValueFlags::Raw | ValueFlags::Mem | ValueFlags::Porto);
 
     /* I/O */
-    AddColumn("Maj/s", "major_faults'", "Major page fault count", ValueFlags::Mem | ValueFlags::Io);
-    AddColumn("Min/s", "minor_faults'", "Minor page fault count", ValueFlags::Mem | ValueFlags::Io);
+    AddColumn("Maj/s", "major_faults'", "Major page fault count", ValueFlags::Mem);
+    AddColumn("Min/s", "minor_faults'", "Minor page fault count", ValueFlags::Mem);
 
     AddColumn("IO pol", "io_policy", "IO policy", ValueFlags::Raw | ValueFlags::Io | ValueFlags::Porto);
 
+    AddColumn("Read", "io_read[hw]' b", "IO bytes per second read from disk", ValueFlags::Io);
+    AddColumn("Write", "io_write[hw]' b", "IO bytes per second written to disk", ValueFlags::Io);
+
     AddColumn("IO depth", "io_time[hw]' 1e9", "Average hardware queue depth", ValueFlags::Io);
     AddColumn("IO wait", "io_wait[hw]' 1e9", "Average scheduler queue depth", ValueFlags::Io);
+    AddColumn("IO wsync", "io_wait[hw sync]' 1e9", "Average scheduler synchronous queue depth", ValueFlags::Io);
 
-    AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second", ValueFlags::Io);
-    AddColumn("IO read b/s", "io_read[hw]' b", "IO bytes read from disk", ValueFlags::Io);
-    AddColumn("IO write b/s", "io_write[hw]' b", "IO bytes written to disk", ValueFlags::Io);
+    AddColumn("IO op", "io_ops[hw]'", "IO operations per second", ValueFlags::Io);
+    AddColumn("IO sy", "io_ops[hw sync]'", "IO synchronous operations per second", ValueFlags::Io);
+    AddColumn("IO rd", "io_ops[hw read]'", "IO read operations per second", ValueFlags::Io);
+    AddColumn("IO wr", "io_ops[hw write]'", "IO write operations per second", ValueFlags::Io);
 
-    AddColumn("FS op/s", "io_ops[fs]'", "IO operations by fs", ValueFlags::Io);
-    AddColumn("FS read b/s", "io_read[fs]' b", "IO bytes read by fs", ValueFlags::Io);
-    AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs", ValueFlags::Io);
+    AddColumn("FS op", "io_ops[fs]'", "IO operations by fs", ValueFlags::Io);
+    AddColumn("FS read", "io_read[fs]' b", "IO bytes read by fs", ValueFlags::Io);
+    AddColumn("FS write", "io_write[fs]' b", "IO bytes written by fs", ValueFlags::Io);
 
     /* Network */
     AddColumn("Net", "net", "Network config", ValueFlags::NetState | ValueFlags::Net | ValueFlags::Porto);

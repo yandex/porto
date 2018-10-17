@@ -311,6 +311,7 @@ public:
         Iops = 4,
         Time = 8,
         Wait = 16,
+        Sync = 32,
     };
     TError GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const;
     TError SetIoWeight(TCgroup &cg, const std::string &policy, double weight) const;
