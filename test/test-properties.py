@@ -591,6 +591,7 @@ volume_spec = [
 'build_time',
 'device_name',
 'state',
+'st',
 'place',
 'owner',
 'path',
@@ -654,6 +655,7 @@ ExpectEq(p['place_key'], v.properties['place_key'])
 ExpectEq(p['device_name'], v.properties['device_name'])
 ExpectEq(p['auto_path'], True)
 ExpectEq(p['state'], 'ready')
+ExpectEq(p['st'], 2)
 ExpectEq(p['owner']['user'], v.properties['owner_user'])
 ExpectEq(p['owner']['group'], v.properties['owner_group'])
 ExpectEq(p['cred']['user'], v.properties['user'])

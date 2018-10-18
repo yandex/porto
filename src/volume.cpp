@@ -1440,22 +1440,20 @@ TPath TVolume::ComposePath(const TContainer &ct) const {
 
 std::string TVolume::StateName(EVolumeState state) {
     switch (state) {
-    case EVolumeState::Initial:
-        return "initial";
-    case EVolumeState::Building:
+    case EVolumeState::UNREADY:
+        return "unready";
+    case EVolumeState::BUILDING:
         return "building";
-    case EVolumeState::Ready:
+    case EVolumeState::READY:
         return "ready";
-    case EVolumeState::Tuning:
+    case EVolumeState::TUNING:
         return "tuning";
-    case EVolumeState::Unlinked:
+    case EVolumeState::UNLINKED:
         return "unlinked";
-    case EVolumeState::ToDestroy:
-        return "to-destroy";
-    case EVolumeState::Destroying:
-        return "destroying";
-    case EVolumeState::Destroyed:
-        return "destroyed";
+    case EVolumeState::DELETING:
+        return "deleting";
+    case EVolumeState::DELETED:
+        return "deleted";
     default:
         return "unknown";
     }
@@ -1464,7 +1462,7 @@ std::string TVolume::StateName(EVolumeState state) {
 void TVolume::SetState(EVolumeState state) {
     L("Change volume {} state {} -> {}", Path, StateName(State), StateName(state));
     State = state;
-    if (state == EVolumeState::Ready || state == EVolumeState::Destroyed)
+    if (state & (EVolumeState::READY | EVolumeState::DELETED))
         VolumesCv.notify_all();
 }
 
@@ -1614,7 +1612,7 @@ TError TVolume::ClaimPlace(uint64_t size) {
         return OK;
 
     if ((!size || size > ClaimedSpace) && !CL->IsInternalUser() &&
-            State != EVolumeState::Destroying) {
+            State != EVolumeState::DELETING) {
         for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
             ct->LockStateWrite();
 
@@ -1663,13 +1661,13 @@ TError TVolume::ClaimPlace(uint64_t size) {
 }
 
 TError TVolume::DependsOn(const TPath &path) {
-    if (State == EVolumeState::Ready && !path.Exists())
+    if (State == EVolumeState::READY && !path.Exists())
         return TError(EError::VolumeNotFound, "Volume {} depends on non-existent path {}", Path, path);
 
     auto link = ResolveOriginLocked(path);
     if (link) {
-        if (link->Volume->State != EVolumeState::Ready &&
-                link->Volume->State != EVolumeState::Tuning)
+        if (!(link->Volume->State & (EVolumeState::READY |
+                                     EVolumeState::TUNING)))
             return TError(EError::VolumeNotReady, "Volume {} depends on non-ready volume {}", Path, link->Volume->Path);
         L("Volume {} depends on volume {}", Path, link->Volume->Path);
         link->Volume->Nested.insert(shared_from_this());
@@ -1723,9 +1721,8 @@ TError TVolume::CheckConflicts(const TPath &path) {
         if (vol->Path.IsInside(path))
             return TError(EError::InvalidPath, "Volume path {} overlaps with volume {}", path, vol->Path);
 
-        if (path.IsInside(vol->Path) &&
-                vol->State != EVolumeState::Ready &&
-                vol->State != EVolumeState::Tuning)
+        if (path.IsInside(vol->Path) && !(vol->State & (EVolumeState::READY |
+                                                        EVolumeState::TUNING)))
             return TError(EError::VolumeNotReady, "Volume path {} inside volume {} and it is not ready", path, vol->Path);
 
         if (vol->Place.IsInside(path))
@@ -2316,9 +2313,9 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         return OK;
 
     auto volumes_lock = LockVolumes();
-    if (State != EVolumeState::Ready &&
-            State != EVolumeState::Tuning &&
-            State != EVolumeState::Building)
+    if (!(State & (EVolumeState::READY |
+                   EVolumeState::TUNING |
+                   EVolumeState::BUILDING)))
         return TError(EError::VolumeNotReady, "Volume {} not ready", Path);
 
     if (link->Volume.get() != this)
@@ -2511,7 +2508,7 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
 
         /* common link */
         if (it->first == link->Volume->Path) {
-            link->Volume->SetState(EVolumeState::Unlinked);
+            link->Volume->SetState(EVolumeState::UNLINKED);
             unlinked.emplace_back(link->Volume);
         }
 
@@ -2566,15 +2563,16 @@ TError TVolume::Delete() {
         auto &volume = (*it);
 
         if (Path != volume->Path) {
-            while (volume->State == EVolumeState::Building)
+            while (volume->State == EVolumeState::BUILDING)
                 VolumesCv.wait(volumes_lock);
         }
 
-        while (volume->State == EVolumeState::Destroying)
+        while (volume->State == EVolumeState::DELETING)
             VolumesCv.wait(volumes_lock);
 
-        if (volume->State != EVolumeState::Destroyed)
-            volume->SetState(EVolumeState::ToDestroy);
+        if (!(volume->State & (EVolumeState::UNLINKED |
+                               EVolumeState::DELETED)))
+            volume->SetState(EVolumeState::UNLINKED);
 
         for (auto &nested : volume->Nested) {
             if (nested == cycle) {
@@ -2620,13 +2618,13 @@ TError TVolume::Delete() {
 
     for (auto &volume : plan) {
 
-        while (volume->State == EVolumeState::Destroying)
+        while (volume->State == EVolumeState::DELETING)
             VolumesCv.wait(volumes_lock);
 
-        if (volume->State == EVolumeState::Destroyed)
+        if (volume->State == EVolumeState::DELETED)
             continue;
 
-        volume->SetState(EVolumeState::Destroying);
+        volume->SetState(EVolumeState::DELETING);
 
         /* unlink containers and umount targets */
         while (!volume->Links.empty()) {
@@ -2671,7 +2669,7 @@ TError TVolume::Delete() {
             volume->VolumeOwnerContainer = nullptr;
         }
 
-        volume->SetState(EVolumeState::Destroyed);
+        volume->SetState(EVolumeState::DELETED);
 
         volumes_lock.unlock();
 
@@ -2798,9 +2796,9 @@ TError TVolume::DeleteOne() {
 }
 
 TError TVolume::StatFS(TStatFS &result) {
-    if (State != EVolumeState::Ready &&
-            State != EVolumeState::Tuning &&
-            State != EVolumeState::Unlinked) {
+    if (!(State & (EVolumeState::READY |
+                   EVolumeState::TUNING |
+                   EVolumeState::UNLINKED))) {
         result.Reset();
         return TError(EError::VolumeNotReady, "Volume {} is not ready", Path);
     }
@@ -2821,11 +2819,11 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
     }
 
     auto volumes_lock = LockVolumes();
-    while (State == EVolumeState::Tuning)
+    while (State == EVolumeState::TUNING)
         VolumesCv.wait(volumes_lock);
-    if (State != EVolumeState::Ready)
+    if (State != EVolumeState::READY)
         return TError(EError::VolumeNotReady, "Volume not ready: " + Path.ToString());
-    SetState(EVolumeState::Tuning);
+    SetState(EVolumeState::TUNING);
     volumes_lock.unlock();
 
     if (properties.count(V_SPACE_LIMIT) || properties.count(V_INODE_LIMIT)) {
@@ -2893,8 +2891,8 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
 out:
 
     volumes_lock.lock();
-    if (State == EVolumeState::Tuning)
-        SetState(EVolumeState::Ready);
+    if (State == EVolumeState::TUNING)
+        SetState(EVolumeState::READY);
     volumes_lock.unlock();
 
     if (!error)
@@ -2932,14 +2930,14 @@ TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
             return TError(EError::VolumeAlreadyLinked, "Volume already linked");
     }
 
-    if (State != EVolumeState::Ready &&
-            State != EVolumeState::Tuning &&
-            State != EVolumeState::Building)
+    if (!(State & (EVolumeState::READY |
+                   EVolumeState::TUNING |
+                   EVolumeState::BUILDING)))
         return TError(EError::VolumeNotReady, "Volume not ready: {}", Path);
 
     /* Mount link if volume is ready */
-    if (target && (State == EVolumeState::Ready ||
-                   State == EVolumeState::Tuning)) {
+    if (target && (State & (EVolumeState::READY |
+                            EVolumeState::TUNING))) {
         host_target = container->RootPath / target;
         error = CheckConflicts(host_target);
         if (error)
@@ -3059,9 +3057,9 @@ next:
     L_ACT("Del volume {} link {} for CT{}:{}", Path, link->Target, container->Id, container->Name);
 
     Links.remove(link);
-    if (Links.empty() && (State == EVolumeState::Ready ||
-                          State == EVolumeState::Tuning)) {
-        SetState(EVolumeState::Unlinked);
+    if (Links.empty() && (State & (EVolumeState::READY |
+                                   EVolumeState::TUNING))) {
+        SetState(EVolumeState::UNLINKED);
         unlinked.emplace_back(shared_from_this());
     }
     container->VolumeLinks.remove(link);
@@ -3119,8 +3117,8 @@ TError TVolume::CheckRequired(TContainer &ct) {
         auto link = ResolveLinkLocked(ct.RootPath / path);
         if (!link)
             return TError(EError::VolumeNotFound, "Required volume {} not found", path);
-        if (link->Volume->State != EVolumeState::Ready &&
-                link->Volume->State != EVolumeState::Tuning)
+        if (!(link->Volume->State & (EVolumeState::READY |
+                                     EVolumeState::TUNING)))
             return TError(EError::VolumeNotReady, "Required volume {} not ready", path);
         link->Volume->HasDependentContainer = true;
     }
@@ -3152,8 +3150,8 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, Porto::TVolu
         ret[V_GROUP] = VolumeCred.Group();
     ret[V_PERMISSIONS] = fmt::format("{:#o}", VolumePermissions);
     ret[V_CREATOR] = Creator;
-    ret[V_READY] = BoolToString(State == EVolumeState::Ready ||
-                                State == EVolumeState::Tuning);
+    ret[V_READY] = BoolToString(State & (EVolumeState::READY |
+                                         EVolumeState::TUNING));
 
     ret[V_BUILD_TIME] = FormatTime(BuildTime);
     ret["build_time[raw]"] = std::to_string(BuildTime);
@@ -3215,6 +3213,8 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, Porto::TVolu
             l->set_required(true);
     }
 
+    dump->set_st(State);
+
     volumes_lock.unlock();
 
     TStatFS stat;
@@ -3242,9 +3242,8 @@ TError TVolume::Save() {
 
     auto volumes_lock = LockVolumes();
 
-    if (State == EVolumeState::ToDestroy ||
-            State == EVolumeState::Destroying ||
-            State == EVolumeState::Destroyed)
+    if (State & (EVolumeState::DELETING |
+                 EVolumeState::DELETED))
         return OK;
 
     ChangeTime = time(nullptr);
@@ -3275,8 +3274,8 @@ TError TVolume::Save() {
         node.Set(V_GROUP, VolumeCred.Group());
 
     node.Set(V_PERMISSIONS, fmt::format("{:#o}", VolumePermissions));
-    node.Set(V_READY, BoolToString(State == EVolumeState::Ready ||
-                                   State == EVolumeState::Tuning));
+    node.Set(V_READY, BoolToString(State & (EVolumeState::READY |
+                                            EVolumeState::TUNING)));
     node.Set(V_PRIVATE, Private);
     if (!Labels.empty())
         node.Set(V_LABELS, StringMapToString(Labels));
@@ -3594,7 +3593,7 @@ TError TVolume::Create(const Porto::TVolume &spec,
     volume->VolumeOwnerContainer = owner;
     owner->OwnedVolumes.push_back(volume);
 
-    volume->SetState(EVolumeState::Building);
+    volume->SetState(EVolumeState::BUILDING);
 
     volumes_lock.unlock();
 
@@ -3658,7 +3657,7 @@ next_link:
     }
 
     /* Complete costriction */
-    volume->SetState(EVolumeState::Ready);
+    volume->SetState(EVolumeState::READY);
     common_link->Busy = false;
     volumes_lock.unlock();
 
@@ -3739,7 +3738,7 @@ void TVolume::RestoreAll(void) {
             continue;
         }
 
-        if (volume->State != EVolumeState::Ready) {
+        if (volume->State != EVolumeState::READY) {
             L("Volume {} is not ready ({}) and will be removed", volume->Path, StateName(volume->State));
             broken_volumes.push_back(volume);
             continue;
@@ -3757,7 +3756,7 @@ void TVolume::RestoreAll(void) {
 
         if (!volume->Links.size()) {
             L("Volume {} has no linked containers", volume->Path);
-            volume->SetState(EVolumeState::Unlinked);
+            volume->SetState(EVolumeState::UNLINKED);
             broken_volumes.push_back(volume);
             continue;
         }
@@ -3991,7 +3990,7 @@ TError TVolume::ParseConfig(const TStringMap &cfg, Porto::TVolume &spec) {
                 v = time(nullptr);
             spec.set_build_time(v);
         } else if (key == V_READY) {
-            spec.set_state(val == "true" ? "ready" : "unknown");
+            spec.set_state(val == "true" ? "ready" : "unready");
         } else if (key == V_STATE) {
             spec.set_state(val);
         } else
@@ -4047,7 +4046,7 @@ TError TVolume::Load(const Porto::TVolume &spec, bool full) {
         VolumePermissions = spec.permissions();
 
     if (spec.has_state() && full)
-        SetState(spec.state() == "ready" ? EVolumeState::Ready : EVolumeState::ToDestroy);
+        SetState(spec.state() == "ready" ? EVolumeState::READY : EVolumeState::UNREADY);
 
     if (spec.has_private_value())
         Private = spec.private_value();
@@ -4092,6 +4091,7 @@ void TVolume::Dump(Porto::TVolume &spec, bool full) {
         spec.set_auto_path(true);
 
     spec.set_id(Id);
+    spec.set_st(State);
     spec.set_state(StateName(State));
     spec.set_backend(BackendType);
 

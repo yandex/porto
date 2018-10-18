@@ -788,6 +788,16 @@ message TContainer {
 
 // Volumes
 
+enum EVolumeState {
+   UNREADY = 0;      // "unready"
+   BUILDING = 1;     // "building"
+   READY = 2;        // "ready"
+   UNLINKED = 4;     // "unlinked"
+   TUNING = 8;       // "tuning"
+   DELETING = 16;    // "deleting"
+   DELETED = 32;     // "deleted"
+};
+
 message TVolumeProperty {
     optional string name = 1;
     optional string value = 2;
@@ -803,6 +813,7 @@ message TVolumeDescription {
 
     optional uint64 change_time = 5;    // sec since epoch
     optional bool no_changes = 6;       // change_time < changed_since
+    optional EVolumeState st = 7;
 }
 
 
@@ -845,6 +856,7 @@ message TVolume {
 
     optional string id = 4;                 // out
     optional string state = 5;              // out
+    optional EVolumeState st = 16;          // out
 
     optional string private_value = 6;      // at most 4096 bytes
 

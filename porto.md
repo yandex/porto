@@ -1244,13 +1244,13 @@ Like for container volume configuration is a set of key-value pairs.
 * **change\_time\[raw\]**  - seconds since the epoch
 
 * **state**         - volume state
-    - *initial*
+    - *unready*
     - *building*
     - *ready*
     - *unlinked*
-    - *to-destroy*
-    - *destroying*
-    - *destroyed*
+    - *tuning*
+    - *deleting*
+    - *deleted*
 
 * **private**       - 4096 bytes of user-defined text
 

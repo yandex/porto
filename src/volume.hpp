@@ -52,20 +52,11 @@ constexpr const char *V_PLACE = "place";
 constexpr const char *V_PLACE_KEY = "place_key";
 constexpr const char *V_DEVICE_NAME = "device_name";
 
+using Porto::EVolumeState;
+
 class TVolume;
 class TContainer;
 class TKeyValue;
-
-enum class EVolumeState {
-    Initial,
-    Building,
-    Ready,
-    Tuning,
-    Unlinked,
-    ToDestroy,
-    Destroying,
-    Destroyed,
-};
 
 class TVolumeBackend {
 public:
@@ -121,7 +112,7 @@ public:
     std::string BackendType;
     std::string Id;
 
-    EVolumeState State = EVolumeState::Initial;
+    EVolumeState State = EVolumeState::UNREADY;
     static std::string StateName(EVolumeState state);
     void SetState(EVolumeState state);
 
