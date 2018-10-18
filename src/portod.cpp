@@ -696,7 +696,7 @@ again:
 
             bool found = false;
             for (auto &it: Containers) {
-                if (it.second->State != EContainerState::Stopped &&
+                if (it.second->State != EContainerState::STOPPED &&
                         it.second->GetCgroup(*hy) == *cg) {
                     found = true;
                     break;
@@ -733,7 +733,7 @@ static void CleanupWorkdir() {
     for (auto &name: list) {
         auto it = Containers.find(name);
         if (it != Containers.end() &&
-                it->second->State != EContainerState::Stopped)
+                it->second->State != EContainerState::STOPPED)
             continue;
         TPath path = temp / name;
         error = RemoveRecursive(path);

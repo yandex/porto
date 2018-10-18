@@ -1109,7 +1109,7 @@ noinline TError WaitContainers(const Porto::TWaitRequest &req, bool async,
     }
 
     if (req.has_timeout_ms() && req.timeout_ms() == 0) {
-        client->MakeReport("", EContainerState::Undefined, async);
+        client->MakeReport("", EContainerState::UNDEFINED, async);
     } else {
         waiter->Activate(client);
         if (req.timeout_ms()) {
@@ -1611,8 +1611,8 @@ noinline TError AttachProcess(const Porto::TAttachProcessRequest &req, bool thre
     if (!newCt->IsChildOf(*oldCt))
         return TError(EError::Permission, "new container must be child of current");
 
-    if (!(newCt->State & (EContainerState::Running |
-                          EContainerState::Meta)))
+    if (!(newCt->State & (EContainerState::RUNNING |
+                          EContainerState::META)))
         return TError(EError::InvalidState, "new container is not running");
 
     for (auto ct = newCt; ct && ct != oldCt; ct = ct->Parent)

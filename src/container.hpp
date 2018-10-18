@@ -96,13 +96,13 @@ public:
     const std::string Name;
     const std::string FirstName;
 
-    EContainerState State = EContainerState::Stopped;
+    EContainerState State = EContainerState::STOPPED;
     std::atomic<int> RunningChildren;
     std::atomic<int> StartingChildren;
 
     bool HasResources() const {
-        return !(State & (EContainerState::Stopped |
-                          EContainerState::Destroyed));
+        return !(State & (EContainerState::STOPPED |
+                          EContainerState::DESTROYED));
     }
 
     /* protected with ContainersMutex */

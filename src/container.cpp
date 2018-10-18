@@ -158,7 +158,7 @@ TError TContainer::LockAction(std::unique_lock<std::mutex> &containers_lock, boo
     L_DBG("LockAction{} CT{}:{}", (shared ? "Shared" : ""), Id, Name);
 
     while (1) {
-        if (State == EContainerState::Destroyed) {
+        if (State == EContainerState::DESTROYED) {
             L_DBG("Lock failed, CT{}:{} was destroyed", Id, Name);
             return TError(EError::ContainerDoesNotExist, "Container was destroyed");
         }
@@ -322,8 +322,8 @@ void TContainer::Unregister() {
     if (error)
         L_WRN("Cannot put CT{}:{} id: {}", Id, Name, error);
 
-    PORTO_ASSERT(State == EContainerState::Stopped);
-    State = EContainerState::Destroyed;
+    PORTO_ASSERT(State == EContainerState::STOPPED);
+    State = EContainerState::DESTROYED;
 }
 
 TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name) :
@@ -610,7 +610,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     ct->TestClearPropDirty(EProperty::RESOLV_CONF);
 
     /* Restore cgroups only for running containers */
-    if (!(ct->State & (EContainerState::Stopped | EContainerState::Dead))) {
+    if (!(ct->State & (EContainerState::STOPPED | EContainerState::DEAD))) {
 
         error = TNetwork::RestoreNetwork(*ct);
         if (error)
@@ -680,18 +680,18 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
             goto err;
     }
 
-    if (ct->State == EContainerState::Dead && ct->AutoRespawn)
+    if (ct->State == EContainerState::DEAD && ct->AutoRespawn)
         ct->ScheduleRespawn();
 
     /* Do not apply dynamic properties to dead container */
-    if (ct->State == EContainerState::Dead)
+    if (ct->State == EContainerState::DEAD)
         memset(ct->PropDirty, 0, sizeof(ct->PropDirty));
 
     error = ct->Save();
     if (error)
         goto err;
 
-    if (ct->State == EContainerState::Stopped)
+    if (ct->State == EContainerState::STOPPED)
         ct->RemoveWorkDir();
 
     SystemClient.ReleaseContainer();
@@ -700,7 +700,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
 err:
     TNetwork::StopNetwork(*ct);
-    ct->SetState(EContainerState::Stopped);
+    ct->SetState(EContainerState::STOPPED);
     ct->RemoveWorkDir();
     lock.lock();
     SystemClient.ReleaseContainer(true);
@@ -711,47 +711,49 @@ err:
 
 std::string TContainer::StateName(EContainerState state) {
     switch (state) {
-    case EContainerState::Stopped:
+    case EContainerState::STOPPED:
         return "stopped";
-    case EContainerState::Dead:
+    case EContainerState::DEAD:
         return "dead";
-    case EContainerState::Respawning:
+    case EContainerState::RESPAWNING:
         return "respawning";
-    case EContainerState::Starting:
+    case EContainerState::STARTING:
         return "starting";
-    case EContainerState::Running:
+    case EContainerState::RUNNING:
         return "running";
-    case EContainerState::Stopping:
+    case EContainerState::STOPPING:
         return "stopping";
-    case EContainerState::Paused:
+    case EContainerState::PAUSED:
         return "paused";
-    case EContainerState::Meta:
+    case EContainerState::META:
         return "meta";
-    case EContainerState::Destroyed:
+    case EContainerState::DESTROYED:
         return "destroyed";
     default:
-        return "unknown";
+        return "undefined";
     }
 }
 
 EContainerState TContainer::ParseState(const std::string &name) {
     if (name == "stopped")
-        return EContainerState::Stopped;
+        return EContainerState::STOPPED;
     if (name == "dead")
-        return EContainerState::Dead;
+        return EContainerState::DEAD;
     if (name == "respawning")
-        return EContainerState::Respawning;
+        return EContainerState::RESPAWNING;
     if (name == "starting")
-        return EContainerState::Starting;
+        return EContainerState::STARTING;
     if (name == "running")
-        return EContainerState::Running;
+        return EContainerState::RUNNING;
     if (name == "stopping")
-        return EContainerState::Stopping;
+        return EContainerState::STOPPING;
     if (name == "paused")
-        return EContainerState::Paused;
+        return EContainerState::PAUSED;
     if (name == "meta")
-        return EContainerState::Meta;
-    return EContainerState::Destroyed;
+        return EContainerState::META;
+    if (name == "destroyed")
+        return EContainerState::DESTROYED;
+    return EContainerState::UNDEFINED;
 }
 
 TError TContainer::ValidLabel(const std::string &label, const std::string &value) {
@@ -929,7 +931,7 @@ TPath TContainer::GetCwd() const {
 }
 
 int TContainer::GetExitCode() const {
-    if (!(State & (EContainerState::Dead | EContainerState::Respawning)))
+    if (!(State & (EContainerState::DEAD | EContainerState::RESPAWNING)))
         return 256;
     if (OomKilled)
         return -99;
@@ -950,8 +952,8 @@ TError TContainer::UpdateSoftLimit() {
 
         /* Set memory soft limit for dead or hollow meta containers */
         if (ct->PressurizeOnDeath &&
-                (ct->State == EContainerState::Dead ||
-                 (ct->State == EContainerState::Meta &&
+                (ct->State == EContainerState::DEAD ||
+                 (ct->State == EContainerState::META &&
                   !ct->RunningChildren && !ct->StartingChildren)))
             lim = config().container().dead_memory_soft_limit();
 
@@ -978,37 +980,37 @@ void TContainer::SetState(EContainerState next) {
     auto prev = State;
     State = next;
 
-    if (prev == EContainerState::Starting || next == EContainerState::Starting) {
+    if (prev == EContainerState::STARTING || next == EContainerState::STARTING) {
         for (auto p = Parent; p; p = p->Parent)
-            p->StartingChildren += next == EContainerState::Starting ? 1 : -1;
+            p->StartingChildren += next == EContainerState::STARTING ? 1 : -1;
     }
 
-    if (prev == EContainerState::Running || next == EContainerState::Running) {
+    if (prev == EContainerState::RUNNING || next == EContainerState::RUNNING) {
         for (auto p = Parent; p; p = p->Parent)
-            p->RunningChildren += next == EContainerState::Running ? 1 : -1;
+            p->RunningChildren += next == EContainerState::RUNNING ? 1 : -1;
     }
 
-    if (next == EContainerState::Dead && AutoRespawn)
+    if (next == EContainerState::DEAD && AutoRespawn)
         ScheduleRespawn();
 
     DowngradeStateLock();
 
-    if (prev == EContainerState::Running || next == EContainerState::Running) {
+    if (prev == EContainerState::RUNNING || next == EContainerState::RUNNING) {
         for (auto p = Parent; p; p = p->Parent)
-            if (!p->RunningChildren && p->State == EContainerState::Meta)
+            if (!p->RunningChildren && p->State == EContainerState::META)
                 TContainerWaiter::ReportAll(*p);
     }
 
     std::string label, value;
 
-    if ((State & (EContainerState::Stopped |
-                  EContainerState::Dead |
-                  EContainerState::Respawning)) &&
+    if ((State & (EContainerState::STOPPED |
+                  EContainerState::DEAD |
+                  EContainerState::RESPAWNING)) &&
                 StartError) {
         label = P_START_ERROR;
         value = StartError.ToString();
-    } else if (State & (EContainerState::Dead |
-                        EContainerState::Respawning)) {
+    } else if (State & (EContainerState::DEAD |
+                        EContainerState::RESPAWNING)) {
         label = P_EXIT_CODE;
         value = std::to_string(GetExitCode());
     }
@@ -1023,7 +1025,7 @@ TError TContainer::Destroy(std::list<std::shared_ptr<TVolume>> &unlinked) {
 
     L_ACT("Destroy CT{}:{}", Id, Name);
 
-    if (State != EContainerState::Stopped) {
+    if (State != EContainerState::STOPPED) {
         error = Stop(0);
         if (error)
             return error;
@@ -1275,7 +1277,7 @@ uint64_t TContainer::GetTotalMemGuarantee(bool containers_locked) const {
     uint64_t sum = 0lu;
 
     /* Stopped container doesn't have memory guarantees */
-    if (State == EContainerState::Stopped)
+    if (State == EContainerState::STOPPED)
         return 0;
 
     if (!containers_locked)
@@ -1557,8 +1559,8 @@ TError TContainer::DistributeCpus() {
     subtree.reverse();
 
     for (auto &parent: subtree) {
-        if (parent->State & (EContainerState::Stopped |
-                             EContainerState::Dead))
+        if (parent->State & (EContainerState::STOPPED |
+                             EContainerState::DEAD))
             continue;
 
         auto childs = parent->Childs();
@@ -1572,8 +1574,8 @@ TError TContainer::DistributeCpus() {
         for (auto type: order) {
             for (auto &ct: childs) {
                 if (ct->CpuSetType != type ||
-                        (ct->State & (EContainerState::Stopped |
-                                      EContainerState::Dead)))
+                        (ct->State & (EContainerState::STOPPED |
+                                      EContainerState::DEAD)))
                     continue;
 
                 ct->CpuVacant.Clear();
@@ -1645,8 +1647,8 @@ TError TContainer::DistributeCpus() {
     for (auto &ct: subtree) {
         if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
                 !ct->TestPropDirty(EProperty::CPU_SET_AFFINITY) ||
-                (ct->State & (EContainerState::Stopped |
-                              EContainerState::Dead)))
+                (ct->State & (EContainerState::STOPPED |
+                              EContainerState::DEAD)))
             continue;
 
         auto cg = ct->GetCgroup(CpusetSubsystem);
@@ -1666,8 +1668,8 @@ TError TContainer::DistributeCpus() {
     for (auto &ct: subtree) {
         if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
                 !ct->TestClearPropDirty(EProperty::CPU_SET_AFFINITY) ||
-                (ct->State & (EContainerState::Stopped |
-                              EContainerState::Dead)))
+                (ct->State & (EContainerState::STOPPED |
+                              EContainerState::DEAD)))
             continue;
 
         auto cg = ct->GetCgroup(CpusetSubsystem);
@@ -1699,9 +1701,9 @@ TError TContainer::ApplyCpuGuarantee() {
         auto ct_lock = LockContainers();
         CpuGuaranteeSum = 0;
         for (auto child: Children) {
-            if (child->State & (EContainerState::Running |
-                                EContainerState::Meta |
-                                EContainerState::Starting))
+            if (child->State & (EContainerState::RUNNING |
+                                EContainerState::META |
+                                EContainerState::STARTING))
                 CpuGuaranteeSum += std::max(child->CpuGuarantee, child->CpuGuaranteeSum);
         }
         ct_lock.unlock();
@@ -1730,15 +1732,15 @@ void TContainer::PropagateCpuLimit() {
     for (auto ct = this; ct; ct = ct->Parent.get()) {
         uint64_t sum = 0;
 
-        if (ct->State == EContainerState::Running ||
-                (ct->State == EContainerState::Starting && !ct->IsMeta()))
+        if (ct->State == EContainerState::RUNNING ||
+                (ct->State == EContainerState::STARTING && !ct->IsMeta()))
             sum += ct->CpuLimit ?: max;
 
         for (auto &child: ct->Children) {
-            if (child->State == EContainerState::Running ||
-                    (child->State == EContainerState::Starting && !child->IsMeta()))
+            if (child->State == EContainerState::RUNNING ||
+                    (child->State == EContainerState::STARTING && !child->IsMeta()))
                 sum += child->CpuLimit ?: max;
-            else if (child->State == EContainerState::Meta)
+            else if (child->State == EContainerState::META)
                 sum += std::min(child->CpuLimit ?: max, child->CpuLimitSum);
         }
 
@@ -1794,7 +1796,7 @@ TError TContainer::ApplyCpuLimit() {
 
     if (limit && (limit < CpuLimitCur || !CpuLimitCur)) {
         for (auto &ct: subtree)
-            if (ct.get() != this && ct->State != EContainerState::Stopped &&
+            if (ct.get() != this && ct->State != EContainerState::STOPPED &&
                     (ct->Controllers & CGROUP_CPU) && ct->CpuLimitCur > limit)
                 ct->SetCpuLimit(limit);
     }
@@ -1804,7 +1806,7 @@ TError TContainer::ApplyCpuLimit() {
         return error;
 
     for (auto &ct: subtree) {
-        if (ct.get() != this && ct->State != EContainerState::Stopped &&
+        if (ct.get() != this && ct->State != EContainerState::STOPPED &&
                 (ct->Controllers & CGROUP_CPU)) {
             uint64_t limit = ct->CpuLimit;
             for (auto *p = ct->Parent.get(); p && limit; p = p->Parent.get())
@@ -2017,8 +2019,8 @@ TError TContainer::ApplyDynamicProperties() {
 
     if (TestClearPropDirty(EProperty::ULIMIT)) {
         for (auto &ct: Subtree()) {
-            if (ct->State & (EContainerState::Stopped |
-                             EContainerState::Dead))
+            if (ct->State & (EContainerState::STOPPED |
+                             EContainerState::DEAD))
                 continue;
             error = ct->ApplyUlimits();
             if (error) {
@@ -2098,7 +2100,7 @@ TError TContainer::ApplyDeviceConf() const {
             return error;
     }
 
-    if (State != EContainerState::Starting && Task.Pid && !RootPath.IsRoot()) {
+    if (State != EContainerState::STARTING && Task.Pid && !RootPath.IsRoot()) {
         error = Devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
         if (error)
             return error;
@@ -2225,7 +2227,7 @@ TError TContainer::PrepareCgroups() {
         /* Nested cgroup makes a copy from parent at creation */
         if ((Level == 1 || TPath(devcg.Name).IsSimple()) && !HostMode) {
             /* at restore child cgroups blocks reset */
-            error = RootContainer->Devices.Apply(devcg, State == EContainerState::Starting);
+            error = RootContainer->Devices.Apply(devcg, State == EContainerState::STARTING);
             if (error)
                 return error;
         }
@@ -2570,8 +2572,8 @@ TError TContainer::StartParents() {
     if (FreezerSubsystem.IsFrozen(cg))
         return TError(EError::InvalidState, "Parent container is frozen");
 
-    if (Parent->State & (EContainerState::Running |
-                         EContainerState::Meta))
+    if (Parent->State & (EContainerState::RUNNING |
+                         EContainerState::META))
         return OK;
 
     auto current = CL->LockedContainer;
@@ -2579,8 +2581,8 @@ TError TContainer::StartParents() {
     std::shared_ptr<TContainer> target;
     do {
         target = Parent;
-        while (target->Parent && target->Parent->State != EContainerState::Running &&
-                target->Parent->State != EContainerState::Meta)
+        while (target->Parent && target->Parent->State != EContainerState::RUNNING &&
+                target->Parent->State != EContainerState::META)
             target = target->Parent;
 
         CL->ReleaseContainer();
@@ -2743,7 +2745,7 @@ TError TContainer::PrepareStart() {
 TError TContainer::Start() {
     TError error;
 
-    if (State != EContainerState::Stopped)
+    if (State != EContainerState::STOPPED)
         return TError(EError::InvalidState, "Cannot start container {} in state {}", Name, StateName(State));
 
     error = StartParents();
@@ -2760,7 +2762,7 @@ TError TContainer::Start() {
 
     L_ACT("Start CT{}:{}", Id, Name);
 
-    SetState(EContainerState::Starting);
+    SetState(EContainerState::STARTING);
 
     StartTime = GetCurrentTimeMs();
     RealStartTime = time(nullptr);
@@ -2790,15 +2792,15 @@ TError TContainer::Start() {
     UpgradeActionLock();
 
     if (error) {
-        SetState(EContainerState::Stopping);
+        SetState(EContainerState::STOPPING);
         (void)Terminate(0);
         goto err;
     }
 
     if (IsMeta())
-        SetState(EContainerState::Meta);
+        SetState(EContainerState::META);
     else
-        SetState(EContainerState::Running);
+        SetState(EContainerState::RUNNING);
 
     SetProp(EProperty::ROOT_PID);
 
@@ -2819,7 +2821,7 @@ err:
     FreeResources();
 err_prepare:
     StartError = error;
-    SetState(EContainerState::Stopped);
+    SetState(EContainerState::STOPPED);
     Statistics->ContainersFailedStart++;
 
     return error;
@@ -2936,7 +2938,7 @@ void TContainer::FreeResources() {
 }
 
 TError TContainer::Kill(int sig) {
-    if (State != EContainerState::Running)
+    if (State != EContainerState::RUNNING)
         return TError(EError::InvalidState, "invalid container state ");
 
     L_ACT("Kill task {} in CT{}:{}", Task.Pid, Id, Name);
@@ -3021,7 +3023,7 @@ TError TContainer::Stop(uint64_t timeout) {
     auto freezer = GetCgroup(FreezerSubsystem);
     TError error;
 
-    if (State == EContainerState::Stopped)
+    if (State == EContainerState::STOPPED)
         return OK;
 
     if (!(Controllers & CGROUP_FREEZER) && !JobMode) {
@@ -3046,10 +3048,10 @@ TError TContainer::Stop(uint64_t timeout) {
     for (auto &ct : subtree) {
         auto cg = ct->GetCgroup(FreezerSubsystem);
 
-        if (ct->IsRoot() || ct->State == EContainerState::Stopped)
+        if (ct->IsRoot() || ct->State == EContainerState::STOPPED)
             continue;
 
-        ct->SetState(EContainerState::Stopping);
+        ct->SetState(EContainerState::STOPPING);
         error = ct->Terminate(deadline);
         if (error)
             L_ERR("Cannot terminate tasks in CT{}:{}: {}", ct->Id, ct->Name, error);
@@ -3066,7 +3068,7 @@ TError TContainer::Stop(uint64_t timeout) {
         CL->LockedContainer->UpgradeActionLock();
 
     for (auto &ct: subtree) {
-        if (ct->State == EContainerState::Stopped)
+        if (ct->State == EContainerState::STOPPED)
             continue;
 
         L_ACT("Stop CT{}:{}", Id, Name);
@@ -3098,7 +3100,7 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->FreeRuntimeResources();
         ct->FreeResources();
 
-        ct->SetState(EContainerState::Stopped);
+        ct->SetState(EContainerState::STOPPED);
 
         error = ct->Save();
         if (error)
@@ -3135,7 +3137,7 @@ void TContainer::Reap(bool oomKilled) {
     Stdout.Rotate(*this);
     Stderr.Rotate(*this);
 
-    SetState(EContainerState::Dead);
+    SetState(EContainerState::DEAD);
 
     FreeRuntimeResources();
 
@@ -3146,7 +3148,7 @@ void TContainer::Reap(bool oomKilled) {
 
 void TContainer::Exit(int status, bool oomKilled) {
 
-    if (State == EContainerState::Stopped)
+    if (State == EContainerState::STOPPED)
         return;
 
     /* SIGKILL could be delivered earlier than OOM event */
@@ -3175,14 +3177,14 @@ void TContainer::Exit(int status, bool oomKilled) {
     }
 
     for (auto &ct: Subtree()) {
-        if (ct->State != EContainerState::Stopped &&
-                ct->State != EContainerState::Dead)
+        if (ct->State != EContainerState::STOPPED &&
+                ct->State != EContainerState::DEAD)
             ct->Reap(oomKilled);
     }
 }
 
 TError TContainer::Pause() {
-    if (State != EContainerState::Running && State != EContainerState::Meta)
+    if (State != EContainerState::RUNNING && State != EContainerState::META)
         return TError(EError::InvalidState, "Contaner not running");
 
     if (!(Controllers & CGROUP_FREEZER))
@@ -3194,8 +3196,8 @@ TError TContainer::Pause() {
         return error;
 
     for (auto &ct: Subtree()) {
-        if (ct->State & (EContainerState::Running | EContainerState::Meta)) {
-            ct->SetState(EContainerState::Paused);
+        if (ct->State & (EContainerState::RUNNING | EContainerState::META)) {
+            ct->SetState(EContainerState::PAUSED);
             ct->PropagateCpuLimit();
             error = ct->Save();
             if (error)
@@ -3225,8 +3227,8 @@ TError TContainer::Resume() {
         auto cg = ct->GetCgroup(FreezerSubsystem);
         if (FreezerSubsystem.IsSelfFreezing(cg))
             FreezerSubsystem.Thaw(cg, false);
-        if (ct->State == EContainerState::Paused) {
-            ct->SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
+        if (ct->State == EContainerState::PAUSED) {
+            ct->SetState(IsMeta() ? EContainerState::META : EContainerState::RUNNING);
             ct->PropagateCpuLimit();
         }
         error = ct->Save();
@@ -3238,13 +3240,13 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::MayRespawn() {
-    if (!(State & (EContainerState::Dead |
-                   EContainerState::Respawning)))
+    if (!(State & (EContainerState::DEAD |
+                   EContainerState::RESPAWNING)))
         return TError(EError::InvalidState, "Cannot respawn: container in state={}", TContainer::StateName(State));
 
-    if (!(Parent->State & (EContainerState::Running |
-                           EContainerState::Meta |
-                           EContainerState::Respawning)))
+    if (!(Parent->State & (EContainerState::RUNNING |
+                           EContainerState::META |
+                           EContainerState::RESPAWNING)))
         return TError(EError::InvalidState, "Cannot respawn: parent container in state={}", TContainer::StateName(Parent->State));
 
     if (RespawnLimit && RespawnCount >= RespawnLimit)
@@ -3256,9 +3258,9 @@ TError TContainer::MayRespawn() {
 TError TContainer::ScheduleRespawn() {
     TError error = MayRespawn();
     if (!error) {
-        L_ACT("Change CT{}:{} state {} -> {}", Id, Name, StateName(State), StateName(EContainerState::Respawning));
-        State = EContainerState::Respawning;
-        if (Parent->State == EContainerState::Respawning) {
+        L_ACT("Change CT{}:{} state {} -> {}", Id, Name, StateName(State), StateName(EContainerState::RESPAWNING));
+        State = EContainerState::RESPAWNING;
+        if (Parent->State == EContainerState::RESPAWNING) {
             L_ACT("Respawn CT{}:{} after respawning parent", Id, Name);
         } else {
             L_ACT("Respawn CT{}:{} after {} ms", Id, Name, RespawnDelay / 1000000);
@@ -3274,14 +3276,14 @@ TError TContainer::Respawn() {
 
     error = MayRespawn();
     if (error) {
-        if (State == EContainerState::Respawning)
-            SetState(EContainerState::Dead);
+        if (State == EContainerState::RESPAWNING)
+            SetState(EContainerState::DEAD);
         return error;
     }
 
-    if (Parent->State == EContainerState::Respawning) {
-        if (State != EContainerState::Respawning)
-            SetState(EContainerState::Respawning);
+    if (Parent->State == EContainerState::RESPAWNING) {
+        if (State != EContainerState::RESPAWNING)
+            SetState(EContainerState::RESPAWNING);
         L_ACT("Respawn CT{}:{} after respawning parent", Id, Name);
         return OK;
     }
@@ -3323,9 +3325,9 @@ TError TContainer::Respawn() {
     }
 
     if (IsMeta())
-        SetState(EContainerState::Meta);
+        SetState(EContainerState::META);
     else
-        SetState(EContainerState::Running);
+        SetState(EContainerState::RUNNING);
 
     SetProp(EProperty::ROOT_PID);
 
@@ -3340,7 +3342,7 @@ TError TContainer::Respawn() {
 
     for (auto &child: Childs()) {
         child->LockStateWrite();
-        if (child->State == EContainerState::Respawning || child->AutoRespawn)
+        if (child->State == EContainerState::RESPAWNING || child->AutoRespawn)
             child->ScheduleRespawn();
         child->UnlockState();
     }
@@ -3359,7 +3361,7 @@ err_prepare:
 
     Statistics->ContainersFailedStart++;
     L("Cannot respawn CT{}:{} - {}", Id, Name, error);
-    SetState(EContainerState::Dead);
+    SetState(EContainerState::DEAD);
     (void)Save();
     return error;
 }
@@ -3408,7 +3410,7 @@ TError TContainer::HasProperty(const std::string &property) const {
                 return GetLabel(property, type);
             }
 
-            if (State == EContainerState::Stopped)
+            if (State == EContainerState::STOPPED)
                 return TError(EError::InvalidState, "Not available in stopped state");
 
             for (auto subsys: Subsystems) {
@@ -3435,7 +3437,7 @@ TError TContainer::HasProperty(const std::string &property) const {
         return TError(EError::NoValue, "Property not set");
 
     if (prop->RequireControllers) {
-        if (State == EContainerState::Stopped)
+        if (State == EContainerState::STOPPED)
             return TError(EError::InvalidState, "Not available in stopped state");
         if (!(prop->RequireControllers & Controllers))
             return TError(EError::NoValue, "Controllers is disabled");
@@ -3464,7 +3466,7 @@ TError TContainer::GetProperty(const std::string &origProperty, std::string &val
                 return GetLabel(property, value);
             }
 
-            if (State == EContainerState::Stopped)
+            if (State == EContainerState::STOPPED)
                 return TError(EError::InvalidState,
                         "Not available in stopped state: " + property);
             for (auto subsys: Subsystems) {
@@ -3649,7 +3651,7 @@ TError TContainer::Save(void) {
 
         /* Temporary hack for backward migration */
         if (knob.second->Prop == EProperty::STATE &&
-                State == EContainerState::Respawning)
+                State == EContainerState::RESPAWNING)
             value = "dead";
 
         node.Set(knob.first, value);
@@ -3664,7 +3666,7 @@ TError TContainer::Save(void) {
 }
 
 TError TContainer::Load(const TKeyValue &node) {
-    EContainerState state = EContainerState::Destroyed;
+    EContainerState state = EContainerState::UNDEFINED;
     uint64_t controllers = 0;
     TError error;
 
@@ -3707,22 +3709,23 @@ TError TContainer::Load(const TKeyValue &node) {
 
         if (error) {
             L_ERR("Cannot load {} : {}", key, error);
-            state = EContainerState::Dead;
+            state = EContainerState::DEAD;
             break;
         }
 
         SetProp(prop->Prop);
     }
 
-    if (state != EContainerState::Destroyed) {
+    if (state != EContainerState::UNDEFINED &&
+            state != EContainerState::DESTROYED) {
         UnlockState();
         SetState(state);
         LockStateWrite();
         SetProp(EProperty::STATE);
     } else
-        error = TError("Container has no state");
+        error = TError("Container in state {}", StateName(state));
 
-    if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped)
+    if (!node.Has(P_CONTROLLERS) && State != EContainerState::STOPPED)
         Controllers = RootContainer->Controllers;
 
     if (Level == 1 && CpusetSubsystem.Supported &&
@@ -3801,33 +3804,33 @@ void TContainer::SyncState() {
     L_ACT("Sync CT{}:{} state {}", Id, Name, StateName(State));
 
     if (!freezerCg.Exists()) {
-        if (State != EContainerState::Stopped &&
-                State != EContainerState::Stopping)
+        if (State != EContainerState::STOPPED &&
+                State != EContainerState::STOPPING)
             L_WRN("Freezer not found");
         ForgetPid();
-        SetState(EContainerState::Stopped);
+        SetState(EContainerState::STOPPED);
         return;
     }
 
-    if (State & (EContainerState::Starting |
-                 EContainerState::Respawning))
-        SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
+    if (State & (EContainerState::STARTING |
+                 EContainerState::RESPAWNING))
+        SetState(IsMeta() ? EContainerState::META : EContainerState::RUNNING);
 
     if (FreezerSubsystem.IsFrozen(freezerCg)) {
-        if (State != EContainerState::Paused)
+        if (State != EContainerState::PAUSED)
             FreezerSubsystem.Thaw(freezerCg);
-    } else if (State == EContainerState::Paused)
-        SetState(IsMeta() ? EContainerState::Meta : EContainerState::Running);
+    } else if (State == EContainerState::PAUSED)
+        SetState(IsMeta() ? EContainerState::META : EContainerState::RUNNING);
 
-    if (State & (EContainerState::Stopped |
-                 EContainerState::Stopping)) {
-        if (State == EContainerState::Stopped)
+    if (State & (EContainerState::STOPPED |
+                 EContainerState::STOPPING)) {
+        if (State == EContainerState::STOPPED)
             L("Found unexpected freezer");
         Stop(0);
-    } else if (State == EContainerState::Meta && !WaitTask.Pid && !Isolate) {
+    } else if (State == EContainerState::META && !WaitTask.Pid && !Isolate) {
         /* meta container */
     } else if (!WaitTask.Exists()) {
-        if (State != EContainerState::Dead)
+        if (State != EContainerState::DEAD)
             L("Task no found");
         Reap(false);
     } else if (WaitTask.IsZombie()) {
@@ -3856,38 +3859,39 @@ void TContainer::SyncState() {
         }
     }
 
-    switch (Parent ? Parent->State : EContainerState::Meta) {
-        case EContainerState::Stopped:
-            if (State != EContainerState::Stopped)
+    switch (Parent ? Parent->State : EContainerState::META) {
+        case EContainerState::STOPPED:
+            if (State != EContainerState::STOPPED)
                 Stop(0); /* Also stop paused */
             break;
-        case EContainerState::Dead:
-            if (State != EContainerState::Dead && State != EContainerState::Stopped)
+        case EContainerState::DEAD:
+            if (State != EContainerState::DEAD && State != EContainerState::STOPPED)
                 Reap(false);
             break;
-        case EContainerState::Running:
-        case EContainerState::Meta:
-        case EContainerState::Starting:
-        case EContainerState::Stopping:
-        case EContainerState::Respawning:
+        case EContainerState::RUNNING:
+        case EContainerState::META:
+        case EContainerState::STARTING:
+        case EContainerState::STOPPING:
+        case EContainerState::RESPAWNING:
             /* Any state is ok */
             break;
-        case EContainerState::Paused:
-            if (State == EContainerState::Running || State == EContainerState::Meta)
-                SetState(EContainerState::Paused);
+        case EContainerState::PAUSED:
+            if (State == EContainerState::RUNNING || State == EContainerState::META)
+                SetState(EContainerState::PAUSED);
             break;
-        case EContainerState::Destroyed:
+        case EContainerState::DESTROYED:
+        case EContainerState::UNDEFINED:
             L_ERR("Destroyed parent?");
             break;
     }
 
-    if (State != EContainerState::Stopped && !HasProp(EProperty::START_TIME)) {
+    if (State != EContainerState::STOPPED && !HasProp(EProperty::START_TIME)) {
         StartTime = GetCurrentTimeMs();
         RealStartTime = time(nullptr);
         SetProp(EProperty::START_TIME);
     }
 
-    if (State == EContainerState::Dead && !HasProp(EProperty::DEATH_TIME)) {
+    if (State == EContainerState::DEAD && !HasProp(EProperty::DEATH_TIME)) {
         DeathTime = GetCurrentTimeMs();
         RealDeathTime = time(nullptr);
         SetProp(EProperty::DEATH_TIME);
@@ -3950,7 +3954,7 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
 }
 
 TError TContainer::EnableControllers(uint64_t controllers) {
-    if (State == EContainerState::Stopped) {
+    if (State == EContainerState::STOPPED) {
         Controllers |= controllers;
         RequiredControllers |= controllers;
     } else if ((Controllers & controllers) != controllers)
@@ -4041,7 +4045,7 @@ void TContainer::Event(const TEvent &event) {
         if (ct && !CL->LockContainer(ct)) {
             std::list<std::shared_ptr<TVolume>> unlinked;
 
-            if (ct->State == EContainerState::Dead &&
+            if (ct->State == EContainerState::DEAD &&
                     GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
                 Statistics->RemoveDead++;
                 ct->Destroy(unlinked);
@@ -4068,12 +4072,12 @@ void TContainer::Event(const TEvent &event) {
     case EEventType::RotateLogs:
     {
         for (auto &ct: RootContainer->Subtree()) {
-            if (ct->State == EContainerState::Dead &&
+            if (ct->State == EContainerState::DEAD &&
                     GetCurrentTimeMs() >= ct->DeathTime + ct->AgingTime) {
                 TEvent ev(EEventType::DestroyAgedContainer, ct);
                 EventQueue->Add(0, ev);
             }
-            if (ct->State == EContainerState::Running) {
+            if (ct->State == EContainerState::RUNNING) {
                 ct->Stdout.Rotate(*ct);
                 ct->Stderr.Rotate(*ct);
             }

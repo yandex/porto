@@ -40,10 +40,10 @@ bool TContainerWaiter::ShouldReport(TContainer &ct) {
 
     /* Sync wait reports only stopped, dead, respawning, hollow meta */
     if (!Async &&
-        !(ct.State & (EContainerState::Stopped |
-                      EContainerState::Dead |
-                      EContainerState::Respawning)) &&
-            (ct.State != EContainerState::Meta || ct.RunningChildren))
+        !(ct.State & (EContainerState::STOPPED |
+                      EContainerState::DEAD |
+                      EContainerState::RESPAWNING)) &&
+            (ct.State != EContainerState::META || ct.RunningChildren))
         return false;
 
     for (auto &nm: Names)
@@ -95,7 +95,7 @@ void TContainerWaiter::Timeout() {
     auto lock = LockWaiters();
     auto client = Client.lock();
     if (client) {
-        client->MakeReport("", EContainerState::Undefined, Async);
+        client->MakeReport("", EContainerState::UNDEFINED, Async);
         Deactivate();
         if (Async)
             client->AsyncWaiter.reset();

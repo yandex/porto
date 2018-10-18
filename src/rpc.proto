@@ -443,17 +443,16 @@ message TCapabilities {
 
 
 enum EContainerState {
-    Undefined = 0;   // internal state
-    Stopped = 1;     // "stopped"
-    Running = 2;     // "running"
-    Dead = 4;        // "dead"
-    Meta = 8;        // "meta"
-    Starting = 16;   // "starting"
-    Stopping = 32;   // "stopping"
-    Respawning = 64; // "respawning"
-    Paused = 128;    // "paused"
-    Destroyed = 256; // internal state
-
+    UNDEFINED = 0;   // "undefined"
+    STOPPED = 1;     // "stopped"
+    RUNNING = 2;     // "running"
+    DEAD = 4;        // "dead"
+    META = 8;        // "meta"
+    STARTING = 16;   // "starting"
+    STOPPING = 32;   // "stopping"
+    RESPAWNING = 64; // "respawning"
+    PAUSED = 128;    // "paused"
+    DESTROYED = 256; // "destroyed"
 }
 
 message TContainerCommandArgv {

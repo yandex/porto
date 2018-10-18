@@ -70,11 +70,11 @@ TError TProperty::CanGet() const {
     if (!IsSupported)
         return TError(EError::NotSupported, "{} is not supported", Name);
 
-    if (IsRuntimeOnly && (CT->State & (EContainerState::Stopped |
-                                       EContainerState::Starting)))
+    if (IsRuntimeOnly && (CT->State & (EContainerState::STOPPED |
+                                       EContainerState::STARTING)))
         return TError(EError::InvalidState, "{} is not available in {} state", Name, TContainer::StateName(CT->State));
 
-    if (IsDeadOnly && CT->State != EContainerState::Dead)
+    if (IsDeadOnly && CT->State != EContainerState::DEAD)
         return TError(EError::InvalidState, "{} available only in dead state", Name);
 
     return OK;
@@ -89,10 +89,10 @@ TError TProperty::CanSet() const {
     if (IsReadOnly)
         return TError(EError::InvalidValue, "{} is raad-only", Name);
 
-    if (!IsDynamic && CT->State != EContainerState::Stopped)
+    if (!IsDynamic && CT->State != EContainerState::STOPPED)
         return TError(EError::InvalidState, "{} could be set only in stopped state", Name);
 
-    if (!IsAnyState && CT->State == EContainerState::Dead)
+    if (!IsAnyState && CT->State == EContainerState::DEAD)
         return TError(EError::InvalidState, "{} cannot be set in dead state", Name);
 
     return OK;
@@ -979,7 +979,7 @@ public:
     }
     TError Set(uint64_t val) {
         CT->NewMemGuarantee = val;
-        if (CT->State != EContainerState::Stopped) {
+        if (CT->State != EContainerState::STOPPED) {
             TError error = CT->CheckMemGuarantee();
             /* always allow to decrease guarantee under overcommit */
             if (error && val > CT->MemGuarantee) {
@@ -2122,7 +2122,7 @@ public:
         return OK;
     }
     TError Set(const std::string &value) {
-        if (CT->State != EContainerState::Stopped &&
+        if (CT->State != EContainerState::STOPPED &&
             ((CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/") !=
              (value == "keep" || value == "" || (CT->Root == "/" && value == "inherit"))))
             return TError(EError::InvalidState, "Cannot enable/disable resolv.conf overriding in runtime");
@@ -4543,7 +4543,7 @@ public:
 
     TError Has() {
         if (ClassStat) {
-            if (CT->State == EContainerState::Stopped)
+            if (CT->State == EContainerState::STOPPED)
                 return TError(EError::InvalidState, "Not available in stopped state");
             if (!(CT->Controllers & CGROUP_NETCLS))
                 return TError(EError::ResourceNotAvailable, "RequireControllers is disabled");
@@ -4810,9 +4810,9 @@ public:
             val = si.uptime;
             return OK;
         }
-        if (CT->State == EContainerState::Stopped)
+        if (CT->State == EContainerState::STOPPED)
             val = 0;
-        else if (CT->State == EContainerState::Dead)
+        else if (CT->State == EContainerState::DEAD)
             val = (CT->DeathTime - CT->StartTime) / 1000;
         else
             val = (GetCurrentTimeMs() - CT->StartTime) / 1000;
@@ -4820,7 +4820,7 @@ public:
     }
     TError Get(const std::string &index, int64_t &val) {
         if (index == "dead") {
-            if (CT->State == EContainerState::Dead)
+            if (CT->State == EContainerState::DEAD)
                 val = (GetCurrentTimeMs() - CT->DeathTime) / 1000;
             else
                 return TError(EError::InvalidState, "Not dead yet");
@@ -4830,7 +4830,7 @@ public:
     }
     void Dump(Porto::TContainer &spec, int64_t val) {
         spec.set_time(val);
-        if (CT->State == EContainerState::Dead)
+        if (CT->State == EContainerState::DEAD)
             spec.set_dead_time((GetCurrentTimeMs() - CT->DeathTime) / 1000);
     }
 } static Time;
