@@ -73,7 +73,7 @@ public:
     virtual TError Configure(void);
     virtual TError Restore(void);
     virtual TError Build(void) =0;
-    virtual TError Destroy(void) =0;
+    virtual TError Delete(void) =0;
     virtual TError StatFS(TStatFS &result) =0;
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
     virtual std::string ClaimPlace();
@@ -196,9 +196,9 @@ public:
     TError MakeSymlinks(const TFile &base);
     TError MakeShares(const TFile &base, bool cow);
 
-    static void DestroyAll();
-    TError DestroyOne();
-    TError Destroy();
+    static void DeleteAll();
+    TError DeleteOne();
+    TError Delete();
 
     TError Save(void);
     TError Restore(const TKeyValue &node);
@@ -223,7 +223,7 @@ public:
 
     static void UnlinkAllVolumes(std::shared_ptr<TContainer> container,
                                  std::list<std::shared_ptr<TVolume>> &unlinked);
-    static void DestroyUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked);
+    static void DeleteUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked);
 
     static TError CheckRequired(TContainer &ct);
 

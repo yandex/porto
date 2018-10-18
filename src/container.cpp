@@ -4052,7 +4052,7 @@ void TContainer::Event(const TEvent &event) {
             }
             CL->ReleaseContainer();
 
-            TVolume::DestroyUnlinked(unlinked);
+            TVolume::DeleteUnlinked(unlinked);
         }
         break;
     }
@@ -4065,7 +4065,7 @@ void TContainer::Event(const TEvent &event) {
                 ct->Destroy(unlinked);
             CL->ReleaseContainer();
 
-            TVolume::DestroyUnlinked(unlinked);
+            TVolume::DeleteUnlinked(unlinked);
         }
         break;
 

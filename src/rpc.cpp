@@ -467,7 +467,7 @@ undo:
     std::list<std::shared_ptr<TVolume>> unlinked;
     (void)ct->Destroy(unlinked);
     CL->ReleaseContainer();
-    TVolume::DestroyUnlinked(unlinked);
+    TVolume::DeleteUnlinked(unlinked);
     rsp.Clear();
     return error;
 }
@@ -615,7 +615,7 @@ noinline TError DestroyContainer(const Porto::TDestroyRequest &req) {
 
     CL->ReleaseContainer();
 
-    TVolume::DestroyUnlinked(unlinked);
+    TVolume::DeleteUnlinked(unlinked);
 
     return error;
 }
@@ -1286,9 +1286,9 @@ noinline TError UnlinkVolume(const Porto::TUnlinkVolumeRequest &req) {
         std::list<std::shared_ptr<TVolume>> unlinked;
         error = volume->UnlinkVolume(ct, req.has_target() ? req.target() : "***", unlinked, req.strict());
         CL->ReleaseContainer();
-        TVolume::DestroyUnlinked(unlinked);
+        TVolume::DeleteUnlinked(unlinked);
     } else {
-        error = volume->Destroy();
+        error = volume->Delete();
     }
 
     return error;

@@ -101,7 +101,7 @@ public:
         return "";
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         return OK;
     }
 
@@ -132,7 +132,7 @@ public:
         return "";
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         return Volume->InternalPath.UmountAll();
     }
 
@@ -169,7 +169,7 @@ public:
         return "";
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         return Volume->InternalPath.UmountAll();
     }
 
@@ -206,7 +206,7 @@ public:
         return "";
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         return Volume->InternalPath.UmountAll();
     }
 
@@ -275,7 +275,7 @@ public:
         return "tmpfs";
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         return Volume->InternalPath.UmountAll();
     }
 
@@ -338,7 +338,7 @@ public:
         return "";
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         TProjectQuota quota(Volume->Path);
         TError error;
 
@@ -410,7 +410,7 @@ public:
                 Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         TProjectQuota quota(Volume->StoragePath);
         TError error = Volume->InternalPath.UmountAll();
 
@@ -665,13 +665,13 @@ public:
         return error;
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         TPath loop = GetLoopDevice();
 
         if (Volume->DeviceIndex < 0)
             return OK;
 
-        L_ACT("Destroy loop {}", loop);
+        L_ACT("Delete loop {}", loop);
         TError error = Volume->InternalPath.UmountAll();
         TError error2 = PutLoopDev(Volume->DeviceIndex);
         if (!error)
@@ -859,7 +859,7 @@ err:
         return error;
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         TProjectQuota quota(Volume->StoragePath);
         TError error = Volume->InternalPath.UmountAll();
 
@@ -1074,7 +1074,7 @@ err:
         return error;
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         if (Volume->DeviceIndex >= 0) {
             Volume->InternalPath.UmountAll();
             Volume->GetInternal("lower").UmountAll();
@@ -1183,7 +1183,7 @@ public:
         return error;
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         std::string device = GetDevice();
         TError error, error2;
 
@@ -1360,7 +1360,7 @@ public:
         return error;
     }
 
-    TError Destroy() override {
+    TError Delete() override {
         TError error = Volume->InternalPath.UmountAll();
         if (!Persistent) {
             TError error2 = RunCommand({"lvm", "lvremove", "--force", Device});
@@ -2533,25 +2533,25 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
     return error;
 }
 
-void TVolume::DestroyAll() {
+void TVolume::DeleteAll() {
     std::list<std::shared_ptr<TVolume>> plan;
     for (auto &it : Volumes)
         plan.push_front(it.second);
     for (auto &vol: plan) {
-        TError error = vol->Destroy();
+        TError error = vol->Delete();
         if (error)
             L_WRN("Cannot destroy volume {} : {}", vol->Path , error);
     }
 }
 
-TError TVolume::Destroy() {
+TError TVolume::Delete() {
     TError error, ret;
 
     std::list<std::shared_ptr<TVolume>> plan = {shared_from_this()};
     std::list<std::shared_ptr<TVolume>> work = {shared_from_this()};
 
     if (CL->LockedContainer) {
-        L_WRN("Locked container {} in TVolume::Destroy()", CL->LockedContainer->Name);
+        L_WRN("Locked container {} in TVolume::Delete()", CL->LockedContainer->Name);
         Stacktrace();
         CL->ReleaseContainer();
     }
@@ -2647,7 +2647,7 @@ TError TVolume::Destroy() {
 
         volumes_lock.unlock();
 
-        error = volume->DestroyOne();
+        error = volume->DeleteOne();
         if (error && !ret)
             ret = error;
 
@@ -2692,8 +2692,8 @@ TError TVolume::Destroy() {
     return ret;
 }
 
-TError TVolume::DestroyOne() {
-    L_ACT("Destroy volume: {} backend: {}", Path, BackendType);
+TError TVolume::DeleteOne() {
+    L_ACT("Delete volume: {} backend: {}", Path, BackendType);
 
     TPath internal = GetInternal("");
     TError ret, error;
@@ -2708,7 +2708,7 @@ TError TVolume::DestroyOne() {
     }
 
     if (Backend) {
-        error = Backend->Destroy();
+        error = Backend->Delete();
         if (error) {
             L_ERR("Can't destroy volume backend: {}", error);
             if (!ret)
@@ -3103,11 +3103,11 @@ void TVolume::UnlinkAllVolumes(std::shared_ptr<TContainer> container,
     container->OwnedVolumes.clear();
 }
 
-void TVolume::DestroyUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked) {
+void TVolume::DeleteUnlinked(std::list<std::shared_ptr<TVolume>> &unlinked) {
     TError error;
 
     for (auto &volume: unlinked) {
-        error = volume->Destroy();
+        error = volume->Delete();
         if (error)
             L_WRN("Cannot destroy volume {}: {}", volume->Path, error);
     }
@@ -3671,7 +3671,7 @@ next_link:
 
 undo:
     common_link->Busy = false;
-    volume->Destroy();
+    volume->Delete();
     return error;
 }
 
@@ -3787,7 +3787,7 @@ next_link:
 
     for (auto &volume : broken_volumes) {
         Statistics->VolumeLost++;
-        error = volume->Destroy();
+        error = volume->Delete();
         if (error)
             L_WRN("Volume {} destroy: {}", volume->Path, error);
     }

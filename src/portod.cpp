@@ -763,7 +763,7 @@ static void DestroyContainers(bool weak) {
 
     SystemClient.ReleaseContainer();
 
-    TVolume::DestroyUnlinked(unlinked);
+    TVolume::DeleteUnlinked(unlinked);
 }
 
 static int Portod() {
@@ -902,8 +902,8 @@ static int Portod() {
         L_SYS("Destroy containers...");
         DestroyContainers(false);
 
-        L_SYS("Destroy volumes...");
-        TVolume::DestroyAll();
+        L_SYS("Delete volumes...");
+        TVolume::DeleteAll();
     }
 
     SystemClient.FinishRequest();
@@ -934,8 +934,8 @@ static int Portod() {
         L_SYS("Destroy containers...");
         DestroyContainers(false);
 
-        L_SYS("Destroy volumes...");
-        TVolume::DestroyAll();
+        L_SYS("Delete volumes...");
+        TVolume::DeleteAll();
 
         std::list<std::shared_ptr<TVolume>> unlinked;
 
@@ -945,7 +945,7 @@ static int Portod() {
         if (error)
             L_ERR("Cannot destroy root container{}", error);
 
-        TVolume::DestroyUnlinked(unlinked);
+        TVolume::DeleteUnlinked(unlinked);
 
         SystemClient.FinishRequest();
 
