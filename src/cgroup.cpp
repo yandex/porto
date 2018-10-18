@@ -964,35 +964,34 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     bool recursive = true;
     TError error;
 
-    if (HasThrottlerRec) {
-        /* offstream patch */
-        if (stat & IoStat::Time)
-            knob = "blkio.throttle.io_service_time_recursive";
-        else if (stat & IoStat::Wait)
-            knob = "blkio.throttle.io_wait_time_recursive";
-        else if (stat & IoStat::Iops)
-            knob = "blkio.throttle.io_serviced_recursive";
+    if (stat & IoStat::Time) {
+        if (HasThrottlerTime)
+            knob = "blkio.throttle.io_service_time_recursive"; /* offstream */
         else
-            knob = "blkio.throttle.io_service_bytes_recursive";
-    } else if (stat & IoStat::Time) {
-        /* cfq only */
-        knob = "blkio.io_service_time_recursive";
+            knob = "blkio.io_service_time_recursive"; /* cfq only */
     } else if (stat & IoStat::Wait) {
-        /* cfq only */
-        knob = "blkio.io_wait_time_recursive";
-    } else if (HasThrottler && !cg.IsRoot()) {
+        if (HasThrottlerTime)
+            knob = "blkio.throttle.io_wait_time_recursive"; /* offstream */
+        else
+            knob = "blkio.io_wait_time_recursive"; /* cfq only */
+    } else if (stat & IoStat::Iops) {
         /* throttler has couners for raids */
-        if (stat & IoStat::Iops)
+        if (HasThrottlerRec)
+            knob = "blkio.throttle.io_serviced_recursive"; /* offstream */
+        else if (HasThrottler && !cg.IsRoot()) {
             knob = "blkio.throttle.io_serviced";
-        else
-            knob = "blkio.throttle.io_service_bytes";
-        /* recursive only for removed sane behavior */
-        recursive = false;
+            recursive = false; /* recursive only for removed sane behavior */
+        } else
+            knob = "blkio.io_serviced_recursive"; /* cfq only */
     } else {
-        if (stat & IoStat::Iops)
-            knob = "blkio.io_serviced_recursive";
-        else
-            knob = "blkio.io_service_bytes_recursive";
+        /* throttler has couners for raids */
+        if (HasThrottlerRec)
+            knob = "blkio.throttle.io_service_bytes_recursive"; /* offstream */
+        else if (HasThrottler && !cg.IsRoot()) {
+            knob = "blkio.throttle.io_service_bytes";
+            recursive = false; /* recursive only for removed sane behavior */
+        } else
+            knob = "blkio.io_service_bytes_recursive"; /* cfq only */
     }
 
     error = cg.Knob(knob).ReadLines(lines);
