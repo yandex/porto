@@ -216,14 +216,14 @@ void TConsoleScreen::HelpDialog() {
          "space - pause/resume screen updates",
          "u - update screen",
          "",
-         "d, del - disable column",
+         "delete - hide column",
          "backspace - move column left",
          "f - choose columns",
          "a - show all",
          "c - show cpu",
          "m - show memory",
          "n - show network",
-         "i - show disk io",
+         "d - show disk",
          "p - show policy and porto",
          "",
          "g - get properties",
@@ -1352,7 +1352,6 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
             screen.ColumnsMenu(top.Columns);
             break;
         case KEY_DC:
-        case 'd':
             if (top.SelectedColumn > 0) {
                 top.Columns[top.SelectedColumn].Hidden ^= true;
                 top.ChangeSelection(1, 0, screen);
@@ -1370,7 +1369,7 @@ int portotop(Porto::TPortoApi *api, const std::vector<std::string> &args) {
             for (auto &c: top.Columns)
                 c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Mem));
             break;
-        case 'i':
+        case 'd':
             for (auto &c: top.Columns)
                 c.Hidden = !(c.Flags & (ValueFlags::Always | ValueFlags::Io));
             break;
