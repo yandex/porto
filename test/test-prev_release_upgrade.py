@@ -38,9 +38,9 @@ def CheckRt(r):
     pid = r.GetProperty("root_pid")
     task_stat = open("/proc/{}/stat".format(pid), "r").read().split()
     (nice, prio, policy) = [task_stat[i] for i in [18, 39, 40]]
-    assert nice == "-20"
-    assert prio == "10"
-    assert policy == "2"
+    ExpectEq(nice, "-20")
+    ExpectEq(prio, "10")
+    ExpectEq(policy, "2")
 
 #FIXME: remove it in the future, use capabilities from snapshot
 def CheckCaps(r, new_porto):
@@ -82,7 +82,7 @@ def VerifyProps(r, props):
     for p in props:
         value = r.GetProperty(p[0])
         try:
-            assert PropTrim(p[1]) == PropTrim(value)
+            ExpectEq(PropTrim(p[1]), PropTrim(value))
         except AssertionError as e:
             print "{} prop value <{}> != <{}>".format(p[0], p[1], value)
             raise e
@@ -136,7 +136,7 @@ def CheckNetworkProblems():
     a = conn.Call('GetSystem')
     conn.Get(['/'], ['net_bytes'], sync=True)
     b = conn.Call('GetSystem')
-    assert a.get('network_problems') == b.get('network_problems'), "Network problems detected"
+    ExpectEq(a.get('network_problems'), b.get('network_problems'))
 
 
 c = porto.Connection(timeout=3)
@@ -314,17 +314,17 @@ c.Wait(["test"])
 r = c.Create("a")
 r.SetProperty("command", "bash -c '" + portoctl + " run -W self/a command=\"echo 123\"'")
 r.Start()
-assert r.Wait() == "a"
-assert r.GetProperty("exit_status") == "0"
+ExpectEq(r.Wait(), "a")
+ExpectEq(r.GetProperty("exit_status"), "0")
 
 r2 = c.Find("a/a")
 r2.Wait() == "a/a"
-assert r2.GetProperty("exit_status") == "0"
-assert r2.GetProperty("stdout") == "123\n"
+ExpectEq(r2.GetProperty("exit_status"), "0")
+ExpectEq(r2.GetProperty("stdout"), "123\n")
 r2.Destroy()
 r.Destroy()
 
-assert c.GetProperty("test", "exit_status") == "0"
+ExpectEq(c.GetProperty("test", "exit_status"), "0")
 
 r = c.Find("parent_app")
 VerifyProps(r, parent_knobs)
@@ -374,11 +374,11 @@ ExpectEq(ver, PREV_VERSION)
 CheckNetworkProblems()
 
 r = c.Find("test2")
-assert r.Wait() == "test2"
-assert r.GetProperty("stdout") == "456\n"
-assert r.GetProperty("exit_status") == "0"
+ExpectEq(r.Wait(), "test2")
+ExpectEq(r.GetProperty("stdout"), "456\n")
+ExpectEq(r.GetProperty("exit_status"), "0")
 
-assert c.GetProperty("parent_os/os", "state") == "running"
+ExpectEq(c.GetProperty("parent_os/os", "state"), "running")
 
 r = c.Find("parent_app")
 VerifyProps(r, parent_knobs)
@@ -408,7 +408,7 @@ r = c.Find("rt_parent/rt_app")
 VerifyProps(r, rt_app_knobs)
 VerifySnapshot(r, snap_rt_app)
 CheckCaps(r, False)
-assert legacy_rt_settings == DumpLegacyRt(r)
+ExpectEq(legacy_rt_settings, DumpLegacyRt(r))
 
 AsRoot()
 

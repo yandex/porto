@@ -24,34 +24,34 @@ r.SetProperty("root", v.path)
 r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=porto-bob")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-bob"
-assert r2.GetProperty("owner_user") == "porto-alice"
-assert r2.GetProperty("user") == "porto-bob"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "porto-bob")
+ExpectEq(r2.GetProperty("owner_user"), "porto-alice")
+ExpectEq(r2.GetProperty("user"), "porto-bob")
 r2.Destroy()
 r.Stop()
 
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\"")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "root"
-assert r2.GetProperty("owner_user") == "porto-alice"
-assert r2.GetProperty("user") == "root"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "root")
+ExpectEq(r2.GetProperty("owner_user"), "porto-alice")
+ExpectEq(r2.GetProperty("user"), "root")
 r2.Destroy()
 r.Stop()
 
 #We shouldn't be allowed to create sibling with root user
 r.SetProperty("command", "/portobin/portoctl run -W b command=\"id -u\" isolate=false user=root")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
-assert r.GetProperty("exit_status") == "256"
+ExpectEq(r.GetProperty("exit_status"), "256")
 r.Stop()
 r.Destroy()
 
@@ -67,59 +67,59 @@ r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
 r.SetProperty("virt_mode", "app")
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\"")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-alice"
-assert r2.GetProperty("owner_user") == "porto-alice"
-assert r2.GetProperty("user") == "porto-alice"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "porto-alice")
+ExpectEq(r2.GetProperty("owner_user"), "porto-alice")
+ExpectEq(r2.GetProperty("user"), "porto-alice")
 r2.Destroy()
 
 r.Stop()
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=porto-bob")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-bob"
-assert r2.GetProperty("owner_user") == "porto-alice"
-assert r2.GetProperty("user") == "porto-bob"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "porto-bob")
+ExpectEq(r2.GetProperty("owner_user"), "porto-alice")
+ExpectEq(r2.GetProperty("user"), "porto-bob")
 r2.Destroy()
 
 r.Stop()
 r.SetProperty("user", "porto-charlie")
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\"")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-charlie"
-assert r2.GetProperty("user") == "porto-charlie"
-assert r2.GetProperty("owner_user") == "porto-alice"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "porto-charlie")
+ExpectEq(r2.GetProperty("user"), "porto-charlie")
+ExpectEq(r2.GetProperty("owner_user"), "porto-alice")
 r2.Destroy()
 r.Stop()
 
 #Tricky moment: subcontainer creation rights depends on owner_user
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=porto-alice")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-alice"
-assert r2.GetProperty("user") == "porto-alice"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "porto-alice")
+ExpectEq(r2.GetProperty("user"), "porto-alice")
 r2.Destroy()
 r.Stop()
 
 r.SetProperty("command", "/portobin/portoctl run -W b command=\"id -u\" user=porto-bob")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
-assert r.GetProperty("exit_status")
-assert re.search("Permission", r.GetProperty("stderr")) is not None
+Expect(r.GetProperty("exit_status"))
+Expect(re.search("Permission", r.GetProperty("stderr")) is not None)
 r.Destroy()
 
 #Check what if the owner will be root...
@@ -138,45 +138,45 @@ r.SetProperty("bind", "{} /portobin/ ro".format(portobin))
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=porto-bob")
 r.SetProperty("user", "porto-alice")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "porto-bob"
-assert r2.GetProperty("user") == "porto-bob"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "porto-bob")
+ExpectEq(r2.GetProperty("user"), "porto-bob")
 r2.Destroy()
 r.Stop()
 
 r.SetProperty("command", "/portobin/portoctl run -W self/a command=\"id -u\" user=root")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("test/a")
-assert r2.Wait() == "test/a"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "root"
-assert r2.GetProperty("user") == "root"
+ExpectEq(r2.Wait(), "test/a")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "root")
+ExpectEq(r2.GetProperty("user"), "root")
 r2.Destroy()
 r.Stop()
 
 #Now, we can create sibling with root user
 r.SetProperty("command", "/portobin/portoctl run -W b command=\"id -u\" user=root")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
 r2 = c.Find("b")
-assert r2.Wait() == "b"
-assert pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name == "root"
-assert r2.GetProperty("user") == "root"
+ExpectEq(r2.Wait(), "b")
+ExpectEq(pwd.getpwuid(int(r2.GetProperty("stdout"))).pw_name, "root")
+ExpectEq(r2.GetProperty("user"), "root")
 r2.Destroy()
 r.Stop()
 
 #Check if we can prevent creating root-created container create sibline with root user
 r.SetProperty("enable_porto", "child-only")
 r.Start()
-assert r.Wait() == "test"
+ExpectEq(r.Wait(), "test")
 
-assert r.GetProperty("exit_status") == "256"
-assert re.search("Permission", r.GetProperty("stderr"))
+ExpectEq(r.GetProperty("exit_status"), "256")
+Expect(re.search("Permission", r.GetProperty("stderr")))
 
 r.Destroy()
 v.Unlink("/")

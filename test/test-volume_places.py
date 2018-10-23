@@ -30,7 +30,7 @@ os.mkdir(PLACE_DIR)
 
 def Test():
     #Prepare dirs and check non-compliant dirs
-    assert Catch(c.CreateVolume, path=None, place=PLACE_DIR) == porto.exceptions.InvalidValue
+    ExpectEq(Catch(c.CreateVolume, path=None, place=PLACE_DIR), porto.exceptions.InvalidValue)
 
     #Prepare dummy layer also
     f = open(DIR + "/file.txt", "w")
@@ -51,33 +51,33 @@ def Test():
     os.mkdir(DIR + "/a")
 
     #Finally, checking functions
-    assert Catch(c.CreateVolume, path=DIR + "/a", place=PLACE_DIR, backend="native", layers=["ubuntu-precise"]) == porto.exceptions.LayerNotFound
+    ExpectEq(Catch(c.CreateVolume, path=DIR + "/a", place=PLACE_DIR, backend="native", layers=["ubuntu-precise"]), porto.exceptions.LayerNotFound)
 
     v = c.CreateVolume(path=None, layers=["ubuntu-precise"], backend="plain")
     v.Export(DIR + "/tmp_ubuntu_precise.tar")
     c.ImportLayer("place-ubuntu-precise", DIR + "/tmp_ubuntu_precise.tar", place=PLACE_DIR)
-    assert Catch(c.FindLayer, "place-ubuntu-precise") == porto.exceptions.LayerNotFound
+    ExpectEq(Catch(c.FindLayer, "place-ubuntu-precise"), porto.exceptions.LayerNotFound)
 
     l = c.FindLayer("place-ubuntu-precise", place=PLACE_DIR)
 
-    assert l.GetPrivate() == ""
+    ExpectEq(l.GetPrivate(), "")
     l.SetPrivate("XXXX")
-    assert l.GetPrivate() == "XXXX"
+    ExpectEq(l.GetPrivate(), "XXXX")
 
     l.Merge(DIR + "/file_layer.tar", private_value="YYYY")
-    assert l.GetPrivate() == "YYYY"
+    ExpectEq(l.GetPrivate(), "YYYY")
 
     os.unlink(DIR + "/tmp_ubuntu_precise.tar")
     v.Unlink("/")
 
     #Should also fail because of foreign layer vise versa
-    assert Catch(c.CreateVolume, path=DIR + "/a", backend="native", layers=["place-ubuntu-precise"]) == porto.exceptions.LayerNotFound
+    ExpectEq(Catch(c.CreateVolume, path=DIR + "/a", backend="native", layers=["place-ubuntu-precise"]), porto.exceptions.LayerNotFound)
 
     #Check volume is working properly
     v = c.CreateVolume(path=DIR + "/a", place=PLACE_DIR, backend="native", layers=["place-ubuntu-precise"])
 
     place_volumes = os.listdir(PLACE_DIR + "/porto_volumes")
-    assert len(place_volumes) == 1
+    ExpectEq(len(place_volumes), 1)
 
     cont = c.Create("test")
     cont.SetProperty("command", "bash -c \"echo -n 789987 > /123321.txt\"")
@@ -87,21 +87,21 @@ def Test():
     cont.Stop()
 
     f = open(PLACE_DIR + "/porto_volumes/" + place_volumes[0] + "/native/123321.txt", "r")
-    assert f.read() == "789987"
+    ExpectEq(f.read(), "789987")
 
     cont.SetProperty("command", "cat /file.txt")
     cont.Start()
     cont.Wait()
-    assert cont.Get(["stdout"])["stdout"] == "1234567890"
+    ExpectEq(cont.Get(["stdout"])["stdout"], "1234567890")
     cont.Destroy()
 
     #Check what will be if we rename our place
 
-    assert len(c.ListLayers(place=PLACE_DIR)) == 1
+    ExpectEq(len(c.ListLayers(place=PLACE_DIR)), 1)
     os.renames(PLACE_DIR, PLACE_DIR+"1")
-    assert Catch(c.ListLayers, place=PLACE_DIR) == porto.exceptions.UnknownError
+    ExpectEq(Catch(c.ListLayers, place=PLACE_DIR), porto.exceptions.UnknownError)
     os.renames(PLACE_DIR + "1", PLACE_DIR)
-    assert len(c.ListLayers(place=PLACE_DIR)) == 1
+    ExpectEq(len(c.ListLayers(place=PLACE_DIR)), 1)
 
     v.Export(DIR + "/tmp_back_ubuntu_precise.tar")
 
@@ -109,9 +109,9 @@ def Test():
 
     c.RemoveLayer("place-ubuntu-precise", place=PLACE_DIR)
 
-    assert len(os.listdir(PLACE_DIR + "/porto_volumes")) == 0
-    assert len(c.ListLayers(place=PLACE_DIR)) == 0
-    assert len(os.listdir(PLACE_DIR + "/porto_layers")) == 0
+    ExpectEq(len(os.listdir(PLACE_DIR + "/porto_volumes")), 0)
+    ExpectEq(len(c.ListLayers(place=PLACE_DIR)), 0)
+    ExpectEq(len(os.listdir(PLACE_DIR + "/porto_layers")), 0)
 
 
 ret = 0

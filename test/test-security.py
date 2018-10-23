@@ -19,18 +19,18 @@ from test_common import *
 def run_streams(r):
     r.SetProperty("command", "echo -n 654321")
     r.SetProperty("stdout_path", "/tmp/porto-tests/root-secret")
-    assert Catch(r.Start) == porto.exceptions.InvalidValue
+    ExpectEq(Catch(r.Start), porto.exceptions.InvalidValue)
 
     r.SetProperty("command", "tee /proc/self/fd/2")
     r.SetProperty("stdin_path", "/tmp/porto-tests/porto-alice-stdin")
     r.SetProperty("stderr_path", "/tmp/porto-tests/root-secret")
-    assert Catch(r.Start) == porto.exceptions.InvalidValue
+    ExpectEq(Catch(r.Start), porto.exceptions.InvalidValue)
 
     r.SetProperty("command", "cat")
     r.SetProperty("stdin_path", "/tmp/porto-tests/root-secret")
     r.SetProperty("stdout_path", "")
     r.SetProperty("stderr_path", "")
-    assert Catch(r.Start) == porto.exceptions.InvalidValue
+    ExpectEq(Catch(r.Start), porto.exceptions.InvalidValue)
 
 
 def std_streams_escalation():
@@ -129,9 +129,9 @@ def ns_escape(v):
     r.Start()
     time.sleep(5)
 
-    assert c.GetProperty("parent","state") == "dead" and c.GetProperty("parent/child", "state") == "dead"
+    ExpectEq(c.GetProperty("parent","state") == "dead" and c.GetProperty("parent/child", "state"), "dead")
     output = c.Get(["parent","parent/child"], ["stdout"])
-    assert output["parent"]["stdout"] == "OK"
+    ExpectEq(output["parent"]["stdout"], "OK")
 
     #And now vice versa...
 
@@ -146,8 +146,8 @@ def ns_escape(v):
 
     c.Wait(["parent"])
     output = c.Get(["parent","parent/child"], ["stdout"])
-    assert output["parent"]["stdout"] == "OK\n"
-    assert output["parent/child"]["stdout"] == "OKOK"
+    ExpectEq(output["parent"]["stdout"], "OK\n")
+    ExpectEq(output["parent/child"]["stdout"], "OKOK")
 
     AsRoot()
 
@@ -189,19 +189,19 @@ def binds_escalation(v):
     r.SetProperty("root", v.path)
     r.SetProperty("bind", "/etc/shadow /tmp/shadow ro")
     r.SetProperty("command", "python /porto/test/test-security.py read_shadow")
-    assert Catch(r.Start) == porto.exceptions.PermissionError
+    ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 
     r.SetProperty("bind", "/etc/passwd /tmp/passwd rw")
     r.SetProperty("command", "python /porto/test/test-security.py append_passwd")
-    assert Catch(r.Start) == porto.exceptions.PermissionError
+    ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 
     r.SetProperty("bind", "/etc/sudoers /tmp/sudoers rw")
     r.SetProperty("command", "python /porto/test/test-security.py append_sudoers")
-    assert Catch(r.Start) == porto.exceptions.PermissionError
+    ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 
     r.SetProperty("bind", "/sbin /tmp/lol rw")
     r.SetProperty("command", "/tmp/lol/hwclock")
-    assert Catch(r.Start) == porto.exceptions.PermissionError
+    ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 
     r.Destroy()
     AsRoot()
@@ -225,11 +225,11 @@ def binds_escalation(v):
     r.SetProperty("bind", "/tmp/porto-tests/dir1 /tmp/porto-tests/mount1/mount2 rw")
     r.SetProperty("command", "dd if=/dev/zero of=/tmp/porto-tests/mount1/mount2/file bs=32 count=1") 
 
-    assert Catch(r.Start) == porto.exceptions.PermissionError
+    ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 
     r.SetProperty("bind", "/tmp/porto-tests/dir-bob /tmp/porto-tests/mount1/mount2 rw")
 
-    assert Catch(r.Start) == porto.exceptions.PermissionError
+    ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 
     c.Destroy("test")
     AsRoot()
@@ -257,7 +257,7 @@ def internal_escalation(v):
     r.Start()
     r.Wait()
 
-    assert c.GetProperty("test_cont2", "user") == "porto-alice"
+    ExpectEq(c.GetProperty("test_cont2", "user"), "porto-alice")
 
     r.Destroy()
     c.Destroy("test_cont2")
@@ -284,8 +284,8 @@ def porto_namespace_escape(v):
     r.Start()
     r.Wait()
 
-    assert r.GetProperty("porto_namespace") == "test"
-    assert r.GetData("exit_status") != "0"
+    ExpectEq(r.GetProperty("porto_namespace"), "test")
+    ExpectNe(r.GetData("exit_status"), "0")
 
     r.Destroy()
 
@@ -358,10 +358,10 @@ def layer_escalation(v):
     r.Start()
     r.Wait()
 
-    assert Catch(open, "/tmp/porto-tests/evil_file", "r") == IOError
+    ExpectEq(Catch(open, "/tmp/porto-tests/evil_file", "r"), IOError)
 
-    assert Catch(c.RemoveLayer, "../../../..") == porto.exceptions.InvalidValue
-    assert Catch(c.ImportLayer, "../etc", "/tmp") == porto.exceptions.InvalidValue
+    ExpectEq(Catch(c.RemoveLayer, "../../../.."), porto.exceptions.InvalidValue)
+    ExpectEq(Catch(c.ImportLayer, "../etc", "/tmp"), porto.exceptions.InvalidValue)
 
     r.Destroy()
 
@@ -386,7 +386,7 @@ def layer_escalation(v):
     r.Start()
     r.Wait()
 
-    assert open("/tmp/porto-tests/good_file", "r").read() == "I am a duck"
+    ExpectEq(open("/tmp/porto-tests/good_file", "r").read(), "I am a duck")
 
     r.Destroy()
 

@@ -23,7 +23,7 @@ def VerifyProperties(r, knobs):
     for k in knobs:
         value = r.GetProperty(k)
         try:
-            assert value == knobs[k]
+            ExpectEq(value, knobs[k])
         except BaseException as e:
             print "Assertion for {} : \n <{}> \n != \n <{}>".format(k, value, knobs[k])
             raise e
@@ -133,9 +133,9 @@ for k in knobs:
     value = subprocess.check_output([portoctl, "get", "test", k]).rstrip("\n")
     try:
         if type(knobs[k]) is bool:
-            assert value == str(knobs[k]).lower()
+            ExpectEq(value, str(knobs[k]).lower())
         else:
-            assert value == knobs[k]
+            ExpectEq(value, knobs[k])
     except AssertionError:
         print "portoctl get {} result:\n <{}> \n != <{}> \n".format(k, value, knobs[k])
         raise e

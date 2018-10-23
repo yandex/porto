@@ -54,8 +54,8 @@ if NAME in [layer.name for layer in c.ListLayers()]:
 
 c.ImportLayer(NAME, "{}/{}".format(TMPDIR, "layer.tar"))
 
-assert os.stat(BASE) != None
-assert os.stat("{}/file.txt".format(BASE)) != None
+ExpectNe(os.stat(BASE), None)
+ExpectNe(os.stat("{}/file.txt".format(BASE)), None)
 
 print "Preparing special directory tree of depth: {} ... ".format(len(WIDTHS))
 start_ts = time.time()

@@ -32,7 +32,10 @@ def ExpectNe(a, b):
     assert a != b, "{} should not be equal{}".format(a, b)
 
 def ExpectLe(a, b, descr=""):
-    assert a <= b, "{}{} should be less or equal {}".format(descr, a, b)
+    assert a <= b, "{} {} should be <= {}".format(descr, a, b)
+
+def ExpectGe(a, b, descr=""):
+    assert a >= b, "{} {} should be >= {}".format(descr, a, b)
 
 def ExpectRange(a, l, h):
     assert l <= a <= h, "{} should be within {} .. {}".format(a, l, h)

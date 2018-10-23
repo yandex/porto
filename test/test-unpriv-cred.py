@@ -12,16 +12,16 @@ AsBob()
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
-assert r.GetProperty("user") == "porto-bob"
-assert r.GetProperty("group") == "porto-bob"
+ExpectEq(r.GetProperty("user"), "porto-bob")
+ExpectEq(r.GetProperty("group"), "porto-bob")
 r.SetProperty("group", "porto-charlie")
-assert Catch(r.Start) == porto.exceptions.PermissionError
+ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 r.SetProperty("user", "porto-charlie")
 r.SetProperty("command", "ls")
 r.Start()
-assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-charlie"
-assert r.GetProperty("group") == "porto-charlie"
+ExpectEq(r.Wait(), "test")
+ExpectEq(r.GetProperty("user"), "porto-charlie")
+ExpectEq(r.GetProperty("group"), "porto-charlie")
 print "%s OK!" %(Case)
 r.Destroy()
 AsRoot()
@@ -32,17 +32,17 @@ AsAlice()
 c = porto.Connection()
 c.connect()
 r = c.Create("test")
-assert r.GetProperty("user") == "porto-alice"
-assert r.GetProperty("group") == "porto-alice"
+ExpectEq(r.GetProperty("user"), "porto-alice")
+ExpectEq(r.GetProperty("group"), "porto-alice")
 r.SetProperty("group", "porto-david")
-assert Catch(r.Start) == porto.exceptions.PermissionError
+ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 r.SetProperty("user", "porto-david")
 r.SetProperty("group", "porto-david")
 r.SetProperty("command", "ls")
 r.Start()
-assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-david"
-assert r.GetProperty("group") == "porto-david"
+ExpectEq(r.Wait(), "test")
+ExpectEq(r.GetProperty("user"), "porto-david")
+ExpectEq(r.GetProperty("group"), "porto-david")
 print "%s OK!" %(Case)
 r.Destroy()
 AsRoot()
@@ -55,9 +55,9 @@ c.connect()
 r = c.Create("test")
 r.SetProperty("command", "ls")
 r.Start()
-assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-bob"
-assert r.GetProperty("group") == "porto-bob"
+ExpectEq(r.Wait(), "test")
+ExpectEq(r.GetProperty("user"), "porto-bob")
+ExpectEq(r.GetProperty("group"), "porto-bob")
 print "%s OK!" %(Case)
 r.Destroy()
 AsRoot()
@@ -70,7 +70,7 @@ c.connect()
 r = c.Create("test")
 r.SetProperty("command", "ls")
 r.SetProperty("user", "porto-bob")
-assert Catch(r.Start) == porto.exceptions.PermissionError
+ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 r.Destroy()
 print "%s OK!" %(Case)
 AsRoot()
@@ -83,7 +83,7 @@ c.connect()
 r = c.Create("test")
 r.SetProperty("user", "porto-charlie")
 r.SetProperty("group", "porto-alice")
-assert Catch(r.Start) == porto.exceptions.PermissionError
+ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 print "%s OK!" %(Case)
 r.Destroy()
 AsRoot()
@@ -96,9 +96,9 @@ r.SetProperty("user", "porto-bob")
 r.SetProperty("group", "porto-alice")
 r.SetProperty("command", "ls")
 r.Start()
-assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-bob"
-assert r.GetProperty("group") == "porto-alice"
+ExpectEq(r.Wait(), "test")
+ExpectEq(r.GetProperty("user"), "porto-bob")
+ExpectEq(r.GetProperty("group"), "porto-alice")
 print "%s OK!" %(Case)
 r.Destroy()
 
@@ -114,16 +114,16 @@ AsAlice()
 c = porto.Connection()
 c.connect()
 r = c.Find("test")
-assert Catch(r.Start) == porto.exceptions.PermissionError
+ExpectEq(Catch(r.Start), porto.exceptions.PermissionError)
 AsRoot()
 AsBob()
 c = porto.Connection()
 c.connect()
 r = c.Find("test")
 r.Start()
-assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-bob"
-assert r.GetProperty("group") == "porto-bob"
+ExpectEq(r.Wait(), "test")
+ExpectEq(r.GetProperty("user"), "porto-bob")
+ExpectEq(r.GetProperty("group"), "porto-bob")
 r.Destroy()
 print "%s OK!" %(Case)
 AsRoot()

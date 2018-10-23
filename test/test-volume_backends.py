@@ -65,7 +65,7 @@ def check_readonly(c, path, **args):
     c.SetProperty("test", "command", "bash -c \"echo 123 > " + v.path + "/123.txt\"")
     c.Start("test")
     c.Wait(["test"])
-    assert c.GetProperty("test", "exit_status") == "256"
+    ExpectEq(c.GetProperty("test", "exit_status"), "256")
     c.Destroy("test")
     v.Unlink("/")
 
@@ -75,14 +75,14 @@ def check_place(c, path, **args):
 
     v = c.CreateVolume(path, **args)
     place_volumes = os.listdir(PLACE)
-    assert len(place_volumes) == place_num + 1
-    assert len(c.ListVolumes()) == vol_num + 1
+    ExpectEq(len(place_volumes), place_num + 1)
+    ExpectEq(len(c.ListVolumes()), vol_num + 1)
 
     os.stat(PLACE + "/" + place_volumes[0] + "/" + args["backend"])
     v.Unlink("/")
 
-    assert len(os.listdir(PLACE)) == place_num
-    assert len(c.ListVolumes()) == vol_num
+    ExpectEq(len(os.listdir(PLACE)), place_num)
+    ExpectEq(len(c.ListVolumes()), vol_num)
 
 def check_destroy_linked_non_root(c, path, **args):
     place_num = len(os.listdir(PLACE))
@@ -91,8 +91,8 @@ def check_destroy_linked_non_root(c, path, **args):
     v = c.CreateVolume(path, **args)
 
     place_volumes = os.listdir(PLACE)
-    assert len(place_volumes) == place_num + 1
-    assert len(c.ListVolumes()) == vol_num + 1
+    ExpectEq(len(place_volumes), place_num + 1)
+    ExpectEq(len(c.ListVolumes()), vol_num + 1)
 
     r = c.Create("test")
     v.Link("test")
@@ -102,8 +102,8 @@ def check_destroy_linked_non_root(c, path, **args):
     r.Wait()
     r.Destroy()
 
-    assert len(os.listdir(PLACE)) == place_num
-    assert len(c.ListVolumes()) == vol_num
+    ExpectEq(len(os.listdir(PLACE)), place_num)
+    ExpectEq(len(c.ListVolumes()), vol_num)
 
 def check_mounted(c, path, **args):
     v = c.CreateVolume(path, **args)
@@ -115,14 +115,14 @@ def check_mounted(c, path, **args):
                   v.path + "/file.txt  \"")
     r.Start()
     r.Wait()
-    assert r.GetProperty("stdout") == "aabb"
+    ExpectEq(r.GetProperty("stdout"), "aabb")
     if path is not None:
-        assert open(path + "/file.txt", "r").read() == "3210"
-    assert open(v.path + "/file.txt", "r").read() == "3210"
+        ExpectEq(open(path + "/file.txt", "r").read(), "3210")
+    ExpectEq(open(v.path + "/file.txt", "r").read(), "3210")
     path = v.path
     r.Destroy()
     if args["backend"] != "quota":
-        assert Catch(os.stat, path + "/file.txt") == OSError
+        ExpectEq(Catch(os.stat, path + "/file.txt"), OSError)
     else:
         os.remove(path + "/file.txt")
 
@@ -137,7 +137,7 @@ def check_space_limit(c, path, limits, cleanup=True, **args):
     r.Start()
     r.Wait()
 
-    assert os.stat(v.path + "/file.zeroes").st_size <= int(limits[2])
+    ExpectLe(os.stat(v.path + "/file.zeroes").st_size, int(limits[2]))
     if not cleanup:
         return (r,v)
     r.Destroy()
@@ -151,7 +151,7 @@ def check_tune_space_limit(c, path, limits=None, **args):
     v.Tune(space_limit=limits[3])
     r.Start()
     r.Wait()
-    assert os.stat(v.path + "/file.zeroes").st_size == int(limits[4])
+    ExpectEq(os.stat(v.path + "/file.zeroes").st_size, int(limits[4]))
     r.Destroy()
 
 def check_inode_limit(c, path, cleanup=True, **args):
@@ -165,8 +165,8 @@ def check_inode_limit(c, path, cleanup=True, **args):
                   "/\$i; done\"")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "256"
-    assert len(os.listdir(v.path)) < 24
+    ExpectEq(r.GetProperty("exit_status"), "256")
+    ExpectLe(len(os.listdir(v.path)), 23)
     if not cleanup:
         return (r, v)
     r.Destroy()
@@ -177,8 +177,8 @@ def check_tune_inode_limit(c, path, **args):
     v.Tune(inode_limit="32")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
-    assert len(os.listdir(v.path)) >= 24
+    ExpectEq(r.GetProperty("exit_status"), "0")
+    ExpectGe(len(os.listdir(v.path)), 24)
     r.Destroy()
 
 def check_layers(c, path, cleanup=True, **args):
@@ -191,8 +191,8 @@ def check_layers(c, path, cleanup=True, **args):
     r.SetProperty("command", "cat /test_file.txt")
     r.Start()
     r.Wait()
-    assert r.GetProperty("exit_status") == "0"
-    assert r.GetProperty("stdout") == "1234567890"
+    ExpectEq(r.GetProperty("exit_status"), "0")
+    ExpectEq(r.GetProperty("stdout"), "1234567890")
     if not cleanup:
         return (r, v)
     r.Destroy()
@@ -202,18 +202,18 @@ def check_projid_is_set(c, path, **args):
     open(path + "/file.txt", "w").write("111")
 
     #Checking quota project id is set
-    assert get_quota_fs_projid(DIR) == 0
+    ExpectEq(get_quota_fs_projid(DIR), 0)
     projid = get_quota_fs_projid(path)
     ino_id = os.stat(path).st_ino
 
-    assert projid == ino_id + 2 ** 31
-    assert get_quota_fs_projid(path + "/file.txt") == projid
+    ExpectEq(projid, ino_id + 2 ** 31)
+    ExpectEq(get_quota_fs_projid(path + "/file.txt"), projid)
 
     v.Unlink("/")
 
     # FIXME keep_project_quota_id
-    assert get_quota_fs_projid(path) == projid
-    assert get_quota_fs_projid(path + "/file.txt") == projid
+    ExpectEq(get_quota_fs_projid(path), projid)
+    ExpectEq(get_quota_fs_projid(path + "/file.txt"), projid)
 
     os.unlink(path + "/file.txt")
 
@@ -231,10 +231,8 @@ def backend_plain(c):
         check_mounted(c, path, **args)
         check_destroy_linked_non_root(c, path, **args)
 
-        assert Catch(check_tune_space_limit, c, path, **args) ==\
-                     porto.exceptions.InvalidProperty
-        assert Catch(check_tune_inode_limit, c, path, **args) ==\
-                     porto.exceptions.InvalidProperty
+        ExpectEq(Catch(check_tune_space_limit, c, path, **args), porto.exceptions.InvalidProperty)
+        ExpectEq(Catch(check_tune_inode_limit, c, path, **args), porto.exceptions.InvalidProperty)
         check_layers(c, path, **args)
 
     os.rmdir(TMPDIR)
@@ -247,8 +245,8 @@ def backend_bind(c):
     TMPDIR = DIR + "/bind"
     os.mkdir(TMPDIR)
 
-    assert Catch(check_mounted, c, None, **args) == porto.exceptions.InvalidProperty
-    assert Catch(check_mounted, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
+    ExpectEq(Catch(check_mounted, c, None, **args), porto.exceptions.InvalidProperty)
+    ExpectEq(Catch(check_mounted, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
 
     BIND_STORAGE_DIR = DIR + "/bind_storage"
     os.mkdir(BIND_STORAGE_DIR)
@@ -257,11 +255,9 @@ def backend_bind(c):
     check_readonly(c, TMPDIR, **args)
     check_destroy_linked_non_root(c, TMPDIR, **args)
     check_mounted(c, TMPDIR, **args)
-    assert Catch(check_tune_space_limit, c, TMPDIR, **args) ==\
-                 porto.exceptions.InvalidProperty
-    assert Catch(check_tune_inode_limit, c, TMPDIR, **args) ==\
-                 porto.exceptions.InvalidProperty
-    assert Catch(check_layers, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
+    ExpectEq(Catch(check_tune_space_limit, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
+    ExpectEq(Catch(check_tune_inode_limit, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
+    ExpectEq(Catch(check_layers, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
 
     os.rmdir(TMPDIR)
     os.remove(BIND_STORAGE_DIR + "/file.txt")
@@ -282,7 +278,7 @@ def backend_tmpfs(c):
         check_tune_space_limit(c, path, **args)
         check_tune_inode_limit(c, path, **args)
 
-    assert Catch(check_layers, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
+    ExpectEq(Catch(check_layers, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
 
     os.rmdir(TMPDIR)
 
@@ -292,16 +288,16 @@ def backend_quota(c):
     TMPDIR = DIR + "/quota"
     os.mkdir(TMPDIR)
 
-    assert Catch(check_mounted, c, None, **args) == porto.exceptions.InvalidProperty
-    assert Catch(check_mounted, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
+    ExpectEq(Catch(check_mounted, c, None, **args), porto.exceptions.InvalidProperty)
+    ExpectEq(Catch(check_mounted, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
 
     args["space_limit"] = "1M"
     check_mounted(c, TMPDIR, **args)
-    assert Catch(check_readonly, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
+    ExpectEq(Catch(check_readonly, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
 
     check_destroy_linked_non_root(c, TMPDIR, **args)
 
-    assert Catch(check_tune_space_limit, c, TMPDIR, **args) == AssertionError
+    ExpectEq(Catch(check_tune_space_limit, c, TMPDIR, **args), AssertionError)
     cleanup_portod(c)
     os.remove(TMPDIR + "/file.zeroes")
 
@@ -314,7 +310,7 @@ def backend_quota(c):
     AsRoot()
     c = porto_reconnect(c)
 
-    assert Catch(check_tune_inode_limit, c, TMPDIR, **args) == AssertionError
+    ExpectEq(Catch(check_tune_inode_limit, c, TMPDIR, **args), AssertionError)
     cleanup_portod(c)
     for i in os.listdir(TMPDIR):
         os.remove(TMPDIR + "/" + i)
@@ -324,7 +320,7 @@ def backend_quota(c):
 
     check_tune_inode_limit(c, TMPDIR, **args)
 
-    assert Catch(check_layers, c, TMPDIR, **args) == porto.exceptions.InvalidProperty
+    ExpectEq(Catch(check_layers, c, TMPDIR, **args), porto.exceptions.InvalidProperty)
 
     AsRoot()
     c = porto_reconnect(c)
@@ -391,16 +387,16 @@ def backend_overlay(c):
         r.SetProperty("command", "bash -c \'echo 123 >> {}/a1\'".format(v.path))
         r.Start()
         r.Wait()
-        assert r.GetProperty("exit_status") == "0"
-        assert int(v.GetProperty("space_used")) <= int(v.GetProperty("space_limit"))
+        ExpectEq(r.GetProperty("exit_status"), "0")
+        ExpectLe(int(v.GetProperty("space_used")), int(v.GetProperty("space_limit")))
 
         r.Stop()
         r.SetProperty("command", "bash -c \'echo 456 >> {}/a2 || true\'".format(v.path))
         r.Start()
         r.Wait()
-        assert r.GetProperty("exit_status") == "0"
-        assert int(v.GetProperty("space_used")) <= int(v.GetProperty("space_limit"))
-        assert os.statvfs(v.path).f_bfree != 0
+        ExpectEq(r.GetProperty("exit_status"), "0")
+        ExpectLe(int(v.GetProperty("space_used")), int(v.GetProperty("space_limit")))
+        ExpectNe(os.statvfs(v.path).f_bfree, 0)
 
         r.Destroy()
         v.Unlink()
@@ -439,12 +435,12 @@ def backend_overlay(c):
 
         v = c.CreateVolume(dest, layers=["d_layer"])
 
-        assert os.path.exists(v.path + "/d1")
-        assert os.path.exists(v.path + "/d1/a1")
-        assert os.path.exists(v.path + "/d1/a2")
-        assert os.path.exists(v.path + "/d2")
-        assert os.path.exists(v.path + "/d2/a1")
-        assert os.path.exists(v.path + "/d2/a2")
+        Expect(os.path.exists(v.path + "/d1"))
+        Expect(os.path.exists(v.path + "/d1/a1"))
+        Expect(os.path.exists(v.path + "/d1/a2"))
+        Expect(os.path.exists(v.path + "/d2"))
+        Expect(os.path.exists(v.path + "/d2/a1"))
+        Expect(os.path.exists(v.path + "/d2/a2"))
 
         os.unlink(v.path + "/d2/a1")
         os.unlink(v.path + "/d2/a2")
@@ -459,15 +455,15 @@ def backend_overlay(c):
 
         v = c.CreateVolume(dest, layers=["d_removed_layer", "d_layer"])
 
-        assert os.path.exists(v.path + "/d1")
-        assert os.path.exists(v.path + "/d1/a1")
-        assert os.path.exists(v.path + "/d1/a2")
-        assert os.path.exists(v.path + "/d2")
-        assert os.path.exists(v.path + "/d2/a3")
-        assert open(v.path + "/d2/a3", "r").read() == "a3"
+        Expect(os.path.exists(v.path + "/d1"))
+        Expect(os.path.exists(v.path + "/d1/a1"))
+        Expect(os.path.exists(v.path + "/d1/a2"))
+        Expect(os.path.exists(v.path + "/d2"))
+        Expect(os.path.exists(v.path + "/d2/a3"))
+        ExpectEq(open(v.path + "/d2/a3", "r").read(), "a3")
         try:
-            assert not os.path.exists(v.path + "/d2/a1")
-            assert not os.path.exists(v.path + "/d2/a2")
+            Expect(not os.path.exists(v.path + "/d2/a1"))
+            Expect(not os.path.exists(v.path + "/d2/a2"))
         except AssertionError:
             #FIXME: remove when tar --xargs wiil be used
             print "Directory opaqueness is lost as expected"
@@ -507,7 +503,7 @@ def backend_overlay(c):
         r.Wait()
         v.Export(DIR + "/upper.tar")
         r.Destroy()
-        assert tarfile.open(name=DIR + "/upper.tar").extractfile("test_file2.txt").read() == "1234"
+        ExpectEq(tarfile.open(name=DIR + "/upper.tar").extractfile("test_file2.txt").read(), "1234")
         os.remove(DIR + "/upper.tar")
 
     os.rmdir(TMPDIR)
@@ -533,7 +529,7 @@ def backend_loop(c):
     args["space_limit"] = "512M"
     v = c.CreateVolume(**args)
     args["storage"] = os.path.abspath(v.path + "/../loop/loop.img")
-    assert Catch(c.CreateVolume, **args) == porto.exceptions.Busy
+    ExpectEq(Catch(c.CreateVolume, **args), porto.exceptions.Busy)
     v.Unlink("/")
 
     f = open(DIR + "/loop.img", "w")
@@ -543,7 +539,7 @@ def backend_loop(c):
     subprocess.check_call(["mkfs.ext4", "-F", "-q", DIR + "/loop.img"])
     args["storage"] = os.path.abspath(DIR + "/loop.img")
     v = c.CreateVolume(**args)
-    assert Catch(c.CreateVolume, **args) == porto.exceptions.Busy
+    ExpectEq(Catch(c.CreateVolume, **args), porto.exceptions.Busy)
     v.Unlink("/")
 
     os.unlink(DIR + "/loop.img")
@@ -561,8 +557,8 @@ os.mkdir(DIR)
 c = porto_reconnect(c)
 
 def TestBody(c):
-    assert len(os.listdir(PLACE)) == 0
-    assert len(c.ListVolumes()) == 0
+    ExpectEq(len(os.listdir(PLACE)), 0)
+    ExpectEq(len(c.ListVolumes()), 0)
 
     open(DIR + "/test_file.txt", "w").write("1234567890")
     t = tarfile.open(name=DUMMYLAYER, mode="w")
@@ -583,8 +579,8 @@ def TestBody(c):
     backend_loop(c)
 
     c.RemoveLayer("test-volumes")
-    assert len(c.ListVolumes()) == 0
-    assert len(os.listdir(PLACE)) == 0
+    ExpectEq(len(c.ListVolumes()), 0)
+    ExpectEq(len(os.listdir(PLACE)), 0)
 
 ret = 0
 
