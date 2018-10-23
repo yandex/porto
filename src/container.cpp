@@ -386,8 +386,10 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 
     if (IsRoot()) {
         CpuLimit = GetNumCores() * NSEC_PER_SEC;
+        MemGuarantee = config().daemon().memory_guarantee_reserve();
         SetProp(EProperty::CPU_LIMIT);
         SetProp(EProperty::MEM_LIMIT);
+        SetProp(EProperty::MEM_GUARANTEE);
     }
 
     IoPolicy = "";
