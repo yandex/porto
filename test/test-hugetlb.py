@@ -22,14 +22,14 @@ SetSize('0')
 
 ExpectEq(root['hugetlb_limit'], '0')
 
-total = root['memory_limit']
+total = int(root['memory_limit'])
 
 SetSize('1')
 
 ExpectEq(root['hugetlb_limit'], '2097152')
 ExpectEq(root['hugetlb_usage'], '0')
 
-ExpectEq(root['memory_limit'], str(int(total) - 2097152))
+ExpectEq(root['memory_limit'], str(total - 2097152))
 
 a = conn.Run('a', command="fallocate -l 2m /dev/hugepages/dummy", wait=1)
 
@@ -90,7 +90,8 @@ os.unlink('/dev/hugepages/dummy')
 SetSize('0')
 
 
-total = root['memory_limit']
+total = int(root['memory_limit'])
+reserve = int(root['memory_guarantee'])
 
 ExpectEq(root['memory_guarantee_total'], '0')
 
@@ -99,9 +100,9 @@ ExpectEq(Catch(conn.Run, 'a', memory_guarantee=total), porto.exceptions.Resource
 AsAlice()
 alice_conn = porto.Connection()
 
-a = alice_conn.Run('a', memory_guarantee=int(total) - 2**31)
+a = alice_conn.Run('a', memory_guarantee=total - reserve)
 
-ExpectEq(root['memory_guarantee_total'], str(int(total) - 2**31))
+ExpectEq(root['memory_guarantee_total'], str(total - reserve))
 
 ExpectEq(Catch(alice_conn.Run, 'b', memory_guarantee='4k'), porto.exceptions.ResourceNotAvailable)
 
@@ -124,9 +125,9 @@ ExpectEq(Catch(alice_conn.Run, 'b'), porto.exceptions.ResourceNotAvailable)
 b = alice_conn.Run('a/b')
 b.Destroy()
 
-ExpectEq(Catch(alice_conn.SetProperty, 'a', 'memory_guarantee', int(total) - 2**31 + 1), porto.exceptions.ResourceNotAvailable)
+ExpectEq(Catch(alice_conn.SetProperty, 'a', 'memory_guarantee', total - reserve + 1), porto.exceptions.ResourceNotAvailable)
 
-alice_conn.SetProperty('a', 'memory_guarantee', int(total) - 2**31 - 1)
+alice_conn.SetProperty('a', 'memory_guarantee', total - reserve - 1)
 alice_conn.SetProperty('a', 'memory_guarantee', 0)
 
 ExpectEq(root['memory_guarantee_total'], '0')
