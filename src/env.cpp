@@ -151,12 +151,6 @@ TError TUlimitResource::Parse(const std::string &str) {
     return OK;
 }
 
-std::string TUlimitResource::Format() const {
-    auto soft = Soft < RLIM_INFINITY ? fmt::format("{}", Soft) : "unlimited";
-    auto hard = Hard < RLIM_INFINITY ? fmt::format("{}", Hard) : "unlimited";
-    return fmt::format("{}: {} {}", TUlimit::GetName(Type), soft, hard);
-}
-
 int TUlimit::GetType(const std::string &name) {
     static const std::map<std::string, int> types = {
         { "as", RLIMIT_AS },
@@ -240,10 +234,17 @@ TError TUlimit::Parse(const std::string &str) {
     return OK;
 }
 
+std::string TUlimit::Format(uint64_t val) {
+    return val < RLIM_INFINITY ? std::to_string(val) : "unlimited";
+}
+
 std::string TUlimit::Format() const {
     std::string str;
     for (auto &res: Resources)
-        str += res.Format() + "; ";
+        str += fmt::format("{}: {} {}; ",
+                           TUlimit::GetName(res.Type),
+                           TUlimit::Format(res.Soft),
+                           TUlimit::Format(res.Hard));
     return str;
 }
 

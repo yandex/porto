@@ -543,8 +543,7 @@ static TError TuneLimits() {
     if (error)
         return error;
 
-    for (auto &res: ulimit.Resources)
-        L_SYS("Ulimit {}", res.Format());
+    L_SYS("Ulimit {}", ulimit.Format());
 
     return OK;
 }

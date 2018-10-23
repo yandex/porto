@@ -555,7 +555,7 @@ public:
 class TUlimitProperty : public TProperty {
 public:
     TUlimitProperty() : TProperty(P_ULIMIT, EProperty::ULIMIT,
-            "Process limits: as|core|data|locks|memlock|nofile|nproc|stack: [soft]|unlimited [hard];... (see man prlimit)") 
+            "Process limits: as|core|data|locks|memlock|nofile|nproc|stack: [soft]|unlimited [hard];... (see man prlimit)")
     {
         IsDynamic = true;
     }
@@ -567,9 +567,13 @@ public:
 
     TError GetIndexed(const std::string &index, std::string &value) {
         auto type = TUlimit::GetType(index);
+        if (type < 0)
+            return TError(EError::InvalidValue, "invalid ulimit: {}", index);
         for (auto &res: CT->Ulimit.Resources) {
             if (res.Type == type)
-                value = res.Format();
+                value = fmt::format("{} {}",
+                                    TUlimit::Format(res.Soft),
+                                    TUlimit::Format(res.Hard));
         }
         return OK;
     }

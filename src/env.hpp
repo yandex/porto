@@ -35,7 +35,6 @@ struct TUlimitResource {
     bool Overwritten;
 
     TError Parse(const std::string &str);
-    std::string Format() const;
 };
 
 struct TUlimit {
@@ -44,7 +43,10 @@ struct TUlimit {
     static int GetType(const std::string &name);
     static std::string GetName(int type);
     TError Parse(const std::string &str);
+
+    static std::string Format(uint64_t val);
     std::string Format() const;
+
     TError Load(pid_t pid = 0);
     TError Apply(pid_t pid = 0) const;
     void Clear() { Resources.clear(); }
