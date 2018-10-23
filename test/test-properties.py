@@ -480,12 +480,12 @@ ct = conn.Run(ct_name)
 
 print " -  ulimit core"
 set_old('ulimit[core]', 'unlimited')
-ExpectEq(get_old('ulimit[core]'), 'core: unlimited unlimited')
+ExpectEq(get_old('ulimit[core]'), 'unlimited unlimited')
 set_old('ulimit[core]', '0 unlimited')
 ExpectEq(get_sub('ulimit', 'ulimit', 'type', 'core'), {'type': 'core', 'soft': 0})
 set_new('ulimit', {'merge': True, 'ulimit': [{'type': 'core', 'unlimited': True}]})
 ExpectEq(get_sub('ulimit', 'ulimit', 'type', 'core'), {'type': 'core', 'unlimited': True})
-ExpectEq(get_old('ulimit[core]'), 'core: unlimited unlimited')
+ExpectEq(get_old('ulimit[core]'), 'unlimited unlimited')
 
 ct.Destroy()
 
