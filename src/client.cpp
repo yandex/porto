@@ -48,6 +48,12 @@ TClient::~TClient() {
 void TClient::CloseConnection() {
     auto lock = Lock();
 
+    if (SyncWaiter)
+        SyncWaiter->Deactivate();
+
+    if (AsyncWaiter)
+        AsyncWaiter->Deactivate();
+
     if (Fd >= 0) {
         if (InEpoll)
             EpollLoop->RemoveSource(Fd);

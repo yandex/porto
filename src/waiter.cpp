@@ -10,30 +10,39 @@ static inline std::unique_lock<std::mutex> LockWaiters() {
 }
 
 TContainerWaiter::~TContainerWaiter() {
-    if (Active) {
-        auto lock = LockWaiters();
-        Deactivate();
-    }
+    PORTO_ASSERT(!Client);
 }
 
-void TContainerWaiter::Activate(std::shared_ptr<TClient> &client) {
+void TContainerWaiter::Activate(TClient &client) {
     auto lock = LockWaiters();
-    Client = client;
-    auto link = Async ? &client->AsyncWaiter : &client->SyncWaiter;
-    if (*link) {
-        (*link)->Deactivate();
-        link->reset();
-    }
+
+    auto link = Async ? &client.AsyncWaiter : &client.SyncWaiter;
+    if (*link)
+        (*link)->DeactivateLocked();
+
+    PORTO_ASSERT(!Client);
+
     if (!Names.empty() || !Wildcards.empty()) {
+        Client = &client;
         *link = shared_from_this();
-        Active = true;
         ContainerWaiters.push_back(this);
     }
 }
 
 void TContainerWaiter::Deactivate() {
-    Active = false;
+    auto lock = LockWaiters();
+    if (Client)
+        DeactivateLocked();
+}
+
+void TContainerWaiter::DeactivateLocked() {
+    PORTO_ASSERT(Client);
+    auto link = Async ? &Client->AsyncWaiter : &Client->SyncWaiter;
+    PORTO_ASSERT(link->get() == this);
+
     ContainerWaiters.remove(this);
+    link->reset();
+    Client = nullptr;
 }
 
 bool TContainerWaiter::ShouldReport(TContainer &ct) {
@@ -71,35 +80,25 @@ void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const
         if (waiter->ShouldReport(ct) &&
                 (label.empty() || (label[0] >= 'a' && label[0] <= 'z') ||
                  waiter->ShouldReportLabel(label))) {
-            auto client = waiter->Client.lock();
 
             std::string name;
-            if (client && !client->ComposeName(ct.Name, name)) {
-                client->MakeReport(name, ct.State, waiter->Async, label, value);
+            if (!waiter->Client->ComposeName(ct.Name, name)) {
+                waiter->Client->MakeReport(name, ct.State, waiter->Async, label, value);
                 if (!waiter->Async) {
                     ++it;
-                    waiter->Deactivate();
-                    client->SyncWaiter.reset();
+                    waiter->DeactivateLocked();
                     continue;
                 }
             }
         }
-        if (waiter->Active)
-            ++it;
-        else
-            it = ContainerWaiters.erase(it);
+        ++it;
     }
 }
 
 void TContainerWaiter::Timeout() {
     auto lock = LockWaiters();
-    auto client = Client.lock();
-    if (client && Active) {
-        client->MakeReport("", EContainerState::UNDEFINED, Async);
-        Deactivate();
-        if (Async)
-            client->AsyncWaiter.reset();
-        else
-            client->SyncWaiter.reset();
+    if (Client) {
+        Client->MakeReport("", EContainerState::UNDEFINED, Async);
+        DeactivateLocked();
     }
 }

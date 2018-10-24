@@ -21,18 +21,18 @@ struct TContainerReport {
 
 class TContainerWaiter : public std::enable_shared_from_this<TContainerWaiter> {
 public:
-    std::weak_ptr<TClient> Client;
+    TClient *Client = nullptr;
     std::vector<std::string> Names;
     std::vector<std::string> Wildcards;
     std::vector<std::string> Labels;
     bool Async;
-    bool Active = false;
 
     TContainerWaiter(bool async) : Async(async) { }
     ~TContainerWaiter();
 
-    void Activate(std::shared_ptr<TClient> &client);
+    void Activate(TClient &client);
     void Deactivate();
+    void DeactivateLocked();
 
     bool ShouldReport(TContainer &ct);
     bool ShouldReportLabel(const std::string &label);

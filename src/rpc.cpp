@@ -1111,7 +1111,7 @@ noinline TError WaitContainers(const Porto::TWaitRequest &req, bool async,
     if (req.has_timeout_ms() && req.timeout_ms() == 0) {
         client->MakeReport("", EContainerState::UNDEFINED, async);
     } else {
-        waiter->Activate(client);
+        waiter->Activate(*client);
         if (req.timeout_ms()) {
             TEvent e(EEventType::WaitTimeout, nullptr);
             e.WaitTimeout.Waiter = waiter;
