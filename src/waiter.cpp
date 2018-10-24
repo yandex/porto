@@ -94,7 +94,7 @@ void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const
 void TContainerWaiter::Timeout() {
     auto lock = LockWaiters();
     auto client = Client.lock();
-    if (client) {
+    if (client && Active) {
         client->MakeReport("", EContainerState::UNDEFINED, Async);
         Deactivate();
         if (Async)
