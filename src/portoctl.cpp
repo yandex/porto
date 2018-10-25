@@ -1229,6 +1229,9 @@ public:
         launcher.Environment.push_back("PORTO_SHELL_NAME=" + ct);
         launcher.Environment.push_back("PORTO_SHELL_USER=" + current_user);
 
+        if (user == "root" || getuid() == 0)
+            launcher.Environment.push_back("HOME=/root");
+
         if (user != "") {
             if (user == "root") {
                 launcher.SetProperty("virt_mode", "os");
