@@ -964,6 +964,9 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     bool recursive = true;
     TError error;
 
+    if (!(stat & (IoStat::Read | IoStat::Write | IoStat::Sync)))
+        stat = (IoStat)(stat | IoStat::Read | IoStat::Write);
+
     if (stat & IoStat::Time) {
         if (HasThrottlerTime)
             knob = "blkio.throttle.io_service_time_recursive"; /* offstream */
@@ -1056,17 +1059,19 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
         }
     }
 
-    if (stat & IoStat::Read) {
-        map["hw"] = hw_read;
-    } else if (stat & IoStat::Write) {
-        map["hw"] = hw_write;
-    } else if (stat & IoStat::Sync) {
-        map["hw"] = hw_sync;
-    } else {
-        map["hw"] = hw_read + hw_write;
-        map["hw read"] = hw_read;
-        map["hw write"] = hw_write;
-        map["hw sync"] = hw_sync;
+    if (stat & IoStat::Read)
+        map["hw"] += hw_read;
+
+    if (stat & IoStat::Write)
+        map["hw"] += hw_write;
+
+    if (stat & IoStat::Sync)
+        map["hw"] += hw_sync;
+
+    if ((stat & (IoStat::Read | IoStat::Write)) == (IoStat::Read | IoStat::Write)) {
+        map["hw r"] = hw_read;
+        map["hw w"] = hw_write;
+        map["hw s"] = hw_sync;
     }
 
     return OK;

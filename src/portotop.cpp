@@ -1215,12 +1215,12 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
 
     AddColumn("IO depth", "io_time[hw]' 1e9", "Average hardware queue depth", ValueFlags::Io);
     AddColumn("IO wait", "io_wait[hw]' 1e9", "Average scheduler queue depth", ValueFlags::Io);
-    AddColumn("IO wsync", "io_wait[hw sync]' 1e9", "Average scheduler synchronous queue depth", ValueFlags::Io);
+    AddColumn("IO wsync", "io_wait[hw s]' 1e9", "Average scheduler synchronous queue depth", ValueFlags::Io);
 
     AddColumn("IO op", "io_ops[hw]'", "IO operations per second", ValueFlags::Io);
-    AddColumn("IO sy", "io_ops[hw sync]'", "IO synchronous operations per second", ValueFlags::Io);
-    AddColumn("IO rd", "io_ops[hw read]'", "IO read operations per second", ValueFlags::Io);
-    AddColumn("IO wr", "io_ops[hw write]'", "IO write operations per second", ValueFlags::Io);
+    AddColumn("IO sy", "io_ops[hw s]'", "IO synchronous operations per second", ValueFlags::Io);
+    AddColumn("IO rd", "io_ops[hw r]'", "IO read operations per second", ValueFlags::Io);
+    AddColumn("IO wr", "io_ops[hw w]'", "IO write operations per second", ValueFlags::Io);
 
     AddColumn("FS op", "io_ops[fs]'", "IO operations by fs", ValueFlags::Io);
     AddColumn("FS read", "io_read[fs]' b", "IO bytes read by fs", ValueFlags::Io);
