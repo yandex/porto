@@ -41,8 +41,9 @@ void TContainerWaiter::DeactivateLocked() {
     PORTO_ASSERT(link->get() == this);
 
     ContainerWaiters.remove(this);
-    link->reset();
     Client = nullptr;
+
+    link->reset();
 }
 
 bool TContainerWaiter::ShouldReport(TContainer &ct) {
