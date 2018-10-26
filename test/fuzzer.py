@@ -1013,6 +1013,7 @@ print "Kills", porto_kills.value
 print "Errors", get_property(conn, "/", "porto_stat[errors]")
 print "Warnings", get_property(conn, "/", "porto_stat[warnings]")
 print "PortoStarts", get_property(conn, "/", "porto_stat[spawned]")
+print "PortoCrash", get_property(conn, "/", "porto_stat[porto_crash]")
 print "VolumeLost", get_property(conn, "/", "porto_stat[volume_lost]")
 print "ContainerLost", get_property(conn, "/", "porto_stat[restore_failed]")
 

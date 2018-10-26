@@ -1190,7 +1190,12 @@ static void SpawnPortod(std::shared_ptr<TEpollLoop> loop) {
             if (source->Fd == sigFd) {
 
             } else if (source->Fd == ackfd[0]) {
+                if (ev.events & EPOLLHUP) {
+                    L_SYS("Portod closed pipe for zombies");
+                    goto exit;
+                }
                 if (!ReapZombies(ackfd[0])) {
+                    L_SYS("Cannot get ack for zombies");
                     goto exit;
                 }
             } else {
@@ -1210,6 +1215,10 @@ exit:
         (void)waitpid(PortodPid, &PortodStatus, 0);
         PortodPid = 0;
     }
+
+    if (WIFSIGNALED(PortodStatus) ? (WTERMSIG(PortodStatus) != SIGKILL) :
+                                    WEXITSTATUS(PortodStatus))
+        Statistics->PortoCrash++;
 
     L_SYS("Portod {}", FormatExitStatus(PortodStatus));
 

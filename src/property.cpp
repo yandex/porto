@@ -4909,6 +4909,8 @@ public:
 
 void TPortoStat::Populate(TUintMap &m) {
     m["spawned"] = Statistics->PortoStarts;
+    m["porto_crash"] = Statistics->PortoCrash;
+
     m["errors"] = Statistics->Errors;
     m["warnings"] = Statistics->Warns;
     m["taints"] = Statistics->Taints;

@@ -1832,6 +1832,7 @@ noinline static TError GetSystemProperties(const Porto::TGetSystemRequest *, Por
     rsp->set_errors(Statistics->Errors);
     rsp->set_warnings(Statistics->Warns);
     rsp->set_porto_starts(Statistics->PortoStarts);
+    rsp->set_porto_crash(Statistics->PortoCrash);
     rsp->set_porto_uptime((GetCurrentTimeMs() - Statistics->PortoStarted) / 1000);
     rsp->set_master_uptime((GetCurrentTimeMs() - Statistics->MasterStarted) / 1000);
     rsp->set_taints(Statistics->Taints);

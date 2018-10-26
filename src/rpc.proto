@@ -1013,6 +1013,8 @@ message TGetSystemResponse {
     optional fixed64 fail_invalid_command = 602;
     optional fixed64 fail_memory_guarantee = 603;
 
+    optional fixed64 porto_crash = 666;
+
     optional fixed64 network_count = 700;
     optional fixed64 network_created = 701;
     optional fixed64 network_problems = 702;
