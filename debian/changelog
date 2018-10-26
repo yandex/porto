@@ -1,3 +1,12 @@
+yandex-porto (4.20.4) unstable; urgency=low
+
+  * test/wait: check nonblock and timeout
+  * porto: fix assert in waiter state machine
+  * cgroup: fix per-device read/write statistics
+  * porto: count portod crashes
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 26 Oct 2018 19:19:23 +0300
+
 yandex-porto (4.20.3) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
