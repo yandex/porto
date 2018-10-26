@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
 import porto
+import subprocess
 from test_common import *
 
+subprocess.call(["modprobe", "brd"])
 os.chmod("/dev/ram0", 0666)
 
 AsAlice()
