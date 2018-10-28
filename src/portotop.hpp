@@ -103,14 +103,14 @@ private:
 
 namespace ValueFlags {
     static const int Raw = 0x1;
-    static const int Map = 0x2;
     static const int DfDt = 0x4;
     static const int PartOfRoot = 0x8;
     static const int Seconds = 0x10;
     static const int Bytes = 0x20;
     static const int Percents = 0x40;
-    static const int Multiplier = 0x80;
+    static const int Nano = 0x80;
     static const int Left = 0x100;
+    static const int Int = 0x200;
     static const int Hidden = 0x800;
 
     static const int Container = 0x1000;
@@ -133,7 +133,9 @@ public:
     TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container);
     TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
                 std::shared_ptr<TPortoContainer> &container,
-                const std::string &variable, int flags = 0, double multiplier = 1);
+                const std::string &variable,
+                const std::string &index,
+                int flags);
     ~TPortoValue();
 
     int Flags;
@@ -145,11 +147,12 @@ public:
 private:
     std::shared_ptr<TPortoValueCache> Cache;
     std::shared_ptr<TPortoContainer> Container;
-    std::string Variable; // property or data
+    std::string Variable;
+    std::string Index;
 
     std::string AsString;
+
     double AsNumber = 0.0;
-    double Multiplier = 0.0;
 };
 
 class TCommonValue {
@@ -198,7 +201,12 @@ public:
     void Sort();
     void Print(TConsoleScreen &screen);
 
-    bool AddColumn(std::string title, std::string signal, std::string desc, int flags = 0);
+    void AddColumn(const std::string &title,
+                  const std::string &desc,
+                  const std::string &prop,
+                  const std::string &index,
+                  int flags);
+
     void MarkRow();
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
@@ -222,10 +230,11 @@ public:
     bool Invert = false;
 
 private:
-    void AddCommon(int row, const std::string &title, const std::string &var,
-                   std::shared_ptr<TPortoContainer> &container,
-                   int flags = 0, double multiplier = 1.0);
-    void AddColumn(const TColumn &c);
+    void AddCommon(int row,
+                   const std::string &title,
+                   const std::string &var,
+                   const std::string &index,
+                   int flags);
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
 
