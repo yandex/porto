@@ -1087,7 +1087,9 @@ void TPortoTop::AddCommon(int row,
 TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args) :
     Api(api),
     Cache(std::make_shared<TPortoValueCache>()),
-    RootContainer(std::make_shared<TPortoContainer>("/")) {
+    RootContainer(std::make_shared<TPortoContainer>("/"))
+{
+    std::string val;
 
     (void)args;
 
@@ -1139,11 +1141,11 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
               "cpu_throttled", "",
               ValueFlags::Cpu | ValueFlags::DfDt | ValueFlags::Nano | ValueFlags::Percents);
 
-    AddColumn("IO-T%", "Waiting for disk IO completion",
+    AddColumn("IO T%", "Waiting for disk IO completion",
               "io_time", "hw",
               ValueFlags::Cpu | ValueFlags::DfDt | ValueFlags::Nano | ValueFlags::Percents);
 
-    AddColumn("IO-W%", "Waiting for disk IO start",
+    AddColumn("IO W%", "Waiting for disk IO start",
               "io_wait", "hw",
               ValueFlags::Cpu | ValueFlags::DfDt | ValueFlags::Nano | ValueFlags::Percents);
 
@@ -1253,36 +1255,20 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
               "io_write", "hw",
               ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Bytes);
 
-    AddColumn("IO depth", "Average hardware queue depth",
-              "io_time", "hw",
-              ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
-
-    AddColumn("IO wait", "Average scheduler queue depth",
-              "io_wait", "hw",
-              ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
-
-    AddColumn("IO wsync", "Average scheduler synchronous queue depth",
-              "io_wait", "hw s",
-              ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
-
-    AddColumn("IO op", "IO operations per second",
+    AddColumn("Iops", "IO operations per second",
               "io_ops", "hw",
               ValueFlags::Io | ValueFlags::DfDt);
 
-    AddColumn("IO sy", "IO synchronous operations per second",
-              "io_ops", "hw s",
-              ValueFlags::Io | ValueFlags::DfDt);
-
-    AddColumn("IO rd", "IO read operations per second",
+    AddColumn("Rops", "IO read operations per second",
               "io_ops", "hw r",
               ValueFlags::Io | ValueFlags::DfDt);
 
-    AddColumn("IO wr", "IO write operations per second",
+    AddColumn("Wops", "IO write operations per second",
               "io_ops", "hw w",
               ValueFlags::Io | ValueFlags::DfDt);
 
-    AddColumn("FS op", "IO operations by fs",
-              "io_ops", "fs",
+    AddColumn("Sops", "IO synchronous operations per second",
+              "io_ops", "hw s",
               ValueFlags::Io | ValueFlags::DfDt);
 
     AddColumn("FS read", "IO bytes read by fs",
@@ -1292,6 +1278,62 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
     AddColumn("FS write", "IO bytes written by fs",
               "io_write", "fs",
               ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Bytes);
+
+    AddColumn("FS ops", "IO operations by fs",
+              "io_ops", "fs",
+              ValueFlags::Io | ValueFlags::DfDt);
+
+    AddColumn("Hq", "Average hardware queue depth",
+              "io_time", "hw",
+              ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
+
+    AddColumn("Sq", "Average scheduler queue depth",
+              "io_wait", "hw",
+              ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
+
+    if (!Api->GetProperty("/", "io_time", val)) {
+        TStringMap map;
+        StringToStringMap(val, map);
+        for (auto &it: map) {
+            auto dev = it.first;
+            if (dev == "fs" || dev == "hw" || dev.find(' ') != std::string::npos)
+                continue;
+
+            AddColumn("Hq " + dev, "Average hardware queue depth for disk " + dev,
+                      "io_time", dev,
+                      ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
+
+            AddColumn("Sq " + dev, "Average scheduler queue depth for disk " + dev,
+                      "io_wait", dev,
+                      ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Nano);
+        }
+    }
+
+    if (!Api->GetProperty("/", "io_ops", val)) {
+        TStringMap map;
+        StringToStringMap(val, map);
+        for (auto &it: map) {
+            auto dev = it.first;
+            if (dev == "fs" || dev == "hw" || dev.find(' ') != std::string::npos)
+                continue;
+
+            AddColumn("Rd " + dev, "IO bytes per second read from disk " + dev,
+                      "io_read", dev,
+                      ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Bytes);
+
+            AddColumn("Wr " + dev, "IO bytes per second written to disk " + dev,
+                      "io_write", dev,
+                      ValueFlags::Io | ValueFlags::DfDt | ValueFlags::Bytes);
+
+            AddColumn("Op " + dev, "IO operations per second for disk " + dev,
+                      "io_ops", dev,
+                      ValueFlags::Io | ValueFlags::DfDt);
+
+            AddColumn("Wo " + dev, "Write operations per second for disk " + dev,
+                      "io_ops", dev + " w",
+                      ValueFlags::Io | ValueFlags::DfDt);
+        }
+    }
 
     /* Network */
     AddColumn("Net", "Network config",
