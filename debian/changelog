@@ -1,3 +1,12 @@
+yandex-porto (4.20.5) unstable; urgency=low
+
+  * test/devices: load module brd
+  * cgroup: collect more disk statistics
+  * portotop: parse map properties
+  * portotop: add per-disk columns
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 29 Oct 2018 16:09:03 +0300
+
 yandex-porto (4.20.4) unstable; urgency=low
 
   * test/wait: check nonblock and timeout
