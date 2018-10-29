@@ -794,6 +794,8 @@ Disk names are single words, like: "sda" or "md0".
 
 "hw" is a total statistics for all disks.
 
+Second index: "r" - read, "w" - write, "d" - discard, "s" - sync (read + sync write).
+
 Statistics and limits could be requested for filesystem path.
 Absolute paths are resolved in host, paths starting with dot in chroot:
 **io\_read\[/\]**, **io\_read\[.\]**.
@@ -806,18 +808,18 @@ Absolute paths are resolved in host, paths starting with dot in chroot:
 
     Works with blk-throttler or CFQ group scheduler.
 
-* **io\_ops** - disk operations: \<disk\>|hw: \<count\>;...
+* **io\_ops** - disk operations: \<disk\>|hw \[r|w|d|s\]: \<count\>;...
 
     Works with blk-throttler or CFQ group scheduler.
 
-* **io\_time** - total io execution time: \<disk\>|hw: \<nanoseconds\>;...
+* **io\_time** - total io execution time: \<disk\>|hw \[r|w|d|s\]: \<nanoseconds\>;...
 
    Total time spent in hardware queues.
    Works for CFQ group or with offstream patch.
 
    Rate of change is a average queue depth.
 
-* **io\_wait** - total io wait time: \<disk\>|hw: \<nanoseconds\>;...
+* **io\_wait** - total io wait time: \<disk\>|hw \[r|w|d|s\]: \<nanoseconds\>;...
 
    Total time spent in scheduler queues.
    Works for CFQ group or with offstream patch.

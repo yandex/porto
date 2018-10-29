@@ -964,8 +964,8 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     bool recursive = true;
     TError error;
 
-    if (!(stat & (IoStat::Read | IoStat::Write | IoStat::Sync)))
-        stat = (IoStat)(stat | IoStat::Read | IoStat::Write);
+    if (!(stat & (IoStat::Read | IoStat::Write | IoStat::Discard | IoStat::Sync)))
+        stat = (IoStat)(stat | IoStat::Full);
 
     if (stat & IoStat::Time) {
         if (HasThrottlerTime)
@@ -1017,11 +1017,16 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
 
     uint64_t hw_read = 0;
     uint64_t hw_write = 0;
+    uint64_t hw_discard = 0;
     uint64_t hw_sync = 0;
 
     for (auto &line: lines) {
         auto word = SplitString(line, ' ');
         if (word.size() != 3)
+            continue;
+
+        uint64_t val;
+        if (StringToUint64(word[2], val) || !val)
             continue;
 
         if (word[0] != prev) {
@@ -1037,23 +1042,32 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
         if (hide)
             continue;
 
-        uint64_t val;
-        if (StringToUint64(word[2], val) || !val)
-            continue;
-
         if (word[1] == "Read") {
-            if (stat & IoStat::Read)
+            if (stat & (IoStat::Read | IoStat::Full))
                 map[name] += val;
+            if (stat & IoStat::Full)
+                map[name + " r"] += val;
             if (summ)
                 hw_read += val;
         } else if (word[1] == "Write") {
-            if (stat & IoStat::Write)
+            if (stat & (IoStat::Write | IoStat::Full))
                 map[name] += val;
+            if (stat & IoStat::Full)
+                map[name + " w"] += val;
             if (summ)
                 hw_write += val;
+        } else if (word[1] == "Discard") {
+            if (stat & (IoStat::Discard | IoStat::Full))
+                map[name] += val;
+            if (stat & IoStat::Full)
+                map[name + " d"] += val;
+            if (summ)
+                hw_discard += val;
         } else if (word[1] == "Sync") {
             if (stat & IoStat::Sync)
                 map[name] += val;
+            if (stat & IoStat::Full)
+                map[name + " s"] += val;
             if (summ)
                 hw_sync += val;
         }
@@ -1065,12 +1079,17 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     if (stat & IoStat::Write)
         map["hw"] += hw_write;
 
+    if (stat & IoStat::Discard)
+        map["hw"] += hw_discard;
+
     if (stat & IoStat::Sync)
         map["hw"] += hw_sync;
 
-    if ((stat & (IoStat::Read | IoStat::Write)) == (IoStat::Read | IoStat::Write)) {
+    if (stat & IoStat::Full) {
+        map["hw"] = hw_read + hw_write + hw_discard;
         map["hw r"] = hw_read;
         map["hw w"] = hw_write;
+        map["hw d"] = hw_discard;
         map["hw s"] = hw_sync;
     }
 
