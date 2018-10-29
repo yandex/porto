@@ -2465,71 +2465,6 @@ undo:
     return error;
 }
 
-TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
-                           std::list<std::shared_ptr<TVolume>> &unlinked,
-                           bool strict) {
-    TError error;
-
-    auto volumes_lock = LockVolumes();
-    if (link->Volume.get() != this)
-        return TError(EError::InvalidValue, "Wrong volume link");
-    if (!link->HostTarget)
-        return OK;
-    TPath host_target = link->HostTarget;
-    volumes_lock.unlock();
-
-    L_ACT("Umount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
-
-    error = host_target.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
-    if (error) {
-        error = TError(error, "Cannot umount volume {} link {} for CT{}:{} target {}", Path,
-                host_target, link->Container->Id, link->Container->Name, link->Target);
-        if (error.Error == EError::NotFound)
-            L("{}", error.Text);
-        else if (strict)
-            return error;
-        else
-            L_WRN("{}", error.Text);
-    }
-
-    volumes_lock.lock();
-
-    for (auto it = VolumeLinks.lower_bound(host_target);
-            it != VolumeLinks.end() && it->first.IsInside(host_target);) {
-        auto &link = it->second;
-
-        if (link->HostTarget != it->first)
-            L_WRN("Volume link out of sync: {} != {}", link->HostTarget, it->first);
-
-        if (link->HostTarget != host_target)
-            L_ACT("Umount nested volume {} link {} for CT{}:{}",
-                    link->Volume->Path, link->HostTarget,
-                    link->Container->Id, link->Container->Name);
-
-        /* common link */
-        if (it->first == link->Volume->Path) {
-            link->Volume->SetState(EVolumeState::UNLINKED);
-            unlinked.emplace_back(link->Volume);
-        }
-
-        for (auto ct = link->Container; ct; ct = ct->Parent) {
-            ct->VolumeMounts--;
-            if (ct->VolumeMounts < 0)
-                L_WRN("Volume mounts underflow {} at {} total {}", ct->VolumeMounts, ct->Name, VolumeLinks.size());
-        }
-
-        link->HostTarget = "";
-        it = VolumeLinks.erase(it);
-    }
-
-    volumes_lock.unlock();
-
-    /* Save changes only after umounting */
-    (void)Save();
-
-    return error;
-}
-
 void TVolume::DeleteAll() {
     std::list<std::shared_ptr<TVolume>> plan;
     for (auto &it : Volumes)
@@ -3015,6 +2950,7 @@ TError TVolume::UnlinkVolume(std::shared_ptr<TContainer> container, const TPath 
     std::shared_ptr<TVolumeLink> link;
     bool all = target.ToString() == "***";
     bool was_linked = false;
+    TPath host_target;
 
 next:
     for (auto &l: Links) {
@@ -3041,32 +2977,77 @@ next:
     if (link->Busy)
         return TError(EError::Busy, "Volume {} link {} is busy", Path, target);
 
-    if (link->HostTarget) {
-        link->Busy = true;
-        volumes_lock.unlock();
-        error = UmountLink(link, unlinked, strict);
-        link->Busy = false;
-        if (error) {
-            if (strict)
-                return error;
-            L_WRN("Cannot umount volume link: {}", error);
+    if (link->Volume.get() != this)
+        return TError(EError::InvalidValue, "Wrong volume link");
+
+    if (!link->HostTarget) {
+        L_ACT("Del volume {} link {} for CT{}:{}", Path, link->Target, container->Id, container->Name);
+        container->VolumeLinks.remove(link);
+        Links.remove(link);
+        if (Links.empty() && (State & (EVolumeState::READY |
+                                       EVolumeState::TUNING))) {
+            SetState(EVolumeState::UNLINKED);
+            unlinked.emplace_back(shared_from_this());
         }
-        volumes_lock.lock();
+        goto done;
     }
 
-    L_ACT("Del volume {} link {} for CT{}:{}", Path, link->Target, container->Id, container->Name);
+    link->Busy = true;
+    host_target = link->HostTarget;
+    volumes_lock.unlock();
 
-    Links.remove(link);
-    if (Links.empty() && (State & (EVolumeState::READY |
-                                   EVolumeState::TUNING))) {
-        SetState(EVolumeState::UNLINKED);
-        unlinked.emplace_back(shared_from_this());
+    L_ACT("Umount volume {} link {} for CT{}:{}", Path, host_target, link->Container->Id, link->Container->Name);
+
+    error = host_target.Umount(UMOUNT_NOFOLLOW | (strict ? 0 : MNT_DETACH));
+    if (error) {
+        error = TError(error, "Cannot umount volume {} link {} for CT{}:{} target {}", Path,
+                host_target, link->Container->Id, link->Container->Name, link->Target);
+        if (error.Error == EError::NotFound)
+            L("{}", error.Text);
+        else if (strict)
+            return error;
+        else
+            L_WRN("{}", error);
     }
-    container->VolumeLinks.remove(link);
-    /* Required path at container is sticky */
+
+    volumes_lock.lock();
+    link->Busy = false;
+
+    for (auto it = VolumeLinks.lower_bound(host_target);
+            it != VolumeLinks.end() && it->first.IsInside(host_target);) {
+        auto &link = it->second;
+        auto &vol = link->Volume;
+
+        if (link->HostTarget != it->first)
+            L_WRN("Volume link out of sync: {} != {}", link->HostTarget, it->first);
+
+        L_ACT("Del volume {} link {} for CT{}:{}", vol->Path, link->Target, link->Container->Id, link->Container->Name);
+
+        link->Container->VolumeLinks.remove(link);
+        vol->Links.remove(link);
+
+        /* Last or common link */
+        if ((vol->Links.empty() || link->HostTarget == vol->Path) &&
+                (vol->State & (EVolumeState::READY | EVolumeState::TUNING))) {
+            vol->SetState(EVolumeState::UNLINKED);
+            unlinked.emplace_back(vol);
+        }
+
+        for (auto ct = link->Container; ct; ct = ct->Parent) {
+            ct->VolumeMounts--;
+            if (ct->VolumeMounts < 0)
+                L_WRN("Volume mounts underflow {} at {} total {}", ct->VolumeMounts, ct->Name, VolumeLinks.size());
+        }
+
+        link->HostTarget = "";
+        it = VolumeLinks.erase(it);
+    }
+
+done:
     volumes_lock.unlock();
     link.reset();
 
+    /* Save changes only after umounting */
     (void)Save();
 
     if (all) {
