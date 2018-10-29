@@ -2276,6 +2276,9 @@ TError TContainer::GetEnvironment(TEnv &env) const {
 TError TContainer::ResolvePlace(TPath &place) const {
     TError error;
 
+    if (StringStartsWith(place.ToString(), "///"))
+        place = RootPath / place.ToString().substr(2);
+
     if (place.IsAbsolute()) {
         for (auto &policy: PlacePolicy) {
             if (policy[0] == '/' || policy == "***") {

@@ -1242,7 +1242,12 @@ Like for container volume configuration is a set of key-value pairs.
     This is path to directory where must be sub-directories
     "porto_layers", "porto_storage" and "porto_volumes".
 
-    Default and possible paths are controller by container property **place**.
+    Default and possible paths are controller by container property **place**:
+
+    - *default*       - first path in client container property **place**
+    - */path*         - path in host
+    - *///path*       - path in client container
+    - *alias*         - path in host set is *alias*=*/path* in property **place**
 
 * **place\_key**    - key for charging **place\_limit** for **owner\_container**
 
