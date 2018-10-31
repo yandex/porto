@@ -1,3 +1,13 @@
+yandex-porto (4.20.6) unstable; urgency=low
+
+  * porto: handle place="///path" as path in client container
+  * volume: recursive volume unlink
+  * debian: rewrite sysv init script
+  * property: io_time and io_wait requires blkio cgroup
+  * property: handle path request type index for io_ops io_wait io_time
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 31 Oct 2018 14:56:13 +0300
+
 yandex-porto (4.20.5) unstable; urgency=low
 
   * test/devices: load module brd
