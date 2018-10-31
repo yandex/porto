@@ -4681,16 +4681,24 @@ public:
         if (map.find(index) != map.end()) {
             value = std::to_string(map[index]);
         } else {
-            std::string disk, name;
+            std::string path, type, disk, name;
 
-            error = BlkioSubsystem.ResolveDisk(CL->ClientContainer->RootPath,
-                                               index, disk);
+            if (index.size() > 2 && index[index.size() - 2] == ' ') {
+                path = index.substr(0, index.size() - 2);
+                type = index.substr(index.size() - 2);
+            } else {
+                path = index;
+                type = "";
+            }
+
+            error = BlkioSubsystem.ResolveDisk(CL->ClientContainer->RootPath, path, disk);
             if (error)
                 return error;
             error = BlkioSubsystem.DiskName(disk, name);
             if (error)
                 return error;
-            value = std::to_string(map[name]);
+
+            value = std::to_string(map[name + type]);
         }
 
         return OK;
@@ -4753,7 +4761,7 @@ public:
 class TIoOpsStat : public TIoStat {
 public:
     TIoOpsStat() : TIoStat(P_IO_OPS, EProperty::NONE,
-            "IO operations: fs|hw|<disk>|<path>: <ops>;...") {}
+            "IO operations: fs|hw|<disk>|<path> [r|w|d|s]: <ops>;...") {}
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Iops, map);
@@ -4775,7 +4783,7 @@ public:
 class TIoTimeStat : public TIoStat {
 public:
     TIoTimeStat() : TIoStat(P_IO_TIME, EProperty::NONE,
-            "IO time: hw|<disk>|<path>: <nanoseconds>;...")
+            "IO time: hw|<disk>|<path> [r|w|d|s]: <nanoseconds>;...")
     {
         RequireControllers = CGROUP_BLKIO;
     }
@@ -4792,7 +4800,7 @@ public:
 class TIoWaitStat : public TIoStat {
 public:
     TIoWaitStat() : TIoStat(P_IO_WAIT, EProperty::NONE,
-            "IO wait: hw|<disk>|<path>: <nanoseconds>;...")
+            "IO wait: hw|<disk>|<path> [r|w|d|s]: <nanoseconds>;...")
     {
         RequireControllers = CGROUP_BLKIO;
     }
