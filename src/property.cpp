@@ -4775,7 +4775,10 @@ public:
 class TIoTimeStat : public TIoStat {
 public:
     TIoTimeStat() : TIoStat(P_IO_TIME, EProperty::NONE,
-            "IO time: hw|<disk>|<path>: <nanoseconds>;...") {}
+            "IO time: hw|<disk>|<path>: <nanoseconds>;...")
+    {
+        RequireControllers = CGROUP_BLKIO;
+    }
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
@@ -4789,7 +4792,10 @@ public:
 class TIoWaitStat : public TIoStat {
 public:
     TIoWaitStat() : TIoStat(P_IO_WAIT, EProperty::NONE,
-            "IO wait: hw|<disk>|<path>: <nanoseconds>;...") {}
+            "IO wait: hw|<disk>|<path>: <nanoseconds>;...")
+    {
+        RequireControllers = CGROUP_BLKIO;
+    }
     TError GetMap(TUintMap &map) {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Wait, map);
