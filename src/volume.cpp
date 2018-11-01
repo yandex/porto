@@ -128,10 +128,6 @@ public:
                 Volume->GetMountFlags() | MS_SLAVE | MS_SHARED);
     }
 
-    std::string ClaimPlace() override {
-        return "";
-    }
-
     TError Destroy() override {
         return Volume->InternalPath.UmountAll();
     }
@@ -1613,10 +1609,11 @@ TError TVolume::ClaimPlace(uint64_t size) {
     if (place == "")
         return OK;
 
-    if ((!size || size > ClaimedSpace) && !CL->IsInternalUser() &&
-            State != EVolumeState::Destroying) {
-        for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
-            ct->LockStateWrite();
+    for (auto ct = VolumeOwnerContainer; ct; ct = ct->Parent) {
+        ct->LockStateWrite();
+
+        if ((!size || size > ClaimedSpace) && !CL->IsInternalUser() &&
+                State != EVolumeState::Destroying) {
 
             uint64_t total_limit = ct->PlaceLimit.count("total") ?
                                    ct->PlaceLimit.at("total") : UINT64_MAX;
@@ -1646,14 +1643,18 @@ TError TVolume::ClaimPlace(uint64_t size) {
                     c->UnlockState();
                 }
 
-                return TError(EError::ResourceNotAvailable, "Not enough place limit in {}", ct->Name);
+                return TError(EError::ResourceNotAvailable,
+                              "Not enough place limit in {} for {} limit {}, total usage {} of {}, {} usage {} of {}",
+                              ct->Name, Path, StringFormatSize(size - ClaimedSpace),
+                              StringFormatSize(total_usage), StringFormatSize(total_limit),
+                              place, StringFormatSize(place_usage), StringFormatSize(place_limit));
             }
-
-            ct->PlaceUsage["total"] += size - ClaimedSpace;
-            ct->PlaceUsage[place] += size - ClaimedSpace;
-
-            ct->UnlockState();
         }
+
+        ct->PlaceUsage["total"] += size - ClaimedSpace;
+        ct->PlaceUsage[place] += size - ClaimedSpace;
+
+        ct->UnlockState();
     }
 
     auto volumes_lock = LockVolumes();
