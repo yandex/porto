@@ -3,18 +3,103 @@ from test_common import *
 import sys
 import os
 import porto
+import socket
+
+# CONNECTION
+
+c = porto.Connection()
+
+assert c.Connected() == False
+
+c.Connect()
+
+assert c.Connected() == True
+
+c.Disconnect()
+
+assert c.Connected() == False
+
+# AUTO CONNECT
+
+c.Version()
+
+assert c.Connected() == True
+
+# AUTO RECONNECT
+
+ReloadPortod()
+
+assert c.Connected() == True
+
+c.Version()
+
+assert c.Connected() == True
+
+# NO AUTO RECONNECT
+
+c.Disconnect()
+c.SetAutoReconnect(False)
+
+try:
+    c.Version()
+except porto.exceptions.SocketError:
+    pass
+else:
+    assert False
+
+assert c.Connected() == False
+
+# CONNECTION ERROR
+
+blackhole='/run/portod.socket.blackhole'
+
+if os.path.exists(blackhole):
+    os.remove(blackhole)
+
+c = porto.Connection(socket_path=blackhole, timeout=1)
+start = time.time()
+try:
+    c.Connect()
+except porto.exceptions.SocketError:
+    pass
+else:
+    assert False
+
+assert c.Connected() == False
+assert time.time() - start < 0.1
+
+# CONNECTION TIMEOUT
+
+blackhole_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+blackhole_sock.bind(blackhole)
+blackhole_sock.listen(1)
+
+c = porto.Connection(socket_path=blackhole, timeout=1)
+start = time.time()
+try:
+    c.Connect()
+    c.Version()
+except porto.exceptions.SocketTimeout:
+    pass
+else:
+    assert False
+
+assert c.Connected() == False
+assert time.time() - start > 0.9
+
+os.remove(blackhole)
+
+# COMMANDS
 
 AsAlice()
 
 c = porto.Connection()
 
-assert c.connected() == False
-assert c.nr_connects() == 0
+assert c.Connected() == False
 
-c.connect()
+c.Connect()
 
-assert c.connected() == True
-assert c.nr_connects() == 1
+assert c.Connected() == True
 
 c.List()
 c.Plist()
@@ -337,8 +422,8 @@ ms.Remove()
 a = c.CreateWeakContainer(container_name)
 a.SetProperty("command", "sleep 60")
 a.Start()
-c.disconnect()
-c.connect()
+c.Disconnect()
+c.Connect()
 if Catch(c.Find, container_name) != porto.exceptions.ContainerDoesNotExist:
     Catch(c.Wait, [container_name], 1000)
     assert Catch(c.Destroy, container_name) == porto.exceptions.ContainerDoesNotExist
@@ -349,7 +434,7 @@ Catch(c.Destroy, container_name)
 # PID and RECONNECT
 
 c2 = porto.Connection(auto_reconnect=False)
-c2.connect()
+c2.Connect()
 
 pid = os.fork()
 if pid:
@@ -360,38 +445,6 @@ else:
     assert Catch(c2.Version) == porto.exceptions.SocketError
     sys.exit(0)
 
-c2.disconnect()
+c2.Disconnect()
 
-c.disconnect()
-
-
-# TRY CONNECT
-
-c = porto.Connection(socket_path='/run/portod.socket.not.found', timeout=1)
-start = time.time()
-try:
-    c.TryConnect()
-except porto.exceptions.SocketError:
-    pass
-else:
-    assert False
-
-assert c.connected() == False
-assert c.nr_connects() == 1
-assert time.time() - start < 0.1
-
-
-# RETRY CONNECT
-
-c = porto.Connection(socket_path='/run/portod.socket.not.found', timeout=1)
-start = time.time()
-try:
-    c.Connect()
-except porto.exceptions.SocketTimeout:
-    pass
-else:
-    assert False
-
-assert c.connected() == False
-assert c.nr_connects() == 2
-assert time.time() - start > 0.9
+c.Disconnect()

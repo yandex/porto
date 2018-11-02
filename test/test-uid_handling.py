@@ -124,9 +124,9 @@ r.Destroy()
 
 #Check what if the owner will be root...
 
-c.disconnect()
+c.Disconnect()
 AsRoot()
-c.connect()
+c.Connect()
 
 #Usually porto-alice cannot run -W as porto-bob, but with owner_user == root solves everything
 
@@ -183,7 +183,7 @@ v.Unlink("/")
 
 #Create volume for non-existing user
 AsAlice()
-c.connect()
+c.Connect()
 
 v = c.CreateVolume(None, user="999")
 ExpectEq(os.stat(v.path).st_uid, 999)

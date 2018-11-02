@@ -16,7 +16,7 @@ def Catch(func, *args, **kwargs):
 #TODO fix that
 
 c = porto.Connection()
-c.connect()
+c.Connect()
 
 if "memory_guarantee" not in c.Plist():
     print "SKIP memory_guarantee"

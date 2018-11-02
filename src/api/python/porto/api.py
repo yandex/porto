@@ -1,5 +1,4 @@
 import os
-import time
 import socket
 import threading
 
@@ -44,74 +43,49 @@ def _decode_message(msg):
 
 class _RPC(object):
     def __init__(self, socket_path, timeout, socket_constructor,
-                 lock_constructor, auto_reconnect, reconnect_interval):
+                 lock_constructor, auto_reconnect):
         self.lock = lock_constructor()
         self.socket_path = socket_path
         self.timeout = timeout
         self.socket_constructor = socket_constructor
         self.sock = None
         self.sock_pid = None
-        self.deadline = None
         self.auto_reconnect = auto_reconnect
-        self.reconnect_interval = reconnect_interval
-        self.nr_connects = 0
-        self.connect_time = None
         self.async_wait_names = []
         self.async_wait_callback = None
         self.async_wait_timeout = None
 
-    def _connect(self):
-        if self.connect_time:
-            diff = time.time() - self.connect_time
-            if 0 < diff < self.reconnect_interval:
-                time.sleep(self.reconnect_interval - diff)
-        SOCK_CLOEXEC = 0o2000000
-        self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM | SOCK_CLOEXEC)
-        self._set_socket_timeout()
-        self.nr_connects += 1
-        self.connect_time = time.time()
-        self.sock.connect(self.socket_path)
-        self.sock_pid = os.getpid()
-        self._resend_async_wait()
-
-    def _check_connect(self):
-        if self.sock is None:
-            if self.auto_reconnect:
-                self._connect()
-            else:
-                raise exceptions.SocketError("Porto socket is not connected")
-        elif self.sock_pid != os.getpid():
-            if self.auto_reconnect:
-                self._connect()
-            else:
-                raise exceptions.SocketError("Porto socket connected by other pid {}".format(self.sock_pid))
-
-    def _set_deadline(self, timeout):
-        if timeout is None or timeout < 0:
-            self.deadline = None
-        else:
-            self.deadline = time.time() + timeout
-
-    def _check_deadline(self):
-        if self.deadline is not None and self.deadline < time.time():
-            self.sock = None
-            raise exceptions.SocketTimeout("Porto connection timeout")
-
-    def _set_socket_timeout(self):
-        if self.deadline is None:
+    def _set_timeout(self, extra_timeout=0):
+        if extra_timeout is None:
             self.sock.settimeout(None)
         else:
-            timeout = self.deadline - time.time()
-            if timeout > 0.001:
-                self.sock.settimeout(timeout)
-            else:
-                self.sock = None
-                raise exceptions.SocketTimeout("Porto connection timeout")
+            self.sock.settimeout(self.timeout + extra_timeout)
+
+    def set_timeout(self, timeout):
+        with self.lock:
+            self.timeout = timeout
+            if self.sock is not None:
+                self._set_timeout()
+
+    def _connect(self):
+        try:
+            SOCK_CLOEXEC = 0o2000000
+            self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM | SOCK_CLOEXEC)
+            self._set_timeout()
+            self.sock.connect(self.socket_path)
+        except socket.timeout as e:
+            self.sock = None
+            raise exceptions.SocketTimeout("Porto connection timeout: {}".format(e))
+        except socket.error as e:
+            self.sock = None
+            raise exceptions.SocketError("Porto connection error: {}".format(e))
+
+        self.sock_pid = os.getpid()
+        self._resend_async_wait()
 
     def _recv_data(self, count):
         msg = bytearray()
         while len(msg) < count:
-            self._set_socket_timeout()
             chunk = self.sock.recv(count - len(msg))
             if not chunk:
                 raise socket.error(socket.errno.ECONNRESET, os.strerror(socket.errno.ECONNRESET))
@@ -150,66 +124,57 @@ class _RPC(object):
         hdr.append(length)
         return hdr + req
 
-    def call(self, request, call_timeout=0):
+    def call(self, request, extra_timeout=0):
         req = self.encode_request(request)
 
         with self.lock:
-            self._set_deadline(self.timeout)
-            request_deadline = self.deadline
-
-            while True:
-                self.deadline = request_deadline
-                self._check_deadline()
-
+            if self.sock is None:
+                if self.auto_reconnect:
+                    self._connect()
+                else:
+                    raise exceptions.SocketError("Porto socket is not connected")
+            elif self.sock_pid != os.getpid():
+                if self.auto_reconnect:
+                    self._connect()
+                else:
+                    raise exceptions.SocketError("Porto socket connected by other pid {}".format(self.sock_pid))
+            elif self.auto_reconnect:
                 try:
-                    self._check_connect()
-                    self._set_socket_timeout()
                     self.sock.sendall(req)
-
-                    if call_timeout is None or call_timeout < 0:
-                        self.deadline = None
-                    elif self.deadline is not None:
-                        self.deadline += call_timeout
-
-                    response = self._recv_response()
+                    req = None
                 except socket.timeout as e:
                     self.sock = None
-                    if not self.auto_reconnect:
-                        raise exceptions.SocketTimeout("Porto connection timeout: {}".format(e))
+                    raise exceptions.SocketTimeout("Porto connection timeout: {}".format(e))
                 except socket.error as e:
-                    self.sock = None
-                    if not self.auto_reconnect:
-                        raise exceptions.SocketError("Socket error: {}".format(e))
-                else:
-                    break
-
-        if response.error != rpc_pb2.Success:
-            raise exceptions.PortoException.Create(response.error, response.errorMsg)
-        return response
-
-    def connect(self, timeout=None):
-        with self.lock:
-            self._set_deadline(timeout if timeout is not None else self.timeout)
-            while True:
-                try:
-                    self._check_deadline()
                     self._connect()
-                except (socket.timeout, socket.error):
-                    pass
-                else:
-                    break
 
-    def try_connect(self, timeout=None):
-        with self.lock:
-            self._set_deadline(timeout if timeout is not None else self.timeout)
             try:
-                self._connect()
+                if req is not None:
+                    self.sock.sendall(req)
+
+                if extra_timeout is None or extra_timeout > 0:
+                    self._set_timeout(extra_timeout)
+
+                response = self._recv_response()
+
+                if extra_timeout is None or extra_timeout > 0:
+                    self._set_timeout()
+
             except socket.timeout as e:
                 self.sock = None
                 raise exceptions.SocketTimeout("Porto connection timeout: {}".format(e))
             except socket.error as e:
                 self.sock = None
-                raise exceptions.SocketError("Porto connection error: {}".format(e))
+                raise exceptions.SocketError("Socket error: {}".format(e))
+
+        if response.error != rpc_pb2.Success:
+            raise exceptions.PortoException.Create(response.error, response.errorMsg)
+
+        return response
+
+    def connect(self):
+        with self.lock:
+            self._connect()
 
     def disconnect(self):
         with self.lock:
@@ -613,46 +578,53 @@ class Connection(object):
     def __init__(self,
                  socket_path='/run/portod.socket',
                  timeout=300,
-                 disk_timeout=600,
+                 disk_timeout=900,
                  socket_constructor=socket.socket,
                  lock_constructor=threading.Lock,
-                 auto_reconnect=True,
-                 reconnect_interval=0.5):
+                 auto_reconnect=True):
         self.rpc = _RPC(socket_path=socket_path,
                         timeout=timeout,
                         socket_constructor=socket_constructor,
                         lock_constructor=lock_constructor,
-                        auto_reconnect=auto_reconnect,
-                        reconnect_interval=reconnect_interval)
+                        auto_reconnect=auto_reconnect)
         self.disk_timeout = disk_timeout
 
-    def connect(self, timeout=None):
-        self.rpc.connect(timeout)
-
-    def nr_connects(self):
-        return self.rpc.nr_connects
-
-    def disconnect(self):
-        self.rpc.disconnect()
-
-    def connected(self):
-        return self.rpc.connected()
-
-    def Connect(self, timeout=None):
-        self.rpc.connect(timeout)
-
-    def TryConnect(self, timeout=None):
-        self.rpc.try_connect(timeout)
+    def Connect(self):
+        self.rpc.connect()
 
     def Disconnect(self):
         self.rpc.disconnect()
 
-    def Call(self, command_name, response_name=None, **kwargs):
+    def connect(self):
+        self.Connect()
+
+    def disconnect(self):
+        self.Disconnect()
+
+    def Connected(self):
+        return self.rpc.connected()
+
+    def GetTimeout(self):
+        return self.rpc.timeout
+
+    def SetTimeout(self, timeout):
+        self.rpc.set_timeout(timeout)
+
+    def GetDiskTimeout(self):
+        return self.disk_timeout
+
+    def SetDiskTimeout(self, disk_timeout):
+        self.disk_timeout = disk_timeout
+
+    def SetAutoReconnect(self, auto_reconnect):
+        self.rpc.auto_reconnect = auto_reconnect
+
+    def Call(self, command_name, response_name=None, extra_timeout=0, **kwargs):
         req = rpc_pb2.TPortoRequest()
         cmd = getattr(req, command_name)
         cmd.SetInParent()
         _encode_message(cmd, kwargs)
-        rsp = self.rpc.call(req)
+        rsp = self.rpc.call(req, extra_timeout)
         if hasattr(rsp, response_name or command_name):
             return _decode_message(getattr(rsp, response_name or command_name))
         return None

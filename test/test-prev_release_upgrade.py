@@ -289,7 +289,7 @@ snap_rt_app = SnapshotProps(r)
 r.Start()
 legacy_rt_settings = DumpLegacyRt(r)
 
-c.disconnect()
+c.Disconnect()
 
 AsRoot()
 
@@ -357,7 +357,7 @@ VerifySnapshot(r, snap_rt_app)
 CheckCaps(r, True)
 CheckRt(r)
 
-c.disconnect()
+c.Disconnect()
 
 AsRoot()
 

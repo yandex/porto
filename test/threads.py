@@ -121,7 +121,7 @@ def cloud(conn, this_script):
 
 def run_thread(thread, this_script, iterations = 0):
     conn = Connection(socket_path='/run/portod.socket', timeout=30)
-    conn.connect()
+    conn.Connect()
 
     print '{} {} iterations'.format(thread, iterations)
 

@@ -158,7 +158,7 @@ def TestRecovery():
     KillPid(GetMasterPid(), signal.SIGKILL)
     subprocess.check_call([portod, "start"])
     AsAlice()
-    c.connect()
+    c.Connect()
 
     l = c.List()
     ExpectEq(len(l), 2)
@@ -177,16 +177,16 @@ def TestRecovery():
     KillPid(GetMasterPid(), signal.SIGKILL)
     subprocess.check_output([portod, "start"])
     AsAlice()
-    c.connect()
+    c.Connect()
 
     ExpectEq(c.Wait(["a:b"]), "a:b")
     c.Destroy("a:b")
 
     print "Make sure we don't kill containers when doing recovery"
 
-    c.disconnect()
+    c.Disconnect()
     AsRoot()
-    c.connect()
+    c.Connect()
 
     props = {"command" : "sleep 1000",\
              "user" : "porto-alice",\
@@ -204,7 +204,7 @@ def TestRecovery():
     Expect(not IsZombie(pid))
 
     KillPid(GetPortodPid(), signal.SIGKILL)
-    c.connect()
+    c.Connect()
 
     ExpectProp(r, "state", "running")
     ExpectProp(r, "root_pid", str(pid))
@@ -217,9 +217,9 @@ def TestRecovery():
 
     c.Destroy("a:b")
 
-    c.disconnect()
+    c.Disconnect()
     AsAlice()
-    c.connect()
+    c.Connect()
 
     print "Make sure meta gets correct state upon recovery"
 
@@ -232,7 +232,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     ExpectProp(parent, "state", "meta")
     parent.Destroy()
@@ -249,7 +249,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
     parent = c.Find("a")
     child = c.Find("a/b")
 
@@ -286,7 +286,7 @@ def TestRecovery():
 
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     pid = c.GetData("a_b", "root_pid")
 
@@ -317,7 +317,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), 9)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     r = c.Find("a:b")
 
@@ -335,7 +335,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     r = c.Find("a:b")
     r.GetData("respawn_count") == "1"
@@ -350,7 +350,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     r = c.Find("a:b")
     ExpectProp(r, "state", "stopped")
@@ -374,7 +374,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     ExpectNe(GetState(r.GetData("root_pid")), "")
 
@@ -401,7 +401,7 @@ def TestRecovery():
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
-    c.connect()
+    c.Connect()
 
     RespawnTicks(r)
     r.Destroy()
@@ -418,7 +418,7 @@ def TestRecovery():
     ExpectEq(len(c.List()), n)
     #ExpectException(c.Create, porto.exceptions.ResourceNotAvailable, "max_plus_one")
 
-    c.disconnect()
+    c.Disconnect()
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
     AsAlice()
@@ -432,7 +432,7 @@ def TestRecovery():
     for i in range(0, n):
         c.Destroy("recover" + str(i))
 
-    c.disconnect()
+    c.Disconnect()
     c = porto.Connection(timeout=30)
 
 #Former selftest.cpp TestWaitRecovery()
@@ -450,7 +450,7 @@ def TestWaitRecovery():
 
     AsRoot()
     KillPid(GetPortodPid(), signal.SIGKILL)
-    c.connect()
+    c.Connect()
 
     aaa = c.Find("aaa")
     ExpectEq(aaa.Wait(timeout=3000), "aaa")
@@ -466,7 +466,7 @@ def TestWaitRecovery():
     AsRoot()
     KillPid(GetMasterPid(), signal.SIGKILL)
     subprocess.check_call([portod, "start"])
-    c.connect()
+    c.Connect()
 
     aaa = c.Find("aaa")
     ExpectEq(aaa.Wait(timeout=3000), "aaa")
@@ -502,7 +502,7 @@ def TestVolumeRecovery():
     os.mkdir("/place/porto_volumes/leftover_volume", 0755)
 
     KillPid(GetPortodPid(), signal.SIGKILL)
-    c.connect()
+    c.Connect()
 
     ExpectEq(len(c.ListVolumes()), 2)
 
@@ -532,7 +532,7 @@ def TestTCCleanup():
 
     c = porto.Connection(timeout=30)
 
-    c.connect()
+    c.Connect()
 
     subprocess.check_call([portod, "--discard", "restart"])
 
@@ -565,10 +565,10 @@ def TestTCCleanup():
     ExpectEq(c.GetProperty("/", "porto_stat[errors]"), "0")
     ExpectEq(c.GetProperty("/", "porto_stat[warnings]"), "0")
 
-    c.disconnect()
+    c.Disconnect()
     subprocess.check_call([portod, "--discard", "restart"])
 
-    c.connect()
+    c.Connect()
 
     c.Create("a")
 
@@ -586,7 +586,7 @@ def TestTCCleanup():
 
     subprocess.check_call([portod, "reload"])
 
-    c.connect()
+    c.Connect()
 
     ExpectEq(c.Find("a").name, "a")
     ExpectEq(c.Find("a/b").name, "a/b")

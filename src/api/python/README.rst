@@ -5,7 +5,7 @@ To initiate connection, simply do(portod must be started)::
 
     >>> from porto import Connection
     >>> rpc = Connection()
-    >>> rpc.connect()
+    >>> rpc.Connect()
 
 To create container *test*::
 
@@ -34,4 +34,4 @@ Destroy container *test*::
 
 Close connection::
 
-    >>> rpc.disconnect()
+    >>> rpc.Disconnect()

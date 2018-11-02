@@ -35,7 +35,7 @@ def DumpObjectState(r, keys):
 
 def porto_reconnect(c):
     if c is not None:
-        c.disconnect()
+        c.Disconnect()
 
     return porto.Connection(timeout=600)
 
