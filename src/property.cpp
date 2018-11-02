@@ -44,6 +44,22 @@ TError TProperty::SetIndexed(const std::string &, const std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
+TError TProperty::GetInt(uint64_t &) {
+    return TError(EError::InvalidValue, "Not int property");
+}
+
+TError TProperty::GetIntIndexed(const std::string &, uint64_t &) {
+    return TError(EError::InvalidValue, "Not int property");
+}
+
+TError TProperty::SetInt(uint64_t value) {
+    return Set(std::to_string(value));
+}
+
+TError TProperty::SetIntIndexed(const std::string &index, uint64_t value) {
+    return SetIndexed(index, std::to_string(value));
+}
+
 bool TProperty::Has(const Porto::TContainer &) {
     return false;
 }
@@ -149,6 +165,14 @@ public:
         if (it == val.end())
             return TError(EError::InvalidValue, "Index not found {}", index);
         value = std::to_string(it->second);
+        return OK;
+    }
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        const TUintMap &val = Get();
+        auto it = val.find(index);
+        if (it == val.end())
+            return TError(EError::InvalidValue, "Index not found {}", index);
+        value = it->second;
         return OK;
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -262,6 +286,15 @@ public:
     TError Parse(const std::string &str, int64_t &val) {
         return StringToInt64(str, val);
     }
+    TError GetInt(uint64_t &value) {
+        int64_t val;
+        TError error = Get(val);
+        value = val;
+        return error;
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
+    }
 };
 
 class TBoolProperty : public TTypedProperty<bool> {
@@ -274,6 +307,15 @@ public:
     TError Parse(const std::string &str, bool &val) {
         return StringToBool(str, val);
     }
+    TError GetInt(uint64_t &value) {
+        bool val;
+        TError error = Get(val);
+        value = val;
+        return error;
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
+    }
 };
 
 class TSizeProperty : public TTypedProperty<uint64_t> {
@@ -283,6 +325,12 @@ public:
     TError Parse(const std::string &str, uint64_t &val) {
         return StringToSize(str, val);
     }
+    TError GetInt(uint64_t &value) {
+        return Get(value);
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
+    }
 };
 
 class TNsecProperty : public TTypedProperty<uint64_t> {
@@ -291,6 +339,12 @@ public:
         TTypedProperty<uint64_t>(name, prop, desc) {}
     TError Parse(const std::string &str, uint64_t &val) {
         return StringToNsec(str, val);
+    }
+    TError GetInt(uint64_t &value) {
+        return Get(value);
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
     }
 };
 
@@ -313,6 +367,12 @@ public:
             return error;
         value = std::to_string(val);
         return OK;
+    }
+    TError GetInt(uint64_t &value) {
+        return Get(value);
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
     }
 };
 
@@ -360,6 +420,12 @@ public:
             return error;
         return Set(val);
     }
+    TError GetInt(uint64_t &value) {
+        return Get(value);
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
+    }
 };
 
 class TWeightProperty : public TTypedProperty<double> {
@@ -377,6 +443,15 @@ public:
         if (val < 0.01 || val > 100 || unit.size())
             return TError(EError::InvalidValue, "out of range");
         return OK;
+    }
+    TError GetInt(uint64_t &value) {
+        double val;
+        TError error = Get(val);
+        value = val * 1e9;
+        return error;
+    }
+    TError SetInt(uint64_t value) {
+        return Set((double)value / 1e9);
     }
 };
 
@@ -400,6 +475,23 @@ public:
 
         auto val = Get();
         value = BoolToString((val.Permitted & caps.Permitted) == caps.Permitted);
+        return OK;
+    }
+    TError GetInt(uint64_t &value) {
+        auto val = Get();
+        value = val.Permitted;
+        return OK;
+    }
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        TCapabilities caps;
+        TError error;
+
+        error = caps.Parse(index);
+        if (error)
+            return error;
+
+        auto val = Get();
+        value = (val.Permitted & caps.Permitted) == caps.Permitted;
         return OK;
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -598,6 +690,28 @@ public:
         return OK;
     }
 
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        auto type = TUlimit::GetType(index);
+        if (type < 0)
+            return TError(EError::InvalidValue, "invalid ulimit: {}", index);
+        for (auto &res: CT->Ulimit.Resources) {
+            if (res.Type == type) {
+                value = res.Soft;
+                return OK;
+            }
+        }
+        return TError(EError::NoValue, "ulimit is not set: {}", index);
+    }
+
+    TError SetIntIndexed(const std::string &index, uint64_t value) {
+        auto type = TUlimit::GetType(index);
+        if (type < 0)
+            return TError(EError::InvalidValue, "invalid ulimit: {}", index);
+        CT->Ulimit.Set(type, value, value);
+        CT->SetProp(EProperty::ULIMIT);
+        return OK;
+    }
+
     void Dump(Porto::TContainer &spec) {
         TUlimit ulimit = CT->GetUlimit();
         auto map = spec.mutable_ulimit();
@@ -788,6 +902,10 @@ public:
         value = UserName(CT->TaskCred.Uid);
         return OK;
     }
+    TError GetInt(uint64_t &value) {
+        value = CT->TaskCred.Uid;
+        return OK;
+    }
     TError Set(const std::string &username) {
         TCred cred;
         TError error = cred.Init(username);
@@ -823,6 +941,10 @@ public:
     TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
     TError Get(std::string &value) {
         value = GroupName(CT->TaskCred.Gid);
+        return OK;
+    }
+    TError GetInt(uint64_t &value) {
+        value = CT->TaskCred.Gid;
         return OK;
     }
     TError Set(const std::string &groupname) {
@@ -895,6 +1017,10 @@ public:
         value = UserName(CT->OwnerCred.Uid);
         return OK;
     }
+    TError GetInt(uint64_t &value) {
+        value = CT->OwnerCred.Uid;
+        return OK;
+    }
 
     TError Set(const std::string &username) {
         TCred newCred;
@@ -936,6 +1062,10 @@ public:
 
     TError Get(std::string &value) {
         value = GroupName(CT->OwnerCred.Gid);
+        return OK;
+    }
+    TError GetInt(uint64_t &value) {
+        value = CT->OwnerCred.Gid;
         return OK;
     }
 
@@ -1631,6 +1761,13 @@ public:
         val = CT->Umask;
         return OK;
     }
+    TError GetInt(uint64_t &value) {
+        value = CT->Umask;
+        return OK;
+    }
+    TError SetInt(uint64_t value) {
+        return Set(value);
+    }
     TError Set(unsigned val) {
         CT->Umask = val;
         CT->SetProp(EProperty::UMASK);
@@ -1678,6 +1815,14 @@ public:
         if (error)
             return error;
         value = BoolToString((CT->Controllers & val) == val);
+        return OK;
+    }
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        uint64_t val;
+        TError error = StringParseFlags(index, ControllersName, val, ';');
+        if (error)
+            return error;
+        value = (CT->Controllers & val) == val;
         return OK;
     }
     TError SetIndexed(const std::string &index, const std::string &value) {
@@ -1797,6 +1942,13 @@ public:
         if (!env.GetEnv(index, value))
             return TError(EError::InvalidValue, "Variable " + index + " not defined");
         return OK;
+    }
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        std::string val;
+        TError error = GetIndexed(index, val);
+        if (error)
+            return error;
+        return StringToUint64(val, value);
     }
     TError Set(const std::string &val) {
         TEnv env;
@@ -3435,6 +3587,13 @@ public:
         auto lock = LockContainers();
         return CT->GetLabel(index, value);
     }
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        std::string val;
+        TError error = GetIndexed(index, val);
+        if (error)
+            return error;
+        return StringToUint64(val, value);
+    }
     TError Set(TStringMap &map, bool merge) {
         TError error;
         for (auto &it: map) {
@@ -3736,6 +3895,10 @@ public:
         value = TContainer::StateName(CT->State);
         return OK;
     }
+    TError GetInt(uint64_t &value) {
+        value = (unsigned)CT->State;
+        return OK;
+    }
     void Dump(Porto::TContainer &spec) {
         spec.set_state(TContainer::StateName(CT->State));
     }
@@ -3749,6 +3912,10 @@ public:
     }
     TError Get(std::string &value) {
         value = std::to_string((unsigned)CT->State);
+        return OK;
+    }
+    TError GetInt(uint64_t &value) {
+        value = (unsigned)CT->State;
         return OK;
     }
     void Dump(Porto::TContainer &spec) {
@@ -4201,6 +4368,19 @@ public:
         value = std::to_string(it->second);
         return OK;
     }
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
+        TError error;
+        TVmStat st;
+
+        error = CT->GetVmStat(st);
+        if (error)
+            return error;
+        auto it = st.Stat.find(index);
+        if (it == st.Stat.end())
+            return TError(EError::InvalidProperty, "Unknown {}", index);
+        value = it->second;
+        return OK;
+    }
     void Dump(Porto::TContainer &spec) {
         TVmStat st;
         if (CT->GetVmStat(st))
@@ -4357,6 +4537,12 @@ public:
             }
         }
         return TError(EError::InvalidProperty, "Unknown network class");
+    }
+    TError GetIntIndexed(const std::string &index, std::string &value) {
+        if (index[0] == 'C' && index[1] == 'S' &&
+                index[2] >= '0' && index[2] >= '0' + NR_TC_CLASSES)
+            value = CT->NetClass.MetaHandle + index[2] - '0';
+        return TError(EError::InvalidProperty, "Unknown network class: {}", index);
     }
     void Dump(Porto::TContainer &spec) {
         if (!CT->Net)
@@ -4572,20 +4758,27 @@ public:
         return UintMapToString(stat, value);
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
         auto lock = TNetwork::LockNetState();
         if (ClassStat) {
             auto it = CT->NetClass.Fold->ClassStat.find(index);
             if (it == CT->NetClass.Fold->ClassStat.end())
-                return TError(EError::InvalidValue, "network device " + index + " not found");
-            value = std::to_string(it->second.*Member);
+                return TError(EError::DeviceNotFound, "network device " + index + " not found");
+            value = it->second.*Member;
         } else if (CT->Net) {
             auto it = CT->Net->DeviceStat.find(index);
             if (it == CT->Net->DeviceStat.end())
-                return TError(EError::InvalidValue, "network device " + index + " not found");
-            value = std::to_string(it->second.*Member);
+                return TError(EError::DeviceNotFound, "network device " + index + " not found");
+            value = it->second.*Member;
         }
         return OK;
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) {
+        uint64_t val;
+        TError error = GetIntIndexed(index, val);
+        value = std::to_string(val);
+        return error;
     }
 
     void Dump(Porto::TContainer &spec) {
@@ -4672,14 +4865,14 @@ public:
             return error;
         return UintMapToString(map, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIntIndexed(const std::string &index, uint64_t &value) {
         TUintMap map;
         TError error = GetMap(map);
         if (error)
             return error;
 
         if (map.find(index) != map.end()) {
-            value = std::to_string(map[index]);
+            value = map[index];
         } else {
             std::string path, type, disk, name;
 
@@ -4698,10 +4891,16 @@ public:
             if (error)
                 return error;
 
-            value = std::to_string(map[name + type]);
+            value = map[name + type];
         }
 
         return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        uint64_t val;
+        TError error = GetIntIndexed(index, val);
+        value = std::to_string(val);
+        return error;
     }
     void DumpMap(Porto::TUintMap &dump) {
         TUintMap map;
@@ -4915,6 +5114,7 @@ public:
     void Populate(TUintMap &m);
     TError Get(std::string &value);
     TError GetIndexed(const std::string &index, std::string &value);
+    TError GetIntIndexed(const std::string &index, uint64_t &value);
     TPortoStat() : TProperty(P_PORTO_STAT, EProperty::NONE, "Porto statistics") {
         IsReadOnly = true;
         IsHidden = true;
@@ -5010,6 +5210,17 @@ TError TPortoStat::Get(std::string &value) {
     Populate(m);
 
     return UintMapToString(m, value);
+}
+
+TError TPortoStat::GetIntIndexed(const std::string &index, uint64_t &value) {
+    TUintMap m;
+    Populate(m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = m[index];
+    return OK;
 }
 
 TError TPortoStat::GetIndexed(const std::string &index,
@@ -5159,6 +5370,10 @@ public:
     TError Get(std::string &value) {
         for (auto &taint: CT->Taint())
             value += taint + "\n";
+        return OK;
+    }
+    TError GetInt(uint64_t value) {
+        value = CT->Taint().size();
         return OK;
     }
     void Dump(Porto::TContainer &spec) {

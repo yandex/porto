@@ -39,15 +39,27 @@ int main(int, char **) {
     ExpectSuccess(api.GetProperty("/", "state", str));
     ExpectEq(str, "meta");
 
+    ExpectSuccess(api.GetInt("/", "state", val));
+    ExpectEq(val, Porto::META);
+
+    ExpectSuccess(api.GetProperty("/", "controllers", "memory", str));
+    ExpectEq(str, "true");
+
+    ExpectSuccess(api.GetInt("/", "controllers", "memory", val));
+    ExpectEq(val, 1);
+
+    ExpectSuccess(api.GetProperty("/", "memory_usage", str));
+    ExpectNeq(str, "0");
+
+    val = 0;
+    ExpectSuccess(api.GetInt("/", "memory_usage", val));
+    ExpectNeq(val, 0);
+
     auto ct = api.GetContainer("/");
     Expect(ct != nullptr);
     ExpectEq(ct->name(), "/");
 
-    val = 0;
-    ExpectSuccess(api.GetProperty("/", "memory_usage", val));
-    ExpectNeq(val, 0);
-
-    ExpectEq(api.GetProperty("/", "__wrong__", val), Porto::EError::InvalidProperty);
+    ExpectEq(api.GetInt("/", "__wrong__", val), Porto::EError::InvalidProperty);
     ExpectEq(api.Error(), Porto::EError::InvalidProperty);
     ExpectEq(api.GetLastError(str), Porto::EError::InvalidProperty);
 
@@ -57,9 +69,13 @@ int main(int, char **) {
 
     ExpectSuccess(api.Create("a"));
 
-    ExpectSuccess(api.SetProperty("a", "memory_limit", "1M"));
-    ExpectSuccess(api.GetProperty("a", "memory_limit", val));
-    ExpectEq(val, 1 << 20);
+    ExpectSuccess(api.SetProperty("a", "memory_limit", "2M"));
+    ExpectSuccess(api.GetProperty("a", "memory_limit", str));
+    ExpectEq(str, "2097152");
+
+    ExpectSuccess(api.SetInt("a", "memory_limit", 1<<20));
+    ExpectSuccess(api.GetInt("a", "memory_limit", val));
+    ExpectEq(val, 1048576);
 
     ExpectSuccess(api.SetLabel("a", "TEST.a", "."));
 

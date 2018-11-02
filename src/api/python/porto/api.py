@@ -268,11 +268,11 @@ class Container(object):
             return Container(self.conn, child)
         return Container(self.conn, self.name + "/" + child)
 
-    def __getitem__(self, key):
-        return self.conn.GetProperty(self.name, key)
+    def __getitem__(self, prop):
+        return self.conn.GetProperty(self.name, prop)
 
-    def __setitem__(self, key, value):
-        return self.conn.SetProperty(self.name, key, value)
+    def __setitem__(self, prop, value):
+        return self.conn.SetProperty(self.name, prop, value)
 
     def Start(self):
         self.conn.Start(self.name)
@@ -298,11 +298,17 @@ class Container(object):
     def GetProperties(self):
         return self.Get(self.conn.Plist())
 
-    def GetProperty(self, key, sync=False):
-        return self.conn.GetProperty(self.name, key, sync)
+    def GetProperty(self, prop, index=None, sync=False):
+        return self.conn.GetProperty(self.name, prop, index=index, sync=sync)
 
-    def SetProperty(self, key, value):
-        self.conn.SetProperty(self.name, key, value)
+    def SetProperty(self, prop, value, index=None):
+        self.conn.SetProperty(self.name, prop, value, index=index)
+
+    def GetInt(self, prop, index=None):
+        return self.conn.GetInt(self.name, prop, index)
+
+    def SetInt(self, prop, value, index=None):
+        self.conn.SetInt(self.name, prop, value, index)
 
     def GetLabel(self, label):
         return self.conn.GetLabel(self.name, label)
@@ -692,8 +698,8 @@ class Connection(object):
     def Run(self, name, weak=True, start=True, wait=0, root_volume=None, private_value=None, **kwargs):
         ct = self.Create(name, weak=True)
         try:
-            for key, value in kwargs.items():
-                ct.SetProperty(key, value)
+            for prop, value in kwargs.items():
+                ct.SetProperty(prop, value)
             if private_value is not None:
                 ct.SetProperty('private', private_value)
             if root_volume is not None:
@@ -775,11 +781,17 @@ class Connection(object):
             res[container.name] = var
         return res
 
-    def GetProperty(self, name, key, sync=False):
+    def GetProperty(self, name, prop, index=None, sync=False, real=False):
         request = rpc_pb2.TPortoRequest()
         request.GetProperty.name = name
-        request.GetProperty.property = key
+        if type(prop) is tuple:
+            request.GetProperty.property = prop[0] + "[" + prop[1] + "]"
+        elif index is not None:
+            request.GetProperty.property = prop + "[" + index + "]"
+        else:
+            request.GetProperty.property = prop
         request.GetProperty.sync = sync
+        request.GetProperty.real = real
         res = self.rpc.call(request).GetProperty.value
         if res == 'false':
             return False
@@ -787,7 +799,7 @@ class Connection(object):
             return True
         return res
 
-    def SetProperty(self, name, key, value):
+    def SetProperty(self, name, prop, value, index=None):
         if value is False:
             value = 'false'
         elif value is True:
@@ -799,13 +811,20 @@ class Connection(object):
 
         request = rpc_pb2.TPortoRequest()
         request.SetProperty.name = name
-        request.SetProperty.property = key
+
+        if type(prop) is tuple:
+            request.SetProperty.property = prop[0] + "[" + prop[1] + "]"
+        elif index is not None:
+            request.SetProperty.property = prop + "[" + index + "]"
+        else:
+            request.SetProperty.property = prop
+
         request.SetProperty.value = value
         self.rpc.call(request)
 
     def Set(self, container, **kwargs):
-        for name, value in kwargs.items():
-            self.SetProperty(container, name, value)
+        for prop, value in kwargs.items():
+            self.SetProperty(container, prop, value)
 
     def GetData(self, name, data, sync=False):
         request = rpc_pb2.TPortoRequest()
@@ -818,6 +837,45 @@ class Connection(object):
         elif res == 'true':
             return True
         return res
+
+    def GetInt(self, name, prop, index=None):
+        request = rpc_pb2.TPortoRequest()
+        request.GetIntProperty.name = name
+        if type(prop) is tuple:
+            request.GetIntProperty.property = prop[0]
+            request.GetIntProperty.index = prop[1]
+        else:
+            request.GetIntProperty.property = prop
+            if index is not None:
+                request.GetIntProperty.index = index
+        try:
+            return self.rpc.call(request).GetIntProperty.value
+        except exceptions.InvalidMethod:
+            val = self.GetProperty(name, prop, index=index, real=True)
+            try:
+                return int(val)
+            except ValueError:
+                raise exceptions.InvalidValue("Non integer value: {}".format(val))
+        except:
+            raise
+
+    def SetInt(self, name, prop, value, index=None):
+        request = rpc_pb2.TPortoRequest()
+        request.SetIntProperty.name = name
+        if type(prop) is tuple:
+            request.SetIntProperty.property = prop[0]
+            request.SetIntProperty.index = prop[1]
+        else:
+            request.SetIntProperty.property = prop
+            if index is not None:
+                request.SetIntProperty.index = index
+        request.SetIntProperty.value = value
+        try:
+            self.rpc.call(request)
+        except exceptions.InvalidMethod:
+            self.SetProperty(name, prop, value, index=index)
+        except:
+            raise
 
     def ContainerProperties(self):
         request = rpc_pb2.TPortoRequest()
@@ -896,7 +954,7 @@ class Connection(object):
         return _decode_message(resp.Wait)
 
     def GetLabel(self, container, label):
-        return self.GetProperty(container, label)
+        return self.GetProperty(container, 'labels', label)
 
     def SetLabel(self, container, label, value, prev_value=None, state=None):
         req = rpc_pb2.TPortoRequest()

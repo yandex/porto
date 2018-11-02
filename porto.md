@@ -113,6 +113,9 @@ and provide access to individual values via **property\[key\]**
 Values which represent size in bytes could have floating-point and 1024-based
 suffixes: B|K|M|G|T|P|E. Porto returns these values in bytes without suffixes.
 
+Values that represent cpu power in text properties are in cores with suffix c,
+in integer properties are in nanoseconds per second, nanocore - core / 10^9.
+
 Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNAME:
 '\*' and '?' doesn't match '/', with extension: '\*\*\*' - matches everything.
 
@@ -731,6 +734,8 @@ write permissions to the target or owning related volume.
 
     Syntax: 0.0..100.0 (in %) | \<cores\>c (in cores), default: 0
 
+    Integer property in nanosecons per second or nanocores.
+
     Increase cpu.shares accourding to required cpu power distribution.
     Offstream kernel patches provides more accurate control.
 
@@ -744,6 +749,8 @@ write permissions to the target or owning related volume.
 * **cpu\_limit** - CPU usage limit
 
     Syntax: 0.0..100.0 (in %) | \<cores\>c (in cores), default: 0 (unlimited)
+
+    Integer property in nanosecons per second or nanocores.
 
     Porto setup both CFS and RT cgroup limits.
     RT cgroup limit is strictly non-overcommitable in mainline kernel.
@@ -767,7 +774,7 @@ write permissions to the target or owning related volume.
 
 * **cpu\_period** - CPU limit accounting period
 
-    Syntax: 1ms..1s, default: 100ms \[nanoseconds\]
+    Syntax: 1ms..1s, default: 100ms
 
 * **cpu\_policy**  - CPU scheduler policy, see **sched(7)**
     - *normal*   - SCHED\_OTHER (default)

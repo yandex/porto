@@ -35,8 +35,27 @@ c.FindLabel("TEST.test")
 
 c.ListStorage()
 
+c.GetData("/", 'cpu_usage')
+c.GetProperty("/", 'cpu_usage')
+c.GetInt("/", 'cpu_usage')
+
+c.GetProperty("/", 'controllers', 'cpu')
+c.GetProperty("/", ('controllers', 'cpu'))
+
+c.GetInt("/", 'controllers', 'cpu')
+c.GetInt("/", ('controllers', 'cpu'))
+
 r = c.Find("/")
 r.GetData('cpu_usage')
+r.GetProperty('cpu_usage')
+
+r.GetProperty("controllers", "cpu")
+r.GetProperty(("controllers", "cpu"))
+
+r.GetInt("cpu_usage")
+
+r.GetInt("controllers", "cpu")
+r.GetInt(("controllers", "cpu"))
 
 prefix = "test-api.py-"
 container_name = prefix + "a"
@@ -102,8 +121,15 @@ assert container_name in c.List()
 
 assert a["state"] == "stopped"
 assert a.GetData("state") == "stopped"
+
 a.SetProperty("command", "false")
 assert a.GetProperty("command") == False
+
+a.SetProperty("memory_limit", "2M")
+assert a.GetProperty("memory_limit") == "2097152"
+
+a.SetInt("memory_limit", 1<<20)
+assert a.GetInt("memory_limit") == 1048576
 
 a.Set(command="/bin/true", private="test")
 assert a.Get(["command", "state", "private"]) == {"command": "/bin/true", "state": "stopped", "private": "test"}

@@ -37,6 +37,7 @@ void TRequest::Classify() {
         Req.has_get() ||
         Req.has_getdataproperty() ||
         Req.has_getproperty() ||
+        Req.has_getintproperty() ||
         Req.has_listdataproperties() ||
         Req.has_listproperties() ||
         Req.has_listvolumeproperties() ||
@@ -94,6 +95,20 @@ void TRequest::Parse() {
             opts.push_back("sync=true");
         if (Req.getproperty().has_real() && Req.getproperty().real())
             opts.push_back("real=true");
+    } else if (Req.has_getintproperty()) {
+        Cmd = "Get";
+        Arg = Req.getintproperty().name();
+        if (Req.getintproperty().has_index())
+            opts = { "property=" + Req.getintproperty().property(), "index=" +  Req.getintproperty().index() };
+        else
+            opts = { "property=" + Req.getintproperty().property() };
+    } else if (Req.has_setintproperty()) {
+        Cmd = "Set";
+        Arg = Req.setintproperty().name();
+        if (Req.setintproperty().has_index())
+            opts = { fmt::format("{}[{}]={}", Req.setintproperty().property(), Req.setintproperty().index(), Req.setintproperty().value()) };
+        else
+            opts = { fmt::format("{}={}", Req.setintproperty().property(), Req.setintproperty().value()) };
     } else if (Req.has_getdataproperty()) {
         Cmd = "Get";
         Arg = Req.getdataproperty().name();
@@ -347,6 +362,8 @@ static std::string ResponseAsString(const Porto::TPortoResponse &resp) {
             ret += v.path() + " ";
     } else if (resp.has_getproperty()) {
         ret = resp.getproperty().value();
+    } else if (resp.has_getintproperty()) {
+        ret = std::to_string(resp.getintproperty().value());
     } else if (resp.has_getdataproperty()) {
         ret = resp.getdataproperty().value();
     } else if (resp.has_get()) {
@@ -851,6 +868,44 @@ noinline TError SetContainerProperty(const Porto::TSetPropertyRequest &req) {
 
     ct->LockStateWrite();
     error = ct->SetProperty(property, value);
+    ct->UnlockState();
+
+    return error;
+}
+
+noinline TError GetContainerIntProperty(
+        const Porto::TGetIntPropertyRequest &req,
+        Porto::TGetIntPropertyResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    uint64_t value;
+    TError error;
+
+    error = CL->ReadContainer(req.name(), ct);
+    if (error)
+        return error;
+
+    ct->LockStateRead();
+    error = ct->GetIntProperty(req.property(), req.index(), value);
+    ct->UnlockState();
+
+    if (!error)
+        rsp.set_value(value);
+
+    return error;
+}
+
+noinline TError SetContainerIntProperty(
+        const Porto::TSetIntPropertyRequest &req,
+        Porto::TSetIntPropertyResponse &rsp) {
+    std::shared_ptr<TContainer> ct;
+    TError error;
+
+    error = CL->WriteContainer(req.name(), ct);
+    if (error)
+        return error;
+
+    ct->LockStateWrite();
+    error = ct->SetIntProperty(req.property(), req.index(), req.value());
     ct->UnlockState();
 
     return error;
@@ -1987,6 +2042,10 @@ void TRequest::Handle() {
         error = GetContainerProperty(Req.getproperty(), rsp);
     else if (Req.has_setproperty())
         error = SetContainerProperty(Req.setproperty());
+    else if (Req.has_getintproperty())
+        error = GetContainerIntProperty(Req.getintproperty(), *rsp.mutable_getintproperty());
+    else if (Req.has_setintproperty())
+        error = SetContainerIntProperty(Req.setintproperty(), *rsp.mutable_setintproperty());
     else if (Req.has_getdataproperty())
         error = GetDataProperty(Req.getdataproperty(), rsp);
     else if (Req.has_get())

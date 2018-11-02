@@ -3441,12 +3441,9 @@ TError TContainer::HasProperty(const std::string &property) const {
     if (prop->Prop != EProperty::NONE && !HasProp(prop->Prop))
         return TError(EError::NoValue, "Property not set");
 
-    if (prop->RequireControllers) {
-        if (State == EContainerState::STOPPED)
-            return TError(EError::InvalidState, "Not available in stopped state");
-        if (!(prop->RequireControllers & Controllers))
-            return TError(EError::NoValue, "Controllers is disabled");
-    }
+    if (prop->RequireControllers && !(prop->RequireControllers & Controllers))
+        return TError(EError::NoValue, "Required controllers {} are disabled: {}",
+                      TSubsystem::Format(prop->RequireControllers), property);
 
     CT = const_cast<TContainer *>(this);
     error = prop->Has();
@@ -3567,6 +3564,86 @@ TError TContainer::SetProperty(const std::string &origProperty,
         error = ApplyDynamicProperties();
         if (error) {
             (void)prop->Set(oldValue);
+            (void)TestClearPropDirty(prop->Prop);
+        }
+    }
+
+    CT = nullptr;
+
+    if (!error)
+        error = Save();
+
+    return error;
+}
+
+TError TContainer::GetIntProperty(const std::string &property,
+                                  const std::string &index,
+                                  uint64_t &value) const {
+    TError error;
+
+    auto it = ContainerProperties.find(property);
+    if (it == ContainerProperties.end())
+        return TError(EError::InvalidProperty, "Unknown container property: {}", property);
+
+    auto prop = it->second;
+
+    if (prop->RequireControllers && !(prop->RequireControllers & Controllers))
+        return TError(EError::NoValue, "Required controllers {} are disabled: {}",
+                      TSubsystem::Format(prop->RequireControllers), property);
+
+    CT = const_cast<TContainer *>(this);
+    error = prop->CanGet();
+    if (!error) {
+        if (index.length())
+            error = prop->GetIntIndexed(index, value);
+        else
+            error = prop->GetInt(value);
+    }
+    CT = nullptr;
+
+    return error;
+}
+
+TError TContainer::SetIntProperty(
+        const std::string &property,
+        const std::string &index,
+        uint64_t value) {
+    TError error;
+
+    if (IsRoot())
+        return TError(EError::Permission, "System containers are read only");
+
+    auto it = ContainerProperties.find(property);
+    if (it == ContainerProperties.end())
+        return TError(EError::InvalidProperty, "Invalid property " + property);
+
+    auto prop = it->second;
+
+    CT = this;
+
+    error = prop->CanSet();
+
+    if (!error && prop->RequireControllers)
+        error = EnableControllers(prop->RequireControllers);
+
+    uint64_t oldValue;
+    if (!error)
+        error = prop->GetInt(oldValue);
+
+    if (!error) {
+        if (index.length())
+            error = prop->SetIntIndexed(index, value);
+        else
+            error = prop->SetInt(value);
+    }
+
+    if (!error && HasResources()) {
+        error = ApplyDynamicProperties();
+        if (error) {
+            if (index.length())
+                (void)prop->SetIntIndexed(index, oldValue);
+            else
+                (void)prop->SetInt(oldValue);
             (void)TestClearPropDirty(prop->Prop);
         }
     }

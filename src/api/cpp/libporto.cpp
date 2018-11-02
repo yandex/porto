@@ -405,25 +405,6 @@ EError TPortoApi::GetProperty(const TString &name,
     return LastError;
 }
 
-EError TPortoApi::GetProperty(const TString &name,
-                               const TString &property,
-                               uint64_t &value,
-                               int flags) {
-    TString str;
-    if (!GetProperty(name, property, str, flags)) {
-        const char *ptr = str.c_str();
-        char *end;
-
-        errno = 0;
-        value = strtoull(ptr, &end, 10);
-        if (errno || end == ptr || *end) {
-            LastError = EError::InvalidValue;
-            LastErrorMsg = " value: " + str;
-        }
-    }
-    return LastError;
-}
-
 EError TPortoApi::SetProperty(const TString &name,
                               const TString &property,
                               const TString &value) {
@@ -435,6 +416,65 @@ EError TPortoApi::SetProperty(const TString &name,
     req->set_value(value);
 
     return Call();
+}
+
+EError TPortoApi::GetInt(const TString &name,
+                         const TString &property,
+                         const TString &index,
+                         uint64_t &value) {
+    Req.Clear();
+    auto req = Req.mutable_getintproperty();
+
+    req->set_name(name);
+    req->set_property(property);
+    if (index.size())
+        req->set_index(index);
+
+    if (!Call()) {
+        value = Rsp.getintproperty().value();
+    } else if (LastError == EError::InvalidMethod) {
+        /* fallback */
+        TString key = property, str;
+        if (index.size())
+            key = property + "[" + index + "]";
+        if (!GetProperty(name, key, str, GET_REAL)) {
+            const char *ptr = str.c_str();
+            char *end;
+
+            errno = 0;
+            value = strtoull(ptr, &end, 10);
+            if (errno || end == ptr || *end) {
+                LastError = EError::InvalidValue;
+                LastErrorMsg = " value: " + str;
+            }
+        }
+    }
+
+    return LastError;
+}
+
+EError TPortoApi::SetInt(const TString &name,
+                         const TString &property,
+                         const TString &index,
+                         uint64_t value) {
+    Req.Clear();
+    auto req = Req.mutable_setintproperty();
+
+    req->set_name(name);
+    req->set_property(property);
+    if (index.size())
+        req->set_index(index);
+    req->set_value(value);
+
+    if (Call() == EError::InvalidMethod) {
+        /* fallback */
+        TString key = property;
+        if (index.size())
+            key = property + "[" + index + "]";
+        return SetProperty(name, key, std::to_string(value));
+    }
+
+    return LastError;
 }
 
 EError TPortoApi::SetLabel(const TString &name,

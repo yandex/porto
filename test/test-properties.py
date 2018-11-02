@@ -18,16 +18,16 @@ bool_test = [
 ]
 
 cpu_test = [
-    ("0c", 0),
-    ("1c", 1),
-    ("3.14c", 3.14),
+    ("1c", 1, 1000000000),
+    ("0c", 0, 0),
+    ("3.14c", 3.14, 3140000000),
 ]
 
 weight_test = [
-    ("1", 1),
-    ("10", 10),
-    ("0.01", 0.01),
-    ("100", 100),
+    ("10", 10, 10000000000),
+    ("1", 1, 1000000000),
+    ("0.01", 0.01, 10000000),
+    ("100", 100, 100000000000),
 ]
 
 map_test = [
@@ -62,20 +62,20 @@ tests = {
     "foo bar baz",
 ],
 "user": [
-    "root",
-    "porto-alice",
+    ("root", "root", 0),
+    ("porto-alice", "porto-alice", alice_uid),
 ],
 "group": [
-    "root",
-    "porto-alice",
+    ("root", "root", 0),
+    ("porto-alice", "porto-alice", alice_gid),
 ],
 "owner_user": [
-    "root",
-    "porto-alice",
+    ("root", "root", 0),
+    ("porto-alice", "porto-alice", alice_uid),
 ],
 "owner_group": [
-    "root",
-    "porto-alice",
+    ("root", "root", 0),
+    ("porto-alice", "porto-alice", alice_gid),
 ],
 "env": [
     ("TEST=123", {'var': [ {'name': 'TEST', 'value': '123'} ] } ),
@@ -103,8 +103,8 @@ tests = {
     "/foo/bar",
 ],
 "root_readonly": [
-    (False, False),
-    (True, True),
+    (False, False, 0),
+    (True, True, 1),
 ],
 "cwd": [
     "/",
@@ -115,8 +115,8 @@ tests = {
 "stderr_path": path_test,
 "stdout_limit": size_test,
 "umask": [
-    ("0755", 0o755),
-    ("0700", 0o700),
+    ("0755", 0o755, 0o755),
+    ("0700", 0o700, 0o700),
 ],
 
 "controllers": [
@@ -368,6 +368,9 @@ ct_name = "a"
 def get_old(name):
     return conn.GetProperty(ct_name, name)
 
+def get_int(name):
+    return conn.GetInt(ct_name, name)
+
 def get_new(name):
     return conn.Call('GetContainer', name=[ct_name], property=[name])['container'][0].get(name)
 
@@ -379,6 +382,9 @@ def get_sub(name, field, key, val):
 
 def set_old(name, value):
     conn.SetProperty(ct_name, name, value)
+
+def set_int(name, value):
+    return conn.SetInt(ct_name, name, value)
 
 def set_new(name, value):
     conn.Call('SetContainer', container={'name': ct_name, name: value})
@@ -400,8 +406,10 @@ for name, cases in tests.iteritems():
         if isinstance(case, tuple):
             old = case[0]
             new = case[1]
+            int_val = case[2] if len(case) > 2 else None
         else:
             old = new = case
+            int_val = None
 
         # print "   ", old, new
 
@@ -409,10 +417,19 @@ for name, cases in tests.iteritems():
         ExpectEq(get_old(name), old)
         ExpectEq(get_new(name), new)
 
+        if int_val is not None:
+            ExpectEq(get_int(name), int_val)
+
         if name not in ['labels', 'devices']:
             set_old(name, init_old)
             ExpectEq(get_old(name), init_old)
             ExpectEq(get_new(name), init_new)
+
+            if int_val is not None:
+                set_int(name, int_val)
+                ExpectEq(get_old(name), old)
+                ExpectEq(get_new(name), new)
+                set_old(name, init_old)
 
         set_new(name, new)
         ExpectEq(get_old(name), old)
@@ -428,11 +445,13 @@ for name, cases in tests.iteritems():
 
 ct = conn.Run(ct_name)
 
-print " - state"
+print " -  state"
 ExpectEq(get_old("state"), "meta")
 ExpectEq(get_new("state"), "meta")
+ExpectEq(get_int("state"), 8)
 ExpectEq(get_old("st"), "8")
 ExpectEq(get_new("st"), 8)
+ExpectEq(get_int("st"), 8)
 
 for name, cases in ro_tests.iteritems():
     print " - ", name
@@ -440,6 +459,9 @@ for name, cases in ro_tests.iteritems():
     ExpectNe(init_old, None)
     init_new = get_new(name)
     ExpectNe(init_new, None)
+    if isinstance(init_new, (int, long)):
+        init_int = get_int(name)
+        ExpectEq(init_int, init_new)
     # print "   ", init_old, init_new
 
 ct.Destroy()
@@ -448,8 +470,10 @@ ct = conn.Run(ct_name, wait=1, command="true")
 
 ExpectEq(get_old("state"), "dead")
 ExpectEq(get_new("state"), "dead")
+ExpectEq(get_int("state"), 4)
 ExpectEq(get_old("st"), "4")
 ExpectEq(get_new("st"), 4)
+ExpectEq(get_int("st"), 4)
 
 for name, cases in dead_tests.iteritems():
     print " - ", name
@@ -463,6 +487,7 @@ for name in ['creation_time', 'change_time', 'start_time', 'death_time']:
     print " - ", name + '[raw]'
     ExpectEq(get_old(name), format_time(get_old(name + '[raw]')))
     ExpectEq(int(get_old(name + '[raw]')), get_new(name))
+    ExpectEq(get_int(name), get_new(name))
 
 ct.Destroy()
 
@@ -471,7 +496,11 @@ ct = conn.Run(ct_name, command="sleep 1000", cpu_limit="0.6c", cpu_guarantee="0.
 
 for name in ['cpu_limit', 'cpu_limit_total', 'cpu_guarantee', 'cpu_guarantee_total']:
     print " - ", name + '[ns]'
-    ExpectEq(int(get_old(name + '[ns]')), get_new(name) * 1e9)
+    cpu_old = int(get_old(name + '[ns]'))
+    cpu_int = get_int(name)
+    cpu_new = get_new(name)
+    ExpectEq(cpu_old, cpu_new * 1e9)
+    ExpectEq(cpu_old, cpu_int)
 
 ct.Destroy()
 
@@ -481,11 +510,14 @@ ct = conn.Run(ct_name)
 print " -  ulimit core"
 set_old('ulimit[core]', 'unlimited')
 ExpectEq(get_old('ulimit[core]'), 'unlimited unlimited')
+ExpectEq(get_int(('ulimit', 'core')), 2**64-1)
 set_old('ulimit[core]', '0 unlimited')
 ExpectEq(get_sub('ulimit', 'ulimit', 'type', 'core'), {'type': 'core', 'soft': 0})
+ExpectEq(get_int(('ulimit', 'core')), 0)
 set_new('ulimit', {'merge': True, 'ulimit': [{'type': 'core', 'unlimited': True}]})
 ExpectEq(get_sub('ulimit', 'ulimit', 'type', 'core'), {'type': 'core', 'unlimited': True})
 ExpectEq(get_old('ulimit[core]'), 'unlimited unlimited')
+ExpectEq(get_int(('ulimit', 'core')), 2**64-1)
 
 ct.Destroy()
 

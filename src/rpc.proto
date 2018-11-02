@@ -191,6 +191,9 @@ message TPortoRequest {
     // Get one property
     optional TGetPropertyRequest GetProperty = 4;
 
+    optional TGetIntPropertyRequest GetIntProperty = 26;
+    optional TSetIntPropertyRequest SetIntProperty = 27;
+
     // Set one property
     optional TSetPropertyRequest SetProperty = 5;
 
@@ -342,6 +345,10 @@ message TPortoResponse {
     optional TListPropertiesResponse ListProperties = 6;
 
     optional TGetPropertyResponse GetProperty = 4;
+
+    optional TGetIntPropertyResponse GetIntProperty = 26;
+    optional TSetIntPropertyResponse SetIntProperty = 27;
+
 
     // Deprecated
     optional TListDataPropertiesResponse ListDataProperties = 7;
@@ -1135,6 +1142,30 @@ message TGetPropertyRequest {
 
 message TGetPropertyResponse {
     optional string value = 1;
+}
+
+
+// Read one integer property
+message TGetIntPropertyRequest {
+    optional string name = 1;
+    optional string property = 2;
+    optional string index = 3;
+}
+
+message TGetIntPropertyResponse {
+    optional uint64 value = 1;
+}
+
+
+// Change one integer property
+message TSetIntPropertyRequest {
+    optional string name = 1;
+    optional string property = 2;
+    optional string index = 3;
+    optional uint64 value = 4;
+}
+
+message TSetIntPropertyResponse {
 }
 
 

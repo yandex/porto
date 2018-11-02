@@ -281,6 +281,12 @@ public:
     virtual TError GetIndexed(const std::string &index, std::string &value);
     virtual TError SetIndexed(const std::string &index, const std::string &value);
 
+    virtual TError GetInt(uint64_t &value);
+    virtual TError GetIntIndexed(const std::string &index, uint64_t &value);
+
+    virtual TError SetInt(uint64_t value);
+    virtual TError SetIntIndexed(const std::string &index, uint64_t value);
+
     virtual bool Has(const Porto::TContainer &spec);
     virtual TError Load(const Porto::TContainer &spec);
     virtual void Dump(Porto::TContainer &spec);

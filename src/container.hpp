@@ -378,6 +378,13 @@ public:
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
 
+    TError GetIntProperty(const std::string &property,
+                          const std::string &index,
+                          uint64_t &value) const;
+    TError SetIntProperty(const std::string &property,
+                          const std::string &index,
+                          uint64_t value);
+
     TError Load(const Porto::TContainer &spec);
     void Dump(const std::vector<std::string> &props, Porto::TContainer &spec);
 

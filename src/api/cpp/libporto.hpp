@@ -175,19 +175,51 @@ public:
                        TString &value,
                        int flags = 0);
 
+    EError GetProperty(const TString &name,
+                       const TString &property,
+                       const TString &index,
+                       TString &value,
+                       int flags = 0) {
+        return GetProperty(name, property + "[" + index + "]", value, flags);
+    }
+
     EError SetProperty(const TString &name,
                        const TString &property,
                        const TString &value);
 
-    EError GetProperty(const TString &name,
-                       const TString &property,
-                       uint64_t &value,
-                       int flags = 0);
-
     EError SetProperty(const TString &name,
                        const TString &property,
-                       uint64_t value) {
-        return SetProperty(name, property, std::to_string(value));
+                       const TString &index,
+                       const TString &value) {
+        return SetProperty(name, property + "[" + index + "]", value);
+    }
+
+    EError GetInt(const TString &name,
+                  const TString &property,
+                  const TString &index,
+                  uint64_t &value);
+
+    EError GetInt(const TString &name,
+                       const TString &property,
+                       uint64_t &value) {
+        return GetInt(name, property, "", value);
+    }
+
+    EError SetInt(const TString &name,
+                  const TString &property,
+                  const TString &index,
+                  uint64_t value);
+
+    EError SetInt(const TString &name,
+                  const TString &property,
+                  uint64_t value) {
+        return SetInt(name, property, "", value);
+    }
+
+    EError GetLabel(const TString &name,
+                    const TString &label,
+                    TString &value) {
+        return GetProperty(name, "labels", label, value);
     }
 
     EError SetLabel(const TString &name,
