@@ -1,0 +1,25 @@
+#!/bin/sh
+
+set -e
+
+./portod stop 2>/dev/null || true
+
+rm -f /var/log/portod.*
+
+for g in porto porto-containers ; do
+	getent group $g >/dev/null || groupadd $g
+done
+
+for u in porto-alice porto-bob; do
+	id $u >/dev/null || useradd $u -G porto
+	getent group ${u}-containers >/dev/null || groupadd ${u}-containers
+done
+
+id porto-charlie >/dev/null || useradd porto-charlie -G porto-containers
+id porto-david >/dev/null || useradd porto-david -G porto-alice-containers
+
+uname -a
+uptime
+./portod version
+
+./portod --discard --verbose start

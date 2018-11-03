@@ -28,16 +28,8 @@ endmacro()
 
 # head
 
-add_test(NAME cleanup_portod
-         COMMAND sudo ${CMAKE_BINARY_DIR}/portod --discard --verbose stop
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-add_test(NAME cleanup_logs
-         COMMAND sudo sh -c "rm -f /var/log/portod.*"
-         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
 add_test(NAME portod_start
-         COMMAND sudo ${CMAKE_BINARY_DIR}/portod --discard --verbose start
+         COMMAND sudo ${CMAKE_SOURCE_DIR}/test/start
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # interface tests
