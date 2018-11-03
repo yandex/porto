@@ -125,11 +125,11 @@ assert a.GetData("state") == "stopped"
 a.SetProperty("command", "false")
 assert a.GetProperty("command") == False
 
-a.SetProperty("memory_limit", "2M")
-assert a.GetProperty("memory_limit") == "2097152"
+a.SetProperty("memory_limit", "2G")
+assert a.GetProperty("memory_limit") == "2147483648"
 
-a.SetInt("memory_limit", 1<<20)
-assert a.GetInt("memory_limit") == 1048576
+a.SetInt("memory_limit", 1<<30)
+assert a.GetInt("memory_limit") == 1073741824
 
 a.Set(command="/bin/true", private="test")
 assert a.Get(["command", "state", "private"]) == {"command": "/bin/true", "state": "stopped", "private": "test"}
