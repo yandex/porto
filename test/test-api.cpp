@@ -1,5 +1,6 @@
 #include <libporto.hpp>
 
+#include <signal.h>
 #include <cassert>
 
 #define Expect(a)   assert(a)
@@ -12,15 +13,43 @@ int main(int, char **) {
     Porto::TString str, path;
     uint64_t val;
 
+    signal(SIGPIPE, SIG_IGN);
+
     Porto::TPortoApi api;
 
+    Expect(!api.Connected());
+    Expect(api.GetFd() < 0);
+
+    // Connect
     ExpectSuccess(api.Connect());
+
+    Expect(api.Connected());
+    Expect(api.GetFd() >= 0);
+
+    // Disconnect
+    api.Disconnect();
+
+    Expect(!api.Connected());
+    Expect(api.GetFd() < 0);
+
+    // Auto connect
+    ExpectSuccess(api.GetVersion(str, str));
+    Expect(api.Connected());
+
+    // Auto reconnect
+    ExpectEq(system("./portod reload"), 0);
+    ExpectSuccess(api.GetVersion(str, str));
+    Expect(api.Connected());
+
+    // No auto reconnect
+    api.Disconnect();
+    api.SetAutoReconnect(false);
+    ExpectEq(api.GetVersion(str, str), Porto::EError::SocketError);
+    api.SetAutoReconnect(true);
 
     val = api.GetTimeout();
     ExpectNeq(val, 0);
     ExpectSuccess(api.SetTimeout(5));
-
-    ExpectSuccess(api.GetVersion(str, str));
 
     ExpectSuccess(api.List(list));
 
@@ -112,7 +141,7 @@ int main(int, char **) {
 
     ExpectSuccess(api.Destroy("a"));
 
-    api.Close();
+    api.Disconnect();
 
     return 0;
 }

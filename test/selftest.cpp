@@ -3348,9 +3348,9 @@ static void TestLeaks(Porto::TPortoApi &api) {
     name = "a";
     for (int i = 0; i < createDestroyNr; i++) {
         ExpectApiSuccess(api.Create(name));
-        api.Close();
+        api.Disconnect();
         ExpectApiSuccess(api.Destroy(name));
-        api.Close();
+        api.Disconnect();
     }
 
     int nowSlave = GetVmRss(slavePid);
@@ -3444,7 +3444,7 @@ static void TestLeaks(Porto::TPortoApi &api) {
         ExpectApiSuccess(api.SetProperty(name, "command", "true"));
         ExpectApiSuccess(api.Start(name));
         ReadPropsAndData(api, name);
-        api.Close();
+        api.Disconnect();
     }
 
     nowSlave = GetVmRss(slavePid);
@@ -3478,7 +3478,7 @@ static void TestLeaks(Porto::TPortoApi &api) {
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
         ExpectApiSuccess(api.Destroy(name));
-        api.Close();
+        api.Disconnect();
     }
 
     nowSlave = GetVmRss(slavePid);

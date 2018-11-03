@@ -14,7 +14,7 @@ extern "C" {
 namespace Porto {
 
 TPortoApi::~TPortoApi() {
-    Close();
+    Disconnect();
 }
 
 EError TPortoApi::SetError(const TString &prefix, int _errno) {
@@ -26,6 +26,7 @@ EError TPortoApi::SetError(const TString &prefix, int _errno) {
             LastError = EError::SocketTimeout;
             break;
         case EIO:
+        case EPIPE:
             LastError = EError::SocketError;
             break;
         default:
@@ -33,7 +34,7 @@ EError TPortoApi::SetError(const TString &prefix, int _errno) {
             break;
     }
     LastErrorMsg = prefix + ": " + strerror(_errno);
-    Close();
+    Disconnect();
     return LastError;
 }
 
@@ -45,7 +46,7 @@ EError TPortoApi::Connect(const char *socket_path) {
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
 
-    Close();
+    Disconnect();
 
     Fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (Fd < 0)
@@ -76,7 +77,7 @@ EError TPortoApi::Connect(const char *socket_path) {
     return EError::Success;
 }
 
-void TPortoApi::Close() {
+void TPortoApi::Disconnect() {
     if (Fd >= 0)
         close(Fd);
     Fd = -1;
@@ -167,13 +168,24 @@ EError TPortoApi::Recv(TPortoResponse &rsp) {
 EError TPortoApi::Call(const TPortoRequest &req,
                         TPortoResponse &rsp,
                         int extra_timeout) {
+    bool reconnect = AutoReconnect;
     EError err = EError::Success;
 
-    if (Fd < 0)
+    if (Fd < 0) {
+        if (!reconnect)
+            return SetError("Not connected", EIO);
         err = Connect();
+        reconnect = false;
+    }
 
-    if (!err)
+    if (!err) {
         err = Send(req);
+        if (err == EError::SocketError && reconnect) {
+            err = Connect();
+            if (!err)
+                err = Send(req);
+        }
+    }
 
     if (!err && extra_timeout && Timeout > 0)
         err = SetSocketTimeout(2, extra_timeout > 0 ? (extra_timeout + Timeout) : -1);

@@ -361,7 +361,7 @@ void InitUsersAndGroups() {
 }
 
 void AsRoot(Porto::TPortoApi &api) {
-    api.Close();
+    api.Disconnect();
 
     ExpectEq(seteuid(0), 0);
     ExpectEq(setegid(0), 0);
@@ -450,7 +450,7 @@ void TestDaemon(Porto::TPortoApi &api) {
 
     AsRoot(api);
 
-    api.Close();
+    api.Disconnect();
     sleep(1);
 
     Say() << "Make sure portod doesn't have zombies" << std::endl;

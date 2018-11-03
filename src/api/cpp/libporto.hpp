@@ -30,6 +30,7 @@ private:
     int Fd = -1;
     int Timeout = DEFAULT_TIMEOUT;
     int DiskTimeout = DEFAULT_DISK_TIMEOUT;
+    bool AutoReconnect = true;
 
     EError LastError = EError::Success;
     TString LastErrorMsg;
@@ -61,9 +62,15 @@ public:
     ~TPortoApi();
 
     int GetFd() const { return Fd; }
+    bool Connected() const { return Fd >= 0; }
 
     EError Connect(const char *socket_path = SOCKET_PATH);
-    void Close();
+    void Disconnect();
+
+    /* Requires signal(SIGPIPE, SIG_IGN) */
+    void SetAutoReconnect(bool auto_reconnect) {
+        AutoReconnect = auto_reconnect;
+    }
 
     /* Request and response timeout in seconds */
     int GetTimeout() const { return Timeout; }
