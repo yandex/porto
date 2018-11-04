@@ -394,7 +394,14 @@ def format_time(ts):
 
 print "CONTAINER"
 
+supported = conn.ContainerProperties()
+
 for name, cases in tests.iteritems():
+
+    if name not in supported:
+        print " - ", name, "unsupported"
+        continue
+
     print " - ", name
 
     ct = conn.Create(ct_name, weak=True)
@@ -560,9 +567,9 @@ ExpectEq(get_new('command_argv'), {'argv': ["a", "'b", "c'", "d'd"]})
 ct.Destroy()
 
 
+for name in supported:
+    assert name in tests.keys() + ro_tests.keys() + dead_tests.keys() + skip_tests.keys(), "property {} is not tested".format(name)
 
-for name in conn.Plist():
-    assert name in  tests.keys() + ro_tests.keys() + dead_tests.keys() + skip_tests.keys(), "property {} is not tested".format(name)
 
 ConfigurePortod('test-coredump', "")
 
