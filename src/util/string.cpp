@@ -372,6 +372,10 @@ bool StringEndsWith(const std::string &str, const std::string &sfx) {
 bool StringMatch(const std::string &str, const std::string &pattern) {
     if (pattern == "***")
         return true;
+    if (StringEndsWith(pattern, "***"))
+        return StringStartsWith(str, pattern.substr(0, pattern.size() - 3));
+    if (StringStartsWith(pattern, "***"))
+        return StringEndsWith(str, pattern.substr(3));
     return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
 }
 

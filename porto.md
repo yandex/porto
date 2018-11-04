@@ -117,7 +117,8 @@ Values that represent cpu power in text properties are in cores with suffix c,
 in integer properties are in nanoseconds per second, nanocore - core / 10^9.
 
 Values which represents text masks works as **fnmatch(3)** with flag FNM\_PATHNAME:
-'\*' and '?' doesn't match '/', with extension: '\*\*\*' - matches everything.
+'\*' and '?' doesn't match '/', with extension: '\*\*\*' - matches everything,
+'prefix\*\*\*' and '\*\*\*suffix' checks maching prefix and suffix.
 
 ## Labels
 
