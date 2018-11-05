@@ -1599,14 +1599,12 @@ noinline TError ListLayers(const Porto::TListLayersRequest &req,
         return error;
 
     std::list<TStorage> layers;
-    error = place.List(EStorageType::Layer, layers);
+    error = place.List(EStorageType::Layer, layers, req.mask());
     if (error)
         return error;
 
     auto list = rsp.mutable_listlayers();
     for (auto &layer: layers) {
-        if (req.has_mask() && !StringMatch(layer.Name, req.mask()))
-            continue;
         list->add_layer(layer.Name);
         (void)layer.Load();
         auto desc = list->add_layers();
@@ -1731,14 +1729,12 @@ noinline TError ListStorages(const Porto::TListStoragesRequest &req,
         return error;
 
     std::list<TStorage> storages;
-    error = place.List(EStorageType::Storage, storages);
+    error = place.List(EStorageType::Storage, storages, req.mask());
     if (error)
         return error;
 
     auto list = rsp.mutable_liststorages();
     for (auto &storage: storages) {
-        if (req.has_mask() && !StringMatch(storage.Name, req.mask()))
-            continue;
         if (storage.Load())
             continue;
         if (storage.Type == EStorageType::Storage) {

@@ -587,17 +587,25 @@ TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     return OK;
 }
 
-TError TPath::ListSubdirs(std::vector<std::string> &result) const {
+TError TPath::ListSubdirs(std::vector<std::string> &result, const std::string &mask) const {
     struct dirent *de;
     DIR *dir;
 
     result.clear();
+
+    if (mask.size() && mask.find_first_of("*?") == std::string::npos) {
+        if ((*this / mask).IsDirectoryStrict())
+            result.push_back(mask);
+        return OK;
+    }
+
     dir = opendir(c_str());
     if (!dir)
         return TError::System("Cannot open directory " + Path);
 
     while ((de = readdir(dir))) {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, "..") &&
+            (!mask.size() || StringMatch(de->d_name, mask)) &&
             (de->d_type == DT_DIR ||
              (de->d_type == DT_UNKNOWN &&
               (*this / std::string(de->d_name)).IsDirectoryStrict())))

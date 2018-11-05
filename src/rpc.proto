@@ -1530,7 +1530,7 @@ message TSetLayerPrivateRequest {
 
 message TListStoragesRequest {
     optional string place = 1;
-    optional string mask = 2;
+    optional string mask = 2; // "name" - storage, "name/" - meta-storage
 }
 
 message TListStoragesResponse {

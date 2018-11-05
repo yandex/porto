@@ -163,7 +163,7 @@ public:
     TError RemoveAll() const;
     TError Rename(const TPath &dest) const;
     TError ReadDirectory(std::vector<std::string> &result) const;
-    TError ListSubdirs(std::vector<std::string> &result) const;
+    TError ListSubdirs(std::vector<std::string> &result, const std::string &mask = "") const;
     TError ClearDirectory() const;
     TError StatFS(TStatFS &result) const;
     TError GetXAttr(const std::string &name, std::string &value) const;

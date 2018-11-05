@@ -274,18 +274,47 @@ TError TStorage::CheckName(const std::string &name, bool meta) {
     return OK;
 }
 
-TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
+/*
+ * /place/porto_layers/$layer                       -> $layer
+ * /place/porto_storage/$storage                    -> $storage
+ * /place/porto_storage/_meta_$meta/$storage        -> $meta/$storage
+ * /place/porto_storage/_meta_$meta/_layer_$layer   -> $meta/$layer
+ */
+TError TStorage::List(EStorageType type,
+                      std::list<TStorage> &list,
+                      const std::string &mask) {
     std::vector<std::string> names;
     TPath path = Path;
+    TError error;
+
+    auto mask_sep = mask.find('/');
+    std::string meta_mask, name_mask;
 
     if (Type == EStorageType::Place) {
         if (type == EStorageType::Layer)
             path = Place / PORTO_LAYERS;
         else
             path = Place / PORTO_STORAGE;
+
+        if (mask_sep == std::string::npos)
+            name_mask = mask;
+        else
+            name_mask = std::string(META_PREFIX) + mask.substr(0, mask_sep);
+
+    } else if (Type == EStorageType::Meta) {
+
+        if (mask_sep != std::string::npos)
+            name_mask = mask.substr(mask_sep + 1);
+
+        if (type == EStorageType::Layer) {
+            if (name_mask.size())
+                name_mask = std::string(META_LAYER) + name_mask;
+            else
+                name_mask = std::string(META_LAYER) + "*";
+        }
     }
 
-    TError error = path.ListSubdirs(names);
+    error = path.ListSubdirs(names, name_mask);
     if (error)
         return error;
 
@@ -294,8 +323,10 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
             TStorage meta;
             meta.Open(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
             list.push_back(meta);
-            if (type == EStorageType::Storage) {
-                error = meta.List(type, list);
+            if (type == EStorageType::Storage &&
+                    (mask_sep == std::string::npos ||
+                     mask_sep != mask.size() - 1)) {
+                error = meta.List(type, list, mask);
                 if (error)
                     return error;
             }
@@ -320,7 +351,7 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
 
     if (Type == EStorageType::Place && type == EStorageType::Layer) {
         names.clear();
-        error = TPath(Place / PORTO_STORAGE).ListSubdirs(names);
+        error = TPath(Place / PORTO_STORAGE).ListSubdirs(names, name_mask);
         if (error) {
             if (!TPath(Place / PORTO_STORAGE).Exists())
                 return OK;
@@ -330,7 +361,7 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
             if (StringStartsWith(name, META_PREFIX)) {
                 TStorage meta;
                 meta.Open(EStorageType::Meta, Place, name.substr(std::string(META_PREFIX).size()));
-                error = meta.List(EStorageType::Layer, list);
+                error = meta.List(EStorageType::Layer, list, mask);
                 if (error)
                     return error;
             }

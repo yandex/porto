@@ -411,7 +411,7 @@ class MetaStorage(object):
 
     def Update(self, pb=None):
         if pb is None:
-            pb = self.conn._ListStorages(self.place, self.name).meta_storages[0]
+            pb = self.conn._ListStorages(self.place, self.name + "/").meta_storages[0]
         self.private_value = pb.private_value
         self.owner_user = pb.owner_user
         self.owner_group = pb.owner_group
@@ -1193,7 +1193,7 @@ class Connection(object):
         return [MetaStorage(self, s.name, place, s) for s in self._ListStorages(place, mask).meta_storages]
 
     def FindMetaStorage(self, name, place=None):
-        response = self._ListStorages(place, name)
+        response = self._ListStorages(place, name + "/")
         if not response.meta_storages:
             raise exceptions.VolumeNotFound("meta storage `%s` not found" % name)
         return MetaStorage(self, name, place, response.meta_storages[0])
