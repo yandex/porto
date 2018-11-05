@@ -131,12 +131,6 @@ alice_gid=GroupId("porto-alice")
 bob_uid=UserId("porto-bob")
 bob_gid=GroupId("porto-bob")
 
-charlie_uid=UserId("porto-charlie")
-charlie_gid=GroupId("porto-charlie")
-
-david_uid=UserId("porto-david")
-david_gid=GroupId("porto-david")
-
 porto_gid=GroupId("porto")
 
 def AsRoot():
@@ -154,12 +148,6 @@ def AsAlice():
 
 def AsBob():
     SwitchUser("porto-bob", bob_uid, bob_gid)
-
-def AsCharlie():
-    SwitchUser("porto-charlie", charlie_uid, charlie_gid)
-
-def AsDavid():
-    SwitchUser("porto-david", david_uid, david_gid)
 
 def GetPortodPid():
     pid = int(open("/run/portod.pid").read())

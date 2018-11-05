@@ -23,7 +23,6 @@ constexpr uid_t NoUser = (uid_t)-1;
 constexpr gid_t NoGroup = (gid_t)-1;
 
 extern gid_t PortoGroup;
-extern gid_t PortoCtGroup;
 
 struct TCred {
     uid_t Uid;

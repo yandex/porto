@@ -12,11 +12,7 @@ done
 
 for u in porto-alice porto-bob; do
 	id $u >/dev/null || useradd $u -G porto
-	getent group ${u}-containers >/dev/null || groupadd ${u}-containers
 done
-
-id porto-charlie >/dev/null || useradd porto-charlie -G porto-containers
-id porto-david >/dev/null || useradd porto-david -G porto-alice-containers
 
 uname -a
 uptime

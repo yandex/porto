@@ -498,8 +498,7 @@ Write access have root user and users from group "porto".
 Write access to container requires any of these conditions:  
 * container is a sub-container  
 * owner\_user matches to client user  
-* owner\_user belongs to group "porto-containers"  
-* owner\_user belongs to group "${CLIENT\_USER}-containers"  
+* client user is root  
 
 ## Filesystem
 
