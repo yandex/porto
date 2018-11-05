@@ -1956,7 +1956,7 @@ public:
         "[-P <place>] [-M] -L|-R|-F [meta/][storage]",
         "Manage internal persistent volume storage",
         "    -P <place>               optional path to place\n"
-        "    -L                       list existing storages\n"
+        "    -L [mask]                list existing storages\n"
         "    -R <storage>             remove storage\n"
         "    -F [days]                remove all unused for [days]\n"
         "    -S <private>             set private value\n"
@@ -2034,7 +2034,12 @@ public:
             }
 
         } else if (list) {
-            auto rsp = Api->ListStorages(place);
+            std::string mask;
+
+            if (args.size() >= 1)
+                mask = args[0];
+
+            auto rsp = Api->ListStorages(place, mask);
             if (!rsp) {
                 PrintError("Cannot list storages");
                 return EXIT_FAILURE;
@@ -2058,6 +2063,8 @@ public:
             }
 
             for (const auto &s: rsp->storages()) {
+                if (meta)
+                    continue;
                 fmt::print("{}\n", s.name());
                 if (s.has_private_value())
                     fmt::print("\tprivate\t{}\n", s.private_value());
@@ -2137,7 +2144,7 @@ public:
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer> [layer...]    remove layer from storage\n"
         "    -F [days]                remove all unused layers (unused for [days])\n"
-        "    -L                       list present layers\n"
+        "    -L [mask]                list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
         "    -Q <volume> <squashfs>   export upper layer into squashfs\n"
         "    -c compression           override compression\n"
@@ -2245,7 +2252,12 @@ public:
             }
 
         } else if (list) {
-            auto rsp = Api->ListLayers(place);
+            std::string mask;
+
+            if (args.size() >= 1)
+                mask = args[0];
+
+            auto rsp = Api->ListLayers(place, mask);
             if (!rsp) {
                 PrintError("Cannot list layers");
                 return EXIT_FAILURE;
