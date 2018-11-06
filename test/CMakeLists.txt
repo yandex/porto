@@ -74,6 +74,7 @@ ADD_PYTHON_TEST(self-container)
 ADD_PYTHON_TEST(portoctl-attach)
 
 ADD_PYTHON_TEST(io-stat)
+ADD_PYTHON_TEST(io-limit)
 
 # limits test
 
