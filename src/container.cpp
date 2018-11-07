@@ -2141,9 +2141,9 @@ TError TContainer::PrepareCgroups() {
     TError error;
 
     if (JobMode) {
+        Controllers = 0;
         if (RequiredControllers)
             return TError(EError::InvalidValue, "Cannot use cgroups in virt_mode=job");
-        Controllers = 0;
         return OK;
     } else {
         Controllers |= CGROUP_FREEZER;
