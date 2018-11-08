@@ -1,5 +1,6 @@
 from . import rpc_pb2
 
+
 class PortoException(Exception):
     EID = None
     __TYPES__ = {}
@@ -29,5 +30,5 @@ class WaitContainerTimeout(PortoException):
 PortoException._Init()
 
 EError = PortoException
-PermissionError = Permission
-UnknownError = Unknown
+PermissionError = Permission  # noqa UnresolvedReference
+UnknownError = Unknown  # noqa UnresolvedReference
