@@ -4,7 +4,9 @@ set -e
 
 ./portod stop 2>/dev/null || true
 
-rm -f /var/log/portod.*
+rm -f /var/log/portod.log
+
+rm -f /etc/portod.conf/test-*.conf
 
 for g in porto porto-containers ; do
 	getent group $g >/dev/null || groupadd $g
