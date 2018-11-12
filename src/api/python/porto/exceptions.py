@@ -20,7 +20,7 @@ class PortoException(Exception):
         return UnknownError(msg)
 
     def __str__(self):
-        return '%s: %s' % (self.__class__.__name__, self.args)
+        return '%s: %s' % (self.__class__.__name__, ', '.join(self.args))
 
 
 class WaitContainerTimeout(PortoException):

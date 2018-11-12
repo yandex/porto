@@ -449,6 +449,15 @@ class TestApi(unittest.TestCase):
         c2.Disconnect()
         c.Disconnect()
 
+    def test_error_stringification(self):
+        c = porto.Connection()
+        c.Connect()
+
+        try:
+            c.Find(container_name)
+        except porto.exceptions.ContainerDoesNotExist as e:
+            self.assertEqual(str(e), "ContainerDoesNotExist: container %s not found" % (container_name,))
+
 
 if __name__ == '__main__':
     unittest.main()
