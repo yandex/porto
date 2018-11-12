@@ -724,6 +724,13 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
             L_ERR("Canot setup default tclass: {}", error);
             return error;
         }
+
+        if (this == HostNetwork.get() && RootContainer) {
+            auto cs_name = fmt::format("{} CS{}", dev.Name, cs);
+            RootContainer->NetClass.TxRate[cs_name] = cls.Rate;
+            if (cls.Ceil)
+                RootContainer->NetClass.TxLimit[cs_name] = cls.Ceil;
+        }
     }
 
     TNlCgFilter filter(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, 0), 1);
@@ -872,7 +879,6 @@ TError TNetwork::SyncDevices() {
         }
 
         if (!dev.Prepared && this == HostNetwork.get()) {
-            RootContainer->NetClass.TxRate[dev.Name] = dev.Rate;
             RootContainer->NetClass.TxLimit[dev.Name] = dev.Ceil;
             RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
         }
@@ -891,9 +897,17 @@ TError TNetwork::SyncDevices() {
             L_NET("Forget network {} device {}:{}", NetName, dev->Index, dev->Name);
 
             if (this == HostNetwork.get()) {
-                RootContainer->NetClass.TxRate.erase(dev->Name);
                 RootContainer->NetClass.TxLimit.erase(dev->Name);
                 RootContainer->NetClass.RxLimit.erase(dev->Name);
+                for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
+                    auto cs_name = fmt::format("{} CS{}", dev->Name, cs);
+                    RootContainer->NetClass.TxRate.erase(cs_name);
+                    RootContainer->NetClass.TxLimit.erase(cs_name);
+                    cs_name = "Leaf " + cs_name;
+                    RootContainer->NetClass.TxRate.erase(cs_name);
+                    RootContainer->NetClass.TxLimit.erase(cs_name);
+                }
+
                 for (auto cls: NetClasses) {
                     cls->ClassStat.erase(dev->Name);
                     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
@@ -1290,6 +1304,14 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     }
     if (error)
         return TError(error, "leaf tc qdisc");
+
+    if (this == HostNetwork.get() && RootContainer &&
+            cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
+        auto cs_name = fmt::format("Leaf {} CS{}", dev.Name, cs);
+        RootContainer->NetClass.TxRate[cs_name] = cls.Rate;
+        if (cls.Ceil)
+            RootContainer->NetClass.TxLimit[cs_name] = cls.Ceil;
+    }
 
     return OK;
 }
