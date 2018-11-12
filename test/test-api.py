@@ -1,6 +1,5 @@
 from test_common import Catch, AsRoot, AsAlice, ReloadPortod
 
-import sys
 import os
 import time
 import socket
@@ -445,7 +444,7 @@ class TestApi(unittest.TestCase):
             c.Version()
             with self.assertRaises(porto.exceptions.SocketError):
                 c2.Version()
-            sys.exit(0)
+            os._exit(0)
 
         c2.Disconnect()
         c.Disconnect()
