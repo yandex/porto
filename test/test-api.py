@@ -379,6 +379,15 @@ class TestApi(unittest.TestCase):
         c = porto.Connection()
         ms = c.CreateMetaStorage(meta_storage_name, space_limit=2**20)
 
+        v = c.CreateVolume(storage=storage_in_meta, private=volume_private)
+        f = open(v.path + "/file", 'w')
+        f.write("test")
+        f.close()
+        v.Export(tarball_path)
+        v.Destroy()
+        st = c.FindStorage(storage_in_meta)
+        st.Remove()
+
         ml = c.ImportLayer(layer_in_meta, tarball_path)
         self.assertEqual(c.FindLayer(layer_in_meta).name, layer_in_meta)
         self.assertEqual(ms.FindLayer("layer").name, layer_in_meta)
