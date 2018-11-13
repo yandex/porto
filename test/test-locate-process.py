@@ -43,7 +43,7 @@ Catch(conn.Destroy, CT_NAME("c"))
 ct = conn.Create(CT_NAME("a"))
 ct.Prepare = types.MethodType(SetPipe, ct)
 ct.Check = types.MethodType(Check, ct)
-ct.SetProperty("env", "PYTHONPATH={}".format(os.environ['PYTHONPATH']))
+ct.SetProperty("cwd", os.path.dirname(__file__))
 
 ct.Prepare()
 ct.SetProperty("command", CMD.format(2))
