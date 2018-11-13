@@ -3152,8 +3152,11 @@ void TContainer::Exit(int status, bool oomKilled) {
     if (State == EContainerState::Stopped)
         return;
 
-    /* SIGKILL could be delivered earlier than OOM event */
-    if (!oomKilled && RecvOomEvents())
+    /*
+     * SIGKILL could be delivered earlier than OOM event.
+     * Any non-zero exit code or signal might be casuesd by OOM.
+     */
+    if (RecvOomEvents() && status)
         oomKilled = true;
 
     /* Detect fatal signals: portoinit cannot kill itself */
@@ -3168,14 +3171,11 @@ void TContainer::Exit(int status, bool oomKilled) {
     LockStateWrite();
     ExitStatus = status;
     SetProp(EProperty::EXIT_STATUS);
-    UnlockState();
-
-    /* Detect memory shortage that happened in syscalls */
-    auto cg = GetCgroup(MemorySubsystem);
-    if (!oomKilled && OomIsFatal && MemorySubsystem.GetOomEvents(cg)) {
-        L("CT{}:{} hit memory limit", Id, Name);
-        oomKilled = true;
+    if (oomKilled) {
+        OomKilled = true;
+        SetProp(EProperty::OOM_KILLED);
     }
+    UnlockState();
 
     for (auto &ct: Subtree()) {
         if (ct->State != EContainerState::Stopped &&
