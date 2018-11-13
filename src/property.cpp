@@ -2669,7 +2669,7 @@ public:
 class TOomIsFatal : public TProperty {
 public:
     TOomIsFatal() : TProperty(P_OOM_IS_FATAL, EProperty::OOM_IS_FATAL,
-            "Kill all affected containers on OOM")
+            "Kill all affected containers on OOM event")
     {
         IsDynamic = true;
     }
