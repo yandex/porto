@@ -13,4 +13,4 @@ container.Destroy()
 """
 
 from . import exceptions
-from .api import Connection
+from .connection import Connection
