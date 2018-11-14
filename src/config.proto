@@ -4,6 +4,93 @@ package cfg;
 
 message TConfig {
     message TNetworkCfg {
+
+        optional uint32 watchdog_ms = 32;
+
+        optional uint32 resolv_conf_watchdog_ms = 43;
+
+        optional uint32 cache_statistics_ms = 35;
+
+        /* L3 network */
+        optional bool proxy_ndp = 30;               // add proxy entries
+        optional uint32 proxy_ndp_max_range = 52;   // limit subnet size
+        optional uint32 proxy_ndp_watchdog_ms = 39;
+
+        optional bool l3_migration_hack = 36;       // share netns with same ip
+
+        optional uint32 l3_default_mtu = 42;        // L3 link mtu
+        optional uint32 l3_default_ipv4_mtu = 50;   // default route mtu
+        optional uint32 l3_default_ipv6_mtu = 51;   // default route mtu
+
+        /* NAT */
+        optional string nat_first_ipv4 = 10;
+        optional string nat_first_ipv6 = 11;
+        optional uint32 nat_count = 12;
+
+        /* ipip6 tunnel */
+        optional uint32 ipip6_encap_limit = 37;
+        optional uint32 ipip6_ttl = 38;
+        optional bool enable_ip6tnl0 = 40;
+
+        /* SLAAC for macvlan */
+        optional uint32 autoconf_timeout_s = 13;
+
+        /* TC scheduler */
+        repeated string unmanaged_device = 14;
+        repeated string unmanaged_group = 15;
+
+        // Uplink tc qdisc - hfsc
+        optional string device_qdisc = 16;
+        optional string device_rate = 17;
+        optional string device_ceil = 27;       // device speed limit
+        optional string device_quantum = 18;
+        optional string device_rate_burst = 22;
+        optional string device_ceil_burst = 23;
+
+        // Host and default tc class
+        optional string default_rate = 19;
+        optional string default_ceil = 20;
+        optional string default_qdisc = 24;
+        optional string default_qdisc_limit = 25;
+        optional string default_qdisc_quantum = 26;
+
+        // Container tc class
+        optional string container_rate = 21;
+        optional string container_qdisc = 28;
+        optional string container_qdisc_limit = 29;
+        optional string container_qdisc_quantum = 33;
+
+        // ToS tc class
+        message TDscpClass {
+            required string name = 1;                   // CS0..CS7
+            required uint32 weight = 2;
+            optional uint64 limit = 3;
+            optional double max_percent = 4 [default = 100];
+        }
+        repeated TDscpClass dscp_class = 44;
+
+        optional string default_tos = 45;               // CS0..CS7
+
+        // Automaic: container + tos -> priority -> tc class
+        optional bool enable_netcls_priority = 46;
+
+        // Leaf qdisc fq-codel
+        optional uint32 codel_target = 47;
+        optional uint32 codel_interval = 48;
+        optional bool codel_ecn = 49;
+
+        // RX tc police
+        optional string ingress_burst = 34;
+
+        /* see man ip-addrlabel */
+        message TAddrLabel {
+            required string prefix = 1;
+            required uint32 label = 2;
+        }
+        repeated TAddrLabel addrlabel = 31;
+
+        /* Deprecated */
+        optional bool enable_iproute = 41;
         optional bool enabled = 1 [deprecated=true];
         optional bool debug = 2 [deprecated=true];
         repeated string devices = 3 [deprecated=true];
@@ -17,59 +104,6 @@ message TConfig {
         }
         repeated TNetworkAlias alias = 8 [deprecated=true];
         optional bool dynamic_ifaces = 9 [deprecated=true];
-        optional string nat_first_ipv4 = 10;
-        optional string nat_first_ipv6 = 11;
-        optional uint32 nat_count = 12;
-        optional uint32 autoconf_timeout_s = 13;
-        repeated string unmanaged_device = 14;
-        repeated string unmanaged_group = 15;
-        optional string device_qdisc = 16;
-        optional string device_rate = 17;
-        optional string device_ceil = 27;
-        optional string device_quantum = 18;
-        optional string default_rate = 19;
-        optional string default_ceil = 20;
-        optional string container_rate = 21;
-        optional string device_rate_burst = 22;
-        optional string device_ceil_burst = 23;
-        optional string default_qdisc = 24;
-        optional string default_qdisc_limit = 25;
-        optional string default_qdisc_quantum = 26;
-        optional string container_qdisc = 28;
-        optional string container_qdisc_limit = 29;
-        optional string container_qdisc_quantum = 33;
-        optional string ingress_burst = 34;
-        optional bool proxy_ndp = 30;
-        message TAddrLabel {
-            required string prefix = 1;
-            required uint32 label = 2;
-        }
-        repeated TAddrLabel addrlabel = 31;
-        optional uint32 watchdog_ms = 32;
-        optional uint32 cache_statistics_ms = 35;
-        optional bool l3_migration_hack = 36;
-        optional uint32 ipip6_encap_limit = 37;
-        optional uint32 ipip6_ttl = 38;
-        optional uint32 proxy_ndp_watchdog_ms = 39;
-        optional bool enable_ip6tnl0 = 40;
-        optional bool enable_iproute = 41;
-        optional uint32 l3_default_mtu = 42;        // link mtu
-        optional uint32 resolv_conf_watchdog_ms = 43;
-        message TDscpClass {
-            required string name = 1;
-            required uint32 weight = 2;
-            optional uint64 limit = 3;
-            optional double max_percent = 4 [default = 100];
-        }
-        repeated TDscpClass dscp_class = 44;
-        optional string default_tos = 45;
-        optional bool enable_netcls_priority = 46;
-        optional uint32 codel_target = 47;
-        optional uint32 codel_interval = 48;
-        optional bool codel_ecn = 49;
-        optional uint32 l3_default_ipv4_mtu = 50;   // default route mtu
-        optional uint32 l3_default_ipv6_mtu = 51;   // default route mtu
-        optional uint32 proxy_ndp_max_range = 52;
     }
 
     message TFileCfg {
