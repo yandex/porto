@@ -1,3 +1,9 @@
+yandex-porto (4.18.13) unstable; urgency=low
+
+  * porto: fix oom detection for containers without own memory cgroup
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 14 Nov 2018 09:47:21 +0300
+
 yandex-porto (4.18.12) unstable; urgency=low
 
   * porto: fix cgroup removal on error path of virt_mode=job
