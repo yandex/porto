@@ -888,15 +888,22 @@ Possible indexes for statistics and parameters:
 
 * **net\_guarantee** - required egress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
+    "eth0 CS0" - egress guarantee for CS0 at eth0 in host  
+    CS0        - egress guarantee for CS0 at each host uplink  
+    eth0       - egress guarantee for each class at eth0 in host  
+    default    - default guarantee for everything  
+
 * **net\_limit**     - maximum egress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
-    net\_limit\[default\] = 10M"   - default limit for everything  
-    net\_limit\[veth\] = 10M       - total egress limit for net="L3 veth"  
-    net\_limit\[CS7\] = 1          - blackhole  
+    "eth0 CS0" - egress limit for CS0 at eth0 in host  
+    CS0        - egress limit for CS0 at each host uplink  
+    veth       - total egress limit for net="L3 veth"  
+    default    - default limit for everything  
+    CS7: 1     - setup blackhole  
 
 * **net\_rx\_limit** - maximum ingress bandwidth: \<interface\>|group \<group\>|default: \<Bps\>;...
 
-    net\_rx\_limit\[veth\]       - total ingress limit for net="L3 veth"
+    veth       - total ingress limit for net="L3 veth"  
 
 * **net\_bytes**     - traffic class counters: \<interface\>|\<class\>: \<bytes\>;...
 
@@ -961,7 +968,7 @@ the same network, this way container becomes reachable from the outside.
 For ip with prefix proxy entry is added for each address in range but range is limited.
 ```
 network {
-    proxy_ndp: true                 (disable proxy entries)
+    proxy_ndp: true                 (add proxy entries)
     proxy_ndp_watchdog_ms: 60000    (reconstruction period)
     proxy_ndp_max_range: 16         (limit for subnet size)
 }
