@@ -1334,6 +1334,9 @@ public:
         else if (value == "host")
             CT->HostMode = true;
 
+        if (CT->HostMode || CT->JobMode)
+            CT->Isolate = false;
+
         CT->SetProp(EProperty::VIRT_MODE);
         return OK;
     }
@@ -1564,17 +1567,11 @@ public:
         return OK;
     }
     TError Set(bool val) {
+        if (val && (CT->HostMode || CT->JobMode))
+            return TError(EError::InvalidValue, "isolate=true incompatible with virt_mode");
         CT->Isolate = val;
         CT->SetProp(EProperty::ISOLATE);
         CT->SanitizeCapabilitiesAll();
-        return OK;
-    }
-    TError Start(void) {
-        if (CT->HostMode || CT->JobMode) {
-            if (CT->Isolate && CT->HasProp(EProperty::ISOLATE))
-                return TError(EError::InvalidValue, "isolate=true incompatible with virt_mode");
-            CT->Isolate = false;
-        }
         return OK;
     }
     void Dump(Porto::TContainer &spec, bool val) {
