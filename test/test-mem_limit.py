@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+# FIXME cleanup this mess
+
 import porto
 import os
 import types
@@ -14,6 +16,8 @@ OLD_KERNEL = kmaj < 4 or (kmaj == 4 and kmin < 3)
 DURATION = 60000 #ms
 
 NAME = os.path.basename(__file__)
+
+conn = porto.Connection(timeout=30)
 
 def CT_NAME(suffix):
     global NAME
@@ -47,7 +51,7 @@ def Prepare(ct, anon=0, total=0, use_anon=0, use_file=0, meta=False, to_wait=Fal
         ct.SetProperty("anon_limit", 0)
 
     if not meta:
-        ct.Vol = ct.conn.CreateVolume(None, [], space_limit=str(SIZE))
+        ct.Vol = conn.CreateVolume(None, [], space_limit=str(SIZE))
         ct.Vol.Link(ct.name)
         ct.Vol.Unlink("/")
         ct.SetProperty("command", "{}/mem_touch {} {} {}/test.mapped{}"\
@@ -108,7 +112,7 @@ def CheckAlive(ct):
         ct.Vol.Unlink(ct.name)
 
 def StartIt(ct):
-    ct.conn.Start(ct.name)
+    ct.Start()
     return ct
 
 def Alloc(conn, suffix):
@@ -126,7 +130,6 @@ def Alloc(conn, suffix):
     ct.Vol = None
     return ct
 
-conn = porto.Connection(timeout=30)
 conn.Alloc = types.MethodType(Alloc, conn)
 
 print "\nMemory limit test, SIZE: {}, EPS: {}\n".format(SIZE, EPS)
