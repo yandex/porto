@@ -3780,7 +3780,7 @@ void TContainer::SyncState() {
         /* meta container */
     } else if (!WaitTask.Exists()) {
         if (State != EContainerState::Dead)
-            L("Task no found");
+            L("Task not found");
         Reap(false);
     } else if (WaitTask.IsZombie()) {
         L("Task is zombie");
