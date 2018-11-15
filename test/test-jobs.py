@@ -31,11 +31,17 @@ a.Destroy()
 
 # host/job
 
-a = c.Run('test-a', virt_mode='host', memory_limit="1G")
+a = c.Run('test-a', virt_mode='host', memory_limit="1G", weak=False)
 ExpectEq(a['state'], 'meta')
 
-b = c.Run('test-a/b', virt_mode='job', command='sleep 1000')
+b = c.Run('test-a/b', virt_mode='job', command='sleep 1000', weak=False)
 ExpectEq(b['state'], 'running')
+
+ReloadPortod()
+
+ExpectEq(a['state'], 'meta')
+ExpectEq(b['state'], 'running')
+
 b.Destroy()
 
 b = c.Run('test-a/b', virt_mode='job', command='sleep 1000')

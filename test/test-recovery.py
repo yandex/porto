@@ -237,6 +237,23 @@ def TestRecovery():
     ExpectProp(parent, "state", "meta")
     parent.Destroy()
 
+
+    print "restore virt_mode=host meta + virt_mode=job child container"
+
+    parent = c.Run("test-host", virt_mode='host', weak=False)
+    child = c.Run("test-host/job", virt_mode='job', command="sleep 1000", weak=False)
+
+    AsRoot()
+    ReloadPortod()
+    AsAlice()
+
+    c.Connect()
+
+    ExpectProp(parent, "state", "meta")
+    ExpectProp(child, "state", "running")
+    parent.Destroy()
+
+
     print "Make sure hierarchical recovery works"
     #Still as alice
 
