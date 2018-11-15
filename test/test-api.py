@@ -152,11 +152,12 @@ class TestApi(unittest.TestCase):
         c.GetVolumes()
         c.FindLabel("TEST.test")
 
-        c.ListStorage()
+        c.ListStorages()
 
         c.GetData("/", 'cpu_usage')
         c.GetProperty("/", 'cpu_usage')
         c.GetInt("/", 'cpu_usage')
+        c.GetMap("/", 'virtual_memory')
 
         c.GetProperty("/", 'controllers', 'cpu')
         c.GetProperty("/", ('controllers', 'cpu'))
@@ -175,6 +176,7 @@ class TestApi(unittest.TestCase):
 
         r.GetInt("controllers", "cpu")
         r.GetInt(("controllers", "cpu"))
+        r.GetMap('virtual_memory')
 
         # CONTAINERS
 
@@ -194,6 +196,8 @@ class TestApi(unittest.TestCase):
 
         a.SetProperty("memory_limit", "2G")
         assert a.GetProperty("memory_limit") == "2147483648"
+
+        a.SetMap("net_limit", {'default': 0})
 
         a.SetInt("memory_limit", 1 << 30)
         assert a.GetInt("memory_limit") == 1073741824

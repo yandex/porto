@@ -4,13 +4,12 @@ Example:
 
 import porto
 
-conn = porto.Connection()
-container = conn.Run("test", command="sleep 5")
+api = porto.api.PortoApi()
+container = api.Run("test", command="sleep 5")
 container.Wait()
 print container['status']
 container.Destroy()
 
 """
 
-from . import exceptions
-from .connection import Connection
+from .api import PortoApi as Connection  # compat
