@@ -620,6 +620,10 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
         if (error)
             goto err;
 
+        error = ct->PrepareOomMonitor();
+        if (error)
+            goto err;
+
         /* Kernel without group rt forbids moving RT tasks in to cpu cgroup */
         if (ct->Task.Pid && !CpuSubsystem.HasRtGroup) {
             auto cpuCg = ct->GetCgroup(CpuSubsystem);
