@@ -121,7 +121,7 @@ def Alloc(conn, suffix):
     ct.CheckOOM = types.MethodType(CheckOOM, ct)
     ct.CheckAlive = types.MethodType(CheckAlive, ct)
     ct.WaitUsage = types.MethodType(WaitUsage, ct)
-    ct.Start = types.MethodType(StartIt, ct)
+    ct.StartIt = types.MethodType(StartIt, ct)
     ct.Total = 0
     ct.Anon = 0
     ct.UseAnon = 0
@@ -137,31 +137,31 @@ print "\nMemory limit test, SIZE: {}, EPS: {}\n".format(SIZE, EPS)
 print "\nCheck limit can be achieved\n"
 
 conn.Alloc("achieve_anon").Prepare(anon=SIZE, total=0, use_anon=SIZE, use_file=0)\
-                          .Start()\
+                          .StartIt()\
                           .CheckOOM(False)
 
 conn.Alloc("achieve_file").Prepare(anon=0, total=SIZE, use_anon=0, use_file=SIZE)\
-                          .Start()\
+                          .StartIt()\
                           .CheckOOM(False)
 
 conn.Alloc("achieve_mixed").Prepare(anon=SIZE / 3, total=SIZE,\
                                     use_anon=SIZE / 3, use_file=2 * SIZE / 3)\
-                           .Start()\
+                           .StartIt()\
                            .CheckOOM(False)
 
 print "\nCheck OOM triggering\n"
 
 conn.Alloc("oom_file").Prepare(anon=0, total=SIZE, use_anon=0, use_file=SIZE * 2)\
-                      .Start()\
+                      .StartIt()\
                       .CheckOOM(True)
 
 conn.Alloc("oom_anon").Prepare(anon=SIZE, total=0, use_anon=SIZE * 2, use_file=0)\
-                      .Start()\
+                      .StartIt()\
                       .CheckOOM(True)
 
 conn.Alloc("oom_anon_with_file").Prepare(anon=SIZE / 2, total=SIZE,\
                                          use_anon=SIZE, use_file=SIZE / 2)\
-                                .Start()\
+                                .StartIt()\
                                 .CheckOOM(True)
 
 print "\nCheck hierarchical\n"
