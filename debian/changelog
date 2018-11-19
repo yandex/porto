@@ -1,3 +1,10 @@
+yandex-porto (4.18.15) unstable; urgency=low
+
+  * test/oom: check oom event after restore
+  * porto: restore oom monitor
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 19 Nov 2018 11:12:28 +0300
+
 yandex-porto (4.18.14) unstable; urgency=low
 
   * porto: set isolate=false for virt_mode=host|job at restore
