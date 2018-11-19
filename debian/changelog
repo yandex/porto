@@ -1,3 +1,47 @@
+yandex-porto (4.20.8) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: add commands GetIntProperty SetIntProperty
+  * test/api: fix tiny memory_limit
+  * test: merge start script
+  * api/cpp: fix and test auto reconnect
+  * api/python: sync timeout logic with cpp api
+  * test/properties: skip unsupported
+  * test/recovery: fix some bugs
+  * porto: handle masks 'prefix***' and '***suffix'
+  * porto: optimize layer and storage listing with exact mask
+  * portoctl: add mask for layer and storage listing
+  * porto: deprecatee groups porto-containers and ${USER}-containers
+  * porto: fix cgroup removal on error path of virt_mode=job
+  * test: add io-limit
+  * test: add net-sched
+  * test/start: remove /etc/portod.conf/test-*.conf
+  * porto: fix oom detection for containers without own memory cgroup
+  * network: set host/fallback tc class rate to 10Mbit
+
+  [ Vsevolod Velichko ]
+  * remove Exception.message (deprecated as of python 2.6)
+  * pep8
+  * port api tests to unittest
+  * fix fork inside test
+  * improve error stringification, add test
+
+  [ Konstantin Khlebnikov ]
+  * test: add symlink to porto api
+  * test/api: fix test_meta_storage
+  * api/python: split api.py
+  * test/locate: fix
+  * api/python: tiny fix
+  * porto: set isolate=false for virt_mode=host|job at restore
+  * test: check virt_mode=host restore
+  * api/python: refactoring
+  * test/test-mem_limit: fix
+  * test/oom: check oom event after restore
+  * porto: restore oom monitor
+  * test/mem_limit: fix
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 19 Nov 2018 11:56:11 +0300
+
 yandex-porto (4.20.7) unstable; urgency=low
 
   * test/place: check place_usage and place_limit
