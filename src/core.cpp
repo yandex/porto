@@ -49,6 +49,8 @@ TError TCore::Handle(const TTuple &args) {
     CatchFatalSignals();
     OpenLog(PORTO_LOG);
 
+    L_CORE("Args {}", MergeEscapeStrings(args, '\t'));
+
     Pid = std::stoi(args[0]);
     Tid = std::stoi(args[1]);
     Vpid = std::stoi(args[2]);
