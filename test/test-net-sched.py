@@ -36,44 +36,49 @@ def run_iperf(name, server, wait=None, cs=None, cfg={}, **kwargs):
     command += " --json"
 
     print command
-    ct = conn.Run(name, command=command, wait=wait, **cfg)
-    if wait == 0:
-        return None
+    return conn.Run(name, command=command, wait=wait, **cfg)
 
+
+def bps(ct):
+    ct.WaitContainer(5)
     res = json.loads(ct['stdout'])
     ct.Destroy()
     return res['end']['sum_sent']['bits_per_second'] / 2.**23
 
 
-res = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_limit": "default: 0"})
+a = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_limit": "default: 0"})
+res = bps(a)
 print "net_limit inf -> ", res
 ExpectRange(res, 8, 12)
 
-
-res = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_limit": "default: 1M"})
+a = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_limit": "default: 1M"})
+res = bps(a)
 print "net_limit 1M -> ", res
-ExpectRange(res, 0.5, 1.5)
+ExpectRange(res, 0.5, 2)
 
 
-run_iperf("test-net-b", server2, time=5, wait=0, cfg={})
-res = run_iperf("test-net-a", server1, time=3, wait=5, cfg={})
-conn.Destroy("test-net-b")
-print "net_guarantee 0 and 0 -> ", res
+b = run_iperf("test-net-b", server2, time=5, wait=0, cfg={})
+a = run_iperf("test-net-a", server1, time=3, wait=5, cfg={})
+res = bps(a)
+res_b = bps(b)
+print "net_guarantee 0 and 0 -> ", res, res_b
 ExpectRange(res, 4, 6)
 
 
-run_iperf("test-net-b", server2, time=5, wait=0, cfg={"net_guarantee": "default: 1M"})
-res = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_guarantee": "default: 1M"})
-conn.Destroy("test-net-b")
-print "net_guarantee 1M and 1M -> ", res
+b = run_iperf("test-net-b", server2, time=5, wait=0, cfg={"net_guarantee": "default: 1M"})
+a = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_guarantee": "default: 1M"})
+res = bps(a)
+res_b = bps(b)
+print "net_guarantee 1M and 1M -> ", res, res_b
 ExpectRange(res, 4, 6)
 
 
-run_iperf("test-net-b", server2, time=5, wait=0, cfg={"net_guarantee": "default: 2M"})
-res = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_guarantee": "default: 3M"})
-conn.Destroy("test-net-b")
-print "net_guarantee 2M and 3M -> ", res
-ExpectRange(res, 5, 7)
+b = run_iperf("test-net-b", server2, time=5, wait=0, cfg={"net_guarantee": "default: 1M"})
+a = run_iperf("test-net-a", server1, time=3, wait=5, cfg={"net_guarantee": "default: 9M"})
+res = bps(a)
+res_b = bps(b)
+print "net_guarantee 9M and 1M -> ", res, res_b
+ExpectRange(res, 8, 10)
 
 
 print "Remove uplink limit"
