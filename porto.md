@@ -750,11 +750,19 @@ write permissions to the target or owning related volume.
     - *iso*      - SCHED\_ISO   (offstream kernel feature)
 
 * **cpu\_set** - CPU affinity
-    - \[N|N-M,\]... - set CPU mask
+    - \[N|N-M,\]... - set of CPUs (logical cores)
     - *node* N      - bind to NUMA node
-    - *reserve* N   - N exclusive CPUs
-    - *threads* N   - only N exclusive CPUs
-    - *cores* N     - only N exclusive SMT cores, one thread for each
+    - *reserve* N   - allocate N CPUs, use the rest too
+    - *threads* N   - allocate N CPUs, use only them
+    - *cores* N     - allocate N physical cores, use only one thread for each
+
+    Each container owns set of cpus (shown in **cpu\_set\_affinity**) and
+    distributes them among childrens.
+
+    Child could use only subset of parent cpus, by default all of them.
+
+    Allocated CPUs are removed from cpu sets of sibling containers,
+    but these CPUs still could be in use by processes outside sub-tree.
 
 * **cpu\_set\_affinity** - resulting CPU affinity: \[N,N-M,\]...
 
