@@ -1,3 +1,11 @@
+yandex-porto (4.18.16) unstable; urgency=low
+
+  * core: log portod core arguments
+  * network: sync statistics every second
+  * porto: rephrase cpu_set documentation
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 22 Nov 2018 10:45:44 +0300
+
 yandex-porto (4.18.15) unstable; urgency=low
 
   * test/oom: check oom event after restore
