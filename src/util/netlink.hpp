@@ -150,6 +150,7 @@ public:
     TError Create(const TNl &nl);
     TError Delete(const TNl &nl);
     bool Check(const TNl &nl);
+    TError CreateCodel(const TNl &nl);
 };
 
 class TNlClass {
