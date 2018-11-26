@@ -996,14 +996,14 @@ TError TNlQdisc::Create(const TNl &nl) {
 
     if (Kind == "htb") {
         if (Default)
-            rtnl_htb_set_defcls(qdisc, Default);
+            rtnl_htb_set_defcls(qdisc, TC_H_MIN(Default));
         if (Quantum)
             rtnl_htb_set_rate2quantum(qdisc, Quantum);
     }
 
     if (Kind == "hfsc") {
         if (Default)
-            rtnl_qdisc_hfsc_set_defcls(qdisc, Default);
+            rtnl_qdisc_hfsc_set_defcls(qdisc, TC_H_MIN(Default));
     }
 
     if (Kind == "sfq") {
@@ -1090,7 +1090,7 @@ bool TNlQdisc::Check(const TNl &nl) {
         goto out;
 
     if (Kind == "htb") {
-        if (rtnl_htb_get_defcls(qdisc) != Default)
+        if (rtnl_htb_get_defcls(qdisc) != TC_H_MIN(Default))
             goto out;
     }
 
@@ -1107,10 +1107,105 @@ out:
     return result;
 }
 
+static uint32_t htb_burst_to_buffer(uint64_t burst, uint64_t speed) {
+    uint32_t tick_per_ns = 64; // /proc/net/psched
+    return std::min((double)burst * NSEC_PER_SEC / tick_per_ns / speed,
+                    (double)UINT32_MAX);
+}
+
+TError TNlClass::CreateHTB(const TNl &nl) {
+    struct tcmsg tchdr;
+    struct nl_msg *msg;
+    struct nlattr *u32;
+    TError error;
+    int ret;
+
+    L_NL("add class htb dev {} id {:x} parent {:x} rate {} ceil {} burst {} cburst {} quantum {} prio {}",
+         Index, Handle, Parent, Rate ?: defRate, Ceil, RateBurst, CeilBurst, Quantum, Prio);
+
+    msg = nlmsg_alloc_simple(RTM_NEWTCLASS, NLM_F_CREATE | NLM_F_REPLACE);
+    if (!msg)
+        return TError(Kind);
+
+    tchdr.tcm_family = AF_UNSPEC;
+    tchdr.tcm_ifindex = Index;
+    tchdr.tcm_handle = Handle;
+    tchdr.tcm_parent = Parent;
+
+    ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
+    if (ret < 0)
+        goto free_msg;
+
+    ret = nla_put(msg, TCA_KIND, Kind.size() + 1, Kind.c_str());
+    if (ret < 0)
+        goto free_msg;
+
+    struct tc_htb_opt opts;
+
+    memset(&opts, 0, sizeof(opts));
+
+    opts.prio = Prio;
+    opts.quantum = Quantum;
+
+    if (Rate) {
+        opts.rate.rate = std::min(Rate, (uint64_t)UINT32_MAX);
+        opts.buffer = htb_burst_to_buffer(RateBurst, Rate);
+    } else {
+        opts.rate.rate = defRate;
+        opts.buffer = htb_burst_to_buffer(RateBurst, defRate);
+    }
+    opts.rate.linklayer = TC_LINKLAYER_ETHERNET;
+
+    if (Ceil) {
+        opts.ceil.rate = std::min(Ceil, (uint64_t)UINT32_MAX);
+        opts.cbuffer = htb_burst_to_buffer(CeilBurst, Ceil);
+    } else {
+        opts.ceil.rate = UINT32_MAX;
+        opts.cbuffer = htb_burst_to_buffer(1, 1); /* 1s */
+    }
+    opts.ceil.linklayer = TC_LINKLAYER_ETHERNET;
+
+    u32 = nla_nest_start(msg, TCA_OPTIONS);
+    if (!u32) {
+        error = TError(EError::Unknown, "TCA_OPTIONS");
+        goto free_msg;
+    }
+
+    ret = nla_put(msg, TCA_HTB_PARMS, sizeof(opts), &opts);
+    if (ret < 0)
+        goto free_msg;
+
+    ret = nla_put_u64(msg, TCA_HTB_RATE64, Rate ?: defRate);
+    if (ret < 0)
+        goto free_msg;
+
+    ret = nla_put_u64(msg, TCA_HTB_CEIL64, Ceil ?: NET_MAX_RATE);
+    if (ret < 0)
+        goto free_msg;
+
+    nla_nest_end(msg, u32);
+
+    ret = nl_send_sync(nl.GetSock(), msg);
+    if (ret)
+        error = nl.Error(ret, Kind);
+
+    return error;
+
+free_msg:
+    if (ret)
+        error = nl.Error(ret, Kind);
+    nlmsg_free(msg);
+
+    return error;
+}
+
 TError TNlClass::Create(const TNl &nl) {
     struct rtnl_class *cls;
     TError error;
     int ret;
+
+    if (Kind == "htb")
+        return CreateHTB(nl);
 
     cls = rtnl_class_alloc();
     if (!cls)
@@ -1124,31 +1219,6 @@ TError TNlClass::Create(const TNl &nl) {
     if (ret < 0) {
         error = nl.Error(ret, "Cannot set class kind");
         goto free_class;
-    }
-
-    if (Kind == "htb") {
-        /* must be <= INT32_MAX to prevent overflows in libnl */
-        uint64_t maxRate = INT32_MAX;
-
-        /*
-         * HTB doesn't allow 0 rate
-         * FIXME add support for 64-bit rates
-         */
-        rtnl_htb_set_rate(cls, std::min(Rate ?: 1, maxRate));
-        rtnl_htb_set_ceil(cls, std::min(Ceil ?: maxRate, maxRate));
-        rtnl_htb_set_prio(cls, 3);
-
-        if (MTU)
-            rtnl_tc_set_mtu(TC_CAST(cls), MTU);
-
-        if (Quantum)
-            rtnl_htb_set_quantum(cls, Quantum);
-
-        if (RateBurst)
-            rtnl_htb_set_rbuffer(cls, RateBurst);
-
-        if (CeilBurst)
-            rtnl_htb_set_cbuffer(cls, CeilBurst);
     }
 
     if (Kind == "hfsc") {
