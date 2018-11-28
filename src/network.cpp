@@ -772,6 +772,13 @@ TError TNetwork::SyncDevices() {
         if (DeviceOwners.count(dev.Name))
             dev.Owner = DeviceOwners.at(dev.Name);
 
+        if (!ManagedNamespace && !dev.Managed) {
+            for (auto &pattern: config().network().managed_device()) {
+                if (StringMatch(dev.Name, pattern))
+                    dev.Managed = dev.Uplink = true;
+            }
+        }
+
         if (dev.Type == "veth") {
             /* Ignore our veth pairs */
             if (!ManagedNamespace &&
@@ -786,7 +793,7 @@ TError TNetwork::SyncDevices() {
                 dev.Uplink = true;
         } else if (dev.Type == "tun") {
             /* Ignore TUN/TAP without known owners */
-            if (!dev.Owner)
+            if (!dev.Owner && !dev.Managed)
                 continue;
         } else if (ManagedNamespace) {
             /* No qdisc in containers except police at uplink */
