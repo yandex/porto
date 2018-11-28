@@ -78,6 +78,7 @@ message TConfig {
         optional uint32 codel_target = 47;
         optional uint32 codel_interval = 48;
         optional bool codel_ecn = 49;
+        optional uint32 codel_ce_threshold = 53;
 
         // RX tc police
         optional string ingress_burst = 34;
