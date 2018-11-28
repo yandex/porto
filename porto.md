@@ -1043,8 +1043,7 @@ This helps container to choose correct source IP when it works in several networ
 
 ## Traffic scheduler
 
-Porto setup **tc-hfsc(8)** scheduler for all host interfaces except listed in
-portod.conf as unmanaged:
+Porto setup tc scheduler for all host interfaces except listed in portod.conf as unmanaged:
 ```
 network {
     unmanaged_device: "name"
@@ -1492,6 +1491,7 @@ CONFIG_VETH
 CONFIG_TUN
 CONFIG_MACVLAN
 CONFIG_IPVLAN
+CONFIG_NET_SCH_HTB
 CONFIG_NET_SCH_HFSC
 CONFIG_NET_SCH_SFQ
 CONFIG_NET_SCH_FQ_CODEL
