@@ -47,7 +47,7 @@ constexpr uint64_t CPU_POWER_PER_SEC = 1000000000ull;
 
 constexpr uint64_t NSEC_PER_SEC = 1000000000ull;
 
-constexpr uint64_t NET_MAX_RATE = 2000000000; /* 16Gbit */
+constexpr uint64_t NET_MAX_RATE = 12500000000000ull; /* 100Tbit */
 
 constexpr uint64_t ROOT_CONTAINER_ID = 1;
 constexpr uint64_t DEFAULT_CONTAINER_ID = 2;

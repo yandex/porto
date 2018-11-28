@@ -537,25 +537,17 @@ TError TNetwork::SetupAddrLabel() {
 
 void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
     TPath knob("/sys/class/net/" + dev.Name + "/speed");
-    uint64_t speed, rate, ceil;
     std::string text;
+    uint64_t speed;
 
-    if (ManagedNamespace) {
+    if (ManagedNamespace || knob.ReadAll(text) ||
+            StringToUint64(text, speed) || speed < 100) {
         dev.Ceil = NET_MAX_RATE;
         dev.Rate = NET_MAX_RATE;
-        return;
-    }
-
-    if (knob.ReadAll(text) || StringToUint64(text, speed) || speed < 100) {
-        ceil = NET_MAX_RATE;
-        rate = NET_MAX_RATE;
     } else {
-        ceil = speed * 125000; /* Mbit -> Bps */
-        rate = ceil;
+        dev.Ceil = speed * 125000; /* Mbit -> Bps */
+        dev.Rate = speed * 125000;
     }
-
-    dev.Ceil = dev.GetConfig(DeviceCeil, ceil);
-    dev.Rate = dev.GetConfig(DeviceRate, rate);
 }
 
 TError TNetwork::SetupPolice(TNetDevice &dev) {
@@ -612,9 +604,9 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     cls.RateBurst = cls.CeilBurst = dev.MTU * 10;
 
     TNlQdisc leaf(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, 1), TC_HANDLE(2, 0));
-    leaf.Kind = dev.GetConfig(ContainerQdisc);
-    leaf.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20);
-    leaf.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2);
+    leaf.Kind = dev.GetConfig(ContainerQdisc, "pfifo");
+    leaf.Limit = dev.GetConfig(ContainerQdiscLimit, 1000);
+    leaf.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 10);
 
     if (rate) {
         error = qdisc.Create(*Nl);
@@ -646,7 +638,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     PORTO_LOCKED(NetStateMutex);
 
     //
-    // 1:0 qdisc (hfsc)
+    // 1:0 qdisc
     //  |
     // 1:1 / class
     //  |
@@ -654,21 +646,21 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     //      |
     //      +- 1:0x10 + CSn Host CSn class
     //      |   |
-    //      |   +- 1x10 + CSn:0 CSn Host leaf qdisc (fq_codel)
+    //      |   +- 1x10 + CSn:0 CSn Host leaf qdisc
     //      |
     //      +- 1:0x20 + CSn Fallback CSn class
     //      |   |
-    //      |   +- 1x20 + CSn:0 CSn Fallback leaf qdisc (fq_codel)
+    //      |   +- 1x20 + CSn:0 CSn Fallback leaf qdisc
     //      |
     //      +-1:Slot + 8 + CSn slot CSn class
     //         |
     //         +- 1:Slot + CSn default leaf for slot CSn class
     //         |   |
-    //         |   +- Slot + CSn:0 slot CSn default leaf qdisc (fq_codel)
+    //         |   +- Slot + CSn:0 slot CSn default leaf qdisc
     //         |
     //         +- 1:Container + CSn container CSn class
     //             |
-    //             +- Container + CSn:0 container CSn leaf qdisc (fq_codel)
+    //             +- Container + CSn:0 container CSn leaf qdisc
     //
 
     L_NET("Setup queue for network {} device {}:{}", NetName, dev.Index, dev.Name);
@@ -694,8 +686,11 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     cls.Index = dev.Index;
     cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, 0);
     cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, 1);
-    cls.Rate = dev.Rate;
-    cls.Ceil = dev.Ceil;
+    cls.Rate = dev.GetConfig(DeviceRate, dev.Rate);
+    cls.Ceil = dev.GetConfig(DeviceCeil, 0);
+    cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 10);
+    cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10);
+    cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10);
 
     error = cls.Create(*Nl);
     if (error) {
@@ -704,21 +699,6 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     }
 
     for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
-        cls.Parent = TC_HANDLE(ROOT_TC_MAJOR, 1);
-        cls.Handle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR + cs);
-        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
-        cls.Ceil = 0;
-        if (CsMaxPercent[cs] < 100)
-            cls.Ceil = dev.Ceil * CsMaxPercent[cs] / 100;
-        if (CsLimit[cs] && (!cls.Ceil || CsLimit[cs] < cls.Ceil))
-            cls.Ceil = CsLimit[cs];
-
-        error = cls.Create(*Nl);
-        if (error) {
-            L_ERR("Cannot setup dscp meta tclass: {}", error);
-            return error;
-        }
-
         error = SetupClass(dev, DefaultClass, cs);
         if (error) {
             L_ERR("Canot setup default tclass: {}", error);
@@ -879,8 +859,8 @@ TError TNetwork::SyncDevices() {
         }
 
         if (!dev.Prepared && this == HostNetwork.get()) {
-            RootContainer->NetClass.TxLimit[dev.Name] = dev.Ceil;
-            RootContainer->NetClass.RxLimit[dev.Name] = dev.Ceil;
+            RootContainer->NetClass.TxLimit[dev.Name] = dev.GetConfig(DeviceCeil, dev.Ceil);
+            RootContainer->NetClass.RxLimit[dev.Name] = dev.GetConfig(DeviceCeil, dev.Ceil);
         }
 
         if (!dev.Prepared)
@@ -1244,15 +1224,16 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     cls.Kind = dev.GetConfig(DeviceQdisc);
     cls.Rate = dev.GetConfig(cfg.TxRate, 0, cs);
     cls.Ceil = dev.GetConfig(cfg.TxLimit, 0, cs);
-    cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 2, cs);
+    cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 10, cs);
     cls.RateBurst = dev.GetConfig(DeviceRateBurst, dev.MTU * 10, cs);
     cls.CeilBurst = dev.GetConfig(DeviceCeilBurst, dev.MTU * 10, cs);
 
     if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1)) {
-        cls.Rate = (double)dev.Rate * CsWeight[cs] / CsTotalWeight;
+        cls.Rate = (double)dev.GetConfig(DeviceRate, dev.Rate) *
+                    CsWeight[cs] / CsTotalWeight;
         cls.Ceil = 0;
         if (CsMaxPercent[cs] < 100)
-            cls.Ceil = dev.Ceil * CsMaxPercent[cs] / 100;
+            cls.Ceil = dev.GetConfig(DeviceCeil, dev.Ceil) * CsMaxPercent[cs] / 100;
         if (CsLimit[cs] && (!cls.Ceil || CsLimit[cs] < cls.Ceil))
             cls.Ceil = CsLimit[cs];
     } else
@@ -1280,15 +1261,15 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
         cls.Ceil = dev.GetConfig(DefaultClassCeil, 0, cs);
         cls.defRate = cls.Rate;
 
-        ctq.Kind = dev.GetConfig(DefaultQdisc, "", cs);
-        ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 0, cs);
-        ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2, cs);
+        ctq.Kind = dev.GetConfig(DefaultQdisc, "pfifo", cs);
+        ctq.Limit = dev.GetConfig(DefaultQdiscLimit, 1000, cs);
+        ctq.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 10, cs);
     } else if (cls.Ceil == 1) {
         ctq.Kind = "blackhole";
     } else {
-        ctq.Kind = dev.GetConfig(ContainerQdisc, "", cs);
-        ctq.Limit = dev.GetConfig(ContainerQdiscLimit, dev.MTU * 20, cs);
-        ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 2, cs);
+        ctq.Kind = dev.GetConfig(ContainerQdisc, "pfifo", cs);
+        ctq.Limit = dev.GetConfig(ContainerQdiscLimit, 1000, cs);
+        ctq.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 10, cs);
     }
 
     L_NET_VERBOSE("Setup CS{} leaf class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
@@ -1510,7 +1491,8 @@ retry:
 
         if (!dev.Managed) {
             /* cleanup legacy hfsc setup from containers */
-            if (ManagedNamespace && !dev.Uplink && dev.Qdisc == "hfsc") {
+            if (ManagedNamespace && !dev.Uplink &&
+                    (dev.Qdisc == "hfsc" || dev.Qdisc == "htb")) {
                 TNlQdisc qdisc(dev.Index, TC_H_ROOT, 0);
                 (void)qdisc.Delete(*Nl);
                 dev.Qdisc = "";

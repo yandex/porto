@@ -128,15 +128,14 @@ static void DefaultConfig() {
     config().mutable_volumes()->set_place_load_limit("default: 2; /ssd: 4");
     config().mutable_volumes()->set_squashfs_compression("gzip");
 
-    config().mutable_network()->set_device_qdisc("default: hfsc");
+    config().mutable_network()->set_device_qdisc("default: htb");
 
     config().mutable_network()->set_default_rate("default: 1250000");  /* 10Mbit */
-    config().mutable_network()->set_default_ceil("default: 0");        /* unlim */
-    config().mutable_network()->set_default_qdisc("default: fq_codel");
+    config().mutable_network()->set_default_qdisc("default: codel");
     config().mutable_network()->set_default_qdisc_limit("default: 10240");
 
     config().mutable_network()->set_container_rate("default: 125000");  /* 1Mbit */
-    config().mutable_network()->set_container_qdisc("default: fq_codel");
+    config().mutable_network()->set_container_qdisc("default: codel");
     config().mutable_network()->set_container_qdisc_limit("default: 10240");
 
     config().mutable_network()->set_autoconf_timeout_s(120);
