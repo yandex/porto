@@ -166,6 +166,7 @@ public:
     uint64_t CeilBurst = 0;
     uint64_t Quantum = 0;
     uint64_t MTU = 0;
+    int Prio = 3;
 
     TNlClass() {}
     TNlClass(int index, uint32_t parent, uint32_t handle) :
@@ -175,6 +176,7 @@ public:
     TError Delete(const TNl &nl);
     TError Load(const TNl &nl);
     bool Exists(const TNl &nl);
+    TError CreateHTB(const TNl &nl);
 };
 
 class TNlCgFilter : public TNonCopyable {
