@@ -45,6 +45,8 @@ constexpr int NR_TC_CLASSES = 8;
 
 constexpr uint64_t CPU_POWER_PER_SEC = 1000000000ull;
 
+constexpr uint64_t NSEC_PER_SEC = 1000000000ull;
+
 constexpr uint64_t NET_MAX_RATE = 2000000000; /* 16Gbit */
 
 constexpr uint64_t ROOT_CONTAINER_ID = 1;
