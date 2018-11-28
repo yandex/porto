@@ -1,3 +1,15 @@
+yandex-porto (4.18.17) unstable; urgency=low
+
+  * porto: add NSEC_PER_SEC
+  * memory: disable default anon_limit for now
+  * netlink: add support for codel qdisc
+  * netlink: setup htb classes directly
+  * network: tune tc defaults
+  * test/tc-classes: remove broken test cases
+  * network: add option for forcing management over host device
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 28 Nov 2018 12:17:28 +0300
+
 yandex-porto (4.18.16) unstable; urgency=low
 
   * core: log portod core arguments
