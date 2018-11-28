@@ -881,6 +881,89 @@ bool TNlClass::Exists(const TNl &nl) {
     return !Load(nl);
 }
 
+TError TNlQdisc::CreateCodel(const TNl &nl) {
+    struct tcmsg tchdr;
+    struct nl_msg *msg;
+    struct nlattr *u32;
+    TError error;
+    int ret;
+
+    L_NL("add qdisc codel dev {} id {:x} parent {:x} limit {} target {} interval {} ecn {} ce_threshold {}",
+         Index, Handle, Parent, Limit,
+         config().network().codel_target() ?: 5000,
+         config().network().codel_interval() ?: 100000,
+         config().network().codel_ecn(),
+         config().network().codel_ce_threshold());
+
+    msg = nlmsg_alloc_simple(RTM_NEWQDISC, NLM_F_CREATE | NLM_F_REPLACE);
+    if (!msg)
+        return TError(Kind);
+
+    tchdr.tcm_family = AF_UNSPEC;
+    tchdr.tcm_ifindex = Index;
+    tchdr.tcm_handle = Handle;
+    tchdr.tcm_parent = Parent;
+
+    ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
+    if (ret < 0)
+        goto free_msg;
+
+    ret = nla_put(msg, TCA_KIND, Kind.size() + 1, Kind.c_str());
+    if (ret < 0)
+        goto free_msg;
+
+    u32 = nla_nest_start(msg, TCA_OPTIONS);
+    if (!u32) {
+        error = TError(EError::Unknown, "TCA_OPTIONS");
+        goto free_msg;
+    }
+
+    if (Limit) {
+        ret = nla_put_u32(msg, TCA_CODEL_LIMIT, Limit);
+        if (ret < 0)
+            goto free_msg;
+    }
+
+    if (config().network().has_codel_target()) {
+        ret = nla_put_u32(msg, TCA_CODEL_TARGET, config().network().codel_target());
+        if (ret < 0)
+            goto free_msg;
+    }
+
+    if (config().network().has_codel_interval()) {
+        ret = nla_put_u32(msg, TCA_CODEL_INTERVAL, config().network().codel_interval());
+        if (ret < 0)
+            goto free_msg;
+    }
+
+    if (config().network().has_codel_ecn()) {
+        ret = nla_put_u32(msg, TCA_CODEL_ECN, config().network().codel_ecn());
+        if (ret < 0)
+            goto free_msg;
+    }
+
+    if (config().network().has_codel_ce_threshold()) {
+        ret = nla_put_u32(msg, TCA_CODEL_CE_THRESHOLD, config().network().codel_ce_threshold());
+        if (ret < 0)
+            goto free_msg;
+    }
+
+    nla_nest_end(msg, u32);
+
+    ret = nl_send_sync(nl.GetSock(), msg);
+    if (ret)
+        error = nl.Error(ret, Kind);
+
+    return error;
+
+free_msg:
+    if (ret)
+        error = nl.Error(ret, Kind);
+    nlmsg_free(msg);
+
+    return error;
+}
+
 TError TNlQdisc::Create(const TNl &nl) {
     TError error = OK;
     int ret;
@@ -888,6 +971,9 @@ TError TNlQdisc::Create(const TNl &nl) {
 
     if (Kind == "")
         return Delete(nl);
+
+    if (Kind == "codel")
+        return CreateCodel(nl);
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
