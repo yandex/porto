@@ -1101,9 +1101,15 @@ public:
 class TExecCmd final : public ICmd {
 public:
     TExecCmd(Porto::TPortoApi *api) : ICmd(api, "exec", 2,
-        "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
-        "Execute command in container, forward terminal, destroy container at the end, exit - ^X^X",
-        "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
+        "[-C] [-T] [-L layer]... <container> command=<command> [properties|volume-properties]",
+        "Execute command in container, forward stdio streams",
+        "    -C          do not destroy container at the end\n"
+        "    -T          do not allocate terminal, forward stdio directly\n"
+        "    -L <layer>  add lower layer (-L top ... -L bottom)\n"
+        "\n"
+        "By default creates weak container, add weak=false to disable that.\n"
+        "Creates root volume if volume properties are set.\n"
+        "Sequence ^X^X terminates container.\n"
         ) { }
 
     int Execute(TCommandEnviroment *environment) final override {
