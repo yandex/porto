@@ -803,8 +803,12 @@ TError TNetwork::SyncDevices() {
             /* Fallback tunnel for RX only */
         } else if (dev.Type == "ip6tnl") {
             /* TX goes via uplink */
+            if (config().network().managed_ip6tnl())
+                dev.Managed = true;
         } else if (dev.Type == "vlan") {
             /* TX goes via uplink */
+            if (config().network().managed_vlan())
+                dev.Managed = true;
         } else {
             dev.Managed = true;
 
