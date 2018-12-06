@@ -585,12 +585,17 @@ EError TPortoApi::WaitContainer(const TString &name,
                                 int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
+    time_t deadline = 0;
+    time_t last_retry = 0;
 
     req->add_name(name);
 
-    if (wait_timeout >= 0)
+    if (wait_timeout >= 0) {
+        deadline = time(nullptr) + wait_timeout;
         req->set_timeout_ms(wait_timeout * 1000);
+    }
 
+retry:
     if (!Call(wait_timeout)) {
         if (Rsp.wait().has_state())
             result_state = Rsp.wait().state();
@@ -598,7 +603,23 @@ EError TPortoApi::WaitContainer(const TString &name,
             result_state = "timeout";
         else
             result_state = "dead";
-    }
+    } else if (LastError == EError::SocketError & AutoReconnect) {
+        time_t now = time(nullptr);
+
+        if (wait_timeout < 0 || now < deadline) {
+            if (wait_timeout >= 0) {
+                wait_timeout = deadline - now;
+                req->set_timeout_ms(wait_timeout * 1000);
+            }
+            if (last_retry == now)
+                sleep(1);
+            last_retry = now;
+            goto retry;
+        }
+
+        result_state = "timeout";
+    } else
+        result_state = "unknown";
 
     return LastError;
 }
