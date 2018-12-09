@@ -705,29 +705,24 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
 }
 
 TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
-        double weight, uint64_t period, uint64_t guarantee) {
+        double weight, uint64_t period, uint64_t guarantee, uint64_t limit) {
+    uint64_t shares, reserve_shares, reserve;
     TError error;
 
-    period = period / 1000; /* ns -> us */
+    if (policy == "rt" || policy == "high" || policy == "iso") {
+        weight *= 16;
+    } else if (policy == "idle") {
+        weight /= 16;
+    }
 
     if (HasReserve && config().container().enable_cpu_reserve()) {
-        uint64_t reserve = std::floor((double)guarantee * period / NSEC_PER_SEC);
-        uint64_t shares = BaseShares, reserve_shares = BaseShares;
-
-        shares *= weight;
-        reserve_shares *= weight;
-
-        if (policy == "rt" || policy == "high" || policy == "iso") {
-            shares *= 16;
-            reserve_shares *= 256;
-        } else if (policy == "normal" || policy == "batch") {
-            reserve_shares *= 16;
-        } else if (policy == "idle") {
-            shares /= 16;
-        }
-
+        shares = std::floor(BaseShares * weight);
         shares = std::min(std::max(shares, MinShares), MaxShares);
+
+        reserve_shares = std::floor(BaseShares * weight * 16);
         reserve_shares = std::min(std::max(reserve_shares, MinShares), MaxShares);
+
+        reserve = std::floor((double)guarantee * period / NSEC_PER_SEC / 1000);
 
         error = cg.SetUint64("cpu.shares", shares);
         if (error)
@@ -742,20 +737,16 @@ TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
             return error;
 
     } else if (HasShares) {
-        uint64_t shares = std::floor((double)guarantee * BaseShares / NSEC_PER_SEC);
 
-        /* default cpu_guarantee is 1c, shares < 1024 are broken */
-        shares = std::max(shares, BaseShares);
+        if (!limit)
+            limit = GetNumCores() * NSEC_PER_SEC;
 
-        shares *= weight;
+        if (guarantee >= limit)
+            weight *= 16;
+        else
+            weight *= 1 + 15. * guarantee / limit;
 
-        if (policy == "rt")
-            shares *= 256;
-        else if (policy == "high" || policy == "iso")
-            shares *= 16;
-        else if (policy == "idle")
-            shares /= 16;
-
+        shares = std::floor(BaseShares * weight);
         shares = std::min(std::max(shares, MinShares), MaxShares);
 
         error = cg.SetUint64("cpu.shares", shares);

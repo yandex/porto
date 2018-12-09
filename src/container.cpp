@@ -1727,7 +1727,7 @@ TError TContainer::ApplyCpuGuarantee() {
         L_ACT("Set cpu guarantee CT{}:{} {} -> {}", Id, Name,
                 CpuPowerToString(CpuGuaranteeCur), CpuPowerToString(cur));
         auto cpucg = GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetGuarantee(cpucg, CpuPolicy, CpuWeight, CpuPeriod, cur);
+        error = CpuSubsystem.SetGuarantee(cpucg, CpuPolicy, CpuWeight, CpuPeriod, cur, CpuLimit);
         if (error) {
             L_ERR("Cannot set cpu guarantee: {}", error);
             return error;

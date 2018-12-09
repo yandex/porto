@@ -262,7 +262,7 @@ public:
     TError InitializeCgroup(TCgroup &cg) override;
     TError SetLimit(TCgroup &cg, uint64_t period, uint64_t limit);
     TError SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit);
-    TError SetGuarantee(TCgroup &cg, const std::string &policy, double weight, uint64_t period, uint64_t guarantee);
+    TError SetGuarantee(TCgroup &cg, const std::string &policy, double weight, uint64_t period, uint64_t guarantee, uint64_t limit);
 };
 
 class TCpuacctSubsystem : public TSubsystem {
