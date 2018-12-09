@@ -255,6 +255,7 @@ message TConfig {
         optional string squashfs_compression = 13;
         optional bool parallel_compression = 15;
         optional bool keep_project_quota_id = 16;
+        optional bool insecure_user_paths = 17;
     }
 
     message TCoreCfg {

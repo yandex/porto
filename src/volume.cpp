@@ -755,7 +755,10 @@ public:
                 error = CL->WriteAccess(pin);
                 if (error) {
                     error = TError(error, "Layer {}", name);
-                    goto err;
+                    if (config().volumes().insecure_user_paths())
+                        L("Ignore {}", error);
+                    else
+                        goto err;
                 }
                 path = pin.ProcPath();
             } else {
@@ -989,7 +992,10 @@ public:
                 error = CL->WriteAccess(pin);
                 if (error) {
                     error = TError(error, "Layer {}", name);
-                    goto err;
+                    if (config().volumes().insecure_user_paths())
+                        L("Ignore {}", error);
+                    else
+                        goto err;
                 }
                 path = pin.ProcPath();
             } else {
@@ -1879,6 +1885,8 @@ TError TVolume::Configure(const TPath &target_root) {
         }
         if (!layer.Exists())
             return TError(EError::LayerNotFound, "Layer not found " + layer.ToString());
+        if (IsSystemPath(layer))
+            return TError(EError::InvalidPath, "Layer path {} in system directory", layer);
         if (!layer.IsDirectoryFollow() && BackendType != "squash")
             return TError(EError::InvalidPath, "Layer must be a directory");
         /* Permissions will be cheked during build */
@@ -1935,8 +1943,13 @@ TError TVolume::MergeLayers() {
                 return error;
 
             error = CL->WriteAccess(pin);
-            if (error)
-                return TError(error, "Layer {}", name);
+            if (error) {
+                error = TError(error, "Layer {}", name);
+                if (config().volumes().insecure_user_paths())
+                    L("Ignore {}", error);
+                else
+                    return error;
+            }
 
             temp = GetInternal("temp");
             error = temp.Mkdir(0700);
@@ -2200,8 +2213,13 @@ TError TVolume::Build() {
             error = CL->ReadAccess(StorageFd);
         else
             error = CL->WriteAccess(StorageFd);
-        if (error)
-            return TError(error, "Volume {}", Path);
+        if (error) {
+            error = TError(error, "Storage {}", Storage);
+            if (config().volumes().insecure_user_paths())
+                L("Ignore {}", error);
+            else
+                return error;
+        }
     } else if (HaveStorage()) {
         TStorage storage;
         storage.Open(EStorageType::Storage, Place, Storage);
