@@ -1,3 +1,10 @@
+yandex-porto (4.18.19) unstable; urgency=low
+
+  * volume: ignore missing write access for user layers and storages
+  * api/cpp: reconnect until timeout in WaitContainer
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Sun, 09 Dec 2018 22:05:01 +0300
+
 yandex-porto (4.18.18) unstable; urgency=low
 
   * network: enable qdisc for vlan and ipv6 tunnels
