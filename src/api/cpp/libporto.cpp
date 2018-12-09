@@ -43,6 +43,7 @@ public:
             LastError = EError::SocketTimeout;
             break;
         case EIO:
+        case EPIPE:
             LastError = EError::SocketError;
             break;
         default:
@@ -196,8 +197,14 @@ int Connection::ConnectionImpl::Call(const rpc::TContainerRequest &req,
     if (Fd < 0)
         ret = Connect();
 
-    if (!ret)
+    if (!ret) {
         ret = Send(req);
+        if (ret == EError::SocketError) {
+            ret = Connect();
+            if (!ret)
+                ret = Send(req);
+        }
+    }
 
     if (!ret && extra_timeout && Timeout > 0)
         ret = SetTimeout(2, extra_timeout > 0 ? (extra_timeout + Timeout) : -1);
@@ -487,24 +494,40 @@ int Connection::Respawn(const std::string &name) {
 int Connection::WaitContainers(const std::vector<std::string> &containers,
                                const std::vector<std::string> &labels,
                                std::string &name, int timeout) {
-    auto wait = Impl->Req.mutable_wait();
+    time_t deadline = timeout >= 0 ? time(nullptr) + timeout : 0;
+    time_t last_retry = 0;
     int ret;
 
-    for (const auto &c : containers)
-        wait->add_name(c);
+    while (1) {
+        auto wait = Impl->Req.mutable_wait();
 
-    for (auto &label: labels)
-        wait->add_label(label);
+        for (const auto &c : containers)
+            wait->add_name(c);
 
-    if (timeout >= 0)
-        wait->set_timeout_ms(timeout * 1000);
+        for (auto &label: labels)
+            wait->add_label(label);
 
-    if (Impl->Fd < 0 && Connect())
-        return Impl->LastError;
+        if (timeout >= 0)
+            wait->set_timeout_ms(timeout * 1000);
 
-    ret = Impl->Call(timeout);
+        ret = Impl->Call(timeout);
+        if (ret != EError::SocketError)
+            break;
 
-    name.assign(Impl->Rsp.wait().name());
+        time_t now = time(nullptr);
+        if (timeout >= 0) {
+            if (now > deadline)
+                break;
+            timeout = deadline - now;
+        }
+
+        if (last_retry == now)
+            sleep(1);
+        last_retry = now;
+    }
+
+    name = Impl->Rsp.has_wait() ? Impl->Rsp.wait().name() : "";
+
     return ret;
 }
 
