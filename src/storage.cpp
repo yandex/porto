@@ -481,6 +481,8 @@ static TError Compression(const TPath &archive, const TFile &arc,
             goto xz;
         if (compress == "tgz" || compress == "tar.gz")
             goto gz;
+        if (compress == "tzst" || compress == "tar.zst")
+            goto zst;
         if (compress == "tar")
             goto tar;
         if (StringEndsWith(compress, "squashfs"))
@@ -497,6 +499,8 @@ static TError Compression(const TPath &archive, const TFile &arc,
                 goto xz;
             if (!strncmp(magic, "\x1F\x8B\x08", 3))
                 goto gz;
+            if (!strncmp(magic, "\x28\xB5\x2F\xFD", 4))
+                goto zst;
             if (!strncmp(magic, "hsqs", 4))
                 goto squash;
         }
@@ -515,6 +519,9 @@ static TError Compression(const TPath &archive, const TFile &arc,
 
     if (StringEndsWith(name, ".gz") || StringEndsWith(name, ".tgz"))
         goto gz;
+
+    if (StringEndsWith(name, ".zst") || StringEndsWith(name, ".tzst"))
+        goto zst;
 
     if (StringEndsWith(name, ".squash") || StringEndsWith(name, ".squashfs"))
         goto squash;
@@ -540,6 +547,18 @@ xz:
     }
     option = "--xz";
     return OK;
+zst:
+    if (!arc && config().volumes().parallel_compression()) {
+        if (TPath("/usr/bin/zstdmt").Exists()) {
+            option = "--use-compress-program=zstdmt -19";
+            return OK;
+        }
+    }
+    if (TPath("/usr/bin/zstd").Exists()) {
+	 option = "--use-compress-program=zstd -19";
+	 return OK;
+    }
+    return TError(EError::NotSupported, "Compression: Can not find /usr/bin/zstd binary" );
 squash:
     format = "squashfs";
     auto sep = compress.find('.');
