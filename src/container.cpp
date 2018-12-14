@@ -360,7 +360,11 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     IpLimit = { { "any" } };
     IpPolicy = "any";
 
-    Hostname = "";
+    if (IsRoot()) {
+        Hostname = GetHostName();
+        SetProp(EProperty::HOSTNAME);
+    }
+
     CapAmbient = NoCapabilities;
     CapAllowed = NoCapabilities;
     CapLimit = NoCapabilities;
@@ -610,6 +614,9 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
 
     /* Do not rewrite resolv.conf at restore */
     ct->TestClearPropDirty(EProperty::RESOLV_CONF);
+
+    if (!ct->HasProp(EProperty::HOSTNAME) && ct->Parent)
+        ct->Hostname = ct->Parent->Hostname;
 
     /* Restore cgroups only for running containers */
     if (!(ct->State & (EContainerState::STOPPED | EContainerState::DEAD))) {
@@ -2432,7 +2439,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           TaskEnv.Mnt.IsolateRun ||
                           (Level == 1 && !HostMode) ||
                           TaskEnv.Mnt.BindMounts.size() ||
-                          Hostname.size() ||
+                          (Hostname.size() && HasProp(EProperty::HOSTNAME)) ||
                           ResolvConf.size() ||
                           EtcHosts.size() ||
                           !TaskEnv.Mnt.Root.IsRoot() ||
@@ -2747,6 +2754,9 @@ TError TContainer::PrepareStart() {
                 return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
         }
     }
+
+    if (!HasProp(EProperty::HOSTNAME) && Parent)
+        Hostname = Parent->Hostname;
 
     return OK;
 }
@@ -4200,7 +4210,7 @@ TTuple TContainer::Taint() {
     if (OwnerCred.IsRootUser() && Level && !HasProp(EProperty::CAPABILITIES))
         taint.push_back("Container owned by root has unrestricted capabilities.");
 
-    if (NetIsolate && Hostname == "")
+    if (NetIsolate && !HasProp(EProperty::HOSTNAME))
         taint.push_back("Container with network namespace without hostname is confusing.");
 
     if (BindDns)

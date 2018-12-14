@@ -244,8 +244,9 @@ TError TTaskEnv::SetHostname() {
     TError error;
 
     if (CT->Hostname.size()) {
-        error = TPath("/etc/hostname").WritePrivate(CT->Hostname + "\n");
-        if (!error)
+        if (CT->HasProp(EProperty::HOSTNAME) || !Mnt.Root.IsRoot())
+            error = TPath("/etc/hostname").WritePrivate(CT->Hostname + "\n");
+        if (!error && CT->HasProp(EProperty::HOSTNAME))
             error = SetHostName(CT->Hostname);
     }
 
@@ -640,7 +641,7 @@ TError TTaskEnv::Start() {
             cloneFlags |= CLONE_NEWNS;
 
         /* Create UTS namspace if hostname is changed or isolate=true */
-        if (CT->Isolate || CT->Hostname != "")
+        if (CT->Isolate || CT->HasProp(EProperty::HOSTNAME))
             cloneFlags |= CLONE_NEWUTS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
