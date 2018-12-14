@@ -268,6 +268,10 @@ TError TCore::Save() {
         filter = "xz";
         format = ".core.xz";
     }
+    if (StringEndsWith(DefaultPattern.ToString(), ".zst")) {
+        filter = "zstd";
+        format = ".core.zst";
+    }
 
     Pattern = dir / ( Prefix + ExeName + "." + std::to_string(Pid) +
               ".S" + std::to_string(Signal) + "." +
