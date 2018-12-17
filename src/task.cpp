@@ -354,12 +354,15 @@ TError TTaskEnv::ConfigureChild() {
             auto envp = Env.Envp();
 
             error = PortoInitCapabilities.ApplyLimit();
-            if (error)
-                return error;
+            if (!error) {
+                TFile::CloseAll({PortoInit.Fd, LogFile.Fd});
+                fexecve(PortoInit.Fd, (char *const *)argv, envp);
+                error = TError::System("fexecve");
+            }
 
-            TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), LogFile.Fd});
-            fexecve(PortoInit.Fd, (char *const *)argv, envp);
-            return TError::System("cannot exec portoinit");
+            L("Cannot exec portoinit: {}", error);
+            kill(pid, SIGKILL);
+            _exit(EXIT_FAILURE);
         }
 
         if (setsid() < 0)
