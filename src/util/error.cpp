@@ -51,7 +51,7 @@ bool TError::Deserialize(int fd, TError &error) {
     ret = read(fd, &err, sizeof(err));
     if (ret == 0)
         return false;
-    if (ret != sizeof(Error)) {
+    if (ret != sizeof(Error) || !EError_IsValid(err)) {
         error = System("Can't deserialize error");
         return true;
     }
