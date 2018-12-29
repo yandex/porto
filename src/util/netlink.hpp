@@ -172,11 +172,11 @@ public:
     TNlClass(int index, uint32_t parent, uint32_t handle) :
         Index(index), Parent(parent), Handle(handle) {}
 
-    TError Create(const TNl &nl);
+    TError Create(const TNl &nl, bool safe = false);
     TError Delete(const TNl &nl);
     TError Load(const TNl &nl);
     bool Exists(const TNl &nl);
-    TError CreateHTB(const TNl &nl);
+    TError CreateHTB(const TNl &nl, bool safe = false);
 };
 
 class TNlCgFilter : public TNonCopyable {
