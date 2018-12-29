@@ -1113,7 +1113,7 @@ static uint32_t htb_burst_to_buffer(uint64_t burst, uint64_t speed) {
                     (double)UINT32_MAX);
 }
 
-TError TNlClass::CreateHTB(const TNl &nl) {
+TError TNlClass::CreateHTB(const TNl &nl, bool safe) {
     struct tcmsg tchdr;
     struct nl_msg *msg;
     struct nlattr *u32;
@@ -1122,6 +1122,13 @@ TError TNlClass::CreateHTB(const TNl &nl) {
 
     L_NL("add class htb dev {} id {:x} parent {:x} rate {} ceil {} burst {} cburst {} quantum {} prio {}",
          Index, Handle, Parent, Rate ?: defRate, Ceil, RateBurst, CeilBurst, Quantum, Prio);
+
+    if (safe && Handle != TC_HANDLE(ROOT_TC_MAJOR, 1)) {
+        TNlClass cls(Index, TC_H_UNSPEC, Parent);
+
+        if (!cls.Exists(nl))
+            return TError(EError::Unknown, "parent class does not exists");
+    }
 
     msg = nlmsg_alloc_simple(RTM_NEWTCLASS, NLM_F_CREATE | NLM_F_REPLACE);
     if (!msg)
@@ -1199,13 +1206,13 @@ free_msg:
     return error;
 }
 
-TError TNlClass::Create(const TNl &nl) {
+TError TNlClass::Create(const TNl &nl, bool safe) {
     struct rtnl_class *cls;
     TError error;
     int ret;
 
     if (Kind == "htb")
-        return CreateHTB(nl);
+        return CreateHTB(nl, safe);
 
     cls = rtnl_class_alloc();
     if (!cls)
