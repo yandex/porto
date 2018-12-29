@@ -2002,7 +2002,7 @@ TError TContainer::ApplyDynamicProperties() {
             TestClearPropDirty(EProperty::NET_GUARANTEE) |
             TestClearPropDirty(EProperty::NET_RX_LIMIT)) {
         if (Net) {
-            error = Net->SetupClasses(NetClass);
+            error = Net->SetupClasses(NetClass, true);
             if (error)
                 return error;
         }

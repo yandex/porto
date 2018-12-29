@@ -156,7 +156,7 @@ class TNetwork : public TNonCopyable {
     std::atomic<int> StatGen;
     std::atomic<uint64_t> StatTime;
 
-    TError TrySetupClasses(TNetClass &cls);
+    TError TrySetupClasses(TNetClass &cls, bool safe = false);
 
     void SyncStatLocked();
     TError Reconnect();
@@ -212,9 +212,9 @@ public:
 
     static void InitClass(TContainer &ct);
 
-    TError SetupClass(TNetDevice &dev, TNetClass &cls, int cs);
+    TError SetupClass(TNetDevice &dev, TNetClass &cls, int cs, bool safe = false);
     TError DeleteClass(TNetDevice &dev, TNetClass &cls, int cs);
-    TError SetupClasses(TNetClass &cls);
+    TError SetupClasses(TNetClass &cls, bool safe = false);
     TError SetupPolice(TNetDevice &dev);
 
     void SyncStat();

@@ -1218,7 +1218,7 @@ std::string TNetwork::MatchDevice(const std::string &pattern) {
     return pattern;
 }
 
-TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
+TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs, bool safe) {
     TError error;
 
     PORTO_LOCKED(NetMutex);
@@ -1252,10 +1252,10 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
 
     if (cfg.MetaHandle != cfg.BaseHandle) {
         L_NET_VERBOSE("Setup CS{} meta class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
-        error = cls.Create(*Nl);
+        error = cls.Create(*Nl, safe);
         if (error) {
             (void)cls.Delete(*Nl);
-            error = cls.Create(*Nl);
+            error = cls.Create(*Nl, safe);
         }
         if (error)
             return TError(error, "tc class");
@@ -1285,7 +1285,7 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs) {
 
     L_NET_VERBOSE("Setup CS{} leaf class {:x} {} {}:{}", cs, cls.Handle, NetName, dev.Index, dev.Name);
 
-    error = cls.Create(*Nl);
+    error = cls.Create(*Nl, safe);
     if (error)
         return TError(error, "leaf tc class");
 
@@ -1336,7 +1336,7 @@ TError TNetwork::DeleteClass(TNetDevice &dev, TNetClass &cfg, int cs) {
     return OK;
 }
 
-TError TNetwork::TrySetupClasses(TNetClass &cls) {
+TError TNetwork::TrySetupClasses(TNetClass &cls, bool safe) {
     auto net_lock = LockNet();
     auto state_lock = LockNetState();
     TError error;
@@ -1346,7 +1346,7 @@ TError TNetwork::TrySetupClasses(TNetClass &cls) {
             continue;
 
         for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
-            error = SetupClass(dev, cls, cs);
+            error = SetupClass(dev, cls, cs, safe);
             if (error)
                 return error;
         }
@@ -1358,7 +1358,7 @@ TError TNetwork::TrySetupClasses(TNetClass &cls) {
     return OK;
 }
 
-TError TNetwork::SetupClasses(TNetClass &cls) {
+TError TNetwork::SetupClasses(TNetClass &cls, bool safe) {
     TError error;
 
     if (this != HostNetwork.get()) {
@@ -1369,17 +1369,17 @@ TError TNetwork::SetupClasses(TNetClass &cls) {
                 if (dev.Uplink)
                     SetupPolice(dev);
         }
-        return HostNetwork->SetupClasses(cls);
+        return HostNetwork->SetupClasses(cls, safe);
     }
 
-    error = TrySetupClasses(cls);
+    error = TrySetupClasses(cls, safe);
     if (error) {
         L_NET_VERBOSE("Network {} class setup failed: {}", NetName, error);
         StartRepair();
         error = WaitRepair();
         if (error)
             return error;
-        error = TrySetupClasses(cls);
+        error = TrySetupClasses(cls, safe);
         if (error) {
             StartRepair();
             return error;
