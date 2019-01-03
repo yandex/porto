@@ -374,6 +374,9 @@ public:
     TError SetSymlink(const TPath &symlink, const TPath &target);
 
     TError EnableControllers(uint64_t controllers);
+
+    static TError ParsePropertyName(const std::string &property,
+                                    std::string &name, std::string &index);
     TError HasProperty(const std::string &property) const;
     TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);

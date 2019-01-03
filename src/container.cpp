@@ -3398,28 +3398,38 @@ void TContainer::SyncPropertiesAll() {
     RootContainer->CollectOomKills();
 }
 
-/* return true if index specified for property */
-static bool ParsePropertyName(std::string &name, std::string &idx) {
-    if (name.size() && name.back() == ']') {
-        auto lb = name.find('[');
+/* property -> name[index] */
+TError TContainer::ParsePropertyName(const std::string &property,
+                                     std::string &name, std::string &index) {
+
+    if (property.size() && property.back() == ']') {
+        auto lb = property.find('[');
 
         if (lb != std::string::npos) {
-            idx = name.substr(lb + 1);
-            idx.pop_back();
-            name = name.substr(0, lb);
-
-            return true;
+            index = property.substr(lb + 1);
+            index.pop_back();
+            name = property.substr(0, lb);
         }
+
+        if (!index.size())
+            return TError(EError::InvalidProperty, "Empty property index");
+    } else {
+        name = property;
+        index = "";
     }
 
-    return false;
+    return OK;
 }
 
 TError TContainer::HasProperty(const std::string &property) const {
-    std::string name = property, index;
+    std::string name, index;
     TError error;
 
-    if (!ParsePropertyName(name, index)) {
+    error = ParsePropertyName(property, name, index);
+    if (error)
+        return error;
+
+    if (index.empty()) {
         auto dot = name.find('.');
         if (dot != std::string::npos) {
             std::string type = property.substr(0, dot);
@@ -3466,12 +3476,16 @@ TError TContainer::HasProperty(const std::string &property) const {
     return error;
 }
 
-TError TContainer::GetProperty(const std::string &origProperty, std::string &value) const {
+TError TContainer::GetProperty(const std::string &property,
+                               std::string &value) const {
+    std::string name, index;
     TError error;
-    std::string property = origProperty;
-    std::string idx;
 
-    if (!ParsePropertyName(property, idx)) {
+    error = ParsePropertyName(property, name, index);
+    if (error)
+        return error;
+
+    if (index.empty()) {
         auto dot = property.find('.');
 
         if (dot != std::string::npos) {
@@ -3496,21 +3510,19 @@ TError TContainer::GetProperty(const std::string &origProperty, std::string &val
             return TError(EError::InvalidProperty,
                     "Unknown cgroup attribute: " + property);
         }
-    } else if (!idx.length()) {
-        return TError(EError::InvalidProperty, "Empty property index");
     }
 
-    auto it = ContainerProperties.find(property);
+    auto it = ContainerProperties.find(name);
     if (it == ContainerProperties.end())
         return TError(EError::InvalidProperty,
-                              "Unknown container property: " + property);
+                              "Unknown container property: " + name);
     auto prop = it->second;
 
     CT = const_cast<TContainer *>(this);
     error = prop->CanGet();
     if (!error) {
-        if (idx.length())
-            error = prop->GetIndexed(idx, value);
+        if (index.length())
+            error = prop->GetIndexed(index, value);
         else
             error = prop->Get(value);
     }
@@ -3519,25 +3531,24 @@ TError TContainer::GetProperty(const std::string &origProperty, std::string &val
     return error;
 }
 
-TError TContainer::SetProperty(const std::string &origProperty,
-                               const std::string &origValue) {
+TError TContainer::SetProperty(const std::string &property,
+                               const std::string &value) {
+    std::string name, index;
+    TError error;
+
     if (IsRoot())
         return TError(EError::Permission, "System containers are read only");
 
-    std::string property = origProperty;
-    std::string idx;
+    error = ParsePropertyName(property, name, index);
+    if (error)
+        return error;
 
-    if (ParsePropertyName(property, idx) && !idx.length())
-        return TError(EError::InvalidProperty, "Empty property index");
+    auto it = ContainerProperties.find(name);
 
-    std::string value = StringTrim(origValue);
-    TError error;
-
-    auto it = ContainerProperties.find(property);
     if (it == ContainerProperties.end()) {
         auto dot = property.find('.');
 
-        if (dot != std::string::npos) {
+        if (index.empty() && dot != std::string::npos) {
             std::string type = property.substr(0, dot);
 
             if (type.find_first_not_of(PORTO_LABEL_PREFIX_CHARS) == std::string::npos) {
@@ -3554,6 +3565,7 @@ TError TContainer::SetProperty(const std::string &origProperty,
 
         return TError(EError::InvalidProperty, "Invalid property " + property);
     }
+
     auto prop = it->second;
 
     CT = this;
@@ -3568,8 +3580,8 @@ TError TContainer::SetProperty(const std::string &origProperty,
         error = prop->Get(oldValue);
 
     if (!error) {
-        if (idx.length())
-            error = prop->SetIndexed(idx, value);
+        if (index.length())
+            error = prop->SetIndexed(index, value);
         else
             error = prop->Set(value);
     }
