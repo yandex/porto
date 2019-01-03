@@ -2717,8 +2717,6 @@ public:
         return OK;
     }
     TError Set(uint64_t limit) {
-        if (limit && limit < config().container().min_memory_limit())
-            return TError(EError::InvalidValue, "Should be at least {}", config().container().min_memory_limit());
         if (CT->MemLimit != limit) {
             CT->MemLimit = limit;
             CT->SetProp(EProperty::MEM_LIMIT);
@@ -2728,12 +2726,9 @@ public:
                 MemorySubsystem.SupportAnonLimit() &&
                 config().container().anon_limit_margin()) {
             uint64_t new_anon = 0;
-            if (CT->MemLimit) {
+            if (CT->MemLimit)
                 new_anon = CT->MemLimit - std::min(CT->MemLimit / 4,
                         config().container().anon_limit_margin());
-                new_anon = std::max(new_anon,
-                        config().container().min_memory_limit());
-            }
             if (CT->AnonMemLimit != new_anon) {
                 CT->AnonMemLimit = new_anon;
                 CT->SetPropDirty(EProperty::ANON_LIMIT);
@@ -2783,8 +2778,6 @@ public:
         return OK;
     }
     TError Set(uint64_t limit) {
-        if (limit && limit < config().container().min_memory_limit())
-            return TError(EError::InvalidValue, "Should be at least {}", config().container().min_memory_limit());
         if (CT->AnonMemLimit != limit) {
             CT->AnonMemLimit = limit;
             CT->SetProp(EProperty::ANON_LIMIT);
@@ -2867,8 +2860,6 @@ public:
         return OK;
     }
     TError Set(uint64_t limit) {
-        if (limit && limit < config().container().min_memory_limit())
-            return TError(EError::InvalidValue, "Should be at least {}", config().container().min_memory_limit());
         if (CT->DirtyMemLimit != limit) {
             CT->DirtyMemLimit = limit;
             CT->SetProp(EProperty::DIRTY_LIMIT);
