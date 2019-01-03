@@ -104,6 +104,8 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_memory_limit_margin(std::min(2ull << 30, mem / 4)); /* 2Gb */
 
+    config().mutable_container()->set_memory_high_limit_margin(GetNumCores() * 64 * 4096);
+
     // config().mutable_container()->set_anon_limit_margin(16ull << 20); /* 16Mb */
 
     config().mutable_container()->set_memlock_minimal(8ull << 20); /* 8Mb */

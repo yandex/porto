@@ -225,6 +225,7 @@ message TConfig {
         optional uint64 memlock_minimal = 49;
         optional uint64 memlock_margin = 50;
         optional uint64 memory_limit_margin = 51;
+        optional uint64 memory_high_limit_margin = 54;
 
         message TContainerExtraEnv {
             required string name = 1;

@@ -418,7 +418,7 @@ bool TSubsystem::IsBound(const TCgroup &cgroup) const {
 
 // Memory
 TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
-    uint64_t old_limit, cur_limit, new_limit;
+    uint64_t old_limit, cur_limit, new_limit, high_limit;
     TError error;
 
     /*
@@ -428,6 +428,7 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
     if (!limit) {
         if (SupportSwap())
             (void)cg.Set(MEM_SWAP_LIMIT, "-1");
+        (void)cg.Set(HIGH_LIMIT, "-1");
         return cg.Set(LIMIT, "-1");
     }
 
@@ -443,6 +444,12 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
         cg.GetUint64(MEM_SWAP_LIMIT, cur_limit);
         if (cur_limit < limit)
             (void)cg.SetUint64(MEM_SWAP_LIMIT, limit);
+    }
+
+    if (cg.Has(HIGH_LIMIT)) {
+        high_limit = limit - std::min(limit / 32,
+                config().container().memory_high_limit_margin());
+        (void)cg.SetUint64(HIGH_LIMIT, high_limit);
     }
 
     cur_limit = old_limit;
@@ -464,8 +471,12 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
     if (!error && SupportSwap())
         error = cg.SetUint64(MEM_SWAP_LIMIT, limit);
 
-    if (error)
+    if (error) {
         (void)cg.SetUint64(LIMIT, old_limit);
+        high_limit = old_limit - std::min(old_limit / 32,
+                config().container().memory_high_limit_margin());
+        (void)cg.SetUint64(HIGH_LIMIT, high_limit);
+    }
 
     return error;
 }
