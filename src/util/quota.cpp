@@ -364,11 +364,14 @@ TError TProjectQuota::Create() {
     if (CurrentId && CurrentId != ProjectId)
         return TError(EError::Busy, "Path {} already in project quota {}", Path, CurrentId);
 
-    if (!quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
-                  ProjectId, (caddr_t)&quota)) {
-        if (!config().volumes().keep_project_quota_id() &&
-                (quota.dqb_curspace || quota.dqb_curinodes)) {
-            L_WRN("Project quota {} for {} already in use", ProjectId, Path);
+    if (!quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(), ProjectId, (caddr_t)&quota)) {
+
+        if ((quota.dqb_curinodes || quota.dqb_curspace) &&
+                (!config().volumes().keep_project_quota_id() ||
+                 CurrentId != ProjectId)) {
+
+            L_WRN("Project quota {} for {} already in use: {} inodes {} bytes",
+                    ProjectId, Path, quota.dqb_curinodes, quota.dqb_curspace);
 
             /* Reset quota counters */
             memset(&quota, 0, sizeof(quota));
@@ -396,8 +399,7 @@ TError TProjectQuota::Create() {
     if (CurrentId != ProjectId) {
         error = SetProjectIdAll(Path, ProjectId);
         if (error) {
-            if (config().volumes().keep_project_quota_id())
-                (void)SetProjectIdAll(Path, 0);
+            (void)SetProjectIdAll(Path, 0);
             (void)Destroy();
         }
     }
