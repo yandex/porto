@@ -57,6 +57,8 @@ private:
 
     EError Call(int extra_timeout = 0);
 
+    EError CallWait(TString &result_state, int wait_timeout);
+
 public:
     TPortoApi() { }
     ~TPortoApi();

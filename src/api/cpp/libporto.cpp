@@ -580,19 +580,13 @@ EError TPortoApi::Respawn(const TString &name) {
     return Call();
 }
 
-EError TPortoApi::WaitContainer(const TString &name,
-                                TString &result_state,
-                                int wait_timeout) {
-    Req.Clear();
-    auto req = Req.mutable_wait();
+EError TPortoApi::CallWait(TString &result_state, int wait_timeout) {
     time_t deadline = 0;
     time_t last_retry = 0;
 
-    req->add_name(name);
-
     if (wait_timeout >= 0) {
         deadline = time(nullptr) + wait_timeout;
-        req->set_timeout_ms(wait_timeout * 1000);
+        Req.mutable_wait()->set_timeout_ms(wait_timeout * 1000);
     }
 
 retry:
@@ -603,13 +597,13 @@ retry:
             result_state = "timeout";
         else
             result_state = "dead";
-    } else if (LastError == EError::SocketError & AutoReconnect) {
+    } else if (LastError == EError::SocketError && AutoReconnect) {
         time_t now = time(nullptr);
 
         if (wait_timeout < 0 || now < deadline) {
             if (wait_timeout >= 0) {
                 wait_timeout = deadline - now;
-                req->set_timeout_ms(wait_timeout * 1000);
+                Req.mutable_wait()->set_timeout_ms(wait_timeout * 1000);
             }
             if (last_retry == now)
                 sleep(1);
@@ -624,6 +618,17 @@ retry:
     return LastError;
 }
 
+EError TPortoApi::WaitContainer(const TString &name,
+                                TString &result_state,
+                                int wait_timeout) {
+    Req.Clear();
+    auto req = Req.mutable_wait();
+
+    req->add_name(name);
+
+    return CallWait(result_state, wait_timeout);
+}
+
 EError TPortoApi::WaitContainers(const std::vector<TString> &names,
                                  TString &result_name,
                                  TString &result_state,
@@ -633,17 +638,8 @@ EError TPortoApi::WaitContainers(const std::vector<TString> &names,
 
     for (auto &c : names)
         req->add_name(c);
-    if (wait_timeout >= 0)
-        req->set_timeout_ms(wait_timeout * 1000);
 
-    if (!Call(wait_timeout)) {
-        if (Rsp.wait().has_state())
-            result_state = Rsp.wait().state();
-        else if (Rsp.wait().name() == "")
-            result_state = "timeout";
-        else
-            result_state = "dead";
-    }
+    CallWait(result_state, wait_timeout);
 
     result_name = Rsp.wait().name();
 
@@ -655,15 +651,14 @@ const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
                                      int wait_timeout) {
     Req.Clear();
     auto req = Req.mutable_wait();
+    TString result_state;
 
     for (auto &c : names)
         req->add_name(c);
     for (auto &label: labels)
         req->add_label(label);
-    if (wait_timeout >= 0)
-        req->set_timeout_ms(wait_timeout * 1000);
 
-    Call(wait_timeout);
+    CallWait(result_state, wait_timeout);
 
     if (Rsp.has_wait())
         return &Rsp.wait();
