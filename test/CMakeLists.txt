@@ -73,6 +73,8 @@ ADD_PYTHON_TEST(portoctl-wait)
 ADD_PYTHON_TEST(self-container)
 ADD_PYTHON_TEST(portoctl-attach)
 
+ADD_PYTHON_TEST(io-stat)
+
 # limits test
 
 ADD_PYTHON_TEST(mem-overcommit)
