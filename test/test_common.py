@@ -34,6 +34,9 @@ def ExpectNe(a, b):
 def ExpectLe(a, b, descr=""):
     assert a <= b, "{}{} should be less or equal {}".format(descr, a, b)
 
+def ExpectRange(a, l, h):
+    assert l <= a <= h, "{} should be within {} .. {}".format(a, l, h)
+
 def ExpectProp(ct, prop, val):
     cur = ct.GetProperty(prop)
     assert cur == val, "{} property {} should be {} not {}".format(ct, prop, val, cur)
@@ -49,6 +52,10 @@ def ExpectPropGe(ct, prop, val):
 def ExpectPropLe(ct, prop, val):
     cur = int(ct.GetProperty(prop))
     assert cur <= val, "{} property {} should be at most {} not {}".format(ct, prop, val, cur)
+
+def ExpectPropRange(ct, prop, low, high):
+    cur = int(ct.GetProperty(prop))
+    assert low <= cur <= high, "{} property {} should be within {} .. {} not {}".format(ct, prop, low, high, cur)
 
 def ExpectException(func, exc, *args):
     tmp = Catch(func, *args)
