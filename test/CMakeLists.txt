@@ -13,7 +13,7 @@ add_executable(mem_touch mem_touch.c)
 
 macro(ADD_PYTHON_TEST NAME)
          add_test(NAME ${NAME}
-                  COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
+                  COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endmacro()
 
@@ -77,7 +77,13 @@ ADD_PYTHON_TEST(portoctl-attach)
 
 # ADD_PYTHON_TEST(io-stat)
 
-ADD_PYTHON_TEST(net-sched)
+add_test(NAME net-sched
+         COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-net-sched.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+set_tests_properties(net-sched
+                     PROPERTIES
+                     ENVIRONMENT PORTO_IPERF3_SERVER=${PORTO_IPERF3_SERVER})
 
 ADD_PYTHON_TEST(mem-overcommit)
 ADD_PYTHON_TEST(mem_limit_total)
