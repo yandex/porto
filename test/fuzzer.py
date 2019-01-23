@@ -16,6 +16,8 @@ import functools
 import tarfile
 import porto
 
+from test_common import ConfigurePortod
+
 VERBOSE = False
 ACTIVE = False
 ACTIVE_IO = False
@@ -41,6 +43,7 @@ VOL_MNT_PLACE = FUZZER_MNT + "/mnt"
 VOL_STORAGE = FUZZER_MNT + "/storage"
 TAR1 = FUZZER_MNT + "/l1.tar"
 TAR2 = FUZZER_MNT + "/l2.tar"
+PORTO_KERNEL_PID = None
 
 def randint(a, b):
     return random.randint(a, b)
@@ -67,6 +70,21 @@ def select_equal(elems, default=None):
     if elems:
         return elems[randint(0, len(elems)) - 1]
     return default
+
+def attach_to_cgroup(dst, pid, move_all=False):
+    if not PORTO_KERNEL_PID:
+        return
+
+    cgroups = open("/proc/%s/cgroup" % dst).readlines()
+    if not move_all:
+        cgroups = [cgroups[randint(0, len(cgroups) - 1)]]
+    for cgroup in cgroups:
+        _, cgtype, path = cgroup.split(":")
+        target_path = "/sys/fs/cgroup/%s%s/tasks" % (
+            cgtype if "=" not in cgtype else cgtype.split('=')[1], path.rstrip()
+        )
+        open(target_path, "w").write(str(pid))
+
 
 def inject_test_utils(path):
     file_path = path + "/mem_test.py"
@@ -597,6 +615,10 @@ def Kill(conn,dest):
 
     conn.Kill(dest, signo)
 
+def AttachDState(conn, dest):
+    ct_pid = int(conn.GetProperty(dest, "root_pid"))
+    attach_to_cgroup(ct_pid, PORTO_KERNEL_PID, move_all=True)
+
 def ImportLayer(conn, place, layerstr):
     tar = select_by_weight([ (1, ""), (3, TAR1), (3, TAR2) ])
     if VERBOSE:
@@ -845,10 +867,13 @@ def container_action(conn):
 #       (15, Pause),
 #       (15, Resume),
         (15, Wait),
-        (25, Kill)
+        (25, Kill),
+        (25, AttachDState)
     ] )(conn, select_container(conn))
 
 def prepare_fuzzer():
+    global PORTO_KERNEL_PID
+
     if not os.path.exists(FUZZER_MNT):
         os.mkdir(FUZZER_MNT)
 
@@ -878,7 +903,22 @@ def prepare_fuzzer():
     t.add(FUZZER_MNT + "/f2.txt", arcname="f3.txt")
     t.close()
 
+    if os.environ.get('USE_PORTO_KERNEL', None) == "ON":
+        os.system("insmod ./module/porto_kernel.ko")
+        PORTO_KERNEL_PID = int(open("/sys/module/porto_kernel/parameters/d_thread_pid").read())
+
+    ConfigurePortod('fuzzer', """
+daemon {
+    cgroup_remove_timeout_s: 1
+}
+""")
+
 def cleanup_fuzzer():
+    if PORTO_KERNEL_PID:
+        os.system("rmmod porto_kernel")
+
+    time.sleep(1)
+
     conn = porto.Connection()
 
     for c in our_containers(conn):
@@ -909,6 +949,8 @@ def cleanup_fuzzer():
     if (os.path.exists(FUZZER_MNT)):
         os.rmdir(FUZZER_MNT)
 
+    ConfigurePortod('fuzzer', "")
+
 def should_stop():
     conn=porto.Connection(timeout=10)
     porto_errors = get_property(conn, "/", "porto_stat[errors]", "0")
@@ -936,6 +978,8 @@ def fuzzer_killer(stop, porto_reloads, porto_kills):
             counter = porto_kills
 
         if pid is not None:
+            # reload with D-states should be indicated as error
+            attach_to_cgroup(1, PORTO_KERNEL_PID, move_all=True)
             os.kill(pid, sig)
             with counter.get_lock():
                 counter.value += 1
@@ -1027,6 +1071,7 @@ print "Warnings", get_property(conn, "/", "porto_stat[warnings]")
 print "PortoStarts", get_property(conn, "/", "porto_stat[spawned]")
 print "VolumeLost", get_property(conn, "/", "porto_stat[volume_lost]")
 print "ContainerLost", get_property(conn, "/", "porto_stat[restore_failed]")
+print "CgErrors", get_property(conn, "/", "porto_stat[cgerrors]")
 
 if get_property(conn, "/", "porto_stat[errors]") != "0":
     test_fails += 1

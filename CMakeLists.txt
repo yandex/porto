@@ -20,6 +20,7 @@ OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)
 OPTION(ENABLE_GCOV "Enables coverage" OFF)
 OPTION(USE_CLANG "Compile with clang" OFF)
+OPTION(USE_PORTO_KERNEL "Use porto kernel module for testing" OFF)
 
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
 	set(CMAKE_BUILD_TYPE Release)
