@@ -83,7 +83,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareTask(TTaskEnv &TaskEnv);
 
     TError PrepareResources();
-    void FreeResources();
+    TError FreeResources(bool ignore = true);
 
     TError PrepareRuntimeResources();
     void FreeRuntimeResources();
@@ -402,6 +402,7 @@ public:
     TError Load(const TKeyValue &node);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
+    TError FreeCgroup(const TSubsystem &subsystem);
 
     void ChooseSchedPolicy();
 

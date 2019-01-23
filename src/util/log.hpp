@@ -66,6 +66,7 @@ struct TStatistics {
     std::atomic<uint64_t> NetworksCreated;
     std::atomic<uint64_t> NetworkProblems;
     std::atomic<uint64_t> NetworkRepairs;
+    std::atomic<uint64_t> CgErrors;
 
     /* --- add new fields at the end --- */
 };
@@ -110,6 +111,14 @@ template <typename... Args> inline void L_ERR(const char* fmt, const Args&... ar
     if (Statistics)
         Statistics->Errors++;
     WriteLog("ERR", fmt::format(fmt, args...));
+    if (Verbose)
+        Stacktrace();
+}
+
+template <typename... Args> inline void L_CG_ERR(const char* fmt, const Args&... args) {
+    if (Statistics)
+        Statistics->CgErrors++;
+    WriteLog("CG ERR", fmt::format(fmt, args...));
     if (Verbose)
         Stacktrace();
 }

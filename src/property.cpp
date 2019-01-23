@@ -3547,6 +3547,7 @@ public:
 void TPortoStat::Populate(TUintMap &m) {
     m["spawned"] = Statistics->PortoStarts;
     m["errors"] = Statistics->Errors;
+    m["cgerrors"] = Statistics->CgErrors;
     m["warnings"] = Statistics->Warns;
     m["taints"] = Statistics->Taints;
     m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;

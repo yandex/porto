@@ -963,7 +963,7 @@ TError TContainer::UpdateSoftLimit() {
         if (ct->MemSoftLimit != lim) {
             auto cg = ct->GetCgroup(MemorySubsystem);
             error = MemorySubsystem.SetSoftLimit(cg, lim);
-            if (error)
+            if (error && error.Errno != ENOENT)
                 return error;
             ct->MemSoftLimit = lim;
         }
@@ -2823,7 +2823,7 @@ TError TContainer::Start() {
 err:
     TNetwork::StopNetwork(*this);
     FreeRuntimeResources();
-    FreeResources();
+    (void)FreeResources();
 err_prepare:
     StartError = error;
     SetState(EContainerState::Stopped);
@@ -2868,7 +2868,7 @@ TError TContainer::PrepareResources() {
     return OK;
 
 undo:
-    FreeResources();
+    (void)FreeResources();
     return error;
 }
 
@@ -2919,27 +2919,45 @@ void TContainer::FreeRuntimeResources() {
     }
 }
 
-void TContainer::FreeResources() {
+TError TContainer::FreeResources(bool ignore) {
+    /*
+     * The ignore case is used on startup path,
+     * when the user thing hasn't even started
+     */
+
     TError error;
 
     if (IsRoot())
-        return;
+        return OK;
 
     OomKills = 0;
     OomKillsRaw = 0;
     ClearProp(EProperty::OOM_KILLS);
 
+    /* Dispose freezer at last because of recovery */
+
     for (auto hy: Hierarchies) {
-        if (Controllers & hy->Controllers) {
-            auto cg = GetCgroup(*hy);
-            (void)cg.Remove(); //Logged inside
+        if (Controllers & hy->Controllers &&
+            !(hy->Controllers & CGROUP_FREEZER)) {
+
+            error = FreeCgroup(*hy);
+            if (!ignore && error)
+                return error;
         }
+    }
+
+    if (Controllers & CGROUP_FREEZER) {
+        error = FreeCgroup(FreezerSubsystem);
+        if (!ignore && error)
+            return error;
     }
 
     RemoveWorkDir();
 
     Stdout.Remove(*this);
     Stderr.Remove(*this);
+
+    return OK;
 }
 
 TError TContainer::Kill(int sig) {
@@ -3078,9 +3096,27 @@ TError TContainer::Stop(uint64_t timeout) {
 
         L_ACT("Stop CT{}:{}", Id, Name);
 
+        TNetwork::StopNetwork(*ct);
+        ct->FreeRuntimeResources();
+        error = ct->FreeResources(false);
+
         ct->LockStateWrite();
 
         ct->ForgetPid();
+
+        if (error) {
+            // Prevent deletion because of aging
+            ct->StartTime = ct->DeathTime;
+            ct->RealStartTime = ct->RealDeathTime;
+            ct->DeathTime = GetCurrentTimeMs();
+            ct->RealDeathTime = time(nullptr);
+            ct->UnlockState();
+
+            ct->SetState(EContainerState::Dead);
+            (void)ct->Save();
+
+            return error;
+        }
 
         ct->StartTime = 0;
         ct->RealStartTime = 0;
@@ -3098,12 +3134,6 @@ TError TContainer::Stop(uint64_t timeout) {
         ct->ClearProp(EProperty::OOM_KILLED);
 
         ct->UnlockState();
-
-        (void)ct->Save();
-
-        TNetwork::StopNetwork(*ct);
-        ct->FreeRuntimeResources();
-        ct->FreeResources();
 
         ct->SetState(EContainerState::Stopped);
 
@@ -3903,6 +3933,16 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
         return subsystem.RootCgroup();
 
     return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "%" + cg);
+}
+
+TError TContainer::FreeCgroup(const TSubsystem &subsystem) {
+    auto cg = GetCgroup(subsystem);
+
+    TError error = cg.Remove(); //Logged inside
+    if (error && error.Errno != ENOENT)
+        return error;
+
+    return OK;
 }
 
 TError TContainer::EnableControllers(uint64_t controllers) {
