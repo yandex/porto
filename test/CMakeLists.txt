@@ -11,6 +11,13 @@ target_link_libraries(portotest version porto util config pthread rt fmt ${PB} $
 
 add_executable(mem_touch mem_touch.c)
 
+if (USE_PORTO_KERNEL)
+    add_custom_target(porto-kernel ALL
+                      COMMAND ${CMAKE_SOURCE_DIR}/test/module/build.sh ${CMAKE_SOURCE_DIR}/test/module ${CMAKE_BINARY_DIR}/module
+                      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+                      )
+endif()
+
 macro(ADD_PYTHON_TEST NAME)
          add_test(NAME ${NAME}
                   COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
@@ -131,13 +138,20 @@ add_test(NAME leaks
 ADD_PYTHON_TEST(performance)
 
 add_test(NAME fuzzer_soft
-         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/fuzzer.py --no-kill
+         COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/fuzzer.py --no-kill
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_test(NAME fuzzer
-         COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/fuzzer.py
+         COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/fuzzer.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+set_tests_properties(fuzzer
+                     PROPERTIES
+                     ENVIRONMENT "USE_PORTO_KERNEL=${USE_PORTO_KERNEL}")
+
+set_tests_properties(fuzzer_soft
+                     PROPERTIES
+                     ENVIRONMENT "USE_PORTO_KERNEL=${USE_PORTO_KERNEL}")
 # tail
 
 ADD_PYTHON_TEST(stats)
