@@ -120,7 +120,7 @@ TError TCgroup::RemoveOne() {
     if (error && (error.Errno != ENOENT || Exists())) {
         std::vector<pid_t> tasks;
         GetTasks(tasks);
-        L_ERR("Cannot remove cgroup {} : {}, {} tasks inside",
+        L_CG_ERR("Cannot remove cgroup {} : {}, {} tasks inside",
               *this, error, tasks.size());
     }
 
