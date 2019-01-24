@@ -75,7 +75,7 @@ ADD_PYTHON_TEST(portoctl-attach)
 
 # limits test
 
-ADD_PYTHON_TEST(io-stat)
+# ADD_PYTHON_TEST(io-stat)
 
 ADD_PYTHON_TEST(net-sched)
 
