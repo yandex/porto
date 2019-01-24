@@ -14,7 +14,9 @@ except:
 
 r = c.Find('/')
 
-total_oom = int(r['oom_kills_total'])
+initial_oom_count = int(r['oom_kills_total'])
+
+total_oom = initial_oom_count
 
 
 # no oom
@@ -53,7 +55,7 @@ m = c.Run("test-oom", memory_limit="64M", weak=False)
 
 ReloadPortod()
 
-total_oom = 0
+total_oom = initial_oom_count
 ExpectEq(r['oom_kills_total'], str(total_oom))
 
 a = c.Run("test-oom/a", command="stress -m 1", wait=5)
