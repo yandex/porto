@@ -426,6 +426,31 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     Expect(system(("cp " + cmd + " " + path.ToString()).c_str()) == 0);
 }
 
+static int CountSssFds(const std::vector<std::string> &fdPaths) {
+    // when sssd is running getgrnam, it opens multiple unix sockets to read database
+    std::string sssPrefix = "/var/lib/sss";
+    int sssFds = 0;
+
+    for (auto &path: fdPaths) {
+        if (std::string(path).substr(0, sssPrefix.length()) == sssPrefix)
+            sssFds++;
+    }
+
+    return sssFds;
+}
+
+static int CountUniqueCgroupFds(const std::vector<std::string> &fdPaths) {
+    std::string cgroupPrefix = "/sys/fs/cgroup";
+    std::set<std::string> unique_cgroups;
+
+    for (auto &path: fdPaths) {
+        if (path.substr(0, cgroupPrefix.length()) == cgroupPrefix)
+            unique_cgroups.insert(path);
+    }
+
+    return unique_cgroups.size();
+}
+
 void PrintFds(const std::string &path, struct dirent **lst, int nr) {
     for (int i = 0; i < nr; i++) {
         if (lst[i]->d_name == string(".") ||
@@ -461,14 +486,6 @@ void TestDaemon(Porto::Connection &api) {
 
     std::string path = ("/proc/" + std::to_string(pid) + "/fd");
 
-    // when sssd is running getgrnam opens unix socket to read database
-    int sssFd = 0;
-    if (WordCount("/etc/nsswitch.conf", "sss"))
-        sssFd = 4;
-
-    // ctest leaks log fd
-    sssFd++;
-
     /**
      * .
      * ..
@@ -482,11 +499,33 @@ void TestDaemon(Porto::Connection &api) {
      * 4 (epoll)
      * 5 (host netlink)
      * 6 (signalfd)
+     * /run/portod.socket (FIXME: ???)
+     * portod private socket (FIXME: ???)
      */
+    int appFds = 14 + 2;
+
+    // ctest leaks log fd
+    int ctestFd = 1;
+
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
+    std::vector<std::string> fdPaths;
+    for (int i = 0; i < nr; i++) {
+        if (lst[i]->d_name == string(".") ||
+            lst[i]->d_name == string(".."))
+            continue;
+
+        fdPaths.push_back(ReadLink(path + "/" + lst[i]->d_name));
+    }
+
+    int cgroupsFd = CountUniqueCgroupFds(fdPaths);
+    Expect(cgroupsFd > 0);
+
+    int sssFds = CountSssFds(fdPaths);
+
+    nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    ExpectLessEq(nr, 12 + sssFd + 10);
-    ExpectLessEq(12, nr);
+    ExpectLessEq(nr, appFds + sssFds + ctestFd + cgroupsFd);
+    ExpectLessEq(appFds, nr);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(PORTO_MASTER_PIDFILE);
@@ -508,10 +547,27 @@ void TestDaemon(Porto::Connection &api) {
      * 7 (ack pipe)
      * 9 (signalfd)
      */
+
+    fdPaths.clear();
+    appFds = 9 + 2;
+    nr = scandir(path.c_str(), &lst, NULL, alphasort);
+    for (int i = 0; i < nr; i++) {
+        if (lst[i]->d_name == string(".") ||
+            lst[i]->d_name == string(".."))
+            continue;
+
+        fdPaths.push_back(ReadLink(path + "/" + lst[i]->d_name));
+    }
+
+    cgroupsFd = CountUniqueCgroupFds(fdPaths);
+    Expect(cgroupsFd == 0);
+
+    sssFds = CountSssFds(fdPaths);
+
     nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    ExpectLessEq(nr, 11 + sssFd);
-    ExpectLessEq(11, nr);
+    ExpectLessEq(nr, appFds + sssFds + ctestFd);
+    ExpectLessEq(appFds, nr);
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
