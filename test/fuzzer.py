@@ -572,6 +572,18 @@ def SetProperty(conn,dest):
             ]
     )()
 
+    # FIXME: Do not trigger PORTO-488 for a while
+    if prop == ("virt_mode", "os"):
+        if conn.GetProperty(dest, "root_path") == "/":
+            return
+
+    elif prop == ("root", "/"):
+        if (
+            conn.GetProperty(dest, "root_path") == conn.GetProperty(dest, "root") and
+            conn.GetProperty(dest, "virt_mode") == "os"
+        ):
+            return
+
     if VERBOSE:
         print "Setting container %s property %s = %s" %(dest, prop[0], prop[1])
 
