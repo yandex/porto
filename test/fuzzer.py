@@ -913,6 +913,15 @@ daemon {
 }
 """)
 
+    ConfigurePortod('fuzzer-core', """
+core {
+   enable: true
+   default_pattern: "/coredumps/%e.%p.%s"
+   space_limit_mb: 1024
+   timeout_s: 30
+}
+""")
+
 def cleanup_fuzzer():
     if PORTO_KERNEL_PID:
         os.system("rmmod porto_kernel")
@@ -950,6 +959,7 @@ def cleanup_fuzzer():
         os.rmdir(FUZZER_MNT)
 
     ConfigurePortod('fuzzer', "")
+    ConfigurePortod('fuzzer-core', "")
 
 def should_stop():
     conn=porto.Connection(timeout=10)
