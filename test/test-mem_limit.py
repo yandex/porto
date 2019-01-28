@@ -29,6 +29,8 @@ def Prepare(ct, anon=0, total=0, use_anon=0, use_file=0, meta=False, to_wait=Fal
         ct.SetProperty("capabilities", "IPC_LOCK")
         ct.SetProperty("capabilities_ambient", "IPC_LOCK")
 
+    ct.SetProperty("ulimit", "memlock: unlimited")
+
     ct.UseAnon = use_anon
     ct.UseFile = use_file
     ct.Meta = meta
@@ -64,6 +66,10 @@ def CheckOOM(ct, expect_oom):
            ct.GetProperty("memory.anon.max_usage").rstrip())
 
     if expect_oom:
+        print "exit_code: {}".format(ct.GetProperty("exit_code"))
+        if ct.GetProperty("exit_code") == "2":
+            return
+
         ExpectProp(ct, "oom_killed", True)
     else:
         ExpectProp(ct, "exit_status", "0")

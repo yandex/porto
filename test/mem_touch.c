@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 
 char *fname = "./test.mapped";
 
@@ -59,8 +60,9 @@ int main(int argc, char **argv) {
         if (file_ptr == NULL)
             return 1;
 
-        if (mlock(file_ptr, file))
-            return 1;
+        if (mlock(file_ptr, file) < 0) {
+            return errno == EAGAIN ? 2 : 1;
+        }
     }
 
     if (to_wait)
