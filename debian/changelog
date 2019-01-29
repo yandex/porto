@@ -1,3 +1,32 @@
+yandex-porto (4.18.20) unstable; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * porto: do not report error error into socket if cannot exec portoinit
+  * porto: validate deserialized error code
+  * quota: reset counters at reusing stale project id
+
+  [ Maxim Samoylov ]
+  * test/fuzzer: avoid triggering PORTO-488 for now
+  * test: add io-stat
+
+  [ Konstantin Khlebnikov ]
+  * test: add net-sched
+  * test/net-sched: print second flow
+
+  [ Maxim Samoylov ]
+  * test: disable io-stat invocation in stable branch
+  * test/net-sched: test both schedulers, fix htb limiting, improve assertions
+  * test/fuzzer: inject D-state threads into containers
+  * test/test-oom: mind that testing system can generate its own OOMs
+  * test/portotest: more elaborate portod fd inspecting
+  * test/test-mem_limit: treat mlock EAGAIN as OOM
+  * test/fuzzer: use portod core subsystem
+  * network: ensure container parent tclass exists on dynamic application, PORTO-478
+  * container: leave container dead when unable to dispose cgroups, PORTO-485
+  * test/test-htb-restore: add test for htb restore fix, PORTO-478
+
+ -- max7255 <max7255@max7255-nix>  Tue, 29 Jan 2019 23:33:43 +0300
+
 yandex-porto (4.18.19) unstable; urgency=low
 
   * volume: ignore missing write access for user layers and storages
