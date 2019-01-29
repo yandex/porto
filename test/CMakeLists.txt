@@ -114,6 +114,7 @@ ADD_PYTHON_TEST(hugetlb)
 ADD_PYTHON_TEST(coredump)
 
 ADD_PYTHON_TEST(volume-restore)
+ADD_PYTHON_TEST(htb-restore)
 
 # legacy tests
 
