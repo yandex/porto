@@ -157,8 +157,13 @@ public:
     const std::string ANON_MAX_USAGE = "memory.anon.max_usage";
     const std::string ANON_LIMIT = "memory.anon.limit";
     const std::string ANON_ONLY = "memory.anon.only";
+    const std::string WRITEBACK_BLKIO = "memory.writeback_blkio";
+
+    bool HasWritebackBlkio = false;
 
     TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
+
+    TError InitializeSubsystem() override;
 
     TError Statistics(TCgroup &cg, TUintMap &stat) const {
         return cg.GetUintMap(STAT, stat);
@@ -223,6 +228,8 @@ public:
 
     bool SupportAnonOnly() const;
     TError SetAnonOnly(TCgroup &cg, bool val) const;
+
+    TError LinkWritebackBlkio(TCgroup &memcg, TCgroup &blkcg) const;
 
     TError SetLimit(TCgroup &cg, uint64_t limit);
     TError SetIoLimit(TCgroup &cg, uint64_t limit);

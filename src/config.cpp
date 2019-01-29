@@ -101,6 +101,7 @@ static void DefaultConfig() {
     config().mutable_container()->set_dev_size(32 << 20);
     config().mutable_container()->set_enable_hugetlb(true);
     config().mutable_container()->set_enable_blkio(true);
+    config().mutable_container()->set_link_memory_writeback_blkio(false);
 
     config().mutable_container()->set_memory_limit_margin(std::min(2ull << 30, mem / 4)); /* 2Gb */
 
