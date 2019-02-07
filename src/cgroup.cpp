@@ -887,7 +887,7 @@ TError TCpusetSubsystem::InitializeCgroup(TCgroup &cg) {
 
 TError TNetclsSubsystem::InitializeSubsystem() {
     HasPriority = config().network().enable_netcls_priority() &&
-                  RootCgroup().Has("net_cls.priority");
+                  RootCgroup().Has(PRIORITY);
     if (HasPriority)
         L_CG("support netcls priority");
     return OK;
@@ -899,15 +899,15 @@ TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
     if (HasPriority) {
         uint64_t cur;
 
-        error = cg.GetUint64("net_cls.priority", cur);
+        error = cg.GetUint64(PRIORITY, cur);
         if (error || cur != classid) {
-            error = cg.SetUint64("net_cls.priority", classid);
+            error = cg.SetUint64(PRIORITY, classid);
             if (error)
                 return error;
         }
     }
 
-    return cg.SetUint64("net_cls.classid", classid);
+    return cg.SetUint64(CLASSID, classid);
 }
 
 // Blkio

@@ -7,7 +7,7 @@ conn = porto.Connection()
 expected_errors = int(conn.GetData('/', 'porto_stat[errors]'))
 expected_warnings = int(conn.GetData('/', 'porto_stat[warnings]'))
 
-has_priority = os.path.exists('/sys/fs/cgroup/net_cls/net_cls.priority')
+has_priority = os.path.exists('/sys/fs/cgroup/net_cls/net_cls.ya.priority')
 
 def ping(count=1, size=56, tos=0, host='2a02:6b8::2:242'):
     return "ping6 -c {} -s {} -W 1 -i 0.2 -n -Q {} {}".format(count, size, tos, host)

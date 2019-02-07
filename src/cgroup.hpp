@@ -284,6 +284,8 @@ public:
 
 class TNetclsSubsystem : public TSubsystem {
 public:
+    const std::string CLASSID = "net_cls.classid";
+    const std::string PRIORITY = "net_cls.ya.priority";
     bool HasPriority;
     TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
     TError InitializeSubsystem() override;
