@@ -100,6 +100,7 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TNonCopyable {
 
     std::unique_ptr<TVolumeBackend> Backend;
+    std::mutex InternalMutex;
     TError OpenBackend();
 
 public:
@@ -269,6 +270,10 @@ public:
     TError StatFS(TStatFS &result);
 
     TError GetUpperLayer(TPath &upper);
+
+    inline std::unique_lock<std::mutex> LockInternal() {
+        return std::unique_lock<std::mutex>(InternalMutex);
+    }
 
     friend bool operator<(const std::shared_ptr<TVolume> &lhs,
                           const std::shared_ptr<TVolume> &rhs) {

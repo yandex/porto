@@ -2369,6 +2369,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     TFile target_dir;
     TPath link_mount, real_target;
+    std::unique_lock<std::mutex> internal_lock;
     unsigned long flags = 0;
 
     /* Prepare mountpoint */
@@ -2436,33 +2437,34 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     if (error)
         goto undo;
 
+    /* Several links can be created for one volume at a time */
+    internal_lock = link->Volume->LockInternal();
+
     link_mount = GetInternal("volume_link");
     (void)link_mount.Mkdir(700);
 
     /* make private - cannot move from shared mount */
     error = link_mount.BindRemount(link_mount, MS_PRIVATE);
-    if (error)
-        goto undo;
 
     /* Start new shared group and make read-only - that isn't propagated */
-    error = link_mount.BindRemount(InternalPath, flags | MS_SLAVE | MS_SHARED);
-    if (error)
-        goto undo;
+    if (!error)
+        error = link_mount.BindRemount(InternalPath, flags | MS_SLAVE | MS_SHARED);
 
     /* Move to target path and propagate into namespaces */
-    error = link_mount.MoveMount(target_dir.ProcPath());
+    if (!error)
+        error = link_mount.MoveMount(target_dir.ProcPath());
+
+    (void)link_mount.UmountAll();
+    (void)link_mount.Rmdir();
+
+    internal_lock.unlock();
+
     if (error)
         goto undo;
-
-    link_mount.UmountAll();
-    link_mount.Rmdir();
 
     return OK;
 
 undo:
-    link_mount.UmountAll();
-    link_mount.Rmdir();
-
     volumes_lock.lock();
 
     if (link->HostTarget) {
