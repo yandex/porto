@@ -618,6 +618,13 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
     if (!ct->HasProp(EProperty::HOSTNAME) && ct->Parent)
         ct->Hostname = ct->Parent->Hostname;
 
+    /* Reset disabled default anon_limit */
+    if (MemorySubsystem.SupportAnonLimit() &&
+            !config().container().anon_limit_margin() &&
+            (ct->Controllers & CGROUP_MEMORY) &&
+            !ct->HasProp(EProperty::ANON_LIMIT))
+        ct->SetPropDirty(EProperty::ANON_LIMIT);
+
     /* Restore cgroups only for running containers */
     if (!(ct->State & (EContainerState::STOPPED | EContainerState::DEAD))) {
 
