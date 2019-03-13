@@ -1101,6 +1101,12 @@ TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
     double bfq_weight = weight;
     TError error;
 
+    /*
+     * Cgroup v1 mess:
+     * CFQ: 10..1000 default 500
+     * BFQ: 1..1000 default 100
+     */
+
     if (policy == "rt" || policy == "high") {
         weight *= 1000;
         bfq_weight *= 1000;
@@ -1113,13 +1119,19 @@ TError TBlkioSubsystem::SetIoWeight(TCgroup &cg, const std::string &policy,
     } else
         return TError(EError::InvalidValue, "unknown policy: " + policy);
 
-    if (HasWeight)
-        error = cg.SetUint64("blkio.weight", std::min(std::max(weight, 10.), 1000.));
+    if (cg.Has(CFQ_WEIGHT)) {
+        error = cg.SetUint64(CFQ_WEIGHT, std::min(std::max(weight, 10.), 1000.));
+        if (error)
+            return error;
+    }
 
-    if (!error && HasBfqWeight)
-        error = cg.SetUint64("blkio.bfq.weight", std::min(std::max(bfq_weight, 1.), 1000.));
+    if (cg.Has(BFQ_WEIGHT)) {
+        error = cg.SetUint64(BFQ_WEIGHT, std::min(std::max(bfq_weight, 1.), 1000.));
+        if (error)
+            return error;
+    }
 
-    return error;
+    return OK;
 }
 
 // Devices

@@ -397,9 +397,6 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_BLKIO;
     }
-    void Init(void) {
-        IsSupported = BlkioSubsystem.HasWeight;
-    }
     TError Get(std::string &value) {
         value = StringFormat("%lg", CT->IoWeight);
         return OK;

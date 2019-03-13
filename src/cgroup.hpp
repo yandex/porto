@@ -291,19 +291,18 @@ public:
 
 class TBlkioSubsystem : public TSubsystem {
 public:
-    bool HasWeight = false;
+    const std::string CFQ_WEIGHT = "blkio.weight";
+    const std::string BFQ_WEIGHT = "blkio.bfq.weight";
+
     bool HasThrottler = false;
     bool HasSaneBehavior = false;
-    bool HasBfqWeight = false;
     TBlkioSubsystem() : TSubsystem(CGROUP_BLKIO, "blkio") {}
     bool IsDisabled() override { return !config().container().enable_blkio(); }
     bool IsOptional() override { return true; }
     TError InitializeSubsystem() override {
-        HasWeight = RootCgroup().Has("blkio.weight");
         HasThrottler = RootCgroup().Has("blkio.throttle.read_bps_device");
         if (RootCgroup().GetBool("cgroup.sane_behavior", HasSaneBehavior))
             HasSaneBehavior = false;
-        HasBfqWeight = RootCgroup().Has("blkio.bfq.io_serviced");
         return OK;
     }
     enum IoStat {
