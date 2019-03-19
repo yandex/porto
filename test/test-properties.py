@@ -277,6 +277,7 @@ ro_tests = {
 "memory_guarantee_total": [],
 "anon_max_usage": [],
 "cache_usage": [],
+"shmem_usage": [],
 "hugetlb_usage": [],
 "minor_faults": [],
 "major_faults": [],

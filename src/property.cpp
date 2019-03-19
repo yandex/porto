@@ -4257,6 +4257,24 @@ public:
     }
 } static CacheUsage;
 
+class TShmemUsage : public TSizeProperty {
+public:
+    TShmemUsage() : TSizeProperty(P_SHMEM_USAGE, EProperty::NONE,
+            "Shmem and tmpfs usage [bytes]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+    TError Get(uint64_t &val) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        return MemorySubsystem.GetShmemUsage(cg, val);
+    }
+    void Dump(Porto::TContainer &spec, uint64_t value) {
+        spec.set_shmem_usage(value);
+    }
+} static ShmemUsage;
+
 class THugetlbUsage : public TSizeProperty {
 public:
     THugetlbUsage() : TSizeProperty(P_HUGETLB_USAGE, EProperty::NONE,

@@ -622,6 +622,10 @@ write permissions to the target or owning related volume.
     Physical memory pages that have filesystem\disk backend,
     potentially could be reclaimed by kernel.
 
+* **shmem\_usage** - current shmem and tmpfs usage
+
+    Physical memory pages that belongs to shmem or tmpfs files.
+
 * **hugetlb\_usage** - current hugetlb memory usage in bytes
 
 * **hugetlb\_limit** - hugetlb memory limit in bytes

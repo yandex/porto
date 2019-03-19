@@ -1206,6 +1206,10 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
               "cache_usage", "",
               ValueFlags::Mem | ValueFlags::Bytes);
 
+    AddColumn("Shmem", "Shmem and tmpfs usage",
+              "shmem_usage", "",
+              ValueFlags::Mem | ValueFlags::Bytes);
+
     AddColumn("Htlb", "HugeTLB memory usage",
               "hugetlb_usage", "",
               ValueFlags::Mem | ValueFlags::Bytes);
