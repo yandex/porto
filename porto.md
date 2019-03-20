@@ -720,11 +720,22 @@ write permissions to the target or owning related volume.
 
 * **cpu\_usage** - CPU time used in nanoseconds (1 / 1000\_000\_000s)
 
+    Total cpu time usage from cpuacct cgroup.
+
 * **cpu\_usage\_system** - kernel CPU time in nanoseconds
+
+    Kernel CPU time is included in the **cpu\_usage**.
+
+    For CONFIG_TICK_CPU_ACCOUNTING=y accuracy is low becuase
+    accounted by sampling CONFIG_HZ times per second.
 
 * **cpu\_wait** - total time waiting for execution in nanoseconds (offstream kernel feature)
 
+    This summs time between task wakeup or preemption and start of execution.
+
 * **cpu\_throttled** - total throttled time in nanoseconds
+
+    This summs time when any cpu has runnable tasks in container but no **cpu\_limit** left.
 
 * **cpu\_weight** - CPU weight, syntax: 0.01..100, default: 1
 
