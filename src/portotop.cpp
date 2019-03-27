@@ -1210,6 +1210,10 @@ TPortoTop::TPortoTop(Porto::TPortoApi *api, const std::vector<std::string> &args
               "shmem_usage", "",
               ValueFlags::Mem | ValueFlags::Bytes);
 
+    AddColumn("MLock", "Locked memory",
+              "mlock_usage", "",
+              ValueFlags::Mem | ValueFlags::Bytes);
+
     AddColumn("Htlb", "HugeTLB memory usage",
               "hugetlb_usage", "",
               ValueFlags::Mem | ValueFlags::Bytes);

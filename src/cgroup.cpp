@@ -525,6 +525,14 @@ TError TMemorySubsystem::GetShmemUsage(TCgroup &cg, uint64_t &usage) const {
     return error;
 }
 
+TError TMemorySubsystem::GetMLockUsage(TCgroup &cg, uint64_t &usage) const {
+    TUintMap stat;
+    TError error = Statistics(cg, stat);
+    if (!error)
+        usage = stat["total_unevictable"];
+    return error;
+}
+
 TError TMemorySubsystem::GetAnonUsage(TCgroup &cg, uint64_t &usage) const {
     if (cg.Has(ANON_USAGE))
         return cg.GetUint64(ANON_USAGE, usage);

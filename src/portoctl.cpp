@@ -605,6 +605,7 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
         name == "anon_max_usage" ||
         name == "cache_usage" ||
         name == "shmem_usage" ||
+        name == "mlock_usage" ||
         name == "anon_limit" ||
         name == "anon_limit_total" ||
         name == "max_rss" ||

@@ -4275,6 +4275,24 @@ public:
     }
 } static ShmemUsage;
 
+class TMLockUsage : public TSizeProperty {
+public:
+    TMLockUsage() : TSizeProperty(P_MLOCK_USAGE, EProperty::NONE,
+            "Locked memory [bytes]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+    TError Get(uint64_t &val) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        return MemorySubsystem.GetMLockUsage(cg, val);
+    }
+    void Dump(Porto::TContainer &spec, uint64_t value) {
+        spec.set_mlock_usage(value);
+    }
+} static MLockUsage;
+
 class THugetlbUsage : public TSizeProperty {
 public:
     THugetlbUsage() : TSizeProperty(P_HUGETLB_USAGE, EProperty::NONE,

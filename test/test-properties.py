@@ -278,6 +278,7 @@ ro_tests = {
 "anon_max_usage": [],
 "cache_usage": [],
 "shmem_usage": [],
+"mlock_usage": [],
 "hugetlb_usage": [],
 "minor_faults": [],
 "major_faults": [],

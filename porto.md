@@ -626,6 +626,10 @@ write permissions to the target or owning related volume.
 
     Physical memory pages that belongs to shmem or tmpfs files.
 
+* **mlock\_usage** - current locked memory
+
+    Physical memory pages that locked and cannot be reclaimed.
+
 * **hugetlb\_usage** - current hugetlb memory usage in bytes
 
 * **hugetlb\_limit** - hugetlb memory limit in bytes
