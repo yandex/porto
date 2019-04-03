@@ -282,6 +282,7 @@ EError TPortoApi::Destroy(const TString &name) {
 }
 
 const TListResponse *TPortoApi::List(const TString &mask) {
+    Req.Clear();
     auto req = Req.mutable_list();
 
     if(!mask.empty())
