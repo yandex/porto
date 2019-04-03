@@ -1153,9 +1153,9 @@ for example **memory.status**.
 
 # COREDUMPS
 
-Portod might register itself as a core dump helper and forward cores into container if it has set core\_command.
+Portod might register itself as a core dump helper and forward cores into container if it has set **core\_command**.
 
-Variables set in environment and substituted in core\_command:
+Variables set in environment and substituted in **core\_command**:
 
 - CORE\_PID (pid inside container)
 - CORE\_TID (crashed thread id)
@@ -1178,14 +1178,17 @@ core_command='cp --sparse=always /dev/stdin crash-${CORE_EXE_NAME}-${CORE_PID}-S
 ```
 saves core into file in container.
 
-Container ulimit\[core\] should be set to unlimited, or anything > 1.
+Dumping code is a default action for some signals, see *signal(7)*. Application should not handle signal.
+
+Container ulimit\[core\] should be set to unlimited, or anything > 1. see *core(5)*.
 
 Cores from tasks with suid bit or ambiend capabilities are ignored unless
 suid core dumps are enabled via *prctl(2)* PR\_SET\_DUMPABLE or sysctl fs.suid\_dumpable
-or core\_command is set and container lives in chroot.
+or **core\_command** is set and container lives in chroot.
 
 Core command is executated in same environment as container.
 Information in proc about crashed process and thread available too.
+Execution timeout is set by core.timeout\_s - default 10 minutes.
 
 Porto makes sure that sysctl kernel.core\_pipe\_limit isn't zero,
 otherwise crashed task could exit and dismantle pid namespace too early.
@@ -1195,12 +1198,20 @@ Required setup in portod.conf:
 core {
     enable: true
     default_pattern: "/coredumps/%e.%p.%s"
-    space_limit_mb: 102400
-    slot_space_limit_mb: 10240
 }
 ```
 
-Default pattern is used for non-container cores or if core command isn't set.
+Also there is are some options with defaults:
+```
+core {
+    timeout_s: 600
+    space_limit_mb: 102400
+    slot_space_limit_mb: 10240
+    sync_size: 4194304
+}
+```
+
+Default pattern is used for non-container cores or if **core\_command** isn't set.
 It might use '%' kernel core template defined in *core(5)*.
 If default\_pattern ends with '.gz' or '.xz' core will be compressed.
 
@@ -1214,10 +1225,10 @@ Porto also creates hardlink in same directory with name:
 ${CORE_CONTAINER//\//%}%${CORE_EXE_NAME}.${CORE_PID}.S${CORE_SIG}.$(date +%Y%m%dT%H%M%S).core
 ```
 
-Option space\_limit\_mb limits total size of default pattern directory,
+Option core.space\_limit\_mb limits total size of default pattern directory,
 after exceeding new cores are discarded.
 
-Option slot\_space\_limit\_mb limits total size for each first-level container.
+Option core.slot\_space\_limit\_mb limits total size for each first-level container.
 
 Limits are counted only for already dumped cores and do not include dumping core size, therefore these limits may be exceeded.
 
