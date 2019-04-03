@@ -14,6 +14,8 @@ syntax = "proto2";
    Access level depends on client container and uid.
 
    See defails in porto.md or manpage porto
+
+   TContainer, TVolume and related methods are Porto v5 API.
 */
 
 package Porto;
@@ -204,7 +206,7 @@ message TPortoRequest {
     // Get multiple properties for multiple containers
     optional TGetRequest Get = 15;
 
-    /* Container API based on TContainer */
+    /* Container API based on TContainer (Porto v5 API) */
 
     // Create, configure and start container with volumes
     optional TNewContainerRequest NewContainer = 23;
@@ -242,7 +244,7 @@ message TPortoRequest {
     // Change volume properties - for now only resize
     optional TTuneVolumeRequest TuneVolume = 108;
 
-    // Volume API based on TVolume
+    // Volume API based on TVolume (Porto v5 API)
     optional TNewVolumeRequest NewVolume = 126;
     optional TGetVolumeRequest GetVolume = 127;
 
@@ -356,7 +358,7 @@ message TPortoResponse {
 
     optional TGetResponse Get = 10;
 
-    /* Container API based on TContainer */
+    /* Container API based on TContainer (Porto v5 API) */
 
     optional TNewContainerResponse NewContainer = 23;
     optional TSetContainerResponse SetContainer = 24;
@@ -611,6 +613,7 @@ message TVmStat {
     optional uint64 table = 15;
 }
 
+// Structured Container description (Porto v5 API)
 
 message TContainer {
     optional string name = 1;           // in client namespace
@@ -788,7 +791,7 @@ message TContainer {
 
     optional TContainerVolumeLinks volumes_linked = 500; // out
     optional TContainerVolumes volumes_required = 501;
-    optional TContainerVolumes volumes_owned = 502;
+    optional TContainerVolumes volumes_owned = 502; // out
 
     repeated TError error = 1000;   // out, fatal problems
     repeated TError warning = 1001; // out, non-fatal problems
@@ -859,10 +862,12 @@ message TVolumeShare {
     optional bool cow = 3;              // default: mutable share
 }
 
+// Structured Volume description (Porto V5 API)
+
 message TVolume {
     optional string path = 1;               // path in container, default: auto
-    optional string container = 2;          // defaultL self (client container)
-    repeated TVolumeLink links = 3;         // default: anon link to self
+    optional string container = 2;          // defines root for paths, default: self (client container)
+    repeated TVolumeLink links = 3;         // initial links, default: anon link to self
 
     optional string id = 4;                 // out
     optional string state = 5;              // out
