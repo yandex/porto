@@ -6,6 +6,7 @@
 
 extern "C" {
 #include <errno.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -193,8 +194,10 @@ EError TPortoApi::Call(const TPortoRequest &req,
     if (!err)
         err = Recv(rsp);
 
-    if (extra_timeout && Timeout > 0)
-        SetSocketTimeout(2, Timeout);
+    if (extra_timeout && Timeout > 0) {
+        EError err = SetSocketTimeout(2, Timeout);
+        (void)err;
+    }
 
     if (!err) {
         err = LastError = rsp.error();
@@ -205,8 +208,7 @@ EError TPortoApi::Call(const TPortoRequest &req,
 }
 
 EError TPortoApi::Call(int extra_timeout) {
-    Call(Req, Rsp, extra_timeout);
-    return LastError;
+    return Call(Req, Rsp, extra_timeout);
 }
 
 EError TPortoApi::Call(const TString &req,
@@ -216,13 +218,15 @@ EError TPortoApi::Call(const TString &req,
     if (!google::protobuf::TextFormat::ParseFromString(req, &Req)) {
         LastError = EError::InvalidMethod;
         LastErrorMsg = "Cannot parse request";
+        rsp = "";
         return EError::InvalidMethod;
     }
 
-    Call(Req, Rsp, extra_timeout);
+    EError err = Call(Req, Rsp, extra_timeout);
+
     rsp = Rsp.DebugString();
 
-    return LastError;
+    return err;
 }
 
 EError TPortoApi::GetVersion(TString &tag, TString &revision) {
@@ -517,13 +521,14 @@ EError TPortoApi::IncLabel(const TString &name,
     req->set_label(label);
     req->set_add(add);
 
-    Call();
+    EError err = Call();
 
     if (Rsp.has_inclabel())
         result = Rsp.inclabel().result();
 
-    return LastError;
+    return err;
 }
+
 EError TPortoApi::Start(const TString &name) {
     Req.Clear();
     auto req = Req.mutable_start();
@@ -640,11 +645,11 @@ EError TPortoApi::WaitContainers(const std::vector<TString> &names,
     for (auto &c : names)
         req->add_name(c);
 
-    CallWait(result_state, wait_timeout);
+    EError err = CallWait(result_state, wait_timeout);
 
     result_name = Rsp.wait().name();
 
-    return LastError;
+    return err;
 }
 
 const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
@@ -659,7 +664,8 @@ const TWaitResponse *TPortoApi::Wait(const std::vector<TString> &names,
     for (auto &label: labels)
         req->add_label(label);
 
-    CallWait(result_state, wait_timeout);
+    EError err = CallWait(result_state, wait_timeout);
+    (void)err;
 
     if (Rsp.has_wait())
         return &Rsp.wait();
