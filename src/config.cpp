@@ -157,6 +157,7 @@ static void DefaultConfig() {
 
     config().mutable_network()->set_ipip6_encap_limit(4);
     config().mutable_network()->set_ipip6_ttl(64);
+    config().mutable_network()->set_ipip6_tx_queues(8);
 
     config().mutable_network()->set_enable_ip6tnl0(true);
     config().mutable_network()->set_enable_iproute(false);

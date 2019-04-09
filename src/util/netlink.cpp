@@ -731,7 +731,8 @@ TError TNlLink::AddVeth(const std::string &name,
 
 TError TNlLink::AddIp6Tnl(const std::string &name,
                           const TNlAddr &remote, const TNlAddr &local,
-                          int type, int mtu, int encap_limit, int ttl) {
+                          int type, int mtu, int encap_limit, int ttl,
+                          int tx_queues) {
 
     rtnl_link_set_type(Link, "ip6tnl");
 
@@ -741,6 +742,9 @@ TError TNlLink::AddIp6Tnl(const std::string &name,
     rtnl_link_ip6_tnl_set_encaplimit(Link, encap_limit);
     rtnl_link_ip6_tnl_set_ttl(Link, ttl);
     rtnl_link_set_mtu(Link, mtu);
+
+    if (tx_queues)
+        rtnl_link_set_num_tx_queues(Link, tx_queues);
 
     Dump("add", Link);
 

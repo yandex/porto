@@ -2683,7 +2683,8 @@ TError TNetEnv::SetupInterfaces() {
             error = link.AddIp6Tnl(dev.Name, dev.IpIp6.Remote, dev.IpIp6.Local,
                                    IPPROTO_IPIP, dev.Mtu,
                                    config().network().ipip6_encap_limit(),
-                                   config().network().ipip6_ttl());
+                                   config().network().ipip6_ttl(),
+                                   config().network().ipip6_tx_queues());
             if (error)
                 return error;
         }
