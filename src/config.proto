@@ -41,6 +41,7 @@ message TConfig {
         repeated string managed_device = 54;
         optional bool managed_ip6tnl = 55;
         optional bool managed_vlan = 56;
+        optional bool enforce_unmanaged_defaults = 57;
 
         /* Uplink tc qdisc */
         optional string device_qdisc = 16;
