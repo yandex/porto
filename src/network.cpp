@@ -1501,9 +1501,15 @@ retry:
             SetupPolice(dev);
 
         if (!dev.Managed) {
-            /* cleanup legacy hfsc setup from containers */
-            if (ManagedNamespace && !dev.Uplink &&
-                    (dev.Qdisc == "hfsc" || dev.Qdisc == "htb")) {
+            /*
+               Cleanup:
+               1) Legacy hfsc setup from containers
+               2) Classful qdiscs (highly likely belonged to Porto)
+                  on unmanaged at the moment host interfaces
+             */
+            if (!dev.Uplink &&
+                (dev.Qdisc == "hfsc" || dev.Qdisc == "htb") &&
+                (ManagedNamespace || config().network().enforce_unmanaged_defaults())) {
                 TNlQdisc qdisc(dev.Index, TC_H_ROOT, 0);
                 (void)qdisc.Delete(*Nl);
                 dev.Qdisc = "";

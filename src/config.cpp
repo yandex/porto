@@ -147,7 +147,8 @@ static void DefaultConfig() {
     config().mutable_network()->set_resolv_conf_watchdog_ms(5000);
 
     config().mutable_network()->set_managed_ip6tnl(true);
-    config().mutable_network()->set_managed_vlan(true);
+    config().mutable_network()->set_managed_vlan(false);
+    config().mutable_network()->set_enforce_unmanaged_defaults(true);
 
     config().mutable_network()->set_cache_statistics_ms(1000);
 
