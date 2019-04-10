@@ -1,3 +1,10 @@
+yandex-porto (4.18.21) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * network: do not manage vlans, clean left qdiscs, PORTO-519
+
+ -- max7255 <max7255@max7255-nix>  Wed, 10 Apr 2019 12:58:19 +0300
+
 yandex-porto (4.18.20) unstable; urgency=low
 
   [ Konstantin Khlebnikov ]
