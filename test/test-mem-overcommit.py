@@ -4,6 +4,16 @@ import grp
 import sys
 import os
 
+MIN_RAM_SIZE = 4    # in GB
+MAX_RAM_SIZE = 1024 # in GB = 1 TB
+
+ram_size = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') # in bytes
+ram_size = ram_size / (1024.**3) # in GB
+
+if ram_size <= MIN_RAM_SIZE or MAX_RAM_SIZE <= ram_size:
+    print "\nERROR: Test is valid only for machines with RAM from {} GB to {} GB (not including)!\n".format(MIN_RAM_SIZE, MAX_RAM_SIZE)
+    sys.exit(1)
+
 def Catch(func, *args, **kwargs):
     try:
         func(*args, **kwargs)
@@ -62,10 +72,10 @@ ct4.Start()
 Catch(ct4.SetProperty, "memory_guarantee", "1T")
 
 assert Catch(ct4.SetProperty, "memory_guarantee", "1T") == porto.exceptions.ResourceNotAvailable
-ct4.SetProperty("memory_guarantee", "3.0G")
-assert ct4.GetProperty("memory_guarantee") == "3221225472"
+ct4.SetProperty("memory_guarantee", "2.0G")
+assert ct4.GetProperty("memory_guarantee") == "2147483648"
 assert Catch(ct4.SetProperty, "memory_guarantee", "1T") == porto.exceptions.ResourceNotAvailable
-assert ct4.GetProperty("memory_guarantee") == "3221225472"
+assert ct4.GetProperty("memory_guarantee") == "2147483648"
 ct4.SetProperty("memory_guarantee", "0")
 assert ct4.GetProperty("memory_guarantee") == "0"
 
