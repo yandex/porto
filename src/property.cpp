@@ -3619,6 +3619,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["fail_invalid_value"] = Statistics->FailInvalidValue;
     m["fail_invalid_command"] = Statistics->FailInvalidCommand;
     m["fail_memory_guarantee"] = Statistics->FailMemoryGuarantee;
+    m["fail_invalid_netaddr"] = Statistics->FailInvalidNetaddr;
 
     m["requests_longer_1s"] = Statistics->RequestsLonger1s;
     m["requests_longer_3s"] = Statistics->RequestsLonger3s;

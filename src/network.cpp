@@ -989,6 +989,7 @@ TError TNetwork::GetL3Gate(TNetDeviceConfig &dev) {
     for (auto &ip: dev.Ip) {
         if (ip.Family() == AF_INET ? dev.Gate4.IsEmpty() : dev.Gate6.IsEmpty()) {
             error = TError(EError::InvalidNetworkAddress, "Ip {} have no matching address in host", ip.Format());
+            Statistics->FailInvalidNetaddr++;
             break;
         }
     }
