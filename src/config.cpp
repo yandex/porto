@@ -96,6 +96,7 @@ static void DefaultConfig() {
     config().mutable_container()->set_dev_size(32 << 20);
     config().mutable_container()->set_enable_hugetlb(true);
     config().mutable_container()->set_enable_blkio(true);
+    config().mutable_container()->set_ptrace_on_start(false);
 
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 

@@ -20,6 +20,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <wordexp.h>
@@ -92,7 +93,7 @@ void TTaskEnv::Abort(const TError &error) {
     L("abort due to {}", error);
 
     for (int stage = ReportStage; stage < 2; stage++) {
-        error2 = Sock.SendPid(getpid());
+        error2 = Sock.SendPid(GetPid());
         if (error2 && error2.Errno != ENOMEM)
             L_ERR("{}", error2);
     }
@@ -337,33 +338,12 @@ TError TTaskEnv::ConfigureChild() {
         return error;
 
     if (QuadroFork) {
-        pid_t pid = fork();
+        pid_t pid = Fork(config().container().ptrace_on_start());
         if (pid < 0)
             return TError::System("fork()");
 
-        if (pid) {
-            auto pid_ = std::to_string(pid);
-            const char * argv[] = {
-                "portoinit",
-                "--container",
-                CT->Name.c_str(),
-                "--wait",
-                pid_.c_str(),
-                NULL,
-            };
-            auto envp = Env.Envp();
-
-            error = PortoInitCapabilities.ApplyLimit();
-            if (!error) {
-                TFile::CloseAll({PortoInit.Fd, LogFile.Fd});
-                fexecve(PortoInit.Fd, (char *const *)argv, envp);
-                error = TError::System("fexecve");
-            }
-
-            L("Cannot exec portoinit: {}", error);
-            kill(pid, SIGKILL);
-            _exit(EXIT_FAILURE);
-        }
+        if (pid)
+            ExecPortoinit(pid);
 
         if (setsid() < 0)
             return TError::System("setsid()");
@@ -492,6 +472,65 @@ void TTaskEnv::StartChild() {
     Abort(error);
 }
 
+void TTaskEnv::TracerLoop(pid_t traceePid) {
+    TError error;
+    pid_t pid;
+
+    unsigned int remainingExecs = 1;
+    if (TripleFork)
+        ++remainingExecs;
+    if (QuadroFork)
+        ++remainingExecs;
+
+    int status;
+    if (waitpid(traceePid, &status, 0) != traceePid) {
+        error = TError::System("waitpid()");
+        goto tracer_error;
+    }
+    if (!WIFSTOPPED(status) || WSTOPSIG(status) != SIGSTOP) {
+        error = TError::System("Child doesn't stopped");
+        goto tracer_error;
+    }
+    if (ptrace(PTRACE_SETOPTIONS, traceePid, 0, PTRACE_O_TRACEEXEC)) {
+        error = TError::System("ptrace(PTRACE_SETOPTIONS)");
+        goto tracer_error;
+    }
+    if (ptrace(PTRACE_CONT, traceePid, 0, 0)) {
+        error = TError::System("ptrace(PTRACE_CONT)");
+        goto tracer_error;
+    }
+
+    for (pid = wait(&status); pid > 0; pid = wait(&status)) {
+        if (status >> 8 == (SIGTRAP | (PTRACE_EVENT_EXEC << 8))) {
+            --remainingExecs;
+            if (ptrace(PTRACE_DETACH, pid, 0, 0))
+                error = TError::System("ptrace(PTRACE_DETACH)");
+        } else if (WIFSTOPPED(status)) {
+            if (ptrace(PTRACE_CONT, pid, 0, 0))
+                error = TError::System("ptrace(PTRACE_CONT)");
+        } else if (WIFSIGNALED(status)) {
+            error = TError::System("Child terminated by signal {}", WTERMSIG(status));
+        }
+
+        if (error)
+            goto tracer_error;
+
+        if (!remainingExecs)
+            break;
+    }
+    if (remainingExecs) {
+        error = TError::System("wait()");
+        goto tracer_error;
+    }
+
+    _exit(EXIT_SUCCESS);
+
+tracer_error:
+    L("Tracer failed: {}", error);
+    (void)kill(traceePid, SIGKILL);
+    _exit(EXIT_FAILURE);
+}
+
 TError TTaskEnv::Start() {
     TError error, error2;
 
@@ -513,17 +552,43 @@ TError TTaskEnv::Start() {
     error = task.Fork();
     if (error) {
         Sock.Close();
+        MasterSock.Close();
         L("Can't spawn child: {}", error);
         return error;
     }
 
     if (!task.Pid) {
+        if (config().container().ptrace_on_start()) {
+            pid_t traceePid = fork();
+            if (traceePid < 0)
+                Abort(TError::System("fork()"));
+
+            if (traceePid) {
+                Sock.Close();
+                MasterSock.Close();
+
+                SetDieOnParentExit(SIGKILL);
+
+                SetProcessName("portod-TRACER");
+
+
+                TracerLoop(traceePid);
+            }
+
+            if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+                Abort(TError::System("ptrace(PTRACE_TRACEME)"));
+            raise(SIGSTOP);
+        }
+
+        MasterSock.Close();
+
         TError error;
 
         /* Switch from signafd back to normal signal delivery */
         ResetBlockedSignals();
 
-        SetDieOnParentExit(SIGKILL);
+        if (!config().container().ptrace_on_start())
+            SetDieOnParentExit(SIGKILL);
 
         SetProcessName("portod-CT" + std::to_string(CT->Id));
 
@@ -606,7 +671,17 @@ TError TTaskEnv::Start() {
              * Enter into pid-namespace. fork() hangs in libc if child pid
              * collide with parent pid outside. vfork() has no such problem.
              */
-            pid_t forkPid = vfork();
+            pid_t forkPid;
+            if (!config().container().ptrace_on_start())
+                forkPid = vfork();
+            else
+                /*
+                 * We can't use syscall() function from glibc
+                 * because child corrupts return address on the top of the shared stack.
+                 * We use inline assemlby here for clone(CLONE_VM | CLONE_VFORK | CLONE_PTRACE) syscall.
+                 */
+                forkPid = PtracedVfork();
+
             if (forkPid < 0)
                 Abort(TError::System("fork()"));
 
@@ -631,6 +706,9 @@ TError TTaskEnv::Start() {
         /* Create UTS namspace if hostname is changed or isolate=true */
         if (CT->Isolate || CT->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
+
+        if (config().container().ptrace_on_start())
+            cloneFlags |= CLONE_PTRACE;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
 
@@ -662,25 +740,7 @@ TError TTaskEnv::Start() {
 
         MasterSock2.Close();
 
-        auto pid = std::to_string(clonePid);
-        const char * argv[] = {
-            "portoinit",
-            "--container",
-            CT->Name.c_str(),
-            "--wait",
-            pid.c_str(),
-            NULL,
-        };
-        auto envp = Env.Envp();
-
-        error = PortoInitCapabilities.ApplyLimit();
-        if (error)
-            _exit(EXIT_FAILURE);
-
-        TFile::CloseAll({PortoInit.Fd});
-        fexecve(PortoInit.Fd, (char *const *)argv, envp);
-        kill(clonePid, SIGKILL);
-        _exit(EXIT_FAILURE);
+        ExecPortoinit(clonePid);
     }
 
     Sock.Close();
@@ -702,7 +762,8 @@ TError TTaskEnv::Start() {
     if (error)
         goto kill_all;
 
-    error2 = task.Wait();
+    if (!config().container().ptrace_on_start())
+        error2 = task.Wait();
 
     /* Task was alive, even if it already died we'll get zombie */
     error = MasterSock.SendZero();
@@ -714,7 +775,11 @@ TError TTaskEnv::Start() {
     if (error)
         goto kill_all;
 
-    if (!error && error2) {
+    if (config().container().ptrace_on_start()) {
+        error = task.Wait();
+        if (error)
+            goto kill_all;
+    } else if (!error && error2) {
         error = error2;
         goto kill_all;
     }
@@ -732,4 +797,28 @@ kill_all:
     CT->WaitTask.Pid = 0;
     CT->SeizeTask.Pid = 0;
     return error;
+}
+
+void TTaskEnv::ExecPortoinit(pid_t pid) {
+    auto pid_ = std::to_string(pid);
+    const char * argv[] = {
+        "portoinit",
+        "--container",
+        CT->Name.c_str(),
+        "--wait",
+        pid_.c_str(),
+        NULL,
+    };
+    auto envp = Env.Envp();
+
+    TError error = PortoInitCapabilities.ApplyLimit();
+    if (!error) {
+        TFile::CloseAll({PortoInit.Fd, LogFile.Fd});
+        fexecve(PortoInit.Fd, (char *const *)argv, envp);
+        error = TError::System("fexecve");
+    }
+
+    L("Cannot exec portoinit: {}", error);
+    kill(pid, SIGKILL);
+    _exit(EXIT_FAILURE);
 }

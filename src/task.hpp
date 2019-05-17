@@ -54,8 +54,12 @@ struct TTaskEnv {
     TError WaitAutoconf();
     TError ChildExec();
 
+    void TracerLoop(pid_t traceePid);
+
     void ReportPid(pid_t pid);
     void Abort(const TError &error);
+
+    void ExecPortoinit(pid_t pid);
 };
 
 extern std::list<std::string> IpcSysctls;

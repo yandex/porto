@@ -115,6 +115,14 @@ pid_t GetTid() {
     return syscall(SYS_gettid);
 }
 
+pid_t Clone(unsigned long flags, void *child_stack, void *ptid, void *ctid) {
+    return syscall(SYS_clone, flags, child_stack, ptid, ctid);
+}
+
+pid_t Fork(bool ptrace) {
+    return !ptrace ? fork() : Clone(CLONE_PTRACE | SIGCHLD);
+}
+
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens) {
     struct dirent *de;
     FILE *file;
