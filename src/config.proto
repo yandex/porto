@@ -200,6 +200,7 @@ message TConfig {
         optional int64 dead_memory_soft_limit = 43;
         optional bool pressurize_on_death = 44;
         optional bool enable_blkio = 45;
+        optional bool ptrace_on_start = 54;
 
         message TSysctl {
             required string key = 1;

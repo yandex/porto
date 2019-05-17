@@ -1,5 +1,6 @@
 #include "util/cred.hpp"
 #include "util/log.hpp"
+#include "util/unix.hpp"
 #include "config.hpp"
 #include "common.hpp"
 
@@ -408,7 +409,7 @@ void TCapabilities::Dump() {
 TError TCapabilities::Apply(int mask) const {
     struct __user_cap_header_struct header = {
         .version = _LINUX_CAPABILITY_VERSION_3,
-        .pid = getpid(),
+        .pid = GetPid(),
     };
     struct __user_cap_data_struct data[2];
 

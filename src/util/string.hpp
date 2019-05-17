@@ -6,6 +6,9 @@
 
 #include "util/error.hpp"
 
+#define STRINGIFY_IMPL(x) #x
+#define STRINGIFY(x) STRINGIFY_IMPL(x)
+
 typedef std::map<std::string, uint64_t> TUintMap;
 typedef std::map<std::string, std::string> TStringMap;
 typedef std::vector<std::string> TTuple;
