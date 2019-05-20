@@ -6,10 +6,12 @@ include_directories(${porto_SOURCE_DIR})
 include_directories(${porto_BINARY_DIR})
 
 add_executable(portotest portotest.cpp test.cpp selftest.cpp stresstest.cpp)
-
 target_link_libraries(portotest version porto util config pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
 
 add_executable(mem_touch mem_touch.c)
+
+add_executable(hijack hijack.cpp)
+target_link_libraries(hijack porto pthread fmt ${PB})
 
 if (USE_PORTO_KERNEL)
     add_custom_target(porto-kernel ALL
@@ -104,6 +106,7 @@ ADD_PYTHON_TEST(uid_handling)
 ADD_PYTHON_TEST(unpriv-cred)
 ADD_PYTHON_TEST(isolation)
 ADD_PYTHON_TEST(security)
+ADD_PYTHON_TEST(hijack)
 ADD_PYTHON_TEST(net)
 ADD_PYTHON_TEST(tc-classes)
 ADD_PYTHON_TEST(tc-rebuild)
