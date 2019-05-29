@@ -26,8 +26,10 @@ Makefile
 /debian/yandex-porto/
 /debian/python-portopy/
 /spec/porto.spec
-/TAGS
 /src/libnl-prefix/
 /coverage.info
 /coverage.info.cleaned
 /coverage/
+/build/
+/test/Testing/
+.vscode
