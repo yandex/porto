@@ -3883,7 +3883,7 @@ void TContainer::SyncState() {
     if (!freezerCg.Exists()) {
         if (State != EContainerState::Stopped &&
                 State != EContainerState::Stopping)
-            L_WRN("Freezer not found");
+            L("Freezer not found");
         ForgetPid();
         SetState(EContainerState::Stopped);
         return;
