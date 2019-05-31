@@ -2771,6 +2771,9 @@ TError TContainer::PrepareStart() {
     if (Parent && Parent->JobMode)
         return TError(EError::InvalidValue, "Parent container in virt_mode=job");
 
+    if (JobMode && RequiredControllers)
+        return TError(EError::InvalidValue, "Cannot use cgroups in virt_mode=job");
+
     if (CapLimit.Permitted & ~CapBound.Permitted) {
         TCapabilities cap = CapLimit;
         cap.Permitted &= ~CapBound.Permitted;
