@@ -2102,7 +2102,9 @@ TError TContainer::ApplyDeviceConf() const {
             return error;
     }
 
-    if (State != EContainerState::Starting && Task.Pid && !RootPath.IsRoot()) {
+    /* We also setup devices during container mnt ns setup in task.cpp */
+    if (State != EContainerState::Starting &&
+        Task.Pid && !RootPath.IsRoot() && !TPath(Root).IsRoot()) {
         error = Devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
         if (error)
             return error;
