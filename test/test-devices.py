@@ -163,4 +163,86 @@ ExpectEq(host_dev.st_uid, ct_dev.st_uid)
 ExpectEq(host_dev.st_gid, ct_dev.st_gid)
 a.Destroy()
 
+# Checking devices nodes + hierarchy
+# No access, but device node should persist in child
+a = None
+try:
+    a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]}, devices="/dev/ram0 rwm")
+    ab = c.Run("a/b", wait=60, devices="/dev/ram0 -", command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectNe(ab["exit_code"], "0")
+    ab.Destroy()
+    ab = c.Run("a/b", wait=60, devices="/dev/ram0 -", command="stat /dev/ram0")
+    ExpectEq(ab["exit_code"], "0")
+    ab.Destroy()
+
+    # Device node from parent should not be missed after dynamic update
+    ab = c.Run("a/b", command="sleep infinity", devices="/dev/ram0 -")
+    ab.SetProperty("devices", "/dev/ram0 -")
+
+    # Child with restriction should not access devices, but still observe it
+    abc = c.Run("a/b/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectNe(abc["exit_code"], "0")
+    abc.Destroy()
+    abc = c.Run("a/b/c", wait=60, command="stat /dev/ram0")
+    ExpectEq(abc["exit_code"], "0")
+    abc.Destroy()
+
+    # Free child should observe same devices as designated in parent
+    ac = c.Run("a/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectEq(ac["exit_code"], "0")
+    ac.Destroy()
+    ac = c.Run("a/c", wait=60, command="stat /dev/ram0")
+    ExpectEq(ac["exit_code"], "0")
+    ac.Destroy()
+    ab.Destroy()
+
+    # Now the same scenario, but after portod reload
+    ab = c.Run("a/b", weak=False, command="sleep infinity", devices="/dev/ram0 -")
+    ReloadPortod()
+    abc = c.Run("a/b/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectNe(abc["exit_code"], "0")
+    abc.Destroy()
+    abc = c.Run("a/b/c", wait=60, command="stat /dev/ram0")
+    ExpectEq(abc["exit_code"], "0")
+    abc.Destroy()
+    ac = c.Run("a/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectEq(ac["exit_code"], "0")
+    ac.Destroy()
+    ac = c.Run("a/c", wait=60, command="stat /dev/ram0")
+    ExpectEq(ac["exit_code"], "0")
+    ac.Destroy()
+    ab.Destroy()
+
+    # With chroot in child the device node can be safely deleted
+    child_root = "%s/child" % a["root"]
+    os.mkdir(child_root)
+    v1 = c.CreateVolume(child_root, layers=["ubuntu-precise"])
+    ab = c.Run("a/b", command="sleep infinity", root="/child")
+    v1.Link("a/b")
+    v1.Unlink("/")
+    abc = c.Run("a/b/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectEq(abc["exit_code"], "0")
+    abc.Destroy()
+    ab.SetProperty("devices", "/dev/ram0 -")
+
+    # We observe nothing in child with chroot
+    abc = c.Run("a/b/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectNe(abc["exit_code"], "0")
+    abc.Destroy()
+    abc = c.Run("a/b/c", wait=60, command="stat /dev/ram0")
+    ExpectNe(abc["exit_code"], "0")
+    abc.Destroy()
+
+    # Parent device node persists and accessible from non-chrooted child
+    ac = c.Run("a/c", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
+    ExpectEq(ac["exit_code"], "0")
+    ac.Destroy()
+    ac = c.Run("a/c", wait=60, command="stat /dev/ram0")
+    ExpectEq(ac["exit_code"], "0")
+    ac.Destroy()
+    ab.Destroy()
+finally:
+    if a:
+        a.Destroy()
+
 os.chmod("/dev/ram0", 0660)
