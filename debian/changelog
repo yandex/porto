@@ -1,3 +1,13 @@
+yandex-porto (4.18.22) unstable; urgency=low
+
+  [ Roman Anufriev ]
+  * property: add 'FailInvalidNetaddr' property/'fail_invalid_netaddr' protobuf field for accounting 'InvalidNetworkAddress' error, PORTO-491
+
+  [ Maxim Samoylov ]
+  * container: do not touch device nodes in shared chroot, PORTO-545
+
+ -- max7255 <max7255@max7255-nix>  Wed, 05 Jun 2019 15:42:29 +0300
+
 yandex-porto (4.18.21) unstable; urgency=low
 
   [ Maxim Samoylov ]
