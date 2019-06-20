@@ -1641,7 +1641,7 @@ TError TContainer::DistributeCpus() {
 
         if (vacantGuarantee > parent->CpuVacant.Weight() * CPU_POWER_PER_SEC) {
             if (!parent->CpuVacant.IsEqual(parent->CpuAffinity))
-                return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in CT{}:{}", parent->Id, Parent->Name);
+                return TError(EError::ResourceNotAvailable, "Not enough cpus for cpu_guarantee in CT{}:{}", parent->Id, parent->Name);
             L("CPU guarantee overcommit in CT{}:{}", parent->Id, parent->Name);
         }
     }
