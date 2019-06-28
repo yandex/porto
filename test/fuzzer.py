@@ -80,9 +80,13 @@ def attach_to_cgroup(dst, pid, move_all=False):
         cgroups = [cgroups[randint(0, len(cgroups) - 1)]]
     for cgroup in cgroups:
         _, cgtype, path = cgroup.split(":")
-        target_path = "/sys/fs/cgroup/%s%s/tasks" % (
-            cgtype if "=" not in cgtype else cgtype.split('=')[1], path.rstrip()
-        )
+        if not cgtype:
+            # i.e. unified cgv2
+            return
+        else:
+            if "=" in cgtype:
+                cgtype = cgtype.split('=')[1]
+            target_path = "/sys/fs/cgroup/%s%s/tasks" % (cgtype, path.rstrip())
         open(target_path, "w").write(str(pid))
 
 
