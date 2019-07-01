@@ -580,7 +580,8 @@ TError TTaskEnv::Start() {
             raise(SIGSTOP);
         }
 
-        MasterSock.Close();
+        /* FIXME: this changes stable behaviour with starting child on reload
+        MasterSock.Close(); */
 
         TError error;
 
