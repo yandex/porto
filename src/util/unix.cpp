@@ -36,6 +36,10 @@ extern "C" {
 #include <linux/fs.h>
 }
 
+#ifndef PR_TRANSLATE_PID
+#define PR_TRANSLATE_PID    0x59410001
+#endif
+
 bool TTask::Exists() const {
     return Pid && (!kill(Pid, 0) || errno != ESRCH);
 }
@@ -573,6 +577,19 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
     TNamespaceFd pid_ns, mnt_ns, net_ns;
     TError error;
     TTask task;
+
+    if (pidns <= 0 || pid == 0)
+        return TError(EError::InvalidValue, "TranslatePid: invalid pid");
+    if (pid > 0)
+        result = prctl(PR_TRANSLATE_PID, pid, pidns, 0, 0);
+    else
+        result = prctl(PR_TRANSLATE_PID, -pid, 0, pidns, 0);
+    if (result >= 0)
+        return OK;
+    if (errno == ESRCH)
+        return TError(EError::InvalidValue, "TranslatePid: task not found");
+
+    /* else fallback to SCM_CREDENTIALS */
 
     error = TUnixSocket::SocketPair(sock, sk);
     if (error)
