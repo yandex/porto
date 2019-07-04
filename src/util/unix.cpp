@@ -40,6 +40,10 @@ extern "C" {
 #define PR_TRANSLATE_PID    0x59410001
 #endif
 
+#ifndef PR_SET_DUMPABLE_INIT_NS
+#define PR_SET_DUMPABLE_INIT_NS 0x59410002
+#endif
+
 bool TTask::Exists() const {
     return Pid && (!kill(Pid, 0) || errno != ESRCH);
 }
@@ -218,6 +222,17 @@ void SetProcessName(const std::string &name) {
 
 void SetDieOnParentExit(int sig) {
     (void)prctl(PR_SET_PDEATHSIG, sig, 0, 0, 0);
+}
+
+void SetPtraceProtection(bool enable) {
+    if (!enable)
+        L_SYS("PTrace protection: disabled");
+    else if (prctl(PR_SET_DUMPABLE_INIT_NS, 0, 0, 0, 0))
+        L_SYS("PTrace protection: unsupported");
+    else if (prctl(PR_GET_DUMPABLE, 0, 0, 0, 0) == 3)
+        L_SYS("PTrace protection: enabled");
+    else
+        L_SYS("PTrace protection: broken");
 }
 
 std::string GetTaskName(pid_t pid) {

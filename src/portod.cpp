@@ -796,6 +796,8 @@ static int Portod() {
 
     L_SYS("Portod config:\n{}", config().DebugString());
 
+    SetPtraceProtection(config().daemon().ptrace_protection());
+
     error = TuneLimits();
     if (error)
         FatalError("Cannot set correct limits", error);

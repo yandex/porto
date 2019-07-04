@@ -157,6 +157,7 @@ message TConfig {
         optional uint32 rw_threads = 22;
         optional uint32 ro_threads = 23;
         optional uint32 io_threads = 24;
+        optional bool ptrace_protection = 25;
     }
 
     message TContainerCfg {

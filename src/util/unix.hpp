@@ -66,6 +66,7 @@ uint64_t GetTotalMemory();
 uint64_t GetHugetlbMemory();
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
+void SetPtraceProtection(bool enable);
 std::string GetTaskName(pid_t pid = 0);
 uint64_t TaskHandledSignals(pid_t pid);
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
