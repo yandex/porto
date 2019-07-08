@@ -1342,15 +1342,24 @@ public:
     }
     TError Set(const std::string &value) {
         TDevices devices;
-        TError error = devices.Parse(value, CL->Cred);
-        if (error)
-            return error;
-        if (devices.NeedCgroup) {
-            error = CT->EnableControllers(CGROUP_DEVICES);
+
+        // reset to default + extra + parent devices if empty string is given by user
+        if (value.empty()) {
+            CT->Devices.Devices.clear();
+        } else {
+            TError error = devices.Parse(value, CL->Cred);
             if (error)
                 return error;
+
+            if (devices.NeedCgroup) {
+                error = CT->EnableControllers(CGROUP_DEVICES);
+                if (error)
+                    return error;
+            }
+
+            CT->Devices.Merge(devices, true, true);
         }
-        CT->Devices.Merge(devices, true, true);
+
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
     }

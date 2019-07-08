@@ -2050,12 +2050,23 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (TestClearPropDirty(EProperty::DEVICE_CONF)) {
+        bool was_empty = false;
+        if (Devices.Devices.empty()) {
+            for (auto p = Parent; p; p = p->Parent)
+                Devices.Merge(p->Devices);
+
+            was_empty = true;
+        }
+
         error = ApplyDeviceConf();
         if (error) {
             if (error != EError::Permission && error != EError::DeviceNotFound)
                 L_WRN("Cannot change allowed devices: {}", error);
             return error;
         }
+
+        if (was_empty)
+            Devices.Devices.clear();
     }
 
     return OK;

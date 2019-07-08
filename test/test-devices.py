@@ -94,7 +94,7 @@ a.Destroy()
 m["devices"] = ""
 
 a = c.Run("s/m/a", wait=60, command="dd if=/dev/ram0 of=/dev/null count=1")
-ExpectNe(a["exit_code"], "0")
+ExpectEq(a["exit_code"], "0")
 a.Destroy()
 
 m.Destroy()
@@ -161,6 +161,62 @@ ExpectEq(host_dev.st_mode, ct_dev.st_mode)
 ExpectEq(host_dev.st_rdev, ct_dev.st_rdev)
 ExpectEq(host_dev.st_uid, ct_dev.st_uid)
 ExpectEq(host_dev.st_gid, ct_dev.st_gid)
+a.Destroy()
+
+# Check reverting to default+extra devices after empty devices knob is given
+def GetCgroupDevices(ct):
+    with open("/sys/fs/cgroup/devices/porto%{}/devices.list".format(ct.name), "r") as dev_list_file:
+        return set(dev_list_file.read().splitlines())
+
+a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]})
+default_devices = GetCgroupDevices(a)
+a.Destroy()
+
+ConfigurePortod('test-devices', """
+container {
+        extra_devices: "/dev/ram0 rwm;"
+        }
+""")
+# "/dev/ram0 rwm" = "b 1:0 rwm"
+def_extra_devices = default_devices.copy()
+def_extra_devices.add("b 1:0 rwm")
+
+# "/dev/ram1 rwm" = "b 1:1 rwm"
+all_devices = def_extra_devices.copy()
+all_devices.add("b 1:1 rwm")
+
+# ----------------------------------------
+# set extra device on container start
+a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]}, devices="/dev/ram0 rwm")
+ExpectEq(a.GetProperty("devices"), "/dev/ram0 rwm /dev/ram0 0666 root disk; "); # notice the trailing space
+devices = GetCgroupDevices(a)
+ExpectEq(devices, def_extra_devices)
+
+a.SetProperty("devices", "");
+ExpectEq(a.GetProperty("devices"), "");
+devices = GetCgroupDevices(a)
+ExpectEq(devices, def_extra_devices)
+
+a.Destroy()
+
+# ----------------------------------------
+# set extra device explicitly
+a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]}, devices="/dev/ram1 rwm")
+ExpectEq(a.GetProperty("devices"), "/dev/ram1 rwm /dev/ram1 0660 root disk; "); # notice the trailing space
+devices = GetCgroupDevices(a)
+ExpectEq(devices, all_devices)
+
+a.SetProperty("devices", "/dev/ram0 rwm");
+ExpectEq(a.GetProperty("devices"), "/dev/ram1 - /dev/ram1 0660 root disk; /dev/ram0 rwm /dev/ram0 0666 root disk; "); # notice the trailing space
+devices = GetCgroupDevices(a)
+ExpectEq(devices, def_extra_devices)
+
+a.SetProperty("devices", "");
+ExpectEq(a.GetProperty("devices"), "");
+devices = GetCgroupDevices(a)
+ExpectEq(devices, def_extra_devices)
+
+ConfigurePortod('test-devices', "")
 a.Destroy()
 
 # Checking devices nodes + hierarchy
