@@ -66,6 +66,7 @@ endif()
 
 ADD_PYTHON_TEST(ct-state)
 ADD_PYTHON_TEST(knobs)
+ADD_PYTHON_TEST(std-streams)
 ADD_PYTHON_TEST(labels)
 ADD_PYTHON_TEST(ulimit)
 ADD_PYTHON_TEST(place)
