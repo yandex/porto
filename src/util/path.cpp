@@ -657,7 +657,7 @@ TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
         return TError::System("fstat(" + Path + ")");
     }
 
-    if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage) {
+    if (!S_ISREG(st.st_mode) || (st.st_size <= max_disk_usage) || (st.st_size <= st.st_blksize)) {
         loss = 0;
         close(fd);
         return OK;
