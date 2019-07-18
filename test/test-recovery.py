@@ -133,7 +133,7 @@ def RespawnTicks(r):
             old = new
     #Suppose that respawn will likely tick at least 2 times in 5s
     #otherwise there is some issues there
-    ExpectNe(tick , 2)
+    ExpectLe(3, tick)
 
 
 def TestRecovery():

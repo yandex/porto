@@ -2240,11 +2240,31 @@ TError TContainer::PrepareCgroups() {
     if (Controllers & CGROUP_DEVICES) {
         TCgroup devcg = GetCgroup(DevicesSubsystem);
         /* Nested cgroup makes a copy from parent at creation */
-        if ((Level == 1 || TPath(devcg.Name).IsSimple()) && !HostMode) {
-            /* at restore child cgroups blocks reset */
-            error = RootContainer->Devices.Apply(devcg, State == EContainerState::Starting);
-            if (error)
-                return error;
+        if (!HostMode) {
+            if (State == EContainerState::Starting) {
+                /* on StartContainer() */
+                if (Level == 1 || TPath(devcg.Name).IsSimple()) {
+                    error = RootContainer->Devices.Apply(devcg, true);
+                    if (error)
+                        return error;
+                }
+            } else {
+                /* on Restore() */
+                /* on restore child cgroups blocks reset */
+                TDevices all_devices = Devices;
+                for (auto p = Parent; p; p = p->Parent)
+                    all_devices.Merge(p->Devices);
+
+                error = all_devices.Apply(devcg);
+                if (error)
+                    return error;
+
+                if (!RootPath.IsRoot() && !TPath(Root).IsRoot() && Task.Pid) {
+                    error = all_devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
+                    if (error)
+                        return error;
+                }
+            }
         }
     }
 

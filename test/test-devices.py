@@ -163,6 +163,7 @@ ExpectEq(host_dev.st_uid, ct_dev.st_uid)
 ExpectEq(host_dev.st_gid, ct_dev.st_gid)
 a.Destroy()
 
+# ----------------------------------------
 # Check reverting to default+extra devices after empty devices knob is given
 def GetCgroupDevices(ct):
     with open("/sys/fs/cgroup/devices/porto%{}/devices.list".format(ct.name), "r") as dev_list_file:
@@ -218,6 +219,51 @@ ExpectEq(devices, def_extra_devices)
 
 ConfigurePortod('test-devices', "")
 a.Destroy()
+# ----------------------------------------
+
+# ----------------------------------------
+# Check updating of devices (cgroups and nodes) in chroot after porto reload
+os.mkdir("/tmp/test-devices")
+os.mkdir("/tmp/test-devices/volume")
+vol = c.CreateVolume("/tmp/test-devices/volume", layers=["ubuntu-precise"])
+os.mkdir("/tmp/test-devices/volume/volume")
+vol_vol = c.CreateVolume("/tmp/test-devices/volume/volume", layers=["ubuntu-precise"])
+
+ConfigurePortod('test-devices', """
+container {
+        extra_devices: "/dev/ram0 rwm;"
+        }
+""")
+a = c.Run("a", weak=False)
+ab = c.Run("a/b", weak=False, root=vol.path)
+devices = GetCgroupDevices(ab)
+
+abc = c.Run("a/b/c", weak=False, root="/volume", command="ls dev")
+abc.Wait()
+ExpectEq(abc["exit_code"], "0")
+ExpectEq(devices, GetCgroupDevices(abc))
+abc.Destroy()
+
+# ConfigurePortod also do porto reload
+ConfigurePortod('test-devices', """
+container {
+        extra_devices: "/dev/ram0 rwm; /dev/ram1 rwm;"
+        }
+""")
+devices.add("b 1:1 rwm")
+ExpectEq(devices, GetCgroupDevices(ab))
+
+abc = c.Run("a/b/c", weak=False, root="/volume", command="ls dev")
+abc.Wait()
+ExpectEq(abc["exit_code"], "0")
+ExpectEq(devices, GetCgroupDevices(abc))
+
+ConfigurePortod('test-devices', "")
+a.Destroy()
+c.DestroyVolume("/tmp/test-devices/volume")
+os.rmdir("/tmp/test-devices/volume")
+os.rmdir("/tmp/test-devices")
+# ----------------------------------------
 
 # Checking devices nodes + hierarchy
 # No access, but device node should persist in child
