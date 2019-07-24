@@ -515,7 +515,6 @@ void InitCapabilities() {
 
     /* requires pid-namespace */
     PidNsCapabilities.Permitted =
-        BIT(CAP_SYS_BOOT) |
         BIT(CAP_KILL) |
         BIT(CAP_SYS_PTRACE);
 
@@ -552,6 +551,7 @@ void InitCapabilities() {
         BIT(CAP_LINUX_IMMUTABLE) |
         BIT(CAP_SYS_ADMIN) |
         BIT(CAP_SYS_NICE) |
+        BIT(CAP_SYS_BOOT) |
         BIT(CAP_SYS_RESOURCE);
 
     HelperCapabilities.Permitted = HostCapBound.Permitted;
