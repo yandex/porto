@@ -337,7 +337,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
     Requires **memory\_limit**: IPC\_LOCK.
 
-    Requires **isolate**: SYS\_BOOT, KILL, PTRACE.
+    Requires **isolate**: KILL, PTRACE.
 
     Requires **net** and no **ip\_limit**: NET\_ADMIN.
 
@@ -347,7 +347,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     DAC\_OVERRIDE, FSETID, SETGID, SETUID, SYS\_CHROOT, MKNOD, AUDIT\_WRITE.
 
     Requires no **root**, cannot be ambient, only for suid:
-    LINUX\_IMMUTABLE, SYS\_ADMIN, SYS\_NICE, SYS\_RESOURCE.
+    LINUX\_IMMUTABLE, SYS\_ADMIN, SYS\_NICE, SYS\_RESOURCE, SYS\_BOOT.
 
     Without chroot all these capabilities are available. Capabilities which
     meet requirements could be set as ambient and available within chroot.

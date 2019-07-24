@@ -6,7 +6,7 @@ from test_common import *
 
 AsRoot()
 
-PREV_VERSION = "4.12.21"
+PREV_VERSION = "4.18.20"
 
 TMPDIR = "/tmp/test-release-upgrade"
 prev_portod = TMPDIR + "/old/usr/sbin/portod"
@@ -44,22 +44,33 @@ def CheckRt(r):
 
 #FIXME: remove it in the future, use capabilities from snapshot
 def CheckCaps(r, new_porto):
-    new_porto = True
-    app_caps =  "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"\
-                "LINUX_IMMUTABLE;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;"\
-                "SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;SYS_BOOT;SYS_NICE;SYS_RESOURCE;"\
-                "MKNOD;AUDIT_WRITE;SETFCAP"
+    try:
+        root_path = r.GetProperty("root_path")
+    except:
+        assert not new_porto, "root_path should be accessible in new versions of porto"
+        root_path = ""
 
-    os_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"\
-              "NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;"\
-              "SYS_PTRACE;SYS_BOOT;MKNOD;AUDIT_WRITE;SETFCAP"
+    app_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"
+    app_caps += "LINUX_IMMUTABLE;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;"
+    app_caps += "SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;"
+
+    # Host-chroot containers still have host bounding set
+    app_caps += "" if new_porto and root_path != '/' else "SYS_BOOT;"
+    app_caps += "SYS_NICE;SYS_RESOURCE;MKNOD;AUDIT_WRITE;SETFCAP"
+
+    os_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"
+    os_caps += "NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;"
+
+    # Host-chroot containers still have host bounding set
+    os_caps += "" if new_porto and root_path != '/' else "SYS_BOOT;"
+    os_caps += "MKNOD;AUDIT_WRITE;SETFCAP"
 
     legacy_os_caps = "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_PTRACE; SYS_RESOURCE"
 
     if r.GetProperty("virt_mode") == "app":
-        caps = app_caps if new_porto else ""
+        caps = app_caps
     elif r.GetProperty("virt_mode") == "os":
-        caps = os_caps if new_porto else legacy_os_caps
+        caps = os_caps
     else:
         raise AssertionError("Found unexpected virt_mode value")
 
@@ -164,6 +175,8 @@ pktname = downloads[-4] + "_" + downloads[-3] + "_amd64.deb"
 os.mkdir("old")
 subprocess.check_call(["dpkg", "-x", pktname, "old"])
 os.unlink(pktname)
+
+os.symlink(TMPDIR + "/old/usr/lib/porto/portoinit", "old/usr/sbin/portoinit")
 
 os.chdir(cwd)
 
