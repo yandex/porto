@@ -2493,6 +2493,7 @@ void TContainer::SanitizeCapabilities() {
         if (HostMode)
             CapBound = AllCapabilities;
         else
+            /* FIXME: only virt_mode host should provide such wide set in future */
             CapBound = HostCapBound;
 
         for (auto ct = this; ct; ct = ct->Parent.get()) {

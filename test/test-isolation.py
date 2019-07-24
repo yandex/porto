@@ -79,7 +79,7 @@ ExpectNe(ProcStatus(pid, "NSpid"), pid)
 ExpectEq(ProcStatus(pid, "CapInh"), "0000000000000000")
 ExpectEq(ProcStatus(pid, "CapPrm"), "0000000000000000")
 ExpectEq(ProcStatus(pid, "CapEff"), "0000000000000000")
-ExpectEq(ProcStatus(pid, "CapBnd"), "00000000a84c75fb")
+ExpectEq(ProcStatus(pid, "CapBnd"), "00000000a80c75fb")
 ExpectEq(ProcStatus(pid, "CapAmb"), "0000000000000000")
 
 a.Destroy()
