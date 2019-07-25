@@ -1,3 +1,41 @@
+yandex-porto (4.18.23) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * git: update gitignore
+  * task: attach to intermediate processes with ptrace, PORTO-500
+  * test: Add test for ptrace attack, PORTO-500
+
+  [ Konstantin Khlebnikov ]
+  * cgroup: add bfq weight
+  * cgroup: cleanup blkio cfq/bfq cgroup weight setup
+  * porto: fix crash in TContainer::DistributeCpus on cpu overcommit
+  * network: setup 8 tx queues for ipip6 tunnels
+
+  [ Maxim Samoylov ]
+  * volume: serialize link mount operations
+
+  [ Dmitry Monakhov ]
+  * storage: add zstd compression support
+
+  [ Maxim Samoylov ]
+  * test/fuzzer: cgroupv2 unified workaround
+  * task: revert to old policy with starting on reload
+
+  [ Roman Anufriev ]
+  * util/path: prevent log truncation when 'stdout_limit' is lower than 'st_blksize', PORTO-569
+  * property: reset devices when empty knob is given, PORTO-520
+  * restore: update cgroups and device nodes on container restore, PORTO-562
+
+  [ Konstantin Khlebnikov ]
+  * porto: use prctl PR_TRANSLATE_PID if available
+  * porto: protect daemon clones from ptrace and proc access in containers
+
+  [ Maxim Samoylov ]
+  * cred: drop CAP_SYS_BOOT from non-host containers cap set
+  * test: fix os/app capabilities expectations
+
+ -- max7255 <max7255@max7255-nix>  Thu, 25 Jul 2019 18:29:35 +0300
+
 yandex-porto (4.18.22) unstable; urgency=low
 
   [ Roman Anufriev ]
