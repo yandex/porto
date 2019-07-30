@@ -115,6 +115,14 @@ public:
                State != EContainerState::Destroyed;
     }
 
+    bool IsRunningOrMeta() {
+        return IsRunningOrMeta(State);
+    }
+
+    bool IsRunningOrMeta(EContainerState state) {
+        return state == EContainerState::Running || state == EContainerState::Meta;
+    }
+
     /* protected with ContainersMutex */
     std::list<std::shared_ptr<TContainer>> Children;
 
