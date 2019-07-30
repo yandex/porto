@@ -2631,7 +2631,7 @@ TError TContainer::StartParents() {
 
     if (ActionLocked >= 0 || CL->LockedContainer.get() != this) {
         L_ERR("Container is not locked");
-        return TError(EError::Busy, "Caontiner is not locked");
+        return TError(EError::Busy, "Container is not locked");
     }
 
     if (!Parent)
@@ -2641,8 +2641,7 @@ TError TContainer::StartParents() {
     if (FreezerSubsystem.IsFrozen(cg))
         return TError(EError::InvalidState, "Parent container is frozen");
 
-    if (Parent->State == EContainerState::Running ||
-            Parent->State == EContainerState::Meta)
+    if (IsRunningOrMeta(Parent->State))
         return OK;
 
     auto current = CL->LockedContainer;
@@ -2650,8 +2649,7 @@ TError TContainer::StartParents() {
     std::shared_ptr<TContainer> target;
     do {
         target = Parent;
-        while (target->Parent && target->Parent->State != EContainerState::Running &&
-                target->Parent->State != EContainerState::Meta)
+        while (target->Parent && !IsRunningOrMeta(target->Parent->State))
             target = target->Parent;
 
         CL->ReleaseContainer();
@@ -2833,6 +2831,18 @@ TError TContainer::Start() {
     error = StartParents();
     if (error)
         return error;
+
+    /*
+     * Container can already be started (and even dead) due to non-atomical lock
+     * transfers between parents and children in StartParents() above
+     */
+    if (State != EContainerState::Stopped) {
+        if (IsRunningOrMeta()) {
+            return OK;
+        } else {
+            return TError(EError::InvalidState, "Cannot start container {} in state {}", Name, StateName(State));
+        }
+    }
 
     StartError = OK;
 
