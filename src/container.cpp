@@ -3431,6 +3431,7 @@ err_prepare:
 
     Statistics->ContainersFailedStart++;
     L("Cannot respawn CT{}:{} - {}", Id, Name, error);
+    AccountErrorType(error);
     SetState(EContainerState::Dead);
     (void)Save();
     return error;

@@ -1812,19 +1812,7 @@ void TRequest::Handle() {
         if (!rsp.IsInitialized())
             rsp.Clear();
         Statistics->RequestsFailed++;
-        switch (error.Error) {
-            case EError::Unknown:
-                Statistics->FailSystem++;
-                break;
-            case EError::InvalidValue:
-                Statistics->FailInvalidValue++;
-                break;
-            case EError::InvalidCommand:
-                Statistics->FailInvalidCommand++;
-                break;
-            default:
-                break;
-        }
+        AccountErrorType(error);
     }
 
     rsp.set_error(error.Error);
