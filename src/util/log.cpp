@@ -181,3 +181,22 @@ void Stacktrace() {
     free(funcname);
     free(symbollist);
 }
+
+void AccountErrorType(const TError &error) {
+    if (Statistics) {
+        switch (error.Error) {
+            case EError::Unknown:
+                Statistics->FailSystem++;
+                break;
+            case EError::InvalidValue:
+                Statistics->FailInvalidValue++;
+                break;
+            case EError::InvalidCommand:
+                Statistics->FailInvalidCommand++;
+                break;
+            /* InvalidNetworkAddress accounted inside network.cpp */
+            default:
+                break;
+        }
+    }
+}
