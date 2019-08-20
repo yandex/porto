@@ -345,8 +345,6 @@ def layer_escalation_volume_container():
 
 
 def layer_escalation(v):
-    c = porto.Connection(timeout=120)
-
     AsAlice()
     c = porto.Connection()
     r = c.Create("test")
@@ -393,6 +391,130 @@ def layer_escalation(v):
     AsRoot()
 
 
+def sys_boot_check(v):
+
+    CAP_SYS_BOOT = 0x400000
+
+    def ExpectHasSysBoot(r, has_ambient=True,
+                         command="bash -c \'cat /proc/self/status | grep Bnd\'"):
+        Expect("SYS_BOOT" in r["capabilities"])
+        Expect(("SYS_BOOT" in r["capabilities_ambient_allowed"]) == has_ambient)
+        r["command"] = command
+        r.Start()
+        r.Wait(timeout=1000)
+        Expect("SYS_BOOT" in r["capabilities"])
+        Expect(("SYS_BOOT" in r["capabilities_ambient_allowed"]) == has_ambient)
+        ExpectEq(r["exit_status"], "0")
+        ExpectEq(int(r["stdout"].split()[1], 16) & CAP_SYS_BOOT, CAP_SYS_BOOT)
+
+
+    def ExpectNoSysBoot(r, command="bash -c \'cat /proc/self/status | grep Bnd\'"):
+        Expect("SYS_BOOT" not in r["capabilities"])
+        Expect("SYS_BOOT" not in r["capabilities_ambient_allowed"])
+        r["command"] = command
+        r.Start()
+        r.Wait(timeout=1000)
+        Expect("SYS_BOOT" not in r["capabilities"])
+        Expect("SYS_BOOT" not in r["capabilities_ambient_allowed"])
+        ExpectEq(r["exit_status"], "0")
+        ExpectEq(int(r["stdout"].split()[1], 16) & CAP_SYS_BOOT, 0)
+
+    def ExpectTaint(r):
+        Expect("Isolated container got SYS_BOOT capability" in r["taint"])
+
+    def ExpectNoTaint(r):
+        Expect("Isolated container got SYS_BOOT capability" not in r["taint"])
+
+    CAP_SETFCAP = 0x80000000
+
+    AsRoot()
+
+    # 1) SYS_BOOT stays in bounding/allowed set of container owned by root
+    c = porto.Connection(timeout=10)
+    a = c.Run("sys_boot", start=False, isolate=False,
+              command="bash -c \'cat /proc/self/status | grep Bnd\'")
+    ExpectHasSysBoot(a)
+    a.Stop()
+
+    # 2) Root can set any capability
+    a["capabilities"] = "SYS_BOOT;SETFCAP"
+    a["capabilities_ambient"] = "SYS_BOOT;SETFCAP"
+    ExpectNoTaint(a)
+    ExpectHasSysBoot(a)
+    a.Destroy()
+
+    AsAlice()
+
+    # 3) Non-chroot with isolation should also have bound SYS_BOOT for porto user
+    c = porto.Connection(timeout=10)
+    a = c.Run("sys_boot", start=False, isolate=True,
+              command="bash -c \'cat /proc/self/status | grep Bnd\'")
+    ExpectHasSysBoot(a, has_ambient=False) # previously has_ambient was True
+    a.Stop()
+
+    a["capabilities_ambient"] = "SYS_BOOT"
+    ExpectTaint(a)
+    ExpectHasSysBoot(a, has_ambient=False) # previously has_ambient was True
+    ExpectTaint(a)
+    a.Stop()
+
+    # 4) Even in virt_mode host we cannot set ambient SYS_BOOT
+    #    this also implies isolate=false
+    a["capabilities_ambient"] = ""
+    a["virt_mode"] = "host"
+    # a["isolate"] = "false" # previously we don't sanitize caps on virt_mode
+    ExpectHasSysBoot(a, has_ambient=False)
+    a.Stop()
+
+    a["capabilities_ambient"] = "SYS_BOOT"
+    ExpectTaint(a)
+    ExpectHasSysBoot(a, has_ambient=False) # previously has_ambient was True
+    ExpectTaint(a)
+    a.Stop()
+
+    # 5) Try fake chroot, cap sanitizer does not resolve paths
+    a["capabilities_ambient"] = ""
+    a["virt_mode"] = "app"
+    a["isolate"] = True
+    a["root"] = "/same/dir/../.."
+    Expect("SYS_BOOT" not in a["capabilities"]) # dropped cap
+    Expect(("SYS_BOOT" not in a["capabilities_ambient_allowed"])) # dropped cap
+
+    a["root"] = "/"
+    ExpectHasSysBoot(a, has_ambient=False) # previously has_ambient was True
+    a.Stop()
+
+    # 6) Chroot should disable SYS_BOOT completely
+    a["isolate"] = True
+    a["root"] = v.path
+    ExpectNoSysBoot(a) # dropped cap
+    a.Stop()
+
+    # 7) We silently drop legacy clients capability
+    a["capabilities"] = "SYS_BOOT;SETFCAP"
+    ExpectTaint(a)
+    ExpectNoSysBoot(a)
+    ExpectTaint(a)
+    a.Stop()
+
+    # 8) Dropping capability untaints the container
+    a["capabilities"] = "SETFCAP"
+    ExpectNoTaint(a)
+    ExpectNoSysBoot(a)
+    ExpectNoTaint(a)
+    a.Stop()
+
+    # 9) Ambient capabilities should never contain SYS_BOOT
+    a["capabilities"] = "NET_BIND_SERVICE;SYS_BOOT"
+    a["capabilities_ambient"] = "NET_BIND_SERVICE;SYS_BOOT"
+    ExpectTaint(a)
+    ExpectNoSysBoot(a)
+    ExpectTaint(a)
+
+    a.Destroy()
+    AsRoot()
+
+
 if len(sys.argv) > 1:
     exec(sys.argv[1]+"()")
     exit(0)
@@ -412,6 +534,7 @@ except:
 os.mkdir("/tmp/porto-tests")
 os.chmod("/tmp/porto-tests", 0777)
 
+sys_boot_check(v)
 std_streams_escalation()
 binds_escalation(v)
 internal_escalation(v)

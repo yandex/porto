@@ -35,7 +35,7 @@ knobs = {
                      "SETGID;SETUID;SETPCAP;LINUX_IMMUTABLE;NET_BIND_SERVICE;"\
                      "NET_BROADCAST;NET_ADMIN;NET_RAW;IPC_LOCK;IPC_OWNER;"\
                      "SYS_MODULE;SYS_RAWIO;SYS_CHROOT;SYS_PTRACE;SYS_PACCT;"\
-                     "SYS_ADMIN;SYS_NICE;SYS_RESOURCE;SYS_TIME;"\
+                     "SYS_ADMIN;SYS_BOOT;SYS_NICE;SYS_RESOURCE;SYS_TIME;"\
                      "SYS_TTY_CONFIG;MKNOD;LEASE;AUDIT_WRITE;AUDIT_CONTROL;"\
                      "SETFCAP;MAC_OVERRIDE;MAC_ADMIN;SYSLOG;WAKE_ALARM;"\
                      "BLOCK_SUSPEND;AUDIT_READ",
@@ -136,7 +136,7 @@ for k in knobs:
             assert value == str(knobs[k]).lower()
         else:
             assert value == knobs[k]
-    except AssertionError:
+    except AssertionError as e:
         print "portoctl get {} result:\n <{}> \n != <{}> \n".format(k, value, knobs[k])
         raise e
 
