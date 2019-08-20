@@ -887,6 +887,7 @@ public:
 
         CT->Root = value;
         CT->SetProp(EProperty::ROOT);
+        CT->TaintFlags.RootOnLoop = false;
         CT->SanitizeCapabilitiesAll();
 
         auto subtree = CT->Subtree();
