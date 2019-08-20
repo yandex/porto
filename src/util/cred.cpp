@@ -494,6 +494,9 @@ TCapabilities ChrootCapBound;
 TCapabilities HostCapBound;
 TCapabilities AllCapabilities;
 
+/* Previously we have caps below asserted */
+TCapabilities SysBootCapability;
+
 void InitCapabilities() {
     if (TPath("/proc/sys/kernel/cap_last_cap").ReadInt(LastCapability)) {
         L_WRN("Can't read /proc/sys/kernel/cap_last_cap");
@@ -556,4 +559,5 @@ void InitCapabilities() {
 
     HelperCapabilities.Permitted = HostCapBound.Permitted;
     HelperCapabilities.Permitted &= ~BIT(CAP_SYS_RESOURCE);
+    SysBootCapability.Permitted = BIT(CAP_SYS_BOOT);
 }

@@ -2509,7 +2509,7 @@ void TContainer::SanitizeCapabilities() {
 
         TCapabilities remove;
         if (!pidns)
-            remove.Permitted |= PidNsCapabilities.Permitted;
+            remove.Permitted |= PidNsCapabilities.Permitted | SysBootCapability.Permitted;
         if (!memcg)
             remove.Permitted |= MemCgCapabilities.Permitted;
         if (!netns || netip)
@@ -2518,11 +2518,28 @@ void TContainer::SanitizeCapabilities() {
         if (chroot) {
             CapBound.Permitted &= ChrootCapBound.Permitted & ~remove.Permitted;
             CapAllowed = CapBound;
+
+            if (HasProp(EProperty::CAPABILITIES) &&
+                (CapLimit.Permitted & SysBootCapability.Permitted)) {
+                /* We have CAP_SYS_BOOT for everyone eariler.
+                   Let's enforce it disabled for non-host mode or
+                   privileged first level containers */
+
+                TaintFlags.SysBootForIsolated = true;
+                CapLimit.Permitted &= ~SysBootCapability.Permitted;
+            }
         } else if (HostMode) {
             CapAllowed.Permitted = CapBound.Permitted & ~remove.Permitted;
         } else {
             CapAllowed.Permitted = HostCapAllowed.Permitted &
                                    CapBound.Permitted & ~remove.Permitted;
+        }
+
+        if (HasProp(EProperty::CAPABILITIES_AMBIENT) &&
+            (CapAmbient.Permitted & SysBootCapability.Permitted) ) {
+
+            TaintFlags.SysBootForIsolated = true;
+            CapAmbient.Permitted &= ~SysBootCapability.Permitted;
         }
     }
 
@@ -4192,6 +4209,9 @@ TTuple TContainer::Taint() {
 
     if (TaintFlags.BindWithSuid)
         taint.push_back("Container with bind mount source which allows suid in host");
+
+    if (TaintFlags.SysBootForIsolated)
+        taint.push_back("Isolated container got SYS_BOOT capability as for legacy bounding set, silently dropped now");
 
     return taint;
 }
