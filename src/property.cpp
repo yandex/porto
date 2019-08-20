@@ -3569,6 +3569,19 @@ void TPortoStat::Populate(TUintMap &m) {
         L_ERR("Can't get memory usage of portod");
     m["memory_usage_mb"] = usage / 1024 / 1024;
 
+    usage = 0;
+    cg = CpuacctSubsystem.Cgroup(PORTO_DAEMON_CGROUP);
+    error = CpuacctSubsystem.Usage(cg, usage);
+    if (error)
+        L_ERR("Can't get cpu usage of portod");
+    m["cpu_usage"] = usage;
+
+    usage = 0;
+    error = CpuacctSubsystem.SystemUsage(cg, usage);
+    if (error)
+        L_ERR("Can't get cpu system usage of portod");
+    m["cpu_system_usage"] = usage;
+
     m["epoll_sources"] = Statistics->EpollSources;
 
     m["log_lines"] = Statistics->LogLines;
