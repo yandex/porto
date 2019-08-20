@@ -95,3 +95,4 @@ extern TCapabilities HostCapAllowed;
 extern TCapabilities ChrootCapBound;
 extern TCapabilities HostCapBound;
 extern TCapabilities AllCapabilities;
+extern TCapabilities SysBootCapability;

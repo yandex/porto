@@ -247,6 +247,7 @@ public:
         bool TaintCounted;
         bool RootOnLoop;
         bool BindWithSuid;
+        bool SysBootForIsolated;
     } TaintFlags;
 
     bool RecvOomEvents();

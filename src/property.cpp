@@ -105,6 +105,7 @@ public:
 
         CT->CapLimit = limit;
         CT->SetProp(EProperty::CAPABILITIES);
+        CT->TaintFlags.SysBootForIsolated = false;
         CT->SanitizeCapabilitiesAll();
         return OK;
     }
