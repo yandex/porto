@@ -669,6 +669,7 @@ public:
             CT->Isolate = false;
 
         CT->SetProp(EProperty::VIRT_MODE);
+        CT->SanitizeCapabilitiesAll();
         return OK;
     }
 } static VirtMode;
