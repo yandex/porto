@@ -2700,7 +2700,8 @@ TError TContainer::PrepareStart() {
     if (TaintFlags.TaintCounted && Statistics->ContainersTainted)
         Statistics->ContainersTainted--;
 
-    memset(&TaintFlags, 0, sizeof(TaintFlags));
+    TaintFlags.TaintCounted = 0;
+    TaintFlags.BindWithSuid = false;
 
     /* Check target task credentials */
     error = CL->CanControl(TaskCred);
