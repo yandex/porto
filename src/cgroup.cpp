@@ -75,6 +75,27 @@ TError TCgroup::Create() {
     return error;
 }
 
+TError TCgroup::Rename(TCgroup &target) {
+    TError error;
+
+    if (Secondary())
+        return TError("Cannot rename secondary cgroup " + Type());
+
+    L_CG("Rename cgroup {} to {}", *this, target);
+
+    if (target.Exists())
+        return TError("Cannot rename to existing cgroup " + target.Name);
+
+    if (target.Subsystem != Subsystem)
+        return TError("Cannot rename to other subsystem " + target.Type());
+
+    error = Path().Rename(target.Path());
+    if (!error)
+        Name = target.Name;
+
+    return error;
+}
+
 TError TCgroup::Remove() {
     if (Subsystem->Kind & CGROUP_SYSTEMD) {
         std::vector<TCgroup> children;
@@ -368,6 +389,51 @@ TError TCgroup::KillAll(int signal) const {
 
     if (frozen)
         (void)FreezerSubsystem.Thaw(*this, false);
+
+    return error;
+}
+
+/* Note that knobs will stay in default values, thus use is limited */
+TError TCgroup::Recreate() {
+    TError error;
+    TCgroup tmpcg = Subsystem->Cgroup(Name + "_tmp");
+
+    if (!Exists())
+        return Create();
+
+    if (tmpcg.Exists()) {
+        (void)AttachAll(tmpcg);
+        (void)tmpcg.KillAll(SIGKILL);
+        (void)tmpcg.Remove();
+    }
+
+    L_CG("Recreate cgroup {}", *this);
+    error = tmpcg.Create();
+    if (error)
+        return error;
+
+    error = tmpcg.AttachAll(*this);
+    if (error)
+        goto cleanup;
+
+    error = Remove();
+    if (error)
+        goto cleanup;
+
+    error = tmpcg.Rename(*this);
+    if (!error)
+        return OK;
+
+    L_CG_ERR("Cannot recreate cgroup {} by rename, fallback to reattaching pids", *this);
+
+    error = Create();
+    if (error)
+        return error;
+
+cleanup:
+    (void)AttachAll(tmpcg);
+    (void)tmpcg.KillAll(SIGKILL);
+    (void)tmpcg.Remove();
 
     return error;
 }
@@ -1346,11 +1412,9 @@ TError InitializeDaemonCgroups() {
             continue;
 
         TCgroup cg = hy->Cgroup(PORTO_DAEMON_CGROUP);
-        if (!cg.Exists()) {
-            error = cg.Create();
-            if (error)
-                return error;
-        }
+        error = cg.Recreate();
+        if (error)
+            return error;
 
         // portod
         error = cg.Attach(GetPid());
@@ -1369,11 +1433,9 @@ TError InitializeDaemonCgroups() {
         return error;
 
     cg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
-    if (!cg.Exists()) {
-        error = cg.Create();
-        if (error)
-            return error;
-    }
+    error = cg.Recreate();
+    if (error)
+        return error;
 
     error = MemorySubsystem.SetLimit(cg, config().daemon().helpers_memory_limit());
     if (error)
