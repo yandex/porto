@@ -96,6 +96,7 @@ public:
     bool Exists() const;
 
     TError Create();
+    TError Rename(TCgroup &target);
     TError Remove();
     TError RemoveOne();
 
@@ -134,6 +135,8 @@ public:
 
     TError GetUintMap(const std::string &knob, TUintMap &value) const;
     TError SetSuffix(const std::string suffix);
+
+    TError Recreate();
 };
 
 class TMemorySubsystem : public TSubsystem {
