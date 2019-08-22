@@ -1,3 +1,16 @@
+yandex-porto (4.18.24) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * log: account start fails for respawn case too
+  * property: report porto daemon cpu usage stats
+  * container: do not reset "static" taints on start
+  * property: sanitize capabilities when changing virt_mode
+  * container: silently drop SYS_BOOT on capability sanitize step
+  * test/security: test for SYS_BOOT deprecation
+  * cgroup: force daemon cgroups recreation on start
+
+ -- max7255 <max7255@max7255-nix>  Thu, 22 Aug 2019 16:11:41 +0300
+
 yandex-porto (4.18.23) unstable; urgency=low
 
   [ Dmitry Yakunin ]
