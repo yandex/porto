@@ -3126,6 +3126,11 @@ TError TContainer::Stop(uint64_t timeout) {
         if (ct->IsRoot() || ct->State == EContainerState::Stopped)
             continue;
 
+        if (JobMode && (ct->State == EContainerState::Dead)) {
+            ct->SetState(EContainerState::Stopping);
+            continue;
+        }
+
         ct->SetState(EContainerState::Stopping);
         error = ct->Terminate(deadline);
         if (error)
