@@ -1,6 +1,8 @@
 #include <sstream>
 #include <algorithm>
 #include <condition_variable>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "volume.hpp"
 #include "storage.hpp"
@@ -733,6 +735,8 @@ public:
         std::string lower;
         int layer_idx = 0;
         TFile upperFd, workFd, cowFd;
+        struct stat st;
+        std::unordered_map<dev_t, std::unordered_set<ino_t> > ovlInodes;
 
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
@@ -767,6 +771,27 @@ public:
                 /* Imported layers are available for everybody */
                 (void)layer.Touch();
                 path = layer.Path;
+
+                error = pin.OpenDir(path);
+                if (error) {
+                    error = TError(error, "Cannot open layer {} in place {}", name, Volume->Place);
+                    goto err;
+                }
+            }
+
+            error = pin.Stat(st);
+            if (error)
+                goto err;
+
+            auto dev_inode = ovlInodes.find(st.st_dev);
+            if (dev_inode != ovlInodes.end()) {
+                if (!dev_inode->second.emplace(st.st_ino).second) {
+                    pin.Close();
+                    L("Skipping duplicate lower layer {}", name);
+                    continue;
+                }
+            } else {
+                ovlInodes.emplace(st.st_dev, std::unordered_set<ino_t>()).first->second.emplace(st.st_ino);
             }
 
             std::string layer_id = "L" + std::to_string(Volume->Layers.size() - ++layer_idx);
@@ -845,7 +870,7 @@ public:
 
 err:
         while (layer_idx--) {
-            TPath temp = Volume->GetInternal("L" + std::to_string(layer_idx));
+            TPath temp = Volume->GetInternal("L" + std::to_string(Volume->Layers.size() - layer_idx - 1));
             (void)temp.UmountAll();
             (void)temp.Rmdir();
         }
@@ -917,6 +942,8 @@ public:
         int layer_idx = 0;
         TError error;
         TPath lower;
+        struct stat st;
+        std::unordered_map<dev_t, std::unordered_set<ino_t> > ovlInodes;
 
         lower = Volume->GetInternal("lower");
         error = lower.Mkdir(0755);
@@ -1004,6 +1031,27 @@ public:
                 /* Imported layers are available for everybody */
                 (void)layer.Touch();
                 path = layer.Path;
+
+                error = pin.OpenDir(path);
+                if (error) {
+                    error = TError(error, "Cannot open layer {} in place {}", name, Volume->Place);
+                    goto err;
+                }
+            }
+
+            error = pin.Stat(st);
+            if (error)
+                goto err;
+
+            auto dev_inode = ovlInodes.find(st.st_dev);
+            if (dev_inode != ovlInodes.end()) {
+                if (!dev_inode->second.emplace(st.st_ino).second) {
+                    pin.Close();
+                    L("Skipping duplicate lower layer {}", name);
+                    continue;
+                }
+            } else {
+                ovlInodes.emplace(st.st_dev, std::unordered_set<ino_t>()).first->second.emplace(st.st_ino);
             }
 
             std::string layer_id = "L" + std::to_string(Volume->Layers.size() -
@@ -1055,7 +1103,7 @@ public:
             error = TError(EError::InvalidValue, "Too many layers, kernel limits is 499 plus 1 for upper");
 
         while (layer_idx--) {
-            TPath temp = Volume->GetInternal("L" + std::to_string(layer_idx));
+            TPath temp = Volume->GetInternal("L" + std::to_string(Volume->Layers.size() - layer_idx - 2));
             (void)temp.UmountAll();
             (void)temp.Rmdir();
         }
