@@ -1,3 +1,13 @@
+yandex-porto (4.18.25) unstable; urgency=low
+
+  [ Roman Anufriev ]
+  * container: fix error on exit from virt_mode=job container, PORTO-558
+
+  [ Maxim Samoylov ]
+  * volume: omit duplicate layers in overlay
+
+ -- max7255 <max7255@max7255-nix>  Wed, 25 Sep 2019 00:45:50 +0300
+
 yandex-porto (4.18.24) unstable; urgency=low
 
   [ Maxim Samoylov ]
