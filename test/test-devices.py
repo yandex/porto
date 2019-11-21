@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import sys
+import subprocess
 import porto
 from test_common import *
 
@@ -348,3 +350,33 @@ finally:
         a.Destroy()
 
 os.chmod("/dev/ram0", 0660)
+
+
+try:
+    subprocess.check_call(['gdb', '--version'])
+except:
+    print "Skipping gdb test"
+    sys.exit(0)
+
+# Check portod tolerance to vanished pids on devices restore phase
+
+a = None
+try:
+    a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]}, command="sleep 5")
+
+    app_pid, _, portoinit_pid = a["_root_pid"].split(';')
+
+    c.disconnect()
+
+    # Prevent portoint from immediate exit
+    subprocess.check_call(['gdb', '-p', portoinit_pid, './portoinit', '-ex', 'b _exit', '-ex', 'c', '-ex', 'signal SIGSTOP', '-ex', 'detach', '-ex', 'quit'])
+    ReloadPortod()
+
+    c.connect()
+    ExpectNe(a["state"], "stopped")
+    a.Destroy()
+    a = None
+finally:
+    c.connect()
+    if a:
+        a.Destroy()
