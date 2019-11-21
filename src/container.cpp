@@ -2261,7 +2261,9 @@ TError TContainer::PrepareCgroups() {
 
                 if (!RootPath.IsRoot() && !TPath(Root).IsRoot() && Task.Pid) {
                     error = all_devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
-                    if (error)
+
+                    /* Ignore errors while recreating devices for recently died tasks */
+                    if (error && error.Errno != ENOENT)
                         return error;
                 }
             }
