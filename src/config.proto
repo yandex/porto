@@ -30,7 +30,7 @@ message TConfig {
         /* ipip6 tunnel */
         optional uint32 ipip6_encap_limit = 37;
         optional uint32 ipip6_ttl = 38;
-        optional bool ipip6_tx_queues = 58;
+        optional uint32 ipip6_tx_queues = 58;
         optional bool enable_ip6tnl0 = 40;
 
         /* SLAAC for macvlan */
