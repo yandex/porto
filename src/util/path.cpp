@@ -255,7 +255,7 @@ TError TFile::PivotRoot() const {
 TError TPath::Chown(uid_t uid, gid_t gid) const {
     if (chown(Path.c_str(), uid, gid))
         return TError::System("chown(" + Path + ", " +
-                        UserName(uid) + ", " + GroupName(gid) + ")");
+                        std::to_string(uid) + ", " + std::to_string(gid) + ")");
     return OK;
 }
 
