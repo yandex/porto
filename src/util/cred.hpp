@@ -25,6 +25,8 @@ constexpr gid_t NoGroup = (gid_t)-1;
 extern gid_t PortoGroup;
 extern gid_t PortoCtGroup;
 
+static constexpr const char * CRED_POSTFORK_TAINT_MESSAGE = "Credential function may deadlock in post-fork context";
+
 struct TCred {
     uid_t Uid;
     gid_t Gid;

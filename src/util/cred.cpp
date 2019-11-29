@@ -25,6 +25,8 @@ TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
     std::vector<char> buf(PwdBufSize, '\0');
     int id, err;
 
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
+
     while (1) {
         if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0)
             err = getpwuid_r(id, &pwd, buf.data(), buf.size(), &ptr);
@@ -48,6 +50,8 @@ TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
 TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups) {
     int ngroups = 32;
 
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
+
     for (int retry = 0; retry < 3; retry++) {
         groups.resize(ngroups);
         if (getgrouplist(user.c_str(), gid, groups.data(), &ngroups) >= 0) {
@@ -68,6 +72,8 @@ TError UserId(const std::string &user, uid_t &uid) {
         uid = id;
         return OK;
     }
+
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
 
     while (getpwnam_r(user.c_str(), &pwd, buf.data(), buf.size(), &ptr)) {
         if (errno != ERANGE)
@@ -90,6 +96,8 @@ std::string UserName(uid_t uid) {
 
     if (uid == NoUser)
         return "";
+
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
 
     while (getpwuid_r(uid, &pwd, buf.data(), buf.size(), &ptr)) {
         if (errno != ERANGE)
@@ -116,6 +124,8 @@ TError GroupId(const std::string &group, gid_t &gid) {
         return OK;
     }
 
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
+
     while (getgrnam_r(group.c_str(), &grp, buf.data(), buf.size(), &ptr)) {
         if (errno != ERANGE)
             return TError(EError::InvalidValue, errno, "Cannot find group: " + group);
@@ -138,6 +148,8 @@ std::string GroupName(gid_t gid) {
     if (gid == NoGroup)
         return "";
 
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
+
     while (getgrgid_r(gid, &grp, buf.data(), buf.size(), &ptr)) {
         if (errno != ERANGE)
             return std::to_string(gid);
@@ -152,6 +164,8 @@ std::string GroupName(gid_t gid) {
 
 TCred TCred::Current() {
     TCred cred(geteuid(), getegid());
+
+    TaintPostFork(CRED_POSTFORK_TAINT_MESSAGE);
 
     cred.Groups.resize(getgroups(0, nullptr));
     if (getgroups(cred.Groups.size(), cred.Groups.data()) < 0) {

@@ -1567,6 +1567,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
     rsp->set_container_buried(Statistics->RemoveDead);
     rsp->set_container_lost(Statistics->ContainerLost);
     rsp->set_container_tainted(Statistics->ContainersTainted);
+    rsp->set_postfork_issues(Statistics->PostForkIssues);
 
     rsp->set_stream_rotate_bytes(Statistics->LogRotateBytes);
     rsp->set_stream_rotate_errors(Statistics->LogRotateErrors);
