@@ -197,7 +197,7 @@ TError TDevice::Makedev(const TPath &root) const {
         L_ACT("Make {} device node {} {}:{} {:#o} {}:{}",
                 S_ISBLK(Mode) ? "blk" : "chr", PathInside,
                 major(Node), minor(Node), Mode & 0777,
-                UserName(Uid), GroupName(Gid));
+                Uid, Gid);
         error = path.Mknod(Mode, Node);
         if (error)
             return error;
@@ -215,7 +215,7 @@ TError TDevice::Makedev(const TPath &root) const {
                 return error;
         }
         if (st.st_uid != Uid || st.st_gid != Gid) {
-            L_ACT("Update device node {} owner {}:{}", PathInside, UserName(Uid), GroupName(Gid));
+            L_ACT("Update device node {} owner {}:{}", PathInside, Uid, Gid);
             error = path.Chown(Uid, Gid);
             if (error)
                 return error;
