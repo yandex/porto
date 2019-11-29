@@ -68,6 +68,7 @@ struct TStatistics {
     std::atomic<uint64_t> NetworkRepairs;
     std::atomic<uint64_t> CgErrors;
     std::atomic<uint64_t> FailInvalidNetaddr;
+    std::atomic<uint64_t> PostForkIssues;
 
     /* --- add new fields at the end --- */
 };

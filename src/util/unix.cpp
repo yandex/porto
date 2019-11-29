@@ -651,6 +651,24 @@ static struct tm ForkLocalTime;
 static std::map<pid_t, TTask *> Tasks;
 static std::condition_variable TasksCV;
 
+extern TStatistics *Statistics;
+
+/* Some activity should not be performed after fork-from-thread */
+void TaintPostFork(std::string message) {
+    static bool currentReported = false;
+    if (PostFork) {
+        if (!currentReported)
+            L_TAINT(message);
+
+        if (Statistics) {
+            if (!Statistics->PostForkIssues++)
+                Stacktrace();
+        }
+
+        currentReported = true;
+    }
+}
+
 // after that fork use only syscalls and signal-safe functions
 TError TTask::Fork(bool detach) {
     PORTO_ASSERT(!PostFork);

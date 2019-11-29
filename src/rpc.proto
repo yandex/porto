@@ -400,6 +400,7 @@ message TGetSystemResponse {
     required fixed64 container_buried = 207;
     required fixed64 container_lost = 208;
     optional fixed64 container_tainted = 209;
+    optional fixed64 postfork_issues = 210;
 
     required fixed64 volume_count = 300;
     required fixed64 volume_limit = 301;

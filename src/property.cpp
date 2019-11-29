@@ -3559,6 +3559,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["cgerrors"] = Statistics->CgErrors;
     m["warnings"] = Statistics->Warns;
     m["taints"] = Statistics->Taints;
+    m["postfork_issues"] = Statistics->PostForkIssues;
     m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;
     m["porto_uptime"] = (GetCurrentTimeMs() - Statistics->PortoStarted) / 1000;
     m["queued_statuses"] = Statistics->QueuedStatuses;
