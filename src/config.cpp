@@ -130,6 +130,8 @@ static void DefaultConfig() {
     config().mutable_volumes()->set_place_load_limit("default: 2; /ssd: 4");
     config().mutable_volumes()->set_squashfs_compression("gzip");
 
+    config().mutable_volumes()->set_aux_default_places("/ssd");
+
     config().mutable_network()->set_device_qdisc("default: htb");
 
     config().mutable_network()->set_default_rate("default: 1250000");  /* 10Mbit */

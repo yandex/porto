@@ -259,6 +259,7 @@ message TConfig {
         optional bool parallel_compression = 15;
         optional bool keep_project_quota_id = 16;
         optional bool insecure_user_paths = 17;
+        optional string aux_default_places = 18;
     }
 
     message TCoreCfg {

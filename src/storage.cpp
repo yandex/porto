@@ -141,7 +141,17 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
     error = base.StatStrict(st);
     if (error && error.Errno == ENOENT) {
         /* In non-default place user must create base structure */
-        if (place != PORTO_PLACE && (type == EStorageType::Volume || type == EStorageType::Layer))
+        bool default_place = false;
+        if (place == PORTO_PLACE)
+            default_place = true;
+        else {
+            for (const auto &path : AuxPlacesPaths) {
+                if (place == path)
+                    default_place = true;
+            }
+        }
+
+        if (!default_place && (type == EStorageType::Volume || type == EStorageType::Layer))
             return TError(EError::InvalidValue, base.ToString() + " must be directory");
         error = base.MkdirAll(perms);
         if (!error)

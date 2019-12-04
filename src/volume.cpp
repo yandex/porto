@@ -3535,6 +3535,8 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_INODE_AVAILABLE,    "available disk inodes (ro)", true },
 };
 
+std::vector<std::string> AuxPlacesPaths;
+
 TError TVolume::Create(const rpc::TVolumeSpec &spec,
                        std::shared_ptr<TVolume> &volume) {
     TError error;
@@ -3732,11 +3734,26 @@ void TVolume::RestoreAll(void) {
     std::list<TKeyValue> nodes;
     TError error;
 
-    TStorage place;
-    place.Open(EStorageType::Place, PORTO_PLACE);
-    error = TStorage::CheckPlace(place.Path);
+    TStorage def_place;
+    std::vector<TStorage> aux_places;
+
+    AuxPlacesPaths = SplitString(config().volumes().aux_default_places(), ';');
+
+    def_place.Open(EStorageType::Place, PORTO_PLACE);
+    error = TStorage::CheckPlace(def_place.Path);
     if (error)
-        L_ERR("Cannot prepare place: {}", error);
+        L_ERR("Cannot prepare place {}: {}", def_place.Path, error);
+
+    for (const auto &path : AuxPlacesPaths) {
+        TStorage aux_place;
+
+        aux_place.Open(EStorageType::Place, path);
+        error = TStorage::CheckPlace(aux_place.Path);
+        if (error)
+            L_ERR("Cannot prepare place {}: {}", aux_place.Path, error);
+
+        aux_places.push_back(aux_place);
+    }
 
     error = TKeyValue::ListAll(VolumesKV, nodes);
     if (error)
@@ -3845,69 +3862,84 @@ next_link:
             L_WRN("Volume {} destroy: {}", volume->Path, error);
     }
 
-    TPath volumes = place.Path / PORTO_VOLUMES;
-
     L_SYS("Remove stale volumes...");
 
-    std::vector<std::string> subdirs;
-    error = volumes.ReadDirectory(subdirs);
-    if (error)
-        L_ERR("Cannot list {}", volumes);
+    std::vector<TPath> volumes;
 
-    for (auto dir_name: subdirs) {
-        bool used = false;
-        for (auto v: Volumes) {
-            if (v.second->Id == dir_name) {
-                used = true;
-                break;
-            }
-        }
-        if (used)
-            continue;
+    auto all_def_places = aux_places;
+    all_def_places.push_back(def_place);
 
-        TPath dir = volumes / dir_name;
+    for (const auto &place : all_def_places)
+        volumes.push_back(place.Path / PORTO_VOLUMES);
 
-        error = dir.UmountNested();
+    for (const auto &volume : volumes) {
+        std::vector<std::string> subdirs;
+
+        error = volume.ReadDirectory(subdirs);
         if (error)
-            L_ERR("Cannot umount nested : {}", error);
+            L_ERR("Cannot list {}", volume);
 
-        error = RemoveRecursive(dir);
-        if (error) {
-            L_VERBOSE("Cannot remove {}: {}", dir, error);
-            error = dir.RemoveAll();
+        for (auto dir_name: subdirs) {
+            bool used = false;
+            for (auto v: Volumes) {
+                if (v.second->Id == dir_name) {
+                    used = true;
+                    break;
+                }
+            }
+            if (used)
+                continue;
+
+            TPath dir = volume / dir_name;
+
+            error = dir.UmountNested();
             if (error)
-                L_WRN("Cannot remove {}: {}", dir, error);
+                L_ERR("Cannot umount nested : {}", error);
+
+            error = RemoveRecursive(dir);
+            if (error) {
+                L_VERBOSE("Cannot remove {}: {}", dir, error);
+                error = dir.RemoveAll();
+                if (error)
+                    L_WRN("Cannot remove {}: {}", dir, error);
+            }
         }
     }
 
     L_SYS("Remove stale layers...");
 
     std::list<TStorage> storages;
-    error = place.List(EStorageType::Layer, storages);
-    if (error) {
-        L_WRN("Layers listing failed : {}", error);
-    } else {
-        for (auto &layer : storages) {
-            if (layer.Weak()) {
-                error = layer.Remove(true);
-                if (error && error != EError::Busy)
-                    L_WRN("Cannot remove layer {} : {}", layer.Name, error);
+
+    for (auto &place : all_def_places) {
+        storages.clear();
+        error = place.List(EStorageType::Layer, storages);
+        if (error) {
+            L_WRN("Layers listing failed : {}", error);
+        } else {
+            for (auto &layer : storages) {
+                if (layer.Weak()) {
+                    error = layer.Remove(true);
+                    if (error && error != EError::Busy)
+                        L_WRN("Cannot remove layer {} : {}", layer.Name, error);
+                }
             }
         }
     }
 
     L_SYS("Remove stale storages...");
 
-    storages.clear();
-    error = place.List(EStorageType::Storage, storages);
-    if (error) {
-        L_WRN("Storage listing failed : {}", error);
-    } else {
-        for (auto &storage : storages) {
-            if (storage.Weak()) {
-                error = storage.Remove(true);
-                if (error && error != EError::Busy)
-                    L_WRN("Cannot remove storage {} : {}", storage.Name, error);
+    for (auto &place : all_def_places) {
+        storages.clear();
+        error = place.List(EStorageType::Storage, storages);
+        if (error) {
+            L_WRN("Storage listing failed : {}", error);
+        } else {
+            for (auto &storage : storages) {
+                if (storage.Weak()) {
+                    error = storage.Remove(true);
+                    if (error && error != EError::Busy)
+                        L_WRN("Cannot remove storage {} : {}", storage.Name, error);
+                }
             }
         }
     }
