@@ -238,7 +238,7 @@ def GetMeminfo(tag):
             return int(m.split()[1]) * 1024
 
 def get_kernel_maj_min():
-    kver = re.match("([0-9])\.([0-9])", platform.uname()[2]).groups()
+    kver = re.match("([0-9])\.([0-9]{1,2})", platform.uname()[2]).groups()
     return (int(kver[0]), int(kver[1]))
 
 portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

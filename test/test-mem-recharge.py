@@ -1,5 +1,13 @@
 import porto
+import sys
 from test_common import *
+
+
+if not os.path.exists('/sys/fs/cgroup/memory/memory.recharge_on_pgfault'):
+    print "Test not applicable"
+    sys.exit(0)
+
+may_not_recharge_orphan_locked = get_kernel_maj_min() < (4, 19)
 
 conn = porto.Connection()
 ct = conn.CreateWeakContainer("test-mem-recharge")
@@ -82,14 +90,21 @@ ct.SetProperty("recharge_on_pgfault", False)
 
 print '- touch orphan'
 Run(ct)
-ExpectPropLe(ct, "memory_usage", delta)
+if may_not_recharge_orphan_locked:
+    ExpectPropLe(ct, "memory_usage", delta)
+else:
+    ExpectPropGe(ct, "memory_usage", size)
 ct.Stop()
 
 ct2.SetProperty("recharge_on_pgfault", False)
 
 print '- second touch orphan'
 Run(ct2)
-ExpectPropLe(ct2, "memory_usage", delta)
+if may_not_recharge_orphan_locked:
+    ExpectPropLe(ct2, "memory_usage", delta)
+else:
+    ExpectPropGe(ct2, "memory_usage", size)
+
 ct2.Stop()
 
 ct.SetProperty("recharge_on_pgfault", True)
@@ -117,8 +132,12 @@ ct_mlock.SetProperty("memory_limit", size + delta)
 
 print '- mlock smaller'
 Run(ct_mlock)
-ExpectPropLe(ct_mlock, "memory_usage", delta)
-ExpectPropGe(ct, "memory_usage", size)
+if may_not_recharge_orphan_locked:
+    ExpectPropLe(ct_mlock, "memory_usage", delta)
+    ExpectPropGe(ct, "memory_usage", size)
+else:
+    ExpectPropLe(ct, "memory_usage", delta)
+    ExpectPropGe(ct_mlock, "memory_usage", size)
 ct_mlock.Stop()
 
 ct_mlock.SetProperty("memory_limit", size + delta * 3)
