@@ -1,3 +1,21 @@
+yandex-porto (4.18.26) unstable; urgency=low
+
+  [ Maxim Samoylov ]
+  * container: fix unneccessary container loss on devices restore
+  * config: adopt important network settings to stable
+  * device: log numerical uid:gid only for chroot device nodes
+  * util/path: report chown error with numerical ids only
+  * util/unix, util/cred: helper for tainting post-fork issues
+
+  [ Roman Anufriev ]
+  * volume: add configurable auxilary default places
+
+  [ Maxim Samoylov ]
+  * test/test-mem-recharge: mind specific recharge scenarios
+  * config: use no aux places by default for now
+
+ -- max7255 <max7255@max7255-nix>  Tue, 10 Dec 2019 15:31:35 +0300
+
 yandex-porto (4.18.25) unstable; urgency=low
 
   [ Roman Anufriev ]
