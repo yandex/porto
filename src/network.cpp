@@ -231,6 +231,10 @@ void InitNamespacedNetSysctls() {
     }
 }
 
+bool TNetClass::IsDisabled() {
+    return !config().network().enable_host_classful_qdiscs();
+}
+
 bool TNetwork::NetworkSysctl(const std::string &key) {
     return StringStartsWith(key, "net.");
 }
@@ -263,8 +267,9 @@ TNetDevice::TNetDevice(struct rtnl_link *link) {
     Qdisc = rtnl_link_get_qdisc(link) ?: "";
     Index = rtnl_link_get_ifindex(link);
     Link = rtnl_link_get_link(link);
-    Group = rtnl_link_get_group(link);
     MTU = rtnl_link_get_mtu(link);
+    TxQueues = rtnl_link_get_num_tx_queues(link);
+    Group = rtnl_link_get_group(link);
     GroupName = TNetwork::DeviceGroupName(Group);
 
     Rate = NET_MAX_RATE;
@@ -622,6 +627,12 @@ TError TNetwork::SetupAddrLabel() {
     return error;
 }
 
+std::string TNetwork::GetDeviceQdisc(const TNetDevice &dev) {
+    if (this == HostNetwork.get() && TNetClass::IsDisabled())
+        return dev.TxQueues > 1 ? "mq" : dev.GetConfig(DefaultQdisc);
+    return dev.GetConfig(DeviceQdisc);
+}
+
 void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
     TPath knob("/sys/class/net/" + dev.Name + "/speed");
     std::string text;
@@ -718,6 +729,24 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     return OK;
 }
 
+TError TNetwork::SetupMQ(TNetDevice &dev) {
+    TError error;
+
+    for (int i = 1; i <= dev.TxQueues; ++i) {
+        TNlQdisc leaf(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, i), TC_HANDLE(ROOT_TC_MAJOR + i, 0));
+        leaf.Kind = dev.GetConfig(DefaultQdisc, "pfifo");
+        leaf.Limit = dev.GetConfig(DefaultQdiscLimit, 1000);
+        leaf.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+        error = leaf.Create(*Nl);
+        if (error) {
+            L_ERR("Cannot create leaf qdisc: {}", error);
+            return error;
+        }
+    }
+
+    return OK;
+}
+
 TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     TError error;
 
@@ -753,7 +782,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     L_NET("Setup queue for network {} device {}:{}", NetName, dev.Index, dev.Name);
 
     TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
-    qdisc.Kind = dev.GetConfig(DeviceQdisc);
+    qdisc.Kind = GetDeviceQdisc(dev);
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
 
@@ -766,6 +795,9 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
         }
         dev.Qdisc = qdisc.Kind;
     }
+
+    if (this == HostNetwork.get() && TNetClass::IsDisabled())
+        return dev.TxQueues > 1 ? SetupMQ(dev) : OK;
 
     TNlClass cls;
 
@@ -934,7 +966,7 @@ TError TNetwork::SyncDevices() {
 
             if (!d.Managed) {
                 dev.Prepared = true;
-            } else if (d.Qdisc != dev.GetConfig(DeviceQdisc)) {
+            } else if (d.Qdisc != GetDeviceQdisc(dev)) {
                 L_NET("Missing network {} qdisc at {}:{}", NetName, d.Index, d.Name);
                 dev.Prepared = false;
             } else if (d.Rate != dev.Rate || d.Ceil != dev.Ceil) {
@@ -956,7 +988,7 @@ TError TNetwork::SyncDevices() {
             Devices.push_back(dev);
         }
 
-        if (!dev.Prepared && this == HostNetwork.get()) {
+        if (!dev.Prepared && this == HostNetwork.get() && !TNetClass::IsDisabled()) {
             RootContainer->NetClass.TxLimit[dev.Name] = dev.GetConfig(DeviceCeil, dev.Ceil);
             RootContainer->NetClass.RxLimit[dev.Name] = dev.GetConfig(DeviceCeil, dev.Ceil);
         }
@@ -974,7 +1006,7 @@ TError TNetwork::SyncDevices() {
 
             L_NET("Forget network {} device {}:{}", NetName, dev->Index, dev->Name);
 
-            if (this == HostNetwork.get()) {
+            if (this == HostNetwork.get() && !TNetClass::IsDisabled()) {
                 RootContainer->NetClass.TxLimit.erase(dev->Name);
                 RootContainer->NetClass.RxLimit.erase(dev->Name);
                 for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
@@ -1320,7 +1352,7 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs, bool safe) 
     if (cfg.BaseHandle == TC_HANDLE(ROOT_TC_MAJOR, 1))
         cls.Parent = cfg.BaseHandle;
 
-    cls.Kind = dev.GetConfig(DeviceQdisc);
+    cls.Kind = GetDeviceQdisc(dev);
     cls.Rate = dev.GetConfig(cfg.TxRate, 0, cs);
     cls.Ceil = dev.GetConfig(cfg.TxLimit, 0, cs);
     cls.Quantum = dev.GetConfig(DeviceQuantum, dev.MTU * 10, cs);
@@ -1460,6 +1492,11 @@ TError TNetwork::SetupClasses(TNetClass &cls, bool safe) {
         return HostNetwork->SetupClasses(cls, safe);
     }
 
+    // HostNetwork
+
+    if (TNetClass::IsDisabled())
+        return OK;
+
     error = TrySetupClasses(cls, safe);
     if (error) {
         L_NET_VERBOSE("Network {} class setup failed: {}", NetName, error);
@@ -1479,7 +1516,17 @@ TError TNetwork::SetupClasses(TNetClass &cls, bool safe) {
 
 void TNetwork::InitClass(TContainer &ct) {
     auto &cls = ct.NetClass;
+    if (TNetClass::IsDisabled()) {
+        cls.BaseHandle = 0;
+        cls.MetaHandle = 0;
+        cls.LeafHandle = 0;
+        cls.Fold = nullptr;
+        cls.Parent = nullptr;
+        return;
+    }
+
     cls.Owner = ct.Id;
+
     if (!ct.Parent) {
         cls.BaseHandle = TC_HANDLE(ROOT_TC_MAJOR, 1);
         cls.MetaHandle = TC_HANDLE(ROOT_TC_MAJOR, META_TC_MINOR);
@@ -1611,6 +1658,9 @@ retry:
                 break;
             dev.Prepared = true;
         }
+
+        if (this == HostNetwork.get() && TNetClass::IsDisabled())
+            continue;
 
         for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
             error = SetupClass(dev, DefaultClass, cs);
@@ -1774,6 +1824,9 @@ void TNetwork::SyncStatLocked() {
         StartRepair();
         return;
     }
+
+    if (this == HostNetwork.get() && TNetClass::IsDisabled())
+        return;
 
     for (auto &dev: Devices) {
         dev.ClassCache = nullptr;
@@ -1968,7 +2021,8 @@ TError TNetwork::StartNetwork(TContainer &ct, TTaskEnv &task) {
 
     if (ct.Controllers & CGROUP_NETCLS) {
         ct.Net->InitStat(ct.NetClass);
-        HostNetwork->RegisterClass(ct.NetClass);
+        if (!TNetClass::IsDisabled())
+            HostNetwork->RegisterClass(ct.NetClass);
     }
 
     net_state_lock.unlock();
@@ -2000,7 +2054,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
     if (!net)
         return;
 
-    if (ct.Controllers & CGROUP_NETCLS)
+    if ((ct.Controllers & CGROUP_NETCLS) && !TNetClass::IsDisabled())
         HostNetwork->UnregisterClass(ct.NetClass);
 
     ct.NetClass.Fold = &ct.NetClass;
@@ -2015,7 +2069,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
 
     net_state_lock.unlock();
 
-    if (ct.Controllers & CGROUP_NETCLS) {
+    if ((ct.Controllers & CGROUP_NETCLS) && !TNetClass::IsDisabled()) {
         auto net_lock = HostNetwork->LockNet();
         for (auto &dev: HostNetwork->Devices) {
             if (!dev.Managed || !dev.Prepared)
@@ -2125,7 +2179,8 @@ TError TNetwork::RestoreNetwork(TContainer &ct) {
 
     if (ct.Controllers & CGROUP_NETCLS) {
         net->InitStat(ct.NetClass);
-        HostNetwork->RegisterClass(ct.NetClass);
+        if (!TNetClass::IsDisabled())
+            HostNetwork->RegisterClass(ct.NetClass);
     }
 
     ct.Net = net;
