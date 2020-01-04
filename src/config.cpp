@@ -132,6 +132,8 @@ static void DefaultConfig() {
 
     config().mutable_volumes()->set_aux_default_places("");
 
+    config().mutable_network()->set_enable_host_classful_qdiscs(true);
+
     config().mutable_network()->set_device_qdisc("default: htb");
 
     config().mutable_network()->set_default_rate("default: 1250000");  /* 10Mbit */

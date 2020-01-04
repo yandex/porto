@@ -3120,6 +3120,10 @@ public:
     TError Get(std::string &value) {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
+        if (TNetClass::IsDisabled()) {
+            value = "1:0";
+            return OK;
+        }
         TStringMap map;
         uint32_t id = CT->NetClass.MetaHandle;
         for (int cs = 0; cs < NR_TC_CLASSES; cs++)
@@ -3133,6 +3137,10 @@ public:
     TError GetIndexed(const std::string &index, std::string &value) {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
+        if (TNetClass::IsDisabled()) {
+            value = "1:0";
+            return OK;
+        }
         for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
             uint32_t id = CT->NetClass.MetaHandle;
             if (index == fmt::format("CS{}", cs)) {
@@ -3275,7 +3283,7 @@ public:
     TError Get(std::string &value) {
         TUintMap stat;
         auto lock = TNetwork::LockNetState();
-        if (ClassStat) {
+        if (ClassStat && !TNetClass::IsDisabled()) {
             for (auto &it : CT->NetClass.Fold->ClassStat)
                 stat[it.first] = &it.second->*Member;
         } else if (CT->Net) {
@@ -3287,7 +3295,7 @@ public:
 
     TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = TNetwork::LockNetState();
-        if (ClassStat) {
+        if (ClassStat && !TNetClass::IsDisabled()) {
             auto it = CT->NetClass.Fold->ClassStat.find(index);
             if (it == CT->NetClass.Fold->ClassStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");

@@ -71,6 +71,8 @@ struct TNetClass {
 
     TNetClass *Fold;
     TNetClass *Parent;
+
+    static bool IsDisabled();
 };
 
 class TNetDevice {
@@ -81,9 +83,10 @@ public:
     int Owner = 0;
     int Index;
     int Link;
+    int MTU;
+    int TxQueues;
     int Group;
     std::string GroupName;
-    int MTU;
     uint64_t Rate, Ceil;
     bool Managed;
     bool Uplink;
@@ -202,6 +205,7 @@ public:
     std::string NewDeviceName(const std::string &prefix);
     std::string MatchDevice(const std::string &pattern);
     int DeviceIndex(const std::string &name);
+    std::string GetDeviceQdisc(const TNetDevice &dev);
     void GetDeviceSpeed(TNetDevice &dev) const;
     void SetDeviceOwner(const std::string &name, int owner);
 
@@ -216,6 +220,7 @@ public:
     TError DeleteClass(TNetDevice &dev, TNetClass &cls, int cs);
     TError SetupClasses(TNetClass &cls, bool safe = false);
     TError SetupPolice(TNetDevice &dev);
+    TError SetupMQ(TNetDevice &dev);
 
     void SyncStat();
     static void SyncAllStat();

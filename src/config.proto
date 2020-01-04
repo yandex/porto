@@ -11,6 +11,8 @@ message TConfig {
 
         optional uint32 cache_statistics_ms = 35;
 
+        optional bool enable_host_classful_qdiscs = 59;
+
         /* L3 network */
         optional bool proxy_ndp = 30;               // add proxy entries
         optional uint32 proxy_ndp_max_range = 52;   // limit subnet size
