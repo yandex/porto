@@ -57,9 +57,9 @@ def ExpectPropRange(ct, prop, low, high):
     cur = int(ct.GetProperty(prop))
     assert low <= cur <= high, "{} property {} should be within {} .. {} not {}".format(ct, prop, low, high, cur)
 
-def ExpectException(func, exc, *args):
-    tmp = Catch(func, *args)
-    assert tmp == exc, "method {} should throw {} not {}".format(ct, func, exc, tmp)
+def ExpectException(func, exc, *args, **kwargs):
+    tmp = Catch(func, *args, **kwargs)
+    assert tmp == exc, "method {} should throw {} not {}".format(func, exc, tmp)
 
 def ExpectFile(path, mode, dev=0):
     try:
