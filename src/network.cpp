@@ -150,6 +150,87 @@ static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.ipv6.route.gc_min_interval_ms", "500" },
 };
 
+static std::list<std::string> NamespacedNetSysctls;
+
+void InitNamespacedNetSysctls() {
+    if (CompareVersions(config().linux_version(), "4.5") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_l3mdev_accept");
+    }
+    if (CompareVersions(config().linux_version(), "4.7") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.fib_multipath_use_neigh");
+    }
+    if (CompareVersions(config().linux_version(), "4.11") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_max_tw_buckets");
+        NamespacedNetSysctls.push_back("net.ipv4.udp_l3mdev_accept");
+        NamespacedNetSysctls.push_back("net.ipv4.ip_unprivileged_port_start");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_max_syn_backlog");
+    }
+    if (CompareVersions(config().linux_version(), "4.12") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.fib_multipath_hash_policy");
+        NamespacedNetSysctls.push_back("net.ipv4.udp_early_demux");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_early_demux");
+    }
+    if (CompareVersions(config().linux_version(), "4.13") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_sack");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_window_scaling");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_timestamps");
+    }
+    if (CompareVersions(config().linux_version(), "4.14") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv6.flowlabel_reflect");
+    }
+    if (CompareVersions(config().linux_version(), "4.15") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_abort_on_overflow");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_adv_win_scale");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_app_win");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_autocorking");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_challenge_ack_limit");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_dsack");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_early_retrans");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_fack");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_fastopen");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_fastopen_key");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_fastopen_blackhole_timeout_sec");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_frto");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_invalid_ratelimit");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_limit_output_bytes");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_max_reordering");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_min_rtt_wlen");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_min_tso_segs");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_moderate_rcvbuf");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_no_metrics_save");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_pacing_ca_ratio");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_pacing_ss_ratio");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_recovery");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_retrans_collapse");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_rfc1337");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_rmem");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_slow_start_after_idle");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_stdurg");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_thin_linear_timeouts");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_tso_win_divisor");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_wmem");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_workaround_signed_windows");
+        NamespacedNetSysctls.push_back("net.ipv6.max_dst_opts_number");
+        NamespacedNetSysctls.push_back("net.ipv6.max_dst_opts_length");
+        NamespacedNetSysctls.push_back("net.ipv6.max_hbh_opts_number");
+        NamespacedNetSysctls.push_back("net.ipv6.max_hbh_length");
+    }
+    if (CompareVersions(config().linux_version(), "4.17") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.udp_wmem_min");
+        NamespacedNetSysctls.push_back("net.ipv6.fib_multipath_hash_policy");
+        NamespacedNetSysctls.push_back("net.ipv4.udp_rmem_min");
+    }
+    if (CompareVersions(config().linux_version(), "4.18") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_comp_sack_delay_ns");
+        NamespacedNetSysctls.push_back("net.ipv4.tcp_comp_sack_nr");
+        NamespacedNetSysctls.push_back("net.ipv6.seg6_flowlabel");
+    }
+    if (CompareVersions(config().linux_version(), "4.19") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv4.ip_forward_update_priority");
+        NamespacedNetSysctls.push_back("net.ipv6.icmp.echo_ignore_all");
+    }
+}
+
 bool TNetwork::NetworkSysctl(const std::string &key) {
     return StringStartsWith(key, "net.");
 }
@@ -157,6 +238,10 @@ bool TNetwork::NetworkSysctl(const std::string &key) {
 bool TNetwork::NamespaceSysctl(const std::string &key) {
     for (auto &pair: NetSysctls) {
         if (pair.first == key)
+            return true;
+    }
+    for (auto& namespacedNetSysctl: NamespacedNetSysctls) {
+        if (namespacedNetSysctl == key)
             return true;
     }
     if (StringStartsWith(key, "net.ipv4.conf."))
@@ -311,6 +396,8 @@ void TNetwork::InitializeConfig() {
     NetWatchdogPeriod = config().network().watchdog_ms();
 
     NetProxyNeighbourPeriod = config().network().proxy_ndp_watchdog_ms();
+
+    InitNamespacedNetSysctls();
 
     /* Load default net sysctl from host config */
     for (const auto &p: NetSysctls) {
