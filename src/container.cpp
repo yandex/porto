@@ -2784,11 +2784,13 @@ TError TContainer::PrepareStart() {
         for (const auto &policy: PlacePolicy) {
             TPath place = policy;
             if (!place.IsAbsolute()) {
-                if (policy == "***" &&
-                        std::find(Parent->PlacePolicy.begin(),
+                if (policy == "***") {
+                    if (std::find(Parent->PlacePolicy.begin(),
                             Parent->PlacePolicy.end(),
                             policy) == Parent->PlacePolicy.end())
-                    return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
+                        return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
+                    continue;
+               }
                 auto sep = policy.find('=');
                 if (sep != std::string::npos && policy[sep + 1] == '/')
                     place = policy.substr(sep + 1);
