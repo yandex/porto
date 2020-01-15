@@ -1551,6 +1551,24 @@ TError TVolume::OpenBackend() {
     return OK;
 }
 
+/* create and remove file on volume to load quota file into cache */
+void TVolume::CacheQuotaFile() {
+    TFile tmp;
+    TPath tmp_path = Path + "/" + PORTO_CACHE_QUOTA_FILE_NAME;
+    TError err = tmp.CreateNew(tmp_path, S_IRUSR | S_IWUSR);
+    if (err) {
+        L_WRN("Failed to load quota file into cache for volume \"{}\" : {}", Path, err);
+        return;
+    }
+
+    tmp.Close();
+    err = tmp_path.Unlink();
+    if (err)
+        L_WRN("Failed to unlink tmp file \"{}\" on volume \"{}\" created to load quota file into cache : {}", tmp_path, Path, err);
+
+    return;
+}
+
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(const std::string &type) const {
 
@@ -3722,6 +3740,10 @@ next_link:
     if (error)
         goto undo;
 
+    if (volume->SpaceLimit) {
+        volume->CacheQuotaFile();
+    }
+
     return OK;
 
 undo:
@@ -3804,7 +3826,7 @@ void TVolume::RestoreAll(void) {
 
         error = volume->CheckDependencies();
         if (error) {
-            L("Volume {} has broken dependcies: {}", volume->Path, error);
+            L("Volume {} has broken dependencies: {}", volume->Path, error);
             broken_volumes.push_back(volume);
             continue;
         }
@@ -3849,6 +3871,10 @@ next_link:
 
         if (RootContainer->VolumeMounts != (int)VolumeLinks.size())
             L_WRN("Volume links index out of sync: {} != {}", RootContainer->VolumeMounts, VolumeLinks.size());
+
+        if (volume->SpaceLimit) {
+            volume->CacheQuotaFile();
+        }
 
         L("Volume {} restored", volume->Path);
     }
