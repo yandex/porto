@@ -102,6 +102,7 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
     std::unique_ptr<TVolumeBackend> Backend;
     std::mutex InternalMutex;
     TError OpenBackend();
+    void CacheQuotaFile();
 
 public:
     TPath Path;
