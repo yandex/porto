@@ -2117,7 +2117,9 @@ TError TContainer::ApplyDeviceConf() const {
     if (State != EContainerState::Starting &&
         Task.Pid && !RootPath.IsRoot() && !TPath(Root).IsRoot()) {
         error = Devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
-        if (error)
+
+        /* Ignore errors while recreating devices for recently died tasks */
+        if (error && error.Errno != ENOENT)
             return error;
     }
 

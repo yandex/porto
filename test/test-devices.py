@@ -358,25 +358,27 @@ except:
     print "Skipping gdb test"
     sys.exit(0)
 
-# Check portod tolerance to vanished pids on devices restore phase
-
-a = None
-try:
-    a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]}, command="sleep 5")
-
-    app_pid, _, portoinit_pid = a["_root_pid"].split(';')
-
-    c.disconnect()
-
-    # Prevent portoint from immediate exit
-    subprocess.check_call(['gdb', '-p', portoinit_pid, './portoinit', '-ex', 'b _exit', '-ex', 'c', '-ex', 'signal SIGSTOP', '-ex', 'detach', '-ex', 'quit'])
-    ReloadPortod()
-
-    c.connect()
-    ExpectNe(a["state"], "stopped")
-    a.Destroy()
+def run_test_restore_vanished_pids_devices(*args, **kwargs):
     a = None
-finally:
-    c.connect()
-    if a:
+    try:
+        a = c.Run("a", weak=False, root_volume={"layers": ["ubuntu-precise"]}, command="sleep 5", **kwargs)
+
+        app_pid, _, portoinit_pid = a["_root_pid"].split(';')
+
+        c.disconnect()
+
+        # Prevent portoint from immediate exit
+        subprocess.check_call(['gdb', '-p', portoinit_pid, './portoinit', '-ex', 'b _exit', '-ex', 'c', '-ex', 'signal SIGSTOP', '-ex', 'detach', '-ex', 'quit'])
+        ReloadPortod()
+
+        c.connect()
+        ExpectNe(a["state"], "stopped")
         a.Destroy()
+        a = None
+    finally:
+        c.connect()
+        if a:
+            a.Destroy()
+
+run_test_restore_vanished_pids_devices()
+run_test_restore_vanished_pids_devices(devices="/dev/ram0 rw")
