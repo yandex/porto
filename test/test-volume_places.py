@@ -95,6 +95,43 @@ def Test():
     assert cont.Get(["stdout"])["stdout"] == "1234567890"
     cont.Destroy()
 
+    #prepare more dirs
+    os.mkdir(PLACE_DIR + "/1")
+    os.mkdir(PLACE_DIR + "/1/2")
+    os.mkdir(PLACE_DIR + "/1/2/place1")
+    os.mkdir(PLACE_DIR + "/1/2/place1/porto_layers")
+    os.mkdir(PLACE_DIR + "/1/2/place1/porto_storage")
+
+    #prepare test function
+    def TestWildcards(place, allowed=True):
+        cont = c.Create("test2")
+        cont.SetProperty("place", place)
+        cont.SetProperty("command", 'portoctl layer -P {}'.format(PLACE_DIR + "/1/2/place1"))
+        if allowed:
+            cont.Start()
+            cont.Wait()
+            assert not cont.Get(["stderr"])["stderr"]
+        else:
+            assert Catch(cont.Start) == porto.exceptions.Permission
+        cont.Destroy()
+
+    #Check wildcard
+    cont = c.Create("test2")
+    cont.SetProperty("place", "***")
+    cont.SetProperty("command", 'portoctl layer -L')
+    cont.Start()
+    cont.Wait()
+    assert "SocketError" not in cont.Get(["stderr"])["stderr"]
+    cont.Destroy()
+
+    TestWildcards("/place/***")
+    TestWildcards("/place/***/***")
+    TestWildcards("/place/***/***/***")
+
+    #Wildcard allowed only at the end of the place
+    TestWildcards("/place/***/place1", False)
+    TestWildcards("***/place", False)
+
     #Check what will be if we rename our place
 
     assert len(c.ListLayers(place=PLACE_DIR)) == 1
