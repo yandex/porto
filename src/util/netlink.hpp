@@ -151,7 +151,10 @@ public:
     TError Create(const TNl &nl);
     TError Delete(const TNl &nl);
     bool Check(const TNl &nl);
-    TError CreateCodel(const TNl &nl);
+    TError CreateCodel(const TNl &nl, bool fq_codel = false);
+    TError CreateFqCodel(const TNl &nl) {
+        return CreateCodel(nl, true);
+    }
 };
 
 class TNlClass {

@@ -81,11 +81,15 @@ message TConfig {
         // Automaic: container + tos -> priority -> tc class
         optional bool enable_netcls_priority = 46;
 
-        // Leaf qdisc fq-codel
+        // Leaf qdisc codel or fq-codel
         optional uint32 codel_target = 47;
         optional uint32 codel_interval = 48;
         optional bool codel_ecn = 49;
         optional uint32 codel_ce_threshold = 53;
+
+        // Leaf qdisc fq-codel
+        optional uint32 fq_codel_memory_limit = 60;
+        optional uint32 fq_codel_flows = 61;
 
         // RX tc police
         optional string ingress_burst = 34;
