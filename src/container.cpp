@@ -2349,6 +2349,15 @@ TError TContainer::ResolvePlace(TPath &place) const {
     return TError(EError::Permission, "Place {} is not permitted", place);
 
 found:
+    while (StringEndsWith(place.ToString(), "***")) {
+        if (place.ToString().size() > 3) {
+            place = place.DirName();
+        } else {
+            place = PORTO_PLACE;
+            break;
+        }
+    }
+
     if (!place.IsNormal())
         return TError(EError::InvalidPath, "Place path {} must be normalized", place);
 
@@ -2785,6 +2794,16 @@ TError TContainer::PrepareStart() {
         /* Enforce place restictions */
         for (const auto &policy: PlacePolicy) {
             TPath place = policy;
+            const auto wildcardPos = policy.find("***");
+            if (wildcardPos != std::string::npos && wildcardPos < policy.size() - 3) {
+                auto policyEndPart = policy.substr(wildcardPos, policy.size() - wildcardPos);
+                auto otherChar = find_if(policyEndPart.begin(), policyEndPart.end(), [](const char& c) {
+                    return c != '*' && c != '/';
+                });
+                if (otherChar != policyEndPart.end())
+                    return TError(EError::Permission, "Wildcard allowed only at the end of the place");
+            }
+
             if (!place.IsAbsolute()) {
                 if (policy == "***") {
                     if (std::find(Parent->PlacePolicy.begin(),
