@@ -730,14 +730,18 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     return OK;
 }
 
+void TNetwork::InitClasslessQdisc(TNetDevice &dev, TNlQdisc &qdisc) {
+    qdisc.Kind = dev.GetConfig(DefaultQdisc, "pfifo");
+    qdisc.Limit = dev.GetConfig(DefaultQdiscLimit, 1000);
+    qdisc.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+}
+
 TError TNetwork::SetupMQ(TNetDevice &dev) {
     TError error;
 
     for (int i = 1; i <= dev.TxQueues; ++i) {
         TNlQdisc leaf(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, i), TC_HANDLE(ROOT_TC_MAJOR + i, 0));
-        leaf.Kind = dev.GetConfig(DefaultQdisc, "pfifo");
-        leaf.Limit = dev.GetConfig(DefaultQdiscLimit, 1000);
-        leaf.Quantum = dev.GetConfig(DefaultQdiscQuantum, dev.MTU * 2);
+        InitClasslessQdisc(dev, leaf);
         error = leaf.Create(*Nl);
         if (error) {
             L_ERR("Cannot create leaf qdisc: {}", error);
@@ -786,6 +790,9 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     qdisc.Kind = GetDeviceQdisc(dev);
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
+
+    if (IsHost && TNetClass::IsDisabled() && dev.TxQueues == 1)
+        InitClasslessQdisc(dev, qdisc);
 
     if (force || !qdisc.Check(*Nl)) {
         (void)qdisc.Delete(*Nl);

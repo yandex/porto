@@ -225,6 +225,8 @@ public:
     TError DeleteClass(TNetDevice &dev, TNetClass &cls, int cs);
     TError SetupClasses(TNetClass &cls, bool safe = false);
     TError SetupPolice(TNetDevice &dev);
+
+    void InitClasslessQdisc(TNetDevice &dev, TNlQdisc &qdisc);
     TError SetupMQ(TNetDevice &dev);
 
     void SyncStat();
