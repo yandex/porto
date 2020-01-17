@@ -460,7 +460,7 @@ std::string TNetwork::FormatTos(int tos) {
     return fmt::format("CS{}", tos);
 }
 
-TNetwork::TNetwork() : NatBitmap(0, 0) {
+TNetwork::TNetwork(bool host) : NetIsHost(host), NatBitmap(0, 0) {
     Nl = std::make_shared<TNl>();
 
     DefaultClass.BaseHandle = TC_HANDLE(ROOT_TC_MAJOR, 1);
@@ -541,7 +541,8 @@ TError TNetwork::New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net) {
 }
 
 TError TNetwork::Open(const TPath &path, TNamespaceFd &netns,
-                      std::shared_ptr<TNetwork> &net) {
+                      std::shared_ptr<TNetwork> &net,
+                      bool host) {
     TNamespaceFd curNs;
     TError error;
 
@@ -571,7 +572,7 @@ TError TNetwork::Open(const TPath &path, TNamespaceFd &netns,
         return error;
     }
 
-    net = std::make_shared<TNetwork>();
+    net = std::make_shared<TNetwork>(host);
 
     error = net->Nl->Connect();
     if (error) {
@@ -628,7 +629,7 @@ TError TNetwork::SetupAddrLabel() {
 }
 
 std::string TNetwork::GetDeviceQdisc(const TNetDevice &dev) {
-    if (this == HostNetwork.get() && TNetClass::IsDisabled())
+    if (IsHost() && TNetClass::IsDisabled())
         return dev.TxQueues > 1 ? "mq" : dev.GetConfig(DefaultQdisc);
     return dev.GetConfig(DeviceQdisc);
 }
@@ -654,7 +655,7 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     PORTO_LOCKED(NetMutex);
     PORTO_LOCKED(NetStateMutex);
 
-    if (!RootClass || this == HostNetwork.get())
+    if (!RootClass || IsHost())
         return OK;
 
     auto rate = dev.GetConfig(RootClass->RxLimit);
@@ -796,7 +797,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
         dev.Qdisc = qdisc.Kind;
     }
 
-    if (this == HostNetwork.get() && TNetClass::IsDisabled())
+    if (IsHost() && TNetClass::IsDisabled())
         return dev.TxQueues > 1 ? SetupMQ(dev) : OK;
 
     TNlClass cls;
@@ -824,7 +825,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
             return error;
         }
 
-        if (this == HostNetwork.get() && RootContainer) {
+        if (IsHost() && RootContainer) {
             auto cs_name = fmt::format("{} CS{}", dev.Name, cs);
             RootContainer->NetClass.TxRate[cs_name] = cls.Rate;
             if (cls.Ceil)
@@ -988,7 +989,7 @@ TError TNetwork::SyncDevices() {
             Devices.push_back(dev);
         }
 
-        if (!dev.Prepared && this == HostNetwork.get() && !TNetClass::IsDisabled()) {
+        if (!dev.Prepared && IsHost() && !TNetClass::IsDisabled()) {
             RootContainer->NetClass.TxLimit[dev.Name] = dev.GetConfig(DeviceCeil, dev.Ceil);
             RootContainer->NetClass.RxLimit[dev.Name] = dev.GetConfig(DeviceCeil, dev.Ceil);
         }
@@ -1006,7 +1007,7 @@ TError TNetwork::SyncDevices() {
 
             L_NET("Forget network {} device {}:{}", NetName, dev->Index, dev->Name);
 
-            if (this == HostNetwork.get() && !TNetClass::IsDisabled()) {
+            if (IsHost() && !TNetClass::IsDisabled()) {
                 RootContainer->NetClass.TxLimit.erase(dev->Name);
                 RootContainer->NetClass.RxLimit.erase(dev->Name);
                 for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
@@ -1417,8 +1418,7 @@ TError TNetwork::SetupClass(TNetDevice &dev, TNetClass &cfg, int cs, bool safe) 
     if (error)
         return TError(error, "leaf tc qdisc");
 
-    if (this == HostNetwork.get() && RootContainer &&
-            cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
+    if (IsHost() && RootContainer && cfg.LeafHandle == TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR)) {
         auto cs_name = fmt::format("Leaf {} CS{}", dev.Name, cs);
         RootContainer->NetClass.TxRate[cs_name] = cls.Rate;
         if (cls.Ceil)
@@ -1481,7 +1481,7 @@ TError TNetwork::TrySetupClasses(TNetClass &cls, bool safe) {
 TError TNetwork::SetupClasses(TNetClass &cls, bool safe) {
     TError error;
 
-    if (this != HostNetwork.get()) {
+    if (!IsHost()) {
         if (&cls == RootClass) {
             auto net_lock = LockNet();
             auto net_state_lock = LockNetState();
@@ -1582,7 +1582,7 @@ TError TNetwork::Reconnect() {
     TNamespaceFd netns, cur_ns;
     TError error;
 
-    if (this == HostNetwork.get())
+    if (IsHost())
         return Nl->Connect();
 
     error = cur_ns.Open("/proc/thread-self/ns/net");
@@ -1659,7 +1659,7 @@ retry:
             dev.Prepared = true;
         }
 
-        if (this == HostNetwork.get() && TNetClass::IsDisabled())
+        if (IsHost() && TNetClass::IsDisabled())
             continue;
 
         for (int cs = 0; cs < NR_TC_CLASSES; cs++) {
@@ -1788,7 +1788,7 @@ void TNetwork::StartRepair() {
 
 TError TNetwork::WaitRepair() {
 
-    if (HostNetwork && this != HostNetwork.get()) {
+    if (HostNetwork && !IsHost()) {
         TError error = HostNetwork->WaitRepair();
         if (error)
             return error;
@@ -1825,7 +1825,7 @@ void TNetwork::SyncStatLocked() {
         return;
     }
 
-    if (this == HostNetwork.get() && TNetClass::IsDisabled())
+    if (IsHost() && TNetClass::IsDisabled())
         return;
 
     for (auto &dev: Devices) {
@@ -3023,7 +3023,7 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
     }
 
     if (!Parent) {
-        error = TNetwork::Open("/proc/thread-self/ns/net", NetNs, Net);
+        error = TNetwork::Open("/proc/thread-self/ns/net", NetNs, Net, true);
         if (error)
             return error;
 
