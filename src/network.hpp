@@ -132,6 +132,8 @@ class TNetwork : public TNonCopyable {
         return NetworksList;
     }
 
+    const bool NetIsHost;
+
     /* Protects netink socket operaions and external state */
     std::mutex NetMutex;
 
@@ -169,8 +171,10 @@ class TNetwork : public TNonCopyable {
     TError NetError;
 
 public:
-    TNetwork();
+    TNetwork(bool host = false);
     ~TNetwork();
+
+    bool IsHost() const { return NetIsHost; }
 
     std::shared_ptr<TNl> GetNl() { return Nl; }
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
@@ -179,7 +183,8 @@ public:
 
     static TError New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net);
     static TError Open(const TPath &path, TNamespaceFd &netns,
-                       std::shared_ptr<TNetwork> &net);
+                       std::shared_ptr<TNetwork> &net,
+                       bool host = false);
     void Destroy();
 
     std::unique_lock<std::mutex> LockNet() {
