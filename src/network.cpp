@@ -232,7 +232,7 @@ void InitNamespacedNetSysctls() {
 }
 
 bool TNetClass::IsDisabled() {
-    return !config().network().enable_host_classful_qdiscs();
+    return !config().network().enable_host_net_classes();
 }
 
 bool TNetwork::NetworkSysctl(const std::string &key) {

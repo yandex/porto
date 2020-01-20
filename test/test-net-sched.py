@@ -231,7 +231,7 @@ def run_htb_test(bandwidth_sharing=False):
 
     ConfigurePortod('test-net-sched', """
 network {
-    enable_host_classful_qdiscs: true
+    enable_host_net_classes: true
     device_ceil: "default: %sM
     device_rate: "default: %sM"
     device_qdisc: "default: %s"
@@ -246,7 +246,7 @@ def run_hfsc_test(bandwidth_sharing=False):
 
     ConfigurePortod('test-net-sched', """
 network {
-    enable_host_classful_qdiscs: true
+    enable_host_net_classes: true
     device_ceil: "default: %sM"
     device_qdisc: "default: %s"
 }
@@ -259,7 +259,7 @@ def run_pfifo_fast_test():
 
     ConfigurePortod('test-net-sched', """
 network {
-    enable_host_classful_qdiscs: false,
+    enable_host_net_classes: false,
     default_qdisc: "default: %s"
 }
 """ % qdisc)
@@ -271,7 +271,7 @@ def run_fq_codel_test():
 
     ConfigurePortod('test-net-sched', """
 network {
-    enable_host_classful_qdiscs: false,
+    enable_host_net_classes: false,
     default_qdisc: "default: %s"
 }
 """ % qdisc)
