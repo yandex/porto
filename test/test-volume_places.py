@@ -106,7 +106,7 @@ def Test():
     def TestWildcards(place, allowed=True):
         cont = c.Create("test2")
         cont.SetProperty("place", place)
-        cont.SetProperty("command", 'portoctl layer -P {}'.format(PLACE_DIR + "/1/2/place1"))
+        cont.SetProperty("command", portoctl + ' layer -P {}'.format(PLACE_DIR + "/1/2/place1"))
         if allowed:
             cont.Start()
             cont.Wait()
@@ -118,7 +118,7 @@ def Test():
     #Check wildcard
     cont = c.Create("test2")
     cont.SetProperty("place", "***")
-    cont.SetProperty("command", 'portoctl layer -L')
+    cont.SetProperty("command", portoctl + ' layer -L')
     cont.Start()
     cont.Wait()
     assert "SocketError" not in cont.Get(["stderr"])["stderr"]
