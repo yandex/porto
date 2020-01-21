@@ -1003,8 +1003,9 @@ def fuzzer_killer(stop, porto_reloads, porto_kills):
         if should_stop():
             stop.set();
 
-def fuzzer_thread(please_stop, iter_count, fail_count):
-    random.seed(time.time() + os.getpid())
+def fuzzer_thread(please_stop, iter_count, fail_count, tseed = time.time() + os.getpid()):
+    random.seed(tseed)
+
     conn=porto.Connection(timeout=opts.timeout)
     fail_cnt = 0
     iter_cnt = 0;
@@ -1061,8 +1062,14 @@ porto_kills = multiprocessing.Value('i', 0)
 kill_proc = multiprocessing.Process(target=fuzzer_killer, args=(stop, porto_reloads, porto_kills), name="Killer")
 kill_proc.start()
 
+tseeds = []
 for i in range(0, opts.threads):
-    proc = multiprocessing.Process(target=fuzzer_thread, args=(stop, iter_count, fail_count))
+    seed = time.time() + os.getpid() + i
+    tseeds += [seed]
+    print "Fuzzer Thread: {} Seed: {}".format(i, seed)
+
+for i in range(0, opts.threads):
+    proc = multiprocessing.Process(target=fuzzer_thread, args=(stop, iter_count, fail_count, tseeds[i]))
     proc.start()
     procs += [proc]
 
