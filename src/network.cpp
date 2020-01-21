@@ -791,7 +791,7 @@ TError TNetwork::SetupQueue(TNetDevice &dev, bool force) {
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR);
     qdisc.Quantum = 10;
 
-    if (IsHost && TNetClass::IsDisabled() && dev.TxQueues == 1)
+    if (IsHost() && TNetClass::IsDisabled() && dev.TxQueues == 1)
         InitClasslessQdisc(dev, qdisc);
 
     if (force || !qdisc.Check(*Nl)) {
