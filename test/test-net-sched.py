@@ -23,12 +23,19 @@ qdisc = "htb"
 rate = 10
 
 
+def teardown_dummy():
+    subprocess.check_output(["ip", "link", "delete", "dummy-porto"])
+
 def setup_dummy():
+    try:
+        teardown_dummy()
+    except:
+        pass
     subprocess.check_output(["ip", "link", "add", "dummy-porto", "type", "dummy"])
     subprocess.check_output(["ip", "address", "add", "fd00::1/64", "dev", "dummy-porto"])
 
-def teardown_dummy():
-    subprocess.check_output(["ip", "link", "delete", "dummy-porto"])
+def setup_all_forwarding():
+    subprocess.check_output(["sysctl", "-w", "net.ipv6.conf.all.forwarding=1"])
 
 def qdisc_is_classful():
     return qdisc == "htb" or qdisc == "hfsc"
@@ -284,6 +291,9 @@ conn = porto.Connection()
 try:
     print "Setup dummy iface for MTN tests"
     setup_dummy()
+
+    print "Set net.ipv6.conf.all.forwarding=1"
+    setup_all_forwarding()
 
     # common tests
 
