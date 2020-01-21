@@ -123,7 +123,7 @@ def run_iperf_client(name, server, wait=None, mtn=False, cs=None, cfg={}, **kwar
     ip = ""
     if mtn:
         net = "L3 veth"
-        ip = "veth fd00::100/64"
+        ip = "veth fd00::100/128"
 
     ct = conn.Run(name, command=command, wait=wait, net=net, ip=ip, **cfg)
     if wait:
