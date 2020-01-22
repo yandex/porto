@@ -134,6 +134,7 @@ ADD_PYTHON_TEST(mem_limit)
 ADD_PYTHON_TEST(volume_backends)
 ADD_PYTHON_TEST(volume_places)
 ADD_PYTHON_TEST(volume_links)
+ADD_PYTHON_TEST(volume_sync)
 ADD_PYTHON_TEST(portod_cli)
 ADD_PYTHON_TEST(recovery)
 

@@ -1023,7 +1023,12 @@ noinline TError UnlinkVolume(const rpc::TVolumeUnlinkRequest &req) {
         CL->ReleaseContainer();
         TVolume::DestroyUnlinked(unlinked);
     } else {
-        error = volume->Destroy();
+        auto volumes_lock = LockVolumes();
+        bool valid_for_removal = volume->State == EVolumeState::Ready;
+        volumes_lock.unlock();
+
+        error = valid_for_removal ? volume->Destroy() :
+                TError(EError::VolumeNotReady, "Volume {} is not ready", req.path());
     }
 
     return error;
