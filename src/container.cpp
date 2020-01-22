@@ -2774,6 +2774,9 @@ TError TContainer::PrepareStart() {
     if (JobMode && RequiredControllers)
         return TError(EError::InvalidValue, "Cannot use cgroups in virt_mode=job");
 
+    if (JobMode && IsMeta())
+        return TError(EError::InvalidValue, "Job container without command considered useless");
+
     if (CapLimit.Permitted & ~CapBound.Permitted) {
         TCapabilities cap = CapLimit;
         cap.Permitted &= ~CapBound.Permitted;
