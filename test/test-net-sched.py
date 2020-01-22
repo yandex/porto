@@ -103,7 +103,7 @@ def check_porto_net_classes(*cts):
         ct_classes = get_porto_net_classes(ct)
         Expect(ct_classes.issubset(tc_classes))
 
-def run_iperf_client(name, server, wait=None, mtn=False, cs=None, cfg={}, **kwargs):
+def run_iperf_client(name, server, wait=None, mtn=False, cs=None, reverse=False, cfg={}, **kwargs):
     command="iperf3 --client " + server[0]
     command += " --port " + str(server[1])
 
@@ -116,6 +116,8 @@ def run_iperf_client(name, server, wait=None, mtn=False, cs=None, cfg={}, **kwar
             command += "=" + str(v)
 
     command += " --json"
+    if reverse:
+        command += " --reverse"
 
     print command
 
@@ -168,6 +170,32 @@ def run_mtn_limit_test():
     print "net_limit %sM -> " % rate, res
     ExpectRange(res, rate * 0.9, rate * 1.1)
     s.Destroy()
+
+    print "Test net_rx_limit in MTN"
+
+    s = run_iperf_server("test-net-s")
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=5, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate})
+    res = bps(a)
+    print "net_rx_limit %sM -> " % rate, res
+    ExpectLe(res, rate * 1.1)
+    s.Destroy()
+
+    print "Test both net_limit and net_rx_limit in MTN"
+
+    s = run_iperf_server("test-net-s")
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=5, mtn=True, reverse=False, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
+    res = bps(a)
+    print "net_limit/net_rx_limit %sM -> " % rate, res
+    ExpectLe(res, rate * 1.1)
+    s.Destroy()
+
+    s = run_iperf_server("test-net-s")
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=5, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
+    res = bps(a)
+    print "net_limit/net_rx_limit and reverse %sM -> " % rate, res
+    ExpectLe(res, rate * 1.1)
+    s.Destroy()
+
 
 def run_bandwidth_sharing_test():
     b = run_iperf_client("test-net-b", server2, time=5, wait=0, cfg={})
