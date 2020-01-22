@@ -1,3 +1,53 @@
+yandex-porto (4.18.27) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * net: added recently namespaced sysctls to white list
+
+  [ Maxim Samoylov ]
+  * container: fix wildcard place policy checking
+
+  [ Alexander Kuznetsov ]
+  * volume: add caching of volume quota file upon porto reload and volume creation Commit 066130964e7db98b993e36c7dae6a1e1bec41ce4 upstream
+
+  [ Dmitry Yakunin ]
+  * network: add 'enable_host_classful_qdiscs' option (enabled by default)
+  * test: extend net-sched with MTN net_limit test and switching between classful and classless qdiscs
+
+  [ Maxim Samoylov ]
+  * container: fix one more place where devices restoring fails on missing pids
+
+  [ Dmitry Yakunin ]
+  * net: rework host netns checking
+  * net: setup classless qdisc in case of single tx queue too
+  * net: add missing fq_codel params to config
+  * net: rename enable_host_classful_qdiscs to enable_host_net_classes
+  * net: fix build
+
+  [ Alexander Kuznetsov ]
+  * container: fix segfault on place='***', added validation that '***' was only at the end of the place
+
+  [ Dmitry Yakunin ]
+  * test: net-sched: remove dummy-porto iface and set net.ipv6.conf.all.forwarding=1 before start
+  * net: net-sched: change ip prefix len to 128 for iperf client container
+
+  [ Alexander Kuznetsov ]
+  * container: fix tests with wildcards Link: https://st.yandex-team.ru/PORTO-627
+
+  [ Roman Anufriev ]
+  * container: fix porto crashing if race on start container occured
+
+  [ Maxim Samoylov ]
+  * test/fuzzer: show fuzzer thread seeds prior before starting
+
+  [ Roman Anufriev ]
+  * test/fuzzers: downgrade warning "Freezer not found" to not trigger fuzzers failures
+
+  [ Maxim Samoylov ]
+  * container: validate virt_mode=job cgroup requirement absense earlier
+  * test/net-sched: check net_rx_limit behaviour in MTN
+
+ -- max7255 <max7255@max7255-nix>  Wed, 22 Jan 2020 13:35:29 +0300
+
 yandex-porto (4.18.26) unstable; urgency=low
 
   [ Maxim Samoylov ]
