@@ -103,8 +103,8 @@ def Test():
     os.mkdir(PLACE_DIR + "/1/2/place1/porto_storage")
 
     #prepare test function
-    def TestWildcards(place, allowed=True):
-        cont = c.Create("test2")
+    def TestWildcards(container_name, place, allowed=True):
+        cont = c.Create(container_name)
         cont.SetProperty("place", place)
         cont.SetProperty("command", portoctl + ' layer -P {}'.format(PLACE_DIR + "/1/2/place1"))
         if allowed:
@@ -116,7 +116,7 @@ def Test():
         cont.Destroy()
 
     #Check wildcard
-    cont = c.Create("test2")
+    cont = c.Create("test")
     cont.SetProperty("place", "***")
     cont.SetProperty("command", portoctl + ' layer -L')
     cont.Start()
@@ -124,13 +124,83 @@ def Test():
     assert "SocketError" not in cont.Get(["stderr"])["stderr"]
     cont.Destroy()
 
-    TestWildcards("/place/***")
-    TestWildcards("/place/***/***")
-    TestWildcards("/place/***/***/***")
+    TestWildcards("test", "/place/***")
+    TestWildcards("test", "/place/***/***")
+    TestWildcards("test", "/place/***/***/***")
 
     #Wildcard allowed only at the end of the place
-    TestWildcards("/place/***/place1", False)
-    TestWildcards("***/place", False)
+    TestWildcards("test", "/place/***/place1", False)
+    TestWildcards("test", "***/place", False)
+
+    #Check wildcards in container hierarchy
+
+    #prepare tester class
+    class WildcarsInHierarchyTester(object):
+        def __init__(self):
+            self.parent_places = []
+            self.allowed_child_places = []
+            self.not_allowed_child_places = []
+
+        def AddParentPlace(self, parent_place):
+            self.parent_places.append(parent_place)
+
+        def AddChildPlace(self, child_place, allowed=True):
+            if allowed:
+                self.allowed_child_places.append(child_place)
+            else:
+                self.not_allowed_child_places.append(child_place)
+
+        def Test(self):
+           for parent_place in self.parent_places:
+               cont = c.Create("parent") 
+               cont.SetProperty("place", parent_place)
+               cont.SetProperty("command", ' sleep 5')
+               cont.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+               cont.Start()
+
+               for place in self.allowed_child_places:
+                   TestWildcards("parent/child", place)
+               for place in self.not_allowed_child_places:
+                   TestWildcards("parent/child", place, False)
+
+               cont.Wait()
+               assert not cont.Get(["stderr"])["stderr"]
+               cont.Destroy()
+
+
+    hierarchyTester = WildcarsInHierarchyTester()
+    hierarchyTester.AddParentPlace(PLACE_DIR + "/1/2/***")
+    hierarchyTester.AddParentPlace(PLACE_DIR + "/1/2/***/***")
+    hierarchyTester.AddParentPlace(PLACE_DIR + "/1/2/***/***/***")
+
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/place1")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/***/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/***/***/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2", False)
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/***", False)
+    hierarchyTester.AddChildPlace("***", False)
+    hierarchyTester.AddChildPlace("/place/***", False)
+    hierarchyTester.AddChildPlace("***/place1", False)
+    hierarchyTester.AddChildPlace("/place/***/place1", False)
+    hierarchyTester.Test()
+
+    hierarchyTester = WildcarsInHierarchyTester()
+    hierarchyTester.AddParentPlace("***")
+    hierarchyTester.AddParentPlace(PLACE_DIR + "***")
+    hierarchyTester.AddParentPlace(PLACE_DIR + "***/***")
+    hierarchyTester.AddParentPlace(PLACE_DIR + "***/***/***")
+
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/place1")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/***/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2/***/***/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/1/2")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/***")
+    hierarchyTester.AddChildPlace(PLACE_DIR + "/***/***")
+    hierarchyTester.AddChildPlace("***/place1", False)
+    hierarchyTester.AddChildPlace("/place/***/place1", False)
+    hierarchyTester.Test()
 
     #Check what will be if we rename our place
 
