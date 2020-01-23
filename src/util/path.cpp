@@ -1145,6 +1145,8 @@ TError TMount::ParseMountinfo(const std::string &line) {
 }
 
 bool TMount::HasOption(const std::string &option) const {
+    if (option.empty())
+        return true;
     std::string options = "," + Options + ",";
     std::string mask = "," + option + ",";
     return options.find(mask) != std::string::npos;

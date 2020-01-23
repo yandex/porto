@@ -1009,7 +1009,9 @@ public:
     TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS,
             "Cgroup controllers") { }
     TError Get(std::string &value) {
-        value = StringFormatFlags(CT->Controllers, ControllersName, ";");
+        // TODO: backward compatibility, remove when porto with cgroup2 support will be on the whole cluster
+        uint64_t controllers = CT->Controllers & ~CGROUP2;
+        value = StringFormatFlags(controllers, ControllersName, ";");
         return OK;
     }
     TError Set(const std::string &value) {
@@ -1024,11 +1026,13 @@ public:
         return OK;
     }
     TError GetIndexed(const std::string &index, std::string &value) {
+        // TODO: backward compatibility, remove when porto with cgroup2 support will be on the whole cluster
+        uint64_t controllers = CT->Controllers & ~CGROUP2;
         uint64_t val;
         TError error = StringParseFlags(index, ControllersName, val, ';');
         if (error)
             return error;
-        value = BoolToString((CT->Controllers & val) == val);
+        value = BoolToString((controllers & val) == val);
         return OK;
     }
     TError SetIndexed(const std::string &index, const std::string &value) {

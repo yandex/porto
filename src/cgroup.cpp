@@ -29,6 +29,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_CPUSET,    "cpuset" },
     { CGROUP_PIDS,      "pids" },
     { CGROUP_SYSTEMD,   "systemd" },
+    { CGROUP2,          "cgroup2" },
 };
 
 TPath TCgroup::Path() const {
@@ -420,11 +421,14 @@ TError TCgroup::Recreate() {
     if (error)
         goto cleanup;
 
-    error = tmpcg.Rename(*this);
-    if (!error)
-        return OK;
+    // renaming is not allowed for cgroup2 in kernel
+    if (Subsystem != &Cgroup2Subsystem) {
+        error = tmpcg.Rename(*this);
+        if (!error)
+            return OK;
 
-    L_CG_ERR("Cannot recreate cgroup {} by rename, fallback to reattaching pids", *this);
+        L_CG_ERR("Cannot recreate cgroup {} by rename, fallback to reattaching pids", *this);
+    }
 
     error = Create();
     if (error)
@@ -1243,6 +1247,7 @@ TDevicesSubsystem   DevicesSubsystem;
 THugetlbSubsystem   HugetlbSubsystem;
 TPidsSubsystem      PidsSubsystem;
 TSystemdSubsystem   SystemdSubsystem;
+TCgroup2Subsystem   Cgroup2Subsystem;
 
 std::vector<TSubsystem *> AllSubsystems = {
     &FreezerSubsystem,
@@ -1256,6 +1261,7 @@ std::vector<TSubsystem *> AllSubsystems = {
     &HugetlbSubsystem,
     &PidsSubsystem,
     &SystemdSubsystem,
+    &Cgroup2Subsystem,
 };
 
 std::vector<TSubsystem *> Subsystems;
@@ -1295,7 +1301,7 @@ TError InitializeCgroups() {
 
     for (auto subsys: AllSubsystems) {
         for (auto &mnt: mounts) {
-            if (mnt.Type == "cgroup" && mnt.HasOption(subsys->TestOption())) {
+            if (mnt.Type == subsys->MountType && mnt.HasOption(subsys->TestOption())) {
                 subsys->Root = mnt.Target;
                 L_CG("Found cgroup subsystem {} mounted at {}", subsys->Type, subsys->Root);
                 break;
@@ -1337,7 +1343,7 @@ TError InitializeCgroups() {
             }
         }
 
-        error = path.Mount("cgroup", "cgroup", 0, subsys->MountOptions() );
+        error = path.Mount(subsys->MountType, subsys->MountType, 0, subsys->MountOptions() );
         if (error) {
             (void)path.Rmdir();
             L_ERR("Cannot mount cgroup: {}", error);
@@ -1412,6 +1418,8 @@ TError InitializeDaemonCgroups() {
         &MemorySubsystem,
         &CpuacctSubsystem,
     };
+    if (Cgroup2Subsystem.Supported)
+        DaemonSubsystems.push_back(&Cgroup2Subsystem);
 
     for (auto subsys : DaemonSubsystems) {
         auto hy = subsys->Hierarchy;
@@ -1459,6 +1467,15 @@ TError InitializeDaemonCgroups() {
         error = cg.Create();
         if (error)
             return error;
+    }
+
+    if (Cgroup2Subsystem.Supported) {
+        cg = Cgroup2Subsystem.Cgroup(PORTO_CGROUP_PREFIX);
+        if (!cg.Exists()) {
+            error = cg.Create();
+            if (error)
+                return error;
+        }
     }
 
     return OK;
