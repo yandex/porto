@@ -9,17 +9,18 @@
 struct TDevice;
 class TCgroup;
 
-#define CGROUP_FREEZER  0x0001ull
-#define CGROUP_MEMORY   0x0002ull
-#define CGROUP_CPU      0x0004ull
-#define CGROUP_CPUACCT  0x0008ull
-#define CGROUP_NETCLS   0x0010ull
-#define CGROUP_BLKIO    0x0020ull
-#define CGROUP_DEVICES  0x0040ull
-#define CGROUP_HUGETLB  0x0080ull
-#define CGROUP_CPUSET   0x0100ull
-#define CGROUP_PIDS     0x0200ull
-#define CGROUP_SYSTEMD  0x1000ull
+#define CGROUP_FREEZER  0x00001ull
+#define CGROUP_MEMORY   0x00002ull
+#define CGROUP_CPU      0x00004ull
+#define CGROUP_CPUACCT  0x00008ull
+#define CGROUP_NETCLS   0x00010ull
+#define CGROUP_BLKIO    0x00020ull
+#define CGROUP_DEVICES  0x00040ull
+#define CGROUP_HUGETLB  0x00080ull
+#define CGROUP_CPUSET   0x00100ull
+#define CGROUP_PIDS     0x00200ull
+#define CGROUP_SYSTEMD  0x01000ull
+#define CGROUP2         0x10000ull
 
 extern const TFlagsNames ControllersName;
 
@@ -28,16 +29,21 @@ public:
     const uint64_t Kind = 0x0ull;
     uint64_t Controllers = 0x0ull;
     const std::string Type;
+    const std::string MountType;
     const TSubsystem *Hierarchy = nullptr;
     TPath Root;
     TFile Base;
     bool Supported = false;
 
-    TSubsystem(uint64_t kind, const std::string &type) : Kind(kind), Type(type) { }
+    TSubsystem(uint64_t kind, const std::string &type)
+        : Kind(kind)
+        , Type(type)
+        , MountType(Kind == CGROUP2 ? "cgroup2" : "cgroup")
+    { }
     virtual bool IsDisabled() { return false; }
     virtual bool IsOptional() { return false; }
     virtual std::string TestOption() const { return Type; }
-    virtual std::vector<std::string> MountOptions() { return {Type}; }
+    virtual std::vector<std::string> MountOptions() const { return {Type}; }
 
     virtual TError InitializeSubsystem() {
         return OK;
@@ -377,7 +383,16 @@ public:
     bool IsDisabled() override { return !config().container().enable_systemd(); }
     bool IsOptional() override { return true; }
     std::string TestOption() const override { return "name=" + Type; }
-    std::vector<std::string> MountOptions() override { return { "none", "name=" + Type }; }
+    std::vector<std::string> MountOptions() const override { return { "none", "name=" + Type }; }
+};
+
+class TCgroup2Subsystem : public TSubsystem {
+public:
+    TCgroup2Subsystem() : TSubsystem(CGROUP2, "unified") { }
+    bool IsDisabled() override { return !config().container().enable_cgroup2(); }
+    bool IsOptional() override { return true; }
+    std::string TestOption() const override { return ""; }
+    std::vector<std::string> MountOptions() const override { return {}; }
 };
 
 extern TMemorySubsystem     MemorySubsystem;
@@ -391,6 +406,7 @@ extern TDevicesSubsystem    DevicesSubsystem;
 extern THugetlbSubsystem    HugetlbSubsystem;
 extern TPidsSubsystem       PidsSubsystem;
 extern TSystemdSubsystem    SystemdSubsystem;
+extern TCgroup2Subsystem    Cgroup2Subsystem;
 
 extern std::vector<TSubsystem *> AllSubsystems;
 extern std::vector<TSubsystem *> Subsystems;

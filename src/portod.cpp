@@ -684,7 +684,7 @@ again:
                 continue;
 
             if (cg->Name == PORTO_DAEMON_CGROUP &&
-                    (hy->Controllers & (CGROUP_FREEZER | CGROUP_MEMORY | CGROUP_CPUACCT)))
+                    (hy->Controllers & (CGROUP_FREEZER | CGROUP_MEMORY | CGROUP_CPUACCT | CGROUP2)))
                 continue;
 
             if (cg->Name == PORTO_HELPERS_CGROUP &&
@@ -692,7 +692,7 @@ again:
                 continue;
 
             if (cg->Name == PORTO_CGROUP_PREFIX &&
-                    (hy->Controllers & CGROUP_FREEZER))
+                    (hy->Controllers & (CGROUP_FREEZER | CGROUP2)))
                 continue;
 
             bool found = false;

@@ -407,6 +407,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 
     Controllers |= CGROUP_FREEZER;
 
+    if (Cgroup2Subsystem.Supported)
+        Controllers |= CGROUP2;
+
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
         Controllers |= CGROUP_CPUACCT;
 
@@ -2167,6 +2170,10 @@ TError TContainer::PrepareCgroups() {
     } else {
         Controllers |= CGROUP_FREEZER;
         RequiredControllers |= CGROUP_FREEZER;
+        if (Cgroup2Subsystem.Supported) {
+            Controllers |= CGROUP2;
+            RequiredControllers |= CGROUP2;
+        }
     }
 
     if (!HasProp(EProperty::CPU_SET) && Parent) {
@@ -3811,9 +3818,11 @@ TError TContainer::Load(const TKeyValue &node) {
     if (!node.Has(P_CONTROLLERS) && State != EContainerState::Stopped)
         Controllers = RootContainer->Controllers;
 
-    if (Level == 1 && CpusetSubsystem.Supported &&
-            !(Controllers & CGROUP_CPUSET))
+    if (Level == 1 && CpusetSubsystem.Supported)
         Controllers |= CGROUP_CPUSET;
+
+    if (Cgroup2Subsystem.Supported)
+        Controllers |= CGROUP2;
 
     if (controllers & ~Controllers)
         L_WRN("Missing cgroup controllers {}", TSubsystem::Format(controllers & ~Controllers));
@@ -4005,7 +4014,7 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     if (IsRoot())
         return subsystem.RootCgroup();
 
-    if (subsystem.Controllers & CGROUP_FREEZER) {
+    if (subsystem.Controllers & (CGROUP_FREEZER | CGROUP2)) {
         if (JobMode)
             return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Parent->Name);
         return subsystem.Cgroup(std::string(PORTO_CGROUP_PREFIX) + "/" + Name);

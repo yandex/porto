@@ -322,6 +322,9 @@ TTuple SplitEscapedString(const std::string &str, char sep) {
 }
 
 std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
+    if (tuples.empty())
+        return "";
+
     auto ssp_inner = std::string(1, sep_inner);
     auto rep_inner = "\\" + ssp_inner;
     auto spp_outer = std::string(1, sep_outer);
