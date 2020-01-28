@@ -502,6 +502,11 @@ next:
             goto next;
         }
 
+        if (Buffer.size() > 4096) {
+            std::vector<uint8_t> tmp(4096);
+            Buffer.swap(tmp);
+        }
+
         Sending = false;
 
         /* Out of order message */

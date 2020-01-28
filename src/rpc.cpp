@@ -1669,9 +1669,10 @@ void TRequest::Handle() {
     if (!error && (!RoReq || Verbose))
         L_REQ("{} {} {} from {}", Cmd, Arg, Opt, Client->Id);
 
-    L_DBG("Raw request: {}", Req.ShortDebugString());
+    if (Debug)
+        L_DBG("Raw request: {}", Req.ShortDebugString());
 
-    if (error)
+    if (error && Verbose)
         L_VERBOSE("Invalid request from {} : {} : {}", Client->Id, error, Req.ShortDebugString());
     else if (!RoReq && Client->AccessLevel <= EAccessLevel::ReadOnly)
         error = TError(EError::Permission, "Write access denied");
@@ -1830,7 +1831,8 @@ void TRequest::Handle() {
                 Client->Id, StartTime - QueueTime, FinishTime - StartTime);
     }
 
-    L_DBG("Raw response: {}", rsp.ShortDebugString());
+    if (Debug)
+        L_DBG("Raw response: {}", rsp.ShortDebugString());
 
     auto lock = Client->Lock();
     Client->Processing = false;
