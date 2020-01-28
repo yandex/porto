@@ -12,6 +12,8 @@ extern "C" {
 #include <sys/stat.h>
 }
 
+static constexpr uint64_t STD_STREAM_READ_LIMIT = 1024 * 1024 * 256;
+
 bool TStdStream::IsNull(void) const {
     return Path.IsEmpty() || Path.ToString() == "/dev/null";
 }
@@ -220,6 +222,9 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
         limit = size - offset;
     else if (!off.size())
         offset = size - limit;
+
+    if (limit > STD_STREAM_READ_LIMIT)
+        return TError(EError::ResourceNotAvailable, "StdStream read limit exceeded");
 
     if (limit) {
         text.resize(limit);
