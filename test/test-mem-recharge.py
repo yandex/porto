@@ -26,7 +26,7 @@ ct2.SetProperty("command", "vmtouch -t test")
 
 size = 100 << 20
 delta = 10 << 20
-file(vol.path + "/test", 'w').truncate(size + delta)
+file(vol.path + "/test", 'w').truncate(size)
 
 def Run(ct):
     ct.Start()
