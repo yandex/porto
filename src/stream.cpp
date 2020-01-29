@@ -223,8 +223,11 @@ TError TStdStream::Read(const TContainer &container, std::string &text,
     else if (!off.size())
         offset = size - limit;
 
-    if (limit > STD_STREAM_READ_LIMIT)
-        return TError(EError::ResourceNotAvailable, "StdStream read limit exceeded");
+    if (limit > STD_STREAM_READ_LIMIT) {
+        offset += limit - STD_STREAM_READ_LIMIT;
+        limit = STD_STREAM_READ_LIMIT;
+        L_WRN("StdStream read limit exceeded, response truncated");
+    }
 
     if (limit) {
         text.resize(limit);
