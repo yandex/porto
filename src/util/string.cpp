@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <cstdarg>
 #include <cctype>
+#include <algorithm>
 
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -99,17 +100,16 @@ TError StringToValue(const std::string &str, double &value, std::string &unit) {
 static char size_unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 0};
 
 TError StringToSize(const std::string &str, uint64_t &size) {
-    std::string unit;
     uint64_t mult = 1;
-    double value;
     TError error;
 
-    error = StringToValue(str, value, unit);
-    if (error)
-        return error;
+    auto sep = std::find_if(str.begin(), str.end(), ::isalpha);
 
-    if (value < 0)
-        return TError(EError::InvalidValue, "Negative: " + str);
+    const std::string valueStr(str.begin(), sep);
+    std::string unit(sep, str.end());
+
+    while (unit.size() && ::isspace(unit[0]))
+        unit.erase(unit.begin());
 
     if (!unit[0])
         goto ok;
@@ -141,6 +141,27 @@ TError StringToSize(const std::string &str, uint64_t &size) {
     return TError(EError::InvalidValue, "Bad value unit: " + unit);
 
 ok:
+    {
+        uint64_t value;
+
+        if (StringToUint64(valueStr, value))
+            goto cast_double;
+
+        size = value * mult;
+        if (size / mult != value) // check overflow
+            return TError(EError::InvalidValue, "Too big: " + str);
+
+        return OK;
+    }
+
+cast_double:
+    double value;
+
+    error = StringToValue(str, value, unit);
+    if (error)
+        return error;
+    if (value < 0)
+        return TError(EError::InvalidValue, "Negative: " + str);
     if (value * mult > UINT64_MAX)
         return TError(EError::InvalidValue, "Too big: " + str);
 
