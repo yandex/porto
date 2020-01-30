@@ -208,6 +208,7 @@ message TConfig {
         optional bool pressurize_on_death = 44;
         optional bool enable_blkio = 45;
         optional bool ptrace_on_start = 54;
+        optional uint64 std_stream_read_limit = 55;
 
         message TSysctl {
             required string key = 1;

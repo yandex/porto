@@ -80,6 +80,7 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_stdout_limit(8 << 20); /* 8Mb */
     config().mutable_container()->set_stdout_limit_max(1 << 30); /* 1Gb */
+    config().mutable_container()->set_std_stream_read_limit(16 << 20); /* 16Mb */
 
     config().mutable_container()->set_kill_timeout_ms(1000);
     config().mutable_container()->set_start_timeout_ms(300 * 1000);
