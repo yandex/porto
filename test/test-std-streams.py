@@ -46,3 +46,41 @@ with open(a.GetProperty("cwd") + "/" + a.GetProperty("stdout_path"), "r") as std
     assert stdout_file.read() == res + "\n"
 
 a.Destroy()
+
+#check std stream read limit (default 16Mb)
+ct = c.CreateWeakContainer("test")
+vol = c.CreateVolume(private="test-std-stream", containers=ct.name)
+ct.SetProperty("cwd", vol.path)
+ct.SetProperty("stdout_limit", 1024 * 1024 * 32)
+ct.SetProperty("command", "cat test")
+
+stdout_part1 = 'a' * 16 * 1024 * 1024
+stdout_part2 = 'b' * 16 * 1024 * 1024
+
+f = open(vol.path + "/test", 'w')
+f.write(stdout_part1 + stdout_part2)
+f.close()
+
+ct.Start()
+ct.Wait()
+
+stdout_value = ct.GetProperty("stdout")
+assert stdout_value == stdout_part2
+
+stdout_value = ct.GetProperty("stdout[0]")
+assert stdout_value == stdout_part1
+
+stdout_value = ct.GetProperty("stdout[{}]".format(8 << 20)) #8Mb
+assert stdout_value == stdout_part1[8 << 20:] + stdout_part2[:8 << 20]
+
+stdout_value = ct.GetProperty("stdout[:{}]".format(8 << 20))
+assert stdout_value == stdout_part2[:8 << 20]
+
+stdout_value = ct.GetProperty("stdout[:{}]".format(50 << 20)) #50Mb
+assert stdout_value == stdout_part2
+
+stdout_value = ct.GetProperty("stdout[{}:{}]".format(12 << 20, 8 << 20))
+assert stdout_value == stdout_part1[12 << 20:] + stdout_part2[:4 << 20]
+
+
+ct.Destroy()
