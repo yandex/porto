@@ -2447,6 +2447,8 @@ static void TestFormat(Porto::Connection &) {
     ExpectEq(v, 1ull<<40);
     ExpectOk(StringToSize("\t1\tPB\t", v));
     ExpectEq(v, 1ull<<50);
+    ExpectOk(StringToSize("1000000000000000001", v));
+    ExpectEq(v, 1000000000000000001ull);
     Expect(!!StringToSize("", v));
     Expect(!!StringToSize("z", v));
     Expect(!!StringToSize("1z", v));

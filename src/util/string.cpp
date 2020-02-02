@@ -79,6 +79,16 @@ std::string BoolToString(bool value) {
     return value ? "true" : "false";
 }
 
+const std::string ParseUnit(char* end) {
+    while (isspace(*end))
+        end++;
+    size_t len = strlen(end);
+    while (len && isspace(end[len-1]))
+        len--;
+
+    return std::string(end, len);
+}
+
 TError StringToValue(const std::string &str, double &value, std::string &unit) {
     const char *ptr = str.c_str();
     char *end;
@@ -88,31 +98,28 @@ TError StringToValue(const std::string &str, double &value, std::string &unit) {
     if (errno || end == ptr)
         return TError(EError::InvalidValue, errno, "Bad value: " + str);
 
-    while (isspace(*end))
-        end++;
-    size_t len = strlen(end);
-    while (len && isspace(end[len-1]))
-        len--;
-    unit = std::string(end, len);
+    unit = ParseUnit(end);
+    return OK;
+}
+
+TError StringToValue(const std::string &str, uint64_t &value, std::string &unit) {
+    const char *ptr = str.c_str();
+    char *end;
+
+    errno = 0;
+    value = strtoull(ptr, &end, 10);
+    if (errno || end == ptr)
+        return TError(EError::InvalidValue, errno, "Bad value: " + str);
+
+    unit = ParseUnit(end);
     return OK;
 }
 
 static char size_unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 0};
 
-TError StringToSize(const std::string &str, uint64_t &size) {
-    uint64_t mult = 1;
-    TError error;
-
-    auto sep = std::find_if(str.begin(), str.end(), ::isalpha);
-
-    const std::string valueStr(str.begin(), sep);
-    std::string unit(sep, str.end());
-
-    while (unit.size() && ::isspace(unit[0]))
-        unit.erase(unit.begin());
-
+TError UnitToMult(const std::string& unit, uint64_t &mult) {
     if (!unit[0])
-        goto ok;
+        return OK;
 
     for (int i = 0; size_unit[i]; i++) {
         if (unit[0] == size_unit[i] ||
@@ -125,13 +132,13 @@ TError StringToSize(const std::string &str, uint64_t &size) {
                 case 'b': /* FIXME turn into bits? */
                 case 'B':
                     if (i && unit[2] == '\0')
-                        goto ok;
+                        return OK;
                     break;
                 case 'i':
                     if (!i || unit[2] != 'B')
                         break;
                 case '\0':
-                    goto ok;
+                    return OK;
             }
 
             break;
@@ -139,14 +146,20 @@ TError StringToSize(const std::string &str, uint64_t &size) {
     }
 
     return TError(EError::InvalidValue, "Bad value unit: " + unit);
+}
 
-ok:
+TError StringToSize(const std::string &str, uint64_t &size) {
+    uint64_t mult = 1;
+    std::string unit;
+    TError error;
+
     {
         uint64_t value;
 
-        if (StringToUint64(valueStr, value))
+        if (StringToValue(str, value, unit))
             goto cast_double;
-
+        if (UnitToMult(unit, mult))
+            goto cast_double;
         size = value * mult;
         if (size / mult != value) // check overflow
             return TError(EError::InvalidValue, "Too big: " + str);
@@ -162,9 +175,12 @@ cast_double:
         return error;
     if (value < 0)
         return TError(EError::InvalidValue, "Negative: " + str);
+
+    error = UnitToMult(unit, mult);
+    if (error)
+        return error;
     if (value * mult > UINT64_MAX)
         return TError(EError::InvalidValue, "Too big: " + str);
-
     size = value * mult;
     return OK;
 }
