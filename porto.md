@@ -183,6 +183,8 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
 * **group** - gid of container processes, default: **owner\_group**
 
+* **task\_cred** - credentials of container process: uid gid groups...
+
 * **umask** - initial file creation mask, default: 0002, see **umask(2)**
 
 * **ulimit** - resource limits, syntax: \<type\>: \[soft\]|unlimited \<hard\>|unlimited; ... see **getrlimit(2)**
@@ -452,11 +454,13 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
     Actual porto namespace concatenates prefixes from parents, see **absolute\_namespace**.
 
+* **taint** - list of known problems in container configuration
+
 * **owner\_user** - container owner user, default: creator
 
 * **owner\_group** - container owner group, default: creator
 
-* **taint** - list of known problems in container configuration
+* **owner\_cred** - credentials of container owner: uid gid groups...
 
 Porto client authentication is based on task pid, uid, gid received via
 **socket(7)** SO\_PEERCRED and task freezer cgroup from /proc/pid/cgroup.

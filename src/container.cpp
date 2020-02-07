@@ -529,9 +529,10 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
      * For sub-containers of client container use its task credentials.
      * This is safe because new container will have the same restrictions.
      */
-    if (ct->IsChildOf(*CL->ClientContainer))
+    if (ct->IsChildOf(*CL->ClientContainer)) {
         ct->TaskCred = CL->TaskCred;
-    else
+        (void)ct->TaskCred.InitGroups(ct->TaskCred.User());
+    } else
         ct->TaskCred = CL->Cred;
 
     ct->SetProp(EProperty::USER);

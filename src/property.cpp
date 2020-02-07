@@ -421,6 +421,29 @@ public:
     }
 } static IoWeight;
 
+class TTaskCred : public TProperty {
+public:
+    TTaskCred() : TProperty(P_TASK_CRED, EProperty::NONE,
+            "Credentials: uid gid groups...") {}
+    TError Get(std::string &value) {
+        value = fmt::format("{} {}", CT->TaskCred.Uid, CT->TaskCred.Gid);
+        for (auto gid: CT->TaskCred.Groups)
+            value += fmt::format(" {}", gid);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        TError error;
+        TCred cred;
+        error = cred.Init(value);
+        if (error)
+            return error;
+        CT->TaskCred = cred;
+        CT->SetProp(EProperty::USER);
+        CT->SetProp(EProperty::GROUP);
+        return OK;
+    }
+} static TaskCred;
+
 class TUser : public TProperty {
 public:
     TUser() : TProperty(P_USER, EProperty::USER,
@@ -472,6 +495,33 @@ public:
         return OK;
     }
 } static Group;
+
+class TOwnerCred : public TProperty {
+public:
+    TOwnerCred() : TProperty(P_OWNER_CRED, EProperty::NONE,
+            "Owner credentials: uid gid groups...") {}
+    TError Get(std::string &value) {
+        value = fmt::format("{} {}", CT->OwnerCred.Uid, CT->OwnerCred.Gid);
+        for (auto gid: CT->OwnerCred.Groups)
+            value += fmt::format(" {}", gid);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        TError error;
+        TCred cred;
+        error = cred.Init(value);
+        if (error)
+            return error;
+        error = CL->CanControl(cred);
+        if (error)
+            return error;
+        CT->OwnerCred = cred;
+        CT->SetProp(EProperty::OWNER_USER);
+        CT->SetProp(EProperty::OWNER_GROUP);
+        CT->SanitizeCapabilitiesAll();
+        return OK;
+    }
+} static OwnerCred;
 
 class TOwnerUser : public TProperty {
 public:
