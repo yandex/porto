@@ -276,6 +276,8 @@ void TCred::Dump(rpc::TCred &cred) {
         cred.set_gid(Gid);
         cred.set_group(Group());
     }
+    for (auto grp: Groups)
+        cred.add_grp(grp);
 }
 
 bool TCred::IsMemberOf(gid_t group) const {
