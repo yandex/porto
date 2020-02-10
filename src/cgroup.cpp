@@ -959,13 +959,12 @@ TError TNetclsSubsystem::InitializeSubsystem() {
 
 TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
     TError error;
+    uint64_t cur;
 
     if (!config().network().enable_host_net_classes())
         return OK;
 
     if (HasPriority) {
-        uint64_t cur;
-
         error = cg.GetUint64("net_cls.priority", cur);
         if (error || cur != classid) {
             error = cg.SetUint64("net_cls.priority", classid);
@@ -974,7 +973,14 @@ TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
         }
     }
 
-    return cg.SetUint64("net_cls.classid", classid);
+    error = cg.GetUint64("net_cls.classid", cur);
+    if (error || cur != classid) {
+        error = cg.SetUint64("net_cls.classid", classid);
+        if (error)
+            return error;
+    }
+
+    return OK;
 }
 
 // Blkio
