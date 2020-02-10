@@ -960,6 +960,9 @@ TError TNetclsSubsystem::InitializeSubsystem() {
 TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
     TError error;
 
+    if (!config().network().enable_host_net_classes())
+        return OK;
+
     if (HasPriority) {
         uint64_t cur;
 
