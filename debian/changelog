@@ -1,3 +1,28 @@
+yandex-porto (4.18.28) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * test/container: added more tests for usage wildcards in containers hierarchies
+  * test: fixed bug with size of the test file
+  * rpc/client: fixed memory leak in non-debug mode and compress client buffer after send response Link: https://st.yandex-team.ru/PORTO-585
+  * stream: added StdStream read limit
+  * stream: truncate output of StdStream, if it extended read limit
+  * stream: move stdStream read limit to protobuf config
+  * test: add test for std stream limit
+  * string: parse string to uint64 without using double if it available
+
+  [ Maxim Samoylov ]
+  * container: treat job container without command as invalid config
+  * volume: prevent wildcard removal of busy volumes
+
+  [ Alexander Kuznetsov ]
+  * string: fixed StringToSize parser and add 1 more test
+
+  [ Dmitry Yakunin ]
+  * cgroup: don't use net_cls when host net classes are disabled
+  * cgroup: net_cls: write classid only if it differs from previous value
+
+ -- max7255 <max7255@max7255-nix>  Tue, 11 Feb 2020 00:50:22 +0300
+
 yandex-porto (4.18.27) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
