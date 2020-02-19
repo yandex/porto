@@ -165,7 +165,7 @@ def run_mtn_limit_test():
     print "Test net_limit in MTN"
 
     s = run_iperf_server("test-net-s")
-    a = run_iperf_client("test-net-a", local_server, time=3, wait=10, mtn=True, cfg={"net_limit": "default: %sM" % rate})
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, cfg={"net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit %sM -> " % rate, res
     ExpectRange(res, rate * 0.9, rate * 1.1)
@@ -174,7 +174,7 @@ def run_mtn_limit_test():
     print "Test net_rx_limit in MTN"
 
     s = run_iperf_server("test-net-s")
-    a = run_iperf_client("test-net-a", local_server, time=3, wait=10, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate})
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_rx_limit %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
@@ -183,14 +183,14 @@ def run_mtn_limit_test():
     print "Test both net_limit and net_rx_limit in MTN"
 
     s = run_iperf_server("test-net-s")
-    a = run_iperf_client("test-net-a", local_server, time=3, wait=10, mtn=True, reverse=False, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=False, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit/net_rx_limit %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
     s.Destroy()
 
     s = run_iperf_server("test-net-s")
-    a = run_iperf_client("test-net-a", local_server, time=3, wait=10, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
+    a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit/net_rx_limit and reverse %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
