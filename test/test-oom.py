@@ -35,7 +35,7 @@ a.Destroy()
 
 # simple oom
 
-a = c.Run("test-oom", command="bash -c 'while true; do stress -m 1 ; done'", memory_limit="64M", wait=1)
+a = c.Run("test-oom", command="bash -c 'while true; do stress -m 1 ; done'", memory_limit="64M", wait=5)
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['exit_code'], '-99')
