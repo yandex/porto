@@ -3178,6 +3178,11 @@ void TVolume::UnlinkAllVolumes(std::shared_ptr<TContainer> container,
         volume->VolumeOwnerContainer = container->Parent;
         if (volume->VolumeOwnerContainer)
             volume->VolumeOwnerContainer->OwnedVolumes.push_back(volume);
+
+        error = volume->Save(true);
+
+        if (error)
+            L_WRN("Cannot save volume {}: {}", volume->Path, error);
     }
     container->OwnedVolumes.clear();
 }
@@ -3309,12 +3314,15 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
     }
 }
 
-TError TVolume::Save() {
+TError TVolume::Save(bool locked) {
     TKeyValue node(VolumesKV / Id);
     TError error;
     std::string tmp;
 
-    auto volumes_lock = LockVolumes();
+    std::unique_lock<std::mutex> volumes_lock;
+
+    if (!locked)
+        volumes_lock = LockVolumes();
 
     if (State == EVolumeState::ToDestroy ||
             State == EVolumeState::Destroying ||

@@ -200,7 +200,7 @@ public:
     TError DestroyOne();
     TError Destroy();
 
-    TError Save(void);
+    TError Save(bool locked = false);
     TError Restore(const TKeyValue &node);
 
     static void RestoreAll(void);
