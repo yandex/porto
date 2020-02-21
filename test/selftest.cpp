@@ -52,7 +52,7 @@ static int expectedWarns;
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices", "net_cls" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
-static int LeakConainersNr = 1000;
+static int LeakConainersNr = 500;
 
 static std::string StartWaitAndGetData(Porto::Connection &api, const std::string &name, const std::string &data) {
     string v;
@@ -3429,7 +3429,7 @@ static void TestLeaks(Porto::Connection &api) {
     int initSlave = GetVmRss(slavePid);
     int initMaster = GetVmRss(masterPid);
 
-    int createDestroyNr = 50000;
+    int createDestroyNr = 25000;
 
     time = GetCurrentTimeMs();
     Say() << "Create and destroy single container " << createDestroyNr << " times" << std::endl;
