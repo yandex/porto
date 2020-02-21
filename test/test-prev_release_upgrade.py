@@ -6,7 +6,7 @@ from test_common import *
 
 AsRoot()
 
-PREV_VERSION = "4.18.20"
+PREV_VERSION = "4.18.27"
 
 TMPDIR = "/tmp/test-release-upgrade"
 prev_portod = TMPDIR + "/old/usr/sbin/portod"
@@ -43,26 +43,22 @@ def CheckRt(r):
     assert policy == "2"
 
 #FIXME: remove it in the future, use capabilities from snapshot
-def CheckCaps(r, new_porto):
-    try:
-        root_path = r.GetProperty("root_path")
-    except:
-        assert not new_porto, "root_path should be accessible in new versions of porto"
-        root_path = ""
+def CheckCaps(r):
+    root_path = r.GetProperty("root_path")
 
     app_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"
     app_caps += "LINUX_IMMUTABLE;NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;"
     app_caps += "SYS_CHROOT;SYS_PTRACE;SYS_ADMIN;"
 
     # Host-chroot containers still have host bounding set
-    app_caps += "" if new_porto and root_path != '/' else "SYS_BOOT;"
+    app_caps += "" if root_path != '/' else "SYS_BOOT;"
     app_caps += "SYS_NICE;SYS_RESOURCE;MKNOD;AUDIT_WRITE;SETFCAP"
 
     os_caps = "CHOWN;DAC_OVERRIDE;FOWNER;FSETID;KILL;SETGID;SETUID;SETPCAP;"
     os_caps += "NET_BIND_SERVICE;NET_ADMIN;NET_RAW;IPC_LOCK;SYS_CHROOT;SYS_PTRACE;"
 
     # Host-chroot containers still have host bounding set
-    os_caps += "" if new_porto and root_path != '/' else "SYS_BOOT;"
+    os_caps += "" if root_path != '/' else "SYS_BOOT;"
     os_caps += "MKNOD;AUDIT_WRITE;SETFCAP"
 
     legacy_os_caps = "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_PTRACE; SYS_RESOURCE"
@@ -343,32 +339,32 @@ assert c.GetProperty("test", "exit_status") == "0"
 r = c.Find("parent_app")
 VerifyProps(r, parent_knobs)
 VerifySnapshot(r, snap_parent_app)
-CheckCaps(r, True)
+CheckCaps(r)
 
 r = c.Find("parent_app/app")
 VerifyProps(r, app_knobs)
 VerifySnapshot(r, snap_app)
-CheckCaps(r, True)
+CheckCaps(r)
 
 r = c.Find("parent_os")
 VerifyProps(r, parent_knobs)
 VerifySnapshot(r, snap_parent_os)
-CheckCaps(r, True)
+CheckCaps(r)
 
 r = c.Find("parent_os/os")
 VerifyProps(r, os_knobs)
 VerifySnapshot(r, snap_os)
-CheckCaps(r, True)
+CheckCaps(r)
 
 r = c.Find("rt_parent")
 VerifyProps(r, rt_parent_knobs)
 VerifySnapshot(r, snap_rt_parent)
-CheckCaps(r, True)
+CheckCaps(r)
 
 r = c.Find("rt_parent/rt_app")
 VerifyProps(r, rt_app_knobs)
 VerifySnapshot(r, snap_rt_app)
-CheckCaps(r, True)
+CheckCaps(r)
 CheckRt(r)
 
 c.disconnect()
@@ -397,31 +393,31 @@ assert c.GetProperty("parent_os/os", "state") == "running"
 r = c.Find("parent_app")
 VerifyProps(r, parent_knobs)
 VerifySnapshot(r, snap_parent_app)
-CheckCaps(r, False)
+CheckCaps(r)
 
 r = c.Find("parent_app/app")
 VerifyProps(r, app_knobs)
 VerifySnapshot(r, snap_app)
-CheckCaps(r, False)
+CheckCaps(r)
 
 r = c.Find("parent_os")
 VerifyProps(r, parent_knobs)
-CheckCaps(r, False)
+CheckCaps(r)
 
 r = c.Find("parent_os/os")
 VerifyProps(r, os_knobs)
 VerifySnapshot(r, snap_os)
-CheckCaps(r, False)
+CheckCaps(r)
 
 r = c.Find("rt_parent")
 VerifyProps(r, rt_parent_knobs)
 VerifySnapshot(r, snap_rt_parent)
-CheckCaps(r, False)
+CheckCaps(r)
 
 r = c.Find("rt_parent/rt_app")
 VerifyProps(r, rt_app_knobs)
 VerifySnapshot(r, snap_rt_app)
-CheckCaps(r, False)
+CheckCaps(r)
 assert legacy_rt_settings == DumpLegacyRt(r)
 
 AsRoot()
