@@ -1,3 +1,17 @@
+yandex-porto (4.18.29) unstable; urgency=low
+
+  [ Roman Anufriev ]
+  * test/test-net-sched: increase waiting times to prevent false timeouts
+
+  [ Dmitry Yakunin ]
+  * cgroup: mount cgroup2 subsystem on kernels >= 4.19
+
+  [ Alexander Kuznetsov ]
+  * property: add task_cred and owner_cred
+  * volume: Fix volume ownership transfer on daemon reload We should reflect it in kv state
+
+ -- max7255 <max7255@max7255-nix>  Fri, 21 Feb 2020 04:00:58 +0300
+
 yandex-porto (4.18.28) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
