@@ -2579,17 +2579,24 @@ TError TVolume::UmountLink(std::shared_ptr<TVolumeLink> link,
     for (auto it = VolumeLinks.lower_bound(host_target);
             it != VolumeLinks.end() && it->first.IsInside(host_target);) {
         auto &link = it->second;
+        auto &vol = link->Volume;
 
         if (link->HostTarget != it->first)
             L_WRN("Volume link out of sync: {} != {}", link->HostTarget, it->first);
+
+        L_ACT("Del volume {} link {} for CT{}:{}", vol->Path, link->Target, link->Container->Id, link->Container->Name);
+
+        link->Container->VolumeLinks.remove(link);
+        vol->Links.remove(link);
 
         if (link->HostTarget != host_target)
             L_ACT("Umount nested volume {} link {} for CT{}:{}",
                     link->Volume->Path, link->HostTarget,
                     link->Container->Id, link->Container->Name);
 
-        /* common link */
-        if (it->first == link->Volume->Path) {
+        /* Last or common link */
+        if ((vol->Links.empty() || it->first == link->Volume->Path) &&
+                (vol->State == EVolumeState::Ready || vol->State == EVolumeState::Tuning)) {
             link->Volume->SetState(EVolumeState::Unlinked);
             unlinked.emplace_back(link->Volume);
         }

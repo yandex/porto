@@ -1,6 +1,7 @@
 import multiprocessing
 import time
 import porto
+import os
 
 CT_COUNT = 4
 ITER_COUNT = 50
@@ -120,8 +121,38 @@ for w in workers:
 
 main_ct.Destroy()
 share.Unlink()
+root.Unlink()
 c.RemoveStorage(STORAGE_NAME)
 
 assert len(targets) == 1, "Container shared mount count: {} exceeded one".format(len(targets))
 assert not dead, "Worker has dead prematurely"
 assert not timeout, "Test timed out"
+
+# "Try to link and unlink volumes with targets"
+
+link_path = "/tmp/porto/selftest/a/link"
+sublink_path = "/tmp/porto/selftest/a/link/sublink"
+sub_sublink_path = "/tmp/porto/selftest/a/link/sublink/subsublink/abc"
+
+v1 = c.CreateVolume()
+v2 = c.CreateVolume()
+v3 = c.CreateVolume()
+
+if not os.path.exists(sub_sublink_path):
+    os.makedirs(sub_sublink_path)
+
+c.LinkVolume(v1.path, 'self', link_path)
+c.LinkVolume(v3.path, 'self', sublink_path)
+
+c.UnlinkVolume(link_path) # must unlink sublink and destroy v1
+
+c.LinkVolume(v3.path, 'self', sublink_path) # sublink must be free
+c.LinkVolume(v2.path, 'self', sub_sublink_path)
+
+c.UnlinkVolume(sublink_path) # must unlink sub_sublink and destroy v3
+
+c.LinkVolume(v2.path, 'self', sub_sublink_path) # it must be free
+
+c.UnlinkVolume(v2.path)
+
+assert len(c.ListVolumes()) == 0
