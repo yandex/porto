@@ -1042,8 +1042,8 @@ class Connection(object):
             request.listVolumes.container = container
         return self.rpc.call(request).volumeList.volumes
 
-    def ListVolumes(self, container=None):
-        return [Volume(self, v.path, v) for v in self._ListVolumes(container)]
+    def ListVolumes(self, path=None, container=None):
+        return [Volume(self, v.path, v) for v in self._ListVolumes(path=path, container=container)]
 
     def ListVolumeLinks(self, volume=None, container=None):
         links = []
