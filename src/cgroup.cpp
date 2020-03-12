@@ -231,6 +231,9 @@ TError TCgroup::Attach(pid_t pid, bool thread) const {
     if (Secondary())
         return TError("Cannot attach to secondary cgroup " + Type());
 
+    if (IsCgroup2() && thread)
+        return OK;
+
     L_CG("Attach {} {} to {}", thread ? "thread" : "process", pid, *this);
     TError error = Knob(thread ? "tasks" : "cgroup.procs").WriteAll(std::to_string(pid));
     if (error)
@@ -422,7 +425,7 @@ TError TCgroup::Recreate() {
         goto cleanup;
 
     // renaming is not allowed for cgroup2 in kernel
-    if (Subsystem != &Cgroup2Subsystem) {
+    if (!IsCgroup2()) {
         error = tmpcg.Rename(*this);
         if (!error)
             return OK;
