@@ -100,6 +100,9 @@ public:
     TPath Path() const;
     bool IsRoot() const;
     bool Exists() const;
+    bool IsCgroup2() const {
+        return Subsystem && Subsystem->Kind == CGROUP2;
+    }
 
     TError Create();
     TError Rename(TCgroup &target);
@@ -113,6 +116,8 @@ public:
     }
 
     TError GetTasks(std::vector<pid_t> &pids) const {
+        if (IsCgroup2())
+            return GetPids("cgroup.threads", pids);
         return GetPids("tasks", pids);
     }
 
