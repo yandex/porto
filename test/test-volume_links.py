@@ -124,6 +124,11 @@ share.Unlink()
 root.Unlink()
 c.RemoveStorage(STORAGE_NAME)
 
+for v in c.ListVolumes():
+    v.Unlink()
+
+assert len(c.ListVolumes()) == 0
+
 assert len(targets) == 1, "Container shared mount count: {} exceeded one".format(len(targets))
 assert not dead, "Worker has dead prematurely"
 assert not timeout, "Test timed out"
