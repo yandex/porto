@@ -32,6 +32,10 @@ const TFlagsNames ControllersName = {
     { CGROUP2,          "cgroup2" },
 };
 
+bool TCgroup::IsRestore = false;
+
+static std::map<std::string, std::vector<pid_t>> prevAttachedPidsMap;
+
 TPath TCgroup::Path() const {
     if (!Subsystem)
         return TPath();
@@ -249,21 +253,38 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
     L_CG("Attach all processes from {} to {}", cg, *this);
 
     std::vector<pid_t> pids, prev;
+    std::vector<pid_t>& prevAttachPids = prevAttachedPidsMap[this->Type()];
+
     bool retry;
+    TError error = cg.GetProcesses(pids);
+    if (error)
+        return error;
+
+    bool thread = IsRestore && std::find_first_of(pids.begin(), pids.end(), prevAttachPids.begin(), prevAttachPids.end()) != pids.end();
+
+    if (thread && IsCgroup2())
+        return OK;
 
     do {
-        TError error = cg.GetProcesses(pids);
+        error = thread ? cg.GetTasks(pids) : cg.GetProcesses(pids);
         if (error)
             return error;
+
         retry = false;
         for (auto pid: pids) {
-            error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
+            error = Knob(thread ? "tasks" : "cgroup.procs").WriteAll(std::to_string(pid));
             if (error && error.Errno != ESRCH)
                 return error;
             retry = retry || std::find(prev.begin(), prev.end(), pid) == prev.end();
         }
         prev = pids;
     } while (retry);
+
+    if (IsRestore) {
+        error = GetProcesses(prevAttachPids);
+        if (error)
+            return error;
+    }
 
     return OK;
 }
@@ -354,6 +375,14 @@ bool TCgroup::IsEmpty() const {
     return tasks.empty();
 }
 
+void TCgroup::StartRestore() {
+    IsRestore = true;
+}
+
+void TCgroup::FinishRestore() {
+    prevAttachedPidsMap.clear();
+    IsRestore = false;
+}
 TError TCgroup::KillAll(int signal) const {
     std::vector<pid_t> tasks, killed;
     TError error, error2;

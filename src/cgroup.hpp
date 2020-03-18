@@ -67,6 +67,7 @@ public:
 
 class TCgroup {
 public:
+    static bool IsRestore;
     const TSubsystem *Subsystem = nullptr;
     std::string Name;
 
@@ -124,6 +125,9 @@ public:
     TError GetCount(bool threads, uint64_t &count) const;
 
     bool IsEmpty() const;
+
+    static void StartRestore();
+    static void FinishRestore();
 
     TError Attach(pid_t pid, bool thread = false) const;
     TError AttachAll(const TCgroup &cg) const;
