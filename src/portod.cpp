@@ -887,7 +887,9 @@ static int Portod() {
     SystemClient.ClientContainer = RootContainer;
 
     L_SYS("Restore containers...");
+    TCgroup::StartRestore();
     RestoreContainers();
+    TCgroup::FinishRestore();
 
     L_SYS("Restore statistics...");
     TContainer::SyncPropertiesAll();

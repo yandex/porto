@@ -738,7 +738,71 @@ def TestPersistentStorage():
     ExpectEq(len(c.ListStorages(place="/tmp/test-recover-place")), 0)
     ExpectEq(len(c.ListStorages()), 0)
 
+def TestAttach():
+    print "Verify that tids attached correctly after reload"
 
+    def GetPidsAndTids(name):
+        pids = {int(p.rstrip()) for p in open("/sys/fs/cgroup/freezer/porto/{}/cgroup.procs".format(name), 'r')}
+        tids = {int(p.rstrip()) for p in open("/sys/fs/cgroup/freezer/porto/{}/tasks".format(name), 'r')}
+        return pids, tids
+
+    c = porto.Connection(timeout=30)
+
+    a = c.Create("a")
+    a.SetProperty("command", "python {}/multi-thread_app.py".format(os.path.dirname(os.path.realpath(__file__))))
+    a.SetProperty("isolate", "false")
+
+    a.Start()
+
+    b = c.Create("a/b")
+    b.SetProperty("command", "sleep 1000")
+    b.SetProperty("isolate", "false")
+
+    b.Start()
+    time.sleep(1)
+
+    ExpectProp(a, "state", "running")
+    ExpectProp(b, "state", "running")
+
+    #Get pids and tids before attach
+    pids_a_1, tids_a_1 = GetPidsAndTids(a.name)
+    pids_b_1, tids_b_1 = GetPidsAndTids(b.name)
+
+    tids_a = list(tids_a_1 - pids_a_1)
+    if len(tids_a) == 0:
+        raise Exception("can't find tids for ct a")
+    c.AttachThread(b.name, tids_a[0])
+
+    #save cgroups for pids and tids to check after attach
+    cgroups = {}
+    for pid in tids_a_1.union(tids_a_1, pids_b_1, tids_b_1):
+        cgroups[pid] = open("/proc/{}/cgroup".format(pid), 'r').read()
+
+    #Get pids and tids after attach
+    pids_a_2, tids_a_2 = GetPidsAndTids(a.name)
+    pids_b_2, tids_b_2 = GetPidsAndTids(b.name)
+
+    AsRoot()
+    subprocess.check_call([portod, "reload"])
+    AsAlice()
+
+    time.sleep(1)
+
+    #Get and check pids and tids after reload
+    pids_a_3, tids_a_3 = GetPidsAndTids(a.name)
+    pids_b_3, tids_b_3 = GetPidsAndTids(b.name)
+
+    for tid, cgroup in cgroups.items():
+        assert cgroup == open("/proc/{}/cgroup".format(tid), 'r').read()
+
+    b.Destroy()
+    a.Destroy()
+
+    assert pids_a_2 == pids_a_3
+    assert tids_a_2 == tids_a_3
+
+    assert pids_b_2 == pids_b_3
+    assert tids_b_2 == tids_b_3
 
 subprocess.check_call([portod, "--verbose", "reload"])
 ret = 0
@@ -749,6 +813,7 @@ try:
     TestVolumeRecovery()
     TestTCCleanup()
     TestPersistentStorage()
+    TestAttach()
 except BaseException as e:
     print traceback.format_exc()
     ret = 1
