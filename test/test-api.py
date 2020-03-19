@@ -3,6 +3,7 @@ from test_common import *
 import sys
 import os
 import porto
+import time
 
 AsAlice()
 
@@ -154,6 +155,14 @@ a.Destroy()
 
 
 # LAYERS
+AsRoot()
+
+ConfigurePortod('test-api', """
+volumes {
+    fs_stat_update_interval_ms: 1000
+}
+""")
+AsAlice()
 
 c.ListVolumes()
 v = c.CreateVolume(private=volume_private)
@@ -206,11 +215,21 @@ assert int(w.GetProperty("space_used")) <= volume_size_eps
 assert int(w.GetProperty("space_available")) > volume_size - volume_size_eps
 
 f.write("x" * (volume_size - volume_size_eps * 2))
+
+time.sleep(2)
+
 assert int(w.GetProperty("space_used")) >= volume_size - volume_size_eps * 2
 assert int(w.GetProperty("space_available")) < volume_size_eps * 2
+
 assert Catch(f.write, "x" * volume_size_eps * 2) == IOError
+time.sleep(2)
+
 assert int(w.GetProperty("space_used")) >= volume_size - volume_size_eps
 assert int(w.GetProperty("space_available")) < volume_size_eps
+
+AsRoot()
+ConfigurePortod('test-api', '')
+AsAlice()
 
 a = c.Create(container_name)
 w.Link(a)

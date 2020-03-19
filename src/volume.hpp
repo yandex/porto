@@ -111,6 +111,8 @@ public:
     uint64_t BuildTime = 0;
     uint64_t ChangeTime = 0;
 
+    TStatFS Stat;
+
     TPath Place;
 
     std::string Storage;
@@ -184,6 +186,8 @@ public:
     void Dump(rpc::TVolumeSpec &spec, bool full = false);
 
     void DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolumeDescription *dump);
+
+    void UpdateStatFS();
 
     TError DependsOn(const TPath &path);
     TError CheckDependencies();
@@ -301,3 +305,6 @@ static inline std::unique_lock<std::mutex> LockVolumes() {
 }
 
 extern TError PutLoopDev(const int loopNr); /* Legacy */
+
+void StartStatFsLoop();
+void StopStatFsLoop();

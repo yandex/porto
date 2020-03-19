@@ -137,6 +137,8 @@ static void DefaultConfig() {
 
     config().mutable_volumes()->set_aux_default_places("");
 
+    config().mutable_volumes()->set_fs_stat_update_interval_ms(60000);
+
     config().mutable_network()->set_enable_host_net_classes(true);
 
     config().mutable_network()->set_device_qdisc("default: htb");
