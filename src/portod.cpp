@@ -382,6 +382,7 @@ static void PortodServer() {
         return;
     }
 
+    StartStatFsLoop();
     StartRpcQueue();
     EventQueue->Start();
 
@@ -506,6 +507,7 @@ exit:
     L_SYS("Stop threads...");
     EventQueue->Stop();
     StopRpcQueue();
+    StopStatFsLoop();
 }
 
 static TError TuneLimits() {

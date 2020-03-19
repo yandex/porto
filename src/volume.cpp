@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <unordered_set>
+#include <thread>
 
 #include "volume.hpp"
 #include "storage.hpp"
@@ -37,8 +38,73 @@ static uint64_t NextId = 1;
 
 static std::condition_variable VolumesCv;
 
-/* TVolumeBackend - abstract */
+std::thread StatFsThread;
+bool NeedStopStatFsLoop(false);
+std::condition_variable StatFsCv;
+std::mutex StatFsLock;
 
+void SleepStatFsLoop(std::unique_lock<std::mutex>& locker, const uint64_t sleepTime) {
+    auto now = GetCurrentTimeMs();
+    auto deadline = now + sleepTime;
+
+    while (!NeedStopStatFsLoop && deadline > now) {
+        StatFsCv.wait_for(locker, std::chrono::milliseconds(deadline - now));
+        now = GetCurrentTimeMs();
+    }
+}
+
+void StatFsUpdateLoop() {
+    SetProcessName("portod-FS");
+
+    const uint64_t statFsUpdateInterval = config().volumes().fs_stat_update_interval_ms();
+    std::unique_lock<std::mutex> locker(StatFsLock);
+
+    while (!NeedStopStatFsLoop) {
+        std::list<std::shared_ptr<TVolume>> volumes;
+        locker.unlock();
+        auto volumes_lock = LockVolumes();
+
+        for (auto& it: Volumes)
+            volumes.push_back(it.second);
+
+        volumes_lock.unlock();
+        locker.lock();
+
+        const uint64_t sleepTime = volumes.empty() ? statFsUpdateInterval : statFsUpdateInterval / volumes.size();
+
+        if (volumes.empty()) {
+            SleepStatFsLoop(locker, sleepTime);
+            continue;
+        }
+
+        for (auto& volume: volumes) {
+            if (NeedStopStatFsLoop)
+                return;
+
+            locker.unlock();
+            volume->UpdateStatFS();
+            locker.lock();
+
+            SleepStatFsLoop(locker, sleepTime);
+        }
+    }
+}
+
+void StartStatFsLoop() {
+    NeedStopStatFsLoop = false;
+    StatFsThread = std::thread(StatFsUpdateLoop);
+}
+
+void StopStatFsLoop() {
+    {
+        std::unique_lock<std::mutex> locker(StatFsLock);
+        NeedStopStatFsLoop = true;
+    }
+    StatFsCv.notify_all();
+    StatFsThread.join();
+}
+
+/* TVolumeBackend - abstract */
 TError TVolumeBackend::Configure() {
     return OK;
 }
@@ -3303,13 +3369,10 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
 
     volumes_lock.unlock();
 
-    TStatFS stat;
-    if (!StatFS(stat)) {
-        ret[V_SPACE_USED] = std::to_string(stat.SpaceUsage);
-        ret[V_INODE_USED] = std::to_string(stat.InodeUsage);
-        ret[V_SPACE_AVAILABLE] = std::to_string(stat.SpaceAvail);
-        ret[V_INODE_AVAILABLE] = std::to_string(stat.InodeAvail);
-    }
+    ret[V_SPACE_USED] = std::to_string(Stat.SpaceUsage);
+    ret[V_INODE_USED] = std::to_string(Stat.InodeUsage);
+    ret[V_SPACE_AVAILABLE] = std::to_string(Stat.SpaceAvail);
+    ret[V_INODE_AVAILABLE] = std::to_string(Stat.InodeAvail);
 
     dump->set_path(path.ToString());
     dump->set_change_time(ChangeTime);
@@ -3319,6 +3382,10 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
         p->set_name(prop.first);
         p->set_value(prop.second);
     }
+}
+
+void TVolume::UpdateStatFS() {
+    StatFS(Stat);
 }
 
 TError TVolume::Save(bool locked) {
@@ -3534,6 +3601,8 @@ TError TVolume::Restore(const TKeyValue &node) {
         Links.emplace_back(link);
         ct->VolumeLinks.emplace_back(link);
     }
+
+    UpdateStatFS();
 
     return OK;
 }
@@ -3758,6 +3827,8 @@ next_link:
     if (volume->SpaceLimit) {
         volume->CacheQuotaFile();
     }
+
+    volume->UpdateStatFS();
 
     return OK;
 
@@ -4275,11 +4346,10 @@ void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
 
     volumes_lock.unlock();
 
-    TStatFS stat;
-    if (!full && !StatFS(stat)) {
-        spec.mutable_space()->set_usage(stat.SpaceUsage);
-        spec.mutable_space()->set_available(stat.SpaceAvail);
-        spec.mutable_inodes()->set_usage(stat.InodeUsage);
-        spec.mutable_inodes()->set_available(stat.InodeAvail);
+    if (!full) {
+        spec.mutable_space()->set_usage(Stat.SpaceUsage);
+        spec.mutable_space()->set_available(Stat.SpaceAvail);
+        spec.mutable_inodes()->set_usage(Stat.InodeUsage);
+        spec.mutable_inodes()->set_available(Stat.InodeAvail);
     }
 }
