@@ -63,3 +63,23 @@ TError TVmStat::Parse(pid_t pid) {
 
     return OK;
 }
+
+TError GetFdSize(pid_t pid, uint64_t &fdSize) {
+    std::string text, line;
+    TError error;
+
+    error = TPath(fmt::format("/proc/{}/status", pid)).ReadAll(text, 64 << 10);
+    if (error)
+        return error;
+
+    std::stringstream ss(text);
+    while (std::getline(ss, line)) {
+        if (!StringStartsWith(line, "FDSize:"))
+            continue;
+
+        static constexpr auto sep = sizeof("FDSize:") - 1;
+        error = StringToUint64(line.substr(sep + 1, line.size() - sep), fdSize);
+        return error;
+    }
+    return TError("Cannot find FDSize in /proc/{}/status", pid);
+}

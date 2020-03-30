@@ -124,6 +124,7 @@ class TNetwork : public TNonCopyable {
 
     static std::unordered_map<ino_t, std::shared_ptr<TNetwork>> NetworksIndex;
     static void Register(std::shared_ptr<TNetwork> &net, ino_t inode);
+    static TError GetSockets(const std::vector<pid_t> &pids, std::unordered_set<ino_t> &sockets);
     void Unregister();
 
     static inline std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> Networks() {
@@ -268,6 +269,8 @@ public:
     static void NetWatchdog();
 
     static TError SyncResolvConf();
+    static void UpdateSockDiag();
+    static void RepairSockDiag();
 };
 
 struct TNetDeviceConfig {

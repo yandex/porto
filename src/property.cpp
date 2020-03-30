@@ -3310,6 +3310,7 @@ class TNetStatProperty : public TProperty {
 public:
     uint64_t TNetStat:: *Member;
     bool ClassStat;
+    bool SockStat;
 
     TNetStatProperty(std::string name, uint64_t TNetStat:: *member,
                      std::string desc) : TProperty(name, EProperty::NONE, desc) {
@@ -3318,6 +3319,9 @@ public:
         IsRuntimeOnly = true;
         ClassStat = Name == P_NET_BYTES || Name == P_NET_PACKETS ||
                     Name == P_NET_DROPS || Name == P_NET_OVERLIMITS;
+        SockStat = Name == P_NET_BYTES ||
+                   Name == P_NET_TX_BYTES || Name == P_NET_RX_BYTES ||
+                   Name == P_NET_TX_PACKETS || Name == P_NET_RX_PACKETS;
     }
 
     TError Has() {
@@ -3340,10 +3344,13 @@ public:
         if (ClassStat && !TNetClass::IsDisabled()) {
             for (auto &it : CT->NetClass.Fold->ClassStat)
                 stat[it.first] = &it.second->*Member;
-        } else if (CT->Net) {
+        } else if (CT->Net && !CT->Net->IsHost()) {
             for (auto &it: CT->Net->DeviceStat)
                 stat[it.first] = &it.second->*Member;
+        } else if (SockStat && TNLinkSockDiag::IsEnabled()) {
+            stat["Total"] = CT->SockStat.*Member;
         }
+
         return UintMapToString(stat, value);
     }
 
@@ -3354,11 +3361,15 @@ public:
             if (it == CT->NetClass.Fold->ClassStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");
             value = std::to_string(it->second.*Member);
-        } else if (CT->Net) {
+        } else if (CT->Net && !CT->Net->IsHost()) {
             auto it = CT->Net->DeviceStat.find(index);
             if (it == CT->Net->DeviceStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");
             value = std::to_string(it->second.*Member);
+        } else if (SockStat && TNLinkSockDiag::IsEnabled()) {
+            if (index != "Total")
+                return TError(EError::InvalidValue, "network device " + index + " not found");
+            value = std::to_string(CT->SockStat.*Member);
         }
         return OK;
     }

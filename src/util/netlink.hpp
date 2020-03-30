@@ -3,8 +3,11 @@
 #include <string>
 #include <functional>
 #include <memory>
+#include <unordered_set>
+#include <unordered_map>
 
 #include "common.hpp"
+#include "tcp_info.hpp"
 extern "C" {
 #include <arpa/inet.h>
 #include <linux/netlink.h>
@@ -16,6 +19,7 @@ struct rtnl_link;
 struct nl_cache;
 struct nl_addr;
 class TNlLink;
+class TNLinkSockDiag;
 
 class TNlAddr {
 public:
@@ -74,6 +78,35 @@ public:
     TError PermanentNeighbour(int ifindex, const TNlAddr &addr,
                               const TNlAddr &lladdr, bool add);
     TError AddrLabel(const TNlAddr &prefix, uint32_t label);
+};
+
+
+struct TSockStat {
+    uint64_t TxBytes = 0;
+    uint64_t RxBytes = 0;
+    uint64_t TxPackets = 0;
+    uint64_t RxPackets = 0;
+};
+
+class TNLinkSockDiag : public TNonCopyable {
+    typedef std::unordered_map<ino_t, struct tcp_info_ext> TTcpInfoMap;
+    typedef std::unique_ptr<TTcpInfoMap> TTcpInfoMapPtr;
+
+    struct nl_sock *Sock = nullptr;
+    TTcpInfoMapPtr TcpInfoMap;
+
+    TError FillTcpInfoMap();
+    static int ValidMsgCb(struct nl_msg *msg, void *arg);
+
+public:
+    static TError Error(int nl_err, const std::string &desc);
+    static bool IsEnabled();
+
+    TError Connect();
+    void Disconnect();
+    TError UpdateData();
+
+    void GetSocketsStats(const std::unordered_set<ino_t> &sockets, std::unordered_map<ino_t, TSockStat> &stats);
 };
 
 class TNlLink : public TNonCopyable {

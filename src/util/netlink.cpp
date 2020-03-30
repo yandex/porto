@@ -15,8 +15,10 @@ extern "C" {
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_addrlabel.h>
+#include <linux/inet_diag.h>
 #include <linux/pkt_sched.h>
 #include <netinet/ether.h>
+#include <netlink/idiag/idiagnl.h>
 #include <netlink/route/class.h>
 #include <netlink/route/classifier.h>
 #include <netlink/route/cls/cgroup.h>
@@ -233,6 +235,100 @@ int TNl::GetFd() {
     return nl_socket_get_fd(Sock);
 }
 
+TError TNLinkSockDiag::Error(int nl_err, const std::string &prefix) {
+    return TNl::Error(nl_err, prefix);
+}
+
+bool TNLinkSockDiag::IsEnabled() {
+    return config().network().sock_diag_update_interval_ms();
+}
+
+TError TNLinkSockDiag::Connect() {
+    Sock = nl_socket_alloc();
+    if (!Sock)
+        return TError("Cannot allocate netlink socket");
+
+    auto ret = nl_socket_modify_cb(Sock, NL_CB_VALID, NL_CB_CUSTOM, ValidMsgCb, &TcpInfoMap);
+    if (ret < 0)
+        return Error(ret, "nl_socket_modify_cb");
+
+    ret = nl_connect(Sock, NETLINK_INET_DIAG);
+    if (ret < 0)
+        return Error(ret, "nl_connect");
+    return OK;
+}
+
+void TNLinkSockDiag::Disconnect() {
+    nl_socket_free(Sock);
+}
+
+TError TNLinkSockDiag::UpdateData() {
+    TcpInfoMap.reset(new TTcpInfoMap);
+
+    auto error = FillTcpInfoMap();
+    if (error)
+        return error;
+
+    return OK;
+}
+
+void TNLinkSockDiag::GetSocketsStats(const std::unordered_set<ino_t> &sockets, std::unordered_map<ino_t, TSockStat> &stats) {
+    stats.clear();
+
+    if (sockets.empty())
+        return;
+
+    for (const auto &info: *TcpInfoMap) {
+        if (sockets.find(info.first) == sockets.cend())
+            continue;
+        auto &stat = stats[info.first];
+        stat.TxBytes += info.second.tcpi_bytes_sent;
+        stat.RxBytes += info.second.tcpi_bytes_received;
+        stat.TxPackets += info.second.tcpi_segs_out;
+        stat.RxPackets += info.second.tcpi_segs_in;
+    }
+}
+
+TError TNLinkSockDiag::FillTcpInfoMap() {
+    struct nl_cb *cb = nl_socket_get_cb(Sock);
+
+    auto ret = idiagnl_send_simple(Sock, 0, AF_INET6, IDIAGNL_SS_ALL, INET_DIAG_INFO);
+    if (ret < 0)
+        return Error(ret, "idiagnl_send_simple");
+
+    ret = nl_recvmsgs(Sock, cb);
+    if (ret < 0)
+        return Error(ret, "nl_recvmsgs");
+
+    nl_cb_put(cb);
+
+    return OK;
+}
+
+static struct nla_policy ext_policy[INET_DIAG_MAX+1] = {
+    {}, // INET_DIAG_NONE
+    {}, // INET_DIAG_MEMINFO
+    { 0, sizeof(struct tcp_info_ext), 0 }, // INET_DIAG_INFO
+};
+
+int TNLinkSockDiag::ValidMsgCb(struct nl_msg *msg, void *arg) {
+    struct nlmsghdr *hdr = nlmsg_hdr(msg);
+    struct inet_diag_msg *raw_msg;
+    struct nlattr *tb[INET_DIAG_MAX+1];
+
+    TTcpInfoMap &TcpInfoMap = *((TTcpInfoMapPtr*)arg)->get();
+    if (nlmsg_parse(hdr, sizeof(struct inet_diag_msg), tb, INET_DIAG_MAX, ext_policy) < 0)
+        return 0;
+
+    raw_msg = (struct inet_diag_msg *)nlmsg_data(hdr);
+
+    if (tb[INET_DIAG_INFO]) {
+        struct tcp_info_ext *info = (struct tcp_info_ext *)nla_data(tb[INET_DIAG_INFO]);
+        TcpInfoMap[raw_msg->idiag_inode] = *info;
+    }
+
+    return NL_OK;
+}
 
 TNlLink::TNlLink(std::shared_ptr<TNl> sock, const std::string &name, int index) {
     Nl = sock;

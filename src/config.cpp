@@ -157,6 +157,8 @@ static void DefaultConfig() {
     config().mutable_network()->set_proxy_ndp_watchdog_ms(60000);
     config().mutable_network()->set_watchdog_ms(1000);
     config().mutable_network()->set_resolv_conf_watchdog_ms(5000);
+    config().mutable_network()->set_sock_diag_update_interval_ms(10000);
+    config().mutable_network()->set_sock_diag_max_fds(100000);
 
     config().mutable_network()->set_managed_ip6tnl(true);
     config().mutable_network()->set_managed_vlan(false);
