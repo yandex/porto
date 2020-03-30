@@ -8,6 +8,8 @@ message TConfig {
         optional uint32 watchdog_ms = 32;
 
         optional uint32 resolv_conf_watchdog_ms = 43;
+        optional uint32 sock_diag_update_interval_ms = 62;
+        optional uint32 sock_diag_max_fds = 63;
 
         optional uint32 cache_statistics_ms = 35;
 

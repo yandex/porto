@@ -9,10 +9,13 @@
 #include "client.hpp"
 #include "helpers.hpp"
 #include "util/log.hpp"
+#include "util/proc.hpp"
 #include "util/string.hpp"
 #include "util/crc32.hpp"
 
 extern "C" {
+#include <unistd.h>
+#include <fcntl.h>
 #include <linux/if.h>
 #include <netinet/ip6.h>
 #include <netinet/ether.h>
@@ -41,6 +44,8 @@ static std::thread NetThread;
 static std::condition_variable NetThreadCv;
 static uint64_t NetWatchdogPeriod;
 static uint64_t NetProxyNeighbourPeriod;
+static uint64_t SockDiagPeriod;
+static uint64_t SockDiagMaxFds;
 
 static std::string ResolvConfCurrent;
 static std::string ResolvConfPrev;
@@ -76,6 +81,8 @@ static TUintMap ContainerQdiscLimit;
 static TUintMap ContainerQdiscQuantum;
 
 static TUintMap IngressBurst;
+
+static TNLinkSockDiag SockDiag;
 
 static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.core.somaxconn", "128" },
@@ -400,6 +407,9 @@ void TNetwork::InitializeConfig() {
 
     NetWatchdogPeriod = config().network().watchdog_ms();
 
+    SockDiagPeriod = config().network().sock_diag_update_interval_ms();
+    SockDiagMaxFds = config().network().sock_diag_max_fds();
+
     NetProxyNeighbourPeriod = config().network().proxy_ndp_watchdog_ms();
 
     InitNamespacedNetSysctls();
@@ -491,6 +501,39 @@ void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
     net->NetInode = inode;
     net->StatTime = GetCurrentTimeMs();
     net->StatGen =  GlobalStatGen.load();
+}
+
+TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<ino_t> &sockets) {
+    sockets.clear();
+
+    for (const auto &pid : pids) {
+        TFile dir;
+
+        auto error = dir.OpenDir("/proc/" + std::to_string(pid) + "/fd");
+        if (error)
+            return TError("Cannot open: {}", error);
+
+        uint64_t fdSize;
+        error = GetFdSize(pid, fdSize);
+        if (error)
+            return error;
+
+        uint64_t fdsCount = 0;
+        struct stat st;
+
+        for (uint64_t i = 0; i < fdSize && fdsCount < SockDiagMaxFds; ++i) {
+            error = dir.StatAt(TPath(std::to_string(i)), true, st);
+            if (error) {
+                if (errno == ENOENT)
+                    continue;
+                return TError("Cannot fstatat:{}", error);
+            }
+            if (S_ISSOCK(st.st_mode))
+                sockets.insert(st.st_ino);
+            ++fdsCount;
+        }
+    }
+    return OK;
 }
 
 void TNetwork::Unregister() {
@@ -1753,9 +1796,63 @@ TError TNetwork::SyncResolvConf() {
     return OK;
 }
 
+void TNetwork::UpdateSockDiag() {
+    auto error = SockDiag.UpdateData();
+    if (error) {
+        L_ERR("Cannot update sock diag: {}", error);
+        RepairSockDiag();
+        return;
+    }
+
+    for (auto ct: HostNetwork->NetUsers) {
+        if (ct->State != EContainerState::Running)
+            continue;
+        auto freezer = ct->GetCgroup(FreezerSubsystem);
+
+        std::vector<pid_t> pids;
+        error = freezer.GetProcesses(pids);
+
+        if (error) {
+            L_ERR("Cannot get pids for CT{}:{}: {}", ct->Id, ct->Name, error);
+            continue;
+        }
+
+        std::unordered_set<ino_t> sockets;
+        error = GetSockets(pids, sockets);
+
+        if (error) {
+            L_ERR("Cannot get sockets for CT{}:{}: {}", ct->Id, ct->Name, error);
+            continue;
+        }
+
+        auto prevSocketsStats = std::move(ct->SocketsStats);
+        SockDiag.GetSocketsStats(sockets, ct->SocketsStats);
+
+        for (auto &it : ct->SocketsStats) {
+            auto itPrev = prevSocketsStats.find(it.first);
+            TSockStat prev;
+            if (itPrev != prevSocketsStats.end())
+                prev = itPrev->second;
+            ct->SockStat.TxBytes += it.second.TxBytes - prev.TxBytes;
+            ct->SockStat.RxBytes += it.second.RxBytes - prev.RxBytes;
+            ct->SockStat.TxPackets += it.second.TxPackets - prev.TxPackets;
+            ct->SockStat.RxPackets += it.second.RxPackets - prev.RxPackets;
+        }
+    }
+}
+
+void TNetwork::RepairSockDiag() {
+    SockDiag.Disconnect();
+    auto error = SockDiag.Connect();
+    if (error)
+        L_ERR("Cannot repair sock diag: {}", error);
+}
+
 void TNetwork::NetWatchdog() {
-    auto LastProxyNeighbour = GetCurrentTimeMs();
-    auto LastResolvConf = LastProxyNeighbour;
+    auto now = GetCurrentTimeMs();
+    auto LastProxyNeighbour = now;
+    auto LastResolvConf = now;
+    auto LastSockDiag = now;
     TError error;
 
     SetProcessName("portod-NET");
@@ -1778,6 +1875,10 @@ void TNetwork::NetWatchdog() {
         if (ResolvConfPeriod && GetCurrentTimeMs() - LastResolvConf >= ResolvConfPeriod) {
             TNetwork::SyncResolvConf();
             LastResolvConf = GetCurrentTimeMs();
+        }
+        if (TNetClass::IsDisabled() && SockDiagPeriod && GetCurrentTimeMs() - LastSockDiag >= SockDiagPeriod) {
+            TNetwork::UpdateSockDiag();
+            LastSockDiag = GetCurrentTimeMs();
         }
         auto lock = LockNetworks();
         NetThreadCv.wait_for(lock, std::chrono::milliseconds(NetWatchdogPeriod/2));
@@ -2117,6 +2218,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
         lock.unlock();
         NetThreadCv.notify_all();
         NetThread.join();
+        SockDiag.Disconnect();
     }
 
     for (auto &dev : env.Devices) {
@@ -3047,6 +3149,10 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
             Net->NatBaseV6.Parse(AF_INET6, config().network().nat_first_ipv6());
         if (config().network().has_nat_count())
             Net->NatBitmap.Resize(config().network().nat_count());
+
+        auto error = SockDiag.Connect();
+        if (error)
+            return TError("Cannot connect sock diag: {}", error);
 
         NetThread = std::thread(&TNetwork::NetWatchdog);
 

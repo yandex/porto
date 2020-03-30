@@ -44,7 +44,7 @@ add_executable(portod portod.cpp core.cpp cgroup.cpp rpc.cpp container.cpp
 		      epoll.cpp client.cpp stream.cpp helpers.cpp waiter.cpp)
 target_link_libraries(portod version porto util config
 			     rpc_proto kv_proto
-			     pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE})
+			     pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE} ${LIBNL_IDIAG})
 
 add_executable(portoctl portoctl.cpp cli.cpp)
 target_link_libraries(portoctl version porto util rt fmt ${PB})

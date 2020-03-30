@@ -211,6 +211,12 @@ def bps(ct):
     ct.Destroy()
     return res['end']['sum_sent']['bits_per_second'] / 2.**23
 
+def sent_bytes(ct):
+    ct.WaitContainer(5)
+    res = json.loads(ct['stdout'])
+    ct.Destroy()
+    return res['end']['sum_sent']['bytes']
+
 
 def run_host_limit_test():
     print "Test net_limit through qdisc classes"
@@ -373,6 +379,32 @@ network {
 
     run_classless_test()
 
+def run_sock_diag_test():
+    print "Test non mtn container net stat"
+
+    set_qdisc("fq_codel")
+
+    ConfigurePortod('test-net-sched', """
+network {
+    enable_host_net_classes: false,
+    watchdog_ms: 100,
+    sock_diag_update_interval_ms: 500,
+    default_qdisc: "default: %s"
+}
+""" % qdisc)
+
+    loss_bytes_coeff = 4.5 / 5 # (iperf_time - sock_diag_update_interval_ms) / iperf_time
+
+    a = run_iperf_client("test-net-a", server1, time=5, wait=6)
+    tx_bytes = int(a.GetProperty('net_tx_bytes[Total]'))
+    iperf_sent_bytes = sent_bytes(a)
+    ExpectRange(tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+
+    b = run_iperf_client("test-net-a", server1, time=5, wait=6, reverse=True)
+    rx_bytes = int(b.GetProperty('net_rx_bytes[Total]'))
+    iperf_sent_bytes = sent_bytes(b)
+    ExpectRange(rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+
 
 conn = porto.Connection()
 
@@ -389,6 +421,7 @@ try:
     run_hfsc_test(True)
     run_pfifo_fast_test()
     run_fq_codel_test()
+    run_sock_diag_test()
 
     # test switching
 

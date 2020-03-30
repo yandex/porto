@@ -278,6 +278,9 @@ public:
     /* Protected with NetStateMutex and container lock */
     TNetClass NetClass;
 
+    TNetStat SockStat;
+    std::unordered_map<ino_t, TSockStat> SocketsStats;
+
     TPath GetCwd() const;
     int GetExitCode() const;
 

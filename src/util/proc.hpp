@@ -11,3 +11,5 @@ public:
    TError Parse(pid_t pid);
    void Add(const TVmStat &a);
 };
+
+TError GetFdSize(pid_t pid, uint64_t &fdSize);
