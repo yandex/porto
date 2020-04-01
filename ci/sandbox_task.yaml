@@ -1,0 +1,15 @@
+---
+sandbox_task:
+  type: YA_MAKE_TGZ
+  description: test porto
+  arts: infra/porto/tests/env/xenial-4.19/test-results/pytest/testing_out_stuff
+  targets: infra/porto/tests/env/xenial-4.19
+  test: True
+  junit_report: True
+  use_aapi_fuse: True
+  resource_archive_check: True
+requirements:
+  cores: 4
+  ram: 8
+  platform: linux_ubuntu_16.04_xenial
+  dc: VLA
