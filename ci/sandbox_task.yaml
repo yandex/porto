@@ -12,4 +12,3 @@ requirements:
   cores: 4
   ram: 8
   platform: linux_ubuntu_16.04_xenial
-  dc: VLA
