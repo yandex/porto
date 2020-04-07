@@ -8,7 +8,7 @@ import re
 import collections
 from test_common import *
 
-remote_host = os.environ.get('PORTO_IPERF3_SERVER', None)
+remote_host = "fe00::2"
 
 if not remote_host:
     print "No remote host specified, skipping test"
@@ -23,16 +23,73 @@ qdisc = "htb"
 rate = 10
 
 
-def teardown_dummy():
-    subprocess.check_output(["ip", "link", "delete", "dummy-porto"])
-
-def setup_dummy():
+def teardown_local_veth(conn):
     try:
-        teardown_dummy()
+        conn.Destroy('veth-server1')
     except:
         pass
-    subprocess.check_output(["ip", "link", "add", "dummy-porto", "type", "dummy"])
-    subprocess.check_output(["ip", "address", "add", "fd00::1/64", "dev", "dummy-porto"])
+    try:
+        conn.Destroy('veth-server2')
+    except:
+        pass
+    ConfigurePortod('test-net-sched', "")
+    subprocess.check_output(["ip6tables", "-t", "nat", "-F"])
+    subprocess.check_output(["ip6tables", "-t", "raw", "-F"])
+    try:
+        subprocess.check_output(["ip", "link", "del", "dev", "veth1"])
+    except:
+        pass
+
+def setup_local_veth(conn):
+    try:
+        teardown_local_veth(conn)
+    except:
+        pass
+    subprocess.check_output(["ip", "link", "add", "veth1", "address", "52:54:00:00:72:55", "type", "veth", "peer", "name", "veth2", "address", "52:54:00:00:55:27"])
+    subprocess.check_output(["ip", "link", "set", "veth1", "up"])
+    subprocess.check_output(["ip", "link", "set", "veth2", "up"])
+    subprocess.check_output(["ip", "address", "add", "fd00::1/64", "dev", "veth1"])
+    subprocess.check_output(["ip", "-6", "nei", "add", "fe00::2", "dev", "veth1", "lladdr", "52:54:00:00:55:27", "nud", "permanent"])
+    subprocess.check_output(["ip", "-6", "nei", "add", "fe00::3", "dev", "veth2", "lladdr", "52:54:00:00:72:55", "nud", "permanent"])
+    subprocess.check_output(["ip", "-6", "route", "add", "fe00::2/128", "dev", "veth1"])
+    subprocess.check_output(["ip", "-6", "route", "add", "fe00::3/128", "dev", "veth2"])
+    subprocess.check_output(["ip6tables", "-t", "nat", "-A", "PREROUTING", "-d", "fe00::2", "-j", "DNAT", "--to-destination", "fd00::1", "-i", "veth2"])
+    subprocess.check_output(["ip6tables", "-t", "nat", "-A", "POSTROUTING", "-d", "fe00::2", "-j", "SNAT", "--to-source", "fe00::3", "-o", "veth1"])
+    ConfigurePortod('test-net-sched', """
+network {
+    managed_device: "veth1"
+}
+""")
+    run_iperf_server('veth-server1', 5201)
+    run_iperf_server('veth-server2', 5202)
+
+    cl = None
+    deadline = time.time() + 20
+    s = server1
+    while s and time.time() < deadline:
+        if not cl:
+            cl = run_iperf_client('cl', s, time=1, wait=0)
+
+        try:
+            w = cl.Wait(timeout_s=1)
+        except:
+            w = None
+
+        if not w:
+            continue
+
+        res = int(cl.GetProperty('exit_code'))
+        cl.Destroy()
+        cl = None
+        if res == 0:
+            if s == server2:
+                s = None
+            else:
+                s = server2
+
+    if s:
+        print "Cannot reliably start local iperf3 servers: %s" % str(s)
+        sys.exit(1)
 
 def setup_all_forwarding():
     subprocess.check_output(["sysctl", "-w", "net.ipv6.conf.all.forwarding=1"])
@@ -41,8 +98,11 @@ def qdisc_is_classful():
     return qdisc == "htb" or qdisc == "hfsc"
 
 def get_tx_queues_num():
-    queues = os.listdir("/sys/class/net/eth0/queues/")
-    return len([q for q in queues if q.startswith("tx")])
+    try:
+        queues = os.listdir("/sys/class/net/%s/queues/" % dev)
+        return len([q for q in queues if q.startswith("tx")])
+    except:
+        return 1
 
 tx_queues_num = get_tx_queues_num()
 
@@ -129,6 +189,10 @@ def run_iperf_client(name, server, wait=None, mtn=False, cs=None, reverse=False,
 
     ct = conn.Run(name, command=command, wait=wait, net=net, ip=ip, **cfg)
     if wait:
+        if int(ct['exit_code']) != 0:
+            print ct['stdout']
+            print ct['stderr']
+
         # check classes of dead container
         if qdisc_is_classful():
             check_porto_net_classes(ct)
@@ -136,10 +200,10 @@ def run_iperf_client(name, server, wait=None, mtn=False, cs=None, reverse=False,
             ExpectProp(ct, "net_class_id", "1:0")
     return ct
 
-def run_iperf_server(name):
-    command = "iperf3 --server --bind fd00::1"
+def run_iperf_server(name, port):
+    command = "bash -c \'while true; do iperf3 --server --bind fd00::1 -p %s ; done\'" % port
     print command
-    return conn.Run(name, command=command)
+    return conn.Run(name, command=command, weak=False)
 
 def bps(ct):
     ct.WaitContainer(5)
@@ -164,37 +228,29 @@ def run_host_limit_test():
 def run_mtn_limit_test():
     print "Test net_limit in MTN"
 
-    s = run_iperf_server("test-net-s")
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, cfg={"net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit %sM -> " % rate, res
     ExpectRange(res, rate * 0.9, rate * 1.1)
-    s.Destroy()
 
     print "Test net_rx_limit in MTN"
 
-    s = run_iperf_server("test-net-s")
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_rx_limit %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
-    s.Destroy()
 
     print "Test both net_limit and net_rx_limit in MTN"
 
-    s = run_iperf_server("test-net-s")
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=False, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit/net_rx_limit %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
-    s.Destroy()
 
-    s = run_iperf_server("test-net-s")
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit/net_rx_limit and reverse %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
-    s.Destroy()
 
 
 def run_bandwidth_sharing_test():
@@ -266,6 +322,7 @@ def run_htb_test(bandwidth_sharing=False):
 
     ConfigurePortod('test-net-sched', """
 network {
+    managed_device: "veth1"
     enable_host_net_classes: true
     device_ceil: "default: %sM
     device_rate: "default: %sM"
@@ -281,6 +338,7 @@ def run_hfsc_test(bandwidth_sharing=False):
 
     ConfigurePortod('test-net-sched', """
 network {
+    managed_device: "veth1"
     enable_host_net_classes: true
     device_ceil: "default: %sM"
     device_qdisc: "default: %s"
@@ -294,6 +352,7 @@ def run_pfifo_fast_test():
 
     ConfigurePortod('test-net-sched', """
 network {
+    managed_device: "veth1"
     enable_host_net_classes: false,
     default_qdisc: "default: %s"
 }
@@ -306,6 +365,7 @@ def run_fq_codel_test():
 
     ConfigurePortod('test-net-sched', """
 network {
+    managed_device: "veth1"
     enable_host_net_classes: false,
     default_qdisc: "default: %s"
 }
@@ -317,11 +377,11 @@ network {
 conn = porto.Connection()
 
 try:
-    print "Setup dummy iface for MTN tests"
-    setup_dummy()
-
     print "Set net.ipv6.conf.all.forwarding=1"
     setup_all_forwarding()
+
+    print "Setup local veth ifaces veth1/veth2 for iperf3 tests"
+    setup_local_veth(conn)
 
     # common tests
 
@@ -354,6 +414,5 @@ finally:
         conn.Destroy('test-net-s')
 
     print "Cleanup uplink limit"
-    ConfigurePortod('test-net-sched', "")
 
-    teardown_dummy()
+    teardown_local_veth(conn)
