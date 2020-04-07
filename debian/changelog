@@ -1,3 +1,18 @@
+yandex-porto (4.18.30) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * volume: Unlink nested links, this also kills nested volumes when common link dies Link: https://st.yandex-team.ru/PORTO-644 Signed-off-by: Alexander Kuznetsov wwfq@yandex-team.ru
+  * test: remove remaining volumes after volumes_links test
+
+  [ Dmitry Yakunin ]
+  * cgroup: fix cgroup2 tasks handling
+
+  [ Alexander Kuznetsov ]
+  * cgroup: make AttachAll as threads when pids cross with previous Link: https://st.yandex-team.ru/PORTO-654 Signed-off-by: Alexander Kuznetsov wwfq@yandex-team.ru
+  * volumes: store statFs in volume class and update it in additional thread Link: https://st.yandex-team.ru/PORTO-650 Signed-off-by: Alexander Kuznetsov wwfq@yandex-team.ru
+
+ -- max7255 <max7255@max7255-nix>  Tue, 07 Apr 2020 18:46:03 +0300
+
 yandex-porto (4.18.29) unstable; urgency=low
 
   [ Roman Anufriev ]
