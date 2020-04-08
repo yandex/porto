@@ -1,8 +1,8 @@
-#!/bin/sh -x
+#!/bin/sh
 
 for u in porto-alice porto-bob porto-charlie porto-david ; do
-	id $u && userdel $u
-	getent group ${u}-containers && groupdel ${u}-containers
+	id $u 1>/dev/null 2>&1 && userdel $u 1>/dev/null 2>&1
+	getent group ${u}-containers 1>/dev/null 2>&1 && groupdel ${u}-containers
 done
 
 # for g in porto porto-containers ; do
