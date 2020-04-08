@@ -90,7 +90,7 @@ static void DefaultConfig() {
     config().mutable_container()->set_max_total(3000);
     config().mutable_container()->set_empty_wait_timeout_ms(5000);
     config().mutable_container()->set_enable_cpu_reserve(true);
-    config().mutable_container()->set_rt_priority(10);
+    config().mutable_container()->set_rt_priority(0);
     config().mutable_container()->set_rt_nice(-20);
     config().mutable_container()->set_high_nice(-10);
     config().mutable_container()->set_enable_tracefs(true);
