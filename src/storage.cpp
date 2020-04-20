@@ -480,6 +480,19 @@ TError TStorage::Touch() {
     return error;
 }
 
+static bool TarSupportsCompressArgs() {
+    static bool tested = false, result = false;
+    if (!tested) {
+        TFile null;
+        result = !null.OpenReadWrite("/dev/null") &&
+                 !RunCommand({ "tar", "--create", "--use-compress-program=gzip --best",
+                               "--files-from", "/dev/null"}, TFile(), null, null);
+        L_SYS("tar {}supports compress program arguments", result ? "" : "not ");
+        tested = true;
+    }
+    return result;
+}
+
 static TError Compression(const TPath &archive, const TFile &arc,
                              const std::string &compress,
                              std::string &format, std::string &option) {
@@ -560,12 +573,15 @@ xz:
 zst:
     if (!arc && config().volumes().parallel_compression()) {
         if (TPath("/usr/bin/zstdmt").Exists()) {
-            option = "--use-compress-program=zstdmt -19";
+            if (TarSupportsCompressArgs())
+                option = "--use-compress-program=zstdmt -19";
+            else
+                option = "--use-compress-program=zstdmt ";
             return OK;
         }
     }
     if (TPath("/usr/bin/zstd").Exists()) {
-        if (!arc)
+        if (!arc && TarSupportsCompressArgs())
             option = "--use-compress-program=zstd -19";
         else
             option = "--use-compress-program=zstd";
