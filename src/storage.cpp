@@ -565,8 +565,11 @@ zst:
         }
     }
     if (TPath("/usr/bin/zstd").Exists()) {
-	 option = "--use-compress-program=zstd -19";
-	 return OK;
+        if (!arc)
+            option = "--use-compress-program=zstd -19";
+        else
+            option = "--use-compress-program=zstd";
+        return OK;
     }
     return TError(EError::NotSupported, "Compression: Can not find /usr/bin/zstd binary" );
 squash:
