@@ -53,8 +53,8 @@ static TPidFile PortodPidFile(PORTO_PIDFILE, PORTOD_NAME, "portod-slave");
 std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
-static pid_t MasterPid;
-static pid_t PortodPid;
+pid_t MasterPid;
+pid_t PortodPid;
 static int PortodStatus;
 
 static ino_t SocketIno = 0;
