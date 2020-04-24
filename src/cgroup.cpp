@@ -36,6 +36,9 @@ bool TCgroup::IsRestore = false;
 
 static std::map<std::string, std::vector<pid_t>> prevAttachedPidsMap;
 
+extern pid_t MasterPid;
+extern pid_t PortodPid;
+
 TPath TCgroup::Path() const {
     if (!Subsystem)
         return TPath();
@@ -409,6 +412,10 @@ TError TCgroup::KillAll(int signal) const {
             break;
         retry = false;
         for (auto pid: tasks) {
+            if (pid == MasterPid || pid == PortodPid) {
+                L_TAINT(fmt::format("Cannot kill portod process {}", pid));
+                continue;
+            }
             if (std::find(killed.begin(), killed.end(), pid) == killed.end()) {
                 if (kill(pid, signal) && errno != ESRCH && !error) {
                     error = TError::System("kill");
