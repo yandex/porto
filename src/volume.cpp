@@ -1921,8 +1921,8 @@ TError TVolume::Configure(const TPath &target_root) {
     if (error)
         return TError(error, "Volume {}", Path);
 
-    if (VolumeOwner.Gid != CL->Cred.Gid && !CL->IsSuperUser() &&
-            !CL->Cred.IsMemberOf(VolumeOwner.Gid))
+    if (VolumeOwner.GetGid() != CL->Cred.GetGid() && !CL->IsSuperUser() &&
+            !CL->Cred.IsMemberOf(VolumeOwner.GetGid()))
         return TError(EError::Permission, "Changing owner group is not permitted");
 
     /* Autodetect volume backend, prefer native or overlay */
@@ -3303,9 +3303,9 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
 
     ret[V_OWNER_USER] = VolumeOwner.User();
     ret[V_OWNER_GROUP] = VolumeOwner.Group();
-    if (VolumeCred.Uid != NoUser)
+    if (VolumeCred.GetUid() != NoUser)
         ret[V_USER] = VolumeCred.User();
-    if (VolumeCred.Gid != NoGroup)
+    if (VolumeCred.GetGid() != NoGroup)
         ret[V_GROUP] = VolumeCred.Group();
     ret[V_PERMISSIONS] = fmt::format("{:#o}", VolumePermissions);
     ret[V_CREATOR] = Creator;
@@ -3425,9 +3425,9 @@ TError TVolume::Save(bool locked) {
     node.Set(V_OWNER_USER, VolumeOwner.User());
     node.Set(V_OWNER_GROUP, VolumeOwner.Group());
 
-    if (VolumeCred.Uid != NoUser)
+    if (VolumeCred.GetUid() != NoUser)
         node.Set(V_USER, VolumeCred.User());
-    if (VolumeCred.Gid != NoGroup)
+    if (VolumeCred.GetGid() != NoGroup)
         node.Set(V_GROUP, VolumeCred.Group());
 
     node.Set(V_PERMISSIONS, fmt::format("{:#o}", VolumePermissions));

@@ -426,7 +426,7 @@ public:
     TTaskCred() : TProperty(P_TASK_CRED, EProperty::NONE,
             "Credentials: uid gid groups...") {}
     TError Get(std::string &value) {
-        value = fmt::format("{} {}", CT->TaskCred.Uid, CT->TaskCred.Gid);
+        value = fmt::format("{} {}", CT->TaskCred.GetUid(), CT->TaskCred.GetGid());
         for (auto gid: CT->TaskCred.Groups)
             value += fmt::format(" {}", gid);
         return OK;
@@ -449,26 +449,28 @@ public:
     TUser() : TProperty(P_USER, EProperty::USER,
             "Start command with given user") {}
     TError Get(std::string &value) {
-        value = UserName(CT->TaskCred.Uid);
+        value = CT->TaskCred.User();
         return OK;
     }
     TError Set(const std::string &username) {
         TCred cred;
         TError error = cred.Init(username);
         if (error) {
-            cred.Gid = CT->TaskCred.Gid;
-            error = UserId(username, cred.Uid);
+            cred.SetGid(CT->TaskCred.GetGid());
+            uid_t newUid;
+            error = UserId(username, newUid);
             if (error)
                 return error;
+            cred.SetUid(newUid);
         } else if (CT->HasProp(EProperty::GROUP))
-            cred.Gid = CT->TaskCred.Gid;
+            cred.SetGid(CT->TaskCred.GetGid());
         CT->TaskCred = cred;
         CT->SetProp(EProperty::USER);
         return OK;
     }
     TError Start(void) {
         if (CT->OsMode)
-            CT->TaskCred.Uid = RootUser;
+            CT->TaskCred.SetUid(RootUser);
         return OK;
     }
 } static User;
@@ -477,7 +479,7 @@ class TGroup : public TProperty {
 public:
     TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
     TError Get(std::string &value) {
-        value = GroupName(CT->TaskCred.Gid);
+        value = CT->TaskCred.Group();
         return OK;
     }
     TError Set(const std::string &groupname) {
@@ -485,13 +487,13 @@ public:
         TError error = GroupId(groupname, newGid);
         if (error)
             return error;
-        CT->TaskCred.Gid = newGid;
+        CT->TaskCred.SetGid(newGid);
         CT->SetProp(EProperty::GROUP);
         return OK;
     }
     TError Start(void) {
         if (CT->OsMode)
-            CT->TaskCred.Gid = RootGroup;
+            CT->TaskCred.SetGid(RootGroup);
         return OK;
     }
 } static Group;
@@ -501,7 +503,7 @@ public:
     TOwnerCred() : TProperty(P_OWNER_CRED, EProperty::NONE,
             "Owner credentials: uid gid groups...") {}
     TError Get(std::string &value) {
-        value = fmt::format("{} {}", CT->OwnerCred.Uid, CT->OwnerCred.Gid);
+        value = fmt::format("{} {}", CT->OwnerCred.GetUid(), CT->OwnerCred.GetGid());
         for (auto gid: CT->OwnerCred.Groups)
             value += fmt::format(" {}", gid);
         return OK;
@@ -529,13 +531,13 @@ public:
             "Container owner user") {}
 
     TError Get(std::string &value) {
-        value = UserName(CT->OwnerCred.Uid);
+        value = CT->OwnerCred.User();
         return OK;
     }
 
     TError Set(const std::string &username) {
         TCred newCred;
-        gid_t oldGid = CT->OwnerCred.Gid;
+        gid_t oldGid = CT->OwnerCred.GetGid();
         TError error = newCred.Init(username);
         if (error)
             return error;
@@ -544,7 +546,7 @@ public:
         if (newCred.IsMemberOf(oldGid) ||
                 CL->Cred.IsMemberOf(oldGid) ||
                 CL->IsSuperUser())
-            newCred.Gid = oldGid;
+            newCred.SetGid(oldGid);
 
         error = CL->CanControl(newCred);
         if (error)
@@ -563,7 +565,7 @@ public:
             "Container owner group") {}
 
     TError Get(std::string &value) {
-        value = GroupName(CT->OwnerCred.Gid);
+        value = CT->OwnerCred.Group();
         return OK;
     }
 
@@ -579,7 +581,7 @@ public:
             return TError(EError::Permission, "Desired group : " + groupname +
                     " isn't in current user supplementary group list");
 
-        CT->OwnerCred.Gid = newGid;
+        CT->OwnerCred.SetGid(newGid);
         CT->SetProp(EProperty::OWNER_GROUP);
         return OK;
     }

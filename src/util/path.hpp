@@ -146,7 +146,7 @@ public:
     TError Chown(uid_t uid, gid_t gid) const;
 
     TError Chown(const TCred &cred) const {
-        return Chown(cred.Uid, cred.Gid);
+        return Chown(cred.GetUid(), cred.GetGid());
     }
 
     TError Chmod(const int mode) const;
@@ -284,12 +284,12 @@ public:
     TError ReadlinkAt(const TPath &path, TPath &target) const;
     TError Chown(uid_t uid, gid_t gid) const;
     TError Chown(const TCred &cred) const {
-        return Chown(cred.Uid, cred.Gid);
+        return Chown(cred.GetUid(), cred.GetGid());
     }
     TError Chmod(mode_t mode) const;
     TError ChownAt(const TPath &path, uid_t uid, gid_t gid) const;
     TError ChownAt(const TPath &path, const TCred &cred) const {
-        return ChownAt(path, cred.Uid, cred.Gid);
+        return ChownAt(path, cred.GetUid(), cred.GetGid());
     }
     TError ChmodAt(const TPath &path, mode_t mode) const;
     TError Touch() const;

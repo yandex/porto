@@ -27,12 +27,28 @@ extern gid_t PortoCtGroup;
 
 static constexpr const char * CRED_POSTFORK_TAINT_MESSAGE = "Credential function may deadlock in post-fork context";
 
-struct TCred {
+class TCred {
     uid_t Uid;
     gid_t Gid;
+    std::string UName;
+    std::string GName;
+
+    void UpdateUserName() {
+        UName = RootUser == Uid ? "root" : UserName(Uid);
+    }
+
+    void UpdateGroupName() {
+        GName = RootGroup == Gid ? "root" : GroupName(Gid);
+    }
+
+public:
     std::vector<gid_t> Groups;
 
-    TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
+    TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {
+        UpdateUserName();
+        UpdateGroupName();
+    }
+
     TCred() : Uid(NoUser), Gid(NoGroup) {}
 
     static TCred Current();
@@ -45,12 +61,30 @@ struct TCred {
 
     TError Apply() const;
 
+    uid_t GetUid() const {
+        return Uid;
+    }
+
+    gid_t GetGid() const {
+        return Gid;
+    }
+
+    void SetUid(uid_t uid) {
+        Uid = uid;
+        UpdateUserName();
+    }
+
+    void SetGid(gid_t gid) {
+        Gid = gid;
+        UpdateGroupName();
+    }
+
     std::string User() const {
-        return UserName(Uid);
+        return UName;
     }
 
     std::string Group() const {
-        return GroupName(Gid);
+        return GName;
     }
 
     bool IsRootUser() const { return Uid == RootUser; }

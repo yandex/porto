@@ -2400,7 +2400,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
 
     TaskEnv.Cred = TaskCred;
 
-    TaskEnv.LoginUid = OsMode ? -1 : OwnerCred.Uid;
+    TaskEnv.LoginUid = OsMode ? -1 : OwnerCred.GetUid();
 
     error = GetEnvironment(TaskEnv.Env);
     if (error)
@@ -2741,10 +2741,10 @@ TError TContainer::PrepareStart() {
 
     /* Check target task credentials */
     error = CL->CanControl(TaskCred);
-    if (!error && !OwnerCred.IsMemberOf(TaskCred.Gid) && !CL->IsSuperUser()) {
+    if (!error && !OwnerCred.IsMemberOf(TaskCred.GetGid()) && !CL->IsSuperUser()) {
         TCred cred;
         cred.Init(TaskCred.User());
-        if (!cred.IsMemberOf(TaskCred.Gid))
+        if (!cred.IsMemberOf(TaskCred.GetGid()))
             error = TError(EError::Permission, "Cannot control group " + TaskCred.Group());
     }
 
