@@ -1645,7 +1645,7 @@ uint32_t TFile::FsType() const {
 
 bool TFile::Access(const struct stat &st, const TCred &cred, enum AccessMode mode) {
     unsigned mask = mode;
-    if (cred.Uid == st.st_uid)
+    if (cred.GetUid() == st.st_uid)
         mask <<= 6;
     else if (cred.IsMemberOf(st.st_gid))
         mask <<= 3;

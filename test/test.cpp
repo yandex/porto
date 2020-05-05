@@ -352,8 +352,8 @@ void InitUsersAndGroups() {
     error = Bob.Init("porto-bob");
     ExpectOk(error);
 
-    ExpectNeq(Alice.Uid, Bob.Uid);
-    ExpectNeq(Alice.Gid, Bob.Gid);
+    ExpectNeq(Alice.GetUid(), Bob.GetUid());
+    ExpectNeq(Alice.GetGid(), Bob.GetGid());
 
     Expect(!Nobody.IsMemberOf(PortoGroup));
     Expect(Alice.IsMemberOf(PortoGroup));
@@ -372,8 +372,8 @@ void AsUser(Porto::Connection &api, TCred &cred) {
     AsRoot(api);
 
     ExpectEq(setgroups(cred.Groups.size(), cred.Groups.data()), 0);
-    ExpectEq(setregid(0, cred.Gid), 0);
-    ExpectEq(setreuid(0, cred.Uid), 0);
+    ExpectEq(setregid(0, cred.GetGid()), 0);
+    ExpectEq(setreuid(0, cred.GetUid()), 0);
 }
 
 void AsNobody(Porto::Connection &api) {

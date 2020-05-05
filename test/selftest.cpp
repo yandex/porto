@@ -1305,8 +1305,8 @@ static void TestUserGroupProperty(Porto::Connection &api) {
 
     GetUidGid(pid, uid, gid);
 
-    ExpectEq(uid, Alice.Uid);
-    ExpectEq(gid, Alice.Gid);
+    ExpectEq(uid, Alice.GetUid());
+    ExpectEq(gid, Alice.GetGid());
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check custom user & group" << std::endl;
@@ -1351,8 +1351,8 @@ static void TestUserGroupProperty(Porto::Connection &api) {
 
     GetUidGid(pid, uid, gid);
 
-    ExpectEq(uid, Bob.Uid);
-    ExpectEq(gid, Bob.Gid);
+    ExpectEq(uid, Bob.GetUid());
+    ExpectEq(gid, Bob.GetGid());
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check integer user & group" << std::endl;

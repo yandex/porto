@@ -93,16 +93,16 @@ TError TClient::IdentifyClient(bool initial) {
         return TError::System("Cannot identify client: getsockopt() failed");
 
     /* check that request from the same pid and container is still here */
-    if (!initial && Pid == cr.pid && TaskCred.Uid == cr.uid &&
-            TaskCred.Gid == cr.gid && ClientContainer &&
+    if (!initial && Pid == cr.pid && TaskCred.GetUid() == cr.uid &&
+            TaskCred.GetGid() == cr.gid && ClientContainer &&
             (ClientContainer->State == EContainerState::Running ||
              ClientContainer->State == EContainerState::Starting ||
              ClientContainer->State == EContainerState::Stopping ||
              ClientContainer->State == EContainerState::Meta))
         return OK;
 
-    TaskCred.Uid = cr.uid;
-    TaskCred.Gid = cr.gid;
+    TaskCred.SetUid(cr.uid);
+    TaskCred.SetGid(cr.gid);
     Pid = cr.pid;
 
     Cred = TaskCred;
@@ -322,7 +322,7 @@ TError TClient::CanControl(const TCred &other) {
     if (AccessLevel <= EAccessLevel::ReadOnly)
         return TError(EError::Permission, "Write access denied");
 
-    if (IsSuperUser() || Cred.Uid == other.Uid || other.IsUnknown())
+    if (IsSuperUser() || Cred.GetUid() == other.GetUid() || other.IsUnknown())
         return OK;
 
     /* Everybody can control users from group porto-containers */

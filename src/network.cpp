@@ -2501,8 +2501,8 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
                 return TError(EError::InvalidValue, "Invalid " + line);
             dev.Type = "tap";
             dev.Name = StringTrim(settings[1]);
-            dev.Tap.Uid = TaskCred.Uid;
-            dev.Tap.Gid = TaskCred.Gid;
+            dev.Tap.Uid = TaskCred.GetUid();
+            dev.Tap.Gid = TaskCred.GetGid();
         } else if (type == "MTU") {
             if (settings.size() != 3)
                 return TError(EError::InvalidValue, "Invalid " + line);

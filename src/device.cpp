@@ -101,7 +101,7 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
             return error;
         if (mode & ~0777)
             return TError(EError::InvalidValue, "invalid device mode: " + opt[3]);
-        if ((mode & ~(Mode & 0777)) && cred.Uid != Uid && !cred.IsRootUser())
+        if ((mode & ~(Mode & 0777)) && cred.GetUid() != Uid && !cred.IsRootUser())
             return TError(EError::Permission, "{} cannot change device {} permissions {:#o} to {:#o}",
                           cred.ToString(), Path, Mode & 0777, mode);
         Mode = mode | (Mode & ~0777);
@@ -112,7 +112,7 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
         error = UserId(opt[4], uid);
         if (error)
             return error;
-        if (uid != Uid && cred.Uid != Uid && !cred.IsRootUser())
+        if (uid != Uid && cred.GetUid() != Uid && !cred.IsRootUser())
             return TError(EError::Permission, "{} cannot change device {} uid {} to {}",
                           cred.ToString(), Path, UserName(Uid), UserName(uid));
         Uid = uid;
@@ -123,7 +123,7 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
         error = GroupId(opt[5], gid);
         if (error)
             return error;
-        if (gid != Gid && cred.Uid != Uid && !cred.IsRootUser())
+        if (gid != Gid && cred.GetUid() != Uid && !cred.IsRootUser())
             return TError(EError::Permission, "{} cannot change device {} gid {} to {}",
                           cred.ToString(), Path, GroupName(Gid), GroupName(gid));
         Gid = gid;
