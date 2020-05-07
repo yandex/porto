@@ -524,7 +524,8 @@ static TError TuneLimits() {
                 NR_SUPERUSER_CONTAINERS * 2 +
                 (config().daemon().ro_threads() +
                  config().daemon().rw_threads() +
-                 config().daemon().io_threads()) * 10 +
+                 config().daemon().io_threads() +
+                 config().daemon().vl_threads()) * 10 +
                 config().daemon().max_clients() +
                 NR_SUPERUSER_CLIENTS +
                 1000;

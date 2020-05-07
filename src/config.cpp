@@ -56,6 +56,7 @@ static void DefaultConfig() {
     config().mutable_daemon()->set_rw_threads(20);
     config().mutable_daemon()->set_ro_threads(10);
     config().mutable_daemon()->set_io_threads(5);
+    config().mutable_daemon()->set_vl_threads(5);
     config().mutable_daemon()->set_ptrace_protection(true);
 
     config().mutable_daemon()->set_max_clients(1000);

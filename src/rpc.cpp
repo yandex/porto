@@ -48,12 +48,6 @@ void TRequest::Classify() {
         Req.has_getvolume();
 
     IoReq =
-        Req.has_createvolume() ||
-        Req.has_tunevolume() ||
-        Req.has_linkvolume() ||
-        Req.has_unlinkvolume() ||
-        Req.has_linkvolumetarget() ||
-        Req.has_unlinkvolumetarget() ||
         Req.has_importlayer() ||
         Req.has_exportlayer() ||
         Req.has_removelayer() ||
@@ -61,7 +55,15 @@ void TRequest::Classify() {
         Req.has_exportstorage() ||
         Req.has_removestorage() ||
         Req.has_createmetastorage() ||
-        Req.has_removemetastorage() ||
+        Req.has_removemetastorage();
+
+    VlReq =
+        Req.has_createvolume() ||
+        Req.has_tunevolume() ||
+        Req.has_linkvolume() ||
+        Req.has_unlinkvolume() ||
+        Req.has_linkvolumetarget() ||
+        Req.has_unlinkvolumetarget() ||
         Req.has_newvolume();
 }
 
@@ -1904,17 +1906,20 @@ public:
 static TRequestQueue RwQueue("portod-RW");
 static TRequestQueue RoQueue("portod-RO");
 static TRequestQueue IoQueue("portod-IO");
+static TRequestQueue VlQueue("portod-VL"); // queue for volume operations
 
 void StartRpcQueue() {
     RwQueue.Start(config().daemon().rw_threads());
     RoQueue.Start(config().daemon().ro_threads());
     IoQueue.Start(config().daemon().io_threads());
+    VlQueue.Start(config().daemon().vl_threads());
 }
 
 void StopRpcQueue() {
     RwQueue.Stop();
     RoQueue.Stop();
     IoQueue.Stop();
+    VlQueue.Stop();
 }
 
 void QueueRpcRequest(std::unique_ptr<TRequest> &request) {
@@ -1925,6 +1930,8 @@ void QueueRpcRequest(std::unique_ptr<TRequest> &request) {
         RoQueue.Enqueue(request);
     else if (request->IoReq)
         IoQueue.Enqueue(request);
+    else if (request->VlReq)
+        VlQueue.Enqueue(request);
     else
         RwQueue.Enqueue(request);
 }
