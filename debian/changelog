@@ -1,3 +1,40 @@
+yandex-porto (4.18.31) unstable; urgency=low
+
+  [ Roman Anufriev ]
+  * test/test-net-sched: increase waiting times again to prevent false timeouts
+  * test/test-oom: increase waiting time to prevent false timeout
+  * test/selftest: decrease number of containers to prevent tests timeout
+  * test/mem-overcommit: check if available RAM is sufficient for running test
+  * ci: add yaml file with test parameters
+
+  [ Dmitry Monakhov ]
+  * storage: Remove useless arguments on decompression
+  * storage: Do not pass compression arguments for old tar
+
+  [ Maxim Samoylov ]
+  * test/net-sched: test uplink qdisc limiter locally
+  * scripts: apply silencer on test environment scripts
+
+  [ Alexander Kuznetsov ]
+  * net: catch bytes/packets stat with netlink for containers by sockets
+
+  [ Dmitry Yakunin ]
+  * config: set default rt_priority to 0
+
+  [ Alexander Kuznetsov ]
+  * test: change previous porto version in prev_release_upgrade test to 4.18.27
+  * cred: resolve uid/gid-names only on changing
+  * cgroup: don't kill portod or master on KillAll
+  * test:config rt_priority before CheckRt in test-prev_release_upgrade
+  * volumes: move servicing of volume requests to dedicated queue
+  * config/layers: parameterize path to 'tar' binary Commit 754bb9c238bf010174b61e6a6d7f30a8d1f4c9ca upstream
+  * test: add testing of volume queue Commit 1b831bb9e8347e66c04261e12ec6cfde351d08fb upstream
+
+  [ Maxim Samoylov ]
+  * debian: add build dependency for libnl-idiag
+
+ -- max7255 <max7255@max7255-nix>  Fri, 08 May 2020 01:00:17 +0300
+
 yandex-porto (4.18.30) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
