@@ -167,6 +167,7 @@ message TConfig {
         optional uint32 io_threads = 24;
         optional bool ptrace_protection = 25;
         optional uint32 vl_threads = 26;
+        optional string tar_path = 27;
     }
 
     message TContainerCfg {
