@@ -57,6 +57,7 @@ static void DefaultConfig() {
     config().mutable_daemon()->set_ro_threads(10);
     config().mutable_daemon()->set_io_threads(5);
     config().mutable_daemon()->set_vl_threads(5);
+    config().mutable_daemon()->set_tar_path("tar");
 
     config().mutable_daemon()->set_max_clients(1000);
     config().mutable_daemon()->set_max_clients_in_container(500);

@@ -603,7 +603,7 @@ static bool TarSupportsXattrs() {
     if (!tested) {
         TFile null;
         result = !null.OpenReadWrite("/dev/null") &&
-                 !RunCommand({ "tar", "--create", "--xattrs",
+                 !RunCommand({ config().daemon().tar_path(), "--create", "--xattrs",
                                "--files-from", "/dev/null"}, TFile(), null, null);
         L_SYS("tar {}supports extended attributes", result ? "" : "not ");
         tested = true;
@@ -730,7 +730,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
     Statistics->LayerImport++;
 
     if (compress_format == "tar") {
-        TTuple args = { "tar",
+        TTuple args = { config().daemon().tar_path(),
                         "--numeric-owner",
                         "--preserve-permissions",
                         compress_option,
@@ -869,7 +869,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
     }
 
     if (compress_format == "tar") {
-        TTuple args = { "tar",
+        TTuple args = { config().daemon().tar_path(),
                         "--one-file-system",
                         "--numeric-owner",
                         "--preserve-permissions",
