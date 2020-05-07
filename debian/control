@@ -4,6 +4,7 @@ Build-Depends:
  cmake, debhelper (>= 8.0.0), pkg-config, autoconf, libtool,
  protobuf-compiler, libprotobuf-dev, libncurses5-dev,
  libnl-3-dev (>=3.2.27), libnl-route-3-dev (>=3.2.27),
+ libnl-idiag-3-dev (>=3.2.27),
  g++ (>= 4:4.7) | g++-4.7,
  dh-python, python-all, python-setuptools, python3-setuptools,
  bash-completion, pandoc
