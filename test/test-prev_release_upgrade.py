@@ -365,11 +365,22 @@ r = c.Find("rt_parent/rt_app")
 VerifyProps(r, rt_app_knobs)
 VerifySnapshot(r, snap_rt_app)
 CheckCaps(r)
-CheckRt(r)
+
+try:
+    AsRoot()
+    ConfigurePortod('test-prev_release_upgrade', """
+    container {
+        rt_priority: 10
+    }""")
+    AsAlice()
+
+    CheckRt(r)
+
+finally:
+    AsRoot()
+    ConfigurePortod('test-prev_release_upgrade', "")
 
 c.disconnect()
-
-AsRoot()
 
 print " - downgrade"
 
