@@ -29,6 +29,7 @@ struct TCore {
 	std::string Cwd;
 	std::string OwnerUser;
 	std::string OwnerGroup;
+	std::string State;
 
 	uid_t OwnerUid = -1;
 	gid_t OwnerGid = -1;

@@ -95,7 +95,8 @@ TError TCore::Handle(const TTuple &args) {
         return OK;
     }
 
-    if (CoreCommand != "") {
+    if (CoreCommand != "" &&
+        (State == TContainer::StateName(EContainerState::Running) || State == TContainer::StateName(EContainerState::Meta))) {
         L_CORE("Forward core from CT:{} {} {}:{} thread {}:{} signal {} dumpable {}",
                 Container, ExeName, Pid, ProcessName, Tid, ThreadName, Signal, Dumpable);
 
@@ -153,6 +154,7 @@ TError TCore::Identify() {
             Conn.GetProperty(Container, P_OWNER_USER, OwnerUser) ||
             Conn.GetProperty(Container, P_OWNER_GROUP, OwnerGroup) ||
             Conn.GetProperty(Container, P_CWD, Cwd) ||
+            Conn.GetProperty(Container, P_STATE, State) ||
             Conn.GetProperty(Container, P_ROOT_PATH, RootPath)) {
         int err;
         std::string msg;
