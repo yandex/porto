@@ -510,8 +510,11 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
         TFile dir;
 
         auto error = dir.OpenDir("/proc/" + std::to_string(pid) + "/fd");
-        if (error)
+        if (error) {
+            if (errno == ENOENT)
+                continue;
             return TError("Cannot open: {}", error);
+        }
 
         uint64_t fdSize;
         error = GetFdSize(pid, fdSize);
