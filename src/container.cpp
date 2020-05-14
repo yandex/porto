@@ -415,7 +415,10 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
 
     if (Level <= 1) {
         Controllers |= CGROUP_MEMORY | CGROUP_CPU | CGROUP_CPUACCT |
-                       CGROUP_NETCLS | CGROUP_DEVICES;
+                       CGROUP_DEVICES;
+
+        if (NetclsSubsystem.Supported)
+            Controllers |= CGROUP_NETCLS;
 
         if (BlkioSubsystem.Supported)
             Controllers |= CGROUP_BLKIO;
