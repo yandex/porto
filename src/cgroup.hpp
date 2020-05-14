@@ -302,6 +302,7 @@ public:
 class TNetclsSubsystem : public TSubsystem {
 public:
     bool HasPriority;
+    bool IsOptional() override { return !config().network().enable_host_net_classes(); }
     TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
     TError InitializeSubsystem() override;
     TError SetClass(TCgroup &cg, uint32_t classid) const;
