@@ -1689,7 +1689,7 @@ TError TContainer::DistributeCpus() {
             return error;
         }
 
-        error = CpusetSubsystem.SetMems(cg, "");
+        error = CpusetSubsystem.SetMems(cg, ct->CpuMems);
         if (error) {
             L("Cannot set mem affinity: {}", error);
             return error;
