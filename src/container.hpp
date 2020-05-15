@@ -219,6 +219,7 @@ public:
     TBitMap CpuAffinity;
     TBitMap CpuVacant;
     TBitMap CpuReserve;
+    std::string CpuMems;
 
     /* Under CpuAffinityMutex */
     uint64_t CpuGuaranteeSum = 0;

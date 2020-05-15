@@ -2094,13 +2094,29 @@ public:
             value = StringFormat("cores %u", CT->CpuSetArg);
             break;
         }
+
+        if (!CT->CpuMems.empty()) {
+            if (!value.empty())
+                value += "; ";
+            value += "mems " + CT->CpuMems;
+        }
+
         return OK;
     }
     TError Set(const std::string &value) {
-        auto cfg = SplitEscapedString(value, ' ');
-        auto lock = LockCpuAffinity();
+        auto cfgs = SplitEscapedString(value, ' ', ';');
+        std::string mems;
+        TTuple cfg;
         TError error;
 
+        for (const auto& v : cfgs) {
+            if (v.size() != 0 && v[0] != "mems")
+                cfg = v;
+            else if (v.size() == 2)
+                mems = v[1];
+        }
+
+        auto lock = LockCpuAffinity();
         ECpuSetType type;
         int arg = !CT->CpuSetArg;
 
@@ -2140,6 +2156,15 @@ public:
         } else
             return TError(EError::InvalidValue, "wrong format");
 
+        if (CT->CpuMems != mems) {
+            // FIXME don't forgot about childs and parents mems
+            auto cg = CT->GetCgroup(CpusetSubsystem);
+            error = CpusetSubsystem.SetMems(cg, mems);
+            if (!error)
+                CT->CpuMems = mems;
+            else
+                L_TAINT(fmt::format("Cannot set mems: {}", error));
+        }
         if (CT->CpuSetType != type || CT->CpuSetArg != arg) {
             CT->CpuSetType = type;
             CT->CpuSetArg = arg;
