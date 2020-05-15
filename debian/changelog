@@ -1,3 +1,15 @@
+yandex-porto (4.18.32) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * network: dont return error ENOENT on opening /proc/pid/fd
+  * core: don't forward core if container in stopping state
+  * property: add ability to change cpuset.mems by cpu_set property On this step skip SetMems errors. TODO: think about child containers when set cpuset.mems
+
+  [ Konstantin Khlebnikov ]
+  * cgroup: make net_cls optional if enable_host_net_classes=false
+
+ -- max7255 <max7255@max7255-nix>  Fri, 15 May 2020 20:48:04 +0300
+
 yandex-porto (4.18.31) unstable; urgency=low
 
   [ Roman Anufriev ]
