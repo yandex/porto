@@ -2478,8 +2478,13 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     link->HostTarget = host_target;
 
-    if (VolumeLinks.find(link->HostTarget) != VolumeLinks.end())
+    auto prevLinkIt = VolumeLinks.find(link->HostTarget);
+    if (prevLinkIt != VolumeLinks.end()) {
         L_WRN("Duplicate volume link: {}", link->HostTarget);
+
+        for (auto ct = prevLinkIt->second->Container; ct; ct = ct->Parent)
+            ct->VolumeMounts--;
+    }
 
     VolumeLinks[link->HostTarget] = link;
 
@@ -3743,6 +3748,9 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
     error = volume->CheckDependencies();
     if (error) {
         VolumeLinks.erase(volume->Path);
+        if (volume->Path == volume->InternalPath)
+            RootContainer->VolumeMounts--;
+
         return error;
     }
 
