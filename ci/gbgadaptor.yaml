@@ -1,0 +1,23 @@
+---
+sandbox_task:
+  type: BUILD_DEB_PACKAGE
+  description: build debian package
+  git_url: "{{bitbucket.repo_url}}"
+  git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
+  git_head: "{{bitbucket.ref_id}}"
+  gpg_public: robot-rtc-builder-gpg-public
+  gpg_private: robot-rtc-builder-gpg-private
+  platform: linux_ubuntu_16.04_xenial
+  install_dependencies: true
+  release_dist_repo: search-precise,search-trusty,search-xenial,search-bionic
+  release_upload_packages: true
+  save_packages: true
+  sign_packages: true
+  src_origin: git
+  ssh_login: robot-rtc-builder
+  ssh_private: robot-rtc-builder-ssh
+
+requirements:
+  cores: 32
+  ram: 128
+  platform: linux_ubuntu_16.04_xenial
