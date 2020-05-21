@@ -518,8 +518,11 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
 
         uint64_t fdSize;
         error = GetFdSize(pid, fdSize);
-        if (error)
+        if (error) {
+            if (errno == ENOENT)
+                continue;
             return error;
+        }
 
         uint64_t fdsCount = 0;
         struct stat st;
