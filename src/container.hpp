@@ -76,7 +76,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplySchedPolicy() const;
     TError ApplyIoPolicy() const;
     TError ApplyDeviceConf() const;
-    TError ApplyDynamicProperties();
+    TError ApplyDynamicProperties(bool onRestore = false);
     TError PrepareOomMonitor();
     void ShutdownOom();
     TError PrepareCgroups();

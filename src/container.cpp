@@ -680,7 +680,7 @@ TError TContainer::Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct)
                 MemorySubsystem.SetGuarantee(memCg, 0);
         }
 
-        error = ct->ApplyDynamicProperties();
+        error = ct->ApplyDynamicProperties(true);
         if (error)
             goto err;
 
@@ -1830,7 +1830,7 @@ TError TContainer::ApplyCpuLimit() {
 }
 
 
-TError TContainer::ApplyDynamicProperties() {
+TError TContainer::ApplyDynamicProperties(bool onRestore) {
     auto memcg = GetCgroup(MemorySubsystem);
     auto blkcg = GetCgroup(BlkioSubsystem);
     TError error;
@@ -2026,7 +2026,7 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (TestClearPropDirty(EProperty::ULIMIT)) {
+    if (TestClearPropDirty(EProperty::ULIMIT) && !onRestore) {
         for (auto &ct: Subtree()) {
             if (ct->State == EContainerState::Stopped ||
                     ct->State == EContainerState::Dead)
