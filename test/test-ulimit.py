@@ -45,3 +45,24 @@ ExpectUlimit(a, 'Max locked memory', '1056964608 unlimited bytes')
 a.Destroy()
 
 b.Destroy()
+
+
+def check_core_ulimit(pid, unlimited_count):
+    pr = subprocess.check_output(['prlimit', '-p', pid, '--core'])
+    assert unlimited_count == pr.count("unlimited")
+
+try:
+    a = c.Run("a", weak=False, command='sleep 20', ulimit='core: unlimited')
+    pid = a.GetProperty("root_pid")
+
+    check_core_ulimit(pid, 2)
+
+    subprocess.check_call(['prlimit', '-p', pid, '--core=0'])
+    check_core_ulimit(pid, 0)
+
+    ReloadPortod()
+
+    check_core_ulimit(pid, 0)
+
+finally:
+    a.Destroy()
