@@ -36,6 +36,26 @@ void TVmStat::Add(const TVmStat &other) {
         Stat[it.first] += it.second;
 }
 
+void TVmStat::Dump(rpc::TVmStat &s) {
+    #define DUMP_STAT_FIELD(f) s.set_##f(Stat[#f])
+    DUMP_STAT_FIELD(count);
+    DUMP_STAT_FIELD(size);
+    DUMP_STAT_FIELD(max_size);
+    DUMP_STAT_FIELD(used);
+    DUMP_STAT_FIELD(max_used);
+    DUMP_STAT_FIELD(anon);
+    DUMP_STAT_FIELD(file);
+    DUMP_STAT_FIELD(shmem);
+    DUMP_STAT_FIELD(huge);
+    DUMP_STAT_FIELD(swap);
+    DUMP_STAT_FIELD(data);
+    DUMP_STAT_FIELD(stack);
+    DUMP_STAT_FIELD(code);
+    DUMP_STAT_FIELD(locked);
+    DUMP_STAT_FIELD(table);
+    #undef DUMP_STAT_FIELD
+}
+
 TError TVmStat::Parse(pid_t pid) {
     std::string text, line;
     TError error;

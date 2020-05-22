@@ -332,6 +332,18 @@ class Container(object):
     def ListVolumeLinks(self):
         return self.conn.ListVolumeLinks(container=self)
 
+    def Dump(self):
+        spec = self.conn.GetContainersSpecs([self.name])
+        if len(spec) == 0:
+            raise exceptions.ContainerDoesNotExist
+        return spec[0]
+
+    def LoadSpec(self, new_spec):
+        spec = rpc_pb2.TContainerSpec()
+        spec.CopyFrom(new_spec)
+        spec.name = self.name
+        self.conn.SetSpec(spec)
+
 class Layer(object):
     def __init__(self, conn, name, place=None, pb=None):
         assert isinstance(conn, Connection)
@@ -676,6 +688,29 @@ class Connection(object):
             request.create.name = name
         self.rpc.call(request)
         return Container(self, name)
+
+    def GetContainersSpecs(self, names):
+        request = rpc_pb2.TContainerRequest()
+        for name in names:
+            filter = request.ListContainersBy.filters.add()
+            filter.name = name
+        resp = self.rpc.call(request)
+        return resp.ListContainersBy.containers
+
+    def SetSpec(self, spec):
+        request = rpc_pb2.TContainerRequest()
+        request.UpdateFromSpec.container.CopyFrom(spec)
+        resp = self.rpc.call(request)
+
+    def CreateSpec(self, container, volume=None, start=False):
+        request = rpc_pb2.TContainerRequest()
+        if container:
+            request.CreateFromSpec.container.CopyFrom(container)
+        if volume:
+            requers.CreateFromSpec.volume.CopyFrom(volume)
+        request.CreateFromSpec.start = start
+        resp = self.rpc.call(request)
+        return Container(self, container.name)
 
     def CreateWeakContainer(self, name):
         return self.Create(name, weak=True)

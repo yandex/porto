@@ -48,6 +48,7 @@ void TRequest::Classify() {
         Req.has_convertpath() ||
         Req.has_locateprocess() ||
         Req.has_getsystem() ||
+        Req.has_listcontainersby() ||
         Req.has_getvolume();
 
     IoReq =
@@ -293,6 +294,16 @@ void TRequest::Parse() {
     } else if (Req.has_newvolume()) {
         Cmd = "NewVolume";
         Arg = Req.newvolume().volume().path();
+    } else if (Req.has_createfromspec()) {
+        Cmd = "CreateFromSpec";
+        Arg = Req.createfromspec().container().name();
+        Opt = Req.createfromspec().ShortDebugString();
+    } else if (Req.has_updatefromspec()) {
+        Cmd = "UpdateFromSpec";
+        Arg = Req.updatefromspec().container().name();
+        Opt = Req.updatefromspec().ShortDebugString();
+    } else if (Req.has_listcontainersby()) {
+        Cmd = "ListContainersBy";
     } else if (Req.has_getvolume()) {
         Cmd = "GetVolume";
     } else
@@ -359,6 +370,155 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
         ret = "Ok";
 
     return ret;
+}
+
+noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
+    std::shared_ptr<TContainer> ct;
+    std::string name;
+    TError error;
+
+    error = CL->ResolveName(req.container().name(), name);
+    if (error)
+        return error;
+    error = TContainer::Create(name, ct);
+    ct->LockStateWrite();
+    ct->IsWeak = true;
+    ct->UnlockState();
+
+    if (error)
+        return error;
+
+    /* link volumes with container */
+    for (auto volume_spec: *req.mutable_volumes()) {
+        bool linked = false;
+        for (auto &link: *volume_spec.mutable_links())
+            linked |= link.container() == req.container().name();
+        if (!linked) {
+            auto link = volume_spec.add_links();
+            link->set_container(req.container().name());
+        }
+    }
+
+    error = CL->LockContainer(ct);
+    if (error)
+        return error;
+
+    error = ct->Load(req.container());
+    if (error)
+        goto undo;
+
+    if (req.container().weak()) {
+        ct->SetProp(EProperty::WEAK);
+        CL->WeakContainers.emplace_back(ct);
+    } else
+        ct->IsWeak = false;
+
+    CL->ReleaseContainer();
+
+    for (auto volume_spec: req.volumes()) {
+        if (!volume_spec.has_container()) {
+            auto link = volume_spec.add_links();
+            link->set_container(name);
+        }
+        if (!volume_spec.has_owner_container())
+            volume_spec.set_owner_container(name);
+
+        std::shared_ptr<TVolume> volume;
+
+        error = TVolume::Create(volume_spec, volume);
+        if (error) {
+            Statistics->VolumesFailed++;
+            goto undo;
+        }
+    }
+
+    error = CL->LockContainer(ct);
+    if (error)
+        return error;
+
+    if (req.start()) {
+        error = ct->Start();
+        if (error)
+            goto undo;
+    }
+
+    CL->ReleaseContainer();
+
+    return OK;
+
+undo:
+    std::list<std::shared_ptr<TVolume>> unlinked;
+    (void)ct->Destroy(unlinked);
+    CL->ReleaseContainer();
+    TVolume::DestroyUnlinked(unlinked);
+    return error;
+}
+
+noinline TError UpdateFromSpec(const rpc::TUpdateFromSpecRequest &req) {
+    std::shared_ptr<TContainer> ct;
+    TError error;
+
+    error = CL->WriteContainer(req.container().name(), ct);
+    if (error)
+        return error;
+
+    error = ct->Load(req.container(), true);
+    CL->ReleaseContainer();
+
+    return error;
+}
+
+noinline TError ListContainersBy(const rpc::TListContainersRequest &req,
+                             rpc::TListContainersResponse &rsp) {
+    std::vector<std::string> names, props;
+    std::unordered_map<std::string, std::string> propsOps;
+    TError error;
+
+    if (req.field_options().has_stdout_options()) {
+        propsOps["stdout"] = fmt::format("{}:{}",
+                                    req.field_options().stdout_options().stdstream_offset(),
+                                    req.field_options().stdout_options().stdstream_limit());
+    }
+
+    if (req.field_options().has_stderr_options()) {
+        propsOps["stderr"] = fmt::format("{}:{}",
+                                    req.field_options().stderr_options().stdstream_offset(),
+                                    req.field_options().stderr_options().stdstream_limit());
+    }
+
+    for(auto &prop: req.field_options().properties())
+        props.push_back(prop);
+
+    auto lock = LockContainers();
+    for (auto &it: Containers) {
+        auto &ct = it.second;
+        std::string name;
+        if (CL->ComposeName(ct->Name, name))
+            continue;
+        names.push_back(name);
+    }
+    lock.unlock();
+
+    for (const auto &name : names) {
+        std::shared_ptr<TContainer> ct;
+        lock.lock();
+        auto error = CL->ResolveContainer(name, ct);
+        lock.unlock();
+        if (error)
+            continue;
+        for (auto filter : req.filters()) {
+            if (StringMatch(name, filter.name())) {
+                if (filter.has_labels() && !ct->MatchLabels(filter.labels()))
+                    continue;
+
+                auto container = rsp.add_containers();
+                container->mutable_spec()->set_name(name);
+                ct->Dump(props, propsOps, *container);
+            }
+        }
+    }
+
+    return OK;
 }
 
 static noinline TError CreateContainer(std::string reqName, bool weak) {
@@ -1688,6 +1848,12 @@ void TRequest::Handle() {
         error = TError(EError::Permission, "Write access denied");
     else if (!RoReq && PortodFrozen && !Client->IsSuperUser())
         error = TError(EError::PortoFrozen, "Porto frozen, only root user might change anything");
+    else if (Req.has_createfromspec())
+        error = CreateFromSpec(*Req.mutable_createfromspec());
+    else if (Req.has_updatefromspec())
+        error = UpdateFromSpec(Req.updatefromspec());
+    else if (Req.has_listcontainersby())
+        error = ListContainersBy(Req.listcontainersby(), *rsp.mutable_listcontainersby());
     else if (Req.has_create())
         error = CreateContainer(Req.create().name(), false);
     else if (Req.has_createweak())

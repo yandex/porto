@@ -9,7 +9,14 @@
 namespace rpc {
     class TContainerRequest;
     class TContainerResponse;
+    class TGetContainerResponse;
+    class TContainerSpec;
+    class TContainer;
     class TStorageListResponse;
+    class TGetVolumeResponse;
+    class TVolumeSpec;
+    class TListContainersRequest;
+    class TGetVolumeRequest;
 }
 
 namespace Porto {
@@ -100,6 +107,8 @@ public:
 
     std::string GetLastError() const;
     void GetLastError(int &error, std::string &msg) const;
+
+    uint64_t ResponseTimestamp() const;
 
     int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp,
              int extra_timeout = 0);
@@ -216,6 +225,15 @@ public:
     int AttachThread(const std::string &name,
                      int pid, const std::string &comm);
     int LocateProcess(int pid, const std::string &comm, std::string &name);
+
+    int GetContainerSpec(const std::string &name, rpc::TContainer &container);
+    int ListContainersBy(const rpc::TListContainersRequest &listContainersRequest, std::vector<rpc::TContainer> &containers);
+    int CreateFromSpec(const rpc::TContainerSpec &container, std::vector<rpc::TVolumeSpec> volumes, bool start = false);
+    int UpdateFromSpec(const rpc::TContainerSpec &container);
+
+    int ListVolumesBy(const rpc::TGetVolumeRequest &getVolumeRequest, std::vector<rpc::TVolumeSpec> &volumes);
+
+    int CreateVolumeFromSpec(const rpc::TVolumeSpec &volume, rpc::TVolumeSpec &resultSpec);
 };
 
 } /* namespace Porto */

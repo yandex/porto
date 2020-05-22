@@ -132,7 +132,7 @@ TError TDevice::Parse(TTuple &opt, const TCred &cred) {
     return OK;
 }
 
-std::string TDevice::Format() const {
+std::string TDevice::FormatAccess() const {
     std::string perm;
 
     if (MayRead)
@@ -148,8 +148,40 @@ std::string TDevice::Format() const {
     if (Optional)
         perm += "?";
 
-    return fmt::format("{} {} {} {:#o} {} {}", Path, perm, PathInside,
+    return perm;
+}
+
+std::string TDevice::Format() const {
+    return fmt::format("{} {} {} {:#o} {} {}", Path, FormatAccess(), PathInside,
                        Mode & 0777, UserName(Uid), GroupName(Gid));
+}
+
+TError TDevice::Load(const rpc::TContainerDevice &dev, const TCred &cred) {
+    // for consistency with set(string)
+    TTuple cfg = {dev.device(), dev.access()};
+    if (dev.has_path()) {
+        cfg.push_back(dev.path());
+        if (dev.has_mode()) {
+            cfg.push_back(dev.mode());
+            if (dev.has_user()) {
+                cfg.push_back(dev.user());
+                if (dev.has_group()) {
+                    cfg.push_back(dev.group());
+                }
+            }
+        }
+    }
+
+    return Parse(cfg, cred);
+}
+
+void TDevice::Dump(rpc::TContainerDevice &dev) const {
+    dev.set_device(Path.ToString());
+    dev.set_access(FormatAccess());
+    dev.set_path(PathInside.ToString());
+    dev.set_mode(fmt::format("{:#o}",Mode & 0777));
+    dev.set_user(UserName(Uid));
+    dev.set_group(GroupName(Gid));
 }
 
 std::string TDevice::CgroupRule(bool allow) const {

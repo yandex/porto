@@ -55,6 +55,9 @@ ADD_PYTHON3_TEST(api)
 ADD_PYTHON_TEST(wait)
 ADD_PYTHON3_TEST(wait)
 
+ADD_PYTHON_TEST(spec)
+ADD_PYTHON3_TEST(spec)
+
 if(EXISTS /usr/bin/go AND EXISTS /usr/share/gocode/src/github.com/golang/protobuf)
 add_test(NAME go_api
          COMMAND sudo go test -v api/go/porto

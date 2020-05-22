@@ -81,6 +81,8 @@ enum EError {
 
     SocketTimeout = 504;
 
+    Taint = 666;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }
@@ -117,6 +119,10 @@ message TContainerRequest {
     optional TFindLabelRequest FindLabel = 20;
     optional TSetLabelRequest SetLabel = 21;
     optional TIncLabelRequest IncLabel = 22;
+
+    optional TCreateFromSpecRequest CreateFromSpec = 23;
+    optional TUpdateFromSpecRequest UpdateFromSpec = 24;
+    optional TListContainersRequest ListContainersBy = 25;
 
     optional TVolumePropertyListRequest listVolumeProperties = 103;
     optional TVolumeCreateRequest createVolume = 104;
@@ -199,6 +205,8 @@ message TContainerResponse {
     optional TSetLabelResponse SetLabel = 21;
     optional TIncLabelResponse IncLabel = 22;
 
+    optional TListContainersResponse ListContainersBy = 25;
+
     optional TNewVolumeResponse NewVolume = 126;
     optional TGetVolumeResponse GetVolume = 127;
 
@@ -210,12 +218,398 @@ message TContainerResponse {
 // Common objects
 
 
+message TStringMap {
+    message TStringMapEntry {
+        optional string key = 1;
+        optional string val = 2;
+    }
+    // TODO replace with map
+    // map<string, string> map = 1;
+    repeated TStringMapEntry map = 1;
+    optional bool merge = 2;        // in, default: replace
+}
+
+
+message TUintMap {
+    message TUintMapEntry {
+        optional string key = 1;
+        optional uint64 val = 2;
+    }
+    // TODO replace with map
+    // map<string, uint64> map = 1;
+    repeated TUintMapEntry map = 1;
+    optional bool merge = 2;        // in, default: replace
+}
+
+
+message TError {
+    optional EError error = 1 [ default = LostError ];
+    optional string msg = 2;
+}
+
+
 message TCred {
-    optional string user = 1;           // requires user or uid or both
+    optional string user = 1;       // requires user or uid or both
     optional fixed32 uid = 2;
     optional string group = 3;
     optional fixed32 gid = 4;
-    repeated fixed32 grp = 5;           // out, supplementary groups
+    repeated fixed32 grp = 5;       // out, supplementary groups
+}
+
+
+message TCapabilities {
+    repeated string cap = 1;
+    optional string hex = 2;        // out
+}
+
+
+// Container
+
+
+message TContainerEnvVar {
+    required string name = 1;
+    optional string value = 2;
+    optional bool unset = 3;        // out
+}
+
+message TContainerEnv {
+    repeated TContainerEnvVar var = 1;
+    optional bool merge = 2;        // in, default: replace
+}
+
+
+message TContainerUlimit {
+    required string type = 1;
+    optional bool unlimited = 2;
+    optional uint64 soft = 3;
+    optional uint64 hard = 4;
+    optional bool inherited = 5;    // out
+}
+
+message TContainerUlimits {
+    repeated TContainerUlimit ulimit = 1;
+    optional bool merge = 2;        // in, default: replace
+}
+
+
+message TContainerControllers {
+    repeated string controller = 1;
+}
+
+
+message TContainerCgroup {
+    required string controller = 1;
+    required string path = 2;
+    optional bool inherited = 3;
+}
+
+message TContainerCgroups {
+    repeated TContainerCgroup cgroup = 1;
+}
+
+
+message TContainerCpuSet {
+    optional string policy = 1;     // inherit|set|node|reserve|threads|cores
+    optional uint32 arg = 2;        // for node|reserve|threads|cores
+    optional string list = 3;       // for set
+    repeated uint32 cpu = 4;        // for set (used if list isn't set)
+    optional uint32 count = 5;      // out
+    optional string mems = 6;
+}
+
+
+message TContainerBindMount {
+    required string source = 1;
+    required string target = 2;
+    repeated string flag = 3;
+}
+
+message TContainerBindMounts {
+    repeated TContainerBindMount bind = 1;
+}
+
+
+message TContainerVolumeLink {
+    required string volume = 1;
+    optional string target = 2;
+    optional bool required = 3;
+    optional bool read_only = 4;
+}
+
+message TContainerVolumeLinks {
+    repeated TContainerVolumeLink link = 1;
+}
+
+
+message TContainerVolumes {
+    repeated string volume = 1;
+}
+
+
+message TContainerPlace {
+    required string place = 1;
+    optional string alias = 2;
+}
+
+message TContainerPlaceConfig {
+    repeated TContainerPlace cfg = 1;
+}
+
+
+message TContainerDevice {
+    required string device = 1;
+    required string access = 2;
+    optional string path = 3;
+    optional string mode = 4;
+    optional string user = 5;
+    optional string group = 6;
+}
+
+message TContainerDevices {
+    repeated TContainerDevice device = 1;
+    optional bool merge = 2;        // in, default: replace
+}
+
+
+message TContainerNetOption {
+    required string opt = 1;
+    repeated string arg = 2;
+}
+
+message TContainerNetConfig {
+    repeated TContainerNetOption cfg = 1;
+    optional bool inherited = 2;    // out
+}
+
+
+message TContainerIpLimit {
+    required string policy = 1;     // any|none|some
+    repeated string ip = 2;
+}
+
+
+message TContainerIpConfig {
+    message TContainerIp {
+        required string dev = 1;
+        required string ip = 2;
+    }
+    repeated TContainerIp cfg = 1;
+}
+
+
+message TVmStat {
+    optional uint64 count = 1;
+    optional uint64 size = 2;
+    optional uint64 max_size = 3;
+    optional uint64 used = 4;
+    optional uint64 max_used = 5;
+    optional uint64 anon = 6;
+    optional uint64 file = 7;
+    optional uint64 shmem = 8;
+    optional uint64 huge = 9;
+    optional uint64 swap = 10;
+    optional uint64 data = 11;
+    optional uint64 stack = 12;
+    optional uint64 code = 13;
+    optional uint64 locked = 14;
+    optional uint64 table = 15;
+}
+
+message TContainerStatus {
+    optional string absolute_name = 1;  // out, "/porto/..."
+    optional string state = 2;          // out
+    optional uint64 id = 3;             // out
+    optional uint32 level = 4;          // out
+    optional string parent = 5;         // out, "/porto/..."
+
+    optional string absolute_namespace = 6;    // out
+
+    optional int32 root_pid = 7;       // out
+    optional int32 exit_status = 8;    // out
+    optional int32 exit_code = 9;      // out
+    optional bool core_dumped = 10;     // out
+    optional TError start_error = 11;   // out
+    optional uint64 time = 12;          // out
+    optional uint64 dead_time = 13;     // out
+
+    optional TCapabilities capabilities_allowed = 14;           // out
+    optional TCapabilities capabilities_ambient_allowed = 15;   // out
+    optional string root_path = 16;     // out, in client namespace
+    optional uint64 stdout_offset = 17; // out
+    optional uint64 stderr_offset = 18; // out
+    optional string stderr = 69; // out
+    optional string stdout = 70; // out
+
+    optional uint64 creation_time = 19; // out
+    optional uint64 start_time = 20;    // out
+    optional uint64 death_time = 21;    // out
+    optional uint64 change_time = 22;   // out
+    optional bool no_changes = 23;      // out, change_time < changed_since
+
+    optional TContainerCgroups cgroups = 24;     // out
+    optional TContainerCpuSet cpu_set_affinity = 25;     // out
+
+    optional uint64 cpu_usage = 26;            // out
+    optional uint64 cpu_usage_system = 27;     // out
+    optional uint64 cpu_wait = 28;             // out
+    optional uint64 cpu_throttled = 29;        // out
+
+    optional uint64 process_count = 30;        // out
+    optional uint64 thread_count = 31;         // out
+    optional TUintMap io_read = 32;        // out, bytes
+    optional TUintMap io_write = 33;       // out, bytes
+    optional TUintMap io_ops = 34;         // out, ops
+    optional TUintMap io_time = 35;        // out, ns
+
+    optional TUintMap place_usage = 36;
+    optional uint64 memory_usage = 37;         // out, bytes
+
+    optional uint64 memory_guarantee_total = 38;   // out
+
+    optional uint64 memory_limit_total = 39;   // out
+
+    optional uint64 anon_limit_total = 40;
+    optional uint64 anon_usage = 41;           // out, bytes
+    optional double cpu_guarantee_total = 42;
+
+    optional uint64 cache_usage = 43;          // out, bytes
+
+    optional uint64 hugetlb_usage = 44;        // out, bytes
+    optional uint64 hugetlb_limit = 45;
+
+    optional uint64 minor_faults = 46;         // out
+    optional uint64 major_faults = 47;         // out
+    optional uint64 memory_reclaimed = 48;     // out
+    optional TVmStat virtual_memory = 49;      // out
+
+    optional uint64 oom_kills = 50;            // out
+    optional uint64 oom_kills_total = 51;      // out
+    optional bool oom_killed = 52;             // out
+
+    optional TUintMap net_bytes = 54;          // out
+    optional TUintMap net_packets = 55;        // out
+    optional TUintMap net_drops = 56;          // out
+    optional TUintMap net_overlimits = 57;     // out
+    optional TUintMap net_rx_bytes = 58;       // out
+    optional TUintMap net_rx_packets = 59;     // out
+    optional TUintMap net_rx_drops = 60;       // out
+    optional TUintMap net_tx_bytes = 61;       // out
+    optional TUintMap net_tx_packets = 62;     // out
+    optional TUintMap net_tx_drops = 63;       // out
+
+    optional TContainerVolumeLinks volumes_linked = 64; // out
+    optional TContainerVolumes volumes_owned = 65;
+
+    repeated TError error = 66;   // out
+    repeated TError warning = 67; // out
+    repeated TError taint = 68;   // out
+}
+
+message TContainerSpec {
+    required string name = 1;           // in client namespace
+    optional bool weak = 2;
+    optional string private = 3;
+    optional TStringMap labels = 4;
+
+    optional string command = 5;
+    optional TContainerEnv env = 6;
+    optional TContainerUlimits ulimit = 7;
+    optional string core_command = 8;
+
+    optional bool isolate = 9;
+    optional string virt_mode = 10;
+    optional string enable_porto = 11;
+    optional string porto_namespace = 12;
+
+    optional uint64 aging_time = 13;
+
+    optional TCred task_cred = 14;
+    optional string user = 15;
+    optional string group = 16;
+
+    optional TCred owner_cred = 17;
+    optional string owner_user = 18;
+    optional string owner_group = 19;
+
+    optional TCapabilities capabilities = 20;
+    optional TCapabilities capabilities_ambient = 21;
+
+    optional string root = 22;          // in parent namespace
+    optional bool root_readonly = 23;
+    optional TContainerBindMounts bind = 24;
+    optional TStringMap symlink = 25;
+    optional TContainerDevices devices = 26;
+    optional TContainerPlaceConfig place = 27;
+    optional TUintMap place_limit = 28;
+
+    optional string cwd = 29;
+    optional string stdin_path = 30;
+    optional string stdout_path = 31;
+    optional string stderr_path = 32;
+    optional uint64 stdout_limit = 33;
+    optional uint32 umask = 34;
+
+    optional bool respawn = 35;
+    optional uint64 respawn_count = 36;
+    optional uint64 max_respawns = 37;
+    optional uint64 respawn_delay = 38;
+
+    optional TContainerControllers controllers = 39;
+
+    optional string cpu_policy = 40;   // normal|idle|batch|high|rt
+    optional double cpu_weight = 41;   // 0.01 .. 100
+
+    optional double cpu_guarantee = 42;        // in cores
+    optional double cpu_limit = 43;            // in cores
+    optional double cpu_limit_total = 44;
+    optional uint64 cpu_period = 45;           // ns
+
+    optional TContainerCpuSet cpu_set = 46;
+
+    optional uint64 thread_limit = 47;
+
+    optional string io_policy = 48;    // none|rt|high|normal|batch|idle
+    optional double io_weight = 49;    // 0.01 .. 100
+
+    optional TUintMap io_limit = 50;       // bps
+    optional TUintMap io_ops_limit = 51;   // iops
+
+    optional uint64 memory_guarantee = 52;     // bytes
+
+    optional uint64 memory_limit = 53;         // bytes
+
+    optional uint64 anon_limit = 54;
+    optional uint64 anon_max_usage = 55;
+
+    optional uint64 dirty_limit = 56;
+
+    optional uint64 hugetlb_limit = 57;
+
+    optional bool recharge_on_pgfault = 58;
+    optional bool pressurize_on_death = 59;
+    optional bool anon_only = 60;
+
+    optional int32 oom_score_adj = 61;         // -1000 .. +1000
+    optional bool oom_is_fatal = 62;
+
+    optional TContainerNetConfig net = 63;
+    optional TContainerIpLimit ip_limit = 64;
+    optional TContainerIpConfig ip = 65;
+    optional TContainerIpConfig default_gw = 66;
+    optional string hostname = 67;
+    optional string resolv_conf = 68;
+    optional string etc_hosts = 69;
+    optional TStringMap sysctl = 70;
+    optional TUintMap net_guarantee = 71;      // bytes per second
+    optional TUintMap net_limit = 72;          // bytes per second
+    optional TUintMap net_rx_limit = 73;       // bytes per second
+
+    optional TContainerVolumes volumes_required = 75;
+}
+
+message TContainer {
+    required TContainerSpec spec = 1;
+    optional TContainerStatus status = 2;
 }
 
 
@@ -451,6 +845,41 @@ message TSetSystemRequest {
 message TSetSystemResponse {
 }
 
+message TCreateFromSpecRequest {
+    required TContainerSpec container = 1;
+    repeated TVolumeSpec volumes = 2;
+    optional bool start = 3;
+}
+
+message TUpdateFromSpecRequest {
+    required TContainerSpec container = 1;
+}
+
+message TListContainersFilter {
+    required string name = 1;    // name or wildcards, default: all
+    optional TStringMap labels = 2;
+    optional uint64 changed_since = 3;  // change_time >= changed_since
+}
+
+message TStreamDumpOptions {
+    required uint64 stdstream_offset = 2; // default: 0
+    required uint64 stdstream_limit = 3;  // default: 8Mb
+}
+
+message TListContainersFieldOptions {
+    repeated string properties = 1;       // property names, default: all
+    optional TStreamDumpOptions stdout_options = 2;    // for GetIndexed stdout
+    optional TStreamDumpOptions stderr_options = 3;    // for GetIndexed stderr
+}
+
+message TListContainersRequest {
+    repeated TListContainersFilter filters = 1;
+    optional TListContainersFieldOptions field_options = 2;
+}
+
+message TListContainersResponse {
+    repeated TContainer containers = 1;
+}
 
 // List available properties
 message TContainerPropertyListRequest {

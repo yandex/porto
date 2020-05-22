@@ -3720,6 +3720,107 @@ TError TContainer::SetProperty(const std::string &origProperty,
     return error;
 }
 
+bool TContainer::MatchLabels(const rpc::TStringMap &labels) const {
+    bool matchLabels = true;
+    for (const auto &label : labels.map()) {
+        bool matchLabel = false;
+        for (const auto &it: Labels) {
+            if (it.first == label.key() && it.second == label.val()) {
+                matchLabel = true;
+                break;
+            }
+        }
+        if (!matchLabel) {
+            matchLabels = false;
+            break;
+        }
+    }
+    return matchLabels;
+}
+
+TError TContainer::Load(const rpc::TContainerSpec &spec, bool restoreOnError) {
+    TError error;
+    rpc::TContainerSpec oldSpec;
+
+    PORTO_ASSERT(!CT);
+    CT = this;
+    LockStateWrite();
+    ChangeTime = time(nullptr);
+    for (auto &it :ContainerProperties) {
+        auto prop = it.second;
+        if (!prop->Has(spec))
+            continue;
+        error = prop->CanSet();
+        if (!error && prop->RequireControllers)
+            error = EnableControllers(prop->RequireControllers);
+        if (!error) {
+            if (restoreOnError)
+                prop->Dump(oldSpec);
+            error = prop->Load(spec);
+        }
+        if (error)
+            break;
+    }
+    SanitizeCapabilities();
+    UnlockState();
+    CT = nullptr;
+
+    if (!error && HasResources())
+        error = ApplyDynamicProperties();
+
+    if (!error)
+        error = Save();
+
+    if (error && restoreOnError)
+        Load(oldSpec, false);
+
+    return error;
+}
+
+void TContainer::Dump(const std::vector<std::string> &props, std::unordered_map<std::string, std::string> &propsOps, rpc::TContainer &spec) {
+    PORTO_ASSERT(!CT);
+    CT = this;
+    LockStateRead();
+    if (props.empty()) {
+        for (auto &it :ContainerProperties) {
+            auto prop = it.second;
+            if (!prop->CanGet()) {
+                if (prop->IsReadOnly)
+                    prop->Dump(*spec.mutable_status());
+                else
+                    prop->Dump(*spec.mutable_spec());
+            }
+        }
+    } else {
+        for (auto &p: props) {
+            auto it = ContainerProperties.find(p);
+            if (it == ContainerProperties.end()) {
+                TError(EError::InvalidProperty, "Unknown property {}", p).Dump(*spec.mutable_status()->add_error());
+                continue;
+            }
+            auto prop = it->second;
+            auto index = propsOps.find(prop->Name);
+
+            if (!prop->CanGet()) {
+                if (prop->IsReadOnly) {
+                    if (index == propsOps.end())
+                        prop->Dump(*spec.mutable_status());
+                    else
+                        prop->DumpIndexed(index->second, *spec.mutable_status());
+                }
+                else {
+                    if (index == propsOps.end())
+                        prop->Dump(*spec.mutable_spec());
+                    else
+                        prop->DumpIndexed(index->second, *spec.mutable_spec());
+                }
+            }
+        }
+    }
+    UnlockState();
+    CT = nullptr;
+}
+
 TError TContainer::Save(void) {
     TKeyValue node(ContainersKV / std::to_string(Id));
     TError error;

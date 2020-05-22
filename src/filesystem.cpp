@@ -97,6 +97,48 @@ std::string TBindMount::Format(const std::vector<TBindMount> &binds) {
     return MergeEscapeStrings(lines, ' ', ';');
 }
 
+TError TBindMount::Load(const rpc::TContainerBindMount &spec) {
+    TError error;
+    uint64_t flag;
+
+    Source = spec.source();
+    Target = spec.target();
+    MntFlags = 0;
+
+    for (const auto &flag_str: spec.flag()) {
+        error = TMount::ParseFlags(flag_str, flag,
+                                   MS_RDONLY | MS_ALLOW_WRITE |
+                                   MS_NODEV | MS_ALLOW_DEV |    /* check permissions at start */
+                                   MS_NOSUID | MS_ALLOW_SUID |
+                                   MS_NOEXEC | MS_ALLOW_EXEC |
+                                   MS_REC | MS_PRIVATE | MS_UNBINDABLE |
+                                   MS_NOATIME | MS_NODIRATIME | MS_RELATIME);
+        if (error)
+            return error;
+
+        MntFlags |= flag;
+    }
+
+    // by default disable backward propagation
+    if (!(MntFlags & (MS_PRIVATE | MS_UNBINDABLE)))
+        MntFlags |= MS_SLAVE | MS_SHARED;
+
+    // FIXME temporary hack
+    for (auto &src: config().container().rec_bind_hack())
+        if (Source == src)
+            MntFlags |= MS_REC;
+
+    return OK;
+}
+
+void TBindMount::Dump(rpc::TContainerBindMount &spec) {
+    spec.set_source(Source.ToString());
+    spec.set_target(Target.ToString());
+    for (uint64_t flag = 1; flag <= MntFlags && flag; flag <<= 1)
+        if (flag & (MntFlags & ~(MS_SLAVE | MS_SHARED)))
+            spec.add_flag(TMount::FormatFlags(flag));
+}
+
 TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
     bool directory;
     TFile src, dst;

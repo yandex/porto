@@ -261,6 +261,10 @@ void Connection::Close() {
     Impl->Close();
 }
 
+uint64_t Connection::ResponseTimestamp() const {
+    return Impl->Rsp.timestamp();
+}
+
 int Connection::Call(const rpc::TContainerRequest &req,
                      rpc::TContainerResponse &rsp,
                      int extra_timeout) {
@@ -895,6 +899,88 @@ int Connection::LocateProcess(int pid, const std::string &comm,
         return ret;
 
     name = Impl->Rsp.locateprocess().name();
+
+    return ret;
+}
+
+int Connection::GetContainerSpec(const std::string &name, rpc::TContainer &container) {
+    rpc::TListContainersRequest req;
+    auto filter = req.add_filters();
+    filter->set_name(name);
+
+    std::vector<rpc::TContainer> containers;
+
+    int ret = ListContainersBy(req, containers);
+    if (!ret && containers.size()) {
+        container = containers[0];
+        return EError::Success;
+    }
+
+    return ret;
+}
+
+int Connection::ListContainersBy(const rpc::TListContainersRequest &listContainersRequest, std::vector<rpc::TContainer> &containers) {
+    auto req = Impl->Req.mutable_listcontainersby();
+    *req = listContainersRequest;
+
+    int ret = Impl->Call();
+    if (ret)
+        return ret;
+
+    for (auto &ct : Impl->Rsp.listcontainersby().containers())
+        containers.push_back(ct);
+
+    return EError::Success;
+}
+
+int Connection::CreateFromSpec(const rpc::TContainerSpec &container, std::vector<rpc::TVolumeSpec> volumes, bool start) {
+    auto req = Impl->Req.mutable_createfromspec();
+
+    auto ct = req->mutable_container();
+    *ct = container;
+
+    for  (auto &volume : volumes) {
+        auto v = req->add_volumes();
+        *v = volume;
+    }
+
+    req->set_start(start);
+
+    return Impl->Call();
+}
+
+int Connection::UpdateFromSpec(const rpc::TContainerSpec &container) {
+    auto req = Impl->Req.mutable_updatefromspec();
+
+    auto ct = req->mutable_container();
+    *ct = container;
+
+    return Impl->Call();
+}
+
+int Connection::ListVolumesBy(const rpc::TGetVolumeRequest &getVolumeRequest, std::vector<rpc::TVolumeSpec> &volumes) {
+    auto req = Impl->Req.mutable_getvolume();
+    *req = getVolumeRequest;
+
+    int ret = Impl->Call();
+    if (ret)
+        return ret;
+
+    for (auto volume : Impl->Rsp.getvolume().volume())
+        volumes.push_back(volume);
+    return EError::Success;
+}
+
+int Connection::CreateVolumeFromSpec(const rpc::TVolumeSpec &volume, rpc::TVolumeSpec &resultSpec) {
+    auto req = Impl->Req.mutable_newvolume();
+    auto vol = req->mutable_volume();
+    *vol = volume;
+
+    int ret = Impl->Call();
+    if (ret)
+        return ret;
+
+    resultSpec =  Impl->Rsp.newvolume().volume();
 
     return ret;
 }
