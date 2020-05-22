@@ -77,6 +77,8 @@ public:
 
     TError Serialize(int fd) const;
     static bool Deserialize(int fd, TError &error);
+
+    void Dump(rpc::TError &error) const;
 };
 
 extern const TError OK;

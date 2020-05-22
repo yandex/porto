@@ -404,6 +404,37 @@ TError TCapabilities::Parse(const std::string &string) {
     return StringParseFlags(string, CapNames, Permitted, ';');
 }
 
+TError TCapabilities::Change(const std::string &name, bool set) {
+    for (auto &it: CapNames) {
+        if (it.second == name) {
+            if (set)
+                Permitted |= it.first;
+            else
+                Permitted &= ~it.first;
+            return OK;
+        }
+    }
+    return TError(EError::InvalidValue, "Unknown capability {}", name);
+}
+
+TError TCapabilities::Load(const rpc::TCapabilities &cap) {
+    Permitted = 0;
+    for (auto name: cap.cap()) {
+        TError error = Change(name, true);
+        if (error)
+            return error;
+    }
+    return OK;
+}
+
+void TCapabilities::Dump(rpc::TCapabilities &cap) const {
+    for (auto &it: CapNames) {
+        if (Permitted & it.first)
+            cap.add_cap(it.second);
+    }
+    cap.set_hex(fmt::format("{:016x}", Permitted));
+}
+
 TError TCapabilities::Get(pid_t pid, int type) {
     struct __user_cap_header_struct header = {
         .version = _LINUX_CAPABILITY_VERSION_3,

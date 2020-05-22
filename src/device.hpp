@@ -29,9 +29,13 @@ struct TDevice {
     TDevice(const TPath &path, dev_t node) : Path(path), PathInside(path), Node(node) {}
 
     TError Parse(TTuple &opt, const TCred &cred);
+    std::string FormatAccess() const;
     std::string Format() const;
     std::string CgroupRule(bool allow) const;
     TError Makedev(const TPath &root = "/") const;
+
+    TError Load(const rpc::TContainerDevice &dev, const TCred &cred);
+    void Dump(rpc::TContainerDevice &dev) const;
 };
 
 struct TDevices {

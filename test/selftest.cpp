@@ -3581,6 +3581,142 @@ static void TestLeaks(Porto::Connection &api) {
     ExpectLessEq(nowMaster, expMaster);
 }
 
+static void TestContainerSpec(Porto::Connection &api) {
+    Say() << "Check GetContainer spec api" << std::endl;
+    std::string tmp;
+    std::string c = "aaa";
+    std::string d = "bbb";
+
+    ExpectApiSuccess(api.Create(c));
+
+    ExpectApiSuccess(api.SetProperty(c, "command", "echo 1234567890"));
+    ExpectApiSuccess(api.SetProperty(c, "weak", "true"));
+
+    rpc::TContainer ctSpec;
+    ExpectApiSuccess(api.GetContainerSpec(c, ctSpec));
+
+    ExpectEq(ctSpec.spec().name(), c);
+    ExpectEq(ctSpec.status().state(), "stopped");
+    ExpectEq(ctSpec.spec().weak(), true);
+    ExpectEq(ctSpec.spec().command(), "echo 1234567890");
+    ExpectEq(ctSpec.spec().isolate(), true);
+    ExpectEq(ctSpec.status().level(), 1);
+    ExpectApiSuccess(api.SetProperty(c, "MY.qwer", "testLabel"));
+    ExpectApiSuccess(api.SetProperty(c, "MY.abc", "test1234"));
+
+    ExpectApiSuccess(api.Create(d));
+    ExpectApiSuccess(api.SetProperty(d, "MY.qwer", "testLabel"));
+    ExpectApiSuccess(api.SetProperty(d, "weak", "true"));
+
+    Say() << "Check labels filter and stdout property in spec" << std::endl;
+    {
+        ExpectApiSuccess(api.Start(c));
+
+        rpc::TListContainersRequest listContainersRequest;
+        auto filter = listContainersRequest.add_filters();
+        filter->set_name("*");
+        auto label = filter->mutable_labels()->add_map();
+        label->set_key("MY.qwer");
+        label->set_val("testLabel");
+
+        label = filter->mutable_labels()->add_map();
+        label->set_key("MY.abc");
+        label->set_val("test1234");
+
+        auto fieldOptions = listContainersRequest.mutable_field_options();
+
+        fieldOptions->add_properties("command");
+        fieldOptions->add_properties("stdout");
+        auto stdoutOps = fieldOptions->mutable_stdout_options();
+        stdoutOps->set_stdstream_limit(10);
+        stdoutOps->set_stdstream_offset(0);
+
+        std::vector<rpc::TContainer> containers;
+        ExpectApiSuccess(api.ListContainersBy(listContainersRequest, containers));
+        ExpectEq(containers.size(), 1);
+        Expect(containers[0].has_status());
+        Expect(containers[0].status().has_stdout());
+        ExpectEq(containers[0].status().stdout(), "1234567890");
+        ExpectEq(containers[0].status().stderr(), "");
+        ExpectApiSuccess(api.Stop(c));
+    }
+    ExpectApiSuccess(api.Destroy(d));
+
+    Say() << "Check UpdateFromSpec spec api" << std::endl;
+
+    rpc::TContainerSpec spec;
+
+    spec.set_command("sleep 15");
+    spec.set_name(c);
+    ExpectApiSuccess(api.UpdateFromSpec(spec));
+
+    ExpectApiSuccess(api.GetContainerSpec(c, ctSpec));
+    ExpectEq(ctSpec.spec().command(), "sleep 15");
+
+    ExpectApiSuccess(api.Destroy(c));
+
+    Say() << "Check NewContainer spec api" << std::endl;
+
+    spec.set_name(d);
+    ExpectApiSuccess(api.CreateFromSpec(spec, {}));
+    ExpectApiSuccess(api.GetContainerSpec(d, ctSpec));
+
+    ExpectEq(ctSpec.spec().name(), d);
+    ExpectEq(ctSpec.spec().command(), "sleep 15");
+    ExpectEq(ctSpec.status().state(), "stopped");
+    ExpectEq(ctSpec.status().level(), 1);
+
+    spec.set_enable_porto("errorrr");
+    spec.set_command("sleep 212");
+    ExpectApiFailure(api.UpdateFromSpec(spec), EError::InvalidValue);
+    ExpectApiSuccess(api.GetContainerSpec(d, ctSpec));
+    ExpectEq(ctSpec.spec().command(), "sleep 15");
+    ExpectEq(ctSpec.spec().enable_porto(), "true");
+    ExpectApiSuccess(api.Destroy(d));
+
+    spec.set_enable_porto("true");
+    spec.set_command("sleep 15");
+
+
+    ExpectApiSuccess(api.CreateFromSpec(spec, {rpc::TVolumeSpec(), rpc::TVolumeSpec()}, true));
+    ExpectApiSuccess(api.GetContainerSpec(d, ctSpec));
+    ExpectEq(ctSpec.status().state(), "running");
+    ExpectEq(ctSpec.spec().command(), "sleep 15");
+    ExpectEq(ctSpec.status().volumes_linked().link().size(), 2);
+
+    for (auto volume_linked : ctSpec.status().volumes_linked().link()) {
+        rpc::TGetVolumeRequest listVolumesRequest;
+        listVolumesRequest.add_path(volume_linked.volume());
+        std::vector<rpc::TVolumeSpec> volumes;
+
+        ExpectApiSuccess(api.ListVolumesBy(listVolumesRequest, volumes));
+        ExpectEq(volumes.size(), 1);
+        ExpectEq(volumes[0].owner_container(), d);
+    }
+
+    ExpectApiSuccess(api.Destroy(d));
+
+    Say() << "Check NewVolume spec api" << std::endl;
+    rpc::TVolumeSpec vpsec;
+    rpc::TVolumeSpec resultSpec;
+    ExpectApiSuccess(api.CreateVolumeFromSpec(vpsec, resultSpec));
+    ExpectEq(resultSpec.container(), "/");
+    ExpectNeq(resultSpec.path(), "");
+
+    Say() << "Check GewVolume spec api" << std::endl;
+
+    rpc::TGetVolumeRequest listVolumesRequest;
+    listVolumesRequest.add_path(resultSpec.path());
+    std::vector<rpc::TVolumeSpec> volumes;
+
+    ExpectApiSuccess(api.ListVolumesBy(listVolumesRequest, volumes));
+    ExpectEq(volumes.size(), 1);
+    ExpectEq(volumes[0].container(), "/");
+    ExpectEq(volumes[0].owner_container(), "/");
+
+    ExpectApiSuccess(api.UnlinkVolume(volumes[0].path()));
+}
+
 static void CleanupVolume(Porto::Connection &api, const std::string &path) {
     AsRoot(api);
     TPath dir(path);
@@ -4569,6 +4705,7 @@ int SelfTest(std::vector<std::string> args) {
         { "daemon", TestDaemon },
         { "convert", TestConvertPath },
         { "leaks", TestLeaks },
+        { "spec", TestContainerSpec },
 
         // the following tests will restart porto several times
         { "bad_client", TestBadClient },
