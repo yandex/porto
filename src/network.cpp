@@ -1810,7 +1810,13 @@ void TNetwork::UpdateSockDiag() {
         return;
     }
 
-    for (auto ct: HostNetwork->NetUsers) {
+    auto state_lock = LockNetState();
+    std::vector<std::shared_ptr<TContainer>> hostNetUsers(HostNetwork->NetUsers.size());
+    for (auto ct: HostNetwork->NetUsers)
+        hostNetUsers.emplace_back(ct->shared_from_this());
+    state_lock.unlock();
+
+    for (auto ct: hostNetUsers) {
         if (ct->State != EContainerState::Running)
             continue;
         auto freezer = ct->GetCgroup(FreezerSubsystem);
