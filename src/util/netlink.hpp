@@ -89,7 +89,7 @@ struct TSockStat {
 };
 
 class TNLinkSockDiag : public TNonCopyable {
-    typedef std::unordered_map<ino_t, struct tcp_info_ext> TTcpInfoMap;
+    typedef std::unordered_map<ino_t, struct tcp_info_ext_v2> TTcpInfoMap;
     typedef std::unique_ptr<TTcpInfoMap> TTcpInfoMapPtr;
 
     struct nl_sock *Sock = nullptr;
@@ -105,6 +105,11 @@ public:
     TError Connect();
     void Disconnect();
     TError UpdateData();
+    size_t TcpInfoMapSize() {
+        if (TcpInfoMap)
+            return TcpInfoMap->size();
+        return 0;
+    }
 
     void GetSocketsStats(const std::unordered_set<ino_t> &sockets, std::unordered_map<ino_t, TSockStat> &stats);
 };
