@@ -504,6 +504,7 @@ void TNetwork::Register(std::shared_ptr<TNetwork> &net, ino_t inode) {
 }
 
 TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<ino_t> &sockets) {
+    uint64_t fdsCount = 0;
     sockets.clear();
 
     for (const auto &pid : pids) {
@@ -524,7 +525,6 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
             return error;
         }
 
-        uint64_t fdsCount = 0;
         struct stat st;
 
         for (uint64_t i = 0; i < fdSize && fdsCount < SockDiagMaxFds; ++i) {
@@ -538,6 +538,10 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
                 sockets.insert(st.st_ino);
             ++fdsCount;
         }
+
+        /* Too many sockets in netns, break iteration */
+        if (fdsCount >= SockDiagMaxFds)
+            return OK;
     }
     return OK;
 }
@@ -1810,6 +1814,8 @@ void TNetwork::UpdateSockDiag() {
         return;
     }
 
+    L_DBG("Got sock diag for {} sockets", SockDiag.TcpInfoMapSize());
+
     auto state_lock = LockNetState();
     std::vector<std::shared_ptr<TContainer>> hostNetUsers(HostNetwork->NetUsers.size());
     for (auto ct: HostNetwork->NetUsers)
@@ -1840,16 +1846,23 @@ void TNetwork::UpdateSockDiag() {
         auto prevSocketsStats = std::move(ct->SocketsStats);
         SockDiag.GetSocketsStats(sockets, ct->SocketsStats);
 
+        auto now = GetCurrentTimeMs();
+
         for (auto &it : ct->SocketsStats) {
             auto itPrev = prevSocketsStats.find(it.first);
             TSockStat prev;
             if (itPrev != prevSocketsStats.end())
                 prev = itPrev->second;
-            ct->SockStat.TxBytes += it.second.TxBytes - prev.TxBytes;
-            ct->SockStat.RxBytes += it.second.RxBytes - prev.RxBytes;
-            ct->SockStat.TxPackets += it.second.TxPackets - prev.TxPackets;
-            ct->SockStat.RxPackets += it.second.RxPackets - prev.RxPackets;
+
+            state_lock.lock();
+            ct->SockStat.TxBytes += (it.second.TxBytes >= prev.TxBytes) ? (it.second.TxBytes - prev.TxBytes) : it.second.TxBytes;
+            ct->SockStat.RxBytes += (it.second.RxBytes >= prev.RxBytes) ? (it.second.RxBytes - prev.RxBytes) : it.second.RxBytes;
+            ct->SockStat.TxPackets += (it.second.TxPackets >= prev.TxPackets) ? (it.second.TxPackets - prev.TxPackets) : it.second.TxPackets;
+            ct->SockStat.RxPackets += (it.second.RxPackets >= prev.RxPackets) ? (it.second.RxPackets - prev.RxPackets) : it.second.RxPackets;
+            ct->SockStat.UpdateTs = now;
+            state_lock.unlock();
         }
+
     }
 }
 
@@ -1864,11 +1877,16 @@ void TNetwork::NetWatchdog() {
     auto now = GetCurrentTimeMs();
     auto LastProxyNeighbour = now;
     auto LastResolvConf = now;
-    auto LastSockDiag = now;
+    auto SockDiagDeadline = now;
     TError error;
 
     SetProcessName("portod-NET");
     while (HostNetwork) {
+        now = GetCurrentTimeMs();
+        if (TNetClass::IsDisabled() && SockDiagPeriod && now >= SockDiagDeadline) {
+            TNetwork::UpdateSockDiag();
+            SockDiagDeadline = now + SockDiagPeriod;
+        }
         auto nets = Networks();
         for (auto &net: *nets) {
             auto lock = net->LockNet();
@@ -1888,12 +1906,11 @@ void TNetwork::NetWatchdog() {
             TNetwork::SyncResolvConf();
             LastResolvConf = GetCurrentTimeMs();
         }
-        if (TNetClass::IsDisabled() && SockDiagPeriod && GetCurrentTimeMs() - LastSockDiag >= SockDiagPeriod) {
-            TNetwork::UpdateSockDiag();
-            LastSockDiag = GetCurrentTimeMs();
-        }
+
         auto lock = LockNetworks();
-        NetThreadCv.wait_for(lock, std::chrono::milliseconds(NetWatchdogPeriod/2));
+        now = GetCurrentTimeMs();
+        if (now < SockDiagDeadline)
+            NetThreadCv.wait_for(lock, std::chrono::milliseconds(std::min(SockDiagDeadline - now, NetWatchdogPeriod / 2)));
     }
 }
 

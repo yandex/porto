@@ -3346,7 +3346,7 @@ public:
         IsRuntimeOnly = true;
         ClassStat = Name == P_NET_BYTES || Name == P_NET_PACKETS ||
                     Name == P_NET_DROPS || Name == P_NET_OVERLIMITS;
-        SockStat = Name == P_NET_BYTES ||
+        SockStat = Name == P_NET_BYTES || Name == P_NET_PACKETS ||
                    Name == P_NET_TX_BYTES || Name == P_NET_RX_BYTES ||
                    Name == P_NET_TX_PACKETS || Name == P_NET_RX_PACKETS;
     }
@@ -3375,8 +3375,10 @@ public:
             for (auto &it: CT->Net->DeviceStat)
                 stat[it.first] = &it.second->*Member;
         } else if (SockStat && TNLinkSockDiag::IsEnabled()) {
-            stat["Total"] = CT->SockStat.*Member;
+            stat["Uplink"] = CT->SockStat.*Member;
+            stat["Latency"] = GetCurrentTimeMs() - CT->SockStat.UpdateTs;
         }
+
 
         return UintMapToString(stat, value);
     }
@@ -3394,9 +3396,13 @@ public:
                 return TError(EError::InvalidValue, "network device " + index + " not found");
             value = std::to_string(it->second.*Member);
         } else if (SockStat && TNLinkSockDiag::IsEnabled()) {
-            if (index != "Total")
+            if (index == "Latency") {
+                value = std::to_string(GetCurrentTimeMs() - CT->SockStat.UpdateTs);
+            } else if (index == "Uplink") {
+                value = std::to_string(CT->SockStat.*Member);
+            } else {
                 return TError(EError::InvalidValue, "network device " + index + " not found");
-            value = std::to_string(CT->SockStat.*Member);
+            }
         }
         return OK;
     }

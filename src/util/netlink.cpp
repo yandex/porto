@@ -305,25 +305,47 @@ TError TNLinkSockDiag::FillTcpInfoMap() {
     return OK;
 }
 
-static struct nla_policy ext_policy[INET_DIAG_MAX+1] = {
+static struct nla_policy ext_policy_v2[INET_DIAG_MAX+1] = {
     {}, // INET_DIAG_NONE
     {}, // INET_DIAG_MEMINFO
-    { 0, sizeof(struct tcp_info_ext), 0 }, // INET_DIAG_INFO
+    { 0, sizeof(struct tcp_info_ext_v2), 0 }, // INET_DIAG_INFO
+};
+
+static struct nla_policy ext_policy_v1[INET_DIAG_MAX+1] = {
+    {}, // INET_DIAG_NONE
+    {}, // INET_DIAG_MEMINFO
+    { 0, sizeof(struct tcp_info_ext_v1), 0 }, // INET_DIAG_INFO
 };
 
 int TNLinkSockDiag::ValidMsgCb(struct nl_msg *msg, void *arg) {
     struct nlmsghdr *hdr = nlmsg_hdr(msg);
     struct inet_diag_msg *raw_msg;
     struct nlattr *tb[INET_DIAG_MAX+1];
+    struct tcp_info_ext_v2 shadow;
+    struct tcp_info_ext_v2 *info = &shadow;
 
     TTcpInfoMap &TcpInfoMap = *((TTcpInfoMapPtr*)arg)->get();
-    if (nlmsg_parse(hdr, sizeof(struct inet_diag_msg), tb, INET_DIAG_MAX, ext_policy) < 0)
-        return 0;
+    if (nlmsg_parse(hdr, sizeof(struct inet_diag_msg), tb, INET_DIAG_MAX, ext_policy_v2) < 0) {
+        if (nlmsg_parse(hdr, sizeof(struct inet_diag_msg), tb, INET_DIAG_MAX, ext_policy_v1) < 0)
+            return 0;
+
+        //FIXME: copying only used fields now
+        struct tcp_info_ext_v1 *infov1 = (struct tcp_info_ext_v1 *)nla_data(tb[INET_DIAG_INFO]);
+        memset(&shadow, 0, sizeof(shadow));
+        shadow.tcpi_segs_out = infov1->tcpi_segs_out;
+        shadow.tcpi_segs_in = infov1->tcpi_segs_in;
+        shadow.tcpi_bytes_received = infov1->tcpi_bytes_received;
+        shadow.tcpi_bytes_acked = infov1->tcpi_bytes_acked;
+
+        /* substitute v2 field with similiar semantics from v1 */
+        shadow.tcpi_bytes_sent = infov1->tcpi_bytes_acked;
+    } else {
+        info = (struct tcp_info_ext_v2 *)nla_data(tb[INET_DIAG_INFO]);
+    }
 
     raw_msg = (struct inet_diag_msg *)nlmsg_data(hdr);
 
     if (tb[INET_DIAG_INFO]) {
-        struct tcp_info_ext *info = (struct tcp_info_ext *)nla_data(tb[INET_DIAG_INFO]);
         TcpInfoMap[raw_msg->idiag_inode] = *info;
     }
 

@@ -30,6 +30,8 @@ struct TNetStat {
     uint64_t RxDrops = 0lu;
     uint64_t RxOverruns = 0lu;
 
+    uint64_t UpdateTs = 0lu;
+
     void operator+=(const TNetStat &a) {
         TxBytes += a.TxBytes;
         TxPackets += a.TxPackets;
