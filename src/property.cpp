@@ -3352,16 +3352,15 @@ public:
     }
 
     TError Has() {
-        if (ClassStat) {
+        if (ClassStat && !TNetClass::IsDisabled()) {
             if (CT->State == EContainerState::Stopped)
                 return TError(EError::InvalidState, "Not available in stopped state");
             if (!(CT->Controllers & CGROUP_NETCLS))
                 return TError(EError::ResourceNotAvailable, "RequireControllers is disabled");
             return OK;
-        }
-
-        if (!CT->NetInherit || CT->IsRoot())
+        } else if (!CT->NetInherit || CT->IsRoot() || (SockStat && TNLinkSockDiag::IsEnabled()))
             return OK;
+
         return TError(EError::ResourceNotAvailable, "Shared network");
     }
 

@@ -1817,7 +1817,9 @@ void TNetwork::UpdateSockDiag() {
     L_DBG("Got sock diag for {} sockets", SockDiag.TcpInfoMapSize());
 
     auto state_lock = LockNetState();
-    std::vector<std::shared_ptr<TContainer>> hostNetUsers(HostNetwork->NetUsers.size());
+    std::vector<std::shared_ptr<TContainer>> hostNetUsers;
+    hostNetUsers.reserve(HostNetwork->NetUsers.size());
+
     for (auto ct: HostNetwork->NetUsers)
         hostNetUsers.emplace_back(ct->shared_from_this());
     state_lock.unlock();

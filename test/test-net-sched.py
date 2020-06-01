@@ -396,12 +396,12 @@ network {
     loss_bytes_coeff = 4.5 / 5 # (iperf_time - sock_diag_update_interval_ms) / iperf_time
 
     a = run_iperf_client("test-net-a", server1, time=5, wait=6)
-    tx_bytes = int(a.GetProperty('net_tx_bytes[Total]'))
+    tx_bytes = int(a.GetProperty('net_tx_bytes[Uplink]'))
     iperf_sent_bytes = sent_bytes(a)
     ExpectRange(tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
 
     b = run_iperf_client("test-net-a", server1, time=5, wait=6, reverse=True)
-    rx_bytes = int(b.GetProperty('net_rx_bytes[Total]'))
+    rx_bytes = int(b.GetProperty('net_rx_bytes[Uplink]'))
     iperf_sent_bytes = sent_bytes(b)
     ExpectRange(rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
 
