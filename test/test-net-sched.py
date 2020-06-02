@@ -393,17 +393,45 @@ network {
 }
 """ % qdisc)
 
-    loss_bytes_coeff = 4.5 / 5 # (iperf_time - sock_diag_update_interval_ms) / iperf_time
+    meta_a = conn.Create('meta-a', weak=True)
+    meta_a.Start()
 
-    a = run_iperf_client("test-net-a", server1, time=5, wait=6)
+    root_ct = conn.Find('/')
+    loss_bytes_coeff = 4.5 / 5 # (iperf_time - sock_diag_update_interval_ms) / iperf_time
+    iperf_total_sent = 0
+
+    # check ct stats
+    a = run_iperf_client("meta-a/test-net-a", server1, time=5, wait=6)
     tx_bytes = int(a.GetProperty('net_tx_bytes[Uplink]'))
     iperf_sent_bytes = sent_bytes(a)
     ExpectRange(tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
 
-    b = run_iperf_client("test-net-a", server1, time=5, wait=6, reverse=True)
+    # check parent stats
+    parent_tx_bytes = int(meta_a.GetProperty('net_tx_bytes[Uplink]'))
+    ExpectRange(parent_tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+
+    # check root container stats
+    iperf_total_sent += iperf_sent_bytes
+    root_tx_bytes = int(root_ct.GetProperty('net_tx_bytes[SockDiag]'))
+    root_rx_bytes = int(root_ct.GetProperty('net_rx_bytes[SockDiag]'))
+    ExpectRange(root_tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+    ExpectRange(root_rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+
+    # check ct stats
+    b = run_iperf_client("meta-a/test-net-a", server1, time=5, wait=6, reverse=True)
     rx_bytes = int(b.GetProperty('net_rx_bytes[Uplink]'))
     iperf_sent_bytes = sent_bytes(b)
     ExpectRange(rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+
+    # check parent stats
+    parent_rx_bytes = int(meta_a.GetProperty('net_rx_bytes[Uplink]'))
+    ExpectRange(parent_rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+
+    # check root container stats
+    iperf_total_sent += iperf_sent_bytes
+    root_rx_bytes = int(root_ct.GetProperty('net_rx_bytes[SockDiag]'))
+    root_tx_bytes = int(root_ct.GetProperty('net_tx_bytes[SockDiag]'))
+    ExpectRange(root_rx_bytes, loss_bytes_coeff * iperf_total_sent, iperf_total_sent)
 
 
 conn = porto.Connection()
