@@ -3370,9 +3370,11 @@ public:
         if (ClassStat && !TNetClass::IsDisabled()) {
             for (auto &it : CT->NetClass.Fold->ClassStat)
                 stat[it.first] = &it.second->*Member;
-        } else if (CT->Net && !CT->Net->IsHost()) {
+        } else if (CT->Net && (!CT->Net->IsHost() || CT->IsRoot())) {
             for (auto &it: CT->Net->DeviceStat)
                 stat[it.first] = &it.second->*Member;
+            if (CT->IsRoot() && SockStat && TNLinkSockDiag::IsEnabled())
+                stat["SockDiag"] = CT->SockStat.*Member;
         } else if (SockStat && TNLinkSockDiag::IsEnabled()) {
             stat["Uplink"] = CT->SockStat.*Member;
             stat["Latency"] = GetCurrentTimeMs() - CT->SockStat.UpdateTs;
@@ -3389,7 +3391,11 @@ public:
             if (it == CT->NetClass.Fold->ClassStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");
             value = std::to_string(it->second.*Member);
-        } else if (CT->Net && !CT->Net->IsHost()) {
+        } else if (CT->Net && (!CT->Net->IsHost()) || CT->IsRoot()) {
+            if (CT->IsRoot() && index == "SockDiag" && SockStat && TNLinkSockDiag::IsEnabled()) {
+                value = std::to_string(CT->SockStat.*Member);
+                return OK;
+            }
             auto it = CT->Net->DeviceStat.find(index);
             if (it == CT->Net->DeviceStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");

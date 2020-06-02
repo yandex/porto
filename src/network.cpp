@@ -1850,21 +1850,30 @@ void TNetwork::UpdateSockDiag() {
 
         auto now = GetCurrentTimeMs();
 
+        TNetStat statDiff;
+
         for (auto &it : ct->SocketsStats) {
             auto itPrev = prevSocketsStats.find(it.first);
             TSockStat prev;
             if (itPrev != prevSocketsStats.end())
                 prev = itPrev->second;
 
-            state_lock.lock();
-            ct->SockStat.TxBytes += (it.second.TxBytes >= prev.TxBytes) ? (it.second.TxBytes - prev.TxBytes) : it.second.TxBytes;
-            ct->SockStat.RxBytes += (it.second.RxBytes >= prev.RxBytes) ? (it.second.RxBytes - prev.RxBytes) : it.second.RxBytes;
-            ct->SockStat.TxPackets += (it.second.TxPackets >= prev.TxPackets) ? (it.second.TxPackets - prev.TxPackets) : it.second.TxPackets;
-            ct->SockStat.RxPackets += (it.second.RxPackets >= prev.RxPackets) ? (it.second.RxPackets - prev.RxPackets) : it.second.RxPackets;
-            ct->SockStat.UpdateTs = now;
-            state_lock.unlock();
+            statDiff.TxBytes += (it.second.TxBytes >= prev.TxBytes) ? (it.second.TxBytes - prev.TxBytes) : it.second.TxBytes;
+            statDiff.RxBytes += (it.second.RxBytes >= prev.RxBytes) ? (it.second.RxBytes - prev.RxBytes) : it.second.RxBytes;
+            statDiff.TxPackets += (it.second.TxPackets >= prev.TxPackets) ? (it.second.TxPackets - prev.TxPackets) : it.second.TxPackets;
+            statDiff.RxPackets += (it.second.RxPackets >= prev.RxPackets) ? (it.second.RxPackets - prev.RxPackets) : it.second.RxPackets;
         }
 
+        state_lock.lock();
+
+        ct->SockStat += statDiff;
+        ct->SockStat.UpdateTs = now;
+
+        for (auto parent = ct->Parent; parent; parent = parent->Parent) {
+            parent->SockStat += statDiff;
+            parent->SockStat.UpdateTs = now;
+        }
+        state_lock.unlock();
     }
 }
 
