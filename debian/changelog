@@ -1,3 +1,23 @@
+yandex-porto (4.18.33) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * ci: fix sandbox task result path
+  * network: dont return error ENOENT on opening /proc/pid/status
+  * network: fix segfault on UpdateSockStat when raw ptr invalid
+  * container: apply ulimits in container tasks only in dynamic, not on reload
+
+  [ Maxim Samoylov ]
+  * network: improve SOCK_DIAG stats collection
+
+  [ Alexander Kuznetsov ]
+  * volume: fix some bugs with incorrect VolumeMounts value
+  * property: fix 'has' method for SockStat test: fix net sched test
+
+  [ Dmitry Monakhov ]
+  * ci: add sandbox build config
+
+ -- max7255 <max7255@max7255-nix>  Tue, 02 Jun 2020 19:24:25 +0300
+
 yandex-porto (4.18.32) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
