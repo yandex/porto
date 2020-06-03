@@ -3391,7 +3391,7 @@ public:
             if (it == CT->NetClass.Fold->ClassStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");
             value = std::to_string(it->second.*Member);
-        } else if (CT->Net && (!CT->Net->IsHost()) || CT->IsRoot()) {
+        } else if (CT->Net && (!CT->Net->IsHost() || CT->IsRoot())) {
             if (CT->IsRoot() && index == "SockDiag" && SockStat && TNLinkSockDiag::IsEnabled()) {
                 value = std::to_string(CT->SockStat.*Member);
                 return OK;
