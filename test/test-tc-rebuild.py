@@ -16,24 +16,35 @@ def has_qdisc(link):
 def del_qdisc(link):
     subprocess.check_call(['tc', 'qdisc', 'del', 'root', 'dev', link])
 
-managed_links = [link for link in os.listdir('/sys/class/net') if has_qdisc(link)]
-assert managed_links
+ConfigurePortod('test-tc-rebuild', """
+network {
+    enable_host_net_classes: true,
+    default_qdisc: "default: codel",
+    container_qdisc: "default: fq_codel",
+}""")
 
-for link in managed_links:
-    del_qdisc(link)
-    assert not has_qdisc(link)
+try:
+    managed_links = [link for link in os.listdir('/sys/class/net') if has_qdisc(link)]
+    assert managed_links
+
+    for link in managed_links:
+        del_qdisc(link)
+        assert not has_qdisc(link)
 
 # start test container
-test = conn.Create('test')
-test.SetProperty('command', 'true')
-test.Start()
-test.Wait()
-assert test.GetData('exit_status') == '0'
-test.Destroy()
+    test = conn.Create('test')
+    test.SetProperty('command', 'true')
+    test.Start()
+    test.Wait()
+    assert test.GetData('exit_status') == '0'
+    test.Destroy()
 
 # recheck qdisc
-for link in managed_links:
-    assert has_qdisc(link)
+    for link in managed_links:
+        assert has_qdisc(link)
 
-ExpectEq(int(conn.GetData('/', 'porto_stat[errors]')), expected_errors)
-ExpectEq(int(conn.GetData('/', 'porto_stat[warnings]')), expected_warnings)
+    ExpectEq(int(conn.GetData('/', 'porto_stat[errors]')), expected_errors)
+    ExpectEq(int(conn.GetData('/', 'porto_stat[warnings]')), expected_warnings)
+
+finally:
+    ConfigurePortod('test-tc-rebuild', "")
