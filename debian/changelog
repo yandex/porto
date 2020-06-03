@@ -1,3 +1,14 @@
+yandex-porto (4.18.34) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * network: account child sock stat in parent containers
+  * property: fix condition in net property
+
+  [ Maxim Samoylov ]
+  * config: set classless config as default
+
+ -- max7255 <max7255@max7255-nix>  Wed, 03 Jun 2020 16:27:21 +0300
+
 yandex-porto (4.18.33) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
