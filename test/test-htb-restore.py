@@ -41,7 +41,10 @@ r = conn.Create("a")
 try:
     ConfigurePortod("htb-restore", """
 network {
-    device_qdisc: "default: hfsc"
+    device_qdisc: "default: hfsc",
+    enable_host_net_classes: true,
+    managed_ip6tnl: true,
+    enforce_unmanaged_defaults: true
 }
 """)
 
@@ -65,7 +68,10 @@ network {
 
     ConfigurePortod("htb-restore", """
 network {
-    device_qdisc: "default: htb"
+    device_qdisc: "default: htb",
+    enable_host_net_classes: true,
+    managed_ip6tnl: true,
+    enforce_unmanaged_defaults: true
 }
 """)
 
