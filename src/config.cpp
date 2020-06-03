@@ -141,16 +141,16 @@ static void DefaultConfig() {
 
     config().mutable_volumes()->set_fs_stat_update_interval_ms(60000);
 
-    config().mutable_network()->set_enable_host_net_classes(true);
+    config().mutable_network()->set_enable_host_net_classes(false);
 
     config().mutable_network()->set_device_qdisc("default: htb");
 
     config().mutable_network()->set_default_rate("default: 1250000");  /* 10Mbit */
-    config().mutable_network()->set_default_qdisc("default: codel");
+    config().mutable_network()->set_default_qdisc("default: fq_codel");
     config().mutable_network()->set_default_qdisc_limit("default: 10240");
 
     config().mutable_network()->set_container_rate("default: 125000");  /* 1Mbit */
-    config().mutable_network()->set_container_qdisc("default: codel");
+    config().mutable_network()->set_container_qdisc("default: fq_codel");
     config().mutable_network()->set_container_qdisc_limit("default: 10240");
 
     config().mutable_network()->set_autoconf_timeout_s(120);
@@ -162,9 +162,9 @@ static void DefaultConfig() {
     config().mutable_network()->set_sock_diag_update_interval_ms(5000);
     config().mutable_network()->set_sock_diag_max_fds(100000);
 
-    config().mutable_network()->set_managed_ip6tnl(true);
+    config().mutable_network()->set_managed_ip6tnl(false);
     config().mutable_network()->set_managed_vlan(false);
-    config().mutable_network()->set_enforce_unmanaged_defaults(true);
+    config().mutable_network()->set_enforce_unmanaged_defaults(false);
 
     config().mutable_network()->set_cache_statistics_ms(1000);
 
