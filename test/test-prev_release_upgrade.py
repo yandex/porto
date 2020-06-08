@@ -6,7 +6,7 @@ from test_common import *
 
 AsRoot()
 
-PREV_VERSION = "4.18.27"
+PREV_VERSION = "4.18.32"
 
 TMPDIR = "/tmp/test-release-upgrade"
 prev_portod = TMPDIR + "/old/usr/sbin/portod"
@@ -204,175 +204,175 @@ parent_knobs = [
     ("env", "CONTAINER=porto;PARENT=1")
 ]
 
-r = c.Create("parent_app")
-SetProps(r, parent_knobs)
-VerifyProps(r, parent_knobs)
-snap_parent_app = SnapshotProps(r)
-
-app_knobs = [
-    ("cpu_limit", "1c"),
-    ("private", "parent_app"),
-    ("respawn", False),
-    ("cpu_policy", "normal"),
-    ("memory_guarantee", "16384000"),
-    ("command", "sleep 20"),
-    ("memory_limit", "512000000"),
-    ("cwd", portosrc),
-    ("net_limit", "default: 0"),
-    ("cpu_guarantee", "0.01c"),
-    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
-    ("io_limit", "300000"),
-    ("isolate", False),
-    ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
-]
-
-r = c.Create("parent_app/app")
-SetProps(r, app_knobs)
-VerifyProps(r, app_knobs)
-snap_app = SnapshotProps(r)
-r.Start()
-
-v = c.CreateVolume(None, layers=["ubuntu-precise"])
-r = c.Create("parent_os")
-SetProps(r, parent_knobs)
-VerifyProps(r, parent_knobs)
-snap_parent_os = SnapshotProps(r)
-
-os_knobs = [
-    ("virt_mode", "os"),
-    ("porto_namespace", "parent"),
-    ("bind", "{} /portobin ro; {} /portosrc ro".format(portobin, portosrc)),
-    ("hostname", "shiny_os_container"),
-    ("root_readonly", False),
-    ("cpu_policy", "normal"),
-    ("memory_limit", "1024000000"),
-    ("command", "/sbin/init"),
-    ("env", "VIRT_MODE=os;BIND=;HOSTNAME=shiny_new_container;"\
-            "ROOT_READONLY=false;CPU_POLICY=normal;COMMAND=/sbin/init;"\
-            "NET=macvlan eth0 eth0;"\
-            "ROOT={};RECHARGE_ON_PGFAULT=true".format(v.path)),
-    ("net", "macvlan eth0 eth0"),
-    ("root", v.path),
-    ("recharge_on_pgfault", True)
-]
-
-r = c.Create("parent_os/os")
-SetProps(r, os_knobs)
-VerifyProps(r, os_knobs)
-snap_os = SnapshotProps(r)
-r.Start()
-
-rt_parent_knobs = [
-    ("private", "rt_parent"),
-    ("respawn", False),
-    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
-    ("isolate", True),
-    ("env", "CONTAINER=porto;PARENT=1")
-]
-
-r = c.Create("rt_parent")
-SetProps(r, rt_parent_knobs)
-VerifyProps(r, rt_parent_knobs)
-snap_rt_parent = SnapshotProps(r)
-
-rt_app_knobs = [
-    ("cpu_limit", "4c"),
-    ("private", "rt_app"),
-    ("respawn", False),
-    ("cpu_policy", "rt"),
-    ("memory_guarantee", "2000000000"),
-    ("command", "sleep 20"),
-    ("memory_limit", "2100000000"),
-    ("cwd", portosrc),
-    ("net_limit", "default: 0"),
-    ("cpu_guarantee", "4c"),
-    ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
-    ("recharge_on_pgfault", True),
-    ("isolate", False),
-    ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
-]
-
-r = c.Create("rt_parent/rt_app")
-SetProps(r, rt_app_knobs)
-VerifyProps(r, rt_app_knobs)
-snap_rt_app = SnapshotProps(r)
-r.Start()
-legacy_rt_settings = DumpLegacyRt(r)
-
-c.disconnect()
-
 AsRoot()
+ConfigurePortod('test-prev_release_upgrade', """
+container {
+    rt_priority: 10
+}""")
+AsAlice()
 
-print " - upgrade"
+try:
+    r = c.Create("parent_app")
+    SetProps(r, parent_knobs)
+    VerifyProps(r, parent_knobs)
+    snap_parent_app = SnapshotProps(r)
 
-subprocess.check_call([portod, "upgrade"])
+    app_knobs = [
+        ("cpu_limit", "1c"),
+        ("private", "parent_app"),
+        ("respawn", False),
+        ("cpu_policy", "normal"),
+        ("memory_guarantee", "16384000"),
+        ("command", "sleep 20"),
+        ("memory_limit", "512000000"),
+        ("cwd", portosrc),
+        ("net_limit", "default: 0"),
+        ("cpu_guarantee", "0.01c"),
+        ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
+        ("io_limit", "300000"),
+        ("isolate", False),
+        ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
+    ]
+
+    r = c.Create("parent_app/app")
+    SetProps(r, app_knobs)
+    VerifyProps(r, app_knobs)
+    snap_app = SnapshotProps(r)
+    r.Start()
+
+    v = c.CreateVolume(None, layers=["ubuntu-precise"])
+    r = c.Create("parent_os")
+    SetProps(r, parent_knobs)
+    VerifyProps(r, parent_knobs)
+    snap_parent_os = SnapshotProps(r)
+
+    os_knobs = [
+        ("virt_mode", "os"),
+        ("porto_namespace", "parent"),
+        ("bind", "{} /portobin ro; {} /portosrc ro".format(portobin, portosrc)),
+        ("hostname", "shiny_os_container"),
+        ("root_readonly", False),
+        ("cpu_policy", "normal"),
+        ("memory_limit", "1024000000"),
+        ("command", "/sbin/init"),
+        ("env", "VIRT_MODE=os;BIND=;HOSTNAME=shiny_new_container;"\
+                "ROOT_READONLY=false;CPU_POLICY=normal;COMMAND=/sbin/init;"\
+                "NET=macvlan eth0 eth0;"\
+                "ROOT={};RECHARGE_ON_PGFAULT=true".format(v.path)),
+        ("net", "macvlan eth0 eth0"),
+        ("root", v.path),
+        ("recharge_on_pgfault", True)
+    ]
+
+    r = c.Create("parent_os/os")
+    SetProps(r, os_knobs)
+    VerifyProps(r, os_knobs)
+    snap_os = SnapshotProps(r)
+    r.Start()
+
+    rt_parent_knobs = [
+        ("private", "rt_parent"),
+        ("respawn", False),
+        ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
+        ("isolate", True),
+        ("env", "CONTAINER=porto;PARENT=1")
+    ]
+
+    r = c.Create("rt_parent")
+    SetProps(r, rt_parent_knobs)
+    VerifyProps(r, rt_parent_knobs)
+    snap_rt_parent = SnapshotProps(r)
+
+    rt_app_knobs = [
+        ("cpu_limit", "4c"),
+        ("private", "rt_app"),
+        ("respawn", False),
+        ("cpu_policy", "rt"),
+        ("memory_guarantee", "2000000000"),
+        ("command", "sleep 20"),
+        ("memory_limit", "2100000000"),
+        ("cwd", portosrc),
+        ("net_limit", "default: 0"),
+        ("cpu_guarantee", "4c"),
+        ("ulimit", "data: 16000000 32000000; memlock: 4096 4096; nofile: 100 200; nproc: 500 1000; "),
+        ("recharge_on_pgfault", True),
+        ("isolate", False),
+        ("env", "CONTAINER=porto;PARENT=1;TAG=mytag mytag2 mytag3")
+    ]
+
+    r = c.Create("rt_parent/rt_app")
+    SetProps(r, rt_app_knobs)
+    VerifyProps(r, rt_app_knobs)
+    snap_rt_app = SnapshotProps(r)
+    r.Start()
+    legacy_rt_settings = DumpLegacyRt(r)
+
+    c.disconnect()
+
+    AsRoot()
+
+    print " - upgrade"
+
+    subprocess.check_call([portod, "upgrade"])
 
 #That means we've upgraded successfully
 
-AsAlice()
+    AsAlice()
 
-c = porto.Connection(timeout=3)
+    c = porto.Connection(timeout=3)
 
-ver, rev = c.Version()
-ExpectNe(ver, PREV_VERSION)
-CheckNetworkProblems()
+    ver, rev = c.Version()
+    ExpectNe(ver, PREV_VERSION)
+    CheckNetworkProblems()
 
-c.Wait(["test"])
+    c.Wait(["test"])
 
 #Checking if we can create subcontainers successfully (cgroup migration involved)
 
-r = c.Create("a")
-r.SetProperty("command", "bash -c '" + portoctl + " run -W self/a command=\"echo 123\"'")
-r.Start()
-assert r.Wait() == "a"
-assert r.GetProperty("exit_status") == "0"
+    r = c.Create("a")
+    r.SetProperty("command", "bash -c '" + portoctl + " run -W self/a command=\"echo 123\"'")
+    r.Start()
+    assert r.Wait() == "a"
+    assert r.GetProperty("exit_status") == "0"
 
-r2 = c.Find("a/a")
-r2.Wait() == "a/a"
-assert r2.GetProperty("exit_status") == "0"
-assert r2.GetProperty("stdout") == "123\n"
-r2.Destroy()
-r.Destroy()
+    r2 = c.Find("a/a")
+    r2.Wait() == "a/a"
+    assert r2.GetProperty("exit_status") == "0"
+    assert r2.GetProperty("stdout") == "123\n"
+    r2.Destroy()
+    r.Destroy()
 
-assert c.GetProperty("test", "exit_status") == "0"
+    assert c.GetProperty("test", "exit_status") == "0"
 
-r = c.Find("parent_app")
-VerifyProps(r, parent_knobs)
-VerifySnapshot(r, snap_parent_app)
-CheckCaps(r)
+    r = c.Find("parent_app")
+    VerifyProps(r, parent_knobs)
+    VerifySnapshot(r, snap_parent_app)
+    CheckCaps(r)
 
-r = c.Find("parent_app/app")
-VerifyProps(r, app_knobs)
-VerifySnapshot(r, snap_app)
-CheckCaps(r)
+    r = c.Find("parent_app/app")
+    VerifyProps(r, app_knobs)
+    VerifySnapshot(r, snap_app)
+    CheckCaps(r)
 
-r = c.Find("parent_os")
-VerifyProps(r, parent_knobs)
-VerifySnapshot(r, snap_parent_os)
-CheckCaps(r)
+    r = c.Find("parent_os")
+    VerifyProps(r, parent_knobs)
+    VerifySnapshot(r, snap_parent_os)
+    CheckCaps(r)
 
-r = c.Find("parent_os/os")
-VerifyProps(r, os_knobs)
-VerifySnapshot(r, snap_os)
-CheckCaps(r)
+    r = c.Find("parent_os/os")
+    VerifyProps(r, os_knobs)
+    VerifySnapshot(r, snap_os)
+    CheckCaps(r)
 
-r = c.Find("rt_parent")
-VerifyProps(r, rt_parent_knobs)
-VerifySnapshot(r, snap_rt_parent)
-CheckCaps(r)
+    r = c.Find("rt_parent")
+    VerifyProps(r, rt_parent_knobs)
+    VerifySnapshot(r, snap_rt_parent)
+    CheckCaps(r)
 
-r = c.Find("rt_parent/rt_app")
-VerifyProps(r, rt_app_knobs)
-VerifySnapshot(r, snap_rt_app)
-CheckCaps(r)
-
-try:
-    AsRoot()
-    ConfigurePortod('test-prev_release_upgrade', """
-    container {
-        rt_priority: 10
-    }""")
-    AsAlice()
+    r = c.Find("rt_parent/rt_app")
+    VerifyProps(r, rt_app_knobs)
+    VerifySnapshot(r, snap_rt_app)
+    CheckCaps(r)
 
     CheckRt(r)
 
