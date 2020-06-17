@@ -187,6 +187,7 @@ static void DefaultConfig() {
 
     NetSysctl("net.ipv6.conf.all.accept_dad", "0");
     NetSysctl("net.ipv6.conf.default.accept_dad", "0");
+    NetSysctl("net.ipv6.auto_flowlabels", "0");
 }
 
 static TError ReadConfig(const TPath &path, bool silent) {
