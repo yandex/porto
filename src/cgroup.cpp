@@ -1004,9 +1004,6 @@ TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
     TError error;
     uint64_t cur;
 
-    if (!config().network().enable_host_net_classes())
-        return OK;
-
     if (HasPriority) {
         error = cg.GetUint64("net_cls.priority", cur);
         if (error || cur != classid) {
