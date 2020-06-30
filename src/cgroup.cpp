@@ -235,6 +235,9 @@ TError TCgroup::GetUintMap(const std::string &knob, TUintMap &value) const {
 }
 
 TError TCgroup::Attach(pid_t pid, bool thread) const {
+    if (IsNetcls() && !config().network().enable_host_net_classes())
+        return OK;
+
     if (Secondary())
         return TError("Cannot attach to secondary cgroup " + Type());
 
@@ -250,6 +253,9 @@ TError TCgroup::Attach(pid_t pid, bool thread) const {
 }
 
 TError TCgroup::AttachAll(const TCgroup &cg) const {
+    if (IsNetcls() && !config().network().enable_host_net_classes())
+        return OK;
+
     if (Secondary())
         return TError("Cannot attach to secondary cgroup " + Type());
 
@@ -1003,6 +1009,9 @@ TError TNetclsSubsystem::InitializeSubsystem() {
 TError TNetclsSubsystem::SetClass(TCgroup &cg, uint32_t classid) const {
     TError error;
     uint64_t cur;
+
+    if (!config().network().enable_host_net_classes())
+        return OK;
 
     if (HasPriority) {
         error = cg.GetUint64("net_cls.priority", cur);

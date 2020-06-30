@@ -49,7 +49,7 @@ static int expectedRespawns;
 static int expectedErrors;
 static int expectedWarns;
 
-static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices", "net_cls" };
+static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices", "net_cls", "cgroup2" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
 static int LeakConainersNr = 500;
@@ -78,10 +78,12 @@ static void ExpectCorrectCgroups(const string &pid, const string &name, const st
     auto cgmap = GetCgroups(pid);
 
     for (auto &subsys : subsystems) {
-        if (subsys == "freezer")
+        if (subsys == "freezer" || subsys == "cgroup2")
             ExpectEq(cgmap[subsys], "/porto/" + name);
         else if (subsys == "cpuacct" && cgmap["cpuacct"] != cgmap["cpu"])
             ExpectEq(cgmap[subsys], "/porto%" + name);
+        else if (subsys == "net_cls" && !config().network().enable_host_net_classes())
+            ExpectEq(cgmap[subsys], "/");
         else
             ExpectEq(cgmap[subsys], "/porto%" + name2);
     }

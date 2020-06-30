@@ -174,9 +174,13 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
 
     for (auto l : lines) {
         auto tokens = SplitString(l, ':', 3);
-        if (tokens.size() > 2)
-            for (auto s : SplitString(tokens[1], ','))
-                cgmap[s] = tokens[2];
+        if (tokens.size() > 2) {
+            if (tokens[1].empty())
+                cgmap["cgroup2"] = tokens[2];
+            else
+                for (auto s : SplitString(tokens[1], ','))
+                    cgmap[s] = tokens[2];
+        }
     }
 
     return cgmap;

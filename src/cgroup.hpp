@@ -101,8 +101,15 @@ public:
     TPath Path() const;
     bool IsRoot() const;
     bool Exists() const;
+
+    bool IsSubsystem(uint64_t kind) const {
+        return Subsystem && Subsystem->Kind == kind;
+    }
+    bool IsNetcls() const {
+        return IsSubsystem(CGROUP_NETCLS);
+    }
     bool IsCgroup2() const {
-        return Subsystem && Subsystem->Kind == CGROUP2;
+        return IsSubsystem(CGROUP2);
     }
 
     TError Create();
@@ -303,7 +310,7 @@ class TNetclsSubsystem : public TSubsystem {
 public:
     bool HasPriority;
     TNetclsSubsystem() : TSubsystem(CGROUP_NETCLS, "net_cls") {}
-    bool IsDisabled() override { return !config().network().enable_host_net_classes(); }
+    bool IsOptional() override { return !config().network().enable_host_net_classes(); }
     TError InitializeSubsystem() override;
     TError SetClass(TCgroup &cg, uint32_t classid) const;
 };
