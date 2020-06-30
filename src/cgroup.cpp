@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cmath>
 #include <csignal>
+#include <unordered_set>
+#include <mutex>
 
 #include "cgroup.hpp"
 #include "device.hpp"
@@ -38,6 +40,8 @@ static std::map<std::string, std::vector<pid_t>> prevAttachedPidsMap;
 
 extern pid_t MasterPid;
 extern pid_t PortodPid;
+extern std::unordered_set<pid_t> PortoTids;
+extern std::mutex TidsMutex;
 
 TPath TCgroup::Path() const {
     if (!Subsystem)
@@ -418,8 +422,12 @@ TError TCgroup::KillAll(int signal) const {
             break;
         retry = false;
         for (auto pid: tasks) {
-            if (pid == MasterPid || pid == PortodPid) {
-                L_TAINT(fmt::format("Cannot kill portod process {}", pid));
+            std::unique_lock<std::mutex> lock(TidsMutex);
+            bool portoThread = PortoTids.find(pid) != PortoTids.end();
+            lock.unlock();
+
+            if (portoThread || pid == MasterPid || pid == PortodPid) {
+                L_TAINT(fmt::format("Cannot kill portod thread {}", pid));
                 continue;
             }
             if (std::find(killed.begin(), killed.end(), pid) == killed.end()) {

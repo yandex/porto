@@ -10,6 +10,7 @@
 #include "waiter.hpp"
 #include "event.hpp"
 #include "helpers.hpp"
+#include "util/thread.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
@@ -1863,7 +1864,7 @@ public:
 
     void Start(int thread_count) {
         for (int index = 0; index < thread_count; index++)
-            Threads.emplace_back(new std::thread(&TRequestQueue::Run, this, index));
+            Threads.emplace_back(NewThread(&TRequestQueue::Run, this, std::ref(index)));
     }
 
     void Stop() {

@@ -53,6 +53,9 @@ static TPidFile PortodPidFile(PORTO_PIDFILE, PORTOD_NAME, "portod-slave");
 std::unique_ptr<TEpollLoop> EpollLoop;
 std::unique_ptr<TEventQueue> EventQueue;
 
+std::unordered_set<pid_t> PortoTids;
+std::mutex TidsMutex;
+
 pid_t MasterPid;
 pid_t PortodPid;
 static int PortodStatus;

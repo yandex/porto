@@ -12,6 +12,7 @@
 #include "util/proc.hpp"
 #include "util/string.hpp"
 #include "util/crc32.hpp"
+#include "util/thread.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -40,7 +41,7 @@ std::unordered_map<ino_t, std::shared_ptr<TNetwork>> TNetwork::NetworksIndex;
 std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> TNetwork::NetworksList = std::make_shared<const std::list<std::shared_ptr<TNetwork>>>();
 std::atomic<int> TNetwork::GlobalStatGen;
 
-static std::thread NetThread;
+static std::unique_ptr<std::thread> NetThread;
 static std::condition_variable NetThreadCv;
 static uint64_t NetWatchdogPeriod;
 static uint64_t NetProxyNeighbourPeriod;
@@ -2257,7 +2258,7 @@ void TNetwork::StopNetwork(TContainer &ct) {
         HostNetwork = nullptr;
         lock.unlock();
         NetThreadCv.notify_all();
-        NetThread.join();
+        NetThread->join();
         SockDiag.Disconnect();
     }
 
@@ -3194,7 +3195,7 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
         if (error)
             return TError("Cannot connect sock diag: {}", error);
 
-        NetThread = std::thread(&TNetwork::NetWatchdog);
+        NetThread = std::unique_ptr<std::thread>(NewThread(&TNetwork::NetWatchdog));
 
         return OK;
     }
