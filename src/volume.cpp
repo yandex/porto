@@ -12,6 +12,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/quota.hpp"
+#include "util/thread.hpp"
 #include "config.hpp"
 #include "kvalue.hpp"
 #include "helpers.hpp"
@@ -38,7 +39,7 @@ static uint64_t NextId = 1;
 
 static std::condition_variable VolumesCv;
 
-std::thread StatFsThread;
+std::unique_ptr<std::thread> StatFsThread;
 bool NeedStopStatFsLoop(false);
 std::condition_variable StatFsCv;
 std::mutex StatFsLock;
@@ -92,7 +93,7 @@ void StatFsUpdateLoop() {
 
 void StartStatFsLoop() {
     NeedStopStatFsLoop = false;
-    StatFsThread = std::thread(StatFsUpdateLoop);
+    StatFsThread = std::unique_ptr<std::thread>(NewThread(&StatFsUpdateLoop));
 }
 
 void StopStatFsLoop() {
@@ -101,7 +102,7 @@ void StopStatFsLoop() {
         NeedStopStatFsLoop = true;
     }
     StatFsCv.notify_all();
-    StatFsThread.join();
+    StatFsThread->join();
 }
 
 /* TVolumeBackend - abstract */

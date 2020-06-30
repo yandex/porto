@@ -7,6 +7,7 @@
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/locks.hpp"
+#include "util/thread.hpp"
 
 template<typename T,
          typename Q = std::queue<T>>
@@ -24,7 +25,7 @@ public:
 
     void Start() {
         for (size_t i = 0; i < Nr; i++)
-            Threads.push_back(std::make_shared<std::thread>(&TWorker::WorkerFn, this, Name + std::to_string(i)));
+            Threads.push_back(std::shared_ptr<std::thread>(NewThread(&TWorker::WorkerFn, this, Name + std::to_string(i))));
     }
 
     void Stop() {
