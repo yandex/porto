@@ -2214,12 +2214,6 @@ TError TContainer::PrepareCgroups() {
     }
 
     auto missing = Controllers | RequiredControllers;
-    /* for possible rollback do not clear net_cls controller in Controllers
-     * (and thus in kv storage too, because of Save() at the end of Restore())
-     * and just ignore it if net_cls subsystem is disabled
-     */
-    if (!NetclsSubsystem.Supported)
-        missing &= ~CGROUP_NETCLS;
 
     for (auto hy: Hierarchies) {
         TCgroup cg = GetCgroup(*hy);
