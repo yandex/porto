@@ -24,6 +24,8 @@ extern "C" {
 #include <sys/stat.h>
 }
 
+extern __thread char ReqId[9];
+
 void TRequest::Classify() {
 
     /* Normally not logged in non-verbose mode */
@@ -1851,6 +1853,10 @@ void TRequest::Handle() {
         L_WRN("Cannot send response for {} : {}", Client->Id, error);
 }
 
+void TRequest::ChangeId() {
+    snprintf(ReqId, sizeof(ReqId), "%.8x", rand());
+}
+
 class TRequestQueue {
     std::vector<std::unique_ptr<std::thread>> Threads;
     std::queue<std::unique_ptr<TRequest>> Queue;
@@ -1887,6 +1893,7 @@ public:
 
     void Run(int index) {
         SetProcessName(fmt::format("{}{}", Name, index));
+        srand(GetCurrentTimeMs());
         auto lock = std::unique_lock<std::mutex>(Mutex);
         while (true) {
             while (Queue.empty() && !ShouldStop)
@@ -1896,6 +1903,7 @@ public:
             auto request = std::unique_ptr<TRequest>(std::move(Queue.front()));
             Queue.pop();
             lock.unlock();
+            request->ChangeId();
             request->Handle();
             request = nullptr;
             lock.lock();

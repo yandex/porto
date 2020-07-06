@@ -17,6 +17,8 @@ bool StdLog = false;
 bool Verbose = false;
 bool Debug = false;
 
+__thread char ReqId[9];
+
 TStatistics *Statistics = nullptr;
 
 void InitStatistics() {
@@ -73,8 +75,14 @@ void OpenLog(const TPath &path) {
 }
 
 void WriteLog(const char *prefix, const std::string &log_msg) {
-    std::string msg = fmt::format("{} {}[{}]: {} {}\n",
-            FormatTime(time(nullptr)), GetTaskName(), GetTid(), prefix, log_msg);
+    std::string reqIdMsg = strlen(ReqId) ? fmt::format(" id:[{}]", ReqId) : "";
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    std::string currentTimeMs = fmt::format("{}.{}", FormatTime(ts.tv_sec), ts.tv_nsec / 1000000);
+
+    std::string msg = fmt::format("{} {}[{}]{}: {} {}\n",
+            currentTimeMs, GetTaskName(), GetTid(), reqIdMsg, prefix, log_msg);
 
     if (Statistics) {
         Statistics->LogLines++;
