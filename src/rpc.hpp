@@ -25,6 +25,7 @@ public:
     void Parse();
     TError Check();
     void Handle();
+    void ChangeId();
 };
 
 void StartRpcQueue();
