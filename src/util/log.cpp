@@ -38,7 +38,7 @@ void InitStatistics() {
     PORTO_ASSERT(Statistics != nullptr);
 }
 
-TFile LogFile(STDOUT_FILENO);
+TFile LogFile;
 
 void OpenLog(const TPath &path) {
     int fd;
