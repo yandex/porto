@@ -75,7 +75,7 @@ void OpenLog(const TPath &path) {
 }
 
 void WriteLog(const char *prefix, const std::string &log_msg) {
-    std::string reqIdMsg = strlen(ReqId) ? fmt::format(" id:[{}]", ReqId) : "";
+    std::string reqIdMsg = strlen(ReqId) ? fmt::format("[{}]", ReqId) : "";
 
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
