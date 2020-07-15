@@ -16,6 +16,8 @@ extern "C" {
 #define TRACEFS_MAGIC          0x74726163
 #endif
 
+extern bool EnableCgroupNs;
+
 static std::vector<TPath> SystemPaths = {
     "/bin",
     "/boot",
@@ -434,7 +436,7 @@ TError TMountNamespace::MountTraceFs() {
 
 TError TMountNamespace::MountSystemd() {
 
-    if (Systemd.empty())
+    if (Systemd.empty() || EnableCgroupNs)
         return OK;
 
     TPath tmpfs = "sys/fs/cgroup";
@@ -686,11 +688,13 @@ TError TMountNamespace::Setup() {
     if (ProcFd.FsType() != PROC_SUPER_MAGIC)
         return TError("Cannot open procfs");
 
-    if (HostRoot.IsRoot()) {
+    if (HostRoot.IsRoot() || EnableCgroupNs) {
         error = TPath("/sys/fs/cgroup").UmountAll();
         if (error)
             return error;
+    }
 
+    if (HostRoot.IsRoot()) {
         error = TPath("/sys/fs/pstore").UmountAll();
         if (error)
             return error;

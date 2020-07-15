@@ -26,6 +26,7 @@ extern "C" {
 #include <wordexp.h>
 #include <grp.h>
 #include <net/if.h>
+#include <linux/sched.h>
 }
 
 std::list<std::string> IpcSysctls = {
@@ -46,6 +47,8 @@ std::list<std::string> IpcSysctls = {
 
     "kernel.sem",
 };
+
+extern bool EnableCgroupNs;
 
 void InitIpcSysctl() {
     for (const auto &key: IpcSysctls) {
@@ -700,6 +703,9 @@ TError TTaskEnv::Start() {
         int cloneFlags = SIGCHLD;
         if (CT->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
+
+        if (EnableCgroupNs && CT->OsMode)
+            cloneFlags |= CLONE_NEWCGROUP;
 
         if (NewMountNs)
             cloneFlags |= CLONE_NEWNS;
