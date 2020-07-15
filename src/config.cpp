@@ -104,6 +104,8 @@ static void DefaultConfig() {
     if (CompareVersions(config().linux_version(), "4.19") >= 0)
         config().mutable_container()->set_enable_cgroup2(true);
 
+    config().mutable_container()->set_use_os_mode_cgroupns(false);
+
     config().mutable_container()->set_min_memory_limit(1ull << 20); /* 1Mb */
 
     // config().mutable_container()->set_memory_limit_margin(2ull << 30); /* 2Gb */

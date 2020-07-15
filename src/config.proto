@@ -214,6 +214,7 @@ message TConfig {
         optional bool ptrace_on_start = 54;
         optional uint64 std_stream_read_limit = 55;
         optional bool enable_cgroup2 = 56;
+        optional bool use_os_mode_cgroupns = 57;
 
         message TSysctl {
             required string key = 1;

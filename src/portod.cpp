@@ -74,6 +74,8 @@ bool ShutdownPortod = false;
 static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
 
+bool EnableCgroupNs = false;
+
 static bool RunningInContainer() {
     if (getpid() == 1)
         return getenv("container") != nullptr;
@@ -794,6 +796,9 @@ static int Portod() {
         FatalError("Cannot save pid", error);
 
     ReadConfigs();
+
+    EnableCgroupNs = config().container().use_os_mode_cgroupns() &&
+                     (CompareVersions(config().linux_version(), "4.6") >= 0);
     InitPortoGroups();
     InitCapabilities();
     InitIpcSysctl();
