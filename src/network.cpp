@@ -521,7 +521,7 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
         uint64_t fdSize;
         error = GetFdSize(pid, fdSize);
         if (error) {
-            if (errno == ENOENT)
+            if (errno == ENOENT || errno == ESRCH)
                 continue;
             return error;
         }
