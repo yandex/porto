@@ -1,5 +1,5 @@
 Source: yandex-porto
-Maintainer: Konstantin Khlebnikov <khlebnikov@yandex-team.ru>
+Maintainer: Maxim Samoylov <max7255@yandex-team.ru>
 Build-Depends:
  cmake, debhelper (>= 8.0.0), pkg-config, autoconf, libtool,
  protobuf-compiler, libprotobuf-dev, libncurses5-dev,
