@@ -1634,8 +1634,11 @@ public:
     TError Get(std::string &value) {
         TMultiTuple links;
 
+        auto volumes_lock = LockVolumes();
+        links.reserve(CT->VolumeLinks.size());
+
         for (auto &link: CT->VolumeLinks) {
-            TPath path = link->Volume->ComposePath(*CL->ClientContainer);
+            TPath path = link->Volume->ComposePathLocked(*CL->ClientContainer);
             if (!path)
                 path = "%" + link->Volume->Path.ToString();
             links.push_back({path.ToString()});
@@ -1646,6 +1649,7 @@ public:
             if (link->Required)
                 links.back().push_back("!");
         }
+        volumes_lock.unlock();
 
         value = MergeEscapeStrings(links, ' ', ';');
         return OK;
