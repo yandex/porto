@@ -1533,9 +1533,7 @@ std::shared_ptr<TVolumeLink> TVolume::ResolveOrigin(const TPath &path) {
     return ResolveOriginLocked(path);
 }
 
-TPath TVolume::ComposePath(const TContainer &ct) const {
-    auto volumes_lock = LockVolumes();
-
+TPath TVolume::ComposePathLocked(const TContainer &ct) const {
     /* prefer own link */
     for (auto &link: ct.VolumeLinks) {
         if (link->Volume.get() == this && link->Target)
@@ -1553,6 +1551,11 @@ TPath TVolume::ComposePath(const TContainer &ct) const {
 
     /* volume path */
     return ct.RootPath.InnerPath(Path);
+}
+
+TPath TVolume::ComposePath(const TContainer &ct) const {
+    auto volumes_lock = LockVolumes();
+    return ComposePathLocked(ct);
 }
 
 std::string TVolume::StateName(EVolumeState state) {

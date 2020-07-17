@@ -178,6 +178,7 @@ public:
     static std::shared_ptr<TVolumeLink> ResolveOriginLocked(const TPath &path);
     static std::shared_ptr<TVolumeLink> ResolveOrigin(const TPath &path);
 
+    TPath ComposePathLocked(const TContainer &ct) const;
     TPath ComposePath(const TContainer &ct) const;
 
     TError Configure(const TPath &target_root);
