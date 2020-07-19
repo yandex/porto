@@ -26,9 +26,8 @@ TError TCore::Register(const TPath &portod) {
             return error;
     }
 
-    pattern = "|" + portod.ToString() + " core %P %I %p %i %s %d %c " +
-              StringReplaceAll(config().core().default_pattern(), " ", "__SPACE__") +
-              " %u %g";
+    pattern = "|" + portod.ToString() + " core %P %I %p %i %s %d %c %u %g " +
+              StringReplaceAll(config().core().default_pattern(), " ", "__SPACE__");
     return SetSysctl("kernel.core_pattern", pattern);
 }
 
@@ -58,12 +57,14 @@ TError TCore::Handle(const TTuple &args) {
     Signal = std::stoi(args[4]);
     Dumpable = std::stoi(args[5]);
     Ulimit = std::stoull(args[6]);
-    if (args.size() > 7)
-        DefaultPattern = StringReplaceAll(args[7], "__SPACE__", " ");
+    OwnerUid = std::stoi(args[7]);
+    OwnerGid = std::stoi(args[8]);
 
     if (args.size() > 9) {
-        OwnerUid = std::stoi(args[8]);
-        OwnerGid = std::stoi(args[9]);
+        std::string pattern;
+        for (int i=9; i < args.size(); ++i)
+            pattern += args[i];
+        DefaultPattern = StringReplaceAll(pattern, "__SPACE__", " ");
     }
 
     ProcessName = GetTaskName(Pid);
