@@ -179,6 +179,10 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     }
     ```
 
+* **env\_secret** - secret environment variables, syntax: \<variable\>=\<value\>; ...
+
+    Same as **env** but logging and reading replace value with "<secret>".
+
 * **user** - uid of container processes, default **owner\_user**
 
 * **group** - gid of container processes, default: **owner\_group**

@@ -11,20 +11,22 @@ struct TEnv {
         bool Set;
         bool Locked;
         bool Overwritten;
+        bool Secret;
         std::string Data;
     };
     std::vector<TEnvVar> Vars;
     std::vector<char *> Environ;
 
     void ClearEnv();
-    bool GetEnv(const std::string &name, std::string &value) const;
+    TError GetEnv(const std::string &name, std::string &value) const;
     TError SetEnv(const std::string &name, const std::string &value,
-                  bool overwrite = true, bool lock = false);
+                  bool overwrite = true, bool lock = false,
+                  bool secret = false);
     TError UnsetEnv(const std::string &name, bool overwrite = true);
     char **Envp();
 
-    TError Parse(const std::string &cfg, bool overwrite);
-    void Format(std::string &cfg) const;
+    TError Parse(const std::string &cfg, bool overwrite, bool secret = false);
+    void Format(std::string &cfg, bool show_secret = false) const;
     TError Apply() const;
 };
 

@@ -12,18 +12,19 @@ void TEnv::ClearEnv() {
     Environ.clear();
 }
 
-bool TEnv::GetEnv(const std::string &name, std::string &value) const {
+TError TEnv::GetEnv(const std::string &name, std::string &value) const {
     for (const auto &var: Vars) {
         if (var.Set && var.Name == name) {
-            value = var.Value;
-            return true;
+            value = var.Secret ? "<secret>" : var.Value;
+            return OK;
         }
     }
-    return false;
+    return TError(EError::InvalidValue, "Environment variable {} not defined", name);;
 }
 
 TError TEnv::SetEnv(const std::string &name, const std::string &value,
-                    bool overwrite /* true */, bool lock /* false */) {
+                    bool overwrite /* true */, bool lock /* false */,
+                    bool secret /* false */) {
     for (auto &var: Vars) {
         if (var.Name != name)
             continue;
@@ -37,9 +38,10 @@ TError TEnv::SetEnv(const std::string &name, const std::string &value,
         var.Set = true;
         var.Locked = lock;
         var.Overwritten = overwrite;
+        var.Secret = secret;
         return OK;
     }
-    Vars.push_back({name, value, true, lock, overwrite, ""});
+    Vars.push_back({name, value, true, lock, overwrite, secret, ""});
     return OK;
 }
 
@@ -56,13 +58,15 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
         var.Value = "";
         var.Set = false;
         var.Overwritten = overwrite;
+        var.Secret = false;
         return OK;
     }
-    Vars.push_back({name, "", false, false, overwrite, ""});
+    Vars.push_back({name, "", false, false, overwrite, false, ""});
     return OK;
 }
 
-TError TEnv::Parse(const std::string &cfg, bool overwrite) {
+TError TEnv::Parse(const std::string &cfg, bool overwrite,
+                   bool secret /* false */) {
     for (auto &str: SplitEscapedString(cfg, ';')) {
         auto sep = str.find('=');
         TError error;
@@ -70,21 +74,23 @@ TError TEnv::Parse(const std::string &cfg, bool overwrite) {
         if (sep == std::string::npos)
             error = UnsetEnv(str, overwrite);
         else
-            error = SetEnv(str.substr(0, sep),
-                           str.substr(sep + 1), overwrite);
+            error = SetEnv(str.substr(0, sep), str.substr(sep + 1),
+                           overwrite, false, secret);
         if (error && overwrite)
             return error;
     }
     return OK;
 }
 
-void TEnv::Format(std::string &cfg) const {
+void TEnv::Format(std::string &cfg, bool show_secret /* false */) const {
     TTuple tuple;
     for (const auto &var: Vars) {
-        if (var.Set)
-            tuple.push_back(var.Name + "=" + var.Value);
-        else
+        if (!var.Set)
             tuple.push_back(var.Name);
+        else if (var.Secret && !show_secret)
+            tuple.push_back(var.Name + "=<secret>");
+        else
+            tuple.push_back(var.Name + "=" + var.Value);
     }
     cfg = MergeEscapeStrings(tuple, ';');
 }

@@ -16,6 +16,7 @@ public:
     bool RoReq;
     bool IoReq;
     bool VlReq;
+    bool SecretReq;
 
     std::string Cmd;
     std::string Arg;
