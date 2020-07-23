@@ -5567,6 +5567,16 @@ void TPortoStat::Populate(TUintMap &m) {
     m["requests_longer_30s"] = Statistics->RequestsLonger30s;
     m["requests_longer_5m"] = Statistics->RequestsLonger5m;
     m["longest_read_request"] = Statistics->LongestRoRequest;
+
+    m["spec_requests_completed"] = Statistics->SpecRequestsCompleted;
+    m["spec_requests_longer_1s"] = Statistics->SpecRequestsLonger1s;
+    m["spec_requests_longer_3s"] = Statistics->SpecRequestsLonger3s;
+    m["spec_requests_longer_30s"] = Statistics->SpecRequestsLonger30s;
+    m["spec_requests_longer_5m"] = Statistics->SpecRequestsLonger5m;
+    m["spec_requests_failed"] = Statistics->SpecRequestsFailed;
+    m["spec_fail_invalid_value"] = Statistics->SpecRequestsFailedInvalidValue;
+    m["spec_fail_unknown"] = Statistics->SpecRequestsFailedUnknown;
+    m["spec_fail_no_container"] = Statistics->SpecRequestsFailedContainerDoesNotExist;
 }
 
 TError TPortoStat::Get(std::string &value) {
