@@ -2316,6 +2316,9 @@ TError TContainer::GetEnvironment(TEnv &env) const {
         TError error = env.Parse(ct->EnvCfg, overwrite);
         if (error && overwrite)
             return error;
+        error = env.Parse(ct->EnvSecret, overwrite, true);
+        if (error && overwrite)
+            return error;
         overwrite = false;
 
         if (ct->Isolate)
@@ -3841,7 +3844,7 @@ TError TContainer::Save(void) {
         if (knob.second->Prop == EProperty::NONE || !HasProp(knob.second->Prop))
             continue;
 
-        error = knob.second->Get(value);
+        error = knob.second->Save(value);
         if (error)
             break;
 

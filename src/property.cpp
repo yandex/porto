@@ -69,6 +69,10 @@ void TProperty::Dump(rpc::TContainerSpec &) {
 void TProperty::Dump(rpc::TContainerStatus &) {
 }
 
+TError TProperty::Save(std::string &value) {
+    return Get(value);
+}
+
 void TProperty::DumpIndexed(const std::string &, rpc::TContainerSpec &) {
 }
 
@@ -1690,9 +1694,7 @@ public:
         TError error = CT->GetEnvironment(env);
         if (error)
             return error;
-        if (!env.GetEnv(index, value))
-            return TError(EError::InvalidValue, "Variable " + index + " not defined");
-        return OK;
+        return env.GetEnv(index, value);
     }
     TError Set(const std::string &val) {
         TEnv env;
@@ -1726,7 +1728,7 @@ public:
                 auto v = e->add_var();
                 v->set_name(var.Name);
                 if (var.Set)
-                    v->set_value(var.Value);
+                    v->set_value(var.Secret ? "<secret>" : var.Value);
                 else
                     v->set_unset(true);
             }
@@ -1759,6 +1761,90 @@ public:
         return OK;
     }
 } static EnvProperty;
+
+class TEnvSecretProperty : public TProperty {
+public:
+    TEnvSecretProperty() : TProperty(P_ENV_SECRET, EProperty::ENV_SECRET,
+            "Container secret environment variables: <name>=<value>; ...") {}
+    TError Save(std::string &val) override {
+        val = CT->EnvSecret;
+        return OK;
+    }
+    TError Get(std::string &val) {
+        TEnv env;
+        TError error = env.Parse(CT->EnvSecret, true, true);
+        if (error)
+            return error;
+        env.Format(val);
+        return OK;
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        TEnv env;
+        TError error = env.Parse(CT->EnvSecret, true, true);
+        if (error)
+            return error;
+        return env.GetEnv(index, value);
+    }
+    TError Set(const std::string &val) {
+        TEnv env;
+        TError error = env.Parse(val, true, true);
+        if (error)
+            return error;
+        env.Format(CT->EnvSecret, true);
+        CT->SetProp(EProperty::ENV_SECRET);
+        return OK;
+    }
+    TError SetIndexed(const std::string &index, const std::string &val) {
+        TEnv env;
+        TError error = env.Parse(CT->EnvSecret, true, true);
+        if (error)
+            return error;
+        error = env.SetEnv(index, val, true, false, true);
+        if (error)
+            return error;
+        env.Format(CT->EnvSecret, true);
+        CT->SetProp(EProperty::ENV_SECRET);
+        return OK;
+    }
+    void Dump(rpc::TContainerSpec &spec) {
+        TEnv env;
+        if (env.Parse(CT->EnvSecret, true, true))
+            return;
+        auto e = spec.mutable_env_secret();
+        for (auto &var: env.Vars) {
+            auto v = e->add_var();
+            v->set_name(var.Name);
+            if (var.Set)
+                v->set_value("<secret>");
+            else
+                v->set_unset(true);
+        }
+    }
+    bool Has(const rpc::TContainerSpec &spec) {
+        return spec.has_env_secret();
+    }
+    TError Load(const rpc::TContainerSpec &spec) {
+        TEnv env;
+        TError error;
+
+        if (spec.env_secret().merge()) {
+            error = env.Parse(CT->EnvSecret, true, true);
+            if (error)
+                return error;
+        }
+        for (auto &var: spec.env_secret().var()) {
+            if (var.has_value())
+                error = env.SetEnv(var.name(), var.value(), true, false, true);
+            else
+                error = env.UnsetEnv(var.name());
+            if (error)
+                return error;
+        }
+        env.Format(CT->EnvSecret, true);
+        CT->SetProp(EProperty::ENV_SECRET);
+        return OK;
+    }
+} static EnvSecretProperty;
 
 class TBind : public TProperty {
 public:

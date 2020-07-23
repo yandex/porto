@@ -151,6 +151,7 @@ public:
 
     std::string Hostname;
     std::string EnvCfg;
+    std::string EnvSecret;
     std::vector<TBindMount> BindMounts;
     std::map<TPath, TPath> Symlink;
     TMultiTuple IpList;

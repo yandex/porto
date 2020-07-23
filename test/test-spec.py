@@ -34,7 +34,9 @@ try:
 
 # check env
     a.SetProperty("env", "PYTHONPATH1=/porto/src/api/python")
+    a.SetProperty("env_secret", "PYTHONPATH_SECRET=/porto/src/api/python")
     assert a.GetProperty('env[PYTHONPATH1]') ==  "/porto/src/api/python"
+    assert a.GetProperty('env_secret[PYTHONPATH_SECRET]') == '<secret>'
 
     dump = a.Dump()
 
@@ -43,6 +45,9 @@ try:
         envs[env.name] = env.value
     assert envs['PYTHONPATH1'] == a.GetProperty('env[PYTHONPATH1]')
     assert envs['USER'] == a.GetProperty('env[USER]')
+
+    for secret in dump.spec.env_secret.var:
+        assert secret.value == '<secret>'
 
     CopyProps(a, b)
 

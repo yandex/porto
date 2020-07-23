@@ -69,6 +69,11 @@ void TRequest::Classify() {
         Req.has_linkvolumetarget() ||
         Req.has_unlinkvolumetarget() ||
         Req.has_newvolume();
+
+    SecretReq = 
+        Req.has_setproperty() && StringStartsWith(Req.setproperty().property(), "env_secret") ||
+        Req.has_createfromspec() && Req.createfromspec().has_container() && Req.createfromspec().container().has_env_secret() ||
+        Req.has_updatefromspec() && Req.updatefromspec().has_container() && Req.updatefromspec().container().has_env_secret();
 }
 
 void TRequest::Parse() {
@@ -122,7 +127,10 @@ void TRequest::Parse() {
     } else if (Req.has_setproperty()) {
         Cmd = "Set";
         Arg = Req.setproperty().name();
-        opts = { Req.setproperty().property() + "=" + Req.setproperty().value() };
+        if (SecretReq)
+            opts = { Req.setproperty().property() + "=<secret>" };
+        else
+            opts = { Req.setproperty().property() + "=" + Req.setproperty().value() };
     } else if (Req.has_start()) {
         Cmd = "Start";
         Arg = Req.start().name();
@@ -297,11 +305,17 @@ void TRequest::Parse() {
     } else if (Req.has_createfromspec()) {
         Cmd = "CreateFromSpec";
         Arg = Req.createfromspec().container().name();
-        Opt = Req.createfromspec().ShortDebugString();
+        if (SecretReq)
+            Opt = "<secret>";
+        else
+            Opt = Req.createfromspec().ShortDebugString();
     } else if (Req.has_updatefromspec()) {
         Cmd = "UpdateFromSpec";
         Arg = Req.updatefromspec().container().name();
-        Opt = Req.updatefromspec().ShortDebugString();
+        if (SecretReq)
+            Opt = "<secret>";
+        else
+            Opt = Req.updatefromspec().ShortDebugString();
     } else if (Req.has_listcontainersby()) {
         Cmd = "ListContainersBy";
     } else if (Req.has_getvolume()) {
@@ -1840,7 +1854,7 @@ void TRequest::Handle() {
     if (!error && (!RoReq || Verbose))
         L_REQ("{} {} {} from {}", Cmd, Arg, Opt, Client->Id);
 
-    if (Debug)
+    if (Debug && !SecretReq)
         L_DBG("Raw request: {}", Req.ShortDebugString());
 
     if (error && Verbose)

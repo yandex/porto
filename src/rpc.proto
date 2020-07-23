@@ -513,6 +513,7 @@ message TContainerSpec {
 
     optional string command = 5;
     optional TContainerEnv env = 6;
+    optional TContainerEnv env_secret = 90;  // in, out hides values
     optional TContainerUlimits ulimit = 7;
     optional string core_command = 8;
 

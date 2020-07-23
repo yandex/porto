@@ -21,6 +21,7 @@ constexpr const char *P_OWNER_USER = "owner_user";
 constexpr const char *P_OWNER_GROUP = "owner_group";
 constexpr const char *P_OWNER_CRED = "owner_cred";
 constexpr const char *P_ENV = "env";
+constexpr const char *P_ENV_SECRET = "env_secret";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_PLACE = "place";
 constexpr const char *P_PLACE_LIMIT = "place_limit";
@@ -174,6 +175,7 @@ enum class EProperty {
     OWNER_USER,
     OWNER_GROUP,
     ENV,
+    ENV_SECRET,
     PORTO_NAMESPACE,
     PLACE,
     PLACE_LIMIT,
@@ -283,6 +285,8 @@ public:
     virtual void Dump(rpc::TContainerStatus &spec);
     virtual void DumpIndexed(const std::string &index, rpc::TContainerSpec &spec);
     virtual void DumpIndexed(const std::string &index, rpc::TContainerStatus &spec);
+
+    virtual TError Save(std::string &value);
 
     virtual TError Start(void);
 };
