@@ -1832,6 +1832,7 @@ void TRequest::Handle() {
     Client->StartRequest();
     StartTime = GetCurrentTimeMs();
     auto timestamp = time(nullptr);
+    bool specRequest = false;
 
     Parse();
     error = Check();
@@ -1848,12 +1849,18 @@ void TRequest::Handle() {
         error = TError(EError::Permission, "Write access denied");
     else if (!RoReq && PortodFrozen && !Client->IsSuperUser())
         error = TError(EError::PortoFrozen, "Porto frozen, only root user might change anything");
-    else if (Req.has_createfromspec())
+    else if (Req.has_createfromspec()) {
         error = CreateFromSpec(*Req.mutable_createfromspec());
-    else if (Req.has_updatefromspec())
+        specRequest = true;
+    }
+    else if (Req.has_updatefromspec()) {
         error = UpdateFromSpec(Req.updatefromspec());
-    else if (Req.has_listcontainersby())
+        specRequest = true;
+    }
+    else if (Req.has_listcontainersby()) {
         error = ListContainersBy(Req.listcontainersby(), *rsp.mutable_listcontainersby());
+        specRequest = true;
+    }
     else if (Req.has_create())
         error = CreateContainer(Req.create().name(), false);
     else if (Req.has_createweak())
@@ -1964,23 +1971,37 @@ void TRequest::Handle() {
     FinishTime = GetCurrentTimeMs();
     Client->FinishRequest();
 
-    Statistics->RequestsCompleted++;
-    Statistics->RequestsQueued--;
-
     uint64_t RequestTime = FinishTime - QueueTime;
-    if (RequestTime > 1000)
-        Statistics->RequestsLonger1s++;
-    if (RequestTime > 3000)
-        Statistics->RequestsLonger3s++;
-    if (RequestTime > 30000)
-        Statistics->RequestsLonger30s++;
-    if (RequestTime > 300000)
-        Statistics->RequestsLonger5m++;
 
-    if (RoReq && RequestTime > Statistics->LongestRoRequest) {
-        L("Longest read request {} time={}+{} ms", Cmd,
-                StartTime - QueueTime, FinishTime - StartTime);
-        Statistics->LongestRoRequest = RequestTime;
+    Statistics->RequestsQueued--;
+    if (!specRequest) {
+        Statistics->RequestsCompleted++;
+
+        if (RequestTime > 1000)
+            Statistics->RequestsLonger1s++;
+        if (RequestTime > 3000)
+            Statistics->RequestsLonger3s++;
+        if (RequestTime > 30000)
+            Statistics->RequestsLonger30s++;
+        if (RequestTime > 300000)
+            Statistics->RequestsLonger5m++;
+
+        if (RoReq && RequestTime > Statistics->LongestRoRequest) {
+            L("Longest read request {} time={}+{} ms", Cmd,
+                    StartTime - QueueTime, FinishTime - StartTime);
+            Statistics->LongestRoRequest = RequestTime;
+        }
+    } else {
+        Statistics->SpecRequestsCompleted++;
+
+        if (RequestTime > 1000)
+            Statistics->SpecRequestsLonger1s++;
+        if (RequestTime > 3000)
+            Statistics->SpecRequestsLonger3s++;
+        if (RequestTime > 30000)
+            Statistics->SpecRequestsLonger30s++;
+        if (RequestTime > 300000)
+            Statistics->SpecRequestsLonger5m++;
     }
 
     if (error == EError::Queued)
@@ -1989,7 +2010,17 @@ void TRequest::Handle() {
     if (error) {
         if (!rsp.IsInitialized())
             rsp.Clear();
-        Statistics->RequestsFailed++;
+        if (!specRequest)
+            Statistics->RequestsFailed++;
+        else {
+            Statistics->SpecRequestsFailed++;
+            if (error == EError::Unknown)
+                Statistics->SpecRequestsFailedUnknown++;
+            else if (error == EError::InvalidValue)
+                Statistics->SpecRequestsFailedInvalidValue++;
+            else if (error == EError::ContainerDoesNotExist)
+                Statistics->SpecRequestsFailedContainerDoesNotExist++;
+        }
         AccountErrorType(error);
     }
 

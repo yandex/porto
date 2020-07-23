@@ -44,6 +44,15 @@ struct TStatistics {
     std::atomic<uint64_t> RequestsLonger5m;
     std::atomic<uint64_t> ClientsConnected;
     std::atomic<uint64_t> RequestsFailed;
+    std::atomic<uint64_t> SpecRequestsCompleted;
+    std::atomic<uint64_t> SpecRequestsLonger1s;
+    std::atomic<uint64_t> SpecRequestsLonger3s;
+    std::atomic<uint64_t> SpecRequestsLonger30s;
+    std::atomic<uint64_t> SpecRequestsLonger5m;
+    std::atomic<uint64_t> SpecRequestsFailed;
+    std::atomic<uint64_t> SpecRequestsFailedInvalidValue;
+    std::atomic<uint64_t> SpecRequestsFailedUnknown;
+    std::atomic<uint64_t> SpecRequestsFailedContainerDoesNotExist;
     std::atomic<uint64_t> VolumesCreated;
     std::atomic<uint64_t> VolumesFailed;
     std::atomic<uint64_t> FailSystem;
