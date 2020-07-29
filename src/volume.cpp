@@ -543,6 +543,11 @@ again:
         return TError::System("ioctl(LOOP_SET_FD)");
     }
 
+    TPath scheduler(fmt::format("/sys/block/loop{}/queue/scheduler", nr));
+    error = scheduler.WriteAll("none");
+    if (error)
+        return error;
+
     memset(&info, 0, sizeof(info));
     strncpy((char *)info.lo_file_name, path.c_str(), LO_NAME_SIZE - 1);
 
