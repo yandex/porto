@@ -1,3 +1,53 @@
+yandex-porto (5.0.0) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * property: fix segfault on TLinkedVolumes::Get
+  * net: pass ESRCH error when collect sockets
+  * core: fix segfault when process name with spaces cored
+
+  [ Maxim Samoylov ]
+  * debian: actualize maintainer
+
+  [ Alexander Kuznetsov ]
+  * porto: container spec dump and load properties in protobuf format
+
+  [ wwfq ]
+  * spec: separate statistics for spec requests
+  * porto: secret environment variables
+
+  [ Alexander Kuznetsov ]
+  * filesystem: show full cgroup hierarchy in virt_mode=os container
+
+  [ Maxim Samoylov ]
+  * config: drop PROTOBUF_DEPRECATED
+
+ -- max7255 <max7255@max7255-nix>  Wed, 29 Jul 2020 15:39:34 +0300
+
+yandex-porto (5.0.0) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * property: fix segfault on TLinkedVolumes::Get
+  * net: pass ESRCH error when collect sockets
+  * core: fix segfault when process name with spaces cored
+
+  [ Maxim Samoylov ]
+  * debian: actualize maintainer
+
+  [ Alexander Kuznetsov ]
+  * porto: container spec dump and load properties in protobuf format
+
+  [ wwfq ]
+  * spec: separate statistics for spec requests
+  * porto: secret environment variables
+
+  [ Alexander Kuznetsov ]
+  * filesystem: show full cgroup hierarchy in virt_mode=os container
+
+  [ Maxim Samoylov ]
+  * config: drop PROTOBUF_DEPRECATED
+
+ -- max7255 <max7255@max7255-nix>  Wed, 29 Jul 2020 15:38:05 +0300
+
 yandex-porto (4.18.35) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
