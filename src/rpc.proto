@@ -120,9 +120,9 @@ message TContainerRequest {
     optional TSetLabelRequest SetLabel = 21;
     optional TIncLabelRequest IncLabel = 22;
 
-    optional TCreateFromSpecRequest CreateFromSpec = 23;
-    optional TUpdateFromSpecRequest UpdateFromSpec = 24;
-    optional TListContainersRequest ListContainersBy = 25;
+    optional TCreateFromSpecRequest CreateFromSpec = 230;
+    optional TUpdateFromSpecRequest UpdateFromSpec = 231;
+    optional TListContainersRequest ListContainersBy = 232;
 
     optional TVolumePropertyListRequest listVolumeProperties = 103;
     optional TVolumeCreateRequest createVolume = 104;
@@ -205,7 +205,7 @@ message TContainerResponse {
     optional TSetLabelResponse SetLabel = 21;
     optional TIncLabelResponse IncLabel = 22;
 
-    optional TListContainersResponse ListContainersBy = 25;
+    optional TListContainersResponse ListContainersBy = 232;
 
     optional TNewVolumeResponse NewVolume = 126;
     optional TGetVolumeResponse GetVolume = 127;
