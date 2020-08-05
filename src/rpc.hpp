@@ -32,3 +32,4 @@ public:
 void StartRpcQueue();
 void StopRpcQueue();
 void QueueRpcRequest(std::unique_ptr<TRequest> &req);
+uint64_t RpcRequestsTopRunningTime();

@@ -3,6 +3,7 @@
 #include "config.hpp"
 #include "cgroup.hpp"
 #include "client.hpp"
+#include "rpc.hpp"
 #include "container.hpp"
 #include "volume.hpp"
 #include "network.hpp"
@@ -5751,6 +5752,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["requests_longer_30s"] = Statistics->RequestsLonger30s;
     m["requests_longer_5m"] = Statistics->RequestsLonger5m;
     m["longest_read_request"] = Statistics->LongestRoRequest;
+    m["requests_top_running_time"] = RpcRequestsTopRunningTime() / 1000;
 
     m["spec_requests_completed"] = Statistics->SpecRequestsCompleted;
     m["spec_requests_longer_1s"] = Statistics->SpecRequestsLonger1s;

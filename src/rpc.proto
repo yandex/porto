@@ -829,6 +829,7 @@ message TGetSystemResponse {
     required fixed64 request_longer_3s = 505;
     required fixed64 request_longer_30s = 506;
     required fixed64 request_longer_5m = 507;
+    optional fixed64 request_top_running_time = 508;  // seconds
 
     required fixed64 fail_system = 600;
     required fixed64 fail_invalid_value = 601;
