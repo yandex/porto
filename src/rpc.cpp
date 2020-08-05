@@ -1780,6 +1780,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
     rsp->set_request_longer_3s(Statistics->RequestsLonger3s);
     rsp->set_request_longer_30s(Statistics->RequestsLonger30s);
     rsp->set_request_longer_5m(Statistics->RequestsLonger5m);
+    rsp->set_request_top_running_time(RpcRequestsTopRunningTime() / 1000);
 
     rsp->set_fail_system(Statistics->FailSystem);
     rsp->set_fail_invalid_value(Statistics->FailInvalidValue);
@@ -2070,6 +2071,7 @@ void TRequest::ChangeId() {
 
 class TRequestQueue {
     std::vector<std::unique_ptr<std::thread>> Threads;
+    std::vector<uint64_t> StartTime;
     std::queue<std::unique_ptr<TRequest>> Queue;
     std::condition_variable Wakeup;
     std::mutex Mutex;
@@ -2080,6 +2082,7 @@ public:
     TRequestQueue(const std::string &name) : Name(name) {}
 
     void Start(int thread_count) {
+        StartTime.resize(thread_count);
         for (int index = 0; index < thread_count; index++)
             Threads.emplace_back(NewThread(&TRequestQueue::Run, this, std::ref(index)));
     }
@@ -2113,13 +2116,26 @@ public:
                 break;
             auto request = std::unique_ptr<TRequest>(std::move(Queue.front()));
             Queue.pop();
+            StartTime[index] = GetCurrentTimeMs();
             lock.unlock();
             request->ChangeId();
             request->Handle();
             request = nullptr;
             lock.lock();
+            StartTime[index] = 0;
         }
         lock.unlock();
+    }
+
+    uint64_t TopRunningTime() {
+        uint64_t now = GetCurrentTimeMs();
+        uint64_t ret = 0;
+        auto lock = std::unique_lock<std::mutex>(Mutex);
+        for (auto start: StartTime) {
+            if (start)
+                ret = std::max(ret, now - start);
+        }
+        return ret;
     }
 };
 
@@ -2154,4 +2170,14 @@ void QueueRpcRequest(std::unique_ptr<TRequest> &request) {
         VlQueue.Enqueue(request);
     else
         RwQueue.Enqueue(request);
+}
+
+
+uint64_t RpcRequestsTopRunningTime() {
+    auto rw = RwQueue.TopRunningTime();
+    auto ro = RoQueue.TopRunningTime();
+    auto io = IoQueue.TopRunningTime();
+    auto vl = VlQueue.TopRunningTime();
+
+    return std::max({rw, ro, io, vl});
 }
