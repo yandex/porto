@@ -216,6 +216,7 @@ TError TTaskEnv::ChildExec() {
         dup2(open("/dev/null", O_RDWR | O_CLOEXEC), 9);
     }
 
+    L("Exec '{}'", result.we_wordv[0]);
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
     if (errno == EAGAIN)
@@ -439,6 +440,8 @@ TError TTaskEnv::WaitAutoconf() {
 }
 
 void TTaskEnv::StartChild() {
+    L("Start child");
+
     TError error;
 
     if (TripleFork) {
