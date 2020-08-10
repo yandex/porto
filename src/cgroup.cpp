@@ -428,7 +428,7 @@ TError TCgroup::KillAll(int signal) const {
             bool portoThread = PortoTids.find(pid) != PortoTids.end();
             lock.unlock();
 
-            if (portoThread || pid == MasterPid || pid == PortodPid || pid < 0) {
+            if (portoThread || pid == MasterPid || pid == PortodPid || pid <= 0) {
                 L_TAINT(fmt::format("Cannot kill portod thread {}", pid));
                 continue;
             }
