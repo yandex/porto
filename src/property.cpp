@@ -3161,8 +3161,9 @@ public:
     TCpuPeriod() : TProperty(P_CPU_PERIOD, EProperty::CPU_PERIOD,
             "CPU limit period: 1ms..1s, default: 100ms [nanoseconds]")
     {
+        /* We want to allow changing period
+           for the sake of incremental inheritancy */
         IsDynamic = true;
-        RequireControllers = CGROUP_CPU;
     }
     TError Get(std::string &value) {
         value = std::to_string(CT->CpuPeriod);

@@ -382,7 +382,12 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     CpuPolicy = Parent ? Parent->CpuPolicy : "normal";
     ChooseSchedPolicy();
 
-    CpuPeriod = config().container().cpu_period();
+    CpuPeriod = Parent ? Parent->CpuPeriod : config().container().cpu_period();
+
+    if (CpuPeriod != 100000000) {
+        /* Default cfs period is not configurable in kernel */
+        SetProp(EProperty::CPU_PERIOD);
+    }
 
     if (IsRoot()) {
         CpuLimit = GetNumCores() * CPU_POWER_PER_SEC;
@@ -1988,6 +1993,20 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
         error = ApplyCpuLimit();
         if (error)
             return error;
+    }
+
+    /* Kludge for the sake of dynamic update and inheritance
+       for existing containers */
+
+    if (TestClearPropDirty(EProperty::CPU_PERIOD)) {
+        if (Controllers & CGROUP_CPU) {
+            auto cg = GetCgroup(CpuSubsystem);
+            error = CpuSubsystem.SetPeriod(cg, CpuPeriod);
+            if (error) {
+                L_ERR("Cannot update cpu period for cgroup: {}", error);
+                return error;
+            }
+        }
     }
 
     if (TestClearPropDirty(EProperty::CPU_POLICY) ||
