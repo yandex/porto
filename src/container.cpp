@@ -379,7 +379,7 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     else
         PlacePolicy = Parent->PlacePolicy;
 
-    CpuPolicy = "normal";
+    CpuPolicy = Parent ? Parent->CpuPolicy : "normal";
     ChooseSchedPolicy();
 
     CpuPeriod = config().container().cpu_period();
