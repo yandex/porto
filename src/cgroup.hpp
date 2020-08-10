@@ -284,6 +284,7 @@ public:
     TCpuSubsystem() : TSubsystem(CGROUP_CPU, "cpu") { }
     TError InitializeSubsystem() override;
     TError InitializeCgroup(TCgroup &cg) override;
+    TError SetPeriod(TCgroup &cg, uint64_t period);
     TError SetLimit(TCgroup &cg, uint64_t period, uint64_t limit);
     TError SetRtLimit(TCgroup &cg, uint64_t period, uint64_t limit);
     TError SetGuarantee(TCgroup &cg, const std::string &policy, double weight, uint64_t period, uint64_t guarantee);

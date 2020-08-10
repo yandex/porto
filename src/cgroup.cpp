@@ -793,6 +793,25 @@ TError TCpuSubsystem::InitializeCgroup(TCgroup &cg) {
     return OK;
 }
 
+
+TError TCpuSubsystem::SetPeriod(TCgroup &cg, uint64_t period) {
+    TError error;
+
+    period = period / 1000; /* ns -> us */
+
+    if (HasQuota) {
+        if (period < 1000) /* 1ms */
+            period = 1000;
+
+        if (period > 1000000) /* 1s */
+            period = 1000000;
+
+        return cg.Set("cpu.cfs_period_us", std::to_string(period));
+    }
+
+    return OK;
+}
+
 TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     TError error;
 
@@ -806,6 +825,8 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
 
         if (!limit)
             quota = -1;
+
+        (void)cg.Set("cpu.cfs_quota_us", std::to_string(quota));
 
         error = cg.Set("cpu.cfs_period_us", std::to_string(period));
         if (error)
