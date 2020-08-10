@@ -1,3 +1,20 @@
+yandex-porto (5.0.1) unstable; urgency=low
+
+  [ wwfq ]
+  * volume: use none scheduler for loop backend
+  * rpc: change spec proto objects numbers
+
+  [ Alexander Kuznetsov ]
+  * cgroup: don't kill negative pids on KillAll
+  * cgroup: don't kill zero pids on KillAll
+  * task: write more logs when task starting
+
+  [ Maxim Samoylov ]
+  * container: add cpu_policy value inheritance
+  * container: fix cpu_period property
+
+ -- max7255 <max7255@max7255-nix>  Mon, 10 Aug 2020 14:58:19 +0300
+
 yandex-porto (5.0.0) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
