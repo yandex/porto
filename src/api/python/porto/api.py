@@ -707,7 +707,7 @@ class Connection(object):
         if container:
             request.CreateFromSpec.container.CopyFrom(container)
         if volume:
-            requers.CreateFromSpec.volume.CopyFrom(volume)
+            request.CreateFromSpec.volume.CopyFrom(volume)
         request.CreateFromSpec.start = start
         resp = self.rpc.call(request)
         return Container(self, container.name)
