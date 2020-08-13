@@ -1532,6 +1532,8 @@ Stanislav Ivanichkin <sivanichkin@yandex-team.ru>
 Vsevolod Minkov <vminkov@yandex-team.ru>  
 Vsevolod Velichko <torkve@yandex-team.ru>  
 Maxim Samoylov <max7255@yandex-team.ru>  
+Dmitry Yakunin <zeil@yandex-team.ru>
+Alexander Kuznetsov <wwfq@yandex-team.ru>
 
 # COPYRIGHT
 
