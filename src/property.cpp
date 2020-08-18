@@ -714,13 +714,8 @@ public:
             value += fmt::format(" {}", gid);
         return OK;
     }
-    TError Set(const std::string &value) {
-        TError error;
-        TCred cred;
-        error = cred.Init(value);
-        if (error)
-            return error;
-        error = CL->CanControl(cred);
+    TError SetCred(const TCred &cred) {
+        TError error = CL->CanControl(cred);
         if (error)
             return error;
         CT->OwnerCred = cred;
@@ -728,6 +723,14 @@ public:
         CT->SetProp(EProperty::OWNER_GROUP);
         CT->SanitizeCapabilitiesAll();
         return OK;
+    }
+
+    TError Set(const std::string &value) {
+        TCred cred;
+        TError error = cred.Init(value);
+        if (error)
+            return error;
+        return SetCred(cred);
     }
 
     void Dump(rpc::TContainerSpec &spec) override {
@@ -739,7 +742,11 @@ public:
     }
 
     TError Load(const rpc::TContainerSpec &spec) override {
-        return CT->OwnerCred.Load(spec.owner_cred());
+        TCred cred;
+        TError error = cred.Load(spec.owner_cred());
+        if (error)
+            return error;
+        return SetCred(cred);
     }
 } static OwnerCred;
 
