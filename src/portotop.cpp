@@ -218,6 +218,7 @@ void TConsoleScreen::HelpDialog() {
          "tab - expand conteainers tree: first, second, all",
          "@ - go to self container",
          "! - mark selected container",
+         "H - hide unmarked containers",
          "",
          "1-9,0 - set update delay to 1s-9s and 10s",
          "space - pause/resume screen updates",
@@ -848,28 +849,42 @@ void TPortoTop::Print(TConsoleScreen &screen) {
     PrintTitle(at_row - 1, screen);
     int y = 0;
     SelectedContainer = "";
+    std::set<std::string> containers;
     ContainerTree->ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
+            containers.insert(row->GetName());
             if (y >= FirstRow && y < MaxRows) {
-                bool selected = y == SelectedRow;
-                if (selected)
-                    SelectedContainer = row->GetName();
-                int x = FirstX;
+                if (!FilterMode || RowColor.find(row->GetName()) != RowColor.end()) {
+                    bool selected = y == SelectedRow;
+                    if (selected)
+                        SelectedContainer = row->GetName();
+                    int x = FirstX;
 
-                int attr = 0;
-                if (selected)
-                    attr |= A_REVERSE;
-                auto col = RowColor.find(row->GetName());
-                if (col != RowColor.end())
-                    attr |= COLOR_PAIR(col->second);
+                    int attr = 0;
+                    if (selected)
+                        attr |= A_REVERSE;
+                    auto col = RowColor.find(row->GetName());
+                    if (col != RowColor.end() && !FilterMode)
+                        attr |= COLOR_PAIR(col->second);
 
-                for (auto &c : Columns) {
-                    if (!c.Hidden)
-                        x += 1 + c.Print(*row, x, at_row + y - FirstRow,
-                                         screen, attr);
+                    for (auto &c : Columns) {
+                        if (!c.Hidden)
+                            x += 1 + c.Print(*row, x, at_row + y - FirstRow,
+                                             screen, attr);
+                    }
+                    y++;
                 }
             }
-            y++;
         }, MaxLevel);
+
+    std::set<std::string> destroyedContainers;
+    for (const auto &it : RowColor) {
+       if (containers.find(it.first) == containers.end())
+           destroyedContainers.insert(it.first);
+    }
+
+    for (const auto &container : destroyedContainers)
+        RowColor.erase(container);
+
     screen.Refresh();
 }
 
@@ -881,6 +896,10 @@ void TPortoTop::MarkRow() {
         if (++NextColor > 6)
             NextColor = 1;
     }
+}
+
+void TPortoTop::HideRows() {
+    FilterMode ^= true;
 }
 
 void TPortoTop::AddColumn(const TColumn &c) {
@@ -959,6 +978,9 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
 
     if (SelectedRow < 0)
         SelectedRow = 0;
+
+    if (FilterMode && SelectedRow >= RowColor.size())
+        SelectedRow = RowColor.size() - 1;
 
     if (SelectedRow >= MaxRows)
         SelectedRow = MaxRows - 1;
@@ -1376,6 +1398,10 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
             break;
         case '!':
             top.MarkRow();
+            break;
+        case 'H':
+            top.HideRows();
+            top.ChangeSelection(0, -1000, screen);
             break;
         case '@':
             top.SelectedContainer = "self";

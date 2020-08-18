@@ -188,6 +188,7 @@ public:
     bool AddColumn(std::string title, std::string signal, std::string desc,
                    bool hidden = false);
     void MarkRow();
+    void HideRows();
 
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
     void ChangeView(int x, int y);
@@ -230,5 +231,6 @@ private:
 
     int NextColor = 1;
     std::map<std::string, int> RowColor;
+    bool FilterMode = false;
 };
 
