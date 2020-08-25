@@ -35,6 +35,12 @@ static std::vector<TPath> SystemPaths = {
     "/var",
 };
 
+static std::vector<std::string> HiddenCgroupMounts = {
+    "net_cls",
+    "net_prio",
+    "net_cls,net_prio"
+};
+
 bool IsSystemPath(const TPath &path) {
     TPath normal = path.NormalPath();
 
@@ -436,7 +442,7 @@ TError TMountNamespace::MountTraceFs() {
 
 TError TMountNamespace::MountSystemd() {
 
-    if (Systemd.empty() || EnableCgroupNs)
+    if (Systemd.empty())
         return OK;
 
     TPath tmpfs = "sys/fs/cgroup";
@@ -627,6 +633,34 @@ TError TMountNamespace::ProtectProc() {
     return OK;
 }
 
+TError TMountNamespace::ProtectCgroups() {
+    TPath tmpfs = "sys/fs/cgroup";
+    TError error;
+
+    error = tmpfs.UmountAll();
+    if (error)
+        return error;
+
+    error = tmpfs.Mount("tmpfs", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME, {"mode=755"});
+    if (error)
+        return error;
+
+    // hide some cgroup hierarchy for virt_mode=os containers with cgroup ns PORTO-718
+    for (const auto &cgroupName : HiddenCgroupMounts) {
+        TPath cgroup = tmpfs / cgroupName;
+
+        error = cgroup.MkdirAll(0);
+        if (error)
+            return error;
+
+        error = cgroup.Mount("tmpfs", "tmpfs", MS_RDONLY, {"mode=0", "size=1k"});
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
 TError TMountNamespace::Setup() {
     TPath dot(".");
     TError error;
@@ -738,7 +772,10 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    error = MountSystemd();
+    if (!EnableCgroupNs)
+        error = MountSystemd();
+    else
+        error = ProtectCgroups();
     if (error)
         return error;
 
