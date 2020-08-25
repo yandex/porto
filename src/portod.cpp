@@ -692,7 +692,7 @@ again:
                 continue;
 
             if (cg->Name == PORTO_DAEMON_CGROUP &&
-                    (hy->Controllers & (CGROUP_FREEZER | CGROUP_MEMORY | CGROUP_CPUACCT | CGROUP2)))
+                    (hy->Controllers & (CGROUP_FREEZER | CGROUP_MEMORY | CGROUP_CPUACCT | CGROUP2 | CGROUP_PERF)))
                 continue;
 
             if (cg->Name == PORTO_HELPERS_CGROUP &&

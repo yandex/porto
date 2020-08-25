@@ -30,6 +30,7 @@ const TFlagsNames ControllersName = {
     { CGROUP_HUGETLB,   "hugetlb" },
     { CGROUP_CPUSET,    "cpuset" },
     { CGROUP_PIDS,      "pids" },
+    { CGROUP_PERF,      "perf_event" },
     { CGROUP_SYSTEMD,   "systemd" },
     { CGROUP2,          "cgroup2" },
 };
@@ -1322,6 +1323,7 @@ TBlkioSubsystem     BlkioSubsystem;
 TDevicesSubsystem   DevicesSubsystem;
 THugetlbSubsystem   HugetlbSubsystem;
 TPidsSubsystem      PidsSubsystem;
+TPerfSubsystem      PerfSubsystem;
 TSystemdSubsystem   SystemdSubsystem;
 TCgroup2Subsystem   Cgroup2Subsystem;
 
@@ -1336,6 +1338,7 @@ std::vector<TSubsystem *> AllSubsystems = {
     &DevicesSubsystem,
     &HugetlbSubsystem,
     &PidsSubsystem,
+    &PerfSubsystem,
     &SystemdSubsystem,
     &Cgroup2Subsystem,
 };
@@ -1493,6 +1496,7 @@ TError InitializeDaemonCgroups() {
         &FreezerSubsystem,
         &MemorySubsystem,
         &CpuacctSubsystem,
+        &PerfSubsystem,
     };
     if (Cgroup2Subsystem.Supported)
         DaemonSubsystems.push_back(&Cgroup2Subsystem);
