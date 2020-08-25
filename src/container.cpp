@@ -415,6 +415,9 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     if (Cgroup2Subsystem.Supported)
         Controllers |= CGROUP2;
 
+    if (PerfSubsystem.Supported)
+        Controllers |= CGROUP_PERF;
+
     if (CpuacctSubsystem.Controllers == CGROUP_CPUACCT)
         Controllers |= CGROUP_CPUACCT;
 
@@ -3947,6 +3950,9 @@ TError TContainer::Load(const TKeyValue &node) {
 
     if (Level == 1 && CpusetSubsystem.Supported)
         Controllers |= CGROUP_CPUSET;
+
+    if (PerfSubsystem.Supported)
+        Controllers |= CGROUP_PERF;
 
     if (Cgroup2Subsystem.Supported)
         Controllers |= CGROUP2;

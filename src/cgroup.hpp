@@ -19,6 +19,7 @@ class TCgroup;
 #define CGROUP_HUGETLB  0x00080ull
 #define CGROUP_CPUSET   0x00100ull
 #define CGROUP_PIDS     0x00200ull
+#define CGROUP_PERF     0x00400ull
 #define CGROUP_SYSTEMD  0x01000ull
 #define CGROUP2         0x10000ull
 
@@ -393,6 +394,11 @@ public:
     TError SetLimit(TCgroup &cg, uint64_t limit) const;
 };
 
+class TPerfSubsystem : public TSubsystem {
+public:
+    TPerfSubsystem() : TSubsystem(CGROUP_PERF, "perf_event") {}
+};
+
 class TSystemdSubsystem : public TSubsystem {
 public:
     TCgroup PortoService;
@@ -423,6 +429,7 @@ extern TBlkioSubsystem      BlkioSubsystem;
 extern TDevicesSubsystem    DevicesSubsystem;
 extern THugetlbSubsystem    HugetlbSubsystem;
 extern TPidsSubsystem       PidsSubsystem;
+extern TPerfSubsystem       PerfSubsystem;
 extern TSystemdSubsystem    SystemdSubsystem;
 extern TCgroup2Subsystem    Cgroup2Subsystem;
 
