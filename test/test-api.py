@@ -143,6 +143,24 @@ a.Start()
 assert a.Wait() == a.name
 assert a.GetData("exit_status") == "0"
 assert a.GetData("stdout") == "test\n"
+a.Stop()
+
+a.SetProperty("command_argv", "echo\ttest2")
+assert a.GetProperty("command_argv") == "echo\ttest2"
+a.Start()
+assert a.Wait() == a.name
+assert a.GetData("exit_status") == "0"
+assert a.GetData("stdout") == "test2\n"
+a.Stop()
+
+a.SetProperty("command_argv", "")
+a.SetProperty("command_argv[0]", "echo")
+a.SetProperty("command_argv[5]", "test3")
+a.Start()
+assert a.Wait() == a.name
+assert a.GetData("exit_status") == "0"
+assert a.GetData("stdout") == "    test3\n"
+
 c.Destroy(a)
 
 assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist

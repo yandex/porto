@@ -14,6 +14,7 @@ constexpr const char *P_RAW_DEATH_TIME = "_death_time";
 constexpr const char *P_TAINT = "taint";
 
 constexpr const char *P_COMMAND = "command";
+constexpr const char *P_COMMAND_ARGV = "command_argv";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";
 constexpr const char *P_TASK_CRED = "task_cred";
@@ -170,6 +171,7 @@ enum class EProperty {
     START_TIME,
     DEATH_TIME,
     COMMAND,
+    COMMAND_ARGV,
     USER,
     GROUP,
     OWNER_USER,

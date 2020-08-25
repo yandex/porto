@@ -134,6 +134,7 @@ public:
     TCred TaskCred;
     std::string Command;
     std::string CoreCommand;
+    TTuple CommandArgv;
     TPath Cwd;
     TStdStream Stdin, Stdout, Stderr;
     std::string Root;
@@ -291,7 +292,7 @@ public:
     void RemoveWorkDir() const;
 
     bool IsMeta() const {
-        return Command.empty();
+        return Command.empty() && !HasProp(EProperty::COMMAND_ARGV);
     }
 
     TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name);

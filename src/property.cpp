@@ -921,8 +921,12 @@ public:
         return OK;
     }
     TError Set(const std::string &command) {
+        if (command.size() > CONTAINER_COMMAND_MAX)
+            return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
         CT->Command = command;
         CT->SetProp(EProperty::COMMAND);
+        CT->CommandArgv.clear();
+        CT->ClearProp(EProperty::COMMAND_ARGV);
         return OK;
     }
     TError Start(void) {
@@ -943,6 +947,86 @@ public:
         return Set(spec.command());
     }
 } static Command;
+
+class TCommandArgv : public TProperty {
+public:
+    TCommandArgv() : TProperty(P_COMMAND_ARGV, EProperty::COMMAND_ARGV,
+            "Verbatim command line, format: argv0\\targv1\\t...") {}
+    TError Get(std::string &val) {
+        val = MergeEscapeStrings(CT->CommandArgv, '\t');
+        return OK;
+    }
+    TError SetCommand() {
+        CT->Command = "";
+        for (auto &argv: CT->CommandArgv)
+            CT->Command += "'" + StringReplaceAll(argv, "'", "'\\''") + "' ";
+        CT->SetProp(EProperty::COMMAND);
+        return OK;
+    }
+    TError Set(const std::string &val) {
+        if (val.size() > CONTAINER_COMMAND_MAX)
+            return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
+        CT->CommandArgv = SplitEscapedString(val, '\t');
+        if (CT->CommandArgv.size())
+            CT->SetProp(EProperty::COMMAND_ARGV);
+        else
+            CT->ClearProp(EProperty::COMMAND_ARGV);
+        return SetCommand();
+    }
+    TError GetIndexed(const std::string &index, std::string &value) {
+        uint64_t i;
+        if (StringToUint64(index, i) || i >= CT->CommandArgv.size())
+            return TError(EError::InvalidProperty, "Invalid index");
+        value = CT->CommandArgv[i];
+        return OK;
+    }
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        uint64_t i;
+        if (StringToUint64(index, i))
+            return TError(EError::InvalidProperty, "Invalid index");
+
+        size_t size = CT->Command.size() + value.size();
+        if (i < CT->CommandArgv.size())
+            size -= CT->CommandArgv[i].size();
+        else
+            size += i - CT->CommandArgv.size();
+        if (i > CONTAINER_COMMAND_MAX || size > CONTAINER_COMMAND_MAX)
+            return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
+
+        if (i >= CT->CommandArgv.size())
+            CT->CommandArgv.resize(i + 1);
+
+        CT->CommandArgv[i] = value;
+        CT->SetProp(EProperty::COMMAND_ARGV);
+        return SetCommand();
+    }
+    void Dump(rpc::TContainerSpec &spec) override {
+        if (CT->CommandArgv.empty())
+            return;
+
+        auto cmd = spec.mutable_command_argv();
+        for (auto &argv: CT->CommandArgv)
+            cmd->add_argv(argv);
+    }
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_command_argv();
+    }
+    TError Load(const rpc::TContainerSpec &spec) override {
+        size_t size = 0;
+        for (auto &argv: spec.command_argv().argv())
+            size += argv.size();
+        if (size > CONTAINER_COMMAND_MAX)
+            return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
+        CT->CommandArgv.clear();
+        for (auto &argv: spec.command_argv().argv())
+            CT->CommandArgv.push_back(argv);
+        if (CT->CommandArgv.size())
+            CT->SetProp(EProperty::COMMAND_ARGV);
+        else
+            CT->ClearProp(EProperty::COMMAND_ARGV);
+        return SetCommand();
+    }
+} static CommandArgv;
 
 class TCoreCommand : public TProperty {
 public:
