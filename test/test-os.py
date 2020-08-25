@@ -35,6 +35,19 @@ def CheckCgroupHierarchy(ct, haveCgroups):
         ExpectNe(r['exit_code'], '0')
         r.Destroy()
 
+        r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup/freezer', private='portoctl shell', isolate=False)
+        ExpectEq(r['exit_code'], '0')
+        ExpectNe(len(r['stdout']), 0)
+        r.Destroy()
+
+        unmounted_cgroups = ['net_cls', 'net_prio', 'net_cls,net_prio']
+
+        for unmounted_cgroup in unmounted_cgroups:
+            r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup/{}'.format(unmounted_cgroup), private='portoctl shell', isolate=False)
+            ExpectEq(r['exit_code'], '0')
+            ExpectEq(len(r['stdout']), 0)
+            r.Destroy()
+
 
 try:
     ConfigurePortod('test-os', """

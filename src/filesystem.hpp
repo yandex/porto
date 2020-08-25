@@ -50,6 +50,7 @@ public:
     TError RemountRun();
     TError MountBinds();
     TError ProtectProc();
+    TError ProtectCgroups();
     TError MountTraceFs();
     TError MountSystemd();
 
