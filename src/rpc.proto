@@ -266,6 +266,10 @@ message TCapabilities {
 // Container
 
 
+message TContainerCommandArgv {
+    repeated string argv = 1;
+}
+
 message TContainerEnvVar {
     required string name = 1;
     optional string value = 2;
@@ -512,6 +516,7 @@ message TContainerSpec {
     optional TStringMap labels = 4;
 
     optional string command = 5;
+    optional TContainerCommandArgv command_argv = 76;
     optional TContainerEnv env = 6;
     optional TContainerEnv env_secret = 90;  // in, out hides values
     optional TContainerUlimits ulimit = 7;

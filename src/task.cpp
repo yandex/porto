@@ -179,29 +179,42 @@ TError TTaskEnv::ChildExec() {
         return TError::System("cannot exec portoinit");
     }
 
-    wordexp_t result;
+    std::vector<const char *> argv;
+    if (CT->HasProp(EProperty::COMMAND_ARGV)) {
+        argv.resize(CT->CommandArgv.size() + 1);
+        for (unsigned i = 0; i < argv.size(); i++)
+            argv[i] = CT->CommandArgv[i].c_str();
+        argv.back() = nullptr;
+    } else {
+        wordexp_t result;
 
-    int ret = wordexp(CT->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
-    switch (ret) {
-    case WRDE_BADCHAR:
-        return TError(EError::InvalidCommand, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {{, }}");
-    case WRDE_BADVAL:
-        return TError(EError::InvalidCommand, "wordexp(): undefined shell variable was referenced");
-    case WRDE_CMDSUB:
-        return TError(EError::InvalidCommand, "wordexp(): command substitution is not supported");
-    case WRDE_SYNTAX:
-        return TError(EError::InvalidCommand, "wordexp(): syntax error");
-    default:
-    case WRDE_NOSPACE:
-        return TError(EError::InvalidCommand, "wordexp(): error {}", ret);
-    case 0:
-        break;
+        int ret = wordexp(CT->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+        switch (ret) {
+        case WRDE_BADCHAR:
+            return TError(EError::InvalidCommand, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {{, }}");
+        case WRDE_BADVAL:
+            return TError(EError::InvalidCommand, "wordexp(): undefined shell variable was referenced");
+        case WRDE_CMDSUB:
+            return TError(EError::InvalidCommand, "wordexp(): command substitution is not supported");
+        case WRDE_SYNTAX:
+            return TError(EError::InvalidCommand, "wordexp(): syntax error");
+        default:
+        case WRDE_NOSPACE:
+            return TError(EError::InvalidCommand, "wordexp(): error {}", ret);
+        case 0:
+            break;
+        }
+
+        argv.resize(result.we_wordc + 1);
+        for (unsigned i = 0; i < result.we_wordc; i++)
+            argv[i] = result.we_wordv[i];
+        argv.back() = nullptr;
     }
 
     if (Verbose) {
         L("command={}", CT->Command);
-        for (unsigned i = 0; result.we_wordv[i]; i++)
-            L("argv[{}]={}", i, result.we_wordv[i]);
+        for (unsigned i = 0; argv[i]; i++)
+            L("argv[{}]={}", i, argv[i]);
         for (unsigned i = 0; envp[i]; i++)
             L("environ[{}]={}", i, envp[i]);
     }
@@ -216,14 +229,13 @@ TError TTaskEnv::ChildExec() {
         dup2(open("/dev/null", O_RDWR | O_CLOEXEC), 9);
     }
 
-    L("Exec '{}'", result.we_wordv[0]);
-    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
+    L("Exec '{}'", argv[0]);
+    execvpe(argv[0], (char *const *)argv.data(), envp);
 
     if (errno == EAGAIN)
-        return TError(EError::ResourceNotAvailable, errno, "cannot exec " +
-                      std::string(result.we_wordv[0]) + ": not enough ulimit nproc");
+        return TError(EError::ResourceNotAvailable, errno, "cannot exec {} not enough ulimit nproc", argv[0]);
 
-    return TError(EError::InvalidCommand, errno, "cannot exec " + std::string(result.we_wordv[0]));
+    return TError(EError::InvalidCommand, errno, "cannot exec {}", argv[0]);
 }
 
 TError TTaskEnv::WriteResolvConf() {

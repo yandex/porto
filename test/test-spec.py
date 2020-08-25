@@ -155,6 +155,12 @@ try:
     assert dump.status.memory_guarantee_total == int(a.GetProperty('memory_guarantee_total'))
 
     assert dump.status.state == a.GetProperty('state')
+
+    a.SetProperty("command_argv", "sleep\t321")
+    assert a.GetProperty("command_argv") == "sleep\t321"
+    CopyProps(a, b)
+    assert b.GetProperty("command_argv") == "sleep\t321"
+
     a.SetProperty("command", "sleep 123")
     CopyProps(a, b)
     assert a.GetProperty('command') == b.GetProperty('command')
