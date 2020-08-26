@@ -1,3 +1,18 @@
+yandex-porto (5.0.2) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * porto: validate cred in TOwnerCred::Load
+  * portotop: hide unmarked containers on 'H'
+  * api: fix typo in python api
+  * cgroup: make perf_event cgroup hierarchy
+  * porto: add property command_argv
+  * filesystem: hide net_cls and net_prio cgroups in os container with cgroup ns
+
+  [ Maxim Samoylov ]
+  * porto: update authors
+
+ -- max7255 <max7255@max7255-nix>  Wed, 26 Aug 2020 18:27:56 +0300
+
 yandex-porto (5.0.1) unstable; urgency=low
 
   [ wwfq ]
