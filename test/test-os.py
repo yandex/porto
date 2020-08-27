@@ -20,7 +20,8 @@ def CheckCgroupHierarchy(ct, haveCgroups):
 
     # Check cgroup hierarchy in child container
     r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup')
-    assert (len(r['stdout'].strip().split('\n')) <= 1)
+    res_cgroups = r['stdout'].strip().split('\n')
+    assert res_cgroups == ['net_cls', 'net_cls,net_prio', 'net_prio'] or res_cgroups == ['systemd']
     r.Destroy()
 
     if haveCgroups:
@@ -31,10 +32,6 @@ def CheckCgroupHierarchy(ct, haveCgroups):
         r.Destroy()
 
         # Create subcgroup in child containers
-        r = conn.Run(ct.name + '/child', wait=10, command='mkdir -p /sys/fs/cgroup/freezer/cgroup123')
-        ExpectNe(r['exit_code'], '0')
-        r.Destroy()
-
         r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup/freezer', private='portoctl shell', isolate=False)
         ExpectEq(r['exit_code'], '0')
         ExpectNe(len(r['stdout']), 0)
