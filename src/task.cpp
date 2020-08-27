@@ -182,7 +182,7 @@ TError TTaskEnv::ChildExec() {
     std::vector<const char *> argv;
     if (CT->HasProp(EProperty::COMMAND_ARGV)) {
         argv.resize(CT->CommandArgv.size() + 1);
-        for (unsigned i = 0; i < argv.size(); i++)
+        for (unsigned i = 0; i < CT->CommandArgv.size(); i++)
             argv[i] = CT->CommandArgv[i].c_str();
         argv.back() = nullptr;
     } else {
