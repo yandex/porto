@@ -430,13 +430,6 @@ noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
     CL->ReleaseContainer();
 
     for (auto volume_spec: req.volumes()) {
-        if (!volume_spec.has_container()) {
-            auto link = volume_spec.add_links();
-            link->set_container(name);
-        }
-        if (!volume_spec.has_owner_container())
-            volume_spec.set_owner_container(name);
-
         std::shared_ptr<TVolume> volume;
 
         error = TVolume::Create(volume_spec, volume);
