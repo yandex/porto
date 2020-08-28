@@ -3792,6 +3792,19 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
             if (error)
                 goto undo;
             error = volume->LinkVolume(ct, link.target(), link.read_only(), link.required());
+
+            if (!error && link.container_root() && ct->Parent) {
+                ct->LockStateWrite();
+                error = ct->SetProperty(P_ROOT, ct->Parent->RootPath.InnerPath(volume->Path).ToString());
+                ct->UnlockState();
+            }
+
+            if (!error && link.container_cwd()) {
+                ct->LockStateWrite();
+                error = ct->SetProperty(P_CWD, ct->RootPath.InnerPath(volume->Path).ToString());
+                ct->UnlockState();
+            }
+
             CL->ReleaseContainer();
             if (error)
                 goto undo;

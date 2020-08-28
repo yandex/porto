@@ -644,6 +644,8 @@ message TVolumeLink {
     optional bool required = 3;         // container cannot work without it
     optional bool read_only = 4;
     optional string host_target = 5;    // out, absolute path in host
+    optional bool container_root = 6;   // in, set container root
+    optional bool container_cwd = 7;     // in, set container cwd
 }
 
 message TVolumeResource {
