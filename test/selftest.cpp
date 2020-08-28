@@ -3677,8 +3677,21 @@ static void TestContainerSpec(Porto::Connection &api) {
     spec.set_enable_porto("true");
     spec.set_command("sleep 15");
 
+    Say() << "Create container with volumes without links" << std::endl;;
 
     ExpectApiSuccess(api.CreateFromSpec(spec, {rpc::TVolumeSpec(), rpc::TVolumeSpec()}, true));
+    ExpectApiSuccess(api.GetContainerSpec(d, ctSpec));
+    ExpectEq(ctSpec.status().state(), "running");
+    ExpectEq(ctSpec.spec().command(), "sleep 15");
+    ExpectEq(ctSpec.status().volumes_linked().link().size(), 0);
+    ExpectApiSuccess(api.Destroy(d));
+
+    Say() << "Create container with volumes with links" << std::endl;;
+    auto volumeLinked =  rpc::TVolumeSpec();
+    volumeLinked.add_links()->set_container(spec.name());
+    volumeLinked.set_owner_container(spec.name());
+
+    ExpectApiSuccess(api.CreateFromSpec(spec, {volumeLinked, volumeLinked}, true));
     ExpectApiSuccess(api.GetContainerSpec(d, ctSpec));
     ExpectEq(ctSpec.status().state(), "running");
     ExpectEq(ctSpec.spec().command(), "sleep 15");
