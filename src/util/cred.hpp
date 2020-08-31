@@ -60,6 +60,7 @@ public:
     TError InitGroups(const std::string &user);
 
     TError Apply() const;
+    TError SetupMapping(pid_t pid) const;
 
     uid_t GetUid() const {
         return Uid;
@@ -88,6 +89,7 @@ public:
     }
 
     bool IsRootUser() const { return Uid == RootUser; }
+    bool IsRootGroup() const { return Gid == RootGroup; }
 
     bool IsUnknown() const { return Uid == NoUser && Gid == NoGroup; }
 

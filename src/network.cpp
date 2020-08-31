@@ -561,7 +561,7 @@ void TNetwork::Unregister() {
     NetInode = 0;
 }
 
-TError TNetwork::New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net) {
+TError TNetwork::New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net, pid_t netnsPid) {
     TNamespaceFd curNs;
     TError error;
 
@@ -569,12 +569,21 @@ TError TNetwork::New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net) {
     if (error)
         return error;
 
-    if (unshare(CLONE_NEWNET))
-        return TError::System("unshare(CLONE_NEWNET)");
+    if (netnsPid) {
+        error = netns.Open(fmt::format("/proc/{}/ns/net", netnsPid));
+        if (error)
+            return error;
+        error = netns.SetNs(CLONE_NEWNET);
+        if (error)
+            return error;
+    } else {
+        if (unshare(CLONE_NEWNET))
+            return TError::System("unshare(CLONE_NEWNET)");
 
-    error = netns.Open("/proc/thread-self/ns/net");
-    if (error)
-        return error;
+        error = netns.Open("/proc/thread-self/ns/net");
+        if (error)
+            return error;
+    }
 
     net = std::make_shared<TNetwork>();
 
@@ -3219,7 +3228,7 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
     }
 
     if (NetIsolate) {
-        error = TNetwork::New(NetNs, Net);
+        error = TNetwork::New(NetNs, Net, ct.DockerMode ? ct.Task.Pid : 0);
         if (error)
             return error;
 

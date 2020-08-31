@@ -215,6 +215,7 @@ message TConfig {
         optional uint64 std_stream_read_limit = 55;
         optional bool enable_cgroup2 = 56;
         optional bool use_os_mode_cgroupns = 57;
+        optional bool enable_docker_mode = 58;
 
         message TSysctl {
             required string key = 1;

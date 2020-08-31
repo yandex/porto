@@ -2159,7 +2159,7 @@ TError TContainer::ApplyDeviceConf() const {
 
     if (Controllers & CGROUP_DEVICES) {
         TCgroup cg = GetCgroup(DevicesSubsystem);
-        error = Devices.Apply(cg);
+        error = Devices.Apply(cg, TaskCred.IsRootUser());
         if (error)
             return error;
     }
@@ -2301,7 +2301,7 @@ TError TContainer::PrepareCgroups() {
             if (State == EContainerState::Starting) {
                 /* on StartContainer() */
                 if (Level == 1 || TPath(devcg.Name).IsSimple()) {
-                    error = RootContainer->Devices.Apply(devcg, true);
+                    error = RootContainer->Devices.Apply(devcg, TaskCred.IsRootUser(), true);
                     if (error)
                         return error;
                 }
@@ -2312,7 +2312,7 @@ TError TContainer::PrepareCgroups() {
                 for (auto p = Parent; p; p = p->Parent)
                     all_devices.Merge(p->Devices);
 
-                error = all_devices.Apply(devcg);
+                error = all_devices.Apply(devcg, TaskCred.IsRootUser());
                 if (error)
                     return error;
 
@@ -2646,9 +2646,11 @@ TError TContainer::StartTask() {
     TTaskEnv TaskEnv;
     TError error;
 
-    error = TNetwork::StartNetwork(*this, TaskEnv);
-    if (error)
-        return error;
+    if (!DockerMode) {
+        error = TNetwork::StartNetwork(*this, TaskEnv);
+        if (error)
+            return error;
+    }
 
     if (IsRoot())
         return OK;
@@ -2888,6 +2890,17 @@ TError TContainer::PrepareStart() {
 
 TError TContainer::Start() {
     TError error;
+
+    if (DockerMode) {
+        if (!Parent && !Parent->OsMode && Root.empty())
+            return TError(EError::Permission, "Container {} with virt_mode=docker must have parent with virt_mode=os and chroot", Name);
+
+        if (!OwnerCred.IsRootUser())
+            return TError(EError::Permission, "Container {} with virt_mode=docker must be started by root", Name);
+
+        if (TaskCred.IsRootUser() || TaskCred.IsRootGroup())
+            return TError(EError::Permission, "Command in container {} with virt_mode=docker must not be run by root", Name);
+    }
 
     if (State != EContainerState::Stopped)
         return TError(EError::InvalidState, "Cannot start container {} in state {}", Name, StateName(State));

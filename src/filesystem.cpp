@@ -17,6 +17,7 @@ extern "C" {
 #endif
 
 extern bool EnableCgroupNs;
+extern bool EnableDockerMode;
 
 static std::vector<TPath> SystemPaths = {
     "/bin",
@@ -465,7 +466,7 @@ TError TMountNamespace::MountSystemd() {
     return error;
 }
 
-TError TMountNamespace::SetupRoot() {
+TError TMountNamespace::SetupRoot(bool rootUser) {
     TPath dot(".");
     TError error;
 
@@ -511,7 +512,7 @@ TError TMountNamespace::SetupRoot() {
         { "dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
             { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5",
               "max=" + std::to_string(config().container().devpts_max()) }},
-        { "sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {}},
+        { "sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | (rootUser && EnableDockerMode ? 0ul : MS_RDONLY), {}},
     };
 
     for (auto &m : mounts) {
@@ -661,7 +662,7 @@ TError TMountNamespace::ProtectCgroups() {
     return OK;
 }
 
-TError TMountNamespace::Setup() {
+TError TMountNamespace::Setup(bool rootUser, bool dockerMode) {
     TPath dot(".");
     TError error;
 
@@ -722,7 +723,7 @@ TError TMountNamespace::Setup() {
     if (ProcFd.FsType() != PROC_SUPER_MAGIC)
         return TError("Cannot open procfs");
 
-    if (HostRoot.IsRoot() || EnableCgroupNs) {
+    if (HostRoot.IsRoot() || (EnableCgroupNs && !rootUser)) {
         error = TPath("/sys/fs/cgroup").UmountAll();
         if (error)
             return error;
@@ -758,7 +759,7 @@ TError TMountNamespace::Setup() {
                 return error;
         }
     } else {
-        error = SetupRoot();
+        error = SetupRoot(rootUser);
         if (error)
             return error;
     }
@@ -768,13 +769,15 @@ TError TMountNamespace::Setup() {
     if (error)
         return error;
 
-    error = ProtectProc();
-    if (error)
-        return error;
+    if (!rootUser || !dockerMode) {
+        error = ProtectProc();
+        if (error)
+            return error;
+    }
 
     if (!EnableCgroupNs)
         error = MountSystemd();
-    else
+    else if (!rootUser || !EnableDockerMode)
         error = ProtectCgroups();
     if (error)
         return error;

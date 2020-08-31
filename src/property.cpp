@@ -20,6 +20,8 @@ extern "C" {
 #include <sys/wait.h>
 }
 
+extern bool EnableDockerMode;
+
 __thread TContainer *CT = nullptr;
 std::map<std::string, TProperty*> ContainerProperties;
 
@@ -932,8 +934,13 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->OsMode && !CT->HasProp(EProperty::COMMAND))
-            CT->Command = "/sbin/init";
+        if (!CT->HasProp(EProperty::COMMAND)) {
+            if (CT->OsMode)
+                CT->Command = "/sbin/init";
+            else if (CT->DockerMode)
+                CT->Command = "bash -c 'containerd& dockerd'";
+        }
+
         return OK;
     }
 
@@ -1077,7 +1084,8 @@ public:
     TError Get(std::string &value) {
         value = CT->OsMode ? "os" :
                 CT->JobMode ? "job" :
-                CT->HostMode ? "host" : "app";
+                CT->HostMode ? "host" :
+                CT->DockerMode ? "docker" : "app";
         return OK;
     }
     TError Set(const std::string &value) {
@@ -1085,12 +1093,14 @@ public:
         if (value != "app" &&
                 value != "os" &&
                 value != "job" &&
+                (value != "docker" || !EnableDockerMode) &&
                 value != "host")
             return TError(EError::InvalidValue, "Unknown: {}", value);
 
         CT->OsMode = false;
         CT->JobMode = false;
         CT->HostMode = false;
+        CT->DockerMode = false;
 
         if (value == "os")
             CT->OsMode = true;
@@ -1098,6 +1108,8 @@ public:
             CT->JobMode = true;
         else if (value == "host")
             CT->HostMode = true;
+        else if (value == "docker")
+            CT->DockerMode = true;
 
         if (CT->HostMode || CT->JobMode)
             CT->Isolate = false;

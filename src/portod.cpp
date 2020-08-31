@@ -75,6 +75,7 @@ static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
 
 bool EnableCgroupNs = false;
+bool EnableDockerMode = false;
 
 static bool RunningInContainer() {
     if (getpid() == 1)
@@ -799,6 +800,8 @@ static int Portod() {
 
     EnableCgroupNs = config().container().use_os_mode_cgroupns() &&
                      (CompareVersions(config().linux_version(), "4.6") >= 0);
+    EnableDockerMode = config().container().enable_docker_mode();
+
     InitPortoGroups();
     InitCapabilities();
     InitIpcSysctl();

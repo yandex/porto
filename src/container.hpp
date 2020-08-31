@@ -145,6 +145,7 @@ public:
     bool OsMode = false;        /* Start as init process */
     bool HostMode = false;      /* Preserve host capabilites */
     bool JobMode = false;       /* Process group */
+    bool DockerMode = false;
 
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */

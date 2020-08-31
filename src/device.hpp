@@ -47,7 +47,7 @@ struct TDevices {
     std::string Format() const;
 
     TError Makedev(const TPath &root = "/") const;
-    TError Apply(const TCgroup &cg, bool reset = false) const;
+    TError Apply(const TCgroup &cg, bool rootUser, bool reset = false) const;
 
     TError InitDefault();
     void Merge(const TDevices &devices, bool overwrite = false, bool replace = false);

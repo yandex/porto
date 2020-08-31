@@ -45,7 +45,7 @@ public:
     TNamespaceFd HostNs;
     TNamespaceFd ContainerNs;
 
-    TError SetupRoot();
+    TError SetupRoot(bool rootUser);
     TError MountRun();
     TError RemountRun();
     TError MountBinds();
@@ -54,7 +54,7 @@ public:
     TError MountTraceFs();
     TError MountSystemd();
 
-    TError Setup();
+    TError Setup(bool rootUser, bool dockerMode);
 
     TError Enter(pid_t pid);
     TError Leave();
