@@ -27,6 +27,7 @@ struct TTaskEnv {
     TNamespaceFd MntFd;
     TNamespaceFd RootFd;
     TNamespaceFd CwdFd;
+    TNamespaceFd CgFd;
 
     TEnv Env;
     bool TripleFork;

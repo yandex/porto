@@ -224,6 +224,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     - *os* - start **command** as init process
     - *host* - start **command** without security restrictions
     - *job* - start **command** as process group in parent container
+    - *docker* - start **command** in user namespace
 
     Side effects of **virt\_mode**=*os*
 
@@ -235,6 +236,12 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     - reset loginuid for container
     - enable systemd cgroup if /sbin/init is systemd
     - stop command will send *SIGPWR* rather than *SIGTERM*
+
+    Side effects of **virt\_mode**=*docker*
+    - set default **command**="bash -c 'containerd& dockerd'"
+    - join user and network namespaces
+    - **user** and **group** must be not "root"
+    - parent must be with **virt_mode**="os"
 
 ## State
 

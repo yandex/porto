@@ -184,7 +184,7 @@ public:
 
     std::string NetName;
 
-    static TError New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net);
+    static TError New(TNamespaceFd &netns, std::shared_ptr<TNetwork> &net, pid_t netnsPid = 0);
     static TError Open(const TPath &path, TNamespaceFd &netns,
                        std::shared_ptr<TNetwork> &net,
                        bool host = false);

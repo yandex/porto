@@ -49,6 +49,7 @@ std::list<std::string> IpcSysctls = {
 };
 
 extern bool EnableCgroupNs;
+extern bool EnableDockerMode;
 
 void InitIpcSysctl() {
     for (const auto &key: IpcSysctls) {
@@ -145,6 +146,10 @@ TError TTaskEnv::OpenNamespaces(TContainer &ct) {
         return error;
 
     error = MntFd.Open(pid, "ns/mnt");
+    if (error)
+        return error;
+
+    error = CgFd.Open(pid, "ns/cgroup");
     if (error)
         return error;
 
@@ -307,7 +312,9 @@ TError TTaskEnv::ConfigureChild() {
         devices.Merge(p->Devices);
 
     if (NewMountNs) {
-        error = Mnt.Setup();
+
+        error = Mnt.Setup(EnableDockerMode && CT->OwnerCred.IsRootUser(),
+                          CT->DockerMode);
         if (error)
             return error;
 
@@ -421,6 +428,18 @@ TError TTaskEnv::ConfigureChild() {
         return error;
 
     umask(CT->Umask);
+
+    if (CT->DockerMode) {
+        unshare(CLONE_NEWUSER | CLONE_NEWNET | CLONE_NEWNS);
+
+        error = Sock.SendZero();
+        if (error)
+            Abort(error);
+
+        error = Sock.RecvZero();
+        if (error)
+            Abort(error);
+    }
 
     return OK;
 }
@@ -680,6 +699,10 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
+        error = CgFd.SetNs(CLONE_NEWCGROUP);
+        if (error)
+            Abort(error);
+
         error = RootFd.Chroot();
         if (error)
             Abort(error);
@@ -791,6 +814,26 @@ TError TTaskEnv::Start() {
         error2 = task.Wait();
 
     /* Task was alive, even if it already died we'll get zombie */
+
+    if (CT->DockerMode) {
+        // wait joining user namespace
+        error = MasterSock.RecvZero();
+        if (error)
+            Abort(error);
+
+        error = CT->TaskCred.SetupMapping(CT->Task.Pid);
+        if (error)
+            Abort(error);
+
+        error = TNetwork::StartNetwork(*CT, *this);
+        if (error)
+            Abort(error);
+
+        error = MasterSock.SendZero();
+        if (error)
+            Abort(error);
+    }
+
     error = MasterSock.SendZero();
     if (error)
         L("Task wakeup error: {}", error);

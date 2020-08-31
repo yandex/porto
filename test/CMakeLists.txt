@@ -91,6 +91,7 @@ ADD_PYTHON_TEST(devices)
 ADD_PYTHON_TEST(systemd)
 ADD_PYTHON_TEST(os)
 ADD_PYTHON_TEST(jobs)
+ADD_PYTHON_TEST(docker)
 
 ADD_PYTHON_TEST(portoctl-exec)
 ADD_PYTHON_TEST(portoctl-wait)

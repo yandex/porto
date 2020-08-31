@@ -8,6 +8,8 @@ extern "C" {
 #include <sys/sysmacros.h>
 }
 
+extern bool EnableDockerMode;
+
 TError TDevice::CheckPath(const TPath &path) {
     if (!path.IsNormal())
         return TError(EError::InvalidValue, "Non-normalized device path: {}", path);
@@ -339,10 +341,10 @@ TError TDevices::Makedev(const TPath &root) const {
     return OK;
 }
 
-TError TDevices::Apply(const TCgroup &cg, bool reset) const {
+TError TDevices::Apply(const TCgroup &cg, bool rootUser, bool reset) const {
     TError error;
 
-    if (reset) {
+    if (reset && (!rootUser || !EnableDockerMode)) {
         error = cg.Set("devices.deny", "a");
         if (error)
             return error;
@@ -362,7 +364,7 @@ TError TDevices::Apply(const TCgroup &cg, bool reset) const {
         }
 
         rule = device.CgroupRule(false);
-        if (rule != "") {
+        if (rule != "" && (!rootUser || !EnableDockerMode)) {
             error = cg.Set("devices.deny", rule);
             if (error)
                 return error;
