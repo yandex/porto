@@ -27,6 +27,8 @@ TClient SystemClient("<system>");
 TClient WatchdogClient("<watchdog>");
 __thread TClient *CL = nullptr;
 
+extern bool EnableCgroupNs;
+
 TClient::TClient(int fd) : TEpollSource(fd) {
     ConnectionTime = GetCurrentTimeMs();
     ActivityTimeMs = ConnectionTime;
@@ -108,7 +110,8 @@ TError TClient::IdentifyClient(bool initial) {
     Cred = TaskCred;
     Comm = GetTaskName(Pid);
 
-    error = TContainer::FindTaskContainer(Pid, ct);
+    // strict if cgroup namespaces are disabled
+    error = TContainer::FindTaskContainer(Pid, ct, !EnableCgroupNs);
     if (error && error.Errno != ENOENT)
         L_WRN("Cannot identify container of pid {} : {}", Pid, error);
 
