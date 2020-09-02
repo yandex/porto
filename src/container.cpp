@@ -115,22 +115,42 @@ std::string TContainer::ParentName(const std::string &name) {
     return name.substr(0, sep);
 }
 
-std::shared_ptr<TContainer> TContainer::Find(const std::string &name) {
+std::shared_ptr<TContainer> TContainer::Find(const std::string &name, bool strict) {
     PORTO_LOCKED(ContainersMutex);
-    auto it = Containers.find(name);
-    if (it == Containers.end())
-        return nullptr;
-    return it->second;
+
+    if (strict) {
+        auto it = Containers.find(name);
+        if (it == Containers.end())
+            return nullptr;
+        return it->second;
+    }
+
+    // Find nearest parent if not strict
+    std::string ctName = name;
+
+    while (!ctName.empty()) {
+        auto it = Containers.find(ctName);
+        if (it != Containers.end())
+            return it->second;
+
+        auto pos = ctName.rfind('/');
+        if (pos == std::string::npos)
+            break;
+
+        ctName = ctName.substr(0, pos);
+    }
+
+    return nullptr;
 }
 
-TError TContainer::Find(const std::string &name, std::shared_ptr<TContainer> &ct) {
-    ct = Find(name);
+TError TContainer::Find(const std::string &name, std::shared_ptr<TContainer> &ct, bool strict) {
+    ct = Find(name, strict);
     if (ct)
         return OK;
     return TError(EError::ContainerDoesNotExist, "container " + name + " not found");
 }
 
-TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct) {
+TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct, bool strict) {
     TError error;
     TCgroup cg;
 
@@ -150,7 +170,7 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct)
     if (!StringStartsWith(name, prefix))
         return TContainer::Find(ROOT_CONTAINER, ct);
 
-    return TContainer::Find(name.substr(prefix.length()), ct);
+    return TContainer::Find(name.substr(prefix.length()), ct, strict);
 }
 
 /* lock subtree shared or exclusive */

@@ -2,6 +2,7 @@ import porto
 from test_common import *
 import os
 import time
+import shutil
 
 conn = porto.Connection()
 
@@ -11,6 +12,16 @@ def ExpectRunlevel(ct, level):
     ExpectEq(r['exit_code'], '0')
     r.Destroy()
 
+
+def CheckSubCgroups(ct):
+    r = conn.Run(ct.name + '/child', wait=10,
+                 command='''bash -c "mkdir -p /sys/fs/cgroup/freezer/dir123/subdir567;
+                            echo $$ >/sys/fs/cgroup/freezer/dir123/subdir567/cgroup.procs;
+                            chmod +x /portoctl; /portoctl list"''',
+                            private='portoctl shell', isolate=False)
+    ExpectEq(len(r['stderr']), 0)
+    r.Destroy()
+    ExpectEq(conn.GetProperty("/", "porto_stat[warnings]"), "0")
 
 def CheckCgroupHierarchy(ct, haveCgroups):
     # Check cgroup hierarchy in portoctl shell container
@@ -64,6 +75,8 @@ try:
     a.Stop()
     a.Start()
     ExpectRunlevel(a, 'N 5')
+    shutil.copyfile(portoctl, "{}/portoctl".format(a.GetData('root')))
+    CheckSubCgroups(a)
     CheckCgroupHierarchy(a, True)
     a.Destroy()
 

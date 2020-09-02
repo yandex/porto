@@ -444,9 +444,9 @@ public:
     static std::string StateName(EContainerState state);
     static EContainerState ParseState(const std::string &name);
 
-    static std::shared_ptr<TContainer> Find(const std::string &name);
-    static TError Find(const std::string &name, std::shared_ptr<TContainer> &ct);
-    static TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct);
+    static std::shared_ptr<TContainer> Find(const std::string &name, bool strict = true);
+    static TError Find(const std::string &name, std::shared_ptr<TContainer> &ct, bool strict = true);
+    static TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct, bool strict = true);
 
     static TError Create(const std::string &name, std::shared_ptr<TContainer> &ct);
     static TError Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct);
