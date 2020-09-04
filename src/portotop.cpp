@@ -848,13 +848,14 @@ void TPortoTop::Print(TConsoleScreen &screen) {
 
     PrintTitle(at_row - 1, screen);
     int y = 0;
+    int hiddenRows = 0;
     SelectedContainer = "";
     std::set<std::string> containers;
     ContainerTree->ForEach([&] (std::shared_ptr<TPortoContainer> &row) {
             containers.insert(row->GetName());
             if (y >= FirstRow && y < MaxRows) {
                 if (!FilterMode || RowColor.find(row->GetName()) != RowColor.end()) {
-                    bool selected = y == SelectedRow;
+                    bool selected = (!FilterMode && y == SelectedRow) || (FilterMode && (y - hiddenRows) == SelectedRow);
                     if (selected)
                         SelectedContainer = row->GetName();
                     int x = FirstX;
@@ -868,12 +869,14 @@ void TPortoTop::Print(TConsoleScreen &screen) {
 
                     for (auto &c : Columns) {
                         if (!c.Hidden)
-                            x += 1 + c.Print(*row, x, at_row + y - FirstRow,
+                            x += 1 + c.Print(*row, x, at_row + y - FirstRow - hiddenRows,
                                              screen, attr);
                     }
-                    y++;
+                } else {
+                    hiddenRows++;
                 }
             }
+            y++;
         }, MaxLevel);
 
     std::set<std::string> destroyedContainers;
