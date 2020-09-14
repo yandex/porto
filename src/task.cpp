@@ -452,7 +452,10 @@ TError TTaskEnv::WaitAutoconf() {
 }
 
 void TTaskEnv::StartChild() {
-    L("Start child");
+    /* Use third fork between entering into parent pid-namespace and
+    cloning isolated child pid-namespace: porto keeps waiter task inside
+    which waits sub-container main task and dies in the same way. */
+    L("Start child with TripleFork={} QuadroFork={}", TripleFork, QuadroFork);
 
     TError error;
 
@@ -836,6 +839,7 @@ void TTaskEnv::ExecPortoinit(pid_t pid) {
     TError error = PortoInitCapabilities.ApplyLimit();
     if (!error) {
         TFile::CloseAll({PortoInit.Fd, LogFile.Fd});
+        L("Exec portoinit");
         fexecve(PortoInit.Fd, (char *const *)argv, envp);
         error = TError::System("fexecve");
     }
