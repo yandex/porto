@@ -274,6 +274,8 @@ message TContainerEnvVar {
     required string name = 1;
     optional string value = 2;
     optional bool unset = 3;        // out
+    optional string salt = 4;
+    optional string hash = 5;
 }
 
 message TContainerEnv {

@@ -294,24 +294,54 @@ static void MD5_Final(unsigned char *result, MD5_CTX *ctx)
     memset(ctx, 0, sizeof(*ctx));
 }
 
-TError Md5Sum(TFile &file, std::string &sum) {
-    MD5_CTX ctx;
-    unsigned char bin[16];
-    std::string buf;
-    TError error;
+class Md5 {
+    MD5_CTX Ctx;
+    unsigned char Bin[16];
 
-    MD5_Init(&ctx);
+public:
+    Md5() {
+        MD5_Init(&Ctx);
+    }
+
+    void Update(const std::string &buf) {
+        MD5_Update(&Ctx, buf.c_str(), buf.size());
+    }
+
+    void Get(std::string &hash) {
+        hash.clear();
+        MD5_Final(Bin, &Ctx);
+        for (int i = 0; i < 16; ++i)
+            hash += fmt::format("{:02x}", Bin[i]);
+    }
+};
+
+TError Md5Sum(TFile &file, std::string &sum) {
+    Md5 md5;
+    TError error;
+    std::string buf;
+
     while (1) {
         error = file.Read(buf);
         if (error)
             return error;
         if (!buf.size())
             break;
-        MD5_Update(&ctx, buf.c_str(), buf.size());
+        md5.Update(buf);
     }
-    MD5_Final(bin, &ctx);
-    sum = "";
-    for (int i = 0; i < 16; ++i)
-        sum += fmt::format("{:02x}", bin[i]);
+    md5.Get(sum);
     return OK;
+}
+
+void Md5Sum(const std::string &value, std::string &sum) {
+    Md5 md5;
+    md5.Update(value);
+    md5.Get(sum);
+}
+
+void Md5Sum(const std::string &salt, const std::string &value, std::string &sum) {
+    Md5Sum(salt + value, sum);
+}
+
+std::string GenerateSalt() {
+    return fmt::format("{:8x}", rand());
 }

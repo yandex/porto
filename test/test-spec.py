@@ -4,6 +4,7 @@ import sys
 import os
 import porto
 import time
+import hashlib
 
 ConfigurePortod('test-spec', """
 core {
@@ -21,6 +22,8 @@ container_name = prefix + "a"
 container_name_b = prefix + "b"
 
 def CopyProps(ct_a, ct_b):
+    spec = ct_a.Dump().spec
+    spec.env_secret.Clear()
     ct_b.LoadSpec(ct_a.Dump().spec)
 
 def CheckVolatileProp(v1, v2):
@@ -33,10 +36,13 @@ try:
     clean_spec = porto.rpc_pb2.TContainerSpec()
 
 # check env
-    a.SetProperty("env", "PYTHONPATH1=/porto/src/api/python")
-    a.SetProperty("env_secret", "PYTHONPATH_SECRET=/porto/src/api/python")
-    assert a.GetProperty('env[PYTHONPATH1]') ==  "/porto/src/api/python"
-    assert a.GetProperty('env_secret[PYTHONPATH_SECRET]') == '<secret>'
+    secret_value = '/porto/src/api/python'
+
+    a.SetProperty('env', 'PYTHONPATH1=/porto/src/api/python')
+    a.SetProperty('env_secret', 'PYTHONPATH_SECRET=' + secret_value)
+    assert a.GetProperty('env[PYTHONPATH1]') ==  '/porto/src/api/python'
+    assert a.GetProperty('env_secret[PYTHONPATH_SECRET]').startswith('<secret salt=')
+    assert a.GetProperty('env_secret[PYTHONPATH_SECRET]') != a.GetProperty('env_secret[PYTHONPATH_SECRET]')
 
     dump = a.Dump()
 
@@ -46,8 +52,10 @@ try:
     assert envs['PYTHONPATH1'] == a.GetProperty('env[PYTHONPATH1]')
     assert envs['USER'] == a.GetProperty('env[USER]')
 
+    assert len(dump.spec.env_secret.var) == 1
     for secret in dump.spec.env_secret.var:
         assert secret.value == '<secret>'
+        assert hashlib.md5(secret.salt + secret_value).hexdigest() == secret.hash
 
     CopyProps(a, b)
 
