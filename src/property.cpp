@@ -12,6 +12,7 @@
 #include "util/unix.hpp"
 #include "util/proc.hpp"
 #include "util/cred.hpp"
+#include "util/md5.hpp"
 #include <sstream>
 
 extern "C" {
@@ -1825,8 +1826,18 @@ public:
             if (var.Overwritten) {
                 auto v = e->add_var();
                 v->set_name(var.Name);
-                if (var.Set)
-                    v->set_value(var.Secret ? "<secret>" : var.Value);
+                if (var.Set) {
+                    if (var.Secret) {
+                        std::string salt = GenerateSalt();
+                        std::string hash;
+                        Md5Sum(salt, var.Value, hash);
+                        v->set_value("<secret>");
+                        v->set_salt(salt);
+                        v->set_hash(hash);
+                    } else {
+                        v->set_value(var.Value);
+                    }
+                }
                 else
                     v->set_unset(true);
             }
@@ -1912,8 +1923,14 @@ public:
         for (auto &var: env.Vars) {
             auto v = e->add_var();
             v->set_name(var.Name);
-            if (var.Set)
+            if (var.Set) {
+                std::string salt = GenerateSalt();
+                std::string hash;
+                Md5Sum(salt, var.Value, hash);
                 v->set_value("<secret>");
+                v->set_salt(salt);
+                v->set_hash(hash);
+            }
             else
                 v->set_unset(true);
         }

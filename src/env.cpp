@@ -2,6 +2,7 @@
 
 #include "env.hpp"
 #include "util/log.hpp"
+#include "util/md5.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -15,7 +16,14 @@ void TEnv::ClearEnv() {
 TError TEnv::GetEnv(const std::string &name, std::string &value) const {
     for (const auto &var: Vars) {
         if (var.Set && var.Name == name) {
-            value = var.Secret ? "<secret>" : var.Value;
+            if (var.Secret) {
+                std::string salt = GenerateSalt();
+                std::string hash;
+                Md5Sum(salt, var.Value, hash);
+                value = fmt::format("<secret salt={} md5={}>", salt, hash);
+                return OK;
+            }
+            value = var.Value;
             return OK;
         }
     }
@@ -87,8 +95,12 @@ void TEnv::Format(std::string &cfg, bool show_secret /* false */) const {
     for (const auto &var: Vars) {
         if (!var.Set)
             tuple.push_back(var.Name);
-        else if (var.Secret && !show_secret)
-            tuple.push_back(var.Name + "=<secret>");
+        else if (var.Secret && !show_secret) {
+            std::string value;
+            std::string salt = GenerateSalt();
+            Md5Sum(salt, var.Value, value);
+            tuple.push_back(fmt::format("{}=<secret salt={} md5={}>",var.Name, salt, value));
+        }
         else
             tuple.push_back(var.Name + "=" + var.Value);
     }

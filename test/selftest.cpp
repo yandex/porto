@@ -13,6 +13,7 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
+#include "util/md5.hpp"
 #include "test.hpp"
 #include "rpc.hpp"
 
@@ -2456,6 +2457,27 @@ static void TestFormat(Porto::Connection &) {
     Expect(!!StringToSize("1z", v));
 }
 
+static void TestMd5(Porto::Connection &) {
+    std::string tmp;
+    Md5Sum("value1", tmp);
+    ExpectEq(tmp, "9946687e5fa0dab5993ededddb398d2e");
+
+    Md5Sum("98765gjkko wwwq", tmp);
+    ExpectEq(tmp, "7f72ebc9d13715759833a35ed7ef44f5");
+
+    const std::string salt = "123";
+    const std::string value = "9wqwe124'wwwq";
+    const std::string hash = "11fb9780a3a1531f6b509892fa455367";
+
+    Md5Sum(salt, value, tmp);
+    ExpectEq(tmp, hash);
+
+    tmp.clear();
+
+    Md5Sum(salt + value, tmp);
+    ExpectEq(tmp, hash);
+}
+
 static void TestRoot(Porto::Connection &api) {
     string v;
     string root = "/";
@@ -4679,6 +4701,7 @@ int SelfTest(std::vector<std::string> args) {
         { "path", TestPath },
         { "idmap", TestIdmap },
         { "format", TestFormat },
+        { "md5sum", TestMd5 },
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },
