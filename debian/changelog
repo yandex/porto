@@ -1,3 +1,17 @@
+yandex-porto (5.0.4) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * porto: flag for setting volume auto path as root or cwd in CreateFromSpec
+  * porto: add statistics for top time of currently running requests
+  * spec: dont link created volume with container by default in CreateFromSpec
+  * portotop: fix bug on scrolling
+  * man: Add space_limit_mb and slot_space_limit_mb description clarification
+  * porto: non strict finding client container when enabled cgroup namespaces
+  * porto: add libnl-idiag, pandoc for building
+  * log: print quadro/triple at start
+
+ -- max7255 <max7255@max7255-nix>  Wed, 16 Sep 2020 16:49:22 +0300
+
 yandex-porto (5.0.3) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
