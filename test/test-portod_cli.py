@@ -36,6 +36,8 @@ assert os.readlink(PORTOD_PATH) == portod
 subprocess.check_call([portod, 'restart'])
 assert subprocess.check_output([portod, 'status']) == "running\n"
 
+assert len(subprocess.check_output([portod, 'dump'])) != 0
+
 subprocess.check_call([portod, 'reload'])
 assert subprocess.check_output([portod, 'status']) == "running\n"
 assert os.readlink(PORTOD_PATH) == portod

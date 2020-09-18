@@ -1766,6 +1766,7 @@ int main(int argc, char **argv) {
         return ReopenLog();
 
     if (cmd == "dump") {
+        OpenLog();
         KvDump();
         return EXIT_SUCCESS;
     }

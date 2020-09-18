@@ -10,6 +10,7 @@ extern bool Verbose;
 extern bool Debug;
 extern TFile LogFile;
 
+void OpenLog();
 void OpenLog(const TPath &path);
 void WriteLog(const char *prefix, const std::string &log_msg);
 void Stacktrace();
