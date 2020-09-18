@@ -42,6 +42,10 @@ void InitStatistics() {
 
 TFile LogFile;
 
+void OpenLog() {
+    LogFile.SetFd = STDOUT_FILENO;
+}
+
 void OpenLog(const TPath &path) {
     int fd;
 
