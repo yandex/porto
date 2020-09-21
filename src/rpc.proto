@@ -775,6 +775,7 @@ message TGetSystemResponse {
 
     required fixed64 errors = 4;
     required fixed64 warnings = 5;
+    required fixed64 fatals = 11;
     required fixed64 porto_starts = 6;
     required fixed64 porto_uptime = 7;
     required fixed64 master_uptime = 8;

@@ -20,6 +20,8 @@ void Crash() {
 }
 
 void FatalSignal(int sig) {
+    Statistics->Fatals++;
+
     /* don't hang */
     alarm(5);
 
