@@ -18,6 +18,7 @@ struct TStatistics {
     std::atomic<uint64_t> PortoStarts;
     std::atomic<uint64_t> Errors;
     std::atomic<uint64_t> Warns;
+    std::atomic<uint64_t> Fatals;
     std::atomic<uint64_t> MasterStarted;
     std::atomic<uint64_t> PortoStarted;
     std::atomic<uint64_t> QueuedStatuses;

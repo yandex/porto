@@ -5661,6 +5661,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["errors"] = Statistics->Errors;
     m["cgerrors"] = Statistics->CgErrors;
     m["warnings"] = Statistics->Warns;
+    m["fatals"] = Statistics->Fatals;
     m["taints"] = Statistics->Taints;
     m["postfork_issues"] = Statistics->PostForkIssues;
     m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;

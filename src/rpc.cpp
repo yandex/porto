@@ -1721,6 +1721,7 @@ noinline static TError GetSystemProperties(const rpc::TGetSystemRequest *, rpc::
     rsp->set_kernel_version(config().linux_version());
     rsp->set_errors(Statistics->Errors);
     rsp->set_warnings(Statistics->Warns);
+    rsp->set_fatals(Statistics->Fatals);
     rsp->set_porto_starts(Statistics->PortoStarts);
     rsp->set_porto_uptime((GetCurrentTimeMs() - Statistics->PortoStarted) / 1000);
     rsp->set_master_uptime((GetCurrentTimeMs() - Statistics->MasterStarted) / 1000);
