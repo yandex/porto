@@ -70,7 +70,7 @@ void TRequest::Classify() {
         Req.has_unlinkvolumetarget() ||
         Req.has_newvolume();
 
-    SecretReq = 
+    SecretReq =
         Req.has_setproperty() && StringStartsWith(Req.setproperty().property(), "env_secret") ||
         Req.has_createfromspec() && Req.createfromspec().has_container() && Req.createfromspec().container().has_env_secret() ||
         Req.has_updatefromspec() && Req.updatefromspec().has_container() && Req.updatefromspec().container().has_env_secret();
@@ -2077,7 +2077,7 @@ public:
     void Start(int thread_count) {
         StartTime.resize(thread_count);
         for (int index = 0; index < thread_count; index++)
-            Threads.emplace_back(NewThread(&TRequestQueue::Run, this, std::ref(index)));
+            Threads.emplace_back(NewThread(&TRequestQueue::Run, this, index));
     }
 
     void Stop() {

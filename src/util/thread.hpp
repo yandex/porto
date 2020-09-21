@@ -20,7 +20,8 @@ void ThreadWrapper(F&& f, Args&&... args) {
     std::ref(f)(std::forward<Args>(args)...);
 }
 
+// Attention, Args are taken by values
 template <class F, class... Args>
-std::thread *NewThread(F&& f, Args&&... args) {
+std::thread *NewThread(F&& f, Args... args) {
     return new std::thread(&ThreadWrapper<F, Args...>, std::forward<F>(f), std::forward<Args>(args)...);
 }
