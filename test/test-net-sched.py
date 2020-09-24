@@ -163,7 +163,7 @@ def check_porto_net_classes(*cts):
         ct_classes = get_porto_net_classes(ct)
         Expect(ct_classes.issubset(tc_classes))
 
-def run_iperf_client(name, server, wait=None, mtn=False, cs=None, reverse=False, cfg={}, **kwargs):
+def run_iperf_client(name, server, wait=None, udp=False, mtn=False, cs=None, reverse=False, cfg={}, **kwargs):
     command="iperf3 --client " + server[0]
     command += " --port " + str(server[1])
 
@@ -178,6 +178,8 @@ def run_iperf_client(name, server, wait=None, mtn=False, cs=None, reverse=False,
     command += " --json"
     if reverse:
         command += " --reverse"
+    if udp:
+        command += " --udp"
 
     print command
 
@@ -257,6 +259,20 @@ def run_mtn_limit_test():
     res = bps(a)
     print "net_limit/net_rx_limit and reverse %sM -> " % rate, res
     ExpectLe(res, rate * 1.1)
+
+    if qdisc in ["fq_codel", "pfifo_fast"]:
+        print "Check tx drops and overlimits"
+        a = run_iperf_client("test-net-a", server1, time=5, bandwidth=0, length=1300, wait=20, udp=True, mtn=True, cfg={"net_limit": "default: 100K"})
+        ExpectPropGe(a, "net_tx_drops[group default]", 100)
+        ExpectPropGe(a, "net_overlimits[group default]", 100)
+        ExpectPropLe(a, "net_rx_drops[group default]", 10)
+        a.Destroy()
+
+        print "Check rx drops and overlimits"
+        a = run_iperf_client("test-net-a", server1, time=5, bandwidth=0, length=1300, wait=20, udp=True, mtn=True, reverse=True, cfg={"net_rx_limit": "default: 100K"})
+        ExpectPropGe(a, "net_rx_drops[group default]", 100)
+        ExpectPropLe(a, "net_tx_drops[group default]", 10)
+        a.Destroy()
 
 
 def run_bandwidth_sharing_test():

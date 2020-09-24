@@ -1170,6 +1170,29 @@ free_qdisc:
     return error;
 }
 
+TQdiscStat TNlQdisc::Stat(const TNl &nl) {
+    struct nl_cache *qdiscCache;
+    TQdiscStat stat;
+
+    int ret = rtnl_qdisc_alloc_cache(nl.GetSock(), &qdiscCache);
+    if (ret < 0) {
+        L_ERR("{}",  nl.Error(ret, "cannot alloc qdisc cache"));
+        return stat;
+    }
+
+    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, Index, Handle);
+
+    if (qdisc) {
+        stat.Drops = rtnl_tc_get_stat(TC_CAST(qdisc), RTNL_TC_DROPS);
+        stat.Overruns = rtnl_tc_get_stat(TC_CAST(qdisc), RTNL_TC_OVERLIMITS);
+        rtnl_qdisc_put(qdisc);
+    }
+
+    nl_cache_free(qdiscCache);
+
+    return stat;
+}
+
 TError TNlQdisc::Delete(const TNl &nl) {
     struct rtnl_qdisc *qdisc;
     int ret;
