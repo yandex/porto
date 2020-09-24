@@ -2,7 +2,7 @@
 sandbox_task:
   type: YA_MAKE_TGZ
   description: test porto
-  arts: infra/porto/tests/env/xenial-4.19/test-results/py3test/testing_out_stuff
+  arts: infra/porto/tests/env/xenial-4.19/test-results/py3test
   targets: infra/porto/tests/env/xenial-4.19
   test: True
   junit_report: True
