@@ -1017,6 +1017,17 @@ TError TNetwork::SyncDevices() {
         dev.DeviceStat.TxDrops = rtnl_link_get_stat(link, RTNL_LINK_TX_DROPPED);
         dev.DeviceStat.TxOverruns = rtnl_link_get_stat(link, RTNL_LINK_TX_ERRORS);
 
+        if (dev.Type == "L3" || dev.Type == "veth") {
+            TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+            auto qdiscStat = qdisc.Stat(*Nl);
+            dev.DeviceStat.TxDrops += qdiscStat.Drops;
+            dev.DeviceStat.TxOverruns += qdiscStat.Overruns;
+
+            TNlQdisc qdiscIngress(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
+            qdiscStat = qdiscIngress.Stat(*Nl);
+            dev.DeviceStat.RxDrops += qdiscStat.Drops;
+        }
+
         auto net_state_lock = LockNetState();
 
         bool found = false;

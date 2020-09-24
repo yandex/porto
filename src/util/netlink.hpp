@@ -175,6 +175,11 @@ public:
     std::shared_ptr<TNl> GetNl() { return Nl; };
 };
 
+struct TQdiscStat {
+    uint64_t Drops = 0;
+    uint64_t Overruns = 0;
+};
+
 class TNlQdisc {
 public:
     int Index;
@@ -188,6 +193,7 @@ public:
 
     TError Create(const TNl &nl);
     TError Delete(const TNl &nl);
+    TQdiscStat Stat(const TNl &nl);
     bool Check(const TNl &nl);
     TError CreateCodel(const TNl &nl, bool fq_codel = false);
     TError CreateFqCodel(const TNl &nl) {
