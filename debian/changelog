@@ -1,3 +1,14 @@
+yandex-porto (5.0.5) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * ci: fix sandbox task
+  * porto: take args in thread factory by values
+  * porto: add statistics for fatal signals
+  * portod: fix portod dump
+  * network: catch drops/Overruns stat from qdisc
+
+ -- max7255 <max7255@max7255-nix>  Wed, 30 Sep 2020 13:35:53 +0300
+
 yandex-porto (5.0.4) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
