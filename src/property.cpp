@@ -2434,6 +2434,23 @@ public:
     }
 } static SeizePid;
 
+class TRawCreationTime : public TProperty {
+public:
+    TRawCreationTime() : TProperty(P_RAW_CREATION_TIME, EProperty::CREATION_TIME, "") {
+        IsReadOnly = true;
+        IsHidden = true;
+    }
+    TError Get(std::string &value) {
+        value = std::to_string(CT->CreationTime);
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        auto error = StringToUint64(value, CT->CreationTime);
+        CT->RealCreationTime = time(nullptr) - (GetCurrentTimeMs() - CT->CreationTime) / 1000;
+        return OK;
+    }
+} static RawCreationTime;
+
 class TRawStartTime : public TProperty {
 public:
     TRawStartTime() : TProperty(P_RAW_START_TIME, EProperty::START_TIME, "") {
