@@ -353,13 +353,15 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     ClientsCount(0), ContainerRequests(0), OomEvents(0)
 {
     Statistics->ContainersCount++;
-    RealCreationTime = time(nullptr);
 
     memset(&TaintFlags, 0, sizeof(TaintFlags));
 
     std::fill(PropSet, PropSet + sizeof(PropSet), false);
     std::fill(PropDirty, PropDirty + sizeof(PropDirty), false);
 
+    RealCreationTime = time(nullptr);
+    CreationTime = GetCurrentTimeMs();
+    SetProp(EProperty::CREATION_TIME);
 
     Stdin.SetOutside("/dev/null");
     Stdout.SetOutside("stdout");

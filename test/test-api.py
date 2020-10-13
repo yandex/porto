@@ -101,6 +101,14 @@ assert a.name == container_name
 assert c.Find(container_name).name == container_name
 assert container_name in c.List()
 
+time.sleep(2)
+creation_time = a["creation_time"]
+assert len(creation_time) != 0
+AsRoot()
+ReloadPortod()
+AsAlice()
+assert creation_time == a["creation_time"]
+
 assert a["state"] == "stopped"
 assert a.GetData("state") == "stopped"
 a.SetProperty("command", "false")

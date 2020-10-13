@@ -175,6 +175,7 @@ public:
     time_t RealDeathTime = 0;
 
     TError StartError;
+    uint64_t CreationTime = 0;
     uint64_t StartTime = 0;
     uint64_t DeathTime = 0;
     uint64_t AgingTime;
