@@ -20,6 +20,12 @@ if (USE_PORTO_KERNEL)
                       )
 endif()
 
+macro(ADD_PYTHON_TEST_PARTS PART)
+         add_test(NAME part${PART}
+                  COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-parts.py ${PART}
+                  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endmacro()
+
 macro(ADD_PYTHON_TEST NAME)
          add_test(NAME ${NAME}
                   COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
@@ -31,6 +37,11 @@ macro(ADD_PYTHON3_TEST NAME)
                   COMMAND sudo PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python3 -uB ${CMAKE_SOURCE_DIR}/test/test-${NAME}.py
                   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endmacro()
+
+# split tests into 8 parts
+foreach(VARIABLE 1 2 3 4 5 6 7 8)
+    ADD_PYTHON_TEST_PARTS(${VARIABLE})
+endforeach()
 
 # head
 
