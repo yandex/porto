@@ -1,7 +1,7 @@
 /var/log/portod.log {
-	size 400M
+	size 1200M
 	missingok
-	rotate 7
+	rotate 10
 	compress
 	notifempty
 	nocreate
