@@ -1,3 +1,5 @@
+from test_common import *
+
 import subprocess
 import sys
 
@@ -91,4 +93,6 @@ for i in range(1, 9):
 part8 = test_names
 
 for test in eval('part{}'.format(sys.argv[1])):
+    if test == 'portod_start':
+        subprocess.check_call([portod, 'stop'])
     subprocess.check_call(['ctest', '-R', '^{}$'.format(test), '-V'])
