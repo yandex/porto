@@ -511,6 +511,8 @@ try:
     a = c.Create(container_name)
     a.SetProperty('command', 'sleep 100')
     a.Start()
+    time.sleep(1)
+
     dump = a.Dump()
 
     CheckVolatileProp(dump.status.memory_usage, int(a.GetProperty('memory_usage')))
