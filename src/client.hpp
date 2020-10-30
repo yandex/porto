@@ -38,6 +38,7 @@ public:
     bool Receiving = false;
     bool WaitRequest = false;
     bool InEpoll = false;
+    bool CloseAfterResponse = false;
 
     TClient(int fd);
     TClient(const std::string &special);
@@ -68,7 +69,11 @@ public:
     TError ReadAccess(const TFile &file);
     TError WriteAccess(const TFile &file);
 
-    void CloseConnection();
+    void CloseConnectionLocked(bool serverShutdown = false);
+    void CloseConnection(bool serverShutdown = false) {
+        auto lock = Lock();
+        CloseConnectionLocked(serverShutdown);
+    }
 
     void StartRequest();
     void FinishRequest();

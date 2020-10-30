@@ -76,6 +76,7 @@ static uint64_t ShutdownDeadline = 0;
 
 bool EnableCgroupNs = false;
 bool EnableDockerMode = false;
+uint32_t RequestHandlingDelayMs = 0;
 
 static bool RunningInContainer() {
     if (getpid() == 1)
@@ -507,7 +508,7 @@ static void PortodServer() {
 exit:
 
     for (auto c : Clients)
-        c.second->CloseConnection();
+        c.second->CloseConnection(true);
     Clients.clear();
 
     L_SYS("Stop threads...");
@@ -801,6 +802,7 @@ static int Portod() {
     EnableCgroupNs = config().container().use_os_mode_cgroupns() &&
                      (CompareVersions(config().linux_version(), "4.6") >= 0);
     EnableDockerMode = config().container().enable_docker_mode() && EnableCgroupNs;
+    RequestHandlingDelayMs = config().daemon().request_handling_delay_ms();
 
     InitPortoGroups();
     InitCapabilities();
