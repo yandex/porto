@@ -177,6 +177,7 @@ message TConfig {
         optional uint32 vl_threads = 26;
         optional string tar_path = 27;
         optional uint32 debug_hung_tasks_count = 28;
+        optional uint32 request_handling_delay_ms = 29;  // for retriability test
     }
 
     message TContainerCfg {

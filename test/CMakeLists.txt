@@ -135,6 +135,7 @@ ADD_PYTHON_TEST(coredump)
 
 ADD_PYTHON_TEST(volume-restore)
 ADD_PYTHON_TEST(htb-restore)
+ADD_PYTHON3_TEST(retriability)
 
 # legacy tests
 

@@ -47,8 +47,11 @@ TClient::~TClient() {
     CloseConnection();
 }
 
-void TClient::CloseConnection() {
-    auto lock = Lock();
+void TClient::CloseConnectionLocked(bool serverShutdown) {
+    if (Processing && serverShutdown) {
+        CloseAfterResponse = true;
+        return;
+    }
 
     if (Fd >= 0) {
         if (InEpoll)

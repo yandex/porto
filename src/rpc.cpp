@@ -21,10 +21,13 @@
 #include <google/protobuf/descriptor.h>
 
 extern "C" {
+#include <unistd.h>
 #include <sys/stat.h>
 }
 
 extern __thread char ReqId[9];
+
+extern uint32_t RequestHandlingDelayMs;
 
 void TRequest::Classify() {
 
@@ -1889,6 +1892,10 @@ void TRequest::Handle() {
     TError error;
 
     Client->StartRequest();
+
+    if (RequestHandlingDelayMs)
+        usleep(RequestHandlingDelayMs * 1000);
+
     StartTime = GetCurrentTimeMs();
     auto timestamp = time(nullptr);
     bool specRequest = false;
@@ -2066,7 +2073,7 @@ void TRequest::Handle() {
     }
 
     if (error == EError::Queued)
-        return;
+        goto exit;
 
     if (error) {
         if (!rsp.IsInitialized())
@@ -2102,13 +2109,20 @@ void TRequest::Handle() {
     if (Debug)
         L_DBG("Raw response: {}", rsp.ShortDebugString());
 
+exit:
     auto lock = Client->Lock();
-    Client->Processing = false;
-    error = Client->QueueResponse(rsp);
-    if (!error && !Client->Sending)
-        error = Client->SendResponse(true);
-    if (error)
-        L_WRN("Cannot send response for {} : {}", Client->Id, error);
+
+    if (error != EError::Queued) {
+        Client->Processing = false;
+        error = Client->QueueResponse(rsp);
+        if (!error && !Client->Sending)
+            error = Client->SendResponse(true);
+        if (error)
+            L_WRN("Cannot send response for {} : {}", Client->Id, error);
+    }
+
+    if (Client->CloseAfterResponse)
+        Client->CloseConnectionLocked();
 }
 
 void TRequest::ChangeId() {
