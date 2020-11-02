@@ -55,7 +55,7 @@ try:
     assert len(dump.spec.env_secret.var) == 1
     for secret in dump.spec.env_secret.var:
         assert secret.value == '<secret>'
-        assert hashlib.md5(secret.salt + secret_value).hexdigest() == secret.hash
+        assert hashlib.md5(str(secret.salt + secret_value).encode()).hexdigest() == secret.hash
 
     CopyProps(a, b)
 
