@@ -276,12 +276,13 @@ def run_mtn_limit_test():
 
 
 def run_bandwidth_sharing_test():
-    b = run_iperf_client("test-net-b", server2, time=5, wait=0, cfg={})
-    a = run_iperf_client("test-net-a", server1, time=3, wait=5, cfg={})
+    b = run_iperf_client("test-net-b", server2, time=6, wait=0, cfg={})
+    time.sleep(1)
+    a = run_iperf_client("test-net-a", server1, time=4, wait=6, cfg={})
     res = bps(a)
     res_b = bps(b)
 
-    b_rate = (5 * res_b - 2 * rate) / 3
+    b_rate = (6 * res_b - 2 * rate) / 4
     print "net_guarantee 0 and 0 -> %s and %s (%s measured)" % (res, b_rate, res_b)
 
     # Thresholds rationale:
@@ -291,11 +292,12 @@ def run_bandwidth_sharing_test():
 
     ExpectRange(res / b_rate, 0.5, 1.5)
 
-    b = run_iperf_client("test-net-b", server2, time=5, wait=0, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
-    a = run_iperf_client("test-net-a", server1, time=3, wait=5, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
+    b = run_iperf_client("test-net-b", server2, time=6, wait=0, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
+    time.sleep(1)
+    a = run_iperf_client("test-net-a", server1, time=4, wait=6, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
     res = bps(a)
     res_b = bps(b)
-    b_rate = (5 * res_b - 2 * rate) / 3
+    b_rate = (6 * res_b - 2 * rate) / 4
     print "net_guarantee %sM and %sM -> %s and %s (%s measured)" %(int(rate * 0.1), int(rate * 0.1), res, b_rate, res_b)
 
     # We demand guarantee and also expect "even distribution"
@@ -307,18 +309,19 @@ def run_bandwidth_sharing_test():
     ExpectLe(0.09, res_b / rate)
     ExpectRange(res / b_rate, 0.5, 1.5)
 
-    b = run_iperf_client("test-net-b", server2, time=5, wait=0, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
-    a = run_iperf_client("test-net-a", server1, time=3, wait=5, cfg={"net_guarantee": "default: %sM" % int(rate * 0.9)})
+    b = run_iperf_client("test-net-b", server2, time=6, wait=0, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
+    time.sleep(1)
+    a = run_iperf_client("test-net-a", server1, time=4, wait=6, cfg={"net_guarantee": "default: %sM" % int(rate * 0.9)})
     res = bps(a)
     res_b = bps(b)
-    b_rate = (5 * res_b - 2 * rate) / 3
+    b_rate = (6 * res_b - 2 * rate) / 4
     print "net_guarantee %sM and %sM -> %s and %s measured (%s b_rate)" % (int(rate * 0.9), int(rate * 0.1), res, res_b, b_rate)
 
     # We demand guarantees to be followed
     # 1) no less than -10% from guarantee, 0.8
     # 2) net-b guarantee keeped
 
-    ExpectLe(0.85, res / rate)
+    ExpectLe(0.81, res / rate)
     ExpectLe(0.09, res_b / rate)
 
 def run_classful_test(bandwidth_sharing):
@@ -413,41 +416,41 @@ network {
     meta_a.Start()
 
     root_ct = conn.Find('/')
-    loss_bytes_coeff = 4.5 / 5 # (iperf_time - sock_diag_update_interval_ms) / iperf_time
-    iperf_total_sent = 0
+    loss_bytes_coeff = 4.5 / 5 - 0.01 # (iperf_time - sock_diag_update_interval_ms) / iperf_time - 1%
+    iperf_total_sent = 0.
 
     # check ct stats
     a = run_iperf_client("meta-a/test-net-a", server1, time=5, wait=6)
-    tx_bytes = int(a.GetProperty('net_tx_bytes[Uplink]'))
+    tx_bytes = float(a.GetProperty('net_tx_bytes[Uplink]'))
     iperf_sent_bytes = sent_bytes(a)
-    ExpectRange(tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+    ExpectRange(tx_bytes / iperf_sent_bytes, loss_bytes_coeff, 1.01)
 
     # check parent stats
-    parent_tx_bytes = int(meta_a.GetProperty('net_tx_bytes[Uplink]'))
-    ExpectRange(parent_tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+    parent_tx_bytes = float(meta_a.GetProperty('net_tx_bytes[Uplink]'))
+    ExpectRange(parent_tx_bytes / iperf_sent_bytes, loss_bytes_coeff, 1.01)
 
     # check root container stats
     iperf_total_sent += iperf_sent_bytes
-    root_tx_bytes = int(root_ct.GetProperty('net_tx_bytes[SockDiag]'))
-    root_rx_bytes = int(root_ct.GetProperty('net_rx_bytes[SockDiag]'))
-    ExpectRange(root_tx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
-    ExpectRange(root_rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+    root_tx_bytes = float(root_ct.GetProperty('net_tx_bytes[SockDiag]'))
+    root_rx_bytes = float(root_ct.GetProperty('net_rx_bytes[SockDiag]'))
+    ExpectRange(root_tx_bytes / iperf_sent_bytes, loss_bytes_coeff, 1.01)
+    ExpectRange(root_rx_bytes / iperf_sent_bytes, loss_bytes_coeff, 1.01)
 
     # check ct stats
     b = run_iperf_client("meta-a/test-net-a", server1, time=5, wait=6, reverse=True)
-    rx_bytes = int(b.GetProperty('net_rx_bytes[Uplink]'))
+    rx_bytes = float(b.GetProperty('net_rx_bytes[Uplink]'))
     iperf_sent_bytes = sent_bytes(b)
-    ExpectRange(rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+    ExpectRange(rx_bytes / iperf_sent_bytes, loss_bytes_coeff, 1.01)
 
     # check parent stats
-    parent_rx_bytes = int(meta_a.GetProperty('net_rx_bytes[Uplink]'))
-    ExpectRange(parent_rx_bytes, loss_bytes_coeff * iperf_sent_bytes, iperf_sent_bytes)
+    parent_rx_bytes = float(meta_a.GetProperty('net_rx_bytes[Uplink]'))
+    ExpectRange(parent_rx_bytes / iperf_sent_bytes, loss_bytes_coeff, 1.01)
 
     # check root container stats
     iperf_total_sent += iperf_sent_bytes
-    root_rx_bytes = int(root_ct.GetProperty('net_rx_bytes[SockDiag]'))
-    root_tx_bytes = int(root_ct.GetProperty('net_tx_bytes[SockDiag]'))
-    ExpectRange(root_rx_bytes, loss_bytes_coeff * iperf_total_sent, iperf_total_sent)
+    root_rx_bytes = float(root_ct.GetProperty('net_rx_bytes[SockDiag]'))
+    root_tx_bytes = float(root_ct.GetProperty('net_tx_bytes[SockDiag]'))
+    ExpectRange(root_rx_bytes / iperf_total_sent, loss_bytes_coeff, 1.01)
 
 
 conn = porto.Connection()
