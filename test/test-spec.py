@@ -516,9 +516,11 @@ try:
     assert dump.status.state == a.GetProperty('state')
 
     a.Destroy()
+
     a = c.Create(container_name)
-    a.SetProperty('command', 'sleep 100')
     a.Start()
+
+    ab = c.Run(a.name + '/b', wait=0, weak=True, command="python -c 'import time; a = [0 for i in range(1024 * 1024)]; time.sleep(3)'")
     time.sleep(1)
 
     dump = a.Dump()
@@ -530,6 +532,11 @@ try:
     CheckVolatileProp(dump.status.cache_usage, int(a.GetProperty('cache_usage')))
     CheckVolatileProp(dump.status.hugetlb_usage, int(a.GetProperty('hugetlb_usage')))
 
+    ab.WaitContainer(5)
+    ExpectEq(ab['exit_code'], '0')
+    ab.Destroy()
+
+    dump = a.Dump()
     assert int(a.GetProperty('minor_faults')) == dump.status.minor_faults
     assert int(a.GetProperty('major_faults')) == dump.status.major_faults
 
@@ -586,8 +593,6 @@ try:
         assert io_time_stat.find('{}: {}'.format(io_ts.key, io_ts.val)) != -1
     assert (0 if len(io_time_stat) == 0 else (io_time_stat.count(';') + 1)) == len(dump.status.io_time.map)
 
-    assert dump.status.time == int(a.GetProperty('time'))
-
     assert dump.status.creation_time == int(a.GetProperty('creation_time[raw]'))
 
     assert dump.status.start_time == int(a.GetProperty('start_time[raw]'))
@@ -599,6 +604,8 @@ try:
     assert dump.spec.thread_limit == int(a.GetProperty('thread_limit'))
 
     a.Stop()
+    dump = a.Dump()
+    assert dump.status.time == int(a.GetProperty('time'))
 
     AsRoot()
     a.SetProperty('net', 'L3 veth')
@@ -621,7 +628,7 @@ try:
         assert taints.find(taint.msg) != -1
     assert taints.count('\n') == len(dump.status.taint)
 
-    a.SetProperty('command', 'sleep 1')
+    a.SetProperty('command', 'echo 1')
     a.Start()
 
     assert a.Wait() == a.name
