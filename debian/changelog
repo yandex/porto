@@ -1,3 +1,18 @@
+yandex-porto (5.0.6) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * container: save and load creation time in kv storage
+  * test: split tests into 8 parts
+  * test: fix parts test
+  * test: restart porto before test
+  * test: sleep 1 second after start command and before usage tests
+  * property: print salt and md5sum for env_secret
+  * test: fix flaky tests
+  * logrotate: store more logs
+  * test: encode string before hashing
+
+ -- max7255 <max7255@max7255-nix>  Thu, 05 Nov 2020 19:36:03 +0300
+
 yandex-porto (5.0.5) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
