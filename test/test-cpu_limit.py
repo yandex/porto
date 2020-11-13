@@ -2,6 +2,7 @@ import porto
 import os
 import multiprocessing
 import types
+from test_common import *
 
 NAME = os.path.basename(__file__)
 
@@ -230,3 +231,40 @@ if CPUNR > 3:
 
         for ct in conts:
             ct.Check()
+
+# check cpu limit/guarantee bound
+a = conn.Create('a', weak=True)
+a.SetProperty('cpu_limit', '{}c'.format(CPUNR - 1))
+a.SetProperty('cpu_guarantee', '6c')
+
+b = conn.Create('a/b', weak=True)
+b.SetProperty('cpu_limit', '{}c'.format(CPUNR - 2))
+b.SetProperty('cpu_guarantee', '8c')
+
+c = conn.Create('a/b/c', weak=True)
+c.SetProperty('cpu_limit', '{}c'.format(CPUNR))
+c.SetProperty('cpu_guarantee', '2c')
+
+d = conn.Create('a/b/c/d', weak=True)
+d.SetProperty('command', 'sleep 100')
+
+a.Start()
+b.Start()
+c.Start()
+d.Start()
+
+ExpectProp(a, 'cpu_limit_bound', '{}c'.format(CPUNR - 1))
+ExpectProp(b, 'cpu_limit_bound', '{}c'.format(CPUNR - 2))
+ExpectProp(c, 'cpu_limit_bound', '{}c'.format(CPUNR - 2))
+ExpectProp(d, 'cpu_limit_bound', '{}c'.format(CPUNR - 2))
+
+ExpectProp(a, 'cpu_guarantee_bound', '6c')
+ExpectProp(b, 'cpu_guarantee_bound', '8c')
+ExpectProp(c, 'cpu_guarantee_bound', '8c')
+ExpectProp(d, 'cpu_guarantee_bound', '8c')
+
+assert 0 != a.Dump().status.cpu_limit_total
+assert '%dc' % a.Dump().status.cpu_limit_total == a.GetProperty('cpu_limit_total')
+assert '%dc' % b.Dump().status.cpu_limit_total == b.GetProperty('cpu_limit_total')
+assert '%dc' % c.Dump().status.cpu_limit_total == c.GetProperty('cpu_limit_total')
+assert '%dc' % d.Dump().status.cpu_limit_total == d.GetProperty('cpu_limit_total')
