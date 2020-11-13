@@ -3219,7 +3219,7 @@ public:
 
 class TCpuLimitTotal : public TProperty {
 public:
-    TCpuLimitTotal() : TProperty(P_CPU_TOTAL_LIMIT, EProperty::NONE,
+    TCpuLimitTotal() : TProperty(P_CPU_LIMIT_TOTAL, EProperty::NONE,
             "CPU total limit: <CPUS>c [cores]")
     {
         IsReadOnly = true;
@@ -3230,10 +3230,28 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerStatus &spec) override {
         spec.set_cpu_limit_total((double)CT->CpuLimitSum / CPU_POWER_PER_SEC);
     }
 } static CpuLimitTotal;
+
+class TCpuLimitBound : public TProperty {
+public:
+    TCpuLimitBound() : TProperty(P_CPU_LIMIT_BOUND, EProperty::NONE,
+            "CPU bound limit: <CPUS>c [cores]")
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        if (CT->CpuLimitBound)
+            value = CpuPowerToString(CT->CpuLimitBound);
+        return OK;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) override {
+        spec.set_cpu_limit_bound((double)CT->CpuLimitBound / CPU_POWER_PER_SEC);
+    }
+} static CpuLimitBound;
 
 class TCpuGuarantee : public TProperty {
 public:
@@ -3284,7 +3302,7 @@ public:
 
 class TCpuGuaranteeTotal : public TProperty {
 public:
-    TCpuGuaranteeTotal() : TProperty(P_CPU_TOTAL_GUARANTEE, EProperty::NONE,
+    TCpuGuaranteeTotal() : TProperty(P_CPU_GUARANTEE_TOTAL, EProperty::NONE,
             "CPU total guarantee: <CPUS>c [cores]")
     {
         IsReadOnly = true;
@@ -3299,6 +3317,24 @@ public:
          spec.set_cpu_guarantee_total((double)std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum) / CPU_POWER_PER_SEC);
     }
 } static CpuGuaranteeTotal;
+
+class TCpuGuaranteeBound : public TProperty {
+public:
+    TCpuGuaranteeBound() : TProperty(P_CPU_GUARANTEE_BOUND, EProperty::NONE,
+            "CPU bound guarantee: <CPUS>c [cores]")
+    {
+        IsReadOnly = true;
+    }
+    TError Get(std::string &value) {
+        if (CT->CpuGuaranteeBound)
+            value = CpuPowerToString(CT->CpuGuaranteeBound);
+        return OK;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) override {
+         spec.set_cpu_guarantee_bound((double)CT->CpuGuaranteeBound / CPU_POWER_PER_SEC);
+    }
+} static CpuGuaranteeBound;
 
 class TCpuPeriod : public TProperty {
 public:

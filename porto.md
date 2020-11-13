@@ -743,6 +743,8 @@ write permissions to the target or owning related volume.
 
     For root container this shows total CPU guarantee.
 
+* **cpu\_guarantee\_bound** - maximum guarantee of upper hierarhy
+
 * **cpu\_limit** - CPU usage limit
 
     Syntax: 0.0..100.0 (in %) | \<cores\>c (in cores), default: 0 (unlimited)
@@ -758,6 +760,8 @@ write permissions to the target or owning related volume.
     meta childrens plus contianer cpu\_limit if it's running.
 
     For root contianer this shows total CPU commitment.
+
+* **cpu\_limit\_bound** - minimum limit of upper hierarhy
 
 * **cpu\_period** - CPU limit accounting period
 

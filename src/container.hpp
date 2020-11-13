@@ -217,6 +217,9 @@ public:
     double CpuWeight = 1;
     uint64_t CpuPeriod;
 
+    uint64_t CpuLimitBound = 0;
+    uint64_t CpuGuaranteeBound = 0;
+
     /* Under CpuAffinityMutex */
     ECpuSetType CpuSetType = ECpuSetType::Inherit;
     int CpuSetArg = 0;

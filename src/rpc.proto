@@ -477,6 +477,9 @@ message TContainerStatus {
     optional uint64 anon_limit_total = 40;
     optional uint64 anon_usage = 41;           // out, bytes
     optional double cpu_guarantee_total = 42;
+    optional double cpu_guarantee_bound = 421;
+    optional double cpu_limit_total = 422;
+    optional double cpu_limit_bound = 423;
 
     optional uint64 cache_usage = 43;          // out, bytes
 
@@ -570,7 +573,7 @@ message TContainerSpec {
 
     optional double cpu_guarantee = 42;        // in cores
     optional double cpu_limit = 43;            // in cores
-    optional double cpu_limit_total = 44;
+    optional double cpu_limit_total = 44;      // deprecated (value moved to TContainerStatus)
     optional uint64 cpu_period = 45;           // ns
 
     optional TContainerCpuSet cpu_set = 46;

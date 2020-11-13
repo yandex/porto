@@ -1768,6 +1768,13 @@ void TContainer::PropagateCpuLimit() {
     uint64_t max = RootContainer->CpuLimit;
     auto ct_lock = LockContainers();
 
+    if (Parent)
+        CpuLimitBound = CpuLimit ? std::min(CpuLimit, Parent->CpuLimitBound) : Parent->CpuLimitBound;
+    else
+        CpuLimitBound = CpuLimit;
+
+    CpuGuaranteeBound = std::max(CpuGuarantee, CpuGuaranteeBound);
+
     for (auto ct = this; ct; ct = ct->Parent.get()) {
         uint64_t sum = 0;
 
@@ -1781,6 +1788,9 @@ void TContainer::PropagateCpuLimit() {
                 sum += child->CpuLimit ?: max;
             else if (child->State == EContainerState::Meta)
                 sum += std::min(child->CpuLimit ?: max, child->CpuLimitSum);
+
+            child->CpuLimitBound = child->CpuLimit ? std::min(child->CpuLimit, ct->CpuLimitBound) : ct->CpuLimitBound;
+            child->CpuGuaranteeBound = std::max(child->CpuGuarantee, ct->CpuGuaranteeBound);
         }
 
         if (sum == ct->CpuLimitSum)
