@@ -1,3 +1,11 @@
+yandex-porto (5.0.7) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * portoctl: add option for drop cap_sys_admin for base container in 'portoctl build' task
+  * porto: add virt_mode=docker for run docker daemon in porto container
+
+ -- max7255 <max7255@max7255-nix>  Fri, 13 Nov 2020 15:20:24 +0300
+
 yandex-porto (5.0.6) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
