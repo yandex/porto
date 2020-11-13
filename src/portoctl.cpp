@@ -2301,6 +2301,7 @@ public:
             "    -s script2                 bash script runs inside after os stop (with root=volume)\n"
             "    -M                         merge all layers together\n"
             "    -k                         keep volume and container\n"
+            "    -D                         drop CAP_SYS_ADMIN for base container\n"
             ) { }
 
     ~TBuildCmd() { }
@@ -2327,6 +2328,7 @@ public:
         TPath output;
         TPath outputImage;
         bool squash = false;
+        bool dropSysAdmin = false;
         std::string compression;
         TPath loopStorage, loopImage;
         std::vector<std::string> env;
@@ -2348,6 +2350,7 @@ public:
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
             { 's', true, [&](const char *arg) { scripts2.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *) { launcher.WeakContainer = false; } },
+            { 'D', false, [&](const char *) { dropSysAdmin = true; } },
             { 'M', false, [&](const char *) { launcher.MergeLayers = true; } },
         });
 
@@ -2557,6 +2560,8 @@ public:
         base.Environment = launcher.Environment;
         base.SetProperty("isolate", "true");
         base.SetProperty("net", "inherited");
+        if (dropSysAdmin)
+            base.SetProperty("capabilities[SYS_ADMIN]", "false");
 
         if (base.VirtMode == "os")
             std::cout << "\nStarting OS ..." << std::endl;
