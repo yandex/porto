@@ -800,7 +800,7 @@ static int Portod() {
 
     EnableCgroupNs = config().container().use_os_mode_cgroupns() &&
                      (CompareVersions(config().linux_version(), "4.6") >= 0);
-    EnableDockerMode = config().container().enable_docker_mode();
+    EnableDockerMode = config().container().enable_docker_mode() && EnableCgroupNs;
 
     InitPortoGroups();
     InitCapabilities();
