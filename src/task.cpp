@@ -149,9 +149,11 @@ TError TTaskEnv::OpenNamespaces(TContainer &ct) {
     if (error)
         return error;
 
-    error = CgFd.Open(pid, "ns/cgroup");
-    if (error)
-        return error;
+    if (EnableCgroupNs) {
+        error = CgFd.Open(pid, "ns/cgroup");
+        if (error)
+            return error;
+    }
 
     error = RootFd.Open(pid, "root");
     if (error)
@@ -699,9 +701,11 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
-        error = CgFd.SetNs(CLONE_NEWCGROUP);
-        if (error)
-            Abort(error);
+        if (EnableCgroupNs) {
+            error = CgFd.SetNs(CLONE_NEWCGROUP);
+            if (error)
+                Abort(error);
+        }
 
         error = RootFd.Chroot();
         if (error)
