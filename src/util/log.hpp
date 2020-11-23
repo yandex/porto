@@ -16,6 +16,7 @@ void WriteLog(const char *prefix, const std::string &log_msg);
 void Stacktrace();
 
 struct TStatistics {
+    /* --- add new fields at the end --- */
     std::atomic<uint64_t> PortoStarts;
     std::atomic<uint64_t> Errors;
     std::atomic<uint64_t> Warns;
