@@ -1,23 +1,132 @@
 ---
-sandbox_task:
-  type: BUILD_DEB_PACKAGE
-  description: build debian package
-  git_url: "{{bitbucket.repo_url}}"
-  git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
-  git_head: "{{bitbucket.ref_id}}"
-  gpg_public: robot-rtc-builder-gpg-public
-  gpg_private: robot-rtc-builder-gpg-private
-  platform: linux_ubuntu_16.04_xenial
-  install_dependencies: true
-  release_dist_repo: search-precise,search-trusty,search-xenial,search-bionic
-  release_upload_packages: true
-  save_packages: true
-  sign_packages: true
-  src_origin: git
-  ssh_login: robot-rtc-builder
-  ssh_private: robot-rtc-builder-ssh
+kind: 'gbgadaptor/v1'
+jobs:
+  precise:
+    git_ref_pattern: 'refs/tags/v.+'
+    sandbox_tasks:
+      - type: PBUILDER_BUILD_DEB_PACKAGE
+        custom_fields:
+          release_subscribers: 'porto@yandex-team.ru'
+          description: build debian package for precise
+          git_url: "{{bitbucket.repo_url}}"
+          git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
+          git_head: "{{bitbucket.ref_id}}"
+          gpg_public: robot-rtc-builder-gpg-public
+          gpg_private: robot-rtc-builder-gpg-private
+          pbuilder_tarball_origin: 'tarball'
+          tar_base: '1849247840'
+          release_dist_repo: search-precise
+          release_upload_packages: true
+          save_packages: true
+          sign_packages: true
+          src_origin: git
+          ssh_login: robot-rtc-builder
+          ssh_private: robot-rtc-builder-ssh
+        requirements:
+          cores: 8
+          ram: 32
+          platform: linux_ubuntu_16.04_xenial
 
-requirements:
-  cores: 32
-  ram: 128
-  platform: linux_ubuntu_16.04_xenial
+  trusty:
+    git_ref_pattern: 'refs/tags/v.+'
+    sandbox_tasks:
+      - type: PBUILDER_BUILD_DEB_PACKAGE
+        custom_fields:
+          release_subscribers: 'porto@yandex-team.ru'
+          description: build debian package for trusty
+          git_url: "{{bitbucket.repo_url}}"
+          git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
+          git_head: "{{bitbucket.ref_id}}"
+          gpg_public: robot-rtc-builder-gpg-public
+          gpg_private: robot-rtc-builder-gpg-private
+          pbuilder_tarball_origin: 'tarball'
+          tar_base: '1849249621'
+          release_dist_repo: search-trusty
+          release_upload_packages: true
+          save_packages: true
+          sign_packages: true
+          src_origin: git
+          ssh_login: robot-rtc-builder
+          ssh_private: robot-rtc-builder-ssh
+        requirements:
+          cores: 8
+          ram: 32
+          platform: linux_ubuntu_16.04_xenial
+
+  xenial:
+    git_ref_pattern: 'refs/.+'
+    sandbox_tasks:
+      - type: PBUILDER_BUILD_DEB_PACKAGE
+        custom_fields:
+          release_subscribers: 'porto@yandex-team.ru'
+          description: build debian package for xenial
+          git_url: "{{bitbucket.repo_url}}"
+          git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
+          git_head: "{{bitbucket.ref_id}}"
+          gpg_public: robot-rtc-builder-gpg-public
+          gpg_private: robot-rtc-builder-gpg-private
+          pbuilder_tarball_origin: 'tarball'
+          tar_base: '1849252471'
+          release_dist_repo: search-xenial
+          release_upload_packages: true
+          save_packages: true
+          sign_packages: true
+          src_origin: git
+          ssh_login: robot-rtc-builder
+          ssh_private: robot-rtc-builder-ssh
+        requirements:
+          cores: 8
+          ram: 32
+          platform: linux_ubuntu_16.04_xenial
+
+  bionic:
+    git_ref_pattern: 'refs/tags/v.+'
+    sandbox_tasks:
+      - type: PBUILDER_BUILD_DEB_PACKAGE
+        custom_fields:
+          release_subscribers: 'porto@yandex-team.ru'
+          description: build debian package for bionic
+          git_url: "{{bitbucket.repo_url}}"
+          git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
+          git_head: "{{bitbucket.ref_id}}"
+          gpg_public: robot-rtc-builder-gpg-public
+          gpg_private: robot-rtc-builder-gpg-private
+          pbuilder_tarball_origin: 'tarball'
+          tar_base: '1849253792'
+          release_dist_repo: search-bionic
+          release_upload_packages: true
+          save_packages: true
+          sign_packages: true
+          src_origin: git
+          ssh_login: robot-rtc-builder
+          ssh_private: robot-rtc-builder-ssh
+        requirements:
+          cores: 8
+          ram: 32
+          platform: linux_ubuntu_16.04_xenial
+
+  focal:
+    git_ref_pattern: 'refs/tags/v.+'
+    sandbox_tasks:
+      - type: PBUILDER_BUILD_DEB_PACKAGE
+        custom_fields:
+          release_subscribers: 'porto@yandex-team.ru'
+          description: build debian package for focal
+          git_url: "{{bitbucket.repo_url}}"
+          git_token: "{{bitbucket.vault_secret_owner}}:{{bitbucket.vault_secret_name}}"
+          git_head: "{{bitbucket.ref_id}}"
+          gpg_public: robot-rtc-builder-gpg-public
+          gpg_private: robot-rtc-builder-gpg-private
+          pbuilder_tarball_origin: 'tarball'
+          tar_base: '1849255972'
+          release_dist_repo: search-focal
+          release_upload_packages: true
+          save_packages: true
+          sign_packages: true
+          src_origin: git
+          ssh_login: robot-rtc-builder
+          ssh_private: robot-rtc-builder-ssh
+        requirements:
+          cores: 8
+          ram: 32
+          platform: linux_ubuntu_16.04_xenial
