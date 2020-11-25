@@ -502,6 +502,7 @@ message TContainerStatus {
     optional TUintMap net_tx_bytes = 61;       // out
     optional TUintMap net_tx_packets = 62;     // out
     optional TUintMap net_tx_drops = 63;       // out
+    optional TUintMap net_netstat = 163;       // out
 
     optional TContainerVolumeLinks volumes_linked = 64; // out
     optional TContainerVolumes volumes_owned = 65;
