@@ -1905,6 +1905,31 @@ void TNetwork::RepairSockDiag() {
         L_ERR("Cannot repair sock diag: {}", error);
 }
 
+void TNetwork::UpdateNetStat() {
+    TError error;
+
+    auto state_lock = LockNetState();
+
+    for (auto net : *TNetwork::NetworksList) {
+        if (net->NetUsers.empty() || net->IsHost())
+            continue;
+
+        for (auto ct : net->NetUsers) {
+            if (ct->State != EContainerState::Meta && ct->State != EContainerState::Running)
+                continue;
+
+            error = GetNetStat(ct->Task.Pid, net->NetStat);
+            if (error) {
+                if (errno == ENOENT || errno == ESRCH)
+                    continue;
+                L_ERR("Cannot get netstat, CT:{} {}", ct->Name, error);
+            }
+
+            break;
+        }
+    }
+}
+
 void TNetwork::NetWatchdog() {
     auto now = GetCurrentTimeMs();
     auto LastProxyNeighbour = now;
@@ -1915,8 +1940,10 @@ void TNetwork::NetWatchdog() {
     SetProcessName("portod-NET");
     while (HostNetwork) {
         now = GetCurrentTimeMs();
-        if (TNetClass::IsDisabled() && SockDiagPeriod && now >= SockDiagDeadline) {
-            TNetwork::UpdateSockDiag();
+        if (SockDiagPeriod && now >= SockDiagDeadline) {
+            if (TNetClass::IsDisabled())
+                TNetwork::UpdateSockDiag();
+            TNetwork::UpdateNetStat();
             SockDiagDeadline = now + SockDiagPeriod;
         }
         auto nets = Networks();

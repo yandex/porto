@@ -5268,6 +5268,7 @@ public:
     uint64_t TNetStat:: *Member;
     bool ClassStat;
     bool SockStat;
+    bool NetStat;
 
     TNetStatProperty(std::string name, uint64_t TNetStat:: *member,
                      std::string desc) : TProperty(name, EProperty::NONE, desc) {
@@ -5279,10 +5280,16 @@ public:
         SockStat = Name == P_NET_BYTES || Name == P_NET_PACKETS ||
                    Name == P_NET_TX_BYTES || Name == P_NET_RX_BYTES ||
                    Name == P_NET_TX_PACKETS || Name == P_NET_RX_PACKETS;
+        NetStat = Name == P_NET_NETSTAT;
     }
 
     TError Has() {
-        if (ClassStat && !TNetClass::IsDisabled()) {
+        if (NetStat) {
+            if (CT->Net->IsHost())
+                return TError(EError::ResourceNotAvailable, "Not available for container with host network");
+            else
+                return OK;
+        } else if (ClassStat && !TNetClass::IsDisabled()) {
             if (CT->State == EContainerState::Stopped)
                 return TError(EError::InvalidState, "Not available in stopped state");
             if (!(CT->Controllers & CGROUP_NETCLS))
@@ -5296,7 +5303,11 @@ public:
 
     TError Get(TUintMap &stat) {
         auto lock = TNetwork::LockNetState();
-        if (ClassStat && !TNetClass::IsDisabled()) {
+        if (NetStat) {
+            if (CT->Net->IsHost())
+                return TError(EError::ResourceNotAvailable, "Not available for container with host network");
+            stat = CT->Net->NetStat;
+        } else if (ClassStat && !TNetClass::IsDisabled()) {
             for (auto &it : CT->NetClass.Fold->ClassStat)
                 stat[it.first] = &it.second->*Member;
         } else if (CT->Net && (!CT->Net->IsHost() || CT->IsRoot())) {
@@ -5320,7 +5331,12 @@ public:
 
     TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = TNetwork::LockNetState();
-        if (ClassStat && !TNetClass::IsDisabled()) {
+        if (NetStat) {
+            auto it = CT->Net->NetStat.find(index);
+            if (it == CT->Net->NetStat.end())
+                return TError(EError::InvalidValue, "network stat " + index + " not found");
+            value = std::to_string(it->second);
+        } else if (ClassStat && !TNetClass::IsDisabled()) {
             auto it = CT->NetClass.Fold->ClassStat.find(index);
             if (it == CT->NetClass.Fold->ClassStat.end())
                 return TError(EError::InvalidValue, "network device " + index + " not found");
@@ -5375,6 +5391,8 @@ public:
             map = spec.mutable_net_rx_packets();
         else if (Name == P_NET_RX_DROPS)
             map = spec.mutable_net_rx_drops();
+        else if (Name == P_NET_NETSTAT)
+            map = spec.mutable_net_netstat();
         else
             return;
 
@@ -5408,6 +5426,9 @@ TNetStatProperty NetTxPackets(P_NET_TX_PACKETS, &TNetStat::TxPackets,
         "Device TX packets: <interface>: <packets>;...");
 TNetStatProperty NetTxDrops(P_NET_TX_DROPS, &TNetStat::TxDrops,
         "Device TX drops: <interface>: <packets>;...");
+
+TNetStatProperty NetStat(P_NET_NETSTAT, nullptr,
+        "Net namespace statistics from /proc/net/netstat: <key>: <value>;...");
 
 class TIoStat : public TProperty {
 public:

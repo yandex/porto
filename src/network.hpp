@@ -235,6 +235,9 @@ public:
     void SyncStat();
     static void SyncAllStat();
 
+    /* Network stats from /proc/net/netstat */
+    TUintMap NetStat;
+
     TError GetL3Gate(TNetDeviceConfig &dev);
 
     TError SetupProxyNeighbour(const std::vector <TNlAddr> &ip,
@@ -273,6 +276,8 @@ public:
     static TError SyncResolvConf();
     static void UpdateSockDiag();
     static void RepairSockDiag();
+
+    static void UpdateNetStat();
 };
 
 struct TNetDeviceConfig {
