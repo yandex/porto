@@ -31,18 +31,18 @@ part1 = ['uid_handling',
          'volume-restore',
          'htb-restore']
 
-part2 = ['portotest',
-         'legacy-root-loop',
-         'net-sched']
+part2 = ['net-sched']
 
 part3 = ['mem-overcommit',
          'mem_limit_total',
+         'legacy-root-loop',
          'dirty-limit',
          'cpu_limit']
 
 part4 = ['leaks']
 
 part5 = ['cleanup_portod',
+         'portotest',
          'cleanup_logs',
          'portod_start',
          'api',
