@@ -9,6 +9,6 @@ sandbox_task:
   use_aapi_fuse: True
   resource_archive_check: True
 requirements:
-  cores: 4
-  ram: 8
+  cores: 32
+  ram: 32
   platform: linux_ubuntu_16.04_xenial

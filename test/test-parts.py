@@ -31,9 +31,10 @@ part1 = ['uid_handling',
          'volume-restore',
          'htb-restore']
 
-part2 = ['net-sched']
+part2 = ['net-sched1']
 
-part3 = ['mem-overcommit',
+part3 = ['net-sched2',
+         'mem-overcommit',
          'mem_limit_total',
          'legacy-root-loop',
          'dirty-limit',
