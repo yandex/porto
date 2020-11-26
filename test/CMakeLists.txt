@@ -91,13 +91,21 @@ ADD_PYTHON_TEST(portoctl-attach)
 
 # ADD_PYTHON_TEST(io-stat)
 
-add_test(NAME net-sched
+add_test(NAME net-sched1
          COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-net-sched.py
          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-set_tests_properties(net-sched
+add_test(NAME net-sched2
+         COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-net-sched.py
+         WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+set_tests_properties(net-sched1
                      PROPERTIES
-                     ENVIRONMENT PORTO_IPERF3_SERVER=${PORTO_IPERF3_SERVER})
+                     ENVIRONMENT PART=1)
+
+set_tests_properties(net-sched2
+                     PROPERTIES
+                     ENVIRONMENT PART=2)
 
 ADD_PYTHON_TEST(mem-overcommit)
 ADD_PYTHON_TEST(mem_limit_total)

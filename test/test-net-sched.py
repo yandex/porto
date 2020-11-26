@@ -462,25 +462,26 @@ try:
     print "Setup local veth ifaces veth1/veth2 for iperf3 tests"
     setup_local_veth(conn)
 
-    # common tests
+    part = os.environ['PART']
+    if part == '1':
+        # common tests
+        run_htb_test(True)
+        run_hfsc_test(True)
+        run_pfifo_fast_test()
+        run_fq_codel_test()
+        run_sock_diag_test()
+    elif part == '2':
+        # test switching
 
-    run_htb_test(True)
-    run_hfsc_test(True)
-    run_pfifo_fast_test()
-    run_fq_codel_test()
-    run_sock_diag_test()
+        # htb -> fq_codel -> htb
+        run_htb_test()
+        run_fq_codel_test()
+        run_htb_test()
 
-    # test switching
-
-    # htb -> fq_codel -> htb
-    run_htb_test()
-    run_fq_codel_test()
-    run_htb_test()
-
-    # hfsc -> fq_codel -> hfsc
-    run_hfsc_test()
-    run_fq_codel_test()
-    run_hfsc_test()
+        # hfsc -> fq_codel -> hfsc
+        run_hfsc_test()
+        run_fq_codel_test()
+        run_hfsc_test()
 
 finally:
     cts = conn.List()
