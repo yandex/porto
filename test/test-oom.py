@@ -84,7 +84,7 @@ m.Destroy()
 
 a = c.Run("test-oom", command="bash -c 'while true; do stress -m 1 ; done'", memory_limit="64M", oom_is_fatal=False)
 
-a.Wait(timeout_s=1)
+a.Wait(timeout_s=3)
 
 ExpectEq(a['state'], 'running')
 ExpectNe(a['oom_kills'], '0')
@@ -121,6 +121,7 @@ a = c.Run("test-oom", command="stress -m 1", memory_limit="64M", respawn=True, m
 
 while a['state'] != 'dead':
     a.Wait()
+time.sleep(3)
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['respawn_count'], '2')

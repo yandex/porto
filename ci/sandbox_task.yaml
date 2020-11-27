@@ -11,4 +11,5 @@ sandbox_task:
 requirements:
   cores: 32
   ram: 32
+  disk_usage: 64
   platform: linux_ubuntu_16.04_xenial

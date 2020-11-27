@@ -54,11 +54,11 @@ try:
     ExpectEq(c['state'], 'running')
 
     # run docker containers in dockerd with user namespace
-    b = conn.Run('a/c/b', wait=10, command='docker run hello-world')
+    b = conn.Run('a/c/b', wait=15, command='docker run hello-world')
     ExpectEq(b['exit_code'], '0')
     b.Destroy()
 
-    b = conn.Run('a/c/b', wait=10, command='docker run --privileged hello-world')
+    b = conn.Run('a/c/b', wait=15, command='docker run --privileged hello-world')
     ExpectEq(b['exit_code'], '0')
     b.Destroy()
 
