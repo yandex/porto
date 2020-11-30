@@ -93,11 +93,25 @@ for i in range(1, 9):
 # Put remaining tests in part8
 part8 = test_names
 
-for test in eval('part{}'.format(sys.argv[1])):
-    # restart portod to remove containers/volumes
-    if test == 'portod_start':
-        subprocess.check_call([portod, 'stop'])
-    else:
-        subprocess.check_call([portod, 'restart'])
 
-    subprocess.check_call(['ctest', '-R', '^{}$'.format(test), '-V'])
+def run_test(test_name):
+    ATTEMPTS = 2
+    for i in range(ATTEMPTS):
+        # restart portod to remove containers/volumes
+        if test == 'portod_start':
+            subprocess.check_call([portod, 'stop'])
+        else:
+            subprocess.check_call([portod, 'restart'])
+
+        try:
+            subprocess.check_call(['ctest', '-R', '^{}$'.format(test), '-V'])
+            return
+        except Exception as e:
+            if i != ATTEMPTS - 1:
+                continue
+            else:
+                raise e
+    
+
+for test in eval('part{}'.format(sys.argv[1])):
+    run_test(test)
