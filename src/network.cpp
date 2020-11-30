@@ -28,6 +28,7 @@ extern "C" {
 #include <netlink/route/addr.h>
 #include <netlink/route/class.h>
 #include <netlink/route/neighbour.h>
+#include <netlink/route/route.h>
 #include <netlink/route/qdisc/htb.h>
 }
 
@@ -2547,10 +2548,17 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
         } else if (type == "L3") {
             dev.Type = "L3";
             dev.Name = "eth0";
-            if (settings.size() > 1)
-                dev.Name = StringTrim(settings[1]);
-            if (settings.size() > 2)
-                dev.Master = StringTrim(settings[2]);
+            int nameIndex = 1;
+            int masterIndex = 2;
+            if (settings.size() > 1 && StringTrim(settings[1]) == "extra_routes") {
+                dev.EnableExtraRoutes = true;
+                nameIndex = 2;
+                masterIndex = 3;
+            }
+            if (settings.size() > nameIndex)
+                dev.Name = StringTrim(settings[nameIndex]);
+            if (settings.size() > masterIndex)
+                dev.Master = StringTrim(settings[masterIndex]);
             if (config().network().l3_default_mtu() > 0)
                 dev.Mtu = config().network().l3_default_mtu();
             if (config().network().l3_default_ipv4_mtu() > 0)
@@ -3105,6 +3113,16 @@ TError TNetEnv::SetupInterfaces() {
             if (error)
                 return error;
         }
+        if (dev.EnableExtraRoutes  && dev.Type == "L3") {
+            if (!dev.Gate6.IsEmpty()) {
+                for (const auto &extraRoute : config().network().extra_routes()) {
+                    error = AddRoute(extraRoute.dst(), Net->DeviceIndex(dev.Name), dev.Gate6.Addr, extraRoute.mtu(),
+                            extraRoute.has_advmss() ? extraRoute.advmss() : 0);
+                    if (error)
+                        return error;
+                }
+            }
+        }
     }
 
     return OK;
@@ -3154,6 +3172,70 @@ TError TNetEnv::ApplySysctl() {
 err:
     TError error2 = curNs.SetNs(CLONE_NEWNET);
     PORTO_ASSERT(!error2);
+
+    return error;
+}
+
+TError TNetEnv::AddRoute(const std::string &dsc, int index, struct nl_addr *via, int mtu, int advmss) {
+    struct nl_addr *dst = NULL;
+    struct rtnl_route *route;
+    struct rtnl_nexthop *nh;
+    TError error;
+    int ret;
+
+    route = rtnl_route_alloc();
+    if (!route)
+        return TError(EError::Unknown, "Cannot allocate route");
+
+    nh = rtnl_route_nh_alloc();
+    if (!nh) {
+        error = TError(EError::Unknown, "Cannot allocate nh");
+        goto err;
+    }
+
+    ret = nl_addr_parse(dsc.c_str(), AF_INET6, &dst);
+    if (ret) {
+        error = TNLinkSockDiag::Error(ret, "Cannot parse dst");
+        goto err;
+    }
+
+    rtnl_route_nh_set_gateway(nh, via);
+    rtnl_route_nh_set_ifindex(nh, index);
+    rtnl_route_add_nexthop(route, nh);
+
+    if (mtu) {
+        ret = rtnl_route_set_metric(route, RTAX_MTU, mtu);
+        if (ret < 0) {
+            error = TNLinkSockDiag::Error(ret, "Cannot set mtu");
+            goto err;
+        }
+    }
+
+    if (advmss) {
+        ret = rtnl_route_set_metric(route, RTAX_ADVMSS, advmss);
+        if (ret < 0) {
+            error = TNLinkSockDiag::Error(ret, "Cannot set advmss");
+            goto err;
+        }
+    }
+
+    ret = rtnl_route_set_dst(route, dst);
+    if (ret < 0) {
+        error = TNLinkSockDiag::Error(ret, "Cannot set dst");
+        goto err;
+    }
+
+    ret = rtnl_route_add(Net->GetSock(), route, NLM_F_CREATE | NLM_F_REPLACE);
+    if (ret < 0) {
+        error = TNLinkSockDiag::Error(ret, "Cannot add route");
+        goto err;
+    }
+
+    error = OK;
+err:
+    if (dst)
+        nl_addr_put(dst);
+    rtnl_route_put(route);
 
     return error;
 }

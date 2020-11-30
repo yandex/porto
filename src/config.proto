@@ -103,6 +103,13 @@ message TConfig {
         }
         repeated TAddrLabel addrlabel = 31;
 
+        message TExtraRoute {
+            required string dst = 1;
+            required uint32 mtu = 2;
+            optional uint32 advmss = 3;
+        }
+        repeated TExtraRoute extra_routes = 64;
+
         /* Deprecated */
         optional bool enable_iproute = 41;
         optional bool enabled = 1 [deprecated=true];

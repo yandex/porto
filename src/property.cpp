@@ -1498,7 +1498,7 @@ public:
             "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
             "ipvlan <master> <name> [l2|l3] [mtu] | "
             "veth <name> <bridge> [mtu] [hw] | "
-            "L3 <name> [master] | "
+            "L3 [extra_routes] <name> [master] | "
             "NAT [name] | "
             "ipip6 <name> <remote> <local> | "
             "tap <name> | "
