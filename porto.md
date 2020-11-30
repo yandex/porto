@@ -850,7 +850,7 @@ Possible indexes for statistics and parameters:
 * **net** - network namespace configuration, Syntax: \<option\> \[args\]...;...
     - *inherited*            - use parent container network namespace (default)
     - *none*                 - empty namespace, no network access (default for virt\_mode=os)
-    - *L3* \<name\> \[master\]  - veth pair and ip routing from host
+    - *L3* \[extra\_routes\] \<name\> \[master\]  - veth pair and ip routing from host
     - *NAT* \[name\]         - same as L3 but assign ip automatically
     - *tap* \<name\>         - tap interface with L3 routing
     - *ipip6* \<name\> \<remote\> \<local\> - ipv4-via-ipv6 tunnel

@@ -290,6 +290,7 @@ struct TNetDeviceConfig {
     int Group = 0;
     bool Autoconf = false;
     bool EnableECN = false;
+    bool EnableExtraRoutes = false;
 
     std::vector<TNlAddr> Ip;
     TNlAddr Gate4;
@@ -348,6 +349,7 @@ struct TNetEnv {
     TError ConfigureL3(TNetDeviceConfig &dev);
     TError SetupInterfaces();
     TError ApplySysctl();
+    TError AddRoute(const std::string &dsc, int index, struct nl_addr *via, int mtu, int advmss);
 
     TError CreateTap(TNetDeviceConfig &dev);
     TError DestroyTap(TNetDeviceConfig &dev);
