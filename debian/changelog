@@ -1,3 +1,20 @@
+yandex-porto (5.0.8) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * porto: enter cgroup namespace only if EnableCgroupNs=true
+  * test: change the division of tests
+  * test: split net-sched test into 2 parts
+  * test: make tests more stable
+  * ci: build porto in pbuilder_build_deb_package sandbox task
+  * porto: fix porto stat
+  * network: add statistics from /proc/net/netstat
+  * test: make 2 attempts on test in test-parts
+  * property: add cpu_limit/guarantee_bound
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 01 Dec 2020 15:14:43 +0300
+
 yandex-porto (5.0.7) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
