@@ -6,7 +6,6 @@
 case "$1" in
     configure)
     getent group porto > /dev/null || groupadd --gid 1333 porto
-    rm -f /run/portod.stat
     if [ -x "/bin/systemctl" ] ; then
 	/bin/systemctl enable yandex-porto.service || true
 	/bin/systemctl reload-or-restart yandex-porto.service || true
