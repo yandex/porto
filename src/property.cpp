@@ -5867,6 +5867,12 @@ void TPortoStat::Populate(TUintMap &m) {
     m["spec_fail_invalid_value"] = Statistics->SpecRequestsFailedInvalidValue;
     m["spec_fail_unknown"] = Statistics->SpecRequestsFailedUnknown;
     m["spec_fail_no_container"] = Statistics->SpecRequestsFailedContainerDoesNotExist;
+
+    m["lock_operations_count"] = Statistics->LockOperationsCount;
+    m["lock_operations_longer_1s"] = Statistics->LockOperationsLonger1s;
+    m["lock_operations_longer_3s"] = Statistics->LockOperationsLonger3s;
+    m["lock_operations_longer_30s"] = Statistics->LockOperationsLonger30s;
+    m["lock_operations_longer_5m"] = Statistics->LockOperationsLonger5m;
 }
 
 TError TPortoStat::Get(std::string &value) {

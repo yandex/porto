@@ -7,6 +7,7 @@
 #include "common.hpp"
 #include "util/path.hpp"
 #include "util/log.hpp"
+#include "util/mutex.hpp"
 
 constexpr const char *V_ID = "id";
 constexpr const char *V_PATH = "path";
@@ -296,13 +297,13 @@ struct TVolumeProperty {
 extern std::vector<TVolumeProperty> VolumeProperties;
 extern std::vector<std::string> AuxPlacesPaths;
 
-extern std::mutex VolumesMutex;
+extern MeasuredMutex VolumesMutex;
 extern std::map<TPath, std::shared_ptr<TVolume>> Volumes;
 extern std::map<TPath, std::shared_ptr<TVolumeLink>> VolumeLinks;
 extern TPath VolumesKV;
 
 static inline std::unique_lock<std::mutex> LockVolumes() {
-    return std::unique_lock<std::mutex>(VolumesMutex);
+    return VolumesMutex.UniqueLock();
 }
 
 extern TError PutLoopDev(const int loopNr); /* Legacy */

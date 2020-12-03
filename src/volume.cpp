@@ -32,7 +32,7 @@ extern "C" {
 }
 
 TPath VolumesKV;
-std::mutex VolumesMutex;
+MeasuredMutex VolumesMutex("volumes");
 std::map<TPath, std::shared_ptr<TVolume>> Volumes;
 std::map<TPath, std::shared_ptr<TVolumeLink>> VolumeLinks;
 static uint64_t NextId = 1;

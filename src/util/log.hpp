@@ -82,6 +82,11 @@ struct TStatistics {
     std::atomic<uint64_t> FailInvalidNetaddr;
     std::atomic<uint64_t> PostForkIssues;
 
+    std::atomic<uint64_t> LockOperationsCount;
+    std::atomic<uint64_t> LockOperationsLonger1s;
+    std::atomic<uint64_t> LockOperationsLonger3s;
+    std::atomic<uint64_t> LockOperationsLonger30s;
+    std::atomic<uint64_t> LockOperationsLonger5m;
     /* --- add new fields at the end --- */
 };
 
