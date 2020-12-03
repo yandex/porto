@@ -1185,11 +1185,16 @@ public:
     }
 };
 
-class TShellCmd final : public ICmd {
+
+class TRawShellCmd : public ICmd {
+    bool JobMode;
+
 public:
-    TShellCmd(Porto::Connection *api) : ICmd(api, "shell", 1,
+    TRawShellCmd(Porto::Connection *api, const std::string &name, bool jobMode = false) : JobMode(jobMode), ICmd(api, name, 1,
             "[-u <user>] [-g <group>] <container> [command] [argument]...",
-            "start shell (default /bin/bash) in container, exit - ^X^X") { }
+            fmt::format("start shell (default /bin/bash) in container{}, exit - ^X^X",
+                         jobMode ? " with virt_mode=job" : "")
+            ) { }
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string current_user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
@@ -1254,6 +1259,9 @@ public:
             }
         }
 
+        if (JobMode)
+            launcher.SetProperty("virt_mode", "job");
+
         if (group != "" && (user != "root" || group != "root"))
             launcher.SetProperty("group", group);
 
@@ -1277,6 +1285,16 @@ public:
 
         return EXIT_SUCCESS;
     }
+};
+
+class TShellCmd final : public TRawShellCmd {
+public:
+    TShellCmd(Porto::Connection *api) : TRawShellCmd(api, "shell") {}
+};
+
+class TEnterCmd final : public TRawShellCmd {
+public:
+    TEnterCmd(Porto::Connection *api) : TRawShellCmd(api, "enter", true) {}
 };
 
 class TGcCmd final : public ICmd {
@@ -2849,6 +2867,7 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TRunCmd>();
     handler.RegisterCommand<TExecCmd>();
     handler.RegisterCommand<TShellCmd>();
+    handler.RegisterCommand<TEnterCmd>();
     handler.RegisterCommand<TGcCmd>();
     handler.RegisterCommand<TFindCmd>();
     handler.RegisterCommand<TWaitCmd>();
