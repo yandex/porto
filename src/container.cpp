@@ -42,7 +42,7 @@ extern "C" {
 #include <linux/magic.h>
 }
 
-std::mutex ContainersMutex;
+MeasuredMutex ContainersMutex("containers");
 static std::condition_variable ContainersCV;
 std::shared_ptr<TContainer> RootContainer;
 std::map<std::string, std::shared_ptr<TContainer>> Containers;

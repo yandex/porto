@@ -10,6 +10,7 @@
 #include "util/unix.hpp"
 #include "util/log.hpp"
 #include "util/idmap.hpp"
+#include "util/mutex.hpp"
 #include "task.hpp"
 #include "stream.hpp"
 #include "property.hpp"
@@ -459,14 +460,14 @@ public:
     static void Event(const TEvent &event);
 };
 
-extern std::mutex ContainersMutex;
+extern MeasuredMutex ContainersMutex;
 extern std::shared_ptr<TContainer> RootContainer;
 extern std::map<std::string, std::shared_ptr<TContainer>> Containers;
 extern TPath ContainersKV;
 extern TIdMap ContainerIdMap;
 
 static inline std::unique_lock<std::mutex> LockContainers() {
-    return std::unique_lock<std::mutex>(ContainersMutex);
+    return ContainersMutex.UniqueLock();
 }
 
 extern std::mutex CpuAffinityMutex;
