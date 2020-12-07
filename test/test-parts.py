@@ -29,6 +29,8 @@ part1 = ['uid_handling',
          'hugetlb',
          'coredump',
          'volume-restore',
+         'mem-recharge',
+         'volume_queue',
          'htb-restore']
 
 part2 = ['net-sched1']
@@ -82,7 +84,7 @@ part7 = ['performance',
          'portod_stop']
 
 # TO FIX
-broken_tests = ['devices', 'mem-recharge', 'volume_queue']
+broken_tests = ['devices']
 
 for test in part1 + part2 + part3 + part4 + part5 + part6 + part7 + broken_tests:
     test_names.remove(test)
