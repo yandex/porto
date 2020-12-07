@@ -1908,9 +1908,10 @@ void TNetwork::RepairSockDiag() {
 void TNetwork::UpdateNetStat() {
     TError error;
 
-    auto state_lock = LockNetState();
+    auto networks = Networks();
+    for (auto net : *networks) {
+        auto state_lock = LockNetState();
 
-    for (auto net : *TNetwork::NetworksList) {
         if (net->NetUsers.empty() || net->IsHost())
             continue;
 
