@@ -1,15 +1,34 @@
 ---
-sandbox_task:
-  type: YA_MAKE_TGZ
-  description: test porto
-  arts: infra/porto/tests/env/xenial-4.19/test-results/py3test
-  targets: infra/porto/tests/env/xenial-4.19
-  test: True
-  junit_report: True
-  use_aapi_fuse: True
-  resource_archive_check: True
-requirements:
-  cores: 32
-  ram: 32
-  disk_usage: 64
-  platform: linux_ubuntu_16.04_xenial
+kind: 'gbgadaptor/v1'
+jobs:
+  xenial-4.19:
+    sandbox_task:
+      type: YA_MAKE_TGZ
+      description: xenial 4.19 test porto
+      arts: infra/porto/tests/env/xenial-4.19/test-results/py3test
+      targets: infra/porto/tests/env/xenial-4.19
+      test: True
+      junit_report: True
+      use_aapi_fuse: True
+      resource_archive_check: True
+    requirements:
+      cores: 32
+      ram: 32
+      disk_usage: 64
+      platform: linux_ubuntu_16.04_xenial
+
+  xenial-5.4:
+    sandbox_task:
+      type: YA_MAKE_TGZ
+      description: xenial 5.4 test porto
+      arts: infra/porto/tests/env/xenial-5.4/test-results/py3test
+      targets: infra/porto/tests/env/xenial-5.4
+      test: True
+      junit_report: True
+      use_aapi_fuse: True
+      resource_archive_check: True
+    requirements:
+      cores: 32
+      ram: 32
+      disk_usage: 64
+      platform: linux_ubuntu_16.04_xenial

@@ -13,13 +13,6 @@ add_executable(mem_touch mem_touch.c)
 add_executable(hijack hijack.cpp)
 target_link_libraries(hijack porto pthread fmt ${PB})
 
-if (USE_PORTO_KERNEL)
-    add_custom_target(porto-kernel ALL
-                      COMMAND ${CMAKE_SOURCE_DIR}/test/module/build.sh ${CMAKE_SOURCE_DIR}/test/module ${CMAKE_BINARY_DIR}/module
-                      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-                      )
-endif()
-
 macro(ADD_PYTHON_TEST_PARTS PART)
          add_test(NAME part${PART}
                   COMMAND sudo -E PYTHONPATH=${CMAKE_SOURCE_DIR}/src/api/python python -uB ${CMAKE_SOURCE_DIR}/test/test-parts.py ${PART}

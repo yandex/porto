@@ -908,7 +908,11 @@ def prepare_fuzzer():
     t.close()
 
     if os.environ.get('USE_PORTO_KERNEL', None) == "ON":
-        os.system("insmod ./module/porto_kernel.ko")
+        modules_dir = os.path.dirname(__file__) + '/module'
+        subprocess.check_call(['apt', 'update'])
+        os.system('apt install -y linux-headers-$(uname -r)')
+        subprocess.check_call(['./build.sh', '.', '.'], cwd=modules_dir)
+        subprocess.call(['insmod', 'porto_kernel.ko'], cwd=modules_dir)
         PORTO_KERNEL_PID = int(open("/sys/module/porto_kernel/parameters/d_thread_pid").read())
 
     ConfigurePortod('fuzzer', """
