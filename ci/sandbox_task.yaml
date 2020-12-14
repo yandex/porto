@@ -13,7 +13,7 @@ jobs:
       resource_archive_check: True
     requirements:
       cores: 32
-      ram: 32
+      ram: 64
       disk_usage: 64
       platform: linux_ubuntu_16.04_xenial
 
@@ -29,6 +29,6 @@ jobs:
       resource_archive_check: True
     requirements:
       cores: 32
-      ram: 32
+      ram: 64
       disk_usage: 64
       platform: linux_ubuntu_16.04_xenial
