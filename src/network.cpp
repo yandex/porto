@@ -513,7 +513,7 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
 
         auto error = dir.OpenDir("/proc/" + std::to_string(pid) + "/fd");
         if (error) {
-            if (errno == ENOENT)
+            if (errno == ENOENT || errno == ESRCH)
                 continue;
             return TError("Cannot open: {}", error);
         }
@@ -531,7 +531,7 @@ TError TNetwork::GetSockets(const std::vector<pid_t> &pids, std::unordered_set<i
         for (uint64_t i = 0; i < fdSize && fdsCount < SockDiagMaxFds; ++i) {
             error = dir.StatAt(TPath(std::to_string(i)), true, st);
             if (error) {
-                if (errno == ENOENT)
+                if (errno == ENOENT || errno == ESRCH)
                     continue;
                 return TError("Cannot fstatat:{}", error);
             }
