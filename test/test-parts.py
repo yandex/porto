@@ -36,7 +36,6 @@ part1 = ['uid_handling',
          'portod_cli',
          'stats',
          'recovery',
-         'leaks',
          'net-sched1']
 
 part2 = ['net-sched2',
@@ -45,7 +44,6 @@ part2 = ['net-sched2',
          'legacy-root-loop',
          'dirty-limit',
          'cpu_limit',
-         'fuzzer',
          'mem_limit',
          'portod_stop',]
 
@@ -72,30 +70,27 @@ part3 = ['cleanup_portod',
          'portoctl-exec',
          'portoctl-wait',
          'self-container',
-         'fuzzer_soft',
          'performance',
          'volume_places',
          'volume_links',
          'volume_sync',
          'portoctl-attach']
 
-# REMOVE WHEN REMOVED IN ARC
-part5 = []
-part6 = []
-part7 = []
-part8 = []
+part4 = ['leaks',
+         'fuzzer',
+         'fuzzer_soft']
 
 # TO FIX
 broken_tests = ['devices']
 
-for test in part1 + part2 + part3 + part8 + part5 + part6 + part7 + broken_tests:
+for test in part1 + part2 + part3 + part4 + broken_tests:
     test_names.remove(test)
 
 for i in range(1, 9):
     test_names.remove('part{}'.format(i))
 
 # Put remaining tests in part8
-part4 = test_names
+part4 += test_names
 
 
 def run_test(test_name):
