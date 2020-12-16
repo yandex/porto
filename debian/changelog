@@ -1,3 +1,20 @@
+yandex-porto (5.0.10) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * ci: update pbuilder tarballs
+  * ci: use base tarballs with TTL=INF
+  * ci: increase memory for test task
+  * network: pass ESRCH on getting container sockets
+  * test: change the division of tests
+  * test: remove empty tests
+  * porto: do not remove /run/portod.stat
+  * porto: add statistics for time of lock operations
+  * network: add extra_routes option for net=L3
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 16 Dec 2020 19:03:52 +0300
+
 yandex-porto (5.0.9) unstable; urgency=low
 
   [ Dmitry Yakunin ]
