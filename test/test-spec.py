@@ -674,6 +674,7 @@ try:
     speca.name = 'test22'
     speca.weak = True
     d = c.CreateSpec(container=speca)
+    ExpectEq(Catch(c.CreateSpec, container=speca), porto.exceptions.ContainerAlreadyExists)
     d_command = d.GetProperty('command')
     d.Destroy()
 

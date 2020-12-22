@@ -394,7 +394,11 @@ noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
     error = CL->ResolveName(req.container().name(), name);
     if (error)
         return error;
+
     error = TContainer::Create(name, ct);
+    if (error)
+        return error;
+
     ct->LockStateWrite();
     ct->IsWeak = true;
     ct->UnlockState();
