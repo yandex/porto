@@ -1,6 +1,7 @@
 from test_common import *
 
 import subprocess
+import porto
 import sys
 
 assert len(sys.argv) == 2
@@ -114,3 +115,7 @@ def run_test(test_name):
 
 for test in eval('part{}'.format(sys.argv[1])):
     run_test(test)
+    if test not in ['portod_stop', 'cleanup_portod']:
+        c = porto.Connection()
+        fatals = int(c.GetProperty('/', 'porto_stat[fatals]'))
+        assert 0 == fatals
