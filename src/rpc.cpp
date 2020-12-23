@@ -403,9 +403,6 @@ noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
     ct->IsWeak = true;
     ct->UnlockState();
 
-    if (error)
-        return error;
-
     /* link volumes with container */
     for (auto volume_spec: *req.mutable_volumes()) {
         bool linked = false;
@@ -425,12 +422,6 @@ noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
     if (error)
         goto undo;
 
-    if (req.container().weak()) {
-        ct->SetProp(EProperty::WEAK);
-        CL->WeakContainers.emplace_back(ct);
-    } else
-        ct->IsWeak = false;
-
     CL->ReleaseContainer();
 
     for (auto volume_spec: req.volumes()) {
@@ -439,6 +430,9 @@ noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
         error = TVolume::Create(volume_spec, volume);
         if (error) {
             Statistics->VolumesFailed++;
+            auto error2 = CL->LockContainer(ct);
+            if (error2)
+                return error2;
             goto undo;
         }
     }
@@ -446,6 +440,12 @@ noinline TError CreateFromSpec(rpc::TCreateFromSpecRequest &req) {
     error = CL->LockContainer(ct);
     if (error)
         return error;
+
+    if (req.container().weak()) {
+        ct->SetProp(EProperty::WEAK);
+        CL->WeakContainers.emplace_back(ct);
+    } else
+        ct->IsWeak = false;
 
     if (req.start()) {
         error = ct->Start();
@@ -524,7 +524,11 @@ noinline TError ListContainersBy(const rpc::TListContainersRequest &req,
 
                 auto container = rsp.add_containers();
                 container->mutable_spec()->set_name(name);
+                error = CL->LockContainer(ct);
+                if (error)
+                    continue;
                 ct->Dump(props, propsOps, *container);
+                CL->ReleaseContainer();
             }
         }
     }
