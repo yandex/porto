@@ -35,7 +35,7 @@ TPath VolumesKV;
 MeasuredMutex VolumesMutex("volumes");
 std::map<TPath, std::shared_ptr<TVolume>> Volumes;
 std::map<TPath, std::shared_ptr<TVolumeLink>> VolumeLinks;
-static uint64_t NextId = 1;
+static std::atomic<uint64_t> NextId(1);
 
 static std::condition_variable VolumesCv;
 
@@ -1909,18 +1909,6 @@ TError TVolume::CheckConflicts(const TPath &path) {
 TError TVolume::Configure(const TPath &target_root) {
     TError error;
 
-    if (Spec->private_value().size() > PRIVATE_VALUE_MAX)
-        return TError(EError::InvalidValue, "Private value too log, max {} bytes", PRIVATE_VALUE_MAX);
-
-    /* Default user:group */
-    VolumeOwner = CL->Cred;
-    VolumeCred = CL->TaskCred;
-    Creator = CL->ClientContainer->Name + " " + CL->Cred.User() + " " + CL->Cred.Group();
-
-    error = Load(*Spec);
-    if (error)
-        return error;
-
     error = CL->ClientContainer->ResolvePlace(Place);
     if (error)
         return error;
@@ -3662,6 +3650,9 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
 
     L_VERBOSE("Volume spec: {}", spec.ShortDebugString());
 
+    if (spec.private_value().size() > PRIVATE_VALUE_MAX)
+        return TError(EError::InvalidValue, "Private value too log, max {} bytes", PRIVATE_VALUE_MAX);
+
     TPath place = spec.place();
     error = CL->ClientContainer->ResolvePlace(place);
     if (error)
@@ -3693,11 +3684,24 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
     if (error)
         return error;
 
-    auto volumes_lock = LockVolumes();
+    volume = std::make_shared<TVolume>();
+    volume->Id = std::to_string(NextId++);
+    volume->Spec = &spec;
+
+    /* Default user:group */
+    volume->VolumeOwner = CL->Cred;
+    volume->VolumeCred = CL->TaskCred;
+    volume->Creator = CL->ClientContainer->Name + " " + CL->Cred.User() + " " + CL->Cred.Group();
+
+    error = volume->Load(spec);
+    if (error)
+        return error;
 
     auto max_vol = config().volumes().max_total();
     if (CL->IsSuperUser())
         max_vol += NR_SUPERUSER_VOLUMES;
+
+    auto volumes_lock = LockVolumes();
 
     if (Volumes.size() >= max_vol)
         return TError(EError::ResourceNotAvailable, "number of volumes reached limit: " + std::to_string(max_vol));
@@ -3732,10 +3736,6 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
         if (error)
             return error;
     }
-
-    volume = std::make_shared<TVolume>();
-    volume->Id = std::to_string(NextId++);
-    volume->Spec = &spec;
 
     error = volume->Configure(target_root);
     if (error)
