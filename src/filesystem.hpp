@@ -54,7 +54,7 @@ public:
     TError MountTraceFs();
     TError MountSystemd();
 
-    TError Setup(bool rootUser, bool dockerMode);
+    TError Setup(bool capSysAdmin, bool rootUser, bool dockerMode);
 
     TError Enter(pid_t pid);
     TError Leave();

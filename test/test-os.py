@@ -56,6 +56,12 @@ def CheckCgroupHierarchy(ct, haveCgroups):
             ExpectEq(len(r['stdout']), 0)
             r.Destroy()
 
+def CheckSystemd(ct):
+    r = conn.Run(ct.name + '/child', wait=10, command='systemctl -a', private='portoctl shell', isolate=False)
+    assert len(r['stdout'].strip().split('\n')) != 0
+    assert len(r['stderr']) == 0
+    r.Destroy()
+
 
 try:
     ConfigurePortod('test-os', """
@@ -77,9 +83,18 @@ try:
     ExpectRunlevel(a, 'N 5')
     shutil.copyfile(portoctl, "{}/portoctl".format(a.GetData('root')))
     CheckSubCgroups(a)
+    CheckSystemd(a)
     CheckCgroupHierarchy(a, True)
     a.Destroy()
 
+    m = conn.Run("m", root_volume={'layers': ["ubuntu-xenial"]})
+    a = conn.Create("m/a")
+    a.SetProperty('virt_mode', 'os')
+    a.SetProperty('capabilities[SYS_ADMIN]', 'false')
+    a.Start()
+    CheckCgroupHierarchy(a, False)
+    CheckSystemd(a)
+    m.Destroy()
 
     m = conn.Run("m", root_volume={'layers': ["ubuntu-precise"]})
     a = conn.Run("m/a", virt_mode='os')
@@ -100,7 +115,17 @@ try:
     a.Stop()
     a.Start()
     CheckCgroupHierarchy(a, False)
+    CheckSystemd(a)
     ExpectRunlevel(a, 'N 5')
+    m.Destroy()
+
+    m = conn.Run("m", root_volume={'layers': ["ubuntu-xenial"]})
+    a = conn.Create("m/a")
+    a.SetProperty('virt_mode', 'os')
+    a.SetProperty('capabilities[SYS_ADMIN]', 'false')
+    a.Start()
+    CheckCgroupHierarchy(a, False)
+    CheckSystemd(a)
     m.Destroy()
 
 finally:

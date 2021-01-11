@@ -448,7 +448,7 @@ TError TMountNamespace::MountSystemd() {
 
     TPath tmpfs = "sys/fs/cgroup";
     TPath systemd = tmpfs / "systemd";
-    TPath systemd_rw = systemd / Systemd;
+    TPath systemd_rw = EnableCgroupNs ? systemd : systemd / Systemd; // if cgroup ns enabled, current cgroup is root
     TError error;
 
     error = tmpfs.UmountAll();
@@ -662,7 +662,7 @@ TError TMountNamespace::ProtectCgroups() {
     return OK;
 }
 
-TError TMountNamespace::Setup(bool rootUser, bool dockerMode) {
+TError TMountNamespace::Setup(bool capSysAdmin, bool rootUser, bool dockerMode) {
     TPath dot(".");
     TError error;
 
@@ -775,7 +775,7 @@ TError TMountNamespace::Setup(bool rootUser, bool dockerMode) {
             return error;
     }
 
-    if (!EnableCgroupNs)
+    if (!EnableCgroupNs || !capSysAdmin)
         error = MountSystemd();
     else if (!rootUser || !EnableDockerMode)
         error = ProtectCgroups();
