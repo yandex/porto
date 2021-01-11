@@ -27,6 +27,7 @@ extern "C" {
 #include <grp.h>
 #include <net/if.h>
 #include <linux/sched.h>
+#include <linux/capability.h>
 }
 
 std::list<std::string> IpcSysctls = {
@@ -315,8 +316,8 @@ TError TTaskEnv::ConfigureChild() {
 
     if (NewMountNs) {
 
-        error = Mnt.Setup(EnableDockerMode && CT->OwnerCred.IsRootUser(),
-                          CT->DockerMode);
+        error = Mnt.Setup(CT->CapBound.Permitted & BIT(CAP_SYS_ADMIN),
+                          EnableDockerMode && CT->OwnerCred.IsRootUser(), CT->DockerMode);
         if (error)
             return error;
 
