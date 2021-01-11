@@ -17,35 +17,19 @@ for line in tests.split('\n'):
 
 
 part1 = ['uid_handling',
-         'unpriv-cred',
-         'isolation',
-         'security',
-         'hijack',
-         'net',
+         'oom',
          'tc-classes',
          'tc-rebuild',
          'locate-process',
-         'prev_release_upgrade',
-         'oom',
          'hugetlb',
          'coredump',
-         'volume-restore',
-         'mem-recharge',
-         'volume_queue',
          'htb-restore',
-         'volume_backends',
          'portod_cli',
          'stats',
-         'recovery',
          'net-sched1']
 
 part2 = ['net-sched2',
          'mem-overcommit',
-         'mem_limit_total',
-         'legacy-root-loop',
-         'dirty-limit',
-         'cpu_limit',
-         'mem_limit',
          'portod_stop',]
 
 part3 = ['cleanup_portod',
@@ -71,20 +55,35 @@ part3 = ['cleanup_portod',
          'portoctl-exec',
          'portoctl-wait',
          'self-container',
-         'performance',
-         'volume_places',
-         'volume_links',
-         'volume_sync',
          'portoctl-attach']
 
 part4 = ['leaks',
-         'fuzzer',
-         'fuzzer_soft']
+         'fuzzer']
 
-part5 = []
-part6 = []
-part7 = []
-part8 = []
+part5 = ['fuzzer_soft',
+         'unpriv-cred',
+         'isolation',
+         'security',
+         'hijack',
+         'net']
+
+part6 = ['volume_places',
+         'volume_links',
+         'volume-restore',
+         'mem-recharge',
+         'mem_limit_total',
+         'legacy-root-loop',
+         'dirty-limit',
+         'cpu_limit',
+         'mem_limit',
+         'volume_queue',
+         'volume_sync']
+
+part7 = ['volume_backends',
+         'performance']
+
+part8 = ['prev_release_upgrade',
+         'recovery']
 
 # TO FIX
 broken_tests = ['devices']
