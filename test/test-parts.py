@@ -81,17 +81,22 @@ part4 = ['leaks',
          'fuzzer',
          'fuzzer_soft']
 
+part5 = []
+part6 = []
+part7 = []
+part8 = []
+
 # TO FIX
 broken_tests = ['devices']
 
-for test in part1 + part2 + part3 + part4 + broken_tests:
+for test in part1 + part2 + part3 + part4 + part5 + part6 + part7 + part8 + broken_tests:
     test_names.remove(test)
 
 for i in range(1, 9):
     test_names.remove('part{}'.format(i))
 
 # Put remaining tests in part8
-part4 += test_names
+part8 += test_names
 
 
 def run_test(test_name):
