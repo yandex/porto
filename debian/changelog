@@ -1,3 +1,18 @@
+yandex-porto (5.0.11) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * spec: do not pass error on creating container test: check fatals after tests
+  * test: split tests into 8 parts
+  * spec: lock container before undo in CreateFromSpec,       lock container before Dump in ListContainersBy,
+  * ci: update tarball resources test: split tests into 8 parts
+  * ci: use pbuilder tarballs with installed packages for build porto
+  * filesystem: mount /sys/fs/cgroup/systemd if cgroupns enabled and container without cap_sys_admin
+  * volumes: make critical section smaller on creating volume
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 13 Jan 2021 19:22:24 +0300
+
 yandex-porto (5.0.10) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
