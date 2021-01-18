@@ -866,7 +866,7 @@ Possible indexes for statistics and parameters:
     - *veth* \<name\> \<bridge\> \[mtu\] \[hw\]
     - *ECN* \[name\]         - enable ECN
 
-* **ip**             - ip addresses, syntax: \<interface\> \<ip\>\[/\<prefix\>\];...
+* **ip**             - ip addresses, syntax: \<interface\> \<ip|auto\>\[/\<prefix|prj_id\>\];...
 
     For L3 devices whole prefix is routed inside, see [L3].
 

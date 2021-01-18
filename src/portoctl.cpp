@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <csignal>
 #include <cmath>
+#include <regex>
 
 #include "libporto.hpp"
 #include "cli.hpp"
@@ -22,6 +23,9 @@ extern "C" {
 #include <wordexp.h>
 #include <termios.h>
 #include <poll.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
 }
 
 using std::string;
@@ -47,6 +51,41 @@ volatile int ChildDead;
 
 static void CatchChild(int) {
     ChildDead = 1;
+}
+
+std::string GetVlan688Subnet() {
+    struct ifaddrs *ifAddrStruct = NULL;
+    struct ifaddrs *ifa;
+    std::string subnet;
+
+    if (getifaddrs(&ifAddrStruct)) {
+        std::cerr << strerror(errno) << std::endl;
+        return "";
+    }
+
+    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr->sa_family == AF_INET6) {
+            if (strcmp(ifa->ifa_name, "vlan688") == 0) {
+                char addressBuffer[INET6_ADDRSTRLEN];
+                if (inet_ntop(AF_INET6,  &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr, addressBuffer, INET6_ADDRSTRLEN) == NULL)
+                    continue;
+
+                static const std::regex re("2a02:6b8[:0-9a-f]\+::");
+                std::string addr(addressBuffer);
+                std::smatch match;
+
+                if (std::regex_search(addr, match, re)) {
+                    subnet = StringReplaceAll(match[0], "::", "");
+                    break;
+                }
+            }
+        }
+    }
+
+    if (ifAddrStruct != NULL)
+        freeifaddrs(ifAddrStruct);
+
+    return subnet;
 }
 
 class TLauncher {
@@ -124,6 +163,26 @@ public:
         } else if (key == "layers") {
             NeedVolume = true;
             Layers = SplitEscapedString(val, ';');
+        } else if (key == "ip") {
+            auto args = SplitEscapedString(val, ' ');
+            if (args.size() > 1 && args[1] == "auto") {
+                const auto subnet = GetVlan688Subnet();
+                if (subnet.empty())
+                    return TError(EError::Unknown, "Cannot get subnet for vlan688");
+
+                std::string prjId = "0:604";
+                if (args.size() > 2)
+                    prjId = args[2];
+
+                srand(GetCurrentTimeMs());
+
+                char rnd[3];
+                snprintf(rnd, sizeof(rnd), "%.2x", rand());
+
+                const auto ip = fmt::format("{}:{}::{}", subnet, prjId, rnd);
+                Properties[key] = fmt::format("{} {}", args[0], ip);
+            } else
+                Properties[key] = val;
         } else
             Properties[key] = val;
 
