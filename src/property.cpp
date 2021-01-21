@@ -5321,6 +5321,8 @@ public:
 
     TError Has() {
         if (NetStat) {
+            if (!CT->Net)
+                return TError(EError::Unknown, "Net is empty");
             if (CT->Net->IsHost())
                 return TError(EError::ResourceNotAvailable, "Not available for container with host network");
             else
@@ -5340,6 +5342,8 @@ public:
     TError Get(TUintMap &stat) {
         auto lock = TNetwork::LockNetState();
         if (NetStat) {
+            if (!CT->Net)
+                return TError(EError::Unknown, "Net is empty");
             if (CT->Net->IsHost())
                 return TError(EError::ResourceNotAvailable, "Not available for container with host network");
             stat = CT->Net->NetStat;
@@ -5368,6 +5372,8 @@ public:
     TError GetIndexed(const std::string &index, std::string &value) {
         auto lock = TNetwork::LockNetState();
         if (NetStat) {
+            if (!CT->Net)
+                return TError(EError::Unknown, "Net is empty");
             auto it = CT->Net->NetStat.find(index);
             if (it == CT->Net->NetStat.end())
                 return TError(EError::InvalidValue, "network stat " + index + " not found");
