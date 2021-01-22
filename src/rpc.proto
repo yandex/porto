@@ -563,7 +563,7 @@ message TContainerSpec {
 
     optional bool respawn = 35;
     optional uint64 respawn_count = 36;
-    optional uint64 max_respawns = 37;
+    optional int64 max_respawns = 37;
     optional uint64 respawn_delay = 38;
 
     optional TContainerControllers controllers = 39;
