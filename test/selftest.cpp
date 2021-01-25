@@ -3645,6 +3645,9 @@ static void TestContainerSpec(Porto::Connection &api) {
         label->set_key("MY.abc");
         label->set_val("test1234");
 
+        auto filter2 = listContainersRequest.add_filters();
+        filter2->set_name("unknown");
+
         auto fieldOptions = listContainersRequest.mutable_field_options();
 
         fieldOptions->add_properties("command");
@@ -3655,12 +3658,18 @@ static void TestContainerSpec(Porto::Connection &api) {
 
         std::vector<rpc::TContainer> containers;
         ExpectApiSuccess(api.ListContainersBy(listContainersRequest, containers));
-        ExpectEq(containers.size(), 1);
+        ExpectEq(containers.size(), 2);
         Expect(containers[0].has_status());
         Expect(containers[0].status().has_stdout());
         ExpectEq(containers[0].status().stdout(), "1234567890");
         ExpectEq(containers[0].status().stderr(), "");
         ExpectApiSuccess(api.Stop(c));
+
+        //check response for unknown container
+        ExpectEq(containers[1].spec().name(), "unknown");
+        ExpectEq(containers[1].error().error(), EError::ContainerDoesNotExist);
+        ExpectEq(containers[1].error().msg(), "container unknown not found");
+        Expect(!containers[1].has_status());
     }
     ExpectApiSuccess(api.Destroy(d));
 

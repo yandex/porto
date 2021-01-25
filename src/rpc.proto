@@ -622,6 +622,7 @@ message TContainerSpec {
 message TContainer {
     required TContainerSpec spec = 1;
     optional TContainerStatus status = 2;
+    optional TError error = 3;
 }
 
 
