@@ -510,6 +510,8 @@ noinline TError ListContainersBy(const rpc::TListContainersRequest &req,
     }
     lock.unlock();
 
+    std::set<std::string> found;
+
     for (const auto &name : names) {
         std::shared_ptr<TContainer> ct;
         lock.lock();
@@ -522,14 +524,27 @@ noinline TError ListContainersBy(const rpc::TListContainersRequest &req,
                 if (filter.has_labels() && !ct->MatchLabels(filter.labels()))
                     continue;
 
+                found.insert(filter.name());
                 auto container = rsp.add_containers();
                 container->mutable_spec()->set_name(name);
+
                 error = CL->LockContainer(ct);
-                if (error)
-                    continue;
-                ct->Dump(props, propsOps, *container);
-                CL->ReleaseContainer();
+                if (!error) {
+                    ct->Dump(props, propsOps, *container);
+                    CL->ReleaseContainer();
+                } else
+                    error.Dump(*container->mutable_error());
+                break;
             }
+        }
+    }
+
+    for (auto filter : req.filters()) {
+        if (found.find(filter.name()) == found.end()) {
+            auto container = rsp.add_containers();
+            container->mutable_spec()->set_name(filter.name());
+            error = TError(EError::ContainerDoesNotExist, "container " + filter.name() + " not found");
+            error.Dump(*container->mutable_error());
         }
     }
 
