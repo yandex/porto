@@ -3996,11 +3996,13 @@ TError TContainer::Load(const TKeyValue &node) {
     if (Level == 1 && CpusetSubsystem.Supported)
         Controllers |= CGROUP_CPUSET;
 
-    if (PerfSubsystem.Supported)
-        Controllers |= CGROUP_PERF;
+    if (!JobMode) {
+        if (PerfSubsystem.Supported)
+            Controllers |= CGROUP_PERF;
 
-    if (Cgroup2Subsystem.Supported)
-        Controllers |= CGROUP2;
+        if (Cgroup2Subsystem.Supported)
+            Controllers |= CGROUP2;
+    }
 
     if (controllers & ~Controllers)
         L_WRN("Missing cgroup controllers {}", TSubsystem::Format(controllers & ~Controllers));
