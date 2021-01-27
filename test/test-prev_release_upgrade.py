@@ -6,7 +6,7 @@ from test_common import *
 
 AsRoot()
 
-PREV_VERSION = "4.18.32"
+PREV_VERSION = "5.0.11"
 
 TMPDIR = "/tmp/test-release-upgrade"
 prev_portod = TMPDIR + "/old/usr/sbin/portod"
