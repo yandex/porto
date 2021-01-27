@@ -1,3 +1,20 @@
+yandex-porto (5.0.12) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * property: check that Net is not nullptr before use
+
+  [ Roman Anufriev ]
+  * python_api: pass container instead of path to _ListVolumes from ListVolumes
+
+  [ Alexander Kuznetsov ]
+  * portoctl: enable ip='dev auto [prj_id] for net='L3 ...'
+  * rpc: change max_respawns in spec from uint64 to int64
+  * spec: return error in TContaner when we can not lock it or can not find
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 27 Jan 2021 12:52:56 +0300
+
 yandex-porto (5.0.11) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
