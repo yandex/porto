@@ -1656,8 +1656,7 @@ public:
     TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS,
             "Cgroup controllers") { }
     TError Get(std::string &value) {
-        // TODO: backward compatibility, remove when porto with perf_event cgroup support will be on the whole cluster
-        uint64_t controllers = CT->Controllers & ~CGROUP_PERF;
+        uint64_t controllers = CT->Controllers;
         value = StringFormatFlags(controllers, ControllersName, ";");
         return OK;
     }
@@ -1673,8 +1672,7 @@ public:
         return OK;
     }
     TError GetIndexed(const std::string &index, std::string &value) {
-        // TODO: backward compatibility, remove when porto with perf_event cgroup support will be on the whole cluster
-        uint64_t controllers = CT->Controllers & ~CGROUP_PERF;
+        uint64_t controllers = CT->Controllers;
         uint64_t val;
         TError error = StringParseFlags(index, ControllersName, val, ';');
         if (error)
@@ -1704,8 +1702,7 @@ public:
 
     void Dump(rpc::TContainerSpec &spec) override {
         auto out = spec.mutable_controllers();
-        // TODO: backward compatibility, remove when porto with perf_event cgroup support will be on the whole cluster
-        uint64_t controllers = CT->Controllers & ~CGROUP_PERF;
+        uint64_t controllers = CT->Controllers;
         for (auto &it: ControllersName)
             if (controllers & it.first)
                 out->add_controller(it.second);
