@@ -4793,6 +4793,68 @@ public:
     }
 } static CacheUsage;
 
+class TShmemUsage: public TProperty {
+public:
+    TShmemUsage() : TProperty(P_SHMEM_USAGE, EProperty::NONE,
+            "Shmem and tmpfs usage [bytes]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+
+    TError Get(uint64_t &val) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        return MemorySubsystem.GetShmemUsage(cg, val);
+    }
+
+    TError Get(std::string &value) {
+        uint64_t val;
+        TError error = Get(val);
+        if (!error)
+            value = std::to_string(val);
+        return error;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) override {
+        uint64_t val;
+        TError error = Get(val);
+        if (!error)
+            spec.set_shmem_usage(val);
+    }
+} static ShmemUsage;
+
+class TMLockUsage: public TProperty {
+public:
+    TMLockUsage() : TProperty(P_MLOCK_USAGE, EProperty::NONE,
+            "Locked memory [bytes]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_MEMORY;
+    }
+
+    TError Get(uint64_t &val) {
+        auto cg = CT->GetCgroup(MemorySubsystem);
+        return MemorySubsystem.GetMLockUsage(cg, val);
+    }
+
+    TError Get(std::string &value) {
+        uint64_t val;
+        TError error = Get(val);
+        if (!error)
+            value = std::to_string(val);
+        return error;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) override {
+        uint64_t val;
+        TError error = Get(val);
+        if (!error)
+            spec.set_mlock_usage(val);
+    }
+} static MLockUsage;
+
 class THugetlbUsage : public TProperty {
 public:
     THugetlbUsage() : TProperty(P_HUGETLB_USAGE, EProperty::NONE,

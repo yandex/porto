@@ -605,6 +605,39 @@ TError TMemorySubsystem::GetCacheUsage(TCgroup &cg, uint64_t &usage) const {
     return error;
 }
 
+TError TMemorySubsystem::GetShmemUsage(TCgroup &cg, uint64_t &usage) const {
+    TUintMap stat;
+    TError error = Statistics(cg, stat);
+    if (error)
+        return error;
+
+    if (stat.count("total_shmem")) {
+        usage = stat["total_shmem"];
+    } else {
+        if (cg.Has(ANON_USAGE))
+            cg.GetUint64(ANON_USAGE, usage);
+        else
+            usage = stat["total_inactive_anon"] +
+                    stat["total_active_anon"] +
+                    stat["total_unevictable"];
+
+        if (usage >= stat["total_rss"])
+            usage -= stat["total_rss"];
+        else
+            usage = 0;
+    }
+
+    return error;
+}
+
+TError TMemorySubsystem::GetMLockUsage(TCgroup &cg, uint64_t &usage) const {
+    TUintMap stat;
+    TError error = Statistics(cg, stat);
+    if (!error)
+        usage = stat["total_unevictable"];
+    return error;
+}
+
 TError TMemorySubsystem::GetAnonUsage(TCgroup &cg, uint64_t &usage) const {
     if (cg.Has(ANON_USAGE))
         return cg.GetUint64(ANON_USAGE, usage);
