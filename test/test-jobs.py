@@ -50,3 +50,23 @@ b.Destroy()
 
 ExpectEq(a['state'], 'meta')
 a.Destroy()
+
+# check controllers after reload.
+a = c.Run('test-a', weak=False, command='sleep 1000', memory_limit='1M')
+
+b = c.Run('test-a/b', virt_mode='job', command='sleep 1000', weak=False)
+ExpectEq(b['state'], 'running')
+
+oom = c.Run('test-a/c', wait=0, weak=False, command='stress -m 1')
+time.sleep(5)
+
+ExpectEq(a['state'], 'dead')
+
+ExpectEq(len(b['controllers']), 0)
+
+ReloadPortod()
+
+ExpectEq(len(b['controllers']), 0)
+ExpectEq(a['state'], 'dead')
+
+a.Destroy()
