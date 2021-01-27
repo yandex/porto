@@ -1183,6 +1183,8 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddColumn("A lim", "anon_limit b", "Anonymous memory limit");
 
     AddColumn("Cache", "cache_usage b", "Cache memory usage");
+    AddColumn("Shmem", "shmem_usage b", "Shmem and tmpfs usage");
+    AddColumn("MLock", "mlock_usage b", "Locked memory");
 
     AddColumn("Mt lim", "memory_limit_total b", "Memory total limit");
     AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee");

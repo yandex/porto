@@ -234,6 +234,8 @@ public:
     }
 
     TError GetCacheUsage(TCgroup &cg, uint64_t &usage) const;
+    TError GetShmemUsage(TCgroup &cg, uint64_t &usage) const;
+    TError GetMLockUsage(TCgroup &cg, uint64_t &usage) const;
     TError GetAnonUsage(TCgroup &cg, uint64_t &usage) const;
 
     TError GetAnonMaxUsage(TCgroup &cg, uint64_t &usage) const {

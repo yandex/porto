@@ -530,6 +530,8 @@ try:
     CheckVolatileProp(dump.status.anon_usage, int(a.GetProperty('anon_usage')))
     CheckVolatileProp(dump.spec.anon_max_usage, int(a.GetProperty('anon_max_usage')))
     CheckVolatileProp(dump.status.cache_usage, int(a.GetProperty('cache_usage')))
+    CheckVolatileProp(dump.status.shmem_usage, int(a.GetProperty('shmem_usage')))
+    CheckVolatileProp(dump.status.mlock_usage, int(a.GetProperty('mlock_usage')))
     CheckVolatileProp(dump.status.hugetlb_usage, int(a.GetProperty('hugetlb_usage')))
 
     ab.WaitContainer(5)

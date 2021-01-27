@@ -491,6 +491,9 @@ message TContainerStatus {
     optional uint64 memory_reclaimed = 48;     // out
     optional TVmStat virtual_memory = 49;      // out
 
+    optional uint64 shmem_usage = 71;          // out, bytes
+    optional uint64 mlock_usage = 72;          // out, bytes
+
     optional uint64 oom_kills = 50;            // out
     optional uint64 oom_kills_total = 51;      // out
     optional bool oom_killed = 52;             // out
