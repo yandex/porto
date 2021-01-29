@@ -1,3 +1,14 @@
+yandex-porto (5.0.13) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * cgroups: remove backward compatibility for perf_event cgroup
+  * container: do not load cgroup2 and perf_event controllers for virt_mode=job container
+  * Commit af911e87ac2871478417ddab7ebdf05dbf2c9922 upstream Commit af14b341c6ec73c3b5faefb567ffcbe1aa021870 upstream
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 29 Jan 2021 10:59:43 +0300
+
 yandex-porto (5.0.12) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
