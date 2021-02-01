@@ -6,6 +6,7 @@ import porto
 from test_common import *
 
 c = porto.Connection()
+stress_memory = "bash -c 'while true; do stress -m 1 ; done'"
 
 try:
     c.Destroy("test-oom")
@@ -35,7 +36,7 @@ a.Destroy()
 
 # simple oom
 
-a = c.Run("test-oom", command="bash -c 'while true; do stress -m 1 ; done'", memory_limit="64M", wait=5)
+a = c.Run("test-oom", command=stress_memory, memory_limit="64M", wait=5)
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['exit_code'], '-99')
@@ -58,7 +59,7 @@ ReloadPortod()
 total_oom = initial_oom_count
 ExpectEq(r['oom_kills_total'], str(total_oom))
 
-a = c.Run("test-oom/a", command="stress -m 1", wait=5)
+a = c.Run("test-oom/a", command=stress_memory, wait=5)
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['oom_killed'], True)
@@ -82,9 +83,9 @@ m.Destroy()
 
 # non fatal oom
 
-a = c.Run("test-oom", command="bash -c 'while true; do stress -m 1 ; done'", memory_limit="64M", oom_is_fatal=False)
+a = c.Run("test-oom", command=stress_memory, memory_limit="64M", oom_is_fatal=False)
 
-a.Wait(timeout_s=1)
+a.Wait(timeout_s=5)
 
 ExpectEq(a['state'], 'running')
 ExpectNe(a['oom_kills'], '0')
@@ -102,7 +103,7 @@ total_oom = int(r['oom_kills_total'])
 
 # os move oom
 
-a = c.Run("test-oom", command="stress -m 1", virt_mode="os", memory_limit="64M", wait=1)
+a = c.Run("test-oom", command=stress_memory, virt_mode="os", memory_limit="64M", wait=5)
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['exit_code'], '-99')
 ExpectEq(a['oom_killed'], True)
@@ -117,10 +118,11 @@ a.Destroy()
 
 # respawn after oom
 
-a = c.Run("test-oom", command="stress -m 1", memory_limit="64M", respawn=True, max_respawns=2, respawn_delay='0.5s')
+a = c.Run("test-oom", command=stress_memory, memory_limit="64M", respawn=True, max_respawns=2, respawn_delay='0.5s')
 
 while a['state'] != 'dead':
     a.Wait()
+time.sleep(10)
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['respawn_count'], '2')
@@ -138,7 +140,7 @@ a.Destroy()
 # oom at parent
 
 a = c.Run("test-oom", memory_limit="64M")
-b = c.Run("test-oom/b", command="stress -m 1", memory_limit="128M", wait=1)
+b = c.Run("test-oom/b", command=stress_memory, memory_limit="128M", wait=5)
 
 ExpectEq(b['state'], 'dead')
 ExpectEq(b['exit_code'], '-99')
@@ -152,7 +154,7 @@ ExpectEq(a['oom_kills_total'], '1')
 ExpectEq(int(a['oom_kills']) + int(b['oom_kills']), 1)
 
 # Race: Speculative OOM could be detected in a or test-oom/b
-time.sleep(1)
+time.sleep(5)
 
 ExpectEq(a.GetProperty('oom_kills', sync=True), '0')
 ExpectEq(b['oom_kills'], '1')
@@ -169,7 +171,7 @@ a.Destroy()
 
 a = c.Run("test-oom", memory_limit="128M")
 
-b = c.Run("test-oom/b", command="stress -m 1", memory_limit="64M", wait=1)
+b = c.Run("test-oom/b", command=stress_memory, memory_limit="64M", wait=5)
 
 ExpectEq(b['state'], 'dead')
 ExpectEq(b['exit_code'], '-99')
@@ -189,7 +191,7 @@ ExpectEq(r['oom_kills_total'], str(total_oom))
 
 b.Stop()
 b.Start()
-b.WaitContainer(1)
+b.WaitContainer(5)
 
 ExpectEq(b['state'], 'dead')
 ExpectEq(b['exit_code'], '-99')
@@ -208,7 +210,7 @@ ExpectEq(r['oom_kills_total'], str(total_oom))
 # third oom at child after recreate
 
 b.Destroy()
-b = c.Run("test-oom/b", command="stress -m 1", memory_limit="64M", wait=1)
+b = c.Run("test-oom/b", command=stress_memory, memory_limit="64M", wait=5)
 
 ExpectEq(b['state'], 'dead')
 ExpectEq(b['exit_code'], '-99')

@@ -52,12 +52,13 @@ ExpectEq(a['state'], 'meta')
 a.Destroy()
 
 # check controllers after reload.
-a = c.Run('test-a', weak=False, command='sleep 1000', memory_limit='1M')
+a = c.Run('test-a', weak=False, command='sleep 1000', memory_limit='64M')
 
 b = c.Run('test-a/b', virt_mode='job', command='sleep 1000', weak=False)
 ExpectEq(b['state'], 'running')
 
-oom = c.Run('test-a/c', wait=0, weak=False, command='stress -m 1')
+oom = c.Run('test-a/c', wait=0, weak=False, command="bash -c 'while true; do stress -m 1 ; done'")
+oom.Wait(5)
 time.sleep(5)
 
 ExpectEq(a['state'], 'dead')
