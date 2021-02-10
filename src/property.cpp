@@ -5838,6 +5838,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["queued_events"] = Statistics->QueuedEvents;
     m["remove_dead"] = Statistics->RemoveDead;
     m["restore_failed"] = Statistics->ContainerLost;
+    m["start_timeouts"] = Statistics->StartTimeouts;
     uint64_t usage = 0;
     auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
     TError error = MemorySubsystem.Usage(cg, usage);

@@ -14,6 +14,7 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/netlink.hpp"
+#include "util/proc.hpp"
 
 extern "C" {
 #include <string.h>
@@ -51,6 +52,15 @@ std::list<std::string> IpcSysctls = {
 
 extern bool EnableCgroupNs;
 extern bool EnableDockerMode;
+
+void PrintStack(pid_t pid) {
+    std::string stack;
+    auto error = GetStack(pid, stack);
+    if (!error)
+        L("Stack: {}", stack);
+    else
+        L_ERR("Can not print stack: {}", error);
+}
 
 void InitIpcSysctl() {
     for (const auto &key: IpcSysctls) {
@@ -299,6 +309,7 @@ TError TTaskEnv::ApplySysctl() {
 }
 
 TError TTaskEnv::ConfigureChild() {
+    L("ConfigureChild");
     TError error;
 
     error = CT->GetUlimit().Apply();
@@ -418,6 +429,7 @@ TError TTaskEnv::ConfigureChild() {
             return error;
     }
 
+    L("open default streams in child");
     error = CT->Stdin.OpenInside(*CT);
     if (error)
         return error;
@@ -474,11 +486,7 @@ TError TTaskEnv::WaitAutoconf() {
 }
 
 void TTaskEnv::StartChild() {
-    /* Use third fork between entering into parent pid-namespace and
-    cloning isolated child pid-namespace: porto keeps waiter task inside
-    which waits sub-container main task and dies in the same way. */
-    L("Start child with TripleFork={} QuadroFork={}", TripleFork, QuadroFork);
-
+    L("StartChild");
     TError error;
 
     if (TripleFork) {
@@ -575,6 +583,11 @@ tracer_error:
 }
 
 TError TTaskEnv::Start() {
+    /* Use third fork between entering into parent pid-namespace and
+    cloning isolated child pid-namespace: porto keeps waiter task inside
+    which waits sub-container main task and dies in the same way. */
+    L("Start with TripleFork={} QuadroFork={}", TripleFork, QuadroFork);
+
     TError error, error2;
 
     CT->Task.Pid = 0;
@@ -645,6 +658,7 @@ TError TTaskEnv::Start() {
 
         (void)setsid();
 
+        L("Attach to cgroups");
         // move to target cgroups
         for (auto &cg : Cgroups) {
             error = cg.Attach(GetPid());
@@ -656,6 +670,7 @@ TError TTaskEnv::Start() {
         if (error && CT->OomScoreAdj)
             Abort(error);
 
+        L("setpriority");
         if (setpriority(PRIO_PROCESS, 0, CT->SchedNice))
             Abort(TError::System("setpriority"));
 
@@ -667,6 +682,7 @@ TError TTaskEnv::Start() {
         if (SetIoPrio(0, CT->IoPrio))
             Abort(TError::System("ioprio"));
 
+        L("open default streams");
         /* Default streams and redirections are outside */
         error = CT->Stdin.OpenOutside(*CT, *Client);
         if (error)
@@ -680,7 +696,7 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
-        /* Enter namespaces */
+        L("Enter namespaces");
 
         error = IpcFd.SetNs(CLONE_NEWIPC);
         if (error)
@@ -721,6 +737,7 @@ TError TTaskEnv::Start() {
              * Enter into pid-namespace. fork() hangs in libc if child pid
              * collide with parent pid outside. vfork() has no such problem.
              */
+            L("vfork");
             pid_t forkPid;
             if (!config().container().ptrace_on_start())
                 forkPid = vfork();
@@ -763,6 +780,7 @@ TError TTaskEnv::Start() {
         if (config().container().ptrace_on_start())
             cloneFlags |= CLONE_PTRACE;
 
+        L("clone");
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
 
         if (clonePid < 0) {
@@ -803,8 +821,13 @@ TError TTaskEnv::Start() {
         goto kill_all;
 
     error = MasterSock.RecvPid(CT->WaitTask.Pid, CT->TaskVPid);
-    if (error)
+    if (error) {
+        if (errno == EWOULDBLOCK) {
+            Statistics->StartTimeouts++;
+            PrintStack(task.Pid);
+        }
         goto kill_all;
+    }
 
     /* Ack WPid */
     error = MasterSock.SendZero();
@@ -812,8 +835,13 @@ TError TTaskEnv::Start() {
         goto kill_all;
 
     error = MasterSock.RecvPid(CT->Task.Pid, CT->TaskVPid);
-    if (error)
+    if (error) {
+        if (errno == EWOULDBLOCK) {
+            Statistics->StartTimeouts++;
+            PrintStack(CT->WaitTask.Pid);
+        }
         goto kill_all;
+    }
 
     if (!config().container().ptrace_on_start())
         error2 = task.Wait();
@@ -845,8 +873,13 @@ TError TTaskEnv::Start() {
 
     /* Prefer reported error if any */
     error = MasterSock.RecvError();
-    if (error)
+    if (error) {
+        if (errno == EWOULDBLOCK) {
+            Statistics->StartTimeouts++;
+            PrintStack(CT->Task.Pid);
+        }
         goto kill_all;
+    }
 
     if (config().container().ptrace_on_start()) {
         error = task.Wait();

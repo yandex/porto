@@ -16,3 +16,5 @@ public:
 TError GetFdSize(pid_t pid, uint64_t &fdSize);
 
 TError GetNetStat(pid_t pid, TUintMap &stats);
+
+TError GetStack(pid_t pid, std::string &stack);
