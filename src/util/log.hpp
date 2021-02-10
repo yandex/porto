@@ -87,6 +87,8 @@ struct TStatistics {
     std::atomic<uint64_t> LockOperationsLonger3s;
     std::atomic<uint64_t> LockOperationsLonger30s;
     std::atomic<uint64_t> LockOperationsLonger5m;
+
+    std::atomic<uint64_t> StartTimeouts;
     /* --- add new fields at the end --- */
 };
 

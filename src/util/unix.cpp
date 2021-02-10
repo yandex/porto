@@ -371,6 +371,7 @@ TError TUnixSocket::RecvInt(int &val) const {
 }
 
 TError TUnixSocket::SendPid(pid_t pid) const {
+    L("SendPid");
     struct iovec iovec = {
         .iov_base = &pid,
         .iov_len = sizeof(pid),
@@ -405,6 +406,7 @@ TError TUnixSocket::SendPid(pid_t pid) const {
 }
 
 TError TUnixSocket::RecvPid(pid_t &pid, pid_t &vpid) const {
+    L("RecvPid");
     struct iovec iovec = {
         .iov_base = &vpid,
         .iov_len = sizeof(vpid),
