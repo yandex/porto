@@ -84,3 +84,21 @@ assert stdout_value == stdout_part1[12 << 20:] + stdout_part2[:4 << 20]
 
 
 ct.Destroy()
+
+# check fifo pipe for stdin
+ct = c.CreateWeakContainer('test')
+
+vol = c.CreateVolume(layers=['ubuntu-xenial'], containers='test')
+ct.SetProperty("root", vol.path)
+
+ct.Start()
+
+a = c.Run('test/a', wait=5, command='mkfifo /pipe')
+ExpectEq(a['exit_code'], '0')
+a.Destroy()
+
+b = c.Run('test/b', wait=5, command='sleep 1', stdin_path='/pipe')
+ExpectEq(b['exit_code'], '0')
+b.Destroy()
+
+ct.Destroy()
