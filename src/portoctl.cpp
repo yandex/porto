@@ -176,10 +176,10 @@ public:
 
                 srand(GetCurrentTimeMs());
 
-                char rnd[3];
-                snprintf(rnd, sizeof(rnd), "%.2x", rand());
+                char rnd[10];
+                snprintf(rnd, sizeof(rnd), "%.4x:%.4x", (uint16_t)rand(), (uint16_t)rand());
 
-                const auto ip = fmt::format("{}:{}::{}", subnet, prjId, rnd);
+                const auto ip = fmt::format("{}:{}:{}", subnet, prjId, rnd);
                 Properties[key] = fmt::format("{} {}", args[0], ip);
             } else
                 Properties[key] = val;
