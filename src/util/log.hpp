@@ -92,6 +92,20 @@ struct TStatistics {
     /* --- add new fields at the end --- */
 };
 
+struct TStatistic {
+    std::atomic<uint64_t> TStatistics:: *Member;
+    bool Resetable = true;
+    bool TimeStat = false;
+
+    TStatistic(std::atomic<uint64_t> TStatistics:: *member, bool resetable = true, bool timeStat = false) :
+        Member(member),
+        Resetable(resetable),
+        TimeStat(timeStat)
+        {}
+};
+
+extern std::map<std::string, TStatistic> PortoStatMembers;
+
 extern TStatistics *Statistics;
 
 void InitStatistics();

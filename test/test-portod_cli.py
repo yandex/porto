@@ -1,4 +1,5 @@
 import os
+import porto
 import subprocess
 from test_common import *
 
@@ -79,3 +80,21 @@ assert os.readlink(PORTOD_PATH) == portod
 assert subprocess.check_output([portod, 'status']) == "running\n"
 
 os.rmdir(TMPDIR)
+
+
+conn = porto.Connection()
+conn.CreateWeakContainer('a')
+conn.CreateWeakContainer('b')
+
+assert 2 == int(conn.GetData('/', 'porto_stat[containers]'))
+assert 0 != int(conn.GetData('/', 'porto_stat[containers_created]'))
+
+subprocess.check_output([portod, 'clearstat', 'containers_created'])
+
+assert 0 == int(conn.GetData('/', 'porto_stat[containers_created]'))
+assert 0 != int(conn.GetData('/', 'porto_stat[containers_started]'))
+
+subprocess.check_output([portod, 'clearstat'])
+
+assert 2 == int(conn.GetData('/', 'porto_stat[containers]'))
+assert 0 == int(conn.GetData('/', 'porto_stat[containers_started]'))

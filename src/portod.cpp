@@ -1646,38 +1646,56 @@ static int SetSystemProperties(TTuple arg) {
     return EXIT_SUCCESS;
 }
 
+static int ClearStatistics(TTuple arg) {
+    Porto::Connection conn;
+    std::string rsp;
+    std::string req;
+    if (arg.size() == 1)
+        req = fmt::format("ClearStatistics {{ stat: \"{}\" }}", arg[0]);
+    else
+        req = "ClearStatistics {}";
+
+    int ret = conn.Call(req, rsp);
+    if (ret) {
+        std::cerr << conn.GetLastError() << std::endl;
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
 static void Usage() {
     std::cout
         << std::endl
         << "Usage: portod [options...] <command> [argments...]" << std::endl
         << std::endl
         << "Option: " << std::endl
-        << "  -h | --help     print this message" << std::endl
-        << "  -v | --version  print version and revision" << std::endl
-        << "  --stdlog        print log into stdout" << std::endl
-        << "  --norespawn     exit after failure" << std::endl
-        << "  --verbose       verbose logging" << std::endl
-        << "  --debug         debug logging" << std::endl
-        << "  --discard       discard state after start" << std::endl
+        << "  -h | --help      print this message" << std::endl
+        << "  -v | --version   print version and revision" << std::endl
+        << "  --stdlog         print log into stdout" << std::endl
+        << "  --norespawn      exit after failure" << std::endl
+        << "  --verbose        verbose logging" << std::endl
+        << "  --debug          debug logging" << std::endl
+        << "  --discard        discard state after start" << std::endl
         << std::endl
         << "Commands: " << std::endl
-        << "  status          check current portod status" << std::endl
-        << "  daemon          start portod, this is default" << std::endl
-        << "  start           daemonize and start portod" << std::endl
-        << "  stop            stop running portod" << std::endl
-        << "  kill            kill running portod" << std::endl
-        << "  restart         stop followed by start" << std::endl
-        << "  reload          reexec portod" << std::endl
-        << "  reopenlog       reopen portod.log" << std::endl
-        << "  upgrade         upgrade running portod" << std::endl
-        << "  dump            print internal key-value state" << std::endl
-        << "  get             print system properties" << std::endl
-        << "  set <key> <val> change system properties" << std::endl
-        << "  freeze          freeze changes" << std::endl
-        << "  unfreeze        unfreeze changes" << std::endl
-        << "  core            receive and forward core dump" << std::endl
-        << "  help            print this message" << std::endl
-        << "  version         print version and revision" << std::endl
+        << "  status           check current portod status" << std::endl
+        << "  daemon           start portod, this is default" << std::endl
+        << "  start            daemonize and start portod" << std::endl
+        << "  stop             stop running portod" << std::endl
+        << "  kill             kill running portod" << std::endl
+        << "  restart          stop followed by start" << std::endl
+        << "  reload           reexec portod" << std::endl
+        << "  reopenlog        reopen portod.log" << std::endl
+        << "  upgrade          upgrade running portod" << std::endl
+        << "  dump             print internal key-value state" << std::endl
+        << "  get              print system properties" << std::endl
+        << "  set <key> <val>  change system properties" << std::endl
+        << "  clearstat [stat] reset statistics" << std::endl
+        << "  freeze           freeze changes" << std::endl
+        << "  unfreeze         unfreeze changes" << std::endl
+        << "  core             receive and forward core dump" << std::endl
+        << "  help             print this message" << std::endl
+        << "  version          print version and revision" << std::endl
         << std::endl;
 }
 
@@ -1781,6 +1799,9 @@ int main(int argc, char **argv) {
 
     if (cmd == "set")
         return SetSystemProperties(TTuple(argv + opt + 1, argv + argc));
+
+    if (cmd == "clearstat")
+        return ClearStatistics(TTuple(argv + opt + 1, argv + argc));
 
     if (cmd == "freeze")
         return SetSystemProperties({"frozen", "true"});

@@ -20,6 +20,7 @@ bool Debug = false;
 __thread char ReqId[9];
 
 TStatistics *Statistics = nullptr;
+std::map<std::string, TStatistic> PortoStatMembers;
 
 void InitStatistics() {
     TError error;
@@ -38,6 +39,77 @@ void InitStatistics() {
                                      MAP_SHARED | (file ? 0 : MAP_ANONYMOUS),
                                      file.Fd, 0);
     PORTO_ASSERT(Statistics != nullptr);
+
+    PortoStatMembers.emplace(std::make_pair("spawned", TStatistic(&TStatistics::PortoStarts)));
+    PortoStatMembers.emplace(std::make_pair("errors", TStatistic(&TStatistics::Errors)));
+    PortoStatMembers.emplace(std::make_pair("cgerrors", TStatistic(&TStatistics::CgErrors)));
+    PortoStatMembers.emplace(std::make_pair("warnings", TStatistic(&TStatistics::Warns)));
+    PortoStatMembers.emplace(std::make_pair("fatals", TStatistic(&TStatistics::Fatals)));
+    PortoStatMembers.emplace(std::make_pair("taints", TStatistic(&TStatistics::Taints)));
+    PortoStatMembers.emplace(std::make_pair("postfork_issues", TStatistic(&TStatistics::PostForkIssues)));
+    PortoStatMembers.emplace(std::make_pair("master_uptime", TStatistic(&TStatistics::MasterStarted, false, true)));
+    PortoStatMembers.emplace(std::make_pair("porto_uptime", TStatistic(&TStatistics::PortoStarted, false, true)));
+    PortoStatMembers.emplace(std::make_pair("queued_statuses", TStatistic(&TStatistics::QueuedStatuses, false)));
+    PortoStatMembers.emplace(std::make_pair("queued_events", TStatistic(&TStatistics::QueuedEvents, false)));
+    PortoStatMembers.emplace(std::make_pair("remove_dead", TStatistic(&TStatistics::RemoveDead)));
+    PortoStatMembers.emplace(std::make_pair("restore_failed", TStatistic(&TStatistics::ContainerLost)));
+    PortoStatMembers.emplace(std::make_pair("start_timeouts", TStatistic(&TStatistics::StartTimeouts)));
+    PortoStatMembers.emplace(std::make_pair("epoll_sources", TStatistic(&TStatistics::EpollSources, false)));
+    PortoStatMembers.emplace(std::make_pair("log_lines", TStatistic(&TStatistics::LogLines, false)));
+    PortoStatMembers.emplace(std::make_pair("log_bytes", TStatistic(&TStatistics::LogBytes, false)));
+    PortoStatMembers.emplace(std::make_pair("log_lines_lost", TStatistic(&TStatistics::LogLinesLost)));
+    PortoStatMembers.emplace(std::make_pair("log_bytes_lost", TStatistic(&TStatistics::LogBytesLost)));
+    PortoStatMembers.emplace(std::make_pair("log_open", TStatistic(&TStatistics::LogOpen)));
+    PortoStatMembers.emplace(std::make_pair("log_rotate_bytes", TStatistic(&TStatistics::LogRotateBytes)));
+    PortoStatMembers.emplace(std::make_pair("log_rotate_errors", TStatistic(&TStatistics::LogRotateErrors)));
+    PortoStatMembers.emplace(std::make_pair("containers", TStatistic(&TStatistics::ContainersCount, false)));
+    PortoStatMembers.emplace(std::make_pair("containers_created", TStatistic(&TStatistics::ContainersCreated)));
+    PortoStatMembers.emplace(std::make_pair("containers_started", TStatistic(&TStatistics::ContainersStarted)));
+    PortoStatMembers.emplace(std::make_pair("containers_failed_start", TStatistic(&TStatistics::ContainersFailedStart)));
+    PortoStatMembers.emplace(std::make_pair("containers_oom", TStatistic(&TStatistics::ContainersOOM)));
+    PortoStatMembers.emplace(std::make_pair("containers_tainted", TStatistic(&TStatistics::ContainersTainted)));
+    PortoStatMembers.emplace(std::make_pair("layer_import", TStatistic(&TStatistics::LayerImport)));
+    PortoStatMembers.emplace(std::make_pair("layer_export", TStatistic(&TStatistics::LayerExport)));
+    PortoStatMembers.emplace(std::make_pair("layer_remove", TStatistic(&TStatistics::LayerRemove)));
+    PortoStatMembers.emplace(std::make_pair("volumes", TStatistic(&TStatistics::VolumesCount, false)));
+    PortoStatMembers.emplace(std::make_pair("volumes_created", TStatistic(&TStatistics::VolumesCreated)));
+    PortoStatMembers.emplace(std::make_pair("volumes_failed", TStatistic(&TStatistics::VolumesFailed)));
+    PortoStatMembers.emplace(std::make_pair("volume_links", TStatistic(&TStatistics::VolumeLinks, false)));
+    PortoStatMembers.emplace(std::make_pair("volume_links_mounted", TStatistic(&TStatistics::VolumeLinksMounted)));
+    PortoStatMembers.emplace(std::make_pair("volume_lost", TStatistic(&TStatistics::VolumeLost)));
+    PortoStatMembers.emplace(std::make_pair("networks", TStatistic(&TStatistics::NetworksCount, false)));
+    PortoStatMembers.emplace(std::make_pair("networks_created", TStatistic(&TStatistics::NetworksCreated)));
+    PortoStatMembers.emplace(std::make_pair("network_problems", TStatistic(&TStatistics::NetworkProblems)));
+    PortoStatMembers.emplace(std::make_pair("network_repairs", TStatistic(&TStatistics::NetworkRepairs)));
+    PortoStatMembers.emplace(std::make_pair("clients", TStatistic(&TStatistics::ClientsCount, false)));
+    PortoStatMembers.emplace(std::make_pair("clients_connected", TStatistic(&TStatistics::ClientsConnected)));
+    PortoStatMembers.emplace(std::make_pair("requests_queued", TStatistic(&TStatistics::RequestsQueued, false)));
+    PortoStatMembers.emplace(std::make_pair("requests_completed", TStatistic(&TStatistics::RequestsCompleted)));
+    PortoStatMembers.emplace(std::make_pair("requests_failed", TStatistic(&TStatistics::RequestsFailed)));
+    PortoStatMembers.emplace(std::make_pair("fail_system", TStatistic(&TStatistics::FailSystem)));
+    PortoStatMembers.emplace(std::make_pair("fail_invalid_value", TStatistic(&TStatistics::FailInvalidValue)));
+    PortoStatMembers.emplace(std::make_pair("fail_invalid_command", TStatistic(&TStatistics::FailInvalidCommand)));
+    PortoStatMembers.emplace(std::make_pair("fail_memory_guarantee", TStatistic(&TStatistics::FailMemoryGuarantee)));
+    PortoStatMembers.emplace(std::make_pair("fail_invalid_netaddr", TStatistic(&TStatistics::FailInvalidNetaddr)));
+    PortoStatMembers.emplace(std::make_pair("requests_longer_1s", TStatistic(&TStatistics::RequestsLonger1s)));
+    PortoStatMembers.emplace(std::make_pair("requests_longer_3s", TStatistic(&TStatistics::RequestsLonger3s)));
+    PortoStatMembers.emplace(std::make_pair("requests_longer_30s", TStatistic(&TStatistics::RequestsLonger30s)));
+    PortoStatMembers.emplace(std::make_pair("requests_longer_5m", TStatistic(&TStatistics::RequestsLonger5m)));
+    PortoStatMembers.emplace(std::make_pair("longest_read_request", TStatistic(&TStatistics::LongestRoRequest)));
+    PortoStatMembers.emplace(std::make_pair("spec_requests_completed", TStatistic(&TStatistics::SpecRequestsCompleted)));
+    PortoStatMembers.emplace(std::make_pair("spec_requests_longer_1s", TStatistic(&TStatistics::SpecRequestsLonger1s)));
+    PortoStatMembers.emplace(std::make_pair("spec_requests_longer_3s", TStatistic(&TStatistics::SpecRequestsLonger3s)));
+    PortoStatMembers.emplace(std::make_pair("spec_requests_longer_30s", TStatistic(&TStatistics::SpecRequestsLonger30s)));
+    PortoStatMembers.emplace(std::make_pair("spec_requests_longer_5m", TStatistic(&TStatistics::SpecRequestsLonger5m)));
+    PortoStatMembers.emplace(std::make_pair("spec_requests_failed", TStatistic(&TStatistics::SpecRequestsFailed)));
+    PortoStatMembers.emplace(std::make_pair("spec_fail_invalid_value", TStatistic(&TStatistics::SpecRequestsFailedInvalidValue)));
+    PortoStatMembers.emplace(std::make_pair("spec_fail_unknown", TStatistic(&TStatistics::SpecRequestsFailedUnknown)));
+    PortoStatMembers.emplace(std::make_pair("spec_fail_no_container", TStatistic(&TStatistics::SpecRequestsFailedContainerDoesNotExist)));
+    PortoStatMembers.emplace(std::make_pair("lock_operations_count", TStatistic(&TStatistics::LockOperationsCount)));
+    PortoStatMembers.emplace(std::make_pair("lock_operations_longer_1s", TStatistic(&TStatistics::LockOperationsLonger1s)));
+    PortoStatMembers.emplace(std::make_pair("lock_operations_longer_3s", TStatistic(&TStatistics::LockOperationsLonger3s)));
+    PortoStatMembers.emplace(std::make_pair("lock_operations_longer_30s", TStatistic(&TStatistics::LockOperationsLonger30s)));
+    PortoStatMembers.emplace(std::make_pair("lock_operations_longer_5m", TStatistic(&TStatistics::LockOperationsLonger5m)));
 }
 
 TFile LogFile;

@@ -299,6 +299,9 @@ void TRequest::Parse() {
     } else if (Req.has_setsystem()) {
         Cmd = "SetSystem";
         Arg = Req.ShortDebugString();
+    } else if (Req.has_clearstatistics()) {
+        Cmd = "ClearStatistics";
+        Arg = Req.ShortDebugString();
     } else if (Req.has_newvolume()) {
         Cmd = "NewVolume";
         Arg = Req.newvolume().volume().path();
@@ -1835,6 +1838,27 @@ noinline static TError SetSystemProperties(const rpc::TSetSystemRequest *req, rp
     return OK;
 }
 
+noinline static TError ClearStatistics(const rpc::TClearStatisticsRequest *req) {
+    if (req->has_stat()) {
+        auto it = PortoStatMembers.find(req->stat());
+
+        if (it == PortoStatMembers.end())
+            return TError(EError::InvalidValue, "Unknown statistic");
+
+         if (!it->second.Resetable)
+            return TError(EError::InvalidValue, "Field cannot be cleared");
+
+        Statistics->*(it->second.Member) = 0;
+    } else {
+        for (const auto &it : PortoStatMembers) {
+            if (it.second.Resetable)
+                Statistics->*(it.second.Member) = 0;
+        }
+    }
+
+    return OK;
+}
+
 TError TRequest::Check() {
     auto req_ref = Req.GetReflection();
 
@@ -1997,6 +2021,8 @@ void TRequest::Handle() {
         error = GetSystemProperties(&Req.getsystem(), rsp.mutable_getsystem());
     else if (Req.has_setsystem())
         error = SetSystemProperties(&Req.setsystem(), rsp.mutable_setsystem());
+    else if (Req.has_clearstatistics())
+        error = ClearStatistics(&Req.clearstatistics());
     else
         error = TError(EError::InvalidMethod, "invalid RPC method");
 
