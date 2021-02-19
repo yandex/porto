@@ -162,6 +162,8 @@ message TContainerRequest {
 
     optional TGetSystemRequest GetSystem = 300;
     optional TSetSystemRequest SetSystem = 301;
+
+    optional TClearStatisticsRequest ClearStatistics = 302;
 }
 
 
@@ -776,6 +778,11 @@ message TVersionResponse {
 
 // Get porto statistics
 message TGetSystemRequest {
+}
+
+// Clear porto statistics
+message TClearStatisticsRequest {
+    optional string stat = 1;
 }
 
 message TGetSystemResponse {

@@ -5825,20 +5825,13 @@ public:
 } static PortoStat;
 
 void TPortoStat::Populate(TUintMap &m) {
-    m["spawned"] = Statistics->PortoStarts;
-    m["errors"] = Statistics->Errors;
-    m["cgerrors"] = Statistics->CgErrors;
-    m["warnings"] = Statistics->Warns;
-    m["fatals"] = Statistics->Fatals;
-    m["taints"] = Statistics->Taints;
-    m["postfork_issues"] = Statistics->PostForkIssues;
-    m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;
-    m["porto_uptime"] = (GetCurrentTimeMs() - Statistics->PortoStarted) / 1000;
-    m["queued_statuses"] = Statistics->QueuedStatuses;
-    m["queued_events"] = Statistics->QueuedEvents;
-    m["remove_dead"] = Statistics->RemoveDead;
-    m["restore_failed"] = Statistics->ContainerLost;
-    m["start_timeouts"] = Statistics->StartTimeouts;
+    for (const auto &it : PortoStatMembers) {
+        if (it.second.TimeStat)
+            m[it.first] = (GetCurrentTimeMs() - Statistics->*(it.second.Member)) / 1000;
+        else
+            m[it.first] = Statistics->*(it.second.Member);
+    }
+
     uint64_t usage = 0;
     auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
     TError error = MemorySubsystem.Usage(cg, usage);
@@ -5859,86 +5852,15 @@ void TPortoStat::Populate(TUintMap &m) {
         L_ERR("Can't get cpu system usage of portod");
     m["cpu_system_usage"] = usage;
 
-    m["epoll_sources"] = Statistics->EpollSources;
-
-    m["log_lines"] = Statistics->LogLines;
-    m["log_bytes"] = Statistics->LogBytes;
-    m["log_lines_lost"] = Statistics->LogLinesLost;
-    m["log_bytes_lost"] = Statistics->LogBytesLost;
-    m["log_open"] = Statistics->LogOpen;
-
-    m["log_rotate_bytes"] = Statistics->LogRotateBytes;
-    m["log_rotate_errors"] = Statistics->LogRotateErrors;
-
     m["containers"] = Statistics->ContainersCount - NR_SERVICE_CONTAINERS;
-
-    m["containers_created"] = Statistics->ContainersCreated;
-    m["containers_started"] = Statistics->ContainersStarted;
-    m["containers_failed_start"] = Statistics->ContainersFailedStart;
-    m["containers_oom"] = Statistics->ContainersOOM;
-    m["containers_tainted"] = Statistics->ContainersTainted;
-
     m["running"] = RootContainer->RunningChildren;
     m["running_children"] = CT->RunningChildren;
     m["starting_children"] = CT->StartingChildren;
-
-    m["layer_import"] = Statistics->LayerImport;
-    m["layer_export"] = Statistics->LayerExport;
-    m["layer_remove"] = Statistics->LayerRemove;
-
-    m["volumes"] = Statistics->VolumesCount;
-    m["volumes_created"] = Statistics->VolumesCreated;
-    m["volumes_failed"] = Statistics->VolumesFailed;
-    m["volume_links"] = Statistics->VolumeLinks;
-    m["volume_links_mounted"] = Statistics->VolumeLinksMounted;
-    m["volume_lost"] = Statistics->VolumeLost;
-
     m["volume_mounts"] = CT->VolumeMounts;
-
-    m["networks"] = Statistics->NetworksCount;
-    m["networks_created"] = Statistics->NetworksCreated;
-    m["network_problems"] = Statistics->NetworkProblems;
-    m["network_repairs"] = Statistics->NetworkRepairs;
-
-    m["clients"] = Statistics->ClientsCount;
-    m["clients_connected"] = Statistics->ClientsConnected;
-
     m["container_clients"] = CT->ClientsCount;
     m["container_oom"] = CT->OomEvents;
     m["container_requests"] = CT->ContainerRequests;
-
-    m["requests_queued"] = Statistics->RequestsQueued;
-    m["requests_completed"] = Statistics->RequestsCompleted;
-    m["requests_failed"] = Statistics->RequestsFailed;
-
-    m["fail_system"] = Statistics->FailSystem;
-    m["fail_invalid_value"] = Statistics->FailInvalidValue;
-    m["fail_invalid_command"] = Statistics->FailInvalidCommand;
-    m["fail_memory_guarantee"] = Statistics->FailMemoryGuarantee;
-    m["fail_invalid_netaddr"] = Statistics->FailInvalidNetaddr;
-
-    m["requests_longer_1s"] = Statistics->RequestsLonger1s;
-    m["requests_longer_3s"] = Statistics->RequestsLonger3s;
-    m["requests_longer_30s"] = Statistics->RequestsLonger30s;
-    m["requests_longer_5m"] = Statistics->RequestsLonger5m;
-    m["longest_read_request"] = Statistics->LongestRoRequest;
     m["requests_top_running_time"] = RpcRequestsTopRunningTime() / 1000;
-
-    m["spec_requests_completed"] = Statistics->SpecRequestsCompleted;
-    m["spec_requests_longer_1s"] = Statistics->SpecRequestsLonger1s;
-    m["spec_requests_longer_3s"] = Statistics->SpecRequestsLonger3s;
-    m["spec_requests_longer_30s"] = Statistics->SpecRequestsLonger30s;
-    m["spec_requests_longer_5m"] = Statistics->SpecRequestsLonger5m;
-    m["spec_requests_failed"] = Statistics->SpecRequestsFailed;
-    m["spec_fail_invalid_value"] = Statistics->SpecRequestsFailedInvalidValue;
-    m["spec_fail_unknown"] = Statistics->SpecRequestsFailedUnknown;
-    m["spec_fail_no_container"] = Statistics->SpecRequestsFailedContainerDoesNotExist;
-
-    m["lock_operations_count"] = Statistics->LockOperationsCount;
-    m["lock_operations_longer_1s"] = Statistics->LockOperationsLonger1s;
-    m["lock_operations_longer_3s"] = Statistics->LockOperationsLonger3s;
-    m["lock_operations_longer_30s"] = Statistics->LockOperationsLonger30s;
-    m["lock_operations_longer_5m"] = Statistics->LockOperationsLonger5m;
 }
 
 TError TPortoStat::Get(std::string &value) {
