@@ -1,3 +1,16 @@
+yandex-porto (5.0.14) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * test: wait oom-s for more time
+  * stream: do not block when open fifo pipe for read
+  * task: add more logs at container start. Add stat for start timeouts
+  * portoctl: add more randomness to ip = auto
+  * statistics: reset porto_stats on portod clearstat [stat]
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 24 Feb 2021 15:39:58 +0300
+
 yandex-porto (5.0.13) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
