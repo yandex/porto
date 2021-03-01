@@ -1094,13 +1094,15 @@ public:
                 value != "os" &&
                 value != "job" &&
                 (value != "docker" || !EnableDockerMode) &&
-                value != "host")
+                value != "host" &&
+                value != "fuse")
             return TError(EError::InvalidValue, "Unknown: {}", value);
 
         CT->OsMode = false;
         CT->JobMode = false;
         CT->HostMode = false;
         CT->DockerMode = false;
+        CT->UsernsMode = false;
 
         if (value == "os")
             CT->OsMode = true;
@@ -1110,6 +1112,8 @@ public:
             CT->HostMode = true;
         else if (value == "docker")
             CT->DockerMode = true;
+        else if (value == "fuse")
+            CT->UsernsMode = true;
 
         if (CT->HostMode || CT->JobMode)
             CT->Isolate = false;

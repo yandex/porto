@@ -60,7 +60,7 @@ public:
     TError InitGroups(const std::string &user);
 
     TError Apply() const;
-    TError SetupMapping(pid_t pid) const;
+    TError SetupMapping(pid_t pid, bool directMapping) const;
 
     uid_t GetUid() const {
         return Uid;
