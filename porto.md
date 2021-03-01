@@ -225,6 +225,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     - *host* - start **command** without security restrictions
     - *job* - start **command** as process group in parent container
     - *docker* - start **command** in user namespace
+    - *fuse* - start **command** in mount and user namespace with direct mapping
 
     Side effects of **virt\_mode**=*os*
 

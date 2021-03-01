@@ -147,6 +147,7 @@ public:
     bool HostMode = false;      /* Preserve host capabilites */
     bool JobMode = false;       /* Process group */
     bool DockerMode = false;
+    bool UsernsMode = false;
 
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */
