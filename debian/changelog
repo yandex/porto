@@ -1,3 +1,13 @@
+yandex-porto (5.0.15) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  *     ci: fix build for precise
+  * task: start task in user namespace with direct mapping if userns_mode equal true
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 02 Mar 2021 18:59:31 +0300
+
 yandex-porto (5.0.14) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
