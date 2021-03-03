@@ -2928,6 +2928,30 @@ static void TestLimits(Porto::Connection &api) {
     ExpectApiFailure(api.SetProperty(name, "private", tooLong), EError::InvalidValue);
 
     ExpectApiSuccess(api.Destroy(name));
+
+    Say() << "Check thread limit" << std::endl;
+
+    // cycle for get error on different forks, clone, vfork
+    for (int thread_limit = 10; thread_limit < 20; ++thread_limit) {
+        ExpectApiSuccess(api.Create(name));
+        ExpectApiSuccess(api.SetProperty(name, "thread_limit", std::to_string(thread_limit)));
+        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectApiSuccess(api.Start(name));
+
+        for (int i = 0; i < 10; i++) {
+            std::string childName = name + "/" + std::to_string(i);
+            ExpectApiSuccess(api.Create(childName));
+            ExpectApiSuccess(api.SetProperty(childName, "command", "sleep 1000"));
+
+            // 3 threads per container
+            if (3 * (i + 2) <= thread_limit)
+                ExpectApiSuccess(api.Start(childName));
+            else
+                ExpectApiFailure(api.Start(childName), EError::Unknown);
+        }
+
+        ExpectApiSuccess(api.Destroy(name));
+    }
 }
 
 static void TestUlimitProperty(Porto::Connection &api) {
