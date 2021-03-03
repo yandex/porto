@@ -44,7 +44,7 @@ TError TError::Serialize(int fd) const {
 
 bool TError::Deserialize(int fd, TError &error) {
     EError err;
-    int errno;
+    int errno_;
     int ret;
     unsigned len;
 
@@ -55,7 +55,7 @@ bool TError::Deserialize(int fd, TError &error) {
         error = System("Can't deserialize error");
         return true;
     }
-    ret = read(fd, &errno, sizeof(Errno));
+    ret = read(fd, &errno_, sizeof(Errno));
     if (ret != sizeof(Errno)) {
         error = System("Can't deserialize errno");
         return true;
@@ -78,7 +78,7 @@ bool TError::Deserialize(int fd, TError &error) {
         return true;
     }
 
-    error = TError(err, errno, std::move(desc));
+    error = TError(err, errno_, std::move(desc));
     return true;
 }
 
