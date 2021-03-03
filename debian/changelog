@@ -1,3 +1,13 @@
+yandex-porto (5.0.16) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * ci: build porto on branch for all platforms
+  * fix: at the start, we could change global errno when changing the local errno
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 03 Mar 2021 11:05:27 +0300
+
 yandex-porto (5.0.15) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
