@@ -187,6 +187,7 @@ public:
     std::string Kind;
     uint32_t Default = 0;
     uint32_t Limit = 0;
+    uint32_t MemoryLimit = 0;
     uint32_t Quantum = 0;
     TNlQdisc(int index, uint32_t parent, uint32_t handle) :
         Index(index), Parent(parent), Handle(handle) {}
@@ -210,6 +211,8 @@ public:
     uint64_t Rate = 0;
     uint64_t defRate = 0;
     uint64_t Ceil = 0;
+    uint64_t Burst = 0;
+    uint64_t BurstDuration = 0;
     uint64_t RateBurst = 0;
     uint64_t CeilBurst = 0;
     uint64_t Quantum = 0;

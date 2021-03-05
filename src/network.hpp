@@ -209,6 +209,8 @@ public:
 
     std::map<std::string, int> DeviceOwners;
 
+    int HostPeerIndex = -1;
+
     TError SyncDevices();
     std::string NewDeviceName(const std::string &prefix);
     std::string MatchDevice(const std::string &pattern);
@@ -228,6 +230,7 @@ public:
     TError DeleteClass(TNetDevice &dev, TNetClass &cls, int cs);
     TError SetupClasses(TNetClass &cls, bool safe = false);
     TError SetupPolice(TNetDevice &dev);
+    TError SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &statLock);
 
     void InitClasslessQdisc(TNetDevice &dev, TNlQdisc &qdisc);
     TError SetupMQ(TNetDevice &dev);

@@ -183,6 +183,7 @@ static void DefaultConfig() {
     config().mutable_network()->set_enable_iproute(false);
     config().mutable_network()->set_enable_netcls_priority(true);
     config().mutable_network()->set_l3_default_mtu(9000);
+    config().mutable_network()->set_default_uplink_speed_gb(10);
 
     config().mutable_core()->set_enable(false);
     config().mutable_core()->set_timeout_s(600); /* 10min */
