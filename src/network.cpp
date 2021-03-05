@@ -84,6 +84,10 @@ static TUintMap ContainerQdiscQuantum;
 
 static TUintMap IngressBurst;
 
+static uint64_t UplinkSpeed;
+
+static double TCP_RTO_VALUE = 0.004;
+
 static TNLinkSockDiag SockDiag;
 
 static std::list<std::pair<std::string, std::string>> NetSysctls = {
@@ -407,6 +411,8 @@ void TNetwork::InitializeConfig() {
     if (config().network().has_ingress_burst())
         StringToUintMap(config().network().ingress_burst(), IngressBurst);
 
+    UplinkSpeed = config().network().default_uplink_speed_gb() * 1000000000ull / 8;
+
     NetWatchdogPeriod = config().network().watchdog_ms();
 
     SockDiagPeriod = config().network().sock_diag_update_interval_ms();
@@ -671,6 +677,15 @@ void TNetwork::Destroy() {
             L_NET("Cannot remove root qdisc: {}", error);
     }
 
+    if (HostPeerIndex >= 0) {
+        TNlQdisc qdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+        HostPeerIndex = -1;
+        auto lock = HostNetwork->LockNet();
+        error = qdisc.Delete(*HostNetwork->GetNl());
+        if (error)
+            L_NET("Cannot remove root qdisc for host dev: {}", error);
+    }
+
     // TODO: destroy mac/ip-vlan here
 
     Nl->Disconnect();
@@ -722,10 +737,11 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     if (!RootClass || IsHost())
         return OK;
 
+    /*  DO NOT REMOVE https://st.yandex-team.ru/PORTO-809
     auto rate = dev.GetConfig(RootClass->RxLimit);
 
     TNlPoliceFilter police(dev.Index, TC_H_INGRESS);
-    police.Mtu = 65536; /* maximum GRO skb */
+    police.Mtu = 65536; // maximum GRO skb
     police.Rate = rate;
     police.Burst = dev.GetConfig(IngressBurst, std::max(rate / 10, police.Mtu * 10ul));
     (void)police.Delete(*Nl);
@@ -747,15 +763,15 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
             return error;
         }
     }
+    */
 
-    rate = dev.GetConfig(RootClass->TxLimit);
+    auto rate = dev.GetConfig(RootClass->TxLimit);
 
     /* without clsact police filter requires classful qdisc,
      * so let's install trivial hfsc instead */
 
+    TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
     qdisc.Kind = "hfsc";
-    qdisc.Parent = TC_H_ROOT;
-    qdisc.Handle = TC_HANDLE(ROOT_TC_MAJOR, 0);
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, 1);
     qdisc.Quantum = 10;
     (void)qdisc.Delete(*Nl);
@@ -789,6 +805,70 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
             L_ERR("Cannot create egress leaf qdisc: {}", error);
             return error;
         }
+    }
+
+    return OK;
+}
+
+TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &statLock) {
+    // set rx limit like tx on host peer
+    TError error;
+
+    PORTO_LOCKED(NetMutex);
+    PORTO_LOCKED(NetStateMutex);
+
+    if (!RootClass || IsHost() || HostPeerIndex < 0)
+        return OK;
+
+    auto rate = dev.GetConfig(RootClass->RxLimit);
+
+    if (!rate) {
+        HostPeerIndex = -1;
+        return OK;
+    }
+
+    // take host network lock first, to avoid dead lock
+    statLock.unlock();
+    auto lockNet = HostNetwork->LockNet();
+    statLock.lock();
+
+    auto &hostNl = *HostNetwork->GetNl();
+
+    TNlQdisc qdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+    qdisc.Index = HostPeerIndex;
+    qdisc.Kind = "hfsc";
+    qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, 1);
+    (void)qdisc.Delete(hostNl);
+
+    TNlClass cls(HostPeerIndex, TC_HANDLE(ROOT_TC_MAJOR, 0), TC_HANDLE(ROOT_TC_MAJOR, 1));
+    cls.Kind = qdisc.Kind;
+    cls.Rate = cls.Ceil = rate;
+    cls.Burst = UplinkSpeed;
+    cls.BurstDuration = 10000; // 10ms
+
+    TNlQdisc leaf(HostPeerIndex, TC_HANDLE(ROOT_TC_MAJOR, 1), TC_HANDLE(2, 0));
+    leaf.Kind = dev.GetConfig(ContainerQdisc, "pfifo");
+    leaf.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 10);
+
+    // https://st.yandex-team.ru/PORTO-809
+    leaf.MemoryLimit = std::max(std::floor(TCP_RTO_VALUE * rate), 64000.);
+
+    error = qdisc.Create(hostNl);
+    if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
+        L_ERR("Cannot create egress qdisc for host peer: {}", error);
+        return error;
+    }
+
+    error = cls.Create(hostNl);
+    if (error) {
+        L_ERR("Cannot create egress class for host peer: {}", error);
+        return error;
+    }
+
+    error = leaf.Create(hostNl);
+    if (error) {
+        L_ERR("Cannot create egress leaf qdisc for host peer: {}", error);
+        return error;
     }
 
     return OK;
@@ -1033,9 +1113,17 @@ TError TNetwork::SyncDevices() {
             dev.DeviceStat.TxDrops += qdiscStat.Drops;
             dev.DeviceStat.TxOverruns += qdiscStat.Overruns;
 
+            if (HostPeerIndex >= 0) {
+                TNlQdisc peerQdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+                auto lock = HostNetwork->LockNet();
+                qdiscStat = peerQdisc.Stat(*HostNetwork->GetNl());
+                dev.DeviceStat.RxDrops += qdiscStat.Drops;
+            }
+            /* DO NOT REMOVE https://st.yandex-team.ru/PORTO-809
             TNlQdisc qdiscIngress(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
             qdiscStat = qdiscIngress.Stat(*Nl);
             dev.DeviceStat.RxDrops += qdiscStat.Drops;
+            */
         }
 
         auto net_state_lock = LockNetState();
@@ -1568,8 +1656,10 @@ TError TNetwork::SetupClasses(TNetClass &cls, bool safe) {
             auto net_lock = LockNet();
             auto net_state_lock = LockNetState();
             for (auto &dev: Devices)
-                if (dev.Uplink)
+                if (dev.Uplink) {
+                    SetupRxLimit(dev, net_state_lock);
                     SetupPolice(dev);
+                }
         }
         return HostNetwork->SetupClasses(cls, safe);
     }
@@ -1714,8 +1804,10 @@ TError TNetwork::RepairLocked() {
 
 retry:
     for (auto &dev: Devices) {
-        if (dev.Uplink)
+        if (dev.Uplink) {
+            SetupRxLimit(dev, state_lock);
             SetupPolice(dev);
+        }
 
         if (!dev.Managed) {
             /*
@@ -2849,6 +2941,8 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
         if (error)
             return error;
     }
+
+    Net->HostPeerIndex = peer.GetIndex();
 
     return OK;
 }

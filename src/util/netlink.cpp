@@ -1077,8 +1077,10 @@ TError TNlQdisc::CreateCodel(const TNl &nl, bool fq_codel) {
                 goto free_msg;
         }
 
-        if (config().network().has_fq_codel_memory_limit()) {
-            ret = nla_put_u32(msg, TCA_FQ_CODEL_MEMORY_LIMIT, config().network().fq_codel_memory_limit());
+        uint32_t memoryLimit = MemoryLimit ? MemoryLimit :
+                                             (config().network().has_fq_codel_memory_limit() ? config().network().fq_codel_memory_limit() : 0);
+        if (memoryLimit) {
+            ret = nla_put_u32(msg, TCA_FQ_CODEL_MEMORY_LIMIT, memoryLimit);
             if (ret < 0)
                 goto free_msg;
         }
@@ -1385,12 +1387,13 @@ TError TNlClass::Create(const TNl &nl, bool safe) {
 
     if (Kind == "hfsc") {
         uint64_t maxRate = UINT32_MAX;
+        uint64_t burst = std::min(maxRate, Burst);
         struct tc_service_curve rsc, fsc, usc;
 
         if (Rate) {
-            rsc.m1 = std::min(Rate * 2, maxRate);
+            rsc.m1 = burst ? burst : std::min(Rate * 2, maxRate);
             rsc.m2 = std::min(Rate, maxRate);
-            rsc.d = rsc.m1 ? std::ceil(Quantum * 1000000. / rsc.m1) : 0;
+            rsc.d = BurstDuration ? BurstDuration : (rsc.m1 ? std::ceil(Quantum * 1000000. / rsc.m1) : 0);
 
             ret = rtnl_class_hfsc_set_rsc(cls, &rsc);
             if (error) {
@@ -1399,9 +1402,9 @@ TError TNlClass::Create(const TNl &nl, bool safe) {
             }
         }
 
-        fsc.m1 = std::min(std::max(Rate, defRate) * 2, maxRate);
+        fsc.m1 = burst ? burst : std::min(std::max(Rate, defRate) * 2, maxRate);
         fsc.m2 = std::min(std::max(Rate, defRate), maxRate);
-        fsc.d = fsc.m1 ? std::ceil(RateBurst * 1000000. / fsc.m1) : 0;
+        fsc.d = BurstDuration ? BurstDuration : (fsc.m1 ? std::ceil(RateBurst * 1000000. / fsc.m1) : 0);
 
         ret = rtnl_class_hfsc_set_fsc(cls, &fsc);
         if (error) {
@@ -1410,9 +1413,9 @@ TError TNlClass::Create(const TNl &nl, bool safe) {
         }
 
         if (Ceil) {
-            usc.m1 = std::min(Ceil * 2, maxRate);
+            usc.m1 = burst ? burst : std::min(Ceil * 2, maxRate);
             usc.m2 = std::min(Ceil, maxRate);
-            usc.d = usc.m1 ? std::ceil(CeilBurst * 1000000. / usc.m1) : 0;
+            usc.d = BurstDuration ? BurstDuration : (usc.m1 ? std::ceil(CeilBurst * 1000000. / usc.m1) : 0);
 
             ret = rtnl_class_hfsc_set_usc(cls, &usc);
             if (error) {
