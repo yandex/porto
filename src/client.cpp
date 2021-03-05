@@ -158,10 +158,12 @@ TError TClient::IdentifyClient(bool initial) {
 
     Id = fmt::format("CL{}:{}({}) CT{}:{}", Fd, Comm, Pid, ct->Id, ct->Name);
 
-    L_VERBOSE("Connected {} cred={} tcred={} access={} ns={} wns={}",
-                Id, Cred.ToString(), TaskCred.ToString(),
-                AccessLevel <= EAccessLevel::ReadOnly ? "ro" : "rw",
-                PortoNamespace, WriteNamespace);
+    if (AccessLevel <= EAccessLevel::ReadOnly || Verbose) {
+        L("Connected {} cred={} tcred={} access={} ns={} wns={}",
+                    Id, Cred.ToString(), TaskCred.ToString(),
+                    AccessLevel <= EAccessLevel::ReadOnly ? "ro" : "rw",
+                    PortoNamespace, WriteNamespace);
+    }
 
     return OK;
 }
