@@ -1102,7 +1102,7 @@ public:
         CT->JobMode = false;
         CT->HostMode = false;
         CT->DockerMode = false;
-        CT->UsernsMode = false;
+        CT->FuseMode = false;
 
         if (value == "os")
             CT->OsMode = true;
@@ -1113,7 +1113,7 @@ public:
         else if (value == "docker")
             CT->DockerMode = true;
         else if (value == "fuse")
-            CT->UsernsMode = true;
+            CT->FuseMode = true;
 
         if (CT->HostMode || CT->JobMode)
             CT->Isolate = false;
@@ -2346,6 +2346,16 @@ public:
     {
         IsDynamic = true;
     }
+
+    TError Start(void) {
+        if (!CT->HasProp(EProperty::DEVICE_CONF)) {
+            if (CT->FuseMode)
+                return Set("/dev/fuse rw");
+        }
+
+        return OK;
+    }
+
     TError Get(std::string &value) {
         value = CT->Devices.Format();
         return OK;
