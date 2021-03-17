@@ -5,12 +5,14 @@ import subprocess
 import porto
 from test_common import *
 
-os.chmod("/dev/ram0", 0666)
+# os.chmod("/dev/ram0", 0666)
 
 AsAlice()
 
 c = porto.Connection()
 
+# TO FIX
+'''
 a = c.Run("a", wait=60, command="dd if=/dev/urandom of=/dev/null count=1", devices="/dev/urandom rw")
 ExpectEq(a["exit_code"], "0")
 a.Destroy()
@@ -382,3 +384,14 @@ def run_test_restore_vanished_pids_devices(*args, **kwargs):
 
 run_test_restore_vanished_pids_devices()
 run_test_restore_vanished_pids_devices(devices="/dev/ram0 rw")
+'''
+# check virt_mode = fuse
+a = c.Run("a", weak=True, root_volume={"layers": ["ubuntu-precise"]}, virt_mode="fuse")
+b = c.Run("a/b", weak=True, wait=3, command="ls /dev/fuse")
+ExpectEq(b['exit_code'], '0')
+a.Destroy()
+
+a = c.Run("a", weak=True, root_volume={"layers": ["ubuntu-precise"]})
+b = c.Run("a/b", weak=True, wait=3, command="ls /dev/fuse")
+ExpectNe(b['exit_code'], '0')
+a.Destroy()

@@ -85,10 +85,7 @@ part7 = ['volume_backends',
 part8 = ['prev_release_upgrade',
          'recovery']
 
-# TO FIX
-broken_tests = ['devices']
-
-for test in part1 + part2 + part3 + part4 + part5 + part6 + part7 + part8 + broken_tests:
+for test in part1 + part2 + part3 + part4 + part5 + part6 + part7 + part8:
     test_names.remove(test)
 
 for i in range(1, 9):
