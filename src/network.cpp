@@ -2460,6 +2460,8 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid " + line);
             std::string name = StringTrim(settings[1]);
+            if (name.find("..") != std::string::npos)
+                return TError(EError::Permission, "'..' not allowed in net namespace path");
             TPath path("/var/run/netns/" + name);
             if (!path.Exists())
                 return TError(EError::InvalidValue, "net namespace not found: " + name);
