@@ -19,6 +19,10 @@ ExpectEq(Catch(conn.Run, "a", net="L3 veth", ip="veth 2001:db8::"), porto.except
 
 # known gateway
 a = conn.Run("a", net="L3 veth", ip="veth 198.51.100.0", default_gw="veth 198.51.100.1")
+
+# '..' not allowed in net namespace path
+ExpectEq(Catch(conn.Run, "a/b", net="netns ../../proc/1/ns/net"), porto.exceptions.Permission)
+
 a.Destroy()
 a = conn.Run("a", wait=1, command="ip -6 r", net="L3 veth", ip="veth 2001:db8::", default_gw="veth 2001:db8::1")
 default_routes = a['stdout'].split('\n')
