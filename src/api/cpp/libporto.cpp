@@ -18,11 +18,14 @@ namespace Porto {
 
 static const char PortoSocket[] = "/run/portod.socket";
 
+static const int PORTOD_RELOAD_ERRNO = 6000;
+
 class Connection::ConnectionImpl {
 public:
     int Fd = -1;
     int Timeout = DEFAULT_TIMEOUT;
     int DiskTimeout = DISK_TIMEOUT;
+    bool EnablePortodReloadError = false;
 
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
@@ -35,6 +38,8 @@ public:
     std::string LastErrorMsg;
 
     int Error(int err, const std::string &prefix) {
+        LastErrorMsg = std::string(prefix + ": " + strerror(err));
+
         switch (err) {
         case ENOENT:
             LastError = EError::SocketUnavailable;
@@ -46,11 +51,14 @@ public:
         case EPIPE:
             LastError = EError::SocketError;
             break;
+        case PORTOD_RELOAD_ERRNO:
+            LastErrorMsg = "connection closed by server";
+            LastError = EError::PortodReloaded;
+            break;
         default:
             LastError = EError::Unknown;
             break;
         }
-        LastErrorMsg = std::string(prefix + ": " + strerror(err));
         Close();
         return LastError;
     }
@@ -72,7 +80,7 @@ public:
     }
 
     int Send(const rpc::TContainerRequest &req);
-    int Recv(rpc::TContainerResponse &rsp);
+    int Recv(rpc::TContainerResponse &rsp, bool enablePortodReloadError = false);
     int Call(const rpc::TContainerRequest &req, rpc::TContainerResponse &rsp,
              int extra_timeout = -1);
     int Call(int extra_timeout = -1);
@@ -153,7 +161,7 @@ int Connection::ConnectionImpl::Send(const rpc::TContainerRequest &req) {
     return EError::Success;
 }
 
-int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp) {
+int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp, bool enablePortodReloadError) {
     google::protobuf::io::FileInputStream raw(Fd);
     google::protobuf::io::CodedInputStream input(&raw);
 
@@ -161,14 +169,14 @@ int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp) {
         uint32_t size;
 
         if (!input.ReadVarint32(&size))
-            return Error(raw.GetErrno() ?: EIO, "recv");
+            return Error(raw.GetErrno() ?: (enablePortodReloadError ? PORTOD_RELOAD_ERRNO : EIO), "recv");
 
         auto prev_limit = input.PushLimit(size);
 
         rsp.Clear();
 
         if (!rsp.ParseFromCodedStream(&input))
-            return Error(raw.GetErrno() ?: EIO, "recv");
+            return Error(raw.GetErrno() ?: (enablePortodReloadError ? PORTOD_RELOAD_ERRNO : EIO), "recv");
 
         input.PopLimit(prev_limit);
 
@@ -210,7 +218,7 @@ int Connection::ConnectionImpl::Call(const rpc::TContainerRequest &req,
         ret = SetTimeout(2, extra_timeout > 0 ? (extra_timeout + Timeout) : -1);
 
     if (!ret)
-        ret = Recv(rsp);
+        ret = Recv(rsp, EnablePortodReloadError);
 
     if (extra_timeout && Timeout > 0)
         SetTimeout(2, Timeout);
@@ -255,6 +263,14 @@ int Connection::GetDiskTimeout() const {
 int Connection::SetDiskTimeout(int disk_timeout) {
     Impl->DiskTimeout = disk_timeout;
     return EError::Success;
+}
+
+void Connection::SetEnablePortodReloadError(bool value) {
+    Impl->EnablePortodReloadError = value;
+}
+
+bool Connection::GetEnablePortodReloadError() const {
+    return Impl->EnablePortodReloadError;
 }
 
 void Connection::Close() {
@@ -713,12 +729,14 @@ int Connection::TuneVolume(const std::string &path,
 int Connection::ImportLayer(const std::string &layer,
                             const std::string &tarball, bool merge,
                             const std::string &place,
-                            const std::string &private_value) {
+                            const std::string &private_value,
+                            bool verboseError) {
     auto req = Impl->Req.mutable_importlayer();
 
     req->set_layer(layer);
     req->set_tarball(tarball);
     req->set_merge(merge);
+    req->set_verbose_error(verboseError);
     if (place.size())
         req->set_place(place);
     if (private_value.size())

@@ -22,7 +22,8 @@ static void HelperError(TFile &err, const std::string &text, TError error) {
 
 TError RunCommand(const std::vector<std::string> &command,
                   const TFile &dir, const TFile &in, const TFile &out,
-                  const TCapabilities &caps) {
+                  const TCapabilities &caps,
+                  bool verboseError) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
     TFile err;
@@ -54,6 +55,13 @@ TError RunCommand(const std::vector<std::string> &command,
             TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
             if (error2)
                 text = "Cannot read stderr: " + error2.ToString();
+
+            if (verboseError) {
+                error.Error = EError::HelperError;
+                if (text.find("not recoverable") != std::string::npos)
+                    error.Error = EError::HelperFatalError;
+            }
+
             error = TError(error, "helper: {} stderr: {}", cmdline, text);
         }
         return error;

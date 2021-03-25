@@ -1064,11 +1064,12 @@ class Connection(object):
             prop.name, prop.value = name, value
         self.rpc.call(request)
 
-    def ImportLayer(self, layer, tarball, place=None, private_value=None, timeout=None):
+    def ImportLayer(self, layer, tarball, place=None, private_value=None, timeout=None, verbose_error=False):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
         request.importLayer.merge = False
+        request.importLayer.verbose_error = verbose_error
         if place is not None:
             request.importLayer.place = place
         if private_value is not None:
