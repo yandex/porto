@@ -647,7 +647,7 @@ TError TStorage::SaveChecksums() {
     return OK;
 }
 
-TError TStorage::ImportArchive(const TPath &archive, const std::string &compress, bool merge) {
+TError TStorage::ImportArchive(const TPath &archive, const std::string &compress, bool merge, bool verboseError) {
     TPath temp = TempPath(IMPORT_PREFIX);
     TError error;
     TFile arc;
@@ -743,7 +743,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
                         "--xattrs-include=trusted.overlay.*",
                         "--xattrs-include=user.*"});
 
-        error = RunCommand(args, import_dir, arc, TFile());
+        error = RunCommand(args, import_dir, arc, TFile(), HelperCapabilities, verboseError);
     } else if (compress_format == "squashfs") {
         TTuple args = { "unsquashfs",
                         "-force",
@@ -757,7 +757,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &compress
         if (error)
             return error;
 
-        error = RunCommand(args, parent_dir);
+        error = RunCommand(args, parent_dir, TFile(), TFile(), HelperCapabilities, verboseError);
     } else
         error = TError(EError::NotSupported, "Unsuported format " + compress_format);
 

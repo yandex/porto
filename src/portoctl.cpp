@@ -2257,6 +2257,9 @@ public:
             { 'v', false, [&](const char *) { verbose = true; } },
         });
 
+        if (verbose)
+            Api->SetEnablePortodReloadError(true);
+
         if (squash && compression.empty())
             compression = "squashfs";
 

@@ -73,6 +73,9 @@ enum EError {
 
     InvalidLabel = 29;
 
+    HelperError = 30;
+    HelperFatalError = 31;
+
     NotFound = 404;
 
     SocketError = 502;
@@ -80,6 +83,8 @@ enum EError {
     SocketUnavailable = 503;
 
     SocketTimeout = 504;
+
+    PortodReloaded = 505;
 
     Taint = 666;
 
@@ -1277,6 +1282,7 @@ message TLayerImportRequest {
     optional string place = 4;
     optional string private_value = 5;
     optional string compress = 6;
+    optional bool verbose_error = 7;
 }
 
 

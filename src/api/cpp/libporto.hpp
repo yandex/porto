@@ -105,6 +105,9 @@ public:
     int GetDiskTimeout() const;
     int SetDiskTimeout(int timeout);
 
+    void SetEnablePortodReloadError(bool value);
+    bool GetEnablePortodReloadError() const;
+
     std::string GetLastError() const;
     void GetLastError(int &error, std::string &msg) const;
 
@@ -190,7 +193,7 @@ public:
 
     int ImportLayer(const std::string &layer, const std::string &tarball,
                     bool merge = false, const std::string &place = "",
-                    const std::string &private_value = "");
+                    const std::string &private_value = "", bool verboseError = false);
 
     int ExportLayer(const std::string &volume, const std::string &tarball,
                     const std::string &compress = "");

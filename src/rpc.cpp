@@ -228,6 +228,8 @@ void TRequest::Parse() {
             opts.push_back("merge=true");
         if (Req.importlayer().has_private_value())
             opts.push_back("private=" + Req.importlayer().private_value());
+        if (Req.importlayer().verbose_error())
+            opts.push_back("verbose_error=true");
     } else if (Req.has_exportlayer()) {
         if (Req.exportlayer().has_layer()) {
             Cmd = "ReexportLayer";
@@ -1375,7 +1377,8 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
 
     return layer.ImportArchive(CL->ResolvePath(req.tarball()),
                                req.has_compress() ? req.compress() : "",
-                               req.merge());
+                               req.merge(),
+                               req.verbose_error());
 }
 
 noinline TError GetLayerPrivate(const rpc::TLayerGetPrivateRequest &req,

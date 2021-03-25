@@ -1,9 +1,11 @@
 from test_common import *
+from threading import Thread
 
 import sys
 import os
 import porto
 import time
+import subprocess
 
 AsAlice()
 
@@ -47,6 +49,7 @@ volume_size = 256*(2**20)
 volume_size_eps = 40*(2**20) # loop/ext4: 5% reserve + 256 byte inode per 4k of data
 volume_path = "/tmp/" + prefix + "layer"
 tarball_path = "/tmp/" + prefix + "layer.tgz"
+broken_tarball_path = "/tmp/" + prefix + "broken_layer.tgz"
 storage_tarball_path = "/tmp/" + prefix + "storage.tgz"
 storage_name = prefix + "volume_storage"
 meta_storage_name = prefix + "meta_storage"
@@ -202,6 +205,12 @@ v.Export(tarball_path)
 l = c.ImportLayer(layer_name, tarball_path)
 assert l.name == layer_name
 assert c.FindLayer(layer_name).name == layer_name
+
+# make broken layer
+subprocess.check_call(['tar', '-cf', broken_tarball_path, '/bin'])
+subprocess.check_call(['truncate', '-s' '1M', broken_tarball_path]) # file.truncate corrupt tar header
+ExpectEq(porto.exceptions.Unknown, Catch(c.ImportLayer, "abc", broken_tarball_path))
+ExpectEq(porto.exceptions.HelperFatalError, Catch(c.ImportLayer, "abc", broken_tarball_path, verbose_error=True))
 
 assert l.GetPrivate() == ""
 l.SetPrivate("123654")
@@ -414,3 +423,36 @@ else:
 assert c.connected() == False
 assert c.nr_connects() == 2
 assert time.time() - start > 0.9
+
+# check new error on portod upgrade only in python3
+if sys.version_info.major != 3:
+    sys.exit(0)
+
+AsRoot()
+
+ConfigurePortod('test-api', """
+daemon {
+    portod_stop_timeout: 1,
+    portod_shutdown_timeout: 2,
+}""")
+
+def Reload():
+    time.sleep(1)
+    subprocess.check_call([portod, 'reload'])
+
+try:
+    os.remove('layer.tar.gz')
+except:
+     pass
+
+c = porto.Connection()
+v = c.CreateVolume(layers=['ubuntu-xenial'], backend='native')
+
+portodReload = Thread(target=Reload)
+portodReload.start()
+
+p = subprocess.run([portoctl, 'layer', '-v', '-E', str(v), 'layer.tar.gz'], stdout = subprocess.PIPE, stderr=subprocess.PIPE)
+assert str(p.stderr).find('PortodReloaded:(connection closed by server') >= 0
+
+portodReload.join()
+ConfigurePortod('test-api', '')
