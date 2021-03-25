@@ -827,8 +827,10 @@ TError TMountNamespace::Enter(pid_t pid) {
         return error;
 
     error = TPath("/").Chdir();
-    if (error)
+    if (error) {
+        PORTO_ASSERT(!Leave());
         return error;
+    }
 
     return OK;
 }
