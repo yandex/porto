@@ -17,4 +17,4 @@ TError GetFdSize(pid_t pid, uint64_t &fdSize);
 
 TError GetNetStat(pid_t pid, TUintMap &stats);
 
-TError GetStack(pid_t pid, std::string &stack);
+TError GetProc(pid_t pid, const std::string &knob, std::string &value);

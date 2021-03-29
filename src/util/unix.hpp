@@ -61,6 +61,10 @@ pid_t PtracedVfork() {
     return pid;
 }
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
+void PrintProc(const std::string &knob, pid_t pid, bool debug = true);
+static void PrintStack(pid_t pid, bool debug = true) {
+    PrintProc("stack", pid, debug);
+}
 
 uint64_t GetCurrentTimeMs();
 bool WaitDeadline(uint64_t deadline, uint64_t sleep = 10);

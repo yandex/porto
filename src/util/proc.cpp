@@ -136,6 +136,6 @@ TError GetNetStat(pid_t pid, TUintMap &stats) {
     return OK;
 }
 
-TError GetStack(pid_t pid, std::string &stack) {
-    return TPath(fmt::format("/proc/{}/stack", pid)).ReadAll(stack, 64 << 10);
+TError GetProc(pid_t pid, const std::string &knob, std::string &value) {
+    return TPath(fmt::format("/proc/{}/{}", pid, knob)).ReadAll(value, 64 << 10);
 }
