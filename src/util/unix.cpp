@@ -11,6 +11,7 @@
 #include "util/path.hpp"
 #include "util/log.hpp"
 #include "util/namespace.hpp"
+#include "util/proc.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -178,6 +179,15 @@ full_scan:
     }
     closedir(dir);
     return OK;
+}
+
+void PrintProc(const std::string &knob, pid_t pid, bool debug) {
+    std::string value;
+    auto error = GetProc(pid, knob, value);
+    if (!error)
+        L("{}: {}", knob, value);
+    else if (!debug)
+        L_ERR("Can not get /proc/{}/{}: {}", pid, knob, error);
 }
 
 uint64_t GetCurrentTimeMs() {

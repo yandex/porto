@@ -139,6 +139,8 @@ TError TCgroup::RemoveOne() {
     L_CG("Remove cgroup {}", *this);
     error = Path().Rmdir();
 
+    std::vector<pid_t> startTasks;
+    GetTasks(startTasks);
     /* workaround for bad synchronization */
     if (error && error.Errno == EBUSY && !Path().StatStrict(st) && st.st_nlink == 2) {
         uint64_t deadline = GetCurrentTimeMs() + config().daemon().cgroup_remove_timeout_s() * 1000;
@@ -158,6 +160,20 @@ TError TCgroup::RemoveOne() {
         GetTasks(tasks);
         L_CG_ERR("Cannot remove cgroup {} : {}, {} tasks inside",
               *this, error, tasks.size());
+
+        L("Tasks before destroy:");
+        for (auto task : startTasks)
+            L("task: {}", task);
+
+        L("Tasks after destroy:");
+        for (int i = 0;
+             i < tasks.size() && i < config().daemon().debug_hung_tasks_count();
+             ++i) {
+            auto task = tasks[i];
+            PrintProc("status", task);
+            PrintProc("wchan", task);
+            PrintStack(task);
+        }
     }
 
     return error;

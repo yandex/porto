@@ -14,7 +14,6 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/netlink.hpp"
-#include "util/proc.hpp"
 
 extern "C" {
 #include <string.h>
@@ -52,15 +51,6 @@ std::list<std::string> IpcSysctls = {
 
 extern bool EnableCgroupNs;
 extern bool EnableDockerMode;
-
-void PrintStack(pid_t pid) {
-    std::string stack;
-    auto error = GetStack(pid, stack);
-    if (!error)
-        L("Stack: {}", stack);
-    else
-        L_ERR("Can not print stack: {}", error);
-}
 
 void InitIpcSysctl() {
     for (const auto &key: IpcSysctls) {
