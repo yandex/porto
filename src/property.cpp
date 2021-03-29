@@ -3472,12 +3472,14 @@ public:
 
     void SetMems(const std::string &mems) {
         if (CT->CpuMems != mems) {
+            CT->CpuMems = mems;
+
+            if (CT->State == EContainerState::Stopped)
+                return;
             // FIXME don't forgot about childs and parents mems
             auto cg = CT->GetCgroup(CpusetSubsystem);
             auto error = CpusetSubsystem.SetMems(cg, mems);
-            if (!error)
-                CT->CpuMems = mems;
-            else
+            if (error)
                 L_TAINT(fmt::format("Cannot set mems: {}", error));
         }
     }
