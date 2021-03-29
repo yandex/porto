@@ -40,7 +40,7 @@ knobs = {
                      "SETFCAP;MAC_OVERRIDE;MAC_ADMIN;SYSLOG;WAKE_ALARM;"\
                      "BLOCK_SUSPEND;AUDIT_READ",
     "command" : "bash -c \'echo $(sleep) | xargs -I%sdf echo %sdf\'",
-    #"controllers" : "freezer;memory;cpu;cpuacct;net_cls;blkio;devices;hugetlb;cpuset",
+    "controllers" : "freezer;memory;cpu;cpuacct;net_cls;blkio;devices;hugetlb;cpuset;perf_event;cgroup2",
     "cpu_guarantee" : "0.756c",
     "cpu_limit" : "0.9c",
     "cpu_policy" : "normal",
@@ -140,6 +140,14 @@ for k in knobs:
         print "portoctl get {} result:\n <{}> \n != <{}> \n".format(k, value, knobs[k])
         raise e
 
+c.Destroy("test")
+
+r = c.Create("test")
+r.SetProperty("cpu_set", "mems 0")
+r.SetProperty("command", "sleep 10")
+r.Start()
+with open("/sys/fs/cgroup/cpuset/porto%test/cpuset.mems") as f:
+    assert int(f.read()) == 0
 c.Destroy("test")
 
 subprocess.check_call([portod, "--verbose", "--discard", "reload"])
