@@ -16,88 +16,96 @@ for line in tests.split('\n'):
         test_names.append(line[1].strip())
 
 
-part1 = ['uid_handling',
-         'oom',
-         'tc-classes',
-         'tc-rebuild',
-         'locate-process',
-         'hugetlb',
-         'coredump',
-         'htb-restore',
-         'portod_cli',
-         'stats',
-         'net-sched1']
+part1 = {'uid_handling':2,
+         'oom':25,
+         'tc-classes':10,
+         'tc-rebuild':2,
+         'locate-process':2,
+         'hugetlb':2,
+         'coredump':2,
+         'htb-restore':2,
+         'portod_cli':3,
+         'stats':1,
+         'net-sched1':200}
 
-part2 = ['net-sched2',
-         'mem-overcommit',
-         'portod_stop',]
+part2 = {'net-sched2':200,
+         'mem-overcommit':1,
+         'portod_stop':1}
 
-part3 = ['cleanup_portod',
-         'portotest',
-         'cleanup_logs',
-         'portod_start',
-         'api',
-         'python3-api',
-         'wait',
-         'python3-wait',
-         'ct-state',
-         'knobs',
-         'std-streams',
-         'labels',
-         'ulimit',
-         'place',
-         'mount',
-         'aufs',
-         'symlink',
-         'systemd',
-         'os',
-         'jobs',
-         'portoctl-exec',
-         'portoctl-wait',
-         'self-container',
-         'portoctl-attach']
+part3 = {'cleanup_portod':1,
+         'portotest':90,
+         'cleanup_logs':1,
+         'portod_start':1,
+         'api':15,
+         'python3-api':60,
+         'wait':1,
+         'python3-wait':1,
+         'ct-state':2,
+         'knobs':1,
+         'std-streams':3,
+         'labels':1,
+         'ulimit':1,
+         'place':1,
+         'mount':1,
+         'aufs':1,
+         'symlink':1,
+         'systemd':1,
+         'os':6,
+         'jobs':8,
+         'portoctl-exec':1,
+         'portoctl-wait':1,
+         'self-container':2,
+         'portoctl-attach':1}
 
-part4 = ['leaks',
-         'fuzzer']
+part4 = {'leaks':180,
+         'fuzzer':80}
 
-part5 = ['fuzzer_soft',
-         'unpriv-cred',
-         'isolation',
-         'security',
-         'hijack',
-         'net']
+part5 = {'fuzzer_soft':120,
+         'unpriv-cred':1,
+         'isolation':1,
+         'security':11,
+         'hijack':1,
+         'net':6}
 
-part6 = ['volume_places',
-         'volume_links',
-         'volume-restore',
-         'mem-recharge',
-         'mem_limit_total',
-         'legacy-root-loop',
-         'dirty-limit',
-         'cpu_limit',
-         'mem_limit',
-         'volume_queue',
-         'volume_sync']
+part6 = {'volume_places':65,
+         'volume_links':3,
+         'volume-restore':2,
+         'mem-recharge':2,
+         'mem_limit_total':1,
+         'legacy-root-loop':2,
+         'dirty-limit':1,
+         'cpu_limit':20,
+         'mem_limit':65,
+         'volume_queue':100,
+         'volume_sync':20}
 
-part7 = ['volume_backends',
-         'performance']
+part7 = {'volume_backends':55,
+         'performance':115}
 
-part8 = ['prev_release_upgrade',
-         'recovery']
+part8 = {'prev_release_upgrade':50,
+         'recovery':40,
+         'spec':4,
+         'python3-spec':4,
+         'docker':30}
 
-for test in part1 + part2 + part3 + part4 + part5 + part6 + part7 + part8:
+for test in part1.keys() + part2.keys() + part3.keys() + part4.keys() + part5.keys() + part6.keys() + part7.keys() + part8.keys():
     test_names.remove(test)
 
 for i in range(1, 9):
     test_names.remove('part{}'.format(i))
 
-# Put remaining tests in part8
-part8 += test_names
+# Put remaining tests in part8 with default timeout 10s
+for test in test_names:
+    part8[test] = 10
 
 
-def run_test(test_name):
+def run_test(test_name, timeout):
+    timeout += 50
+
     ATTEMPTS = 2
     for i in range(ATTEMPTS):
+        # clean configs
+        subprocess.check_call(['rm', '-rf', 'rm -rf /etc/portod.conf.d/*'])
         # restart portod to remove containers/volumes
         if test == 'portod_start':
             subprocess.check_call([portod, 'stop'])
@@ -105,17 +113,16 @@ def run_test(test_name):
             subprocess.check_call([portod, 'restart'])
 
         try:
-            subprocess.check_call(['ctest', '-R', '^{}$'.format(test), '-V'])
+            subprocess.check_call(['ctest', '-R', '^{}$'.format(test_name), '-V', '--timeout', str(timeout)])
             return
         except Exception as e:
             if i != ATTEMPTS - 1:
                 continue
             else:
                 raise e
-    
 
-for test in eval('part{}'.format(sys.argv[1])):
-    run_test(test)
+for test, timeout in eval('part{}.items()'.format(sys.argv[1])):
+    run_test(test, timeout)
     if test not in ['portod_stop', 'cleanup_portod']:
         c = porto.Connection()
         fatals = int(c.GetProperty('/', 'porto_stat[fatals]'))
