@@ -1,3 +1,21 @@
+yandex-porto (5.0.17) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * client: print info for read only connections
+  * network: not allow '..' in net namespace path
+  * filesystem: leave to host mount ns, if cannot chdir in container ns
+  * container: add test for cpuset.mems and fix bug
+  * porto: default devices='/dev/fuse rw' for virt_mode=fuse
+  * porto: print /proc/pid/status and /proc/pid/stack for busy tasks if we cannot remove cgroups
+  * error: more errors for ImportLayer with verbose=true. show PortodUpgraded error if porto upgraded on request if EnablePortodShutdownError for client == true
+  * test: add timeouts for tests
+  * string: fix typo. int must be double
+  *     network: set rx limit for mtn as tx limit on host peer
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 02 Apr 2021 17:22:28 +0300
+
 yandex-porto (5.0.16) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
