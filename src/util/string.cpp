@@ -215,7 +215,7 @@ std::string StringFormatDuration(uint64_t msec) {
 
 TError StringToNsec(const std::string &str, uint64_t &nsec) {
     std::string unit;
-    uint64_t mult = 1;
+    double mult = 1;
     double value;
     TError error;
 
