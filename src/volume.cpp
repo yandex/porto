@@ -2575,10 +2575,11 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     internal_lock = link->Volume->LockInternal();
 
     link_mount = GetInternal("volume_link");
-    (void)link_mount.Mkdir(700);
+    error = link_mount.Mkdir(700);
 
     /* make private - cannot move from shared mount */
-    error = link_mount.BindRemount(link_mount, MS_PRIVATE);
+    if (!error)
+        error = link_mount.BindRemount(link_mount, MS_PRIVATE);
 
     /* Start new shared group and make read-only - that isn't propagated */
     if (!error)
