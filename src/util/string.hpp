@@ -36,7 +36,7 @@ bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);
 bool StringStartsWith(const std::string &str, const std::string &prefix);
 bool StringEndsWith(const std::string &str, const std::string &suffix);
-bool StringMatch(const std::string &str, const std::string &pattern);
+bool StringMatch(const std::string &str, const std::string &pattern, bool strict = false);
 
 typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
 std::string StringFormatFlags(uint64_t flags,

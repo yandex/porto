@@ -2382,7 +2382,7 @@ TError TContainer::GetEnvironment(TEnv &env) const {
     return OK;
 }
 
-TError TContainer::ResolvePlace(TPath &place) const {
+TError TContainer::ResolvePlace(TPath &place, bool strict) const {
     TError error;
 
     if (StringStartsWith(place.ToString(), "///"))
@@ -2391,12 +2391,12 @@ TError TContainer::ResolvePlace(TPath &place) const {
     if (place.IsAbsolute()) {
         for (auto &policy: PlacePolicy) {
             if (policy[0] == '/' || policy == "***") {
-                if (StringMatch(place.ToString(), policy))
+                if (StringMatch(place.ToString(), policy, strict))
                     goto found;
             } else {
                 auto sep = policy.find('=');
                 if (sep != std::string::npos &&
-                        StringMatch(place.ToString(), policy.substr(sep + 1)))
+                        StringMatch(place.ToString(), policy.substr(sep + 1), strict))
                     goto found;
             }
         }

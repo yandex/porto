@@ -409,11 +409,13 @@ bool StringEndsWith(const std::string &str, const std::string &sfx) {
     return !str.compare(str.length() - sfx.length(), sfx.length(), sfx);
 }
 
-bool StringMatch(const std::string &str, const std::string &pattern) {
-    if (pattern == "***")
-        return true;
-    if (StringEndsWith(pattern, "***"))
-        return StringStartsWith(str, pattern.substr(0, pattern.find("***")));
+bool StringMatch(const std::string &str, const std::string &pattern, bool strict) {
+    if (!strict) {
+        if (pattern == "***")
+            return true;
+        if (StringEndsWith(pattern, "***"))
+            return StringStartsWith(str, pattern.substr(0, pattern.find("***")));
+    }
     return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
 }
 
