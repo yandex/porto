@@ -1085,7 +1085,8 @@ public:
         value = CT->OsMode ? "os" :
                 CT->JobMode ? "job" :
                 CT->HostMode ? "host" :
-                CT->DockerMode ? "docker" : "app";
+                CT->DockerMode ? "docker" :
+                CT->FuseMode ? "fuse" : "app";
         return OK;
     }
     TError Set(const std::string &value) {
