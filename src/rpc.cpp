@@ -1412,7 +1412,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
     TError error;
 
     if (req.has_layer()) {
-        error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
+        error = layer.Resolve(EStorageType::Layer, req.place(), req.layer(), true);
         if (error)
             return error;
 
@@ -1668,7 +1668,7 @@ noinline TError ExportStorage(const rpc::TStorageExportRequest &req) {
     TStorage storage;
     TError error;
 
-    error = storage.Resolve(EStorageType::Storage, req.place(), req.name());
+    error = storage.Resolve(EStorageType::Storage, req.place(), req.name(), true);
     if (error)
         return error;
 

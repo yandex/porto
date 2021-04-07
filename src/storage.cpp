@@ -42,11 +42,11 @@ static std::condition_variable StorageCv;
 static TUintMap PlaceLoad;
 static TUintMap PlaceLoadLimit;
 
-TError TStorage::Resolve(EStorageType type, const TPath &place, const std::string &name) {
+TError TStorage::Resolve(EStorageType type, const TPath &place, const std::string &name, bool strict) {
     TError error;
 
     Place = place;
-    error = CL->ClientContainer->ResolvePlace(Place);
+    error = CL->ClientContainer->ResolvePlace(Place, strict);
     if (error)
         return error;
 

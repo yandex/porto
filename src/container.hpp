@@ -443,7 +443,7 @@ public:
 
     TError GetEnvironment(TEnv &env) const;
 
-    TError ResolvePlace(TPath &place) const;
+    TError ResolvePlace(TPath &place, bool strict = false) const;
 
     static TError ValidName(const std::string &name, bool superuser);
     static std::string ParentName(const std::string &name);

@@ -10,6 +10,7 @@ import os
 import subprocess
 import shutil
 import tarfile
+import uuid
 
 import porto
 from test_common import *
@@ -544,3 +545,35 @@ ns_escape(v)
 
 shutil.rmtree("/tmp/porto-tests")
 v.Unlink()
+
+# check PORTO-509
+
+random = uuid.uuid4().hex
+v = c.CreateVolume(path=None, layers=["ubuntu-precise"])
+v2 = c.CreateVolume(path=None)
+
+with open(os.path.join(v2.path, random), 'w') as _:
+    pass
+
+shutil.copyfile(os.path.join(os.path.dirname(sys.argv[0]), 'porto-509-repro.py'), os.path.join(v.path, 'repr.py'))
+
+chroot_portoctl = os.path.join(v.path, 'portoctl')
+shutil.copyfile(portoctl, chroot_portoctl)
+os.chmod(chroot_portoctl, 755)
+
+a = c.Run('abc', wait=10, weak=True, root=v.path, command='python /repr.py layer {}'.format(v2.path))
+ExpectNe(a['exit_code'], '0')
+ExpectNe(a['stderr'].find('exit status 11'), -1)
+a.Destroy()
+
+a = c.Run('abc', wait=10, weak=True, root=v.path, command='python /repr.py storage {}'.format(v2.path))
+ExpectNe(a['exit_code'], '0')
+ExpectNe(a['stderr'].find('exit status 11'), -1)
+a.Destroy()
+
+# FOR REPRODUCE
+#output = subprocess.check_output(['tar', '-tvf', "{}/layer.tar.gz".format(v.path)])
+#ExpectEq(output.find(random), -1)
+
+v.Unlink()
+v2.Unlink()
