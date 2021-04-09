@@ -12,8 +12,8 @@ jobs:
       use_aapi_fuse: True
       resource_archive_check: True
     requirements:
-      cores: 32
-      ram: 64
+      cores: 48
+      ram: 128
       disk_usage: 64
       platform: linux_ubuntu_16.04_xenial
 
@@ -28,7 +28,7 @@ jobs:
       use_aapi_fuse: True
       resource_archive_check: True
     requirements:
-      cores: 32
-      ram: 64
+      cores: 48
+      ram: 128
       disk_usage: 64
       platform: linux_ubuntu_16.04_xenial
