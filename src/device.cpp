@@ -358,7 +358,7 @@ TError TDevices::Apply(const TCgroup &cg, bool rootUser, bool reset) const {
             error = cg.Set("devices.allow", rule);
             if (error) {
                 if (error.Errno == EPERM)
-                    return TError(EError::Permission, "Device {} is not pertmitted for parent container", device.Path);
+                    return TError(EError::Permission, "Device {} is not permitted for parent container", device.Path);
                 return error;
             }
         }
