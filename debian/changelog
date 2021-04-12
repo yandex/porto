@@ -1,3 +1,20 @@
+yandex-porto (5.0.20) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * volume: do not ignore mkdir error on LinkVolume
+  * property: fix GetProperty for virt_mode=fuse
+  * ci: take more cores and ram in sandbox tasks for tests
+
+  [ Nikita Vetoshkin ]
+  * minor: fix misprint in error message
+
+  [ Alexander Kuznetsov ]
+  * porto: fix vulnerability and add test        do not use wildcards on exports
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 12 Apr 2021 13:20:22 +0300
+
 yandex-porto (5.0.19) unstable; urgency=low
 
   * UNRELEASED
