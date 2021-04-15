@@ -365,7 +365,7 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
     Requires **isolate**: KILL, PTRACE.
 
-    Requires **net** and no **ip\_limit**: NET\_ADMIN.
+    Requires **net**: NET\_ADMIN.
 
     Always available: NET\_BIND\_SERVICE, NET\_RAW
 
