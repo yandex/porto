@@ -2569,7 +2569,6 @@ void TContainer::SanitizeCapabilities() {
         bool pidns = false;
         bool memcg = false;
         bool netns = false;
-        bool netip = false;
 
         if (HostMode)
             CapBound = AllCapabilities;
@@ -2582,7 +2581,6 @@ void TContainer::SanitizeCapabilities() {
             pidns |= ct->Isolate;
             memcg |= ct->MemLimit && ct->HasProp(EProperty::MEM_LIMIT);
             netns |= ct->NetIsolate;
-            netip |= ct->IpPolicy != "any";
 
             if (ct->HasProp(EProperty::CAPABILITIES))
                 CapBound.Permitted &= ct->CapLimit.Permitted;
@@ -2593,7 +2591,7 @@ void TContainer::SanitizeCapabilities() {
             remove.Permitted |= PidNsCapabilities.Permitted | SysBootCapability.Permitted;
         if (!memcg)
             remove.Permitted |= MemCgCapabilities.Permitted;
-        if (!netns || netip)
+        if (!netns)
             remove.Permitted |= NetNsCapabilities.Permitted;
 
         if (chroot) {
