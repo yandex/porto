@@ -1,3 +1,12 @@
+yandex-porto (5.0.21) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * porto: do not remove CAP_NET_ADMIN in chroot if ip_limit is set
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 16 Apr 2021 11:54:18 +0300
+
 yandex-porto (5.0.20) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
