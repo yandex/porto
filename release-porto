@@ -15,6 +15,11 @@ push() {
 	git push origin -f v${ver}:v${ver}
 }
 
+pypi() {
+    cd src/api/python/
+    python setup.py sdist upload -r yandex
+}
+
 case "$1" in
 all)
 	commit
@@ -26,7 +31,10 @@ commit)
 push)
 	push
 ;;
+pypi)
+	pypi
+;;
 "")
-	echo "Usage: $0 all|commit|push"
+	echo "Usage: $0 all|commit|push|pypi"
 ;;
 esac
