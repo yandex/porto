@@ -6,11 +6,14 @@
 case "$1" in
     configure)
     getent group porto > /dev/null || groupadd --gid 1333 porto
-    if [ -x "/bin/systemctl" ] ; then
-	/bin/systemctl enable yandex-porto.service || true
-	/bin/systemctl reload-or-restart yandex-porto.service || true
-    else
-	invoke-rc.d yandex-porto reload || true
+    # Do not reload porto if running under hostmanager
+    if [ "$HOSTMAN" != "1" ]; then
+      if [ -x "/bin/systemctl" ] ; then
+      	/bin/systemctl enable yandex-porto.service || true
+      	/bin/systemctl reload-or-restart yandex-porto.service || true
+      else
+      	invoke-rc.d yandex-porto reload || true
+      fi
     fi
     ;;
 esac
