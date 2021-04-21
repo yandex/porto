@@ -1,3 +1,15 @@
+yandex-porto (5.0.22) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * release: add pypi target
+
+  [ Anton Suvorov ]
+  * do not reload portod if running under hostmanager
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 21 Apr 2021 17:49:00 +0300
+
 yandex-porto (5.0.21) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
