@@ -190,7 +190,7 @@ TError TProjectQuota::Toggle(const TFile &dir, bool enabled) {
     return OK;
 }
 
-TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
+TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id, bool isDir) {
     struct fsxattr attr;
     int fd, ret;
     TError error;
@@ -203,7 +203,8 @@ TError TProjectQuota::SetProjectIdOne(const TPath &path, uint32_t id) {
 
     ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
     if (!ret) {
-        attr.fsx_xflags |= FS_XFLAG_PROJINHERIT;
+        if (isDir)
+            attr.fsx_xflags |= FS_XFLAG_PROJINHERIT;
         attr.fsx_projid = id;
         ret = ioctl(fd, FS_IOC_FSSETXATTR, &attr);
     }
@@ -225,7 +226,7 @@ TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
         error = walk.Next();
         if (error || !walk.Path)
             return error;
-        error = SetProjectIdOne(walk.Path, id);
+        error = SetProjectIdOne(walk.Path, id, walk.Directory);
         if (error) {
             /* ignore errors for non-regular and non-directory */
             if (walk.Directory || walk.Path.IsRegularStrict())
