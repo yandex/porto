@@ -337,6 +337,14 @@ def backend_quota(c):
             os.remove(TMPDIR+"/"+i)
     os.rmdir(TMPDIR)
 
+    # do not set FS_XFLAG_PROJINHERIT for files
+    v = c.CreateVolume()
+    with open(os.path.join(v.path, 'f'), 'w') as _:
+        pass
+    v2 = c.CreateVolume(storage=v.path, space_limit='1M')
+    v2.Unlink()
+    v.Unlink()
+
 def backend_native(c):
     args = dict()
     args["backend"] = "native"
