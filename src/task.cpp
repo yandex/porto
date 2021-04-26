@@ -156,6 +156,25 @@ TError TTaskEnv::OpenNamespaces(TContainer &ct) {
             return error;
     }
 
+    error = UserFd.Open(pid, "ns/user");
+    if (error)
+        return error;
+
+    /* https://github.com/torvalds/linux/blob/v4.19/kernel/user_namespace.c#L1263
+     * Don't allow gaining capabilities by reentering
+     * the same user namespace.
+     */
+
+    TNamespaceFd currentUserFd;
+    error = currentUserFd.Open("proc/thread-self/ns/user");
+    if (error)
+        return error;
+
+    if (UserFd.Inode() == currentUserFd.Inode())
+        UserFd.Close();
+
+    currentUserFd.Close();
+
     error = RootFd.Open(pid, "root");
     if (error)
         return error;
@@ -433,6 +452,10 @@ TError TTaskEnv::ConfigureChild() {
         return error;
 
     umask(CT->Umask);
+
+    error = UserFd.SetNs(CLONE_NEWUSER);
+    if (error)
+        Abort(error);
 
     if (CT->DockerMode || CT->FuseMode) {
         int unshareFlags = CLONE_NEWUSER | CLONE_NEWNS;
