@@ -73,6 +73,7 @@ bool PortodFrozen = false;
 bool ShutdownPortod = false;
 static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
+std::atomic_bool NeedStopHelpers(false);
 
 bool EnableCgroupNs = false;
 bool EnableDockerMode = false;
@@ -510,6 +511,7 @@ exit:
     for (auto c : Clients)
         c.second->CloseConnection(true);
     Clients.clear();
+    NeedStopHelpers = true;
 
     L_SYS("Stop threads...");
     EventQueue->Stop();
