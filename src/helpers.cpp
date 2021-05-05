@@ -12,6 +12,8 @@ extern "C" {
 #include <linux/loop.h>
 }
 
+extern std::atomic_bool NeedStopHelpers;
+
 static void HelperError(TFile &err, const std::string &text, TError error) __attribute__ ((noreturn));
 
 static void HelperError(TFile &err, const std::string &text, TError error) {
@@ -23,7 +25,8 @@ static void HelperError(TFile &err, const std::string &text, TError error) {
 TError RunCommand(const std::vector<std::string> &command,
                   const TFile &dir, const TFile &in, const TFile &out,
                   const TCapabilities &caps,
-                  bool verboseError) {
+                  bool verboseError,
+                  bool interruptible) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
     TFile err;
@@ -49,20 +52,24 @@ TError RunCommand(const std::vector<std::string> &command,
         return error;
 
     if (task.Pid) {
-        error = task.Wait();
+        error = task.Wait(interruptible, NeedStopHelpers);
         if (error) {
-            std::string text;
-            TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
-            if (error2)
-                text = "Cannot read stderr: " + error2.ToString();
+            if (interruptible && NeedStopHelpers) {
+                error = TError(EError::SocketError, "Helper killed by timeout on portod reload");
+            } else {
+                std::string text;
+                TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
+                if (error2)
+                    text = "Cannot read stderr: " + error2.ToString();
 
-            if (verboseError) {
-                error.Error = EError::HelperError;
-                if (text.find("not recoverable") != std::string::npos)
-                    error.Error = EError::HelperFatalError;
+                if (verboseError) {
+                    error.Error = EError::HelperError;
+                    if (text.find("not recoverable") != std::string::npos)
+                        error.Error = EError::HelperFatalError;
+                }
+
+                error = TError(error, "helper: {} stderr: {}", cmdline, text);
             }
-
-            error = TError(error, "helper: {} stderr: {}", cmdline, text);
         }
         return error;
     }

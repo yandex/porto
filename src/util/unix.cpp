@@ -699,15 +699,32 @@ TError TTask::Fork(bool detach) {
     return OK;
 }
 
-TError TTask::Wait() {
+TError TTask::Wait(bool interruptible, const std::atomic_bool &stop) {
     auto lock = std::unique_lock<std::mutex>(ForkLock);
     if (Running) {
         pid_t pid = Pid;
         int status;
         lock.unlock();
         /* main thread could be blocked on lock that we're holding */
-        if (waitpid(pid, &status, 0) == pid)
+        pid_t pid_ = 0;
+        while (true) {
+            pid_ = waitpid(pid, &status, interruptible ? WNOHANG : 0);
+            if (pid_)
+                break;
+
+            if (stop) {
+                L("Kill helper on portod reload");
+                auto error = Kill(SIGKILL);
+                if (error)
+                    L_ERR("Cannot kill helper: {}", error);
+            }
+
+            usleep(100 * 1000); // sleep 100 ms
+        }
+
+        if (pid_ == pid)
             pid = 0;
+
         lock.lock();
         if (!pid) {
             if (Running) {

@@ -2,6 +2,7 @@
 
 #include "common.hpp"
 
+#include <atomic>
 #include <functional>
 #include <vector>
 #include <set>
@@ -22,7 +23,7 @@ struct TTask {
     bool Running = false;
 
     TError Fork(bool detach = false);
-    TError Wait();
+    TError Wait(bool interruptible = false, const std::atomic_bool &stop = false);
     static bool Deliver(pid_t pid, int status);
 
     bool Exists() const;
