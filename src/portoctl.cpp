@@ -1251,11 +1251,10 @@ class TRawShellCmd : public ICmd {
     bool JobMode;
 
 public:
-    TRawShellCmd(Porto::Connection *api, const std::string &name, bool jobMode = false) : JobMode(jobMode), ICmd(api, name, 1,
-            "[-u <user>] [-g <group>] <container> [command] [argument]...",
-            fmt::format("start shell (default /bin/bash) in container{}, exit - ^X^X",
-                         jobMode ? " with virt_mode=job" : "")
-            ) { }
+    TRawShellCmd(Porto::Connection *api, const std::string &name, bool jobMode = false)
+        : ICmd(api, name, 1, "[-u <user>] [-g <group>] <container> [command] [argument]...",
+               fmt::format("start shell (default /bin/bash) in container{}, exit - ^X^X", jobMode ? " with virt_mode=job" : ""))
+        , JobMode(jobMode) { }
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string current_user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";

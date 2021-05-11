@@ -2642,8 +2642,8 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
         } else if (type == "L3") {
             dev.Type = "L3";
             dev.Name = "eth0";
-            int nameIndex = 1;
-            int masterIndex = 2;
+            size_t nameIndex = 1;
+            size_t masterIndex = 2;
             if (settings.size() > 1 && StringTrim(settings[1]) == "extra_routes") {
                 dev.EnableExtraRoutes = true;
                 nameIndex = 2;

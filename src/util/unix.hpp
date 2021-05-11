@@ -62,7 +62,7 @@ pid_t PtracedVfork() {
 }
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 void PrintProc(const std::string &knob, pid_t pid, bool debug = true);
-static void PrintStack(pid_t pid, bool debug = true) {
+inline void PrintStack(pid_t pid, bool debug = true) {
     PrintProc("stack", pid, debug);
 }
 

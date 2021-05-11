@@ -49,7 +49,7 @@ public:
     void AddOffset(uint64_t offset);
     uint64_t GetOffset(const TNlAddr &base) const;
     void GetRange(TNlAddr &base, uint64_t &count) const;
-    TError GetRange(std::vector<TNlAddr> &addrs, int max) const;
+    TError GetRange(std::vector<TNlAddr> &addrs, uint64_t max) const;
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);

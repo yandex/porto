@@ -166,7 +166,7 @@ TError TCgroup::RemoveOne() {
             L("task: {}", task);
 
         L("Tasks after destroy:");
-        for (int i = 0;
+        for (size_t i = 0;
              i < tasks.size() && i < config().daemon().debug_hung_tasks_count();
              ++i) {
             auto task = tasks[i];
