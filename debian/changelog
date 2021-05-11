@@ -1,3 +1,15 @@
+yandex-porto (5.0.24) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * porto: join into parent user ns on start
+  * porto: do not disconnect clients on request processing on upgrade/reload
+  * porto: fix some compiller warnings
+  * porto: kill imports after timeout on reload
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 12 May 2021 00:21:04 +0300
+
 yandex-porto (5.0.23) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
