@@ -1889,7 +1889,7 @@ void TNlAddr::GetRange(TNlAddr &base, uint64_t &count) const {
     memset(byte + 1, 0, bits / 8);
 }
 
-TError TNlAddr::GetRange(std::vector<TNlAddr> &addrs, int max) const {
+TError TNlAddr::GetRange(std::vector<TNlAddr> &addrs, uint64_t max) const {
     TNlAddr base;
     uint64_t count;
 
