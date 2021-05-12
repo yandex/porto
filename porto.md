@@ -1040,6 +1040,45 @@ network {
 }
 ```
 
+For L3 network we can add extra_routes, and setup mtu, advmss for it:
+```
+network {
+    extra_routes {
+        dst: "default | ipv6"
+        mtu: <mtu>
+        advmss: <advmss>
+    }
+}
+```
+
+Example:
+```
+network {
+    extra_routes {
+        dst: "default"
+        mtu: 1450
+        advmss: 1390
+    },
+    extra_routes {
+        dst: "64:ff9b::/96"
+        mtu: 1450
+        advmss: 1390
+    },
+    extra_routes {
+        dst: "2a02:6b8::/32"
+        mtu: 8910
+    },
+    extra_routes {
+        dst: "2620:10f:d000::/44"
+        mtu: 8910
+    },
+}
+
+For enable extra_routes in container you must add extra_routes option for net property:
+```
+net="L3 extra_routes ..."
+```
+
 ## NAT
 
 Mode **net**=NAT works as L3 and automatically allocates IP from pool configured in portod.conf:
