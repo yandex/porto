@@ -307,7 +307,7 @@ static TError AcceptConnection(int listenFd) {
     Statistics->ClientsConnected++;
 
     auto client = std::make_shared<TClient>(clientFd);
-    error = client->IdentifyClient(true);
+    error = client->IdentifyClient();
     if (error)
         return error;
 
