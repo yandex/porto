@@ -78,7 +78,7 @@ public:
     void StartRequest();
     void FinishRequest();
 
-    TError IdentifyClient(bool initial);
+    TError IdentifyClient();
     std::string RelativeName(const std::string &name) const;
     TError ComposeName(const std::string &name, std::string &relative_name) const;
     TError ResolveName(const std::string &relative_name, std::string &name) const;
@@ -123,6 +123,8 @@ private:
     uint64_t Offset = 0;
     std::vector<uint8_t> Buffer;
     std::unique_ptr<TRequest> Request;
+
+    static TError CheckContainerState(EContainerState state);
 };
 
 extern TClient SystemClient;

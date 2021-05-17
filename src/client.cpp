@@ -88,7 +88,7 @@ void TClient::FinishRequest() {
     CL = nullptr;
 }
 
-TError TClient::IdentifyClient(bool initial) {
+TError TClient::IdentifyClient() {
     std::shared_ptr<TContainer> ct;
     struct ucred cr;
     socklen_t len = sizeof(cr);
@@ -96,15 +96,6 @@ TError TClient::IdentifyClient(bool initial) {
 
     if (getsockopt(Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len))
         return TError::System("Cannot identify client: getsockopt() failed");
-
-    /* check that request from the same pid and container is still here */
-    if (!initial && Pid == cr.pid && TaskCred.GetUid() == cr.uid &&
-            TaskCred.GetGid() == cr.gid && ClientContainer &&
-            (ClientContainer->State == EContainerState::Running ||
-             ClientContainer->State == EContainerState::Starting ||
-             ClientContainer->State == EContainerState::Stopping ||
-             ClientContainer->State == EContainerState::Meta))
-        return OK;
 
     TaskCred.SetUid(cr.uid);
     TaskCred.SetGid(cr.gid);
@@ -131,11 +122,9 @@ TError TClient::IdentifyClient(bool initial) {
     if (AccessLevel == EAccessLevel::None)
         return TError(EError::Permission, "Porto disabled in container " + ct->Name);
 
-    if (ct->State != EContainerState::Running &&
-            ct->State != EContainerState::Starting &&
-            ct->State != EContainerState::Stopping &&
-            ct->State != EContainerState::Meta)
-        return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(ct->State));
+    error = CheckContainerState(ct->State);
+    if (error)
+        return error;
 
     if (ct->ClientsCount < 0)
         L_ERR("Client count underflow");
@@ -167,6 +156,16 @@ TError TClient::IdentifyClient(bool initial) {
                     AccessLevel <= EAccessLevel::ReadOnly ? "ro" : "rw",
                     PortoNamespace, WriteNamespace);
     }
+
+    return OK;
+}
+
+TError TClient::CheckContainerState(EContainerState state) {
+    if (state != EContainerState::Running &&
+            state != EContainerState::Starting &&
+            state != EContainerState::Stopping &&
+            state != EContainerState::Meta)
+        return TError(EError::Permission, "Client from containers in state " + TContainer::StateName(state));
 
     return OK;
 }
@@ -611,7 +610,7 @@ TError TClient::Event(uint32_t events) {
 
         error = ReadRequest(Request->Req);
         if (!error) {
-            error = IdentifyClient(false);
+            error = CheckContainerState(ClientContainer->State);
             if (!error)
                 QueueRequest();
 
