@@ -154,7 +154,11 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct,
     TError error;
     TCgroup cg;
 
-    error = FreezerSubsystem.TaskCgroup(pid, cg);
+    if (Cgroup2Subsystem.IsDisabled())
+        error = FreezerSubsystem.TaskCgroup(pid, cg);
+    else
+        error = Cgroup2Subsystem.TaskCgroup(pid, cg);
+
     if (error)
         return error;
 

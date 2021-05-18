@@ -577,3 +577,26 @@ a.Destroy()
 
 v.Unlink()
 v2.Unlink()
+
+# KERNEL-651
+# check that we can not create "fake" unified cgroup by rename systemd cgroup with \n in name
+# https://github.com/torvalds/linux/blob/v4.19/kernel/cgroup/cgroup-v1.c#L845-L875
+
+v = c.CreateVolume(path=None, layers=["ubuntu-xenial"])
+shutil.copyfile(portoctl, "{}/portoctl".format(v.path))
+
+a = c.Run('abc', wait=0, root=v.path, virt_mode='os')
+b = c.Run('abc/d', wait=1, command="""
+bash -c "mkdir /sys/fs/cgroup/systemd/porto%abc/0::asd;
+ls $'/sys/fs/cgroup/systemd/porto%abc/0::asd';
+mv $'/sys/fs/cgroup/systemd/porto%abc/0::asd' $'/sys/fs/cgroup/systemd/porto%abc/\n0::asd';
+chmod +x /portoctl;
+echo $$ >  $'/sys/fs/cgroup/systemd/porto%abc/\n0::asd/tasks'
+/portoctl get self absolute_name"
+""")
+
+ExpectNe(b['stderr'].find('recv: Connection reset by peer'), -1)
+ExpectNe(b['exit_code'], '0')
+
+a.Destroy()
+v.Unlink()

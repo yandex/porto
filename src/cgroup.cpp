@@ -527,31 +527,39 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
     std::vector<std::string> lines;
     auto cg_file = TPath("/proc/" + std::to_string(pid) + "/cgroup");
     auto type = TestOption();
+    std::unordered_set<std::string> cgroupTypes;
 
     TError error = cg_file.ReadLines(lines);
     if (error)
         return error;
 
+    bool found = false;
+
     for (auto &line : lines) {
         auto fields = SplitString(line, ':', 3);
-        if (fields.size() < 2)
+        if (fields.size() < 3)
             continue;
 
         auto cgroups = SplitString(fields[1], ',');
+        if (Kind == CGROUP2 && cgroups.empty())
+            cgroups.push_back("");
 
-        bool found = false;
-        for (auto &cg : cgroups)
-            if (cg == type)
+        for (auto &cg : cgroups) {
+            // KERNEL-651
+            // check that we do not have fake cgroup created by cgroup with \n in name
+            if (cgroupTypes.find(cg) != cgroupTypes.end())
+                return TError(EError::Permission, "Fake cgroup found");
+            cgroupTypes.insert(cg);
+
+            if (!found && cg == type) {
                 found = true;
-
-        if (found) {
-            cgroup.Subsystem = this;
-            cgroup.Name = fields[2];
-            return OK;
+                cgroup.Subsystem = this;
+                cgroup.Name = fields[2];
+            }
         }
     }
 
-    return TError("Cannot find {} cgroup for process {}", Type, pid);
+    return found ? OK : TError("Cannot find {} cgroup for process {}", Type, pid);
 }
 
 bool TSubsystem::IsBound(const TCgroup &cgroup) const {
