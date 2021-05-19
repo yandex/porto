@@ -677,9 +677,8 @@ void TNetwork::Destroy() {
             L_NET("Cannot remove root qdisc: {}", error);
     }
 
-    if (HostPeerIndex >= 0) {
+    if (EnabledRxLimit) {
         TNlQdisc qdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
-        HostPeerIndex = -1;
         auto lock = HostNetwork->LockNet();
         error = qdisc.Delete(*HostNetwork->GetNl());
         if (error)
@@ -823,7 +822,7 @@ TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &sta
     auto rate = dev.GetConfig(RootClass->RxLimit);
 
     if (!rate) {
-        HostPeerIndex = -1;
+        EnabledRxLimit = false;
         return OK;
     }
 
@@ -871,6 +870,7 @@ TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &sta
         return error;
     }
 
+    EnabledRxLimit = true;
     return OK;
 }
 
@@ -1113,7 +1113,7 @@ TError TNetwork::SyncDevices() {
             dev.DeviceStat.TxDrops += qdiscStat.Drops;
             dev.DeviceStat.TxOverruns += qdiscStat.Overruns;
 
-            if (HostPeerIndex >= 0) {
+            if (EnabledRxLimit) {
                 TNlQdisc peerQdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
                 auto lock = HostNetwork->LockNet();
                 qdiscStat = peerQdisc.Stat(*HostNetwork->GetNl());
