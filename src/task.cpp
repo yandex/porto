@@ -201,7 +201,7 @@ TError TTaskEnv::ChildExec() {
             NULL,
         };
         SetDieOnParentExit(0);
-        TFile::CloseAll({PortoInit.Fd, Sock.GetFd(), LogFile.Fd});
+        TFile::Close({0, 1, 2});
         fexecve(PortoInit.Fd, (char *const *)args, envp);
         return TError::System("cannot exec portoinit");
     }
@@ -247,7 +247,7 @@ TError TTaskEnv::ChildExec() {
     }
 
     SetDieOnParentExit(0);
-    TFile::CloseAll({0, 1, 2, Sock.GetFd(), LogFile.Fd});
+    PortoInit.Close();
 
     /* https://bugs.launchpad.net/upstart/+bug/1582199 */
     if (CT->Command == "/sbin/init" && CT->OsMode &&
@@ -439,6 +439,9 @@ TError TTaskEnv::ConfigureChild() {
     }
 
     L("open default streams in child");
+
+    TFile::CloseAllExcept({0, 1, 2, Sock.GetFd(), LogFile.Fd, PortoInit.Fd, UserFd.GetFd()});
+
     error = CT->Stdin.OpenInside(*CT);
     if (error)
         return error;
@@ -456,6 +459,8 @@ TError TTaskEnv::ConfigureChild() {
     error = UserFd.SetNs(CLONE_NEWUSER);
     if (error)
         return error;
+
+    UserFd.Close();
 
     if (CT->DockerMode || CT->FuseMode) {
         int unshareFlags = CLONE_NEWUSER | CLONE_NEWNS;
@@ -939,7 +944,7 @@ void TTaskEnv::ExecPortoinit(pid_t pid) {
 
     TError error = PortoInitCapabilities.ApplyLimit();
     if (!error) {
-        TFile::CloseAll({PortoInit.Fd, LogFile.Fd});
+        TFile::CloseAllExcept({PortoInit.Fd, LogFile.Fd});
         L("Exec portoinit");
         fexecve(PortoInit.Fd, (char *const *)argv, envp);
         error = TError::System("fexecve");

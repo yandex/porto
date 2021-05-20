@@ -141,7 +141,7 @@ TError RunCommand(const std::vector<std::string> &command,
     if (error)
         HelperError(err, "caps", error);
 
-    TFile::CloseAll({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
+    TFile::CloseAllExcept({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
     const char **argv = (const char **)malloc(sizeof(*argv) * (command.size() + 1));
     for (size_t i = 0; i < command.size(); i++)
