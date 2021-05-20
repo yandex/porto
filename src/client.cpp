@@ -101,6 +101,9 @@ TError TClient::IdentifyClient() {
     TaskCred.SetGid(cr.gid);
     Pid = cr.pid;
 
+    if (stat(("/proc/" + std::to_string(Pid)).c_str(), &PidStat))
+        return TError(EError::Unknown, "Can not make stat for '/proc/{}': {}", Pid, strerror(errno));
+
     Cred = TaskCred;
     Comm = GetTaskName(Pid);
 

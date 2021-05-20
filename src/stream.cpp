@@ -120,6 +120,14 @@ TError TStdStream::OpenOutside(const TContainer &container,
                 !TFile::Access(st, client.Cred, Stream ? TFile::W : TFile::R))
             return TError(EError::Permission,
                     "Not enough permissions for redirect: " + Path.ToString());
+
+        // PORTO-853
+        struct stat pidStat;
+        if (stat(("/proc/" + std::to_string(client.Pid)).c_str(), &pidStat))
+            return TError(EError::Unknown, "Can not make stat for '/proc/{}': {}", client.Pid, strerror(errno));
+
+        if (pidStat.st_dev != client.PidStat.st_dev || pidStat.st_ino != client.PidStat.st_ino)
+            return TError(EError::Permission, "Client process changed");
     } else if (Outside)
         return Open(ResolveOutside(container), container.TaskCred);
 
