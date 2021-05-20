@@ -455,7 +455,7 @@ TError TTaskEnv::ConfigureChild() {
 
     error = UserFd.SetNs(CLONE_NEWUSER);
     if (error)
-        Abort(error);
+        return error;
 
     if (CT->DockerMode || CT->FuseMode) {
         int unshareFlags = CLONE_NEWUSER | CLONE_NEWNS;
@@ -467,11 +467,11 @@ TError TTaskEnv::ConfigureChild() {
 
         error = Sock.SendZero();
         if (error)
-            Abort(error);
+            return error;
 
         error = Sock.RecvZero();
         if (error)
-            Abort(error);
+            return error;
     }
 
     return OK;
