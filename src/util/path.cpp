@@ -1245,7 +1245,12 @@ void TFile::Swap(TFile &other) {
     other.SetFd = tmp;
 }
 
-void TFile::CloseAll(std::vector<int> except) {
+void TFile::Close(const std::vector<int> &fds) {
+    for (int fd : fds)
+        close(fd);
+}
+
+void TFile::CloseAllExcept(const std::vector<int> &except) {
     int max = getdtablesize();
     for (int fd = 0; fd < max; fd++) {
         if (std::find(except.begin(), except.end(), fd) == except.end())

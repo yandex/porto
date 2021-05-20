@@ -666,7 +666,7 @@ TError TranslatePid(pid_t pid, pid_t pidns, pid_t &result) {
     if (error)
         _exit(EXIT_FAILURE);
 
-    TFile::CloseAll({sk.GetFd()});
+    TFile::CloseAllExcept({sk.GetFd()});
 
     pid_t child = vfork();
     if (child < 0)

@@ -257,7 +257,8 @@ public:
     TError CreateTrunc(const TPath &path, int mode);
     void Close(void);
     void Swap(TFile &other);
-    static void CloseAll(std::vector<int> except);
+    static void Close(const std::vector<int> &fds);
+    static void CloseAllExcept(const std::vector<int> &except);
     TPath RealPath(void) const;
     TPath ProcPath(void) const;
     TError Read(std::string &text) const;
