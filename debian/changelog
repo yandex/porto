@@ -1,3 +1,24 @@
+yandex-porto (5.0.25) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * man: add extra_routes
+
+  [ Dmitry Yakunin ]
+  * debian: service: set TimeoutStartSec to 360
+
+  [ Alexander Kuznetsov ]
+  * network: fix net_rx_limit to work on running container
+  * porto: resolve client container by cgroup v2 if enabled
+  * porto: do not Identify Client on request. Identify once at connecting
+  * test: split tests into 4 parts
+  * task: do not Abort on error in ConfigureChild
+  * porto: close unused fds before open std streams inside
+  * porto: identify client by pid and inode of /proc/pid
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 21 May 2021 13:12:53 +0300
+
 yandex-porto (5.0.24) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
