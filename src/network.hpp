@@ -241,6 +241,7 @@ public:
 
     /* Network stats from /proc/net/netstat */
     TUintMap NetStat;
+    TUintMap NetSnmp;
 
     TError GetL3Gate(TNetDeviceConfig &dev);
 
@@ -281,7 +282,7 @@ public:
     static void UpdateSockDiag();
     static void RepairSockDiag();
 
-    static void UpdateNetStat();
+    static void UpdateProcNetStats(const std::string &basename);
 };
 
 struct TNetDeviceConfig {
