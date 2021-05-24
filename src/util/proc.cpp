@@ -104,11 +104,11 @@ TError GetFdSize(pid_t pid, uint64_t &fdSize) {
     return TError("Cannot find FDSize in /proc/{}/status", pid);
 }
 
-TError GetNetStat(pid_t pid, TUintMap &stats) {
+TError GetProcNetStats(pid_t pid, TUintMap &stats, const std::string &basename) {
     std::string text, line;
     TError error;
 
-    error = TPath(fmt::format("/proc/{}/net/netstat", pid)).ReadAll(text, 64 << 10);
+    error = TPath(fmt::format("/proc/{}/net/{}", pid, basename)).ReadAll(text, 64 << 10);
     if (error)
         return error;
 
@@ -124,7 +124,7 @@ TError GetNetStat(pid_t pid, TUintMap &stats) {
     }
 
     if (headerList.size() != valuesList.size())
-        return TError("Invalid netstat structure: /proc/{}/net/netstat, {} headers != {} values", pid, headerList.size(), valuesList.size());
+        return TError("Invalid net stat structure: /proc/{}/net/{}, {} headers != {} values", pid, basename, headerList.size(), valuesList.size());
 
     for (int i = 0; i < headerList.size(); ++i) {
         uint64_t value;

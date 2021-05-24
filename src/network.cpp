@@ -1998,7 +1998,7 @@ void TNetwork::RepairSockDiag() {
         L_ERR("Cannot repair sock diag: {}", error);
 }
 
-void TNetwork::UpdateNetStat() {
+void TNetwork::UpdateProcNetStats(const std::string &basename) {
     TError error;
 
     auto networks = Networks();
@@ -2012,11 +2012,14 @@ void TNetwork::UpdateNetStat() {
             if (ct->State != EContainerState::Meta && ct->State != EContainerState::Running)
                 continue;
 
-            error = GetNetStat(ct->Task.Pid, net->NetStat);
+            if (basename == "netstat")
+                error = GetProcNetStats(ct->Task.Pid, net->NetStat, basename);
+            else if (basename == "snmp")
+                error = GetProcNetStats(ct->Task.Pid, net->NetSnmp, basename);
             if (error) {
                 if (errno == ENOENT || errno == ESRCH)
                     continue;
-                L_ERR("Cannot get netstat, CT:{} {}", ct->Name, error);
+                L_ERR("Cannot get stat for '{}', CT:{} {}", basename, ct->Name, error);
             }
 
             break;
@@ -2031,13 +2034,17 @@ void TNetwork::NetWatchdog() {
     auto SockDiagDeadline = now;
     TError error;
 
+    const std::string snmp = "snmp";
+    const std::string netstat = "netstat";
+
     SetProcessName("portod-NET");
     while (HostNetwork) {
         now = GetCurrentTimeMs();
         if (SockDiagPeriod && now >= SockDiagDeadline) {
             if (TNetClass::IsDisabled())
                 TNetwork::UpdateSockDiag();
-            TNetwork::UpdateNetStat();
+            TNetwork::UpdateProcNetStats(netstat);
+            TNetwork::UpdateProcNetStats(snmp);
             SockDiagDeadline = now + SockDiagPeriod;
         }
         auto nets = Networks();

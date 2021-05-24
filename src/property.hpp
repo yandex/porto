@@ -150,6 +150,7 @@ constexpr const char *P_NET_TX_BYTES = "net_tx_bytes";
 constexpr const char *P_NET_TX_PACKETS = "net_tx_packets";
 constexpr const char *P_NET_TX_DROPS = "net_tx_drops";
 constexpr const char *P_NET_NETSTAT = "net_netstat";
+constexpr const char *P_NET_SNMP = "net_snmp";
 constexpr const char *P_IO_READ = "io_read";
 constexpr const char *P_IO_WRITE = "io_write";
 constexpr const char *P_IO_OPS = "io_ops";
