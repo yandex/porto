@@ -26,12 +26,18 @@ part1 = {'uid_handling':2,
          'htb-restore':2,
          'portod_cli':3,
          'stats':1,
-         'net-sched1':200,
-         'cleanup_portod':1,
+         'net-sched1':200}
+
+part2 = {'net-sched2':200,
+         'mem-overcommit':1,
+         'portod_stop':1}
+
+part3 = {'cleanup_portod':1,
          'portotest':90,
          'cleanup_logs':1,
          'portod_start':1,
          'api':15,
+         'python3-api':60,
          'wait':1,
          'python3-wait':1,
          'ct-state':2,
@@ -51,21 +57,17 @@ part1 = {'uid_handling':2,
          'self-container':2,
          'portoctl-attach':1}
 
+part4 = {'leaks':180,
+         'fuzzer':80}
 
-part2 = {'net-sched2':200,
-         'mem-overcommit':1,
-         'portod_stop':1,
-         'leaks':180}
-
-part3 = {'fuzzer_soft':120,
-         'fuzzer':80,
+part5 = {'fuzzer_soft':120,
          'unpriv-cred':1,
-         'python3-api':60,
          'isolation':1,
          'security':11,
          'hijack':1,
-         'net':6,
-         'volume_places':65,
+         'net':6}
+
+part6 = {'volume_places':65,
          'volume_links':3,
          'volume-restore':2,
          'mem-recharge':2,
@@ -77,24 +79,25 @@ part3 = {'fuzzer_soft':120,
          'volume_queue':100,
          'volume_sync':20}
 
-part4 = {'volume_backends':55,
-         'performance':115,
-         'prev_release_upgrade':50,
+part7 = {'volume_backends':55,
+         'performance':115}
+
+part8 = {'prev_release_upgrade':50,
          'recovery':40,
          'spec':4,
          'python3-spec':4,
          'python3-retriability':120,
          'docker':30}
 
-for test in part1.keys() + part2.keys() + part3.keys() + part4.keys():
+for test in part1.keys() + part2.keys() + part3.keys() + part4.keys() + part5.keys() + part6.keys() + part7.keys() + part8.keys():
     test_names.remove(test)
 
 for i in range(1, 9):
     test_names.remove('part{}'.format(i))
 
-# Put remaining tests in part4 with default timeout 10s
+# Put remaining tests in part8 with default timeout 10s
 for test in test_names:
-    part4[test] = 10
+    part8[test] = 10
 
 
 def run_test(test_name, timeout):
