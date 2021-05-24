@@ -3,6 +3,28 @@
 #include "portotop.hpp"
 #include "version.hpp"
 
+static void Usage() {
+    std::cout
+        << std::endl
+        << "Usage: portoctl-top [options...]" << std::endl
+        << std::endl
+        << "Option: " << std::endl
+        << "  -h | --help      print this message" << std::endl
+        << "  -c | --cpu       show cpu stat columns" << std::endl
+        << "  -m | --memory    show memory stat columns" << std::endl
+        << "  --io             show io stat columns" << std::endl
+        << "  -n | --network   show network stat columns" << std::endl
+        << "  -p | --porto     show porto stat columns" << std::endl
+        << std::endl;
+}
+
+static bool ShowAll = true;
+static bool ShowCpu = false;
+static bool ShowMem = false;
+static bool ShowIo = false;
+static bool ShowNet = false;
+static bool ShowPorto = false;
+
 static double ParseNumber(const std::string &str) {
     return strtod(str.c_str(), nullptr);
 }
@@ -1159,67 +1181,76 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
     AddColumn("Time", "time s", "Time elapsed since start or death");
 
     /* CPU */
-    AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
-    AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
-    AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
-    AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%");
+    if (ShowAll || ShowCpu) {
+        AddColumn("Cpu%", "cpu_usage'% 1e9", "Cpu usage in core%");
+        AddColumn("Sys%", "cpu_usage_system'% 1e9", "System cpu usage in core%");
+        AddColumn("Wait%", "cpu_wait'% 1e9", "Cpu wait time in core%");
+        AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%");
 
-    AddColumn("C pol", "cpu_policy", "Cpu scheduler policy");
-    AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores");
-    AddColumn("C lim", "cpu_limit", "Cpu limit in cores");
+        AddColumn("C pol", "cpu_policy", "Cpu scheduler policy");
+        AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores");
+        AddColumn("C lim", "cpu_limit", "Cpu limit in cores");
 
-    AddColumn("Ct lim", "cpu_limit_total", "Cpu total limit in cores");
-    AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores");
+        AddColumn("Ct lim", "cpu_limit_total", "Cpu total limit in cores");
+        AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores");
 
-    AddColumn("Threads", "thread_count", "Threads count");
+        AddColumn("Threads", "thread_count", "Threads count");
+    }
 
     /* Memory */
-    AddColumn("Memory", "memory_usage b", "Memory usage");
-    AddColumn("M g-e", "memory_guarantee b", "Memory guarantee");
-    AddColumn("M lim", "memory_limit b", "Memory limit");
-    AddColumn("M r-d/s", "memory_reclaimed' b", "Memory reclaimed");
+    if (ShowAll || ShowMem) {
+        AddColumn("Memory", "memory_usage b", "Memory usage");
+        AddColumn("M g-e", "memory_guarantee b", "Memory guarantee");
+        AddColumn("M lim", "memory_limit b", "Memory limit");
+        AddColumn("M r-d/s", "memory_reclaimed' b", "Memory reclaimed");
 
-    AddColumn("Anon", "anon_usage b", "Anonymous memory usage");
-    AddColumn("A lim", "anon_limit b", "Anonymous memory limit");
+        AddColumn("Anon", "anon_usage b", "Anonymous memory usage");
+        AddColumn("A lim", "anon_limit b", "Anonymous memory limit");
 
-    AddColumn("Cache", "cache_usage b", "Cache memory usage");
-    AddColumn("Shmem", "shmem_usage b", "Shmem and tmpfs usage");
-    AddColumn("MLock", "mlock_usage b", "Locked memory");
+        AddColumn("Cache", "cache_usage b", "Cache memory usage");
+        AddColumn("Shmem", "shmem_usage b", "Shmem and tmpfs usage");
+        AddColumn("MLock", "mlock_usage b", "Locked memory");
 
-    AddColumn("Mt lim", "memory_limit_total b", "Memory total limit");
-    AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee");
+        AddColumn("Mt lim", "memory_limit_total b", "Memory total limit");
+        AddColumn("Mt g-e", "memory_guarantee_total b", "Memory total guarantee");
 
-    AddColumn("OOM", "porto_stat[container_oom]", "OOM count");
+        AddColumn("OOM", "porto_stat[container_oom]", "OOM count");
+    }
 
     /* I/O */
-    AddColumn("Maj/s", "major_faults'", "Major page fault count");
-    AddColumn("Min/s", "minor_faults'", "Minor page fault count");
+    if (ShowAll || ShowIo){
+        AddColumn("Maj/s", "major_faults'", "Major page fault count");
+        AddColumn("Min/s", "minor_faults'", "Minor page fault count");
 
-    AddColumn("IO load", "io_time[hw]' 1e9", "Average disk queue depth");
+        AddColumn("IO load", "io_time[hw]' 1e9", "Average disk queue depth");
 
-    AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second");
-    AddColumn("IO Read b/s", "io_read[hw]' b", "IO bytes read from disk");
-    AddColumn("IO Write b/s", "io_write[hw]' b", "IO bytes written to disk");
+        AddColumn("IO op/s", "io_ops[hw]'", "IO operations per second");
+        AddColumn("IO Read b/s", "io_read[hw]' b", "IO bytes read from disk");
+        AddColumn("IO Write b/s", "io_write[hw]' b", "IO bytes written to disk");
 
-    AddColumn("FS op/s", "io_ops[fs]'", "IO operations by fs");
-    AddColumn("FS read b/s", "io_read[fs]' b", "IO bytes read by fs");
-    AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs");
+        AddColumn("FS op/s", "io_ops[fs]'", "IO operations by fs");
+        AddColumn("FS read b/s", "io_read[fs]' b", "IO bytes read by fs");
+        AddColumn("FS write b/s", "io_write[fs]' b", "IO bytes written by fs");
+    }
 
     /* Network */
+    if (ShowAll || ShowNet) {
+        AddColumn("RX Lim", "net_rx_limit[default] b", "Default network RX limit");
+        AddColumn("TX g-e", "net_guarantee[default] b", "Default network TX guarantee");
+        AddColumn("TX lim", "net_limit[default] b", "Default network TX limit");
 
-    AddColumn("RX Lim", "net_rx_limit[default] b", "Default network RX limit");
-    AddColumn("TX g-e", "net_guarantee[default] b", "Default network TX guarantee");
-    AddColumn("TX lim", "net_limit[default] b", "Default network TX limit");
-
-    AddColumn("Net RX", "net_rx_bytes[Uplink]' b", "Uplink bytes received");
-    AddColumn("Net TX", "net_bytes[Uplink]' b", "Uplink bytes transmitted");
-    AddColumn("Pkt RX", "net_rx_packets[Uplink]'", "Uplink packets received");
-    AddColumn("Pkt TX", "net_packets[Uplink]'", "Uplink packets transmitted");
+        AddColumn("Net RX", "net_rx_bytes[Uplink]' b", "Uplink bytes received");
+        AddColumn("Net TX", "net_bytes[Uplink]' b", "Uplink bytes transmitted");
+        AddColumn("Pkt RX", "net_rx_packets[Uplink]'", "Uplink packets received");
+        AddColumn("Pkt TX", "net_packets[Uplink]'", "Uplink packets transmitted");
+    }
 
     /* Porto */
-    AddColumn("Porto", "enable_porto", "Porto access level");
-    AddColumn("Cli", "porto_stat[container_clients]", "Porto clients");
-    AddColumn("RPS", "porto_stat[container_requests]'", "Porto requests/s");
+    if (ShowAll || ShowPorto) {
+        AddColumn("Porto", "enable_porto", "Porto access level");
+        AddColumn("Cli", "porto_stat[container_clients]", "Porto clients");
+        AddColumn("RPS", "porto_stat[container_requests]'", "Porto requests/s");
+    }
 }
 
 static bool exit_immediatly = false;
@@ -1432,6 +1463,32 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
 }
 
 int main(int argc, char *argv[]) {
+    int opt = 0;
+    while (++opt < argc && argv[opt][0] == '-') {
+        std::string arg(argv[opt]);
+        if (arg == "-h" || arg == "--help") {
+            Usage();
+            return EXIT_SUCCESS;
+        }
+
+        if (arg == "-c" || arg == "--cpu") {
+            ShowCpu = true;
+            ShowAll = false;
+        } else if (arg == "-m" || arg == "--memory") {
+            ShowMem = true;
+            ShowAll = false;
+        } else if (arg == "--io") {
+            ShowIo = true;
+            ShowAll = false;
+        } else if (arg == "-n" || arg == "--network") {
+            ShowNet = true;
+            ShowAll = false;
+        } else if (arg == "-p" || arg == "--porto") {
+            ShowPorto = true;
+            ShowAll = false;
+        }
+    }
+
     const std::vector<std::string> args(argv + 1, argv + argc);
     Porto::Connection api;
 
