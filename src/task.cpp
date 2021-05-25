@@ -440,7 +440,7 @@ TError TTaskEnv::ConfigureChild() {
 
     L("open default streams in child");
 
-    TFile::CloseAllExcept({0, 1, 2, Sock.GetFd(), LogFile.Fd, PortoInit.Fd, UserFd.GetFd()});
+    TFile::CloseAllExcept({0, 1, 2, Sock.GetFd(), MasterSock.GetFd(), LogFile.Fd, PortoInit.Fd, UserFd.GetFd()});
 
     error = CT->Stdin.OpenInside(*CT);
     if (error)
@@ -534,6 +534,8 @@ void TTaskEnv::StartChild() {
     error = Sock.RecvZero();
     if (error)
         Abort(error);
+
+    MasterSock.Close();
 
     /* Reset signals before exec, signal block already lifted */
     ResetIgnoredSignals();
