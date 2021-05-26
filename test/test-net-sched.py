@@ -266,12 +266,14 @@ def run_mtn_limit_test():
         ExpectPropGe(a, "net_tx_drops[group default]", 100)
         ExpectPropGe(a, "net_overlimits[group default]", 100)
         ExpectPropLe(a, "net_rx_drops[group default]", 10)
+        ExpectPropGe(a, "net_snmp[RetransSegs]", 1)
         a.Destroy()
 
         print "Check rx drops and overlimits"
         a = run_iperf_client("test-net-a", server1, time=5, bandwidth=0, length=1300, wait=20, udp=True, mtn=True, reverse=True, cfg={"net_rx_limit": "default: 100K"})
         ExpectPropGe(a, "net_rx_drops[group default]", 100)
         ExpectPropLe(a, "net_tx_drops[group default]", 10)
+        ExpectPropGe(a, "net_snmp[RetransSegs]", 1)
         a.Destroy()
 
 
