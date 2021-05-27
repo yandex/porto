@@ -1,3 +1,20 @@
+yandex-porto (5.0.26) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * fix porto.md
+
+  [ Alexander Kuznetsov ]
+  * ci: split tests into 8 parts
+  * portotop: add options to show only cpu/memory/net/io/porto stat columns
+  * task: do not close porto socket pair on configure child
+
+  [ Oleg Senin ]
+  * network: add stats from /proc/net/snmp
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 27 May 2021 10:16:16 +0300
+
 yandex-porto (5.0.25) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
