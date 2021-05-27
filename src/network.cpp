@@ -1932,9 +1932,13 @@ void TNetwork::UpdateSockDiag() {
 
     auto state_lock = LockNetState();
     std::vector<std::shared_ptr<TContainer>> hostNetUsers;
-    hostNetUsers.reserve(HostNetwork->NetUsers.size());
+    auto hostNetwork = HostNetwork;
+    if (!hostNetwork)
+        return;
 
-    for (auto ct: HostNetwork->NetUsers)
+    hostNetUsers.reserve(hostNetwork->NetUsers.size());
+
+    for (auto ct: hostNetwork->NetUsers)
         hostNetUsers.emplace_back(ct->shared_from_this());
     state_lock.unlock();
 
