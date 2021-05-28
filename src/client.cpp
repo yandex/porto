@@ -339,13 +339,6 @@ TError TClient::CanControl(const TCred &other) {
     if (other.IsMemberOf(PortoCtGroup))
         return OK;
 
-    /* Init group $USER-containers lazily */
-    if (!UserCtGroup && GroupId(Cred.User() + USER_CT_SUFFIX, UserCtGroup))
-        UserCtGroup = NoGroup;
-
-    if (other.IsMemberOf(UserCtGroup))
-        return OK;
-
     return TError(EError::Permission, Cred.ToString() + " cannot control " + other.ToString());
 }
 

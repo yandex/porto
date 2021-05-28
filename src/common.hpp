@@ -71,7 +71,6 @@ constexpr const char *PORTO_HELPERS_CGROUP = "/portod-helpers";
 
 constexpr const char *PORTO_GROUP_NAME = "porto";
 constexpr const char *PORTO_CT_GROUP_NAME = "porto-containers";
-constexpr const char *USER_CT_SUFFIX = "-containers";
 constexpr const char *PORTO_SOCKET_PATH = "/run/portod.socket";
 constexpr uint64_t PORTO_SOCKET_MODE = 0666;
 

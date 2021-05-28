@@ -503,7 +503,6 @@ Write access to container requires any of these conditions:
 * container is a sub-container  
 * owner\_user matches to client user  
 * owner\_user belongs to group "porto-containers"  
-* owner\_user belongs to group "${CLIENT\_USER}-containers"  
 
 ## Filesystem
 

@@ -39,10 +39,7 @@ assert Catch(r.Start) == porto.exceptions.PermissionError
 r.SetProperty("user", "porto-david")
 r.SetProperty("group", "porto-david")
 r.SetProperty("command", "ls")
-r.Start()
-assert r.Wait() == "test"
-assert r.GetProperty("user") == "porto-david"
-assert r.GetProperty("group") == "porto-david"
+assert Catch(r.Start) == porto.exceptions.PermissionError
 print "%s OK!" %(Case)
 r.Destroy()
 AsRoot()
