@@ -30,7 +30,6 @@ public:
     pid_t Pid = 0;
     struct stat PidStat = {};
     std::string Comm;
-    gid_t UserCtGroup = 0;
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;
     uint64_t ActivityTimeMs = 0;
