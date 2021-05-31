@@ -1,13 +1,8 @@
 #!/bin/sh
 
-for g in porto porto-containers ; do
-	getent group $g 1>/dev/null 2>&1 || groupadd $g
-done
-
 for u in porto-alice porto-bob; do
 	id $u 1>/dev/null 2>&1 || useradd $u -G porto
-	getent group ${u}-containers || groupadd ${u}-containers
 done
 
-id porto-charlie 1>/dev/null 2>&1 || useradd porto-charlie -G porto-containers
-id porto-david 1>/dev/null 2>&1 || useradd porto-david -G porto-alice-containers
+id porto-charlie 1>/dev/null 2>&1 || useradd porto-charlie
+id porto-david 1>/dev/null 2>&1 || useradd porto-david
