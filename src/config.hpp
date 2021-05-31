@@ -8,3 +8,4 @@
 
 extern cfg::TConfig &config();
 void ReadConfigs(bool silent = false);
+TError ValidateConfig();

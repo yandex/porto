@@ -1289,6 +1289,9 @@ static int PortodMaster() {
         FatalError("Cannot save pid", error);
 
     ReadConfigs();
+    error = ValidateConfig();
+    if (error)
+        FatalError("Invalid config", error);
 
     TPath pathVer(PORTO_VERSION_FILE);
 

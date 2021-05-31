@@ -243,3 +243,18 @@ void ReadConfigs(bool silent) {
     Debug |= config().log().debug();
     Verbose |= Debug | config().log().verbose();
 }
+
+TError ValidateConfig() {
+#ifndef __x86_64__
+    if (config().container().ptrace_on_start())
+        return TError(EError::InvalidMethod, "ptrace_on_start function not implemented");
+#endif
+
+#if TCA_FQ_CODEL_MAX <= 8
+    if (config().network().has_fq_codel_memory_limit() &&
+        config().network().fq_codel_memory_limit() > 0)
+        return TError(EError::InvalidValue, "fq_codel memory limit not supported");
+#endif
+
+    return OK;
+}

@@ -45,7 +45,9 @@ pid_t Clone(unsigned long flags, void *child_stack = NULL, void *ptid = NULL, vo
 pid_t Fork(bool ptrace = false);
 inline pid_t PtracedVfork() __attribute__((always_inline));
 pid_t PtracedVfork() {
-    pid_t pid;
+    pid_t pid = -1;
+
+#ifdef __x86_64__
     __asm__ __volatile__ (
         "mov $" STRINGIFY(SYS_clone) ", %%rax;"
         "mov $" STRINGIFY(CLONE_VM | CLONE_VFORK | CLONE_PTRACE | SIGCHLD) ", %%rdi;"
@@ -59,6 +61,8 @@ pid_t PtracedVfork() {
         :
         : "rax", "rdi", "rsi", "rdx", "r10", "r8"
     );
+#endif
+
     return pid;
 }
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);

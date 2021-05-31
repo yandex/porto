@@ -676,9 +676,9 @@ TError TTaskEnv::Start() {
 
         /* FIXME try to replace clone() with  unshare() */
 #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
-        char stack[8192*4];
+        char stack[8192*4] __attribute__ ((aligned (16)));
 #else
-        char stack[8192];
+        char stack[8192] __attribute__ ((aligned (16)));
 #endif
 
         (void)setsid();
@@ -805,7 +805,7 @@ TError TTaskEnv::Start() {
         if (config().container().ptrace_on_start())
             cloneFlags |= CLONE_PTRACE;
 
-        L("clone");
+        L("clone, flags: {}", cloneFlags);
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
 
         if (clonePid < 0) {
