@@ -1077,13 +1077,16 @@ TError TNlQdisc::CreateCodel(const TNl &nl, bool fq_codel) {
                 goto free_msg;
         }
 
+#if TCA_FQ_CODEL_MAX > 8
         uint32_t memoryLimit = MemoryLimit ? MemoryLimit :
                                              (config().network().has_fq_codel_memory_limit() ? config().network().fq_codel_memory_limit() : 0);
+
         if (memoryLimit) {
             ret = nla_put_u32(msg, TCA_FQ_CODEL_MEMORY_LIMIT, memoryLimit);
             if (ret < 0)
                 goto free_msg;
         }
+#endif
 
         if (config().network().has_fq_codel_flows()) {
             ret = nla_put_u32(msg, TCA_FQ_CODEL_FLOWS, config().network().fq_codel_flows());
