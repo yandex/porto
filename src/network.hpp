@@ -209,7 +209,6 @@ public:
 
     std::map<std::string, int> DeviceOwners;
 
-    int HostPeerIndex = -1;
     bool EnabledRxLimit = false;
 
     TError SyncDevices();
