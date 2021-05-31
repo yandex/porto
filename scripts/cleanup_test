@@ -2,10 +2,4 @@
 
 for u in porto-alice porto-bob porto-charlie porto-david ; do
 	id $u 1>/dev/null 2>&1 && userdel $u 1>/dev/null 2>&1
-	getent group ${u}-containers 1>/dev/null 2>&1 && groupdel ${u}-containers
 done
-
-# for g in porto porto-containers ; do
-#	getent group $g && groupdel $g
-# done
-

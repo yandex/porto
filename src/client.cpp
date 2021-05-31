@@ -335,10 +335,6 @@ TError TClient::CanControl(const TCred &other) {
     if (IsSuperUser() || Cred.GetUid() == other.GetUid() || other.IsUnknown())
         return OK;
 
-    /* Everybody can control users from group porto-containers */
-    if (other.IsMemberOf(PortoCtGroup))
-        return OK;
-
     return TError(EError::Permission, Cred.ToString() + " cannot control " + other.ToString());
 }
 

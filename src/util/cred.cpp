@@ -15,7 +15,6 @@ extern "C" {
 }
 
 gid_t PortoGroup;
-gid_t PortoCtGroup;
 
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
@@ -360,9 +359,6 @@ void InitPortoGroups() {
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error)
         FatalError("Cannot find group porto", error);
-
-    if (GroupId(PORTO_CT_GROUP_NAME, PortoCtGroup))
-        PortoCtGroup = NoGroup;
 }
 
 #ifndef CAP_BLOCK_SUSPEND
