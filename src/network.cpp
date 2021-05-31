@@ -669,20 +669,21 @@ void TNetwork::Destroy() {
     auto lock = LockNet();
 
     for (auto &dev: Devices) {
-        if (!dev.Managed)
+        auto nl = Nl;
+        int index = dev.Index;
+
+        // delete qdisc for L3 device in host netns
+        // veth devices in container netns is not Managed
+        if (dev.Type == "veth" && EnabledRxLimit) {
+            nl = HostNetwork->GetNl();
+            index = dev.Link;
+        } else if (!dev.Managed)
             continue;
-        TNlQdisc qdisc(dev.Index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
-        error = qdisc.Delete(*Nl);
+
+        TNlQdisc qdisc(index, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+        error = qdisc.Delete(*nl);
         if (error)
             L_NET("Cannot remove root qdisc: {}", error);
-    }
-
-    if (EnabledRxLimit) {
-        TNlQdisc qdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
-        auto lock = HostNetwork->LockNet();
-        error = qdisc.Delete(*HostNetwork->GetNl());
-        if (error)
-            L_NET("Cannot remove root qdisc for host dev: {}", error);
     }
 
     // TODO: destroy mac/ip-vlan here
@@ -816,7 +817,7 @@ TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &sta
     PORTO_LOCKED(NetMutex);
     PORTO_LOCKED(NetStateMutex);
 
-    if (!RootClass || IsHost() || HostPeerIndex < 0)
+    if (!RootClass || IsHost())
         return OK;
 
     auto rate = dev.GetConfig(RootClass->RxLimit);
@@ -833,19 +834,19 @@ TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &sta
 
     auto &hostNl = *HostNetwork->GetNl();
 
-    TNlQdisc qdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
-    qdisc.Index = HostPeerIndex;
+    TNlQdisc qdisc(dev.Link, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+    qdisc.Index = dev.Link;
     qdisc.Kind = "hfsc";
     qdisc.Default = TC_HANDLE(ROOT_TC_MAJOR, 1);
     (void)qdisc.Delete(hostNl);
 
-    TNlClass cls(HostPeerIndex, TC_HANDLE(ROOT_TC_MAJOR, 0), TC_HANDLE(ROOT_TC_MAJOR, 1));
+    TNlClass cls(dev.Link, TC_HANDLE(ROOT_TC_MAJOR, 0), TC_HANDLE(ROOT_TC_MAJOR, 1));
     cls.Kind = qdisc.Kind;
     cls.Rate = cls.Ceil = rate;
     cls.Burst = UplinkSpeed;
     cls.BurstDuration = 10000; // 10ms
 
-    TNlQdisc leaf(HostPeerIndex, TC_HANDLE(ROOT_TC_MAJOR, 1), TC_HANDLE(2, 0));
+    TNlQdisc leaf(dev.Link, TC_HANDLE(ROOT_TC_MAJOR, 1), TC_HANDLE(2, 0));
     leaf.Kind = dev.GetConfig(ContainerQdisc, "pfifo");
     leaf.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 10);
 
@@ -1114,7 +1115,7 @@ TError TNetwork::SyncDevices() {
             dev.DeviceStat.TxOverruns += qdiscStat.Overruns;
 
             if (EnabledRxLimit) {
-                TNlQdisc peerQdisc(HostPeerIndex, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
+                TNlQdisc peerQdisc(dev.Link, TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, 0));
                 auto lock = HostNetwork->LockNet();
                 qdiscStat = peerQdisc.Stat(*HostNetwork->GetNl());
                 dev.DeviceStat.RxDrops += qdiscStat.Drops;
@@ -2952,8 +2953,6 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
         if (error)
             return error;
     }
-
-    Net->HostPeerIndex = peer.GetIndex();
 
     return OK;
 }
