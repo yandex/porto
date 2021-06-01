@@ -297,6 +297,7 @@ public:
     virtual void DumpIndexed(const std::string &index, rpc::TContainerStatus &spec);
 
     virtual TError Save(std::string &value);
+    virtual TError Load(const std::string &value);
 
     virtual TError Start(void);
 };

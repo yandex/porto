@@ -77,6 +77,10 @@ TError TProperty::Save(std::string &value) {
     return Get(value);
 }
 
+TError TProperty::Load(const std::string &value) {
+    return Set(value);
+}
+
 void TProperty::DumpIndexed(const std::string &, rpc::TContainerSpec &) {
 }
 
@@ -1139,16 +1143,62 @@ public:
     }
 } static VirtMode;
 
-class TStdinPath : public TProperty {
+class TStdStreamProperty : public TProperty {
 public:
-    TStdinPath() : TProperty(P_STDIN_PATH, EProperty::STDIN,
+    TStdStreamProperty(const std::string &name, EProperty prop, const std::string &desc) : TProperty(name, prop, desc) {}
+
+    TError Save(std::string &value, const TStdStream &stream) {
+        value = fmt::format("{};{};{}", stream.PathStat.st_ino, stream.PathStat.st_dev, stream.Path.ToString());
+        return OK;
+    }
+
+    TError Load(const std::string &value, TStdStream &stream) {
+        auto values = SplitString(value, ';', 3);
+
+        if (values.size() == 1)
+            stream.SetInside(values[0], *CL, true);
+        else if (values.size() == 3) {
+            stream.SetInside(values[2], *CL, true);
+            uint64_t inode, dev;
+            auto error = StringToUint64(values[0], inode);
+            if (error)
+                return error;
+
+            error = StringToUint64(values[1], dev);
+            if (error)
+                return error;
+
+            stream.PathStat.st_ino = inode;
+            stream.PathStat.st_dev = dev;
+        }
+
+        CT->SetProp(Prop);
+        return OK;
+    }
+};
+
+class TStdinPath : public TStdStreamProperty {
+public:
+    TStdinPath() : TStdStreamProperty(P_STDIN_PATH, EProperty::STDIN,
             "Container standard input path") {}
+
+    TError Save(std::string &value) override {
+        return TStdStreamProperty::Save(value, CT->Stdin);
+    }
+
+    TError Load(const std::string &value) override {
+        return TStdStreamProperty::Load(value, CT->Stdin);
+    }
+
     TError Get(std::string &value) {
         value = CT->Stdin.Path.ToString();
         return OK;
     }
+
     TError Set(const std::string &path) {
-        CT->Stdin.SetInside(path);
+        auto error = CT->Stdin.SetInside(path, *CL);
+        if (error)
+            return error;
         CT->SetProp(EProperty::STDIN);
         return OK;
     }
@@ -1166,19 +1216,32 @@ public:
     }
 } static StdinPath;
 
-class TStdoutPath : public TProperty {
+class TStdoutPath : public TStdStreamProperty {
 public:
-    TStdoutPath() : TProperty(P_STDOUT_PATH, EProperty::STDOUT,
+    TStdoutPath() : TStdStreamProperty(P_STDOUT_PATH, EProperty::STDOUT,
             "Container standard output path") {}
+
+    TError Save(std::string &value) override {
+        return TStdStreamProperty::Save(value, CT->Stdout);
+    }
+
+    TError Load(const std::string &value) override {
+        return TStdStreamProperty::Load(value, CT->Stdout);
+    }
+
     TError Get(std::string &value) {
         value =  CT->Stdout.Path.ToString();
         return OK;
     }
+
     TError Set(const std::string &path) {
-        CT->Stdout.SetInside(path);
+        auto error = CT->Stdout.SetInside(path, *CL);
+        if (error)
+            return error;
         CT->SetProp(EProperty::STDOUT);
         return OK;
     }
+
     TError Start(void) {
         if (CT->OsMode && !CT->HasProp(EProperty::STDOUT))
             CT->Stdout.SetOutside("/dev/null");
@@ -1198,19 +1261,32 @@ public:
     }
 } static StdoutPath;
 
-class TStderrPath : public TProperty {
+class TStderrPath : public TStdStreamProperty {
 public:
-    TStderrPath() : TProperty(P_STDERR_PATH, EProperty::STDERR,
+    TStderrPath() : TStdStreamProperty(P_STDERR_PATH, EProperty::STDERR,
             "Container standard error path") {}
+
+    TError Save(std::string &value) override {
+        return TStdStreamProperty::Save(value, CT->Stderr);
+    }
+
+    TError Load(const std::string &value) override {
+        return TStdStreamProperty::Load(value, CT->Stderr);
+    }
+
     TError Get(std::string &value) {
         value = CT->Stderr.Path.ToString();
         return OK;
     }
+
     TError Set(const std::string &path) {
-        CT->Stderr.SetInside(path);
+        auto error = CT->Stderr.SetInside(path, *CL);
+        if (error)
+            return error;
         CT->SetProp(EProperty::STDERR);
         return OK;
     }
+
     TError Start(void) {
          if (CT->OsMode && !CT->HasProp(EProperty::STDERR))
             CT->Stderr.SetOutside("/dev/null");
