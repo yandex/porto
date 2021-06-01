@@ -13,6 +13,24 @@ extern "C" {
 #include <sys/stat.h>
 }
 
+TError TStdStream::SetInside(const std::string &path, const TClient &client, bool restore) {
+    Path = path;
+    Outside = false;
+
+    if (!restore && !IsNull() && IsRedirect()) {
+        int clientFd = -1;
+        auto error = StringToInt(Path.ToString().substr(8), clientFd);
+        if (error)
+            return error;
+
+        auto fdPath = StringFormat("/proc/%u/fd/%u", client.Pid, clientFd);
+        if (stat(fdPath.c_str(), &PathStat))
+            return TError(EError::Unknown, "Can not make stat for {}: {}", fdPath, strerror(errno));
+    }
+
+    return OK;
+}
+
 bool TStdStream::IsNull(void) const {
     return Path.IsEmpty() || Path.ToString() == "/dev/null";
 }
@@ -106,10 +124,26 @@ TError TStdStream::OpenOutside(const TContainer &container,
         if (error)
             return error;
 
-        TPath path(StringFormat("/proc/%u/fd/%u", client.Pid, clientFd));
+        auto fdPath = StringFormat("/proc/%u/fd/%u", client.Pid, clientFd);
+        TPath path(fdPath);
         error = Open(path, container.TaskCred);
         if (error)
             return error;
+
+        // PORTO-856
+        // skip checking for old containers with empty PathStat
+        if (PathStat.st_ino != 0) {
+            struct stat pathStat;
+            if (stat(fdPath.c_str(), &pathStat))
+                return TError(EError::Unknown, "Can not make stat for {}: {}", fdPath, strerror(errno));
+
+            if (pathStat.st_dev != PathStat.st_dev || pathStat.st_ino != PathStat.st_ino) {
+                L_ERR("FD of std stream changed: {} != {}", PathStat.st_ino, pathStat.st_ino);
+                Statistics->Fatals++;
+                // enable strict check after confirmation that fix do not broke clients
+                // return TError(EError::Permission, "FD of std stream changed");
+            }
+        }
 
         /* check permissions agains our copy */
         path = StringFormat("/proc/self/fd/%u", Stream);

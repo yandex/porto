@@ -13,6 +13,7 @@ public:
     bool Outside = false;
     uint64_t Limit = 0;
     uint64_t Offset = 0;
+    struct stat PathStat = {};
 
     TStdStream(int stream): Stream(stream) { }
 
@@ -21,11 +22,7 @@ public:
         Outside = true;
     }
 
-    void SetInside(const std::string &path) {
-        Path = path;
-        Outside = false;
-    }
-
+    TError SetInside(const std::string &path, const TClient &client, bool restore = false);
     bool IsNull(void) const;
     bool IsRedirect(void) const;
     TPath ResolveOutside(const TContainer &container) const;
