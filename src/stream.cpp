@@ -126,8 +126,21 @@ TError TStdStream::OpenOutside(const TContainer &container,
         if (stat(("/proc/" + std::to_string(client.Pid)).c_str(), &pidStat))
             return TError(EError::Unknown, "Can not make stat for '/proc/{}': {}", client.Pid, strerror(errno));
 
-        if (pidStat.st_dev != client.PidStat.st_dev || pidStat.st_ino != client.PidStat.st_ino)
-            return TError(EError::Permission, "Client process changed");
+        if (pidStat.st_dev != client.PidStat.st_dev || pidStat.st_ino != client.PidStat.st_ino) {
+            PrintProc("status", client.Pid, false);
+            PrintProc("cmdline", client.Pid, false);
+            PrintProc("cgroup", client.Pid, false);
+
+            std::string pidTime = fmt::format("{}.{}", FormatTime(client.PidStat.st_mtim.tv_sec), client.PidStat.st_mtim.tv_nsec);
+            std::string currentPidTime = fmt::format("{}.{}", FormatTime(pidStat.st_mtim.tv_sec), pidStat.st_mtim.tv_nsec);
+
+            L_ERR("Client process changed. /proc/pid stat at connect: inode: {} dev: {} st_mtim: {}. Now: inode: {} dev: {} st_mtim: {}",
+                  client.PidStat.st_ino, client.PidStat.st_dev, pidTime,
+                  pidStat.st_ino, pidStat.st_dev, currentPidTime);
+
+            // Enable after fix RTCSUPPORT-10554
+            // return TError(EError::Permission, "Client process changed");
+        }
     } else if (Outside)
         return Open(ResolveOutside(container), container.TaskCred);
 
