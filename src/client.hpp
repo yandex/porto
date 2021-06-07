@@ -28,7 +28,7 @@ public:
     TCred Cred;
     TCred TaskCred;
     pid_t Pid = 0;
-    struct stat PidStat = {};
+    uint64_t StartTime = 0;
     std::string Comm;
     std::shared_ptr<TContainer> ClientContainer;
     std::shared_ptr<TContainer> LockedContainer;

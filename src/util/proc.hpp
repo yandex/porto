@@ -18,3 +18,5 @@ TError GetFdSize(pid_t pid, uint64_t &fdSize);
 TError GetProcNetStats(pid_t pid, TUintMap &stats, const std::string &basename);
 
 TError GetProc(pid_t pid, const std::string &knob, std::string &value);
+
+TError GetProcStartTime(pid_t pid, uint64_t &time);

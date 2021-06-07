@@ -2,6 +2,7 @@
 
 #include "proc.hpp"
 #include "path.hpp"
+#include "log.hpp"
 
 const static TStringMap VmStatMap = {
     {"VmSize", "size"},
@@ -138,4 +139,24 @@ TError GetProcNetStats(pid_t pid, TUintMap &stats, const std::string &basename) 
 
 TError GetProc(pid_t pid, const std::string &knob, std::string &value) {
     return TPath(fmt::format("/proc/{}/{}", pid, knob)).ReadAll(value, 64 << 10);
+}
+
+TError GetProcStartTime(pid_t pid, uint64_t &time) {
+    std::string stat;
+
+    auto error = GetProc(pid, "stat", stat);
+    if (error)
+        return error;
+
+    const char *cleanStat = strrchr(stat.c_str(), ')');
+    if (!cleanStat)
+        return TError("Invalid /proc/pid/stat structure: {}", stat);
+
+    auto values = SplitEscapedString(cleanStat + 2, ' ');
+
+    // starttime is at 20 position after command
+    if (values.size() < 20)
+        return TError("Invalid /proc/pid/stat structure: {}", stat);
+
+    return StringToUint64(values[19], time);
 }

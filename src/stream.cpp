@@ -1,6 +1,7 @@
 #include "stream.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
+#include "util/proc.hpp"
 #include "client.hpp"
 #include "container.hpp"
 
@@ -122,23 +123,15 @@ TError TStdStream::OpenOutside(const TContainer &container,
                     "Not enough permissions for redirect: " + Path.ToString());
 
         // PORTO-853
-        struct stat pidStat;
-        if (stat(("/proc/" + std::to_string(client.Pid)).c_str(), &pidStat))
-            return TError(EError::Unknown, "Can not make stat for '/proc/{}': {}", client.Pid, strerror(errno));
+        uint64_t clientStartTime;
+        error = GetProcStartTime(client.Pid, clientStartTime);
+        if (error)
+            return TError(EError::Unknown, "Can not get client process start time: {}", error);
 
-        if (pidStat.st_dev != client.PidStat.st_dev || pidStat.st_ino != client.PidStat.st_ino) {
-            PrintProc("status", client.Pid, false);
-            PrintProc("cmdline", client.Pid, false);
-            PrintProc("cgroup", client.Pid, false);
-
-            std::string pidTime = fmt::format("{}.{}", FormatTime(client.PidStat.st_mtim.tv_sec), client.PidStat.st_mtim.tv_nsec);
-            std::string currentPidTime = fmt::format("{}.{}", FormatTime(pidStat.st_mtim.tv_sec), pidStat.st_mtim.tv_nsec);
-
-            L_ERR("Client process changed. /proc/pid stat at connect: inode: {} dev: {} st_mtim: {}. Now: inode: {} dev: {} st_mtim: {}",
-                  client.PidStat.st_ino, client.PidStat.st_dev, pidTime,
-                  pidStat.st_ino, pidStat.st_dev, currentPidTime);
-
-            // Enable after fix RTCSUPPORT-10554
+        if (clientStartTime != client.StartTime) {
+            Statistics->Fatals++;
+            L_ERR("Client process changed: {} != {}", client.StartTime, clientStartTime);
+            // enable strict check after confirmation that fix do not broke clients
             // return TError(EError::Permission, "Client process changed");
         }
     } else if (Outside)

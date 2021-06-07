@@ -14,6 +14,7 @@
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 #include "util/md5.hpp"
+#include "util/proc.hpp"
 #include "test.hpp"
 #include "rpc.hpp"
 
@@ -2478,6 +2479,18 @@ static void TestMd5(Porto::Connection &) {
     ExpectEq(tmp, hash);
 }
 
+static void TestProcUtils(Porto::Connection &) {
+    uint64_t currentTime = GetCurrentTimeMs() / 1000;
+    uint64_t startTime;
+    ExpectOk(GetProcStartTime(GetPid(), startTime));
+
+    // Convert ticks to seconds
+    startTime /= sysconf(_SC_CLK_TCK);
+
+    ExpectLessEq(startTime, currentTime);
+    ExpectLessEq(currentTime - startTime, 60);
+}
+
 static void TestRoot(Porto::Connection &api) {
     string v;
     string root = "/";
@@ -4740,6 +4753,7 @@ int SelfTest(std::vector<std::string> args) {
         { "idmap", TestIdmap },
         { "format", TestFormat },
         { "md5sum", TestMd5 },
+        { "proc", TestProcUtils },
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },

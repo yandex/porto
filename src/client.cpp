@@ -9,6 +9,7 @@
 #include "property.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
+#include "util/proc.hpp"
 #include "util/string.hpp"
 #include "portod.hpp"
 #include "event.hpp"
@@ -101,8 +102,9 @@ TError TClient::IdentifyClient() {
     TaskCred.SetGid(cr.gid);
     Pid = cr.pid;
 
-    if (stat(("/proc/" + std::to_string(Pid)).c_str(), &PidStat))
-        return TError(EError::Unknown, "Can not make stat for '/proc/{}': {}", Pid, strerror(errno));
+    error = GetProcStartTime(Pid, StartTime);
+    if(error)
+        return TError(EError::Unknown, "Can not get client process start time: {}", error);
 
     Cred = TaskCred;
     Comm = GetTaskName(Pid);
