@@ -419,6 +419,10 @@ bool StringMatch(const std::string &str, const std::string &pattern, bool strict
     return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
 }
 
+bool StringSubpath(const std::string &path, const std::string &subpath) {
+    return fnmatch(path.c_str(), subpath.c_str(), FNM_LEADING_DIR) == 0;
+}
+
 std::string StringFormatFlags(uint64_t flags,
                               const TFlagsNames &names,
                               const std::string sep) {

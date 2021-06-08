@@ -22,6 +22,7 @@ constexpr const char *P_TASK_CRED = "task_cred";
 constexpr const char *P_OWNER_USER = "owner_user";
 constexpr const char *P_OWNER_GROUP = "owner_group";
 constexpr const char *P_OWNER_CRED = "owner_cred";
+constexpr const char *P_OWNER_CONTAINERS = "owner_containers";
 constexpr const char *P_ENV = "env";
 constexpr const char *P_ENV_SECRET = "env_secret";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
@@ -184,6 +185,7 @@ enum class EProperty {
     GROUP,
     OWNER_USER,
     OWNER_GROUP,
+    OWNER_CONTAINERS,
     ENV,
     ENV_SECRET,
     PORTO_NAMESPACE,

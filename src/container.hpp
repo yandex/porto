@@ -133,6 +133,7 @@ public:
     uint64_t RequiredControllers = 0;
     TCred OwnerCred;
     TCred TaskCred;
+    std::vector<std::string> OwnerContainers;
     std::string Command;
     std::string CoreCommand;
     TTuple CommandArgv;

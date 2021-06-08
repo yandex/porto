@@ -844,6 +844,46 @@ public:
     }
 } static OwnerGroup;
 
+class TOwnerContainers : public TProperty {
+public:
+    TOwnerContainers() : TProperty(P_OWNER_CONTAINERS, EProperty::OWNER_CONTAINERS, "Containers that have write access to container") {
+        IsDynamic = true;
+    }
+
+    TError Get(std::string &value) {
+        value = MergeEscapeStrings(CT->OwnerContainers, ';');
+        return OK;
+    }
+
+    TError Set(const std::string &value) {
+        std::vector<std::string> values;
+
+        for (const auto &name : SplitEscapedString(value, ';')) {
+            std::string realName;
+            auto error = CL->ResolveName(name, realName);
+            if (error)
+                return error;
+            values.push_back(realName);
+        }
+
+        CT->OwnerContainers.swap(values);
+        CT->SetProp(EProperty::OWNER_CONTAINERS);
+        return OK;
+    }
+
+    void Dump(rpc::TContainerSpec &spec) override {
+        spec.set_owner_containers(MergeEscapeStrings(CT->OwnerContainers, ';'));
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_owner_containers();
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) override {
+        return Set(spec.owner_containers());
+    }
+} static OwnerContainers;
+
 class TMemoryGuarantee : public TProperty {
 public:
     TMemoryGuarantee() : TProperty(P_MEM_GUARANTEE, EProperty::MEM_GUARANTEE,
