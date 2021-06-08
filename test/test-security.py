@@ -586,7 +586,7 @@ v = c.CreateVolume(path=None, layers=["ubuntu-xenial"])
 shutil.copyfile(portoctl, "{}/portoctl".format(v.path))
 
 a = c.Run('abc', wait=0, root=v.path, virt_mode='os')
-b = c.Run('abc/d', wait=1, command="""
+b = c.Run('abc/d', wait=3, command="""
 bash -c "mkdir /sys/fs/cgroup/systemd/porto%abc/0::asd;
 ls $'/sys/fs/cgroup/systemd/porto%abc/0::asd';
 mv $'/sys/fs/cgroup/systemd/porto%abc/0::asd' $'/sys/fs/cgroup/systemd/porto%abc/\n0::asd';

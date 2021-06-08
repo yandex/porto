@@ -239,7 +239,7 @@ def run_mtn_limit_test():
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, cfg={"net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit %sM -> " % rate, res
-    ExpectRange(res, rate * 0.9, rate * 1.15)
+    ExpectRange(res, rate * 0.9, rate * 1.16)
 
     print "Test net_rx_limit in MTN"
 
