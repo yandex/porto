@@ -486,6 +486,10 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
 
 * **owner\_cred** - credentials of container owner: uid gid groups...
 
+* **owner\_containers** - containers that have write access to container
+
+    Also grants write access to parent containers. If not set all containers have write access.
+
 Porto client authentication is based on task pid, uid, gid received via
 **socket(7)** SO\_PEERCRED and task freezer cgroup from /proc/pid/cgroup.
 

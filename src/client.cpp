@@ -366,6 +366,15 @@ TError TClient::CanControl(const TContainer &ct, bool child) {
                 return TError(error, "Write access denied: container {}", ct.Name);
         }
 
+        const auto &clientName = ClientContainer->Name;
+        if (clientName != "/" && !ct.OwnerContainers.empty()) {
+            for (const auto &allowedClient : ct.OwnerContainers) {
+                if (StringSubpath(clientName, allowedClient))
+                    return OK;
+            }
+            return TError(EError::Permission, "Write access denied: client not allowed in owner_containers property");
+        }
+
         return OK;
     }
 

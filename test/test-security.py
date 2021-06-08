@@ -577,3 +577,38 @@ a.Destroy()
 
 v.Unlink()
 v2.Unlink()
+
+# test client containers permission
+def CheckCtPermission(name, is_sucess):
+    b = c.Run(name, wait=3, command=portoctl + ' set abc thread_limit 1000')
+    ExpectEq(b['exit_code'] == '0', is_sucess)
+    b.Destroy()
+
+a = c.Run('abc', wait=0)
+
+b = c.Run('abc/d', wait=3, command=portoctl + ' set abc owner_containers "bcd;cde/fgh"')
+ExpectEq(b['exit_code'], '0')
+b.Destroy()
+
+CheckCtPermission('abc/d', False)
+CheckCtPermission('bcd', True)
+
+CheckCtPermission('bcd', True)
+bcd = c.Run('bcd', wait=0)
+CheckCtPermission('bcd/e', False)
+bcd.Destroy()
+
+CheckCtPermission('cde', True)
+cde = c.Run('cde', wait=0)
+CheckCtPermission('cde/fgh', True)
+CheckCtPermission('cde/fg', False)
+CheckCtPermission('cde/fghh', False)
+cde.Destroy()
+
+b = c.Run('bcd', wait=3, command=portoctl + ' set abc owner_containers "self;abc"')
+ExpectEq(b['exit_code'], '0')
+b.Destroy()
+
+ExpectEq(c.GetProperty('abc','owner_containers'), 'bcd;abc')
+
+a.Destroy()

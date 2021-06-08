@@ -553,6 +553,7 @@ message TContainerSpec {
     optional TCred owner_cred = 17;
     optional string owner_user = 18;
     optional string owner_group = 19;
+    optional string owner_containers = 77;
 
     optional TCapabilities capabilities = 20;
     optional TCapabilities capabilities_ambient = 21;
