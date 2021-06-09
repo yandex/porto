@@ -11,7 +11,7 @@ conn = porto.Connection()
 ConfigurePortod('test-retriability', """
 daemon {
     portod_shutdown_timeout: 1,
-    request_handling_delay_ms: 3000,
+    request_handling_delay_ms: 4000,
 }""")
 
 def TestCmd(command, restart_portod=False, fail=False):
