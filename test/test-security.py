@@ -595,8 +595,9 @@ echo $$ >  $'/sys/fs/cgroup/systemd/porto%abc/\n0::asd/tasks'
 /portoctl get self absolute_name"
 """)
 
-ExpectNe(b['stderr'].find('recv: Connection reset by peer'), -1)
+time.sleep(1)
 ExpectNe(b['exit_code'], '0')
+ExpectNe(b['stderr'].find('recv: Connection reset by peer'), -1)
 
 a.Destroy()
 v.Unlink()
