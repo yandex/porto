@@ -80,11 +80,11 @@ part6 = {'volume_places':65,
          'volume_sync':20}
 
 part7 = {'volume_backends':55,
+         'recovery':40,
+         'prev_release_upgrade':50,
          'performance':115}
 
-part8 = {'prev_release_upgrade':50,
-         'recovery':40,
-         'spec':4,
+part8 = {'spec':4,
          'python3-spec':4,
          'python3-retriability':120,
          'docker':30}

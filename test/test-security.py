@@ -588,16 +588,14 @@ shutil.copyfile(portoctl, "{}/portoctl".format(v.path))
 a = c.Run('abc', wait=0, root=v.path, virt_mode='os')
 b = c.Run('abc/d', wait=3, command="""
 bash -c "mkdir /sys/fs/cgroup/systemd/porto%abc/0::asd;
-ls $'/sys/fs/cgroup/systemd/porto%abc/0::asd';
 mv $'/sys/fs/cgroup/systemd/porto%abc/0::asd' $'/sys/fs/cgroup/systemd/porto%abc/\n0::asd';
 chmod +x /portoctl;
 echo $$ >  $'/sys/fs/cgroup/systemd/porto%abc/\n0::asd/tasks'
 /portoctl get self absolute_name"
 """)
 
-time.sleep(1)
 ExpectNe(b['exit_code'], '0')
-ExpectNe(b['stderr'].find('recv: Connection reset by peer'), -1)
+ExpectNe(b['stderr'].find('Can\'t get containers'), -1)
 
 a.Destroy()
 v.Unlink()
