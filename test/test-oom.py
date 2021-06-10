@@ -118,11 +118,11 @@ a.Destroy()
 
 # respawn after oom
 
-a = c.Run("test-oom", command=stress_memory, memory_limit="64M", respawn=True, max_respawns=2, respawn_delay='0.5s')
+a = c.Run("test-oom", command=stress_memory, memory_limit="64M", respawn=True, max_respawns=2, respawn_delay='2s')
 
 while a['state'] != 'dead':
     a.Wait()
-time.sleep(10)
+time.sleep(5)
 
 ExpectEq(a['state'], 'dead')
 ExpectEq(a['respawn_count'], '2')
