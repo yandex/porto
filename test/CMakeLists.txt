@@ -91,6 +91,7 @@ ADD_PYTHON_TEST(docker)
 
 ADD_PYTHON_TEST(portoctl-exec)
 ADD_PYTHON_TEST(portoctl-wait)
+ADD_PYTHON_TEST(portoctl-pull-sandbox)
 ADD_PYTHON_TEST(self-container)
 ADD_PYTHON_TEST(portoctl-attach)
 

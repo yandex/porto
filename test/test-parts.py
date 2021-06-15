@@ -54,6 +54,7 @@ part3 = {'cleanup_portod':1,
          'jobs':8,
          'portoctl-exec':1,
          'portoctl-wait':1,
+         'portoctl-pull-sandbox':130,
          'self-container':2,
          'portoctl-attach':1}
 

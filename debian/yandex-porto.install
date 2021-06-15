@@ -3,3 +3,4 @@ usr/sbin/portod usr/sbin
 usr/lib/porto/portoinit usr/lib/porto
 usr/lib/porto/portoctl-top usr/lib/porto
 usr/share/man/man8/porto.8 usr/share/man/man8
+usr/lib/porto/portoctl-pull-sandbox usr/lib/porto

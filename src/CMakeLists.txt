@@ -81,3 +81,18 @@ install(
 	FILES ${CMAKE_CURRENT_BINARY_DIR}/porto.8
 	DESTINATION share/man/man8
 )
+
+add_custom_command(
+	OUTPUT portoctl-pull-sandbox
+	DEPENDS ${CMAKE_SOURCE_DIR}/src/portoctl-pull-sandbox
+	COMMAND cp ${CMAKE_SOURCE_DIR}/src/portoctl-pull-sandbox ${CMAKE_CURRENT_BINARY_DIR}/portoctl-pull-sandbox
+	VERBATIM)
+
+add_custom_target(pull-sandbox ALL
+	DEPENDS portoctl-pull-sandbox)
+
+install(
+	FILES ${CMAKE_CURRENT_BINARY_DIR}/portoctl-pull-sandbox
+	DESTINATION lib/porto
+	PERMISSIONS WORLD_EXECUTE WORLD_WRITE WORLD_READ
+)

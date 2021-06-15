@@ -1,0 +1,89 @@
+#!/bin/bash
+usage() {
+    echo "usage: $0 [-o <layer>] [--raw] <raw_sandbox_filter|image_path|image_name/image_type>"
+    echo "       $0 rtc-xenial/os"
+    echo "       $0 infra/environments/rtc-bionic/os-layer/layer.tar.gz"
+    echo "       $0 -o rtc-xenial-layer rtc-xenial/os"
+    echo "       $0 --raw '--type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=infra/environments/rtc-bionic/os-layer/layer.tar.gz'"
+    exit 1
+}
+
+if [ "$1" == "--help" ] || [ "$1" == "-h" ] || [[ $# -eq 0 ]]; then
+    usage
+fi
+
+if [[ $# -ge 3 ]]  && [ "$1" == "-o" ]; then
+    result_layer=$2
+    shift
+    shift
+fi
+
+if [[ $# -eq 2 ]]  && [ "$1" == "--raw" ]; then
+    raw=$2
+    shift
+    shift
+fi
+
+if [ -z "$raw" ]; then
+    if [[ $# -eq 1 ]]; then
+        image=$1
+    else
+        usage
+    fi
+fi
+
+if [ -n "$raw" ]; then
+    echo "+ find resource:"
+    echo "++ ya tool sandboxctl list_resource -q --limit=1 $raw"
+    id=$(ya tool sandboxctl list_resource -q --limit=1 $raw 2>/dev/null)
+    if [[ $? -ne 0 || -z "$id" ]]; then
+        echo 'Can not find resource'
+        exit 1
+    fi
+else
+    echo "+ find resource:"
+    echo "++ ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=$image"
+    id=$(ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=$image 2>/dev/null)
+
+    if [[ $? -ne 0 || -z "$id" ]]; then
+        res_name=$(echo $image | cut -d'/' -f1)
+        res_type=$(echo $image | cut -d'/' -f2)
+        echo "+ find resource:"
+        echo "++ ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.gz"
+        id=$(ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.gz 2>/dev/null)
+        if [[ $? -ne 0 || -z "$id" ]]; then
+            echo 'Can not find resource'
+            exit 1
+        fi
+    fi
+fi
+
+if [[ -z "$result_layer" ]]; then
+    result_layer="pull-sadbox-layer-$id"
+fi
+
+tmpfile=$(mktemp /tmp/portoctl-pull-sandbox-layer-$id-XXXXXX)
+if [[ $? -ne 0 ]]; then
+    exit 1
+fi
+
+echo "+ download resource: https://sandbox.yandex-team.ru/resource/$id/view:"
+curl -f https://proxy.sandbox.yandex-team.ru/$id -o $tmpfile
+if [[ $? -ne 0 ]]; then
+    echo "Can not download resource"
+    rm -f $tmpfile
+    exit 1
+fi
+
+echo "+ import $tmpfile layer as $result_layer"
+portoctl layer -S '{"source":"sandbox","url":"https://sandbox.yandex-team.ru/resource/'$id'/view"}' -I $result_layer $tmpfile
+if [[ $? -ne 0 ]]; then
+    echo "Can not import layer"
+    rm -f $tmpfile
+    exit 1
+else
+    echo "Use something like the following to run porto container with result layer:"
+    echo "  portoctl exec -L $result_layer abc command=bash"
+fi
+
+rm -f $tmpfile
