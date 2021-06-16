@@ -163,9 +163,8 @@ TError TStdStream::OpenOutside(const TContainer &container,
 
         if (clientStartTime != client.StartTime) {
             Statistics->Fatals++;
-            L_ERR("Client process changed: {} != {}", client.StartTime, clientStartTime);
-            // enable strict check after confirmation that fix do not broke clients
-            // return TError(EError::Permission, "Client process changed");
+            L_ERR("Client process changed: start time {} != {}", client.StartTime, clientStartTime);
+            return TError(EError::Permission, "Client process changed: start time {} != {}", client.StartTime, clientStartTime);
         }
     } else if (Outside)
         return Open(ResolveOutside(container), container.TaskCred);
