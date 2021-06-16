@@ -138,10 +138,9 @@ TError TStdStream::OpenOutside(const TContainer &container,
                 return TError(EError::Unknown, "Can not make stat for {}: {}", fdPath, strerror(errno));
 
             if (pathStat.st_dev != PathStat.st_dev || pathStat.st_ino != PathStat.st_ino) {
-                L_ERR("FD of std stream changed: {} != {}", PathStat.st_ino, pathStat.st_ino);
                 Statistics->Fatals++;
-                // enable strict check after confirmation that fix do not broke clients
-                // return TError(EError::Permission, "FD of std stream changed");
+                L_ERR("Inode of std stream changed: {} != {}", PathStat.st_ino, pathStat.st_ino);
+                return TError(EError::Permission, "Inode of std stream changed: {} != {}", PathStat.st_ino, pathStat.st_ino);
             }
         }
 
