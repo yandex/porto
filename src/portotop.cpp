@@ -3,6 +3,10 @@
 #include "portotop.hpp"
 #include "version.hpp"
 
+extern "C" {
+#include <getopt.h>
+}
+
 static void Usage() {
     std::cout
         << std::endl
@@ -12,9 +16,10 @@ static void Usage() {
         << "  -h | --help      print this message" << std::endl
         << "  -c | --cpu       show cpu stat columns" << std::endl
         << "  -m | --memory    show memory stat columns" << std::endl
-        << "  --io             show io stat columns" << std::endl
+        << "  -i | --io        show io stat columns" << std::endl
         << "  -n | --network   show network stat columns" << std::endl
         << "  -p | --porto     show porto stat columns" << std::endl
+        << "  -f | --filter    containers mask" << std::endl
         << std::endl;
 }
 
@@ -24,6 +29,7 @@ static bool ShowMem = false;
 static bool ShowIo = false;
 static bool ShowNet = false;
 static bool ShowPorto = false;
+static std::string ContainersFilter = "***";
 
 static double ParseNumber(const std::string &str) {
     return strtod(str.c_str(), nullptr);
@@ -606,7 +612,7 @@ std::shared_ptr<TPortoContainer> TPortoContainer::GetParent(int level) {
 
 std::shared_ptr<TPortoContainer> TPortoContainer::ContainerTree(Porto::Connection &api) {
     std::vector<std::string> containers;
-    int ret = api.List(containers);
+    int ret = api.List(containers, ContainersFilter);
     if (ret)
         return nullptr;
 
@@ -1464,28 +1470,50 @@ int portotop(Porto::Connection *api, const std::vector<std::string> &args) {
 
 int main(int argc, char *argv[]) {
     int opt = 0;
-    while (++opt < argc && argv[opt][0] == '-') {
-        std::string arg(argv[opt]);
-        if (arg == "-h" || arg == "--help") {
-            Usage();
-            return EXIT_SUCCESS;
-        }
 
-        if (arg == "-c" || arg == "--cpu") {
-            ShowCpu = true;
-            ShowAll = false;
-        } else if (arg == "-m" || arg == "--memory") {
-            ShowMem = true;
-            ShowAll = false;
-        } else if (arg == "--io") {
-            ShowIo = true;
-            ShowAll = false;
-        } else if (arg == "-n" || arg == "--network") {
-            ShowNet = true;
-            ShowAll = false;
-        } else if (arg == "-p" || arg == "--porto") {
-            ShowPorto = true;
-            ShowAll = false;
+    static struct option long_options[] = {
+        {"help",     no_argument,       0,  'h' },
+        {"cpu",      no_argument,       0,  'c' },
+        {"memory",   no_argument,       0,  'm' },
+        {"io",       no_argument,       0,  'i' },
+        {"network",  no_argument,       0,  'n' },
+        {"porto",    no_argument,       0,  'p' },
+        {"filter",   required_argument, 0,  'f' },
+        {0,          0,                 0,   0   }
+    };
+
+    int long_index =0;
+    while ((opt = getopt_long(argc, argv,"hcminpf:", long_options, &long_index )) != -1) {
+        switch (opt) {
+            case 'h':
+                Usage();
+                return EXIT_SUCCESS;
+            case 'c':
+                ShowCpu = true;
+                ShowAll = false;
+                break;
+            case 'm':
+                ShowMem = true;
+                ShowAll = false;
+                break;
+            case 'i':
+                ShowIo = true;
+                ShowAll = false;
+                break;
+            case 'n':
+                ShowNet = true;
+                ShowAll = false;
+                break;
+            case 'p':
+                ShowPorto = true;
+                ShowAll = false;
+                break;
+            case 'f':
+                ContainersFilter = optarg;
+                break;
+            default:
+                Usage();
+                return EXIT_FAILURE;
         }
     }
 
