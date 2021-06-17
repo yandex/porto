@@ -123,7 +123,7 @@ TError TProperty::CanSet() const {
         return TError(EError::NotSupported, "{} is not supported", Name);
 
     if (IsReadOnly)
-        return TError(EError::InvalidValue, "{} is raad-only", Name);
+        return TError(EError::InvalidValue, "{} is read-only", Name);
 
     if (!IsDynamic && CT->State != EContainerState::Stopped)
         return TError(EError::InvalidState, "{} could be set only in stopped state", Name);
