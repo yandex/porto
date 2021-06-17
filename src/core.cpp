@@ -176,7 +176,7 @@ TError TCore::Identify() {
 
 TError TCore::Forward() {
     std::string core = Container + "/core-" + std::to_string(Pid);
-    TMultiTuple env = {
+    TMultiTuple envValues = {
         {"CORE_PID", std::to_string(Vpid)},
         {"CORE_TID", std::to_string(Vtid)},
         {"CORE_SIG", std::to_string(Signal)},
@@ -194,19 +194,30 @@ TError TCore::Forward() {
     /* To let open /dev/stdin */
     fchmod(STDIN_FILENO, 0666);
 
-    if (Conn.CreateWeakContainer(core) ||
-            Conn.SetProperty(core, P_ISOLATE, "false") ||
-            Conn.SetProperty(core, P_STDIN_PATH, "/dev/fd/0") ||
-            Conn.SetProperty(core, P_STDOUT_PATH, "/dev/null") ||
-            Conn.SetProperty(core, P_STDERR_PATH, "/dev/null") ||
-            Conn.SetProperty(core, P_COMMAND, CoreCommand) ||
-            Conn.SetProperty(core, P_USER, User) ||
-            Conn.SetProperty(core, P_GROUP, Group) ||
-            Conn.SetProperty(core, P_OWNER_USER, OwnerUser) ||
-            Conn.SetProperty(core, P_OWNER_GROUP, OwnerGroup) ||
-            Conn.SetProperty(core, P_CWD, Cwd) ||
-            Conn.SetProperty(core, P_ENV, MergeEscapeStrings(env, '=', ';')))
-        return TError("cannot setup CT:{}", core);
+    rpc::TContainerSpec spec;
+    spec.set_name(core);
+    spec.set_weak(true);
+    spec.set_owner_containers("self");
+    spec.set_isolate(false);
+    spec.set_stdin_path("/dev/fd/0");
+    spec.set_stdout_path("/dev/null");
+    spec.set_stderr_path("/dev/null");
+    spec.set_command(CoreCommand);
+    spec.set_user(User);
+    spec.set_group(Group);
+    spec.set_owner_user(OwnerUser);
+    spec.set_owner_group(OwnerGroup);
+    spec.set_cwd(Cwd);
+    auto env = spec.mutable_env();
+    for (const auto &envValue : envValues) {
+        auto val = env->add_var();
+        val->set_name(envValue[0]);
+        val->set_value(envValue[1]);
+    }
+
+    auto error = Conn.CreateFromSpec(spec, {});
+    if (error)
+        return TError("cannot setup CT:{} {}", core, error);
 
     /*
      * Allow poking tasks with suid and ambient capabilities,
