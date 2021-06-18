@@ -267,6 +267,28 @@ def run_mtn_limit_test():
         ExpectPropGe(a, "net_overlimits[group default]", 100)
         ExpectPropLe(a, "net_rx_drops[group default]", 10)
         ExpectPropGe(a, "net_snmp[RetransSegs]", 1)
+
+        Expect(int(a['net_tx_max_speed']) > 50 * 2**20)
+        Expect(int(a['net_rx_max_speed']) < 2**20)
+
+        tx_hgram = a['net_tx_speed_hgram'].split(';')
+        rx_hgram = a['net_rx_speed_hgram'].split(';')
+        ExpectEq(49, len(tx_hgram))
+        ExpectEq(49, len(rx_hgram))
+
+        def GetBytes(hgram):
+            mbytes = 0
+            for kv in hgram:
+                bucket, value = [ int(v) for v in kv.split(':') ]
+                # 25ms is watchdog period
+                mbytes += value * bucket * 0.025
+            return mbytes * 2**20
+
+        tx = GetBytes(tx_hgram)
+        rx = GetBytes(rx_hgram)
+        ExpectRange(tx / float(a['net_tx_bytes[veth]']), 0.75, 1.0)
+        ExpectEq(0, rx)
+
         a.Destroy()
 
         print "Check rx drops and overlimits"
@@ -274,8 +296,20 @@ def run_mtn_limit_test():
         ExpectPropGe(a, "net_rx_drops[group default]", 100)
         ExpectPropLe(a, "net_tx_drops[group default]", 10)
         ExpectPropGe(a, "net_snmp[RetransSegs]", 1)
-        a.Destroy()
 
+        Expect(int(a['net_rx_max_speed']) > 50 * 2**20)
+        Expect(int(a['net_tx_max_speed']) < 2.**20)
+
+        tx_hgram = a['net_tx_speed_hgram'].split(';')
+        rx_hgram = a['net_rx_speed_hgram'].split(';')
+        ExpectEq(49, len(tx_hgram))
+        ExpectEq(49, len(rx_hgram))
+        tx = GetBytes(tx_hgram)
+        rx = GetBytes(rx_hgram)
+        ExpectRange(rx / float(a['net_rx_bytes[veth]']), 0.75, 1.0)
+        ExpectEq(0, tx)
+
+        a.Destroy()
 
 def run_bandwidth_sharing_test():
     b = run_iperf_client("test-net-b", server2, time=6, wait=0, cfg={})

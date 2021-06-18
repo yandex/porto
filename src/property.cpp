@@ -5648,6 +5648,54 @@ TNetProperty NetLimit(P_NET_LIMIT, &TNetClass::TxLimit, EProperty::NET_LIMIT,
 TNetProperty NetRxLimit(P_NET_RX_LIMIT, &TNetClass::RxLimit, EProperty::NET_RX_LIMIT,
         "Maximum ingress bandwidth: <interface>|default: <Bps>;...");
 
+class TNetL3StatProperty : public TProperty {
+public:
+    TNetL3StatProperty(std::string name, std::string desc) : TProperty(name, EProperty::NONE, desc) {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        IsHidden = true;
+    }
+
+    TError Has() {
+        auto lock = TNetwork::LockNetState();
+        if (!CT->Net)
+            return TError(EError::Unknown, "Net is empty");
+        if (CT->Net->IsHost())
+            return TError(EError::ResourceNotAvailable, "Not available for container with host network");
+        else
+            return OK;
+    }
+
+    TError Get(std::string &value) {
+        auto lock = TNetwork::LockNetState();
+
+        if (!CT->Net)
+            return TError(EError::Unknown, "Net is empty");
+        if (CT->Net->IsHost())
+            return TError(EError::ResourceNotAvailable, "Not available for container with host network");
+
+        if (Name == P_NET_TX_SPEED_HGRAM) {
+            const auto txHgram = CT->Net->TxSpeedHgram;
+            if (txHgram)
+                value = txHgram->Format();
+        } else if (Name == P_NET_RX_SPEED_HGRAM) {
+            const auto rxHgram = CT->Net->RxSpeedHgram;
+            if (rxHgram)
+                value = rxHgram->Format();
+        } else if (Name == P_NET_TX_MAX_SPEED)
+            value = std::to_string(CT->Net->TxMaxSpeed);
+        else if (Name == P_NET_RX_MAX_SPEED)
+            value = std::to_string(CT->Net->RxMaxSpeed);
+
+        return OK;
+    }
+};
+
+TNetL3StatProperty NetTxMaxSpeed(P_NET_TX_MAX_SPEED, "Maximum tx speed since net namespace creation");
+TNetL3StatProperty NetRxMaxSpeed(P_NET_RX_MAX_SPEED, "Maximum rx speed since net namespace creation");
+TNetL3StatProperty NetTxSpeedHgram(P_NET_TX_SPEED_HGRAM, "Network tx speed hgram since net namespace creation");
+TNetL3StatProperty NetRxSpeedHgram(P_NET_RX_SPEED_HGRAM, "Network rx speed hgram since net namespace creation");
+
 class TNetStatProperty : public TProperty {
 public:
     uint64_t TNetStat:: *Member;
