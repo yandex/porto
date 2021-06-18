@@ -13,6 +13,7 @@
 #include "util/namespace.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
+#include "util/hgram.hpp"
 
 class TContainer;
 class TNetwork;
@@ -204,6 +205,10 @@ public:
     std::vector<TNetDevice> Devices;
 
     std::map<std::string, TNetStat> DeviceStat;
+    std::shared_ptr<THistogram> RxSpeedHgram;
+    std::shared_ptr<THistogram> TxSpeedHgram;
+    uint64_t RxMaxSpeed = 0;
+    uint64_t TxMaxSpeed = 0;
 
     std::list<TNetProxyNeighbour> Neighbours;
 
@@ -276,6 +281,7 @@ public:
     static TError RestoreNetwork(TContainer &ct);
 
     static void NetWatchdog();
+    static void L3StatWatchdog();
 
     static TError SyncResolvConf();
     static void UpdateSockDiag();

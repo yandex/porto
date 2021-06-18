@@ -187,6 +187,9 @@ static void DefaultConfig() {
     config().mutable_network()->set_l3_default_mtu(9000);
     config().mutable_network()->set_default_uplink_speed_gb(10);
 
+    config().mutable_network()->set_l3stat_watchdog_ms(25);
+    config().mutable_network()->set_l3stat_watchdog_lost_ms(50);
+
     config().mutable_core()->set_enable(false);
     config().mutable_core()->set_timeout_s(600); /* 10min */
     config().mutable_core()->set_space_limit_mb(102400); /* 100Gb */

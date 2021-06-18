@@ -15,6 +15,7 @@
 #include "util/idmap.hpp"
 #include "util/md5.hpp"
 #include "util/proc.hpp"
+#include "util/hgram.hpp"
 #include "test.hpp"
 #include "rpc.hpp"
 
@@ -2491,6 +2492,26 @@ static void TestProcUtils(Porto::Connection &) {
     ExpectLessEq(currentTime - startTime, 60);
 }
 
+static void TestHistogramm(Porto::Connection &) {
+    THistogram hgram({1, 5, 10, 100, 1000});
+
+    ExpectEq("1:0;5:0;10:0;100:0;1000:0", hgram.Format());
+
+    hgram.Add(0);
+    hgram.Add(1);
+    ExpectEq("1:1;5:0;10:0;100:0;1000:0", hgram.Format());
+
+    hgram.Add(10);
+    ExpectEq("1:1;5:0;10:1;100:0;1000:0", hgram.Format());
+
+    hgram.Add(50);
+    hgram.Add(100);
+    ExpectEq("1:1;5:0;10:2;100:1;1000:0", hgram.Format());
+
+    hgram.Add(10000);
+    ExpectEq("1:1;5:0;10:2;100:1;1000:1", hgram.Format());
+}
+
 static void TestRoot(Porto::Connection &api) {
     string v;
     string root = "/";
@@ -4754,6 +4775,7 @@ int SelfTest(std::vector<std::string> args) {
         { "format", TestFormat },
         { "md5sum", TestMd5 },
         { "proc", TestProcUtils },
+        { "histogramm", TestHistogramm },
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },

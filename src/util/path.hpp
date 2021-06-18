@@ -191,6 +191,7 @@ public:
     TError ReadAll(std::string &text, size_t max = 1048576) const;
     TError ReadLines(std::vector<std::string> &lines, size_t max = 1048576) const;
     TError ReadInt(int &value) const;
+    TError ReadUint64(uint64_t &value) const;
 
     TError WriteAll(const std::string &text) const;
     TError WriteAtomic(const std::string &text) const;

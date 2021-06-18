@@ -54,6 +54,7 @@ void InitStatistics() {
     PortoStatMembers.insert(std::make_pair("remove_dead", TStatistic(&TStatistics::RemoveDead)));
     PortoStatMembers.insert(std::make_pair("restore_failed", TStatistic(&TStatistics::ContainerLost)));
     PortoStatMembers.insert(std::make_pair("start_timeouts", TStatistic(&TStatistics::StartTimeouts)));
+    PortoStatMembers.insert(std::make_pair("l3stat_lost", TStatistic(&TStatistics::L3StatLost)));
     PortoStatMembers.insert(std::make_pair("epoll_sources", TStatistic(&TStatistics::EpollSources, false)));
     PortoStatMembers.insert(std::make_pair("log_lines", TStatistic(&TStatistics::LogLines, false)));
     PortoStatMembers.insert(std::make_pair("log_bytes", TStatistic(&TStatistics::LogBytes, false)));

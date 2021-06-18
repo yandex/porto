@@ -13,6 +13,7 @@
 #include "util/string.hpp"
 #include "util/crc32.hpp"
 #include "util/thread.hpp"
+#include "util/hgram.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -35,6 +36,12 @@ extern "C" {
 static std::shared_ptr<TNetwork> HostNetwork;
 
 std::mutex TNetwork::NetworksMutex;
+std::mutex L3StatMutex;
+
+static inline std::unique_lock<std::mutex> LockL3Stat() {
+    return std::unique_lock<std::mutex>(L3StatMutex);
+}
+
 std::mutex TNetwork::NetStateMutex;
 int TNetwork::DefaultTos = 0;
 
@@ -43,11 +50,15 @@ std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> TNetwork::NetworksLi
 std::atomic<int> TNetwork::GlobalStatGen;
 
 static std::unique_ptr<std::thread> NetThread;
+static std::unique_ptr<std::thread> L3StatThread;
 static std::condition_variable NetThreadCv;
+static std::condition_variable L3ThreadCv;
 static uint64_t NetWatchdogPeriod;
 static uint64_t NetProxyNeighbourPeriod;
 static uint64_t SockDiagPeriod;
 static uint64_t SockDiagMaxFds;
+static uint64_t L3StatWatchdogPeriod;
+static uint64_t L3StatWatchdogLostPeriod;
 
 static std::string ResolvConfCurrent;
 static std::string ResolvConfPrev;
@@ -164,6 +175,49 @@ static std::list<std::pair<std::string, std::string>> NetSysctls = {
 };
 
 static std::list<std::string> NamespacedNetSysctls;
+
+// 49 is maximum buckets for yasm
+static const std::vector<unsigned> L3StatBuckets = {
+    0, 10, 13, 16, 19, 22, 25, 28, 31, 35,
+    39, 43, 47, 51, 56, 61, 67, 73, 80, 88,
+    96, 105, 110, 120, 130, 140, 150, 165, 180, 200,
+    220, 240, 265, 290, 320, 350, 385, 450, 500, 600,
+    700, 800, 900, 1000, 1500, 2000, 3000, 4000, 5000,
+};
+
+struct L3DeviceStat {
+    // copy constructor needed for std::map in old compilers without move semantic
+    L3DeviceStat(const L3DeviceStat &other)
+    : UpdateTs(other.UpdateTs)
+    , RxPrev(other.RxPrev)
+    , TxPrev(other.TxPrev)
+    , RxMax(other.RxMax.load())
+    , TxMax(other.TxMax.load())
+    , Found(other.Found)
+    , RxHgram(other.RxHgram)
+    , TxHgram(other.TxHgram)
+    {}
+
+    L3DeviceStat()
+    : UpdateTs(GetCurrentTimeMs())
+    , RxMax(0)
+    , TxMax(0)
+    , RxHgram(std::make_shared<THistogram>(L3StatBuckets))
+    , TxHgram(std::make_shared<THistogram>(L3StatBuckets))
+    {}
+
+    uint64_t UpdateTs;
+    uint64_t RxPrev = 0;
+    uint64_t TxPrev = 0;
+    std::atomic<uint64_t> RxMax;
+    std::atomic<uint64_t> TxMax;
+    bool Found = true;
+
+    std::shared_ptr<THistogram> RxHgram;
+    std::shared_ptr<THistogram> TxHgram;
+};
+
+static std::unordered_map<int, L3DeviceStat> L3Stats;
 
 void InitNamespacedNetSysctls() {
     if (CompareVersions(config().linux_version(), "4.5") >= 0) {
@@ -417,6 +471,9 @@ void TNetwork::InitializeConfig() {
 
     SockDiagPeriod = config().network().sock_diag_update_interval_ms();
     SockDiagMaxFds = config().network().sock_diag_max_fds();
+
+    L3StatWatchdogPeriod = config().mutable_network()->l3stat_watchdog_ms();
+    L3StatWatchdogLostPeriod = config().mutable_network()->l3stat_watchdog_lost_ms();
 
     NetProxyNeighbourPeriod = config().network().proxy_ndp_watchdog_ms();
 
@@ -1129,6 +1186,19 @@ TError TNetwork::SyncDevices() {
             qdiscStat = qdiscIngress.Stat(*Nl);
             dev.DeviceStat.RxDrops += qdiscStat.Drops;
             */
+            auto l3StatLock = LockL3Stat();
+
+            auto it = L3Stats.find(dev.Link);
+            if (it != L3Stats.end()) {
+                if (!RxSpeedHgram)
+                    RxSpeedHgram = it->second.RxHgram;
+                if (!TxSpeedHgram)
+                    TxSpeedHgram = it->second.TxHgram;
+                RxMaxSpeed = it->second.RxMax;
+                TxMaxSpeed = it->second.TxMax;
+            }
+
+            l3StatLock.unlock();
         }
 
         auto net_state_lock = LockNetState();
@@ -1393,7 +1463,7 @@ void TNetwork::DelProxyNeightbour(const std::vector<TNlAddr> &ips) {
         for (auto &ip: addrs) {
             for (auto &dev: Devices) {
                 error = Nl->ProxyNeighbour(dev.Index, ip, false);
-                if (error)
+                if (error && error.Errno != ENODEV)
                     L_ERR("Cannot remove proxy neighbour: {}", error);
             }
             Neighbours.remove_if([&](TNetProxyNeighbour &np) { return ip.IsEqual(np.Ip); });
@@ -2085,6 +2155,89 @@ void TNetwork::NetWatchdog() {
     }
 }
 
+void UpdateL3Stat() {
+    for (auto &stat : L3Stats)
+        stat.second.Found = false;
+
+    std::vector<std::string> devices;
+    auto error = TPath("/sys/devices/virtual/net").ListSubdirs(devices);
+    if (error) {
+        L_ERR("Can not list /sys/devices/virtual/net: {}", error);
+        return;
+    }
+
+    uint64_t ifindex, rx, tx;
+
+    for (const auto &l3 : devices) {
+        if (!StringStartsWith(l3, "L3-"))
+            continue;
+
+        error = TPath(fmt::format("/sys/devices/virtual/net/{}/ifindex", l3)).ReadUint64(ifindex);
+        if (error)
+            continue;
+        error = TPath(fmt::format("/sys/devices/virtual/net/{}/statistics/rx_bytes", l3)).ReadUint64(rx);
+        if (error)
+            continue;
+        error = TPath(fmt::format("/sys/devices/virtual/net/{}/statistics/tx_bytes", l3)).ReadUint64(tx);
+        if (error)
+            continue;
+
+        auto now = GetCurrentTimeMs();
+
+        auto lock = LockL3Stat();
+        auto &l3Stat = L3Stats[ifindex];
+        lock.unlock();
+
+        if (l3Stat.UpdateTs) {
+            auto intervalMs = now - l3Stat.UpdateTs;
+            if (intervalMs > L3StatWatchdogLostPeriod) {
+                L("Can not update {} stat in {}ms: current interval {}ms", l3, L3StatWatchdogPeriod, intervalMs);
+                l3Stat.UpdateTs = now;
+                Statistics->L3StatLost++;
+                continue;
+            } else if (intervalMs == 0)
+                continue;
+
+            // rx in L3 is tx for container similarly for tx
+            uint64_t rxSpeed = (tx - l3Stat.TxPrev) * (1000. / intervalMs);
+            uint64_t txSpeed = (rx - l3Stat.RxPrev) * (1000. / intervalMs);
+            unsigned rxSpeedMb = rxSpeed / (1024 * 1024);
+            unsigned txSpeedMb = txSpeed / (1024 * 1024);
+
+            if (l3Stat.RxPrev != 0) {
+                l3Stat.RxMax = std::max(l3Stat.RxMax.load(), rxSpeed);
+                l3Stat.RxHgram->Add(rxSpeedMb);
+            }
+            if (l3Stat.TxPrev != 0) {
+                l3Stat.TxMax = std::max(l3Stat.TxMax.load(), txSpeed);
+                l3Stat.TxHgram->Add(txSpeedMb);
+            }
+        }
+
+        l3Stat.TxPrev = tx;
+        l3Stat.RxPrev = rx;
+        l3Stat.UpdateTs = now;
+        l3Stat.Found = true;
+    }
+
+    auto lock = LockL3Stat();
+    for(auto it = L3Stats.begin(); it != L3Stats.end();) {
+        if (it->second.Found)
+            ++it;
+        else
+            it = L3Stats.erase(it);
+    }
+}
+
+void TNetwork::L3StatWatchdog() {
+    SetProcessName("portod-NET-L3-STAT");
+    while (HostNetwork) {
+        UpdateL3Stat();
+        auto lock = LockL3Stat();
+        L3ThreadCv.wait_for(lock, std::chrono::milliseconds(L3StatWatchdogPeriod));
+    }
+}
+
 void TNetwork::StartRepair() {
     Statistics->NetworkProblems++;
     if (!NetError)
@@ -2417,7 +2570,9 @@ void TNetwork::StopNetwork(TContainer &ct) {
         HostNetwork = nullptr;
         lock.unlock();
         NetThreadCv.notify_all();
+        L3ThreadCv.notify_all();
         NetThread->join();
+        L3StatThread->join();
         SockDiag.Disconnect();
     }
 
@@ -3438,6 +3593,7 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
             return TError("Cannot connect sock diag: {}", error);
 
         NetThread = std::unique_ptr<std::thread>(NewThread(&TNetwork::NetWatchdog));
+        L3StatThread = std::unique_ptr<std::thread>(NewThread(&TNetwork::L3StatWatchdog));
 
         return OK;
     }

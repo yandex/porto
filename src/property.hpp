@@ -142,6 +142,10 @@ constexpr const char *P_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *P_STDERR = "stderr";
 constexpr const char *P_STDERR_OFFSET = "stderr_offset";
 
+constexpr const char *P_NET_TX_MAX_SPEED = "net_tx_max_speed";
+constexpr const char *P_NET_RX_MAX_SPEED = "net_rx_max_speed";
+constexpr const char *P_NET_TX_SPEED_HGRAM = "net_tx_speed_hgram";
+constexpr const char *P_NET_RX_SPEED_HGRAM = "net_rx_speed_hgram";
 constexpr const char *P_NET_CLASS_ID = "net_class_id";
 constexpr const char *P_NET_BYTES = "net_bytes";
 constexpr const char *P_NET_PACKETS = "net_packets";

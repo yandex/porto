@@ -1014,6 +1014,14 @@ TError TPath::ReadInt(int &value) const {
     return error;
 }
 
+TError TPath::ReadUint64(uint64_t &value) const {
+    std::string text;
+    TError error = ReadAll(text);
+    if (!error)
+        error = StringToUint64(text, value);
+    return error;
+}
+
 TError TPath::FindMount(TMount &mount, bool exact) const {
     std::vector<std::string> lines;
 
