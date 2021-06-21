@@ -20,6 +20,9 @@ extern "C" {
 #include <sys/wait.h>
 }
 
+extern bool SupportCgroupNs;
+extern bool EnableOsModeCgroupNs;
+extern bool EnableRwCgroupFs;
 extern bool EnableDockerMode;
 
 __thread TContainer *CT = nullptr;
@@ -1182,6 +1185,64 @@ public:
         return Set(spec.virt_mode());
     }
 } static VirtMode;
+
+class TCgroupFs : public TProperty {
+public:
+    TCgroupFs() : TProperty(P_CGROUPFS, EProperty::CGROUPFS,
+            "Cgroup fs: none|ro|rw") {}
+    TError Start(void) {
+        if (EnableOsModeCgroupNs && !CT->HasProp(EProperty::CGROUPFS) && CT->OsMode)
+            return Set("rw");
+        return OK;
+    }
+
+    TError Get(std::string &value) {
+        switch (CT->CgroupFs) {
+            case ECgroupFs::None:
+                value = "none";
+                break;
+            case ECgroupFs::Ro:
+                value = "ro";
+                break;
+            case ECgroupFs::Rw:
+                value = "rw";
+                break;
+        }
+        return OK;
+    }
+    TError Set(const std::string &value) {
+        if (value == "none")
+            CT->CgroupFs = ECgroupFs::None;
+        else if (!SupportCgroupNs)
+            return TError(EError::NotSupported, "Cgroup namespaces not supported");
+        else if (value == "ro")
+            CT->CgroupFs = ECgroupFs::Ro;
+        else if (value == "rw") {
+            if ((EnableOsModeCgroupNs && CT->OsMode) || EnableRwCgroupFs)
+                CT->CgroupFs = ECgroupFs::Rw;
+            else
+                return TError(EError::Permission, "Cgroup namespaces disabled in portod.conf: rw access to cgroupfs denied");
+        } else
+            return TError(EError::InvalidValue, "Unknown cgroupfs value: {}", value);
+
+        CT->SetProp(EProperty::CGROUPFS);
+        return OK;
+    }
+
+    void Dump(rpc::TContainerSpec &spec) override {
+        std::string val;
+        Get(val);
+        spec.set_cgroupfs(val);
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_cgroupfs();
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) override {
+        return Set(spec.cgroupfs());
+    }
+} static CgroupFs;
 
 class TStdStreamProperty : public TProperty {
 public:

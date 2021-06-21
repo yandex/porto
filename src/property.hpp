@@ -107,6 +107,7 @@ constexpr const char *P_IP = "ip";
 constexpr const char *P_IP_LIMIT = "ip_limit";
 constexpr const char *P_DEFAULT_GW = "default_gw";
 constexpr const char *P_VIRT_MODE = "virt_mode";
+constexpr const char *P_CGROUPFS = "cgroupfs";
 constexpr const char *P_AGING_TIME = "aging_time";
 constexpr const char *P_ENABLE_PORTO = "enable_porto";
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
@@ -238,6 +239,7 @@ enum class EProperty {
     IP_LIMIT,
     DEFAULT_GW,
     VIRT_MODE,
+    CGROUPFS,
     AGING_TIME,
     ENABLE_PORTO,
     RESOLV_CONF,

@@ -97,7 +97,7 @@ public:
     }
 
     TCgroup Child(const std::string& name) const;
-    TError ChildsAll(std::vector<TCgroup> &cgroups) const;
+    TError ChildsAll(std::vector<TCgroup> &cgroups, bool all = false) const;
 
     TPath Path() const;
     bool IsRoot() const;

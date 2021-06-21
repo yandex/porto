@@ -27,7 +27,6 @@ extern "C" {
 #include <grp.h>
 #include <net/if.h>
 #include <linux/sched.h>
-#include <linux/capability.h>
 }
 
 std::list<std::string> IpcSysctls = {
@@ -49,7 +48,7 @@ std::list<std::string> IpcSysctls = {
     "kernel.sem",
 };
 
-extern bool EnableCgroupNs;
+extern bool SupportCgroupNs;
 extern bool EnableDockerMode;
 
 void InitIpcSysctl() {
@@ -150,7 +149,7 @@ TError TTaskEnv::OpenNamespaces(TContainer &ct) {
     if (error)
         return error;
 
-    if (EnableCgroupNs) {
+    if (SupportCgroupNs) {
         error = CgFd.Open(pid, "ns/cgroup");
         if (error)
             return error;
@@ -336,8 +335,7 @@ TError TTaskEnv::ConfigureChild() {
 
     if (NewMountNs) {
 
-        error = Mnt.Setup(CT->CapBound.Permitted & BIT(CAP_SYS_ADMIN),
-                          EnableDockerMode && CT->OwnerCred.IsRootUser(), CT->DockerMode);
+        error = Mnt.Setup(*CT);
         if (error)
             return error;
 
@@ -743,7 +741,7 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
-        if (EnableCgroupNs) {
+        if (SupportCgroupNs) {
             error = CgFd.SetNs(CLONE_NEWCGROUP);
             if (error)
                 Abort(error);
@@ -792,7 +790,7 @@ TError TTaskEnv::Start() {
         if (CT->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
 
-        if (EnableCgroupNs && CT->OsMode)
+        if (SupportCgroupNs && CT->CgroupFs != ECgroupFs::None)
             cloneFlags |= CLONE_NEWCGROUP;
 
         if (NewMountNs)

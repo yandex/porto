@@ -8,6 +8,8 @@
 #include "util/cred.hpp"
 #include "util/namespace.hpp"
 
+class TContainer;
+
 struct TBindMount {
     TPath Source;
     TPath Target;
@@ -50,11 +52,11 @@ public:
     TError RemountRun();
     TError MountBinds();
     TError ProtectProc();
-    TError ProtectCgroups();
     TError MountTraceFs();
     TError MountSystemd();
+    TError MountCgroups(bool rw);
 
-    TError Setup(bool capSysAdmin, bool rootUser, bool dockerMode);
+    TError Setup(const TContainer &ct);
 
     TError Enter(pid_t pid);
     TError Leave();

@@ -108,6 +108,7 @@ static void DefaultConfig() {
         config().mutable_container()->set_enable_cgroup2(true);
 
     config().mutable_container()->set_use_os_mode_cgroupns(false);
+    config().mutable_container()->set_enable_rw_cgroupfs(false);
 
     config().mutable_container()->set_enable_docker_mode(false);
 

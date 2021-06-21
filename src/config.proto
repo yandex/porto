@@ -225,7 +225,8 @@ message TConfig {
         optional bool ptrace_on_start = 54;
         optional uint64 std_stream_read_limit = 55;
         optional bool enable_cgroup2 = 56;
-        optional bool use_os_mode_cgroupns = 57;
+        optional bool use_os_mode_cgroupns = 57 [deprecated=true]; // use cgroupfs container option
+        optional bool enable_rw_cgroupfs = 59;
         optional bool enable_docker_mode = 58;
 
         message TSysctl {

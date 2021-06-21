@@ -75,7 +75,9 @@ static uint64_t ShutdownStart = 0;
 static uint64_t ShutdownDeadline = 0;
 std::atomic_bool NeedStopHelpers(false);
 
-bool EnableCgroupNs = false;
+bool SupportCgroupNs = false;
+bool EnableOsModeCgroupNs = false;
+bool EnableRwCgroupFs = false;
 bool EnableDockerMode = false;
 uint32_t RequestHandlingDelayMs = 0;
 
@@ -801,9 +803,12 @@ static int Portod() {
 
     ReadConfigs();
 
-    EnableCgroupNs = config().container().use_os_mode_cgroupns() &&
-                     (CompareVersions(config().linux_version(), "4.6") >= 0);
-    EnableDockerMode = config().container().enable_docker_mode() && EnableCgroupNs;
+    SupportCgroupNs = CompareVersions(config().linux_version(), "4.6") >= 0;
+    if (SupportCgroupNs) {
+        EnableRwCgroupFs = config().container().enable_rw_cgroupfs();
+        EnableOsModeCgroupNs = EnableRwCgroupFs || config().container().use_os_mode_cgroupns();
+        EnableDockerMode = config().container().enable_docker_mode() && EnableOsModeCgroupNs;
+    }
     RequestHandlingDelayMs = config().daemon().request_handling_delay_ms();
 
     InitPortoGroups();

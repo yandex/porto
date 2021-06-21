@@ -1,6 +1,7 @@
 #include "filesystem.hpp"
 #include "config.hpp"
 #include "cgroup.hpp"
+#include "container.hpp"
 #include "util/log.hpp"
 
 
@@ -16,7 +17,6 @@ extern "C" {
 #define TRACEFS_MAGIC          0x74726163
 #endif
 
-extern bool EnableCgroupNs;
 extern bool EnableDockerMode;
 
 static std::vector<TPath> SystemPaths = {
@@ -34,12 +34,6 @@ static std::vector<TPath> SystemPaths = {
     "/sys",
     "/usr",
     "/var",
-};
-
-static std::vector<std::string> HiddenCgroupMounts = {
-    "net_cls",
-    "net_prio",
-    "net_cls,net_prio"
 };
 
 bool IsSystemPath(const TPath &path) {
@@ -448,7 +442,7 @@ TError TMountNamespace::MountSystemd() {
 
     TPath tmpfs = "sys/fs/cgroup";
     TPath systemd = tmpfs / "systemd";
-    TPath systemd_rw = EnableCgroupNs ? systemd : systemd / Systemd; // if cgroup ns enabled, current cgroup is root
+    TPath systemd_rw = systemd / Systemd;
     TError error;
 
     error = tmpfs.UmountAll();
@@ -464,6 +458,67 @@ TError TMountNamespace::MountSystemd() {
         error = systemd_rw.BindRemount(systemd_rw, MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_ALLOW_WRITE);
 
     return error;
+}
+
+TError TMountNamespace::MountCgroups(bool rw) {
+    TError error;
+    TPath tmpfs = "sys/fs/cgroup";
+
+    error = tmpfs.UmountAll();
+    if (error)
+        return error;
+
+    error = tmpfs.Mount("tmpfs", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME, {"mode=755"});
+    if (error)
+        return error;
+
+    static const struct {
+        std::string Type;
+        std::string Path;
+        std::vector<std::string> Options;
+    } cgroups[] = {
+        { "cgroup",  "freezer",          { "freezer" }},
+        { "cgroup",  "pids",             { "pids" }},
+        { "cgroup",  "cpuset",           { "cpuset" }},
+        { "cgroup",  "memory",           { "memory" }},
+        { "cgroup",  "blkio",            { "blkio" }},
+        { "cgroup",  "cpu,cpuacct",      { "cpu", "cpuacct" }},
+        { "cgroup",  "devices",          { "devices" }},
+        { "cgroup",  "hugetlb",          { "hugetlb" }},
+        { "cgroup",  "net_cls,net_prio", { "net_cls", "net_prio" }},
+        { "cgroup",  "perf_event",       { "perf_event" }},
+        { "cgroup",  "systemd",          { "name=systemd" }},
+        { "cgroup2", "unified",          {}}
+    };
+
+    for (const auto &cg : cgroups) {
+        TPath cgroup = tmpfs / cg.Path;
+        error = cgroup.MkdirAll(0755);
+        if (error)
+            return error;
+
+        error = cgroup.Mount(cg.Type, cg.Type, MS_NOSUID | MS_NOEXEC | MS_NODEV | (rw ? MS_ALLOW_WRITE : MS_RDONLY), cg.Options);
+        if (error)
+            return error;
+    }
+
+    static const struct {
+        TPath path;
+        TPath target;
+    } symlinks[] = {
+        { "sys/fs/cgroup/cpu",      "cpu,cpuacct" },
+        { "sys/fs/cgroup/cpuacct",  "cpu,cpuacct" },
+        { "sys/fs/cgroup/net_cls",  "net_cls,net_prio" },
+        { "sys/fs/cgroup/net_prio", "net_cls,net_prio" },
+    };
+
+    for (auto &s : symlinks) {
+        error = s.path.Symlink(s.target);
+        if (error)
+            return error;
+    }
+
+    return tmpfs.Remount(MS_RDONLY);
 }
 
 TError TMountNamespace::SetupRoot(bool rootUser) {
@@ -634,35 +689,10 @@ TError TMountNamespace::ProtectProc() {
     return OK;
 }
 
-TError TMountNamespace::ProtectCgroups() {
-    TPath tmpfs = "sys/fs/cgroup";
-    TError error;
+TError TMountNamespace::Setup(const TContainer &ct) {
+    bool rootUser = EnableDockerMode && ct.OwnerCred.IsRootUser();
+    bool dockerMode = ct.DockerMode;
 
-    error = tmpfs.UmountAll();
-    if (error)
-        return error;
-
-    error = tmpfs.Mount("tmpfs", "tmpfs", MS_NOEXEC | MS_NOSUID | MS_NODEV | MS_STRICTATIME, {"mode=755"});
-    if (error)
-        return error;
-
-    // hide some cgroup hierarchy for virt_mode=os containers with cgroup ns PORTO-718
-    for (const auto &cgroupName : HiddenCgroupMounts) {
-        TPath cgroup = tmpfs / cgroupName;
-
-        error = cgroup.MkdirAll(0);
-        if (error)
-            return error;
-
-        error = cgroup.Mount("tmpfs", "tmpfs", MS_RDONLY, {"mode=0", "size=1k"});
-        if (error)
-            return error;
-    }
-
-    return OK;
-}
-
-TError TMountNamespace::Setup(bool capSysAdmin, bool rootUser, bool dockerMode) {
     TPath dot(".");
     TError error;
 
@@ -723,7 +753,7 @@ TError TMountNamespace::Setup(bool capSysAdmin, bool rootUser, bool dockerMode) 
     if (ProcFd.FsType() != PROC_SUPER_MAGIC)
         return TError("Cannot open procfs");
 
-    if (HostRoot.IsRoot() || (EnableCgroupNs && !rootUser)) {
+    if (HostRoot.IsRoot()) {
         error = TPath("/sys/fs/cgroup").UmountAll();
         if (error)
             return error;
@@ -775,10 +805,11 @@ TError TMountNamespace::Setup(bool capSysAdmin, bool rootUser, bool dockerMode) 
             return error;
     }
 
-    if (!EnableCgroupNs || !capSysAdmin)
+    if (ct.CgroupFs != ECgroupFs::None)
+        error = MountCgroups(ct.DockerMode || ct.CgroupFs == ECgroupFs::Rw);
+    else
         error = MountSystemd();
-    else if (!rootUser || !EnableDockerMode)
-        error = ProtectCgroups();
+
     if (error)
         return error;
 

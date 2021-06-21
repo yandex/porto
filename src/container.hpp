@@ -51,6 +51,12 @@ enum class ECpuSetType {
     Absolute,
 };
 
+enum class ECgroupFs {
+    None,
+    Ro,
+    Rw,
+};
+
 class TProperty;
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
@@ -149,6 +155,7 @@ public:
     bool JobMode = false;       /* Process group */
     bool DockerMode = false;
     bool FuseMode = false;
+    ECgroupFs CgroupFs = ECgroupFs::None;
 
     TMultiTuple NetProp;
     bool NetIsolate;            /* Create new network namespace */
