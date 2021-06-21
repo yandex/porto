@@ -249,6 +249,13 @@ Porto provides API for label lookup, atomic compare-and-set, atomic increment an
     - join mount namespaces
     - join user namespaces with direct mapping
 
+* **cgroupfs** - mount cgroup fs in container:
+    - *none* - (default) do not mount
+    - *ro* - mount read only
+    - *rw* - allow write. Allowed by config via **enable_rw_cgroupfs**=*true*
+
+    If **cgroupfs**!=*none* then task starts in cgroup namespace
+
 ## State
 
 * **id** - container id, 64-bit decimal

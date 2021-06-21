@@ -44,8 +44,6 @@ extern pid_t PortodPid;
 extern std::unordered_set<pid_t> PortoTids;
 extern std::mutex TidsMutex;
 
-extern bool EnableCgroupNs;
-
 TPath TCgroup::Path() const {
     if (!Subsystem)
         return TPath();
@@ -112,18 +110,16 @@ TError TCgroup::Rename(TCgroup &target) {
 }
 
 TError TCgroup::Remove() {
-    if ((Subsystem->Kind & CGROUP_SYSTEMD) || EnableCgroupNs) {
-        std::vector<TCgroup> children;
+    std::vector<TCgroup> children;
 
-        TError error = ChildsAll(children);
+    TError error = ChildsAll(children, true);
+    if (error)
+        return error;
+
+    for (auto it = children.rbegin(); it != children.rend(); ++it) {
+        error = (*it).RemoveOne();
         if (error)
             return error;
-
-        for (auto it = children.rbegin(); it != children.rend(); ++it) {
-            error = (*it).RemoveOne();
-            if (error)
-                return error;
-        }
     }
 
     return RemoveOne();
@@ -328,7 +324,7 @@ TCgroup TCgroup::Child(const std::string& name) const {
     return TCgroup(Subsystem, Name + "/" + name);
 }
 
-TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
+TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups, bool all) const {
     TPathWalk walk;
     TError error;
 
@@ -352,7 +348,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
         std::string name = Subsystem->Root.InnerPath(walk.Path).ToString();
 
         /* Ignore non-proto cgroups */
-        if (!StringStartsWith(name, PORTO_CGROUP_PREFIX) && !EnableCgroupNs)
+        if (!StringStartsWith(name, PORTO_CGROUP_PREFIX) && !all)
             continue;
 
         cgroups.push_back(TCgroup(Subsystem,  name));

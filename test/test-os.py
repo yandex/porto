@@ -14,6 +14,7 @@ def ExpectRunlevel(ct, level):
 
 
 def CheckSubCgroups(ct):
+    warnings = conn.GetProperty("/", "porto_stat[warnings]")
     r = conn.Run(ct.name + '/child', wait=10,
                  command='''bash -c "mkdir -p /sys/fs/cgroup/freezer/dir123/subdir567;
                             echo $$ >/sys/fs/cgroup/freezer/dir123/subdir567/cgroup.procs;
@@ -21,18 +22,25 @@ def CheckSubCgroups(ct):
                             private='portoctl shell', isolate=False)
     ExpectEq(len(r['stderr']), 0)
     r.Destroy()
-    ExpectEq(conn.GetProperty("/", "porto_stat[warnings]"), "0")
+    ExpectEq(conn.GetProperty("/", "porto_stat[warnings]"), warnings)
 
 def CheckCgroupHierarchy(ct, haveCgroups):
     # Check cgroup hierarchy in portoctl shell container
     r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup', private='portoctl shell', isolate=False)
-    assert (len(r['stdout'].strip().split('\n')) > 1) == haveCgroups
+    res_cgroups = r['stdout'].strip().split('\n')
+    if haveCgroups:
+        assert len(res_cgroups) == 16
+    else:
+        res_cgroups == ['systemd']
     r.Destroy()
 
     # Check cgroup hierarchy in child container
     r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup')
     res_cgroups = r['stdout'].strip().split('\n')
-    assert res_cgroups == ['net_cls', 'net_cls,net_prio', 'net_prio'] or res_cgroups == ['systemd']
+    if haveCgroups:
+        assert len(res_cgroups) == 16
+    else:
+        assert res_cgroups == ['systemd']
     r.Destroy()
 
     if haveCgroups:
@@ -53,7 +61,10 @@ def CheckCgroupHierarchy(ct, haveCgroups):
         for unmounted_cgroup in unmounted_cgroups:
             r = conn.Run(ct.name + '/child', wait=10, command='ls /sys/fs/cgroup/{}'.format(unmounted_cgroup), private='portoctl shell', isolate=False)
             ExpectEq(r['exit_code'], '0')
-            ExpectEq(len(r['stdout']), 0)
+            if not haveCgroups:
+                ExpectEq(len(r['stdout']), 0)
+            else:
+                ExpectNe(len(r['stdout']), 0)
             r.Destroy()
 
 def CheckSystemd(ct):
@@ -92,7 +103,7 @@ try:
     a.SetProperty('virt_mode', 'os')
     a.SetProperty('capabilities[SYS_ADMIN]', 'false')
     a.Start()
-    CheckCgroupHierarchy(a, False)
+    CheckCgroupHierarchy(a, True)
     CheckSystemd(a)
     m.Destroy()
 

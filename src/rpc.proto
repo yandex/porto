@@ -543,6 +543,7 @@ message TContainerSpec {
     optional string virt_mode = 10;
     optional string enable_porto = 11;
     optional string porto_namespace = 12;
+    optional string cgroupfs = 78;
 
     optional uint64 aging_time = 13;
 
