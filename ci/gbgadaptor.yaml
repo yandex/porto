@@ -118,7 +118,7 @@ jobs:
           gpg_public: robot-rtc-builder-gpg-public
           gpg_private: robot-rtc-builder-gpg-private
           pbuilder_tarball_origin: 'tarball'
-          tar_base: '1930154509'
+          tar_base: '2243249075'
           release_dist_repo: search-focal
           release_upload_packages: true
           save_packages: true
