@@ -56,7 +56,7 @@ static void CatchChild(int) {
 std::string GetVlan688Subnet() {
     struct ifaddrs *ifAddrStruct = NULL;
     struct ifaddrs *ifa;
-    std::string subnet;
+    char subnet[20] = {};
 
     if (getifaddrs(&ifAddrStruct)) {
         std::cerr << strerror(errno) << std::endl;
@@ -66,16 +66,11 @@ std::string GetVlan688Subnet() {
     for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr->sa_family == AF_INET6) {
             if (strcmp(ifa->ifa_name, "vlan688") == 0) {
-                char addressBuffer[INET6_ADDRSTRLEN];
-                if (inet_ntop(AF_INET6,  &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr, addressBuffer, INET6_ADDRSTRLEN) == NULL)
-                    continue;
-
-                static const std::regex re("2a02:6b8[:0-9a-f]\+::");
-                std::string addr(addressBuffer);
-                std::smatch match;
-
-                if (std::regex_search(addr, match, re)) {
-                    subnet = StringReplaceAll(match[0], "::", "");
+                const auto &addr = ((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr.s6_addr;
+                // find global addr like 2a02:6b8:*
+                if (addr[0] == 0x2a && addr[1] == 0x02 && addr[2] == 0x06 && addr[3] == 0xb8) {
+                    sprintf(subnet, "%.2x%.2x:%.2x%.2x:%.2x%.2x:%.2x%.2x",
+                            addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7]);
                     break;
                 }
             }
