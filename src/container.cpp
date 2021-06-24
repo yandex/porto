@@ -3138,7 +3138,7 @@ TError TContainer::FreeResources(bool ignore) {
 
 TError TContainer::Kill(int sig) {
     if (State != EContainerState::Running)
-        return TError(EError::InvalidState, "invalid container state ");
+        return TError(EError::InvalidState, "invalid container state={}", TContainer::StateName(State));
 
     L_ACT("Kill task {} in CT{}:{}", Task.Pid, Id, Name);
     return Task.Kill(sig);
