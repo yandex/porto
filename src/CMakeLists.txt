@@ -47,10 +47,10 @@ target_link_libraries(portod version porto util config
 			     pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE} ${LIBNL_IDIAG})
 
 add_executable(portoctl portoctl.cpp cli.cpp)
-target_link_libraries(portoctl version porto util rt fmt ${PB})
+target_link_libraries(portoctl version porto util pthread rt fmt ${PB})
 
 add_executable(portoctl-top portotop.cpp)
-target_link_libraries(portoctl-top version porto util
+target_link_libraries(portoctl-top version porto util pthread
 			       rt menu fmt ${PB} ${CURSES_LIBRARIES})
 
 add_executable(portoinit portoinit.c)
