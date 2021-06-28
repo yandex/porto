@@ -5533,7 +5533,6 @@ public:
         TProperty(name, prop, desc), Member(member)
     {
         IsDynamic = true;
-        RequireControllers = CGROUP_NETCLS;
     }
 
     TError Set(TUintMap &map) {
