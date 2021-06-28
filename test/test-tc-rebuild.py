@@ -5,6 +5,9 @@ from test_common import *
 import re
 import os
 
+# disabled because tc do not used
+sys.exit(0)
+
 conn = porto.Connection()
 
 expected_errors = int(conn.GetData('/', 'porto_stat[errors]'))

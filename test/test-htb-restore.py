@@ -4,6 +4,9 @@ import os
 import re
 import subprocess
 
+# disabled because tc do not used
+sys.exit(0)
+
 def has_class(link, class_id):
     (major, minor) = class_id.split(':')
     expr = 'class (htb|hfsc) %s\:%s' % (major, minor)
