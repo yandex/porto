@@ -36,7 +36,7 @@ try:
         b.Destroy()
 
     # change owner recursive
-    for dir in ['/sys/fs/cgroup', '/var/lib/docker', '/var/lib/containerd', '/etc/docker', '/etc/containerd']:
+    for dir in ['/var/lib/docker', '/var/lib/containerd', '/etc/docker', '/etc/containerd']:
         b = conn.Run('a/b', wait=10, command='chown -R {}:{} {}'.format(uid, gid, dir))
         if dir != '/sys/fs/cgroup':
             ExpectEq(b['exit_code'], '0')

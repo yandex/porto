@@ -500,6 +500,12 @@ TError TMountNamespace::MountCgroups(bool rw) {
         error = cgroup.Mount(cg.Type, cg.Type, MS_NOSUID | MS_NOEXEC | MS_NODEV | (rw ? MS_ALLOW_WRITE : MS_RDONLY), cg.Options);
         if (error)
             return error;
+
+        if (rw) {
+            error = cgroup.Chmod(0777);
+            if (error)
+                return error;
+        }
     }
 
     static const struct {
