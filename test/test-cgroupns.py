@@ -63,7 +63,7 @@ try:
         ExpectEq(16, len(b['stdout'].split()))
         b.Destroy()
 
-        b = conn.Run('a/b', wait=0, virt_mode='job', isolate=False, command='bash -c "mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test/cgroup.procs; sleep 3"')
+        b = conn.Run('a/b', wait=0, virt_mode='job', isolate=False, user='1044', command='bash -c "mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test/cgroup.procs; sleep 3"')
 
         time.sleep(1)
         with open('/sys/fs/cgroup/freezer/porto/a/test/cgroup.procs') as f:
