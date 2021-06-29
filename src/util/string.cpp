@@ -135,8 +135,9 @@ TError UnitToMult(const std::string& unit, uint64_t &mult) {
                         return OK;
                     break;
                 case 'i':
-                    if (!i || unit[2] != 'B')
-                        break;
+                    if (i && unit[2] == 'B' && unit[3] == '\0')
+                        return OK;
+                    break;
                 case '\0':
                     return OK;
             }

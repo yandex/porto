@@ -632,7 +632,7 @@ static void RestoreContainers() {
             if (!node->Has(P_RAW_NAME))
                 error = TError("name not found");
             if (!error && (StringToInt(node->Get(P_RAW_ID), node->Id) ||
-                           node->Id > 3 && ids.GetAt(node->Id)))
+                           (node->Id > 3 && ids.GetAt(node->Id))))
                 node->Id = 0;
         }
         if (error) {

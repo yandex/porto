@@ -13,9 +13,9 @@ public:
     bool Outside = false;
     uint64_t Limit = 0;
     uint64_t Offset = 0;
-    struct stat PathStat = {};
+    struct stat PathStat;
 
-    TStdStream(int stream): Stream(stream) { }
+    TStdStream(int stream): Stream(stream) { memset(&PathStat, 0, sizeof(PathStat)); }
 
     void SetOutside(const std::string &path) {
         Path = path;

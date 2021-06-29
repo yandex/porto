@@ -59,8 +59,9 @@ void ResetIgnoredSignals() {
 }
 
 void Signal(int signum, void (*handler)(int)) {
-    struct sigaction sa = {};
+    struct sigaction sa;
 
+    memset(&sa, 0, sizeof(sa));
     sa.sa_handler = handler;
     if (sigaction(signum, &sa, NULL)) {
         L_ERR("Cannot set signal action");

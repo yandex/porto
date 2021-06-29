@@ -39,10 +39,10 @@ public:
         Error(other.Error), Errno(other.Errno),
         Text(fmt::format(fmt, args...) + ": " + other.Text) {}
 
-    TError(const TError &other) = default;
-    TError(TError &&other) = default;
-    TError &operator=(TError &&other) = default;
-    TError &operator=(const TError &other) = default;
+    TError(const TError &) = default;
+    TError(TError &&) = default;
+    TError &operator=(TError &&) = default;
+    TError &operator=(const TError &) = default;
 
     explicit operator bool() const {
         return Error != EError::Success;

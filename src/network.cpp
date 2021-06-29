@@ -1402,11 +1402,12 @@ void TNetwork::RepairProxyNeightbour() {
     auto sk = GetSock();
     TError error;
     int ret;
-    struct ndmsg ndmsg = {};
+    struct ndmsg ndmsg;
 
     if (Neighbours.empty())
         return;
 
+    memset(&ndmsg, 0, sizeof(ndmsg));
     ndmsg.ndm_family = AF_UNSPEC;
     ndmsg.ndm_flags = NTF_PROXY;
 

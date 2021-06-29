@@ -72,8 +72,9 @@ TError TNl::Error(int nl_err, const std::string &prefix) {
 
 void TNl::Dump(const std::string &prefix, void *obj) const {
     std::stringstream ss;
-    struct nl_dump_params dp = {};
+    struct nl_dump_params dp;
 
+    memset(&dp, 0, sizeof(dp));
     dp.dp_type = Verbose ? NL_DUMP_STATS : NL_DUMP_LINE;
     dp.dp_data = &ss;
     dp.dp_cb = [](struct nl_dump_params *dp, char *buf) {
@@ -306,14 +307,14 @@ TError TNLinkSockDiag::FillTcpInfoMap() {
 }
 
 static struct nla_policy ext_policy_v2[INET_DIAG_MAX+1] = {
-    {}, // INET_DIAG_NONE
-    {}, // INET_DIAG_MEMINFO
+    { 0, 0, 0 }, // INET_DIAG_NONE
+    { 0, 0, 0 }, // INET_DIAG_MEMINFO
     { 0, sizeof(struct tcp_info_ext_v2), 0 }, // INET_DIAG_INFO
 };
 
 static struct nla_policy ext_policy_v1[INET_DIAG_MAX+1] = {
-    {}, // INET_DIAG_NONE
-    {}, // INET_DIAG_MEMINFO
+    { 0, 0, 0 }, // INET_DIAG_NONE
+    { 0, 0, 0 }, // INET_DIAG_MEMINFO
     { 0, sizeof(struct tcp_info_ext_v1), 0 }, // INET_DIAG_INFO
 };
 
@@ -643,7 +644,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     uint32_t masterIdx;
     struct nl_msg *msg;
     struct nlattr *linkinfo, *infodata;
-    struct ifinfomsg ifi = {};
+    struct ifinfomsg ifi;
     struct ether_addr ea;
     auto Name = GetName();
 
@@ -661,6 +662,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     if (!msg)
         return TError("Unable to add " + vlantype + ": no memory");
 
+    memset(&ifi, 0, sizeof(ifi));
     ret = nlmsg_append(msg, &ifi, sizeof(ifi), NLMSG_ALIGNTO);
     if (ret < 0) {
         error = TError("Unable to add " + vlantype + ": " + nl_geterror(ret));
@@ -1041,31 +1043,31 @@ TError TNlQdisc::CreateCodel(const TNl &nl, bool fq_codel) {
     }
 
     if (Limit) {
-        ret = nla_put_u32(msg, fq_codel ? TCA_FQ_CODEL_LIMIT : TCA_CODEL_LIMIT, Limit);
+        ret = nla_put_u32(msg, fq_codel ? (int)TCA_FQ_CODEL_LIMIT : (int)TCA_CODEL_LIMIT, Limit);
         if (ret < 0)
             goto free_msg;
     }
 
     if (config().network().has_codel_target()) {
-        ret = nla_put_u32(msg, fq_codel ? TCA_FQ_CODEL_TARGET : TCA_CODEL_TARGET, config().network().codel_target());
+        ret = nla_put_u32(msg, fq_codel ? (int)TCA_FQ_CODEL_TARGET : (int)TCA_CODEL_TARGET, config().network().codel_target());
         if (ret < 0)
             goto free_msg;
     }
 
     if (config().network().has_codel_interval()) {
-        ret = nla_put_u32(msg, fq_codel ? TCA_FQ_CODEL_INTERVAL : TCA_CODEL_INTERVAL, config().network().codel_interval());
+        ret = nla_put_u32(msg, fq_codel ? (int)TCA_FQ_CODEL_INTERVAL : (int)TCA_CODEL_INTERVAL, config().network().codel_interval());
         if (ret < 0)
             goto free_msg;
     }
 
     if (config().network().has_codel_ecn()) {
-        ret = nla_put_u32(msg, fq_codel ? TCA_FQ_CODEL_ECN : TCA_CODEL_ECN, config().network().codel_ecn());
+        ret = nla_put_u32(msg, fq_codel ? (int)TCA_FQ_CODEL_ECN : (int)TCA_CODEL_ECN, config().network().codel_ecn());
         if (ret < 0)
             goto free_msg;
     }
 
     if (config().network().has_codel_ce_threshold()) {
-        ret = nla_put_u32(msg, fq_codel ? TCA_FQ_CODEL_CE_THRESHOLD : TCA_CODEL_CE_THRESHOLD, config().network().codel_ce_threshold());
+        ret = nla_put_u32(msg, fq_codel ? (int)TCA_FQ_CODEL_CE_THRESHOLD : (int)TCA_CODEL_CE_THRESHOLD, config().network().codel_ce_threshold());
         if (ret < 0)
             goto free_msg;
     }
@@ -1503,8 +1505,8 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
     uint32_t result = TC_ACT_OK;
     TError error = OK;
     struct nlattr *u32, *u32_police;
-    struct tc_u32_sel sel = {};
-    struct tc_police parm = {};
+    struct tc_u32_sel sel;
+    struct tc_police parm;
     struct nl_msg *msg;
     struct tcmsg tchdr;
     int ret;
@@ -1540,6 +1542,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
 
     u32 = nla_nest_start(msg, TCA_OPTIONS);
 
+    memset(&sel, 0, sizeof(sel));
     sel.flags = TC_U32_TERMINAL;
     ret = nla_put(msg, TCA_U32_SEL, sizeof(sel), &sel);
     if (ret < 0) {
@@ -1558,6 +1561,7 @@ TError TNlPoliceFilter::Create(const TNl &nl) {
 
     }
 
+    memset(&parm, 0, sizeof(parm));
     parm.action = TC_ACT_SHOT;
 
     parm.rate.mpu = 0;

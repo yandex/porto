@@ -62,7 +62,7 @@ TError TCore::Handle(const TTuple &args) {
 
     if (args.size() > 9) {
         std::string pattern;
-        for (int i=9; i < args.size(); ++i)
+        for (size_t i = 9; i < args.size(); ++i)
             pattern += args[i];
         DefaultPattern = StringReplaceAll(pattern, "__SPACE__", " ");
     }

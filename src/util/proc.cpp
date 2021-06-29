@@ -127,7 +127,7 @@ TError GetProcNetStats(pid_t pid, TUintMap &stats, const std::string &basename) 
     if (headerList.size() != valuesList.size())
         return TError("Invalid net stat structure: /proc/{}/net/{}, {} headers != {} values", pid, basename, headerList.size(), valuesList.size());
 
-    for (int i = 0; i < headerList.size(); ++i) {
+    for (size_t i = 0; i < headerList.size(); ++i) {
         uint64_t value;
         error = StringToUint64(valuesList[i], value);
         if (error)

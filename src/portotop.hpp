@@ -118,6 +118,7 @@ class TPortoValue {
 public:
     TPortoValue();
     TPortoValue(const TPortoValue &src);
+    TPortoValue& operator=(const TPortoValue &src);
     TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container);
     TPortoValue(std::shared_ptr<TPortoValueCache> &cache,
                 std::shared_ptr<TPortoContainer> &container,
