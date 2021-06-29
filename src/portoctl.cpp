@@ -2689,7 +2689,7 @@ public:
         }
 
         if (base.VirtMode == "os")
-            std::cout << "\Stopping OS ..." << std::endl;
+            std::cout << "\nStopping OS ..." << std::endl;
 
         error = base.StopContainer();
         if (error) {

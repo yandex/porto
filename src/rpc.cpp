@@ -74,9 +74,9 @@ void TRequest::Classify() {
         Req.has_newvolume();
 
     SecretReq =
-        Req.has_setproperty() && StringStartsWith(Req.setproperty().property(), "env_secret") ||
-        Req.has_createfromspec() && Req.createfromspec().has_container() && Req.createfromspec().container().has_env_secret() ||
-        Req.has_updatefromspec() && Req.updatefromspec().has_container() && Req.updatefromspec().container().has_env_secret();
+        (Req.has_setproperty() && StringStartsWith(Req.setproperty().property(), "env_secret")) ||
+        (Req.has_createfromspec() && Req.createfromspec().has_container() && Req.createfromspec().container().has_env_secret()) ||
+        (Req.has_updatefromspec() && Req.updatefromspec().has_container() && Req.updatefromspec().container().has_env_secret());
 }
 
 void TRequest::Parse() {

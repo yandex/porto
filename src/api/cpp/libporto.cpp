@@ -103,7 +103,7 @@ int Connection::ConnectionImpl::Connect()
 
     memset(&peer_addr, 0, sizeof(struct sockaddr_un));
     peer_addr.sun_family = AF_UNIX;
-    strncpy(peer_addr.sun_path, PortoSocket, sizeof(PortoSocket) - 1);
+    memcpy(peer_addr.sun_path, PortoSocket, sizeof(PortoSocket) - 1);
 
     peer_addr_size = sizeof(struct sockaddr_un);
     if (connect(Fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0)

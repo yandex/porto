@@ -136,6 +136,8 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
     case EStorageType::Meta:
         base = place;
         break;
+    case EStorageType::Place:
+        break;
     }
 
     error = base.StatStrict(st);

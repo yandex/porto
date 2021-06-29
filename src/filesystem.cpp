@@ -11,6 +11,7 @@ extern "C" {
 #include <linux/kdev_t.h>
 #include <sys/vfs.h>
 #include <linux/magic.h>
+#include <linux/fs.h>
 }
 
 #ifndef TRACEFS_MAGIC

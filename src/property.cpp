@@ -4205,12 +4205,12 @@ public:
         }
         if (count > PORTO_LABEL_COUNT_MAX)
             return TError(EError::ResourceNotAvailable, "Too many labels");
-            if (!merge) {
-                for (auto &it: CT->Labels) {
-                    if (map.find(it.first) == map.end())
-                        map[it.first] = "";
-                }
+        if (!merge) {
+            for (auto &it: CT->Labels) {
+                if (map.find(it.first) == map.end())
+                    map[it.first] = "";
             }
+        }
         for (auto &it: map)
             CT->SetLabel(it.first, it.second);
         lock.unlock();
@@ -5113,10 +5113,10 @@ public:
     }
 
     void Dump(rpc::TContainerStatus &spec) override {
-        uint64_t v;
-        TError error = Get(v);
+        uint64_t val = 0;
+        TError error = Get(val);
         if (!error)
-            spec.set_minor_faults(v);
+            spec.set_minor_faults(val);
     }
 } static MinorFaults;
 
@@ -5149,7 +5149,7 @@ public:
         return OK;
     }
     void Dump(rpc::TContainerStatus &spec) override {
-        uint64_t val;
+        uint64_t val = 0;
         auto error = Get(val);
         if (!error)
             spec.set_major_faults(val);
@@ -5353,7 +5353,7 @@ public:
     }
 
     void Dump(rpc::TContainerStatus &spec) override {
-        uint64_t val;
+        uint64_t val = 0;
         auto error = Get(val);
         if (!error)
             spec.set_cpu_throttled(val);
@@ -5922,7 +5922,7 @@ public:
     }
 
     void Dump(rpc::TContainerStatus &spec) override {
-        int64_t val;
+        int64_t val = 0;
         auto error = Get(val);
         if (error)
             return;

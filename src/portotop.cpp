@@ -454,6 +454,19 @@ TPortoValue::TPortoValue(const TPortoValue &src) :
         Cache->Register(Container->GetName(), Variable);
 }
 
+TPortoValue& TPortoValue::operator=(const TPortoValue &src) {
+    if (this != &src) {
+        Cache = src.Cache;
+        Container = src.Container;
+        Variable = src.Variable;
+        Flags = src.Flags;
+        AsString = src.AsString;
+        AsNumber = src.AsNumber;
+        Multiplier = src.Multiplier;
+    }
+    return *this;
+}
+
 TPortoValue::TPortoValue(const TPortoValue &src, std::shared_ptr<TPortoContainer> &container) :
     Cache(src.Cache), Container(container), Variable(src.Variable), Flags(src.Flags),
     Multiplier(src.Multiplier) {
@@ -1010,7 +1023,7 @@ void TPortoTop::ChangeSelection(int x, int y, TConsoleScreen &screen) {
     if (SelectedRow < 0)
         SelectedRow = 0;
 
-    if (FilterMode && SelectedRow >= RowColor.size())
+    if (FilterMode && SelectedRow >= (int)RowColor.size())
         SelectedRow = RowColor.size() - 1;
 
     if (SelectedRow >= MaxRows)

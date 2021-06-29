@@ -49,9 +49,11 @@ constexpr uint64_t NSEC_PER_SEC = 1000000000ull;
 
 constexpr uint64_t NET_MAX_RATE = 12500000000000ull; /* 100Tbit */
 
-constexpr uint64_t ROOT_CONTAINER_ID = 1;
-constexpr uint64_t DEFAULT_CONTAINER_ID = 2;
-constexpr uint64_t LEGACY_CONTAINER_ID = 3;
+constexpr int ROOT_CONTAINER_ID = 1;
+constexpr int DEFAULT_CONTAINER_ID = 2;
+constexpr int LEGACY_CONTAINER_ID = 3;
+constexpr int CONTAINER_ID_MAX = 4095;
+constexpr int CONTAINER_LEVEL_MAX = 16;
 
 constexpr const char *ROOT_CONTAINER = "/";
 constexpr const char *ROOT_PORTO_NAMESPACE = "/porto/";
@@ -109,8 +111,6 @@ constexpr const char *PORTO_CACHE_QUOTA_FILE_NAME = "porto.volume.cache_quota_fi
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_PATH_MAX_FOR_SUPERUSER = 220;
-constexpr uint64_t CONTAINER_ID_MAX = 4095;
-constexpr uint64_t CONTAINER_LEVEL_MAX = 16;
 constexpr uint64_t RUN_SUBDIR_LIMIT = 100u;
 constexpr uint64_t PRIVATE_VALUE_MAX = 4096;
 constexpr uint64_t CONTAINER_COMMAND_MAX = 128 * 1024;    // ARG_MAX from include/uapi/linux/limits.h
