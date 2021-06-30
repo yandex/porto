@@ -48,6 +48,14 @@ std::shared_ptr<TContainer> RootContainer;
 std::map<std::string, std::shared_ptr<TContainer>> Containers;
 TPath ContainersKV;
 TIdMap ContainerIdMap(1, CONTAINER_ID_MAX);
+std::vector<ExtraProperty> ExtraProperties;
+
+std::unordered_set<std::string> SupportedExtraProperties = {
+    "cgroupfs",
+    "command",
+    "max_respawns",
+    "userns",
+};
 
 std::mutex CpuAffinityMutex;
 static std::vector<TBitMap> CoreThreads;
@@ -1809,6 +1817,42 @@ void TContainer::PropagateCpuLimit() {
     ct_lock.unlock();
 }
 
+TError TContainer::ApplyExtraProperties() {
+    TError error;
+
+    // clean old extra properties
+    for (const auto &extraProp: EnabledExtraProperties) {
+        auto prop = ContainerProperties.find(extraProp);
+        if (prop != ContainerProperties.end()) {
+            error = prop->second->Reset();
+            if (error)
+                return error;
+            ClearProp(prop->second->Prop);
+        }
+    }
+
+    EnabledExtraProperties.clear();
+    ClearProp(EProperty::EXTRA_PROPS);
+
+    for (const auto &extraProp: ExtraProperties) {
+        if (!StringMatch(Name, extraProp.Filter))
+            continue;
+
+        auto prop = ContainerProperties.find(extraProp.Name);
+        if (prop != ContainerProperties.end() && !HasProp(prop->second->Prop)) {
+            error = prop->second->Set(extraProp.Value);
+            if (error)
+                return error;
+
+            EnabledExtraProperties.push_back(extraProp.Name);
+        }
+    }
+
+    if (!EnabledExtraProperties.empty())
+        SetProp(EProperty::EXTRA_PROPS);
+    return OK;
+}
+
 TError TContainer::SetCpuLimit(uint64_t limit) {
     auto cpucg = GetCgroup(CpuSubsystem);
     TError error;
@@ -2750,11 +2794,17 @@ TError TContainer::PrepareStart() {
     if (Parent) {
         CT = this;
         LockStateWrite();
-        for (auto &knob: ContainerProperties) {
-            error = knob.second->Start();
-            if (error)
-                break;
+
+        error = ApplyExtraProperties();
+
+        if (!error) {
+            for (auto &knob: ContainerProperties) {
+                error = knob.second->Start();
+                if (error)
+                    break;
+            }
         }
+
         UnlockState();
         CT = nullptr;
         if (error)
@@ -3786,8 +3836,16 @@ TError TContainer::SetProperty(const std::string &origProperty,
 
     CT = nullptr;
 
-    if (!error)
+    if (!error) {
+        auto it = std::find(EnabledExtraProperties.begin(), EnabledExtraProperties.end(), origProperty);
+        if (it != EnabledExtraProperties.end()) {
+            EnabledExtraProperties.erase(it);
+            if (EnabledExtraProperties.empty())
+                ClearProp(EProperty::EXTRA_PROPS);
+        }
+
         error = Save();
+    }
 
     return error;
 }

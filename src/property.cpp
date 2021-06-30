@@ -58,6 +58,10 @@ TError TProperty::Set(const std::string &) {
     return TError(EError::NotSupported, "Not implemented: " + Name);
 }
 
+TError TProperty::Reset() {
+    return TError(EError::NotSupported, "Reset not implemented: " + Name);
+}
+
 TError TProperty::GetIndexed(const std::string &, std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
@@ -963,10 +967,35 @@ public:
     }
 } static MemTotalGuarantee;
 
+class TExtraProps : public TProperty {
+public:
+    TExtraProps() : TProperty(P_EXTRA_PROPS, EProperty::EXTRA_PROPS,
+            "Container's extra properties")
+    {
+        IsReadOnly = true;
+        IsHidden = true;
+    }
+    TError Set(const std::string &value) {
+        CT->EnabledExtraProperties = SplitString(value, ';');
+        CT->SetProp(EProperty::EXTRA_PROPS);
+        return OK;
+    }
+    TError Get(std::string &value) {
+        value = MergeEscapeStrings(CT->EnabledExtraProperties, ';');
+        return OK;
+    }
+    void Dump(rpc::TContainerStatus &spec) override {
+        spec.set_extra_properties(MergeEscapeStrings(CT->EnabledExtraProperties, ';'));
+    }
+} static ExtraProps;
+
 class TCommand : public TProperty {
 public:
     TCommand() : TProperty(P_COMMAND, EProperty::COMMAND,
             "Command executed upon container start") {}
+    TError Reset() override {
+        return Set("");
+    }
     TError Get(std::string &command) {
         command = CT->Command;
         return OK;
@@ -1205,6 +1234,10 @@ class TUserNs : public TProperty {
 public:
     TUserNs() : TProperty(P_USERNS, EProperty::USERNS, "New user namespace") {}
 
+    TError Reset() override {
+        return Set("false");
+    }
+
     TError Get(std::string &value) {
         value = BoolToString(CT->UserNs);
         return OK;
@@ -1245,6 +1278,11 @@ class TCgroupFs : public TProperty {
 public:
     TCgroupFs() : TProperty(P_CGROUPFS, EProperty::CGROUPFS,
             "Cgroup fs: none|ro|rw") {}
+
+    TError Reset() override {
+        return Set("none");
+    }
+
     TError Start(void) {
         if (EnableOsModeCgroupNs && !CT->HasProp(EProperty::CGROUPFS) && CT->OsMode)
             return Set("rw");
@@ -4116,6 +4154,9 @@ public:
     {
         IsDynamic = true;
         IsAnyState = true;
+    }
+    TError Reset() override {
+        return Set("-1");
     }
     TError Get(std::string &value) {
         if (CT->HasProp(EProperty::RESPAWN_LIMIT))
