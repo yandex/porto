@@ -155,6 +155,7 @@ public:
     bool JobMode = false;       /* Process group */
     bool DockerMode = false;
     bool FuseMode = false;
+    bool UserNs = false;
     ECgroupFs CgroupFs = ECgroupFs::None;
 
     TMultiTuple NetProp;

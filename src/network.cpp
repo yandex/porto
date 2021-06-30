@@ -3445,7 +3445,7 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
     }
 
     if (NetIsolate) {
-        error = TNetwork::New(NetNs, Net, ct.DockerMode ? ct.Task.Pid : 0);
+        error = TNetwork::New(NetNs, Net, ct.UserNs ? ct.Task.Pid : 0);
         if (error)
             return error;
 

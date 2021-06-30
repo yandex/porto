@@ -662,7 +662,7 @@ public:
         return OK;
     }
     TError Start(void) {
-        if (CT->OsMode)
+        if (CT->OsMode && !CT->UserNs)
             CT->TaskCred.SetUid(RootUser);
         return OK;
     }
@@ -1128,6 +1128,20 @@ class TVirtMode : public TProperty {
 public:
     TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
             "Virtualization mode: os|app|job|host") {}
+
+    TError Start(void) {
+        if (CT->HasProp(EProperty::USERNS)) {
+            if (CT->UserNs && (CT->HostMode || CT->JobMode))
+                return TError(EError::InvalidValue, "userns=true incompatible with virt_mode");
+            else if (!CT->UserNs && CT->DockerMode)
+                return TError(EError::InvalidValue, "userns=false incompatible with virt_mode");
+        } else if (CT->DockerMode) {
+            CT->UserNs = true;
+            CT->SetProp(EProperty::USERNS);
+        }
+        return OK;
+    }
+
     TError Get(std::string &value) {
         value = CT->OsMode ? "os" :
                 CT->JobMode ? "job" :
@@ -1136,6 +1150,7 @@ public:
                 CT->FuseMode ? "fuse" : "app";
         return OK;
     }
+
     TError Set(const std::string &value) {
 
         if (value != "app" &&
@@ -1185,6 +1200,46 @@ public:
         return Set(spec.virt_mode());
     }
 } static VirtMode;
+
+class TUserNs : public TProperty {
+public:
+    TUserNs() : TProperty(P_USERNS, EProperty::USERNS, "New user namespace") {}
+
+    TError Get(std::string &value) {
+        value = BoolToString(CT->UserNs);
+        return OK;
+    }
+
+    TError Set(bool value) {
+        if (value && (CT->HostMode || CT->JobMode))
+            return TError(EError::InvalidValue, "userns=true incompatible with virt_mode");
+        else if (!value && CT->DockerMode)
+            return TError(EError::InvalidValue, "userns=false incompatible with virt_mode");
+        CT->UserNs = value;
+        CT->SetProp(EProperty::USERNS);
+        return OK;
+    }
+
+    TError Set(const std::string &value) {
+        bool val;
+        TError error = StringToBool(value, val);
+        if (error)
+            return error;
+        return Set(val);
+    }
+
+    void Dump(rpc::TContainerSpec &spec) override {
+        spec.set_userns(CT->UserNs);
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_userns();
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) override {
+        return Set(spec.userns());
+    }
+} static UserNs;
 
 class TCgroupFs : public TProperty {
 public:
