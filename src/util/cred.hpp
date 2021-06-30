@@ -40,6 +40,8 @@ class TCred {
         GName = RootGroup == Gid ? "root" : GroupName(Gid);
     }
 
+    static std::string GetMapping(uint32_t id);
+
 public:
     std::vector<gid_t> Groups;
 
@@ -59,7 +61,7 @@ public:
     TError InitGroups(const std::string &user);
 
     TError Apply() const;
-    TError SetupMapping(pid_t pid, bool directMapping) const;
+    TError SetupMapping(pid_t pid) const;
 
     uid_t GetUid() const {
         return Uid;
