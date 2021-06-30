@@ -57,6 +57,12 @@ enum class ECgroupFs {
     Rw,
 };
 
+struct ExtraProperty {
+    std::string Filter;
+    std::string Name;
+    std::string Value;
+};
+
 class TProperty;
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
@@ -105,6 +111,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplyCpuLimit();
     TError ApplyCpuGuarantee();
     void PropagateCpuLimit();
+    TError ApplyExtraProperties();
 
 public:
     const std::shared_ptr<TContainer> Parent;
@@ -140,6 +147,7 @@ public:
     TCred OwnerCred;
     TCred TaskCred;
     std::vector<std::string> OwnerContainers;
+    std::vector<std::string> EnabledExtraProperties;
     std::string Command;
     std::string CoreCommand;
     TTuple CommandArgv;

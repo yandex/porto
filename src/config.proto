@@ -259,6 +259,13 @@ message TConfig {
             required string value = 2;
         }
         repeated TContainerExtraEnv extra_env = 53;
+
+        message TExtraProperty {
+            required string filter = 1;
+            required string name = 2;
+            required string value = 3;
+        }
+        repeated TExtraProperty extra_properties = 60;
     }
 
     message TPrivilegesCfg {

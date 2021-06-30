@@ -458,6 +458,7 @@ message TContainerStatus {
     optional uint64 death_time = 21;    // out
     optional uint64 change_time = 22;   // out
     optional bool no_changes = 23;      // out, change_time < changed_since
+    optional string extra_properties = 73;
 
     optional TContainerCgroups cgroups = 24;     // out
     optional TContainerCpuSet cpu_set_affinity = 25;     // out

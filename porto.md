@@ -1012,6 +1012,27 @@ Possible indexes for statistics and parameters:
     }
     ```
 
+# EXTRA PROPERTIES
+
+Option **extra\_properties** in portod.conf set container properties
+by containers name filter if property do not set
+
+Example:
+```
+container {
+    extra_properties {
+        filter: "abc"
+        name: "command"
+        value: "sleep 123"
+    }
+    extra_properties {
+        filter: "***"
+        name: "cgroupfs"
+        value: "rw"
+    }
+}
+```
+
 # NETWORKING
 
 ## L2

@@ -81,6 +81,9 @@ bool EnableRwCgroupFs = false;
 bool EnableDockerMode = false;
 uint32_t RequestHandlingDelayMs = 0;
 
+extern std::vector<ExtraProperty> ExtraProperties;
+extern std::unordered_set<std::string> SupportedExtraProperties;
+
 static bool RunningInContainer() {
     if (getpid() == 1)
         return getenv("container") != nullptr;
@@ -810,6 +813,17 @@ static int Portod() {
         EnableDockerMode = config().container().enable_docker_mode() && EnableOsModeCgroupNs;
     }
     RequestHandlingDelayMs = config().daemon().request_handling_delay_ms();
+
+    for (const auto &extraProp : config().container().extra_properties()) {
+        const auto propName = extraProp.name();
+        if (SupportedExtraProperties.find(propName) == SupportedExtraProperties.end()) {
+            L_ERR("Extra property {} not supported", propName);
+            Statistics->Fatals++;
+            continue;
+        }
+
+        ExtraProperties.push_back({extraProp.filter(), propName, extraProp.value()});
+    }
 
     InitPortoGroups();
     InitCapabilities();

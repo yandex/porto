@@ -81,6 +81,7 @@ ADD_PYTHON_TEST(systemd)
 ADD_PYTHON_TEST(os)
 ADD_PYTHON_TEST(cgroupns)
 ADD_PYTHON_TEST(userns)
+ADD_PYTHON_TEST(extra_properties)
 ADD_PYTHON_TEST(jobs)
 ADD_PYTHON_TEST(docker)
 

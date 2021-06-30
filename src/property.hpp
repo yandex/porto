@@ -14,6 +14,7 @@ constexpr const char *P_RAW_DEATH_TIME = "_death_time";
 
 constexpr const char *P_TAINT = "taint";
 
+constexpr const char *P_EXTRA_PROPS = "extra_properties";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_COMMAND_ARGV = "command_argv";
 constexpr const char *P_USER = "user";
@@ -181,6 +182,7 @@ enum class EProperty {
     CREATION_TIME,
     START_TIME,
     DEATH_TIME,
+    EXTRA_PROPS,
     COMMAND,
     COMMAND_ARGV,
     USER,
@@ -291,6 +293,7 @@ public:
     virtual TError Has();
     virtual TError Get(std::string &value) = 0;
     virtual TError Set(const std::string &value);
+    virtual TError Reset();
 
     virtual TError GetIndexed(const std::string &index, std::string &value);
     virtual TError SetIndexed(const std::string &index, const std::string &value);
