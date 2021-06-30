@@ -45,6 +45,13 @@ private:
 
     TPath AddComponent(const TPath &component) const;
 
+    static void RootFilesChownFilter(const struct stat& st, uid_t &uid, gid_t &gid) {
+        if (st.st_uid != 0)
+            uid = (uid_t)-1;
+        if (st.st_gid != 0)
+            gid = (gid_t)-1;
+    }
+
 public:
     TPath(const std::string &path) : Path(path) {}
     TPath(const char *path) : Path(path) {}
@@ -144,9 +151,26 @@ public:
     TError Chroot() const;
 
     TError Chown(uid_t uid, gid_t gid) const;
-
     TError Chown(const TCred &cred) const {
         return Chown(cred.GetUid(), cred.GetGid());
+    }
+
+    TError Lchown(uid_t uid, gid_t gid) const;
+    TError Lchown(const TCred &cred) const {
+        return Lchown(cred.GetUid(), cred.GetGid());
+    }
+
+    typedef void (*TChownFilter)(const struct stat&, uid_t &uid, gid_t &gid);
+    TError ChownRecursive(uid_t uid, gid_t gid, TChownFilter filter = nullptr) const;
+    TError ChownRecursive(const TCred &cred, TChownFilter filter = nullptr) const {
+        return ChownRecursive(cred.GetUid(), cred.GetGid(), filter);
+    }
+
+    TError ChownRecursiveRootFiles(uid_t uid, gid_t gid) const {
+        return ChownRecursive(uid, gid, RootFilesChownFilter);
+    }
+    TError ChownRecursiveRootFiles(const TCred &cred) const {
+        return ChownRecursiveRootFiles(cred.GetUid(), cred.GetGid());
     }
 
     TError Chmod(const int mode) const;

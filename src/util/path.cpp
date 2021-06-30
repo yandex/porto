@@ -259,6 +259,48 @@ TError TPath::Chown(uid_t uid, gid_t gid) const {
     return OK;
 }
 
+TError TPath::Lchown(uid_t uid, gid_t gid) const {
+    if (lchown(Path.c_str(), uid, gid))
+        return TError::System("lchown(" + Path + ", " +
+                        std::to_string(uid) + ", " + std::to_string(gid) + ")");
+    return OK;
+}
+
+TError TPath::ChownRecursive(uid_t uid, gid_t gid, TChownFilter filter) const {
+    TPathWalk walk;
+    TError error;
+
+    error = walk.Open(*this);
+    if (error)
+        return error;
+
+    while (1) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            return error;
+
+        uid_t chownUid = uid;
+        gid_t chownGid = gid;
+        if (filter && walk.Stat)
+            filter(*walk.Stat, chownUid, chownGid);
+
+        if (chownUid != (uid_t)-1 || chownGid != (gid_t)-1) {
+            if (walk.Stat && S_ISLNK(walk.Stat->st_mode))
+                error = walk.Path.Lchown(chownUid, chownGid);
+            else {
+                int mode = walk.Stat ? walk.Stat->st_mode : 0;
+                error = walk.Path.Chown(chownUid, chownGid);
+                if (!error && mode)
+                    error = walk.Path.Chmod(mode);
+            }
+            if (error && errno != ENOENT && errno != EROFS)
+                return error;
+        }
+    }
+
+    return OK;
+}
+
 TError TPath::Chmod(const int mode) const {
     int ret = chmod(Path.c_str(), mode);
     if (ret)
