@@ -877,7 +877,7 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
-        error = CT->TaskCred.SetupMapping(CT->Task.Pid, CT->FuseMode);
+        error = CT->TaskCred.SetupMapping(CT->Task.Pid);
         if (error)
             Abort(error);
 

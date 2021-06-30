@@ -323,20 +323,19 @@ TError TCred::Apply() const {
     return OK;
 }
 
-TError TCred::SetupMapping(pid_t pid, bool directMapping) const {
+std::string TCred::GetMapping(uint32_t id) {
+    if (id <= 1)
+        return fmt::format("0 {} 1\n{} {} {}", id, id + 1, id + 1, 4294967295 - 1 - id);
+    else
+        return fmt::format("0 {} 1\n1 1 {}\n{} {} {}", id, id - 1, id + 1, id + 1, 4294967295 - 1 - id);
+}
+
+TError TCred::SetupMapping(pid_t pid) const {
     TError error;
     std::string uidMap, gidMap;
 
-    if (directMapping) {
-        uidMap = "0 0 4294967294";
-        gidMap = "0 0 4294967294";
-    } else {
-        // 4294967294 = (uid_t) - 2
-        // (uid_t) - 1 = nobody
-        // map root to nobody
-        uidMap = fmt::format("0 {} {}\n{} 1 {}", Uid, 4294967294 - Uid, 4294967294 - Uid, Uid - 1);
-        gidMap = fmt::format("0 {} {}\n{} 1 {}", Gid, 4294967294 - Gid, 4294967294 - Gid, Gid - 1);
-    }
+    uidMap = GetMapping(Uid);
+    gidMap = GetMapping(Gid);
 
     error = TPath(fmt::format("/proc/{}/uid_map", pid)).WriteAll(uidMap);
     if (error)
