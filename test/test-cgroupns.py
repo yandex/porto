@@ -47,11 +47,11 @@ try:
 
         a.Destroy()
 
-    def CheckCgroupfsRw(is_os):
+    def CheckCgroupfsRw(is_os, userns=False):
         if is_os:
             ExpectEq(porto.exceptions.PermissionError, Catch(conn.Run, 'a', cgroupfs='rw', wait=0, root_volume={'layers': ['ubuntu-xenial']}))
 
-        a = conn.Run('a', cgroupfs='rw', virt_mode=('os' if is_os else 'app'), wait=0, root_volume={'layers': ['ubuntu-xenial']})
+        a = conn.Run('a', cgroupfs='rw', userns=userns, user='1044' if userns else '0', virt_mode=('os' if is_os else 'app'), wait=0, root_volume={'layers': ['ubuntu-xenial']})
 
         b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, command='cat /proc/self/cgroup')
         ExpectEq('0', b['exit_code'])
@@ -86,7 +86,8 @@ try:
 
     CheckCgroupfsNone()
     CheckCgroupfsRo()
-    CheckCgroupfsRw(True)
+    CheckCgroupfsRw(is_os=True)
+    CheckCgroupfsRw(is_os=True, userns=True)
 
     ConfigurePortod('test-cgroupns', """
     container {
@@ -95,7 +96,8 @@ try:
 
     CheckCgroupfsNone()
     CheckCgroupfsRo()
-    CheckCgroupfsRw(False)
+    CheckCgroupfsRw(is_os=False)
+    CheckCgroupfsRw(is_os=False, userns=True)
 
 finally:
     ConfigurePortod('test-cgroupns', "")

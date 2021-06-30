@@ -2658,7 +2658,7 @@ TError TContainer::StartTask() {
     TTaskEnv TaskEnv;
     TError error;
 
-    if (!DockerMode) {
+    if (!UserNs) {
         error = TNetwork::StartNetwork(*this, TaskEnv);
         if (error)
             return error;

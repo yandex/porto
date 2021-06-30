@@ -460,13 +460,13 @@ TError TTaskEnv::ConfigureChild() {
 
     UserFd.Close();
 
-    if (CT->DockerMode || CT->FuseMode) {
+    if (CT->UserNs || CT->FuseMode) {
         int unshareFlags = CLONE_NEWUSER | CLONE_NEWNS;
-        if (CT->DockerMode)
-            unshareFlags |= CLONE_NEWNET;
+        if (CT->UserNs)
+            unshareFlags |= CLONE_NEWNET | CLONE_NEWCGROUP;
 
         if (unshare(unshareFlags))
-            return TError::System("unshare(CLONE_NEWUSER | CLONE_NEWNS{})", CT->DockerMode ? " | CLONE_NEWNET" : "");
+            return TError::System("unshare(CLONE_NEWUSER | CLONE_NEWNS{})", CT->UserNs ? " | CLONE_NEWNET" : "");
 
         error = Sock.SendZero();
         if (error)
@@ -871,7 +871,7 @@ TError TTaskEnv::Start() {
 
     /* Task was alive, even if it already died we'll get zombie */
 
-    if (CT->DockerMode || CT->FuseMode) {
+    if (CT->UserNs || CT->FuseMode) {
         // wait joining user namespace
         error = MasterSock.RecvZero();
         if (error)
@@ -881,7 +881,7 @@ TError TTaskEnv::Start() {
         if (error)
             Abort(error);
 
-        if (CT->DockerMode) {
+        if (CT->UserNs) {
             error = TNetwork::StartNetwork(*CT, *this);
             if (error)
                 Abort(error);
