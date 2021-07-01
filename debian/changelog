@@ -1,3 +1,40 @@
+yandex-porto (5.0.29) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * test: disable tests for net_classes.
+  * test: make oom and security tests more stable
+  * stream: return error if inode of fd changed
+  * stream: return error if client process changed and we try to open it's fd
+
+  [ Dmitry Yakunin ]
+  * property: fix error message
+
+  [ Alexander Kuznetsov ]
+  * core: disable write access to portod core container
+  * portotop: add containers filter
+  * ci: recreate pbuilder focal layer
+  * porto: link portoctl and portoctl-top with pthread
+
+  [ amich ]
+  * container: report invalid state name on kill
+
+  [ Alexander Kuznetsov ]
+  * porto: add cgroupfs property
+  * portoctl: fix ip='veth auto'
+  * filesystem: chmod cgroupfs with 777 if cgroupfs=rw Signed-off-by: Alexander Kuznetsov wwfq@yandex-team.ru Link: https://st.yandex-team.ru/PORTO-870
+
+  [ Dmitry Yakunin ]
+  * build: remove pedantic flag, treat warnings as errors, fix all warnings
+  * cred: use common mapping for userns
+  * property: add userns
+
+  [ Alexander Kuznetsov ]
+  * porto: add extra_properties option to config
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 01 Jul 2021 18:09:18 +0300
+
 yandex-porto (5.0.28) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
