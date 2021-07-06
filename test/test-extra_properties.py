@@ -9,13 +9,38 @@ try:
     container {
         extra_properties {
             filter: "abc"
-            name: "command"
-            value: "sleep 123"
+            properties {
+                name: "command"
+                value: "sleep 123"
+            }
+            properties {
+                name: "max_respawns"
+                value: "10"
+            }
+        }
+    }""")
+
+    a = conn.Run('abc')
+    ExpectEq('command;max_respawns', a['extra_properties'])
+    ExpectEq('sleep 123', a['command'])
+    ExpectEq('10', a['max_respawns'])
+    a.Destroy()
+
+    ConfigurePortod('test-extra_properties', """
+    container {
+        extra_properties {
+            filter: "abc"
+            properties {
+                name: "command"
+                value: "sleep 123"
+            }
         }
         extra_properties {
             filter: "***"
-            name: "max_respawns"
-            value: "1024"
+            properties {
+                name: "max_respawns"
+                value: "1024"
+            }
         }
     }""")
 
@@ -69,13 +94,17 @@ try:
     container {
         extra_properties {
             filter: "abc"
-            name: "command123"
-            value: "sleep 123"
+            properties {
+                name: "command123"
+                value: "sleep 123"
+            }
         }
         extra_properties {
             filter: "***"
-            name: "max_respawns321"
-            value: "1024"
+            properties {
+                name: "max_respawns321"
+                value: "1024"
+            }
         }
     }""")
 

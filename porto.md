@@ -1022,13 +1022,21 @@ Example:
 container {
     extra_properties {
         filter: "abc"
-        name: "command"
-        value: "sleep 123"
+        properties {
+            name: "command"
+            value: "sleep 123"
+        }
+        properties {
+            name: "max_respawns"
+            value: "10"
+        }
     }
     extra_properties {
         filter: "***"
-        name: "cgroupfs"
-        value: "rw"
+        properties {
+            name: "cgroupfs"
+            value: "rw"
+        }
     }
 }
 ```

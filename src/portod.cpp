@@ -815,14 +815,20 @@ static int Portod() {
     RequestHandlingDelayMs = config().daemon().request_handling_delay_ms();
 
     for (const auto &extraProp : config().container().extra_properties()) {
-        const auto propName = extraProp.name();
-        if (SupportedExtraProperties.find(propName) == SupportedExtraProperties.end()) {
-            L_ERR("Extra property {} not supported", propName);
-            Statistics->Fatals++;
-            continue;
-        }
+        ExtraProperty properties;
+        properties.Filter = extraProp.filter();
 
-        ExtraProperties.push_back({extraProp.filter(), propName, extraProp.value()});
+        for (const auto &prop : extraProp.properties()) {
+            const auto &propName = prop.name();
+            if (SupportedExtraProperties.find(propName) == SupportedExtraProperties.end()) {
+                L_ERR("Extra property {} not supported", propName);
+                Statistics->Fatals++;
+                continue;
+            }
+            properties.Properties.push_back({propName, prop.value()});
+        }
+        if (!properties.Properties.empty())
+            ExtraProperties.emplace_back(properties);
     }
 
     InitPortoGroups();
