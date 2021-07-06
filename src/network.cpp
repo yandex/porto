@@ -780,12 +780,16 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     cls.Kind = qdisc.Kind;
     cls.Index = dev.Index;
     cls.Rate = cls.Ceil = rate;
-    cls.RateBurst = cls.CeilBurst = dev.MTU * 10;
+    cls.Burst = UplinkSpeed;
+    cls.BurstDuration = 10000; // 10ms
 
     TNlQdisc leaf(dev.Index, TC_HANDLE(ROOT_TC_MAJOR, 1), TC_HANDLE(2, 0));
     leaf.Kind = dev.GetConfig(ContainerQdisc, "pfifo");
     leaf.Limit = dev.GetConfig(ContainerQdiscLimit, 1000);
     leaf.Quantum = dev.GetConfig(ContainerQdiscQuantum, dev.MTU * 10);
+
+    // https://st.yandex-team.ru/PORTO-809
+    leaf.MemoryLimit = std::max(std::floor(TCP_RTO_VALUE * rate), 64000.);
 
     if (rate) {
         error = qdisc.Create(*Nl);
