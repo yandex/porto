@@ -463,10 +463,12 @@ TError TTaskEnv::ConfigureChild() {
     if (CT->UserNs || CT->FuseMode) {
         int unshareFlags = CLONE_NEWUSER | CLONE_NEWNS;
         if (CT->UserNs)
-            unshareFlags |= CLONE_NEWNET | CLONE_NEWCGROUP;
+            unshareFlags |= CLONE_NEWNET | (SupportCgroupNs ? CLONE_NEWCGROUP : 0);
 
         if (unshare(unshareFlags))
-            return TError::System("unshare(CLONE_NEWUSER | CLONE_NEWNS{})", CT->UserNs ? " | CLONE_NEWNET" : "");
+            return TError::System("unshare(CLONE_NEWUSER | CLONE_NEWNS{}{})",
+                                  (CT->UserNs ? " | CLONE_NEWNET" : ""),
+                                  (SupportCgroupNs ? " | CLONE_NEWCGROUP" : ""));
 
         error = Sock.SendZero();
         if (error)
