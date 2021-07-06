@@ -262,8 +262,12 @@ message TConfig {
 
         message TExtraProperty {
             required string filter = 1;
-            required string name = 2;
-            required string value = 3;
+
+            message TProperty {
+                required string name = 1;
+                required string value = 2;
+            }
+            repeated TProperty properties = 2;
         }
         repeated TExtraProperty extra_properties = 60;
     }

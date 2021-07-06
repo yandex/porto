@@ -1838,13 +1838,15 @@ TError TContainer::ApplyExtraProperties() {
         if (!StringMatch(Name, extraProp.Filter))
             continue;
 
-        auto prop = ContainerProperties.find(extraProp.Name);
-        if (prop != ContainerProperties.end() && !HasProp(prop->second->Prop)) {
-            error = prop->second->Set(extraProp.Value);
-            if (error)
-                return error;
+        for (const auto &extraProperty : extraProp.Properties) {
+            auto prop = ContainerProperties.find(extraProperty.Name);
+            if (prop != ContainerProperties.end() && !HasProp(prop->second->Prop)) {
+                error = prop->second->Set(extraProperty.Value);
+                if (error)
+                    return error;
 
-            EnabledExtraProperties.push_back(extraProp.Name);
+                EnabledExtraProperties.push_back(extraProperty.Name);
+            }
         }
     }
 

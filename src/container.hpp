@@ -59,8 +59,12 @@ enum class ECgroupFs {
 
 struct ExtraProperty {
     std::string Filter;
-    std::string Name;
-    std::string Value;
+
+    struct Property {
+        std::string Name;
+        std::string Value;
+    };
+    std::vector<Property> Properties;
 };
 
 class TProperty;
