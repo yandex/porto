@@ -1,10 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <string>
 #include <memory>
 #include <functional>
+#include <thread>
 
 namespace rpc {
     class TContainerRequest;
@@ -82,6 +85,7 @@ enum GetFlags {
 };
 
 class Connection {
+    friend class AsyncWaiter;
     class ConnectionImpl;
 
     std::unique_ptr<ConnectionImpl> Impl;
@@ -132,7 +136,13 @@ public:
     int AsyncWait(const std::vector<std::string> &containers,
                   const std::vector<std::string> &labels,
                   std::function<void(AsyncWaitEvent &event)> callbacks,
-                  int timeout = INFINITE_TIMEOUT);
+                  int timeout = INFINITE_TIMEOUT,
+                  const std::string &targetState = "");
+
+    int StopAsyncWait(const std::vector<std::string> &containers,
+                      const std::vector<std::string> &labels,
+                      const std::string &targetState = "");
+
     int Recv();
 
     int List(std::vector<std::string> &list,
@@ -234,6 +244,66 @@ public:
     int ListVolumesBy(const rpc::TGetVolumeRequest &getVolumeRequest, std::vector<rpc::TVolumeSpec> &volumes);
 
     int CreateVolumeFromSpec(const rpc::TVolumeSpec &volume, rpc::TVolumeSpec &resultSpec);
+};
+
+class AsyncWaiter {
+    typedef std::function<void(AsyncWaitEvent &event)> TAsyncPortoCallback;
+    struct CallbackData {
+        const TAsyncPortoCallback Callback;
+        const std::string State;
+    };
+
+    enum class ERequestType {
+        None,
+        Add,
+        Del,
+        Stop,
+    };
+
+    std::unordered_map<std::string, CallbackData> AsyncCallbacks;
+    std::unique_ptr<std::thread> WatchDogThread;
+    std::atomic<uint64_t> CallbacksCount;
+    int EpollFd = -1;
+    Connection Api;
+
+    int Sock, MasterSock;
+    std::string ReqCt;
+    std::string ReqState;
+    TAsyncPortoCallback ReqCallback;
+
+    std::function<void(const std::string &error, int ret)> FatalCallback;
+    bool FatalError = false;
+
+    void MainCallback(Porto::AsyncWaitEvent &event);
+    inline TAsyncPortoCallback GetMainCallback() {
+        return [this](Porto::AsyncWaitEvent &event) {
+            MainCallback(event);
+        };
+    }
+
+    int Repair();
+    void WatchDog();
+
+    void SendInt(int fd, int value);
+    int RecvInt(int fd);
+
+    void HandleAddRequest();
+    void HandleDelRequest();
+
+    void Fatal(const std::string &error, int ret) {
+        FatalError = true;
+        FatalCallback(error, ret);
+    }
+
+public:
+    AsyncWaiter(std::function<void(const std::string &error, int ret)> fatalCallback);
+    ~AsyncWaiter();
+
+    int Add(const std::string &ct, const std::string &state, std::function<void(AsyncWaitEvent &event)> callback);
+    int Remove(const std::string &ct);
+    uint64_t InvocationCount() const {
+        return CallbacksCount;
+    }
 };
 
 } /* namespace Porto */

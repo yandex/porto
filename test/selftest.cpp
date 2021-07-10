@@ -4240,6 +4240,83 @@ static void TestWait(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy(c));
 }
 
+static void TestAsyncWait(Porto::Connection &api) {
+    for (int i = 0; i < 3; ++i) {
+        Say() << "test async waiter #" << i << std::endl;
+        Porto::AsyncWaiter waiter([](const std::string &error, int ret) {
+            std::cerr << "error " << error << " " << ret << std::endl;
+            Expect(false);
+        });
+
+        ExpectEq(waiter.InvocationCount(), 0);
+        std::string result;
+
+        waiter.Add("abc", "starting", [&result](Porto::AsyncWaitEvent &event) {
+                result += event.Name + "-" + event.State;
+                });
+
+        waiter.Add("abcdef", "starting", [&result](Porto::AsyncWaitEvent &event) {
+                result += event.Name + "-" + event.State;
+                });
+
+        ExpectEq(0, waiter.Remove("abcdef"));
+
+        // check removed waiter
+        std::string name = "abcdef";
+        ExpectApiSuccess(api.Create(name));
+        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectApiSuccess(api.Destroy(name));
+
+        ExpectEq(result.empty(), true);
+        ExpectEq(waiter.InvocationCount(), 0);
+
+        // reload portod waiters must be repaired
+        KillSlave(api, SIGKILL);
+
+        name = "abcd";
+        ExpectApiSuccess(api.Create(name));
+        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectApiSuccess(api.Destroy(name));
+
+        ExpectEq(result.empty(), true);
+        ExpectEq(waiter.InvocationCount(), 0);
+
+        KillSlave(api, SIGKILL);
+
+        name = "abc";
+        // callback works only once
+        for (auto i = 0; i < 2; ++i) {
+            ExpectApiSuccess(api.Create(name));
+            ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1"));
+            ExpectApiSuccess(api.Start(name));
+            ExpectApiSuccess(api.Destroy(name));
+            ExpectEq(result, "abc-starting");
+        }
+
+        ExpectEq(waiter.InvocationCount(), 1);
+
+        name = "abcd";
+        for (auto i = 0; i < 3; ++i) {
+            waiter.Add("abcd", "destroyed", [&result](Porto::AsyncWaitEvent &event) {
+                    result += ";" + event.Name + "-" + event.State;
+                    });
+
+            if (i == 2)
+                waiter.Remove("abcd");
+
+            ExpectApiSuccess(api.Create(name));
+            ExpectApiSuccess(api.SetProperty(name, "command", "true"));
+            ExpectApiSuccess(api.Start(name));
+            ExpectApiSuccess(api.Destroy(name));
+        }
+
+        ExpectEq(waiter.InvocationCount(), 3);
+        ExpectEq(result, fmt::format("{};{};{}", "abc-starting", "abcd-destroyed", "abcd-destroyed"));
+    }
+}
+
 static void TestWaitRecovery(Porto::Connection &api) {
     std::string c = "aaa";
     std::string d = "aaa/bbb";
@@ -4776,6 +4853,7 @@ int SelfTest(std::vector<std::string> args) {
         { "md5sum", TestMd5 },
         { "proc", TestProcUtils },
         { "histogramm", TestHistogramm },
+        { "async_wait", TestAsyncWait },
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },

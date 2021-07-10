@@ -120,6 +120,7 @@ message TContainerRequest {
     optional TContainerCreateRequest createWeak = 17;
     optional TContainerRespawnRequest Respawn = 18;
     optional TContainerWaitRequest AsyncWait = 19;
+    optional TContainerWaitRequest StopAsyncWait = 128;
 
     optional TFindLabelRequest FindLabel = 20;
     optional TSetLabelRequest SetLabel = 21;
@@ -1098,6 +1099,9 @@ message TContainerWaitRequest {
 
     // list of label names or wildcards
     repeated string label = 3;
+
+    // async wait with target_state works only once
+    optional string target_state = 4;
 }
 
 message TContainerWaitResponse {

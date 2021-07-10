@@ -45,6 +45,9 @@ bool TContainerWaiter::ShouldReport(TContainer &ct) {
             (ct.State != EContainerState::Meta || ct.RunningChildren))
         return false;
 
+    if (Async && !TargetState.empty() && TargetState != TContainer::StateName(ct.State))
+        return false;
+
     for (auto &nm: Names)
         if (ct.Name == nm)
             return true;
@@ -75,10 +78,14 @@ void TContainerWaiter::ReportAll(TContainer &ct, const std::string &label, const
             std::string name;
             if (client && !client->ComposeName(ct.Name, name)) {
                 client->MakeReport(name, TContainer::StateName(ct.State), waiter->Async, label, value);
-                if (!waiter->Async) {
+
+                if (!waiter->Async || !waiter->TargetState.empty()) {
                     ++it;
                     waiter->Deactivate();
-                    client->SyncWaiter.reset();
+                    if (waiter->Async)
+                        client->AsyncWaiter.reset();
+                    else
+                        client->SyncWaiter.reset();
                     continue;
                 }
             }
@@ -101,4 +108,38 @@ void TContainerWaiter::Timeout() {
         else
             client->SyncWaiter.reset();
     }
+}
+
+bool TContainerWaiter::operator==(const TContainerWaiter &waiter) const {
+    if (Async != waiter.Async || TargetState != waiter.TargetState)
+        return false;
+
+    bool equal = (Names.size() == waiter.Names.size() && std::equal(Names.begin(), Names.end(), waiter.Names.begin()));
+    if (!equal)
+        return false;
+
+    equal = (Wildcards.size() == waiter.Wildcards.size() && std::equal(Wildcards.begin(), Wildcards.end(), waiter.Wildcards.begin()));
+    if (!equal)
+        return false;
+
+    return Labels.size() == waiter.Labels.size() && std::equal(Labels.begin(), Labels.end(), waiter.Labels.begin());
+}
+
+TError TContainerWaiter::Remove(const TContainerWaiter &waiter, const TClient &client) {
+    auto lock = LockWaiters();
+    for (auto it = ContainerWaiters.begin(); it != ContainerWaiters.end(); ++it) {
+        auto otherWaiter = *it;
+        auto waiterClient = otherWaiter->Client.lock();
+
+        // client of waiter is nullptr
+        if (&client == waiterClient.get() && waiter == *otherWaiter) {
+            otherWaiter->Deactivate();
+            if (waiter.Async)
+                waiterClient->AsyncWaiter.reset();
+            else
+                waiterClient->SyncWaiter.reset();
+            return OK;
+        }
+    }
+    return TError(EError::InvalidValue, "Waiter not found");
 }

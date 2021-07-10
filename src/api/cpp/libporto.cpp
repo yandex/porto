@@ -10,6 +10,7 @@ using ::rpc::EError;
 
 extern "C" {
 #include <unistd.h>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 }
@@ -31,6 +32,7 @@ public:
     std::vector<std::string> AsyncWaitContainers;
     int AsyncWaitTimeout = -1;
     std::function<void(AsyncWaitEvent &event)> AsyncWaitCallback;
+    bool AsyncWaitOneShot = false;
 
     int LastError = 0;
     std::string LastErrorMsg;
@@ -184,6 +186,9 @@ int Connection::ConnectionImpl::Recv(rpc::TContainerResponse &rsp) {
                     rsp.asyncwait().value(),
                 };
                 AsyncWaitCallback(event);
+
+                if (AsyncWaitOneShot)
+                    return EError::Success;
             }
         } else
             return EError::Success;
@@ -539,7 +544,8 @@ int Connection::WaitContainers(const std::vector<std::string> &containers,
 int Connection::AsyncWait(const std::vector<std::string> &containers,
                           const std::vector<std::string> &labels,
                           std::function<void(AsyncWaitEvent &event)> callback,
-                          int timeout) {
+                          int timeout,
+                          const std::string &targetState) {
     Impl->AsyncWaitContainers.clear();
     Impl->AsyncWaitTimeout = timeout;
     Impl->AsyncWaitCallback = callback;
@@ -549,12 +555,31 @@ int Connection::AsyncWait(const std::vector<std::string> &containers,
         Impl->Req.mutable_asyncwait()->add_label(label);
     if (timeout >= 0)
         Impl->Req.mutable_asyncwait()->set_timeout_ms(timeout * 1000);
+    if (!targetState.empty()) {
+        Impl->Req.mutable_asyncwait()->set_target_state(targetState);
+        Impl->AsyncWaitOneShot = true;
+    } else
+        Impl->AsyncWaitOneShot = false;
+
     int ret = Impl->Call();
     if (ret)
         Impl->AsyncWaitCallback = nullptr;
     else
         Impl->AsyncWaitContainers = containers;
     return ret;
+}
+
+int Connection::StopAsyncWait(const std::vector<std::string> &containers,
+                              const std::vector<std::string> &labels,
+                              const std::string &targetState) {
+    for (auto &name: containers)
+        Impl->Req.mutable_stopasyncwait()->add_name(name);
+    for (auto &label: labels)
+        Impl->Req.mutable_stopasyncwait()->add_label(label);
+    if (!targetState.empty())
+        Impl->Req.mutable_stopasyncwait()->set_target_state(targetState);
+
+    return Impl->Call();
 }
 
 int Connection::Recv() {
@@ -986,6 +1011,209 @@ int Connection::CreateVolumeFromSpec(const rpc::TVolumeSpec &volume, rpc::TVolum
     resultSpec =  Impl->Rsp.newvolume().volume();
 
     return ret;
+}
+
+void AsyncWaiter::MainCallback(Porto::AsyncWaitEvent &event) {
+    CallbacksCount++;
+
+    auto it = AsyncCallbacks.find(event.Name);
+    if (it != AsyncCallbacks.end() && it->second.State == event.State) {
+        it->second.Callback(event);
+        AsyncCallbacks.erase(it);
+    }
+}
+
+int AsyncWaiter::Repair() {
+    for (const auto &it : AsyncCallbacks) {
+        int ret = Api.AsyncWait({it.first}, {}, GetMainCallback(), -1, it.second.State);
+        if (ret)
+            return ret;
+    }
+    return 0;
+}
+
+void AsyncWaiter::WatchDog() {
+    int ret;
+    auto apiFd = Api.Impl->Fd;
+
+    while (true) {
+        struct epoll_event events[2];
+        int nfds = epoll_wait(EpollFd, events, 2, -1);
+
+        if (nfds < 0) {
+            Fatal("Can not make epoll_wait", errno);
+            return;
+        }
+
+        for (int n = 0; n < nfds; ++n) {
+            if (events[n].data.fd == apiFd) {
+                ret = Api.Recv();
+                // portod reloaded - async_wait must be repaired
+                if (ret == EError::SocketError) {
+                    ret = Api.Connect();
+                    if (ret) {
+                        Fatal("Can not connect to porto api", ret);
+                        return;
+                    }
+
+                    ret = Repair();
+                    if (ret) {
+                        Fatal("Can not repair", ret);
+                        return;
+                    }
+
+                    apiFd = Api.Impl->Fd;
+
+                    struct epoll_event portoEv;
+                    portoEv.events = EPOLLIN | EPOLLPRI | EPOLLET;
+                    portoEv.data.fd = apiFd;
+                    if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, apiFd, &portoEv)) {
+                        Fatal("Can not epoll_ctl", errno);
+                        return;
+                    }
+               }
+            } else if (events[n].data.fd == Sock) {
+                ERequestType requestType = static_cast<ERequestType>(RecvInt(Sock));
+
+                switch (requestType) {
+                case ERequestType::Add:
+                    HandleAddRequest();
+                    break;
+                case ERequestType::Del:
+                    HandleDelRequest();
+                    break;
+                case ERequestType::Stop:
+                    return;
+                case ERequestType::None:
+                default:
+                    Fatal("Unknown request", static_cast<int>(requestType));
+                }
+            }
+        }
+    }
+}
+
+void AsyncWaiter::SendInt(int fd, int value) {
+    int ret = write(fd, &value, sizeof(value));
+    if (ret != sizeof(value))
+        Fatal("Can not send int", errno);
+}
+
+int AsyncWaiter::RecvInt(int fd) {
+    int value;
+    int ret = read(fd, &value, sizeof(value));
+    if (ret != sizeof(value))
+        Fatal("Can not recv int", errno);
+
+    return value;
+}
+
+void AsyncWaiter::HandleAddRequest() {
+    int ret = 0;
+
+    auto it = AsyncCallbacks.find(ReqCt);
+    if (it != AsyncCallbacks.end()) {
+        ret = Api.StopAsyncWait({ReqCt}, {}, it->second.State);
+        AsyncCallbacks.erase(it);
+    }
+
+    AsyncCallbacks.insert(std::make_pair(ReqCt, CallbackData({ReqCallback, ReqState})));
+
+    ret = Api.AsyncWait({ReqCt}, {}, GetMainCallback(), -1, ReqState);
+    SendInt(Sock, ret);
+}
+
+void AsyncWaiter::HandleDelRequest() {
+    int ret = 0;
+
+    auto it = AsyncCallbacks.find(ReqCt);
+    if (it != AsyncCallbacks.end()) {
+        ret = Api.StopAsyncWait({ReqCt}, {}, it->second.State);
+        AsyncCallbacks.erase(it);
+    }
+
+    SendInt(Sock, ret);
+}
+
+AsyncWaiter::AsyncWaiter(std::function<void(const std::string &error, int ret)> fatalCallback)
+: CallbacksCount(0ul)
+, FatalCallback(fatalCallback)
+{
+    int socketPair[2];
+    int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
+    if (ret) {
+        Fatal("Can not make socketpair", ret);
+        return;
+    }
+
+    MasterSock = socketPair[0];
+    Sock = socketPair[1];
+
+    ret = Api.Connect();
+    if (ret) {
+        Fatal("Can not connect to porto api", ret);
+        return;
+    }
+
+    auto apiFd = Api.Impl->Fd;
+
+    EpollFd = epoll_create(2);
+
+    if (EpollFd == -1) {
+        Fatal("Can not epoll_create", errno);
+        return;
+    }
+
+    struct epoll_event pairEv;
+    pairEv.events = EPOLLIN | EPOLLPRI | EPOLLET;
+    pairEv.data.fd = Sock;
+
+    struct epoll_event portoEv;
+    portoEv.events = EPOLLIN | EPOLLPRI | EPOLLET;
+    portoEv.data.fd = apiFd;
+
+    if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, Sock, &pairEv)) {
+        Fatal("Can not epoll_ctl", errno);
+        return;
+    }
+
+    if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, apiFd, &portoEv)) {
+        Fatal("Can not epoll_ctl", errno);
+        return;
+    }
+
+    WatchDogThread = std::unique_ptr<std::thread>(new std::thread(&AsyncWaiter::WatchDog, this));
+}
+
+AsyncWaiter::~AsyncWaiter() {
+    SendInt(MasterSock, static_cast<int>(ERequestType::Stop));
+    WatchDogThread->join();
+
+    close(EpollFd);
+    close(Sock);
+    close(MasterSock);
+}
+
+int AsyncWaiter::Add(const std::string &ct, const std::string &state, std::function<void(AsyncWaitEvent &event)> callback) {
+    if (FatalError)
+        return -1;
+
+    ReqCt = ct;
+    ReqState = state;
+    ReqCallback = callback;
+
+    SendInt(MasterSock, static_cast<int>(ERequestType::Add));
+    return RecvInt(MasterSock);
+}
+
+int AsyncWaiter::Remove(const std::string &ct) {
+    if (FatalError)
+        return -1;
+
+    ReqCt = ct;
+
+    SendInt(MasterSock, static_cast<int>(ERequestType::Del));
+    return RecvInt(MasterSock);
 }
 
 } /* namespace Porto */
