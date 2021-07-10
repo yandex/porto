@@ -48,6 +48,7 @@ void TRequest::Classify() {
         Req.has_listvolumeproperties() ||
         Req.has_wait() ||
         Req.has_asyncwait() ||
+        Req.has_stopasyncwait() ||
         Req.has_convertpath() ||
         Req.has_locateprocess() ||
         Req.has_getsystem() ||
@@ -998,7 +999,7 @@ noinline TError Version(rpc::TContainerResponse &rsp) {
 }
 
 noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async,
-        rpc::TContainerResponse &rsp, std::shared_ptr<TClient> &client) {
+        rpc::TContainerResponse &rsp, std::shared_ptr<TClient> &client, bool stop = false) {
     std::string name, full_name;
     TError error;
 
@@ -1006,6 +1007,8 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
         return TError(EError::InvalidValue, "Containers to wait are not set");
 
     auto waiter = std::make_shared<TContainerWaiter>(async);
+    if (req.has_target_state())
+        waiter->TargetState = req.target_state();
 
     for (auto &label: req.label())
         waiter->Labels.push_back(label);
@@ -1022,7 +1025,8 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
 
         error = client->ResolveName(name, full_name);
         if (error) {
-            rsp.mutable_wait()->set_name(name);
+            if (!stop)
+                rsp.mutable_wait()->set_name(name);
             return error;
         }
 
@@ -1032,6 +1036,8 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
         }
 
         waiter->Names.push_back(full_name);
+        if (stop)
+            continue;
 
         std::shared_ptr<TContainer> ct;
         error = TContainer::Find(full_name, ct);
@@ -1059,6 +1065,9 @@ noinline TError WaitContainers(const rpc::TContainerWaitRequest &req, bool async
             }
         }
     }
+
+    if (stop)
+        return TContainerWaiter::Remove(*waiter, *client);
 
     if (!waiter->Wildcards.empty()) {
         for (auto &it: Containers) {
@@ -1965,6 +1974,8 @@ void TRequest::Handle() {
         error = WaitContainers(Req.wait(), false, rsp, Client);
     else if (Req.has_asyncwait())
         error = WaitContainers(Req.asyncwait(), true, rsp, Client);
+    else if (Req.has_stopasyncwait())
+        error = WaitContainers(Req.stopasyncwait(), true, rsp, Client, true);
     else if (Req.has_listvolumeproperties())
         error = ListVolumeProperties(rsp);
     else if (Req.has_createvolume())

@@ -25,11 +25,14 @@ public:
     std::vector<std::string> Names;
     std::vector<std::string> Wildcards;
     std::vector<std::string> Labels;
+    std::string TargetState;
     bool Async;
     bool Active = false;
 
     TContainerWaiter(bool async) : Async(async) { }
     ~TContainerWaiter();
+
+    bool operator==(const TContainerWaiter &waiter) const;
 
     void Activate(std::shared_ptr<TClient> &client);
     void Deactivate();
@@ -39,4 +42,5 @@ public:
     void Timeout();
 
     static void ReportAll(TContainer &ct, const std::string &label = "", const std::string &value = "");
+    static TError Remove(const TContainerWaiter &waiter, const TClient &client);
 };

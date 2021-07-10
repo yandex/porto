@@ -1410,15 +1410,18 @@ public:
         int timeout = -1;
         bool async = false;
         std::vector<std::string> labels;
+        std::string targetState;
+
         const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = (std::stoi(arg) + 999) / 1000; } },
             { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
+            { 'S', true, [&](const char *arg) { targetState = arg; } },
             { 'L', true, [&](const char *arg) { labels.push_back(arg); } },
             { 'A', false, [&](const char *) { async = true; } },
         });
 
         if (async) {
-            int ret = Api->AsyncWait(containers.empty() ? std::vector<std::string>({"***"}) : containers, labels, PrintAsyncWait, timeout);
+            int ret = Api->AsyncWait(containers.empty() ? std::vector<std::string>({"***"}) : containers, labels, PrintAsyncWait, timeout, targetState);
             if (ret) {
                 PrintError("Can't wait for containers");
                 return ret;
