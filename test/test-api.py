@@ -453,7 +453,6 @@ portodReload.start()
 
 p = subprocess.run([portoctl, 'layer', '-v', '-E', str(v), 'layer.tar.gz'], stdout = subprocess.PIPE, stderr=subprocess.PIPE)
 assert p.returncode == 0
-# assert str(p.stderr).find('PortodReloaded:(connection closed by server') >= 0
 
 portodReload.join()
 ConfigurePortod('test-api', '')
