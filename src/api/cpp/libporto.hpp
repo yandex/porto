@@ -105,9 +105,6 @@ public:
     int GetDiskTimeout() const;
     int SetDiskTimeout(int timeout);
 
-    void SetEnablePortodReloadError(bool value);
-    bool GetEnablePortodReloadError() const;
-
     std::string GetLastError() const;
     void GetLastError(int &error, std::string &msg) const;
 
