@@ -2582,6 +2582,9 @@ public:
     {
         IsDynamic = true;
     }
+    TError Reset() override {
+        return Set("default");
+    }
     TError Get(std::string &value) {
         if (CT->ResolvConf.size() || CT->IsRoot())
             value = StringReplaceAll(CT->ResolvConf, "\n", ";");
