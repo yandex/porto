@@ -56,6 +56,7 @@ std::unordered_set<std::string> SupportedExtraProperties = {
     "max_respawns",
     "userns",
     "unshare_on_exec",
+    "resolv_conf",
 };
 
 std::mutex CpuAffinityMutex;
