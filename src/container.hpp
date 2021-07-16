@@ -168,6 +168,8 @@ public:
     bool DockerMode = false;
     bool FuseMode = false;
     bool UserNs = false;
+    TCred UserNsCred;
+    bool UnshareOnExec = false;
     ECgroupFs CgroupFs = ECgroupFs::None;
 
     TMultiTuple NetProp;
@@ -321,6 +323,10 @@ public:
 
     bool IsMeta() const {
         return Command.empty() && !HasProp(EProperty::COMMAND_ARGV);
+    }
+
+    bool InUserNs() const {
+        return !UserNsCred.IsUnknown();
     }
 
     TContainer(std::shared_ptr<TContainer> parent, int id, const std::string &name);

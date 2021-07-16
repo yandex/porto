@@ -547,6 +547,7 @@ message TContainerSpec {
     optional string porto_namespace = 12;
     optional string cgroupfs = 78;
     optional bool userns = 79;
+    optional bool unshare_on_exec = 80;
 
     optional uint64 aging_time = 13;
 

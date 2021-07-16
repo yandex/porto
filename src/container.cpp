@@ -55,6 +55,7 @@ std::unordered_set<std::string> SupportedExtraProperties = {
     "command",
     "max_respawns",
     "userns",
+    "unshare_on_exec",
 };
 
 std::mutex CpuAffinityMutex;
@@ -507,6 +508,13 @@ TContainer::TContainer(std::shared_ptr<TContainer> parent, int id, const std::st
     else
         AccessLevel = EAccessLevel::Normal;
     SetProp(EProperty::ENABLE_PORTO);
+
+    for (auto p = Parent.get(); p; p = p->Parent.get()) {
+        if (p->UserNs) {
+            UserNsCred = p->TaskCred;
+            break;
+        }
+    }
 }
 
 TContainer::~TContainer() {
@@ -572,10 +580,17 @@ TError TContainer::Create(const std::string &name, std::shared_ptr<TContainer> &
      * This is safe because new container will have the same restrictions.
      */
     if (ct->IsChildOf(*CL->ClientContainer)) {
-        ct->TaskCred = CL->TaskCred;
+        if (ct->InUserNs() && CL->TaskCred.IsRootUser())
+            ct->TaskCred = ct->UserNsCred;
+        else
+            ct->TaskCred = CL->TaskCred;
         (void)ct->TaskCred.InitGroups(ct->TaskCred.User());
-    } else
-        ct->TaskCred = CL->Cred;
+    } else {
+        if (ct->InUserNs() && CL->Cred.IsRootUser())
+            ct->TaskCred = ct->UserNsCred;
+        else
+            ct->TaskCred = CL->Cred;
+    }
 
     ct->SetProp(EProperty::USER);
     ct->SetProp(EProperty::GROUP);
@@ -2582,7 +2597,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
         }
     }
 
-    TaskEnv.Mnt.IsolateRun = TaskEnv.Mnt.Root.IsRoot() && OsMode && Isolate;
+    TaskEnv.Mnt.IsolateRun = TaskEnv.Mnt.Root.IsRoot() && OsMode && Isolate && !InUserNs();
 
     // Create new mount namespaces if we have to make any changes
     TaskEnv.NewMountNs = Isolate ||
