@@ -244,7 +244,7 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
     return OK;
 }
 
-TError TMountNamespace::MountRun() {
+TError TMountNamespace::MountRun(const TContainer &ct) {
     TPath run = "run";
     std::vector<std::string> run_paths, subdirs;
     std::vector<struct stat> run_paths_stat;
@@ -326,10 +326,16 @@ TError TMountNamespace::MountRun() {
             return error;
     }
 
+    if (ct.InUserNs()) {
+        error = run.ChownRecursiveRootFiles(ct.UserNsCred);
+        if (error)
+            return error;
+    }
+
     return OK;
 }
 
-TError TMountNamespace::RemountRun() {
+TError TMountNamespace::RemountRun(const TContainer &ct) {
     TPath run("/run"), tmp("/tmp");
     TError error;
 
@@ -342,7 +348,7 @@ TError TMountNamespace::RemountRun() {
     if (error)
         return error;
 
-    error = MountRun();
+    error = MountRun(ct);
     if (error)
         return error;
 
@@ -461,7 +467,8 @@ TError TMountNamespace::MountSystemd() {
     return error;
 }
 
-TError TMountNamespace::MountCgroups(bool rw) {
+TError TMountNamespace::MountCgroups(const TContainer &ct) {
+    bool rw = ct.DockerMode || ct.CgroupFs == ECgroupFs::Rw;
     TError error;
     TPath tmpfs = "sys/fs/cgroup";
 
@@ -507,6 +514,12 @@ TError TMountNamespace::MountCgroups(bool rw) {
             if (error)
                 return error;
         }
+
+        if (ct.InUserNs()) {
+            error = cgroup.ChownRecursiveRootFiles(ct.UserNsCred);
+            if (error)
+                return error;
+        }
     }
 
     static const struct {
@@ -525,10 +538,22 @@ TError TMountNamespace::MountCgroups(bool rw) {
             return error;
     }
 
+    if (ct.InUserNs()) {
+        error = tmpfs.ChownRecursiveRootFiles(ct.UserNsCred);
+        if (error)
+            return error;
+
+        for (auto &s : symlinks) {
+            error = s.path.Lchown(ct.UserNsCred);
+            if (error)
+                return error;
+        }
+    }
+
     return tmpfs.Remount(MS_RDONLY);
 }
 
-TError TMountNamespace::SetupRoot(bool rootUser) {
+TError TMountNamespace::SetupRoot(const TContainer &ct) {
     TPath dot(".");
     TError error;
 
@@ -574,7 +599,7 @@ TError TMountNamespace::SetupRoot(bool rootUser) {
         { "dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
             { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5",
               "max=" + std::to_string(config().container().devpts_max()) }},
-        { "sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | (rootUser && EnableDockerMode ? 0ul : MS_RDONLY), {}},
+        { "sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | (EnableDockerMode && ct.OwnerCred.IsRootUser() ? 0ul : MS_RDONLY), {}},
     };
 
     for (auto &m : mounts) {
@@ -585,7 +610,7 @@ TError TMountNamespace::SetupRoot(bool rootUser) {
             return error;
     }
 
-    error = MountRun();
+    error = MountRun(ct);
     if (error)
         return error;
 
@@ -662,6 +687,12 @@ TError TMountNamespace::SetupRoot(bool rootUser) {
     if (error)
         L_WRN("Cannot mount tracefs: {}", error);
 
+    if (ct.InUserNs()) {
+        error = dot.ChownRecursiveRootFiles(ct.UserNsCred);
+        if (error)
+            return error;
+    }
+
     return OK;
 }
 
@@ -697,9 +728,6 @@ TError TMountNamespace::ProtectProc() {
 }
 
 TError TMountNamespace::Setup(const TContainer &ct) {
-    bool rootUser = EnableDockerMode && ct.OwnerCred.IsRootUser();
-    bool dockerMode = ct.DockerMode;
-
     TPath dot(".");
     TError error;
 
@@ -791,12 +819,12 @@ TError TMountNamespace::Setup(const TContainer &ct) {
 
     if (Root.IsRoot()) {
         if (IsolateRun) {
-            error = RemountRun();
+            error = RemountRun(ct);
             if (error)
                 return error;
         }
     } else {
-        error = SetupRoot(rootUser);
+        error = SetupRoot(ct);
         if (error)
             return error;
     }
@@ -806,14 +834,14 @@ TError TMountNamespace::Setup(const TContainer &ct) {
     if (error)
         return error;
 
-    if (!rootUser || !dockerMode) {
+    if ((!EnableDockerMode || !ct.OwnerCred.IsRootUser() || !ct.DockerMode) && !ct.InUserNs()) {
         error = ProtectProc();
         if (error)
             return error;
     }
 
     if (ct.CgroupFs != ECgroupFs::None)
-        error = MountCgroups(ct.DockerMode || ct.CgroupFs == ECgroupFs::Rw);
+        error = MountCgroups(ct);
     else
         error = MountSystemd();
 

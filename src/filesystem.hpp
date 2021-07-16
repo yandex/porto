@@ -47,14 +47,14 @@ public:
     TNamespaceFd HostNs;
     TNamespaceFd ContainerNs;
 
-    TError SetupRoot(bool rootUser);
-    TError MountRun();
-    TError RemountRun();
+    TError SetupRoot(const TContainer &ct);
+    TError MountRun(const TContainer &ct);
+    TError RemountRun(const TContainer &ct);
     TError MountBinds();
     TError ProtectProc();
     TError MountTraceFs();
     TError MountSystemd();
-    TError MountCgroups(bool rw);
+    TError MountCgroups(const TContainer &ct);
 
     TError Setup(const TContainer &ct);
 

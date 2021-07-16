@@ -651,22 +651,26 @@ public:
     }
     TError Set(const std::string &username) {
         TCred cred;
-        TError error = cred.Init(username);
-        if (error) {
-            cred.SetGid(CT->TaskCred.GetGid());
-            uid_t newUid;
-            error = UserId(username, newUid);
-            if (error)
-                return error;
-            cred.SetUid(newUid);
-        } else if (CT->HasProp(EProperty::GROUP))
-            cred.SetGid(CT->TaskCred.GetGid());
+        if (CT->InUserNs() && username == "root")
+            cred = CT->UserNsCred;
+        else {
+            TError error = cred.Init(username);
+            if (error) {
+                cred.SetGid(CT->TaskCred.GetGid());
+                uid_t newUid;
+                error = UserId(username, newUid);
+                if (error)
+                    return error;
+                cred.SetUid(newUid);
+            } else if (CT->HasProp(EProperty::GROUP))
+                cred.SetGid(CT->TaskCred.GetGid());
+        }
         CT->TaskCred = cred;
         CT->SetProp(EProperty::USER);
         return OK;
     }
     TError Start(void) {
-        if (CT->OsMode && !CT->UserNs)
+        if (CT->OsMode && !CT->UserNs && !CT->InUserNs())
             CT->TaskCred.SetUid(RootUser);
         return OK;
     }
@@ -693,15 +697,19 @@ public:
     }
     TError Set(const std::string &groupname) {
         gid_t newGid;
-        TError error = GroupId(groupname, newGid);
-        if (error)
-            return error;
+        if (CT->InUserNs() && groupname == "root")
+            newGid = CT->UserNsCred.GetGid();
+        else {
+            TError error = GroupId(groupname, newGid);
+            if (error)
+                return error;
+        }
         CT->TaskCred.SetGid(newGid);
         CT->SetProp(EProperty::GROUP);
         return OK;
     }
     TError Start(void) {
-        if (CT->OsMode)
+        if (CT->OsMode && !CT->UserNs && !CT->InUserNs())
             CT->TaskCred.SetGid(RootGroup);
         return OK;
     }
@@ -1164,8 +1172,9 @@ public:
                 return TError(EError::InvalidValue, "userns=true incompatible with virt_mode");
             else if (!CT->UserNs && CT->DockerMode)
                 return TError(EError::InvalidValue, "userns=false incompatible with virt_mode");
-        } else if (CT->DockerMode) {
+        } else if (CT->DockerMode || CT->FuseMode) {
             CT->UserNs = true;
+            CT->UnshareOnExec = true;
             CT->SetProp(EProperty::USERNS);
         }
         return OK;
@@ -1235,7 +1244,7 @@ public:
     TUserNs() : TProperty(P_USERNS, EProperty::USERNS, "New user namespace") {}
 
     TError Reset() override {
-        return Set("false");
+        return Set(false);
     }
 
     TError Get(std::string &value) {
@@ -1273,6 +1282,46 @@ public:
         return Set(spec.userns());
     }
 } static UserNs;
+
+class TUnshareOnExec : public TProperty {
+public:
+    TUnshareOnExec() : TProperty(P_UNSHARE_ON_EXEC, EProperty::UNSHARE_ON_EXEC, "Call unshare(CLONE_NEWNS) right before exec()") {}
+
+    TError Reset() override {
+        return Set(false);
+    }
+
+    TError Get(std::string &value) {
+        value = BoolToString(CT->UnshareOnExec);
+        return OK;
+    }
+
+    TError Set(bool value) {
+        CT->UnshareOnExec = value;
+        CT->SetProp(EProperty::UNSHARE_ON_EXEC);
+        return OK;
+    }
+
+    TError Set(const std::string &value) {
+        bool val;
+        TError error = StringToBool(value, val);
+        if (error)
+            return error;
+        return Set(val);
+    }
+
+    void Dump(rpc::TContainerSpec &spec) override {
+        spec.set_userns(CT->UnshareOnExec);
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_unshare_on_exec();
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) override {
+        return Set(spec.unshare_on_exec());
+    }
+} static UnshareOnExec;
 
 class TCgroupFs : public TProperty {
 public:
@@ -4156,7 +4205,7 @@ public:
         IsAnyState = true;
     }
     TError Reset() override {
-        return Set("-1");
+        return Set(-1);
     }
     TError Get(std::string &value) {
         if (CT->HasProp(EProperty::RESPAWN_LIMIT))

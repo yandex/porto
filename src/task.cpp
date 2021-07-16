@@ -171,6 +171,8 @@ TError TTaskEnv::OpenNamespaces(TContainer &ct) {
 
     if (UserFd.Inode() == currentUserFd.Inode())
         UserFd.Close();
+    else
+        PORTO_ASSERT(ct.InUserNs());
 
     currentUserFd.Close();
 
@@ -253,6 +255,11 @@ TError TTaskEnv::ChildExec() {
             !(CT->Controllers & CGROUP_SYSTEMD)) {
         L_VERBOSE("Reserve fd 9 for upstart JOB_PROCESS_SCRIPT_FD");
         dup2(open("/dev/null", O_RDWR | O_CLOEXEC), 9);
+    }
+
+    if (CT->UnshareOnExec) {
+        if (unshare(CLONE_NEWNS))
+            return TError::System("unshare(CLONE_NEWNS)");
     }
 
     L("Exec '{}'", argv[0]);
@@ -354,6 +361,13 @@ TError TTaskEnv::ConfigureChild() {
     }
 
     if (!Mnt.Root.IsRoot()) {
+        if (CT->InUserNs()) {
+            for (auto &device: devices.Devices) {
+                if (device.Uid == RootUser)
+                    device.Uid = CT->UserNsCred.GetUid();
+            }
+        }
+
         error = devices.Makedev();
         if (error)
             return error;
@@ -460,13 +474,13 @@ TError TTaskEnv::ConfigureChild() {
 
     UserFd.Close();
 
-    if (CT->UserNs || CT->FuseMode) {
-        int unshareFlags = CLONE_NEWUSER | CLONE_NEWNS;
+    if (CT->UserNs) {
+        int unshareFlags = CLONE_NEWUSER;
         if (CT->UserNs)
             unshareFlags |= CLONE_NEWNET | (SupportCgroupNs ? CLONE_NEWCGROUP : 0);
 
         if (unshare(unshareFlags))
-            return TError::System("unshare(CLONE_NEWUSER | CLONE_NEWNS{}{})",
+            return TError::System("unshare(CLONE_NEWUSER | {}{})",
                                   (CT->UserNs ? " | CLONE_NEWNET" : ""),
                                   (SupportCgroupNs ? " | CLONE_NEWCGROUP" : ""));
 
@@ -873,7 +887,7 @@ TError TTaskEnv::Start() {
 
     /* Task was alive, even if it already died we'll get zombie */
 
-    if (CT->UserNs || CT->FuseMode) {
+    if (CT->UserNs) {
         // wait joining user namespace
         error = MasterSock.RecvZero();
         if (error)
