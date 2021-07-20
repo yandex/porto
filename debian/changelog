@@ -1,3 +1,17 @@
+yandex-porto (5.0.30) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * porto: rework extra_properties format
+  * network: enable tx burst like rx
+  * porto: check that cgroupns supported, before use
+  * api: remove unused option
+  * network: take lock in NetWatchDog only if needed
+  * network: add network high precision speed statistics
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 20 Jul 2021 17:10:02 +0300
+
 yandex-porto (5.0.29) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
