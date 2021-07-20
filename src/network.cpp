@@ -2077,10 +2077,11 @@ void TNetwork::NetWatchdog() {
             LastResolvConf = GetCurrentTimeMs();
         }
 
-        auto lock = LockNetworks();
         now = GetCurrentTimeMs();
-        if (now < SockDiagDeadline)
+        if (now < SockDiagDeadline) {
+            auto lock = LockNetworks();
             NetThreadCv.wait_for(lock, std::chrono::milliseconds(std::min(SockDiagDeadline - now, NetWatchdogPeriod / 2)));
+        }
     }
 }
 
