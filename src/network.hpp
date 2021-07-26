@@ -216,7 +216,7 @@ public:
 
     bool EnabledRxLimit = false;
 
-    TError SyncDevices();
+    TError SyncDevicesLocked();
     std::string NewDeviceName(const std::string &prefix);
     std::string MatchDevice(const std::string &pattern);
     int DeviceIndex(const std::string &name);
