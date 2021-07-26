@@ -728,12 +728,14 @@ void TNetwork::Destroy() {
     for (auto &dev: Devices) {
         auto nl = Nl;
         int index = dev.Index;
+        std::unique_lock<std::mutex> hostNetLock;
 
         // delete qdisc for L3 device in host netns
         // veth devices in container netns is not Managed
         if (dev.Type == "veth" && EnabledRxLimit) {
             nl = HostNetwork->GetNl();
             index = dev.Link;
+            hostNetLock = HostNetwork->LockNet();
         } else if (!dev.Managed)
             continue;
 
@@ -1077,7 +1079,9 @@ void TNetwork::SetDeviceOwner(const std::string &name, int owner) {
             dev.Owner = owner;
 }
 
-TError TNetwork::SyncDevices() {
+TError TNetwork::SyncDevicesLocked() {
+    PORTO_LOCKED(NetMutex);
+
     struct nl_cache *cache;
     TError error;
     int ret;
@@ -1290,6 +1294,8 @@ TError TNetwork::SyncDevices() {
 }
 
 TError TNetwork::GetL3Gate(TNetDeviceConfig &dev) {
+    PORTO_LOCKED(NetMutex);
+
     struct nl_cache *cache, *lcache;
     int default_mtu = -1;
     TError error;
@@ -1857,19 +1863,21 @@ TError TNetwork::Reconnect() {
 }
 
 TError TNetwork::RepairLocked() {
+    PORTO_LOCKED(NetMutex);
+
     TError error;
 
     L_NET("Repair network {}", NetName);
 
     NetError = TError::Queued();
 
-    error = SyncDevices();
+    error = SyncDevicesLocked();
     if (error) {
         L_NET("Reconnect network {} netlink after: {}", NetName, error);
         error = Reconnect();
         if (error)
             L_NET("Cannot reconnect network {} netlink: {}", NetName, error);
-        error = SyncDevices();
+        error = SyncDevicesLocked();
     }
 
     bool force = false;
@@ -2272,6 +2280,8 @@ void TNetwork::InitStat(TNetClass &cls) {
 }
 
 void TNetwork::SyncStatLocked() {
+    PORTO_LOCKED(NetMutex);
+
     TError error;
 
     auto curTime = GetCurrentTimeMs();
@@ -2280,7 +2290,7 @@ void TNetwork::SyncStatLocked() {
     L_NET_VERBOSE("Sync network {} statistics generation {} after {} ms",
           NetName, (unsigned)curGen, curTime - StatTime);
 
-    error = SyncDevices();
+    error = SyncDevicesLocked();
     if (error) {
         StartRepair();
         return;
@@ -3227,6 +3237,8 @@ TError TNetEnv::DestroyTap(TNetDeviceConfig &tap) {
 }
 
 TError TNetEnv::SetupInterfaces() {
+    PORTO_LOCKED(Net->NetMutex);
+
     auto parent_lock = ParentNet->LockNet();
     auto source_nl = ParentNet->GetNl();
     auto target_nl = Net->GetNl();
@@ -3315,7 +3327,7 @@ TError TNetEnv::SetupInterfaces() {
 
     Net->ManagedNamespace = true;
 
-    error = Net->SyncDevices();
+    error = Net->SyncDevicesLocked();
     if (error)
         return error;
 
@@ -3577,7 +3589,10 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
         Net->NetName = "host";
         HostNetwork = Net;
 
-        error = Net->SyncDevices();
+        auto lock = Net->LockNet();
+        error = Net->SyncDevicesLocked();
+        lock.unlock();
+
         if (error)
             return error;
 
