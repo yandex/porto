@@ -1,3 +1,16 @@
+yandex-porto (5.0.31) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * ci: use more cores for tests
+  * network: take lock before delete qdisc from L3 device on host
+  * api: add AsyncWaiter for make async wait simpler
+  * portoctl: add portoctl sandbox-pull command for download typical base layers
+  * container: do not enable net_cls controller by default test: disable tests with tc classes
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 30 Jul 2021 15:23:54 +0300
+
 yandex-porto (5.0.30) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
