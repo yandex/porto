@@ -3,6 +3,9 @@
 import porto
 from test_common import *
 
+# now allow suid binaries in linked volumes
+nosuid = False
+
 c = porto.Connection(timeout=10)
 
 def CheckBaseMounts(mnt, chroot=True):
@@ -38,15 +41,15 @@ host_mnt = ParseMountinfo()
 
 Expect('rw' in host_mnt[root_volume.path]['flag'])
 Expect('nodev' in host_mnt[root_volume.path]['flag'])
-Expect('nosuid' in host_mnt[root_volume.path]['flag'])
+Expect('nosuid' in host_mnt[root_volume.path]['flag'] if nosuid else True)
 
 Expect('rw' in host_mnt[test_volume.path]['flag'])
 Expect('nodev' in host_mnt[test_volume.path]['flag'])
-Expect('nosuid' in host_mnt[test_volume.path]['flag'])
+Expect('nosuid' in host_mnt[test_volume.path]['flag'] if nosuid else True)
 
 Expect('ro' in host_mnt[ro_volume.path]['flag'])
 Expect('nodev' in host_mnt[ro_volume.path]['flag'])
-Expect('nosuid' in host_mnt[ro_volume.path]['flag'])
+Expect('nosuid' in host_mnt[ro_volume.path]['flag'] if nosuid else True)
 
 # no chroot
 a = c.Run("a")
@@ -154,7 +157,7 @@ Expect('master' in mnt['/test'])
 Expect('shared' in mnt['/test'])
 
 Expect('nodev' in mnt['/test']['flag'])
-Expect('nosuid' in mnt['/test']['flag'])
+Expect('nosuid' in mnt['/test']['flag'] if nosuid else True)
 
 Expect('/test/sub' not in mnt)
 
@@ -240,7 +243,7 @@ Expect(root_volume.path + '/test_ro' in mnt)
 Expect('ro' in mnt[root_volume.path + '/test_ro']['flag'])
 
 Expect('nodev' in mnt[root_volume.path + '/test_ro']['flag'])
-Expect('nosuid' in mnt[root_volume.path + '/test_ro']['flag'])
+Expect('nosuid' in mnt[root_volume.path + '/test_ro']['flag'] if nosuid else True)
 
 Expect(root_volume.path + '/test_ro/sub' not in mnt)
 Expect(root_volume.path + '/ro_vol' in mnt)
@@ -253,7 +256,7 @@ Expect('/test_ro' in mnt)
 Expect('ro' in mnt['/test_ro']['flag'])
 
 Expect('nodev' in mnt['/test_ro']['flag'])
-Expect('nosuid' in mnt['/test_ro']['flag'])
+Expect('nosuid' in mnt['/test_ro']['flag'] if nosuid else True)
 
 Expect('/test_ro/sub' not in mnt)
 Expect('/ro_vol' in mnt)
