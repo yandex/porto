@@ -2583,7 +2583,7 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
 
     /* Start new shared group and make read-only - that isn't propagated */
     if (!error)
-        error = link_mount.BindRemount(InternalPath, flags | MS_SLAVE | MS_SHARED);
+        error = link_mount.BindRemount(InternalPath, flags | MS_SLAVE | MS_SHARED | MS_ALLOW_SUID);
 
     /* Move to target path and propagate into namespaces */
     if (!error)
