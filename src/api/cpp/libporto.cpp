@@ -1040,6 +1040,9 @@ void AsyncWaiter::WatchDog() {
         struct epoll_event events[2];
         int nfds = epoll_wait(EpollFd, events, 2, -1);
 
+        if (errno == EINTR)
+            continue;
+
         if (nfds < 0) {
             Fatal("Can not make epoll_wait", errno);
             return;
@@ -1065,7 +1068,7 @@ void AsyncWaiter::WatchDog() {
                     apiFd = Api.Impl->Fd;
 
                     struct epoll_event portoEv;
-                    portoEv.events = EPOLLIN | EPOLLPRI | EPOLLET;
+                    portoEv.events = EPOLLIN;
                     portoEv.data.fd = apiFd;
                     if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, apiFd, &portoEv)) {
                         Fatal("Can not epoll_ctl", errno);
@@ -1140,7 +1143,7 @@ AsyncWaiter::AsyncWaiter(std::function<void(const std::string &error, int ret)> 
 , FatalCallback(fatalCallback)
 {
     int socketPair[2];
-    int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, socketPair);
+    int ret = socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, socketPair);
     if (ret) {
         Fatal("Can not make socketpair", ret);
         return;
@@ -1157,7 +1160,7 @@ AsyncWaiter::AsyncWaiter(std::function<void(const std::string &error, int ret)> 
 
     auto apiFd = Api.Impl->Fd;
 
-    EpollFd = epoll_create(2);
+    EpollFd = epoll_create1(EPOLL_CLOEXEC);
 
     if (EpollFd == -1) {
         Fatal("Can not epoll_create", errno);
@@ -1165,11 +1168,11 @@ AsyncWaiter::AsyncWaiter(std::function<void(const std::string &error, int ret)> 
     }
 
     struct epoll_event pairEv;
-    pairEv.events = EPOLLIN | EPOLLPRI | EPOLLET;
+    pairEv.events = EPOLLIN;
     pairEv.data.fd = Sock;
 
     struct epoll_event portoEv;
-    portoEv.events = EPOLLIN | EPOLLPRI | EPOLLET;
+    portoEv.events = EPOLLIN;
     portoEv.data.fd = apiFd;
 
     if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, Sock, &pairEv)) {
