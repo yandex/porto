@@ -1040,10 +1040,10 @@ void AsyncWaiter::WatchDog() {
         struct epoll_event events[2];
         int nfds = epoll_wait(EpollFd, events, 2, -1);
 
-        if (errno == EINTR)
-            continue;
-
         if (nfds < 0) {
+            if (errno == EINTR)
+                continue;
+
             Fatal("Can not make epoll_wait", errno);
             return;
         }
@@ -1191,6 +1191,11 @@ AsyncWaiter::AsyncWaiter(std::function<void(const std::string &error, int ret)> 
 AsyncWaiter::~AsyncWaiter() {
     SendInt(MasterSock, static_cast<int>(ERequestType::Stop));
     WatchDogThread->join();
+
+    // pedantic check, that porto api is watching by epoll
+    if (epoll_ctl(EpollFd, EPOLL_CTL_DEL, Api.Impl->Fd, nullptr) || epoll_ctl(EpollFd, EPOLL_CTL_DEL, Sock, nullptr)) {
+        Fatal("Can not epoll_ctl_del", errno);
+    }
 
     close(EpollFd);
     close(Sock);
