@@ -65,7 +65,7 @@ TestCmd("UnlinkVolume('{}')".format(volumes[0]), True)
 TestCmd("UnlinkVolume('{}')".format(volumes[1]))
 
 v = conn.CreateVolume()
-subprocess.call(['dd', 'if=/dev/urandom', 'of=' + str(v) + '/foo', 'bs=1M', 'count=512'])
+subprocess.call(['dd', 'if=/dev/urandom', 'of=' + str(v) + '/foo', 'bs=1M', 'count=1024'])
 
 subprocess.call(['rm', '-f', '/tmp/layer.tar.gz'])
 

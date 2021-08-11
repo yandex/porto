@@ -87,7 +87,7 @@ part7 = {'volume_backends':55,
 
 part8 = {'spec':4,
          'python3-spec':4,
-         'python3-retriability':120,
+         'python3-retriability':160,
          'docker':30}
 
 for test in part1.keys() + part2.keys() + part3.keys() + part4.keys() + part5.keys() + part6.keys() + part7.keys() + part8.keys():
