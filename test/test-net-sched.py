@@ -239,26 +239,26 @@ def run_mtn_limit_test():
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, cfg={"net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit %sM -> " % rate, res
-    ExpectRange(res, rate * 0.9, rate * 1.5)
+    ExpectRange(res, rate * 0.9, rate * 1.6)
 
     print "Test net_rx_limit in MTN"
 
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_rx_limit %sM -> " % rate, res
-    ExpectLe(res, rate * 1.5)
+    ExpectLe(res, rate * 1.6)
 
     print "Test both net_limit and net_rx_limit in MTN"
 
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=False, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit/net_rx_limit %sM -> " % rate, res
-    ExpectLe(res, rate * 1.5)
+    ExpectLe(res, rate * 1.6)
 
     a = run_iperf_client("test-net-a", local_server, time=3, wait=20, mtn=True, reverse=True, cfg={"net_rx_limit": "default: %sM" % rate, "net_limit": "default: %sM" % rate})
     res = bps(a)
     print "net_limit/net_rx_limit and reverse %sM -> " % rate, res
-    ExpectLe(res, rate * 1.5)
+    ExpectLe(res, rate * 1.6)
 
     if qdisc in ["fq_codel", "pfifo_fast"]:
         print "Check tx drops and overlimits"
@@ -326,7 +326,7 @@ def run_bandwidth_sharing_test():
     # 1) Allow up to +- 50% fairness between containers, mind the default rate of 10M
     # 2) Use relative estimation for b container
 
-    ExpectRange(res / b_rate, 0.5, 1.5)
+    ExpectRange(res / b_rate, 0.5, 1.6)
 
     b = run_iperf_client("test-net-b", server2, time=6, wait=0, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
     time.sleep(1)
@@ -343,7 +343,7 @@ def run_bandwidth_sharing_test():
 
     ExpectLe(0.09, res / rate)
     ExpectLe(0.09, res_b / rate)
-    ExpectRange(res / b_rate, 0.5, 1.5)
+    ExpectRange(res / b_rate, 0.5, 1.6)
 
     b = run_iperf_client("test-net-b", server2, time=6, wait=0, cfg={"net_guarantee": "default: %sM" % int(rate * 0.1)})
     time.sleep(1)
