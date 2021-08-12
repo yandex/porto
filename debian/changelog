@@ -1,3 +1,19 @@
+yandex-porto (5.0.32) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * api: small fixes for async waiter
+  * api: fixes for async waiter
+  * test: make net_sched more stable
+  * test: make retriability test more stable
+
+  [ Dmitry Yakunin ]
+  * util/path: add Lchown and ChownRecursive (with filter) helpers
+  * container: more user namespace logic
+  * property: add resolv_conf to allowed extra properties
+  * volume: allow suid binaries in linked volumes
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 12 Aug 2021 12:50:00 +0300
+
 yandex-porto (5.0.31) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
