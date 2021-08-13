@@ -126,7 +126,7 @@ static std::list<std::pair<std::string, std::string>> NetSysctls = {
     { "net.ipv4.ip_forward_use_pmtu", "0" },
     { "net.ipv4.ip_nonlocal_bind", "0" },
     //"net.ipv4.fwmark_reflect",
-    //"net.ipv4.tcp_fwmark_accept",
+    { "net.ipv4.tcp_fwmark_accept", "0" },
     { "net.ipv4.tcp_mtu_probing", "0" },
     { "net.ipv4.tcp_base_mss", "1024" },
     { "net.ipv4.tcp_probe_threshold", "8" },
