@@ -1194,9 +1194,9 @@ TError TNetwork::SyncDevicesLocked() {
 
             auto it = L3Stats.find(dev.Link);
             if (it != L3Stats.end()) {
-                if (!RxSpeedHgram)
+                if (!RxSpeedHgram || RxSpeedHgram.get() != it->second.RxHgram.get())
                     RxSpeedHgram = it->second.RxHgram;
-                if (!TxSpeedHgram)
+                if (!TxSpeedHgram || TxSpeedHgram.get() != it->second.TxHgram.get())
                     TxSpeedHgram = it->second.TxHgram;
                 RxMaxSpeed = it->second.RxMax;
                 TxMaxSpeed = it->second.TxMax;
@@ -2196,6 +2196,8 @@ void UpdateL3Stat() {
         auto &l3Stat = L3Stats[ifindex];
         lock.unlock();
 
+        l3Stat.Found = true;
+
         if (l3Stat.UpdateTs) {
             auto intervalMs = now - l3Stat.UpdateTs;
             if (intervalMs > L3StatWatchdogLostPeriod) {
@@ -2225,7 +2227,6 @@ void UpdateL3Stat() {
         l3Stat.TxPrev = tx;
         l3Stat.RxPrev = rx;
         l3Stat.UpdateTs = now;
-        l3Stat.Found = true;
     }
 
     auto lock = LockL3Stat();
