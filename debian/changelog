@@ -1,3 +1,10 @@
+yandex-porto (5.0.34) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * network: fix shared ptr leak
+
+ -- max7255 <max7255@max7255-nix>  Mon, 16 Aug 2021 17:52:07 +0300
+
 yandex-porto (5.0.33) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
