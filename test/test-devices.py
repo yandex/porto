@@ -389,6 +389,12 @@ run_test_restore_vanished_pids_devices(devices="/dev/ram0 rw")
 a = c.Run("a", weak=True, root_volume={"layers": ["ubuntu-precise"]}, virt_mode="fuse")
 b = c.Run("a/b", weak=True, wait=3, command="ls /dev/fuse")
 ExpectEq(b['exit_code'], '0')
+b.Destroy()
+
+b = c.Run("a/b", weak=True, wait=3, command="ifconfig")
+assert len(b['stdout']) != 0
+ExpectEq(b['exit_code'], '0')
+
 a.Destroy()
 
 a = c.Run("a", weak=True, root_volume={"layers": ["ubuntu-precise"]})
