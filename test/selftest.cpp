@@ -3691,6 +3691,7 @@ static void TestContainerSpec(Porto::Connection &api) {
     Say() << "Check labels filter and stdout property in spec" << std::endl;
     {
         ExpectApiSuccess(api.Start(c));
+        ExpectApiSuccess(api.WaitContainers({c}, {}, tmp, 0));
 
         rpc::TListContainersRequest listContainersRequest;
         auto filter = listContainersRequest.add_filters();
