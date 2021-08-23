@@ -1641,11 +1641,11 @@ Stanislav Ivanichkin <sivanichkin@yandex-team.ru>
 Vsevolod Minkov <vminkov@yandex-team.ru>  
 Vsevolod Velichko <torkve@yandex-team.ru>  
 Maxim Samoylov <max7255@yandex-team.ru>  
-Dmitry Yakunin <zeil@yandex-team.ru>
+Dmitry Yakunin <zeil@yandex-team.ru>  
 Alexander Kuznetsov <wwfq@yandex-team.ru>
 
 # COPYRIGHT
 
-Copyright (C) YANDEX LLC, 2015-2017.
+Copyright (C) YANDEX LLC, 2015-2021.
 Licensed under the GNU LESSER GENERAL PUBLIC LICENSE.
 See LICENSE file for more details.
