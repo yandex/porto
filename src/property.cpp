@@ -6018,10 +6018,13 @@ public:
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Write, map);
 
-        if (MemorySubsystem.SupportIoLimit()) {
-            auto memCg = CT->GetCgroup(MemorySubsystem);
-            TUintMap memStat;
-            if (!MemorySubsystem.Statistics(memCg, memStat))
+        auto memCg = CT->GetCgroup(MemorySubsystem);
+        TUintMap memStat;
+
+        auto error = MemorySubsystem.Statistics(memCg, memStat);
+        if (!error) {
+            map["total_writeback"] = memStat["total_writeback"];
+            if (MemorySubsystem.SupportIoLimit())
                 map["fs"] = memStat["fs_io_write_bytes"];
         }
 
