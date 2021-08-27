@@ -11,6 +11,7 @@
 #include "util/string.hpp"
 #include "util/md5.hpp"
 #include "util/quota.hpp"
+#include "util/thread.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -22,6 +23,7 @@ static const char LAYER_TMP[] = "_tmp_";
 static const char WEAK_PREFIX[] = "_weak_";
 static const char IMPORT_PREFIX[] = "_import_";
 static const char REMOVE_PREFIX[] = "_remove_";
+static const char ASYNC_REMOVE_PREFIX[] = "_asyncremove_";
 static const char PRIVATE_PREFIX[] = "_private_";
 static const char META_PREFIX[] = "_meta_";
 static const char META_LAYER[] = "_layer_";
@@ -41,6 +43,64 @@ static std::condition_variable StorageCv;
 
 static TUintMap PlaceLoad;
 static TUintMap PlaceLoadLimit;
+
+extern std::atomic_bool NeedStopHelpers;
+
+static std::unique_ptr<std::thread> AsyncRemoveThread;
+static std::condition_variable AsyncRemoverCv;
+static std::mutex AsyncRemoverMutex;
+
+static std::set<TPath> Places;
+static std::mutex PlacesMutex;
+
+static inline std::unique_lock<std::mutex> LockAsyncRemover() {
+    return std::unique_lock<std::mutex>(AsyncRemoverMutex);
+}
+
+static inline std::unique_lock<std::mutex> LockPlaces() {
+    return std::unique_lock<std::mutex>(PlacesMutex);
+}
+
+
+void AsyncRemoveWatchDog() {
+    TError error;
+
+    while (!NeedStopHelpers) {
+        auto placesLock = LockPlaces();
+        const auto places = Places;
+        placesLock.unlock();
+
+        for (const auto &place : places) {
+            TPath base = place / PORTO_LAYERS;
+
+            std::vector<std::string> list;
+
+            auto asyncRemoverLock = LockAsyncRemover();
+            error = base.ReadDirectory(list);
+            asyncRemoverLock.unlock();
+
+            if (error)
+                continue;
+
+            for (auto &name: list) {
+                if (!StringStartsWith(name, ASYNC_REMOVE_PREFIX))
+                    continue;
+
+                TPath path = base / name;
+
+                error = RemoveRecursive(path, true);
+                if (error)
+                    L_ERR("Can not async remove layer: {}", error);
+
+                if (NeedStopHelpers)
+                    return;
+            }
+        }
+
+        auto asyncRemoverLock = LockAsyncRemover();
+        AsyncRemoverCv.wait_for(asyncRemoverLock, std::chrono::milliseconds(5000));
+    }
+}
 
 TError TStorage::Resolve(EStorageType type, const TPath &place, const std::string &name, bool strict) {
     TError error;
@@ -96,6 +156,14 @@ void TStorage::Open(EStorageType type, const TPath &place, const std::string &na
 void TStorage::Init() {
     if (StringToUintMap(config().volumes().place_load_limit(), PlaceLoadLimit))
         PlaceLoadLimit = {{"default", 1}};
+
+    Places.insert("/place");
+    AsyncRemoveThread = std::unique_ptr<std::thread>(NewThread(&AsyncRemoveWatchDog));
+}
+
+void TStorage::StopAsyncRemover() {
+    AsyncRemoverCv.notify_all();
+    AsyncRemoveThread->join();
 }
 
 void TStorage::IncPlaceLoad(const TPath &place) {
@@ -183,6 +251,9 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
         return error;
 
     for (auto &name: list) {
+        if (StringStartsWith(name, ASYNC_REMOVE_PREFIX))
+            continue;
+
         TPath path = base / name;
 
         if (type == EStorageType::Storage && path.IsDirectoryStrict() &&
@@ -260,6 +331,10 @@ TError TStorage::CheckPlace(const TPath &place) {
     if (error)
         return error;
 
+    auto lockPlaces = LockPlaces();
+    Places.insert(place);
+    lockPlaces.unlock();
+
     return OK;
 }
 
@@ -279,6 +354,7 @@ TError TStorage::CheckName(const std::string &name, bool meta) {
             StringStartsWith(name, LAYER_TMP) ||
             StringStartsWith(name, IMPORT_PREFIX) ||
             StringStartsWith(name, REMOVE_PREFIX) ||
+            StringStartsWith(name, ASYNC_REMOVE_PREFIX) ||
             StringStartsWith(name, PRIVATE_PREFIX) ||
             StringStartsWith(name, META_PREFIX) ||
             StringStartsWith(name, META_LAYER))
@@ -905,7 +981,7 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
     return error;
 }
 
-TError TStorage::Remove(bool weak) {
+TError TStorage::Remove(bool weak, bool async) {
     TPath temp;
     TError error;
 
@@ -939,7 +1015,11 @@ TError TStorage::Remove(bool weak) {
     }
 
     TFile temp_dir;
-    temp = TempPath(REMOVE_PREFIX + std::to_string(RemoveCounter++));
+    temp = TempPath((async ? ASYNC_REMOVE_PREFIX : REMOVE_PREFIX) + std::to_string(RemoveCounter++));
+
+    std::unique_lock<std::mutex> asyncRemoverLock;
+    if (async)
+        asyncRemoverLock = LockAsyncRemover();
 
     error = Path.Rename(temp);
     if (!error) {
@@ -950,6 +1030,8 @@ TError TStorage::Remove(bool weak) {
         }
     }
 
+    if (async)
+        asyncRemoverLock.unlock();
     lock.unlock();
 
     if (error)
@@ -965,12 +1047,14 @@ TError TStorage::Remove(bool weak) {
             L_WRN("Cannot destroy quota {}: {}", temp, error);
     }
 
-    error = RemoveRecursive(temp);
-    if (error) {
-        L_VERBOSE("Cannot remove storage {}: {}", temp, error);
-        error = temp.RemoveAll();
-        if (error)
-            L_WRN("Cannot remove storage {}: {}", temp, error);
+    if (!async) {
+        error = RemoveRecursive(temp);
+            if (error) {
+                L_VERBOSE("Cannot remove storage {}: {}", temp, error);
+                error = temp.RemoveAll();
+                if (error)
+                    L_WRN("Cannot remove storage {}: {}", temp, error);
+            }
     }
 
     DecPlaceLoad(Place);

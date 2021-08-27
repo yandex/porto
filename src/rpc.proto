@@ -1308,6 +1308,7 @@ message TLayerExportRequest {
 message TLayerRemoveRequest {
     required string layer = 1;
     optional string place = 2;
+    optional bool async = 3;
 }
 
 

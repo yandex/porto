@@ -39,7 +39,8 @@ public:
     bool Weak() const;
     uint64_t LastUsage() const;
     TError Load();
-    TError Remove(bool weak = false);
+    TError RemoveAsync();
+    TError Remove(bool weak = false, bool async=false);
     TError Touch();
     TError SaveOwner(const TCred &owner);
     TError SetPrivate(const std::string &text);
@@ -51,6 +52,7 @@ public:
     TError StatMeta(TStatFS &stat);
 
     static void Init();
+    static void StopAsyncRemover();
     static void IncPlaceLoad(const TPath &place);
     static void DecPlaceLoad(const TPath &place);
 

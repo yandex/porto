@@ -12,4 +12,4 @@ TError RunCommand(const std::vector<std::string> &command,
                   bool interruptible = false);
 TError CopyRecursive(const TPath &src, const TPath &dst);
 TError ClearRecursive(const TPath &path);
-TError RemoveRecursive(const TPath &path);
+TError RemoveRecursive(const TPath &path, bool interruptible = false);

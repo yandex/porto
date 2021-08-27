@@ -1457,12 +1457,13 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
 noinline TError RemoveLayer(const rpc::TLayerRemoveRequest &req) {
     TStorage layer;
     TError error;
+    bool async = req.has_async() ? req.async() : false;
 
     error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
     if (error)
         return error;
 
-    return layer.Remove();
+    return layer.Remove(false, async);
 }
 
 noinline TError ListLayers(const rpc::TLayerListRequest &req,
