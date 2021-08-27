@@ -53,10 +53,10 @@ TError RunCommand(const std::vector<std::string> &command,
         return error;
 
     if (task.Pid) {
-        if (interruptible)
-            error = task.Wait(true, NeedStopHelpers, CL->Closed);
+        if (interruptible && CL)
+            error = task.Wait(interruptible, NeedStopHelpers, CL->Closed);
         else
-            error = task.Wait(false, NeedStopHelpers);
+            error = task.Wait(interruptible, NeedStopHelpers);
 
         if (error && error == EError::Unknown) {
             std::string text;
@@ -179,7 +179,7 @@ TError ClearRecursive(const TPath &path) {
     return RunCommand({ "find", ".", "-xdev", "-mindepth", "1", "-delete"}, dir);
 }
 
-TError RemoveRecursive(const TPath &path) {
+TError RemoveRecursive(const TPath &path, bool interruptible) {
     TError error;
     TFile dir;
 
@@ -187,5 +187,5 @@ TError RemoveRecursive(const TPath &path) {
     if (error)
         return error;
 
-    return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()}, dir);
+    return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()}, dir, TFile(), TFile(), HelperCapabilities, false, interruptible);
 }

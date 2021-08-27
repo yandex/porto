@@ -1090,9 +1090,10 @@ class Connection(object):
         self.rpc.call(request, timeout or self.disk_timeout)
         return Layer(self, layer, place)
 
-    def RemoveLayer(self, layer, place=None, timeout=None):
+    def RemoveLayer(self, layer, place=None, timeout=None, async=False):
         request = rpc_pb2.TContainerRequest()
         request.removeLayer.layer = layer
+        request.removeLayer.async = async
         if place is not None:
             request.removeLayer.place = place
         self.rpc.call(request, timeout or self.disk_timeout)

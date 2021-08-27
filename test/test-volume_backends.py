@@ -412,7 +412,7 @@ def backend_overlay(c):
 
         r.Destroy()
         v.Unlink()
-        c.RemoveLayer("a_layer")
+        c.RemoveLayer("a_layer", async=True)
 
     def opaque_xattr(dest):
         DLAYER = TMPDIR + "/d_layer.tar"

@@ -522,6 +522,7 @@ exit:
     EventQueue->Stop();
     StopRpcQueue();
     StopStatFsLoop();
+    TStorage::StopAsyncRemover();
 }
 
 static TError TuneLimits() {

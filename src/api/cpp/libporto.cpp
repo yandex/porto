@@ -766,10 +766,11 @@ int Connection::ExportLayer(const std::string &volume,
     return Impl->Call(Impl->DiskTimeout);
 }
 
-int Connection::RemoveLayer(const std::string &layer, const std::string &place) {
+int Connection::RemoveLayer(const std::string &layer, const std::string &place, bool async) {
     auto req = Impl->Req.mutable_removelayer();
 
     req->set_layer(layer);
+    req->set_async(async);
     if (place.size())
         req->set_place(place);
     return Impl->Call(Impl->DiskTimeout);
