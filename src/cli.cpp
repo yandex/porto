@@ -198,6 +198,12 @@ void TCommandHandler::RegisterCommand(std::unique_ptr<ICmd> cmd) {
 
 int TCommandHandler::HandleCommand(int argc, char *argv[]) {
 
+    if (argc > 2 && (std::string(argv[1]) == "--disk-timeout")) {
+        PortoApi.SetDiskTimeout(atoi(argv[2]));
+        argc -= 2;
+        argv += 2;
+    }
+
     if (argc > 2 && (std::string(argv[1]) == "-t" ||
                      std::string(argv[1]) == "--timeout")) {
         PortoApi.SetTimeout(atoi(argv[2]));

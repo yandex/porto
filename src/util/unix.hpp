@@ -23,7 +23,9 @@ struct TTask {
     bool Running = false;
 
     TError Fork(bool detach = false);
-    TError Wait(bool interruptible = false, const std::atomic_bool &stop = false);
+    TError Wait(bool interruptible = false,
+                const std::atomic_bool &stop = false,
+                const std::atomic_bool &disconnected = false);
     static bool Deliver(pid_t pid, int status);
 
     bool Exists() const;
