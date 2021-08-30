@@ -447,6 +447,7 @@ except:
 
 c = porto.Connection()
 v = c.CreateVolume(layers=['ubuntu-xenial'], backend='native')
+subprocess.call(['dd', 'if=/dev/urandom', 'of=' + str(v) + '/foo', 'bs=1M', 'count=512'])
 
 portodReload = Thread(target=Reload)
 portodReload.start()
@@ -455,4 +456,12 @@ p = subprocess.run([portoctl, 'layer', '-v', '-E', str(v), 'layer.tar.gz'], stdo
 assert p.returncode == 0
 
 portodReload.join()
+
+
+p = subprocess.run([portoctl, '--disk-timeout', '1', '-t', '1', 'layer', '-I', 'ubuntu-api-test', 'layer.tar.gz'], stdout = subprocess.PIPE, stderr=subprocess.PIPE)
+assert p.returncode != 0
+assert str(p.stderr).find('Resource temporarily unavailable') >= 0
+time.sleep(5)
+assert str(os.listdir('/place/porto_layers')).find('ubuntu-api-test') == -1
+
 ConfigurePortod('test-api', '')

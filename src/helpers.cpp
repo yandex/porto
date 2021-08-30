@@ -1,5 +1,6 @@
 #include "helpers.hpp"
 #include "common.hpp"
+#include "client.hpp"
 #include "util/path.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
@@ -52,24 +53,24 @@ TError RunCommand(const std::vector<std::string> &command,
         return error;
 
     if (task.Pid) {
-        error = task.Wait(interruptible, NeedStopHelpers);
-        if (error) {
-            if (interruptible && NeedStopHelpers) {
-                error = TError(EError::SocketError, "Helper killed by timeout on portod reload");
-            } else {
-                std::string text;
-                TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
-                if (error2)
-                    text = "Cannot read stderr: " + error2.ToString();
+        if (interruptible)
+            error = task.Wait(true, NeedStopHelpers, CL->Closed);
+        else
+            error = task.Wait(false, NeedStopHelpers);
 
-                if (verboseError) {
-                    error.Error = EError::HelperError;
-                    if (text.find("not recoverable") != std::string::npos)
-                        error.Error = EError::HelperFatalError;
-                }
+        if (error && error == EError::Unknown) {
+            std::string text;
+            TError error2 = err.ReadEnds(text, TError::MAX_LENGTH - 1024);
+            if (error2)
+                text = "Cannot read stderr: " + error2.ToString();
 
-                error = TError(error, "helper: {} stderr: {}", cmdline, text);
+            if (verboseError) {
+                error.Error = EError::HelperError;
+                if (text.find("not recoverable") != std::string::npos)
+                    error.Error = EError::HelperFatalError;
             }
+
+            error = TError(error, "helper: {} stderr: {}", cmdline, text);
         }
         return error;
     }

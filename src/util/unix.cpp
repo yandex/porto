@@ -731,7 +731,10 @@ TError TTask::Fork(bool detach) {
     return OK;
 }
 
-TError TTask::Wait(bool interruptible, const std::atomic_bool &stop) {
+TError TTask::Wait(bool interruptible,
+                   const std::atomic_bool &stop,
+                   const std::atomic_bool &disconnected) {
+    TError error;
     auto lock = std::unique_lock<std::mutex>(ForkLock);
     if (Running) {
         pid_t pid = Pid;
@@ -744,11 +747,18 @@ TError TTask::Wait(bool interruptible, const std::atomic_bool &stop) {
             if (pid_)
                 break;
 
-            if (stop) {
-                L("Kill helper on portod reload");
-                auto error = Kill(SIGKILL);
-                if (error)
-                    L_ERR("Cannot kill helper: {}", error);
+            bool kill = stop || disconnected;
+            if (kill) {
+                auto killError = Kill(SIGKILL);
+                if (killError)
+                    L_ERR("Cannot kill helper: {}", killError);
+                else {
+                    if (stop) {
+                        L("Kill helper on portod reload");
+                        error = TError(EError::SocketError, "Helper killed by timeout on portod reload");
+                    } else if (disconnected)
+                        error = TError(EError::SocketError, "Helper killed at client disconnection");
+                }
             }
 
             usleep(100 * 1000); // sleep 100 ms
@@ -777,6 +787,10 @@ TError TTask::Wait(bool interruptible, const std::atomic_bool &stop) {
             return TError("detached task");
         TasksCV.wait(lock);
     }
+
+    if (error)
+        return error;
+
     if (Status)
         return TError(EError::Unknown, FormatExitStatus(Status));
     return OK;

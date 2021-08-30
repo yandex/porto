@@ -39,6 +39,7 @@ public:
     bool WaitRequest = false;
     bool InEpoll = false;
     bool CloseAfterResponse = false;
+    std::atomic_bool Closed = ATOMIC_VAR_INIT(false);
 
     TClient(int fd);
     TClient(const std::string &special);

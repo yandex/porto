@@ -61,6 +61,7 @@ void TClient::CloseConnectionLocked(bool serverShutdown) {
         L_VERBOSE("Disconnected {} time={} ms", Id, ConnectionTime);
         close(Fd);
         Fd = -1;
+        Closed = true;
 
         Statistics->ClientsCount--;
         if (ClientContainer)
