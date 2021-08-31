@@ -1121,6 +1121,7 @@ For enable extra_routes in container you must add extra_routes option for net pr
 ```
 net="L3 extra_routes ..."
 ```
+From porto 5.1 extra_routes enabled by default for L3 network.
 
 ## NAT
 

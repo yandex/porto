@@ -2826,10 +2826,13 @@ TError TNetEnv::ParseNet(TMultiTuple &net_settings) {
         } else if (type == "L3") {
             dev.Type = "L3";
             dev.Name = "eth0";
+            // enable extra_routes by default with L3 network
+            dev.EnableExtraRoutes = true;
+
             size_t nameIndex = 1;
             size_t masterIndex = 2;
+            // backward compatibility
             if (settings.size() > 1 && StringTrim(settings[1]) == "extra_routes") {
-                dev.EnableExtraRoutes = true;
                 nameIndex = 2;
                 masterIndex = 3;
             }
