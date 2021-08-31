@@ -52,22 +52,20 @@ network {
     }
 """)
 
-extra_routes = ['64:ff9b::/96 via 2001:db8::1 dev veth  proto static  metric 1024  mtu 1450 advmss 1390',
+extra_routes = ['64:ff9b::/96 via 2001:db8::1 dev veth  proto static  metric 1024  mtu 1450 advmss 1390 pref medium',
                 '2620:10f:d000::/44 via 2001:db8::1 dev veth  proto static  metric 1024  mtu 8910 pref medium',
                 '2a02:6b8::/32 via 2001:db8::1 dev veth  proto static  metric 1024  mtu 8910 pref medium',
                 'default via 2001:db8::1 dev veth  proto static  metric 1024  mtu 1450 advmss 1390 pref medium']
 
 def TestExtraRoutes(enable):
+    # extra routes enabled by default
     a = conn.Run("a", net="L3 {}veth".format("extra_routes " if enable else ""), ip="veth 2001:db8::", default_gw="veth 2001:db8::1")
     ab = conn.Run("a/b", wait=1, command="ip -6 r")
-    routes = ab['stdout'].split('\n')
+    routes = ab['stdout'].replace('\t', ' ').split('\n')
 
-    if not enable:
-        assert default_routes == routes
-    else:
-        for route in routes:
-            if route not in routes and route not in extra_routes:
-                raise BaseException("Unknown route {}".format(route))
+    for route in extra_routes:
+        if route not in routes:
+            raise BaseException("Extra route not found {}".format(route))
 
     a.Destroy()
 
