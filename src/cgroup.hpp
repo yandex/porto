@@ -182,6 +182,7 @@ public:
     const std::string ANON_MAX_USAGE = "memory.anon.max_usage";
     const std::string ANON_LIMIT = "memory.anon.limit";
     const std::string ANON_ONLY = "memory.anon.only";
+    const std::string NUMA_BALANCE_VMPROT = "memory.numa_balance_vmprot";
 
     TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
 
@@ -231,6 +232,13 @@ public:
         if (!SupportRechargeOnPgfault())
             return OK;
         return cg.SetBool(RECHARGE_ON_PAGE_FAULT, enable);
+    }
+
+    bool SupportNumaBalance() const {
+        return RootCgroup().Has(NUMA_BALANCE_VMPROT);
+    }
+    TError SetNumaBalance(TCgroup &cg, uint64_t flag, uint64_t mask) {
+        return cg.Set(NUMA_BALANCE_VMPROT, fmt::format("{} {}", flag, mask));
     }
 
     TError GetCacheUsage(TCgroup &cg, uint64_t &usage) const;

@@ -142,12 +142,37 @@ for k in knobs:
 
 c.Destroy("test")
 
+def check_numa_balance(s):
+    if not os.path.exists('/sys/fs/cgroup/memory/memory.numa_balance_vmprot'):
+        return
+
+    with open('/sys/fs/cgroup/memory/porto%test/memory.numa_balance_vmprot') as f:
+        assert f.read().strip() == s
+
 r = c.Create("test")
-r.SetProperty("cpu_set", "mems 0")
 r.SetProperty("command", "sleep 10")
 r.Start()
+
+check_numa_balance('0 4')
+
+r.SetProperty("cpu_set", "mems 0")
+check_numa_balance('0 4')
+
 with open("/sys/fs/cgroup/cpuset/porto%test/cpuset.mems") as f:
     assert int(f.read()) == 0
+
+r.SetProperty("cpu_set", "node 0")
+check_numa_balance('0 4')
 c.Destroy("test")
+
+# numa balance enabled for contaienr with chroot and cpuset='node ...'
+r = c.Run('test', wait=0, command='sleep 10', root_volume={'layers': ['ubuntu-xenial']})
+check_numa_balance('0 4')
+r.SetProperty("cpu_set", "node 0")
+check_numa_balance('0 0')
+r.SetProperty("cpu_set", "mems 0")
+check_numa_balance('0 4')
+
+r.Destroy()
 
 subprocess.check_call([portod, "--verbose", "--discard", "reload"])

@@ -2120,6 +2120,18 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
         error = Parent->DistributeCpus();
         if (error)
             return error;
+
+        // https://st.yandex-team.ru/PORTO-903
+        if ((Controllers & CGROUP_MEMORY) && MemorySubsystem.SupportNumaBalance()) {
+            auto memcg = GetCgroup(MemorySubsystem);
+            if (config().mutable_container()->enable_numa_migration() && !RootPath.IsRoot() && CpuSetType == ECpuSetType::Node)
+                error = MemorySubsystem.SetNumaBalance(memcg, 0, 0);
+            else
+                error = MemorySubsystem.SetNumaBalance(memcg, 0, 4);
+
+            if (error)
+                return error;
+        }
     }
 
     if (TestClearPropDirty(EProperty::NET_LIMIT) |

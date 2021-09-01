@@ -133,6 +133,8 @@ static void DefaultConfig() {
     config().mutable_container()->set_enable_systemd(true);
     config().mutable_container()->set_detect_systemd(true);
 
+    config().mutable_container()->set_enable_numa_migration(true);
+
     config().mutable_volumes()->set_enable_quota(true);
     config().mutable_volumes()->set_keep_project_quota_id(true);
     config().mutable_volumes()->set_insecure_user_paths(true);
