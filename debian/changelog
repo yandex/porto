@@ -1,3 +1,19 @@
+yandex-porto (5.1.0) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * property: add total_writeback to io_write property
+  * porto: fix copyright
+  * test: make selftest more stable
+  * network: enable extra routes by default for L3 network
+  * porto: do not create netns when virt_mode=fuse and net inherited
+  * porto: stop importLayer if client disconnected
+  * porto: add async RemoveLayer
+  * container: set memory.numa_balance_vmprot for containers with memory controller and chroot and cpuset='node ...'
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 06 Sep 2021 16:15:44 +0300
+
 yandex-porto (5.0.34) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
