@@ -47,7 +47,7 @@ try:
 
         a.Destroy()
 
-    def CheckCgroupfsRw(is_os, userns=False):
+    def CheckCgroupfsRw(is_os, userns=False, enable_net_cgroups=False):
         if is_os:
             ExpectEq(porto.exceptions.PermissionError, Catch(conn.Run, 'a', cgroupfs='rw', wait=0, root_volume={'layers': ['ubuntu-xenial']}))
 
@@ -71,6 +71,14 @@ try:
         b.Wait()
 
         ExpectEq('0', b['exit_code'])
+        b.Destroy()
+
+        b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, user='1044', command='bash -c "mkdir /sys/fs/cgroup/net_cls/test && rmdir /sys/fs/cgroup/net_cls/test"')
+
+        if enable_net_cgroups:
+            ExpectEq('0', b['exit_code'])
+        else:
+            ExpectNe('0', b['exit_code'])
         b.Destroy()
 
         a.Destroy()
@@ -103,6 +111,16 @@ try:
     CheckCgroupfsRo()
     CheckCgroupfsRw(is_os=False)
     CheckCgroupfsRw(is_os=False, userns=True)
+
+    ConfigurePortod('test-cgroupns', """
+    container {
+        enable_rw_cgroupfs: true
+        enable_rw_net_cgroups: true
+    }""")
+
+    CheckCgroupfsRw(is_os=False, enable_net_cgroups=True)
+    CheckCgroupfsRw(is_os=False, userns=True, enable_net_cgroups=True)
+
 
 finally:
     ConfigurePortod('test-cgroupns', "")

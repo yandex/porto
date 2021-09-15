@@ -272,6 +272,8 @@ message TConfig {
             repeated TProperty properties = 2;
         }
         repeated TExtraProperty extra_properties = 60;
+
+        optional bool enable_rw_net_cgroups = 62;
     }
 
     message TPrivilegesCfg {
