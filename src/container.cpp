@@ -2252,7 +2252,12 @@ TError TContainer::ApplyDeviceConf() const {
     /* We also setup devices during container mnt ns setup in task.cpp */
     if (State != EContainerState::Starting &&
         Task.Pid && !RootPath.IsRoot() && !TPath(Root).IsRoot()) {
-        error = Devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
+        auto devices = Devices;
+
+        if (InUserNs())
+            devices.PrepareForUserNs(UserNsCred);
+
+        error = devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
 
         /* Ignore errors while recreating devices for recently died tasks */
         if (error && error.Errno != ENOENT)
@@ -2402,6 +2407,9 @@ TError TContainer::PrepareCgroups() {
                     return error;
 
                 if (!RootPath.IsRoot() && !TPath(Root).IsRoot() && Task.Pid) {
+                    if (InUserNs())
+                        all_devices.PrepareForUserNs(UserNsCred);
+
                     error = all_devices.Makedev(fmt::format("/proc/{}/root", Task.Pid));
 
                     /* Ignore errors while recreating devices for recently died tasks */

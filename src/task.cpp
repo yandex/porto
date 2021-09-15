@@ -361,12 +361,8 @@ TError TTaskEnv::ConfigureChild() {
     }
 
     if (!Mnt.Root.IsRoot()) {
-        if (CT->InUserNs()) {
-            for (auto &device: devices.Devices) {
-                if (device.Uid == RootUser)
-                    device.Uid = CT->UserNsCred.GetUid();
-            }
-        }
+        if (CT->InUserNs())
+            devices.PrepareForUserNs(CT->UserNsCred);
 
         error = devices.Makedev();
         if (error)
