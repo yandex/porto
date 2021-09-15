@@ -1333,6 +1333,11 @@ public:
     }
 
     TError Start(void) {
+        if (CT->CgroupFs == ECgroupFs::Rw) {
+            if (!(EnableOsModeCgroupNs && CT->OsMode) && !EnableRwCgroupFs)
+                return TError(EError::Permission, "Cgroup namespaces disabled in portod.conf: rw access to cgroupfs denied");
+        }
+
         if (EnableOsModeCgroupNs && !CT->HasProp(EProperty::CGROUPFS) && CT->OsMode)
             return Set("rw");
         return OK;
@@ -1359,12 +1364,9 @@ public:
             return TError(EError::NotSupported, "Cgroup namespaces not supported");
         else if (value == "ro")
             CT->CgroupFs = ECgroupFs::Ro;
-        else if (value == "rw") {
-            if ((EnableOsModeCgroupNs && CT->OsMode) || EnableRwCgroupFs)
-                CT->CgroupFs = ECgroupFs::Rw;
-            else
-                return TError(EError::Permission, "Cgroup namespaces disabled in portod.conf: rw access to cgroupfs denied");
-        } else
+        else if (value == "rw")
+            CT->CgroupFs = ECgroupFs::Rw;
+        else
             return TError(EError::InvalidValue, "Unknown cgroupfs value: {}", value);
 
         CT->SetProp(EProperty::CGROUPFS);

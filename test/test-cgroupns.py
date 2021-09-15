@@ -84,6 +84,11 @@ try:
         use_os_mode_cgroupns : true
     }""")
 
+    # check that container restored correctly
+    a = conn.Run('a', weak=False, virt_mode='os', wait=0, root_volume={'layers': ['ubuntu-xenial']})
+    ReloadPortod()
+    a.Destroy()
+
     CheckCgroupfsNone()
     CheckCgroupfsRo()
     CheckCgroupfsRw(is_os=True)
