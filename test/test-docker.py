@@ -9,6 +9,7 @@ try:
     container {
          use_os_mode_cgroupns : true,
          enable_docker_mode: true
+         enable_rw_net_cgroups: true
     }""")
 
     a = conn.Run('a', virt_mode='os', net='inherited', root_volume={'layers': ['docker-xenial', 'ubuntu-xenial']})

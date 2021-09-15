@@ -484,19 +484,20 @@ TError TMountNamespace::MountCgroups(const TContainer &ct) {
         std::string Type;
         std::string Path;
         std::vector<std::string> Options;
+        bool ForceRo;
     } cgroups[] = {
-        { "cgroup",  "freezer",          { "freezer" }},
-        { "cgroup",  "pids",             { "pids" }},
-        { "cgroup",  "cpuset",           { "cpuset" }},
-        { "cgroup",  "memory",           { "memory" }},
-        { "cgroup",  "blkio",            { "blkio" }},
-        { "cgroup",  "cpu,cpuacct",      { "cpu", "cpuacct" }},
-        { "cgroup",  "devices",          { "devices" }},
-        { "cgroup",  "hugetlb",          { "hugetlb" }},
-        { "cgroup",  "net_cls,net_prio", { "net_cls", "net_prio" }},
-        { "cgroup",  "perf_event",       { "perf_event" }},
-        { "cgroup",  "systemd",          { "name=systemd" }},
-        { "cgroup2", "unified",          {}}
+        { "cgroup",  "freezer",          { "freezer" },             false},
+        { "cgroup",  "pids",             { "pids" },                false},
+        { "cgroup",  "cpuset",           { "cpuset" },              false},
+        { "cgroup",  "memory",           { "memory" },              false},
+        { "cgroup",  "blkio",            { "blkio" },               false},
+        { "cgroup",  "cpu,cpuacct",      { "cpu", "cpuacct" },      false},
+        { "cgroup",  "devices",          { "devices" },             false},
+        { "cgroup",  "hugetlb",          { "hugetlb" },             false},
+        { "cgroup",  "net_cls,net_prio", { "net_cls", "net_prio" }, !config().container().enable_rw_net_cgroups()},
+        { "cgroup",  "perf_event",       { "perf_event" },          false},
+        { "cgroup",  "systemd",          { "name=systemd" },        false},
+        { "cgroup2", "unified",          {},                        false}
     };
 
     for (const auto &cg : cgroups) {
@@ -505,11 +506,11 @@ TError TMountNamespace::MountCgroups(const TContainer &ct) {
         if (error)
             return error;
 
-        error = cgroup.Mount(cg.Type, cg.Type, MS_NOSUID | MS_NOEXEC | MS_NODEV | (rw ? MS_ALLOW_WRITE : MS_RDONLY), cg.Options);
+        error = cgroup.Mount(cg.Type, cg.Type, MS_NOSUID | MS_NOEXEC | MS_NODEV | (rw && !cg.ForceRo ? MS_ALLOW_WRITE : MS_RDONLY), cg.Options);
         if (error)
             return error;
 
-        if (rw) {
+        if (rw && !cg.ForceRo) {
             error = cgroup.Chmod(0777);
             if (error)
                 return error;
