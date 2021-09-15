@@ -1,3 +1,14 @@
+yandex-porto (5.1.1) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * property: fix restore for cgroupfs with virt_mode=os and EnableOsModeCgroupNs=true
+  * filesystem: mount RO net cgroups by default for cgroupns=rw
+  * porto: fix chown devices for userns after portod reload
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 15 Sep 2021 14:32:04 +0300
+
 yandex-porto (5.1.0) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
