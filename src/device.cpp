@@ -322,6 +322,13 @@ std::string TDevices::Format() const {
     return str;
 }
 
+void TDevices::PrepareForUserNs(const TCred &userNsCred) {
+    for (auto &device: Devices) {
+        if (device.Uid == RootUser)
+            device.Uid = userNsCred.GetUid();
+    }
+}
+
 TError TDevices::Makedev(const TPath &root) const {
     TError error;
 
