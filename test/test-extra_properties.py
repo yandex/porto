@@ -105,8 +105,31 @@ try:
                 name: "max_respawns321"
                 value: "1024"
             }
+            properties {
+                name: "capabilities[SYS_ADMIN]"
+                value: "true"
+            }
         }
     }""")
+
+    a = conn.Run('abc')
+    ExpectEq('capabilities[SYS_ADMIN]', a['extra_properties'])
+    ExpectEq(True, a['capabilities[SYS_ADMIN]'])
+
+    a.Stop()
+    a.SetProperty('capabilities[SYS_ADMIN]','false')
+    a.Start()
+
+    ExpectEq('', a['extra_properties'])
+    ExpectEq(False, a['capabilities[SYS_ADMIN]'])
+    a.Destroy()
+
+    a = conn.Create('abc')
+    a.SetProperty('capabilities[SYS_ADMIN]','false')
+    a.Start()
+    ExpectEq('', a['extra_properties'])
+    ExpectEq(False, a['capabilities[SYS_ADMIN]'])
+    a.Destroy()
 
     ExpectEq(fatals + 2, int(conn.GetProperty('/', 'porto_stat[fatals]')))
     subprocess.call([portod, 'clearstat', 'fatals'])

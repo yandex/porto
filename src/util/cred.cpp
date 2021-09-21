@@ -565,6 +565,8 @@ bool TCapabilities::HasSetUidGid() const {
     return (Permitted & BIT(CAP_SETUID)) && (Permitted & BIT(CAP_SETGID));
 }
 
+TCapabilities SysAdminCapability;
+
 TCapabilities NoCapabilities;
 TCapabilities PortoInitCapabilities;
 TCapabilities HelperCapabilities;
@@ -584,6 +586,8 @@ void InitCapabilities() {
         L_WRN("Can't read /proc/sys/kernel/cap_last_cap");
         LastCapability = CAP_AUDIT_READ;
     }
+
+    SysAdminCapability.Permitted = BIT(CAP_SYS_ADMIN);
 
     HasAmbientCapabilities = prctl(PR_CAP_AMBIENT,
                                    PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) == 0;
@@ -633,8 +637,8 @@ void InitCapabilities() {
     /* bounding set for host */
     HostCapBound.Permitted =
         ChrootCapBound.Permitted |
+        SysAdminCapability.Permitted |
         BIT(CAP_LINUX_IMMUTABLE) |
-        BIT(CAP_SYS_ADMIN) |
         BIT(CAP_SYS_NICE) |
         BIT(CAP_SYS_BOOT) |
         BIT(CAP_SYS_RESOURCE);
