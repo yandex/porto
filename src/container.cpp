@@ -57,6 +57,7 @@ std::unordered_set<std::string> SupportedExtraProperties = {
     "userns",
     "unshare_on_exec",
     "resolv_conf",
+    "capabilities[SYS_ADMIN]",
 };
 
 std::mutex CpuAffinityMutex;
@@ -71,6 +72,23 @@ static std::vector<unsigned> ThreadsNode; /* cpu -> numa node */
 static std::vector<unsigned> JailCpuPermutation; /* 0,8,16,24,1,9,17,25,2,10,18,26,... */
 static std::vector<unsigned> CpuToJailPermutationIndex; /* cpu -> index in JailCpuPermutation */
 static std::vector<unsigned> JailCpuPermutationUsage; /* how many containers are jailed at JailCpuPermutation[cpu] core */
+
+/* return true if index specified for property */
+static bool ParsePropertyName(std::string &name, std::string &idx) {
+    if (name.size() && name.back() == ']') {
+        auto lb = name.find('[');
+
+        if (lb != std::string::npos) {
+            idx = name.substr(lb + 1);
+            idx.pop_back();
+            name = name.substr(0, lb);
+
+            return true;
+        }
+    }
+
+    return false;
+}
 
 TError TContainer::ValidName(const std::string &name, bool superuser) {
 
@@ -2070,7 +2088,13 @@ TError TContainer::ApplyExtraProperties() {
 
     // clean old extra properties
     for (const auto &extraProp: EnabledExtraProperties) {
-        auto prop = ContainerProperties.find(extraProp);
+        std::string property = extraProp;
+        std::string idx;
+
+        if (ParsePropertyName(property, idx) && !idx.length())
+            return TError(EError::InvalidProperty, "Empty property index");
+
+        auto prop = ContainerProperties.find(property);
         if (prop != ContainerProperties.end()) {
             error = prop->second->Reset();
             if (error)
@@ -2087,9 +2111,20 @@ TError TContainer::ApplyExtraProperties() {
             continue;
 
         for (const auto &extraProperty : extraProp.Properties) {
-            auto prop = ContainerProperties.find(extraProperty.Name);
+            std::string property = extraProperty.Name;
+            std::string idx;
+
+            if (ParsePropertyName(property, idx) && !idx.length())
+                return TError(EError::InvalidProperty, "Empty property index");
+
+            auto prop = ContainerProperties.find(property);
             if (prop != ContainerProperties.end() && !HasProp(prop->second->Prop)) {
-                error = prop->second->Set(extraProperty.Value);
+
+                if (idx.empty())
+                    error = prop->second->Set(extraProperty.Value);
+                else
+                    error = prop->second->SetIndexed(idx, extraProperty.Value);
+
                 if (error)
                     return error;
 
@@ -2922,6 +2957,11 @@ void TContainer::SanitizeCapabilities() {
 
         if (chroot) {
             CapBound.Permitted &= ChrootCapBound.Permitted & ~remove.Permitted;
+            if (std::find(EnabledExtraProperties.begin(),
+                          EnabledExtraProperties.end(),
+                          "capabilities[SYS_ADMIN]") != EnabledExtraProperties.end() &&
+                (CapLimit.Permitted & SysAdminCapability.Permitted))
+                CapBound.Permitted |= SysAdminCapability.Permitted;
             CapAllowed = CapBound;
 
             if (HasProp(EProperty::CAPABILITIES) &&
@@ -3945,23 +3985,6 @@ void TContainer::SyncProperty(const std::string &name) {
 void TContainer::SyncPropertiesAll() {
     TNetwork::SyncAllStat();
     RootContainer->CollectOomKills();
-}
-
-/* return true if index specified for property */
-static bool ParsePropertyName(std::string &name, std::string &idx) {
-    if (name.size() && name.back() == ']') {
-        auto lb = name.find('[');
-
-        if (lb != std::string::npos) {
-            idx = name.substr(lb + 1);
-            idx.pop_back();
-            name = name.substr(0, lb);
-
-            return true;
-        }
-    }
-
-    return false;
 }
 
 TError TContainer::HasProperty(const std::string &property) const {

@@ -150,6 +150,10 @@ public:
     TCapLimit() : TProperty(P_CAPABILITIES, EProperty::CAPABILITIES,
             "Limit capabilities in container: SYS_ADMIN;NET_ADMIN;... see man capabilities") {}
 
+    TError Reset() override {
+        return SetIndexed("SYS_ADMIN", "false");
+    }
+
     TError CommitLimit(TCapabilities &limit) {
         if (limit.Permitted & ~AllCapabilities.Permitted) {
             limit.Permitted &= ~AllCapabilities.Permitted;
