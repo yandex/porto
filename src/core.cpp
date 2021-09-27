@@ -127,7 +127,9 @@ TError TCore::Handle(const TTuple &args) {
 
 TError TCore::Identify() {
     TStringMap cgmap;
+    std::string msg;
     TError error;
+    int err;
 
     Container = "/";
 
@@ -146,19 +148,33 @@ TError TCore::Identify() {
 
     Container = cg.substr(strlen(PORTO_CGROUP_PREFIX) + 1);
     Slot = Container.substr(0, Container.find('/'));
+
+    // Find first exists container in upper hierarchy if enabled_rw_cgroupfs == true
+    while (Container != "/") {
+        err = Conn.GetProperty(Container, P_CORE_COMMAND, CoreCommand);
+
+        if (!err)
+            break;
+        else if (err == EError::ContainerDoesNotExist && config().container().enable_rw_cgroupfs())
+            Container = TContainer::ParentName(Container);
+        else {
+            Conn.GetLastError(err, msg);
+            error = TError((EError)err, msg);
+            L_ERR("Cannot get CT:{} core command: {}", Container, error);
+            return error;
+        }
+    }
+
     Prefix = StringReplaceAll(Container, "/", "%") + "%";
 
     //FIXME ugly
-    if (Conn.GetProperty(Container, P_CORE_COMMAND, CoreCommand) ||
-            Conn.GetProperty(Container, P_USER, User) ||
+    if (Conn.GetProperty(Container, P_USER, User) ||
             Conn.GetProperty(Container, P_GROUP, Group) ||
             Conn.GetProperty(Container, P_OWNER_USER, OwnerUser) ||
             Conn.GetProperty(Container, P_OWNER_GROUP, OwnerGroup) ||
             Conn.GetProperty(Container, P_CWD, Cwd) ||
             Conn.GetProperty(Container, P_STATE, State) ||
             Conn.GetProperty(Container, P_ROOT_PATH, RootPath)) {
-        int err;
-        std::string msg;
         Conn.GetLastError(err, msg);
         error = TError((EError)err, msg);
         L_ERR("Cannot get CT:{} properties: {}", Container, error);

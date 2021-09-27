@@ -185,7 +185,7 @@ a.Destroy();
 b.Destroy();
 
 
-w = conn.CreateWeakContainer('w')
+w = conn.Create('w')
 v = conn.CreateVolume(layers=['ubuntu-xenial'], containers='w')
 AsRoot()
 os.unlink('/tmp/core')
@@ -257,6 +257,37 @@ ExpectProp(a, 'CORE.dumped', '1')
 os.unlink(v.path + '/core')
 a.Destroy()
 
+# core in container with cgroupfs=rw and core is child cgroup
+AsRoot()
+
+ConfigurePortod('test-coredump', """
+container {
+    enable_rw_cgroupfs: true
+},
+core {
+    enable: true
+    default_pattern: "/tmp/core"
+},
+""")
+
+AsAlice()
+
+command="bash -c 'mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test/cgroup.procs && suid_sleep 100'"
+
+a = conn.Run('a', root=v.path, command=command, ulimit='core: unlimited', cgroupfs='rw', core_command='cp --sparse=always /dev/stdin core')
+time.sleep(3)
+a.Kill(6)
+a.Wait()
+Expect(os.path.exists(v.path + '/core'))
+ExpectEq(os.stat(v.path + '/core').st_uid, alice_uid)
+ExpectEq(os.stat(v.path + '/core').st_gid, alice_gid)
+ExpectEq(os.stat(v.path + '/core').st_mode & 0o777, 0o664)
+ExpectProp(a, 'exit_code', '-6')
+ExpectProp(a, 'core_dumped', True)
+ExpectProp(a, 'CORE.total', '1')
+ExpectProp(a, 'CORE.dumped', '1')
+os.unlink(v.path + '/core')
+a.Destroy()
 
 v.Destroy()
 w.Destroy()
