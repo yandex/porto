@@ -1,3 +1,12 @@
+yandex-porto (5.1.2) unstable; urgency=low
+
+  [ Alexander Kuznetsov ]
+  * core: catch cores from child cgroups from container with cgroupfs=rw
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 28 Sep 2021 15:52:56 +0300
+
 yandex-porto (5.1.1) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
