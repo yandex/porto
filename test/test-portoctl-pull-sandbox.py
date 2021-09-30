@@ -23,6 +23,7 @@ layers = [x.name for x in c.ListLayers()]
 
 try:
     assert subprocess.call([portoctl, 'pull-sandbox', 'rtc-xenial/os']) == 0
+    assert subprocess.call([portoctl, 'pull-sandbox', 'rtc-focal/os']) == 0
     assert subprocess.call([portoctl, 'pull-sandbox', 'infra/environments/rtc-xenial/app-layer/layer.tar.gz']) == 0
     assert subprocess.call([portoctl, 'pull-sandbox', '--raw', '--type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=infra/environments/rtc-bionic/os-layer/layer.tar.gz']) == 0
 

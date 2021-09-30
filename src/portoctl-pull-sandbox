@@ -42,15 +42,21 @@ if [ -n "$raw" ]; then
     fi
 else
     echo "+ find resource:"
-    echo "++ ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=$image"
-    id=$(ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=$image 2>/dev/null)
+    echo "++ ya tool sandboxctl list_resource -q --limit=1 -A released=stable -A arcadia_path=$image"
+    id=$(ya tool sandboxctl list_resource -q --limit=1 -A released=stable -A arcadia_path=$image 2>/dev/null)
 
     if [[ $? -ne 0 || -z "$id" ]]; then
         res_name=$(echo $image | cut -d'/' -f1)
         res_type=$(echo $image | cut -d'/' -f2)
         echo "+ find resource:"
-        echo "++ ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.gz"
-        id=$(ya tool sandboxctl list_resource -q --limit=1 --type ARCADIA_PROJECT_TGZ -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.gz 2>/dev/null)
+        echo "++ ya tool sandboxctl list_resource -q --limit=1 -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.gz"
+        id=$(ya tool sandboxctl list_resource -q --limit=1 -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.gz 2>/dev/null)
+
+        if [[ $? -ne 0 || -z "$id" ]]; then
+            echo "++ ya tool sandboxctl list_resource -q --limit=1 -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.zst"
+            id=$(ya tool sandboxctl list_resource -q --limit=1 -A released=stable -A arcadia_path=infra/environments/$res_name/$res_type-layer/layer.tar.zst 2>/dev/null)
+        fi
+
         if [[ $? -ne 0 || -z "$id" ]]; then
             echo 'Can not find resource'
             exit 1
@@ -84,6 +90,8 @@ if [[ $? -ne 0 ]]; then
 else
     echo "Use something like the following to run porto container with result layer:"
     echo "  portoctl exec -L $result_layer abc command=bash"
+    echo "Use something like the following to remove layer from porto storage:"
+    echo "  portoctl layer -R $result_layer"
 fi
 
 rm -f $tmpfile
