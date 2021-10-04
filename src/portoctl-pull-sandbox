@@ -89,7 +89,7 @@ if [[ $? -ne 0 ]]; then
     exit 1
 else
     echo "Use something like the following to run porto container with result layer:"
-    echo "  portoctl exec -L $result_layer abc command=bash"
+    echo "  portoctl exec -L $result_layer abc command=bash enable_porto=isolate"
     echo "Use something like the following to remove layer from porto storage:"
     echo "  portoctl layer -R $result_layer"
 fi
