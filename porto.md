@@ -803,11 +803,12 @@ write permissions to the target or owning related volume.
     - *iso*      - SCHED\_ISO   (offstream kernel feature)
 
 * **cpu\_set** - CPU affinity
-    - \[N|N-M,\]... - set of CPUs (logical cores)
-    - *node* N      - bind to NUMA node
-    - *reserve* N   - allocate N CPUs, use the rest too
-    - *threads* N   - allocate N CPUs, use only them
-    - *cores* N     - allocate N physical cores, use only one thread for each
+    - \[N|N-M,\]...          - set of CPUs (logical cores)
+    - *node* N               - bind to NUMA node
+    - *jail* N \[;*node* N\] - evenly distribute to N CPUs and optionally bind to NUMA node
+    - *reserve* N            - allocate N CPUs, use the rest too
+    - *threads* N            - allocate N CPUs, use only them
+    - *cores* N              - allocate N physical cores, use only one thread for each
 
     Each container owns set of cpus (shown in **cpu\_set\_affinity**) and
     distributes them among childrens.

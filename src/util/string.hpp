@@ -91,6 +91,20 @@ public:
         return weight;
     }
 
+    int FirstValue(unsigned from) {
+        for (unsigned i = from; i < bits.size(); i++) {
+            if (bits[i])
+                return i;
+        }
+
+        for (unsigned i = 0; i < from; i++) {
+            if (bits[i])
+                return i;
+        }
+
+        return -1;
+    }
+
     bool Get(unsigned index) const {
         return index < Size() && bits[index];
     }

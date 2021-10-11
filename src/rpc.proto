@@ -329,6 +329,7 @@ message TContainerCpuSet {
     repeated uint32 cpu = 4;        // for set (used if list isn't set)
     optional uint32 count = 5;      // out
     optional string mems = 6;
+    optional int32 jail = 7;
 }
 
 

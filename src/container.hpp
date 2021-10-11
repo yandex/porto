@@ -110,6 +110,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                        TBitMap &threads, TBitMap &cores);
+    TError JailCpus();
     TError DistributeCpus();
     TError SetCpuLimit(uint64_t limit);
     TError ApplyCpuLimit();
@@ -248,6 +249,8 @@ public:
     /* Under CpuAffinityMutex */
     ECpuSetType CpuSetType = ECpuSetType::Inherit;
     int CpuSetArg = 0;
+    int CpuJail = 0;
+    bool UpdateJail = false;
     TBitMap CpuAffinity;
     TBitMap CpuVacant;
     TBitMap CpuReserve;
