@@ -61,9 +61,16 @@ std::unordered_set<std::string> SupportedExtraProperties = {
 
 std::mutex CpuAffinityMutex;
 static std::vector<TBitMap> CoreThreads;
+static std::vector<int> NeighborThreads;
 
 static TBitMap NumaNodes;
 static std::vector<TBitMap> NodeThreads;
+
+// Hyper threading disabled in sandbox tests
+static bool HyperThreadingEnabled = false;
+static int JailNumaIndex = 0;
+static std::vector<int> JailIndexes;
+static std::vector<bool> JailNeighborThread;
 
 TError TContainer::ValidName(const std::string &name, bool superuser) {
 
@@ -1571,6 +1578,63 @@ again:
     return OK;
 }
 
+TError TContainer::JailCpus() {
+    TBitMap affinity;
+    auto cg = GetCgroup(CpusetSubsystem);
+
+    if (!cg.Exists())
+        return OK;
+
+    auto lock = LockCpuAffinity();
+
+    unsigned count = CpuJail;
+
+    while (count--) {
+        JailNumaIndex %= NodeThreads.size();
+
+        int numaInd = JailNumaIndex;
+        if (ECpuSetType::Node == CpuSetType) {
+            if (CpuSetArg >= (int)NodeThreads.size())
+                return TError(EError::InvalidValue, "Invalid numa node {} in CT{}:{}", CpuSetArg, Id, Name);
+
+            numaInd = CpuSetArg;
+        }
+
+        auto numaThreads = NodeThreads[numaInd];
+        int cpu = numaThreads.FirstValue(JailIndexes[numaInd]);
+        if (cpu < 0) {
+            L_ERR("Can not find available cpu in '{}'", numaThreads.Format());
+            Statistics->Fatals++;
+            return TError(EError::Unknown, "Can not find available cpu in '{}'", numaThreads.Format());
+        }
+
+        if (JailNeighborThread[numaInd] && HyperThreadingEnabled) {
+            affinity.Set(NeighborThreads[cpu], true);
+            JailIndexes[numaInd] = cpu + 1;
+            JailNeighborThread[numaInd] = false;
+        } else {
+            affinity.Set(cpu);
+            JailIndexes[numaInd] = cpu + (HyperThreadingEnabled ? 0 : 1);
+            JailNeighborThread[numaInd] = true;
+        }
+
+        ++JailNumaIndex;
+    }
+
+    auto error = CpusetSubsystem.SetCpus(cg, affinity.Format());
+    if (error) {
+        L("Cannot set cpu_set : {}", error);
+        return error;
+    }
+
+    CpuAffinity.Clear();
+    CpuAffinity.Set(affinity);
+    SetProp(EProperty::CPU_SET_AFFINITY);
+    UpdateJail = false;
+
+    return OK;
+}
+
 TError TContainer::DistributeCpus() {
     auto lock = LockCpuAffinity();
     TError error;
@@ -1583,12 +1647,21 @@ TError TContainer::DistributeCpus() {
         CoreThreads.clear();
         CoreThreads.resize(CpuAffinity.Size());
 
+        NeighborThreads.clear();
+        NeighborThreads.resize(CpuAffinity.Size());
+
         for (unsigned cpu = 0; cpu < CpuAffinity.Size(); cpu++) {
             if (!CpuAffinity.Get(cpu))
                 continue;
             error = CoreThreads[cpu].Read(StringFormat("/sys/devices/system/cpu/cpu%u/topology/thread_siblings_list", cpu));
             if (error)
                 return error;
+
+            auto coreThreads = CoreThreads[cpu];
+            if (coreThreads.Weight() > 1) {
+                HyperThreadingEnabled = true;
+                NeighborThreads[cpu] = coreThreads.FirstValue(cpu + 1);
+            }
         }
 
         error = NumaNodes.Read("/sys/devices/system/node/online");
@@ -1597,6 +1670,11 @@ TError TContainer::DistributeCpus() {
 
         NodeThreads.clear();
         NodeThreads.resize(NumaNodes.Size());
+
+        JailIndexes.clear();
+        JailIndexes.resize(NumaNodes.Size());
+        JailNeighborThread.clear();
+        JailNeighborThread.resize(NumaNodes.Size());
 
         for (unsigned node = 0; node < NumaNodes.Size(); node++) {
             if (!NumaNodes.Get(node))
@@ -2117,7 +2195,11 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
     }
 
     if (TestClearPropDirty(EProperty::CPU_SET) && Parent) {
-        error = Parent->DistributeCpus();
+        if (!CpuJail)
+            error = Parent->DistributeCpus();
+        else if (UpdateJail)
+            error = JailCpus();
+
         if (error)
             return error;
 

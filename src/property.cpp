@@ -3767,7 +3767,7 @@ public:
 class TCpuSet : public TProperty {
 public:
     TCpuSet() : TProperty(P_CPU_SET, EProperty::CPU_SET,
-            "CPU set: [N|N-M,]... | node N | reserve N | threads N | cores N")
+            "CPU set: [N|N-M,]... | jail N | [jail N;] node N | reserve N | threads N | cores N")
     {
         IsDynamic = true;
         RequireControllers = CGROUP_CPUSET;
@@ -3775,15 +3775,17 @@ public:
     TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
 
+        if (CT->CpuJail)
+            value = fmt::format("jail {}", CT->CpuJail);
+
         switch (CT->CpuSetType) {
         case ECpuSetType::Inherit:
-            value = "";
             break;
         case ECpuSetType::Absolute:
             value = CT->CpuAffinity.Format();
             break;
         case ECpuSetType::Node:
-            value = StringFormat("node %u", CT->CpuSetArg);
+            value += (value.empty() ? "" : "; ") + StringFormat("node %u", CT->CpuSetArg);
             break;
         case ECpuSetType::Reserve:
             value = StringFormat("reserve %u", CT->CpuSetArg);
@@ -3824,15 +3826,26 @@ public:
         std::string mems;
         TTuple cfg;
         TError error;
+        int jail = 0;
 
         for (const auto& v : cfgs) {
-            if (v.size() != 0 && v[0] != "mems")
+            if (v.size() != 0 && v[0] != "mems" && v[0] != "jail")
                 cfg = v;
-            else if (v.size() == 2)
-                mems = v[1];
+            else if (v.size() == 2) {
+                if (v[0] == "jail") {
+                    error = StringToInt(v[1], jail);
+                    if (error)
+                        return error;
+
+                    if (jail < 0)
+                        return TError(EError::InvalidValue, "jail must be positive");
+                } else
+                    mems = v[1];
+            }
         }
 
         auto lock = LockCpuAffinity();
+
         ECpuSetType type;
         int arg = !CT->CpuSetArg;
 
@@ -3874,9 +3887,16 @@ public:
 
         SetMems(mems);
 
-        if (CT->CpuSetType != type || CT->CpuSetArg != arg) {
+        if (jail && (type != ECpuSetType::Node && type != ECpuSetType::Inherit))
+            return TError(EError::InvalidValue, "wrong format");
+
+        if (CT->CpuJail != jail || CT->CpuSetType != type || CT->CpuSetArg != arg) {
+            if (CT->CpuJail != jail || ((CT->CpuSetType == ECpuSetType::Node || type == ECpuSetType::Node) && (type != CT->CpuSetType || CT->CpuSetArg != arg)))
+                CT->UpdateJail = true;
+
             CT->CpuSetType = type;
             CT->CpuSetArg = arg;
+            CT->CpuJail = jail;
             CT->SetProp(EProperty::CPU_SET);
         }
 
@@ -3915,6 +3935,9 @@ public:
             break;
         }
         cfg->set_mems(CT->CpuMems);
+
+        if (CT->CpuJail)
+            cfg->set_jail(CT->CpuJail);
     }
 
     bool Has(const rpc::TContainerSpec &spec) override {
@@ -3924,6 +3947,7 @@ public:
     TError Load(const rpc::TContainerSpec &spec) override {
         auto cfg = spec.cpu_set();
         int arg = cfg.arg();
+        int jail = 0;
         ECpuSetType type;
         TError error;
 
@@ -3959,9 +3983,22 @@ public:
         } else
             return TError(EError::InvalidValue, "unknown cpu_set policy: {}", cfg.policy());
 
-        if (CT->CpuSetType != type || CT->CpuSetArg != arg) {
+        if (cfg.has_jail()) {
+            jail = cfg.jail();
+            if (jail < 0)
+                return TError(EError::InvalidValue, "jail must be positive");
+        }
+
+        if (jail && (type != ECpuSetType::Node && type != ECpuSetType::Inherit))
+            return TError(EError::InvalidValue, "wrong format");
+
+        if (CT->CpuJail != jail || CT->CpuSetType != type || CT->CpuSetArg != arg) {
+            if (CT->CpuJail != jail || ((CT->CpuSetType == ECpuSetType::Node || type == ECpuSetType::Node) && (type != CT->CpuSetType || CT->CpuSetArg != arg)))
+                CT->UpdateJail = true;
+
             CT->CpuSetType = type;
             CT->CpuSetArg = arg;
+            CT->CpuJail = jail;
             CT->SetProp(EProperty::CPU_SET);
         }
 
