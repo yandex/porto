@@ -149,6 +149,7 @@ public:
     bool PropDirty[(int)EProperty::NR_PROPERTIES];
     uint64_t Controllers = 0;
     uint64_t RequiredControllers = 0;
+    bool LinkMemoryWritebackBlkio = false;
     TCred OwnerCred;
     TCred TaskCred;
     std::vector<std::string> OwnerContainers;

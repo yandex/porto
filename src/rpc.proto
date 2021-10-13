@@ -585,6 +585,7 @@ message TContainerSpec {
     optional uint64 respawn_delay = 38;
 
     optional TContainerControllers controllers = 39;
+    optional bool link_memory_writeback_blkio = 81;
 
     optional string cpu_policy = 40;   // normal|idle|batch|high|rt
     optional double cpu_weight = 41;   // 0.01 .. 100

@@ -118,6 +118,7 @@ constexpr const char *P_ETC_HOSTS = "etc_hosts";
 constexpr const char *P_WEAK = "weak";
 constexpr const char *P_UMASK = "umask";
 constexpr const char *P_CONTROLLERS = "controllers";
+constexpr const char *P_LINK_MEMORY_WRITEBACK_BLKIO = "link_memory_writeback_blkio";
 constexpr const char *P_OOM_IS_FATAL = "oom_is_fatal";
 constexpr const char *P_OOM_SCORE_ADJ = "oom_score_adj";
 constexpr const char *P_THREAD_LIMIT = "thread_limit";
@@ -266,6 +267,7 @@ enum class EProperty {
     CAPABILITIES_AMBIENT,
     UMASK,
     CONTROLLERS,
+    LINK_MEMORY_WRITEBACK_BLKIO,
     THREAD_LIMIT,
     SYSCTL,
     NET_RX_LIMIT,

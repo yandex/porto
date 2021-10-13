@@ -121,6 +121,19 @@ try:
     CheckCgroupfsRw(is_os=False, enable_net_cgroups=True)
     CheckCgroupfsRw(is_os=False, userns=True, enable_net_cgroups=True)
 
+    # check link_memory_writeback_blkio
+    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio')
+    ExpectEq(a['stdout'].strip(), '/')
+    a.Destroy()
+
+    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio', link_memory_writeback_blkio=False)
+    ExpectEq(a['stdout'].strip(), '/')
+    a.Destroy()
+
+    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio', link_memory_writeback_blkio=True)
+    ExpectEq(a['stdout'].strip(), '/porto%a')
+    a.Destroy()
+
 
 finally:
     ConfigurePortod('test-cgroupns', "")

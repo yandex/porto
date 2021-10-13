@@ -2054,6 +2054,46 @@ public:
     }
 } static Controllers;
 
+class TLinkMemoryWritebackBlkio : public TProperty {
+public:
+    TLinkMemoryWritebackBlkio() : TProperty(P_LINK_MEMORY_WRITEBACK_BLKIO, EProperty::LINK_MEMORY_WRITEBACK_BLKIO,
+            "Link memory writeback with blkio cgroup")
+    {
+        IsHidden = true;
+    }
+
+    TError Get(std::string &value) {
+        value = BoolToString(CT->LinkMemoryWritebackBlkio);
+        return OK;
+    }
+
+    TError Set(bool value) {
+        CT->LinkMemoryWritebackBlkio = value;
+        CT->SetProp(EProperty::LINK_MEMORY_WRITEBACK_BLKIO);
+        return OK;
+    }
+
+    TError Set(const std::string &value) {
+        bool val;
+        TError error = StringToBool(value, val);
+        if (error)
+            return error;
+        return Set(val);
+    }
+
+    void Dump(rpc::TContainerSpec &spec) override {
+        spec.set_link_memory_writeback_blkio(CT->LinkMemoryWritebackBlkio);
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_link_memory_writeback_blkio();
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) override {
+        return Set(spec.link_memory_writeback_blkio());
+    }
+} static LinkMemoryWritebackBlkio;
+
 class TCgroups : public TProperty {
 public:
     TCgroups() : TProperty(P_CGROUPS, EProperty::NONE, "Cgroups") {

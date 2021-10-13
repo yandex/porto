@@ -2461,9 +2461,19 @@ TError TContainer::PrepareCgroups() {
     }
 
     if (!IsRoot() && (Controllers & CGROUP_MEMORY)) {
-        error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
+        TCgroup memcg = GetCgroup(MemorySubsystem);
+
+        error = memcg.SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
+
+        /* Link memory cgroup writeback with related blkio cgroup */
+        if (LinkMemoryWritebackBlkio) {
+            TCgroup blkcg = GetCgroup(BlkioSubsystem);
+            error = MemorySubsystem.LinkWritebackBlkio(memcg, blkcg);
+            if (error)
+                return error;
+        }
     }
 
     if (Controllers & CGROUP_DEVICES) {

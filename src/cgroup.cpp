@@ -563,6 +563,16 @@ bool TSubsystem::IsBound(const TCgroup &cgroup) const {
 }
 
 // Memory
+TError TMemorySubsystem::InitializeSubsystem() {
+    TCgroup cg = RootCgroup();
+
+    HasWritebackBlkio = cg.Has(MemorySubsystem.WRITEBACK_BLKIO);
+    if (HasWritebackBlkio)
+        L_CG("Supports {}", MemorySubsystem.WRITEBACK_BLKIO);
+
+    return OK;
+}
+
 TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
     uint64_t old_limit, cur_limit, new_limit;
     TError error;
@@ -710,6 +720,21 @@ TError TMemorySubsystem::SetDirtyLimit(TCgroup &cg, uint64_t limit) {
     if (limit || !cg.Has(DIRTY_RATIO))
         return cg.SetUint64(DIRTY_LIMIT, limit);
     return cg.SetUint64(DIRTY_RATIO, 50);
+}
+
+TError TMemorySubsystem::LinkWritebackBlkio(TCgroup &memcg, TCgroup &blkcg) const {
+    TError error;
+    TFile file;
+
+    if (!HasWritebackBlkio || !BlkioSubsystem.Supported || (Controllers & CGROUP_BLKIO))
+        return OK;
+
+    error = file.OpenDir(blkcg.Path());
+    if (error)
+        return error;
+
+    L_CG("Link writeback of {} with {}", memcg, blkcg);
+    return memcg.SetUint64(MemorySubsystem.WRITEBACK_BLKIO, file.Fd);
 }
 
 TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, TFile &event) {
