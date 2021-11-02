@@ -2092,7 +2092,7 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
                 return error;
             }
         }
-        error = BlkioSubsystem.SetIoLimit(blkcg, RootPath, IoBpsLimit);
+        error = BlkioSubsystem.SetIoLimit(blkcg, CL->ClientContainer->RootPath, RootPath, IoBpsLimit);
         if (error)
             return error;
     }
@@ -2106,7 +2106,7 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
                 return error;
             }
         }
-        error = BlkioSubsystem.SetIoLimit(blkcg, RootPath, IoOpsLimit, true);
+        error = BlkioSubsystem.SetIoLimit(blkcg, CL->ClientContainer->RootPath, RootPath, IoOpsLimit, true);
         if (error)
             return error;
     }

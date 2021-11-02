@@ -358,10 +358,10 @@ public:
     };
     TError GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const;
     TError SetIoWeight(TCgroup &cg, const std::string &policy, double weight) const;
-    TError SetIoLimit(TCgroup &cg, const TPath &root, const TUintMap &map, bool iops = false);
+    TError SetIoLimit(TCgroup &cg, const TPath &chroot, const TPath &root, const TUintMap &map, bool iops = false);
 
     TError DiskName(const std::string &disk, std::string &name) const;
-    TError ResolveDisk(const TPath &root, const std::string &key, std::string &disk) const;
+    TError ResolveDisk(const TPath &chroot, const TPath &root, const std::string &key, std::string &disk) const;
 };
 
 class TDevicesSubsystem : public TSubsystem {

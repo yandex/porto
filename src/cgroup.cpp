@@ -1153,7 +1153,7 @@ TError TBlkioSubsystem::DiskName(const std::string &disk, std::string &name) con
 }
 
 /* converts absolule path or disk or partition name into "major:minor" */
-TError TBlkioSubsystem::ResolveDisk(const TPath &root, const std::string &key, std::string &disk) const {
+TError TBlkioSubsystem::ResolveDisk(const TPath &chroot, const TPath &root, const std::string &key, std::string &disk) const {
     TError error;
     int tmp = 0;
 
@@ -1163,9 +1163,12 @@ TError TBlkioSubsystem::ResolveDisk(const TPath &root, const std::string &key, s
         dev_t dev;
 
         if (key[0] == '/')
-            dev = TPath(key).GetDev();
+                if (!chroot.IsRoot())
+                    dev = TPath(chroot / key).GetDev();
+                else
+                    dev = TPath(key).GetDev();
         else if (key[0] == '.')
-            dev = TPath(root / key).GetDev();
+            dev = TPath(root / key.substr(1)).GetDev();
         else
             dev = TPath("/dev/" + key).GetBlockDev();
 
@@ -1270,7 +1273,7 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     return OK;
 }
 
-TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
+TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &chroot, const TPath &root,
                                    const TUintMap &map, bool iops) {
     std::string knob[2] = {
         iops ? "blkio.throttle.read_iops_device" : "blkio.throttle.read_bps_device",
@@ -1309,7 +1312,7 @@ TError TBlkioSubsystem::SetIoLimit(TCgroup &cg, const TPath &root,
         if (key == "fs")
             continue;
 
-        error = ResolveDisk(root, key, disk);
+        error = ResolveDisk(chroot, root, key, disk);
         if (error)
             return error;
 

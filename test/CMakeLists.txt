@@ -120,6 +120,7 @@ ADD_PYTHON_TEST(mem_limit_total)
 ADD_PYTHON_TEST(mem-recharge)
 ADD_PYTHON_TEST(dirty-limit)
 ADD_PYTHON_TEST(cpu_limit)
+ADD_PYTHON_TEST(io-limit)
 
 # functional tests
 
