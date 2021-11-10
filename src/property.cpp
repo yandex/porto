@@ -6003,7 +6003,7 @@ public:
             std::string disk, name;
 
             error = BlkioSubsystem.ResolveDisk(CL->ClientContainer->RootPath,
-                                               CT->RootPath, index, disk);
+                                               index, disk);
             if (error)
                 return error;
             error = BlkioSubsystem.DiskName(disk, name);
