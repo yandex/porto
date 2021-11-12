@@ -1139,7 +1139,7 @@ TError TBlkioSubsystem::ResolveDisk(const TPath &root, const std::string &key, s
         if (key[0] == '/')
             dev = TPath(key).GetDev();
         else if (key[0] == '.')
-            dev = TPath(root / key).GetDev();
+            dev = TPath(root / key.substr(1)).GetDev();
         else
             dev = TPath("/dev/" + key).GetBlockDev();
 
