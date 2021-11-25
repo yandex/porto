@@ -576,6 +576,8 @@ void TPortoValue::Process() {
         AsString = StringFormatDuration(AsNumber * 1000);
     else if (Flags & ValueFlags::Bytes)
         AsString = StringFormatSize(AsNumber);
+    else if (Flags & ValueFlags::Cores)
+        AsString = StringFormat("%.1fc", AsNumber);
     else
         AsString = StringFormat("%g", AsNumber);
 }
@@ -998,6 +1000,10 @@ bool TPortoTop::AddColumn(std::string title, std::string signal,
             case '%':
                 flags |= ValueFlags::Percents;
                 break;
+            case 'c':
+            case 'C':
+                flags |= ValueFlags::Cores;
+                break;
             case ' ':
                 break;
             default:
@@ -1207,11 +1213,11 @@ TPortoTop::TPortoTop(Porto::Connection *api, const std::vector<std::string> &arg
         AddColumn("Thld%", "cpu_throttled'% 1e9", "Cpu throttled time in core%");
 
         AddColumn("C pol", "cpu_policy", "Cpu scheduler policy");
-        AddColumn("C g-e", "cpu_guarantee", "Cpu guarantee in cores");
-        AddColumn("C lim", "cpu_limit", "Cpu limit in cores");
+        AddColumn("C g-e", "cpu_guarantee c", "Cpu guarantee in cores");
+        AddColumn("C lim", "cpu_limit c", "Cpu limit in cores");
 
-        AddColumn("Ct lim", "cpu_limit_total", "Cpu total limit in cores");
-        AddColumn("Ct g-e", "cpu_guarantee_total", "Cpu total guarantee in cores");
+        AddColumn("Ct lim", "cpu_limit_total c", "Cpu total limit in cores");
+        AddColumn("Ct g-e", "cpu_guarantee_total c", "Cpu total guarantee in cores");
 
         AddColumn("Threads", "thread_count", "Threads count");
     }
