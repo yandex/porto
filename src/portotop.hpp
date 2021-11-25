@@ -112,6 +112,7 @@ namespace ValueFlags {
     static const int Percents = 0x40;
     static const int Multiplier = 0x80;
     static const int State = 0x100;
+    static const int Cores = 0x200;
 }
 
 class TPortoValue {
