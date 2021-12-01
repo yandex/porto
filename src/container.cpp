@@ -60,17 +60,17 @@ std::unordered_set<std::string> SupportedExtraProperties = {
 };
 
 std::mutex CpuAffinityMutex;
-static std::vector<TBitMap> CoreThreads;
-static std::vector<int> NeighborThreads;
+static bool HyperThreadingEnabled = false; /* hyperthreading is disabled in vms and sandbox tests */
+static std::vector<unsigned> NeighborThreads; /* cpu -> neighbor hyperthread */
 
 static TBitMap NumaNodes;
-static std::vector<TBitMap> NodeThreads;
+static std::vector<TBitMap> NodeThreads; /* numa node -> list of cpus */
+static std::vector<unsigned> ThreadsNode; /* cpu -> numa node */
 
-// Hyper threading disabled in sandbox tests
-static bool HyperThreadingEnabled = false;
-static int JailNumaIndex = 0;
-static std::vector<int> JailIndexes;
-static std::vector<bool> JailNeighborThread;
+// https://st.yandex-team.ru/PORTO-914
+static std::vector<unsigned> JailCpuPermutation; /* 0,8,16,24,1,9,17,25,2,10,18,26,... */
+static std::vector<unsigned> CpuToJailPermutationIndex; /* cpu -> index in JailCpuPermutation */
+static std::vector<unsigned> JailCpuPermutationUsage; /* how many containers are jailed at JailCpuPermutation[cpu] core */
 
 TError TContainer::ValidName(const std::string &name, bool superuser) {
 
@@ -1541,12 +1541,15 @@ again:
         if (!CpuVacant.Get(cpu))
             continue;
 
-        if (CoreThreads[cpu].IsSubsetOf(CpuVacant)) {
+        auto neighbor = NeighborThreads[cpu];
+        if (CpuVacant.Get(cpu) && CpuVacant.Get(neighbor)) {
             if (nr_cores) {
                 nr_cores--;
                 cores.Set(cpu);
-                threads.Set(CoreThreads[cpu]);
-                CpuVacant.Set(CoreThreads[cpu], false);
+                threads.Set(cpu);
+                threads.Set(neighbor);
+                CpuVacant.Set(cpu, false);
+                CpuVacant.Set(neighbor, false);
             } else if (!try_thread) {
                 nr_threads--;
                 threads.Set(cpu);
@@ -1578,59 +1581,177 @@ again:
     return OK;
 }
 
+TContainer::TJailCpuState TContainer::GetJailCpuState() {
+    auto lock = LockCpuAffinity();
+    return {JailCpuPermutation, JailCpuPermutationUsage};
+}
+
+void TContainer::UpdateJailCpuStateLocked(const TBitMap& affinity, bool release) {
+    PORTO_LOCKED(CpuAffinityMutex);
+
+    for (unsigned cpu = 0; cpu < affinity.Size(); cpu++) {
+        if (!affinity.Get(cpu))
+            continue;
+
+        unsigned index = CpuToJailPermutationIndex[cpu];
+        if (release) {
+            if (JailCpuPermutationUsage[index])
+                JailCpuPermutationUsage[index]--;
+        } else
+            JailCpuPermutationUsage[index]++;
+    }
+}
+
+void TContainer::UpdateJailCpuState(const TBitMap& affinity, bool release) {
+    auto lock = LockCpuAffinity();
+    UpdateJailCpuStateLocked(affinity, release);
+}
+
+unsigned TContainer::NextJailCpu(int node) {
+    if (node >= 0) {
+        const auto& nodeThreads = NodeThreads[node];
+        int minJail = -1, minCpu = -1;
+        unsigned lastNodeCpu = HyperThreadingEnabled ? nodeThreads.Size() / 2 : nodeThreads.Size();
+        for (unsigned cpu = 0; cpu < lastNodeCpu; cpu++) {
+            if (!nodeThreads.Get(cpu))
+                continue;
+
+            /* non-optimal but easy to understand */
+            std::vector<unsigned> threads({ cpu });
+            if (HyperThreadingEnabled)
+                threads.push_back(NeighborThreads[cpu]);
+            for (unsigned thread: threads) {
+                unsigned index = CpuToJailPermutationIndex[thread];
+                if (minJail < 0 || minJail > (int)JailCpuPermutationUsage[index]) {
+                    minJail = (int)JailCpuPermutationUsage[index];
+                    minCpu = index;
+                }
+            }
+        }
+
+        JailCpuPermutationUsage[minCpu]++;
+        return JailCpuPermutation[minCpu];
+    }
+
+    auto min = std::min_element(JailCpuPermutationUsage.begin(), JailCpuPermutationUsage.end());
+    (*min)++;
+    return JailCpuPermutation[min - JailCpuPermutationUsage.begin()];
+}
+
+void TContainer::UnjailCpus(const TBitMap& affinity) {
+    UpdateJailCpuState(affinity, true);
+
+    ClearProp(EProperty::CPU_SET_AFFINITY);
+
+    CpuJail = 0;
+}
+
 TError TContainer::JailCpus() {
     TBitMap affinity;
-    auto cg = GetCgroup(CpusetSubsystem);
+    TError error;
 
+    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+        if (ct->CpuJail)
+            return TError(EError::ResourceNotAvailable, "Nested cpu jails are not supported for CT{}:{}", Id, Name);
+    }
+
+    /* check desired jail value */
+    if (CpuSetType == ECpuSetType::Node) {
+        if (!NumaNodes.Get(CpuSetArg))
+            return TError(EError::ResourceNotAvailable, "Numa node not found for CT{}:{}", Id, Name);
+
+
+        if ((unsigned)NewCpuJail >= NodeThreads[0].Weight())
+            return TError(EError::ResourceNotAvailable, "Invalid jail with numa value {} (max {}) for CT{}:{}", NewCpuJail, NodeThreads[0].Weight() - 1, Id, Name);
+    } else if ((unsigned)NewCpuJail >= JailCpuPermutation.size())
+        return TError(EError::ResourceNotAvailable, "Invalid jail value {} (max {}) for CT{}:{}", NewCpuJail, JailCpuPermutation.size() - 1, Id, Name);
+
+    /* read current cpus from cgroup */
+    auto cg = GetCgroup(CpusetSubsystem);
     if (!cg.Exists())
         return OK;
 
-    auto lock = LockCpuAffinity();
-
-    unsigned count = CpuJail;
-
-    while (count--) {
-        JailNumaIndex %= NodeThreads.size();
-
-        int numaInd = JailNumaIndex;
-        if (ECpuSetType::Node == CpuSetType) {
-            if (CpuSetArg >= (int)NodeThreads.size())
-                return TError(EError::InvalidValue, "Invalid numa node {} in CT{}:{}", CpuSetArg, Id, Name);
-
-            numaInd = CpuSetArg;
-        }
-
-        auto numaThreads = NodeThreads[numaInd];
-        int cpu = numaThreads.FirstValue(JailIndexes[numaInd]);
-        if (cpu < 0) {
-            L_ERR("Can not find available cpu in '{}'", numaThreads.Format());
-            Statistics->Fatals++;
-            return TError(EError::Unknown, "Can not find available cpu in '{}'", numaThreads.Format());
-        }
-
-        if (JailNeighborThread[numaInd] && HyperThreadingEnabled) {
-            affinity.Set(NeighborThreads[cpu], true);
-            JailIndexes[numaInd] = cpu + 1;
-            JailNeighborThread[numaInd] = false;
-        } else {
-            affinity.Set(cpu);
-            JailIndexes[numaInd] = cpu + (HyperThreadingEnabled ? 0 : 1);
-            JailNeighborThread[numaInd] = true;
-        }
-
-        ++JailNumaIndex;
-    }
-
-    auto error = CpusetSubsystem.SetCpus(cg, affinity.Format());
+    std::string currentCpus;
+    error = CpusetSubsystem.GetCpus(cg, currentCpus);
     if (error) {
-        L("Cannot set cpu_set : {}", error);
+        L("Cannot get cpuset.cpus: {}", error);
         return error;
     }
+    error = affinity.Parse(currentCpus);
+    if (error)
+        return error;
+
+    if (!NewCpuJail) {
+        /* disable previously enabled jail */
+        if (CpuJail)
+            UnjailCpus(affinity);
+
+        return OK;
+    }
+
+    /* try to detect previous jail affinity */
+
+    int node = -1;
+    bool nodeChanged = false;
+    if (CpuSetType == ECpuSetType::Node) {
+        /* check if node changed */
+        node = CpuSetArg;
+        for (unsigned cpu = 0; cpu < affinity.Size(); cpu++) {
+            if (!affinity.Get(cpu))
+                continue;
+
+            if (ThreadsNode[cpu] != (unsigned)node) {
+                nodeChanged = true;
+                break;
+            }
+        }
+    } else if (NumaNodes.Weight() > 1 && affinity.Weight() > 1 && affinity.Weight() < JailCpuPermutation.size()) {
+        /* check previous pin to node, assume we was pinned */
+        nodeChanged = true;
+        for (unsigned cpu = 0; cpu < affinity.Size(); cpu++) {
+            if (!affinity.Get(cpu))
+                continue;
+
+            if (node < 0)
+                node = (int)ThreadsNode[cpu];
+            else if (ThreadsNode[cpu] != (unsigned)node) {
+                nodeChanged = false;
+                break;
+            }
+        }
+        /* we reuse node variable, so reset previous value */
+        node = -1;
+    }
+
+    if ((unsigned)NewCpuJail != affinity.Weight() || nodeChanged) {
+        auto lock = LockCpuAffinity();
+
+        if (affinity.Weight() < JailCpuPermutation.size())
+            UpdateJailCpuStateLocked(affinity, true);
+
+        affinity.Clear();
+
+        /* main loop */
+        for (int i = 0; i < NewCpuJail; i++)
+            affinity.Set(NextJailCpu(node));
+
+        lock.unlock();
+
+        error = CpusetSubsystem.SetCpus(cg, affinity.Format());
+        if (error) {
+            L("Cannot set cpuset.cpus: {}", error);
+            return error;
+        }
+    } else if (!CpuJail)
+        /* case of portod reload, fill current usage */
+        UpdateJailCpuState(affinity);
 
     CpuAffinity.Clear();
     CpuAffinity.Set(affinity);
+
     SetProp(EProperty::CPU_SET_AFFINITY);
-    UpdateJail = false;
+
+    CpuJail = NewCpuJail;
 
     return OK;
 }
@@ -1644,23 +1765,21 @@ TError TContainer::DistributeCpus() {
         if (error)
             return error;
 
-        CoreThreads.clear();
-        CoreThreads.resize(CpuAffinity.Size());
-
         NeighborThreads.clear();
         NeighborThreads.resize(CpuAffinity.Size());
 
         for (unsigned cpu = 0; cpu < CpuAffinity.Size(); cpu++) {
             if (!CpuAffinity.Get(cpu))
                 continue;
-            error = CoreThreads[cpu].Read(StringFormat("/sys/devices/system/cpu/cpu%u/topology/thread_siblings_list", cpu));
+
+            TBitMap neighbors;
+            error = neighbors.Read(StringFormat("/sys/devices/system/cpu/cpu%u/topology/thread_siblings_list", cpu));
             if (error)
                 return error;
 
-            auto coreThreads = CoreThreads[cpu];
-            if (coreThreads.Weight() > 1) {
+            if (neighbors.Weight() > 1) {
                 HyperThreadingEnabled = true;
-                NeighborThreads[cpu] = coreThreads.FirstValue(cpu + 1);
+                NeighborThreads[cpu] = neighbors.FirstBitIndex(cpu + 1);
             }
         }
 
@@ -1671,18 +1790,55 @@ TError TContainer::DistributeCpus() {
         NodeThreads.clear();
         NodeThreads.resize(NumaNodes.Size());
 
-        JailIndexes.clear();
-        JailIndexes.resize(NumaNodes.Size());
-        JailNeighborThread.clear();
-        JailNeighborThread.resize(NumaNodes.Size());
+        ThreadsNode.clear();
+        ThreadsNode.resize(CpuAffinity.Size());
 
         for (unsigned node = 0; node < NumaNodes.Size(); node++) {
             if (!NumaNodes.Get(node))
                 continue;
-            error = NodeThreads[node].Read(StringFormat("/sys/devices/system/node/node%u/cpulist", node));
+
+            auto& nodeThreads = NodeThreads[node];
+
+            error = nodeThreads.Read(StringFormat("/sys/devices/system/node/node%u/cpulist", node));
             if (error)
                 return error;
+            for (unsigned cpu = 0; cpu < nodeThreads.Size(); cpu++) {
+                if (!nodeThreads.Get(cpu))
+                    continue;
+
+                ThreadsNode[cpu] = node;
+            }
         }
+
+        JailCpuPermutation.clear();
+        JailCpuPermutation.resize(CpuAffinity.Size());
+        CpuToJailPermutationIndex.clear();
+        CpuToJailPermutationIndex.resize(CpuAffinity.Size());
+
+        std::vector<unsigned> nodeThreadsIter(NumaNodes.Size());
+        for (unsigned i = 0; i != CpuAffinity.Size() / NumaNodes.Size(); i += HyperThreadingEnabled ? 2 : 1) {
+            unsigned j = 0;
+            for (unsigned node = 0; node < NumaNodes.Size(); node++) {
+                if (!NumaNodes.Get(node))
+                    continue;
+
+                int cpu = NodeThreads[node].FirstBitIndex(nodeThreadsIter[node]);
+                unsigned index = i * NumaNodes.Size() + j;
+                JailCpuPermutation[index] = cpu;
+                CpuToJailPermutationIndex[cpu] = index;
+                if (HyperThreadingEnabled) {
+                    index = (i + 1) * NumaNodes.Size() + j;
+                    JailCpuPermutation[index] = NeighborThreads[cpu];
+                    CpuToJailPermutationIndex[NeighborThreads[cpu]] = index;
+                }
+
+                nodeThreadsIter[node] = cpu + 1;
+                ++j;
+            }
+        }
+
+        /* don't clear JailCpuPermutationUsage */
+        JailCpuPermutationUsage.resize(JailCpuPermutation.size());
     }
 
     CpuVacant.Clear();
@@ -1716,6 +1872,7 @@ TError TContainer::DistributeCpus() {
         for (auto type: order) {
             for (auto &ct: childs) {
                 if (ct->CpuSetType != type ||
+                        ct->CpuJail ||
                         ct->State == EContainerState::Stopped ||
                         ct->State == EContainerState::Dead)
                     continue;
@@ -2195,13 +2352,17 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
     }
 
     if (TestClearPropDirty(EProperty::CPU_SET) && Parent) {
-        if (!CpuJail)
-            error = Parent->DistributeCpus();
-        else if (UpdateJail)
+        if (NewCpuJail != CpuJail || CpuSetType == ECpuSetType::Node) {
             error = JailCpus();
+            if (error)
+                return error;
+        }
 
-        if (error)
-            return error;
+        if (!CpuJail) {
+            error = Parent->DistributeCpus();
+            if (error)
+                return error;
+        }
     }
 
     if (TestClearPropDirty(EProperty::NET_LIMIT) |
@@ -2388,7 +2549,7 @@ TError TContainer::PrepareCgroups() {
         auto lock = LockCpuAffinity();
 
         /* Create CPU set if some CPUs in parent are reserved */
-        if (!Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
+        if (!Parent->CpuJail && !Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
             Controllers |= CGROUP_CPUSET;
             RequiredControllers |= CGROUP_CPUSET;
             L("Enable cpuset for CT{}:{} because parent has reserved cpus", Id, Name);
@@ -3272,6 +3433,9 @@ void TContainer::FreeRuntimeResources() {
         if (error)
             L_ERR("Cannot redistribute CPUs: {}", error);
     }
+
+    if (CpuJail)
+        UnjailCpus(CpuAffinity);
 
     PropagateCpuLimit();
 

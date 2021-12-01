@@ -306,6 +306,9 @@ public:
     bool IsOptional() override { return true; }
     TError InitializeCgroup(TCgroup &cg) override;
 
+    TError GetCpus(TCgroup &cg, std::string &cpus) const {
+        return cg.Get("cpuset.cpus", cpus);
+    }
     TError SetCpus(TCgroup &cg, const std::string &cpus) const;
     TError SetMems(TCgroup &cg, const std::string &mems) const;
 };

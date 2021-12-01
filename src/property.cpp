@@ -3817,8 +3817,8 @@ public:
     TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
 
-        if (CT->CpuJail)
-            value = fmt::format("jail {}", CT->CpuJail);
+        if (CT->CpuJail || CT->NewCpuJail)
+            value = fmt::format("jail {}", CT->CpuJail ? CT->CpuJail : CT->NewCpuJail);
 
         switch (CT->CpuSetType) {
         case ECpuSetType::Inherit:
@@ -3879,17 +3879,18 @@ public:
                     if (error)
                         return error;
 
-                    if (jail < 0)
+                    if (jail <= 0)
                         return TError(EError::InvalidValue, "jail must be positive");
                 } else
                     mems = v[1];
-            }
+            } else
+                return TError(EError::InvalidValue, "wrong format");
         }
 
         auto lock = LockCpuAffinity();
 
         ECpuSetType type;
-        int arg = !CT->CpuSetArg;
+        int arg = CT->CpuSetArg;
 
         if (cfg.size() == 0 || cfg[0] == "all" || cfg[0] == "inherit") {
             type = ECpuSetType::Inherit;
@@ -3932,13 +3933,10 @@ public:
         if (jail && (type != ECpuSetType::Node && type != ECpuSetType::Inherit))
             return TError(EError::InvalidValue, "wrong format");
 
-        if (CT->CpuJail != jail || CT->CpuSetType != type || CT->CpuSetArg != arg) {
-            if (CT->CpuJail != jail || ((CT->CpuSetType == ECpuSetType::Node || type == ECpuSetType::Node) && (type != CT->CpuSetType || CT->CpuSetArg != arg)))
-                CT->UpdateJail = true;
-
+        if (CT->CpuSetType != type || CT->CpuSetArg != arg || CT->CpuJail != jail) {
             CT->CpuSetType = type;
             CT->CpuSetArg = arg;
-            CT->CpuJail = jail;
+            CT->NewCpuJail = jail;
             CT->SetProp(EProperty::CPU_SET);
         }
 
@@ -4027,20 +4025,17 @@ public:
 
         if (cfg.has_jail()) {
             jail = cfg.jail();
-            if (jail < 0)
+            if (jail <= 0)
                 return TError(EError::InvalidValue, "jail must be positive");
         }
 
         if (jail && (type != ECpuSetType::Node && type != ECpuSetType::Inherit))
             return TError(EError::InvalidValue, "wrong format");
 
-        if (CT->CpuJail != jail || CT->CpuSetType != type || CT->CpuSetArg != arg) {
-            if (CT->CpuJail != jail || ((CT->CpuSetType == ECpuSetType::Node || type == ECpuSetType::Node) && (type != CT->CpuSetType || CT->CpuSetArg != arg)))
-                CT->UpdateJail = true;
-
+        if (CT->CpuSetType != type || CT->CpuSetArg != arg || CT->CpuJail != jail) {
             CT->CpuSetType = type;
             CT->CpuSetArg = arg;
-            CT->CpuJail = jail;
+            CT->NewCpuJail = jail;
             CT->SetProp(EProperty::CPU_SET);
         }
 
@@ -6372,6 +6367,21 @@ TError TPortoStat::GetIndexed(const std::string &index,
 
     return OK;
 }
+
+class TPortoCpuJailState : public TProperty {
+public:
+    TError Get(std::string &value) {
+        auto state = TContainer::GetJailCpuState();
+        value += "core jails\n";
+        for (unsigned i = 0; i < state.Permutation.size(); i++)
+            value += fmt::format("{:<4d} {:02d}\n", state.Permutation[i], state.Usage[i]);
+        return OK;
+    }
+    TPortoCpuJailState() : TProperty(P_PORTO_CPU_JAIL_STATE, EProperty::NONE, "Porto CPU jail state") {
+        IsReadOnly = true;
+        IsHidden = true;
+    }
+} static PortoCpuJailState;
 
 class TProcessCount : public TProperty {
 public:

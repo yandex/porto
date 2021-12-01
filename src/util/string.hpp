@@ -91,7 +91,7 @@ public:
         return weight;
     }
 
-    int FirstValue(unsigned from) {
+    int FirstBitIndex(unsigned from = 0) {
         for (unsigned i = from; i < bits.size(); i++) {
             if (bits[i])
                 return i;
