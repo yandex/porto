@@ -76,6 +76,7 @@ part6 = {'volume_places':65,
          'legacy-root-loop':2,
          'dirty-limit':1,
          'cpu_limit':20,
+         'cpu-jail':20,
          'mem_limit':65,
          'volume_queue':100,
          'volume_sync':20}

@@ -110,8 +110,14 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                        TBitMap &threads, TBitMap &cores);
-    TError JailCpus();
     TError DistributeCpus();
+
+    static void UpdateJailCpuStateLocked(const TBitMap& affinity, bool release = false);
+    static void UpdateJailCpuState(const TBitMap& affinity, bool release = false);
+    static unsigned NextJailCpu(int node = -1);
+    TError JailCpus();
+    void UnjailCpus(const TBitMap& affinity);
+
     TError SetCpuLimit(uint64_t limit);
     TError ApplyCpuLimit();
     TError ApplyCpuGuarantee();
@@ -252,7 +258,7 @@ public:
     ECpuSetType CpuSetType = ECpuSetType::Inherit;
     int CpuSetArg = 0;
     int CpuJail = 0;
-    bool UpdateJail = false;
+    int NewCpuJail = 0;
     TBitMap CpuAffinity;
     TBitMap CpuVacant;
     TBitMap CpuReserve;
@@ -491,6 +497,16 @@ public:
     static TError Restore(const TKeyValue &kv, std::shared_ptr<TContainer> &ct);
 
     static void Event(const TEvent &event);
+
+    struct TJailCpuState {
+        std::vector<unsigned> Permutation;
+        std::vector<unsigned> Usage;
+
+        TJailCpuState(const std::vector<unsigned>& permutation, std::vector<unsigned> usage)
+            : Permutation(permutation), Usage(usage)
+        {}
+    };
+    static TJailCpuState GetJailCpuState();
 };
 
 extern MeasuredMutex ContainersMutex;
