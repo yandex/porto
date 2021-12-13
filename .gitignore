@@ -33,3 +33,4 @@ Makefile
 /build/
 /test/Testing/
 .vscode
+.idea
