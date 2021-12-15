@@ -2338,6 +2338,48 @@ public:
     }
 } static Bind;
 
+class TBindSocket : public TProperty {
+public:
+    TBindSocket() : TProperty(P_BIND_SOCKET, EProperty::BIND_SOCKET,
+                        "Bind socket mounts: <source> <target> [ro|rw|<flag>],... ;...") {}
+    TError Get(std::string &value) override {
+        value = TBindMount::Format(CT->BindSocketMounts);
+        return OK;
+    }
+    TError Set(const std::string &value) override {
+        std::vector<TBindMount> result;
+        TError error = TBindMount::Parse(value, result);
+        if (error)
+            return error;
+        CT->BindSocketMounts = std::move(result);
+        CT->SetProp(EProperty::BIND_SOCKET);
+        return OK;
+    }
+
+    void Dump(rpc::TContainerSpec &spec) override {
+        auto out = spec.mutable_bind_socket();
+        for (auto &bind: CT->BindSocketMounts)
+            bind.Dump(*out->add_bind());
+    }
+
+    bool Has(const rpc::TContainerSpec &spec) override {
+        return spec.has_bind_socket();
+    }
+
+    TError Load(const rpc::TContainerSpec &spec) override {
+        std::vector<TBindMount> result;
+        result.resize(spec.bind_socket().bind_size());
+        for (int i = 0; i < spec.bind_socket().bind_size(); i++) {
+            TError error = result[i].Load(spec.bind_socket().bind(i));
+            if (error)
+                return error;
+        }
+        CT->BindSocketMounts = std::move(result);
+        CT->SetProp(EProperty::BIND_SOCKET);
+        return OK;
+    }
+} static BindSocket;
+
 class TSymlink : public TProperty {
 public:
     TSymlink() : TProperty(P_SYMLINK, EProperty::SYMLINK, "Symlinks: <symlink>: <target>;...")

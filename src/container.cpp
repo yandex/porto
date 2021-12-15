@@ -2626,6 +2626,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     TaskEnv.QuadroFork = !JobMode && !OsMode && !IsMeta();
 
     TaskEnv.Mnt.BindMounts = BindMounts;
+    TaskEnv.Mnt.BindSocketMounts = BindSocketMounts;
     TaskEnv.Mnt.Symlink = Symlink;
 
     /* legacy kludge */
@@ -2638,40 +2639,50 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
     }
 
     /* Resolve paths in parent namespace and check volume ownership */
-    for (auto &bm: TaskEnv.Mnt.BindMounts) {
-        if (!bm.Source.IsAbsolute())
-            bm.Source = Parent->GetCwd() / bm.Source;
+    auto ResolveAndCheck = [&](std::vector<TBindMount> &binds) -> TError {
+        for (auto &bm: binds) {
+            if (!bm.Source.IsAbsolute())
+                bm.Source = Parent->GetCwd() / bm.Source;
 
-        auto src = TVolume::ResolveOrigin(Parent->RootPath / bm.Source);
-        bm.ControlSource = src && !CL->CanControl(src->Volume->VolumeOwner);
+            auto src = TVolume::ResolveOrigin(Parent->RootPath / bm.Source);
+            bm.ControlSource = src && !CL->CanControl(src->Volume->VolumeOwner);
 
-        if (!bm.Target.IsAbsolute())
-            bm.Target = TaskEnv.Mnt.Cwd / bm.Target;
+            if (!bm.Target.IsAbsolute())
+                bm.Target = TaskEnv.Mnt.Cwd / bm.Target;
 
-        auto dst = TVolume::ResolveOrigin(Parent->RootPath / TaskEnv.Mnt.Root / bm.Target);
-        bm.ControlTarget = dst && !CL->CanControl(dst->Volume->VolumeOwner);
+            auto dst = TVolume::ResolveOrigin(Parent->RootPath / TaskEnv.Mnt.Root / bm.Target);
+            bm.ControlTarget = dst && !CL->CanControl(dst->Volume->VolumeOwner);
 
-        /* allow suid inside by default */
-        bm.MntFlags |= MS_ALLOW_SUID;
+            /* allow suid inside by default */
+            bm.MntFlags |= MS_ALLOW_SUID;
 
-        /* this allows to inject suid binaries into host */
-        if (Parent->RootPath.IsRoot() && !TaskEnv.Mnt.Root.IsRoot() &&
+            /* this allows to inject suid binaries into host */
+            if (Parent->RootPath.IsRoot() && !TaskEnv.Mnt.Root.IsRoot() &&
                 bm.Source.IsDirectoryFollow()) {
-            TStatFS stat;
-            if (!bm.Source.StatFS(stat) && (stat.MntFlags & MS_ALLOW_SUID)) {
-                L("Bindmount source {} allows suid in host", bm.Source);
-                TaintFlags.BindWithSuid = true;
+                TStatFS stat;
+                if (!bm.Source.StatFS(stat) && (stat.MntFlags & MS_ALLOW_SUID)) {
+                    L("Bindmount source {} allows suid in host", bm.Source);
+                    TaintFlags.BindWithSuid = true;
+                }
             }
+
+            if (bm.MntFlags & MS_ALLOW_DEV) {
+                if (!OwnerCred.IsRootUser())
+                    return TError(EError::Permission, "Not enough permissions to allow devices at bind mount");
+            } else
+                bm.MntFlags |= MS_NODEV;
         }
+        return OK;
+    };
 
-        if (bm.MntFlags & MS_ALLOW_DEV) {
-            if (!OwnerCred.IsRootUser())
-                return TError(EError::Permission, "Not enough permissions to allow devices at bind mount");
-        } else
-            bm.MntFlags |= MS_NODEV;
+    error = ResolveAndCheck(TaskEnv.Mnt.BindMounts);
+    if (error) {
+        return error;
     }
-
-    TaskEnv.Mnt.BindPortoSock = AccessLevel != EAccessLevel::None;
+    error = ResolveAndCheck(TaskEnv.Mnt.BindSocketMounts);
+    if (error) {
+        return error;
+    }
 
     if (IsMeta() || TaskEnv.TripleFork || TaskEnv.QuadroFork) {
         TPath path = TPath(PORTO_HELPERS_PATH) / "portoinit";
@@ -2695,6 +2706,7 @@ TError TContainer::PrepareTask(TTaskEnv &TaskEnv) {
                           TaskEnv.Mnt.IsolateRun ||
                           (Level == 1 && !HostMode) ||
                           TaskEnv.Mnt.BindMounts.size() ||
+                          (TaskEnv.Mnt.BindSocketMounts.size() && !(HostMode || JobMode)) ||
                           Hostname.size() ||
                           ResolvConf.size() ||
                           EtcHosts.size() ||
@@ -3050,6 +3062,25 @@ TError TContainer::PrepareStart() {
             if (Parent->ResolvePlace(place))
                 return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
         }
+    }
+
+    /* Check not sockets in BindSocketMounts */
+    error = TBindMount::CheckBindSocketMounts(BindSocketMounts);
+    if (error)
+        return error;
+
+    /* Add/remove porto socket to/from BindSocketMounts */
+    if (AccessLevel != EAccessLevel::None) {
+        if (std::find_if(BindSocketMounts.begin(),
+                         BindSocketMounts.end(),
+                         TBindMount::IsPortoSocket) == BindSocketMounts.end()) {
+            BindSocketMounts.emplace_back(PORTO_SOCKET_PATH, PORTO_SOCKET_PATH);
+        }
+    } else {
+        BindSocketMounts.erase(std::remove_if(BindSocketMounts.begin(),
+                                              BindSocketMounts.end(),
+                                              TBindMount::IsPortoSocket),
+                               BindSocketMounts.end());
     }
 
     return OK;

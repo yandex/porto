@@ -343,7 +343,6 @@ message TContainerBindMounts {
     repeated TContainerBindMount bind = 1;
 }
 
-
 message TContainerVolumeLink {
     required string volume = 1;
     optional string target = 2;
@@ -567,6 +566,7 @@ message TContainerSpec {
     optional string root = 22;          // in parent namespace
     optional bool root_readonly = 23;
     optional TContainerBindMounts bind = 24;
+    optional TContainerBindMounts bind_socket = 82;
     optional TStringMap symlink = 25;
     optional TContainerDevices devices = 26;
     optional TContainerPlaceConfig place = 27;

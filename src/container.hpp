@@ -181,6 +181,7 @@ public:
     std::string EnvCfg;
     std::string EnvSecret;
     std::vector<TBindMount> BindMounts;
+    std::vector<TBindMount> BindSocketMounts;
     std::map<TPath, TPath> Symlink;
     TMultiTuple IpList;
 
