@@ -110,6 +110,11 @@ bool TPath::IsDirectoryFollow() const {
     return !stat(c_str(), &st) && S_ISDIR(st.st_mode);
 }
 
+bool TPath::IsSocket() const {
+    struct stat st;
+    return !stat(c_str(), &st) && S_ISSOCK(st.st_mode);
+}
+
 bool TPath::IsSameInode(const TPath &other) const {
     struct stat a, b;
     if (stat(c_str(), &a) || stat(other.c_str(), &b))

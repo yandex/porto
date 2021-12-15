@@ -17,6 +17,12 @@ struct TBindMount {
     bool ControlSource = false;
     bool ControlTarget = false;
 
+    TBindMount() = default;
+
+    TBindMount(const std::string &source, const std::string &target, uint64_t flags = 0) : Source(source),
+                                                                                           Target(target),
+                                                                                           MntFlags(flags) {}
+
     TError Mount(const TCred &cred, const TPath &target_root) const;
 
     static TError Parse(const std::string &str, std::vector<TBindMount> &binds);
@@ -24,6 +30,9 @@ struct TBindMount {
 
     TError Load(const rpc::TContainerBindMount &spec);
     void Dump(rpc::TContainerBindMount &spec);
+
+    static bool IsPortoSocket(const TBindMount &bind);
+    static TError CheckBindSocketMounts(std::vector<TBindMount> &binds);
 };
 
 struct TMountNamespace {
@@ -38,8 +47,8 @@ public:
     bool RootRo;
     TPath HostRoot;
     std::vector<TBindMount> BindMounts;
+    std::vector<TBindMount> BindSocketMounts;
     std::map<TPath, TPath> Symlink;
-    bool BindPortoSock;
     bool IsolateRun;
     uint64_t RunSize;
     std::string Systemd;
@@ -50,7 +59,6 @@ public:
     TError SetupRoot(const TContainer &ct);
     TError MountRun(const TContainer &ct);
     TError RemountRun(const TContainer &ct);
-    TError MountBinds();
     TError ProtectProc();
     TError MountTraceFs();
     TError MountSystemd();
