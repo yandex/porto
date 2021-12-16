@@ -1,3 +1,19 @@
+yandex-porto (5.1.5) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * Revert "blkio: fix disk resolving from client container"
+  * blkio: fix disk resolving from client chroot with leading dot
+
+  [ kndrvt ]
+  * portotop: fix sorting of values in cores
+  * git: add .idea to .gitignore
+
+  [ Dmitry Yakunin ]
+  * property: add bind_socket property
+  * porto: rework cpu_set jail
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 16 Dec 2021 12:03:02 +0300
+
 yandex-porto (5.1.4) unstable; urgency=low
 
   * blkio: fix disk resolving from client container
