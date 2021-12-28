@@ -538,7 +538,7 @@ Write access to container requires any of these conditions:
 
     If container should have access to porto then /run/portod.socket is binded inside.
 
-* **root\_path** - container root path in client namespace
+** **root\_path** - container root path in client namespace
 
 * **root\_readonly** - remount everything read-only
 
@@ -552,12 +552,6 @@ Write access to container requires any of these conditions:
 
     Bind mount is non-recurse by default, add flag "rec" to bind sub-mounts too.
     By default mount is slave-shared - implements one way propagation.
-
-* **bind_socket** - bind socket mounts: \<source\> \<target\> \[ro|rw|suid|nosuid|private|unbindable|noatime|relatime\],... ;..
-
-    This option creates new mount namespace and binds sockets
-    from parent container mount namespace. Also it binds portod.socket 
-    according to enable_porto option.
 
 * **symlink** - create symlink, format: \<symlink\>: \<target\>;...
 
