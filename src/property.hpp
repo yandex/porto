@@ -96,7 +96,6 @@ constexpr const char *P_ULIMIT = "ulimit";
 constexpr const char *P_HOSTNAME = "hostname";
 constexpr const char *P_BIND_DNS = "bind_dns";
 constexpr const char *P_BIND = "bind";
-constexpr const char *P_BIND_SOCKET = "bind_socket";
 constexpr const char *P_SYMLINK = "symlink";
 constexpr const char *P_NET = "net";
 constexpr const char *P_NET_TOS = "net_tos";
@@ -241,7 +240,6 @@ enum class EProperty {
     HOSTNAME,
     BIND_DNS,
     BIND,
-    BIND_SOCKET,
     SYMLINK,
     NET,
     NET_TOS,

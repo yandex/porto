@@ -244,19 +244,6 @@ TError TBindMount::Mount(const TCred &cred, const TPath &target_root) const {
     return OK;
 }
 
-bool TBindMount::IsPortoSocket(const TBindMount &bind) {
-    return bind.Source == PORTO_SOCKET_PATH &&
-           bind.Target == PORTO_SOCKET_PATH;
-}
-
-TError TBindMount::CheckBindSocketMounts(std::vector<TBindMount> &binds) {
-    for (auto &bm: binds) {
-        if (!bm.Source.IsSocket())
-            return TError(EError::InvalidPath, "{} is not socket", bm.Source);
-    }
-    return OK;
-}
-
 TError TMountNamespace::MountRun(const TContainer &ct) {
     TPath run = "run";
     std::vector<std::string> run_paths, subdirs;
@@ -628,6 +615,18 @@ TError TMountNamespace::SetupRoot(const TContainer &ct) {
     if (error)
         return error;
 
+    if (BindPortoSock) {
+        TPath sock(PORTO_SOCKET_PATH);
+        TPath dest = dot / sock;
+
+        error = dest.Mkfile(0);
+        if (error)
+            return error;
+        error = dest.Bind(sock);
+        if (error)
+            return error;
+    }
+
     struct {
         TPath path;
         mode_t mode;
@@ -854,14 +853,6 @@ TError TMountNamespace::Setup(const TContainer &ct) {
         error = bind.Mount(BindCred, Root);
         if (error)
             return error;
-    }
-
-    if (!Root.IsRoot()) {
-        for (const auto &bind_sock: BindSocketMounts) {
-            error = bind_sock.Mount(BindCred, Root);
-            if (error)
-                return error;
-        }
     }
 
     if (!Root.IsRoot()) {
