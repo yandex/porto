@@ -1,3 +1,9 @@
+yandex-porto (5.1.7) unstable; urgency=low
+
+  * Revert "property: add bind_socket property"
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 28 Dec 2021 18:28:04 +0300
+
 yandex-porto (5.1.6) unstable; urgency=low
 
   [ Alexander Kuznetsov ]
