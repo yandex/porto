@@ -474,7 +474,7 @@ c.RemoveLayer('test-api-layer-1')
 remove_duration = time.time() - start
 
 start = time.time()
-c.RemoveLayer('test-api-layer-2', async=True)
+c.RemoveLayer('test-api-layer-2', asynchronous=True)
 
 async_remove_duration = time.time() - start
 assert str(os.listdir('/place/porto_layers')).find('test-api-layer') != -1
