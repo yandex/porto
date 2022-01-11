@@ -1668,9 +1668,11 @@ TError TContainer::JailCpus() {
     TBitMap affinity;
     TError error;
 
-    for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
-        if (ct->CpuJail)
-            return TError(EError::ResourceNotAvailable, "Nested cpu jails are not supported for CT{}:{}", Id, Name);
+    if (NewCpuJail) {
+        for (auto ct = Parent.get(); ct; ct = ct->Parent.get()) {
+            if (ct->CpuJail)
+                return TError(EError::ResourceNotAvailable, "Nested cpu jails are not supported for CT{}:{}", Id, Name);
+        }
     }
 
     /* check desired jail value */
@@ -1766,6 +1768,9 @@ TError TContainer::JailCpus() {
 
     CpuAffinity.Clear();
     CpuAffinity.Set(affinity);
+
+    CpuVacant.Clear();
+    CpuVacant.Set(CpuAffinity);
 
     SetProp(EProperty::CPU_SET_AFFINITY);
 
@@ -2596,7 +2601,7 @@ TError TContainer::PrepareCgroups() {
         auto lock = LockCpuAffinity();
 
         /* Create CPU set if some CPUs in parent are reserved */
-        if (!Parent->CpuJail && !Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
+        if (!Parent->CpuAffinity.IsEqual(Parent->CpuVacant)) {
             Controllers |= CGROUP_CPUSET;
             RequiredControllers |= CGROUP_CPUSET;
             L("Enable cpuset for CT{}:{} because parent has reserved cpus", Id, Name);

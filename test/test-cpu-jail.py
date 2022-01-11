@@ -11,6 +11,7 @@ if CPUNR < 3:
 conn = porto.Connection(timeout=30)
 a = conn.Create('a')
 b = conn.Create('b')
+c = None
 
 try:
     # incorrect values
@@ -125,14 +126,28 @@ try:
 
     a.Destroy()
 
-except Exception as e:
-    raise e
+    # PORTO-952
+
+    a = conn.Create('a')
+    a.SetProperty('cpu_set', 'jail 1')
+    a.Start()
+
+    b = conn.Create('a/b')
+    b.SetProperty('cpu_set', 'jail 1')
+    ExpectException(b.Start, porto.exceptions.ResourceNotAvailable)
+    b.SetProperty('cpu_set', '')
+    assert b['cpu_set'] == ''
+    b.Start()
+
+    c = conn.Create('c')
+    c.Start()
+
+    assert a['cpu_set'] == 'jail 1'
+    assert a['cpu_set_affinity'] == '0'
+
 finally:
-    try:
-        a.Destroy()
-    except:
-        pass
-    try:
-        b.Destroy()
-    except:
-        pass
+    for ct in [a, b, c]:
+        try:
+            ct.Destroy()
+        except:
+            pass
