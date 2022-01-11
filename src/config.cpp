@@ -158,7 +158,7 @@ static void DefaultConfig() {
     config().mutable_network()->set_default_qdisc_limit("default: 10240");
 
     config().mutable_network()->set_container_rate("default: 125000");  /* 1Mbit */
-    config().mutable_network()->set_container_qdisc("default: fq_codel");
+    config().mutable_network()->set_container_qdisc("default: pfifo_fast");
     config().mutable_network()->set_container_qdisc_limit("default: 10240");
 
     config().mutable_network()->set_autoconf_timeout_s(120);
