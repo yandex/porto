@@ -3819,8 +3819,8 @@ public:
     TError Get(std::string &value) {
         auto lock = LockCpuAffinity();
 
-        if (CT->CpuJail || CT->NewCpuJail)
-            value = fmt::format("jail {}", CT->CpuJail ? CT->CpuJail : CT->NewCpuJail);
+        if (CT->NewCpuJail)
+            value = fmt::format("jail {}", CT->NewCpuJail);
 
         switch (CT->CpuSetType) {
         case ECpuSetType::Inherit:
@@ -3935,7 +3935,7 @@ public:
         if (jail && (type != ECpuSetType::Node && type != ECpuSetType::Inherit))
             return TError(EError::InvalidValue, "wrong format");
 
-        if (CT->CpuSetType != type || CT->CpuSetArg != arg || CT->CpuJail != jail) {
+        if (CT->CpuSetType != type || CT->CpuSetArg != arg || CT->NewCpuJail != jail) {
             CT->CpuSetType = type;
             CT->CpuSetArg = arg;
             CT->NewCpuJail = jail;
