@@ -20,6 +20,13 @@ try:
     a.SetProperty('cpu_set', 'jail {}'.format(CPUNR))
     ExpectException(a.Start, porto.exceptions.ResourceNotAvailable)
 
+    # reset jail on stopped container
+
+    a.SetProperty('cpu_set', 'jail 2')
+    assert a['cpu_set'] == 'jail 2'
+    a.SetProperty('cpu_set', '')
+    assert a['cpu_set'] == ''
+
     a.SetProperty('cpu_set', 'jail 2')
     b.SetProperty('cpu_set', 'jail 2')
 
