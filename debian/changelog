@@ -1,3 +1,17 @@
+yandex-porto (5.1.8) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * cpu_set: fix resetting jail on stopped container
+  * cpu_set: correctly set vacant cpus in jail
+
+  [ Lev Pantyukhin ]
+  * api: python: rename RemoveLayer param 'async' to 'asynchronous'
+
+  [ Dmitry Yakunin ]
+  * net: change default container qdisc to pfifo_fast
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 18 Jan 2022 00:04:09 +0300
+
 yandex-porto (5.1.7) unstable; urgency=low
 
   * Revert "property: add bind_socket property"
