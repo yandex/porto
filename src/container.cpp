@@ -3107,9 +3107,11 @@ TError TContainer::StartParents() {
         if (error)
             return error;
 
-        error = target->Start();
-        if (error)
-            return error;
+        if (!IsRunningOrMeta(target->State)) {
+            error = target->Start();
+            if (error)
+                return error;
+        }
     } while (target != Parent);
 
     CL->ReleaseContainer();
