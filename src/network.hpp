@@ -292,6 +292,7 @@ public:
 
 struct TNetDeviceConfig {
     std::string Name;
+    std::string PeerName;
     std::string Type;
     std::string Mode;
     std::string Mac;

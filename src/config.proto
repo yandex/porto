@@ -113,6 +113,8 @@ message TConfig {
         optional uint32 l3stat_watchdog_ms = 66;
         optional uint32 l3stat_watchdog_lost_ms = 67;
 
+        optional string network_ifup_script = 68;
+
         /* Deprecated */
         optional bool enable_iproute = 41;
         optional bool enabled = 1 [deprecated=true];

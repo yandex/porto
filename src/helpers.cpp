@@ -28,6 +28,16 @@ TError RunCommand(const std::vector<std::string> &command,
                   const TCapabilities &caps,
                   bool verboseError,
                   bool interruptible) {
+
+    return RunCommand(command, {}, dir, in, out, caps, verboseError, interruptible);
+}
+
+TError RunCommand(const std::vector<std::string> &command,
+                  const std::vector<std::string> &env,
+                  const TFile &dir, const TFile &in, const TFile &out,
+                  const TCapabilities &caps,
+                  bool verboseError,
+                  bool interruptible) {
     TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
     TError error;
     TFile err;
@@ -149,7 +159,16 @@ TError RunCommand(const std::vector<std::string> &command,
         argv[i] = command[i].c_str();
     argv[command.size()] = nullptr;
 
-    execvp(argv[0], (char **)argv);
+    if (env.size() == 0) {
+        execvp(argv[0], (char **)argv);
+    } else {
+        const char **envp = (const char **)malloc(sizeof(*envp) * (env.size() + 1));
+        for (size_t i = 0; i < env.size(); i++)
+            envp[i] = env[i].c_str();
+        envp[env.size()] = nullptr;
+
+        execvpe(argv[0], (char **)argv, (char **) envp);
+    }
 
     err.SetFd = STDERR_FILENO;
     HelperError(err, fmt::format("Cannot execute {}", argv[0]), TError::System("exec"));
