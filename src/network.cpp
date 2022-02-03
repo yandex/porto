@@ -3053,10 +3053,10 @@ TError TNetEnv::ParseGw(TMultiTuple &gw_settings) {
 
 TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
     auto lock = HostNetwork->LockNet();
-    std::string peerName = HostNetwork->NewDeviceName("L3-");
+    dev.PeerName = HostNetwork->NewDeviceName("L3-");
     auto parentNl = HostNetwork->GetNl();
     auto Nl = Net->GetNl();
-    TNlLink peer(parentNl, peerName);
+    TNlLink peer(parentNl, dev.PeerName);
     TError error;
 
     if (dev.Mode == "NAT" && dev.Ip.empty()) {
@@ -3075,7 +3075,7 @@ TError TNetEnv::ConfigureL3(TNetDeviceConfig &dev) {
         ipStr += fmt::format("{}={} ", ip.Family() == AF_INET ? "ip4" : "ip6", ip.Format());
 
     L_NET("Setup L3 device {} peer={} mtu={} group={} master={} {}gw4={} mtu4={} gw6={} mtu6={}",
-            dev.Name, peerName, dev.Mtu, TNetwork::DeviceGroupName(dev.Group),
+            dev.Name, dev.PeerName, dev.Mtu, TNetwork::DeviceGroupName(dev.Group),
             dev.Master, ipStr,
             dev.Gate4.Format(), dev.GateMtu4,
             dev.Gate6.Format(), dev.GateMtu6);
@@ -3649,6 +3649,34 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
             lock.unlock();
             Net->Destroy();
             return error;
+        }
+
+        std::string netScriptPath = config().network().network_ifup_script();
+        if (!netScriptPath.empty()) {
+            std::vector<std::string> env;
+
+            env.emplace_back("PORTO_CONTAINER=" + ct.Name);
+            env.emplace_back("PORTO_LABELS=" + StringMapToString(ct.Labels));
+
+            env.emplace_back("PORTO_NET=" + MergeEscapeStrings(ct.NetProp, ' ', ';'));
+            env.emplace_back("PORTO_IP=" + MergeEscapeStrings(ct.IpList, ' ', ';'));
+            std::string value;
+            (void)UintMapToString(ct.NetClass.TxLimit, value);
+            env.emplace_back("PORTO_NET_LIMIT=" + value);
+            (void)UintMapToString(ct.NetClass.RxLimit, value);
+            env.emplace_back("PORTO_NET_RX_LIMIT=" + value);
+
+            for (auto &d: Devices) {
+                if (d.PeerName.find("L3-") != std::string::npos) {
+                    env.emplace_back("PORTO_L3_IFACE=" + d.PeerName);
+                    break;
+                }
+            }
+
+            env.emplace_back("PORTO_NETNS_FD=/proc/" + std::to_string(GetPid()) +
+                             "/fd/" + std::to_string(NetNs.GetFd()));
+
+            RunCommand({netScriptPath}, env);
         }
 
         return OK;
