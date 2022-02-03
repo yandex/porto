@@ -90,7 +90,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void SetState(EContainerState next);
 
     TError ApplyUlimits();
-    TError ApplySchedPolicy() const;
+    TError ApplySchedPolicy();
     TError ApplyIoPolicy() const;
     TError ApplyDeviceConf() const;
     TError ApplyDynamicProperties(bool onRestore = false);
@@ -244,6 +244,7 @@ public:
     int SchedPolicy;
     int SchedPrio;
     int SchedNice;
+    bool SchedNoSmt = false;
 
     uint64_t CpuLimit = 0;
     uint64_t CpuGuarantee = 0;
@@ -259,6 +260,7 @@ public:
     int CpuJail = 0;
     int NewCpuJail = 0;
     TBitMap CpuAffinity;
+    TBitMap TaskAffinity;
     TBitMap CpuVacant;
     TBitMap CpuReserve;
     std::string CpuMems;

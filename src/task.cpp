@@ -718,6 +718,15 @@ TError TTaskEnv::Start() {
         if (sched_setscheduler(0, CT->SchedPolicy, &param))
             Abort(TError::System("sched_setparm"));
 
+        if (CT->SchedNoSmt) {
+            cpu_set_t taskMask;
+
+            CT->TaskAffinity.FillCpuSet(&taskMask);
+
+            if (sched_setaffinity(0, sizeof(taskMask), &taskMask))
+                Abort(TError::System("sched_setaffinity"));
+        }
+
         if (SetIoPrio(0, CT->IoPrio))
             Abort(TError::System("ioprio"));
 

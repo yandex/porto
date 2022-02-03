@@ -40,6 +40,7 @@ extern "C" {
 #include <sys/wait.h>
 #include <sys/vfs.h>
 #include <linux/magic.h>
+#include <sched.h>
 }
 
 MeasuredMutex ContainersMutex("containers");
@@ -1443,6 +1444,7 @@ void TContainer::ChooseSchedPolicy() {
     SchedPolicy = SCHED_OTHER;
     SchedPrio = 0;
     SchedNice = 0;
+    SchedNoSmt = false;
 
     if (CpuPolicy == "rt") {
         SchedNice = config().container().rt_nice();
@@ -1459,6 +1461,8 @@ void TContainer::ChooseSchedPolicy() {
     } else if (CpuPolicy == "iso") {
         SchedPolicy = 4;
         SchedNice = config().container().high_nice();
+    } else if (CpuPolicy == "nosmt") {
+        SchedNoSmt = true;
     }
 
     if (SchedPolicy != SCHED_RR) {
@@ -1468,7 +1472,7 @@ void TContainer::ChooseSchedPolicy() {
     }
 }
 
-TError TContainer::ApplySchedPolicy() const {
+TError TContainer::ApplySchedPolicy() {
     auto cg = GetCgroup(FreezerSubsystem);
     struct sched_param param;
     param.sched_priority = SchedPrio;
@@ -1478,18 +1482,47 @@ TError TContainer::ApplySchedPolicy() const {
     bool retry;
 
     L_ACT("Set {} scheduler policy {}", cg, CpuPolicy);
+
+    cpu_set_t taskMask;
+
+    TaskAffinity.Set(CpuAffinity);
+    if (SchedNoSmt) {
+        for (unsigned cpu = 0; cpu < TaskAffinity.Size(); cpu++) {
+            if (TaskAffinity.Get(cpu)) {
+                TaskAffinity.Set(NeighborThreads[cpu], false);
+            }
+        }
+    }
+
+    TaskAffinity.FillCpuSet(&taskMask);
+    L("Task affinity set: {}", TaskAffinity.Format());
+
     do {
         error = cg.GetTasks(pids);
         retry = false;
         for (auto pid: pids) {
-            if (std::find(prev.begin(), prev.end(), pid) != prev.end() &&
-                    sched_getscheduler(pid) == SchedPolicy)
-                continue;
+            cpu_set_t current;
+
+            if (std::find(prev.begin(), prev.end(), pid) != prev.end()) {
+                if (!sched_getaffinity(pid, sizeof(current), &current) &&
+                    CPU_EQUAL(&current, &taskMask) &&
+                    sched_getscheduler(pid) == SchedPolicy) {
+
+                    continue;
+                }
+            }
+
             if (setpriority(PRIO_PROCESS, pid, SchedNice) && errno != ESRCH)
                 return TError::System("setpriority");
             if (sched_setscheduler(pid, SchedPolicy, &param) &&
                     errno != ESRCH)
                 return TError::System("sched_setscheduler");
+
+            if (!CPU_EQUAL(&current, &taskMask)) {
+                if (sched_setaffinity(pid, sizeof(taskMask), &taskMask) && errno != ESRCH)
+                    return TError::System("sched_setaffinity");
+            }
+
             retry = true;
         }
         prev = pids;
@@ -2382,15 +2415,6 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
         }
     }
 
-    if (TestClearPropDirty(EProperty::CPU_POLICY) ||
-        TestClearPropDirty(EProperty::CPU_WEIGHT)) {
-        error = ApplySchedPolicy();
-        if (error) {
-            L_ERR("Cannot set scheduler policy: {}", error);
-            return error;
-        }
-    }
-
     if (TestClearPropDirty(EProperty::CPU_SET) && Parent) {
         if (NewCpuJail != CpuJail || CpuSetType == ECpuSetType::Node) {
             error = JailCpus();
@@ -2414,6 +2438,15 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
 
             if (error)
                 return error;
+        }
+    }
+
+    if (TestClearPropDirty(EProperty::CPU_POLICY) ||
+        TestClearPropDirty(EProperty::CPU_WEIGHT)) {
+        error = ApplySchedPolicy();
+        if (error) {
+            L_ERR("Cannot set scheduler policy: {}", error);
+            return error;
         }
     }
 
