@@ -402,7 +402,8 @@ def CpuPolicy():
     return ("cpu_policy", select_by_weight( [
                 (1, "normal"),
                 (1, "rt"),
-                (1, "idle")
+                (1, "idle"),
+                (1, "nosmt")
             ] )
     )
 

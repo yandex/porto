@@ -6,6 +6,10 @@
 
 #include "util/error.hpp"
 
+extern "C" {
+#include <sched.h>
+}
+
 #define STRINGIFY_IMPL(x) #x
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
 
@@ -137,5 +141,14 @@ public:
             if (Get(i) != map.Get(i))
                 return false;
         return true;
+    }
+
+    void FillCpuSet(cpu_set_t *mask) const {
+        CPU_ZERO(mask);
+
+        for (unsigned i = 0; i < Size(); i++) {
+            if (Get(i))
+                CPU_SET(i, mask);
+        }
     }
 };

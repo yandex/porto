@@ -487,7 +487,7 @@ public:
     }
     TError Set(const std::string &policy) {
         if (policy != "rt" && policy != "high" && policy != "normal" &&
-                policy != "batch"  && policy != "idle" && policy != "iso")
+                policy != "batch"  && policy != "idle" && policy != "iso" && policy != "nosmt")
             return TError(EError::InvalidValue, "Unknown cpu policy: " + policy);
         if (CT->CpuPolicy != policy) {
             CT->CpuPolicy = policy;
