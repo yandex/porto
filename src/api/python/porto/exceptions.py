@@ -19,7 +19,7 @@ class PortoException(Exception):
         return UnknownError(msg)
 
     def __str__(self):
-        return '{}: {}'.format(self.__class__.__name__, self.message)
+        return '{}: {}'.format(self.__class__.__name__, super(PortoException, self).__str__())
 
 
 class WaitContainerTimeout(PortoException):
