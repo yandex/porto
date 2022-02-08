@@ -33,7 +33,8 @@ public:
     static TError CheckPlace(const TPath &place);
     static TError SanitizeLayer(const TPath &layer, bool merge);
     TError List(enum EStorageType type, std::list<TStorage> &list);
-    TError ImportArchive(const TPath &archive, const std::string &compress = "", bool merge = false, bool verboseError = false);
+    TError ImportArchive(const TPath &archive, const std::string &cgroup, const std::string &compress = "",
+                         bool merge = false, bool verboseError = false);
     TError ExportArchive(const TPath &archive, const std::string &compress = "");
     bool Exists() const;
     bool Weak() const;

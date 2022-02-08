@@ -201,7 +201,8 @@ public:
 
     int ImportLayer(const std::string &layer, const std::string &tarball,
                     bool merge = false, const std::string &place = "",
-                    const std::string &private_value = "", bool verboseError = false);
+                    const std::string &private_value = "", const std::string &cgroup = "",
+                    bool verboseError = false);
 
     int ExportLayer(const std::string &volume, const std::string &tarball,
                     const std::string &compress = "");

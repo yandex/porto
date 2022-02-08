@@ -28,17 +28,17 @@ TError RunCommand(const std::vector<std::string> &command,
                   const TCapabilities &caps,
                   bool verboseError,
                   bool interruptible) {
-
-    return RunCommand(command, {}, dir, in, out, caps, verboseError, interruptible);
+    return RunCommand(command, {}, dir, in, out, caps, PORTO_HELPERS_CGROUP, verboseError, interruptible);
 }
 
 TError RunCommand(const std::vector<std::string> &command,
                   const std::vector<std::string> &env,
                   const TFile &dir, const TFile &in, const TFile &out,
                   const TCapabilities &caps,
+                  const std::string &cgroup,
                   bool verboseError,
                   bool interruptible) {
-    TCgroup memcg = MemorySubsystem.Cgroup(PORTO_HELPERS_CGROUP);
+    TCgroup memcg = MemorySubsystem.Cgroup(cgroup);
     TError error;
     TFile err;
     TTask task;
