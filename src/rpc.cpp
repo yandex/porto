@@ -1397,6 +1397,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     layer.Owner = CL->Cred;
 
     return layer.ImportArchive(CL->ResolvePath(req.tarball()),
+                               req.has_cgroup() ? req.cgroup() : PORTO_HELPERS_CGROUP,
                                req.has_compress() ? req.compress() : "",
                                req.merge(),
                                req.verbose_error());
@@ -1682,7 +1683,7 @@ noinline TError ImportStorage(const rpc::TStorageImportRequest &req) {
     if (req.has_private_value())
         storage.Private = req.private_value();
 
-    return storage.ImportArchive(CL->ResolvePath(req.tarball()),
+    return storage.ImportArchive(CL->ResolvePath(req.tarball()), PORTO_HELPERS_CGROUP,
                                  req.has_compress() ? req.compress() : "");
 }
 

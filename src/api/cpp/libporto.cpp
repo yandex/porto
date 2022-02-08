@@ -746,12 +746,14 @@ int Connection::ImportLayer(const std::string &layer,
                             const std::string &tarball, bool merge,
                             const std::string &place,
                             const std::string &private_value,
+                            const std::string &cgroup,
                             bool verboseError) {
     auto req = Impl->Req.mutable_importlayer();
 
     req->set_layer(layer);
     req->set_tarball(tarball);
     req->set_merge(merge);
+    req->set_cgroup(cgroup);
     req->set_verbose_error(verboseError);
     if (place.size())
         req->set_place(place);

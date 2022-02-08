@@ -16,6 +16,7 @@ TError RunCommand(const std::vector<std::string> &command,
                   const TFile &input = TFile(),
                   const TFile &output = TFile(),
                   const TCapabilities &caps = HelperCapabilities,
+                  const std::string &cgroup = PORTO_HELPERS_CGROUP,
                   bool verboseError = false,
                   bool interruptible = false);
 TError CopyRecursive(const TPath &src, const TPath &dst);
