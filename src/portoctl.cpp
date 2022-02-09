@@ -2187,20 +2187,20 @@ public:
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
-        "[-P <place>] [-S <private>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball]",
+        "[-P <place>] [-S <private>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball [cgroup]]",
         "Manage overlayfs layers in internal storage",
-        "    -P <place>               optional path to place\n"
-        "    -S <private>             store layer private value while importing or separately\n"
-        "    -I <layer> <tarball>     import layer from tarball\n"
-        "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
-        "    -R <layer> [layer...]    remove layer from storage\n"
-        "    -F [days]                remove all unused layers (unused for [days])\n"
-        "    -L                       list present layers\n"
-        "    -E <volume> <tarball>    export upper layer into tarball\n"
-        "    -Q <volume> <squashfs>   export upper layer into squashfs\n"
-        "    -c compression           override compression\n"
-        "    -G <layer>               retrieve layer stored private value\n"
-        "    -v                       be verbose\n"
+        "    -P <place>                     optional path to place\n"
+        "    -S <private>                   store layer private value while importing or separately\n"
+        "    -I <layer> <tarball> <cgroup>  import layer from tarball\n"
+        "    -M <layer> <tarball>           merge tarball into existing or new layer\n"
+        "    -R <layer> [layer...]          remove layer from storage\n"
+        "    -F [days]                      remove all unused layers (unused for [days])\n"
+        "    -L                             list present layers\n"
+        "    -E <volume> <tarball>          export upper layer into tarball\n"
+        "    -Q <volume> <squashfs>         export upper layer into squashfs\n"
+        "    -c compression                 override compression\n"
+        "    -G <layer>                     retrieve layer stored private value\n"
+        "    -v                             be verbose\n"
         ) {}
 
     bool import = false;
@@ -2216,11 +2216,12 @@ public:
     std::string place;
     std::string private_value;
     std::string compression;
+    std::string cgroup = "";
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
         const auto &args = env->GetOpts({
-            { 'P', true,  [&](const char *arg) { place = arg;   } },
+            { 'P', true,  [&](const char *arg) { place = arg; } },
             { 'I', false, [&](const char *) { import = true; } },
             { 'M', false, [&](const char *) { merge  = true; } },
             { 'R', false, [&](const char *) { remove = true; } },
@@ -2244,7 +2245,9 @@ public:
         if (import) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], path, false, place, private_value);
+            if (args.size() > 2)
+                cgroup = args[2];
+            ret = Api->ImportLayer(args[0], path, false, place, private_value, cgroup);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {
