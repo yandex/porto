@@ -753,12 +753,13 @@ int Connection::ImportLayer(const std::string &layer,
     req->set_layer(layer);
     req->set_tarball(tarball);
     req->set_merge(merge);
-    req->set_cgroup(cgroup);
     req->set_verbose_error(verboseError);
     if (place.size())
         req->set_place(place);
     if (private_value.size())
         req->set_private_value(private_value);
+    if (cgroup.size())
+        req->set_cgroup(cgroup);
     return Impl->Call(Impl->DiskTimeout);
 }
 
