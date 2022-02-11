@@ -3,14 +3,23 @@
 #include "util/error.hpp"
 #include "util/path.hpp"
 
+#include <sys/quota.h>
+#include <unordered_set>
+#include <unordered_map>
+
 class TProjectQuota {
     static constexpr const char * PROJECT_QUOTA_FILE = "quota.project";
     static const uint32_t PROJECT_QUOTA_MAGIC = 0xd9c03f14;
 
     TPath Device;
     TPath RootPath;
-    std::string Type;
 
+    bool RemoveUnusedProjects = false;
+
+    std::unordered_set<uint32_t> Inodes;
+    std::unordered_map<uint32_t, std::unique_ptr<dqblk>> Quotas;
+
+    std::string Type;
     TError FindProject();
     TError FindDevice();
 
@@ -19,6 +28,17 @@ class TProjectQuota {
     static TError SetProjectIdOne(const TPath &path, uint32_t id, bool isDir);
     static TError SetProjectIdAll(const TPath &path, uint32_t id);
     static TError InventProjectId(const TPath &path, uint32_t &id);
+
+    bool SeenInode(const struct stat *st);
+    dqblk* FindQuota(uint32_t id);
+    dqblk* SearchQuota(uint32_t id);
+    TError WalkQuotaFile(int fd, unsigned id, int index, int depth);
+    TError ScanQuotaFile(const TPath &quotaPath);
+    TError WalkInodes(const TPathWalk &walk);
+    TError UpdateQuota(uint32_t id, const dqblk *quota);
+    TError WalkUnlinked();
+    TError RecalcUsage();
+
 public:
     TPath Path;
 
@@ -37,6 +57,7 @@ public:
     TError Create();
     TError Resize();
     TError Destroy();
+    TError Check();
 
     TError StatFS(TStatFS &result);
 

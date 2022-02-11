@@ -2038,6 +2038,25 @@ public:
     }
 };
 
+class TCheckVolumeCmd final : public ICmd {
+public:
+    TCheckVolumeCmd(Porto::Connection *api) :
+            ICmd(api, "vcheck", 1, "<path>", "check consistency of the volume (e.g. quota)") { }
+
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetArgs();
+        const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
+
+        int ret = Api->CheckVolume(path);
+        if (ret) {
+            PrintError("Cannot check consistency of the volume");
+            return ret;
+        }
+
+        return 0;
+    }
+};
+
 class TStorageCmd final : public ICmd {
 public:
     TStorageCmd(Porto::Connection *api) : ICmd(api, "storage", 0,
@@ -2935,6 +2954,7 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TUnlinkVolumeCmd>();
     handler.RegisterCommand<TListVolumesCmd>();
     handler.RegisterCommand<TTuneVolumeCmd>();
+    handler.RegisterCommand<TCheckVolumeCmd>();
 
     handler.RegisterCommand<TLayerCmd>();
     handler.RegisterCommand<TBuildCmd>();

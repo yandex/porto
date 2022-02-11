@@ -118,6 +118,10 @@ TError TVolumeBackend::Resize(uint64_t, uint64_t) {
     return TError(EError::NotSupported, "not implemented");
 }
 
+TError TVolumeBackend::Check() {
+    return OK;
+}
+
 std::string TVolumeBackend::ClaimPlace() {
     return Volume->UserStorage() ? "" : Volume->Place.ToString();
 }
@@ -423,6 +427,10 @@ public:
     TError StatFS(TStatFS &result) override {
         return TProjectQuota(Volume->Path).StatFS(result);
     }
+
+    TError Check() override {
+        return TProjectQuota(Volume->Path).Check();
+    }
 };
 
 /* TVolumeNativeBackend - project quota + bindmount */
@@ -504,6 +512,15 @@ public:
         if (Volume->HaveQuota())
             return TProjectQuota(Volume->StoragePath).StatFS(result);
         return Volume->InternalPath.StatFS(result);
+    }
+
+    TError Check() override {
+        TProjectQuota quota(Volume->Path);
+
+        if (Volume->HaveQuota() && quota.Exists())
+            return quota.Check();
+        else
+            return TError(EError::NotSupported, "Volume has no quota or project doesn't exist");
     }
 };
 
@@ -986,6 +1003,15 @@ err:
         if (Volume->HaveQuota())
             return TProjectQuota(Volume->StoragePath).StatFS(result);
         return Volume->InternalPath.StatFS(result);
+    }
+
+    TError Check() override {
+        TProjectQuota quota(Volume->StoragePath);
+
+        if (Volume->HaveQuota() && quota.Exists())
+            return quota.Check();
+        else
+            return TError(EError::NotSupported, "Volume has no quota or project doesn't exist");
     }
 };
 
@@ -3056,6 +3082,10 @@ out:
         Save();
 
     return error;
+}
+
+TError TVolume::Check() {
+    return Backend->Check();
 }
 
 TError TVolume::GetUpperLayer(TPath &upper) {

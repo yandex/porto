@@ -56,6 +56,7 @@ void TRequest::Classify() {
         Req.has_getvolume();
 
     IoReq =
+        Req.has_checkvolume() ||
         Req.has_importlayer() ||
         Req.has_exportlayer() ||
         Req.has_removelayer() ||
@@ -1195,6 +1196,14 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
     return volume->Tune(cfg);
 }
 
+noinline TError CheckVolume(const rpc::TVolumeCheckRequest &req) {
+    std::shared_ptr<TVolume> volume;
+    TError error = CL->ControlVolume(req.path(), volume);
+    if (error)
+        return error;
+    return volume->Check();
+}
+
 noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
     std::shared_ptr<TContainer> ct;
     TError error = CL->WriteContainer(req.container() != "" ? req.container() : SELF_CONTAINER, ct, true);
@@ -1993,6 +2002,8 @@ void TRequest::Handle() {
         error = ListVolumes(Req.listvolumes(), rsp);
     else if (Req.has_tunevolume())
         error = TuneVolume(Req.tunevolume());
+    else if (Req.has_checkvolume())
+        error = CheckVolume(Req.checkvolume());
     else if (Req.has_newvolume())
         error = NewVolume(Req.newvolume(), *rsp.mutable_newvolume());
     else if (Req.has_getvolume())

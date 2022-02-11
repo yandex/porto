@@ -593,6 +593,9 @@ class Volume(object):
     def Destroy(self, strict=None, timeout=None):
         self.conn.UnlinkVolume(self.path, '***', strict=strict, timeout=timeout)
 
+    def Check(self):
+        self.conn.CheckVolume(self.path)
+
 class Property(object):
     def __init__(self, name, desc, read_only, dynamic):
         self.name = name
@@ -1062,6 +1065,11 @@ class Connection(object):
         for name, value in properties.items():
             prop = request.tuneVolume.properties.add()
             prop.name, prop.value = name, value
+        self.rpc.call(request)
+
+    def CheckVolume(self, path):
+        request = rpc_pb2.TContainerRequest()
+        request.checkVolume.path = path
         self.rpc.call(request)
 
     def ImportLayer(self, layer, tarball, place=None, private_value=None, timeout=None, verbose_error=False):

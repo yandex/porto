@@ -736,6 +736,12 @@ int Connection::TuneVolume(const std::string &path,
     return Impl->Call(Impl->DiskTimeout);
 }
 
+int Connection::CheckVolume(const std::string &path) {
+    auto req = Impl->Req.mutable_checkvolume();
+    req->set_path(path);
+    return Impl->Call(Impl->DiskTimeout);
+}
+
 int Connection::ImportLayer(const std::string &layer,
                             const std::string &tarball, bool merge,
                             const std::string &place,
