@@ -138,6 +138,7 @@ message TContainerRequest {
     optional TVolumeUnlinkRequest UnlinkVolumeTarget = 121;
     optional TVolumeListRequest listVolumes = 107;
     optional TVolumeTuneRequest tuneVolume = 108;
+    optional TVolumeCheckRequest checkVolume = 109;
 
     optional TLayerImportRequest importLayer = 110;
     optional TLayerRemoveRequest removeLayer = 111;
@@ -1269,6 +1270,10 @@ message TVolumeListResponse {
 message TVolumeTuneRequest {
     required string path = 1;
     repeated TVolumeProperty properties = 2;
+}
+
+message TVolumeCheckRequest {
+    required string path = 1;
 }
 
 

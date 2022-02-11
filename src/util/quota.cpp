@@ -1,3 +1,4 @@
+#include "util/proc.hpp"
 #include "quota.hpp"
 #include "log.hpp"
 #include "config.hpp"
@@ -6,12 +7,10 @@
 extern "C" {
 #include <linux/quota.h>
 #include <linux/dqblk_xfs.h>
-#include <sys/quota.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <ftw.h>
 }
 
 #ifndef PRJQUOTA
@@ -102,7 +101,7 @@ TError TProjectQuota::InitProjectQuotaFile(const TPath &path) {
 
 TError TProjectQuota::Enable() {
     struct fs_quota_statv statv;
-    struct if_dqinfo dqinfo;
+    struct dqinfo info;
     TError error;
     int ret;
 
@@ -121,8 +120,8 @@ TError TProjectQuota::Enable() {
     auto lock = LockQuota();
 
     if (!quotactl(QCMD(Q_GETINFO, PRJQUOTA), Device.c_str(),
-                  0, (caddr_t)&dqinfo)) {
-        if (!(dqinfo.dqi_flags & DQF_SYS_FILE) ||
+                  0, (caddr_t)&info)) {
+        if (!(info.dqi_flags & DQF_SYS_FILE) ||
             !quotactl(QCMD(Q_QUOTAON, PRJQUOTA), Device.c_str(),
                       0, NULL) || errno == EEXIST)
             return OK;
@@ -251,6 +250,245 @@ TError TProjectQuota::InventProjectId(const TPath &path, uint32_t &id) {
     return OK;
 }
 
+bool TProjectQuota::SeenInode(const struct stat *st) {
+    return !Inodes.insert(static_cast<uint32_t>(st->st_ino)).second;
+}
+
+dqblk* TProjectQuota::FindQuota(uint32_t id) {
+    auto quota = Quotas.find(id);
+    if (quota != Quotas.end())
+        return quota->second.get();
+    else
+        return nullptr;
+}
+
+dqblk* TProjectQuota::SearchQuota(uint32_t id) {
+    dqblk *quota;
+    quota = FindQuota(id);
+    if (!quota) {
+        quota = new dqblk();
+        Quotas.emplace(id, std::unique_ptr<dqblk>(quota));
+    }
+    return quota;
+}
+
+TError TProjectQuota::WalkQuotaFile(int fd, unsigned id, int index, int depth) {
+    __u32 block[256];
+    int i;
+
+    if (pread(fd, &block, sizeof(block),
+              index * sizeof(block)) != sizeof(block))
+        return TError::System("Cannot read quota block {}", index);
+
+    id <<= 8;
+    for (i = 0; i < 256; i++, id++) {
+        if (!block[i])
+            continue;
+        if (depth == 3)
+            SearchQuota(id);
+        else
+            WalkQuotaFile(fd, id, block[i], depth + 1);
+    }
+    return OK;
+}
+
+TError TProjectQuota::ScanQuotaFile(const TPath &quotaPath) {
+    TError error;
+    struct v2_disk_dqheader header;
+    TFile quotaFile;
+
+    quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
+
+    error = quotaFile.OpenRead(quotaPath);
+    if (error)
+        return error;
+    if (read(quotaFile.Fd, &header, sizeof(header)) != sizeof(header))
+        return TError::System("Cannot read quota file \"{}\"", quotaPath);
+    if (header.dqh_magic != PROJECT_QUOTA_MAGIC)
+        return TError(EError::InvalidValue, "Wrong quota file magic");
+    if (header.dqh_version != 1)
+        return TError(EError::NotSupported, "Unsupported quota file version");
+    error = WalkQuotaFile(quotaFile.Fd, 0, 1, 0);
+    return error;
+}
+
+TError TProjectQuota::WalkInodes(const TPathWalk &walk) {
+    TError error;
+    dqblk *quota;
+    uint32_t id;
+
+    if (SeenInode(walk.Stat))
+        return OK;
+
+    error = GetProjectId(walk.Path, id);
+    if (error)
+        return TError(EError::NotFound, "Cannot get project for file \"{}\": {}", walk.Path, error);
+
+    quota = SearchQuota(id);
+    if (quota) {
+        quota->dqb_curinodes++;
+        quota->dqb_curspace += walk.Stat->st_blocks << 9;
+    }
+
+    return OK;
+}
+
+TError TProjectQuota::WalkUnlinked() {
+    TError error;
+    size_t unlinkedInodes = 0;
+    size_t unlinkedSpace = 0;
+    struct dirent *ent;
+    DIR *proc;
+    uint64_t dev;
+
+    dev = Path.GetDev();
+
+    proc = opendir("/proc");
+    if (!proc)
+        return TError::System( "Cannot open \"/proc\"");
+
+    while ((ent = readdir(proc))) {
+        uint64_t fdSize;
+        TFile file;
+        pid_t pid;
+        TPath path(fmt::format("/proc/{}/fd", ent->d_name));
+
+        if (ent->d_type != DT_DIR)
+            continue;
+
+        pid = std::atoi(ent->d_name);
+        if (pid <= 0)
+            continue;
+
+        error = GetFdSize(pid, fdSize);
+        if (error) {
+            L_WRN("{}", error.Text);
+            continue;
+        }
+
+        error = file.OpenRead(path);
+        if (error) {
+            if (error.Errno != ENOENT)
+                L_WRN("{}", error.Text);
+            continue;
+        }
+
+        for (uint64_t fd = 0; fd < fdSize; fd++) {
+            dqblk *quota;
+            uint32_t id;
+            struct stat st;
+            TPath curPath(std::to_string(fd));
+
+            error = file.StatAt(curPath, true, st);
+            if (error) {
+                if (error.Errno != ENOENT)
+                    L_WRN("{}", error.Text);
+                continue;
+            }
+
+            if (!S_ISREG(st.st_mode) || st.st_nlink || st.st_dev != dev)
+                continue;
+
+            if (SeenInode(&st))
+                continue;
+
+            if (GetProjectId(curPath, id)) {
+                L_WRN("Cannot get project for file \"{}/{}\"", path, curPath);
+                continue;
+            }
+
+            quota = FindQuota(id);
+            if (quota) {
+                unlinkedInodes++;
+                unlinkedSpace += st.st_blocks << 9;
+
+                L_WRN("Found unlinked inode for {}: \"{}/{}\" {} bytes",
+                      id, path, curPath, st.st_blocks << 9);
+
+                quota->dqb_curinodes++;
+                quota->dqb_curspace += st.st_blocks << 9;
+            }
+        }
+    }
+
+    closedir(proc);
+
+    if (unlinkedInodes)
+        L_WRN("Found {} unlinked inodes, total {} bytes",
+              unlinkedInodes, unlinkedSpace);
+
+    return OK;
+}
+
+TError TProjectQuota::RecalcUsage() {
+    TError error;
+    TPathWalk walk;
+
+    error = walk.OpenScan(Path);
+    while (!error) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            break;
+        error = WalkInodes(walk);
+    }
+    if (error)
+        return error;
+
+    error = WalkUnlinked();
+    if (error)
+        return error;
+
+    return OK;
+}
+
+TError TProjectQuota::UpdateQuota(uint32_t id, const dqblk *realQuota) {
+    dqblk quota;
+
+    if (!id)
+        return OK;
+
+    if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(), id, (caddr_t)&quota))
+        return TError::System("Cannot get project quota \"{}\" at \"{}\"", id, Device.c_str());
+
+    quota.dqb_valid = 0;
+
+    if (quota.dqb_curinodes != realQuota->dqb_curinodes) {
+        L("Update inode count for {}: {} -> {} ({})",
+          id, quota.dqb_curinodes, realQuota->dqb_curinodes,
+          realQuota->dqb_curinodes - quota.dqb_curinodes);
+        quota.dqb_curinodes = realQuota->dqb_curinodes;
+        quota.dqb_valid |= QIF_INODES;
+    }
+
+    if (quota.dqb_curspace != realQuota->dqb_curspace) {
+        L("Update space usage for {}: {} -> {} ({})",
+          id, quota.dqb_curspace, realQuota->dqb_curspace,
+          realQuota->dqb_curspace - quota.dqb_curspace);
+        quota.dqb_curspace = realQuota->dqb_curspace;
+        quota.dqb_valid |= QIF_SPACE;
+    }
+
+    if (!realQuota->dqb_curinodes && !realQuota->dqb_curspace) {
+        if (RemoveUnusedProjects) {
+            L("Remove unused project quota: {}", id);
+            memset(&quota, 0, sizeof(quota));
+            quota.dqb_valid |= QIF_ALL;
+        } else {
+            L_WRN("Project {} seems unused", id);
+        }
+    }
+
+    if (quota.dqb_valid) {
+        if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA),
+                     Device.c_str(), id, (caddr_t)&quota))
+            return TError::System("Cannot set project quota \"{}\" at \"{}\"", id, Device.c_str());
+
+        quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
+    }
+
+    return OK;
+}
+
 TError TProjectQuota::FindProject() {
     TError error;
 
@@ -277,7 +515,7 @@ TError TProjectQuota::FindDevice() {
     TMount mount;
     TError error;
 
-    /* alredy found */
+    /* already found */
     if (!Device.IsEmpty())
         return OK;
 
@@ -316,7 +554,7 @@ bool TProjectQuota::Exists() {
 }
 
 TError TProjectQuota::Load() {
-    struct if_dqblk quota;
+    dqblk quota;
     TError error;
 
     error = FindProject();
@@ -340,7 +578,7 @@ TError TProjectQuota::Load() {
 }
 
 TError TProjectQuota::Create() {
-    struct if_dqblk quota;
+    dqblk quota;
     TError error;
 
     if (!Path.IsDirectoryStrict()) {
@@ -409,7 +647,7 @@ TError TProjectQuota::Create() {
 }
 
 TError TProjectQuota::Resize() {
-    struct if_dqblk quota;
+    dqblk quota;
     TError error;
 
     error = FindProject();
@@ -435,7 +673,7 @@ TError TProjectQuota::Resize() {
 }
 
 TError TProjectQuota::Destroy() {
-    struct if_dqblk quota;
+    dqblk quota;
     TError error;
 
     error = FindProject();
@@ -463,6 +701,32 @@ TError TProjectQuota::Destroy() {
     quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 
     return error;
+}
+
+TError TProjectQuota::Check() {
+    TError error;
+
+    error = FindDevice();
+    if (error)
+        return error;
+
+    if (Path == RootPath) {
+        /* scan all project id to remove unused */
+        TPath quotaPath = RootPath / PROJECT_QUOTA_FILE;
+        ScanQuotaFile(quotaPath);
+        RemoveUnusedProjects = true;
+    }
+
+    error = RecalcUsage();
+    if (error)
+        return error;
+
+    for (auto &dq: Quotas) {
+        error = UpdateQuota(dq.first, dq.second.get());
+        if (error)
+            return error;
+    }
+    return OK;
 }
 
 TError TProjectQuota::StatFS(TStatFS &result) {
