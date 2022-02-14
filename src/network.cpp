@@ -885,10 +885,7 @@ TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &sta
 
     auto rate = dev.GetConfig(RootClass->RxLimit);
 
-    if (!rate) {
-        EnabledRxLimit = false;
-        return OK;
-    }
+    EnabledRxLimit = false;
 
     // take host network lock first, to avoid dead lock
     statLock.unlock();
@@ -916,25 +913,28 @@ TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &sta
     // https://st.yandex-team.ru/PORTO-809
     leaf.MemoryLimit = std::max(std::floor(TCP_RTO_VALUE * rate), 64000.);
 
-    error = qdisc.Create(hostNl);
-    if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
-        L_ERR("Cannot create egress qdisc for host peer: {}", error);
-        return error;
+    if (rate) {
+        error = qdisc.Create(hostNl);
+        if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
+            L_ERR("Cannot create egress qdisc for host peer: {}", error);
+            return error;
+        }
+
+        error = cls.Create(hostNl);
+        if (error) {
+            L_ERR("Cannot create egress class for host peer: {}", error);
+            return error;
+        }
+
+        error = leaf.Create(hostNl);
+        if (error) {
+            L_ERR("Cannot create egress leaf qdisc for host peer: {}", error);
+            return error;
+        }
+
+        EnabledRxLimit = true;
     }
 
-    error = cls.Create(hostNl);
-    if (error) {
-        L_ERR("Cannot create egress class for host peer: {}", error);
-        return error;
-    }
-
-    error = leaf.Create(hostNl);
-    if (error) {
-        L_ERR("Cannot create egress leaf qdisc for host peer: {}", error);
-        return error;
-    }
-
-    EnabledRxLimit = true;
     return OK;
 }
 
