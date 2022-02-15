@@ -26,7 +26,7 @@ struct TTask {
     TError Wait(bool interruptible = false,
                 const std::atomic_bool &stop = false,
                 const std::atomic_bool &disconnected = false);
-    static bool Deliver(pid_t pid, int status);
+    static bool Deliver(pid_t pid, int code, int status);
 
     bool Exists() const;
     bool IsZombie() const;

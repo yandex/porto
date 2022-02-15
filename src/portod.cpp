@@ -453,7 +453,7 @@ static void PortodServer() {
                         TContainer::DumpLocks();
                         break;
                     case SIGCHLD:
-                        if (!TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_status)) {
+                        if (!TTask::Deliver(sigInfo.ssi_pid, sigInfo.ssi_code, sigInfo.ssi_status)) {
                             TEvent e(EEventType::ChildExit);
                             e.Exit.Pid = sigInfo.ssi_pid;
                             e.Exit.Status = sigInfo.ssi_status;
