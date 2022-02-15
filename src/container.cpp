@@ -198,8 +198,8 @@ TError TContainer::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &ct,
     if (error)
         return error;
 
-    if (cg.Name == PORTO_DAEMON_CGROUP)
-        return TError(EError::NotSupported, "Recursion?");
+    if (cg.Name == PORTO_DAEMON_CGROUP || cg.Name == PORTO_HELPERS_CGROUP)
+        return TError(EError::HelperError, "Read-only access");
 
     std::string prefix = std::string(PORTO_CGROUP_PREFIX) + "/";
     std::string name = cg.Name;

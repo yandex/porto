@@ -109,16 +109,27 @@ TError TClient::IdentifyClient() {
 
     Cred = TaskCred;
     Comm = GetTaskName(Pid);
+    AccessLevel = EAccessLevel::None;
 
     // strict if cgroup namespaces are disabled
     error = TContainer::FindTaskContainer(Pid, ct, !SupportCgroupNs);
+    if (error && error.Error == EError::HelperError) {
+        /* Restrict "recursive" invocations to read-only */
+        AccessLevel = EAccessLevel::ReadOnly;
+
+        auto containers_lock = LockContainers();
+        error = TContainer::Find(ROOT_CONTAINER, ct);
+    }
+
     if (error && error.Errno != ENOENT)
         L_WRN("Cannot identify container of pid {} : {}", Pid, error);
 
     if (error)
         return error;
 
-    AccessLevel = ct->AccessLevel;
+    if (AccessLevel == EAccessLevel::None)
+        AccessLevel = ct->AccessLevel;
+
     for (auto p = ct->Parent; p; p = p->Parent)
         AccessLevel = std::min(AccessLevel, p->AccessLevel);
 
