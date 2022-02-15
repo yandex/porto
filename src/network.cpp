@@ -3675,8 +3675,10 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
 
             env.emplace_back("PORTO_NETNS_FD=/proc/" + std::to_string(GetPid()) +
                              "/fd/" + std::to_string(NetNs.GetFd()));
-
-            RunCommand({netScriptPath}, env);
+            // Return error if helper script exits with non-zero exit code.
+            // ISS will receive an error creating slot container and will try to re-create the container.
+            // No silent misconfiguration will happen.
+            return RunCommand({netScriptPath}, env);
         }
 
         return OK;
