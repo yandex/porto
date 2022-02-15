@@ -796,7 +796,7 @@ TError TTask::Wait(bool interruptible,
     return OK;
 }
 
-bool TTask::Deliver(pid_t pid, int status) {
+bool TTask::Deliver(pid_t pid, int code, int status) {
     auto lock = std::unique_lock<std::mutex>(ForkLock);
     auto it = Tasks.find(pid);
     if (it == Tasks.end()) {
@@ -805,8 +805,8 @@ bool TTask::Deliver(pid_t pid, int status) {
             return true;
         return false;
     }
+    it->second->Status = (code == CLD_EXITED) ? W_EXITCODE(status, 0) : status;
     it->second->Running = false;
-    it->second->Status = status;
     Tasks.erase(it);
     lock.unlock();
     TasksCV.notify_all();
