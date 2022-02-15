@@ -787,7 +787,7 @@ void TNetwork::GetDeviceSpeed(TNetDevice &dev) const {
     }
 }
 
-TError TNetwork::SetupPolice(TNetDevice &dev) {
+TError TNetwork::SetupShaper(TNetDevice &dev) {
     TError error;
 
     PORTO_LOCKED(NetMutex);
@@ -795,34 +795,6 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
 
     if (!RootClass || IsHost())
         return OK;
-
-    /*  DO NOT REMOVE https://st.yandex-team.ru/PORTO-809
-    auto rate = dev.GetConfig(RootClass->RxLimit);
-
-    TNlPoliceFilter police(dev.Index, TC_H_INGRESS);
-    police.Mtu = 65536; // maximum GRO skb
-    police.Rate = rate;
-    police.Burst = dev.GetConfig(IngressBurst, std::max(rate / 10, police.Mtu * 10ul));
-    (void)police.Delete(*Nl);
-
-    TNlQdisc qdisc(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));
-    qdisc.Kind = "ingress";
-    (void)qdisc.Delete(*Nl);
-
-    if (rate) {
-        error = qdisc.Create(*Nl);
-        if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
-            L_WRN("Cannot create ingress qdisc: {}", error);
-            return error;
-        }
-
-        error = police.Create(*Nl);
-        if (error && error.Errno != ENODEV && error.Errno != ENOENT) {
-            L_WRN("Can't create ingress police filter: {}", error);
-            return error;
-        }
-    }
-    */
 
     auto rate = dev.GetConfig(RootClass->TxLimit);
 
@@ -873,7 +845,7 @@ TError TNetwork::SetupPolice(TNetDevice &dev) {
     return OK;
 }
 
-TError TNetwork::SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &statLock) {
+TError TNetwork::SetupPolicer(TNetDevice &dev, std::unique_lock<std::mutex> &statLock) {
     // set rx limit like tx on host peer
     TError error;
 
@@ -1739,8 +1711,8 @@ TError TNetwork::SetupClasses(TNetClass &cls, bool safe) {
             auto net_state_lock = LockNetState();
             for (auto &dev: Devices)
                 if (dev.Uplink) {
-                    SetupRxLimit(dev, net_state_lock);
-                    SetupPolice(dev);
+                    SetupPolicer(dev, net_state_lock);
+                    SetupShaper(dev);
                 }
         }
         return HostNetwork->SetupClasses(cls, safe);
@@ -1889,8 +1861,8 @@ TError TNetwork::RepairLocked() {
 retry:
     for (auto &dev: Devices) {
         if (dev.Uplink) {
-            SetupRxLimit(dev, state_lock);
-            SetupPolice(dev);
+            SetupPolicer(dev, state_lock);
+            SetupShaper(dev);
         }
 
         if (!dev.Managed) {

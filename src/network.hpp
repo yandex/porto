@@ -234,8 +234,8 @@ public:
     TError SetupClass(TNetDevice &dev, TNetClass &cls, int cs, bool safe = false);
     TError DeleteClass(TNetDevice &dev, TNetClass &cls, int cs);
     TError SetupClasses(TNetClass &cls, bool safe = false);
-    TError SetupPolice(TNetDevice &dev);
-    TError SetupRxLimit(TNetDevice &dev, std::unique_lock<std::mutex> &statLock);
+    TError SetupShaper(TNetDevice &dev);
+    TError SetupPolicer(TNetDevice &dev, std::unique_lock<std::mutex> &statLock);
 
     void InitClasslessQdisc(TNetDevice &dev, TNlQdisc &qdisc);
     TError SetupMQ(TNetDevice &dev);
