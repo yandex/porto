@@ -347,7 +347,7 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups, bool all) const {
 
         std::string name = Subsystem->Root.InnerPath(walk.Path).ToString();
 
-        /* Ignore non-proto cgroups */
+        /* Ignore non-porto cgroups */
         if (!StringStartsWith(name, PORTO_CGROUP_PREFIX) && !all)
             continue;
 
@@ -355,6 +355,10 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups, bool all) const {
     }
 
     return OK;
+}
+
+bool TCgroup::IsChildOf(const TCgroup &parent) const {
+    return Subsystem == parent.Subsystem && StringStartsWith(Name, parent.Name + "/");
 }
 
 TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const {

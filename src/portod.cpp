@@ -715,8 +715,9 @@ again:
 
             bool found = false;
             for (auto &it: Containers) {
-                if (it.second->State != EContainerState::Stopped &&
-                        it.second->GetCgroup(*hy) == *cg) {
+                TCgroup ctCg(it.second->GetCgroup(*hy));
+                if (it.second->State != EContainerState::Stopped && (ctCg == *cg ||
+                    (it.second->CgroupFs == ECgroupFs::Rw && cg->IsChildOf(ctCg)))) {
                     found = true;
                     break;
                 }
