@@ -1,9 +1,8 @@
-import porto
 from test_common import *
-import os
+import porto
 import time
 
-conn = porto.Connection()
+conn = porto.Connection(timeout=30)
 
 try:
     def CheckCgroupfsNone():
@@ -20,6 +19,7 @@ try:
         b.Destroy()
 
         a.Destroy()
+
 
     def CheckCgroupfsRo():
         a = conn.Run('a', cgroupfs='ro', wait=0, root_volume={'layers': ['ubuntu-xenial']})
@@ -40,18 +40,22 @@ try:
         ExpectNe('0', b['stdout'].strip())
         b.Destroy()
 
-        b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, command='bash -c "mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test"')
+        b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False,
+                     command='bash -c "mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test"')
         ExpectNe('0', b['exit_code'])
         ExpectNe(-1, b['stderr'].find('Read-only file system'))
         b.Destroy()
 
         a.Destroy()
 
+
     def CheckCgroupfsRw(is_os, userns=False, enable_net_cgroups=False):
         if is_os:
-            ExpectEq(porto.exceptions.PermissionError, Catch(conn.Run, 'a', cgroupfs='rw', wait=0, root_volume={'layers': ['ubuntu-xenial']}))
+            ExpectEq(porto.exceptions.PermissionError,
+                     Catch(conn.Run, 'a', cgroupfs='rw', wait=0, root_volume={'layers': ['ubuntu-xenial']}))
 
-        a = conn.Run('a', cgroupfs='rw', userns=userns, user='1044' if userns else '0', virt_mode=('os' if is_os else 'app'), wait=0, root_volume={'layers': ['ubuntu-xenial']})
+        a = conn.Run('a', cgroupfs='rw', userns=userns, user='1044' if userns else '0',
+                     virt_mode=('os' if is_os else 'app'), wait=0, root_volume={'layers': ['ubuntu-xenial']})
 
         b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, command='cat /proc/self/cgroup')
         ExpectEq('0', b['exit_code'])
@@ -63,17 +67,19 @@ try:
         ExpectEq(16, len(b['stdout'].split()))
         b.Destroy()
 
-        b = conn.Run('a/b', wait=0, virt_mode='job', isolate=False, user='1044', command='bash -c "mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test/cgroup.procs; sleep 3"')
+        b = conn.Run('a/b', wait=0, virt_mode='job', isolate=False, user='1044',
+                     command='bash -c "mkdir /sys/fs/cgroup/freezer/test && echo $$ | tee /sys/fs/cgroup/freezer/test/cgroup.procs; sleep 3"')
 
         time.sleep(1)
         with open('/sys/fs/cgroup/freezer/porto/a/test/cgroup.procs') as f:
-            ExpectEq(2, len(f.read().strip().split())) # bash and sleep in cgroup
+            ExpectEq(2, len(f.read().strip().split()))  # bash and sleep in cgroup
         b.Wait()
 
         ExpectEq('0', b['exit_code'])
         b.Destroy()
 
-        b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, user='1044', command='bash -c "mkdir /sys/fs/cgroup/net_cls/test && rmdir /sys/fs/cgroup/net_cls/test"')
+        b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, user='1044',
+                     command='bash -c "mkdir /sys/fs/cgroup/net_cls/test && rmdir /sys/fs/cgroup/net_cls/test"')
 
         if enable_net_cgroups:
             ExpectEq('0', b['exit_code'])
@@ -83,12 +89,19 @@ try:
 
         a.Destroy()
 
+    ConfigurePortod('test-cgroupns', """
+    container {
+        enable_rw_cgroupfs: false
+    }""")
+
     CheckCgroupfsNone()
     CheckCgroupfsRo()
-    ExpectEq(porto.exceptions.PermissionError, Catch(conn.Run, 'a', cgroupfs='rw', wait=0, root_volume={'layers': ['ubuntu-xenial']}))
+    ExpectEq(porto.exceptions.PermissionError, \
+             Catch(conn.Run, 'a', cgroupfs='rw', wait=0, root_volume={'layers': ['ubuntu-xenial']}))
 
     ConfigurePortod('test-cgroupns', """
     container {
+        enable_rw_cgroupfs: false
         use_os_mode_cgroupns : true
     }""")
 
@@ -126,14 +139,41 @@ try:
     ExpectEq(a['stdout'].strip(), '/')
     a.Destroy()
 
-    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio', link_memory_writeback_blkio=False)
+    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio',
+                 link_memory_writeback_blkio=False)
     ExpectEq(a['stdout'].strip(), '/')
     a.Destroy()
 
-    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio', link_memory_writeback_blkio=True)
+    a = conn.Run('a', wait=5, cgroupfs='ro', command='cat /sys/fs/cgroup/memory/memory.writeback_blkio',
+                 link_memory_writeback_blkio=True)
     ExpectEq(a['stdout'].strip(), '/porto%a')
     a.Destroy()
 
+    # check CgroupCleanup with cgroupfs
+    ConfigurePortod('test-cgroupns', """
+    container {
+        enable_rw_cgroupfs: true
+    }""")
+
+    try:
+        a = conn.Run('a', cgroupfs='rw', command='bash -c "sleep inf & wait $!"', weak=False)
+        b = conn.Run('a/b', wait=5, virt_mode='job', isolate=False, \
+                     command="bash -c 'mkdir /sys/fs/cgroup/freezer/test && echo 3 > /sys/fs/cgroup/freezer/test/cgroup.procs'")
+
+        pids = []
+        with open('/sys/fs/cgroup/freezer/porto/a/test/cgroup.procs') as f:
+            pids = f.read().strip().split()
+        ExpectEq(len(pids), 1)
+        state = a['state']
+
+        ReloadPortod()
+
+        with open('/sys/fs/cgroup/freezer/porto/a/test/cgroup.procs') as f:
+            ExpectEq(f.read().strip().split(), pids)
+        ExpectEq(a['state'], state)
+
+    finally:
+        a.Destroy()
 
 finally:
     ConfigurePortod('test-cgroupns', "")

@@ -98,6 +98,7 @@ public:
 
     TCgroup Child(const std::string& name) const;
     TError ChildsAll(std::vector<TCgroup> &cgroups, bool all = false) const;
+    bool IsChildOf(const TCgroup &parent) const;
 
     TPath Path() const;
     bool IsRoot() const;
@@ -157,7 +158,6 @@ public:
     TError SetBool(const std::string &knob, bool value) const;
 
     TError GetUintMap(const std::string &knob, TUintMap &value) const;
-    TError SetSuffix(const std::string suffix);
 
     TError Recreate();
 };
