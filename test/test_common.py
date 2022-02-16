@@ -29,7 +29,7 @@ def ExpectEq(a, b):
     assert a == b, "{} should be equal {}".format(a, b)
 
 def ExpectNe(a, b):
-    assert a != b, "{} should not be equal{}".format(a, b)
+    assert a != b, "{} should not be equal {}".format(a, b)
 
 def ExpectLe(a, b, descr=""):
     assert a <= b, "{}{} should be less or equal {}".format(descr, a, b)
