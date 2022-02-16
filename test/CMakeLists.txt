@@ -139,6 +139,7 @@ ADD_PYTHON_TEST(prev_release_upgrade)
 ADD_PYTHON_TEST(oom)
 ADD_PYTHON_TEST(hugetlb)
 ADD_PYTHON_TEST(coredump)
+ADD_PYTHON_TEST(net-ifup)
 
 ADD_PYTHON_TEST(volume-restore)
 ADD_PYTHON_TEST(htb-restore)
