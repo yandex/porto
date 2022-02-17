@@ -1,3 +1,38 @@
+yandex-porto (5.1.9) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * porto: add additional meta or running check in TContainer::StartParents
+
+  [ Maxim Samoylov ]
+  * network: introduce network_ifup_script invocation on L3 net setup
+  * container: introduce container cpu_policy nosmt
+
+  [ Dmitry Yakunin ]
+  * api: python: fix exception message in python3
+  * porto: add vcheck to check volume
+  * network: fix rx qdisc deleting
+
+  [ Anton Suvorov ]
+  * Fail network configuration if helper script fails
+
+  [ Lev Pantyukhin ]
+  * porto: CgroupCleanup with cgroupfs doesn't delete container cgroup children
+
+  [ Maxim Samoylov ]
+  * network: fix methods naming ambiguity
+  * client: allow recursive read-only connections
+  * portod: convert signalfd exit status to waitpid format
+
+  [ Dmitry Yakunin ]
+  * tests: fix security test
+
+  [ Maxim Samoylov ]
+  * test: add essential net-ifup testcase
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 17 Feb 2022 11:05:42 +0300
+
 yandex-porto (5.1.8) unstable; urgency=low
 
   [ Dmitry Yakunin ]
