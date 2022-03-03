@@ -877,11 +877,12 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     if (HasQuota) {
         int64_t quota = std::ceil((double)limit * period / CPU_POWER_PER_SEC);
 
-        if (quota < 1000) /* 1ms */
-            quota = 1000;
+        quota *= config().container().cpu_limit_scale();
 
-        if (!limit)
+        if (!quota)
             quota = -1;
+        else if (quota < 1000) /* 1ms */
+            quota = 1000;
 
         (void)cg.Set("cpu.cfs_quota_us", std::to_string(quota));
 
