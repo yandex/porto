@@ -296,6 +296,9 @@ void InitNamespacedNetSysctls() {
         NamespacedNetSysctls.push_back("net.ipv4.ip_forward_update_priority");
         NamespacedNetSysctls.push_back("net.ipv6.icmp.echo_ignore_all");
     }
+    if (CompareVersions(config().linux_version(), "5.1") >= 0) {
+        NamespacedNetSysctls.push_back("net.ipv6.icmp.ratemask");
+    }
 }
 
 bool TNetClass::IsDisabled() {
