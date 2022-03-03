@@ -269,3 +269,61 @@ assert '%dc' % b.Dump().status.cpu_limit_total == b.GetProperty('cpu_limit_total
 assert '%dc' % c.Dump().status.cpu_limit_total == c.GetProperty('cpu_limit_total')
 assert '%dc' % d.Dump().status.cpu_limit_total == d.GetProperty('cpu_limit_total')
 a.Destroy()
+
+# check cpu_limit_scale
+
+def get_cpuacct_knob(ct, knob):
+    if ct == '/':
+        path = knob
+    else:
+        path = 'porto%{}/{}'.format(ct, knob)
+    with open('/sys/fs/cgroup/cpuacct/{}'.format(path)) as f:
+        return int(f.read().decode('utf-8').strip())
+
+def get_cfs_quota_us(ct):
+    return get_cpuacct_knob(ct, 'cpu.cfs_quota_us')
+
+cfs_period_us = get_cpuacct_knob('/', 'cpu.cfs_period_us')
+
+limit_cores = 2
+
+ConfigurePortod('test-cpu_limit', "")
+
+a = conn.Create('a')
+a.SetProperty('cpu_limit', '{}c'.format(limit_cores))
+a.Start()
+
+ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+ExpectEq(get_cfs_quota_us('a'), limit_cores * cfs_period_us)
+
+def run_scale_test(limit_scale):
+    global limit_cores
+    global cfs_period_us
+
+    ConfigurePortod('test-cpu_limit', """
+container {
+    cpu_limit_scale: %f
+}
+""" % (limit_scale))
+
+    ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+    ExpectEq(get_cfs_quota_us('a'), int(limit_scale * limit_cores * cfs_period_us))
+
+run_scale_test(1.1)
+run_scale_test(0.9)
+
+ConfigurePortod('test-cpu_limit', """
+container {
+    cpu_limit_scale: 0
+}
+""")
+
+ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+ExpectEq(get_cfs_quota_us('a'), -1)
+
+ConfigurePortod('test-cpu_limit', "")
+
+ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+ExpectEq(get_cfs_quota_us('a'), limit_cores * cfs_period_us)
+
+a.Destroy()

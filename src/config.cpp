@@ -128,6 +128,7 @@ static void DefaultConfig() {
     config().mutable_container()->set_default_thread_limit(10000);
 
     config().mutable_container()->set_cpu_period(100000000);    /* 100ms */
+    config().mutable_container()->set_cpu_limit_scale(1);
     config().mutable_container()->set_propagate_cpu_guarantee(true);
 
     config().mutable_container()->set_enable_systemd(true);
@@ -263,6 +264,9 @@ TError ValidateConfig() {
         config().network().fq_codel_memory_limit() > 0)
         return TError(EError::InvalidValue, "fq_codel memory limit not supported");
 #endif
+
+    if (config().container().cpu_limit_scale() < 0)
+        return TError(EError::InvalidValue, "cpu_limit_scale is negative");
 
     return OK;
 }
