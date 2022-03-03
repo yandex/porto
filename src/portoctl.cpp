@@ -1123,7 +1123,7 @@ public:
 
 class TRunCmd final : public ICmd {
 public:
-    TRunCmd(Porto::Connection *api) : ICmd(api, "run", 2,
+    TRunCmd(Porto::Connection *api) : ICmd(api, "run", 1,
             "[-L layer] [-W] ... <container> [properties]",
             "create and start container with given properties",
             "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
