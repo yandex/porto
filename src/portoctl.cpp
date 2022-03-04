@@ -711,17 +711,32 @@ public:
 
 class TSetPropertyCmd final : public ICmd {
 public:
-    TSetPropertyCmd(Porto::Connection *api) : ICmd(api, "set", 3, "<container> <property>", "set container property") {}
+    TSetPropertyCmd(Porto::Connection *api) : ICmd(api, "set", 2, "<container> <property>[=| ]<value>", "set container property") {}
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        string val = args[2];
-        for (size_t i = 3; i < args.size(); ++i) {
-            val += " ";
-            val += args[i];
+        string prop;
+        string val;
+
+        if (args.size() == 2) {
+            size_t n = args[1].find('=');
+            if (n == string::npos) {
+                PrintUsage();
+                return EXIT_FAILURE;
+            }
+            prop = args[1].substr(0, n);
+            val = args[1].substr(n + 1, string::npos);
+
+        } else {
+            prop = args[1];
+            val = args[2];
+            for (size_t i = 3; i < args.size(); ++i) {
+                val += " ";
+                val += args[i];
+            }
         }
 
-        int ret = Api->SetProperty(args[0], args[1], val);
+        int ret = Api->SetProperty(args[0], prop, val);
         if (ret)
             PrintError("Can't set property");
 
