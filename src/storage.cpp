@@ -791,8 +791,6 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &memCgrou
         if (error)
             return error;
     } else {
-        /* first layer should not have whiteouts */
-        merge = false;
         error = temp.Mkdir(0775);
         if (error)
             return error;
@@ -842,7 +840,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &memCgrou
     if (error)
         goto err;
 
-    if (Type == EStorageType::Layer) {
+    if (!merge && Type == EStorageType::Layer) {
         error = SanitizeLayer(temp, merge);
         if (error)
             goto err;
@@ -1074,7 +1072,7 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
     if (error)
         return error;
 
-    while (1) {
+    while (true) {
         error = walk.Next();
         if (error || !walk.Path)
             return error;
@@ -1114,8 +1112,6 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
             }
         }
     }
-
-    return OK;
 }
 
 TError TStorage::CreateMeta(uint64_t space_limit, uint64_t inode_limit) {

@@ -2128,11 +2128,11 @@ TError TVolume::MergeLayers() {
         }
         if (error)
             return error;
-    }
 
-    error = TStorage::SanitizeLayer(InternalPath, true);
-    if (error)
-        return error;
+        error = TStorage::SanitizeLayer(InternalPath, false);
+        if (error)
+            return error;
+    }
 
     return OK;
 }

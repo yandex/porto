@@ -197,7 +197,7 @@ public:
         id = "_weak_portoctl-" + std::to_string(GetPid()) + "-" +
              std::to_string(LayerIndex++) + "-" + path.BaseName();
         std::cout << "Importing layer " << path << " as " << id << std::endl;
-        if (Api->ImportLayer(id, path.ToString(), false, Place))
+        if (Api->ImportLayer(id, path.ToString(), MergeLayers, Place))
             return GetLastError();
         ImportedLayers.push_back(id);
         return OK;
