@@ -1462,7 +1462,7 @@ void TContainer::ChooseSchedPolicy() {
         SchedPolicy = 4;
         SchedNice = config().container().high_nice();
     } else if (CpuPolicy == "nosmt") {
-        SchedNoSmt = true;
+        SchedNoSmt = HyperThreadingEnabled;
     }
 
     if (SchedPolicy != SCHED_RR) {
@@ -1483,19 +1483,17 @@ TError TContainer::ApplySchedPolicy() {
 
     L_ACT("Set {} scheduler policy {}", cg, CpuPolicy);
 
-    cpu_set_t taskMask;
 
-    TaskAffinity.Set(CpuAffinity);
+    TBitMap taskAffinity;
     if (SchedNoSmt) {
-        for (unsigned cpu = 0; cpu < TaskAffinity.Size(); cpu++) {
-            if (TaskAffinity.Get(cpu)) {
-                TaskAffinity.Set(NeighborThreads[cpu], false);
-            }
-        }
+        taskAffinity = GetNoSmtCpus();
+        L("Task affinity set: {}", taskAffinity.Format());
+    } else {
+        taskAffinity.Set(CpuAffinity);
     }
 
-    TaskAffinity.FillCpuSet(&taskMask);
-    L("Task affinity set: {}", TaskAffinity.Format());
+    cpu_set_t taskMask;
+    taskAffinity.FillCpuSet(&taskMask);
 
     do {
         error = cg.GetTasks(pids);
@@ -1810,6 +1808,19 @@ TError TContainer::JailCpus() {
     CpuJail = NewCpuJail;
 
     return OK;
+}
+
+TBitMap TContainer::GetNoSmtCpus() {
+    TBitMap taskAffinity;
+
+    taskAffinity.Set(CpuAffinity);
+    for (unsigned cpu = 0; cpu < taskAffinity.Size(); cpu++) {
+        if (taskAffinity.Get(cpu)) {
+            taskAffinity.Set(NeighborThreads[cpu], false);
+        }
+    }
+
+    return taskAffinity;
 }
 
 TError TContainer::DistributeCpus() {
@@ -3313,6 +3324,11 @@ TError TContainer::PrepareStart() {
             if (Parent->ResolvePlace(place))
                 return TError(EError::Permission, "Place {} is not allowed by parent container", policy);
         }
+    }
+
+    if (!HasProp(EProperty::CPU_POLICY)) {
+        CpuPolicy = Parent ? Parent->CpuPolicy : "normal";
+        ChooseSchedPolicy();
     }
 
     return OK;

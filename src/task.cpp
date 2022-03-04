@@ -720,8 +720,7 @@ TError TTaskEnv::Start() {
 
         if (CT->SchedNoSmt) {
             cpu_set_t taskMask;
-
-            CT->TaskAffinity.FillCpuSet(&taskMask);
+            CT->GetNoSmtCpus().FillCpuSet(&taskMask);
 
             if (sched_setaffinity(0, sizeof(taskMask), &taskMask))
                 Abort(TError::System("sched_setaffinity"));

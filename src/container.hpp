@@ -260,7 +260,6 @@ public:
     int CpuJail = 0;
     int NewCpuJail = 0;
     TBitMap CpuAffinity;
-    TBitMap TaskAffinity;
     TBitMap CpuVacant;
     TBitMap CpuReserve;
     std::string CpuMems;
@@ -471,6 +470,7 @@ public:
     TError FreeCgroup(const TSubsystem &subsystem);
 
     void ChooseSchedPolicy();
+    TBitMap GetNoSmtCpus();
 
     /* protected with VolumesLock and container lock */
     std::list<std::shared_ptr<TVolumeLink>> VolumeLinks;
@@ -507,6 +507,7 @@ public:
             : Permutation(permutation), Usage(usage)
         {}
     };
+
     static TJailCpuState GetJailCpuState();
 };
 
