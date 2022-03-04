@@ -176,15 +176,39 @@ TError RunCommand(const std::vector<std::string> &command,
 
 TError CopyRecursive(const TPath &src, const TPath &dst) {
     TError error;
+    TPathWalk walk;
     TFile dir;
+    TPath currentPath;
+    struct stat st;
+
+    error = walk.OpenScan(src);
+    if (error)
+        return error;
 
     error = dir.OpenDir(dst);
     if (error)
         return error;
 
-    return RunCommand({ "cp", "--archive", "--force",
-                        "--one-file-system", "--no-target-directory",
-                        src.ToString(), "." }, dir);
+    /* Remove existing destination excluding directory */
+    while (true) {
+        error = walk.Next();
+        if (error || !walk.Path)
+            break;
+
+        currentPath = walk.Path.RelativePath(src);
+        error = dir.StatAt(currentPath, false, st);
+        if (!error && !S_ISDIR(st.st_mode)) {
+            error = dir.UnlinkAt(currentPath);
+            if (error)
+                return error;
+        }
+    }
+    if (error)
+        return error;
+
+    return RunCommand({"cp", "--archive", "--force",
+                       "--one-file-system", "--no-target-directory",
+                       src.ToString(), "."}, dir);
 }
 
 TError ClearRecursive(const TPath &path) {
