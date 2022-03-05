@@ -2080,12 +2080,27 @@ TError TContainer::ApplyCpuGuarantee() {
         L_ACT("Set cpu guarantee CT{}:{} {} -> {}", Id, Name,
                 CpuPowerToString(CpuGuaranteeCur), CpuPowerToString(cur));
         auto cpucg = GetCgroup(CpuSubsystem);
-        error = CpuSubsystem.SetGuarantee(cpucg, CpuPolicy, CpuWeight, CpuPeriod, cur);
+        error = CpuSubsystem.SetGuarantee(cpucg, CpuPeriod, cur);
         if (error) {
             L_ERR("Cannot set cpu guarantee: {}", error);
             return error;
         }
         CpuGuaranteeCur = cur;
+    }
+
+    return OK;
+}
+
+TError TContainer::ApplyCpuShares() {
+    TError error;
+
+    if (!IsRoot() && (Controllers & CGROUP_CPU)) {
+        auto cpucg = GetCgroup(CpuSubsystem);
+        error = CpuSubsystem.SetShares(cpucg, CpuPolicy, CpuWeight, CpuGuaranteeCur);
+        if (error) {
+            L_ERR("Cannot set cpu shares: {}", error);
+            return error;
+        }
     }
 
     return OK;
@@ -2397,6 +2412,11 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
             if (!config().container().propagate_cpu_guarantee())
                 break;
         }
+    }
+
+    if (Controllers & CGROUP_CPU) {
+        for (auto ct = this; ct; ct = ct->Parent.get())
+            error = ct->ApplyCpuShares();
     }
 
     if (TestPropDirty(EProperty::CPU_LIMIT))

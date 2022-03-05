@@ -270,60 +270,125 @@ assert '%dc' % c.Dump().status.cpu_limit_total == c.GetProperty('cpu_limit_total
 assert '%dc' % d.Dump().status.cpu_limit_total == d.GetProperty('cpu_limit_total')
 a.Destroy()
 
-# check cpu_limit_scale
+a = None
+b = None
 
-def get_cpuacct_knob(ct, knob):
-    if ct == '/':
-        path = knob
-    else:
-        path = 'porto%{}/{}'.format(ct, knob)
-    with open('/sys/fs/cgroup/cpuacct/{}'.format(path)) as f:
-        return int(f.read().decode('utf-8').strip())
+try:
+    # check cpu_limit_scale
 
-def get_cfs_quota_us(ct):
-    return get_cpuacct_knob(ct, 'cpu.cfs_quota_us')
+    def get_cpuacct_knob(ct, knob):
+        if ct == '/':
+            path = knob
+        else:
+            path = 'porto%{}/{}'.format(ct, knob)
+        with open('/sys/fs/cgroup/cpuacct/{}'.format(path)) as f:
+            return int(f.read().decode('utf-8').strip())
 
-cfs_period_us = get_cpuacct_knob('/', 'cpu.cfs_period_us')
+    def get_cfs_quota_us(ct):
+        return get_cpuacct_knob(ct, 'cpu.cfs_quota_us')
 
-limit_cores = 2
+    cfs_period_us = get_cpuacct_knob('/', 'cpu.cfs_period_us')
 
-ConfigurePortod('test-cpu_limit', "")
+    limit_cores = 2
 
-a = conn.Create('a')
-a.SetProperty('cpu_limit', '{}c'.format(limit_cores))
-a.Start()
+    ConfigurePortod('test-cpu_limit', "")
 
-ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
-ExpectEq(get_cfs_quota_us('a'), limit_cores * cfs_period_us)
-
-def run_scale_test(limit_scale):
-    global limit_cores
-    global cfs_period_us
-
-    ConfigurePortod('test-cpu_limit', """
-container {
-    cpu_limit_scale: %f
-}
-""" % (limit_scale))
+    a = conn.Create('a')
+    a.SetProperty('cpu_limit', '{}c'.format(limit_cores))
+    a.Start()
 
     ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
-    ExpectEq(get_cfs_quota_us('a'), int(limit_scale * limit_cores * cfs_period_us))
+    ExpectEq(get_cfs_quota_us('a'), limit_cores * cfs_period_us)
 
-run_scale_test(1.1)
-run_scale_test(0.9)
+    def run_scale_test(limit_scale):
+        global limit_cores
+        global cfs_period_us
 
-ConfigurePortod('test-cpu_limit', """
-container {
-    cpu_limit_scale: 0
-}
-""")
+        ConfigurePortod('test-cpu_limit', """
+    container {
+        cpu_limit_scale: %f
+    }
+    """ % (limit_scale))
 
-ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
-ExpectEq(get_cfs_quota_us('a'), -1)
+        ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+        ExpectEq(get_cfs_quota_us('a'), int(limit_scale * limit_cores * cfs_period_us))
 
-ConfigurePortod('test-cpu_limit', "")
+    run_scale_test(1.1)
+    run_scale_test(0.9)
 
-ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
-ExpectEq(get_cfs_quota_us('a'), limit_cores * cfs_period_us)
+    ConfigurePortod('test-cpu_limit', """
+    container {
+        cpu_limit_scale: 0
+    }
+    """)
 
-a.Destroy()
+    ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+    ExpectEq(get_cfs_quota_us('a'), -1)
+
+    ConfigurePortod('test-cpu_limit', "")
+
+    ExpectProp(a, 'cpu_limit', '{}c'.format(limit_cores))
+    ExpectEq(get_cfs_quota_us('a'), limit_cores * cfs_period_us)
+
+    a.Destroy()
+
+    # check proportional_cpu_shares
+
+    def get_cpu_shares(ct):
+        return get_cpuacct_knob(ct, 'cpu.shares')
+
+    def get_cfs_reserve_shares(ct):
+        return get_cpuacct_knob(ct, 'cpu.cfs_reserve_shares')
+
+    base_shares = get_cpuacct_knob('/', 'cpu.shares')
+    min_shares = 2
+
+    guarantee_cores = 2
+
+    ConfigurePortod('test-cpu_limit', "")
+
+    a = conn.Create('a')
+    b = conn.Create('b')
+    a.SetProperty('cpu_guarantee', '{}c'.format(guarantee_cores))
+    b.SetProperty('cpu_guarantee', '0c')
+    a.Start()
+    b.Start()
+
+    ExpectProp(a, 'cpu_guarantee', '{}c'.format(guarantee_cores))
+    ExpectEq(get_cpu_shares('a'), base_shares)
+    ExpectEq(get_cfs_reserve_shares('a'), 16 * base_shares)
+
+    ExpectProp(b, 'cpu_guarantee', '0c')
+    ExpectEq(get_cpu_shares('b'), base_shares)
+    ExpectEq(get_cfs_reserve_shares('b'), base_shares)
+
+    ConfigurePortod('test-cpu_limit', """
+    container {
+        proportional_cpu_shares: true
+    }
+    """)
+
+    ExpectProp(a, 'cpu_guarantee', '{}c'.format(guarantee_cores))
+    ExpectEq(get_cpu_shares('a'), guarantee_cores * base_shares)
+    ExpectEq(get_cfs_reserve_shares('a'), guarantee_cores * base_shares)
+
+    ExpectProp(b, 'cpu_guarantee', '0c')
+    ExpectEq(get_cpu_shares('b'), min_shares)
+    ExpectEq(get_cfs_reserve_shares('b'), min_shares)
+
+    ConfigurePortod('test-cpu_limit', "")
+
+    ExpectProp(a, 'cpu_guarantee', '{}c'.format(guarantee_cores))
+    ExpectEq(get_cpu_shares('a'), base_shares)
+    ExpectEq(get_cfs_reserve_shares('a'), 16 * base_shares)
+
+    ExpectProp(b, 'cpu_guarantee', '0c')
+    ExpectEq(get_cpu_shares('b'), base_shares)
+    ExpectEq(get_cfs_reserve_shares('b'), base_shares)
+
+finally:
+    for ct in [a, b]:
+        try:
+            ct.Destroy()
+        except:
+            pass

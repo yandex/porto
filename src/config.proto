@@ -220,6 +220,7 @@ message TConfig {
         optional bool default_bind_dns = 37 [deprecated=true];
         optional uint64 cpu_period = 38;
         optional double cpu_limit_scale = 63;
+        optional bool proportional_cpu_shares = 64;
         optional bool enable_systemd = 39;
         optional bool detect_systemd = 40;
         optional string extra_devices = 41;
