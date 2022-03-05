@@ -1397,7 +1397,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
     layer.Owner = CL->Cred;
 
     return layer.ImportArchive(CL->ResolvePath(req.tarball()),
-                               req.has_cgroup() ? req.cgroup() : PORTO_HELPERS_CGROUP,
+                               req.has_mem_cgroup() ? req.mem_cgroup() : PORTO_HELPERS_CGROUP,
                                req.has_compress() ? req.compress() : "",
                                req.merge(),
                                req.verbose_error());

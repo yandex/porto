@@ -16,12 +16,12 @@ def create_tar():
         t.add(test_path + "/file.txt", arcname="file.txt")
 
 
-def invoke(type, cgroup):
+def invoke(type, mem_cgroup):
     if type == "python":
-        conn.ImportLayer("file_layer", test_path + "/file_layer.tar", place=v.place, cgroup=cgroup)
+        conn.ImportLayer("file_layer", test_path + "/file_layer.tar", place=v.place, mem_cgroup=mem_cgroup)
     elif type == "portoctl":
         subprocess.check_call(
-            [portoctl, "layer", "-P", v.place, "-I", "file_layer", test_path + "/file_layer.tar", cgroup])
+            [portoctl, "layer", "-P", v.place, "-I", "file_layer", test_path + "/file_layer.tar", mem_cgroup])
     else:
         raise Exception("Unknown type")
 
@@ -33,20 +33,20 @@ def try_remove(layer):
         pass
 
 
-def get_usage(cgroup):
-    return int(subprocess.check_output(["cat", "/sys/fs/cgroup/memory/{}/memory.usage_in_bytes".format(cgroup)]))
+def get_usage(mem_cgroup):
+    return int(subprocess.check_output(["cat", "/sys/fs/cgroup/memory/{}/memory.usage_in_bytes".format(mem_cgroup)]))
 
 
-def test(type, cgroup=""):
+def test(type, mem_cgroup=""):
     usage_helpers = get_usage("/portod-helpers")
     usage_w = get_usage("/porto%w")
 
-    invoke(type, cgroup)
+    invoke(type, mem_cgroup)
 
     diff_helpers = get_usage("/portod-helpers") - usage_helpers
     diff_w = get_usage("/porto%w") - usage_w
 
-    if cgroup:
+    if mem_cgroup:
         Expect(diff_helpers <= 0)
         Expect(diff_w > 0)
     else:

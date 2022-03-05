@@ -2241,7 +2241,7 @@ public:
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(Porto::Connection *api) : ICmd(api, "layer", 0,
-        "[-P <place>] [-S <private>] -I|-M|-R|-L|-F|-E|-G <layer> [tarball [cgroup]]",
+        "[-P <place>] [-S <private>] -I|-M|-R|-L|-F|-E|-G <layer> [<tarball> [<memory cgroup>]]",
         "Manage overlayfs layers in internal storage",
         "    -P <place>                     optional path to place\n"
         "    -S <private>                   store layer private value while importing or separately\n"
@@ -2270,7 +2270,7 @@ public:
     std::string place;
     std::string private_value;
     std::string compression;
-    std::string cgroup = "";
+    std::string memCgroup = "";
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
@@ -2300,8 +2300,8 @@ public:
             if (args.size() < 2)
                 return EXIT_FAILURE;
             if (args.size() > 2)
-                cgroup = args[2];
-            ret = Api->ImportLayer(args[0], path, false, place, private_value, cgroup);
+                memCgroup = args[2];
+            ret = Api->ImportLayer(args[0], path, false, place, private_value, memCgroup);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {

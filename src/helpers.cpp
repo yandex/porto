@@ -35,10 +35,10 @@ TError RunCommand(const std::vector<std::string> &command,
                   const std::vector<std::string> &env,
                   const TFile &dir, const TFile &in, const TFile &out,
                   const TCapabilities &caps,
-                  const std::string &cgroup,
+                  const std::string &memCgroup,
                   bool verboseError,
                   bool interruptible) {
-    TCgroup memcg = MemorySubsystem.Cgroup(cgroup);
+    TCgroup memcg = MemorySubsystem.Cgroup(memCgroup);
     TError error;
     TFile err;
     TTask task;

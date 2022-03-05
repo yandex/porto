@@ -746,7 +746,7 @@ int Connection::ImportLayer(const std::string &layer,
                             const std::string &tarball, bool merge,
                             const std::string &place,
                             const std::string &private_value,
-                            const std::string &cgroup,
+                            const std::string &memCgroup,
                             bool verboseError) {
     auto req = Impl->Req.mutable_importlayer();
 
@@ -758,8 +758,8 @@ int Connection::ImportLayer(const std::string &layer,
         req->set_place(place);
     if (private_value.size())
         req->set_private_value(private_value);
-    if (cgroup.size())
-        req->set_cgroup(cgroup);
+    if (memCgroup.size())
+        req->set_mem_cgroup(memCgroup);
     return Impl->Call(Impl->DiskTimeout);
 }
 
