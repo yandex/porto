@@ -121,6 +121,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError SetCpuLimit(uint64_t limit);
     TError ApplyCpuLimit();
     TError ApplyCpuGuarantee();
+    TError ApplyCpuShares();
     void PropagateCpuLimit();
     TError ApplyExtraProperties();
 

@@ -128,6 +128,7 @@ static void DefaultConfig() {
 
     config().mutable_container()->set_cpu_period(100000000);    /* 100ms */
     config().mutable_container()->set_cpu_limit_scale(1);
+    config().mutable_container()->set_proportional_cpu_shares(false);
     config().mutable_container()->set_propagate_cpu_guarantee(true);
 
     config().mutable_container()->set_enable_systemd(true);

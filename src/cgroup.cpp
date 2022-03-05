@@ -897,14 +897,26 @@ TError TCpuSubsystem::SetLimit(TCgroup &cg, uint64_t period, uint64_t limit) {
     return OK;
 }
 
-TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
-        double weight, uint64_t period, uint64_t guarantee) {
+TError TCpuSubsystem::SetGuarantee(TCgroup &cg, uint64_t period, uint64_t guarantee) {
     TError error;
 
     period = period / 1000; /* ns -> us */
 
     if (HasReserve && config().container().enable_cpu_reserve()) {
         uint64_t reserve = std::floor((double)guarantee * period / CPU_POWER_PER_SEC);
+
+        error = cg.SetUint64("cpu.cfs_reserve_us", reserve);
+        if (error)
+            return error;
+    }
+
+    return OK;
+}
+
+TError TCpuSubsystem::SetShares(TCgroup &cg, const std::string &policy, double weight, uint64_t guarantee) {
+    TError error;
+
+    if (HasReserve && config().container().enable_cpu_reserve()) {
         uint64_t shares = BaseShares, reserve_shares = BaseShares;
 
         shares *= weight;
@@ -914,7 +926,12 @@ TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
             shares *= 16;
             reserve_shares *= 256;
         } else if (policy == "normal" || policy == "batch") {
-            reserve_shares *= 16;
+            if (config().container().proportional_cpu_shares()) {
+                double scale = (double)guarantee / CPU_POWER_PER_SEC;
+                shares *= scale;
+                reserve_shares *= scale;
+            } else if (guarantee)
+                reserve_shares *= 16;
         } else if (policy == "idle") {
             shares /= 16;
         }
@@ -927,10 +944,6 @@ TError TCpuSubsystem::SetGuarantee(TCgroup &cg, const std::string &policy,
             return error;
 
         error = cg.SetUint64("cpu.cfs_reserve_shares", reserve_shares);
-        if (error)
-            return error;
-
-        error = cg.SetUint64("cpu.cfs_reserve_us", reserve);
         if (error)
             return error;
 
