@@ -31,7 +31,7 @@ public:
 
     static TError CheckName(const std::string &name, bool meta=false);
     static TError CheckPlace(const TPath &place);
-    static TError SanitizeLayer(const TPath &layer, bool merge);
+    static TError SanitizeLayer(const TPath &layer);
     TError List(enum EStorageType type, std::list<TStorage> &list);
     TError ImportArchive(const TPath &archive, const std::string &cgroup, const std::string &compress = "",
                          bool merge = false, bool verboseError = false);

@@ -2129,7 +2129,7 @@ TError TVolume::MergeLayers() {
         if (error)
             return error;
 
-        error = TStorage::SanitizeLayer(InternalPath, false);
+        error = TStorage::SanitizeLayer(InternalPath);
         if (error)
             return error;
     }
