@@ -841,7 +841,7 @@ TError TStorage::ImportArchive(const TPath &archive, const std::string &memCgrou
         goto err;
 
     if (!merge && Type == EStorageType::Layer) {
-        error = SanitizeLayer(temp, merge);
+        error = SanitizeLayer(temp);
         if (error)
             goto err;
     }
@@ -1064,7 +1064,7 @@ TError TStorage::Remove(bool weak, bool async) {
     return error;
 }
 
-TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
+TError TStorage::SanitizeLayer(const TPath &layer) {
     TPathWalk walk;
     TError error;
 
@@ -1104,12 +1104,10 @@ TError TStorage::SanitizeLayer(const TPath &layer, bool merge) {
                     return error;
             }
 
-            if (!merge) {
-                /* Convert into overlayfs whiteout */
-                error = real.Mknod(S_IFCHR, 0);
-                if (error)
-                    return error;
-            }
+            /* Convert into overlayfs whiteout */
+            error = real.Mknod(S_IFCHR, 0);
+            if (error)
+                return error;
         }
     }
 }
