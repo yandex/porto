@@ -13,7 +13,6 @@
 #include "util/proc.hpp"
 #include "util/cred.hpp"
 #include "util/md5.hpp"
-#include <sstream>
 
 extern "C" {
 #include <sys/sysinfo.h>
@@ -50,7 +49,7 @@ TProperty::TProperty(std::string name, EProperty prop, std::string desc) {
     ContainerProperties[name] = this;
 }
 
-TError TProperty::Has() {
+TError TProperty::Has() const {
     return OK;
 }
 
@@ -66,7 +65,7 @@ TError TProperty::GetIndexed(const std::string &, std::string &) {
     return TError(EError::InvalidValue, "Invalid subscript for property");
 }
 
-bool TProperty::Has(const rpc::TContainerSpec &) {
+bool TProperty::Has(const rpc::TContainerSpec &) const {
     return false;
 }
 
@@ -74,10 +73,10 @@ TError TProperty::Load(const rpc::TContainerSpec &) {
     return OK;
 }
 
-void TProperty::Dump(rpc::TContainerSpec &) {
+void TProperty::Dump(rpc::TContainerSpec &) const {
 }
 
-void TProperty::Dump(rpc::TContainerStatus &) {
+void TProperty::Dump(rpc::TContainerStatus &) const {
 }
 
 TError TProperty::Save(std::string &value) {
@@ -168,12 +167,12 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->CapLimit.Format();
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TCapabilities caps;
         TError error = caps.Parse(value);
         if (error)
@@ -181,7 +180,7 @@ public:
         return CommitLimit(caps);
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TCapabilities caps;
         TError error = caps.Parse(index);
         if (error)
@@ -191,7 +190,7 @@ public:
         return OK;
     }
 
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         TCapabilities caps;
         bool val;
 
@@ -207,11 +206,11 @@ public:
         return CommitLimit(caps);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         CT->CapLimit.Dump(*spec.mutable_capabilities());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_capabilities();
     }
 
@@ -230,7 +229,7 @@ public:
     TCapAmbient() : TProperty(P_CAPABILITIES_AMBIENT, EProperty::CAPABILITIES_AMBIENT,
             "Raise capabilities in container: NET_BIND_SERVICE;SYS_PTRACE;...") {}
 
-    void Init(void) {
+    void Init(void) override {
         IsSupported = HasAmbientCapabilities;
     }
 
@@ -247,12 +246,12 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->CapAmbient.Format();
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TCapabilities caps;
         TError error = caps.Parse(value);
         if (error)
@@ -260,7 +259,7 @@ public:
         return CommitAmbient(caps);
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TCapabilities caps;
         TError error = caps.Parse(index);
         if (error)
@@ -270,7 +269,7 @@ public:
         return OK;
     }
 
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         TCapabilities caps;
         bool val;
 
@@ -286,11 +285,11 @@ public:
         return CommitAmbient(caps);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         CT->CapAmbient.Dump(*spec.mutable_capabilities_ambient());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_capabilities_ambient();
     }
 
@@ -311,12 +310,12 @@ public:
         IsReadOnly = true;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->CapBound.Format();
         return OK;
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TCapabilities caps;
         TError error = caps.Parse(index);
         if (error)
@@ -326,7 +325,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         CT->CapBound.Dump(*spec.mutable_capabilities_allowed());
     }
 } static CapAllowed;
@@ -339,16 +338,16 @@ public:
         IsReadOnly = true;
     }
 
-    void Init(void) {
+    void Init(void) override {
         IsSupported = HasAmbientCapabilities;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->CapAllowed.Format();
         return OK;
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TCapabilities caps;
         TError error = caps.Parse(index);
         if (error)
@@ -358,7 +357,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         CT->CapAllowed.Dump(*spec.mutable_capabilities_ambient_allowed());
     }
 } static CapAmbientAllowed;
@@ -366,26 +365,26 @@ public:
 class TCwd : public TProperty {
 public:
     TCwd() : TProperty(P_CWD, EProperty::CWD, "Container working directory") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->GetCwd().ToString();
         return OK;
     }
-    TError Set(const std::string &cwd) {
-        CT->Cwd = cwd;
+    TError Set(const std::string &value) override {
+        CT->Cwd = value;
         CT->SetProp(EProperty::CWD);
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->OsMode && !CT->HasProp(EProperty::CWD))
             CT->Cwd = "/";
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_cwd(CT->GetCwd().ToString());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cwd();
     }
 
@@ -402,12 +401,12 @@ public:
         IsDynamic = true;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Ulimit.Format();
         return OK;
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto type = TUlimit::GetType(index);
         for (auto &res: CT->Ulimit.Resources) {
             if (res.Type == type)
@@ -416,7 +415,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TUlimit lim;
         TError error = lim.Parse(value);
         if (error)
@@ -426,7 +425,7 @@ public:
         return OK;
     }
 
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         TUlimit lim;
         TError error = lim.Parse(index + ":" + value);
         if (error)
@@ -436,7 +435,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         TUlimit ulimit = CT->GetUlimit();
         auto map = spec.mutable_ulimit();
         for (auto &res: ulimit.Resources) {
@@ -453,7 +452,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_ulimit();
     }
 
@@ -481,27 +480,27 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->CpuPolicy;
         return OK;
     }
-    TError Set(const std::string &policy) {
-        if (policy != "rt" && policy != "high" && policy != "normal" &&
-                policy != "batch"  && policy != "idle" && policy != "iso" && policy != "nosmt")
-            return TError(EError::InvalidValue, "Unknown cpu policy: " + policy);
-        if (CT->CpuPolicy != policy) {
-            CT->CpuPolicy = policy;
+    TError Set(const std::string &value) override {
+        if (value != "rt" && value != "high" && value != "normal" &&
+                value != "batch"  && value != "idle" && value != "iso" && value != "nosmt")
+            return TError(EError::InvalidValue, "Unknown cpu policy: " + value);
+        if (CT->CpuPolicy != value) {
+            CT->CpuPolicy = value;
             CT->SetProp(EProperty::CPU_POLICY);
             CT->ChooseSchedPolicy();
         }
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_cpu_policy(CT->CpuPolicy);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cpu_policy();
     }
 
@@ -517,30 +516,30 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->IoPolicy;
         return OK;
     }
-    TError Set(const std::string &policy) {
+    TError Set(const std::string &value) override {
         int ioprio;
 
-        if (policy == "" || policy == "none")
+        if (value == "" || value == "none")
             ioprio = 0;
-        else if (policy == "rt")
+        else if (value == "rt")
             ioprio = (1 << 13) | 4;
-        else if (policy == "high")
+        else if (value == "high")
             ioprio = 2 << 13;
-        else if (policy == "normal")
+        else if (value == "normal")
             ioprio = (2 << 13) | 4;
-        else if (policy == "batch")
+        else if (value == "batch")
             ioprio = (2 << 13) | 7;
-        else if (policy == "idle")
+        else if (value == "idle")
             ioprio = 3 << 13;
         else
-            return TError(EError::InvalidValue, "invalid policy: " + policy);
+            return TError(EError::InvalidValue, "invalid policy: " + value);
 
-        if (CT->IoPolicy != policy) {
-            CT->IoPolicy = policy;
+        if (CT->IoPolicy != value) {
+            CT->IoPolicy = value;
             CT->IoPrio = ioprio;
             CT->SetProp(EProperty::IO_POLICY);
         }
@@ -548,11 +547,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_io_policy(CT->IoPolicy);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_io_policy();
     }
 
@@ -569,7 +568,7 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_BLKIO;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = StringFormat("%lg", CT->IoWeight);
         return OK;
     }
@@ -584,7 +583,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         double val;
         std::string unit;
         TError error = StringToValue(value, val, unit);
@@ -597,11 +596,11 @@ public:
         return Set(val);
     }
 
-     void Dump(rpc::TContainerSpec &spec) override {
+     void Dump(rpc::TContainerSpec &spec) const override {
          spec.set_io_weight(CT->IoWeight);
      }
 
-     bool Has(const rpc::TContainerSpec &spec) override {
+     bool Has(const rpc::TContainerSpec &spec) const override {
          return spec.has_io_weight();
      }
 
@@ -614,13 +613,13 @@ class TTaskCred : public TProperty {
 public:
     TTaskCred() : TProperty(P_TASK_CRED, EProperty::NONE,
             "Credentials: uid gid groups...") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = fmt::format("{} {}", CT->TaskCred.GetUid(), CT->TaskCred.GetGid());
         for (auto gid: CT->TaskCred.Groups)
             value += fmt::format(" {}", gid);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TError error;
         TCred cred;
         error = cred.Init(value);
@@ -632,11 +631,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         CT->TaskCred.Dump(*spec.mutable_task_cred());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_task_cred();
     }
 
@@ -649,20 +648,20 @@ class TUser : public TProperty {
 public:
     TUser() : TProperty(P_USER, EProperty::USER,
             "Start command with given user") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->TaskCred.User();
         return OK;
     }
-    TError Set(const std::string &username) {
+    TError Set(const std::string &value) override {
         TCred cred;
-        if (CT->InUserNs() && username == "root")
+        if (CT->InUserNs() && value == "root")
             cred = CT->UserNsCred;
         else {
-            TError error = cred.Init(username);
+            TError error = cred.Init(value);
             if (error) {
                 cred.SetGid(CT->TaskCred.GetGid());
                 uid_t newUid;
-                error = UserId(username, newUid);
+                error = UserId(value, newUid);
                 if (error)
                     return error;
                 cred.SetUid(newUid);
@@ -673,17 +672,17 @@ public:
         CT->SetProp(EProperty::USER);
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->OsMode && !CT->UserNs && !CT->InUserNs())
             CT->TaskCred.SetUid(RootUser);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_user(CT->TaskCred.User());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_user();
     }
 
@@ -695,16 +694,16 @@ public:
 class TGroup : public TProperty {
 public:
     TGroup() : TProperty(P_GROUP, EProperty::GROUP, "Start command with given group") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->TaskCred.Group();
         return OK;
     }
-    TError Set(const std::string &groupname) {
+    TError Set(const std::string &value) override {
         gid_t newGid;
-        if (CT->InUserNs() && groupname == "root")
+        if (CT->InUserNs() && value == "root")
             newGid = CT->UserNsCred.GetGid();
         else {
-            TError error = GroupId(groupname, newGid);
+            TError error = GroupId(value, newGid);
             if (error)
                 return error;
         }
@@ -712,17 +711,17 @@ public:
         CT->SetProp(EProperty::GROUP);
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->OsMode && !CT->UserNs && !CT->InUserNs())
             CT->TaskCred.SetGid(RootGroup);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_group(CT->TaskCred.Group());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_group();
     }
 
@@ -735,7 +734,7 @@ class TOwnerCred : public TProperty {
 public:
     TOwnerCred() : TProperty(P_OWNER_CRED, EProperty::NONE,
             "Owner credentials: uid gid groups...") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = fmt::format("{} {}", CT->OwnerCred.GetUid(), CT->OwnerCred.GetGid());
         for (auto gid: CT->OwnerCred.Groups)
             value += fmt::format(" {}", gid);
@@ -752,7 +751,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TCred cred;
         TError error = cred.Init(value);
         if (error)
@@ -760,11 +759,11 @@ public:
         return SetCred(cred);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         CT->OwnerCred.Dump(*spec.mutable_owner_cred());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_owner_cred();
     }
 
@@ -782,15 +781,15 @@ public:
     TOwnerUser() : TProperty(P_OWNER_USER, EProperty::OWNER_USER,
             "Container owner user") {}
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->OwnerCred.User();
         return OK;
     }
 
-    TError Set(const std::string &username) {
+    TError Set(const std::string &value) override {
         TCred newCred;
         gid_t oldGid = CT->OwnerCred.GetGid();
-        TError error = newCred.Init(username);
+        TError error = newCred.Init(value);
         if (error)
             return error;
 
@@ -810,11 +809,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_owner_user(CT->OwnerCred.User());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_owner_user();
     }
 
@@ -828,21 +827,21 @@ public:
     TOwnerGroup() : TProperty(P_OWNER_GROUP, EProperty::OWNER_GROUP,
             "Container owner group") {}
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->OwnerCred.Group();
         return OK;
     }
 
-    TError Set(const std::string &groupname) {
+    TError Set(const std::string &value) override {
         gid_t newGid;
-        TError error = GroupId(groupname, newGid);
+        TError error = GroupId(value, newGid);
         if (error)
             return error;
 
         if (!CT->OwnerCred.IsMemberOf(newGid) &&
                 !CL->Cred.IsMemberOf(newGid) &&
                 !CL->IsSuperUser())
-            return TError(EError::Permission, "Desired group : " + groupname +
+            return TError(EError::Permission, "Desired group : " + value +
                     " isn't in current user supplementary group list");
 
         CT->OwnerCred.SetGid(newGid);
@@ -850,11 +849,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_owner_group(CT->OwnerCred.Group());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_owner_group();
     }
 
@@ -869,12 +868,12 @@ public:
         IsDynamic = true;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->OwnerContainers, ';');
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         std::vector<std::string> values;
 
         for (const auto &name : SplitEscapedString(value, ';')) {
@@ -890,11 +889,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_owner_containers(MergeEscapeStrings(CT->OwnerContainers, ';'));
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_owner_containers();
     }
 
@@ -911,10 +910,10 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportGuarantee();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->MemGuarantee);
         return OK;
     }
@@ -937,20 +936,20 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &mem_guarantee) {
-        uint64_t new_val;
-        TError error = StringToSize(mem_guarantee, new_val);
+    TError Set(const std::string &value) override {
+        uint64_t val;
+        TError error = StringToSize(value, val);
         if (error)
             return error;
 
-        return Set(new_val);
+        return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_memory_guarantee(CT->MemGuarantee);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_memory_guarantee();
     }
 
@@ -966,15 +965,15 @@ public:
     {
         IsReadOnly = true;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportGuarantee();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->GetTotalMemGuarantee());
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_memory_guarantee_total(CT->GetTotalMemGuarantee());
     }
 } static MemTotalGuarantee;
@@ -987,16 +986,16 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         CT->EnabledExtraProperties = SplitString(value, ';');
         CT->SetProp(EProperty::EXTRA_PROPS);
         return OK;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->EnabledExtraProperties, ';');
         return OK;
     }
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_extra_properties(MergeEscapeStrings(CT->EnabledExtraProperties, ';'));
     }
 } static ExtraProps;
@@ -1008,20 +1007,20 @@ public:
     TError Reset() override {
         return Set("");
     }
-    TError Get(std::string &command) {
-        command = CT->Command;
+    TError Get(std::string &value) const override {
+        value = CT->Command;
         return OK;
     }
-    TError Set(const std::string &command) {
-        if (command.size() > CONTAINER_COMMAND_MAX)
+    TError Set(const std::string &value) override {
+        if (value.size() > CONTAINER_COMMAND_MAX)
             return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
-        CT->Command = command;
+        CT->Command = value;
         CT->SetProp(EProperty::COMMAND);
         CT->CommandArgv.clear();
         CT->ClearProp(EProperty::COMMAND_ARGV);
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         if (!CT->HasProp(EProperty::COMMAND)) {
             if (CT->OsMode)
                 CT->Command = "/sbin/init";
@@ -1032,11 +1031,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_command(CT->Command);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_command();
     }
 
@@ -1049,8 +1048,8 @@ class TCommandArgv : public TProperty {
 public:
     TCommandArgv() : TProperty(P_COMMAND_ARGV, EProperty::COMMAND_ARGV,
             "Verbatim command line, format: argv0\\targv1\\t...") {}
-    TError Get(std::string &val) {
-        val = MergeEscapeStrings(CT->CommandArgv, '\t');
+    TError Get(std::string &value) const override {
+        value = MergeEscapeStrings(CT->CommandArgv, '\t');
         return OK;
     }
     TError SetCommand() {
@@ -1060,24 +1059,24 @@ public:
         CT->SetProp(EProperty::COMMAND);
         return OK;
     }
-    TError Set(const std::string &val) {
-        if (val.size() > CONTAINER_COMMAND_MAX)
+    TError Set(const std::string &value) override {
+        if (value.size() > CONTAINER_COMMAND_MAX)
             return TError(EError::InvalidValue, "Command too long, max {}", CONTAINER_COMMAND_MAX);
-        CT->CommandArgv = SplitEscapedString(val, '\t');
+        CT->CommandArgv = SplitEscapedString(value, '\t');
         if (CT->CommandArgv.size())
             CT->SetProp(EProperty::COMMAND_ARGV);
         else
             CT->ClearProp(EProperty::COMMAND_ARGV);
         return SetCommand();
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         uint64_t i;
         if (StringToUint64(index, i) || i >= CT->CommandArgv.size())
             return TError(EError::InvalidProperty, "Invalid index");
         value = CT->CommandArgv[i];
         return OK;
     }
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         uint64_t i;
         if (StringToUint64(index, i))
             return TError(EError::InvalidProperty, "Invalid index");
@@ -1097,7 +1096,7 @@ public:
         CT->SetProp(EProperty::COMMAND_ARGV);
         return SetCommand();
     }
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         if (CT->CommandArgv.empty())
             return;
 
@@ -1105,7 +1104,7 @@ public:
         for (auto &argv: CT->CommandArgv)
             cmd->add_argv(argv);
     }
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_command_argv();
     }
     TError Load(const rpc::TContainerSpec &spec) override {
@@ -1132,31 +1131,31 @@ public:
     {
         IsDynamic = true;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = config().core().enable();
     }
-    TError Get(std::string &command) {
+    TError Get(std::string &value) const override {
         /* inherit default core command from parent but not across chroot */
         for (auto ct = CT; ct; ct = ct->Parent.get()) {
-            command = ct->CoreCommand;
+            value = ct->CoreCommand;
             if (ct->HasProp(EProperty::CORE_COMMAND) || ct->Root != "/")
                 break;
         }
         return OK;
     }
-    TError Set(const std::string &command) {
-        CT->CoreCommand = command;
+    TError Set(const std::string &value) override {
+        CT->CoreCommand = value;
         CT->SetProp(EProperty::CORE_COMMAND);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         std::string command;
         Get(command);
         spec.set_core_command(command);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_core_command();
     }
 
@@ -1170,7 +1169,7 @@ public:
     TVirtMode() : TProperty(P_VIRT_MODE, EProperty::VIRT_MODE,
             "Virtualization mode: os|app|job|host") {}
 
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->HasProp(EProperty::USERNS)) {
             if (CT->UserNs && (CT->HostMode || CT->JobMode))
                 return TError(EError::InvalidValue, "userns=true incompatible with virt_mode");
@@ -1184,7 +1183,7 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->OsMode ? "os" :
                 CT->JobMode ? "job" :
                 CT->HostMode ? "host" :
@@ -1193,7 +1192,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
 
         if (value != "app" &&
                 value != "os" &&
@@ -1228,13 +1227,13 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         std::string val;
         Get(val);
         spec.set_virt_mode(val);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_virt_mode();
     }
 
@@ -1251,7 +1250,7 @@ public:
         return Set(false);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->UserNs);
         return OK;
     }
@@ -1266,7 +1265,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -1274,11 +1273,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_userns(CT->UserNs);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_userns();
     }
 
@@ -1295,7 +1294,7 @@ public:
         return Set(false);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->UnshareOnExec);
         return OK;
     }
@@ -1306,7 +1305,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -1314,11 +1313,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_userns(CT->UnshareOnExec);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_unshare_on_exec();
     }
 
@@ -1336,7 +1335,7 @@ public:
         return Set("none");
     }
 
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->CgroupFs == ECgroupFs::Rw) {
             if (!(EnableOsModeCgroupNs && CT->OsMode) && !EnableRwCgroupFs)
                 return TError(EError::Permission, "Cgroup namespaces disabled in portod.conf: rw access to cgroupfs denied");
@@ -1347,7 +1346,7 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         switch (CT->CgroupFs) {
             case ECgroupFs::None:
                 value = "none";
@@ -1361,7 +1360,7 @@ public:
         }
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         if (value == "none")
             CT->CgroupFs = ECgroupFs::None;
         else if (!SupportCgroupNs)
@@ -1377,13 +1376,13 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         std::string val;
         Get(val);
         spec.set_cgroupfs(val);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cgroupfs();
     }
 
@@ -1396,12 +1395,12 @@ class TStdStreamProperty : public TProperty {
 public:
     TStdStreamProperty(const std::string &name, EProperty prop, const std::string &desc) : TProperty(name, prop, desc) {}
 
-    TError Save(std::string &value, const TStdStream &stream) {
+    TError SaveStream(std::string &value, const TStdStream &stream) {
         value = fmt::format("{};{};{}", stream.PathStat.st_ino, stream.PathStat.st_dev, stream.Path.ToString());
         return OK;
     }
 
-    TError Load(const std::string &value, TStdStream &stream) {
+    TError LoadStream(const std::string &value, TStdStream &stream) {
         auto values = SplitString(value, ';', 3);
 
         if (values.size() == 1)
@@ -1432,31 +1431,31 @@ public:
             "Container standard input path") {}
 
     TError Save(std::string &value) override {
-        return TStdStreamProperty::Save(value, CT->Stdin);
+        return TStdStreamProperty::SaveStream(value, CT->Stdin);
     }
 
     TError Load(const std::string &value) override {
-        return TStdStreamProperty::Load(value, CT->Stdin);
+        return TStdStreamProperty::LoadStream(value, CT->Stdin);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Stdin.Path.ToString();
         return OK;
     }
 
-    TError Set(const std::string &path) {
-        auto error = CT->Stdin.SetInside(path, *CL);
+    TError Set(const std::string &value) override {
+        auto error = CT->Stdin.SetInside(value, *CL);
         if (error)
             return error;
         CT->SetProp(EProperty::STDIN);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_stdin_path(CT->Stdin.Path.ToString());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_stdin_path();
     }
 
@@ -1471,37 +1470,37 @@ public:
             "Container standard output path") {}
 
     TError Save(std::string &value) override {
-        return TStdStreamProperty::Save(value, CT->Stdout);
+        return TStdStreamProperty::SaveStream(value, CT->Stdout);
     }
 
     TError Load(const std::string &value) override {
-        return TStdStreamProperty::Load(value, CT->Stdout);
+        return TStdStreamProperty::LoadStream(value, CT->Stdout);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value =  CT->Stdout.Path.ToString();
         return OK;
     }
 
-    TError Set(const std::string &path) {
-        auto error = CT->Stdout.SetInside(path, *CL);
+    TError Set(const std::string &value) override {
+        auto error = CT->Stdout.SetInside(value, *CL);
         if (error)
             return error;
         CT->SetProp(EProperty::STDOUT);
         return OK;
     }
 
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->OsMode && !CT->HasProp(EProperty::STDOUT))
             CT->Stdout.SetOutside("/dev/null");
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_stdout_path(CT->Stdout.Path.ToString());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_stdout_path();
     }
 
@@ -1516,37 +1515,37 @@ public:
             "Container standard error path") {}
 
     TError Save(std::string &value) override {
-        return TStdStreamProperty::Save(value, CT->Stderr);
+        return TStdStreamProperty::SaveStream(value, CT->Stderr);
     }
 
     TError Load(const std::string &value) override {
-        return TStdStreamProperty::Load(value, CT->Stderr);
+        return TStdStreamProperty::LoadStream(value, CT->Stderr);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Stderr.Path.ToString();
         return OK;
     }
 
-    TError Set(const std::string &path) {
-        auto error = CT->Stderr.SetInside(path, *CL);
+    TError Set(const std::string &value) override {
+        auto error = CT->Stderr.SetInside(value, *CL);
         if (error)
             return error;
         CT->SetProp(EProperty::STDERR);
         return OK;
     }
 
-    TError Start(void) {
+    TError Start(void) override {
          if (CT->OsMode && !CT->HasProp(EProperty::STDERR))
             CT->Stderr.SetOutside("/dev/null");
          return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
        spec.set_stderr_path(CT->Stderr.Path.ToString());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_stderr_path();
     }
 
@@ -1562,7 +1561,7 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->Stdout.Limit);
         return OK;
     }
@@ -1579,7 +1578,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t limit;
         TError error = StringToSize(value, limit);
         if (error)
@@ -1588,11 +1587,11 @@ public:
         return Set(limit);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_stdout_limit(CT->Stdout.Limit);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_stdout_limit();
     }
 
@@ -1609,12 +1608,12 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->Stdout.Offset);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_stdout_offset(CT->Stdout.Offset);
     }
 } static StdoutOffset;
@@ -1627,12 +1626,12 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->Stderr.Offset);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_stderr_offset(CT->Stderr.Offset);
     }
 } static StderrOffset;
@@ -1645,10 +1644,10 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         return CT->Stdout.Read(*CT, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         return CT->Stdout.Read(*CT, value, index);
     }
 
@@ -1668,10 +1667,10 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         return CT->Stderr.Read(*CT, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         return CT->Stderr.Read(*CT, value, index);
     }
 
@@ -1690,18 +1689,18 @@ public:
     {
         IsHidden = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->BindDns);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TError error = StringToBool(value, CT->BindDns);
         if (error)
             return error;
         CT->SetProp(EProperty::BIND_DNS);
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->OsMode && !CT->HasProp(EProperty::BIND_DNS))
             CT->BindDns = false;
         return OK;
@@ -1712,7 +1711,7 @@ class TIsolate : public TProperty {
 public:
     TIsolate() : TProperty(P_ISOLATE, EProperty::ISOLATE,
             "New pid/ipc/utc/env namespace") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->Isolate);
         return OK;
     }
@@ -1726,7 +1725,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -1734,11 +1733,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_isolate(CT->Isolate);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_isolate();
     }
 
@@ -1750,11 +1749,11 @@ public:
 class TRoot : public TProperty {
 public:
     TRoot() : TProperty(P_ROOT, EProperty::ROOT, "Container root path in parent namespace") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Root;
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TError error;
 
         if (CT->VolumeMounts)
@@ -1779,17 +1778,17 @@ public:
 
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         if ((CT->HostMode || CT->JobMode) && CT->Root != "/")
             return TError(EError::InvalidValue, "Cannot change root in this virt_mode");
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_root(CT->Root);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_root();
     }
 
@@ -1803,14 +1802,14 @@ public:
     TRootPath() : TProperty(P_ROOT_PATH, EProperty::NONE, "Container root path in client namespace") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CL->ComposePath(CT->RootPath).ToString();
         if (value == "")
             return TError(EError::Permission, "Root path is unreachable");
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         TPath root = CL->ComposePath(CT->RootPath);
         if (root)
             spec.set_root_path(root.ToString());
@@ -1837,7 +1836,8 @@ public:
             "autoconf <name> (SLAAC) | "
             "ip <cmd> <args>... | "
             "netns <name>") {}
-    TError Get(std::string &value) {
+
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->NetProp, ' ', ';');
         return OK;
     }
@@ -1860,11 +1860,11 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &net_desc) {
-        auto new_net_desc = SplitEscapedString(net_desc, ' ', ';');
-        return Set(new_net_desc);
+    TError Set(const std::string &value) override {
+        auto net_desc = SplitEscapedString(value, ' ', ';');
+        return Set(net_desc);
     }
-    TError Start(void) {
+    TError Start(void) override {
         if (CT->OsMode && !CT->HasProp(EProperty::NET)) {
             CT->NetProp = { { "none" } };
             CT->NetIsolate = true;
@@ -1873,7 +1873,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_net();
         for (auto &line: CT->NetProp) {
             auto cfg = out->add_cfg();
@@ -1888,7 +1888,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_net();
     }
 
@@ -1907,7 +1907,7 @@ class TRootRo : public TProperty {
 public:
     TRootRo() : TProperty(P_ROOT_RDONLY, EProperty::ROOT_RDONLY,
             "Make filesystem read-only") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->RootRo);
         return OK;
     }
@@ -1918,7 +1918,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -1926,11 +1926,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_root_readonly(CT->RootRo);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_root_readonly();
     }
 
@@ -1943,7 +1943,7 @@ class TUmask : public TProperty {
 public:
     TUmask() : TProperty(P_UMASK, EProperty::UMASK,
             "Set file mode creation mask") { }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = StringFormat("%#o", CT->Umask);
         return OK;
     }
@@ -1954,7 +1954,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         unsigned val;
         TError error = StringToOct(value, val);
         if (error)
@@ -1962,13 +1962,13 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         std::string val;
         if (!Get(val))
             spec.set_umask(std::stoi(val));
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_umask();
     }
 
@@ -1985,12 +1985,12 @@ class TControllers : public TProperty {
 public:
     TControllers() : TProperty(P_CONTROLLERS, EProperty::CONTROLLERS,
             "Cgroup controllers") { }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t controllers = CT->Controllers;
         value = StringFormatFlags(controllers, ControllersName, ";");
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringParseFlags(value, ControllersName, val, ';');
         if (error)
@@ -2001,7 +2001,7 @@ public:
         CT->SetProp(EProperty::CONTROLLERS);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         uint64_t controllers = CT->Controllers;
         uint64_t val;
         TError error = StringParseFlags(index, ControllersName, val, ';');
@@ -2010,7 +2010,7 @@ public:
         value = BoolToString((controllers & val) == val);
         return OK;
     }
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         uint64_t val;
         bool enable;
         TError error = StringParseFlags(index, ControllersName, val, ';');
@@ -2030,7 +2030,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_controllers();
         uint64_t controllers = CT->Controllers;
         for (auto &it: ControllersName)
@@ -2038,7 +2038,7 @@ public:
                 out->add_controller(it.second);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_controllers();
     }
 
@@ -2066,7 +2066,7 @@ public:
         IsHidden = true;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->LinkMemoryWritebackBlkio);
         return OK;
     }
@@ -2077,7 +2077,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -2085,11 +2085,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_link_memory_writeback_blkio(CT->LinkMemoryWritebackBlkio);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_link_memory_writeback_blkio();
     }
 
@@ -2103,14 +2103,14 @@ public:
     TCgroups() : TProperty(P_CGROUPS, EProperty::NONE, "Cgroups") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         TStringMap map;
         for (auto &subsys: Subsystems)
             map[subsys->Type] = CT->GetCgroup(*subsys).Path().ToString();
         value = StringMapToString(map);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         for (auto &subsys: Subsystems) {
             if (subsys->Type != index)
                 continue;
@@ -2120,7 +2120,7 @@ public:
         return TError(EError::InvalidProperty, "Unknown cgroup subststem: " + index);
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         auto out = spec.mutable_cgroups();
         for (auto &subsys: Subsystems) {
             auto cg = out->add_cgroup();
@@ -2136,21 +2136,21 @@ class THostname : public TProperty {
 public:
     THostname() : TProperty(P_HOSTNAME, EProperty::HOSTNAME,
             "Container hostname") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Hostname;
         return OK;
     }
-    TError Set(const std::string &hostname) {
-        CT->Hostname = hostname;
+    TError Set(const std::string &value) override {
+        CT->Hostname = value;
         CT->SetProp(EProperty::HOSTNAME);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_hostname(CT->Hostname);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_hostname();
     }
 
@@ -2163,27 +2163,27 @@ class TEnvProperty : public TProperty {
 public:
     TEnvProperty() : TProperty(P_ENV, EProperty::ENV,
             "Container environment variables: <name>=<value>; ...") {}
-    TError Get(std::string &val) {
-        val = CT->EnvCfg;
+    TError Get(std::string &value) const override {
+        value = CT->EnvCfg;
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TEnv env;
         TError error = CT->GetEnvironment(env);
         if (error)
             return error;
         return env.GetEnv(index, value);
     }
-    TError Set(const std::string &val) {
+    TError Set(const std::string &value) override {
         TEnv env;
-        TError error =  env.Parse(val, true);
+        TError error =  env.Parse(value, true);
         if (error)
             return error;
         env.Format(CT->EnvCfg);
         CT->SetProp(EProperty::ENV);
         return OK;
     }
-    TError SetIndexed(const std::string &index, const std::string &val) {
+    TError SetIndexed(const std::string &index, const std::string &val) override {
         TEnv env;
         TError error = env.Parse(CT->EnvCfg, true);
         if (error)
@@ -2196,7 +2196,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         TEnv env;
         if (CT->GetEnvironment(env))
             return;
@@ -2223,7 +2223,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_env();
     }
 
@@ -2258,43 +2258,43 @@ public:
         val = CT->EnvSecret;
         return OK;
     }
-    TError Get(std::string &val) {
+    TError Get(std::string &value) const override {
         TEnv env;
         TError error = env.Parse(CT->EnvSecret, true, true);
         if (error)
             return error;
-        env.Format(val);
+        env.Format(value);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TEnv env;
         TError error = env.Parse(CT->EnvSecret, true, true);
         if (error)
             return error;
         return env.GetEnv(index, value);
     }
-    TError Set(const std::string &val) {
+    TError Set(const std::string &value) override {
         TEnv env;
-        TError error = env.Parse(val, true, true);
+        TError error = env.Parse(value, true, true);
         if (error)
             return error;
         env.Format(CT->EnvSecret, true);
         CT->SetProp(EProperty::ENV_SECRET);
         return OK;
     }
-    TError SetIndexed(const std::string &index, const std::string &val) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         TEnv env;
         TError error = env.Parse(CT->EnvSecret, true, true);
         if (error)
             return error;
-        error = env.SetEnv(index, val, true, false, true);
+        error = env.SetEnv(index, value, true, false, true);
         if (error)
             return error;
         env.Format(CT->EnvSecret, true);
         CT->SetProp(EProperty::ENV_SECRET);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) {
+    void Dump(rpc::TContainerSpec &spec) const override {
         TEnv env;
         if (env.Parse(CT->EnvSecret, true, true))
             return;
@@ -2314,10 +2314,10 @@ public:
                 v->set_unset(true);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_env_secret();
     }
-    TError Load(const rpc::TContainerSpec &spec) {
+    TError Load(const rpc::TContainerSpec &spec) override {
         TEnv env;
         TError error;
 
@@ -2344,11 +2344,11 @@ class TBind : public TProperty {
 public:
     TBind() : TProperty(P_BIND, EProperty::BIND,
             "Bind mounts: <source> <target> [ro|rw|<flag>],... ;...") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = TBindMount::Format(CT->BindMounts);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         std::vector<TBindMount> result;
         TError error = TBindMount::Parse(value, result);
         if (error)
@@ -2358,13 +2358,13 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_bind();
         for (auto &bind: CT->BindMounts)
             bind.Dump(*out->add_bind());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_bind();
     }
 
@@ -2388,12 +2388,12 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         for (auto &link: CT->Symlink)
             value += fmt::format("{}: {}; ", link.first, link.second);
         return OK;
     }
-    TError GetIndexed(const std::string &key, std::string &value) {
+    TError GetIndexed(const std::string &key, std::string &value) override {
         TPath sym = TPath(key).NormalPath();
         auto it = CT->Symlink.find(sym);
         if (it == CT->Symlink.end())
@@ -2401,12 +2401,12 @@ public:
         value = it->second.ToString();
         return OK;
     }
-    TError SetIndexed(const std::string &key, const std::string &value) {
+    TError SetIndexed(const std::string &key, const std::string &value) override {
         auto sym = TPath(key).NormalPath();
         auto tgt = TPath(value).NormalPath();
         return CT->SetSymlink(sym, tgt);
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TStringMap map;
         TError error = StringToStringMap(value, map);
         if (error)
@@ -2429,7 +2429,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_symlink();
         for (auto &link: CT->Symlink) {
             auto sym = out->add_map();
@@ -2438,7 +2438,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_symlink();
     }
 
@@ -2468,7 +2468,7 @@ class TIp : public TProperty {
 public:
     TIp() : TProperty(P_IP, EProperty::IP,
             "IP configuration: <interface> <ip>/<prefix>; ...") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->IpList, ' ', ';');
         return OK;
     }
@@ -2483,12 +2483,12 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &ipaddr) {
-        auto ipaddrs = SplitEscapedString(ipaddr, ' ', ';');
+    TError Set(const std::string &value) override {
+        auto ipaddrs = SplitEscapedString(value, ' ', ';');
         return Set(ipaddrs);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_ip();
         for (auto &line: CT->IpList) {
             auto ip = out->add_cfg();
@@ -2497,7 +2497,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_ip();
     }
 
@@ -2513,7 +2513,7 @@ class TIpLimit : public TProperty {
 public:
     TIpLimit() : TProperty(P_IP_LIMIT, EProperty::IP_LIMIT,
             "IP allowed for sub-containers: none|any|<ip>[/<mask>]; ...") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->IpLimit, ';', ' ');
         return OK;
     }
@@ -2550,12 +2550,12 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         auto cfg = SplitEscapedString(value, ';', ' ');
         return Set(cfg);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto cfg = spec.mutable_ip_limit();
         cfg->set_policy(CT->IpPolicy);
         if (CT->IpPolicy == "some")
@@ -2563,7 +2563,7 @@ public:
                 cfg->add_ip(line[0]);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_ip_limit();
     }
 
@@ -2581,7 +2581,7 @@ class TDefaultGw : public TProperty {
 public:
     TDefaultGw() : TProperty(P_DEFAULT_GW, EProperty::DEFAULT_GW,
             "Default gateway: <interface> <ip>; ...") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->DefaultGw, ' ', ';');
         return OK;
     }
@@ -2596,12 +2596,12 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &gw) {
-        auto gws = SplitEscapedString(gw, ' ', ';');
+    TError Set(const std::string &value) override {
+        auto gws = SplitEscapedString(value, ' ', ';');
         return Set(gws);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_default_gw();
         for (auto &line: CT->DefaultGw) {
             auto ip = out->add_cfg();
@@ -2609,7 +2609,7 @@ public:
             ip->set_ip(line[1]);
         }
     }
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_default_gw();
     }
 
@@ -2631,7 +2631,7 @@ public:
     TError Reset() override {
         return Set("default");
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->ResolvConf.size() || CT->IsRoot())
             value = StringReplaceAll(CT->ResolvConf, "\n", ";");
         else if (CT->HasProp(EProperty::RESOLV_CONF))
@@ -2642,7 +2642,7 @@ public:
             value = "default";
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         if (CT->State != EContainerState::Stopped &&
             ((CT->HasProp(EProperty::RESOLV_CONF) ? !CT->ResolvConf.size() : CT->Root == "/") !=
              (value == "keep" || value == "" || (CT->Root == "/" && value == "inherit"))))
@@ -2660,7 +2660,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         if (CT->ResolvConf.size() || CT->IsRoot())
             spec.set_resolv_conf(CT->ResolvConf);
         else if (CT->HasProp(EProperty::RESOLV_CONF))
@@ -2671,7 +2671,7 @@ public:
             spec.set_resolv_conf("default");
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_resolv_conf();
     }
 
@@ -2685,21 +2685,21 @@ public:
     TEtcHosts() : TProperty(P_ETC_HOSTS, EProperty::ETC_HOSTS, "Override /etc/hosts content")
     {
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->EtcHosts;
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         CT->EtcHosts = value;
         CT->SetProp(EProperty::ETC_HOSTS);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_etc_hosts(CT->EtcHosts);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_etc_hosts();
     }
 
@@ -2716,7 +2716,7 @@ public:
         IsDynamic = true;
     }
 
-    TError Start(void) {
+    TError Start(void) override {
         if (!CT->HasProp(EProperty::DEVICE_CONF)) {
             if (CT->FuseMode)
                 return Set("/dev/fuse rw");
@@ -2725,11 +2725,11 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Devices.Format();
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TDevices devices;
 
         // reset to default + extra + parent devices if empty string is given by user
@@ -2752,7 +2752,7 @@ public:
         CT->SetProp(EProperty::DEVICE_CONF);
         return OK;
     }
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         TDevices devices;
         TError error = devices.Parse(index + " " + value, CL->Cred);
         if (error)
@@ -2767,13 +2767,13 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_devices();
         for (auto dev: CT->Devices.Devices)
             dev.Dump(*out->add_device());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_devices();
     }
 
@@ -2802,13 +2802,13 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = StringFormat("%d;%d;%d", CT->Task.Pid,
                                          CT->TaskVPid,
                                          CT->WaitTask.Pid);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TError error;
 
         auto val = SplitEscapedString(value, ';');
@@ -2834,11 +2834,11 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->SeizeTask.Pid);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         return StringToInt(value, CT->SeizeTask.Pid);
     }
 } static SeizePid;
@@ -2849,11 +2849,11 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->CreationTime);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         auto error = StringToUint64(value, CT->CreationTime);
         CT->RealCreationTime = time(nullptr) - (GetCurrentTimeMs() - CT->CreationTime) / 1000;
         return OK;
@@ -2866,11 +2866,11 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->StartTime);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         StringToUint64(value, CT->StartTime);
         CT->RealStartTime = time(nullptr) - (GetCurrentTimeMs() - CT->StartTime) / 1000;
         return OK;
@@ -2883,11 +2883,11 @@ public:
         IsReadOnly = true;
         IsHidden = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->DeathTime);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         StringToUint64(value, CT->DeathTime);
         CT->RealDeathTime = time(nullptr) - (GetCurrentTimeMs() - CT->DeathTime) / 1000;
         return OK;
@@ -2898,21 +2898,21 @@ class TPortoNamespace : public TProperty {
 public:
     TPortoNamespace() : TProperty(P_PORTO_NAMESPACE, EProperty::PORTO_NAMESPACE,
             "Porto containers namespace (container name prefix) (deprecated, use enable_porto=isolate instead)") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->NsName;
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         CT->NsName = value;
         CT->SetProp(EProperty::PORTO_NAMESPACE);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_porto_namespace(CT->NsName);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_porto_namespace();
     }
 
@@ -2925,17 +2925,17 @@ class TPlaceProperty : public TProperty {
 public:
     TPlaceProperty() : TProperty(P_PLACE, EProperty::PLACE,
             "Places for volumes and layers: [default][;/path...][;***][;alias=/path]") {}
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->PlacePolicy, ';');
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         CT->PlacePolicy = SplitEscapedString(value, ';');
         CT->SetProp(EProperty::PLACE);
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto cfg = spec.mutable_place();
         for (auto &place: CT->PlacePolicy) {
             auto p = cfg->add_cfg();
@@ -2949,7 +2949,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_place();
     }
 
@@ -2973,11 +2973,11 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = LockVolumes();
         return UintMapToString(CT->PlaceLimit, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto lock = LockVolumes();
         if (!CT->PlaceLimit.count(index))
             return TError(EError::InvalidValue, "invalid index " + index);
@@ -2992,7 +2992,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TUintMap val;
         TError error = StringToUintMap(value, val);
         if (error)
@@ -3000,7 +3000,7 @@ public:
         return Set(val);
     }
 
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         auto lock = LockVolumes();
         TUintMap val = CT->PlaceLimit;
         TError error = StringToSize(value, val[index]);
@@ -3011,11 +3011,11 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         DumpMap(CT->PlaceLimit, *spec.mutable_place_limit());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_place_limit();
     }
 
@@ -3032,11 +3032,11 @@ public:
             "Current sum of volume space_limit: total|/place|tmpfs|lvm group|rbd: bytes;...") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = LockVolumes();
         return UintMapToString(CT->PlaceUsage, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto lock = LockVolumes();
         if (!CT->PlaceUsage.count(index))
             return TError(EError::InvalidValue, "invalid index " + index);
@@ -3044,7 +3044,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         DumpMap(CT->PlaceUsage, *spec.mutable_place_usage());
     }
 } static PlaceUsage;
@@ -3055,7 +3055,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         TTuple paths;
 
         for (auto &vol: CT->OwnedVolumes) {
@@ -3069,7 +3069,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         auto out = spec.mutable_volumes_owned();
         for (auto &vol: CT->OwnedVolumes) {
             TPath path = CL->ComposePath(vol->Path);
@@ -3086,7 +3086,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         TMultiTuple links;
 
         auto volumes_lock = LockVolumes();
@@ -3110,7 +3110,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         auto out = spec.mutable_volumes_linked();
 
         auto volumes_lock = LockVolumes();
@@ -3139,11 +3139,11 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = MergeEscapeStrings(CT->RequiredVolumes, ';');
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         auto volumes_lock = LockVolumes();
         auto prev = CT->RequiredVolumes;
         CT->RequiredVolumes = SplitEscapedString(value, ';');
@@ -3160,7 +3160,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_volumes_required();
         for (auto &path: CT->RequiredVolumes)
             out->add_volume(path);
@@ -3176,7 +3176,7 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &value) {
+    TError Get(uint64_t &value) const {
         if (!CT->Level)
             value = GetTotalMemory() - GetHugetlbMemory();
         else
@@ -3184,7 +3184,7 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -3218,21 +3218,21 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &limit) {
-        uint64_t new_size = 0lu;
-        TError error = StringToSize(limit, new_size);
+    TError Set(const std::string &value) override {
+        uint64_t size = 0lu;
+        TError error = StringToSize(value, size);
         if (error)
             return error;
-        return Set(new_size);
+        return Set(size);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         uint64_t val;
         if (!Get(val))
             spec.set_memory_limit(val);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_memory_limit();
     }
 
@@ -3247,12 +3247,12 @@ public:
             "Effective memory limit [bytes]") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->GetMemLimit());
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_memory_limit_total(CT->GetMemLimit());
     }
 } static MemoryLimitTotal;
@@ -3265,10 +3265,10 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportAnonLimit();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->AnonMemLimit);
         return OK;
     }
@@ -3283,19 +3283,19 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &limit) {
-        uint64_t new_size;
-        TError error = StringToSize(limit, new_size);
+    TError Set(const std::string &value) override {
+        uint64_t size;
+        TError error = StringToSize(value, size);
         if (error)
             return error;
-        return Set(new_size);
+        return Set(size);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_anon_limit(CT->AnonMemLimit);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_anon_limit();
     }
 
@@ -3310,15 +3310,15 @@ public:
             "Effective anonymous memory limit [bytes]") {
         IsReadOnly = true;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportAnonLimit();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->GetAnonMemLimit());
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_anon_limit_total(CT->GetAnonMemLimit());
     }
 } static AnonLimitTotal;
@@ -3331,10 +3331,10 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportAnonOnly();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->AnonOnly);
         return OK;
     }
@@ -3347,7 +3347,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -3355,11 +3355,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_anon_only(CT->AnonOnly);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_anon_only();
     }
 
@@ -3376,10 +3376,10 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         IsHidden = !MemorySubsystem.SupportDirtyLimit();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->DirtyMemLimit);
         return OK;
     }
@@ -3394,19 +3394,19 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &limit) {
-        uint64_t new_size;
-        TError error = StringToSize(limit, new_size);
+    TError Set(const std::string &value) override {
+        uint64_t size;
+        TError error = StringToSize(value, size);
         if (error)
             return error;
-        return Set(new_size);
+        return Set(size);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_dirty_limit(CT->DirtyMemLimit);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_dirty_limit();
     }
 
@@ -3423,10 +3423,10 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_HUGETLB;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = HugetlbSubsystem.Supported;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (!CT->Level)
             value = std::to_string(GetHugetlbMemory());
         else
@@ -3444,7 +3444,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t limit;
         auto error = StringToSize(value, limit);
         if (error)
@@ -3452,11 +3452,11 @@ public:
         return Set(limit);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_hugetlb_limit(CT->HugetlbLimit);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_hugetlb_limit();
     }
 
@@ -3473,10 +3473,10 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportRechargeOnPgfault();
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->RechargeOnPgfault);
         return OK;
     }
@@ -3489,7 +3489,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -3497,11 +3497,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_recharge_on_pgfault(CT->RechargeOnPgfault);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_recharge_on_pgfault();
     }
 
@@ -3518,7 +3518,7 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->PressurizeOnDeath);
         return OK;
     }
@@ -3531,7 +3531,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -3539,11 +3539,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_pressurize_on_death(CT->PressurizeOnDeath);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_pressurize_on_death();
     }
 
@@ -3560,7 +3560,7 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CpuPowerToString(CT->CpuLimit);
         return OK;
     }
@@ -3574,7 +3574,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t limit;
         TError error = StringToCpuPower(value, limit);
         if (!error && CT->CpuLimit != limit) {
@@ -3584,11 +3584,11 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_cpu_limit((double)CT->CpuLimit / CPU_POWER_PER_SEC);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cpu_limit();
     }
 
@@ -3604,13 +3604,13 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->CpuLimitSum)
             value = CpuPowerToString(CT->CpuLimitSum);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_cpu_limit_total((double)CT->CpuLimitSum / CPU_POWER_PER_SEC);
     }
 } static CpuLimitTotal;
@@ -3622,13 +3622,13 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->CpuLimitBound)
             value = CpuPowerToString(CT->CpuLimitBound);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_cpu_limit_bound((double)CT->CpuLimitBound / CPU_POWER_PER_SEC);
     }
 } static CpuLimitBound;
@@ -3641,7 +3641,7 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_CPU;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CpuPowerToString(CT->CpuGuarantee);
         return OK;
     }
@@ -3655,7 +3655,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t guarantee;
         TError error = StringToCpuPower(value, guarantee);
         if (error)
@@ -3667,11 +3667,11 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_cpu_guarantee((double)CT->CpuGuarantee / CPU_POWER_PER_SEC);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cpu_guarantee();
     }
 
@@ -3687,13 +3687,13 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->CpuGuarantee || CT->CpuGuaranteeSum)
             value = CpuPowerToString(std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum));
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
          spec.set_cpu_guarantee_total((double)std::max(CT->CpuGuarantee, CT->CpuGuaranteeSum) / CPU_POWER_PER_SEC);
     }
 } static CpuGuaranteeTotal;
@@ -3705,13 +3705,13 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->CpuGuaranteeBound)
             value = CpuPowerToString(CT->CpuGuaranteeBound);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
          spec.set_cpu_guarantee_bound((double)CT->CpuGuaranteeBound / CPU_POWER_PER_SEC);
     }
 } static CpuGuaranteeBound;
@@ -3725,7 +3725,7 @@ public:
            for the sake of incremental inheritancy */
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->CpuPeriod);
         return OK;
     }
@@ -3740,7 +3740,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringToNsec(value, val);
         if (error)
@@ -3748,11 +3748,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_cpu_period(CT->CpuPeriod);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cpu_period();
     }
 
@@ -3768,7 +3768,7 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = StringFormat("%lg", CT->CpuWeight);
         return OK;
     }
@@ -3785,7 +3785,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         double val;
         std::string unit;
         TError error = StringToValue(value, val, unit);
@@ -3795,11 +3795,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_cpu_weight(CT->CpuWeight);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cpu_weight();
     }
 
@@ -3816,7 +3816,7 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_CPUSET;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = LockCpuAffinity();
 
         if (CT->NewCpuJail)
@@ -3865,7 +3865,7 @@ public:
         }
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         auto cfgs = SplitEscapedString(value, ' ', ';');
         std::string mems;
         TTuple cfg;
@@ -3945,7 +3945,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto cfg = spec.mutable_cpu_set();
         switch (CT->CpuSetType) {
         case ECpuSetType::Inherit:
@@ -3982,7 +3982,7 @@ public:
             cfg->set_jail(CT->CpuJail);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_cpu_set();
     }
 
@@ -4053,13 +4053,13 @@ public:
             "Resulting CPU affinity: [N,N-M,]...") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = LockCpuAffinity();
         value = CT->CpuAffinity.Format();
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         auto lock = LockCpuAffinity();
         auto cfg = spec.mutable_cpu_set_affinity();
         for (auto cpu = 0u; cpu < CT->CpuAffinity.Size(); cpu++)
@@ -4074,11 +4074,11 @@ class TIoLimit : public TProperty {
 public:
     TIoLimit(std::string name, EProperty prop, std::string desc) :
         TProperty(name, prop, desc) {}
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportIoLimit() ||
          BlkioSubsystem.HasThrottler;
     }
-    TError GetMap(const TUintMap &limit, std::string &value) {
+    TError GetMap(const TUintMap &limit, std::string &value) const {
         if (limit.size() == 1 && limit.count("fs")) {
             value = std::to_string(limit.at("fs"));
             return OK;
@@ -4134,24 +4134,24 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         return GetMap(CT->IoBpsLimit, value);
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         return SetMap(CT->IoBpsLimit, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         return GetMapIndexed(CT->IoBpsLimit, index, value);
     }
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         return SetMapIndexed(CT->IoBpsLimit, index, value);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         DumpMap(CT->IoBpsLimit, *spec.mutable_io_limit());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_io_limit();
     }
 
@@ -4169,24 +4169,24 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         return GetMap(CT->IoOpsLimit, value);
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         return SetMap(CT->IoOpsLimit, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         return GetMapIndexed(CT->IoOpsLimit, index, value);
     }
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         return SetMapIndexed(CT->IoOpsLimit, index, value);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         DumpMap(CT->IoOpsLimit, *spec.mutable_io_ops_limit());
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_io_ops_limit();
     }
 
@@ -4205,7 +4205,7 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->AutoRespawn);
         return OK;
     }
@@ -4216,7 +4216,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -4224,11 +4224,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_respawn(CT->AutoRespawn);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_respawn();
     }
 
@@ -4245,7 +4245,7 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->RespawnCount);
         return OK;
     }
@@ -4256,7 +4256,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringToUint64(value, val);
         if (error)
@@ -4264,11 +4264,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_respawn_count(CT->RespawnCount);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_respawn_count();
     }
 
@@ -4288,7 +4288,7 @@ public:
     TError Reset() override {
         return Set(-1);
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->HasProp(EProperty::RESPAWN_LIMIT))
             value = std::to_string(CT->RespawnLimit);
         return OK;
@@ -4303,7 +4303,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TError error;
         int64_t val;
         if (value != "") {
@@ -4314,11 +4314,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_max_respawns(CT->RespawnLimit);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_max_respawns();
     }
 
@@ -4335,7 +4335,7 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = fmt::format("{}ns", CT->RespawnDelay);
         return OK;
     }
@@ -4346,7 +4346,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringToNsec(value, val);
         if (error)
@@ -4354,11 +4354,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_respawn_delay(CT->RespawnDelay);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_respawn_delay();
     }
 
@@ -4375,21 +4375,21 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = CT->Private;
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         if (value.length() > PRIVATE_VALUE_MAX)
             return TError(EError::InvalidValue, "Private value is too long, max {} bytes", PRIVATE_VALUE_MAX);
         CT->Private = value;
         CT->SetProp(EProperty::PRIVATE);
         return OK;
     }
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_private_(CT->Private);
     }
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_private_();
     }
     TError Load(const rpc::TContainerSpec &spec) override {
@@ -4404,12 +4404,12 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = LockContainers();
         value = StringMapToString(CT->Labels);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto lock = LockContainers();
         return CT->GetLabel(index, value);
     }
@@ -4444,14 +4444,14 @@ public:
             TContainerWaiter::ReportAll(*CT, it.first, it.second);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TStringMap map;
         TError error = StringToStringMap(value, map);
         if (error)
             return error;
         return Set(map, true);
     }
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         TError error = TContainer::ValidLabel(index, value);
         if (error)
             return error;
@@ -4464,7 +4464,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto lock = LockContainers();
         auto map = spec.mutable_labels();
         for (auto &it: CT->Labels) {
@@ -4474,7 +4474,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_labels();
     }
 
@@ -4494,7 +4494,7 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->AgingTime / 1000);
         return OK;
     }
@@ -4505,19 +4505,19 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &time) {
-        uint64_t new_time;
-        TError error = StringToUint64(time, new_time);
+    TError Set(const std::string &value) override {
+        uint64_t time;
+        TError error = StringToUint64(value, time);
         if (error)
             return error;
-        return Set(new_time);
+        return Set(time);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_aging_time(CT->AgingTime / 1000);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_aging_time();
     }
 
@@ -4546,7 +4546,7 @@ public:
         }
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         switch (CT->AccessLevel) {
             case EAccessLevel::None:
                 value = "false";
@@ -4573,7 +4573,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         EAccessLevel level;
 
         if (value == "false" || value == "none")
@@ -4603,20 +4603,20 @@ public:
         CT->SetProp(EProperty::ENABLE_PORTO);
         return OK;
     }
-    TError Start(void) {
+    TError Start(void) override {
         auto parent = CT->Parent;
         if (!Compatible(parent->AccessLevel, CT->AccessLevel))
             CT->AccessLevel = parent->AccessLevel;
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         std::string val;
         Get(val);
         spec.set_enable_porto(val);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_enable_porto();
     }
 
@@ -4633,7 +4633,7 @@ public:
         IsDynamic = true;
         IsAnyState = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->IsWeak);
         return OK;
     }
@@ -4644,7 +4644,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -4652,11 +4652,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_weak(CT->IsWeak);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_weak();
     }
 
@@ -4674,12 +4674,12 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = fmt::format("{}", CT->Id);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_id(CT->Id);
     }
 } static IdProperty;
@@ -4691,12 +4691,12 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = fmt::format("{}", CT->Level);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_level(CT->Level);
     }
 } static LevelProperty;
@@ -4707,7 +4707,7 @@ public:
             "Container name including porto namespaces") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->IsRoot())
             value = ROOT_CONTAINER;
         else
@@ -4715,7 +4715,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         std::string val;
         Get(val);
         spec.set_absolute_name(val);
@@ -4728,12 +4728,12 @@ public:
             "Container namespace including parent namespaces") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = ROOT_PORTO_NAMESPACE + CT->GetPortoNamespace();
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         std::string val;
         Get(val);
         spec.set_absolute_namespace(val);
@@ -4746,11 +4746,11 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = TContainer::StateName(CT->State);
         return OK;
     }
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_state(TContainer::StateName(CT->State));
     }
 } static State;
@@ -4762,15 +4762,15 @@ public:
         IsReadOnly = true;
         IsDeadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->OomKilled);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         return StringToBool(value, CT->OomKilled);
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_oom_killed(CT->OomKilled);
     }
 } static OomKilled;
@@ -4783,16 +4783,16 @@ public:
         IsReadOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         auto cg = MemorySubsystem.RootCgroup();
         uint64_t count;
         IsSupported = !MemorySubsystem.GetOomKills(cg, count);
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->OomKills);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringToUint64(value, val);
         if (!error) {
@@ -4802,7 +4802,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_oom_kills(CT->OomKills);
     }
 } static OomKills;
@@ -4814,16 +4814,16 @@ class TOomKillsTotal : public TProperty {
     {
         IsReadOnly = true;
     }
-    void Init(void) {
+    void Init(void) override {
         auto cg = MemorySubsystem.RootCgroup();
         uint64_t count;
         IsSupported = !MemorySubsystem.GetOomKills(cg, count);
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->OomKillsTotal);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringToUint64(value, val);
         if (!error) {
@@ -4833,7 +4833,7 @@ class TOomKillsTotal : public TProperty {
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_oom_kills_total(CT->OomKillsTotal);
     }
 } static OomKillsTotal;
@@ -4846,13 +4846,13 @@ public:
         IsReadOnly = true;
         IsDeadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(WIFSIGNALED(CT->ExitStatus) &&
                              WCOREDUMP(CT->ExitStatus));
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_core_dumped(WIFSIGNALED(CT->ExitStatus) && WCOREDUMP(CT->ExitStatus));
     }
 } static CoreDumped;
@@ -4864,7 +4864,7 @@ public:
     {
         IsDynamic = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = BoolToString(CT->OomIsFatal);
         return OK;
     }
@@ -4875,7 +4875,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         bool val;
         TError error = StringToBool(value, val);
         if (error)
@@ -4883,11 +4883,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_oom_is_fatal(CT->OomIsFatal);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_oom_is_fatal();
     }
 
@@ -4900,7 +4900,7 @@ class TOomScoreAdj : public TProperty {
 public:
     TOomScoreAdj() : TProperty(P_OOM_SCORE_ADJ, EProperty::OOM_SCORE_ADJ,
             "OOM score adjustment: -1000..1000") { }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = StringFormat("%d", CT->OomScoreAdj);
         return OK;
     }
@@ -4915,7 +4915,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         int val;
         TError error = StringToInt(value, val);
         if (error)
@@ -4923,11 +4923,11 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         spec.set_oom_score_adj(CT->OomScoreAdj);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_oom_score_adj();
     }
 
@@ -4944,7 +4944,7 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->Level == 0)
             value = "";
         else if (CT->Level == 1)
@@ -4954,7 +4954,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         if (CT->Level == 1)
             spec.set_parent(ROOT_CONTAINER);
         else if (CT->Level > 1)
@@ -4971,13 +4971,13 @@ public:
         IsRuntimeOnly = true;
     }
 
-    TError Get(pid_t &pid) {
+    TError Get(pid_t &pid) const {
         if (!CT->HasPidFor(*CL->ClientContainer))
             return TError(EError::Permission, "pid is unreachable");
         return CT->GetPidFor(CL->Pid, pid);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         pid_t pid;
         auto error = Get(pid);
         if (!error)
@@ -4985,7 +4985,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         pid_t pid;
         TError error = Get(pid);
         if (!error)
@@ -5001,15 +5001,15 @@ public:
         IsReadOnly = true;
         IsDeadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->ExitStatus);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         return StringToInt(value, CT->ExitStatus);
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_exit_status(CT->ExitStatus);
     }
 } static ExitStatusProperty;
@@ -5022,12 +5022,12 @@ public:
         IsReadOnly = true;
         IsDeadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = std::to_string(CT->GetExitCode());
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_exit_code(CT->GetExitCode());
     }
 } static ExitCodeProperty;
@@ -5038,13 +5038,13 @@ public:
     {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->StartError)
             value = CT->StartError.ToString();
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         if (CT->StartError)
             CT->StartError.Dump(*spec.mutable_start_error());
     }
@@ -5060,12 +5060,12 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &value) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.Usage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5073,7 +5073,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5091,12 +5091,12 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &val) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetReclaimed(cg, val);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5104,7 +5104,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5122,12 +5122,12 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &val) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetAnonUsage(cg, val);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5135,7 +5135,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5152,16 +5152,16 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = MemorySubsystem.SupportAnonLimit();
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
-        return MemorySubsystem.GetAnonMaxUsage(cg, val);
+        return MemorySubsystem.GetAnonMaxUsage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (error)
@@ -5169,12 +5169,12 @@ public:
         value = std::to_string(val);
         return OK;
     }
-    TError Set(const std::string &) {
+    TError Set(const std::string &) override {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.ResetAnonMaxUsage(cg);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5192,12 +5192,12 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &val) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
         return MemorySubsystem.GetCacheUsage(cg, val);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5205,7 +5205,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5223,12 +5223,12 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
-        return MemorySubsystem.GetShmemUsage(cg, val);
+        return MemorySubsystem.GetShmemUsage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5236,7 +5236,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5254,12 +5254,12 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
-        return MemorySubsystem.GetMLockUsage(cg, val);
+        return MemorySubsystem.GetMLockUsage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5267,7 +5267,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5284,16 +5284,16 @@ public:
         IsRuntimeOnly = true;
         RequireControllers = CGROUP_HUGETLB;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = HugetlbSubsystem.Supported;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(HugetlbSubsystem);
-        return HugetlbSubsystem.GetHugeUsage(cg, val);
+        return HugetlbSubsystem.GetHugeUsage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5301,7 +5301,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         TError error = Get(val);
         if (!val)
@@ -5319,17 +5319,17 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
         TUintMap stat;
         TError error = MemorySubsystem.Statistics(cg, stat);
         if (error)
             return error;
-        val = stat["total_pgfault"] - stat["total_pgmajfault"];
+        value = stat["total_pgfault"] - stat["total_pgmajfault"];
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
             uint64_t val;
             TError error = Get(val);
             if (error)
@@ -5338,7 +5338,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val = 0;
         TError error = Get(val);
         if (!error)
@@ -5356,17 +5356,17 @@ public:
         RequireControllers = CGROUP_MEMORY;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(MemorySubsystem);
         TUintMap stat;
         TError error = MemorySubsystem.Statistics(cg, stat);
         if (error)
             return error;
-        val = stat["total_pgmajfault"];
+        value = stat["total_pgmajfault"];
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (error)
@@ -5374,7 +5374,7 @@ public:
         value = std::to_string(val);
         return OK;
     }
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val = 0;
         auto error = Get(val);
         if (!error)
@@ -5390,7 +5390,7 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         TError error;
         TVmStat st;
 
@@ -5401,7 +5401,7 @@ public:
         UintMapToString(st.Stat, value);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TError error;
         TVmStat st;
 
@@ -5414,7 +5414,7 @@ public:
         value = std::to_string(it->second);
         return OK;
     }
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         TVmStat st;
         if (CT->GetVmStat(st))
             return;
@@ -5431,13 +5431,13 @@ public:
         IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY;
     }
-    void Init(void) {
+    void Init(void) override {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
         TUintMap stat;
         IsSupported = MemorySubsystem.SupportAnonLimit() ||
             (!MemorySubsystem.Statistics(rootCg, stat) && stat.count("total_max_rss"));
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto cg = CT->GetCgroup(MemorySubsystem);
         uint64_t val;
         TError error = MemorySubsystem.GetAnonMaxUsage(cg, val);
@@ -5461,12 +5461,12 @@ public:
         RequireControllers = CGROUP_CPUACCT;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(CpuacctSubsystem);
-        return CpuacctSubsystem.Usage(cg, val);
+        return CpuacctSubsystem.Usage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -5474,7 +5474,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -5492,12 +5492,12 @@ public:
         RequireControllers = CGROUP_CPUACCT;
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(CpuacctSubsystem);
-        return CpuacctSubsystem.SystemUsage(cg, val);
+        return CpuacctSubsystem.SystemUsage(cg, value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -5505,7 +5505,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -5522,16 +5522,16 @@ public:
         IsRuntimeOnly = true;
         RequireControllers = CGROUP_CPUACCT;
     }
-    void Init(void) {
+    void Init(void) override {
         IsSupported = CpuacctSubsystem.RootCgroup().Has("cpuacct.wait");
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(CpuacctSubsystem);
-        return cg.GetUint64("cpuacct.wait", val);
+        return cg.GetUint64("cpuacct.wait", value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         TError error = Get(val);
         if (!error)
@@ -5539,7 +5539,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -5556,21 +5556,21 @@ public:
         IsRuntimeOnly = true;
         RequireControllers = CGROUP_CPU;
     }
-    void Init(void) {
+    void Init(void) override {
         TUintMap stat;
         IsSupported = !CpuSubsystem.RootCgroup().GetUintMap("cpu.stat", stat) && stat.count("throttled_time");
     }
 
-    TError Get(uint64_t &val) {
+    TError Get(uint64_t &value) const {
         auto cg = CT->GetCgroup(CpuSubsystem);
         TUintMap stat;
         TError error = cg.GetUintMap("cpu.stat", stat);
         if (!error)
-            val = stat["throttled_time"];
+            value = stat["throttled_time"];
         return error;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         auto error = Get(val);
         if (!error)
@@ -5578,7 +5578,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val = 0;
         auto error = Get(val);
         if (!error)
@@ -5594,7 +5594,7 @@ public:
         IsReadOnly = true;
         IsRuntimeOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
         if (TNetClass::IsDisabled()) {
@@ -5611,7 +5611,7 @@ public:
         value = StringMapToString(map);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         if (!CT->Net)
             return TError(EError::InvalidState, "not available");
         if (TNetClass::IsDisabled()) {
@@ -5641,11 +5641,11 @@ public:
         IsDynamic = true;
         RequireControllers = CGROUP_NETCLS;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = TNetwork::FormatTos(CT->NetClass.DefaultTos);
         return OK;
     }
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         int tos;
         TError error = TNetwork::ParseTos(value, tos);
         if (!error) {
@@ -5675,7 +5675,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TUintMap map;
         TError error = StringToUintMap(value, map);
         if (error)
@@ -5683,12 +5683,12 @@ public:
         return Set(map);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = TNetwork::LockNetState();
         return UintMapToString(CT->NetClass.*Member, value);
     }
 
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         uint64_t val;
         TError error = StringToSize(value, val);
         if (error)
@@ -5704,7 +5704,7 @@ public:
         return OK;
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto lock = TNetwork::LockNetState();
         auto &cur = CT->NetClass.*Member;
         auto it = cur.find(index);
@@ -5714,14 +5714,14 @@ public:
         return OK;
     }
 
-    TError Start(void) {
+    TError Start(void) override {
         if (Prop == EProperty::NET_RX_LIMIT &&
                 !CT->NetIsolate && CT->NetClass.RxLimit.size())
             return TError(EError::InvalidValue, "Net rx limit requires isolated network");
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         rpc::TUintMap *map;
 
         if (Name == P_NET_GUARANTEE)
@@ -5741,7 +5741,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         if (Name == P_NET_GUARANTEE)
             return spec.has_net_guarantee();
         if (Name == P_NET_LIMIT)
@@ -5785,7 +5785,7 @@ public:
         IsHidden = true;
     }
 
-    TError Has() {
+    TError Has() const override {
         auto lock = TNetwork::LockNetState();
         if (!CT->Net)
             return TError(EError::Unknown, "Net is empty");
@@ -5795,7 +5795,7 @@ public:
             return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto lock = TNetwork::LockNetState();
 
         if (!CT->Net)
@@ -5847,7 +5847,7 @@ public:
         NetSnmp = Name == P_NET_SNMP;
     }
 
-    TError Has() {
+    TError Has() const override {
         if (NetStat || NetSnmp) {
             if (!CT->Net)
                 return TError(EError::Unknown, "Net is empty");
@@ -5867,7 +5867,7 @@ public:
         return TError(EError::ResourceNotAvailable, "Shared network");
     }
 
-    TError Get(TUintMap &stat) {
+    TError Get(TUintMap &stat) const {
         auto lock = TNetwork::LockNetState();
         if (NetStat || NetSnmp) {
             if (!CT->Net)
@@ -5893,14 +5893,14 @@ public:
         return OK;
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         TUintMap stat;
         auto error = Get(stat);
 
         return UintMapToString(stat, value);
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto lock = TNetwork::LockNetState();
         if (NetStat) {
             if (!CT->Net)
@@ -5942,7 +5942,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         rpc::TUintMap *map;
         TUintMap stat;
 
@@ -6022,15 +6022,15 @@ public:
         IsRuntimeOnly = true;
         RequireControllers = CGROUP_MEMORY | CGROUP_BLKIO;
     }
-    virtual TError GetMap(TUintMap &map) = 0;
-    TError Get(std::string &value) {
+    virtual TError GetMap(TUintMap &map) const = 0;
+    TError Get(std::string &value) const override {
         TUintMap map;
         TError error = GetMap(map);
         if (error)
             return error;
         return UintMapToString(map, value);
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         TUintMap map;
         TError error = GetMap(map);
         if (error)
@@ -6054,7 +6054,7 @@ public:
         return OK;
     }
 
-    void DumpMap(rpc::TUintMap &dump) {
+    void DumpMap(rpc::TUintMap &dump) const {
         TUintMap map;
         GetMap(map);
         for (auto &it: map) {
@@ -6069,7 +6069,7 @@ class TIoReadStat : public TIoStat {
 public:
     TIoReadStat() : TIoStat(P_IO_READ, EProperty::NONE,
             "Bytes read from disk: fs|hw|<disk>|<path>: <bytes>;...") {}
-    TError GetMap(TUintMap &map) {
+    TError GetMap(TUintMap &map) const override {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Read, map);
 
@@ -6083,7 +6083,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         DumpMap(*spec.mutable_io_read());
     }
 } static IoReadStat;
@@ -6092,7 +6092,7 @@ class TIoWriteStat : public TIoStat {
 public:
     TIoWriteStat() : TIoStat(P_IO_WRITE, EProperty::NONE,
             "Bytes written to disk: fs|hw|<disk>|<path>: <bytes>;...") {}
-    TError GetMap(TUintMap &map) {
+    TError GetMap(TUintMap &map) const override {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Write, map);
 
@@ -6109,7 +6109,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         DumpMap(*spec.mutable_io_write());
     }
 } static IoWriteStat;
@@ -6118,7 +6118,7 @@ class TIoOpsStat : public TIoStat {
 public:
     TIoOpsStat() : TIoStat(P_IO_OPS, EProperty::NONE,
             "IO operations: fs|hw|<disk>|<path>: <ops>;...") {}
-    TError GetMap(TUintMap &map) {
+    TError GetMap(TUintMap &map) const override {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Iops, map);
 
@@ -6132,7 +6132,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         DumpMap(*spec.mutable_io_ops());
     }
 } static IoOpsStat;
@@ -6141,13 +6141,13 @@ class TIoTimeStat : public TIoStat {
 public:
     TIoTimeStat() : TIoStat(P_IO_TIME, EProperty::NONE,
             "IO time: hw|<disk>|<path>: <nanoseconds>;...") {}
-    TError GetMap(TUintMap &map) {
+    TError GetMap(TUintMap &map) const override {
         auto blkCg = CT->GetCgroup(BlkioSubsystem);
         BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::Time, map);
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         DumpMap(*spec.mutable_io_time());
     }
 } static IoTimeStat;
@@ -6159,26 +6159,26 @@ public:
         IsReadOnly = true;
     }
 
-    TError Get(int64_t &val) {
+    TError Get(uint64_t &value) const {
         if (CT->IsRoot()) {
             struct sysinfo si;
             if (sysinfo(&si))
                 return TError::System("sysinfo");
-            val = si.uptime;
+            value = si.uptime;
             return OK;
         }
         if (CT->State == EContainerState::Stopped)
-            val = 0;
+            value = 0;
         else if (CT->State == EContainerState::Dead)
-            val = (CT->DeathTime - CT->StartTime) / 1000;
+            value = (CT->DeathTime - CT->StartTime) / 1000;
         else
-            val = (GetCurrentTimeMs() - CT->StartTime) / 1000;
+            value = (GetCurrentTimeMs() - CT->StartTime) / 1000;
         return OK;
 
     }
 
-    TError Get(std::string &value) {
-        int64_t val;
+    TError Get(std::string &value) const override {
+        uint64_t val;
         auto error = Get(val);
         if (error)
             return error;
@@ -6186,7 +6186,7 @@ public:
         return OK;
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         if (index == "dead") {
             if (CT->State == EContainerState::Dead)
                 value = std::to_string((GetCurrentTimeMs() - CT->DeathTime) / 1000);
@@ -6197,8 +6197,8 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
-        int64_t val = 0;
+    void Dump(rpc::TContainerStatus &spec) const override {
+        uint64_t val = 0;
         auto error = Get(val);
         if (error)
             return;
@@ -6213,11 +6213,11 @@ public:
     TCreationTime() : TProperty(P_CREATION_TIME, EProperty::NONE, "Creation time") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = FormatTime(CT->RealCreationTime);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         if (index == "raw")
             value = std::to_string(CT->RealCreationTime);
         else
@@ -6225,7 +6225,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_creation_time(CT->RealCreationTime);
     }
 } static CreationTime;
@@ -6235,12 +6235,12 @@ public:
     TStartTime() : TProperty(P_START_TIME, EProperty::NONE, "Start time") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->RealStartTime)
             value = FormatTime(CT->RealStartTime);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         if (index == "raw")
             value = std::to_string(CT->RealStartTime);
         else
@@ -6248,7 +6248,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         if (CT->RealStartTime)
             spec.set_start_time(CT->RealStartTime);
     }
@@ -6260,12 +6260,12 @@ public:
         IsReadOnly = true;
         IsDeadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->RealDeathTime)
             value = FormatTime(CT->RealDeathTime);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         if (index == "raw")
             value = std::to_string(CT->RealDeathTime);
         else
@@ -6273,7 +6273,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_death_time(CT->RealDeathTime);
     }
 } static DeathTime;
@@ -6283,11 +6283,11 @@ public:
     TChangeTime() : TProperty(P_CHANGE_TIME, EProperty::NONE, "Change time") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = FormatTime(CT->ChangeTime);
         return OK;
     }
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         if (index == "raw")
             value = std::to_string(CT->ChangeTime);
         else
@@ -6295,23 +6295,23 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         spec.set_change_time(CT->ChangeTime);
     }
 } static ChangeTime;
 
 class TPortoStat : public TProperty {
 public:
-    void Populate(TUintMap &m);
-    TError Get(std::string &value);
-    TError GetIndexed(const std::string &index, std::string &value);
+    void Populate(TUintMap &m) const;
+    TError Get(std::string &value) const override;
+    TError GetIndexed(const std::string &index, std::string &value) override;
     TPortoStat() : TProperty(P_PORTO_STAT, EProperty::NONE, "Porto statistics") {
         IsReadOnly = true;
         IsHidden = true;
     }
 } static PortoStat;
 
-void TPortoStat::Populate(TUintMap &m) {
+void TPortoStat::Populate(TUintMap &m) const {
     for (const auto &it : PortoStatMembers) {
         if (it.second.TimeStat)
             m[it.first] = (GetCurrentTimeMs() - Statistics->*(it.second.Member)) / 1000;
@@ -6350,7 +6350,7 @@ void TPortoStat::Populate(TUintMap &m) {
     m["requests_top_running_time"] = RpcRequestsTopRunningTime() / 1000;
 }
 
-TError TPortoStat::Get(std::string &value) {
+TError TPortoStat::Get(std::string &value) const {
     TUintMap m;
     Populate(m);
 
@@ -6372,7 +6372,7 @@ TError TPortoStat::GetIndexed(const std::string &index,
 
 class TPortoCpuJailState : public TProperty {
 public:
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         auto state = TContainer::GetJailCpuState();
         value += "core jails\n";
         for (unsigned i = 0; i < state.Permutation.size(); i++)
@@ -6395,11 +6395,11 @@ public:
         RequireControllers = CGROUP_FREEZER;
     }
 
-    TError Get(uint64_t &val) {
-        return CT->GetProcessCount(val);
+    TError Get(uint64_t &value) const {
+        return CT->GetProcessCount(value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t val;
         auto error = Get(val);
         if (error)
@@ -6408,7 +6408,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         auto error = Get(val);
         if (error)
@@ -6427,11 +6427,11 @@ public:
         RequireControllers = CGROUP_FREEZER | CGROUP_PIDS;
     }
 
-    TError Get(uint64_t &val) {
-        return  CT->GetThreadCount(val);
+    TError Get(uint64_t &value) const {
+        return  CT->GetThreadCount(value);
     }
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         uint64_t count;
         TError error = Get(count);
         if (!error)
@@ -6439,7 +6439,7 @@ public:
         return error;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         uint64_t val;
         auto error = Get(val);
         if (error)
@@ -6452,12 +6452,12 @@ class TThreadLimit : public TProperty {
 public:
     TThreadLimit() : TProperty(P_THREAD_LIMIT, EProperty::THREAD_LIMIT,
             "Thread limit") {}
-    void Init() {
+    void Init(void) override {
         IsDynamic = true;
         IsSupported = PidsSubsystem.Supported;
         RequireControllers = CGROUP_PIDS;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         if (CT->HasProp(EProperty::THREAD_LIMIT))
             value = std::to_string(CT->ThreadLimit);
         return OK;
@@ -6469,7 +6469,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         uint64_t val;
         TError error = StringToSize(value, val);
         if (error)
@@ -6477,12 +6477,12 @@ public:
         return Set(val);
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         if (CT->HasProp(EProperty::THREAD_LIMIT))
             spec.set_thread_limit(CT->ThreadLimit);
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_thread_limit();
     }
 
@@ -6496,12 +6496,12 @@ public:
     TSysctlProperty() : TProperty(P_SYSCTL, EProperty::SYSCTL,
             "Sysctl, format: name: value;...") {}
 
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         value = StringMapToString(CT->Sysctl);
         return OK;
     }
 
-    TError GetIndexed(const std::string &index, std::string &value) {
+    TError GetIndexed(const std::string &index, std::string &value) override {
         auto it = CT->Sysctl.find(index);
         if (it != CT->Sysctl.end())
             value = it->second;
@@ -6510,7 +6510,7 @@ public:
         return OK;
     }
 
-    TError Set(const std::string &value) {
+    TError Set(const std::string &value) override {
         TStringMap map;
         TError error = StringToStringMap(value, map);
         if (error)
@@ -6520,7 +6520,7 @@ public:
         return OK;
     }
 
-    TError SetIndexed(const std::string &index, const std::string &value) {
+    TError SetIndexed(const std::string &index, const std::string &value) override {
         if (value == "")
             CT->Sysctl.erase(index);
         else
@@ -6529,7 +6529,7 @@ public:
         return OK;
     }
 
-    void Dump(rpc::TContainerSpec &spec) override {
+    void Dump(rpc::TContainerSpec &spec) const override {
         auto out = spec.mutable_sysctl();
         for (auto &it: CT->Sysctl) {
             auto s = out->add_map();
@@ -6538,7 +6538,7 @@ public:
         }
     }
 
-    bool Has(const rpc::TContainerSpec &spec) override {
+    bool Has(const rpc::TContainerSpec &spec) const override {
         return spec.has_sysctl();
     }
 
@@ -6561,13 +6561,13 @@ public:
     TTaint() : TProperty(P_TAINT, EProperty::NONE, "Container problems") {
         IsReadOnly = true;
     }
-    TError Get(std::string &value) {
+    TError Get(std::string &value) const override {
         for (auto &taint: CT->Taint())
             value += taint + "\n";
         return OK;
     }
 
-    void Dump(rpc::TContainerStatus &spec) override {
+    void Dump(rpc::TContainerStatus &spec) const override {
         for (auto &taint: CT->Taint()) {
             auto t = spec.add_taint();
             t->set_error(EError::Taint);
