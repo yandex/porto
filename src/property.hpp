@@ -60,6 +60,7 @@ constexpr const char *P_MAJOR_FAULTS = "major_faults";
 constexpr const char *P_VIRTUAL_MEMORY = "virtual_memory";
 constexpr const char *P_MEM_LIMIT_TOTAL = "memory_limit_total";
 constexpr const char *P_MEM_GUARANTEE_TOTAL = "memory_guarantee_total";
+constexpr const char *P_MEM_LOCK_POLICY = "memory_lock_policy";
 constexpr const char *P_ANON_LIMIT_TOTAL = "anon_limit_total";
 
 constexpr const char *P_CPU_POLICY = "cpu_policy";
@@ -211,6 +212,7 @@ enum class EProperty {
     STDOUT_LIMIT,
     MEM_GUARANTEE,
     MEM_LIMIT,
+    MEM_LOCK_POLICY,
     DIRTY_LIMIT,
     ANON_LIMIT,
     ANON_ONLY,

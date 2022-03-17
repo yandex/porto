@@ -574,6 +574,10 @@ TError TMemorySubsystem::InitializeSubsystem() {
     if (HasWritebackBlkio)
         L_CG("Supports {}", MemorySubsystem.WRITEBACK_BLKIO);
 
+    HasMemoryLockPolicy = cg.Has(MemorySubsystem.MEMORY_LOCK_POLICY);
+    if (HasMemoryLockPolicy)
+        L_CG("Supports {}", MemorySubsystem.MEMORY_LOCK_POLICY);
+
     return OK;
 }
 

@@ -184,8 +184,10 @@ public:
     const std::string ANON_ONLY = "memory.anon.only";
     const std::string NUMA_BALANCE_VMPROT = "memory.numa_balance_vmprot";
     const std::string WRITEBACK_BLKIO = "memory.writeback_blkio";
+    const std::string MEMORY_LOCK_POLICY = "memory.mlock_policy";
 
     bool HasWritebackBlkio = false;
+    bool HasMemoryLockPolicy = false;
 
     TMemorySubsystem() : TSubsystem(CGROUP_MEMORY, "memory") {}
 

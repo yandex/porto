@@ -57,6 +57,13 @@ enum class ECgroupFs {
     Rw,
 };
 
+enum class EMemoryLockPolicy {
+    Disabled = 0,
+    Mlockall = 1,
+    Executable = 2,
+    Xattr = 3,
+};
+
 struct ExtraProperty {
     std::string Filter;
 
@@ -224,6 +231,7 @@ public:
     uint64_t MemGuarantee = 0;
     uint64_t NewMemGuarantee = 0;
     int64_t MemSoftLimit = 0;
+    EMemoryLockPolicy MemLockPolicy = EMemoryLockPolicy::Disabled;
     uint64_t AnonMemLimit = 0;
     uint64_t DirtyMemLimit = 0;
     uint64_t HugetlbLimit = 0;

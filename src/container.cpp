@@ -2292,6 +2292,14 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
         }
     }
 
+    if (TestClearPropDirty(EProperty::MEM_LOCK_POLICY)) {
+        error = memcg.SetUint64("memory.mlock_policy", static_cast<uint64_t>(MemLockPolicy));
+        if (error) {
+            L_ERR("Cannot set {}: {}", P_MEM_LOCK_POLICY, error);
+            return error;
+        }
+    }
+
     if (TestClearPropDirty(EProperty::ANON_LIMIT)) {
         error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
         if (error) {

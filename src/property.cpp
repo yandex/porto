@@ -3244,7 +3244,8 @@ public:
 class TMemoryLimitTotal : public TProperty {
 public:
     TMemoryLimitTotal() : TProperty(P_MEM_LIMIT_TOTAL, EProperty::NONE,
-            "Effective memory limit [bytes]") {
+            "Effective memory limit [bytes]")
+    {
         IsReadOnly = true;
     }
     TError Get(std::string &value) const override {
@@ -3256,6 +3257,69 @@ public:
         spec.set_memory_limit_total(CT->GetMemLimit());
     }
 } static MemoryLimitTotal;
+
+class TMemoryLockPolicy : public TProperty {
+public:
+    TMemoryLockPolicy() : TProperty(P_MEM_LOCK_POLICY, EProperty::MEM_LOCK_POLICY,
+                                    "Memory lock policy to container memory cgroup") {}
+
+    void Init(void) override {
+        IsDynamic = true;
+        IsSupported = MemorySubsystem.HasMemoryLockPolicy;
+        RequireControllers = CGROUP_MEMORY;
+    }
+
+    TError Get(std::string& value) const override {
+        switch (CT->MemLockPolicy) {
+            case EMemoryLockPolicy::Disabled:
+                value = "disabled";
+                break;
+            case EMemoryLockPolicy::Mlockall:
+                value = "mlockall";
+                break;
+            case EMemoryLockPolicy::Executable:
+                value = "executable";
+                break;
+            case EMemoryLockPolicy::Xattr:
+                value = "xattr";
+        }
+        return OK;
+    }
+
+    TError Set(const std::string& value) override {
+        EMemoryLockPolicy policy;
+
+        if (value == "disabled")
+            policy = EMemoryLockPolicy::Disabled;
+        else if (value == "mlockall")
+            policy = EMemoryLockPolicy::Mlockall;
+        else if (value == "executable")
+            policy = EMemoryLockPolicy::Executable;
+        else if (value == "xattr")
+            policy = EMemoryLockPolicy::Xattr;
+        else
+            return TError(EError::InvalidValue,
+                          "Memory lock policy must be equal 'disabled', 'mlockall', 'executable' or 'xattr'");
+
+        if (CT->MemLockPolicy != policy) {
+            CT->SetProp(EProperty::MEM_LOCK_POLICY);
+            CT->MemLockPolicy = policy;
+        }
+
+        return OK;
+    }
+
+    void Dump(rpc::TContainerStatus& spec) const override {
+        std::string policy;
+        Get(policy);
+        spec.set_memory_lock_policy(policy);
+    }
+
+    TError Load(const rpc::TContainerSpec& spec) override {
+        return Set(spec.memory_lock_policy());
+    }
+
+} static MemoryLockPolicy;
 
 class TAnonLimit : public TProperty {
 public:

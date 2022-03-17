@@ -742,6 +742,14 @@ write permissions to the target or owning related volume.
 
     Types: count, size, max\_size, used, max\_used, anon, file, shmem, huge, swap, locked, data, stack, code, table.
 
+* **memory_lock_policy** - memory.mlock_policy value to container memory cgroup
+
+    Available values:
+    * *disabled* - 0: disabled, default
+    * *mlockall* - 1: similar to mlockall
+    * *executable* - 2: only files which may be executed
+    * *xattr* - 3: only files which has "user.yndx.mlock" xattr
+
 ## CPU
 
 * **cpu\_usage** - CPU time used in nanoseconds (1 / 1000\_000\_000s)
