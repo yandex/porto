@@ -2441,7 +2441,7 @@ TError TVolume::Build() {
             return error;
     }
 
-    /* Initialize cred and perms but do not change is user havn't asked */
+    /* Initialize cred and perms but do not change if user hasn't asked */
     if (!IsReadOnly) {
         if (!KeepStorage || Spec->has_cred()) {
             error = InternalPath.Chown(VolumeCred);
