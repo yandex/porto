@@ -1,3 +1,13 @@
+yandex-porto (5.2.1) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * property: refactor code
+
+  [ Dmitry Yakunin ]
+  * property: add memory lock policy property for container memory cgroup
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 21 Mar 2022 12:52:19 +0300
+
 yandex-porto (5.2.0) unstable; urgency=low
 
   [ Dmitry Yakunin ]
