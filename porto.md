@@ -538,7 +538,7 @@ Write access to container requires any of these conditions:
 
     If container should have access to porto then /run/portod.socket is binded inside.
 
-** **root\_path** - container root path in client namespace
+* **root\_path** - container root path in client namespace
 
 * **root\_readonly** - remount everything read-only
 
