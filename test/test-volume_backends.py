@@ -9,6 +9,7 @@ import shutil
 import tarfile
 import subprocess
 import traceback
+import tempfile
 
 import porto
 from test_common import *
@@ -29,9 +30,9 @@ def DumpObjectState(r, keys):
         except:
             value = "n/a"
 
-        print "{} : \"{}\"".format(k, value)
+        print("{} : \"{}\"".format(k, value))
 
-    print ""
+    print()
 
 def porto_reconnect(c):
     if c is not None:
@@ -42,11 +43,11 @@ def porto_reconnect(c):
 def get_quota_fs_projid(path):
     fmt = "IIII12x"
     arr = array.array('B')
-    arr.fromstring("\x00" * struct.calcsize(fmt))
+    arr.frombytes(b"\x00" * struct.calcsize(fmt))
     fd = os.open(path , os.O_RDONLY | os.O_NOCTTY | os.O_NOFOLLOW |
                        os.O_NOATIME | os.O_NONBLOCK)
     fcntl.ioctl(fd, 0x801c581f, arr)
-    projid = struct.unpack("IIII12x", arr.tostring())[3]
+    projid = struct.unpack("IIII12x", arr.tobytes())[3]
     os.close(fd)
     return projid
 
@@ -122,7 +123,7 @@ def check_mounted(c, path, **args):
     path = v.path
     r.Destroy()
     if args["backend"] != "quota":
-        assert Catch(os.stat, path + "/file.txt") == OSError
+        assert Catch(os.stat, path + "/file.txt") == FileNotFoundError
     else:
         os.remove(path + "/file.txt")
 
@@ -373,14 +374,14 @@ def backend_overlay(c):
     def copyup_quota(dest):
         ALAYER = TMPDIR + "/a_layer.tar"
 
-        f1 = os.tmpfile()
+        f1 = tempfile.TemporaryFile()
         fzero = open("/dev/zero", "rb")
-        f1.write("1" * (32 * 1048576))
+        f1.write(b"\x01" * (32 * 1048576))
         size1 = os.fstat(f1.fileno()).st_size
         f1.seek(0)
 
-        f2 = os.tmpfile()
-        f2.write("2" * (32 * 1048576))
+        f2 = tempfile.TemporaryFile()
+        f2.write(b"\x02" * (32 * 1048576))
         size2 = os.fstat(f2.fileno()).st_size
         f2.seek(0)
 
@@ -423,16 +424,16 @@ def backend_overlay(c):
         t.add(TMPDIR + "/d_dir", arcname="d1")
         t.add(TMPDIR + "/d_dir", arcname="d2")
 
-        f = os.tmpfile()
+        f = tempfile.TemporaryFile()
 
-        f.write("a1")
+        f.write("a1".encode('utf-8'))
         f.seek(0)
         t.addfile(t.gettarinfo(arcname="d1/a1", fileobj=f), fileobj=f)
         f.seek(0)
         t.addfile(t.gettarinfo(arcname="d2/a1", fileobj=f), fileobj=f)
 
         f.seek(0)
-        f.write("a2")
+        f.write("a2".encode('utf-8'))
         f.seek(0)
         t.addfile(t.gettarinfo(arcname="d1/a2", fileobj=f), fileobj=f)
         f.seek(0)
@@ -478,7 +479,7 @@ def backend_overlay(c):
             assert not os.path.exists(v.path + "/d2/a2")
         except AssertionError:
             #FIXME: remove when tar --xargs wiil be used
-            print "Directory opaqueness is lost as expected"
+            print("Directory opaqueness is lost as expected")
             pass
 
         v.Unlink()
@@ -515,7 +516,8 @@ def backend_overlay(c):
         r.Wait()
         v.Export(DIR + "/upper.tar")
         r.Destroy()
-        assert tarfile.open(name=DIR + "/upper.tar").extractfile("test_file2.txt").read() == "1234"
+        with open(DIR + "/upper.tar", "rb") as f:
+            assert tarfile.open(fileobj=f).extractfile("test_file2.txt").read() == "1234".encode('utf-8')
         os.remove(DIR + "/upper.tar")
 
     os.rmdir(TMPDIR)
@@ -600,21 +602,21 @@ try:
     TestBody(c)
 
 except BaseException as e:
-    print traceback.format_exc()
+    print(traceback.format_exc())
     ret = 1
 
 AsRoot()
 c = porto_reconnect(c)
 
 if ret > 0:
-    print "Dumping test state:\n"
+    print("Dumping test state:\n")
 
     for r in c.ListContainers():
-        print "name : \"{}\"".format(r.name)
+        print("name : \"{}\"".format(r.name))
         DumpObjectState(r, [ "command", "exit_status", "stdout", "stderr" ])
 
     for v in c.ListVolumes():
-        print "path : \"{}\"".format(v.path)
+        print("path : \"{}\"".format(v.path))
         DumpObjectState(v, [ "backend", "place",
                              "space_limit", "space_guarantee", "space_used",
                              "inode_limit", "inode_guarantee", "inode_used",

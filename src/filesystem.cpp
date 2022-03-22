@@ -617,14 +617,35 @@ TError TMountNamespace::SetupRoot(const TContainer &ct) {
 
     if (BindPortoSock) {
         TPath sock(PORTO_SOCKET_PATH);
+        TPath portoctl(PORTO_PORTOCTL_PATH);
         TPath dest = dot / sock;
 
         error = dest.Mkfile(0);
         if (error)
             return error;
+
         error = dest.Bind(sock);
         if (error)
             return error;
+
+        if (portoctl.Exists()) {
+            dest = dot / portoctl;
+            if (!dest.Exists()) {
+                if (!dest.DirName().Exists()) {
+                    error = dest.DirName().MkdirAll(0755);
+                    if (error)
+                        return error;
+                }
+
+                error = dest.Mkfile(0755);
+                if (error)
+                    return error;
+            }
+
+            error = dest.Bind(portoctl);
+            if (error)
+                return error;
+        }
     }
 
     struct {

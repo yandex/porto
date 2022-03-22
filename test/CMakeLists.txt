@@ -91,6 +91,7 @@ ADD_PYTHON3_TEST(portoctl-exec)
 ADD_PYTHON_TEST(portoctl-wait)
 ADD_PYTHON_TEST(self-container)
 ADD_PYTHON_TEST(portoctl-attach)
+ADD_PYTHON3_TEST(portoctl-bind)
 
 # limits test
 
@@ -153,7 +154,7 @@ ADD_PYTHON_TEST(legacy-root-loop)
 # slow tests
 
 ADD_PYTHON_TEST(mem_limit)
-ADD_PYTHON_TEST(volume_backends)
+ADD_PYTHON3_TEST(volume_backends)
 ADD_PYTHON_TEST(volume_places)
 ADD_PYTHON_TEST(volume_links)
 ADD_PYTHON_TEST(volume_queue)
