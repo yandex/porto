@@ -1182,11 +1182,11 @@ public:
 
 class TExecCmd final : public ICmd {
 public:
-    TExecCmd(Porto::Connection *api) : ICmd(api, "exec", 2,
-        "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
+    TExecCmd(Porto::Connection *api) : ICmd(api, "exec", 1,
+        "[-C] [-T] [-L layer]... <container> [properties]",
         "Execute command in container, forward terminal, destroy container at the end, exit - ^X^X",
         "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
-        ) { }
+        ) {}
 
     int Execute(TCommandEnviroment *environment) final override {
         TLauncher launcher(Api);
@@ -1228,9 +1228,11 @@ public:
         }
 
         if (!command_found) {
-            std::cerr << "Meta container exec is not supported, "
-                         "please supply command property" << std::endl;
-            return EXIT_FAILURE;
+            error = launcher.SetProperty("command", "/bin/bash");
+            if (error) {
+                std::cerr << "Cannot set command: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
         }
 
         error = launcher.Launch();
