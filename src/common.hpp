@@ -108,6 +108,8 @@ constexpr const char *PORTO_HELPERS_PATH = "/usr/lib/porto";
 
 constexpr const char *PORTO_CACHE_QUOTA_FILE_NAME = "porto.volume.cache_quota_file";
 
+constexpr const char *PORTO_PORTOCTL_PATH = "/usr/sbin/portoctl";
+
 constexpr uint64_t CONTAINER_NAME_MAX = 128;
 constexpr uint64_t CONTAINER_PATH_MAX = 200;
 constexpr uint64_t CONTAINER_PATH_MAX_FOR_SUPERUSER = 220;

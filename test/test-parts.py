@@ -81,7 +81,7 @@ part6 = {'volume_places':65,
          'volume_queue':100,
          'volume_sync':20}
 
-part7 = {'volume_backends':55,
+part7 = {'python3-volume_backends':55,
          'recovery':40,
          'prev_release_upgrade':50,
          'performance':115}
