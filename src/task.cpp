@@ -387,6 +387,11 @@ TError TTaskEnv::ConfigureChild() {
     if (error)
         return error;
 
+    /* Closing before directory changing for security.
+     * More info: https://st.yandex-team.ru/PORTO-925
+     */
+    TFile::CloseAllExcept({0, 1, 2, Sock.GetFd(), Sock2.GetFd(), MasterSock.GetFd(), MasterSock2.GetFd(),
+                           LogFile.Fd, PortoInit.Fd, UserFd.GetFd()});
     error = Mnt.Cwd.Chdir();
     if (error)
         return error;
@@ -447,9 +452,6 @@ TError TTaskEnv::ConfigureChild() {
     }
 
     L("open default streams in child");
-
-    TFile::CloseAllExcept({0, 1, 2, Sock.GetFd(), MasterSock.GetFd(), LogFile.Fd, PortoInit.Fd, UserFd.GetFd()});
-
     error = CT->Stdin.OpenInside(*CT);
     if (error)
         return error;
