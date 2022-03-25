@@ -19,13 +19,14 @@ def create_tar():
 
 def invoke(type, mem_cgroup):
     # /portod-helpers is a default memory cgroup
-    if mem_cgroup == "/portod-helpers":
-        mem_cgroup = ""
+    container = ""
+    if mem_cgroup == "/porto%w":
+        container = "w"
     if type == "python":
-        conn.ImportLayer("file_layer", test_path + "/file_layer.tar", place=v.place, mem_cgroup=mem_cgroup)
+        conn.ImportLayer("file_layer", test_path + "/file_layer.tar", place=v.place, container=container)
     elif type == "portoctl":
         subprocess.check_call(
-            [portoctl, "layer", "-P", v.place, "-I", "file_layer", test_path + "/file_layer.tar", mem_cgroup])
+            [portoctl, "layer", "-P", v.place, "-I", "file_layer", test_path + "/file_layer.tar", container])
     else:
         raise Exception("Unknown type")
 

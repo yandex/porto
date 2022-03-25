@@ -235,6 +235,8 @@ void TRequest::Parse() {
             opts.push_back("private=" + Req.importlayer().private_value());
         if (Req.importlayer().verbose_error())
             opts.push_back("verbose_error=true");
+        if (Req.importlayer().has_container())
+            opts.push_back("container=" + Req.importlayer().container());
     } else if (Req.has_exportlayer()) {
         if (Req.exportlayer().has_layer()) {
             Cmd = "ReexportLayer";
@@ -1384,8 +1386,22 @@ noinline TError GetVolume(const rpc::TGetVolumeRequest &req,
 }
 
 noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
-    TStorage layer;
     TError error;
+    TStorage layer;
+    std::shared_ptr<TContainer> ct;
+    std::string memCgroup = PORTO_HELPERS_CGROUP;
+
+    if (req.has_container()) {
+        error = CL->ReadContainer(req.container(), ct);
+        if (error)
+            return error;
+
+        error = CL->CanControl(*ct);
+        if (error)
+            return error;
+
+        memCgroup = ct->GetCgroup(MemorySubsystem).Name;
+    }
 
     error = layer.Resolve(EStorageType::Layer, req.place(), req.layer());
     if (error)
@@ -1396,8 +1412,7 @@ noinline TError ImportLayer(const rpc::TLayerImportRequest &req) {
 
     layer.Owner = CL->Cred;
 
-    return layer.ImportArchive(CL->ResolvePath(req.tarball()),
-                               req.has_mem_cgroup() ? req.mem_cgroup() : PORTO_HELPERS_CGROUP,
+    return layer.ImportArchive(CL->ResolvePath(req.tarball()), memCgroup,
                                req.has_compress() ? req.compress() : "",
                                req.merge(),
                                req.verbose_error());

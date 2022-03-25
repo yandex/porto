@@ -1072,7 +1072,7 @@ class Connection(object):
         request.checkVolume.path = path
         self.rpc.call(request)
 
-    def ImportLayer(self, layer, tarball, place=None, private_value=None, mem_cgroup=None, timeout=None, verbose_error=False):
+    def ImportLayer(self, layer, tarball, place=None, private_value=None, container=None, timeout=None, verbose_error=False):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
         request.importLayer.tarball = tarball
@@ -1082,8 +1082,8 @@ class Connection(object):
             request.importLayer.place = place
         if private_value is not None:
             request.importLayer.private_value = private_value
-        if mem_cgroup:
-            request.importLayer.mem_cgroup = mem_cgroup
+        if container:
+            request.importLayer.container = container
 
         self.rpc.call(request, timeout or self.disk_timeout)
         return Layer(self, layer, place)

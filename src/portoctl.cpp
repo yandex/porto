@@ -2193,7 +2193,7 @@ public:
         "Manage overlayfs layers in internal storage",
         "    -P <place>                             optional path to place\n"
         "    -S <private>                           store layer private value while importing or separately\n"
-        "    -I <layer> <tarball> <memory cgroup>   import layer from tarball\n"
+        "    -I <layer> <tarball> [<container>]     import layer from tarball\n"
         "    -M <layer> <tarball>                   merge tarball into existing or new layer\n"
         "    -R <layer> [layer...]                  remove layer from storage\n"
         "    -F [days]                              remove all unused layers (unused for [days])\n"
@@ -2218,7 +2218,7 @@ public:
     std::string place;
     std::string private_value;
     std::string compression;
-    std::string memCgroup = "";
+    std::string container = "";
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
@@ -2248,8 +2248,8 @@ public:
             if (args.size() < 2)
                 return EXIT_FAILURE;
             if (args.size() > 2)
-                memCgroup = args[2];
-            ret = Api->ImportLayer(args[0], path, false, place, private_value, memCgroup);
+                container = args[2];
+            ret = Api->ImportLayer(args[0], path, false, place, private_value, container);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {
