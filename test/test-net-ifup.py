@@ -2,6 +2,8 @@
 
 import os
 import porto
+import subprocess
+import time
 
 from test_common import ConfigurePortod,Expect,ExpectException
 
@@ -57,7 +59,13 @@ open(script_path, 'w').write("""
 exit 1
 """)
 
-ExpectException(ct.Start, porto.exceptions.Unknown)
+for i in xrange(0, 10):
+    ExpectException(ct.Start, porto.exceptions.Unknown)
+
+# Nets are cleared asynchronously
+time.sleep(5)
+
+Expect(len(subprocess.check_output(["ip", "-o", "link", "show", "type", "veth"]).split()) < 5)
 
 
 # 2. Check interaction with portod
