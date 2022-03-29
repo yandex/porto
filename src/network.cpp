@@ -3653,7 +3653,12 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
             // Return error if helper script exits with non-zero exit code.
             // ISS will receive an error creating slot container and will try to re-create the container.
             // No silent misconfiguration will happen.
-            return RunCommand({netScriptPath}, env);
+            error = RunCommand({netScriptPath}, env);
+            if (error) {
+                lock.unlock();
+                Net->Destroy();
+                return error;
+            }
         }
 
         return OK;
