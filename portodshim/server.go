@@ -51,7 +51,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 
 	// TODO: Сделать реконнекты к portod
 	// porto client
-	server.mapper.stateMap = map[string]v1alpha2.ContainerState{
+	server.mapper.containerStateMap = map[string]v1alpha2.ContainerState{
 		"stopped":    v1alpha2.ContainerState_CONTAINER_CREATED,
 		"paused":     v1alpha2.ContainerState_CONTAINER_CREATED,
 		"starting":   v1alpha2.ContainerState_CONTAINER_RUNNING,
@@ -60,6 +60,16 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		"respawning": v1alpha2.ContainerState_CONTAINER_RUNNING,
 		"meta":       v1alpha2.ContainerState_CONTAINER_RUNNING,
 		"dead":       v1alpha2.ContainerState_CONTAINER_EXITED,
+	}
+	server.mapper.podStateMap = map[string]v1alpha2.PodSandboxState{
+		"stopped":    v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
+		"paused":     v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
+		"starting":   v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
+		"running":    v1alpha2.PodSandboxState_SANDBOX_READY,
+		"stopping":   v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
+		"respawning": v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
+		"meta":       v1alpha2.PodSandboxState_SANDBOX_READY,
+		"dead":       v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
 	}
 	server.mapper.portoClient, err = Connect()
 	if err != nil {

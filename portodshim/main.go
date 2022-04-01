@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/natefinch/lumberjack.v2"
 	"os"
+	"runtime"
 )
 
 const (
@@ -36,6 +37,11 @@ func makeZapLogger(logPath string, debug bool) (*zap.Logger, error) {
 			zapcore.NewCore(encoder, zapcore.Lock(os.Stdout), al))
 	}
 	return zap.New(core), nil
+}
+
+func getCurrentFuncName() string {
+	pc, _, _, _ := runtime.Caller(1)
+	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
 }
 
 func main() {
