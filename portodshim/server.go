@@ -51,6 +51,16 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 
 	// TODO: Сделать реконнекты к portod
 	// porto client
+	server.mapper.stateMap = map[string]v1alpha2.ContainerState{
+		"stopped":    v1alpha2.ContainerState_CONTAINER_CREATED,
+		"paused":     v1alpha2.ContainerState_CONTAINER_CREATED,
+		"starting":   v1alpha2.ContainerState_CONTAINER_RUNNING,
+		"running":    v1alpha2.ContainerState_CONTAINER_RUNNING,
+		"stopping":   v1alpha2.ContainerState_CONTAINER_RUNNING,
+		"respawning": v1alpha2.ContainerState_CONTAINER_RUNNING,
+		"meta":       v1alpha2.ContainerState_CONTAINER_RUNNING,
+		"dead":       v1alpha2.ContainerState_CONTAINER_EXITED,
+	}
 	server.mapper.portoClient, err = Connect()
 	if err != nil {
 		zap.S().Fatalf("connect to porto: %v", err)
