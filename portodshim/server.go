@@ -13,11 +13,12 @@ import (
 )
 
 type PortodshimServer struct {
-	socket     string
-	listener   net.Listener
-	grpcServer *grpc.Server
-	mapper     PortodshimMapper
-	ctx        context.Context
+	socket        string
+	listener      net.Listener
+	grpcServer    *grpc.Server
+	runtimeMapper PortodshimRuntimeMapper
+	imageMapper   PortodshimImageMapper
+	ctx           context.Context
 }
 
 func unlinkStaleSocket(socketPath string) error {
@@ -51,7 +52,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 
 	// TODO: Сделать реконнекты к portod
 	// porto client
-	server.mapper.containerStateMap = map[string]v1alpha2.ContainerState{
+	server.runtimeMapper.containerStateMap = map[string]v1alpha2.ContainerState{
 		"stopped":    v1alpha2.ContainerState_CONTAINER_CREATED,
 		"paused":     v1alpha2.ContainerState_CONTAINER_CREATED,
 		"starting":   v1alpha2.ContainerState_CONTAINER_RUNNING,
@@ -61,7 +62,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		"meta":       v1alpha2.ContainerState_CONTAINER_RUNNING,
 		"dead":       v1alpha2.ContainerState_CONTAINER_EXITED,
 	}
-	server.mapper.podStateMap = map[string]v1alpha2.PodSandboxState{
+	server.runtimeMapper.podStateMap = map[string]v1alpha2.PodSandboxState{
 		"stopped":    v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
 		"paused":     v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
 		"starting":   v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
@@ -71,7 +72,12 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		"meta":       v1alpha2.PodSandboxState_SANDBOX_READY,
 		"dead":       v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
 	}
-	server.mapper.portoClient, err = Connect()
+	server.runtimeMapper.portoClient, err = Connect()
+	if err != nil {
+		zap.S().Fatalf("connect to porto: %v", err)
+		return nil, fmt.Errorf("connect to porto: %v", err)
+	}
+	server.imageMapper.portoClient, err = Connect()
 	if err != nil {
 		zap.S().Fatalf("connect to porto: %v", err)
 		return nil, fmt.Errorf("connect to porto: %v", err)
@@ -96,7 +102,8 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 	server.grpcServer = grpc.NewServer()
 
 	// TODO: Добавить другую версию API
-	v1alpha2.RegisterRuntimeServiceServer(server.grpcServer, &server.mapper)
+	v1alpha2.RegisterRuntimeServiceServer(server.grpcServer, &server.runtimeMapper)
+	v1alpha2.RegisterImageServiceServer(server.grpcServer, &server.imageMapper)
 
 	zap.S().Info("portodshim is initialized")
 	return &server, nil
@@ -126,7 +133,7 @@ func (server *PortodshimServer) Shutdown() {
 	server.grpcServer.GracefulStop()
 
 	// porto client
-	if err := server.mapper.portoClient.Close(); err != nil {
+	if err := server.runtimeMapper.portoClient.Close(); err != nil {
 		zap.S().Warnf("failed to close porto connection: %v", err)
 	}
 }

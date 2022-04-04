@@ -14,29 +14,28 @@ const (
 	containerName = "porto"
 )
 
-type PortodshimMapper struct {
+type PortodshimRuntimeMapper struct {
 	portoClient       API
 	containerStateMap map[string]v1alpha2.ContainerState
 	podStateMap       map[string]v1alpha2.PodSandboxState
 }
 
-func (mapper *PortodshimMapper) getContainerState(id string) v1alpha2.ContainerState {
+// INTERNAL
+func (mapper *PortodshimRuntimeMapper) getContainerState(id string) v1alpha2.ContainerState {
 	state, err := mapper.portoClient.GetProperty(id, "state")
 	if err != nil {
 		return v1alpha2.ContainerState_CONTAINER_UNKNOWN
 	}
 	return mapper.containerStateMap[state]
 }
-
-func (mapper *PortodshimMapper) getPodState(id string) v1alpha2.PodSandboxState {
+func (mapper *PortodshimRuntimeMapper) getPodState(id string) v1alpha2.PodSandboxState {
 	state, err := mapper.portoClient.GetProperty(id, "state")
 	if err != nil {
 		return v1alpha2.PodSandboxState_SANDBOX_NOTREADY
 	}
 	return mapper.podStateMap[state]
 }
-
-func (mapper *PortodshimMapper) getCreationTime(id string) (int64, error) {
+func (mapper *PortodshimRuntimeMapper) getCreationTime(id string) (int64, error) {
 	creationTimeRaw, err := mapper.portoClient.GetProperty(id, "creation_time[raw]")
 	if err != nil {
 		return 0, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -47,8 +46,7 @@ func (mapper *PortodshimMapper) getCreationTime(id string) (int64, error) {
 	}
 	return time.Unix(creationTime, 0).UnixNano(), nil
 }
-
-func (mapper *PortodshimMapper) getPodAndContainer(id string) (string, string) {
+func (mapper *PortodshimRuntimeMapper) getPodAndContainer(id string) (string, string) {
 	pod := strings.Split(id, "/")[0]
 	name := ""
 	if len(pod) != len(id) {
@@ -56,12 +54,12 @@ func (mapper *PortodshimMapper) getPodAndContainer(id string) (string, string) {
 	}
 	return pod, name
 }
-
-func (mapper *PortodshimMapper) getId(pod string, name string) string {
+func (mapper *PortodshimRuntimeMapper) getId(pod string, name string) string {
 	return pod + "/" + name
 }
 
-func (mapper *PortodshimMapper) Version(ctx context.Context, req *v1alpha2.VersionRequest) (*v1alpha2.VersionResponse, error) {
+// RUNTIME SERVICE INTERFACE
+func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1alpha2.VersionRequest) (*v1alpha2.VersionResponse, error) {
 	tag, rev, err := mapper.portoClient.GetVersion()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -73,7 +71,7 @@ func (mapper *PortodshimMapper) Version(ctx context.Context, req *v1alpha2.Versi
 		RuntimeApiVersion: rev,
 	}, nil
 }
-func (mapper *PortodshimMapper) RunPodSandbox(ctx context.Context, req *v1alpha2.RunPodSandboxRequest) (*v1alpha2.RunPodSandboxResponse, error) {
+func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1alpha2.RunPodSandboxRequest) (*v1alpha2.RunPodSandboxResponse, error) {
 	pod := req.Config.Metadata.Name
 	if _, err := mapper.portoClient.GetProperty(pod, "state"); err != nil {
 		err = mapper.portoClient.Create(pod)
@@ -92,7 +90,7 @@ func (mapper *PortodshimMapper) RunPodSandbox(ctx context.Context, req *v1alpha2
 		PodSandboxId: pod,
 	}, nil
 }
-func (mapper *PortodshimMapper) StopPodSandbox(ctx context.Context, req *v1alpha2.StopPodSandboxRequest) (*v1alpha2.StopPodSandboxResponse, error) {
+func (mapper *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *v1alpha2.StopPodSandboxRequest) (*v1alpha2.StopPodSandboxResponse, error) {
 	pod := req.PodSandboxId
 	err := mapper.portoClient.Stop(pod)
 	if err != nil {
@@ -100,7 +98,7 @@ func (mapper *PortodshimMapper) StopPodSandbox(ctx context.Context, req *v1alpha
 	}
 	return &v1alpha2.StopPodSandboxResponse{}, nil
 }
-func (mapper *PortodshimMapper) RemovePodSandbox(ctx context.Context, req *v1alpha2.RemovePodSandboxRequest) (*v1alpha2.RemovePodSandboxResponse, error) {
+func (mapper *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req *v1alpha2.RemovePodSandboxRequest) (*v1alpha2.RemovePodSandboxResponse, error) {
 	pod := req.PodSandboxId
 	err := mapper.portoClient.Destroy(pod)
 	if err != nil {
@@ -108,7 +106,7 @@ func (mapper *PortodshimMapper) RemovePodSandbox(ctx context.Context, req *v1alp
 	}
 	return &v1alpha2.RemovePodSandboxResponse{}, nil
 }
-func (mapper *PortodshimMapper) PodSandboxStatus(ctx context.Context, req *v1alpha2.PodSandboxStatusRequest) (*v1alpha2.PodSandboxStatusResponse, error) {
+func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req *v1alpha2.PodSandboxStatusRequest) (*v1alpha2.PodSandboxStatusResponse, error) {
 	pod := req.PodSandboxId
 	creationTime, err := mapper.getCreationTime(pod)
 	if err != nil {
@@ -125,10 +123,10 @@ func (mapper *PortodshimMapper) PodSandboxStatus(ctx context.Context, req *v1alp
 		},
 	}, nil
 }
-func (mapper *PortodshimMapper) PodSandboxStats(ctx context.Context, req *v1alpha2.PodSandboxStatsRequest) (*v1alpha2.PodSandboxStatsResponse, error) {
+func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req *v1alpha2.PodSandboxStatsRequest) (*v1alpha2.PodSandboxStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented PodSandboxStats")
 }
-func (mapper *PortodshimMapper) ListPodSandbox(ctx context.Context, req *v1alpha2.ListPodSandboxRequest) (*v1alpha2.ListPodSandboxResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *v1alpha2.ListPodSandboxRequest) (*v1alpha2.ListPodSandboxResponse, error) {
 	response, err := mapper.portoClient.List1("*")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -154,7 +152,7 @@ func (mapper *PortodshimMapper) ListPodSandbox(ctx context.Context, req *v1alpha
 		Items: items,
 	}, nil
 }
-func (mapper *PortodshimMapper) CreateContainer(ctx context.Context, req *v1alpha2.CreateContainerRequest) (*v1alpha2.CreateContainerResponse, error) {
+func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1alpha2.CreateContainerRequest) (*v1alpha2.CreateContainerResponse, error) {
 	pod := req.PodSandboxId
 	name := req.Config.Metadata.Name
 	id := mapper.getId(pod, name)
@@ -166,7 +164,7 @@ func (mapper *PortodshimMapper) CreateContainer(ctx context.Context, req *v1alph
 		ContainerId: id,
 	}, nil
 }
-func (mapper *PortodshimMapper) StartContainer(ctx context.Context, req *v1alpha2.StartContainerRequest) (*v1alpha2.StartContainerResponse, error) {
+func (mapper *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *v1alpha2.StartContainerRequest) (*v1alpha2.StartContainerResponse, error) {
 	id := req.ContainerId
 	err := mapper.portoClient.Start(id)
 	if err != nil {
@@ -174,7 +172,7 @@ func (mapper *PortodshimMapper) StartContainer(ctx context.Context, req *v1alpha
 	}
 	return &v1alpha2.StartContainerResponse{}, nil
 }
-func (mapper *PortodshimMapper) StopContainer(ctx context.Context, req *v1alpha2.StopContainerRequest) (*v1alpha2.StopContainerResponse, error) {
+func (mapper *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v1alpha2.StopContainerRequest) (*v1alpha2.StopContainerResponse, error) {
 	id := req.ContainerId
 	err := mapper.portoClient.Stop(id)
 	if err != nil {
@@ -182,7 +180,7 @@ func (mapper *PortodshimMapper) StopContainer(ctx context.Context, req *v1alpha2
 	}
 	return &v1alpha2.StopContainerResponse{}, nil
 }
-func (mapper *PortodshimMapper) RemoveContainer(ctx context.Context, req *v1alpha2.RemoveContainerRequest) (*v1alpha2.RemoveContainerResponse, error) {
+func (mapper *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req *v1alpha2.RemoveContainerRequest) (*v1alpha2.RemoveContainerResponse, error) {
 	id := req.ContainerId
 	err := mapper.portoClient.Destroy(id)
 	if err != nil {
@@ -190,7 +188,7 @@ func (mapper *PortodshimMapper) RemoveContainer(ctx context.Context, req *v1alph
 	}
 	return &v1alpha2.RemoveContainerResponse{}, nil
 }
-func (mapper *PortodshimMapper) ListContainers(ctx context.Context, req *v1alpha2.ListContainersRequest) (*v1alpha2.ListContainersResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *v1alpha2.ListContainersRequest) (*v1alpha2.ListContainersResponse, error) {
 	response, err := mapper.portoClient.List()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -228,7 +226,7 @@ func (mapper *PortodshimMapper) ListContainers(ctx context.Context, req *v1alpha
 		Containers: containers,
 	}, nil
 }
-func (mapper *PortodshimMapper) ContainerStatus(ctx context.Context, req *v1alpha2.ContainerStatusRequest) (*v1alpha2.ContainerStatusResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req *v1alpha2.ContainerStatusRequest) (*v1alpha2.ContainerStatusResponse, error) {
 	id := req.ContainerId
 	return &v1alpha2.ContainerStatusResponse{
 		Status: &v1alpha2.ContainerStatus{
@@ -240,36 +238,36 @@ func (mapper *PortodshimMapper) ContainerStatus(ctx context.Context, req *v1alph
 		},
 	}, nil
 }
-func (mapper *PortodshimMapper) UpdateContainerResources(ctx context.Context, req *v1alpha2.UpdateContainerResourcesRequest) (*v1alpha2.UpdateContainerResourcesResponse, error) {
+func (mapper *PortodshimRuntimeMapper) UpdateContainerResources(ctx context.Context, req *v1alpha2.UpdateContainerResourcesRequest) (*v1alpha2.UpdateContainerResourcesResponse, error) {
 	return nil, fmt.Errorf("not implemented UpdateContainerResources")
 }
-func (mapper *PortodshimMapper) ReopenContainerLog(ctx context.Context, req *v1alpha2.ReopenContainerLogRequest) (*v1alpha2.ReopenContainerLogResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ReopenContainerLog(ctx context.Context, req *v1alpha2.ReopenContainerLogRequest) (*v1alpha2.ReopenContainerLogResponse, error) {
 	return nil, fmt.Errorf("not implemented ReopenContainerLog")
 }
-func (mapper *PortodshimMapper) ExecSync(ctx context.Context, req *v1alpha2.ExecSyncRequest) (*v1alpha2.ExecSyncResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1alpha2.ExecSyncRequest) (*v1alpha2.ExecSyncResponse, error) {
 	return nil, fmt.Errorf("not implemented ExecSync")
 }
-func (mapper *PortodshimMapper) Exec(ctx context.Context, req *v1alpha2.ExecRequest) (*v1alpha2.ExecResponse, error) {
+func (mapper *PortodshimRuntimeMapper) Exec(ctx context.Context, req *v1alpha2.ExecRequest) (*v1alpha2.ExecResponse, error) {
 	return nil, fmt.Errorf("not implemented Exec")
 }
-func (mapper *PortodshimMapper) Attach(ctx context.Context, req *v1alpha2.AttachRequest) (*v1alpha2.AttachResponse, error) {
+func (mapper *PortodshimRuntimeMapper) Attach(ctx context.Context, req *v1alpha2.AttachRequest) (*v1alpha2.AttachResponse, error) {
 	return nil, fmt.Errorf("not implemented Attach")
 }
-func (mapper *PortodshimMapper) PortForward(ctx context.Context, req *v1alpha2.PortForwardRequest) (*v1alpha2.PortForwardResponse, error) {
+func (mapper *PortodshimRuntimeMapper) PortForward(ctx context.Context, req *v1alpha2.PortForwardRequest) (*v1alpha2.PortForwardResponse, error) {
 	return nil, fmt.Errorf("not implemented PortForward")
 }
-func (mapper *PortodshimMapper) ContainerStats(ctx context.Context, req *v1alpha2.ContainerStatsRequest) (*v1alpha2.ContainerStatsResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ContainerStats(ctx context.Context, req *v1alpha2.ContainerStatsRequest) (*v1alpha2.ContainerStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented ContainerStats")
 }
-func (mapper *PortodshimMapper) ListContainerStats(ctx context.Context, req *v1alpha2.ListContainerStatsRequest) (*v1alpha2.ListContainerStatsResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, req *v1alpha2.ListContainerStatsRequest) (*v1alpha2.ListContainerStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented ListContainerStats")
 }
-func (mapper *PortodshimMapper) ListPodSandboxStats(ctx context.Context, req *v1alpha2.ListPodSandboxStatsRequest) (*v1alpha2.ListPodSandboxStatsResponse, error) {
+func (mapper *PortodshimRuntimeMapper) ListPodSandboxStats(ctx context.Context, req *v1alpha2.ListPodSandboxStatsRequest) (*v1alpha2.ListPodSandboxStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented ListPodSandboxStats")
 }
-func (mapper *PortodshimMapper) UpdateRuntimeConfig(ctx context.Context, req *v1alpha2.UpdateRuntimeConfigRequest) (*v1alpha2.UpdateRuntimeConfigResponse, error) {
+func (mapper *PortodshimRuntimeMapper) UpdateRuntimeConfig(ctx context.Context, req *v1alpha2.UpdateRuntimeConfigRequest) (*v1alpha2.UpdateRuntimeConfigResponse, error) {
 	return nil, fmt.Errorf("not implemented UpdateRuntimeConfig")
 }
-func (mapper *PortodshimMapper) Status(ctx context.Context, req *v1alpha2.StatusRequest) (*v1alpha2.StatusResponse, error) {
+func (mapper *PortodshimRuntimeMapper) Status(ctx context.Context, req *v1alpha2.StatusRequest) (*v1alpha2.StatusResponse, error) {
 	return nil, fmt.Errorf("not implemented Status")
 }
