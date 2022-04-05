@@ -243,6 +243,7 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const string &nam
     ExpectApiSuccess(api.GetData(name, "net_rx_bytes", v));
     ExpectApiSuccess(api.GetData(name, "net_rx_packets", v));
     ExpectApiSuccess(api.GetData(name, "net_rx_drops", v));
+    ExpectApiSuccess(api.GetData(name, "net_rx_overlimits", v));
 
     int intval;
     ExpectApiSuccess(api.GetData(name, "minor_faults", v));
@@ -292,6 +293,7 @@ static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
     ExpectApiFailure(api.GetData(name, "net_rx_bytes", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "net_rx_packets", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "net_rx_drops", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "net_rx_overlimits", v), EError::InvalidState);
 
     ExpectApiFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
@@ -2579,6 +2581,7 @@ static void TestRoot(Porto::Connection &api) {
         "net_rx_bytes",
         "net_rx_packets",
         "net_rx_drops",
+        "net_rx_overlimits",
         "net_tos",
     };
 

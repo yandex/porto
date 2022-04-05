@@ -1159,6 +1159,7 @@ TError TNetwork::SyncDevicesLocked() {
                 auto lock = HostNetwork->LockNet();
                 qdiscStat = peerQdisc.Stat(*HostNetwork->GetNl());
                 dev.DeviceStat.RxDrops += qdiscStat.Drops;
+                dev.DeviceStat.RxOverruns += qdiscStat.Overruns;
             }
             /* DO NOT REMOVE https://st.yandex-team.ru/PORTO-809
             TNlQdisc qdiscIngress(dev.Index, TC_H_INGRESS, TC_H_MAJ(TC_H_INGRESS));

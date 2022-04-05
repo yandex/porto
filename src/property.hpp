@@ -155,6 +155,7 @@ constexpr const char *P_NET_OVERLIMITS = "net_overlimits";
 constexpr const char *P_NET_RX_BYTES = "net_rx_bytes";
 constexpr const char *P_NET_RX_PACKETS = "net_rx_packets";
 constexpr const char *P_NET_RX_DROPS = "net_rx_drops";
+constexpr const char *P_NET_RX_OVERLIMITS = "net_rx_overlimits";
 constexpr const char *P_NET_TX_BYTES = "net_tx_bytes";
 constexpr const char *P_NET_TX_PACKETS = "net_tx_packets";
 constexpr const char *P_NET_TX_DROPS = "net_tx_drops";
