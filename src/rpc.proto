@@ -517,6 +517,7 @@ message TContainerStatus {
     optional TUintMap net_rx_bytes = 58;       // out
     optional TUintMap net_rx_packets = 59;     // out
     optional TUintMap net_rx_drops = 60;       // out
+    optional TUintMap net_rx_overlimits = 601; // out
     optional TUintMap net_tx_bytes = 61;       // out
     optional TUintMap net_tx_packets = 62;     // out
     optional TUintMap net_tx_drops = 63;       // out

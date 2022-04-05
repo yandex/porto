@@ -263,10 +263,13 @@ def run_mtn_limit_test():
     if qdisc in ["fq_codel", "pfifo_fast"]:
         print "Check tx drops and overlimits"
         a = run_iperf_client("test-net-a", server1, time=5, bandwidth=0, length=1300, wait=20, udp=True, mtn=True, cfg={"net_limit": "default: 10M"})
-        drops = a["net_tx_drops[group default]"]
-        overlimits = a["net_overlimits[group default]"]
-        ExpectLe(100, drops + overlimits)
-        ExpectPropLe(a, "net_rx_drops[group default]", 10)
+        tx_drops = int(a["net_tx_drops[group default]"])
+        tx_overlimits = int(a["net_overlimits[group default]"])
+        ExpectLe(1, tx_overlimits)
+        ExpectLe(100, tx_drops + tx_overlimits)
+        rx_drops = int(a["net_rx_drops[group default]"])
+        rx_overlimits = int(a["net_rx_overlimits[group default]"])
+        ExpectLe(rx_drops + rx_overlimits, 10)
         #ExpectPropGe(a, "net_snmp[RetransSegs]", 1)
 
         Expect(int(a['net_tx_max_speed']) > 50 * 2**20)
@@ -294,10 +297,13 @@ def run_mtn_limit_test():
 
         print "Check rx drops and overlimits"
         a = run_iperf_client("test-net-a", server1, time=5, bandwidth=0, length=1300, wait=20, udp=True, mtn=True, reverse=True, cfg={"net_rx_limit": "default: 50M"})
-        drops = a["net_tx_drops[group default]"]
-        overlimits = a["net_overlimits[group default]"]
-        ExpectLe(100, drops + overlimits)
-        ExpectPropGe(a, "net_rx_drops[group default]", 100)
+        tx_drops = int(a["net_tx_drops[group default]"])
+        tx_overlimits = int(a["net_overlimits[group default]"])
+        ExpectLe(tx_drops + tx_overlimits, 10)
+        rx_drops = int(a["net_rx_drops[group default]"])
+        rx_overlimits = int(a["net_rx_overlimits[group default]"])
+        ExpectLe(1, rx_overlimits)
+        ExpectLe(100, rx_drops + rx_overlimits)
         #ExpectPropGe(a, "net_snmp[RetransSegs]", 1)
 
         Expect(int(a['net_rx_max_speed']) > 50 * 2**20)

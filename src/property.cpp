@@ -6035,6 +6035,8 @@ public:
             map = spec.mutable_net_rx_packets();
         else if (Name == P_NET_RX_DROPS)
             map = spec.mutable_net_rx_drops();
+        else if (Name == P_NET_RX_OVERLIMITS)
+            map = spec.mutable_net_rx_overlimits();
         else if (Name == P_NET_NETSTAT)
             map = spec.mutable_net_netstat();
         else if (Name == P_NET_SNMP)
@@ -6065,6 +6067,8 @@ TNetStatProperty NetRxPackets(P_NET_RX_PACKETS, &TNetStat::RxPackets,
         "Device RX packets: <interface>: <packets>;...");
 TNetStatProperty NetRxDrops(P_NET_RX_DROPS, &TNetStat::RxDrops,
         "Device RX drops: <interface>: <packets>;...");
+TNetStatProperty NetRxOverlimits(P_NET_RX_OVERLIMITS, &TNetStat::RxOverruns,
+        "Device RX overlimits: <interface>: <packets>;...");
 
 TNetStatProperty NetTxBytes(P_NET_TX_BYTES, &TNetStat::TxBytes,
         "Device TX bytes: <interface>: <bytes>;...");
