@@ -845,14 +845,9 @@ public:
                 error = pin.OpenDir(name);
                 if (error)
                     goto err;
-                error = CL->WriteAccess(pin);
-                if (error) {
-                    error = TError(error, "Layer {}", name);
-                    if (config().volumes().insecure_user_paths())
-                        L("Ignore {}", error);
-                    else
-                        goto err;
-                }
+                error = CL->ReadAccess(pin);
+                if (error)
+                    goto err;
                 path = pin.ProcPath();
             } else {
                 TStorage layer;
@@ -1114,14 +1109,9 @@ public:
                 error = pin.OpenDir(name);
                 if (error)
                     goto err;
-                error = CL->WriteAccess(pin);
-                if (error) {
-                    error = TError(error, "Layer {}", name);
-                    if (config().volumes().insecure_user_paths())
-                        L("Ignore {}", error);
-                    else
-                        goto err;
-                }
+                error = CL->ReadAccess(pin);
+                if (error)
+                    goto err;
                 path = pin.ProcPath();
             } else {
                 TStorage layer;
@@ -2097,14 +2087,9 @@ TError TVolume::MergeLayers() {
             if (error)
                 return error;
 
-            error = CL->WriteAccess(pin);
-            if (error) {
-                error = TError(error, "Layer {}", name);
-                if (config().volumes().insecure_user_paths())
-                    L("Ignore {}", error);
-                else
-                    return error;
-            }
+            error = CL->ReadAccess(pin);
+            if (error)
+                return error;
 
             temp = GetInternal("temp");
             error = temp.Mkdir(0700);
