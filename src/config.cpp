@@ -138,7 +138,7 @@ static void DefaultConfig() {
 
     config().mutable_volumes()->set_enable_quota(true);
     config().mutable_volumes()->set_keep_project_quota_id(true);
-    config().mutable_volumes()->set_insecure_user_paths(false);
+    config().mutable_volumes()->set_insecure_user_paths("");
 
     if (CompareVersions(config().linux_version(), "4.4") >= 0)
         config().mutable_volumes()->set_direct_io_loop(true);

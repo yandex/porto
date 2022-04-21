@@ -2354,8 +2354,15 @@ TError TVolume::Build() {
         else
             error = CL->WriteAccess(StorageFd);
         if (error) {
+            bool ignore = false;
+            for (const auto &path: InsecureUserPaths) {
+                if (StringMatch(Storage, path)) {
+                    ignore = true;
+                    break;
+                }
+            }
             error = TError(error, "Storage {}", Storage);
-            if (config().volumes().insecure_user_paths())
+            if (ignore)
                 L("Ignore {}", error);
             else
                 return error;
@@ -3656,6 +3663,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
 };
 
 std::vector<std::string> AuxPlacesPaths;
+std::vector<std::string> InsecureUserPaths;
 
 TError TVolume::Create(const rpc::TVolumeSpec &spec,
                        std::shared_ptr<TVolume> &volume) {
@@ -3892,6 +3900,7 @@ void TVolume::RestoreAll(void) {
     std::vector<TStorage> aux_places;
 
     AuxPlacesPaths = SplitString(config().volumes().aux_default_places(), ';');
+    InsecureUserPaths = SplitString(config().volumes().insecure_user_paths(), ';');
 
     def_place.Open(EStorageType::Place, PORTO_PLACE);
     error = TStorage::CheckPlace(def_place.Path);

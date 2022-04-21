@@ -299,6 +299,7 @@ struct TVolumeProperty {
 
 extern std::vector<TVolumeProperty> VolumeProperties;
 extern std::vector<std::string> AuxPlacesPaths;
+extern std::vector<std::string> InsecureUserPaths;
 
 extern MeasuredMutex VolumesMutex;
 extern std::map<TPath, std::shared_ptr<TVolume>> Volumes;
