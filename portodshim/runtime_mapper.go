@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strconv"
@@ -85,6 +86,73 @@ func (mapper *PortodshimRuntimeMapper) getId(pod string, name string) string {
 }
 func (mapper *PortodshimRuntimeMapper) convertToPathId(id string) string {
 	return "_" + id + "_"
+}
+func (mapper *PortodshimRuntimeMapper) convertBase64(src string, encode bool) string {
+	if encode {
+		return base64.RawStdEncoding.EncodeToString([]byte(src))
+	}
+
+	dst, err := base64.RawStdEncoding.DecodeString(src)
+	if err != nil {
+		return src
+	}
+
+	return string(dst)
+}
+func (mapper *PortodshimRuntimeMapper) convertLabel(src string, toPorto bool, prefix string) string {
+	dst := src
+	if toPorto {
+		dst = mapper.convertBase64(dst, true)
+		if prefix != "" {
+			dst = prefix + "." + dst
+		}
+	} else {
+		if prefix != "" {
+			dst = strings.TrimPrefix(dst, prefix+".")
+		}
+		dst = mapper.convertBase64(dst, false)
+	}
+
+	return dst
+}
+func (mapper *PortodshimRuntimeMapper) setLabels(ctx context.Context, id string, labels map[string]string, prefix string) {
+	portoClient := ctx.Value("portoClient").(API)
+
+	for label, value := range labels {
+		err := portoClient.SetProperty(id, fmt.Sprintf("labels[%s]", mapper.convertLabel(label, true, prefix)), mapper.convertLabel(value, true, ""))
+		if err != nil {
+			zap.S().Warnf("%s: label %s: %v", getCurrentFuncName(), label, err)
+			continue
+		}
+	}
+}
+func (mapper *PortodshimRuntimeMapper) getLabels(ctx context.Context, id string, prefix string) map[string]string {
+	portoClient := ctx.Value("portoClient").(API)
+
+	labels, err := portoClient.GetProperty(id, "labels")
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		return map[string]string{}
+	}
+
+	result := make(map[string]string)
+	if len(labels) > 0 {
+		// porto container labels parsing
+		for _, pair := range strings.Split(labels, ";") {
+			splitedPair := strings.Split(pair, ":")
+			label := strings.TrimSpace(splitedPair[0])
+			value := strings.TrimSpace(splitedPair[1])
+			if !strings.HasPrefix(label, prefix) {
+				continue
+			}
+			result[mapper.convertLabel(label, false, prefix)] = mapper.convertLabel(value, false, "")
+		}
+	}
+
+	return result
+}
+func (mapper *PortodshimRuntimeMapper) getValueForKubeLabel(ctx context.Context, id string, label string, prefix string) string {
+	return mapper.convertLabel(mapper.getStringProperty(ctx, id, fmt.Sprintf("labels[%s]", mapper.convertLabel(label, true, prefix))), false, "")
 }
 func (mapper *PortodshimRuntimeMapper) getTimeProperty(ctx context.Context, id string, property string) int64 {
 	return time.Unix(int64(mapper.getUintProperty(ctx, id, property)), 0).UnixNano()
@@ -203,7 +271,6 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 
 	if err == nil {
 		// volume creating
-
 		config := map[string]string{
 			"backend":    "plain",
 			"containers": id,
@@ -233,6 +300,19 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 			_ = os.RemoveAll(rootPath)
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
+
+		// labels and annotations
+		labels := req.GetConfig().GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		if _, found := labels["io.kubernetes.pod.namespace"]; !found {
+			labels["io.kubernetes.pod.namespace"] = req.GetConfig().GetMetadata().GetNamespace()
+		}
+		labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+
+		mapper.setLabels(ctx, id, labels, "LABEL")
+		mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
 	}
 
 	// pod starting
@@ -285,6 +365,7 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
 
 	id := req.GetPodSandboxId()
+	attempt, _ := strconv.ParseUint(mapper.getValueForKubeLabel(ctx, id, "attempt", "LABEL"), 10, 64)
 
 	return &v1.PodSandboxStatusResponse{
 		Status: &v1.PodSandboxStatus{
@@ -292,8 +373,8 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 			Metadata: &v1.PodSandboxMetadata{
 				Name:      id,
 				Uid:       id,
-				Namespace: "default",
-				Attempt:   0,
+				Namespace: mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"),
+				Attempt:   uint32(attempt),
 			},
 			State:     mapper.getPodState(ctx, id),
 			CreatedAt: mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
@@ -309,8 +390,8 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 					},
 				},
 			},
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
 		},
 	}, nil
 }
@@ -407,8 +488,8 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 			},
 			State:       mapper.getPodState(ctx, id),
 			CreatedAt:   mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
 		})
 	}
 
@@ -438,7 +519,6 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 
 	if err == nil {
 		// volume creating
-
 		config := map[string]string{
 			"backend":    "overlay",
 			"containers": id,
@@ -468,6 +548,16 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 			_ = os.RemoveAll(rootPath)
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
+
+		// labels and annotations
+		labels := req.GetConfig().GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+
+		mapper.setLabels(ctx, id, req.GetConfig().GetLabels(), "LABEL")
+		mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
 	}
 
 	return &v1.CreateContainerResponse{
@@ -571,8 +661,8 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 			ImageRef:    image,
 			State:       mapper.getContainerState(ctx, id),
 			CreatedAt:   mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
 		})
 	}
 
@@ -596,7 +686,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 			Id: id,
 			Metadata: &v1.ContainerMetadata{
 				Name:    id,
-				Attempt: 0,
+				Attempt: uint32(mapper.getUintProperty(ctx, id, "labels[LABEL.attempt]")),
 			},
 			State:      mapper.getContainerState(ctx, id),
 			CreatedAt:  mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
@@ -607,8 +697,8 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 				Image: image,
 			},
 			ImageRef:    image,
-			Labels:      map[string]string{},
-			Annotations: map[string]string{},
+			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
 		},
 	}, nil
 }
