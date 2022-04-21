@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 	grpc "google.golang.org/grpc"
-	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 type PortodshimServer struct {
@@ -59,7 +58,7 @@ func serverInterceptor(ctx context.Context,
 	defer portoClient.Close()
 
 	h, err := handler(context.WithValue(ctx, "portoClient", portoClient), req)
-	zap.S().Debugf("request: %s\tduration: %s\terror: %v\n", info.FullMethod, time.Since(start), err)
+	zap.S().Debugf("request: %s\tduration: %s\terror: %v", info.FullMethod, time.Since(start), err)
 
 	return h, err
 }
@@ -70,27 +69,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 
 	server := PortodshimServer{socket: socketPath}
 	server.ctx = server.ShutdownCtx()
-
-	server.runtimeMapper.containerStateMap = map[string]v1alpha2.ContainerState{
-		"stopped":    v1alpha2.ContainerState_CONTAINER_CREATED,
-		"paused":     v1alpha2.ContainerState_CONTAINER_CREATED,
-		"starting":   v1alpha2.ContainerState_CONTAINER_RUNNING,
-		"running":    v1alpha2.ContainerState_CONTAINER_RUNNING,
-		"stopping":   v1alpha2.ContainerState_CONTAINER_RUNNING,
-		"respawning": v1alpha2.ContainerState_CONTAINER_RUNNING,
-		"meta":       v1alpha2.ContainerState_CONTAINER_RUNNING,
-		"dead":       v1alpha2.ContainerState_CONTAINER_EXITED,
-	}
-	server.runtimeMapper.podStateMap = map[string]v1alpha2.PodSandboxState{
-		"stopped":    v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
-		"paused":     v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
-		"starting":   v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
-		"running":    v1alpha2.PodSandboxState_SANDBOX_READY,
-		"stopping":   v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
-		"respawning": v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
-		"meta":       v1alpha2.PodSandboxState_SANDBOX_READY,
-		"dead":       v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
-	}
+	server.runtimeMapper = NewPortodshimRuntimeMapper()
 
 	err = unlinkStaleSocket(socketPath)
 	if err != nil {
@@ -113,10 +92,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 	}
 
 	server.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(serverInterceptor))
-
-	// TODO: Добавить другую версию API
-	v1alpha2.RegisterRuntimeServiceServer(server.grpcServer, &server.runtimeMapper)
-	v1alpha2.RegisterImageServiceServer(server.grpcServer, &server.imageMapper)
+	RegisterServer(&server)
 
 	zap.S().Info("portodshim is initialized")
 	return &server, nil

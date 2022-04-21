@@ -1,13 +1,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -32,7 +33,7 @@ func makeZapLogger(logPath string, debug bool) (*zap.Logger, error) {
 		al = zap.NewAtomicLevelAt(zapcore.DebugLevel)
 	}
 	core := zapcore.NewCore(encoder, sink, al)
-	if terminal.IsTerminal(int(os.Stdout.Fd())) {
+	if term.IsTerminal(int(os.Stdout.Fd())) {
 		core = zapcore.NewTee(
 			core,
 			zapcore.NewCore(encoder, zapcore.Lock(os.Stdout), al))
@@ -42,11 +43,14 @@ func makeZapLogger(logPath string, debug bool) (*zap.Logger, error) {
 
 func getCurrentFuncName() string {
 	pc, _, _, _ := runtime.Caller(1)
-	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
+	return runtime.FuncForPC(pc).Name()
 }
 
 func main() {
-	logger, err := makeZapLogger(portodshimLogPath, false)
+	debug := flag.Bool("debug", false, "show debug logs")
+	flag.Parse()
+
+	logger, err := makeZapLogger(portodshimLogPath, *debug)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cannot create logger: %v", err)
 		return
