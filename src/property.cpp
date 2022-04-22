@@ -5546,6 +5546,99 @@ public:
     }
 } static CpuThrottled;
 
+class TCpuBurstUsage : public TProperty {
+public:
+    TCpuBurstUsage() : TProperty(P_CPU_BURST_USAGE, EProperty::NONE,
+                                "CPU burst usage time [nanoseconds]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_CPU;
+    }
+    void Init(void) override {
+        uint64_t value;
+        IsSupported = !CpuSubsystem.RootCgroup().GetUint64("cpu.cfs_burst_usage", value);
+    }
+
+    TError Get(uint64_t &value) const {
+        auto cg = CT->GetCgroup(CpuSubsystem);
+        return cg.GetUint64("cpu.cfs_burst_usage", value);
+    }
+
+    TError Get(std::string &value) const override {
+        uint64_t val;
+        auto error = Get(val);
+        if (!error)
+            value = std::to_string(val);
+        return error;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) const override {
+        uint64_t val = 0;
+        auto error = Get(val);
+        if (!error)
+            spec.set_cpu_burst_usage(val);
+    }
+} static CpuBurstUsage;
+
+class TCpuUnconstrainedWait : public TProperty {
+public:
+    TCpuUnconstrainedWait() : TProperty(P_CPU_UNCONSTRAINED_WAIT, EProperty::NONE,
+                                 "CPU unconstrained wait time [nanoseconds]")
+    {
+        IsReadOnly = true;
+        IsRuntimeOnly = true;
+        RequireControllers = CGROUP_CPU;
+    }
+    void Init(void) override {
+        uint64_t value;
+        IsSupported = !CpuSubsystem.RootCgroup().GetUint64("cpuacct.wait", value) &&
+                !CpuSubsystem.RootCgroup().GetUint64("cpu.cfs_burst_load", value) &&
+                !CpuSubsystem.RootCgroup().GetUint64("cpu.cfs_burst_usage", value) &&
+                !CpuSubsystem.RootCgroup().GetUint64("cpu.cfs_throttled", value);
+    }
+
+    TError Get(uint64_t& value) const {
+        TError error;
+        auto cg = CT->GetCgroup(CpuSubsystem);
+        TUintMap stat;
+        int64_t wait, burstLoad, burstUsage, throttled;
+
+        error = cg.GetInt64("cpuacct.wait", wait);
+        if (error)
+            return error;
+
+        error = cg.GetUintMap("cpu.stat", stat);
+        if (error)
+            return error;
+
+        burstLoad = static_cast<int64_t>(stat["burst_load"]);
+        burstUsage = static_cast<int64_t>(stat["burst_usage"]);
+        throttled = static_cast<int64_t>(stat["h_throttled_time"]);
+
+        value = static_cast<uint64_t>(std::max(
+                wait - std::max(burstLoad - burstUsage, static_cast<int64_t>(0)) - throttled,
+                static_cast<int64_t>(0)));
+
+        return OK;
+    }
+
+    TError Get(std::string &value) const override {
+        uint64_t val;
+        auto error = Get(val);
+        if (!error)
+            value = std::to_string(val);
+        return error;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) const override {
+        uint64_t val = 0;
+        auto error = Get(val);
+        if (!error)
+            spec.set_cpu_unconstrained_wait(val);
+    }
+} static CpuUnconstrainedWait;
+
 class TNetClassId : public TProperty {
 public:
     TNetClassId() : TProperty(P_NET_CLASS_ID, EProperty::NONE,

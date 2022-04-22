@@ -752,6 +752,10 @@ write permissions to the target or owning related volume.
 
 * **cpu\_throttled** - total throttled time in nanoseconds
 
+* **cpu\_burst\_usage** - total burst usage time in nanoseconds
+
+* **cpu\_unconstrained\_wait** - total unconstrained wait time in nanoseconds
+
 * **cpu\_weight** - CPU weight, syntax: 0.01..100, default: 1
 
     Multiplies cpu.shares and +10% cpu\_weight is -1 nice.
