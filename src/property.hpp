@@ -78,6 +78,8 @@ constexpr const char *P_CPU_USAGE = "cpu_usage";
 constexpr const char *P_CPU_SYSTEM = "cpu_usage_system";
 constexpr const char *P_CPU_WAIT = "cpu_wait";
 constexpr const char *P_CPU_THROTTLED = "cpu_throttled";
+constexpr const char *P_CPU_BURST_USAGE = "cpu_burst_usage";
+constexpr const char *P_CPU_UNCONSTRAINED_WAIT = "cpu_unconstrained_wait";
 
 constexpr const char *P_IO_POLICY = "io_policy";
 constexpr const char *P_IO_WEIGHT = "io_weight";

@@ -686,6 +686,8 @@ static std::string HumanValue(const std::string &full_name, const std::string &v
         name == "cpu_usage_system" ||
         name == "cpu_wait" ||
         name == "cpu_throttled" ||
+        name == "cpu_burst_usage" ||
+        name == "cpu_unconstrained_wait" ||
         name == "cpu_period" ||
         name == "respawn_delay")
         return StringFormatDuration(num / 1000000);

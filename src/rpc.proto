@@ -470,6 +470,8 @@ message TContainerStatus {
     optional uint64 cpu_usage_system = 27;     // out
     optional uint64 cpu_wait = 28;             // out
     optional uint64 cpu_throttled = 29;        // out
+    optional uint64 cpu_burst_usage = 74;        // out
+    optional uint64 cpu_unconstrained_wait = 75;        // out
 
     optional uint64 process_count = 30;        // out
     optional uint64 thread_count = 31;         // out
