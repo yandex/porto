@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"syscall"
 	"time"
+
+	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 const (
@@ -18,7 +19,7 @@ type PortodshimImageMapper struct {
 
 // IMAGE SERVICE INTERFACE
 func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1alpha2.ListImagesRequest) (*v1alpha2.ListImagesResponse, error) {
-	response, err := mapper.portoClient.ListLayers2("", "")
+	response, err := ctx.Value("portoClient").(API).ListLayers2("", "")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -30,12 +31,13 @@ func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1alph
 			Username: desc.OwnerUser,
 		})
 	}
+
 	return &v1alpha2.ListImagesResponse{
 		Images: images,
 	}, nil
 }
 func (mapper *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1alpha2.ImageStatusRequest) (*v1alpha2.ImageStatusResponse, error) {
-	response, err := mapper.portoClient.ListLayers2("", req.Image.GetImage())
+	response, err := ctx.Value("portoClient").(API).ListLayers2("", req.Image.GetImage())
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -60,10 +62,12 @@ func (mapper *PortodshimImageMapper) PullImage(ctx context.Context, req *v1alpha
 	}, nil
 }
 func (mapper *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1alpha2.RemoveImageRequest) (*v1alpha2.RemoveImageResponse, error) {
-	err := mapper.portoClient.RemoveLayer(req.Image.GetImage())
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
+	// temporarily
+	//err = ctx.Value("portoClient").(API).RemoveLayer(req.Image.GetImage())
+	//if err != nil {
+	//	return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	//}
+
 	return &v1alpha2.RemoveImageResponse{}, nil
 }
 func (mapper *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1alpha2.ImageFsInfoRequest) (*v1alpha2.ImageFsInfoResponse, error) {

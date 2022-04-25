@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/crypto/ssh/terminal"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"os"
-	"runtime"
 )
 
 const (

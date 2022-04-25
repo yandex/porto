@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
-	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
+	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 const (
@@ -16,22 +17,21 @@ const (
 )
 
 type PortodshimRuntimeMapper struct {
-	portoClient       API
 	containerStateMap map[string]v1alpha2.ContainerState
 	podStateMap       map[string]v1alpha2.PodSandboxState
 }
 
 // INTERNAL
-func (mapper *PortodshimRuntimeMapper) getContainerState(id string) v1alpha2.ContainerState {
-	state, err := mapper.portoClient.GetProperty(id, "state")
+func (mapper *PortodshimRuntimeMapper) getContainerState(ctx context.Context, id string) v1alpha2.ContainerState {
+	state, err := ctx.Value("portoClient").(API).GetProperty(id, "state")
 	if err != nil {
 		return v1alpha2.ContainerState_CONTAINER_UNKNOWN
 	}
 
 	return mapper.containerStateMap[state]
 }
-func (mapper *PortodshimRuntimeMapper) getPodState(id string) v1alpha2.PodSandboxState {
-	state, err := mapper.portoClient.GetProperty(id, "state")
+func (mapper *PortodshimRuntimeMapper) getPodState(ctx context.Context, id string) v1alpha2.PodSandboxState {
+	state, err := ctx.Value("portoClient").(API).GetProperty(id, "state")
 	if err != nil {
 		return v1alpha2.PodSandboxState_SANDBOX_NOTREADY
 	}
@@ -50,11 +50,11 @@ func (mapper *PortodshimRuntimeMapper) getPodAndContainer(id string) (string, st
 func (mapper *PortodshimRuntimeMapper) getId(pod string, name string) string {
 	return pod + "/" + name
 }
-func (mapper *PortodshimRuntimeMapper) getTimeProperty(id string, property string) int64 {
-	return time.Unix(int64(mapper.getUintProperty(id, property)), 0).UnixNano()
+func (mapper *PortodshimRuntimeMapper) getTimeProperty(ctx context.Context, id string, property string) int64 {
+	return time.Unix(int64(mapper.getUintProperty(ctx, id, property)), 0).UnixNano()
 }
-func (mapper *PortodshimRuntimeMapper) getUintProperty(id string, property string) uint64 {
-	valueString, err := mapper.portoClient.GetProperty(id, property)
+func (mapper *PortodshimRuntimeMapper) getUintProperty(ctx context.Context, id string, property string) uint64 {
+	valueString, err := ctx.Value("portoClient").(API).GetProperty(id, property)
 	if err != nil || valueString == "" {
 		return 0
 	}
@@ -67,21 +67,21 @@ func (mapper *PortodshimRuntimeMapper) getUintProperty(id string, property strin
 
 	return value
 }
-func (mapper *PortodshimRuntimeMapper) getStringProperty(id string, property string) string {
-	value, err := mapper.portoClient.GetProperty(id, property)
+func (mapper *PortodshimRuntimeMapper) getStringProperty(ctx context.Context, id string, property string) string {
+	value, err := ctx.Value("portoClient").(API).GetProperty(id, property)
 	if err != nil {
 		return ""
 	}
 
 	return value
 }
-func (mapper *PortodshimRuntimeMapper) getContainerStats(id string) (*v1alpha2.ContainerStats, error) {
+func (mapper *PortodshimRuntimeMapper) getContainerStats(ctx context.Context, id string) (*v1alpha2.ContainerStats, error) {
 	_, name := mapper.getPodAndContainer(id)
 	if name == "" {
 		return nil, fmt.Errorf("%s: cannot get container stats: specified ID belongs to pod", getCurrentFuncName())
 	}
 
-	cpu := mapper.getUintProperty(id, "cpu_usage")
+	cpu := mapper.getUintProperty(ctx, id, "cpu_usage")
 	timestamp := time.Now().UnixNano()
 
 	// TODO: Заполнить оставшиеся метрики
@@ -101,10 +101,10 @@ func (mapper *PortodshimRuntimeMapper) getContainerStats(id string) (*v1alpha2.C
 			Timestamp:       timestamp,
 			WorkingSetBytes: &v1alpha2.UInt64Value{Value: 0},
 			AvailableBytes:  &v1alpha2.UInt64Value{Value: 0},
-			UsageBytes:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "memory_usage")},
+			UsageBytes:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "memory_usage")},
 			RssBytes:        &v1alpha2.UInt64Value{Value: 0},
-			PageFaults:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "minor_faults")},
-			MajorPageFaults: &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "major_faults")},
+			PageFaults:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "minor_faults")},
+			MajorPageFaults: &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "major_faults")},
 		},
 		WritableLayer: &v1alpha2.FilesystemUsage{
 			Timestamp: timestamp,
@@ -119,7 +119,7 @@ func (mapper *PortodshimRuntimeMapper) getContainerStats(id string) (*v1alpha2.C
 
 // RUNTIME SERVICE INTERFACE
 func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1alpha2.VersionRequest) (*v1alpha2.VersionResponse, error) {
-	tag, rev, err := mapper.portoClient.GetVersion()
+	tag, rev, err := ctx.Value("portoClient").(API).GetVersion()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -134,16 +134,16 @@ func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1alpha
 func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1alpha2.RunPodSandboxRequest) (*v1alpha2.RunPodSandboxResponse, error) {
 	id := req.GetConfig().GetMetadata().GetName()
 
-	if _, err := mapper.portoClient.GetProperty(id, "state"); err != nil {
-		err = mapper.portoClient.Create(id)
+	if _, err := ctx.Value("portoClient").(API).GetProperty(id, "state"); err != nil {
+		err = ctx.Value("portoClient").(API).Create(id)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
 	}
 
-	if mapper.getPodState(id) == v1alpha2.PodSandboxState_SANDBOX_NOTREADY {
-		_ = mapper.portoClient.Stop(id)
-		err := mapper.portoClient.Start(id)
+	if mapper.getPodState(ctx, id) == v1alpha2.PodSandboxState_SANDBOX_NOTREADY {
+		_ = ctx.Value("portoClient").(API).Stop(id)
+		err := ctx.Value("portoClient").(API).Start(id)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
@@ -156,7 +156,7 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 func (mapper *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *v1alpha2.StopPodSandboxRequest) (*v1alpha2.StopPodSandboxResponse, error) {
 	id := req.GetPodSandboxId()
 
-	err := mapper.portoClient.Stop(id)
+	err := ctx.Value("portoClient").(API).Stop(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -166,7 +166,7 @@ func (mapper *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req *v1alpha2.RemovePodSandboxRequest) (*v1alpha2.RemovePodSandboxResponse, error) {
 	id := req.GetPodSandboxId()
 
-	err := mapper.portoClient.Destroy(id)
+	err := ctx.Value("portoClient").(API).Destroy(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -184,8 +184,8 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 				Uid:       id,
 				Namespace: "default",
 			},
-			State:     mapper.getPodState(id),
-			CreatedAt: mapper.getTimeProperty(id, "creation_time[raw]"),
+			State:     mapper.getPodState(ctx, id),
+			CreatedAt: mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
 			Network: &v1alpha2.PodSandboxNetworkStatus{
 				Ip: "",
 			},
@@ -208,16 +208,16 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req 
 		return nil, fmt.Errorf("%s: specified ID belongs to container", getCurrentFuncName())
 	}
 
-	cpu := mapper.getUintProperty(id, "cpu_usage")
+	cpu := mapper.getUintProperty(ctx, id, "cpu_usage")
 
-	response, err := mapper.portoClient.List1(id + "/***")
+	response, err := ctx.Value("portoClient").(API).List1(id + "/***")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	var stats []*v1alpha2.ContainerStats
 	for _, ctrId := range response {
-		st, err := mapper.getContainerStats(ctrId)
+		st, err := mapper.getContainerStats(ctx, ctrId)
 		if err != nil {
 			continue
 		}
@@ -245,24 +245,24 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req 
 					Timestamp:       timestamp,
 					WorkingSetBytes: &v1alpha2.UInt64Value{Value: 0},
 					AvailableBytes:  &v1alpha2.UInt64Value{Value: 0},
-					UsageBytes:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "memory_usage")},
+					UsageBytes:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "memory_usage")},
 					RssBytes:        &v1alpha2.UInt64Value{Value: 0},
-					PageFaults:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "minor_faults")},
-					MajorPageFaults: &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "major_faults")},
+					PageFaults:      &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "minor_faults")},
+					MajorPageFaults: &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "major_faults")},
 				},
 				Network: &v1alpha2.NetworkUsage{
 					Timestamp: timestamp,
 					DefaultInterface: &v1alpha2.NetworkInterfaceUsage{
 						Name:     "eth0",
-						RxBytes:  &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "net_rx_bytes")},
+						RxBytes:  &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "net_rx_bytes")},
 						RxErrors: &v1alpha2.UInt64Value{Value: 0},
-						TxBytes:  &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "net_bytes")},
+						TxBytes:  &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "net_bytes")},
 						TxErrors: &v1alpha2.UInt64Value{Value: 0},
 					},
 				},
 				Process: &v1alpha2.ProcessUsage{
 					Timestamp:    timestamp,
-					ProcessCount: &v1alpha2.UInt64Value{Value: mapper.getUintProperty(id, "process_count")},
+					ProcessCount: &v1alpha2.UInt64Value{Value: mapper.getUintProperty(ctx, id, "process_count")},
 				},
 				Containers: stats,
 			},
@@ -272,7 +272,7 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req 
 }
 func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *v1alpha2.ListPodSandboxRequest) (*v1alpha2.ListPodSandboxResponse, error) {
 	// TODO: Добавить фильтры
-	response, err := mapper.portoClient.List1("*")
+	response, err := ctx.Value("portoClient").(API).List1("*")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -284,8 +284,8 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 			Metadata: &v1alpha2.PodSandboxMetadata{
 				Name: id,
 			},
-			State:     mapper.getPodState(id),
-			CreatedAt: mapper.getTimeProperty(id, "creation_time[raw]"),
+			State:     mapper.getPodState(ctx, id),
+			CreatedAt: mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
 		})
 	}
 
@@ -298,7 +298,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	name := req.GetConfig().GetMetadata().GetName()
 	id := mapper.getId(pod, name)
 
-	err := mapper.portoClient.Create(id)
+	err := ctx.Value("portoClient").(API).Create(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -310,7 +310,12 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 func (mapper *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *v1alpha2.StartContainerRequest) (*v1alpha2.StartContainerResponse, error) {
 	id := req.GetContainerId()
 
-	err := mapper.portoClient.Start(id)
+	_, name := mapper.getPodAndContainer(id)
+	if name == "" {
+		return nil, fmt.Errorf("%s: %s specified ID belongs to pod", getCurrentFuncName(), id)
+	}
+
+	err := ctx.Value("portoClient").(API).Start(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -320,7 +325,12 @@ func (mapper *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v1alpha2.StopContainerRequest) (*v1alpha2.StopContainerResponse, error) {
 	id := req.GetContainerId()
 
-	err := mapper.portoClient.Stop(id)
+	_, name := mapper.getPodAndContainer(id)
+	if name == "" {
+		return nil, fmt.Errorf("%s: %s specified ID belongs to pod", getCurrentFuncName(), id)
+	}
+
+	err := ctx.Value("portoClient").(API).Stop(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -330,7 +340,12 @@ func (mapper *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v
 func (mapper *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req *v1alpha2.RemoveContainerRequest) (*v1alpha2.RemoveContainerResponse, error) {
 	id := req.GetContainerId()
 
-	err := mapper.portoClient.Destroy(id)
+	_, name := mapper.getPodAndContainer(id)
+	if name == "" {
+		return nil, fmt.Errorf("%s: %s specified ID belongs to pod", getCurrentFuncName(), id)
+	}
+
+	err := ctx.Value("portoClient").(API).Destroy(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -339,7 +354,7 @@ func (mapper *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req 
 }
 func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *v1alpha2.ListContainersRequest) (*v1alpha2.ListContainersResponse, error) {
 	// TODO: Добавить фильтры
-	response, err := mapper.portoClient.List()
+	response, err := ctx.Value("portoClient").(API).List()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -363,8 +378,8 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 				Image: "None",
 			},
 			ImageRef:  "None",
-			State:     mapper.getContainerState(id),
-			CreatedAt: mapper.getTimeProperty(id, "creation_time[raw]"),
+			State:     mapper.getContainerState(ctx, id),
+			CreatedAt: mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
 		})
 	}
 
@@ -375,17 +390,22 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req *v1alpha2.ContainerStatusRequest) (*v1alpha2.ContainerStatusResponse, error) {
 	id := req.GetContainerId()
 
+	_, name := mapper.getPodAndContainer(id)
+	if name == "" {
+		return nil, fmt.Errorf("%s: specified ID belongs to pod", getCurrentFuncName())
+	}
+
 	return &v1alpha2.ContainerStatusResponse{
 		Status: &v1alpha2.ContainerStatus{
 			Id: id,
 			Metadata: &v1alpha2.ContainerMetadata{
 				Name: id,
 			},
-			State:      mapper.getContainerState(id),
-			CreatedAt:  mapper.getTimeProperty(id, "creation_time[raw]"),
-			StartedAt:  mapper.getTimeProperty(id, "start_time[raw]"),
-			FinishedAt: mapper.getTimeProperty(id, "death_time[raw]"),
-			ExitCode:   int32(mapper.getUintProperty(id, "exit_code")),
+			State:      mapper.getContainerState(ctx, id),
+			CreatedAt:  mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
+			StartedAt:  mapper.getTimeProperty(ctx, id, "start_time[raw]"),
+			FinishedAt: mapper.getTimeProperty(ctx, id, "death_time[raw]"),
+			ExitCode:   int32(mapper.getUintProperty(ctx, id, "exit_code")),
 			Image: &v1alpha2.ImageSpec{
 				Image: "",
 			},
@@ -412,7 +432,7 @@ func (mapper *PortodshimRuntimeMapper) PortForward(ctx context.Context, req *v1a
 	return nil, fmt.Errorf("not implemented PortForward")
 }
 func (mapper *PortodshimRuntimeMapper) ContainerStats(ctx context.Context, req *v1alpha2.ContainerStatsRequest) (*v1alpha2.ContainerStatsResponse, error) {
-	st, err := mapper.getContainerStats(req.GetContainerId())
+	st, err := mapper.getContainerStats(ctx, req.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -425,7 +445,7 @@ func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, r
 	// TODO: Добавить фильтр по labels
 	filterId := req.GetFilter().GetId()
 	if filterId != "" {
-		st, err := mapper.getContainerStats(filterId)
+		st, err := mapper.getContainerStats(ctx, filterId)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
@@ -441,14 +461,14 @@ func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, r
 		mask = filterPod + "/***"
 	}
 
-	response, err := mapper.portoClient.List1(mask)
+	response, err := ctx.Value("portoClient").(API).List1(mask)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	var stats []*v1alpha2.ContainerStats
 	for _, id := range response {
-		st, err := mapper.getContainerStats(id)
+		st, err := mapper.getContainerStats(ctx, id)
 		if err != nil {
 			continue
 		}
@@ -466,7 +486,7 @@ func (mapper *PortodshimRuntimeMapper) UpdateRuntimeConfig(ctx context.Context, 
 	return nil, fmt.Errorf("not implemented UpdateRuntimeConfig")
 }
 func (mapper *PortodshimRuntimeMapper) Status(ctx context.Context, req *v1alpha2.StatusRequest) (*v1alpha2.StatusResponse, error) {
-	if _, _, err := mapper.portoClient.GetVersion(); err != nil {
+	if _, _, err := ctx.Value("portoClient").(API).GetVersion(); err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 	var conditions []*v1alpha2.RuntimeCondition

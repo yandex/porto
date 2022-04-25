@@ -3,13 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"os/signal"
+	"time"
+
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 	grpc "google.golang.org/grpc"
 	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"net"
-	"os"
-	"os/signal"
 )
 
 type PortodshimServer struct {
@@ -43,6 +45,25 @@ func unlinkStaleSocket(socketPath string) error {
 	}
 }
 
+func serverInterceptor(ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler) (interface{}, error) {
+	start := time.Now()
+
+	portoClient, err := Connect()
+	if err != nil {
+		zap.S().Fatalf("connect to porto: %v", err)
+		return nil, fmt.Errorf("connect to porto: %v", err)
+	}
+	defer portoClient.Close()
+
+	h, err := handler(context.WithValue(ctx, "portoClient", portoClient), req)
+	zap.S().Debugf("request: %s\tduration: %s\terror: %v\n", info.FullMethod, time.Since(start), err)
+
+	return h, err
+}
+
 func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 	var err error
 	zap.S().Info("starting of portodshim initialization")
@@ -50,8 +71,6 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 	server := PortodshimServer{socket: socketPath}
 	server.ctx = server.ShutdownCtx()
 
-	// TODO: Сделать реконнекты к portod
-	// porto client
 	server.runtimeMapper.containerStateMap = map[string]v1alpha2.ContainerState{
 		"stopped":    v1alpha2.ContainerState_CONTAINER_CREATED,
 		"paused":     v1alpha2.ContainerState_CONTAINER_CREATED,
@@ -72,18 +91,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		"meta":       v1alpha2.PodSandboxState_SANDBOX_READY,
 		"dead":       v1alpha2.PodSandboxState_SANDBOX_NOTREADY,
 	}
-	server.runtimeMapper.portoClient, err = Connect()
-	if err != nil {
-		zap.S().Fatalf("connect to porto: %v", err)
-		return nil, fmt.Errorf("connect to porto: %v", err)
-	}
-	server.imageMapper.portoClient, err = Connect()
-	if err != nil {
-		zap.S().Fatalf("connect to porto: %v", err)
-		return nil, fmt.Errorf("connect to porto: %v", err)
-	}
 
-	// cri server
 	err = unlinkStaleSocket(socketPath)
 	if err != nil {
 		zap.S().Fatalf("failed to unlink staled socket: %v", err)
@@ -99,7 +107,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		return nil, fmt.Errorf("chmod error: %s %v", server.socket, err)
 	}
 
-	server.grpcServer = grpc.NewServer()
+	server.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(serverInterceptor))
 
 	// TODO: Добавить другую версию API
 	v1alpha2.RegisterRuntimeServiceServer(server.grpcServer, &server.runtimeMapper)
@@ -131,11 +139,6 @@ func (server *PortodshimServer) Shutdown() {
 	zap.S().Info("portodshim is shutting down")
 
 	server.grpcServer.GracefulStop()
-
-	// porto client
-	if err := server.runtimeMapper.portoClient.Close(); err != nil {
-		zap.S().Warnf("failed to close porto connection: %v", err)
-	}
 }
 
 func (server *PortodshimServer) ShutdownCtx() (ctx context.Context) {
