@@ -13,6 +13,17 @@ a = conn.Create('a')
 b = conn.Create('b')
 c = None
 
+def check_affinity(ct, affinity):
+    ct_affinity = ct['cpu_set_affinity']
+    with open('/sys/fs/cgroup/cpuset/porto%{}/cpuset.cpus'.format(ct)) as f:
+        cg_affinity = str(f.read()).strip()
+    if affinity.startswith('!'):
+        assert ct_affinity != affinity
+        assert cg_affinity != affinity
+    else:
+        assert ct_affinity == affinity
+        assert cg_affinity == affinity
+
 try:
     # incorrect values
 
@@ -35,12 +46,12 @@ try:
 
     a.Start()
     assert a['cpu_set'] == 'jail 2'
-    assert a['cpu_set_affinity'] == '0-1'
+    check_affinity(a, '0-1')
 
     b.Start()
     assert b['cpu_set'] == 'jail 2'
     if CPUNR >= 4:
-        assert b['cpu_set_affinity'] == '2-3'
+        check_affinity(b, '2-3')
 
     # destroy first jailed container
 
@@ -50,7 +61,7 @@ try:
 
     assert b['cpu_set'] == 'jail 2'
     if CPUNR >= 4:
-        assert b['cpu_set_affinity'] == '2-3'
+        check_affinity(b, '2-3')
 
     # free cores are reused
 
@@ -58,18 +69,18 @@ try:
     a.SetProperty('cpu_set', 'jail 1')
     a.Start()
     assert a['cpu_set'] == 'jail 1'
-    assert a['cpu_set_affinity'] == '0'
+    check_affinity(a, '0')
 
     # increase jail value, cores still reused
 
     a.SetProperty('cpu_set', 'jail 2')
-    assert a['cpu_set_affinity'] == '0-1'
+    check_affinity(a, '0-1')
 
     # skip already used cores
 
     a.SetProperty('cpu_set', 'jail 3')
     if CPUNR >= 5:
-        assert a['cpu_set_affinity'] == '0-1,4'
+        check_affinity(a, '0-1,4')
 
     # reload
 
@@ -77,11 +88,11 @@ try:
 
     assert a['cpu_set'] == 'jail 3'
     if CPUNR >= 5:
-        assert a['cpu_set_affinity'] == '0-1,4'
+        check_affinity(a, '0-1,4')
 
     assert b['cpu_set'] == 'jail 2'
     if CPUNR >= 4:
-        assert b['cpu_set_affinity'] == '2-3'
+        check_affinity(b, '2-3')
 
     b.Destroy()
     a.Destroy()
@@ -92,37 +103,37 @@ try:
     a.SetProperty('cpu_set', 'jail 2; node 0')
     a.Start()
     assert a['cpu_set'] == 'jail 2; node 0'
-    assert a['cpu_set_affinity'] == '0-1'
+    check_affinity(a, '0-1')
     a.SetProperty('cpu_set', 'node 0')
-    assert a['cpu_set_affinity'] != '0-1'
+    check_affinity(a, '!0-1')
     a.SetProperty('cpu_set', 'jail 2')
-    assert a['cpu_set_affinity'] == '0-1'
+    check_affinity(a, '0-1')
     a.SetProperty('cpu_set', 'jail 2; node 0')
     assert a['cpu_set'] == 'jail 2; node 0'
-    assert a['cpu_set_affinity'] == '0-1'
+    check_affinity(a, '0-1')
 
     ReloadPortod()
 
     assert a['cpu_set'] == 'jail 2; node 0'
-    assert a['cpu_set_affinity'] == '0-1'
+    check_affinity(a, '0-1')
 
     # jail -> raw cores -> jail -> none
 
     a.SetProperty('cpu_set', 'jail 1')
     assert a['cpu_set'] == 'jail 1'
-    assert a['cpu_set_affinity'] == '0'
+    check_affinity(a, '0')
 
     a.SetProperty('cpu_set', '1')
     assert a['cpu_set'] == '1'
-    assert a['cpu_set_affinity'] == '1'
+    check_affinity(a, '1')
 
     a.SetProperty('cpu_set', 'jail 1')
     assert a['cpu_set'] == 'jail 1'
-    assert a['cpu_set_affinity'] == '1'
+    check_affinity(a, '1')
 
     a.SetProperty('cpu_set', '')
     assert a['cpu_set'] == ''
-    assert a['cpu_set_affinity'] == '0-{}'.format(CPUNR - 1)
+    check_affinity(a, '0-{}'.format(CPUNR - 1))
 
     a.Destroy()
 
@@ -143,7 +154,45 @@ try:
     c.Start()
 
     assert a['cpu_set'] == 'jail 1'
-    assert a['cpu_set_affinity'] == '0'
+    check_affinity(a, '0')
+
+    c.Destroy()
+    b.Destroy()
+    a.Destroy()
+
+    # PORTO-992
+
+    a = conn.Create('a')
+    a.SetProperty('cpu_set', 'jail 2')
+    a.Start()
+
+    b = conn.Create('a/b')
+    b.SetProperty('controllers', 'cpuset')
+    b.Start()
+
+    c = conn.Create('a/b/c')
+    c.SetProperty('controllers', 'cpuset')
+    c.Start()
+
+    check_affinity(a, '0-1')
+    check_affinity(b, '0-1')
+    check_affinity(c, '0-1')
+
+    a.SetProperty('cpu_set', 'jail 1')
+
+    check_affinity(a, '0')
+    check_affinity(b, '0')
+    check_affinity(c, '0')
+
+    a.SetProperty('cpu_set', 'jail 3')
+
+    check_affinity(a, '0-2')
+    check_affinity(b, '0-2')
+    check_affinity(c, '0-2')
+
+    c.Destroy()
+    b.Destroy()
+    a.Destroy()
 
 finally:
     for ct in [a, b, c]:

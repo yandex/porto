@@ -117,6 +117,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError ReserveCpus(unsigned nr_threads, unsigned nr_cores,
                        TBitMap &threads, TBitMap &cores);
+    void SetAffinity(const TBitMap &affinity);
+    TError ApplySubtreeCpus(const std::list<std::shared_ptr<TContainer>> &subtree, const TBitMap &affinity, bool force = false);
     TError DistributeCpus();
 
     static void UpdateJailCpuStateLocked(const TBitMap& affinity, bool release = false);
