@@ -1740,6 +1740,8 @@ TError TContainer::JailCpus() {
         return OK;
     }
 
+    unsigned affinityWeight = affinity.Weight();
+
     /* try to detect previous jail affinity */
 
     int node = -1;
@@ -1756,7 +1758,7 @@ TError TContainer::JailCpus() {
                 break;
             }
         }
-    } else if (NumaNodes.Weight() > 1 && affinity.Weight() > 1 && affinity.Weight() < JailCpuPermutation.size()) {
+    } else if (NumaNodes.Weight() > 1 && affinityWeight > 1 && affinityWeight < JailCpuPermutation.size()) {
         /* check previous pin to node, assume we was pinned */
         nodeChanged = true;
         for (unsigned cpu = 0; cpu < affinity.Size(); cpu++) {
@@ -1774,10 +1776,10 @@ TError TContainer::JailCpus() {
         node = -1;
     }
 
-    if ((unsigned)NewCpuJail != affinity.Weight() || nodeChanged) {
+    if ((unsigned)NewCpuJail != affinityWeight || nodeChanged) {
         auto lock = LockCpuAffinity();
 
-        if (affinity.Weight() < JailCpuPermutation.size())
+        if (affinityWeight < JailCpuPermutation.size())
             UpdateJailCpuStateLocked(affinity, true);
 
         affinity.Clear();
@@ -1788,22 +1790,31 @@ TError TContainer::JailCpus() {
 
         lock.unlock();
 
+        auto subtree = Subtree();
+
+        if ((unsigned)NewCpuJail < affinityWeight) {
+            error = ApplySubtreeCpus(subtree, affinity, true);
+            if (error)
+                return error;
+        }
+
         error = CpusetSubsystem.SetCpus(cg, affinity.Format());
         if (error) {
             L("Cannot set cpuset.cpus: {}", error);
             return error;
         }
+
+        if ((unsigned)NewCpuJail > affinityWeight) {
+            subtree.reverse();
+            error = ApplySubtreeCpus(subtree, affinity, true);
+            if (error)
+                return error;
+        }
     } else if (!CpuJail)
         /* case of portod reload, fill current usage */
         UpdateJailCpuState(affinity);
 
-    CpuAffinity.Clear();
-    CpuAffinity.Set(affinity);
-
-    CpuVacant.Clear();
-    CpuVacant.Set(CpuAffinity);
-
-    SetProp(EProperty::CPU_SET_AFFINITY);
+    SetAffinity(affinity);
 
     CpuJail = NewCpuJail;
 
@@ -1821,6 +1832,45 @@ TBitMap TContainer::GetNoSmtCpus() {
     }
 
     return taskAffinity;
+}
+
+void TContainer::SetAffinity(const TBitMap &affinity) {
+    CpuAffinity.Clear();
+    CpuAffinity.Set(affinity);
+
+    CpuVacant.Clear();
+    CpuVacant.Set(affinity);
+
+    SetProp(EProperty::CPU_SET_AFFINITY);
+    (void)TestClearPropDirty(EProperty::CPU_SET_AFFINITY);
+}
+
+TError TContainer::ApplySubtreeCpus(const std::list<std::shared_ptr<TContainer>> &subtree, const TBitMap &affinity, bool force) {
+    TError error;
+
+    for (auto &ct: subtree) {
+        if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
+                !(force || ct->TestPropDirty(EProperty::CPU_SET_AFFINITY)) ||
+                ct->State == EContainerState::Stopped ||
+                ct->State == EContainerState::Dead)
+            continue;
+
+        auto cg = ct->GetCgroup(CpusetSubsystem);
+
+        if (!cg.Exists())
+            continue;
+
+        error = CpusetSubsystem.SetCpus(cg, affinity.Format());
+        if (error) {
+            L("Cannot set cpu affinity: {}", error);
+            return error;
+        }
+
+        if (force)
+            ct->SetAffinity(affinity);
+    }
+
+    return OK;
 }
 
 TError TContainer::DistributeCpus() {
@@ -2010,24 +2060,9 @@ TError TContainer::DistributeCpus() {
         }
     }
 
-    for (auto &ct: subtree) {
-        if (ct.get() == this || !(ct->Controllers & CGROUP_CPUSET) ||
-                !ct->TestPropDirty(EProperty::CPU_SET_AFFINITY) ||
-                ct->State == EContainerState::Stopped ||
-                ct->State == EContainerState::Dead)
-            continue;
-
-        auto cg = ct->GetCgroup(CpusetSubsystem);
-
-        if (!cg.Exists())
-            continue;
-
-        error = CpusetSubsystem.SetCpus(cg, CpuAffinity.Format());
-        if (error) {
-            L("Cannot set cpu affinity: {}", error);
-            return error;
-        }
-    }
+    error = ApplySubtreeCpus(subtree, CpuAffinity);
+    if (error)
+        return error;
 
     subtree.reverse();
 
