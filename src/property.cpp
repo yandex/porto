@@ -5327,7 +5327,7 @@ public:
     }
 
     TError Get(std::string &value) const override {
-        uint64_t val;
+        uint64_t val = 0;
         TError error = Get(val);
         if (error)
             return error;
@@ -5531,7 +5531,7 @@ public:
     }
 
     TError Get(std::string &value) const override {
-        uint64_t val;
+        uint64_t val = 0;
         auto error = Get(val);
         if (!error)
             value = std::to_string(val);
@@ -6235,7 +6235,7 @@ public:
     }
 
     TError Get(std::string &value) const override {
-        uint64_t val;
+        uint64_t val = 0;
         auto error = Get(val);
         if (error)
             return error;
