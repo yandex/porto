@@ -1472,6 +1472,14 @@ void TContainer::ChooseSchedPolicy() {
     }
 }
 
+// check that srcset1 is subset of srcset2
+static bool CPU_SUBSET(cpu_set_t *srcset1, cpu_set_t *srcset2)
+{
+    cpu_set_t tmp;
+    CPU_AND(&tmp, srcset1, srcset2);
+    return CPU_EQUAL(&tmp, srcset1);
+}
+
 TError TContainer::ApplySchedPolicy() {
     auto cg = GetCgroup(FreezerSubsystem);
     struct sched_param param;
@@ -1482,7 +1490,6 @@ TError TContainer::ApplySchedPolicy() {
     bool retry;
 
     L_ACT("Set {} scheduler policy {}", cg, CpuPolicy);
-
 
     TBitMap taskAffinity;
     if (SchedNoSmt) {
@@ -1503,7 +1510,8 @@ TError TContainer::ApplySchedPolicy() {
 
             if (std::find(prev.begin(), prev.end(), pid) != prev.end()) {
                 if (!sched_getaffinity(pid, sizeof(current), &current) &&
-                    CPU_EQUAL(&current, &taskMask) &&
+                    // https://st.yandex-team.ru/PORTO-993#627a4d9fcd10ac4784266ff7
+                    CPU_SUBSET(&current, &taskMask) &&
                     sched_getscheduler(pid) == SchedPolicy) {
 
                     continue;
@@ -1512,14 +1520,10 @@ TError TContainer::ApplySchedPolicy() {
 
             if (setpriority(PRIO_PROCESS, pid, SchedNice) && errno != ESRCH)
                 return TError::System("setpriority");
-            if (sched_setscheduler(pid, SchedPolicy, &param) &&
-                    errno != ESRCH)
+            if (sched_setscheduler(pid, SchedPolicy, &param) && errno != ESRCH)
                 return TError::System("sched_setscheduler");
-
-            if (!CPU_EQUAL(&current, &taskMask)) {
-                if (sched_setaffinity(pid, sizeof(taskMask), &taskMask) && errno != ESRCH)
-                    return TError::System("sched_setaffinity");
-            }
+            if (sched_setaffinity(pid, sizeof(taskMask), &taskMask) && errno != ESRCH)
+                return TError::System("sched_setaffinity");
 
             retry = true;
         }
