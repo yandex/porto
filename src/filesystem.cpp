@@ -642,7 +642,7 @@ TError TMountNamespace::SetupRoot(const TContainer &ct) {
                     return error;
             }
 
-            error = dest.Bind(portoctl);
+            error = dest.BindRemount(portoctl, MS_RDONLY);
             if (error)
                 return error;
         }
