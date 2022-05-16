@@ -1,3 +1,9 @@
+yandex-porto (5.2.4) unstable; urgency=low
+
+  * filesystem: create portoctl file before remounting root to ro
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 16 May 2022 16:01:04 +0300
+
 yandex-porto (5.2.3) unstable; urgency=low
 
   * filesystem: bind portoctl read only
