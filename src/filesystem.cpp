@@ -53,6 +53,29 @@ bool IsSystemPath(const TPath &path) {
     return false;
 }
 
+static TError PreparePortoctlBind() {
+    TPath dot(".");
+    TPath portoctl(PORTO_PORTOCTL_PATH);
+    TError error;
+
+    if (portoctl.Exists()) {
+        TPath dest = dot / portoctl;
+        if (!dest.Exists()) {
+            if (!dest.DirName().Exists()) {
+                error = dest.DirName().MkdirAll(0755);
+                if (error)
+                    return error;
+            }
+
+            error = dest.Mkfile(0755);
+            if (error)
+                return error;
+        }
+    }
+
+    return OK;
+}
+
 TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds) {
     auto lines = SplitEscapedString(str, ' ', ';');
     TError error;
@@ -630,18 +653,6 @@ TError TMountNamespace::SetupRoot(const TContainer &ct) {
 
         if (portoctl.Exists()) {
             dest = dot / portoctl;
-            if (!dest.Exists()) {
-                if (!dest.DirName().Exists()) {
-                    error = dest.DirName().MkdirAll(0755);
-                    if (error)
-                        return error;
-                }
-
-                error = dest.Mkfile(0755);
-                if (error)
-                    return error;
-            }
-
             error = dest.BindRemount(portoctl, MS_RDONLY);
             if (error)
                 return error;
@@ -782,6 +793,13 @@ TError TMountNamespace::Setup(const TContainer &ct) {
     // allow suid binaries at root volume
     if (!Root.IsRoot()) {
         error = dot.Remount(MS_BIND | MS_ALLOW_SUID);
+        if (error)
+            return error;
+    }
+
+    // create portoctl file before remounting root to ro
+    if (!Root.IsRoot() && BindPortoSock) {
+        error = PreparePortoctlBind();
         if (error)
             return error;
     }
