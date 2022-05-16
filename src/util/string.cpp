@@ -417,7 +417,7 @@ bool StringMatch(const std::string &str, const std::string &pattern, bool strict
         if (StringEndsWith(pattern, "***"))
             return StringStartsWith(str, pattern.substr(0, pattern.find("***")));
         if (StringStartsWith(pattern, "***"))
-            return StringEndsWith(str, pattern.substr(0, pattern.find("***")));
+            return StringEndsWith(str, pattern.substr(3));
     }
     return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
 }
