@@ -446,17 +446,34 @@ static void TestHolder(Porto::Connection &api) {
     name = string(128, 'a');
     ExpectApiSuccess(api.Destroy(name));
 
-    Say() << "Check meta soft limits" << std::endl;
-
     ExpectApiSuccess(api.Create("a/b/c"));
+    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
+
+    Say() << "Check list filters" << std::endl;
+
+    std::vector<std::string> expectedContainers;
+
     containers.clear();
     ExpectApiSuccess(api.List(containers));
-    ExpectEq(containers.size(), 3);
-    ExpectEq(containers[0], string("a"));
-    ExpectEq(containers[1], string("a/b"));
-    ExpectEq(containers[2], string("a/b/c"));
+    expectedContainers = {"a", "a/b", "a/b/c"};
+    Expect(containers == expectedContainers);
 
-    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
+    containers.clear();
+    ExpectApiSuccess(api.List(containers, "***"));
+    expectedContainers = {"a", "a/b", "a/b/c"};
+    Expect(containers == expectedContainers);
+
+    containers.clear();
+    ExpectApiSuccess(api.List(containers, "a***"));
+    expectedContainers = {"a", "a/b", "a/b/c"};
+    Expect(containers == expectedContainers);
+
+    containers.clear();
+    ExpectApiSuccess(api.List(containers, "***c"));
+    expectedContainers = {"a/b/c"};
+    Expect(containers == expectedContainers);
+
+    Say() << "Check meta soft limits" << std::endl;
 
     std::string customLimit = std::to_string(1 * 1024 * 1024);
 
