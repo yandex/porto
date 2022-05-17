@@ -1708,6 +1708,13 @@ TError TContainer::JailCpus() {
             if (ct->CpuJail)
                 return TError(EError::ResourceNotAvailable, "Nested cpu jails are not supported for CT{}:{}", Id, Name);
         }
+
+        for (auto &ct: Subtree()) {
+            if (ct.get() != this) {
+                if (ct->CpuJail)
+                    return TError(EError::ResourceNotAvailable, "Nested cpu jails are not supported for CT{}:{}", Id, Name);
+            }
+        }
     }
 
     /* check desired jail value */
