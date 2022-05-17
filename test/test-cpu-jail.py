@@ -9,8 +9,8 @@ if CPUNR < 3:
     sys.exit(0)
 
 conn = porto.Connection(timeout=30)
-a = conn.Create('a')
-b = conn.Create('b')
+a = None
+b = None
 c = None
 
 def check_affinity(ct, affinity):
@@ -27,19 +27,38 @@ def check_affinity(ct, affinity):
 try:
     # incorrect values
 
+    a = conn.Create('a')
     ExpectException(a.SetProperty, porto.exceptions.InvalidValue, 'cpu_set', 'jail')
     ExpectException(a.SetProperty, porto.exceptions.InvalidValue, 'cpu_set', 'jail 0')
     a.SetProperty('cpu_set', 'jail {}'.format(CPUNR))
     ExpectException(a.Start, porto.exceptions.ResourceNotAvailable)
+    a.SetProperty('cpu_set', '')
+    a.Start()
+
+    b = conn.Create('a/b')
+    b.SetProperty('cpu_set', 'jail 2')
+    b.Start()
+
+    check_affinity(a, '!0')
+    check_affinity(b, '0-1')
+
+    ExpectException(a.SetProperty, porto.exceptions.ResourceNotAvailable, 'cpu_set', 'jail 1')
+    ExpectException(a.SetProperty, porto.exceptions.ResourceNotAvailable, 'cpu_set', 'jail 2')
+    ExpectException(a.SetProperty, porto.exceptions.ResourceNotAvailable, 'cpu_set', 'jail 3')
+
+    b.Destroy()
+    a.Destroy()
 
     # reset jail on stopped container
 
+    a = conn.Create('a')
     a.SetProperty('cpu_set', 'jail 2')
     assert a['cpu_set'] == 'jail 2'
     a.SetProperty('cpu_set', '')
     assert a['cpu_set'] == ''
-
     a.SetProperty('cpu_set', 'jail 2')
+
+    b = conn.Create('b')
     b.SetProperty('cpu_set', 'jail 2')
 
     # simple
