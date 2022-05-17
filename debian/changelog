@@ -1,3 +1,10 @@
+yandex-porto (5.2.5) unstable; urgency=low
+
+  * test: add test for bind portoctl with root_readonly
+  * cpu: check nested jail in children
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 17 May 2022 19:50:04 +0300
+
 yandex-porto (5.2.4) unstable; urgency=low
 
   * filesystem: create portoctl file before remounting root to ro
