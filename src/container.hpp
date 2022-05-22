@@ -8,6 +8,7 @@
 #include <condition_variable>
 
 #include "util/unix.hpp"
+#include "util/task.hpp"
 #include "util/log.hpp"
 #include "util/idmap.hpp"
 #include "util/mutex.hpp"

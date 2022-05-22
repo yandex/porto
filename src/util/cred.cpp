@@ -10,6 +10,9 @@ extern "C" {
 #include <unistd.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#include <sys/statfs.h>
+#include <sys/statvfs.h>
+#include <linux/magic.h>
 #include <linux/capability.h>
 #include <linux/securebits.h>
 }
@@ -646,4 +649,40 @@ void InitCapabilities() {
     HelperCapabilities.Permitted = HostCapBound.Permitted;
     HelperCapabilities.Permitted &= ~BIT(CAP_SYS_RESOURCE);
     SysBootCapability.Permitted = BIT(CAP_SYS_BOOT);
+}
+
+bool TFile::Access(const struct stat &st, const TCred &cred, enum AccessMode mode) {
+    unsigned mask = mode;
+    if (cred.GetUid() == st.st_uid)
+        mask <<= 6;
+    else if (cred.IsMemberOf(st.st_gid))
+        mask <<= 3;
+    return cred.IsRootUser() || (st.st_mode & mask) == mask;
+}
+
+TError TFile::ReadAccess(const TCred &cred) const {
+    struct stat st;
+    TError error = Stat(st);
+    if (error)
+        return error;
+    if (Access(st, cred, TFile::R))
+        return OK;
+    return TError(EError::Permission, cred.ToString() + " has no read access to " + RealPath().ToString());
+}
+
+TError TFile::WriteAccess(const TCred &cred) const {
+    struct statfs fs;
+    if (fstatfs(Fd, &fs))
+        return TError::System("fstatfs");
+    if (fs.f_flags & ST_RDONLY)
+        return TError(EError::Permission, "read only: " + RealPath().ToString());
+    if (fs.f_type == PROC_SUPER_MAGIC)
+        return TError(EError::Permission, "procfs is read only");
+    struct stat st;
+    TError error = Stat(st);
+    if (error)
+        return error;
+    if (Access(st, cred, TFile::W))
+        return OK;
+    return TError(EError::Permission, cred.ToString() + " has no write access to " + RealPath().ToString());
 }

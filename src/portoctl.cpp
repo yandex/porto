@@ -12,7 +12,6 @@
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
-#include "util/cred.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -53,7 +52,7 @@ static void CatchChild(int) {
     ChildDead = 1;
 }
 
-std::string GetVlan688Subnet() {
+static std::string GetVlan688Subnet() {
     struct ifaddrs *ifAddrStruct = NULL;
     struct ifaddrs *ifa;
     char subnet[20] = {};
@@ -81,6 +80,22 @@ std::string GetVlan688Subnet() {
         freeifaddrs(ifAddrStruct);
 
     return subnet;
+}
+
+static TError RunCommand(const std::string &command, std::string &output) {
+    FILE *fp = popen(command.c_str(), "r");
+    if (!fp)
+        return TError::System("Failed to run command '{}'", command);
+
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), fp))
+        output.append(buffer);
+
+    int code = pclose(fp);
+    if (WEXITSTATUS(code))
+        return TError::System("Command '{}': exit code {}", command, code);
+
+    return OK;
 }
 
 class TLauncher {
@@ -1327,9 +1342,11 @@ public:
                 launcher.SetProperty("user", user);
 
             if (group == "") {
-                TCred cred;
-                if (!cred.Init(user))
-                    group = cred.Group();
+                error = RunCommand("id -gn " + user, group);
+                if (error) {
+                    std::cerr << "Cannot determine '" << user << "' primary group: " << error << std::endl;
+                    return EXIT_FAILURE;
+                }
             }
         }
 
