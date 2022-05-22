@@ -1,6 +1,10 @@
 import subprocess
 from test_common import *
 
+deps = subprocess.run(['ldd', portoctl], stdout=subprocess.PIPE).stdout.decode('utf-8')
+ExpectEq(len(list(filter(len, deps.split('\n')))), 1)
+ExpectEq(deps.find('libc'), -1)
+
 ExpectEq(subprocess.call([portoctl, 'exec', 'test', 'command=true'],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE),
