@@ -1,3 +1,9 @@
+yandex-porto (5.2.6) unstable; urgency=low
+
+  * build: make portoctl static
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 23 May 2022 12:05:42 +0300
+
 yandex-porto (5.2.5) unstable; urgency=low
 
   * test: add test for bind portoctl with root_readonly
