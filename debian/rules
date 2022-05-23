@@ -17,6 +17,7 @@ override_dh_shlibdeps:
 override_dh_install:
 	dh_install
 	dh_bash-completion
+	$(SBINDIR)/portoctl --help
 
 override_dh_auto_test:
 

@@ -221,7 +221,7 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
     const std::string name(argv[1]);
     if (name == "-h" || name == "--help") {
         Usage(nullptr);
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
 
     if (name == "-v" || name == "--version") {

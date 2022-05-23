@@ -48,7 +48,7 @@ target_link_libraries(portod version porto util config
 
 add_executable(portoctl portoctl.cpp cli.cpp)
 target_link_libraries(portoctl version porto utilbase fmt ${PROTOBUF_LIBRARY} pthread rt)
-set_target_properties(portoctl PROPERTIES LINK_FLAGS "-static")
+set_target_properties(portoctl PROPERTIES LINK_FLAGS "-static -Wl,--whole-archive -lrt -lpthread -Wl,--no-whole-archive")
 
 add_executable(portoctl-top portotop.cpp)
 target_link_libraries(portoctl-top version porto util pthread
