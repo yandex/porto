@@ -1,3 +1,10 @@
+yandex-porto (5.2.7) unstable; urgency=low
+
+  * portoctl: fix static build on focal
+  * filesystem: temporary disable portoctl binding into container
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Wed, 25 May 2022 23:48:54 +0300
+
 yandex-porto (5.2.6) unstable; urgency=low
 
   * build: make portoctl static
