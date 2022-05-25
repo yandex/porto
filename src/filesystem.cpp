@@ -53,7 +53,7 @@ bool IsSystemPath(const TPath &path) {
     return false;
 }
 
-static TError PreparePortoctlBind() {
+/*static TError PreparePortoctlBind() {
     TPath dot(".");
     TPath portoctl(PORTO_PORTOCTL_PATH);
     TError error;
@@ -74,7 +74,7 @@ static TError PreparePortoctlBind() {
     }
 
     return OK;
-}
+}*/
 
 TError TBindMount::Parse(const std::string &str, std::vector<TBindMount> &binds) {
     auto lines = SplitEscapedString(str, ' ', ';');
@@ -640,7 +640,7 @@ TError TMountNamespace::SetupRoot(const TContainer &ct) {
 
     if (BindPortoSock) {
         TPath sock(PORTO_SOCKET_PATH);
-        TPath portoctl(PORTO_PORTOCTL_PATH);
+        //TPath portoctl(PORTO_PORTOCTL_PATH);
         TPath dest = dot / sock;
 
         error = dest.Mkfile(0);
@@ -651,12 +651,12 @@ TError TMountNamespace::SetupRoot(const TContainer &ct) {
         if (error)
             return error;
 
-        if (portoctl.Exists()) {
+        /*if (portoctl.Exists()) {
             dest = dot / portoctl;
             error = dest.BindRemount(portoctl, MS_RDONLY);
             if (error)
                 return error;
-        }
+        }*/
     }
 
     struct {
@@ -798,11 +798,11 @@ TError TMountNamespace::Setup(const TContainer &ct) {
     }
 
     // create portoctl file before remounting root to ro
-    if (!Root.IsRoot() && BindPortoSock) {
+    /*if (!Root.IsRoot() && BindPortoSock) {
         error = PreparePortoctlBind();
         if (error)
             return error;
-    }
+    }*/
 
     if (RootRo) {
         error = dot.Remount(MS_BIND | MS_REC | MS_RDONLY);
