@@ -2355,8 +2355,9 @@ TError TVolume::Build() {
             error = CL->WriteAccess(StorageFd);
         if (error) {
             bool ignore = false;
+            const std::string storageRealPath = StorageFd.RealPath().ToString();
             for (const auto &path: InsecureUserPaths) {
-                if (StringMatch(Storage, path)) {
+                if (StringMatch(storageRealPath, path)) {
                     ignore = true;
                     break;
                 }
