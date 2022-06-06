@@ -14,12 +14,9 @@ extern "C" {
 }
 
 TError TStdStream::SetInside(const std::string &path, const TClient &client, bool restore) {
-    Path = path;
-    Outside = false;
-
     if (!restore && !IsNull() && IsRedirect()) {
         int clientFd = -1;
-        auto error = StringToInt(Path.ToString().substr(8), clientFd);
+        auto error = StringToInt(path.substr(8), clientFd);
         if (error)
             return error;
 
@@ -27,6 +24,9 @@ TError TStdStream::SetInside(const std::string &path, const TClient &client, boo
         if (stat(fdPath.c_str(), &PathStat))
             return TError(EError::Unknown, "Can not make stat for {}: {}", fdPath, strerror(errno));
     }
+
+    Path = path;
+    Outside = false;
 
     return OK;
 }
