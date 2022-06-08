@@ -2559,7 +2559,8 @@ void TNetwork::StopNetwork(TContainer &ct) {
         NetThreadCv.notify_all();
         L3ThreadCv.notify_all();
         NetThread->join();
-        L3StatThread->join();
+        if (L3StatWatchdogPeriod > 0)
+            L3StatThread->join();
         SockDiag.Disconnect();
     }
 
@@ -3588,7 +3589,8 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
             return TError("Cannot connect sock diag: {}", error);
 
         NetThread = std::unique_ptr<std::thread>(NewThread(&TNetwork::NetWatchdog));
-        L3StatThread = std::unique_ptr<std::thread>(NewThread(&TNetwork::L3StatWatchdog));
+        if (L3StatWatchdogPeriod > 0)
+            L3StatThread = std::unique_ptr<std::thread>(NewThread(&TNetwork::L3StatWatchdog));
 
         return OK;
     }
