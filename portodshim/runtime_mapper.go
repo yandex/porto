@@ -44,7 +44,7 @@ func NewPortodshimRuntimeMapper() PortodshimRuntimeMapper {
 		"running":    v1.PodSandboxState_SANDBOX_READY,
 		"stopping":   v1.PodSandboxState_SANDBOX_NOTREADY,
 		"respawning": v1.PodSandboxState_SANDBOX_NOTREADY,
-		"meta":       v1.PodSandboxState_SANDBOX_READY,
+		"meta":       v1.PodSandboxState_SANDBOX_NOTREADY,
 		"dead":       v1.PodSandboxState_SANDBOX_NOTREADY,
 	}
 
@@ -168,6 +168,22 @@ func (mapper *PortodshimRuntimeMapper) getUintProperty(ctx context.Context, id s
 	}
 
 	value, err := strconv.ParseUint(valueString, 10, 64)
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		return 0
+	}
+
+	return value
+}
+func (mapper *PortodshimRuntimeMapper) getIntProperty(ctx context.Context, id string, property string) int64 {
+	portoClient := ctx.Value("portoClient").(API)
+
+	valueString, err := portoClient.GetProperty(id, property)
+	if err != nil || valueString == "" {
+		return 0
+	}
+
+	value, err := strconv.ParseInt(valueString, 10, 64)
 	if err != nil {
 		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 		return 0
@@ -316,70 +332,74 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	id := req.GetConfig().GetMetadata().GetName()
 
 	err := portoClient.Create(id)
-	if err != nil && err.(*Error).Errno != EError_ContainerAlreadyExists {
+	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	if err == nil {
-		// volume creating
-		config := map[string]string{
-			"backend":    "plain",
-			"containers": id,
-		}
+	// volume creating
+	config := map[string]string{
+		// "backend":    "plain",
+		"backend":    "overlay",
+		"containers": id,
+		"layers":     "ubuntu:xenial",
+	}
 
-		rootPath := VolumesPath + "/" + mapper.convertToPathId(id)
-		err = os.Mkdir(rootPath, 0755)
-		if err != nil {
-			if os.IsExist(err) {
-				zap.S().Warnf("%s: directory already exists: %s", getCurrentFuncName(), rootPath)
-			} else {
-				_ = portoClient.Destroy(id)
-				return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-			}
-		}
-
-		_, err = portoClient.CreateVolume(rootPath, config)
-		if err != nil {
+	rootPath := VolumesPath + "/" + mapper.convertToPathId(id)
+	err = os.Mkdir(rootPath, 0755)
+	if err != nil {
+		if os.IsExist(err) {
+			zap.S().Warnf("%s: directory already exists: %s", getCurrentFuncName(), rootPath)
+		} else {
 			_ = portoClient.Destroy(id)
-			_ = os.RemoveAll(rootPath)
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
+	}
 
-		err = portoClient.SetProperty(id, "root", rootPath)
-		if err != nil {
-			_ = portoClient.Destroy(id)
-			_ = os.RemoveAll(rootPath)
-			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-		}
+	_, err = portoClient.CreateVolume(rootPath, config)
+	if err != nil {
+		_ = portoClient.Destroy(id)
+		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 
-		// network
-		err = portoClient.SetProperty(id, "hostname", req.GetConfig().GetHostname())
-		if err != nil {
-			zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
-		}
+	err = portoClient.SetProperty(id, "root", rootPath)
+	if err != nil {
+		_ = portoClient.Destroy(id)
+		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 
-		mapper.setNetwork(ctx, id, req.GetConfig().GetPortMappings())
+	// network
+	err = portoClient.SetProperty(id, "hostname", req.GetConfig().GetHostname())
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+	}
 
-		// labels and annotations
-		labels := req.GetConfig().GetLabels()
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-		if _, found := labels["io.kubernetes.pod.namespace"]; !found {
-			labels["io.kubernetes.pod.namespace"] = req.GetConfig().GetMetadata().GetNamespace()
-		}
-		labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+	mapper.setNetwork(ctx, id, req.GetConfig().GetPortMappings())
 
-		mapper.setLabels(ctx, id, labels, "LABEL")
-		mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
+	// labels and annotations
+	labels := req.GetConfig().GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	if _, found := labels["io.kubernetes.pod.namespace"]; !found {
+		labels["io.kubernetes.pod.namespace"] = req.GetConfig().GetMetadata().GetNamespace()
+	}
+	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+
+	mapper.setLabels(ctx, id, labels, "LABEL")
+	mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
+
+	// command
+	err = portoClient.SetProperty(id, "command", "sleep inf")
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	// pod starting
-	if mapper.getPodState(ctx, id) == v1.PodSandboxState_SANDBOX_NOTREADY {
-		err := portoClient.Start(id)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-		}
+	err = portoClient.Start(id)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	return &v1.RunPodSandboxResponse{
@@ -393,9 +413,11 @@ func (mapper *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *
 
 	id := req.GetPodSandboxId()
 
-	err := portoClient.Stop(id)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	if state := mapper.getStringProperty(ctx, id, "state"); state == "running" {
+		err := portoClient.Kill(id, 15)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
 	}
 
 	return &v1.StopPodSandboxResponse{}, nil
@@ -573,51 +595,55 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	}
 
 	err := portoClient.Create(id)
-	if err != nil && err.(*Error).Errno != EError_ContainerAlreadyExists {
+	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	if err == nil {
-		// volume creating
-		config := map[string]string{
-			"backend":    "overlay",
-			"containers": id,
-			"layers":     image,
-		}
-		rootPath := VolumesPath + "/" + mapper.convertToPathId(pod) + "/" + mapper.convertToPathId(name)
-		err = os.Mkdir(rootPath, 0755)
-		if err != nil {
-			if os.IsExist(err) {
-				zap.S().Warnf("%s: directory already exists: %s", getCurrentFuncName(), rootPath)
-			} else {
-				_ = portoClient.Destroy(id)
-				return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-			}
-		}
-
-		_, err = portoClient.CreateVolume(rootPath, config)
-		if err != nil {
+	// volume creating
+	config := map[string]string{
+		"backend":    "overlay",
+		"containers": id,
+		"layers":     image,
+	}
+	rootPath := VolumesPath + "/" + mapper.convertToPathId(pod) + "/" + mapper.convertToPathId(name)
+	err = os.Mkdir(rootPath, 0755)
+	if err != nil {
+		if os.IsExist(err) {
+			zap.S().Warnf("%s: directory already exists: %s", getCurrentFuncName(), rootPath)
+		} else {
 			_ = portoClient.Destroy(id)
-			_ = os.RemoveAll(rootPath)
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
+	}
 
-		err = portoClient.SetProperty(id, "root", "/"+mapper.convertToPathId(name))
-		if err != nil {
-			_ = portoClient.Destroy(id)
-			_ = os.RemoveAll(rootPath)
-			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-		}
+	_, err = portoClient.CreateVolume(rootPath, config)
+	if err != nil {
+		_ = portoClient.Destroy(id)
+		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 
-		// labels and annotations
-		labels := req.GetConfig().GetLabels()
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-		labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+	err = portoClient.SetProperty(id, "root", "/"+mapper.convertToPathId(name))
+	if err != nil {
+		_ = portoClient.Destroy(id)
+		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 
-		mapper.setLabels(ctx, id, req.GetConfig().GetLabels(), "LABEL")
-		mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
+	// labels and annotations
+	labels := req.GetConfig().GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+
+	mapper.setLabels(ctx, id, req.GetConfig().GetLabels(), "LABEL")
+	mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
+
+	// command
+	err = portoClient.SetProperty(id, "command", strings.Join(req.GetConfig().GetCommand(), " "))
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	return &v1.CreateContainerResponse{
@@ -655,9 +681,11 @@ func (mapper *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v
 		return nil, fmt.Errorf("%s: %s specified ID belongs to pod", getCurrentFuncName(), id)
 	}
 
-	err := portoClient.Stop(id)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	if state := mapper.getStringProperty(ctx, id, "state"); state == "running" {
+		err := portoClient.Kill(id, 15)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
 	}
 
 	return &v1.StopContainerResponse{}, nil
@@ -756,7 +784,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 			CreatedAt:  mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
 			StartedAt:  mapper.getTimeProperty(ctx, id, "start_time[raw]"),
 			FinishedAt: mapper.getTimeProperty(ctx, id, "death_time[raw]"),
-			ExitCode:   int32(mapper.getUintProperty(ctx, id, "exit_code")),
+			ExitCode:   int32(mapper.getIntProperty(ctx, id, "exit_code")),
 			Image: &v1.ImageSpec{
 				Image: image,
 			},
