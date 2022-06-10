@@ -241,6 +241,51 @@ func (mapper *PortodshimRuntimeMapper) getContainerImage(ctx context.Context, id
 	}
 	return imageDescriptions[0].Properties["layers"]
 }
+func (mapper *PortodshimRuntimeMapper) setNetwork(ctx context.Context, id string, mappings []*v1.PortMapping) {
+	portoClient := ctx.Value("portoClient").(API)
+
+	addresses := ""
+	for _, mapping := range mappings {
+		if ip := mapping.GetHostIp(); ip != "" {
+			addresses += fmt.Sprintf("eth0 %s;", ip)
+		}
+	}
+
+	err := portoClient.SetProperty(id, "ip", addresses)
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+	}
+}
+func (mapper *PortodshimRuntimeMapper) getNetwork(ctx context.Context, id string) *v1.PodSandboxNetworkStatus {
+	portoClient := ctx.Value("portoClient").(API)
+
+	addresses, err := portoClient.GetProperty(id, "ip")
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		return &v1.PodSandboxNetworkStatus{}
+	}
+
+	ips := []*v1.PodIP{}
+	if len(addresses) > 0 {
+		for _, address := range strings.Split(addresses, ";") {
+			if pair := strings.Split(address, " "); len(pair) > 1 {
+				if ip := pair[1]; ip != "auto" {
+					ips = append(ips, &v1.PodIP{Ip: ip})
+				}
+			}
+		}
+	}
+
+	var status v1.PodSandboxNetworkStatus
+	if len(ips) > 0 {
+		status.Ip = ips[0].GetIp()
+	}
+	if len(ips) > 1 {
+		status.AdditionalIps = ips[1:]
+	}
+
+	return &status
+}
 
 // RUNTIME SERVICE INTERFACE
 func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.VersionRequest) (*v1.VersionResponse, error) {
@@ -303,6 +348,14 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 			_ = os.RemoveAll(rootPath)
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
+
+		// network
+		err = portoClient.SetProperty(id, "hostname", req.GetConfig().GetHostname())
+		if err != nil {
+			zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		}
+
+		mapper.setNetwork(ctx, id, req.GetConfig().GetPortMappings())
 
 		// labels and annotations
 		labels := req.GetConfig().GetLabels()
@@ -381,9 +434,7 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 			},
 			State:     mapper.getPodState(ctx, id),
 			CreatedAt: mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
-			Network: &v1.PodSandboxNetworkStatus{
-				Ip: "",
-			},
+			Network:   mapper.getNetwork(ctx, id),
 			Linux: &v1.LinuxPodSandboxStatus{
 				Namespaces: &v1.Namespace{
 					Options: &v1.NamespaceOption{
