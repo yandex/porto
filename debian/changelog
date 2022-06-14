@@ -1,3 +1,14 @@
+yandex-porto (5.2.8) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * network: add ability to disable l3stat watchdog via period
+  * volume: modify InsecureUserPaths matching
+  * stream: set placed after checks in SetInside
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 14 Jun 2022 14:53:53 +0300
+
 yandex-porto (5.2.7) unstable; urgency=low
 
   * portoctl: fix static build on focal
