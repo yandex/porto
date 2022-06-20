@@ -3181,6 +3181,12 @@ TError TContainer::StartParents() {
     if (IsRunningOrMeta(Parent->State))
         return OK;
 
+    /* In case client is portod, we don't start parents
+     * https://st.yandex-team.ru/PORTO-1010
+     */
+    if (CL->IsPortod())
+        return TError(EError::Unknown, "Cannot start parents of portod's container");
+
     auto current = CL->LockedContainer;
 
     std::shared_ptr<TContainer> target;

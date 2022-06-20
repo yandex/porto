@@ -63,6 +63,8 @@ public:
         return (Processing && !WaitRequest) || Offset;
     }
 
+    bool IsPortod() const;
+
     bool CanSetUidGid() const;
     TError CanControl(const TCred &cred);
     TError CanControl(const TContainer &ct, bool child = false);

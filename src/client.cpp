@@ -334,6 +334,10 @@ bool TClient::IsSuperUser(void) const {
     return AccessLevel >= EAccessLevel::SuperUser;
 }
 
+bool TClient::IsPortod(void) const {
+    return StringEndsWith(TPath(StringFormat("/proc/%u/exe", Pid)).RealPath().ToString(), "portod");
+}
+
 bool TClient::CanSetUidGid() const {
     /* loading capabilities by pid is racy, use container limits instead */
     if (TaskCred.IsRootUser())
