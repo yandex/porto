@@ -6194,6 +6194,38 @@ public:
     }
 } static IoOpsStat;
 
+class TIoReadOpsStat : public TIoStat {
+public:
+    TIoReadOpsStat() : TIoStat(P_IO_READ_OPS, EProperty::NONE,
+            "IO read operations: hw|<disk>|<path>: <ops>;...") {}
+    TError GetMap(TUintMap &map) const override {
+        auto blkCg = CT->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::ReadIops, map);
+
+        return OK;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) const override {
+        DumpMap(*spec.mutable_io_read_ops());
+    }
+} static IoReadOpsStat;
+
+class TIoWriteOpsStat : public TIoStat {
+public:
+    TIoWriteOpsStat() : TIoStat(P_IO_WRITE_OPS, EProperty::NONE,
+            "IO write operations: hw|<disk>|<path>: <ops>;...") {}
+    TError GetMap(TUintMap &map) const override {
+        auto blkCg = CT->GetCgroup(BlkioSubsystem);
+        BlkioSubsystem.GetIoStat(blkCg, TBlkioSubsystem::IoStat::WriteIops, map);
+
+        return OK;
+    }
+
+    void Dump(rpc::TContainerStatus &spec) const override {
+        DumpMap(*spec.mutable_io_write_ops());
+    }
+} static IoWriteOpsStat;
+
 class TIoTimeStat : public TIoStat {
 public:
     TIoTimeStat() : TIoStat(P_IO_TIME, EProperty::NONE,

@@ -478,6 +478,8 @@ message TContainerStatus {
     optional TUintMap io_read = 32;        // out, bytes
     optional TUintMap io_write = 33;       // out, bytes
     optional TUintMap io_ops = 34;         // out, ops
+    optional TUintMap io_read_ops = 341;   // out, ops
+    optional TUintMap io_write_ops = 342;  // out, ops
     optional TUintMap io_time = 35;        // out, ns
 
     optional TUintMap place_usage = 36;

@@ -343,6 +343,8 @@ public:
         Read = 1,
         Write = 2,
         Iops = 4,
+        ReadIops = Read | Iops,
+        WriteIops = Write | Iops,
         Time = 8,
     };
     TError GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) const;

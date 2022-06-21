@@ -1193,8 +1193,9 @@ TError TBlkioSubsystem::GetIoStat(TCgroup &cg, enum IoStat stat, TUintMap &map) 
     if (stat & IoStat::Time)
         knob = "blkio.io_service_time_recursive";
     else if (HasThrottler && (HasSaneBehavior || !cg.IsRoot())) {
-        /* get statistics from throttler if possible, it has couners for raids */
+        /* get statistics from throttler if possible, it has counters for raids */
         knob = (stat & IoStat::Iops) ? "blkio.throttle.io_serviced" : "blkio.throttle.io_service_bytes";
+
         /* throtter is recurisve only in sane behavior */
         recursive = HasSaneBehavior;
     } else
