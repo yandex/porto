@@ -14,11 +14,11 @@ extern "C" {
 }
 
 TError TStdStream::SetInside(const std::string &path, const TClient &client, bool restore) {
-    if (!restore && !IsNull() && IsRedirect()) {
+    if (!restore && !IsNull(path) && IsRedirect(path)) {
         int clientFd = -1;
         auto error = StringToInt(path.substr(8), clientFd);
         if (error)
-            return error;
+            return TError(error, "Cannot set {} stream as {}", Stream, path);
 
         auto fdPath = StringFormat("/proc/%u/fd/%u", client.Pid, clientFd);
         if (stat(fdPath.c_str(), &PathStat))
@@ -31,13 +31,21 @@ TError TStdStream::SetInside(const std::string &path, const TClient &client, boo
     return OK;
 }
 
+bool TStdStream::IsNull(const std::string &path) {
+    return path.empty() || path == "/dev/null";
+}
+
 bool TStdStream::IsNull(void) const {
-    return Path.IsEmpty() || Path.ToString() == "/dev/null";
+    return IsNull(Path.ToString());
 }
 
 /* /dev/fd/%d redirects into client task fd */
+bool TStdStream::IsRedirect(const std::string &path) {
+    return StringStartsWith(path, "/dev/fd/");
+}
+
 bool TStdStream::IsRedirect(void) const {
-    return StringStartsWith(Path.ToString(), "/dev/fd/");
+    return IsRedirect(Path.ToString());
 }
 
 TPath TStdStream::ResolveOutside(const TContainer &container) const {

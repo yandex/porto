@@ -8,7 +8,7 @@ class TClient;
 
 class TStdStream {
 public:
-    int Stream;             /* 0 - stdin, 1 - sstdout, 2 - stderr */
+    int Stream;             /* 0 - stdin, 1 - stdout, 2 - stderr */
     TPath Path;
     bool Outside = false;
     uint64_t Limit = 0;
@@ -23,7 +23,9 @@ public:
     }
 
     TError SetInside(const std::string &path, const TClient &client, bool restore = false);
+    static bool IsNull(const std::string &path);
     bool IsNull(void) const;
+    static bool IsRedirect(const std::string &path);
     bool IsRedirect(void) const;
     TPath ResolveOutside(const TContainer &container) const;
 
