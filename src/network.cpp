@@ -35,14 +35,14 @@ extern "C" {
 
 static std::shared_ptr<TNetwork> HostNetwork;
 
-std::mutex TNetwork::NetworksMutex;
+MeasuredMutex TNetwork::NetworksMutex("networks");
 std::mutex L3StatMutex;
 
 static inline std::unique_lock<std::mutex> LockL3Stat() {
     return std::unique_lock<std::mutex>(L3StatMutex);
 }
 
-std::mutex TNetwork::NetStateMutex;
+MeasuredMutex TNetwork::NetStateMutex("net_state");
 int TNetwork::DefaultTos = 0;
 
 std::unordered_map<ino_t, std::shared_ptr<TNetwork>> TNetwork::NetworksIndex;
@@ -538,7 +538,7 @@ std::string TNetwork::FormatTos(int tos) {
     return fmt::format("CS{}", tos);
 }
 
-TNetwork::TNetwork(bool host) : NetIsHost(host), NatBitmap(0, 0) {
+TNetwork::TNetwork(bool host) : NetIsHost(host), NetMutex(host ? "host_net" : "container_net"), NatBitmap(0, 0) {
     Nl = std::make_shared<TNl>();
 
     DefaultClass.BaseHandle = TC_HANDLE(ROOT_TC_MAJOR, 1);
@@ -3220,18 +3220,22 @@ TError TNetEnv::DestroyTap(TNetDeviceConfig &tap) {
 TError TNetEnv::SetupInterfaces() {
     PORTO_LOCKED(Net->NetMutex);
 
-    auto parent_lock = ParentNet->LockNet();
-    auto source_nl = ParentNet->GetNl();
     auto target_nl = Net->GetNl();
     TError error;
 
     for (auto &dev : Devices) {
         if (dev.Type == "steal") {
+            auto parent_lock = ParentNet->LockNet();
+            auto source_nl = ParentNet->GetNl();
+
             TNlLink link(source_nl, dev.Name);
             error = link.ChangeNs(dev.Name, NetNs.GetFd());
             if (error)
                 return error;
         } else if (dev.Type == "ipvlan") {
+            auto parent_lock = ParentNet->LockNet();
+            auto source_nl = ParentNet->GetNl();
+
             std::string master = ParentNet->MatchDevice(dev.Master);
 
             TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
@@ -3245,6 +3249,9 @@ TError TNetEnv::SetupInterfaces() {
                 return error;
             }
         } else if (dev.Type == "macvlan") {
+            auto parent_lock = ParentNet->LockNet();
+            auto source_nl = ParentNet->GetNl();
+
             std::string master = ParentNet->MatchDevice(dev.Master);
 
             TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
@@ -3258,6 +3265,9 @@ TError TNetEnv::SetupInterfaces() {
                 return error;
             }
         } else if (dev.Type == "veth") {
+            auto parent_lock = ParentNet->LockNet();
+            auto source_nl = ParentNet->GetNl();
+
             TNlLink peer(source_nl, ParentNet->NewDeviceName("portove-"));
 
             error = peer.AddVeth(dev.Name, dev.Mac, dev.Mtu,
@@ -3277,8 +3287,6 @@ TError TNetEnv::SetupInterfaces() {
             }
         }
     }
-
-    parent_lock.unlock();
 
     for (auto &dev : Devices) {
         if (dev.Type == "L3") {
@@ -3612,25 +3620,12 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
         Net->NetName = Name;
 
         error = Net->SetupAddrLabel();
-        if (error)
-            return error;
+        if (!error)
+            error = SetupInterfaces();
+        if (!error)
+            error = ApplySysctl();
 
-        error = SetupInterfaces();
-        if (error) {
-            lock.unlock();
-            Net->Destroy();
-            return error;
-        }
-
-        error = ApplySysctl();
-        if (error) {
-            lock.unlock();
-            Net->Destroy();
-            return error;
-        }
-
-        std::string netScriptPath = config().network().network_ifup_script();
-        if (!netScriptPath.empty()) {
+        if (!error && !config().network().network_ifup_script().empty()) {
             std::vector<std::string> env;
 
             env.emplace_back("PORTO_CONTAINER=" + ct.Name);
@@ -3656,12 +3651,13 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
             // Return error if helper script exits with non-zero exit code.
             // Client should receive an error creating slot container and may try to re-create the container.
             // No silent misconfiguration will happen.
-            error = RunCommand({netScriptPath}, env);
-            if (error) {
-                lock.unlock();
-                Net->Destroy();
-                return error;
-            }
+            error = RunCommand({config().network().network_ifup_script()}, env);
+        }
+
+        if (error) {
+            lock.unlock();
+            Net->Destroy();
+            return error;
         }
 
         return OK;

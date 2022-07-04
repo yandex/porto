@@ -14,6 +14,7 @@
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 #include "util/hgram.hpp"
+#include "util/mutex.hpp"
 
 class TContainer;
 class TNetwork;
@@ -114,13 +115,13 @@ struct TNetProxyNeighbour {
 class TNetwork : public TNonCopyable {
     friend struct TNetEnv;
 
-    static std::mutex NetworksMutex;
+    static MeasuredMutex NetworksMutex;
 
     static inline std::unique_lock<std::mutex> LockNetworks() {
-        return std::unique_lock<std::mutex>(NetworksMutex);
+        return NetworksMutex.UniqueLock();
     }
 
-    static std::mutex NetStateMutex;
+    static MeasuredMutex NetStateMutex;
 
     /* Copy-on-write list of networks */
     static std::shared_ptr<const std::list<std::shared_ptr<TNetwork>>> NetworksList;
@@ -139,7 +140,7 @@ class TNetwork : public TNonCopyable {
     const bool NetIsHost;
 
     /* Protects netink socket operaions and external state */
-    std::mutex NetMutex;
+    MeasuredMutex NetMutex;
 
     /* Containers, parent before childs. Protected with NetStateMutex. */
     std::list<TNetClass *> NetClasses;
@@ -192,7 +193,7 @@ public:
     void Destroy();
 
     std::unique_lock<std::mutex> LockNet() {
-        return std::unique_lock<std::mutex>(NetMutex);
+        return NetMutex.UniqueLock();
     }
 
     static inline std::unique_lock<std::mutex> LockNetState() {
