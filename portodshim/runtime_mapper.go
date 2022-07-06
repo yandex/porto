@@ -118,12 +118,14 @@ func (mapper *PortodshimRuntimeMapper) convertLabel(src string, toPorto bool, pr
 func (mapper *PortodshimRuntimeMapper) setLabels(ctx context.Context, id string, labels map[string]string, prefix string) {
 	portoClient := ctx.Value("portoClient").(API)
 
+	labelsString := ""
 	for label, value := range labels {
-		err := portoClient.SetProperty(id, fmt.Sprintf("labels[%s]", mapper.convertLabel(label, true, prefix)), mapper.convertLabel(value, true, ""))
-		if err != nil {
-			zap.S().Warnf("%s: label %s: %v", getCurrentFuncName(), label, err)
-			continue
-		}
+		labelsString += fmt.Sprintf("%s:%s;", mapper.convertLabel(label, true, prefix), mapper.convertLabel(value, true, ""))
+	}
+
+	err := portoClient.SetProperty(id, "labels", labelsString)
+	if err != nil {
+		zap.S().Warnf("%s: cannot set labels %v", getCurrentFuncName(), err)
 	}
 }
 func (mapper *PortodshimRuntimeMapper) getLabels(ctx context.Context, id string, prefix string) map[string]string {
@@ -679,6 +681,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 		return nil, fmt.Errorf("%s: specified ID belongs to pod", getCurrentFuncName())
 	}
 
+	attempt, _ := strconv.ParseUint(mapper.getValueForKubeLabel(ctx, id, "attempt", "LABEL"), 10, 64)
 	image := mapper.getContainerImage(ctx, id)
 
 	return &v1.ContainerStatusResponse{
@@ -686,7 +689,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 			Id: id,
 			Metadata: &v1.ContainerMetadata{
 				Name:    id,
-				Attempt: uint32(mapper.getUintProperty(ctx, id, "labels[LABEL.attempt]")),
+				Attempt: uint32(attempt),
 			},
 			State:      mapper.getContainerState(ctx, id),
 			CreatedAt:  mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
