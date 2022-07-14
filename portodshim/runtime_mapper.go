@@ -201,6 +201,26 @@ func (mapper *PortodshimRuntimeMapper) getStringProperty(ctx context.Context, id
 
 	return value
 }
+func (mapper *PortodshimRuntimeMapper) getPodMetadata(ctx context.Context, id string) *v1.PodSandboxMetadata {
+	labels := mapper.getLabels(ctx, id, "LABEL")
+	attempt, _ := strconv.ParseUint(labels["attempt"], 10, 64)
+
+	return &v1.PodSandboxMetadata{
+		Name:      labels["io.kubernetes.pod.name"],
+		Uid:       labels["io.kubernetes.pod.uid"],
+		Namespace: labels["io.kubernetes.pod.namespace"],
+		Attempt:   uint32(attempt),
+	}
+}
+func (mapper *PortodshimRuntimeMapper) getContainerMetadata(ctx context.Context, id string) *v1.ContainerMetadata {
+	labels := mapper.getLabels(ctx, id, "LABEL")
+	attempt, _ := strconv.ParseUint(labels["attempt"], 10, 64)
+
+	return &v1.ContainerMetadata{
+		Name:    labels["io.kubernetes.container.name"],
+		Attempt: uint32(attempt),
+	}
+}
 func (mapper *PortodshimRuntimeMapper) getContainerStats(ctx context.Context, id string) (*v1.ContainerStats, error) {
 	_, name := mapper.getPodAndContainer(id)
 	if name == "" {
@@ -213,10 +233,8 @@ func (mapper *PortodshimRuntimeMapper) getContainerStats(ctx context.Context, id
 	// TODO: Заполнить оставшиеся метрики
 	return &v1.ContainerStats{
 		Attributes: &v1.ContainerAttributes{
-			Id: id,
-			Metadata: &v1.ContainerMetadata{
-				Name: name,
-			},
+			Id:       id,
+			Metadata: mapper.getContainerMetadata(ctx, id),
 		},
 		Cpu: &v1.CpuUsage{
 			Timestamp:            timestamp,
@@ -446,17 +464,11 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
 
 	id := req.GetPodSandboxId()
-	attempt, _ := strconv.ParseUint(mapper.getValueForKubeLabel(ctx, id, "attempt", "LABEL"), 10, 64)
 
 	return &v1.PodSandboxStatusResponse{
 		Status: &v1.PodSandboxStatus{
-			Id: id,
-			Metadata: &v1.PodSandboxMetadata{
-				Name:      id,
-				Uid:       id,
-				Namespace: mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"),
-				Attempt:   uint32(attempt),
-			},
+			Id:        id,
+			Metadata:  mapper.getPodMetadata(ctx, id),
 			State:     mapper.getPodState(ctx, id),
 			CreatedAt: mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
 			Network:   mapper.getNetwork(ctx, id),
@@ -507,10 +519,8 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req 
 	return &v1.PodSandboxStatsResponse{
 		Stats: &v1.PodSandboxStats{
 			Attributes: &v1.PodSandboxAttributes{
-				Id: id,
-				Metadata: &v1.PodSandboxMetadata{
-					Name: name,
-				},
+				Id:       id,
+				Metadata: mapper.getPodMetadata(ctx, id),
 			},
 			Linux: &v1.LinuxPodSandboxStats{
 				Cpu: &v1.CpuUsage{
@@ -551,8 +561,10 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
 	portoClient := ctx.Value("portoClient").(API)
+	targetId := req.GetFilter().GetId()
+	targetState := req.GetFilter().GetState()
 
-	// TODO: Добавить фильтры
+	// TODO: Добавить фильтры по лейблам
 	response, err := portoClient.List1("*")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -563,16 +575,24 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 		if mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL") == "" {
 			continue
 		}
-		items = append(items, &v1.PodSandbox{
-			Id: id,
-			Metadata: &v1.PodSandboxMetadata{
-				Name: id,
-			},
-			State:       mapper.getPodState(ctx, id),
-			CreatedAt:   mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
-			Labels:      mapper.getLabels(ctx, id, "LABEL"),
-			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
-		})
+		needAppend := true
+		if targetId != "" && targetId != id {
+			needAppend = false
+		}
+		state := mapper.getPodState(ctx, id)
+		if needAppend && targetState != nil && targetState.GetState() != state {
+			needAppend = false
+		}
+		if needAppend {
+			items = append(items, &v1.PodSandbox{
+				Id:          id,
+				Metadata:    mapper.getPodMetadata(ctx, id),
+				State:       state,
+				CreatedAt:   mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
+				Labels:      mapper.getLabels(ctx, id, "LABEL"),
+				Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
+			})
+		}
 	}
 
 	return &v1.ListPodSandboxResponse{
@@ -743,9 +763,7 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 		containers = append(containers, &v1.Container{
 			Id:           id,
 			PodSandboxId: pod,
-			Metadata: &v1.ContainerMetadata{
-				Name: name,
-			},
+			Metadata:     mapper.getContainerMetadata(ctx, id),
 			Image: &v1.ImageSpec{
 				Image: image,
 			},
@@ -770,16 +788,12 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 		return nil, fmt.Errorf("%s: specified ID belongs to pod", getCurrentFuncName())
 	}
 
-	attempt, _ := strconv.ParseUint(mapper.getValueForKubeLabel(ctx, id, "attempt", "LABEL"), 10, 64)
 	image := mapper.getContainerImage(ctx, id)
 
 	return &v1.ContainerStatusResponse{
 		Status: &v1.ContainerStatus{
-			Id: id,
-			Metadata: &v1.ContainerMetadata{
-				Name:    id,
-				Attempt: uint32(attempt),
-			},
+			Id:         id,
+			Metadata:   mapper.getContainerMetadata(ctx, id),
 			State:      mapper.getContainerState(ctx, id),
 			CreatedAt:  mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
 			StartedAt:  mapper.getTimeProperty(ctx, id, "start_time[raw]"),
