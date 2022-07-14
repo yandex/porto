@@ -248,7 +248,7 @@ func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.Vers
 
 	portoClient := ctx.Value("portoClient").(API)
 
-	tag, rev, err := portoClient.GetVersion()
+	tag, _, err := portoClient.GetVersion()
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -256,7 +256,8 @@ func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.Vers
 		Version:           req.GetVersion(),
 		RuntimeName:       containerName,
 		RuntimeVersion:    tag,
-		RuntimeApiVersion: rev,
+		// TODO: temprorary use tag as a RuntimeApiVersion
+		RuntimeApiVersion: tag,
 	}, nil
 }
 func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.RunPodSandboxRequest) (*v1.RunPodSandboxResponse, error) {
