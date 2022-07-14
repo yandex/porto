@@ -538,6 +538,9 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 
 	var items []*v1.PodSandbox
 	for _, id := range response {
+		if mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL") == "" {
+			continue
+		}
 		items = append(items, &v1.PodSandbox{
 			Id: id,
 			Metadata: &v1.PodSandboxMetadata{
@@ -701,6 +704,9 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 		pod, name := mapper.getPodAndContainer(id)
 		if name == "" {
 			// skip containers with level = 1
+			continue
+		}
+		if mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL") == "" {
 			continue
 		}
 
