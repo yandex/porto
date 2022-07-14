@@ -251,6 +251,9 @@ func (mapper *PortodshimRuntimeMapper) setNetwork(ctx context.Context, id string
 		}
 	}
 
+	// TODO: убрать заглушку
+	addresses += "eth0 192.168.1.1;"
+
 	err := portoClient.SetProperty(id, "ip", addresses)
 	if err != nil {
 		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
@@ -297,11 +300,11 @@ func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.Vers
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
+	// TODO: temprorary use tag as a RuntimeApiVersion
 	return &v1.VersionResponse{
 		Version:           req.GetVersion(),
 		RuntimeName:       containerName,
 		RuntimeVersion:    tag,
-		// TODO: temprorary use tag as a RuntimeApiVersion
 		RuntimeApiVersion: tag,
 	}, nil
 }
@@ -765,7 +768,9 @@ func (mapper *PortodshimRuntimeMapper) UpdateContainerResources(ctx context.Cont
 func (mapper *PortodshimRuntimeMapper) ReopenContainerLog(ctx context.Context, req *v1.ReopenContainerLogRequest) (*v1.ReopenContainerLogResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	return nil, fmt.Errorf("not implemented ReopenContainerLog")
+	// return nil, fmt.Errorf("not implemented ReopenContainerLog")
+	// TODO: реализовать ReopenContainerLog и убрать заглушку
+	return &v1.ReopenContainerLogResponse{}, nil
 }
 func (mapper *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSyncRequest) (*v1.ExecSyncResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
