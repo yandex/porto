@@ -101,7 +101,7 @@ static void DefaultConfig() {
     config().mutable_container()->set_dev_size(32 << 20);
     config().mutable_container()->set_enable_hugetlb(true);
     config().mutable_container()->set_enable_blkio(true);
-    config().mutable_container()->set_ptrace_on_start(false);
+    config().mutable_container()->set_ptrace_on_start(true);
 
     if (CompareVersions(config().linux_version(), "4.19") >= 0)
         config().mutable_container()->set_enable_cgroup2(true);
