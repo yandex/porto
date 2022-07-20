@@ -559,8 +559,8 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 
 	targetId := req.GetFilter().GetId()
 	targetState := req.GetFilter().GetState()
+	targetLabels := req.GetFilter().GetLabelSelector()
 
-	// TODO: Добавить фильтры по лейблам
 	mask := "*"
 	if targetId != "" {
 		mask = targetId
@@ -573,8 +573,8 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 
 	var items []*v1.PodSandbox
 	for _, id := range response {
-		// skip not k8s and system namespace
-		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" || strings.HasPrefix(ns, "kube-") {
+		// skip not k8s
+		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" {
 			continue
 		}
 
@@ -584,12 +584,25 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 			continue
 		}
 
+		labels := mapper.getLabels(ctx, id, "LABEL")
+		skip := false
+		for targetLabel, targetValue := range targetLabels {
+			if value, found := labels[targetLabel]; !found || value != targetValue {
+				skip = true
+				break
+			}
+		}
+
+		if skip {
+			continue
+		}
+
 		items = append(items, &v1.PodSandbox{
 			Id:          id,
 			Metadata:    mapper.getPodMetadata(ctx, id),
 			State:       state,
 			CreatedAt:   mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
-			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Labels:      labels,
 			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
 		})
 	}
@@ -740,6 +753,7 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 	targetId := req.GetFilter().GetId()
 	targetState := req.GetFilter().GetState()
 	targetPodSandboxId := req.GetFilter().GetPodSandboxId()
+	targetLabels := req.GetFilter().GetLabelSelector()
 
 	mask := ""
 	if targetPodSandboxId != "" {
@@ -749,7 +763,6 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 		mask = targetId
 	}
 
-	// TODO: Добавить фильтры по лейблам
 	response, err := portoClient.List1(mask)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -762,8 +775,8 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 			continue
 		}
 
-		// skip not k8s and system namespace
-		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" || strings.HasPrefix(ns, "kube-") {
+		// skip not k8s
+		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" {
 			continue
 		}
 
@@ -772,6 +785,19 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 		// filtering
 		state := mapper.getContainerState(ctx, id)
 		if targetState != nil && targetState.GetState() != state {
+			continue
+		}
+
+		labels := mapper.getLabels(ctx, id, "LABEL")
+		skip := false
+		for targetLabel, targetValue := range targetLabels {
+			if value, found := labels[targetLabel]; !found || value != targetValue {
+				skip = true
+				break
+			}
+		}
+
+		if skip {
 			continue
 		}
 
@@ -787,7 +813,7 @@ func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *
 			ImageRef:    image,
 			State:       mapper.getContainerState(ctx, id),
 			CreatedAt:   mapper.getTimeProperty(ctx, id, "creation_time[raw]"),
-			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Labels:      labels,
 			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
 		})
 	}
@@ -873,9 +899,9 @@ func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, r
 
 	portoClient := ctx.Value("portoClient").(API)
 
-	// TODO: Добавить фильтр по лейблам
 	targetId := req.GetFilter().GetId()
 	targetPodSandboxId := req.GetFilter().GetPodSandboxId()
+	targetLabels := req.GetFilter().GetLabelSelector()
 
 	mask := ""
 	if targetPodSandboxId != "" {
@@ -897,8 +923,21 @@ func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, r
 			continue
 		}
 
-		// skip not k8s and system namespace
-		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" || strings.HasPrefix(ns, "kube-") {
+		// skip not k8s
+		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" {
+			continue
+		}
+
+		labels := mapper.getLabels(ctx, id, "LABEL")
+		skip := false
+		for targetLabel, targetValue := range targetLabels {
+			if value, found := labels[targetLabel]; !found || value != targetValue {
+				skip = true
+				break
+			}
+		}
+
+		if skip {
 			continue
 		}
 
