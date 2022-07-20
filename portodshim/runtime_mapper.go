@@ -223,6 +223,65 @@ func (mapper *PortodshimRuntimeMapper) getPodMetadata(ctx context.Context, id st
 		Attempt:   uint32(attempt),
 	}
 }
+func (mapper *PortodshimRuntimeMapper) getPodStats(ctx context.Context, id string) *v1.PodSandboxStats {
+	portoClient := ctx.Value("portoClient").(API)
+
+	cpu := mapper.getUintProperty(ctx, id, "cpu_usage")
+	timestamp := time.Now().UnixNano()
+
+	response, err := portoClient.List1(id + "/***")
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		return nil
+	}
+
+	var stats []*v1.ContainerStats
+	for _, ctrId := range response {
+		stats = append(stats, mapper.getContainerStats(ctx, ctrId))
+	}
+
+	// TODO: Заполнить оставшиеся метрики
+	return &v1.PodSandboxStats{
+		Attributes: &v1.PodSandboxAttributes{
+			Id:          id,
+			Metadata:    mapper.getPodMetadata(ctx, id),
+			Labels:      mapper.getLabels(ctx, id, "LABEL"),
+			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
+		},
+		Linux: &v1.LinuxPodSandboxStats{
+			Cpu: &v1.CpuUsage{
+				Timestamp:            timestamp,
+				UsageCoreNanoSeconds: &v1.UInt64Value{Value: cpu},
+				UsageNanoCores:       &v1.UInt64Value{Value: cpu / 1000000000},
+			},
+			Memory: &v1.MemoryUsage{
+				Timestamp:       timestamp,
+				WorkingSetBytes: &v1.UInt64Value{Value: 0},
+				AvailableBytes:  &v1.UInt64Value{Value: 0},
+				UsageBytes:      &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "memory_usage")},
+				RssBytes:        &v1.UInt64Value{Value: 0},
+				PageFaults:      &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "minor_faults")},
+				MajorPageFaults: &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "major_faults")},
+			},
+			Network: &v1.NetworkUsage{
+				Timestamp: timestamp,
+				DefaultInterface: &v1.NetworkInterfaceUsage{
+					Name:     "eth0",
+					RxBytes:  &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "net_rx_bytes")},
+					RxErrors: &v1.UInt64Value{Value: 0},
+					TxBytes:  &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "net_bytes")},
+					TxErrors: &v1.UInt64Value{Value: 0},
+				},
+			},
+			Process: &v1.ProcessUsage{
+				Timestamp:    timestamp,
+				ProcessCount: &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "process_count")},
+			},
+			Containers: stats,
+		},
+		Windows: &v1.WindowsPodSandboxStats{},
+	}
+}
 func (mapper *PortodshimRuntimeMapper) getContainerMetadata(ctx context.Context, id string) *v1.ContainerMetadata {
 	labels := mapper.getLabels(ctx, id, "LABEL")
 	attempt, _ := strconv.ParseUint(labels["attempt"], 10, 64)
@@ -261,7 +320,7 @@ func (mapper *PortodshimRuntimeMapper) getContainerStats(ctx context.Context, id
 		WritableLayer: &v1.FilesystemUsage{
 			Timestamp: timestamp,
 			FsId: &v1.FilesystemIdentifier{
-				Mountpoint: "/",
+				Mountpoint: VolumesPath + "/" + id,
 			},
 			UsedBytes:  &v1.UInt64Value{Value: 0},
 			InodesUsed: &v1.UInt64Value{Value: 0},
@@ -495,66 +554,10 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req *v1.PodSandboxStatsRequest) (*v1.PodSandboxStatsResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
 
-	portoClient := ctx.Value("portoClient").(API)
-
 	id := req.GetPodSandboxId()
 
-	cpu := mapper.getUintProperty(ctx, id, "cpu_usage")
-
-	response, err := portoClient.List1(id + "/***")
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-
-	var stats []*v1.ContainerStats
-	for _, ctrId := range response {
-		stats = append(stats, mapper.getContainerStats(ctx, ctrId))
-	}
-
-	timestamp := time.Now().UnixNano()
-
-	// TODO: Заполнить оставшиеся метрики
 	return &v1.PodSandboxStatsResponse{
-		Stats: &v1.PodSandboxStats{
-			Attributes: &v1.PodSandboxAttributes{
-				Id:          id,
-				Metadata:    mapper.getPodMetadata(ctx, id),
-				Labels:      mapper.getLabels(ctx, id, "LABEL"),
-				Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
-			},
-			Linux: &v1.LinuxPodSandboxStats{
-				Cpu: &v1.CpuUsage{
-					Timestamp:            timestamp,
-					UsageCoreNanoSeconds: &v1.UInt64Value{Value: cpu},
-					UsageNanoCores:       &v1.UInt64Value{Value: cpu / 1000000000},
-				},
-				Memory: &v1.MemoryUsage{
-					Timestamp:       timestamp,
-					WorkingSetBytes: &v1.UInt64Value{Value: 0},
-					AvailableBytes:  &v1.UInt64Value{Value: 0},
-					UsageBytes:      &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "memory_usage")},
-					RssBytes:        &v1.UInt64Value{Value: 0},
-					PageFaults:      &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "minor_faults")},
-					MajorPageFaults: &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "major_faults")},
-				},
-				Network: &v1.NetworkUsage{
-					Timestamp: timestamp,
-					DefaultInterface: &v1.NetworkInterfaceUsage{
-						Name:     "eth0",
-						RxBytes:  &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "net_rx_bytes")},
-						RxErrors: &v1.UInt64Value{Value: 0},
-						TxBytes:  &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "net_bytes")},
-						TxErrors: &v1.UInt64Value{Value: 0},
-					},
-				},
-				Process: &v1.ProcessUsage{
-					Timestamp:    timestamp,
-					ProcessCount: &v1.UInt64Value{Value: mapper.getUintProperty(ctx, id, "process_count")},
-				},
-				Containers: stats,
-			},
-			Windows: &v1.WindowsPodSandboxStats{},
-		},
+		Stats: mapper.getPodStats(ctx, id),
 	}, nil
 }
 func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *v1.ListPodSandboxRequest) (*v1.ListPodSandboxResponse, error) {
@@ -900,7 +903,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStats(ctx context.Context, req *
 	}, nil
 }
 func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, req *v1.ListContainerStatsRequest) (*v1.ListContainerStatsResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
+	zap.S().Debugf("call %s: %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetPodSandboxId(), req.GetFilter().GetLabelSelector())
 
 	portoClient := ctx.Value("portoClient").(API)
 
@@ -954,9 +957,49 @@ func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, r
 	}, nil
 }
 func (mapper *PortodshimRuntimeMapper) ListPodSandboxStats(ctx context.Context, req *v1.ListPodSandboxStatsRequest) (*v1.ListPodSandboxStatsResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
+	zap.S().Debugf("call %s: %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetLabelSelector())
 
-	return nil, fmt.Errorf("not implemented ListPodSandboxStats")
+	portoClient := ctx.Value("portoClient").(API)
+
+	targetId := req.GetFilter().GetId()
+	targetLabels := req.GetFilter().GetLabelSelector()
+
+	mask := "*"
+	if targetId != "" {
+		mask = targetId
+	}
+
+	response, err := portoClient.List1(mask)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	var stats []*v1.PodSandboxStats
+	for _, id := range response {
+		// skip not k8s
+		if ns := mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.pod.namespace", "LABEL"); ns == "" {
+			continue
+		}
+
+		labels := mapper.getLabels(ctx, id, "LABEL")
+		skip := false
+		for targetLabel, targetValue := range targetLabels {
+			if value, found := labels[targetLabel]; !found || value != targetValue {
+				skip = true
+				break
+			}
+		}
+
+		if skip {
+			continue
+		}
+
+		stats = append(stats, mapper.getPodStats(ctx, id))
+	}
+
+	return &v1.ListPodSandboxStatsResponse{
+		Stats: stats,
+	}, nil
 }
 func (mapper *PortodshimRuntimeMapper) UpdateRuntimeConfig(ctx context.Context, req *v1.UpdateRuntimeConfigRequest) (*v1.UpdateRuntimeConfigResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
