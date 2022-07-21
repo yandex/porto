@@ -17,6 +17,7 @@ import (
 const (
 	containerName = "porto"
 	VolumesPath   = "/place/portodshim_volumes"
+	LogsPath      = "/var/log/portodshim"
 )
 
 type PortodshimRuntimeMapper struct {
@@ -677,6 +678,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		labels = make(map[string]string)
 	}
 	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+	labels["io.kubernetes.container.logpath"] = fmt.Sprintf("%s/%s.log", LogsPath, strings.ReplaceAll(id, "/", "%"))
 
 	mapper.setLabels(ctx, id, req.GetConfig().GetLabels(), "LABEL")
 	mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
@@ -855,6 +857,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req 
 			ImageRef:    image,
 			Labels:      mapper.getLabels(ctx, id, "LABEL"),
 			Annotations: mapper.getLabels(ctx, id, "ANNOTATION"),
+			LogPath:     mapper.getValueForKubeLabel(ctx, id, "io.kubernetes.container.logpath", "LABEL"),
 		},
 	}, nil
 }
@@ -866,8 +869,7 @@ func (mapper *PortodshimRuntimeMapper) UpdateContainerResources(ctx context.Cont
 func (mapper *PortodshimRuntimeMapper) ReopenContainerLog(ctx context.Context, req *v1.ReopenContainerLogRequest) (*v1.ReopenContainerLogResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	// return nil, fmt.Errorf("not implemented ReopenContainerLog")
-	// TODO: реализовать ReopenContainerLog и убрать заглушку
+	// TODO: реализовать ReopenContainerLog
 	return &v1.ReopenContainerLogResponse{}, nil
 }
 func (mapper *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSyncRequest) (*v1.ExecSyncResponse, error) {
