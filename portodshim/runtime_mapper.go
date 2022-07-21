@@ -91,7 +91,12 @@ func (mapper *PortodshimRuntimeMapper) isContainer(id string) bool {
 	return containerId != ""
 }
 func (mapper *PortodshimRuntimeMapper) createId(name string) string {
-	return fmt.Sprintf("%s%x", name[:3], mapper.randGenerator.Uint32())
+	length := 26
+	if len(name) < length {
+		length = len(name)
+	}
+	// max length of return value is 26 + 1 + 4 = 31, so container id <= 63
+	return fmt.Sprintf("%s-%x", name[:length], mapper.randGenerator.Uint32()%65536)
 }
 func (mapper *PortodshimRuntimeMapper) convertBase64(src string, encode bool) string {
 	if encode {
