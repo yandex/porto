@@ -1,7 +1,11 @@
 import subprocess
 from test_common import *
 
-deps = subprocess.run(['ldd', portoctl], stdout=subprocess.PIPE).stdout.decode('utf-8')
+cp = subprocess.run(['ldd', portoctl], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+deps = cp.stdout.decode('utf-8')
+if len(deps) == 0:
+    deps = cp.stderr.decode('utf-8')
+
 ExpectEq(len(list(filter(len, deps.split('\n')))), 1)
 ExpectEq(deps.find('libc'), -1)
 

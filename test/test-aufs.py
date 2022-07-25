@@ -5,6 +5,8 @@ import stat
 import time
 import subprocess
 
+os.umask(0022)
+
 aufs_tar = '/tmp/test-aufs.tar'
 layer_name = 'test-aufs'
 layer_path = '/place/porto_layers/' + layer_name

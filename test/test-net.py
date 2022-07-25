@@ -61,10 +61,10 @@ def TestExtraRoutes(enable):
     # extra routes enabled by default
     a = conn.Run("a", net="L3 {}veth".format("extra_routes " if enable else ""), ip="veth 2001:db8::", default_gw="veth 2001:db8::1")
     ab = conn.Run("a/b", wait=1, command="ip -6 r")
-    routes = ab['stdout'].replace('\t', ' ').split('\n')
+    routes = ab['stdout'].replace('\t', ' ').replace(' ','').split('\n')
 
     for route in extra_routes:
-        if route not in routes:
+        if route.replace(' ', '') not in routes:
             raise BaseException("Extra route not found {}".format(route))
 
     a.Destroy()
@@ -83,7 +83,7 @@ network {
 
 ExpectEq(conn.GetProperty("/", "porto_stat[networks]"), "1")
 a = conn.Run("a", net="L3 veth", ip="veth 198.51.100.0", default_gw="veth 198.51.100.1")
-b = conn.Run("a/b", command="ping -c1 -s1 localhost", wait=5)
+b = conn.Run("a/b", command="ping -c1 -s1 127.0.0.1", wait=5)
 time.sleep(2)
 assert len(a['net_netstat'].split(';')) > 100
 assert a['net_netstat[OutOctets]'] == '58', "OutOctets value: {}".format(a['net_netstat[OutOctets]'])

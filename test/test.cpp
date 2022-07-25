@@ -419,6 +419,11 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
             continue;
         }
 
+	if (StringStartsWith(from.ToString(), "linux-vdso") ||
+            StringMatch(from.ToString(), "ld-linux")) {
+            continue;
+	}
+
         TPath dest = path / from.DirName();
         if (!dest.Exists()) {
             error = dest.MkdirAll(0755);
