@@ -5,7 +5,10 @@ import porto
 import subprocess
 import time
 
-from test_common import ConfigurePortod,Expect,ExpectException
+from test_common import ConfigurePortod,Expect,ExpectException,ExpectLe
+
+def veth_link_count():
+    return len(subprocess.check_output(["ip", "-o", "link", "show", "type", "veth"]).split())
 
 # Prepare
 
@@ -59,13 +62,18 @@ open(script_path, 'w').write("""
 exit 1
 """)
 
+stale_count = veth_link_count()
+
 for i in xrange(0, 10):
     ExpectException(ct.Start, porto.exceptions.Unknown)
 
 # Nets are cleared asynchronously
-time.sleep(5)
+deadline = time.time() + 30.0
 
-Expect(len(subprocess.check_output(["ip", "-o", "link", "show", "type", "veth"]).split()) < 5)
+while time.time() < deadline and veth_link_count() > stale_count:
+    time.sleep(1)
+
+ExpectLe(veth_link_count(), stale_count)
 
 
 # 2. Check interaction with portod
@@ -85,14 +93,14 @@ Expect(int(open(stdout_path, 'r').read()) > 0)
 
 open(script_path, 'w').write("""
 #!/bin/bash
-%s portoctl create ifup-test
+%s create ifup-test
 """ % (portoctl_path))
 
 ExpectException(ct.Start, porto.exceptions.Unknown)
 
 open(script_path, 'w').write("""
 #!/bin/bash
-%s portoctl set test-ifup-script cpu_policy idle
+%s set test-ifup-script cpu_policy idle
 """ % (portoctl_path))
 
 ExpectException(ct.Start, porto.exceptions.Unknown)

@@ -154,9 +154,15 @@ ExpectEq(a['oom_kills_total'], '1')
 ExpectEq(int(a['oom_kills']) + int(b['oom_kills']), 1)
 
 # Race: Speculative OOM could be detected in a or test-oom/b
-time.sleep(5)
+#       (kernel stuff)
+deadline = time.time() + 30
+oom_speculative = 0
 
-ExpectEq(a.GetProperty('oom_kills', sync=True), '0')
+while time.time() < deadline and oom_speculative == 0:
+    oom_speculative = int(a.GetProperty('oom_kills', sync=True)) + int(b.GetProperty('oom_kills', sync=True))
+    time.sleep(1)
+
+ExpectLe(1, oom_speculative)
 ExpectEq(b['oom_kills'], '1')
 ExpectEq(b['oom_kills_total'], '1')
 

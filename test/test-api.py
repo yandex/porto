@@ -50,6 +50,8 @@ volume_size_eps = 40*(2**20) # loop/ext4: 5% reserve + 256 byte inode per 4k of 
 volume_path = "/tmp/" + prefix + "layer"
 tarball_path = "/tmp/" + prefix + "layer.tgz"
 broken_tarball_path = "/tmp/" + prefix + "broken_layer.tgz"
+broken_tarball_file1 = "/tmp/" + prefix + "broken1"
+broken_tarball_file2 = "/tmp/" + prefix + "broken2"
 storage_tarball_path = "/tmp/" + prefix + "storage.tgz"
 storage_name = prefix + "volume_storage"
 meta_storage_name = prefix + "meta_storage"
@@ -207,8 +209,10 @@ assert l.name == layer_name
 assert c.FindLayer(layer_name).name == layer_name
 
 # make broken layer
-subprocess.check_call(['tar', '-cf', broken_tarball_path, '/bin'])
-subprocess.check_call(['truncate', '-s' '1M', broken_tarball_path]) # file.truncate corrupt tar header
+subprocess.check_call(['dd','if=/dev/urandom','of=' + broken_tarball_file1,'bs=2M','count=1'])
+subprocess.check_call(['dd','if=/dev/urandom','of=' + broken_tarball_file2,'bs=2M','count=1'])
+subprocess.check_call(['tar', '-czf', broken_tarball_path, broken_tarball_file1, broken_tarball_file2])
+subprocess.check_call(['truncate', '-s' '1536K', broken_tarball_path]) # file.truncate corrupt tar header
 ExpectEq(porto.exceptions.Unknown, Catch(c.ImportLayer, "abc", broken_tarball_path))
 ExpectEq(porto.exceptions.HelperFatalError, Catch(c.ImportLayer, "abc", broken_tarball_path, verbose_error=True))
 
@@ -428,6 +432,8 @@ assert time.time() - start > 0.9
 if sys.version_info.major != 3:
     sys.exit(0)
 
+# PYTHON 3 ONLY BELOW
+
 AsRoot()
 
 ConfigurePortod('test-api', """
@@ -447,7 +453,7 @@ except:
 
 c = porto.Connection()
 v = c.CreateVolume(layers=['ubuntu-xenial'], backend='native')
-subprocess.call(['dd', 'if=/dev/urandom', 'of=' + str(v) + '/foo', 'bs=1M', 'count=512'])
+subprocess.call(['timeout', '5', 'dd', 'if=/dev/urandom', 'of=' + str(v) + '/foo', 'bs=1M', 'count=2048'])
 
 portodReload = Thread(target=Reload)
 portodReload.start()
@@ -457,7 +463,7 @@ assert p.returncode == 0
 
 portodReload.join()
 
-
+subprocess.call(['vmtouch', '-e', 'layer.tar.gz'])
 p = subprocess.run([portoctl, '--disk-timeout', '1', '-t', '1', 'layer', '-I', 'ubuntu-api-test', 'layer.tar.gz'], stdout = subprocess.PIPE, stderr=subprocess.PIPE)
 assert p.returncode != 0
 assert str(p.stderr).find('Resource temporarily unavailable') >= 0
@@ -485,3 +491,10 @@ time.sleep(10)
 assert str(os.listdir('/place/porto_layers')).find('test-api-layer') == -1
 
 ConfigurePortod('test-api', '')
+
+try:
+    os.unlink(broken_tarball_path)
+    os.unlink(broken_tarball_file1)
+    os.unlink(broken_tarball_file2)
+except:
+    pass

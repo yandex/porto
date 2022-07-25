@@ -133,6 +133,9 @@ try:
 
     ExpectEq(fatals + 2, int(conn.GetProperty('/', 'porto_stat[fatals]')))
     subprocess.call([portod, 'clearstat', 'fatals'])
+    subprocess.call([portod, 'clearstat', 'errors'])
+    ExpectEq(0, int(conn.GetProperty('/', 'porto_stat[fatals]')))
+    ExpectEq(0, int(conn.GetProperty('/', 'porto_stat[errors]')))
 
 finally:
     ConfigurePortod('test-extra_properties', "")
