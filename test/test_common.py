@@ -8,6 +8,13 @@ import grp
 import time
 import platform
 import re
+import subprocess
+
+portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+portobin = os.getcwd()
+portoctl = portobin + "/portoctl"
+portod = os.path.abspath(portobin + "/portod")
+portotest = portobin + "/portotest"
 
 try:
     import google.protobuf
@@ -179,6 +186,21 @@ def ReloadPortod():
     except OSError:
         pass
 
+def StopPortod():
+    global portod
+    subprocess.check_call([portod, 'stop'])
+
+def RestartPortod():
+    # Note that is restart, not reload!
+    # Thus we intentionally want to drop state
+
+    global portod
+    subprocess.check_call([portod, 'restart'])
+
+def CleanupConfigs():
+    for f in os.listdir('/etc/portod.conf.d'):
+        os.unlink('/etc/portod.conf.d/%s' % f)
+
 def ConfigurePortod(name, conf):
     path = '/etc/portod.conf.d/{}.conf'.format(name)
     if os.path.exists(path) and open(path).read() == conf:
@@ -241,8 +263,6 @@ def get_kernel_maj_min():
     kver = re.match("([0-9])\.([0-9]{1,2})", platform.uname()[2]).groups()
     return (int(kver[0]), int(kver[1]))
 
-portosrc = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-portobin = os.getcwd()
-portoctl = portobin + "/portoctl"
-portod = os.path.abspath(portobin + "/portod")
-portotest = portobin + "/portotest"
+if not os.environ.get('PORTO_TEST_NO_RESTART', None):
+    CleanupConfigs()
+    RestartPortod()

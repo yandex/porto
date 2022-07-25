@@ -112,13 +112,13 @@ def ns_escape(v):
 
     r = c.Create("parent")
     r.SetProperty("root", v.path)
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", "python /porto/test/test-security.py ns_escape_container 2 1")
     r.SetProperty("porto_namespace", "parent")
 
     r = c.Create("parent/child")
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     #FIXME:
     #porto r.SetProperty("command","cat /porto/test/test-security.py") shows file contents, but
     #c.SetProperty("parent/child","command", "python /porto/test/test-security.py ns_escape_container 10 0") fails (file not found)
@@ -185,7 +185,7 @@ def binds_escalation(v):
     AsAlice()
     c = porto.Connection()
     r = c.Create("bind_file")
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("root", v.path)
     r.SetProperty("bind", "/etc/shadow /tmp/shadow ro")
@@ -251,7 +251,7 @@ def internal_escalation(v):
     r.SetProperty("porto_namespace", "")
     r.SetProperty("virt_mode", "os")
     r.SetProperty("root", v.path)
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", "python /porto/test/test-security.py internal_escalation_container")
 
@@ -278,7 +278,7 @@ def porto_namespace_escape(v):
     r = c.Create("test")
     r.SetProperty("porto_namespace", "test")
     r.SetProperty("root", v.path)
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", \
                   "python /porto/test/test-security.py porto_namespace_escape_container")
@@ -350,7 +350,7 @@ def layer_escalation(v):
     c = porto.Connection()
     r = c.Create("test")
     r.SetProperty("root", v.path)
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     r.SetProperty("bind", "{} /porto ro".format(portosrc))
     r.SetProperty("command", "python /porto/test/test-security.py layer_escalation_container")
 
@@ -376,7 +376,7 @@ def layer_escalation(v):
 
 
     r.SetProperty("root", v.path)
-    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python")
+    r.SetProperty("env", "PYTHONPATH=/porto/src/api/python;PORTO_TEST_NO_RESTART=1;")
     r.SetProperty("command", "python /porto/test/test-security.py layer_escalation_volume_container " + v.path)
     r.SetProperty("stdout_path","/tmp/stdout")
     r.SetProperty("stderr_path","/tmp/stderr")

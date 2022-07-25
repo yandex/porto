@@ -163,7 +163,7 @@ download = subprocess.check_output(["apt-get", "--force-yes", "download", "yande
 
 print "Package successfully downloaded"
 
-subprocess.check_call([portod, "stop"])
+StopPortod()
 
 downloads = download.split('\n')[0].split()
 pktname = downloads[-4] + "_" + downloads[-3] + "_amd64.deb"
@@ -435,7 +435,7 @@ AsRoot()
 
 print " - restart to new vetsion"
 
-subprocess.check_call([portod, "restart"])
+RestartPortod()
 
 ver, rev = c.Version()
 ExpectNe(ver, PREV_VERSION)

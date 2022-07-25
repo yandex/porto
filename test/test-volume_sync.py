@@ -7,7 +7,7 @@ import subprocess
 from test_common import *
 import random
 
-subprocess.check_output([portod, 'restart'])
+RestartPortod()
 
 def vunlink(num):
     c = porto.Connection()
@@ -35,4 +35,4 @@ try:
         t.join()
 
 finally:
-    subprocess.check_output([portod, 'restart'])
+    RestartPortod()

@@ -551,7 +551,7 @@ def TestTCCleanup():
 
     c.connect()
 
-    subprocess.check_call([portod, "--discard", "restart"])
+    RestartPortod()
 
     kvs = set(os.listdir("/run/porto/kvs"))
 
@@ -583,7 +583,7 @@ def TestTCCleanup():
     ExpectEq(c.GetProperty("/", "porto_stat[warnings]"), "0")
 
     c.disconnect()
-    subprocess.check_call([portod, "--discard", "restart"])
+    RestartPortod()
 
     c.connect()
 
@@ -634,7 +634,7 @@ def TestPersistentStorage():
     ExpectProp(r, "exit_status", "0")
 
     AsRoot()
-    subprocess.check_call([portod, "restart"])
+    RestartPortod()
     AsAlice()
 
     ExpectEq(len(c.ListStorages()), 1)
@@ -659,7 +659,7 @@ def TestPersistentStorage():
     r.GetProperty("exit_status") == "0"
 
     AsRoot()
-    subprocess.check_call([portod, "restart"])
+    RestartPortod()
     AsAlice()
 
     ExpectEq(len(c.ListStorages()), 2)
@@ -689,7 +689,7 @@ def TestPersistentStorage():
     ExpectProp(r, "exit_status", "0")
 
     AsRoot()
-    subprocess.check_call([portod, "restart"])
+    RestartPortod()
     AsAlice()
     ExpectEq(len(c.ListStorages()), 2)
 
@@ -722,7 +722,7 @@ def TestPersistentStorage():
     f.close()
 
     AsRoot()
-    subprocess.check_call([portod, "restart"])
+    RestartPortod()
     AsAlice()
 
     v = c.CreateVolume(None, place="/tmp/test-recover-place", storage="test", backend="native")

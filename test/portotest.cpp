@@ -87,6 +87,9 @@ int main(int argc, char *argv[])
     test::InitUsersAndGroups();
     test::InitKernelFeatures();
 
+    std::vector<std::string> v;
+    ExpectOk(test::Popen("./portod restart", v));
+
     string what = "";
     if (argc >= 2)
         what = argv[1];
