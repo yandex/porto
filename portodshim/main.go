@@ -12,11 +12,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-const (
-	portodshimSocket  = "/run/portodshim.sock"
-	portodshimLogPath = "/var/log/portodshim.log"
-)
-
 func makeZapLogger(logPath string, debug bool) (*zap.Logger, error) {
 	sink := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   logPath,
@@ -50,14 +45,14 @@ func main() {
 	debug := flag.Bool("debug", false, "show debug logs")
 	flag.Parse()
 
-	logger, err := makeZapLogger(portodshimLogPath, *debug)
+	logger, err := makeZapLogger(PortodshimLogPath, *debug)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cannot create logger: %v", err)
 		return
 	}
 	_ = zap.ReplaceGlobals(logger)
 
-	server, err := NewPortodshimServer(portodshimSocket)
+	server, err := NewPortodshimServer(PortodshimSocket)
 	if err != nil {
 		zap.S().Fatalf("init error: %v", err)
 		return

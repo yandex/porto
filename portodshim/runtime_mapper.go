@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/pkg/netns"
+	cni "github.com/containerd/go-cni"
 	"github.com/yandex/porto/src/api/go/porto"
 	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 	"go.uber.org/zap"
@@ -17,20 +20,35 @@ import (
 )
 
 const (
-	containerName = "porto"
-	VolumesPath   = "/place/portodshim_volumes"
-	LogsPath      = "/var/log/portodshim"
-	pauseImage    = "k8s.gcr.io/pause:3.7"
+	runtimeName = "porto"
+	pauseImage  = "k8s.gcr.io/pause:3.7"
+	// loopback + default
+	networkAttachCount = 2
+	ifPrefixName       = "veth"
+	defaultIfName      = "veth0"
 )
 
 type PortodshimRuntimeMapper struct {
 	containerStateMap map[string]v1.ContainerState
 	podStateMap       map[string]v1.PodSandboxState
 	randGenerator     *rand.Rand
+	netPlugin         cni.CNI
 }
 
-func NewPortodshimRuntimeMapper() PortodshimRuntimeMapper {
-	runtimeMapper := PortodshimRuntimeMapper{}
+func NewPortodshimRuntimeMapper() (*PortodshimRuntimeMapper, error) {
+	runtimeMapper := &PortodshimRuntimeMapper{}
+
+	netPlugin, err := cni.New(cni.WithMinNetworkCount(networkAttachCount),
+		cni.WithPluginConfDir(NetworkPluginConfDir),
+		cni.WithPluginDir([]string{NetworkPluginBinDir}),
+		cni.WithInterfacePrefix(ifPrefixName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize cni: %w", err)
+	}
+	if err = netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err != nil {
+		return nil, fmt.Errorf("failed to load cni configuration: %v", err)
+	}
+	runtimeMapper.netPlugin = netPlugin
 
 	runtimeMapper.containerStateMap = map[string]v1.ContainerState{
 		"stopped":    v1.ContainerState_CONTAINER_CREATED,
@@ -56,7 +74,7 @@ func NewPortodshimRuntimeMapper() PortodshimRuntimeMapper {
 
 	runtimeMapper.randGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	return runtimeMapper
+	return runtimeMapper, nil
 }
 
 // INTERNAL
@@ -88,23 +106,37 @@ func (mapper *PortodshimRuntimeMapper) createId(name string) string {
 	// max length of return value is 26 + 1 + 4 = 31, so container id <= 63
 	return fmt.Sprintf("%s-%x", name[:length], mapper.randGenerator.Uint32()%65536)
 }
-func (mapper *PortodshimRuntimeMapper) setNetwork(ctx context.Context, id string, mappings []*v1.PortMapping) {
+func (mapper *PortodshimRuntimeMapper) setNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	addresses := ""
-	for _, mapping := range mappings {
-		if ip := mapping.GetHostIp(); ip != "" {
-			addresses += fmt.Sprintf("eth0 %s;", ip)
+	netnsPath, err := netns.NewNetNS(NetnsDir)
+	if err != nil {
+		return fmt.Errorf("failed to create network namespace, pod %s: %w", id, err)
+	}
+
+	cniLabels := cni.WithLabels(toCniLabels(id, cfg))
+	result, err := mapper.netPlugin.Setup(ctx, id, netnsPath.GetPath(), cniLabels)
+	if err != nil {
+		return err
+	}
+
+	addrs := []string{}
+	for _, ip := range result.Interfaces[defaultIfName].IPConfigs {
+		ipv6 := ip.IP.To16()
+		if ipv6 != nil {
+			addrs = append(addrs, fmt.Sprintf("%s %s", defaultIfName, ipv6))
 		}
 	}
 
-	// TODO: убрать заглушку
-	addresses += "eth0 192.168.1.1;"
-
-	err := portoClient.SetProperty(id, "ip", addresses)
+	err = portoClient.SetProperty(id, "net", fmt.Sprintf("netns %s", filepath.Base(netnsPath.GetPath())))
 	if err != nil {
-		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		return fmt.Errorf("failed set porto prop net, pod %s: %w", id, err)
 	}
+	err = portoClient.SetProperty(id, "ip", strings.Join(addrs, ";"))
+	if err != nil {
+		return fmt.Errorf("failed set porto prop ip, pod %s: %w", id, err)
+	}
+	return nil
 }
 
 func getPodAndContainer(id string) (string, string) {
@@ -289,7 +321,7 @@ func getPodStats(ctx context.Context, id string) *v1.PodSandboxStats {
 			Network: &v1.NetworkUsage{
 				Timestamp: timestamp,
 				DefaultInterface: &v1.NetworkInterfaceUsage{
-					Name:     "eth0",
+					Name:     defaultIfName,
 					RxBytes:  &v1.UInt64Value{Value: getUintProperty(ctx, id, "net_rx_bytes")},
 					RxErrors: &v1.UInt64Value{Value: 0},
 					TxBytes:  &v1.UInt64Value{Value: getUintProperty(ctx, id, "net_bytes")},
@@ -343,7 +375,7 @@ func getContainerStats(ctx context.Context, id string) *v1.ContainerStats {
 		WritableLayer: &v1.FilesystemUsage{
 			Timestamp: timestamp,
 			FsId: &v1.FilesystemIdentifier{
-				Mountpoint: VolumesPath + "/" + id,
+				Mountpoint: VolumesDir + "/" + id,
 			},
 			UsedBytes:  &v1.UInt64Value{Value: 0},
 			InodesUsed: &v1.UInt64Value{Value: 0},
@@ -357,12 +389,11 @@ func getContainerImage(ctx context.Context, id string) string {
 		return ""
 	}
 
-	imageDescriptions, err := portoClient.ListVolumes(VolumesPath+"/"+id, id)
+	imageDescriptions, err := portoClient.ListVolumes(VolumesDir+"/"+id, id)
 	if err != nil {
 		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 		return ""
 	}
-
 	return imageDescriptions[0].Properties["image"]
 }
 func getNetwork(ctx context.Context, id string) *v1.PodSandboxNetworkStatus {
@@ -395,6 +426,19 @@ func getNetwork(ctx context.Context, id string) *v1.PodSandboxNetworkStatus {
 
 	return &status
 }
+func toCniLabels(id string, config *v1.PodSandboxConfig) map[string]string {
+	return map[string]string{
+		"PrjID":         config.GetAnnotations()["PrjID"],
+		"IgnoreUnknown": "1",
+	}
+}
+func parsePropertyNetNS(prop string) string {
+	netnsL := strings.Fields(prop)
+	if netnsL[0] == "netns" && len(netnsL) > 1 {
+		return netnsL[1]
+	}
+	return ""
+}
 
 // RUNTIME SERVICE INTERFACE
 func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.VersionRequest) (*v1.VersionResponse, error) {
@@ -409,7 +453,7 @@ func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.Vers
 	// TODO: temprorary use tag as a RuntimeApiVersion
 	return &v1.VersionResponse{
 		Version:           req.GetVersion(),
-		RuntimeName:       containerName,
+		RuntimeName:       runtimeName,
 		RuntimeVersion:    tag,
 		RuntimeApiVersion: tag,
 	}, nil
@@ -445,7 +489,7 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 		"image":      pauseImage,
 	}
 
-	rootPath := VolumesPath + "/" + id
+	rootPath := VolumesDir + "/" + id
 	err = os.Mkdir(rootPath, 0755)
 	if err != nil {
 		if os.IsExist(err) {
@@ -473,10 +517,16 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	// network
 	err = portoClient.SetProperty(id, "hostname", req.GetConfig().GetHostname())
 	if err != nil {
-		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+		_ = portoClient.Destroy(id)
+		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	mapper.setNetwork(ctx, id, req.GetConfig().GetPortMappings())
+	if err := mapper.setNetwork(ctx, id, req.GetConfig()); err != nil {
+		_ = portoClient.Destroy(id)
+		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 
 	// labels and annotations
 	labels := req.GetConfig().GetLabels()
@@ -533,20 +583,35 @@ func (mapper *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	id := req.GetPodSandboxId()
-
-	err := portoClient.Destroy(id)
+	netProp, err := portoClient.GetProperty(id, "net")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	rootPath := VolumesPath + "/" + id
-	err = os.RemoveAll(rootPath)
-	if err != nil {
+	if err = portoClient.Destroy(id); err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
+	rootPath := VolumesDir + "/" + id
+	if err = os.RemoveAll(rootPath); err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// removes the network from the pod
+	netnsProp := parsePropertyNetNS(netProp)
+	if netnsProp == "" {
+		return nil, fmt.Errorf("%s: %s", getCurrentFuncName(), "netns property hasn't been set")
+	}
+	netnsPath := netns.LoadNetNS(filepath.Join(NetnsDir, netnsProp))
+	if err = mapper.netPlugin.Remove(ctx, id, netnsPath.GetPath(), cni.WithLabels(map[string]string{})); err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+	if err = netnsPath.Remove(); err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 	return &v1.RemovePodSandboxResponse{}, nil
 }
+
 func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req *v1.PodSandboxStatusRequest) (*v1.PodSandboxStatusResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
 
@@ -675,7 +740,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		"containers": id,
 		"image":      imageName,
 	}
-	rootPath := VolumesPath + "/" + id
+	rootPath := VolumesDir + "/" + id
 	err = os.Mkdir(rootPath, 0755)
 	if err != nil {
 		if os.IsExist(err) {
@@ -706,7 +771,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		labels = make(map[string]string)
 	}
 	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
-	labels["io.kubernetes.container.logpath"] = fmt.Sprintf("%s/%s.log", LogsPath, strings.ReplaceAll(id, "/", "%"))
+	labels["io.kubernetes.container.logpath"] = fmt.Sprintf("%s/%s.log", LogsDir, strings.ReplaceAll(id, "/", "%"))
 
 	setLabels(ctx, id, req.GetConfig().GetLabels(), "LABEL")
 	setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
@@ -780,7 +845,7 @@ func (mapper *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req 
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	rootPath := VolumesPath + "/" + id
+	rootPath := VolumesDir + "/" + id
 	err = os.RemoveAll(rootPath)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)

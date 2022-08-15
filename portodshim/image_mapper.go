@@ -13,10 +13,6 @@ import (
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-const (
-	ImagesPath = "/place/porto_docker"
-)
-
 type PortodshimImageMapper struct{}
 
 // INTERNAL
@@ -146,7 +142,7 @@ func (mapper *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.Im
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
 	stat := syscall.Statfs_t{}
-	err := syscall.Statfs(ImagesPath, &stat)
+	err := syscall.Statfs(ImagesDir, &stat)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -156,7 +152,7 @@ func (mapper *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.Im
 			{
 				Timestamp: time.Now().UnixNano(),
 				FsId: &v1.FilesystemIdentifier{
-					Mountpoint: ImagesPath,
+					Mountpoint: ImagesDir,
 				},
 				UsedBytes:  &v1.UInt64Value{Value: (stat.Blocks - stat.Bfree) * uint64(stat.Bsize)},
 				InodesUsed: &v1.UInt64Value{Value: stat.Files - stat.Ffree},

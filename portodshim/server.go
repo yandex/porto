@@ -18,8 +18,8 @@ type PortodshimServer struct {
 	socket        string
 	listener      net.Listener
 	grpcServer    *grpc.Server
-	runtimeMapper PortodshimRuntimeMapper
-	imageMapper   PortodshimImageMapper
+	runtimeMapper *PortodshimRuntimeMapper
+	imageMapper   *PortodshimImageMapper
 	ctx           context.Context
 }
 
@@ -70,12 +70,17 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 
 	server := PortodshimServer{socket: socketPath}
 	server.ctx = server.ShutdownCtx()
-	server.runtimeMapper = NewPortodshimRuntimeMapper()
+
+	server.runtimeMapper, err = NewPortodshimRuntimeMapper()
+	if err != nil {
+		return nil, err
+	}
 
 	err = unlinkStaleSocket(socketPath)
 	if err != nil {
 		zap.S().Fatalf("failed to unlink staled socket: %v", err)
 	}
+
 	server.listener, err = net.Listen("unix", server.socket)
 	if err != nil {
 		zap.S().Fatalf("listen error: %s %v", server.socket, err)
@@ -87,7 +92,7 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		return nil, fmt.Errorf("chmod error: %s %v", server.socket, err)
 	}
 
-	err = os.Mkdir(VolumesPath, 0755)
+	err = os.Mkdir(VolumesDir, 0755)
 	if err != nil && !os.IsExist(err) {
 		return nil, err
 	}
