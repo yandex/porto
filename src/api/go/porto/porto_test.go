@@ -5,11 +5,11 @@ import (
 	"crypto/rand"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"testing"
-	"strings"
 
-	"rpc"
+	"porto/pkg/rpc"
 )
 
 func FailOnError(t *testing.T, conn API, err error) {
@@ -56,7 +56,7 @@ func TestGetVersion(t *testing.T) {
 	defer conn.Close()
 	maj, min, err := conn.GetVersion()
 	FailOnError(t, conn, err)
-	t.Logf("Porto version %d.%d", maj, min)
+	t.Logf("Porto version %s.%s", maj, min)
 }
 
 func TestPlist(t *testing.T) {
@@ -352,8 +352,8 @@ func TestListLayers2(t *testing.T) {
 	FailOnError(t, conn, err)
 	for i := range layers {
 		if layers[i].Name == testLayer &&
-		   layers[i].PrivateValue == "456" &&
-		   layers[i].LastUsage < 10 {
+			layers[i].PrivateValue == "456" &&
+			layers[i].LastUsage < 10 {
 
 			return
 		}
@@ -435,9 +435,9 @@ func TestPlace(t *testing.T) {
 
 	os.RemoveAll(testPlace)
 	os.Mkdir(testPlace, 0755)
-	os.Mkdir(testPlace + "/porto_volumes", 0755)
-	os.Mkdir(testPlace + "/porto_layers", 0755)
-	os.Mkdir(testPlace + "/porto_storage", 0755)
+	os.Mkdir(testPlace+"/porto_volumes", 0755)
+	os.Mkdir(testPlace+"/porto_layers", 0755)
+	os.Mkdir(testPlace+"/porto_storage", 0755)
 
 	config := make(map[string]string)
 	config["private"] = "golang test volume"
@@ -465,8 +465,8 @@ func TestPlace(t *testing.T) {
 
 	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", false))
 	FailOnError(t, conn, conn.RemoveStorage("abcd", testPlace))
-	FailOnError(t, conn, os.Remove(testPlace + "/porto_volumes"))
-	FailOnError(t, conn, os.Remove(testPlace + "/porto_layers"))
-	FailOnError(t, conn, os.Remove(testPlace + "/porto_storage"))
+	FailOnError(t, conn, os.Remove(testPlace+"/porto_volumes"))
+	FailOnError(t, conn, os.Remove(testPlace+"/porto_layers"))
+	FailOnError(t, conn, os.Remove(testPlace+"/porto_storage"))
 	FailOnError(t, conn, os.Remove(testPlace))
 }

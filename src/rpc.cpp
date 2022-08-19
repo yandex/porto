@@ -1177,7 +1177,7 @@ noinline TError CreateVolume(const rpc::TVolumeCreateRequest &req,
     if (error)
         goto err;
 
-    volume->DumpDescription(nullptr, volume->ComposePath(*CL->ClientContainer), rsp.mutable_volume());
+    volume->DumpDescription(nullptr, volume->ComposePath(*CL->ClientContainer), rsp.mutable_volumedescription());
     return OK;
 
 err:

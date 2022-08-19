@@ -967,7 +967,7 @@ class Connection(object):
         for name, value in properties.items():
             prop = request.createVolume.properties.add()
             prop.name, prop.value = name, value
-        pb = self.rpc.call(request, timeout or self.disk_timeout).volume
+        pb = self.rpc.call(request, timeout or self.disk_timeout).volumeDescription
         return Volume(self, pb.path, pb)
 
     def FindVolume(self, path):

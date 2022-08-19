@@ -1,5 +1,3 @@
-//go:generate protoc -I ../.. ../../rpc.proto --go_out=vendor/rpc
-
 package porto
 
 import (
@@ -11,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"porto/pkg/rpc"
 
-	"rpc"
+	"google.golang.org/protobuf/proto"
 )
 
 const portoSocket = "/run/portod.socket"
@@ -87,10 +85,10 @@ type TStorageDescription struct {
 }
 
 type TLayerDescription struct {
-	Name string
-	OwnerUser string
-	OwnerGroup string
-	LastUsage uint64
+	Name         string
+	OwnerUser    string
+	OwnerGroup   string
+	LastUsage    uint64
 	PrivateValue string
 }
 
@@ -156,7 +154,7 @@ type API interface {
 	// LayerAPI
 	ImportLayer(layer string, tarball string, merge bool) error
 	ImportLayer4(layer string, tarball string, merge bool,
-				place string, privateValue string) error
+		place string, privateValue string) error
 	ExportLayer(volume string, tarball string) error
 	RemoveLayer(layer string) error
 	RemoveLayer2(layer string, place string) error
@@ -164,7 +162,7 @@ type API interface {
 	ListLayers2(place string, mask string) ([]TLayerDescription, error)
 
 	GetLayerPrivate(layer string, place string) (string, error)
-	SetLayerPrivate(layer string, place string, privateValue string)  error
+	SetLayerPrivate(layer string, place string, privateValue string) error
 
 	ListStorage(place string, mask string) ([]TStorageDescription, error)
 	RemoveStorage(name string, place string) error
@@ -369,7 +367,7 @@ func (conn *portoConnection) Wait(containers []string, timeout time.Duration) (s
 		}
 
 		timeoutms := uint32(timeout / time.Millisecond)
-		req.Wait.Timeout = &timeoutms
+		req.Wait.TimeoutMs = &timeoutms
 	}
 
 	resp, err := conn.performRequest(req)
@@ -565,7 +563,7 @@ func (conn *portoConnection) CreateVolume(path string, config map[string]string)
 		return desc, err
 	}
 
-	volume := resp.GetVolume()
+	volume := resp.GetVolumeDescription()
 	desc.Path = volume.GetPath()
 	desc.Containers = append(desc.Containers, volume.GetContainers()...)
 	desc.Properties = make(map[string]string, len(volume.GetProperties()))
@@ -668,7 +666,7 @@ func (conn *portoConnection) ImportLayer(layer string, tarball string, merge boo
 }
 
 func (conn *portoConnection) ImportLayer4(layer string, tarball string, merge bool,
-										 place string, privateValue string) error {
+	place string, privateValue string) error {
 	req := &rpc.TContainerRequest{
 		ImportLayer: &rpc.TLayerImportRequest{
 			Layer:        &layer,
@@ -782,7 +780,7 @@ func (conn *portoConnection) GetLayerPrivate(layer string, place string) (string
 }
 
 func (conn *portoConnection) SetLayerPrivate(layer string, place string,
-											 privateValue string) error {
+	privateValue string) error {
 	req := &rpc.TContainerRequest{
 		Setlayerprivate: &rpc.TLayerSetPrivateRequest{
 			Layer:        &layer,
@@ -834,7 +832,7 @@ func (conn *portoConnection) ListStorage(place string, mask string) (ret []TStor
 func (conn *portoConnection) RemoveStorage(name string, place string) error {
 	req := &rpc.TContainerRequest{
 		RemoveStorage: &rpc.TStorageRemoveRequest{
-			Name:  &name,
+			Name: &name,
 		},
 	}
 

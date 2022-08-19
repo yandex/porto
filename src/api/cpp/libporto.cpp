@@ -625,8 +625,8 @@ int Connection::CreateVolume(const std::string &path,
     }
 
     int ret = Impl->Call(Impl->DiskTimeout);
-    if (!ret) {
-        const auto &volume = Impl->Rsp.volume();
+    if (!ret && Impl->Rsp.has_volumedescription()) {
+        const auto &volume = Impl->Rsp.volumedescription();
         result.Path = volume.path();
         for (const auto &p: volume.properties())
             result.Properties[p.name()] = p.value();

@@ -4,6 +4,7 @@ syntax = "proto2";
 // Protocol: Varint length, TContainerRequest req | TContainerResponse rsp.
 
 package rpc;
+option go_package = "rpc/";
 
 // List of error codes
 enum EError {
@@ -200,7 +201,7 @@ message TContainerResponse {
 
     optional TVolumePropertyListResponse volumePropertyList = 12;
 
-    optional TVolumeDescription volume = 13;        // reponse to createVolume
+    optional TVolumeDescription volumeDescription = 13;
     optional TLayerListResponse layers = 14;
     optional TConvertPathResponse convertPath = 15;
     optional TLayerGetPrivateResponse layer_private = 16;

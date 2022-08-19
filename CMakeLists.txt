@@ -15,6 +15,7 @@ endif()
 
 PROJECT(yandex-porto)
 
+OPTION(ENABLE_GO "Enables building golang API" ON)
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
 OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)
@@ -103,6 +104,10 @@ set(CMAKE_INSTALL_PREFIX /usr)
 
 add_subdirectory(src)
 add_subdirectory(test)
+
+if(ENABLE_GO)
+	add_subdirectory(src/api/go)
+endif()
 
 if(ENABLE_PYTHON)
 	include(FindPythonInterp)
