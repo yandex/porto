@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/yandex/porto/src/api/go/porto"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 	grpc "google.golang.org/grpc"
@@ -50,7 +51,7 @@ func serverInterceptor(ctx context.Context,
 	handler grpc.UnaryHandler) (interface{}, error) {
 	start := time.Now()
 
-	portoClient, err := Connect()
+	portoClient, err := porto.Connect()
 	if err != nil {
 		zap.S().Fatalf("connect to porto: %v", err)
 		return nil, fmt.Errorf("connect to porto: %v", err)

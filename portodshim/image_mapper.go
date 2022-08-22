@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yandex/porto/src/api/go/porto"
 	"go.uber.org/zap"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -49,7 +50,7 @@ func (mapper *PortodshimImageMapper) getImageStruct(id string, tags []string, ow
 func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImagesRequest) (*v1.ListImagesResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	portoClient := ctx.Value("portoClient").(API)
+	portoClient := ctx.Value("portoClient").(porto.API)
 
 	response, err := portoClient.ListLayers2("", "")
 	if err != nil {
@@ -79,7 +80,7 @@ func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.Lis
 func (mapper *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageStatusRequest) (*v1.ImageStatusResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.Image.GetImage())
 
-	portoClient := ctx.Value("portoClient").(API)
+	portoClient := ctx.Value("portoClient").(porto.API)
 
 	// TODO: Убрать заглушку
 	rawImage := req.GetImage().GetImage()
@@ -126,7 +127,7 @@ func (mapper *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.Re
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.Image.GetImage())
 
 	// temporarily
-	//portoClient := ctx.Value("portoClient").(API)
+	//portoClient := ctx.Value("portoClient").(porto.API)
 	//err := portoClient.RemoveLayer(req.Image.GetImage())
 	//if err != nil {
 	//	return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)

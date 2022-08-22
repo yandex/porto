@@ -3,13 +3,15 @@ module main
 go 1.17
 
 require (
+	github.com/yandex/porto/src/api/go/porto v0.0.0-20220822120219-b98a70809a99
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20210831042530-f4d43177bf5e
 	google.golang.org/grpc v1.45.0
-	google.golang.org/protobuf v1.28.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/cri-api v0.23.5
 )
+
+require google.golang.org/protobuf v1.28.1 // indirect
 
 require (
 	github.com/gogo/protobuf v1.3.2 // indirect
