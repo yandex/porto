@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"porto/pkg/rpc"
+	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 
 	"google.golang.org/protobuf/proto"
 )

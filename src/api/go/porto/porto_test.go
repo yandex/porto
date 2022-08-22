@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"porto/pkg/rpc"
+	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 )
 
 func FailOnError(t *testing.T, conn API, err error) {
