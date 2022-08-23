@@ -841,6 +841,85 @@ int Connection::SetLayerPrivate(const std::string &private_value,
     return Impl->Call();
 }
 
+int Connection::DockerImageStatus(DockerImage &image,
+                                  const std::string &name,
+                                  const std::string &place) {
+    auto req = Impl->Req.mutable_dockerimagestatus();
+    req->set_name(name);
+    if (!place.empty())
+        req->set_place(place);
+    int ret = Impl->Call();
+    if (!ret && Impl->Rsp.dockerimagestatus().has_image()) {
+        auto i = Impl->Rsp.dockerimagestatus().image();
+        image.Name = i.full_name();
+        for (const auto &layer: i.layers())
+            image.Layers.push_back(layer);
+        image.Command = i.command();
+        image.Env = i.env();
+    }
+    return ret;
+}
+
+int Connection::ListDockerImages(std::vector<DockerImage> &images,
+                                 const std::string &place,
+                                 const std::string &mask) {
+    auto req = Impl->Req.mutable_listdockerimages();
+    if (place.size())
+        req->set_place(place);
+    if (mask.size())
+        req->set_mask(mask);
+    int ret = Impl->Call();
+    if (!ret) {
+        for (const auto &i: Impl->Rsp.listdockerimages().images()) {
+            DockerImage image;
+            image.Name = i.full_name();
+            for (const auto &layer: i.layers())
+                image.Layers.push_back(layer);
+            image.Command = i.command();
+            image.Env = i.env();
+            images.push_back(image);
+        }
+    }
+    return ret;
+}
+
+int Connection::PullDockerImage(DockerImage &image,
+                                const std::string &name,
+                                const std::string &place,
+                                const std::string &auth_token,
+                                const std::string &auth_host,
+                                const std::string &auth_service) {
+    auto req = Impl->Req.mutable_pulldockerimage();
+    req->set_name(name);
+    if (place.size())
+        req->set_place(place);
+    if (auth_token.size())
+        req->set_auth_token(auth_token);
+    if (auth_host.size())
+        req->set_auth_host(auth_host);
+    if (auth_service.size())
+        req->set_auth_service(auth_service);
+    int ret = Impl->Call();
+    if (!ret && Impl->Rsp.pulldockerimage().has_image()) {
+        auto i = Impl->Rsp.pulldockerimage().image();
+        image.Name = i.full_name();
+        for (const auto &layer: i.layers())
+            image.Layers.push_back(layer);
+        image.Command = i.command();
+        image.Env = i.env();
+    }
+    return ret;
+}
+
+int Connection::RemoveDockerImage(const std::string &name,
+                                  const std::string &place) {
+    auto req = Impl->Req.mutable_removedockerimage();
+    req->set_name(name);
+    if (place.size())
+        req->set_place(place);
+    return Impl->Call();
+}
+
 const rpc::TStorageListResponse *Connection::ListStorage(const std::string &place, const std::string &mask) {
     auto req = Impl->Req.mutable_liststorage();
     if (place.size())

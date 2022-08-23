@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/path.hpp"
+
 #include <mutex>
 
 class MeasuredMutex: public std::mutex {
@@ -10,4 +12,14 @@ public:
 
     void lock();
     std::unique_lock<std::mutex> UniqueLock();
+};
+
+
+class TFileMutex {
+    TFile File;
+
+public:
+    TFileMutex() = delete;
+    TFileMutex(const TPath &path, int flags = 0);
+    ~TFileMutex();
 };

@@ -59,6 +59,7 @@ static void DefaultConfig() {
     config().mutable_daemon()->set_vl_threads(5);
     config().mutable_daemon()->set_tar_path("tar");
     config().mutable_daemon()->set_request_handling_delay_ms(0);
+    config().mutable_daemon()->set_docker_images_support(false);
 
     config().mutable_daemon()->set_max_clients(1000);
     config().mutable_daemon()->set_max_clients_in_container(500);

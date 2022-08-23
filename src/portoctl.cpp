@@ -88,6 +88,7 @@ public:
     std::string VolumeBackend;
     std::string VolumeStorage;
     std::string Place;
+    std::string Image;
     std::vector<std::string> Layers;
     std::vector<std::string> VolumeLayers;
     std::vector<std::string> ImportedLayers;
@@ -207,6 +208,9 @@ public:
 
         if (SpaceLimit != "")
             config["space_limit"] = SpaceLimit;
+
+        if (!Image.empty())
+            config["image"] = Image;
 
         if (!Layers.empty()) {
             error = ImportLayers();
@@ -1880,6 +1884,13 @@ public:
                 std::cout << std::endl << std::setw(40) << " ";
             std::cout << std::setw(8) << v.Properties[V_ID];
             std::cout << std::setw(8) << v.Properties[V_BACKEND];
+
+            std::string image = v.Properties[V_IMAGE];
+            auto pos = image.rfind('/');
+            if (pos != std::string::npos)
+                image = image.substr(pos + 1);
+            std::cout << std::setw(20) << image.substr(0, 20);
+
             std::cout << std::right;
             if (inodes) {
                 ShowSizeProperty(v, V_INODE_LIMIT, 10, true);
@@ -1892,6 +1903,8 @@ public:
                 ShowSizeProperty(v, V_SPACE_AVAILABLE, 10);
                 ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
             }
+
+            std::cout << std::left;
 
             for (auto link: v.Links) {
                 std::cout << " " << link.Container;
@@ -1949,12 +1962,15 @@ public:
             std::cout << std::left << std::setw(40) << "Volume";
             std::cout << std::setw(8) << "ID";
             std::cout << std::setw(8) << "Backend";
+            std::cout << std::setw(20) << "Image";
             std::cout << std::right;
             std::cout << std::setw(10) << "Limit";
             std::cout << std::setw(10) << "Used";
             std::cout << std::setw(10) << "Avail";
             std::cout << std::setw(5) << "Use%";
-            std::cout << std::left << " Containers" << std::endl;
+            std::cout << std::left << " ";
+            std::cout << std::setw(30) << "Containers";
+            std::cout << std::endl;
         }
 
         if (args.empty()) {
@@ -2906,6 +2922,194 @@ public:
     }
 };
 
+class TDockerImageListCmd final : public ICmd {
+public:
+    TDockerImageListCmd(Porto::Connection *api) : ICmd(api, "docker-images", 0,
+            "[-P <place>] [pattern]",
+            "List available docker images",
+            "    -P <place>                             optional path to place\n"
+            ) { }
+
+    std::string place;
+    bool verbose = false;
+
+    int Execute(TCommandEnviroment *environment) final override {
+        const auto &args = environment->GetOpts({
+            { 'P', true,  [&](const char *arg) { place = arg; } },
+            { 'v', false, [&](const char *) { verbose = true; } },
+        });
+
+        std::string mask = args.size() ? args[0] : "";
+
+        int ret;
+        std::vector<Porto::DockerImage> images;
+        ret = Api->ListDockerImages(images, place, mask);
+        if (ret) {
+            PrintError("Can't list docker images");
+        } else {
+            for (const auto &i: images) {
+                std::cout << i.Name << std::endl;
+                if (verbose) {
+                    std::cout << "Layers:" << std::endl;
+                    for (const auto &l: i.Layers)
+                        std::cout << "\t" << l << std::endl;
+                    std::cout << "Command: " << i.Command << std::endl;
+                    std::cout << "Env: " << i.Env << std::endl;
+                    std::cout << std::endl;
+                }
+            }
+        }
+
+        return ret;
+    }
+};
+
+class TDockerImagePullCmd final : public ICmd {
+public:
+    TDockerImagePullCmd(Porto::Connection *api) : ICmd(api, "docker-pull", 1,
+            "[-P <place>] <name>",
+            "Pull docker image from a registry",
+            "    -P <place>                             optional path to place\n"
+            ) { }
+
+    std::string place;
+
+    int Execute(TCommandEnviroment *environment) final override {
+        const auto &args = environment->GetOpts({
+            { 'P', true,  [&](const char *arg) { place = arg; } },
+        });
+
+        if (args.size() != 1) {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        std::string name = args[0];
+        std::string token = getenv("DOCKER_TOKEN") ?: "";
+
+        int ret;
+        Porto::DockerImage image;
+        ret = Api->PullDockerImage(image, name, place, token);
+        if (ret)
+            PrintError("Can't pull docker image");
+        else
+            std::cout << image.Name << std::endl;
+
+        return ret;
+    }
+};
+
+class TDockerImageRemoveCmd final : public ICmd {
+public:
+    TDockerImageRemoveCmd(Porto::Connection *api) : ICmd(api, "docker-rmi", 1,
+            "[-P <place>] <name>",
+            "Remove docker image",
+            "    -P <place>                             optional path to place\n"
+            ) { }
+
+    std::string place;
+
+    int Execute(TCommandEnviroment *environment) final override {
+        const auto &args = environment->GetOpts({
+            { 'P', true,  [&](const char *arg) { place = arg; } },
+        });
+
+        if (args.size() != 1) {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        std::string image = args[0];
+
+        int ret;
+        ret = Api->RemoveDockerImage(image, place);
+        if (ret)
+            PrintError("Can't remove docker image");
+
+        return ret;
+    }
+};
+
+class TDockerRunCmd final : public ICmd {
+public:
+    TDockerRunCmd(Porto::Connection *api) : ICmd(api, "docker-run", 2,
+            "[-P <place>] [-T] [-W] ... <container> <image> [properties]",
+            "create and start container with given properties",
+            "    -P <place>                     optional path to place\n"
+            "    -T                             forward terminal and destroy container at the end\n"
+            "    -W                             wait until container exits\n")
+    {}
+
+    std::string place;
+    bool terminal = false;
+
+    int Execute(TCommandEnviroment *env) final override {
+        TLauncher launcher(Api);
+        TError error;
+
+        const auto &args = env->GetOpts({
+            { 'P', true,  [&](const char *arg) { place = arg; } },
+            { 'T', false, [&](const char *) { terminal = true; } },
+            { 'W', false, [&](const char *) { launcher.WaitExit = true; } },
+        });
+
+        if (terminal) {
+            launcher.ForwardTerminal = true;
+            launcher.WeakContainer = true;
+            launcher.WaitExit = true;
+        }
+
+        Porto::DockerImage image;
+        int ret = Api->DockerImageStatus(image, args[1], place);
+        if (ret) {
+            PrintError("Cannot get docker image status");
+            return ret;
+        }
+
+        if (image.Name.empty()) {
+            std::cerr << "Cannot find docker image" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        launcher.NeedVolume = true;
+        launcher.Container = args[0];
+        launcher.Image = args[1];
+        launcher.SetProperty("command", image.Command);
+        launcher.SetProperty("env", image.Env);
+
+        for (size_t i = 2; i < args.size(); ++i) {
+            error = launcher.SetProperty(args[i]);
+            if (error) {
+                std::cerr << "Cannot set property: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
+
+        error = launcher.Launch();
+        if (error) {
+            std::cerr << "Cannot start container: " << error << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if (launcher.WeakContainer)
+            launcher.Cleanup();
+
+        if (terminal) {
+            if (launcher.ExitSignal > 0) {
+                std::cerr << launcher.ExitMessage << std::endl;
+                return 128 + launcher.ExitSignal;
+            }
+
+            if (launcher.ExitCode > 0) {
+                std::cerr << launcher.ExitMessage << std::endl;
+                return launcher.ExitCode;
+            }
+        }
+
+        return EXIT_SUCCESS;
+    }
+};
+
 int main(int argc, char *argv[]) {
     Porto::Connection api;
 
@@ -2947,6 +3151,11 @@ int main(int argc, char *argv[]) {
 
     handler.RegisterCommand<TConvertPathCmd>();
     handler.RegisterCommand<TAttachCmd>();
+
+    handler.RegisterCommand<TDockerImageListCmd>();
+    handler.RegisterCommand<TDockerImagePullCmd>();
+    handler.RegisterCommand<TDockerImageRemoveCmd>();
+    handler.RegisterCommand<TDockerRunCmd>();
 
     int ret = handler.HandleCommand(argc, argv);
     if (ret < 0) {

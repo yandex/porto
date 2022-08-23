@@ -2,6 +2,7 @@
 #include "unix.hpp"
 #include "log.hpp"
 
+#include <sys/file.h>
 
 class MutexTimer {
     const std::string &Name;
@@ -39,4 +40,25 @@ void MeasuredMutex::lock() {
 std::unique_lock<std::mutex> MeasuredMutex::UniqueLock() {
     MutexTimer timer(Name);
     return std::unique_lock<std::mutex>(*this);
+}
+
+
+TFileMutex::TFileMutex(const TPath &path, int flags) {
+    TError error = File.Open(path, flags);
+    if (!error) {
+        int ret = flock(File.Fd, LOCK_EX);
+        if (ret)
+            L_WRN("cannot flock lock {} {}", File.RealPath(), ret);
+    } else {
+        L_WRN("cannot open {} {}", path, error);
+    }
+}
+
+TFileMutex::~TFileMutex() {
+    if (!File)
+        return;
+
+    int ret = flock(File.Fd, LOCK_UN);
+    if (ret)
+        L_WRN("cannot flock unlock {} {}", File.RealPath(), ret);
 }

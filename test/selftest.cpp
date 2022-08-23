@@ -16,6 +16,7 @@
 #include "util/md5.hpp"
 #include "util/proc.hpp"
 #include "util/hgram.hpp"
+#include "docker.hpp"
 #include "test.hpp"
 #include "rpc.hpp"
 
@@ -4866,6 +4867,55 @@ static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Destroy("abc"));
 }
 
+static void TestDockerImageParsing(Porto::Connection &) {
+    auto test = [](const std::string &name, const std::vector<std::string> &target) {
+        std::cerr << name << "  ->  " << target[0] << std::endl;
+        TDockerImage image(name);
+        Expect(image.FullName() == target[0]);
+        Expect(image.Registry   == target[1]);
+        Expect(image.Repository == target[2]);
+        Expect(image.Name       == target[3]);
+        Expect(image.Tag        == target[4]);
+        Expect(image.Digest     == target[5]);
+    };
+
+    // nothing
+    test("ubuntu",                                                           { "registry-1.docker.io/library/ubuntu:latest@", "registry-1.docker.io", "library", "ubuntu", "latest", "" });
+    test("kndrvt/ubuntu",                                                    { "registry-1.docker.io/kndrvt/ubuntu:latest@", "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "" });
+    test("kndrvt/kek/ubuntu",                                                { "registry-1.docker.io/kndrvt/kek/ubuntu:latest@", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "" });
+
+    test("registry.yandex.net/ubuntu",                                       { "registry.yandex.net/library/ubuntu:latest@", "registry.yandex.net", "library", "ubuntu", "latest", "" });
+    test("registry.yandex.net/kndrvt/ubuntu",                                { "registry.yandex.net/kndrvt/ubuntu:latest@", "registry.yandex.net", "kndrvt", "ubuntu", "latest", "" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu",                            { "registry.yandex.net/kndrvt/kek/ubuntu:latest@", "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "" });
+
+    // tag
+    test("ubuntu:xenial",                                                    { "registry-1.docker.io/library/ubuntu:xenial@", "registry-1.docker.io", "library", "ubuntu", "xenial", "" });
+    test("kndrvt/ubuntu:xenial",                                             { "registry-1.docker.io/kndrvt/ubuntu:xenial@", "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "" });
+    test("kndrvt/kek/ubuntu:xenial",                                         { "registry-1.docker.io/kndrvt/kek/ubuntu:xenial@", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "" });
+
+    test("registry.yandex.net/ubuntu:xenial",                                { "registry.yandex.net/library/ubuntu:xenial@", "registry.yandex.net", "library", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/kndrvt/ubuntu:xenial",                         { "registry.yandex.net/kndrvt/ubuntu:xenial@", "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial",                     { "registry.yandex.net/kndrvt/kek/ubuntu:xenial@", "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "" });
+
+    // digest
+    test("ubuntu@df5de72bdb3b711",                                           { "registry-1.docker.io/library/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "library", "ubuntu", "latest", "df5de72bdb3b711" });
+    test("kndrvt/ubuntu@df5de72bdb3b711",                                    { "registry-1.docker.io/kndrvt/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "df5de72bdb3b711" });
+    test("kndrvt/kek/ubuntu@df5de72bdb3b711",                                { "registry-1.docker.io/kndrvt/kek/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "df5de72bdb3b711" });
+
+    test("registry.yandex.net/ubuntu@df5de72bdb3b711",                       { "registry.yandex.net/library/ubuntu:latest@df5de72bdb3b711", "registry.yandex.net", "library", "ubuntu", "latest", "df5de72bdb3b711" });
+    test("registry.yandex.net/kndrvt/ubuntu@df5de72bdb3b711",                { "registry.yandex.net/kndrvt/ubuntu:latest@df5de72bdb3b711", "registry.yandex.net", "kndrvt", "ubuntu", "latest", "df5de72bdb3b711" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu@df5de72bdb3b711",            { "registry.yandex.net/kndrvt/kek/ubuntu:latest@df5de72bdb3b711", "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "df5de72bdb3b711" });
+
+    // tag and digest
+    test("ubuntu:xenial@df5de72bdb3b711",                                    { "registry-1.docker.io/library/ubuntu:xenial@df5de72bdb3b711", "registry-1.docker.io", "library", "ubuntu", "xenial", "df5de72bdb3b711" });
+    test("kndrvt/ubuntu:xenial@df5de72bdb3b711",                             { "registry-1.docker.io/kndrvt/ubuntu:xenial@df5de72bdb3b711", "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "df5de72bdb3b711" });
+    test("kndrvt/kek/ubuntu:xenial@df5de72bdb3b711",                         { "registry-1.docker.io/kndrvt/kek/ubuntu:xenial@df5de72bdb3b711", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "df5de72bdb3b711" });
+
+    test("registry.yandex.net/ubuntu:xenial@df5de72bdb3b711",                { "registry.yandex.net/library/ubuntu:xenial@df5de72bdb3b711", "registry.yandex.net", "library", "ubuntu", "xenial", "df5de72bdb3b711" });
+    test("registry.yandex.net/kndrvt/ubuntu:xenial@df5de72bdb3b711",         { "registry.yandex.net/kndrvt/ubuntu:xenial@df5de72bdb3b711", "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "df5de72bdb3b711" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial@df5de72bdb3b711",     { "registry.yandex.net/kndrvt/kek/ubuntu:xenial@df5de72bdb3b711", "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "df5de72bdb3b711" });
+}
+
 int SelfTest(std::vector<std::string> args) {
     pair<string, std::function<void(Porto::Connection &)>> tests[] = {
         { "path", TestPath },
@@ -4915,6 +4965,7 @@ int SelfTest(std::vector<std::string> args) {
         { "convert", TestConvertPath },
         { "leaks", TestLeaks },
         { "spec", TestContainerSpec },
+        { "docker_images_parsing", TestDockerImageParsing },
 
         // the following tests will restart porto several times
         { "bad_client", TestBadClient },

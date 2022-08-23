@@ -611,6 +611,21 @@ TError TPath::RemoveAll() const {
     return Unlink();
 }
 
+TError TPath::ClearEmptyDirectories(const TPath &root) const {
+    TError error;
+
+    for (TPath path = Path; path != root; path = path.DirName()) {
+        error = path.Rmdir();
+        if (error) {
+            if (error.Errno != ENOTEMPTY)
+                return error;
+            break;
+        }
+    }
+
+    return OK;
+}
+
 TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     struct dirent *de;
     DIR *dir;
@@ -1003,18 +1018,26 @@ TError TPath::WriteAtomic(const std::string &text) const {
     return error;
 }
 
+TError TPath::CreateRegular() const {
+    TError error;
+
+    if (!Exists()) {
+        error = DirName().MkdirAll(0755);
+        if (!error)
+            error = Mkfile(0644);
+    } else if (!IsRegularStrict())
+        error = TError(EError::InvalidValue, "non-regular file " + Path);
+
+    return error;
+}
+
 TError TPath::WritePrivate(const std::string &text) const {
     TError error;
     TFile file;
 
-    if (!Exists()) {
-        error = DirName().MkdirAll(755);
-        if (!error)
-            error = Mkfile(0644);
-        if (error)
-            return error;
-    } else if (!IsRegularStrict())
-        return TError(EError::InvalidValue, "non-regular file " + Path);
+    error = CreateRegular();
+    if (error)
+        return error;
 
     TPath temp = "/run/" + BaseName() + ".XXXXXX";
     error = file.CreateTemporary(temp);
@@ -1032,6 +1055,16 @@ TError TPath::WritePrivate(const std::string &text) const {
     return error;
 }
 
+TError TPath::CreateAndWriteAll(const std::string &text) const {
+    TError error;
+
+    error = CreateRegular();
+    if (error)
+        return error;
+
+    return WriteAll(text);
+}
+
 TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
     std::string text, line;
 
@@ -1043,6 +1076,19 @@ TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
 
     while (std::getline(ss, line))
         lines.push_back(line);
+
+    return OK;
+}
+
+TError TPath::WriteLines(const std::vector<std::string> &lines) const {
+    std::stringstream ss;
+
+    for (const std::string &line: lines)
+        ss << line << '\n';
+
+    TError error = WriteAll(ss.str());
+    if (error)
+        return error;
 
     return OK;
 }

@@ -37,14 +37,18 @@ add_subdirectory(fmt)
 
 include_directories(${libporto_SOURCE_DIR})
 
-add_executable(portod portod.cpp core.cpp cgroup.cpp rpc.cpp container.cpp
-		      event.cpp task.cpp env.cpp device.cpp network.cpp
-		      filesystem.cpp volume.cpp storage.cpp
-		      kvalue.cpp config.cpp property.cpp
-		      epoll.cpp client.cpp stream.cpp helpers.cpp waiter.cpp)
-target_link_libraries(portod version porto util config
+add_library(portocore portod.cpp core.cpp cgroup.cpp rpc.cpp container.cpp
+            event.cpp task.cpp env.cpp device.cpp network.cpp
+            filesystem.cpp volume.cpp storage.cpp
+            kvalue.cpp config.cpp property.cpp
+            epoll.cpp client.cpp stream.cpp helpers.cpp waiter.cpp
+            docker.cpp)
+target_link_libraries(portocore version porto utilbase util config
 			     rpc_proto kv_proto
-			     pthread rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE} ${LIBNL_IDIAG})
+			     rt fmt ${PB} ${LIBNL} ${LIBNL_ROUTE} ${LIBNL_IDIAG} ${LIBSSL} ${LIBCRYPTO} pthread)
+
+add_executable(portod main.cpp)
+target_link_libraries(portod portocore)
 
 add_executable(portoctl portoctl.cpp cli.cpp)
 target_link_libraries(portoctl version porto utilbase fmt ${PROTOBUF_LIBRARY} pthread rt)

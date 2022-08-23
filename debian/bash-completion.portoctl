@@ -17,6 +17,12 @@ _porto_layers ()
 	COMPREPLY=( $( compgen -f -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
 }
 
+_porto_docker_images ()
+{
+	COMPREPLY=( $( compgen -W "$(portoctl docker-images 2>/dev/null) $*" -- "$cur" ) )
+	__ltrim_colon_completions "$cur"
+}
+
 _porto_property_keys ()
 {
 	local prop="${cur%%[*}"
@@ -71,6 +77,28 @@ _portoctl ()
 			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
 			compopt -o nospace
 		fi
+		;;
+	docker-rmi)
+		case "$cword" in
+		2)
+			_porto_docker_images
+			;;
+		esac
+		;;
+	docker-run)
+		case "$cword" in
+		2)
+			_porto_containers
+			;;
+		3)
+			_porto_docker_images
+			;;
+		*)
+			compopt -o filenames
+			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
+			compopt -o nospace
+			;;
+		esac
 		;;
 	build)
 		case "$prev" in

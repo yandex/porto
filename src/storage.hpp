@@ -6,6 +6,7 @@
 enum EStorageType {
     Place,
     Layer,
+    DockerLayer,
     Storage,
     Meta,
     Volume,
@@ -13,7 +14,7 @@ enum EStorageType {
 
 class TStorage {
 public:
-    enum EStorageType Type;
+    EStorageType Type;
     TPath Place;
     std::string Name;
 

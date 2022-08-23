@@ -27,21 +27,23 @@ TError StringToBool(const std::string &str, bool &value);
 std::string BoolToString(bool value);
 
 TTuple SplitString(const std::string &str, const char sep, int max = 0);
-
 TMultiTuple SplitEscapedString(const std::string &str, char sep_inner, char sep_outer);
 TTuple SplitEscapedString(const std::string &str, char sep);
 
-std::string MergeEscapeStrings(const TMultiTuple &tuples,
-                               char sep_inner, char sep_outer);
+std::string MergeString(const TTuple &tuple, char sep);
+std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer);
 std::string MergeEscapeStrings(const TTuple &tuple, char sep);
+std::string MergeWithQuotes(const TTuple &tuple, char sep, char quot = '\"');
 
 std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);
 bool StringStartsWith(const std::string &str, const std::string &prefix);
 bool StringEndsWith(const std::string &str, const std::string &suffix);
-bool StringMatch(const std::string &str, const std::string &pattern, bool strict = false);
+bool StringMatch(const std::string &str, const std::string &pattern, bool strict = false, bool pathname = true);
 bool StringSubpath(const std::string &path, const std::string &subpath);
+bool StringContains(const std::string &str, char target);
+bool StringContainsAny(const std::string &str, const std::string &target);
 
 typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
 std::string StringFormatFlags(uint64_t flags,

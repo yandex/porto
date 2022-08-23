@@ -19,6 +19,9 @@ TError RunCommand(const std::vector<std::string> &command,
                   const std::string &memCgroup = PORTO_HELPERS_CGROUP,
                   bool verboseError = false,
                   bool interruptible = false);
+
 TError CopyRecursive(const TPath &src, const TPath &dst);
 TError ClearRecursive(const TPath &path);
 TError RemoveRecursive(const TPath &path, bool interruptible = false);
+
+TError DownloadFile(const std::string &url, const TPath &path, const std::vector<std::string> &headers = {});

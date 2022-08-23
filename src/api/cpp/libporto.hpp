@@ -56,6 +56,13 @@ struct Layer {
     uint64_t LastUsage;
 };
 
+struct DockerImage {
+    std::string Name;
+    std::vector<std::string> Layers;
+    std::string Command;
+    std::string Env;
+};
+
 struct Storage {
     std::string Name;
     std::string OwnerUser;
@@ -215,6 +222,21 @@ public:
                         const std::string &place = "");
     int SetLayerPrivate(const std::string &private_value, const std::string &layer,
                         const std::string &place = "");
+
+    int DockerImageStatus(DockerImage &image,
+                          const std::string &name,
+                          const std::string &place = "");
+    int ListDockerImages(std::vector<DockerImage> &images,
+                         const std::string &place = "",
+                         const std::string &mask = "");
+    int PullDockerImage(DockerImage &image,
+                        const std::string &name,
+                        const std::string &place = "",
+                        const std::string &auth_token = "",
+                        const std::string &auth_host = "",
+                        const std::string &auth_service = "");
+    int RemoveDockerImage(const std::string &name,
+                          const std::string &place = "");
 
     const rpc::TStorageListResponse *ListStorage(const std::string &place = "", const std::string &mask = "");
 

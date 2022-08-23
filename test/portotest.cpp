@@ -58,9 +58,7 @@ static int TestConnectivity() {
     return 0;
 }
 
-
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     if (argc == 2 && !strcmp(argv[1], "connectivity"))
         return TestConnectivity();
 

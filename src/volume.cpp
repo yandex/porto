@@ -5,6 +5,7 @@
 #include <unordered_set>
 #include <thread>
 
+#include "docker.hpp"
 #include "volume.hpp"
 #include "storage.hpp"
 #include "container.hpp"
@@ -826,6 +827,7 @@ public:
         TFile upperFd, workFd, cowFd;
         struct stat st;
         std::unordered_map<dev_t, std::unordered_set<ino_t> > ovlInodes;
+        EStorageType layerType = Volume->GetLayerType();
 
         if (Volume->HaveQuota()) {
             quota.SpaceLimit = Volume->SpaceLimit;
@@ -851,7 +853,7 @@ public:
                 path = pin.ProcPath();
             } else {
                 TStorage layer;
-                layer.Open(EStorageType::Layer, Volume->Place, name);
+                layer.Open(layerType, Volume->Place, name);
                 /* Imported layers are available for everybody */
                 (void)layer.Touch();
                 path = layer.Path;
@@ -1037,6 +1039,7 @@ public:
         TPath lower;
         struct stat st;
         std::unordered_map<dev_t, std::unordered_set<ino_t> > ovlInodes;
+        EStorageType layerType = Volume->GetLayerType();
 
         lower = Volume->GetInternal("lower");
         error = lower.Mkdir(0755);
@@ -1115,7 +1118,7 @@ public:
                 path = pin.ProcPath();
             } else {
                 TStorage layer;
-                layer.Open(EStorageType::Layer, Volume->Place, name);
+                layer.Open(layerType, Volume->Place, name);
                 /* Imported layers are available for everybody */
                 (void)layer.Touch();
                 path = layer.Path;
@@ -1844,6 +1847,7 @@ TError TVolume::DependsOn(const TPath &path) {
 
 TError TVolume::CheckDependencies() {
     TError error;
+    EStorageType layerType = GetLayerType();
 
     if (!IsAutoPath)
         error = DependsOn(Path.DirName());
@@ -1858,7 +1862,7 @@ TError TVolume::CheckDependencies() {
         TPath layer(l);
         if (!layer.IsAbsolute()) {
             TStorage layer_storage;
-            layer_storage.Open(EStorageType::Layer, Place, l);
+            layer_storage.Open(layerType, Place, l);
             layer = layer_storage.Path;
         }
         if (!error)
@@ -2012,7 +2016,23 @@ TError TVolume::Configure(const TPath &target_root) {
         }
     }
 
+    /* Add layers from image */
+    if (!Image.empty()) {
+        if (!config().daemon().docker_images_support())
+            return TError(EError::NotSupported, "Docker images are not supported");
+
+        /* image and porto layers are not used at the same time */
+        Layers.clear();
+        TDockerImage image(Image);
+        error = image.Load(Place);
+        if (error)
+            return error;
+        for (const auto &layer: image.Layers)
+            Layers.push_back(layer.Digest);
+    }
+
     /* Verify and resolve layers */
+    EStorageType layerType = GetLayerType();
     for (auto &l: Layers) {
         TPath layer(l);
         if (!layer.IsNormal())
@@ -2025,7 +2045,7 @@ TError TVolume::Configure(const TPath &target_root) {
             if (error)
                 return error;
             TStorage layer_storage;
-            layer_storage.Open(EStorageType::Layer, Place, l);
+            layer_storage.Open(layerType, Place, l);
             layer = layer_storage.Path;
         }
         if (!layer.Exists())
@@ -2072,6 +2092,7 @@ TError TVolume::Configure(const TPath &target_root) {
 
 TError TVolume::MergeLayers() {
     TError error;
+    EStorageType layerType = GetLayerType();
 
     if (!HaveLayers())
         return OK;
@@ -2106,7 +2127,7 @@ TError TVolume::MergeLayers() {
             (void)temp.Rmdir();
         } else {
             TStorage layer_storage;
-            layer_storage.Open(EStorageType::Layer, Place, name);
+            layer_storage.Open(layerType, Place, name);
             (void)layer_storage.Touch();
             /* Imported layers are available for everybody */
             error = CopyRecursive(layer_storage.Path, InternalPath);
@@ -2849,9 +2870,10 @@ TError TVolume::Destroy() {
 
         volumes_lock.unlock();
 
+        EStorageType layerType = volume->GetLayerType();
         for (auto &layer: volume->Layers) {
             TStorage storage;
-            storage.Open(EStorageType::Layer, volume->Place, layer);
+            storage.Open(layerType, volume->Place, layer);
             if (storage.Weak()) {
                 error = storage.Remove(true);
                 if (error && error != EError::Busy)
@@ -3087,6 +3109,10 @@ TError TVolume::GetUpperLayer(TPath &upper) {
     else
         upper = Path;
     return OK;
+}
+
+EStorageType TVolume::GetLayerType() const {
+    return Image.empty() ? EStorageType::Layer : EStorageType::DockerLayer;
 }
 
 TError TVolume::LinkVolume(std::shared_ptr<TContainer> container,
@@ -3343,6 +3369,7 @@ void TVolume::DumpDescription(TVolumeLink *link, const TPath &path, rpc::TVolume
     ret[V_STATE] = StateName(State);
     ret[V_PRIVATE] = Private;
     ret[V_READ_ONLY] = BoolToString(IsReadOnly);
+    ret[V_IMAGE] = Image;
     ret[V_SPACE_LIMIT] = std::to_string(SpaceLimit);
     ret[V_INODE_LIMIT] = std::to_string(InodeLimit);
     ret[V_SPACE_GUARANTEE] = std::to_string(SpaceGuarantee);
@@ -3462,6 +3489,7 @@ TError TVolume::Save(bool locked) {
     node.Set(V_PRIVATE, Private);
     node.Set(V_LOOP_DEV, std::to_string(DeviceIndex));
     node.Set(V_READ_ONLY, BoolToString(IsReadOnly));
+    node.Set(V_IMAGE, Image);
     node.Set(V_LAYERS, MergeEscapeStrings(Layers, ';'));
     node.Set(V_SPACE_LIMIT, std::to_string(SpaceLimit));
     node.Set(V_SPACE_GUARANTEE, std::to_string(SpaceGuarantee));
@@ -3649,6 +3677,7 @@ std::vector<TVolumeProperty> VolumeProperties = {
     { V_CREATOR,     "container user group (ro)", true },
     { V_READ_ONLY,   "true|false (default - false)", false },
     { V_CONTAINERS,  "container [target] [ro] [!];... - initial links (default - self)", false },
+    { V_IMAGE,       "[<registry>/][<repository>/]<name>[:<tag>][@<digest>] - docker image", false },
     { V_LAYERS,      "top-layer;...;bottom-layer - overlayfs layers", false },
     { V_PLACE,       "place for layers and default storage (optional)", false },
     { V_DEVICE_NAME, "name of backend disk device (ro)", true },
@@ -4208,6 +4237,8 @@ TError TVolume::ParseConfig(const TStringMap &cfg, rpc::TVolumeSpec &spec) {
             bool v;
             error = StringToBool(val, v);
             spec.set_read_only(v);
+        } else if (key == V_IMAGE) {
+            spec.set_image(val);
         } else if (key == V_LAYERS) {
             for (auto &l: SplitEscapedString(val, ';'))
                 spec.add_layers(l);
@@ -4299,6 +4330,9 @@ TError TVolume::Load(const rpc::TVolumeSpec &spec, bool full) {
     if (spec.has_read_only())
         IsReadOnly = spec.read_only();
 
+    if (spec.has_image())
+        Image = spec.image();
+
     for (auto &l: spec.layers())
         Layers.push_back(l);
 
@@ -4376,6 +4410,9 @@ void TVolume::Dump(rpc::TVolumeSpec &spec, bool full) {
         spec.mutable_inodes()->set_limit(InodeLimit);
     if (InodeGuarantee)
         spec.mutable_inodes()->set_guarantee(InodeGuarantee);
+
+    if (!Image.empty())
+        spec.set_image(Image);
 
     for (auto &layer: Layers) {
         TPath path(layer);

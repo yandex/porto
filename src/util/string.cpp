@@ -322,6 +322,10 @@ TTuple SplitEscapedString(const std::string &str, char sep) {
     return TTuple();
 }
 
+std::string MergeString(const TTuple &tuple, char sep) {
+    return MergeWithQuotes(tuple, sep, '\0');
+}
+
 std::string MergeEscapeStrings(const TMultiTuple &tuples, char sep_inner, char sep_outer) {
     if (tuples.empty())
         return "";
@@ -370,6 +374,24 @@ std::string MergeEscapeStrings(const TTuple &tuple, char sep) {
     return MergeEscapeStrings(tuples, sep, 0);
 }
 
+std::string MergeWithQuotes(const TTuple &tuple, char sep, char quot) {
+    if (tuple.empty())
+        return "";
+
+    std::stringstream ss;
+
+    for (auto &str: tuple) {
+        if (quot && StringContains(str, sep))
+            ss << quot << str << quot << sep;
+        else
+            ss << str << sep;
+    }
+
+    std::string res = ss.str();
+    res.pop_back();
+    return res;
+}
+
 std::string StringTrim(const std::string& s, const std::string &what) {
     std::size_t first = s.find_first_not_of(what);
     std::size_t last  = s.find_last_not_of(what);
@@ -410,7 +432,7 @@ bool StringEndsWith(const std::string &str, const std::string &sfx) {
     return !str.compare(str.length() - sfx.length(), sfx.length(), sfx);
 }
 
-bool StringMatch(const std::string &str, const std::string &pattern, bool strict) {
+bool StringMatch(const std::string &str, const std::string &pattern, bool strict, bool pathname) {
     if (!strict) {
         if (pattern == "***")
             return true;
@@ -419,7 +441,7 @@ bool StringMatch(const std::string &str, const std::string &pattern, bool strict
         if (StringStartsWith(pattern, "***"))
             return StringEndsWith(str, pattern.substr(3));
     }
-    return fnmatch(pattern.c_str(), str.c_str(), FNM_PATHNAME) == 0;
+    return fnmatch(pattern.c_str(), str.c_str(), pathname ? FNM_PATHNAME : 0) == 0;
 }
 
 bool StringSubpath(const std::string &path, const std::string &subpath) {
@@ -450,6 +472,19 @@ std::string StringFormatFlags(uint64_t flags,
     }
 
     return result.str();
+}
+
+bool StringContains(const std::string &str, char target) {
+    return str.find(target) != std::string::npos;
+}
+
+bool StringContainsAny(const std::string &str, const std::string &target) {
+    for (char c: target) {
+        if (StringContains(str, c))
+            return true;
+    }
+
+    return false;
 }
 
 TError StringParseFlags(const std::string &str, const TFlagsNames &names,

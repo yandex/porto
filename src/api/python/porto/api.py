@@ -949,8 +949,10 @@ class Connection(object):
         req.IncLabel.add = add
         return self.rpc.call(req).IncLabel.result
 
-    def CreateVolume(self, path=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
-        if layers:
+    def CreateVolume(self, path=None, image=None, layers=None, storage=None, private_value=None, timeout=None, **properties):
+        if image:
+            properties['image'] = image
+        elif layers:
             layers = [l.name if isinstance(l, Layer) else l for l in layers]
             properties['layers'] = ';'.join(layers)
 
@@ -1179,6 +1181,50 @@ class Connection(object):
 
     def ListStorages(self, place=None, mask=None):
         return [Storage(self, s.name, place, s) for s in self._ListStorages(place, mask).storages]
+
+    # docker images
+    def DockerImageStatus(self, name=None, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.dockerImageStatus.CopyFrom(rpc_pb2.TDockerImageStatusRequest())
+        request.dockerImageStatus.name = name
+        if place is not None:
+            request.dockerImageStatus.place = place
+
+        return self.rpc.call(request).dockerImageStatus.image
+
+    def ListDockerImages(self, place=None, mask=None):
+        request = rpc_pb2.TContainerRequest()
+        request.listDockerImages.CopyFrom(rpc_pb2.TDockerImageListRequest())
+        if place is not None:
+            request.listDockerImages.place = place
+        if mask is not None:
+            request.listDockerImages.mask = mask
+
+        return self.rpc.call(request).listDockerImages.images
+
+    def PullDockerImage(self, name, place=None, auth_token=None, auth_host=None, auth_service=None):
+        request = rpc_pb2.TContainerRequest()
+        request.pullDockerImage.CopyFrom(rpc_pb2.TDockerImagePullRequest())
+        request.pullDockerImage.name = name
+        if place is not None:
+            request.pullDockerImage.place = place
+        if auth_token is not None:
+            request.pullDockerImage.auth_token = auth_token
+        if auth_host is not None:
+            request.pullDockerImage.auth_host = auth_host
+        if auth_service is not None:
+            request.pullDockerImage.auth_service = auth_service
+
+        return self.rpc.call(request).pullDockerImage.image
+
+    def RemoveDockerImage(self, name, place=None):
+        request = rpc_pb2.TContainerRequest()
+        request.removeDockerImage.CopyFrom(rpc_pb2.TDockerImageRemoveRequest())
+        request.removeDockerImage.name = name
+        if place is not None:
+            request.removeDockerImage.place = place
+
+        self.rpc.call(request)
 
     # deprecated
     def ListStorage(self, place=None, mask=None):

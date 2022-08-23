@@ -53,8 +53,12 @@ TError RunCommand(const std::vector<std::string> &command,
 
     std::string cmdline;
 
-    for (auto &arg : command)
-        cmdline += arg + " ";
+    for (auto &arg : command) {
+        if (!StringStartsWith(arg, "--header=Authorization"))
+            cmdline += arg + " ";
+        else
+            cmdline += "--header=Authorization: *** ";
+    }
 
     L_ACT("Call helper: {} in {}", cmdline, path);
 
@@ -87,9 +91,11 @@ TError RunCommand(const std::vector<std::string> &command,
 
     SetProcessName("portod-" + command[0]);
 
-    error = memcg.Attach(GetPid());
-    if (error)
-        HelperError(err, "Cannot attach to helper cgroup: {}", error);
+    if (!memcg.Secondary()) {
+        error = memcg.Attach(GetPid());
+        if (error)
+            HelperError(err, "Cannot attach to helper cgroup", error);
+    }
 
     SetDieOnParentExit(SIGKILL);
 
@@ -231,4 +237,15 @@ TError RemoveRecursive(const TPath &path, bool interruptible) {
         return error;
 
     return RunCommand({"rm", "-rf", "--one-file-system", "--", path.ToString()}, dir, TFile(), TFile(), HelperCapabilities, false, interruptible);
+}
+
+TError DownloadFile(const std::string &url, const TPath &path, const std::vector<std::string> &headers) {
+    std::vector<std::string> command;
+    command.emplace_back("wget");
+    command.emplace_back("-qO");
+    command.emplace_back(path.ToString());
+    for (const auto &h: headers)
+        command.emplace_back("--header=" + h);
+    command.emplace_back(url);
+    return RunCommand(command, TFile(), TFile(), TFile(), HelperCapabilities, false, true);
 }

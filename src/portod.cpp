@@ -1731,7 +1731,7 @@ static void Usage() {
         << std::endl;
 }
 
-int main(int argc, char **argv) {
+int PortodMain(int argc, char **argv) {
     int opt = 0;
 
     while (++opt < argc && argv[opt][0] == '-') {

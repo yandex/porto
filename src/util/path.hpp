@@ -185,6 +185,7 @@ public:
     TError Rmdir() const;
     TError Unlink() const;
     TError RemoveAll() const;
+    TError ClearEmptyDirectories(const TPath &root) const;
     TError Rename(const TPath &dest) const;
     TError ReadDirectory(std::vector<std::string> &result) const;
     TError ListSubdirs(std::vector<std::string> &result) const;
@@ -218,8 +219,12 @@ public:
     TError ReadUint64(uint64_t &value) const;
 
     TError WriteAll(const std::string &text) const;
+    TError WriteLines(const std::vector<std::string> &lines) const;
     TError WriteAtomic(const std::string &text) const;
     TError WritePrivate(const std::string &text) const;
+
+    TError CreateRegular() const;
+    TError CreateAndWriteAll(const std::string &text) const;
 };
 
 // FIXME replace with streaming someday

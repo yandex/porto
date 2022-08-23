@@ -1,11 +1,13 @@
+#include <algorithm>
+#include <condition_variable>
+
 #include "storage.hpp"
 #include "volume.hpp"
 #include "helpers.hpp"
 #include "config.hpp"
 #include "filesystem.hpp"
 #include "client.hpp"
-#include <algorithm>
-#include <condition_variable>
+#include "docker.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -136,7 +138,10 @@ void TStorage::Open(EStorageType type, const TPath &place, const std::string &na
         if (sep == std::string::npos)
             Path = Place / PORTO_LAYERS / Name;
         else
-            Path = place / PORTO_STORAGE / fmt::format("{}{}/{}{}", META_PREFIX, Meta, META_LAYER, name.substr(sep + 1));
+            Path = Place / PORTO_STORAGE / fmt::format("{}{}/{}{}", META_PREFIX, Meta, META_LAYER, name.substr(sep + 1));
+        break;
+    case EStorageType::DockerLayer:
+        Path = TDockerImage::TLayer(Name).LayerPath(Place) / "content";
         break;
     case EStorageType::Storage:
         if (sep == std::string::npos)
@@ -197,6 +202,9 @@ TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) 
         break;
     case EStorageType::Layer:
         base = place / PORTO_LAYERS;
+        break;
+    case EStorageType::DockerLayer:
+        base = place / PORTO_DOCKER_LAYERS;
         break;
     case EStorageType::Storage:
         base = place / PORTO_STORAGE;
@@ -331,6 +339,16 @@ TError TStorage::CheckPlace(const TPath &place) {
     if (error)
         return error;
 
+    if (config().daemon().docker_images_support()) {
+        error = Cleanup(place, EStorageType::DockerLayer, 0700);
+        if (error)
+            return error;
+
+        error = TDockerImage::InitStorage(place, 0700);
+        if (error)
+            return error;
+    }
+
     auto lockPlaces = LockPlaces();
     Places.insert(place);
     lockPlaces.unlock();
@@ -369,6 +387,8 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     if (Type == EStorageType::Place) {
         if (type == EStorageType::Layer)
             path = Place / PORTO_LAYERS;
+        else if (type == EStorageType::DockerLayer)
+            path = Place / PORTO_DOCKER_LAYERS / "blobs";
         else
             path = Place / PORTO_STORAGE;
     }
@@ -376,6 +396,20 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     TError error = path.ListSubdirs(names);
     if (error)
         return error;
+
+    if (type == EStorageType::DockerLayer) {
+        std::vector<std::string> prefixes = std::move(names);
+        names.clear();
+        for (auto &prefix: prefixes) {
+            std::vector<std::string> prefixNames;
+            error = TPath(path / prefix).ListSubdirs(prefixNames);
+            if (error) {
+                L_WRN("Cannot list subdirs {}: {}", path / prefix, error);
+                continue;
+            }
+            names.insert(names.end(), prefixNames.begin(), prefixNames.end());
+        }
+    }
 
     for (auto &name: names) {
         if (Type == EStorageType::Place && StringStartsWith(name, META_PREFIX)) {

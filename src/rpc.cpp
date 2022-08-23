@@ -16,6 +16,7 @@
 #include "util/cred.hpp"
 #include "portod.hpp"
 #include "storage.hpp"
+#include "docker.hpp"
 #include "util/quota.hpp"
 
 #include <google/protobuf/descriptor.h>
@@ -64,7 +65,11 @@ void TRequest::Classify() {
         Req.has_exportstorage() ||
         Req.has_removestorage() ||
         Req.has_createmetastorage() ||
-        Req.has_removemetastorage();
+        Req.has_removemetastorage() ||
+        Req.has_dockerimagestatus() ||
+        Req.has_listdockerimages() ||
+        Req.has_pulldockerimage() ||
+        Req.has_removedockerimage();
 
     VlReq =
         Req.has_createvolume() ||
@@ -265,6 +270,33 @@ void TRequest::Parse() {
         Cmd = "GetLayerPrivate";
     } else if (Req.has_setlayerprivate()) {
         Cmd = "SetLayerPrivate";
+    } else if (Req.has_dockerimagestatus()) {
+        Cmd = "DockerImageStatus";
+        opts = { "name=" + Req.dockerimagestatus().name() };
+        if (Req.dockerimagestatus().has_place())
+            opts.push_back("place=" + Req.dockerimagestatus().place());
+    } else if (Req.has_listdockerimages()) {
+        Cmd = "ListDockerImages";
+        if (Req.listdockerimages().has_mask())
+            opts.push_back("mask=" + Req.listdockerimages().mask());
+        if (Req.listdockerimages().has_place())
+            opts.push_back("place=" + Req.listdockerimages().place());
+    } else if (Req.has_pulldockerimage()) {
+        Cmd = "PullDockerImage";
+        opts = { "name=" + Req.pulldockerimage().name() };
+        if (Req.pulldockerimage().has_place())
+            opts.push_back("place=" + Req.pulldockerimage().place());
+        if (Req.pulldockerimage().has_auth_token())
+            opts.push_back("auth_token=***");
+        if (Req.pulldockerimage().has_auth_host())
+            opts.push_back("auth_host=" + Req.pulldockerimage().auth_host());
+        if (Req.pulldockerimage().has_auth_service())
+            opts.push_back("auth_service=" + Req.pulldockerimage().auth_service());
+    } else if (Req.has_removedockerimage()) {
+        Cmd = "RemoveDockerImage";
+        opts = { "name=" + Req.removedockerimage().name() };
+        if (Req.removedockerimage().has_place())
+            opts.push_back("place=" + Req.removedockerimage().place());
     } else if (Req.has_convertpath()) {
         Cmd = "ConvertPath";
         Arg = Req.convertpath().path();
@@ -1500,15 +1532,24 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     if (error)
         return error;
 
+    // porto layers
     std::list<TStorage> layers;
     error = place.List(EStorageType::Layer, layers);
     if (error)
         return error;
 
+    // docker layers
+    std::list<TStorage> dockerLayers;
+    if (config().daemon().docker_images_support()) {
+        error = place.List(EStorageType::DockerLayer, dockerLayers);
+        if (error)
+            return error;
+    }
+
     auto list = rsp.mutable_layers();
-    for (auto &layer: layers) {
+    auto addLayer = [&](TStorage &layer) {
         if (req.has_mask() && !StringMatch(layer.Name, req.mask()))
-            continue;
+            return;
         list->add_layer(layer.Name);
         (void)layer.Load();
         auto desc = list->add_layers();
@@ -1517,9 +1558,126 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
         desc->set_owner_group(layer.Owner.Group());
         desc->set_private_value(layer.Private);
         desc->set_last_usage(layer.LastUsage());
-    }
+        return;
+    };
+    std::for_each(layers.begin(), layers.end(), addLayer);
+    std::for_each(dockerLayers.begin(), dockerLayers.end(), addLayer);
 
     return error;
+}
+
+noinline TError DockerImageStatus(const rpc::TDockerImageStatusRequest &req,
+                                  rpc::TDockerImageStatusResponse &rsp) {
+    TStorage place;
+    TError error;
+
+    if (!config().daemon().docker_images_support())
+        return TError(EError::NotSupported, "Docker images are not supported");
+
+    error = place.Resolve(EStorageType::Place, req.place());
+    if (error)
+        return error;
+
+    TDockerImage image(req.name());
+    error = image.Load(place.Place);
+    if (error)
+        return error;
+
+    auto desc = rsp.mutable_image();
+    desc->set_full_name(image.FullName());
+    for (const auto &layer: image.Layers)
+        desc->add_layers(layer.Digest);
+    desc->set_command(MergeWithQuotes(image.Command, ' '));
+    desc->set_env(MergeEscapeStrings(image.Env, ';'));
+
+    return OK;
+}
+
+noinline TError ListDockerImages(const rpc::TDockerImageListRequest &req,
+                                 rpc::TDockerImageListResponse &rsp) {
+    TStorage place;
+    TError error;
+
+    if (!config().daemon().docker_images_support())
+        return TError(EError::NotSupported, "Docker images are not supported");
+
+    error = place.Resolve(EStorageType::Place, req.place());
+    if (error)
+        return error;
+
+    std::vector<TDockerImage> images;
+    error = TDockerImage::List(place.Place, images, req.has_mask() ? req.mask() : "");
+    if (error)
+        return error;
+
+    for (const auto &image: images) {
+        for (const auto &tag: image.Tags) {
+            auto desc = rsp.add_images();
+            desc->set_full_name(image.FullName(tag));
+            for (const auto &layer: image.Layers)
+                desc->add_layers(layer.Digest);
+            desc->set_command(MergeWithQuotes(image.Command, ' '));
+            desc->set_env(MergeEscapeStrings(image.Env, ';'));
+        }
+    }
+
+    return OK;
+}
+
+noinline TError PullDockerImage(const rpc::TDockerImagePullRequest &req,
+                                rpc::TDockerImagePullResponse &rsp) {
+    TStorage place;
+    TError error;
+
+    if (!config().daemon().docker_images_support())
+        return TError(EError::NotSupported, "Docker images are not supported");
+
+    error = place.Resolve(EStorageType::Place, req.place());
+    if (error)
+        return error;
+
+    TDockerImage image(req.name());
+
+    if (!req.has_auth_token()) {
+        std::string host, service;
+
+        if (req.has_auth_host())
+            host = req.auth_host();
+        if (req.has_auth_service())
+            host = req.auth_service();
+
+        error = image.GetAuthToken(host, service);
+        if (error)
+            return error;
+    } else
+        image.AuthToken = req.auth_token();
+
+    error = image.Download(place.Place);
+    if (error)
+        return error;
+
+    auto desc = rsp.mutable_image();
+    desc->set_full_name(image.FullName());
+    for (const auto &layer: image.Layers)
+        desc->add_layers(layer.Digest);
+    desc->set_command(MergeWithQuotes(image.Command, ' '));
+    desc->set_env(MergeEscapeStrings(image.Env, ';'));
+
+    return OK;
+}
+
+noinline TError RemoveDockerImage(const rpc::TDockerImageRemoveRequest &req) {
+    TStorage place;
+    TError error;
+
+    if (!config().daemon().docker_images_support())
+        return TError(EError::NotSupported, "Docker images are not supported");
+
+    error = place.Resolve(EStorageType::Place, req.place());
+    if (error)
+        return error;
+
+    return TDockerImage(req.name()).Remove(place.Place);
 }
 
 noinline TError AttachProcess(const rpc::TAttachProcessRequest &req, bool thread) {
@@ -2032,6 +2190,14 @@ void TRequest::Handle() {
         error = RemoveLayer(Req.removelayer());
     else if (Req.has_listlayers())
         error = ListLayers(Req.listlayers(), rsp);
+    else if (Req.has_dockerimagestatus())
+        error = DockerImageStatus(Req.dockerimagestatus(), *rsp.mutable_dockerimagestatus());
+    else if (Req.has_listdockerimages())
+        error = ListDockerImages(Req.listdockerimages(), *rsp.mutable_listdockerimages());
+    else if (Req.has_pulldockerimage())
+        error = PullDockerImage(Req.pulldockerimage(), *rsp.mutable_pulldockerimage());
+    else if (Req.has_removedockerimage())
+        error = RemoveDockerImage(Req.removedockerimage());
     else if (Req.has_convertpath())
         error = ConvertPath(Req.convertpath(), rsp);
     else if (Req.has_attachprocess())

@@ -182,6 +182,7 @@ message TConfig {
         optional string tar_path = 27;
         optional uint32 debug_hung_tasks_count = 28;
         optional uint32 request_handling_delay_ms = 29;  // for retriability test
+        optional bool docker_images_support = 30;
     }
 
     message TContainerCfg {

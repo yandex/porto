@@ -170,6 +170,11 @@ type API interface {
 	ConvertPath(path string, src string, dest string) (string, error)
 	AttachProcess(name string, pid uint32, comm string) error
 
+	DockerImageStatus(name, place string) (*rpc.TDockerImage, error)
+	ListDockerImages(place, mask string) ([]*rpc.TDockerImage, error)
+	PullDockerImage(name, place, authToken, authHost, authService string) (*rpc.TDockerImage, error)
+	RemoveDockerImage(name, place string) error
+
 	Close() error
 }
 
@@ -868,6 +873,88 @@ func (conn *portoConnection) AttachProcess(name string, pid uint32, comm string)
 			Pid:  &pid,
 			Comm: &comm,
 		},
+	}
+
+	_, err := conn.performRequest(req)
+	return err
+}
+
+func (conn *portoConnection) DockerImageStatus(name, place string) (*rpc.TDockerImage, error) {
+	req := &rpc.TContainerRequest{
+		DockerImageStatus: &rpc.TDockerImageStatusRequest{
+			Name: &name,
+		},
+	}
+
+	if place != "" {
+		req.DockerImageStatus.Place = &place
+	}
+
+	rsp, err := conn.performRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.GetDockerImageStatus().GetImage(), nil
+}
+
+func (conn *portoConnection) ListDockerImages(place, mask string) ([]*rpc.TDockerImage, error) {
+	req := &rpc.TContainerRequest{
+		ListDockerImages: &rpc.TDockerImageListRequest{},
+	}
+
+	if place != "" {
+		req.ListDockerImages.Place = &place
+	}
+	if mask != "" {
+		req.ListDockerImages.Mask = &mask
+	}
+
+	rsp, err := conn.performRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.GetListDockerImages().GetImages(), nil
+}
+
+func (conn *portoConnection) PullDockerImage(name, place, authToken, authHost, authService string) (*rpc.TDockerImage, error) {
+	req := &rpc.TContainerRequest{
+		PullDockerImage: &rpc.TDockerImagePullRequest{
+			Name: &name,
+		},
+	}
+
+	if place != "" {
+		req.PullDockerImage.Place = &place
+	}
+	if authToken != "" {
+		req.PullDockerImage.AuthToken = &authToken
+	}
+	if authHost != "" {
+		req.PullDockerImage.AuthHost = &authHost
+	}
+	if authService != "" {
+		req.PullDockerImage.AuthService = &authService
+	}
+
+	rsp, err := conn.performRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.GetPullDockerImage().GetImage(), nil
+}
+
+func (conn *portoConnection) RemoveDockerImage(name, place string) error {
+	req := &rpc.TContainerRequest{
+		RemoveDockerImage: &rpc.TDockerImageRemoveRequest{
+			Name: &name,
+		},
+	}
+
+	if place != "" {
+		req.RemoveDockerImage.Place = &place
 	}
 
 	_, err := conn.performRequest(req)

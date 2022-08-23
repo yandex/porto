@@ -89,6 +89,10 @@ enum EError {
 
     Taint = 666;
 
+    // 700-800 reserved to docker
+    Docker = 700;
+    DockerImageNotFound = 701;
+
     // Reserved error code used by Porto internals. Can't be returned to a user.
     Queued = 1000;
 }
@@ -172,6 +176,11 @@ message TContainerRequest {
     optional TSetSystemRequest SetSystem = 301;
 
     optional TClearStatisticsRequest ClearStatistics = 302;
+
+    optional TDockerImageStatusRequest dockerImageStatus = 303;
+    optional TDockerImageListRequest listDockerImages = 304;
+    optional TDockerImagePullRequest pullDockerImage = 305;
+    optional TDockerImageRemoveRequest removeDockerImage = 306;
 }
 
 
@@ -222,6 +231,10 @@ message TContainerResponse {
 
     optional TGetSystemResponse GetSystem = 300;
     optional TSetSystemResponse SetSystem = 301;
+
+    optional TDockerImageStatusResponse dockerImageStatus = 302;
+    optional TDockerImageListResponse listDockerImages = 303;
+    optional TDockerImagePullResponse pullDockerImage = 304;
 }
 
 
@@ -719,6 +732,7 @@ message TVolumeSpec {
     optional string backend = 10;           // default: auto
     optional string place = 11;             // path in host, default: default place for self
     optional string storage = 12;           // default: temp
+    optional string image = 52;
     repeated string layers = 13;
     optional bool read_only = 14;
 
@@ -1376,4 +1390,54 @@ message TStorageExportRequest {
     required string tarball = 2;
     optional string place = 3;
     optional string compress = 4;
+}
+
+
+// Docker
+
+
+message TDockerImage {
+    required string full_name = 1;
+    repeated string layers = 2;
+    optional string command = 3;
+    optional string env = 4;
+}
+
+
+message TDockerImageStatusRequest {
+    required string name = 1;
+    optional string place = 2;
+}
+
+message TDockerImageStatusResponse {
+    optional TDockerImage image = 1;
+}
+
+
+message TDockerImageListRequest {
+    optional string place = 1;
+    optional string mask = 2;
+}
+
+message TDockerImageListResponse {
+    repeated TDockerImage images = 1;
+}
+
+
+message TDockerImagePullRequest {
+    required string name = 1;
+    optional string place = 2;
+    optional string auth_token = 3;
+    optional string auth_host = 4;
+    optional string auth_service = 5;
+}
+
+message TDockerImagePullResponse {
+    optional TDockerImage image = 1;
+}
+
+
+message TDockerImageRemoveRequest {
+    required string name = 1;
+    optional string place = 2;
 }

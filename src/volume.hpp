@@ -8,6 +8,7 @@
 #include "util/path.hpp"
 #include "util/log.hpp"
 #include "util/mutex.hpp"
+#include "storage.hpp"
 
 constexpr const char *V_ID = "id";
 constexpr const char *V_PATH = "path";
@@ -35,8 +36,9 @@ constexpr const char *V_GROUP = "group";
 constexpr const char *V_PERMISSIONS = "permissions";
 
 constexpr const char *V_STORAGE = "storage";
-constexpr const char *V_LAYERS = "layers";
 constexpr const char *V_READ_ONLY = "read_only";
+constexpr const char *V_IMAGE = "image";
+constexpr const char *V_LAYERS = "layers";
 
 constexpr const char *V_SPACE_LIMIT = "space_limit";
 constexpr const char *V_INODE_LIMIT = "inode_limit";
@@ -136,6 +138,7 @@ public:
 
     bool HasDependentContainer = false;
 
+    std::string Image;
     std::vector<std::string> Layers;
     std::list<std::shared_ptr<TVolumeLink>> Links;
 
@@ -280,6 +283,7 @@ public:
     TError StatFS(TStatFS &result);
 
     TError GetUpperLayer(TPath &upper);
+    EStorageType GetLayerType() const;
 
     inline std::unique_lock<std::mutex> LockInternal() {
         return std::unique_lock<std::mutex>(InternalMutex);
