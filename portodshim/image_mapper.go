@@ -8,69 +8,72 @@ import (
 	"time"
 
 	"github.com/yandex/porto/src/api/go/porto"
+	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 	"go.uber.org/zap"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
-	LayersPath = "/place/porto_layers"
+	ImagesPath = "/place/porto_docker"
 )
 
 type PortodshimImageMapper struct{}
 
 // INTERNAL
-func (mapper *PortodshimImageMapper) getImageAndTag(id string) (string, string) {
-	splitedImage := strings.Split(id, ":")
-	image := splitedImage[0]
-	tag := "latest"
-	if len(splitedImage) > 1 {
-		tag = splitedImage[1]
+func (mapper *PortodshimImageMapper) parseImageName(name string) (string, string, string) {
+	image, digest, _ := strings.Cut(name, "@")
+	image, tag, tagFound := strings.Cut(image, ":")
+	if !tagFound {
+		tag = "latest"
 	}
 
-	return image, tag
+	return image, tag, digest
 }
-func (mapper *PortodshimImageMapper) getImageStruct(id string, tags []string, owner string) *v1.Image {
+func (mapper *PortodshimImageMapper) getImageStruct(fullName string, tags []string) *v1.Image {
 	// default value of size, it must be > 0
 	size := uint64(4)
 
+	name, _, digest := mapper.parseImageName(fullName)
+
 	return &v1.Image{
-		Id:          id,
+		Id:          name + "@sha256:" + digest,
 		RepoTags:    tags,
-		RepoDigests: []string{},
+		RepoDigests: []string{name + "@sha256:" + digest},
 		Size_:       size,
 		Uid: &v1.Int64Value{
 			Value: 1,
 		},
-		Username: owner,
-		Spec:     nil,
+		Username: "",
+		Spec: &v1.ImageSpec{
+			Image:       name + "@sha256:" + digest,
+			Annotations: map[string]string{},
+		},
 	}
 }
 
 // IMAGE SERVICE INTERFACE
 func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImagesRequest) (*v1.ListImagesResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
+	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetFilter().GetImage())
 
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	response, err := portoClient.ListLayers2("", "")
+	portoImages, err := portoClient.ListDockerImages("", "")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	// image tags computation
+	// image tags and digests collection
 	tagsMap := make(map[string][]string)
-	imageOwnerMap := make(map[string]string)
-	for _, desc := range response {
-		image, tag := mapper.getImageAndTag(desc.Name)
-		tagsMap[desc.Name] = append(tagsMap[desc.Name], image+":"+tag)
-		imageOwnerMap[image] = desc.OwnerUser
+	for _, image := range portoImages {
+		name, tag, digest := mapper.parseImageName(image.GetFullName())
+		tagsMap[digest] = append(tagsMap[digest], name+":"+tag)
 	}
 
-	// we have tags for every image here
+	// we have tags and digests for every image here
 	var images []*v1.Image
-	for _, desc := range response {
-		image, _ := mapper.getImageAndTag(desc.Name)
-		images = append(images, mapper.getImageStruct(desc.Name, tagsMap[desc.Name], imageOwnerMap[image]))
+	for _, image := range portoImages {
+		_, _, digest := mapper.parseImageName(image.GetFullName())
+		images = append(images, mapper.getImageStruct(image.GetFullName(), tagsMap[digest]))
 	}
 
 	return &v1.ListImagesResponse{
@@ -78,60 +81,64 @@ func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.Lis
 	}, nil
 }
 func (mapper *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageStatusRequest) (*v1.ImageStatusResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.Image.GetImage())
+	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetImage())
 
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	// TODO: Убрать заглушку
-	rawImage := req.GetImage().GetImage()
-	if strings.HasPrefix(rawImage, "k8s.gcr.io/") {
-		rawImage = "ubuntu:xenial"
+	image, err := portoClient.DockerImageStatus(req.GetImage().GetImage(), "")
+	if err != nil {
+		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
+			return &v1.ImageStatusResponse{
+				Image: nil,
+				Info:  map[string]string{},
+			}, nil
+		}
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	image, tag := mapper.getImageAndTag(rawImage)
 
-	response, err := portoClient.ListLayers2("", image+"***")
+	// TODO: add tags into TDockerImage and delete this
+	name, _, targetDigest := mapper.parseImageName(image.GetFullName())
+	images, err := portoClient.ListDockerImages("", name+"***")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	if len(response) == 0 {
-		return nil, fmt.Errorf("%s: layer not found", getCurrentFuncName())
-	}
 
+	// image tags and digests collection
 	var tags []string
-	imageFound := false
-	for _, desc := range response {
-		_, currentTag := mapper.getImageAndTag(desc.Name)
-		if currentTag == tag {
-			imageFound = true
+	for _, image := range images {
+		name, tag, digest := mapper.parseImageName(image.GetFullName())
+		if digest == targetDigest {
+			tags = append(tags, name+":"+tag)
 		}
-		tags = append(tags, image+":"+currentTag)
-	}
-
-	if !imageFound {
-		return nil, fmt.Errorf("%s: layer not found", getCurrentFuncName())
 	}
 
 	return &v1.ImageStatusResponse{
-		Image: mapper.getImageStruct(image+":"+tag, tags, response[0].OwnerUser),
+		Image: mapper.getImageStruct(image.GetFullName(), tags),
 	}, nil
 }
 func (mapper *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImageRequest) (*v1.PullImageResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.Image.GetImage())
+	zap.S().Debugf("call %s: %s %s", getCurrentFuncName(), req.GetImage(), req.GetAuth())
 
-	// TODO: Убрать заглушку
+	portoClient := ctx.Value("portoClient").(porto.API)
+
+	image, err := portoClient.PullDockerImage(req.GetImage().GetImage(), "", req.GetAuth().GetIdentityToken(), req.GetAuth().GetServerAddress(), req.GetAuth().GetAuth())
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
 	return &v1.PullImageResponse{
-		ImageRef: req.Image.GetImage(),
+		ImageRef: image.GetFullName(),
 	}, nil
 }
 func (mapper *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.RemoveImageRequest) (*v1.RemoveImageResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.Image.GetImage())
+	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetImage())
 
-	// temporarily
-	//portoClient := ctx.Value("portoClient").(porto.API)
-	//err := portoClient.RemoveLayer(req.Image.GetImage())
-	//if err != nil {
-	//	return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	//}
+	portoClient := ctx.Value("portoClient").(porto.API)
+
+	err := portoClient.RemoveDockerImage(req.GetImage().GetImage(), "")
+	if err != nil {
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
 
 	return &v1.RemoveImageResponse{}, nil
 }
@@ -139,7 +146,7 @@ func (mapper *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.Im
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
 	stat := syscall.Statfs_t{}
-	err := syscall.Statfs(LayersPath, &stat)
+	err := syscall.Statfs(ImagesPath, &stat)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -149,7 +156,7 @@ func (mapper *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.Im
 			{
 				Timestamp: time.Now().UnixNano(),
 				FsId: &v1.FilesystemIdentifier{
-					Mountpoint: LayersPath,
+					Mountpoint: ImagesPath,
 				},
 				UsedBytes:  &v1.UInt64Value{Value: (stat.Blocks - stat.Bfree) * uint64(stat.Bsize)},
 				InodesUsed: &v1.UInt64Value{Value: stat.Files - stat.Ffree},

@@ -3,7 +3,7 @@ module main
 go 1.17
 
 require (
-	github.com/yandex/porto/src/api/go/porto v0.0.0-20220822120219-b98a70809a99
+	github.com/yandex/porto/src/api/go/porto v0.0.0-20220823210652-96121fdadd29
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20210831042530-f4d43177bf5e
 	google.golang.org/grpc v1.45.0

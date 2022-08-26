@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yandex/porto/src/api/go/porto"
+	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 	"go.uber.org/zap"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -19,6 +20,7 @@ const (
 	containerName = "porto"
 	VolumesPath   = "/place/portodshim_volumes"
 	LogsPath      = "/var/log/portodshim"
+	pauseImage    = "k8s.gcr.io/pause:3.7"
 )
 
 type PortodshimRuntimeMapper struct {
@@ -341,7 +343,8 @@ func (mapper *PortodshimRuntimeMapper) getContainerImage(ctx context.Context, id
 		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 		return ""
 	}
-	return imageDescriptions[0].Properties["layers"]
+
+	return imageDescriptions[0].Properties["image"]
 }
 func (mapper *PortodshimRuntimeMapper) setNetwork(ctx context.Context, id string, mappings []*v1.PortMapping) {
 	portoClient := ctx.Value("portoClient").(porto.API)
@@ -422,11 +425,23 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
+	// get image status
+	image, err := portoClient.DockerImageStatus(pauseImage, "")
+	if err != nil {
+		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
+			image, err = portoClient.PullDockerImage(pauseImage, "", "", "", "")
+			if err != nil {
+				return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+			}
+		} else {
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
+	}
+
 	// volume creating
 	config := map[string]string{
-		"backend":    "overlay",
 		"containers": id,
-		"layers":     "ubuntu:xenial",
+		"image":      pauseImage,
 	}
 
 	rootPath := VolumesPath + "/" + id
@@ -476,7 +491,11 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	mapper.setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
 
 	// command
-	err = portoClient.SetProperty(id, "command", "sleep inf")
+	err = portoClient.SetProperty(id, "command", image.GetCommand())
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+	}
+	err = portoClient.SetProperty(id, "env", image.GetEnv())
 	if err != nil {
 		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -630,23 +649,30 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	podId := req.GetPodSandboxId()
 	containerId := mapper.createId(req.GetConfig().GetMetadata().GetName())
 	id := fmt.Sprintf("%s/%s", podId, containerId)
-	image := req.GetConfig().GetImage().GetImage()
-
-	// TODO: УБрать заглушку
-	if strings.HasPrefix(image, "k8s.gcr.io/") {
-		image = "ubuntu:xenial"
-	}
+	imageName := req.GetConfig().GetImage().GetImage()
 
 	err := portoClient.Create(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
+	// get image status
+	image, err := portoClient.DockerImageStatus(imageName, "")
+	if err != nil {
+		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
+			image, err = portoClient.PullDockerImage(imageName, "", "", "", "")
+			if err != nil {
+				return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+			}
+		} else {
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
+	}
+
 	// volume creating
 	config := map[string]string{
-		"backend":    "overlay",
 		"containers": id,
-		"layers":     image,
+		"image":      imageName,
 	}
 	rootPath := VolumesPath + "/" + id
 	err = os.Mkdir(rootPath, 0755)
@@ -687,9 +713,13 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	// command
 	cmd := strings.Join(req.GetConfig().GetCommand(), " ")
 	if cmd == "" {
-		cmd = "sleep inf"
+		cmd = image.GetCommand()
 	}
 	err = portoClient.SetProperty(id, "command", cmd)
+	if err != nil {
+		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
+	}
+	err = portoClient.SetProperty(id, "env", image.GetEnv())
 	if err != nil {
 		zap.S().Warnf("%s: %v", getCurrentFuncName(), err)
 	}
