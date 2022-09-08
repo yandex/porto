@@ -2024,7 +2024,7 @@ TError TVolume::Configure(const TPath &target_root) {
         /* image and porto layers are not used at the same time */
         Layers.clear();
         TDockerImage image(Image);
-        error = image.Load(Place);
+        error = image.Status(Place);
         if (error)
             return error;
         for (const auto &layer: image.Layers)

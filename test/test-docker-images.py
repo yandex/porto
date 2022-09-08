@@ -6,6 +6,9 @@ IMAGE_NAME = "alpine:3.16.2"
 IMAGE_FULL_NAME = "registry-1.docker.io/library/alpine:3.16.2@9c6f0724472873bb50a2ae67a9e7adcb57673a183cea8b06eb778dca859181b5"
 LAYER_NAME = "alpine"
 
+K8S_IMAGE_NAME = "k8s.gcr.io/pause:3.7"
+K8S_IMAGE_FULL_NAME = "k8s.gcr.io/pause:3.7@221177c6082a88ea4f6240ab2450d540955ac6f4d5454f0e15751b653ebda165"
+
 conn = porto.Connection(timeout=30)
 
 ConfigurePortod('docker-images', """
@@ -55,3 +58,14 @@ ExpectEq(image, images[0])
 
 image = subprocess.check_output([portoctl, "docker-rmi", IMAGE_NAME]).decode("utf-8")
 ExpectEq(image, "")
+
+
+# k8s image
+image = conn.PullDockerImage(K8S_IMAGE_NAME)
+ExpectEq(image.full_name, K8S_IMAGE_FULL_NAME)
+
+image = conn.DockerImageStatus(K8S_IMAGE_NAME)
+ExpectEq(image.full_name, K8S_IMAGE_FULL_NAME)
+
+conn.RemoveDockerImage(K8S_IMAGE_NAME)
+ExpectException(conn.DockerImageStatus, porto.exceptions.DockerImageNotFound, K8S_IMAGE_NAME)

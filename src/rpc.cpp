@@ -1579,7 +1579,7 @@ noinline TError DockerImageStatus(const rpc::TDockerImageStatusRequest &req,
         return error;
 
     TDockerImage image(req.name());
-    error = image.Load(place.Place);
+    error = image.Status(place.Place);
     if (error)
         return error;
 
@@ -1639,14 +1639,12 @@ noinline TError PullDockerImage(const rpc::TDockerImagePullRequest &req,
     TDockerImage image(req.name());
 
     if (!req.has_auth_token()) {
-        std::string host, service;
-
         if (req.has_auth_host())
-            host = req.auth_host();
+            image.AuthHost = req.auth_host();
         if (req.has_auth_service())
-            host = req.auth_service();
+            image.AuthService = req.auth_service();
 
-        error = image.GetAuthToken(host, service);
+        error = image.GetAuthToken();
         if (error)
             return error;
     } else

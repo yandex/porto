@@ -64,14 +64,8 @@ struct TDockerImage {
     std::vector<std::string> Env;
 
     std::string AuthToken;
-
-    inline std::string FullName() const {
-        return fmt::format("{}/{}/{}:{}@{}", Registry, Repository, Name, Tag, Digest);
-    }
-
-    inline std::string FullName(const std::string &tag) const {
-        return fmt::format("{}/{}/{}:{}@{}", Registry, Repository, Name, tag, Digest);
-    }
+    std::string AuthHost;
+    std::string AuthService;
 
     TDockerImage(const std::string &name)
         : Registry(DOCKER_REGISTRY_HOST)
@@ -93,10 +87,24 @@ struct TDockerImage {
         , SchemaVersion(schemaVersion)
     {}
 
-    TError GetAuthToken(const std::string &host = DOCKER_AUTH_HOST, const std::string &service = DOCKER_AUTH_SERVICE);
+    inline std::string RepositoryAndName() const {
+        if (Repository.empty())
+            return Name;
+        return Repository + "/" + Name;
+    }
+
+    inline std::string FullName() const {
+        return FullName(Tag);
+    }
+
+    inline std::string FullName(const std::string &tag) const {
+        return fmt::format("{}/{}:{}@{}", Registry, RepositoryAndName(), tag, Digest);
+    }
+
+    TError GetAuthToken();
 
     TError Download(const TPath &place);
-    TError Load(const TPath &place);
+    TError Status(const TPath &place);
     TError Remove(const TPath &place, bool needLock = true);
 
     static TError InitStorage(const TPath &place, unsigned perms);
@@ -147,12 +155,18 @@ private:
     TPath ImagePath(const TPath &place) const;
     TPath DigestPath(const TPath &place) const;
 
+    std::string AuthUrl() const;
+    std::string ManifestsUrl(const std::string &digest) const;
+    std::string BlobsUrl(const std::string &digest) const;
+
     std::vector<std::unique_ptr<TFileMutex>> Lock(const TPath &place);
     TError DownloadManifest(const THttpClient &client);
     TError ParseManifest();
     TError DownloadConfig(const THttpClient &client);
     TError ParseConfig();
     TError Save(const TPath &place) const;
+    TError DetectImagePath(const TPath &place);
+    TError Load(const TPath &place);
     TError DownloadLayers(const TPath &place) const;
     void RemoveLayers(const TPath &place) const;
 

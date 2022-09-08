@@ -10,6 +10,7 @@
 
 constexpr const char *DOCKER_TAGS_NAME = "tags";
 constexpr const char *DOCKER_LAYERS_NAME = "layers";
+constexpr const char *DOCKER_EMPTY_REPO_NAME = "_empty";
 
 std::vector<std::unique_ptr<TFileMutex>> TDockerImage::Lock(const TPath &place) {
     std::vector<std::unique_ptr<TFileMutex>> mutexes;
@@ -28,7 +29,7 @@ std::vector<std::unique_ptr<TFileMutex>> TDockerImage::Lock(const TPath &place) 
 }
 
 TPath TDockerImage::ImagePath(const TPath &place) const {
-    return place / PORTO_DOCKER_IMAGES / fmt::format("v{}", SchemaVersion) / Registry / Repository / Name;
+    return place / PORTO_DOCKER_IMAGES / fmt::format("v{}", SchemaVersion) / Registry / (Repository.empty() ? DOCKER_EMPTY_REPO_NAME : Repository) / Name;
 }
 
 TPath TDockerImage::DigestPath(const TPath &place) const {
@@ -39,14 +40,26 @@ TPath TDockerImage::DigestPath(const TPath &place) const {
     return TPath(imagePath / DOCKER_TAGS_NAME / Tag).RealPath();
 }
 
-TError TDockerImage::GetAuthToken(const std::string &host, const std::string &service) {
-    TError error;
+std::string TDockerImage::AuthUrl() const {
+    return fmt::format("https://{}/token?service={}&scope=repository:{}:pull",
+                       AuthHost.empty() ? DOCKER_AUTH_HOST : AuthHost,
+                       AuthService.empty() ? DOCKER_AUTH_SERVICE : AuthService,
+                       RepositoryAndName());
+}
 
+std::string TDockerImage::ManifestsUrl(const std::string &digest) const {
+    return fmt::format("/v2/{}/manifests/{}", RepositoryAndName(), digest);
+}
+
+std::string TDockerImage::BlobsUrl(const std::string &digest) const {
+    return fmt::format("/v2/{}/blobs/sha256:{}", RepositoryAndName(), digest);
+}
+
+TError TDockerImage::GetAuthToken() {
+    TError error;
     std::string response;
-    error = THttpClient::SingleRequest(fmt::format("https://{}/token?service={}&scope=repository:{}/{}:pull",
-                host.empty() ? DOCKER_AUTH_HOST : host,
-                service.empty() ? DOCKER_AUTH_SERVICE : service,
-                Repository, Name), response);
+
+    error = THttpClient::SingleRequest(AuthUrl(), response);
     if (error)
         return error;
 
@@ -108,9 +121,18 @@ TError TDockerImage::DownloadManifest(const THttpClient &client) {
     };
 
     std::string manifests;
-    error = client.MakeRequest(fmt::format("/v2/{}/{}/manifests/{}", Repository, Name, Tag), manifests, headers);
-    if (error)
-        return error;
+    error = client.MakeRequest(ManifestsUrl(Tag), manifests, headers);
+    if (error) {
+        // retry if default repository is empty and we received code 404
+        Repository = "";
+        error = GetAuthToken();
+        if (error)
+            return error;
+
+        error = client.MakeRequest(ManifestsUrl(Tag), manifests, headers);
+        if (error)
+            return error;
+    }
 
     auto manifestJson = nlohmann::json::parse(manifests);
     if (!manifestJson.contains("schemaVersion"))
@@ -125,18 +147,24 @@ TError TDockerImage::DownloadManifest(const THttpClient &client) {
             Manifest = manifests;
         } else if (mediaType == "application/vnd.docker.distribution.manifest.list.v2+json") {
             const std::string targetArch = "amd64";
+            const std::string targetOs = "linux";
             bool found = false;
             for (const auto &m: manifestJson["manifests"]) {
-                if (m["platform"]["architecture"] == targetArch) {
+                if (!m.contains("platform"))
+                    continue;
+                auto p = m["platform"];
+                if (!p.contains("architecture") || !p.contains("os"))
+                    continue;
+                if (p["architecture"] == targetArch && p["os"] == targetOs) {
                     found = true;
                     auto digest = m["digest"].get<std::string>();
-                    error = client.MakeRequest(fmt::format("/v2/{}/{}/manifests/{}", Repository, Name, digest), Manifest, headers);
+                    error = client.MakeRequest(ManifestsUrl(digest), Manifest, headers);
                     if (error)
                         return error;
                 }
             }
             if (!found)
-                return TError(EError::Docker, "Manifest for arch {} is not found", targetArch);
+                return TError(EError::Docker, "Manifest for arch {} and os {} is not found", targetArch, targetOs);
         } else
             return TError(EError::Docker, "Unknown manifest mediaType: {}", mediaType);
     } else
@@ -182,7 +210,7 @@ TError TDockerImage::DownloadConfig(const THttpClient &client) {
         { "Authorization", AuthToken },
     };
 
-    return client.MakeRequest(fmt::format("/v2/{}/{}/blobs/sha256:{}", Repository, Name, Digest), Config, headers);
+    return client.MakeRequest(BlobsUrl(Digest), Config, headers);
 }
 
 TError TDockerImage::LinkTag(const TPath &place) const {
@@ -217,7 +245,7 @@ TError TDockerImage::LinkTag(const TPath &place) const {
                 return error;
         } else {
             // delete tag from current digest
-            std::remove(currentDigestTags.begin(), currentDigestTags.end(), Tag);
+            (void)std::remove(currentDigestTags.begin(), currentDigestTags.end(), Tag);
             error = TPath(tagPath.RealPath() / DOCKER_TAGS_NAME).WriteLines(currentDigestTags);
             if (error)
                 return error;
@@ -305,16 +333,37 @@ TError TDockerImage::Save(const TPath &place) const {
     return OK;
 }
 
-TError TDockerImage::Load(const TPath &place) {
-    TError error;
+TError TDockerImage::DetectImagePath(const TPath &place) {
     TPath digestPath = DigestPath(place);
-
     if (!digestPath.Exists()) {
         SchemaVersion = 1;
         digestPath = DigestPath(place);
-        if (!digestPath.Exists())
-            return TError(EError::DockerImageNotFound, FullName());
+        if (!digestPath.Exists()) {
+            if (Repository == "library") {
+                // try to load empty repository
+                Repository = DOCKER_EMPTY_REPO_NAME;
+                SchemaVersion = 2;
+                digestPath = DigestPath(place);
+                if (!digestPath.Exists()) {
+                    SchemaVersion = 1;
+                    digestPath = DigestPath(place);
+                    if (!digestPath.Exists())
+                        return TError(EError::DockerImageNotFound, FullName());
+                }
+            } else
+                return TError(EError::DockerImageNotFound, FullName());
+        }
     }
+
+    if (Repository == DOCKER_EMPTY_REPO_NAME)
+        Repository = "";
+
+    return OK;
+}
+
+TError TDockerImage::Load(const TPath &place) {
+    TError error;
+    TPath digestPath = DigestPath(place);
 
     error = LoadTags(place);
     if (error)
@@ -352,6 +401,22 @@ TPath TDockerImage::TLayer::LayerPath(const TPath &place) const {
 
 TPath TDockerImage::TLayer::ArchivePath(const TPath &place) const {
     return LayerPath(place) / (Digest + ".tar.gz");
+}
+
+TError TDockerImage::Status(const TPath &place) {
+    TError error;
+
+    error = DetectImagePath(place);
+    if (error)
+        return error;
+
+    auto lock = Lock(place);
+
+    error = Load(place);
+    if (error)
+        return error;
+
+    return OK;
 }
 
 TError TDockerImage::TLayer::Remove(const TPath &place) const {
@@ -406,14 +471,19 @@ void TDockerImage::RemoveLayers(const TPath &place) const {
 
 TError TDockerImage::Remove(const TPath &place, bool needLock) {
     TError error;
-    auto lock = needLock ? Lock(place) : std::vector<std::unique_ptr<TFileMutex>>();
-    TPath imagePath = ImagePath(place);
     bool tagSpecified = Digest.empty();
+
+    error = DetectImagePath(place);
+    if (error)
+        return error;
+
+    auto lock = needLock ? Lock(place) : std::vector<std::unique_ptr<TFileMutex>>();
 
     error = Load(place);
     if (error)
         return error;
 
+    TPath imagePath = ImagePath(place);
     if (Tags.size() > 1) {
         if (!tagSpecified)
             return TError(EError::Docker, "Cannot remove image {}: image is used by multiple tags", FullName());
@@ -470,9 +540,13 @@ TError TDockerImage::DownloadLayers(const TPath &place) const {
             (void)layer.Remove(place);
         }
 
-        error = DownloadFile(fmt::format("https://{}/v2/{}/{}/blobs/sha256:{}", Registry, Repository, Name, layer.Digest), archivePath, { "Authorization: " + AuthToken });
-        if (error)
-            return error;
+        error = DownloadFile(fmt::format("https://{}{}", Registry, BlobsUrl(layer.Digest)), archivePath, { "Authorization: " + AuthToken });
+        if (error) {
+            // retry if registry api doesn't expect to receive token and we received code 401
+            error = DownloadFile(fmt::format("https://{}{}", Registry, BlobsUrl(layer.Digest)), archivePath);
+            if (error)
+                return error;
+        }
 
         TStorage portoLayer;
         error = portoLayer.Resolve(EStorageType::DockerLayer, place, layer.Digest);
@@ -619,7 +693,7 @@ TError TDockerImage::List(const TPath &place, std::vector<TDockerImage> &images,
                         if (digest == DOCKER_TAGS_NAME)
                             continue;
 
-                        TDockerImage image(registry, repository, name, digest, schemaVersion);
+                        TDockerImage image(registry, repository == DOCKER_EMPTY_REPO_NAME ? "" : repository, name, digest, schemaVersion);
                         auto lock = image.Lock(place);
                         error = image.Load(place);
                         if (error)
