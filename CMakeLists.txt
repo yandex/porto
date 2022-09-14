@@ -15,7 +15,7 @@ endif()
 
 PROJECT(yandex-porto)
 
-OPTION(ENABLE_GO "Enables building golang API" ON)
+OPTION(ENABLE_GO "Enables building golang API" OFF)
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
 OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)
