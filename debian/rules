@@ -3,10 +3,11 @@
 DESTDIR=$(CURDIR)/debian/yandex-porto
 SBINDIR=$(DESTDIR)/usr/sbin
 BUILD_TYPE?=Release
+OPENSSL_TGZ_URL?=https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1o.tar.gz
 export DH_VERBOSE=1
 
 override_dh_auto_configure:
-	dh_auto_configure -- -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
+	dh_auto_configure -- -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DOPENSSL_TGZ_URL=$(OPENSSL_TGZ_URL)
 
 override_dh_installinit:
 	dh_installinit --no-restart-on-upgrade

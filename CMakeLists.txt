@@ -86,20 +86,21 @@ else()
 	SET(LIBNL_ROUTE ${INSTALL_DIR}/lib/libnl-route-3.a)
 endif()
 
-#set(OPENSSL_TGZ_URL "https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1o.tar.gz")
-if(OPENSSL_TGZ_URL)
-    ExternalProject_Add(openssl
-        URL ${OPENSSL_TGZ_URL}
-        URL_MD5 8c7daf923abc12d4492e82d576c779f2
-        CONFIGURE_COMMAND <SOURCE_DIR>/config --prefix=<INSTALL_DIR> no-dso
-        BUILD_COMMAND $(MAKE)
-        INSTALL_COMMAND $(MAKE) install_sw)
-    ExternalProject_Get_Property(openssl INSTALL_DIR)
-    include_directories(${INSTALL_DIR}/include)
-    SET(LIBSSL ${INSTALL_DIR}/lib/libssl.a)
-    SET(LIBCRYPTO ${INSTALL_DIR}/lib/libcrypto.a)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPPHTTPLIB_OPENSSL_SUPPORT")
+if(NOT OPENSSL_TGZ_URL)
+    set(OPENSSL_TGZ_URL "https://github.com/openssl/openssl/archive/refs/tags/OpenSSL_1_1_1o.tar.gz")
 endif()
+
+ExternalProject_Add(openssl
+    URL ${OPENSSL_TGZ_URL}
+    URL_MD5 8c7daf923abc12d4492e82d576c779f2
+    CONFIGURE_COMMAND <SOURCE_DIR>/config --prefix=<INSTALL_DIR> no-dso
+    BUILD_COMMAND $(MAKE)
+    INSTALL_COMMAND $(MAKE) install_sw)
+ExternalProject_Get_Property(openssl INSTALL_DIR)
+include_directories(${INSTALL_DIR}/include)
+SET(LIBSSL ${INSTALL_DIR}/lib/libssl.a)
+SET(LIBCRYPTO ${INSTALL_DIR}/lib/libcrypto.a)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPPHTTPLIB_OPENSSL_SUPPORT")
 
 find_library(PB NAMES libprotobuf.a)
 find_package(Protobuf REQUIRED)
