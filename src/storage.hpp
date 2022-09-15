@@ -36,7 +36,7 @@ public:
     TError List(enum EStorageType type, std::list<TStorage> &list);
     TError ImportArchive(const TPath &archive, const std::string &cgroup, const std::string &compress = "",
                          bool merge = false, bool verboseError = false);
-    TError ExportArchive(const TPath &archive, const std::string &compress = "", bool isLayer = false);
+    TError ExportArchive(const TPath &archive, const std::string &compress = "");
     bool Exists() const;
     bool Weak() const;
     uint64_t LastUsage() const;

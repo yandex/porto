@@ -1490,7 +1490,7 @@ noinline TError ExportLayer(const rpc::TLayerExportRequest &req) {
             return error;
 
         return layer.ExportArchive(CL->ResolvePath(req.tarball()),
-                                   req.has_compress() ? req.compress() : "", true);
+                                   req.has_compress() ? req.compress() : "");
     }
 
     std::shared_ptr<TVolume> volume;

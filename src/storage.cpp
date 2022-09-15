@@ -922,7 +922,7 @@ err:
     return error;
 }
 
-TError TStorage::ExportArchive(const TPath &archive, const std::string &compress, bool isLayer) {
+TError TStorage::ExportArchive(const TPath &archive, const std::string &compress) {
     TFile dir, arc;
     TError error;
 
@@ -988,9 +988,6 @@ TError TStorage::ExportArchive(const TPath &archive, const std::string &compress
                         compress_option,
                         "--create",
                         "-C", Path.ToString(), "." };
-
-        if (!isLayer)
-            args.insert(args.begin() + 1, "--exclude=usr/sbin/portoctl");
 
         if (TarSupportsXattrs())
             args.insert(args.begin() + 4, "--xattrs");
