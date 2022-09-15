@@ -146,9 +146,9 @@ type API interface {
 	ListVolumeProperties() ([]TProperty, error)
 	CreateVolume(path string, config map[string]string) (TVolumeDescription, error)
 	TuneVolume(path string, config map[string]string) error
-	LinkVolume(path string, container string) error
-	UnlinkVolume(path string, container string) error
-	UnlinkVolume3(path string, container string, strict bool) error
+	LinkVolume(path string, container string, target string, required bool, readOnly bool) error
+	UnlinkVolume(path string, container string, target string) error
+	UnlinkVolume3(path string, container string, target string, strict bool) error
 	ListVolumes(path string, container string) ([]TVolumeDescription, error)
 
 	// LayerAPI
@@ -599,27 +599,31 @@ func (conn *portoConnection) TuneVolume(path string, config map[string]string) e
 	return err
 }
 
-func (conn *portoConnection) LinkVolume(path string, container string) error {
+func (conn *portoConnection) LinkVolume(path string, container string, target string, required bool, readOnly bool) error {
 	req := &rpc.TContainerRequest{
 		LinkVolume: &rpc.TVolumeLinkRequest{
 			Path:      &path,
 			Container: &container,
+			Target:    &target,
+			Required:  &required,
+			ReadOnly:  &readOnly,
 		},
 	}
 	_, err := conn.performRequest(req)
 	return err
 }
 
-func (conn *portoConnection) UnlinkVolume(path string, container string) error {
-	return conn.UnlinkVolume3(path, container, false)
+func (conn *portoConnection) UnlinkVolume(path string, container string, target string) error {
+	return conn.UnlinkVolume3(path, container, target, false)
 }
 
-func (conn *portoConnection) UnlinkVolume3(path string, container string, strict bool) error {
+func (conn *portoConnection) UnlinkVolume3(path string, container string, target string, strict bool) error {
 	req := &rpc.TContainerRequest{
 		UnlinkVolume: &rpc.TVolumeUnlinkRequest{
 			Path:      &path,
 			Container: &container,
 			Strict:    &strict,
+			Target:    &target,
 		},
 	}
 	if container == "" {

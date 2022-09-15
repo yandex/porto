@@ -5,11 +5,22 @@ import (
 	"crypto/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 
 	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
+)
+
+const (
+	testTmpDir    = "/tmp/"
+	testContainer = "golang_testContainer"
+	testVolume    = testTmpDir + "golang_testVolume"
+	testLayer     = "golang_testLayer"
+	testTarball   = testTmpDir + testLayer + ".tgz"
+	testStorage   = "go_abcde"
+	testPlace     = testTmpDir + "golang_place"
 )
 
 func FailOnError(t *testing.T, conn API, err error) {
@@ -44,12 +55,9 @@ func ConnectToPorto(t *testing.T) API {
 	return conn
 }
 
-const testContainer string = "golang_testContainer"
-const testVolume string = "/tmp/golang_testVolume"
-const testLayer string = "golang_testLayer"
-const testTarball = "/tmp/" + testLayer + ".tgz"
-const testStorage string = "go_abcde"
-const testPlace string = "/tmp/golang_place"
+func makeTestContainerName(t *testing.T) string {
+	return testContainer + "_" + t.Name()
+}
 
 func TestGetVersion(t *testing.T) {
 	conn := ConnectToPorto(t)
@@ -270,7 +278,34 @@ func TestLinkVolume(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()
 	FailOnError(t, conn, conn.Create(testContainer))
-	FailOnError(t, conn, conn.LinkVolume(testVolume, testContainer))
+	FailOnError(t, conn, conn.LinkVolume(testVolume, testContainer, "", false, false))
+}
+
+func TestLinkVolumeTarget(t *testing.T) {
+	cntName := makeTestContainerName(t)
+	cntDir := filepath.Join(testTmpDir, cntName)
+	cntRootDir := filepath.Join(cntDir, "root")
+	cntMountDir := filepath.Join(cntDir, "src")
+
+	// Prepare container root, mount
+	os.MkdirAll(cntRootDir+"/dst", 0755)
+	defer os.RemoveAll(cntDir)
+	os.MkdirAll(cntMountDir, 0755)
+
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+
+	FailOnError(t, conn, conn.Create(cntName))
+	defer conn.Destroy(cntName)
+	FailOnError(t, conn, conn.SetProperty(cntName, "root", cntRootDir))
+	_, err := conn.CreateVolume(cntMountDir, map[string]string{
+		"backend": "bind",
+		"storage": cntMountDir,
+	})
+	FailOnError(t, conn, err)
+	FailOnError(t, conn, conn.LinkVolume(cntMountDir, cntName, "/dst", false, true))
+	FailOnError(t, conn, conn.UnlinkVolume(cntMountDir, "/", ""))
+	FailOnError(t, conn, conn.UnlinkVolume(cntMountDir, cntName, "/dst"))
 }
 
 func TestExportLayer(t *testing.T) {
@@ -283,8 +318,8 @@ func TestExportLayer(t *testing.T) {
 func TestUnlinkVolume(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()
-	FailOnError(t, conn, conn.UnlinkVolume(testVolume, testContainer))
-	FailOnError(t, conn, conn.UnlinkVolume(testVolume, "/"))
+	FailOnError(t, conn, conn.UnlinkVolume(testVolume, testContainer, ""))
+	FailOnError(t, conn, conn.UnlinkVolume(testVolume, "/", ""))
 	FailOnError(t, conn, conn.Destroy(testContainer))
 	os.Remove(testVolume)
 }
@@ -401,7 +436,7 @@ func TestCreateStorage(t *testing.T) {
 
 	volume, err := conn.CreateVolume("", config)
 	FailOnError(t, conn, err)
-	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", false))
+	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", "", false))
 }
 
 func TestListStorage(t *testing.T) {
@@ -463,7 +498,7 @@ func TestPlace(t *testing.T) {
 		t.FailNow()
 	}
 
-	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", false))
+	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", "", false))
 	FailOnError(t, conn, conn.RemoveStorage("abcd", testPlace))
 	FailOnError(t, conn, os.Remove(testPlace+"/porto_volumes"))
 	FailOnError(t, conn, os.Remove(testPlace+"/porto_layers"))
