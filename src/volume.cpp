@@ -2027,8 +2027,8 @@ TError TVolume::Configure(const TPath &target_root) {
         error = image.Status(Place);
         if (error)
             return error;
-        for (const auto &layer: image.Layers)
-            Layers.push_back(layer.Digest);
+        for (auto it = image.Layers.rbegin(); it != image.Layers.rend(); ++it)
+            Layers.push_back(it->Digest);
     }
 
     /* Verify and resolve layers */

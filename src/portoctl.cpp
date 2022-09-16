@@ -221,7 +221,7 @@ public:
 
         if (VolumeBackend != "")
             config["backend"] = VolumeBackend;
-        else if (MergeLayers || Layers.empty())
+        else if (MergeLayers || (Layers.empty() && Image.empty()))
             config["backend"] = "native";
         else
             config["backend"] = "overlay";
