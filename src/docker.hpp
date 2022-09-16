@@ -73,6 +73,9 @@ struct TDockerImage {
         , Tag("latest")
     {
         ParseName(name);
+        // in case registry is docker.io request will be redirected to docker.com
+        if (Registry == "docker.io")
+            Registry = DOCKER_REGISTRY_HOST;
     }
 
     TDockerImage(const std::string &registry,
