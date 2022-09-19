@@ -1,3 +1,53 @@
+yandex-porto (5.3.0) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * container: container doesn't start parents if client is portod
+  * property: add io_read_ops and io_write_ops as division of io_ops
+  * stream: fix checks in SetInside
+
+  [ Dmitry Yakunin ]
+  * network: use MeasuredMutex-es, better error handling
+  * docs: add kndrvt to the AUTHORS
+
+  [ Maxim Samoylov ]
+  * test: fix self-container test stability issue
+  * test: restart portod on each test case
+  * test: make tests compatible with focal
+  * test: make tests more stable
+
+  [ Lev Pantyukhin ]
+  * property: add net_snmp6 property
+
+  [ Dmitry Yakunin ]
+  * ci: disable precise build
+
+  [ Lev Pantyukhin ]
+  * api: add rpc.pb.go updating, split rpc package from porto package, resolve conflicts
+  * api: fix go module name
+
+  [ Dmitry Yakunin ]
+  * ci: disable trusty build
+  * all: add experimental docker images support
+  * build: disable go api building by default
+  * build: enable openssl by default
+  * ci: enable openssl
+
+  [ Lev Pantyukhin ]
+  * docker: fix docker pull for k8s.gcr.io
+
+  [ Stanislav Ivanichkin ]
+  * api: Allow set target property in LinkVolume call
+
+  [ Lev Pantyukhin ]
+  * storage: remove /usr/sbin/portoctl excluding during layer exporting
+  * docker: replace docker.io to registry-1.docker.io as registry
+  * docker: reverse order of image layers
+
+  [ Dmitry Yakunin ]
+  * task: fix typo
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 19 Sep 2022 12:55:45 +0300
+
 yandex-porto (5.2.8) unstable; urgency=low
 
   [ Lev Pantyukhin ]
