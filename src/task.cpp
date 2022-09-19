@@ -718,7 +718,7 @@ TError TTaskEnv::Start() {
         struct sched_param param;
         param.sched_priority = CT->SchedPrio;
         if (sched_setscheduler(0, CT->SchedPolicy, &param))
-            Abort(TError::System("sched_setparm"));
+            Abort(TError::System("sched_setscheduler"));
 
         if (CT->SchedNoSmt) {
             cpu_set_t taskMask;
