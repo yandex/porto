@@ -441,7 +441,7 @@ TError TProjectQuota::RecalcUsage() {
     return OK;
 }
 
-TError TProjectQuota::UpdateQuota(uint32_t id, const dqblk *realQuota) {
+TError TProjectQuota::UpdateQuota(uint32_t id, const dqblk *realQuota, std::string &message) {
     dqblk quota;
 
     if (!id)
@@ -452,25 +452,32 @@ TError TProjectQuota::UpdateQuota(uint32_t id, const dqblk *realQuota) {
 
     quota.dqb_valid = 0;
 
+    auto addToMessage = [&message](const std::string &log) {
+        message += log + "\n";
+        L("{}", log);
+    };
+
     if (quota.dqb_curinodes != realQuota->dqb_curinodes) {
-        L("Update inode count for {}: {} -> {} ({})",
+        addToMessage(fmt::format("Update inode count for {}: {} -> {} ({})",
           id, quota.dqb_curinodes, realQuota->dqb_curinodes,
-          realQuota->dqb_curinodes - quota.dqb_curinodes);
+          (int64_t)(realQuota->dqb_curinodes - quota.dqb_curinodes)));
+
         quota.dqb_curinodes = realQuota->dqb_curinodes;
         quota.dqb_valid |= QIF_INODES;
     }
 
     if (quota.dqb_curspace != realQuota->dqb_curspace) {
-        L("Update space usage for {}: {} -> {} ({})",
+        addToMessage(fmt::format("Update space usage for {}: {} -> {} ({})",
           id, quota.dqb_curspace, realQuota->dqb_curspace,
-          realQuota->dqb_curspace - quota.dqb_curspace);
+          (int64_t)(realQuota->dqb_curspace - quota.dqb_curspace)));
+
         quota.dqb_curspace = realQuota->dqb_curspace;
         quota.dqb_valid |= QIF_SPACE;
     }
 
     if (!realQuota->dqb_curinodes && !realQuota->dqb_curspace) {
         if (RemoveUnusedProjects) {
-            L("Remove unused project quota: {}", id);
+            addToMessage(fmt::format("Remove unused project quota: {}", id));
             memset(&quota, 0, sizeof(quota));
             quota.dqb_valid |= QIF_ALL;
         } else {
@@ -703,7 +710,7 @@ TError TProjectQuota::Destroy() {
     return error;
 }
 
-TError TProjectQuota::Check() {
+TError TProjectQuota::Check(std::string &message) {
     TError error;
 
     error = FindDevice();
@@ -722,7 +729,7 @@ TError TProjectQuota::Check() {
         return error;
 
     for (auto &dq: Quotas) {
-        error = UpdateQuota(dq.first, dq.second.get());
+        error = UpdateQuota(dq.first, dq.second.get(), message);
         if (error)
             return error;
     }

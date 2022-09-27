@@ -736,10 +736,15 @@ int Connection::TuneVolume(const std::string &path,
     return Impl->Call(Impl->DiskTimeout);
 }
 
-int Connection::CheckVolume(const std::string &path) {
+int Connection::CheckVolume(const std::string &path, std::string &message) {
     auto req = Impl->Req.mutable_checkvolume();
     req->set_path(path);
-    return Impl->Call(Impl->DiskTimeout);
+
+    int ret = Impl->Call(Impl->DiskTimeout);
+    if (!ret && Impl->Rsp.checkvolume().has_message())
+        message = Impl->Rsp.checkvolume().message();
+
+    return ret;
 }
 
 int Connection::ImportLayer(const std::string &layer,
@@ -760,6 +765,7 @@ int Connection::ImportLayer(const std::string &layer,
         req->set_private_value(private_value);
     if (container.size())
         req->set_container(container);
+
     return Impl->Call(Impl->DiskTimeout);
 }
 

@@ -1230,12 +1230,21 @@ noinline TError TuneVolume(const rpc::TVolumeTuneRequest &req) {
     return volume->Tune(cfg);
 }
 
-noinline TError CheckVolume(const rpc::TVolumeCheckRequest &req) {
+noinline TError CheckVolume(const rpc::TVolumeCheckRequest &req, rpc::TVolumeCheckResponse &rsp) {
     std::shared_ptr<TVolume> volume;
+    std::string message;
     TError error = CL->ControlVolume(req.path(), volume);
     if (error)
         return error;
-    return volume->Check();
+
+    error = volume->Check(message);
+    if (error)
+        return error;
+
+    if (!message.empty())
+        rsp.set_message(message);
+
+    return OK;
 }
 
 noinline TError LinkVolume(const rpc::TVolumeLinkRequest &req) {
@@ -2175,7 +2184,7 @@ void TRequest::Handle() {
     else if (Req.has_tunevolume())
         error = TuneVolume(Req.tunevolume());
     else if (Req.has_checkvolume())
-        error = CheckVolume(Req.checkvolume());
+        error = CheckVolume(Req.checkvolume(), *rsp.mutable_checkvolume());
     else if (Req.has_newvolume())
         error = NewVolume(Req.newvolume(), *rsp.mutable_newvolume());
     else if (Req.has_getvolume())

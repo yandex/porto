@@ -2044,14 +2044,20 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
         const auto path = TPath(args[0]).AbsolutePath().NormalPath().ToString();
+        std::string message;
 
-        int ret = Api->CheckVolume(path);
+        int ret = Api->CheckVolume(path, message);
         if (ret) {
             PrintError("Cannot check consistency of the volume");
             return ret;
         }
 
-        return 0;
+        if (message.empty())
+            fmt::print(stdout, "Nothing to update\n");
+        else
+            fmt::print(stdout, "{}", message);
+
+        return EXIT_SUCCESS;
     }
 };
 

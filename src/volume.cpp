@@ -119,7 +119,7 @@ TError TVolumeBackend::Resize(uint64_t, uint64_t) {
     return TError(EError::NotSupported, "not implemented");
 }
 
-TError TVolumeBackend::Check() {
+TError TVolumeBackend::Check(std::string &) {
     return OK;
 }
 
@@ -429,8 +429,8 @@ public:
         return TProjectQuota(Volume->Path).StatFS(result);
     }
 
-    TError Check() override {
-        return TProjectQuota(Volume->Path).Check();
+    TError Check(std::string &message) override {
+        return TProjectQuota(Volume->Path).Check(message);
     }
 };
 
@@ -515,11 +515,11 @@ public:
         return Volume->InternalPath.StatFS(result);
     }
 
-    TError Check() override {
+    TError Check(std::string &message) override {
         TProjectQuota quota(Volume->Path);
 
         if (Volume->HaveQuota() && quota.Exists())
-            return quota.Check();
+            return quota.Check(message);
         else
             return TError(EError::NotSupported, "Volume has no quota or project doesn't exist");
     }
@@ -1002,11 +1002,11 @@ err:
         return Volume->InternalPath.StatFS(result);
     }
 
-    TError Check() override {
+    TError Check(std::string &message) override {
         TProjectQuota quota(Volume->StoragePath);
 
         if (Volume->HaveQuota() && quota.Exists())
-            return quota.Check();
+            return quota.Check(message);
         else
             return TError(EError::NotSupported, "Volume has no quota or project doesn't exist");
     }
@@ -3105,8 +3105,8 @@ out:
     return error;
 }
 
-TError TVolume::Check() {
-    return Backend->Check();
+TError TVolume::Check(std::string &message) {
+    return Backend->Check(message);
 }
 
 TError TVolume::GetUpperLayer(TPath &upper) {

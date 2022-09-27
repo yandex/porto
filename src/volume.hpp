@@ -78,7 +78,7 @@ public:
     virtual TError Destroy(void) =0;
     virtual TError StatFS(TStatFS &result) =0;
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
-    virtual TError Check();
+    virtual TError Check(std::string &message);
     virtual std::string ClaimPlace();
 };
 
@@ -244,7 +244,7 @@ public:
 
     TError Tune(const TStringMap &cfg);
 
-    TError Check();
+    TError Check(std::string &message);
 
     TError CheckGuarantee(uint64_t space_guarantee, uint64_t inode_guarantee);
 

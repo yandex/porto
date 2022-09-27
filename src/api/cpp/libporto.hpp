@@ -204,7 +204,7 @@ public:
     }
     int TuneVolume(const std::string &path,
                    const std::map<std::string, std::string> &config);
-    int CheckVolume(const std::string &path);
+    int CheckVolume(const std::string &path, std::string &message);
 
     int ImportLayer(const std::string &layer, const std::string &tarball,
                     bool merge = false, const std::string &place = "",

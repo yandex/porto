@@ -35,7 +35,7 @@ class TProjectQuota {
     TError WalkQuotaFile(int fd, unsigned id, int index, int depth);
     TError ScanQuotaFile(const TPath &quotaPath);
     TError WalkInodes(const TPathWalk &walk);
-    TError UpdateQuota(uint32_t id, const dqblk *quota);
+    TError UpdateQuota(uint32_t id, const dqblk *quota, std::string &message);
     TError WalkUnlinked();
     TError RecalcUsage();
 
@@ -57,7 +57,7 @@ public:
     TError Create();
     TError Resize();
     TError Destroy();
-    TError Check();
+    TError Check(std::string &message);
 
     TError StatFS(TStatFS &result);
 
