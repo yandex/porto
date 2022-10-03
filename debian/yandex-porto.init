@@ -23,7 +23,7 @@ test -x $DAEMON || exit 0
 case "$1" in
 start|stop|restart|reload)
     grep -zqs '^container=' /proc/1/environ && exit 0
-    log_daemon_msg "$1 porto daemon" "porotd"
+    log_daemon_msg "$1 porto daemon" "portod"
     status="0"
     $DAEMON $1 || status="$?"
     log_end_msg $status

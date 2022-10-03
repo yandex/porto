@@ -1,0 +1,20 @@
+[Unit]
+Description=CRI plugin for Porto
+After=network-online.target
+Requires=network-online.target
+ConditionVirtualization=!container
+Documentation=https://github.com/yandex/porto
+
+[Service]
+ExecStart=/usr/sbin/portodshim -debug
+ExecReload=/bin/kill -s SIGTERM $(pidof portodshim) && /usr/sbin/portodshim -debug
+ExecStop=/bin/kill -s SIGTERM $(pidof portodshim)
+Restart=on-failure
+KillSignal=SIGTERM
+KillMode=process
+TimeoutStopSec=360
+TimeoutStartSec=360
+Delegate=true
+
+[Install]
+WantedBy=multi-user.target

@@ -27,6 +27,13 @@ Description: Porto - linux container management system
  .
  Some features requires special kernel.
 
+Package: yandex-portodshim
+Section: utils
+Priority: extra
+Architecture: amd64
+Depends: yandex-porto
+Description: CRI plugin for Porto
+
 Package: python-portopy
 Section: python
 Priority: optional
