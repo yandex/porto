@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -13,12 +15,20 @@ import (
 )
 
 func makeZapLogger(logPath string, debug bool) (*zap.Logger, error) {
-	sink := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   logPath,
-		MaxSize:    500, // megabytes
-		MaxBackups: 3,
-		MaxAge:     28, // days
-	})
+	logger := &lumberjack.Logger{
+		Filename: logPath,
+	}
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP)
+
+	go func() {
+		for {
+			<-c
+			logger.Rotate()
+		}
+	}()
+
+	sink := zapcore.AddSync(logger)
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 	encoderCfg.EncodeLevel = zapcore.CapitalLevelEncoder

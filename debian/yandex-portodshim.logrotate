@@ -1,0 +1,14 @@
+/var/log/portodshim/portodshim.log {
+	size 100M
+	missingok
+	rotate 3
+	compress
+	notifempty
+	nocreate
+	su root syslog
+
+	postrotate
+		/usr/bin/killall -HUP portodshim
+	endscript
+
+}
