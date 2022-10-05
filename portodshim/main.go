@@ -55,6 +55,12 @@ func main() {
 	debug := flag.Bool("debug", false, "show debug logs")
 	flag.Parse()
 
+	err := os.Mkdir(LogsDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		_, _ = fmt.Fprintf(os.Stderr, "cannot create logs dir: %v", err)
+		return
+	}
+
 	logger, err := makeZapLogger(PortodshimLogPath, *debug)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "cannot create logger: %v", err)

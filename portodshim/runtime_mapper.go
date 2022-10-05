@@ -43,12 +43,13 @@ func NewPortodshimRuntimeMapper() (*PortodshimRuntimeMapper, error) {
 		cni.WithPluginDir([]string{NetworkPluginBinDir}),
 		cni.WithInterfacePrefix(ifPrefixName))
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize cni: %w", err)
+		return nil, fmt.Errorf("failed to initialize cni: %v", err)
 	}
 	if err = netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err != nil {
-		return nil, fmt.Errorf("failed to load cni configuration: %v", err)
+		zap.S().Warnf("failed to load cni configuration: %v", err)
+	} else {
+		runtimeMapper.netPlugin = netPlugin
 	}
-	runtimeMapper.netPlugin = netPlugin
 
 	runtimeMapper.containerStateMap = map[string]v1.ContainerState{
 		"stopped":    v1.ContainerState_CONTAINER_CREATED,
@@ -522,10 +523,12 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	if err := mapper.setNetwork(ctx, id, req.GetConfig()); err != nil {
-		_ = portoClient.Destroy(id)
-		_ = os.RemoveAll(rootPath)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	if mapper.netPlugin != nil {
+		if err := mapper.setNetwork(ctx, id, req.GetConfig()); err != nil {
+			_ = portoClient.Destroy(id)
+			_ = os.RemoveAll(rootPath)
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
 	}
 
 	// labels and annotations
