@@ -10,7 +10,7 @@ add_custom_command(
   OUTPUT ${TARGET}
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   DEPENDS ${SRCS}
-  COMMAND env GOPATH=${GOPATH} go build -modcacherw -buildmode=exe -o "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}"
+  COMMAND env GOPATH=${GOPATH} GOCACHE=/tmp go build -modcacherw -buildmode=exe -o "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}"
 )
 
 add_custom_target(cri_plugin ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${TARGET})
