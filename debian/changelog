@@ -1,3 +1,58 @@
+yandex-porto (5.3.1) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * portodshim: init commit
+  * portodshim: add draft of container manipulation methods
+  * portodshim: add draft of pod manipulation methods
+  * portodshim: add draft of image mapper
+  * portodshim: add image manipulation methods
+  * portodshim: add Statuses and Stats
+  * portodshim: add porto connection per request via GRPC interceptor and refactor modules
+  * portodshim: add volume with image to container and image parsing
+  * portodshim: add debug logs and other API version
+  * portodshim: labels and annotations
+  * portodshim: set labels at one request and fix container status
+
+  [ Stanislav Ivanichkin ]
+  * portodshim: temporary use tag as a RuntimeApiVersion
+
+  [ Lev Pantyukhin ]
+  * portodshim: add hostname and ip
+  * portodshim: add some stubs
+
+  [ Stanislav Ivanichkin ]
+  * portodshim: list containers only with namespace label
+
+  [ Lev Pantyukhin ]
+  * portodshim: add command and using kill instead of stop for containers
+  * portodshim: add metadata getting and simple filter in ListPodSandbox
+  * portodshim: add filtering to ListContainers, add system namespaces skipping and add labels/annotations in Stats
+  * portodshim: split name and id
+  * portodshim: add labels filtering
+  * portodshim: modify id length
+  * portodshim: add ListPodSandboxStats
+  * portodshim: add LogPath in ContainerStatus
+  * portodshim: remove porto.go and add remote module dependency
+  * portodshim: refactor image and runtime mapper with new go api
+  * portodshim: remove methods from struct PortodshimRuntimeMapper
+  * portodshim: remove methods from struct PortodshimImageMapper
+
+  [ Stanislav Ivanichkin ]
+  * portodshim: added cni support
+
+  [ Lev Pantyukhin ]
+  * debian: add portodshim package
+  * portodshim: add log rotate
+
+  [ Dmitry Yakunin ]
+  * portodshim: allow to work without cni configuration
+  * ci: add update_tar_bases script
+  * ci: update base tars with golang 1.19.2
+  * portodshim: set go cache to /tmp
+  * ci: use arc in sandbox_task
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 07 Oct 2022 17:33:46 +0300
+
 yandex-porto (5.3.0) unstable; urgency=low
 
   [ Lev Pantyukhin ]
