@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/containerd/containerd v1.6.7
 	github.com/containerd/go-cni v1.1.7
-	github.com/yandex/porto/src/api/go/porto v0.0.0-20220823210652-96121fdadd29
+	github.com/yandex/porto/src/api/go/porto v0.0.0-20220919083929-639628186b7c
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 	google.golang.org/grpc v1.45.0
