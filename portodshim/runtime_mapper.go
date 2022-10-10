@@ -110,6 +110,28 @@ func (mapper *PortodshimRuntimeMapper) createId(name string) string {
 	return fmt.Sprintf("%s-%x", name[:length], mapper.randGenerator.Uint32()%65536)
 }
 
+func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Context, id string, cfg *v1.LinuxContainerResources) error {
+	portoClient := ctx.Value("portoClient").(porto.API)
+
+	// cpu
+	if err := portoClient.SetProperty(id, "cpu_limit", fmt.Sprintf("%fc", float64(cfg.CpuQuota)/100000)); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+	if err := portoClient.SetProperty(id, "cpu_guarantee", fmt.Sprintf("%fc", float64(cfg.CpuQuota)/100000)); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// memory
+	if err := portoClient.SetProperty(id, "memory_limit", strconv.FormatInt(cfg.MemoryLimitInBytes, 10)); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+	if err := portoClient.SetProperty(id, "memory_guarantee", strconv.FormatInt(cfg.MemoryLimitInBytes, 10)); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	return nil
+}
+
 func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
@@ -157,7 +179,6 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerImage(ctx context.Context, id string, imageName string) (*rpc.TDockerImage, error) {
-	var image *rpc.TDockerImage
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	image, err := portoClient.DockerImageStatus(imageName, "")
@@ -631,16 +652,25 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	// get image
 	image, err := mapper.prepareContainerImage(ctx, id, pauseImage)
 	if err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	// command + args
 	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, image); err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	// env
 	if err = mapper.prepareContainerEnv(ctx, id, []*v1.KeyValue{}, image); err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// resources
+	if err = mapper.prepareContainerResources(ctx, id, req.GetConfig().GetLinux().GetResources()); err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
@@ -852,16 +882,19 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	// get image
 	image, err := mapper.prepareContainerImage(ctx, id, req.GetConfig().GetImage().GetImage())
 	if err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	// command + args
 	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), image); err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	// env
 	if err = mapper.prepareContainerEnv(ctx, id, req.GetConfig().GetEnvs(), image); err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
