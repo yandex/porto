@@ -195,13 +195,15 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerImage(ctx context.Context
 	return image, nil
 }
 
-func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cmd []string, args []string, image *rpc.TDockerImage) error {
+func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd []string, cfgArgs []string, imgCmd []string) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	if len(cmd) == 0 {
-		cmd = append(cmd, image.GetCommand())
+	cmd := imgCmd
+	if len(cfgCmd) > 0 {
+		cmd = cfgCmd
+		cmd = append(cmd, cfgArgs...)
 	}
-	cmd = append(cmd, args...)
+
 	return portoClient.SetProperty(id, "command", strings.Join(cmd, " "))
 }
 
@@ -657,7 +659,7 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	}
 
 	// command + args
-	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, image); err != nil {
+	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, []string{image.GetCommand()}); err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -889,7 +891,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	}
 
 	// command + args
-	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), image); err != nil {
+	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), []string{image.GetCommand()}); err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
