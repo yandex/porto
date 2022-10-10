@@ -880,7 +880,9 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	}
 
 	// get image
-	image, err := mapper.prepareContainerImage(ctx, id, req.GetConfig().GetImage().GetImage())
+	// TODO: define imageName in rpc.TDockerImage
+	imageName := req.GetConfig().GetImage().GetImage()
+	image, err := mapper.prepareContainerImage(ctx, id, imageName)
 	if err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -899,7 +901,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	}
 
 	// root
-	rootPath, err := mapper.prepareContainerRoot(ctx, id, "/"+containerId, req.GetConfig().GetImage().GetImage())
+	rootPath, err := mapper.prepareContainerRoot(ctx, id, "/"+containerId, imageName)
 	if err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
