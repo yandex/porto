@@ -70,7 +70,14 @@ public:
     TError CanControl(const TContainer &ct, bool child = false);
 
     TError ReadAccess(const TFile &file);
-    TError WriteAccess(const TFile &file);
+    TError WriteAccess(const TFile &file, bool lockVolumes = true);
+    TError DirWriteAccess(const TPath &dirPath, bool lockVolumes = true) {
+        TFile dir;
+        TError error = dir.OpenDir(dirPath.DirNameNormal());
+        if (error)
+            return error;
+        return WriteAccess(dir, lockVolumes);
+    }
 
     void CloseConnectionLocked(bool serverShutdown = false);
     void CloseConnection(bool serverShutdown = false) {

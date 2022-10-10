@@ -419,7 +419,7 @@ TError TClient::ReadAccess(const TFile &file) {
     return error;
 }
 
-TError TClient::WriteAccess(const TFile &file) {
+TError TClient::WriteAccess(const TFile &file, bool lockVolumes) {
     TError error = file.WriteAccess(TaskCred);
 
     /* Without chroot write access to file is enough */
@@ -437,7 +437,7 @@ TError TClient::WriteAccess(const TFile &file) {
 
     /* Also volume owner gains full access inside */
     if (error) {
-        auto link = TVolume::ResolveOrigin(path);
+        auto link = lockVolumes ? TVolume::ResolveOrigin(path) : TVolume::ResolveOriginLocked(path);
         if (link && !link->ReadOnly && !CanControl(link->Volume->VolumeOwner))
             error = OK;
     }

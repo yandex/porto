@@ -1879,8 +1879,11 @@ TError TVolume::CheckDependencies() {
 }
 
 TError TVolume::CheckConflicts(const TPath &path) {
-    if (IsSystemPath(path))
-        return TError(EError::InvalidPath, "Volume path {} in system directory", path);
+    if (IsSystemPath(path)) {
+        TError error = CL->DirWriteAccess(path, false);
+        if (error)
+            return TError(EError::InvalidPath, "Volume path {} in system directory and client has no write access", path);
+    }
 
     for (auto &it : Volumes) {
         auto &vol = it.second;
@@ -1985,8 +1988,11 @@ TError TVolume::Configure(const TPath &target_root) {
         StoragePath = CL->ResolvePath(StoragePath);
         if (!StoragePath.Exists())
             return TError(EError::InvalidPath, "Storage path does not exist");
-        if (IsSystemPath(StoragePath))
-            return TError(EError::InvalidPath, "Storage in system directory");
+        if (IsSystemPath(StoragePath)) {
+            error = CL->DirWriteAccess(StoragePath, false);
+            if (error)
+                return TError(EError::InvalidPath, "Storage in system directory and client has no write access");
+        }
         Storage = StoragePath.ToString();
         KeepStorage = true;
     } else if (!HaveStorage()) {
