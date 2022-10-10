@@ -46,9 +46,10 @@ func NewPortodshimRuntimeMapper() (*PortodshimRuntimeMapper, error) {
 		return nil, fmt.Errorf("failed to initialize cni: %w", err)
 	}
 	if err = netPlugin.Load(cni.WithLoNetwork, cni.WithDefaultConf); err != nil {
-		return nil, fmt.Errorf("failed to load cni configuration: %v", err)
+		zap.S().Warnf("failed to load cni configuration: %v", err)
+	} else {
+		runtimeMapper.netPlugin = netPlugin
 	}
-	runtimeMapper.netPlugin = netPlugin
 
 	runtimeMapper.containerStateMap = map[string]v1.ContainerState{
 		"stopped":    v1.ContainerState_CONTAINER_CREATED,
@@ -115,6 +116,10 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 	nsOpts := cfg.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	if nsOpts.Network == v1.NamespaceMode_NODE {
 		return nil
+	}
+
+	if mapper.netPlugin == nil {
+		return fmt.Errorf("cni wasn't initialized")
 	}
 
 	netnsPath, err := netns.NewNetNS(NetnsDir)
