@@ -139,10 +139,6 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Con
 func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	if cfg == nil {
-		return nil
-	}
-
 	nsOpts := cfg.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	if nsOpts.Network == v1.NamespaceMode_NODE {
 		return nil
@@ -267,6 +263,17 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 		}
 		if !fileStat.IsDir() {
 			continue
+		}
+		// TODO: durty hack
+		if mount.ContainerPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
+			for {
+				_, err := os.Stat(mount.HostPath + "/ca.crt")
+				if err == nil {
+					break
+				}
+				zap.S().Warnf("%s waiting for a %s", id, mount.HostPath)
+				time.Sleep(1000)
+			}
 		}
 		_, err = portoClient.CreateVolume(mount.HostPath, map[string]string{
 			"backend": "bind",
@@ -679,9 +686,12 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	}
 
 	// resources
-	if err = mapper.prepareContainerResources(ctx, id, req.GetConfig().GetLinux().GetResources()); err != nil {
-		_ = portoClient.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	res := req.GetConfig().GetLinux().GetResources()
+	if res != nil {
+		if err = mapper.prepareContainerResources(ctx, id, res); err != nil {
+			_ = portoClient.Destroy(id)
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
 	}
 
 	// root
@@ -692,10 +702,13 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	}
 
 	// network
-	if err = mapper.prepareContainerNetwork(ctx, id, req.GetConfig()); err != nil {
-		_ = portoClient.Destroy(id)
-		_ = os.RemoveAll(rootPath)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	cfg := req.GetConfig()
+	if cfg != nil && cfg.GetLinux() != nil {
+		if err = mapper.prepareContainerNetwork(ctx, id, cfg); err != nil {
+			_ = portoClient.Destroy(id)
+			_ = os.RemoveAll(rootPath)
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
 	}
 
 	// labels and annotations
