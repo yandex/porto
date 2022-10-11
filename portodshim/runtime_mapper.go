@@ -113,6 +113,10 @@ func (mapper *PortodshimRuntimeMapper) createId(name string) string {
 func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Context, id string, cfg *v1.LinuxContainerResources) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
+	if cfg == nil {
+		return nil
+	}
+
 	// cpu
 	if err := portoClient.SetProperty(id, "cpu_limit", fmt.Sprintf("%fc", float64(cfg.CpuQuota)/100000)); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -134,6 +138,10 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Con
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
+
+	if cfg == nil {
+		return nil
+	}
 
 	nsOpts := cfg.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	if nsOpts.Network == v1.NamespaceMode_NODE {
