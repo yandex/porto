@@ -205,8 +205,8 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 	cmd := imgCmd
 	if len(cfgCmd) > 0 {
 		cmd = cfgCmd
-		cmd = append(cmd, cfgArgs...)
 	}
+	cmd = append(cmd, cfgArgs...)
 
 	return portoClient.SetProperty(id, "command", strings.Join(cmd, " "))
 }
