@@ -256,42 +256,61 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context,
 func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
+	bind := []string{}
 	for _, mount := range mounts {
 		fileStat, err := os.Stat(mount.HostPath)
 		if err != nil {
 			return fmt.Errorf("%s: %s %v", getCurrentFuncName(), id, err)
 		}
-		if !fileStat.IsDir() {
-			continue
-		}
-		// TODO: durty hack
-		if mount.ContainerPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
-			for {
-				_, err := os.Stat(mount.HostPath + "/ca.crt")
-				if err == nil {
-					break
+		if fileStat.IsDir() {
+			// TODO: durty hack
+			if mount.ContainerPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
+				for {
+					_, err := os.Stat(mount.HostPath + "/ca.crt")
+					if err == nil {
+						break
+					}
+					zap.S().Warnf("%s waiting for a %s", id, mount.HostPath)
+					time.Sleep(1000)
 				}
-				zap.S().Warnf("%s waiting for a %s", id, mount.HostPath)
-				time.Sleep(1000)
 			}
-		}
-		_, err = portoClient.CreateVolume(mount.HostPath, map[string]string{
-			"backend": "bind",
-			"storage": mount.HostPath,
-		})
-		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
-			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
-		}
-		err = portoClient.LinkVolume(mount.HostPath, id, mount.ContainerPath, false, mount.Readonly)
-		if err != nil {
-			return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
-		}
-		err = portoClient.UnlinkVolume(mount.HostPath, "/", "")
-		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
-			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+			_, err = portoClient.CreateVolume(mount.HostPath, map[string]string{
+				"backend": "bind",
+				"storage": mount.HostPath,
+			})
+			if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
+				return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+			}
+			err = portoClient.LinkVolume(mount.HostPath, id, mount.ContainerPath, false, mount.Readonly)
+			if err != nil {
+				return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
+			}
+			err = portoClient.UnlinkVolume(mount.HostPath, "/", "")
+			if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
+				return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+			}
+		} else {
+			fileAbsPath := filepath.Join(VolumesDir, id, mount.ContainerPath)
+			_, err = os.Stat(fileAbsPath)
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(filepath.Dir(fileAbsPath), 0777)
+				if err != nil {
+					return fmt.Errorf("111 000 %s: %s %s", getCurrentFuncName(), id, err)
+				}
+				_, err = os.Create(fileAbsPath)
+				if err != nil {
+					return fmt.Errorf("111 111 %s: %s %s", getCurrentFuncName(), id, err)
+				}
+			} else if err != nil {
+				return fmt.Errorf("111 222 %s: %s %s", getCurrentFuncName(), id, err)
+			}
+			bind = append(bind, fmt.Sprintf("%s %s %s", mount.HostPath, mount.ContainerPath, "ro"))
 		}
 	}
-
+	err := portoClient.SetProperty(id, "bind", strings.Join(bind, ";"))
+	if err != nil {
+		return fmt.Errorf("111 333 failed set porto prop bind, pod %s: %s", id, err)
+	}
 	return nil
 }
 
