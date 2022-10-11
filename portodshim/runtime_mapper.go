@@ -249,10 +249,10 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context,
 	return rootAbsPath, nil
 }
 
-func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, req *v1.CreateContainerRequest) error {
+func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	for _, mount := range req.GetConfig().GetMounts() {
+	for _, mount := range mounts {
 		fileStat, err := os.Stat(mount.HostPath)
 		if err != nil {
 			return fmt.Errorf("%s: %s %v", getCurrentFuncName(), id, err)
@@ -775,7 +775,7 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	return &v1.PodSandboxStatusResponse{
+	resp := &v1.PodSandboxStatusResponse{
 		Status: &v1.PodSandboxStatus{
 			Id:        id,
 			Metadata:  getPodMetadata(ctx, id),
@@ -794,7 +794,9 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req
 			Labels:      getLabels(ctx, id, "LABEL"),
 			Annotations: getLabels(ctx, id, "ANNOTATION"),
 		},
-	}, nil
+	}
+	zap.S().Debugf("resp %s: %+v", getCurrentFuncName(), resp)
+	return resp, nil
 }
 
 func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req *v1.PodSandboxStatsRequest) (*v1.PodSandboxStatsResponse, error) {
@@ -910,7 +912,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	}
 
 	// mounts
-	if err = mapper.prepareContainerMounts(ctx, id, req); err != nil {
+	if err = mapper.prepareContainerMounts(ctx, id, req.GetConfig().GetMounts()); err != nil {
 		_ = portoClient.Destroy(id)
 		_ = os.RemoveAll(rootPath)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -922,7 +924,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		labels = make(map[string]string)
 	}
 	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
-	labels["io.kubernetes.container.logpath"] = fmt.Sprintf("%s/%s.log", LogsDir, strings.ReplaceAll(id, "/", "%"))
+	labels["io.kubernetes.container.logpath"] = filepath.Join("/place/porto/", id, "/stdout")
 	setLabels(ctx, id, labels, "LABEL")
 	setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
 
