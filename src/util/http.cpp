@@ -21,8 +21,11 @@ struct THttpClient::TImpl {
         if (res->status != 200) {
             if (res->status >= 300 && res->status < 400) {
                 auto location = res->get_header_value("Location");
-                if (!location.empty())
+                if (!location.empty()) {
+                    if (location[0] == '/')
+                        location = Host + location;
                     return SingleRequest(location, response, headers, request);
+                }
             }
             return TError::System("HTTP request to {} failed: status {}", Host + path, res->status);
         }
