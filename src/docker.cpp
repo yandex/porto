@@ -14,10 +14,20 @@ constexpr const char *DOCKER_EMPTY_REPO_NAME = "_empty";
 
 std::vector<std::unique_ptr<TFileMutex>> TDockerImage::Lock(const TPath &place) {
     std::vector<std::unique_ptr<TFileMutex>> mutexes;
+    std::set<TPath> lockedPaths;
 
-    auto createAndAppend = [&mutexes](TPath &&path) {
-        if (!path.Exists())
-            path.MkdirAll(0755);
+    auto createAndAppend = [&mutexes, &lockedPaths](TPath &&path) {
+        if (lockedPaths.find(path) != lockedPaths.end())
+            return;
+
+        lockedPaths.emplace(path);
+
+        if (!path.Exists()) {
+            TError error = path.MkdirAll(0755);
+            if (error)
+                L_ERR("Cannot create directory {}: {}", path, error);
+        }
+
         mutexes.emplace_back(new TFileMutex(path, O_CLOEXEC | O_DIRECTORY));
     };
 
@@ -325,7 +335,10 @@ TError TDockerImage::Save(const TPath &place) const {
     }
 
     for (const auto &layer: Layers) {
-        error = TPath(layersPath / layer.Digest).Hardlink(layer.ArchivePath(place));
+        TPath layerPath = layersPath / layer.Digest;
+        if (layerPath.Exists())
+            continue;
+        error = layerPath.Hardlink(layer.ArchivePath(place));
         if (error)
             return error;
     }
@@ -526,7 +539,6 @@ TError TDockerImage::DownloadLayers(const TPath &place) const {
     TError error;
 
     for (const auto &layer: Layers) {
-        TPath layerPath = layer.LayerPath(place);
         TPath archivePath = layer.ArchivePath(place);
 
         if (archivePath.Exists()) {
