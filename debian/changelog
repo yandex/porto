@@ -1,3 +1,29 @@
+yandex-porto (5.3.2) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * volume: allow system directories for root
+
+  [ Lev Pantyukhin ]
+  * quota: add vcheck call response
+
+  [ Stanislav Ivanichkin ]
+  * portodshim: added support Mounts spec at pod/container start * pass command args to container * pass env to container * fixed labels for Container * split CreateContaoner and RunPodSandbox funcs into few small funcs (prepareContainer*)
+  * allow run pods without net if cni wasn't initialized
+  * pass cpu/memory_limit to pod
+  * save imageName variable for reusing it
+  * don't use commnd's args from spec if command wasn't defined
+  * deleted main
+  * fixed logging * fixed loggind in PodSandboxStatus * pass exsisted logpath to io.kubernetes.container.logpath
+  * checking if a variable not nil in prepare* funcs
+  * checking if a variable not nil in prepare* funcs
+  * pass args to command even thought command wasn't in spec
+
+  [ Dmitry Yakunin ]
+  * docker: fix duplicate layers handling
+  * http: support redirect to the same host
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 13 Oct 2022 15:20:31 +0300
+
 yandex-porto (5.3.1) unstable; urgency=low
 
   [ Lev Pantyukhin ]
