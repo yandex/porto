@@ -1853,7 +1853,7 @@ public:
                 return error;
         }
         CT->NetProp = val; /* FIXME: Copy vector contents? */
-        CT->NetIsolate = NetEnv.NetIsolate;
+        CT->NetIsolate = NetEnv.NetIsolate || !NetEnv.NetNsName.empty();
         CT->NetInherit = NetEnv.NetInherit;
         CT->SetProp(EProperty::NET);
         CT->SanitizeCapabilitiesAll();

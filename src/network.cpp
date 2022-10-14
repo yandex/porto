@@ -3667,7 +3667,17 @@ TError TNetEnv::OpenNetwork(TContainer &ct) {
         error = TNetwork::Open("/var/run/netns/" + NetNsName, NetNs, Net);
         if (Net && Net->NetName.empty())
             Net->NetName = NetNsName;
-        return error;
+
+        auto lock = Net->LockNet();
+
+        error = ApplySysctl();
+        if (error) {
+            lock.unlock();
+            Net->Destroy();
+            return error;
+        }
+
+        return OK;
     }
 
     if (NetCtName != "") {
