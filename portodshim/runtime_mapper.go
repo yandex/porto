@@ -256,60 +256,40 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context,
 func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	bind := []string{}
 	for _, mount := range mounts {
 		fileStat, err := os.Stat(mount.HostPath)
 		if err != nil {
 			return fmt.Errorf("%s: %s %v", getCurrentFuncName(), id, err)
 		}
-		if fileStat.IsDir() {
-			// TODO: durty hack
-			if mount.ContainerPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
-				for {
-					_, err := os.Stat(mount.HostPath + "/ca.crt")
-					if err == nil {
-						break
-					}
-					zap.S().Warnf("%s waiting for a %s", id, mount.HostPath)
-					time.Sleep(1000)
-				}
-			}
-			_, err = portoClient.CreateVolume(mount.HostPath, map[string]string{
-				"backend": "bind",
-				"storage": mount.HostPath,
-			})
-			if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
-				return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
-			}
-			err = portoClient.LinkVolume(mount.HostPath, id, mount.ContainerPath, false, mount.Readonly)
-			if err != nil {
-				return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
-			}
-			err = portoClient.UnlinkVolume(mount.HostPath, "/", "")
-			if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
-				return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
-			}
-		} else {
-			fileAbsPath := filepath.Join(VolumesDir, id, mount.ContainerPath)
-			_, err = os.Stat(fileAbsPath)
-			if os.IsNotExist(err) {
-				err = os.MkdirAll(filepath.Dir(fileAbsPath), 0777)
-				if err != nil {
-					return fmt.Errorf("111 000 %s: %s %s", getCurrentFuncName(), id, err)
-				}
-				_, err = os.Create(fileAbsPath)
-				if err != nil {
-					return fmt.Errorf("111 111 %s: %s %s", getCurrentFuncName(), id, err)
-				}
-			} else if err != nil {
-				return fmt.Errorf("111 222 %s: %s %s", getCurrentFuncName(), id, err)
-			}
-			bind = append(bind, fmt.Sprintf("%s %s %s", mount.HostPath, mount.ContainerPath, "ro"))
+		if !fileStat.IsDir() {
+			continue
 		}
-	}
-	err := portoClient.SetProperty(id, "bind", strings.Join(bind, ";"))
-	if err != nil {
-		return fmt.Errorf("111 333 failed set porto prop bind, pod %s: %s", id, err)
+		// TODO: durty hack
+		if mount.ContainerPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
+			for {
+				_, err := os.Stat(mount.HostPath + "/ca.crt")
+				if err == nil {
+					break
+				}
+				zap.S().Warnf("%s waiting for a %s", id, mount.HostPath)
+				time.Sleep(1000)
+			}
+		}
+		_, err = portoClient.CreateVolume(mount.HostPath, map[string]string{
+			"backend": "bind",
+			"storage": mount.HostPath,
+		})
+		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
+			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+		}
+		err = portoClient.LinkVolume(mount.HostPath, id, mount.ContainerPath, false, mount.Readonly)
+		if err != nil {
+			return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
+		}
+		err = portoClient.UnlinkVolume(mount.HostPath, "/", "")
+		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
+			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+		}
 	}
 	return nil
 }
@@ -382,7 +362,7 @@ func convertLabel(src string, toPorto bool, prefix string) string {
 	return dst
 }
 
-func setLabels(ctx context.Context, id string, labels map[string]string, prefix string) {
+func setLabels(ctx context.Context, id string, labels map[string]string, prefix string) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	labelsString := ""
@@ -390,10 +370,7 @@ func setLabels(ctx context.Context, id string, labels map[string]string, prefix 
 		labelsString += fmt.Sprintf("%s:%s;", convertLabel(label, true, prefix), convertLabel(value, true, ""))
 	}
 
-	err := portoClient.SetProperty(id, "labels", labelsString)
-	if err != nil {
-		zap.S().Warnf("%s: cannot set labels %v", getCurrentFuncName(), err)
-	}
+	return portoClient.SetProperty(id, "labels", labelsString)
 }
 
 func getLabels(ctx context.Context, id string, prefix string) map[string]string {
@@ -713,6 +690,24 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 		}
 	}
 
+	// labels and annotations
+	labels := req.GetConfig().GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	if _, found := labels["io.kubernetes.pod.namespace"]; !found {
+		labels["io.kubernetes.pod.namespace"] = req.GetConfig().GetMetadata().GetNamespace()
+	}
+	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+	if err = setLabels(ctx, id, labels, "LABEL"); err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+	if err = setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION"); err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
 	// root
 	rootPath, err := mapper.prepareContainerRoot(ctx, id, "", pauseImage)
 	if err != nil {
@@ -729,18 +724,6 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
 	}
-
-	// labels and annotations
-	labels := req.GetConfig().GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	if _, found := labels["io.kubernetes.pod.namespace"]; !found {
-		labels["io.kubernetes.pod.namespace"] = req.GetConfig().GetMetadata().GetNamespace()
-	}
-	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
-	setLabels(ctx, id, labels, "LABEL")
-	setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
 
 	// pod starting
 	err = portoClient.Start(id)
@@ -944,6 +927,23 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
+	// labels and annotations
+	labels := req.GetConfig().GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
+	labels["io.kubernetes.container.logpath"] = filepath.Join("/place/porto/", id, "/stdout")
+	if err = setLabels(ctx, id, labels, "LABEL"); err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+
+	}
+	if err = setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION"); err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
 	// root
 	rootPath, err := mapper.prepareContainerRoot(ctx, id, "/"+containerId, imageName)
 	if err != nil {
@@ -957,16 +957,6 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		_ = os.RemoveAll(rootPath)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-
-	// labels and annotations
-	labels := req.GetConfig().GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
-	labels["io.kubernetes.container.logpath"] = filepath.Join("/place/porto/", id, "/stdout")
-	setLabels(ctx, id, labels, "LABEL")
-	setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION")
 
 	return &v1.CreateContainerResponse{
 		ContainerId: id,
