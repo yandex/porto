@@ -1897,7 +1897,7 @@ TError TVolume::CheckConflicts(const TPath &path) {
         if (vol->Path == path)
             return TError(EError::Busy, "Volume path {} is used by volume {}", path, vol->Path);
 
-        if (vol->Path.IsInside(path))
+        if (vol->BackendType != "bind" && vol->Path.IsInside(path))
             return TError(EError::InvalidPath, "Volume path {} overlaps with volume {}", path, vol->Path);
 
         if (path.IsInside(vol->Path) &&
@@ -1910,10 +1910,10 @@ TError TVolume::CheckConflicts(const TPath &path) {
 
         if (vol->RemoteStorage()) {
 
-        } else if (vol->BackendType == "bind" || vol->BackendType == "rbind") {
+        } else if (vol->BackendType == "rbind") {
             if (vol->StoragePath.IsInside(path))
                 return TError(EError::InvalidPath, "Volume path {} overlaps with volume {} storage {}", path, vol->Path, vol->StoragePath);
-        } else {
+        } else if (vol->BackendType != "bind") {
             if (vol->StoragePath.IsInside(path) || path.IsInside(vol->StoragePath))
                 return TError(EError::InvalidPath, "Volume path {} overlaps with volume {} storage {}", path, vol->Path, vol->StoragePath);
         }
