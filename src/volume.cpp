@@ -3812,11 +3812,14 @@ TError TVolume::Create(const rpc::TVolumeSpec &spec,
             return TError(EError::VolumeAlreadyExists, "Volume already exists");
 
         TFile path_dir;
-        error = path_dir.OpenDir(path);
+        if (!volume->BindFileStorage())
+            error = path_dir.OpenDir(path);
+        else
+            error = path_dir.OpenRead(path);
         if (error)
             return TError(EError::InvalidPath, "Cannot open volume path: {}", error);
 
-        if (!path_dir.IsDirectory())
+        if (!volume->BindFileStorage() && !path_dir.IsDirectory())
             return TError(EError::InvalidPath, "Volume path {} must be a directory", path);
 
         TPath real_path = path_dir.RealPath();

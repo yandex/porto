@@ -321,7 +321,7 @@ with open("/tmp/kek", "w") as file:
     file.write("kek")
 with open(root_b.path + "/tmp/lol", "a") as file:
     file.write("lol")
-bind_volume = conn.CreateVolume("", backend="bind", storage="/tmp/kek", containers='w')
+bind_volume = conn.CreateVolume("/tmp/kek", backend="bind", storage="/tmp/kek", containers='w')
 
 ExpectEq(subprocess.check_output(["cat", "/tmp/kek"]), b"kek")
 ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/lol"]), b"lol")
