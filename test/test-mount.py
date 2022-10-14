@@ -310,32 +310,36 @@ a.Destroy()
 
 
 # mount bind file
-root_a = conn.CreateVolume(containers='w')
-os.mkdir(root_a.path + "/root")
-root_b = conn.CreateVolume(root_a.path + "/root", backend='overlay', layers=['ubuntu-precise'], containers='w')
+for path in ("", "/tmp/kek"):
+    root_a = conn.CreateVolume(containers='w')
+    os.mkdir(root_a.path + "/root")
+    root_b = conn.CreateVolume(root_a.path + "/root", backend='overlay', layers=['ubuntu-precise'], containers='w')
 
-a = conn.Run("a", root=root_a.path, weak=True)
-b = conn.Run("a/b", root="/root", weak=True)
+    a = conn.Run("a", root=root_a.path, weak=True)
+    b = conn.Run("a/b", root="/root", weak=True)
 
-with open("/tmp/kek", "w") as file:
-    file.write("kek")
-with open(root_b.path + "/tmp/lol", "a") as file:
-    file.write("lol")
-bind_volume = conn.CreateVolume("/tmp/kek", backend="bind", storage="/tmp/kek", containers='w')
+    with open("/tmp/kek", "w") as file:
+        file.write("kek")
+    with open(root_b.path + "/tmp/lol", "a") as file:
+        file.write("lol")
+    bind_volume = conn.CreateVolume(path, backend="bind", storage="/tmp/kek", containers='w')
 
-ExpectEq(subprocess.check_output(["cat", "/tmp/kek"]), b"kek")
-ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/lol"]), b"lol")
+    ExpectEq(subprocess.check_output(["cat", "/tmp/kek"]), b"kek")
+    ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/lol"]), b"lol")
 
-conn.LinkVolume(bind_volume.path, "a/b", "/tmp/kek")
-conn.LinkVolume(bind_volume.path, "a/b", "/tmp/lol")
+    conn.LinkVolume(bind_volume.path, "a/b", "/tmp/kek")
+    conn.LinkVolume(bind_volume.path, "a/b", "/tmp/lol")
 
-c = conn.Run("a/b/c", command="cat /tmp/kek", wait=5)
+    c = conn.Run("a/b/c", command="cat /tmp/kek", wait=5)
 
-ExpectEq(c['exit_code'], "0")
-ExpectEq(c['stdout'], "kek")
+    ExpectEq(c['exit_code'], "0")
+    ExpectEq(c['stdout'], "kek")
 
-ExpectEq(subprocess.check_output(["cat", "/tmp/kek"]), b"kek")
-ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/lol"]), b"kek")
-ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/kek"]), b"kek")
+    ExpectEq(subprocess.check_output(["cat", "/tmp/kek"]), b"kek")
+    ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/lol"]), b"kek")
+    ExpectEq(subprocess.check_output(["cat", root_b.path + "/tmp/kek"]), b"kek")
+
+    bind_volume.Destroy()
+    a.Destroy()
 
 w.Destroy()

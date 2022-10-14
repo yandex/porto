@@ -228,8 +228,9 @@ public:
             return TError(EError::InvalidProperty, "bind backend doesn't support layers");
 
         if (Volume->StoragePath.IsRegularFollow()) {
+            if (Volume->InternalPath == Volume->Path)
+                Volume->Path /= Volume->StoragePath.BaseName();
             Volume->InternalPath /= Volume->StoragePath.BaseName();
-            Volume->Path = Volume->InternalPath;
         }
 
         return OK;
