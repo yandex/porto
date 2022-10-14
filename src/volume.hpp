@@ -272,8 +272,12 @@ public:
     }
 
     /* Backend storage could be a regular file */
-    bool FileStorage(void) const {
-        return BackendType == "loop";
+    bool LoopFileStorage(void) const {
+        return BackendType == "loop" && StoragePath.IsRegularFollow();
+    }
+
+    bool BindFileStorage(void) const {
+        return BackendType == "bind" && StoragePath.IsRegularFollow();
     }
 
     bool HaveLayers(void) const {

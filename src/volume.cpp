@@ -227,6 +227,11 @@ public:
         if (Volume->HaveLayers())
             return TError(EError::InvalidProperty, "bind backend doesn't support layers");
 
+        if (Volume->StoragePath.IsRegularFollow()) {
+            Volume->InternalPath /= Volume->StoragePath.BaseName();
+            Volume->Path = Volume->InternalPath;
+        }
+
         return OK;
     }
 
@@ -2353,7 +2358,7 @@ TError TVolume::Build() {
             return error;
     }
 
-    if (FileStorage() && UserStorage() && StoragePath.IsRegularFollow()) {
+    if (LoopFileStorage() && UserStorage()) {
         TFile dir;
 
         error = dir.OpenDir(StoragePath.DirNameNormal());
@@ -2368,8 +2373,13 @@ TError TVolume::Build() {
         error = StorageFd.OpenAt(dir, StoragePath.BaseNameNormal(),
                                  (IsReadOnly ? O_RDONLY : O_RDWR) |
                                  O_CLOEXEC | O_NOCTTY | O_NOFOLLOW);
-    } else if (!RemoteStorage())
-        error = StorageFd.OpenDir(StoragePath);
+    } else if (!RemoteStorage()) {
+        if (!BindFileStorage())
+            error = StorageFd.OpenDir(StoragePath);
+        else
+            error = StorageFd.OpenRead(StoragePath);
+    }
+
     if (error)
         return error;
 
@@ -2421,7 +2431,10 @@ TError TVolume::Build() {
     }
 
     if (BackendType != "dir" && BackendType != "quota") {
-        error = InternalPath.Mkdir(0755);
+        if (!BindFileStorage())
+            error = InternalPath.Mkdir(0755);
+        else
+            error = InternalPath.CreateRegular();
         if (error)
             return error;
     }
@@ -2441,7 +2454,7 @@ TError TVolume::Build() {
             return error;
 
         TFile base;
-        if (RemoteStorage() || FileStorage())
+        if (RemoteStorage() || LoopFileStorage())
             error = base.OpenDirStrict(InternalPath);
         else
             error = base.Dup(StorageFd);
@@ -2552,12 +2565,16 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     std::unique_lock<std::mutex> internal_lock;
     unsigned long flags = 0;
 
+    auto target_components = link->Target.Components();
+
     /* Prepare mountpoint */
     error = target_dir.OpenDirStrict(link->Container->RootPath);
     if (error)
         goto undo;
 
-    for (auto &name: link->Target.Components()) {
+    for (auto it = target_components.begin(); it != target_components.end(); ++it) {
+        auto &name = *it;
+
         if (name == "/")
             continue;
 
@@ -2574,24 +2591,35 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
         if (CL->WriteAccess(target_dir))
             break;
 
-        /* Remove symlink */
-        if (error.Errno == ELOOP || error.Errno == ENOTDIR) {
-            TPath symlink_target;
-            if (target_dir.ReadlinkAt(name, symlink_target))
-                break; /* Not at symlink */
-            L_ACT("Remove symlink {} to {}", target_dir.RealPath() / name, symlink_target);
-            error = target_dir.UnlinkAt(name);
+        if (!BindFileStorage() || (it != target_components.end() - 1)) {
+            /* Remove symlink */
+            if (error.Errno == ELOOP || error.Errno == ENOTDIR) {
+                TPath symlink_target;
+                if (target_dir.ReadlinkAt(name, symlink_target))
+                    break; /* Not at symlink */
+                L_ACT("Remove symlink {} to {}", target_dir.RealPath() / name, symlink_target);
+                error = target_dir.UnlinkAt(name);
+                if (error)
+                    break;
+            }
+
+            L_ACT("Create directory {}", target_dir.RealPath() / name);
+            error = target_dir.MkdirAt(name, 0775);
+            if (error)
+                break;
+            error = target_dir.OpenDirStrictAt(target_dir, name);
+            if (error)
+                break;
+        } else {
+            L_ACT("Create file {}", target_dir.RealPath() / name);
+            error = target_dir.MkfileAt(name, 0644);
+            if (error && error.Errno != EEXIST)
+                break;
+            error = target_dir.OpenAt(target_dir, name, O_RDONLY | O_CLOEXEC | O_NOCTTY);
             if (error)
                 break;
         }
 
-        L_ACT("Create directory {}", target_dir.RealPath() / name);
-        error = target_dir.MkdirAt(name, 0775);
-        if (error)
-            break;
-        error = target_dir.OpenDirStrictAt(target_dir, name);
-        if (error)
-            break;
         error = target_dir.Chown(CL->Cred);
         if (error)
             break;
@@ -2621,7 +2649,10 @@ TError TVolume::MountLink(std::shared_ptr<TVolumeLink> link) {
     internal_lock = link->Volume->LockInternal();
 
     link_mount = GetInternal("volume_link");
-    error = link_mount.Mkdir(700);
+    if (!BindFileStorage())
+        error = link_mount.Mkdir(700);
+    else
+        error = link_mount.CreateRegular();
 
     /* make private - cannot move from shared mount */
     if (!error)

@@ -305,6 +305,8 @@ public:
     TError OpenAtMount(const TFile &mount, const TFile &file, int flags);
     TError OpenDirAllAt(const TFile &dir, const TPath &path);
     TError CreateDirAllAt(const TFile &dir, const TPath &path, int mode, const TCred &cred);
+    TError MknodAt(const TPath &path, int mode, int dev) const;
+    TError MkfileAt(const TPath &path, int mode) const;
     TError MkdirAt(const TPath &path, int mode) const;
     TError UnlinkAt(const TPath &path) const;
     TError RmdirAt(const TPath &path) const;

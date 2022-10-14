@@ -1530,9 +1530,20 @@ TError TFile::OpenDirAt(const TFile &dir, const TPath &path) {
     return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY);
 }
 
-TError TFile::OpenDirStrictAt(const TFile &dir, const TPath &path)
-{
+TError TFile::OpenDirStrictAt(const TFile &dir, const TPath &path) {
     return OpenAt(dir, path, O_RDONLY | O_CLOEXEC | O_DIRECTORY | O_NOFOLLOW);
+}
+
+TError TFile::MknodAt(const TPath &path, int mode, int dev) const {
+    if (path.IsAbsolute())
+        return TError(EError::InvalidPath, "Absolute path {}", path.Path);
+    if (mknodat(Fd, path.c_str(), mode, dev))
+        return TError::System("Cannot mknodat {} {}", RealPath(), path);
+    return OK;
+}
+
+TError TFile::MkfileAt(const TPath &path, int mode) const {
+    return MknodAt(path, S_IFREG | (mode & 0777), 0);
 }
 
 TError TFile::MkdirAt(const TPath &path, int mode) const {
