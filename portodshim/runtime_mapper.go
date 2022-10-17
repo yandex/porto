@@ -107,7 +107,7 @@ func (mapper *PortodshimRuntimeMapper) createId(name string) string {
 		length = len(name)
 	}
 	// max length of return value is 26 + 1 + 4 = 31, so container id <= 63
-	return fmt.Sprintf("%s-%x", name[:length], mapper.randGenerator.Uint32()%65536)
+	return fmt.Sprintf("%s-%04x", name[:length], mapper.randGenerator.Uint32()%65536)
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Context, id string, cfg *v1.LinuxContainerResources) error {
