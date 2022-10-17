@@ -180,6 +180,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 		return fmt.Errorf("failed set porto prop ip, pod %s: %w", id, err)
 	}
 
+	// sysctl
 	sysctls := []string{}
 	for k, v := range cfg.GetLinux().GetSysctls() {
 		sysctls = append(sysctls, fmt.Sprintf("%s:%s", k, v))
