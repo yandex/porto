@@ -1,3 +1,26 @@
+yandex-porto (5.3.3) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * volume: allow bind file as volume
+  * test: add file binding case to mount test
+  * volume: allow non-directory path for file binding
+  * network: allow sysctl with netns
+  * volume: fix path for file binding
+
+  [ Dmitry Yakunin ]
+  * common: increase label max length to 4096
+  * volume: relax overlap check for bind volumes
+
+  [ Stanislav Ivanichkin ]
+  * allowed mount files
+  * check error on set label props
+  * Supported resolv_conf, sysctl properties
+  * fixed comment
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 17 Oct 2022 16:33:20 +0300
+
 yandex-porto (5.3.2) unstable; urgency=low
 
   [ Dmitry Yakunin ]
