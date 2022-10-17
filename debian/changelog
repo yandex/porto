@@ -1,3 +1,13 @@
+yandex-porto (5.3.4) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * portodshim: fix pod or container id length
+  * docker: fix quotes at image command
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 18 Oct 2022 00:15:01 +0300
+
 yandex-porto (5.3.3) unstable; urgency=low
 
   [ Lev Pantyukhin ]
