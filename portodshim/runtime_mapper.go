@@ -165,9 +165,12 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 		}
 	}
 
+	// hostname
 	if err = portoClient.SetProperty(id, "hostname", cfg.GetHostname()); err != nil {
-		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		return fmt.Errorf("failed set porto prop hostname, pod %s: %w", id, err)
 	}
+
+	// net
 	err = portoClient.SetProperty(id, "net", fmt.Sprintf("netns %s", filepath.Base(netnsPath.GetPath())))
 	if err != nil {
 		return fmt.Errorf("failed set porto prop net, pod %s: %w", id, err)
@@ -176,8 +179,15 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 	if err != nil {
 		return fmt.Errorf("failed set porto prop ip, pod %s: %w", id, err)
 	}
-	// TODO: req.GetConfig().GetLinux().GetSysctls()
-	// TODO: resolve.conf
+
+	sysctls := []string{}
+	for k, v := range cfg.GetLinux().GetSysctls() {
+		sysctls = append(sysctls, fmt.Sprintf("%s:%s", k, v))
+	}
+	err = portoClient.SetProperty(id, "sysctl", strings.Join(sysctls, ";"))
+	if err != nil {
+		return fmt.Errorf("failed set porto prop sysctl, pod %s: %w", id, err)
+	}
 
 	return nil
 }
@@ -257,11 +267,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	for _, mount := range mounts {
-		fileStat, err := os.Stat(mount.HostPath)
-		if err != nil {
-			return fmt.Errorf("%s: %s %v", getCurrentFuncName(), id, err)
-		}
-		if !fileStat.IsDir() {
+		if mount.ContainerPath == "/dev/termination-log" {
 			continue
 		}
 		// TODO: durty hack
@@ -275,7 +281,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 				time.Sleep(1000)
 			}
 		}
-		_, err = portoClient.CreateVolume(mount.HostPath, map[string]string{
+		_, err := portoClient.CreateVolume(mount.HostPath, map[string]string{
 			"backend": "bind",
 			"storage": mount.HostPath,
 		})
@@ -291,6 +297,22 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
 		}
 	}
+	return nil
+}
+
+func (mapper *PortodshimRuntimeMapper) prepareContainerResolvConf(ctx context.Context, id string, cfg *v1.DNSConfig) error {
+	portoClient := ctx.Value("portoClient").(porto.API)
+
+	if cfg != nil {
+		resolvConf := []string{}
+		for _, i := range cfg.GetServers() {
+			resolvConf = append(resolvConf, fmt.Sprintf("%s %s", "nameserver", i))
+		}
+		resolvConf = append(resolvConf, fmt.Sprintf("%s %s", "search", strings.Join(cfg.GetSearches(), " ")))
+		resolvConf = append(resolvConf, fmt.Sprintf("%s %s\n", "options", strings.Join(cfg.GetOptions(), " ")))
+		return portoClient.SetProperty(id, "resolv_conf", strings.Join(resolvConf, ";"))
+	}
+
 	return nil
 }
 
@@ -940,6 +962,12 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 
 	}
 	if err = setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION"); err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// resolv.conf
+	if err = mapper.prepareContainerResolvConf(ctx, id, req.GetSandboxConfig().GetDnsConfig()); err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
