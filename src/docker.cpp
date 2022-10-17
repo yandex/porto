@@ -186,20 +186,22 @@ TError TDockerImage::DownloadManifest(const THttpClient &client) {
 TError TDockerImage::ParseConfig() {
     auto configJson = nlohmann::json::parse(Config);
     auto config = configJson["config"];
-
     auto entrypoint = config["Entrypoint"];
+    auto cmd = config["Cmd"];
+
     if (!entrypoint.is_null()) {
         for (const auto &c: entrypoint)
             Command.emplace_back(c);
+        if (!cmd.is_null()) {
+            for (const auto &c: cmd)
+                Command.emplace_back(c);
+        }
     } else {
         Command.emplace_back("/bin/sh");
-        Command.emplace_back("-c");
-    }
-
-    auto cmd = config["Cmd"];
-    if (!cmd.is_null()) {
-        for (const auto &c: cmd)
-            Command.emplace_back(c);
+        if (!cmd.is_null()) {
+            Command.emplace_back("-c");
+            Command.emplace_back(MergeWithQuotes(cmd, ' ', '\''));
+        }
     }
 
     auto env = config["Env"];
