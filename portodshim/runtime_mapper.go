@@ -102,11 +102,11 @@ func (mapper *PortodshimRuntimeMapper) getPodState(ctx context.Context, id strin
 }
 
 func (mapper *PortodshimRuntimeMapper) createId(name string) string {
-	length := 26
+	length := 58
 	if len(name) < length {
 		length = len(name)
 	}
-	// max length of return value is 26 + 1 + 4 = 31, so container id <= 63
+	// max length of return value is 58 + 1 + 4 = 63, so container id <= 127
 	return fmt.Sprintf("%s-%04x", name[:length], mapper.randGenerator.Uint32()%65536)
 }
 
