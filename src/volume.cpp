@@ -1885,11 +1885,8 @@ TError TVolume::CheckDependencies() {
 }
 
 TError TVolume::CheckConflicts(const TPath &path) {
-    if (IsSystemPath(path)) {
-        TError error = CL->DirWriteAccess(path, false);
-        if (error)
-            return TError(EError::InvalidPath, "Volume path {} in system directory and client has no write access", path);
-    }
+    if (IsSystemPath(path))
+        return TError(EError::InvalidPath, "Volume path {} in system directory", path);
 
     for (auto &it : Volumes) {
         auto &vol = it.second;

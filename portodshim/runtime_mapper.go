@@ -282,18 +282,18 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 				time.Sleep(1000)
 			}
 		}
-		_, err := portoClient.CreateVolume(mount.HostPath, map[string]string{
+		volume, err := portoClient.CreateVolume("", map[string]string{
 			"backend": "bind",
 			"storage": mount.HostPath,
 		})
 		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
 			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
 		}
-		err = portoClient.LinkVolume(mount.HostPath, id, mount.ContainerPath, false, mount.Readonly)
+		err = portoClient.LinkVolume(volume.Path, id, mount.ContainerPath, false, mount.Readonly)
 		if err != nil {
 			return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
 		}
-		err = portoClient.UnlinkVolume(mount.HostPath, "/", "")
+		err = portoClient.UnlinkVolume(volume.Path, "/", "")
 		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
 			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
 		}
