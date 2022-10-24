@@ -1863,7 +1863,7 @@ public:
     void ShowPercent(Porto::Volume &v, const char *u, const char *a, int w) {
       uint64_t used, avail;
 
-      if (!v.Properties.count(std::string(u)) |
+      if (!v.Properties.count(std::string(u)) ||
           !v.Properties.count(std::string(a)))
           std::cout << std::setw(w) << "-";
       else if (StringToUint64(v.Properties.at(std::string(u)), used) ||
@@ -1884,12 +1884,19 @@ public:
                 std::cout << std::endl << std::setw(40) << " ";
             std::cout << std::setw(8) << v.Properties[V_ID];
             std::cout << std::setw(8) << v.Properties[V_BACKEND];
+            std::cout << std::setw(40) << v.Properties[V_STORAGE];
+            if (v.Properties[V_STORAGE].length() > 40)
+                // 40 + 8 + 8 + 40 = 96
+                std::cout << std::endl << std::setw(96) << " ";
 
             std::string image = v.Properties[V_IMAGE];
-            auto pos = image.rfind('/');
-            if (pos != std::string::npos)
-                image = image.substr(pos + 1);
-            std::cout << std::setw(20) << image.substr(0, 20);
+            if (!image.empty()) {
+                auto pos = image.rfind('/');
+                if (pos != std::string::npos)
+                    image = image.substr(pos + 1);
+                std::cout << std::setw(20) << image.substr(0, 20);
+            } else
+                std::cout << std::setw(20) << "<none>";
 
             std::cout << std::right;
             if (inodes) {
@@ -1962,6 +1969,7 @@ public:
             std::cout << std::left << std::setw(40) << "Volume";
             std::cout << std::setw(8) << "ID";
             std::cout << std::setw(8) << "Backend";
+            std::cout << std::setw(40) << "Storage";
             std::cout << std::setw(20) << "Image";
             std::cout << std::right;
             std::cout << std::setw(10) << "Limit";
