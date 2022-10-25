@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	cri "github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/netns"
 	cni "github.com/containerd/go-cni"
 	"github.com/yandex/porto/src/api/go/porto"
@@ -152,8 +153,10 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 	if err != nil {
 		return fmt.Errorf("failed to create network namespace, pod %s: %w", id, err)
 	}
-	cniLabels := cni.WithLabels(makeCniLabels(id, cfg))
-	result, err := mapper.netPlugin.Setup(ctx, id, netnsPath.GetPath(), cniLabels)
+	cniNSOpts := []cni.NamespaceOpts{
+		cni.WithCapability(cri.PodAnnotations, cfg.Annotations),
+	}
+	result, err := mapper.netPlugin.Setup(ctx, id, netnsPath.GetPath(), cniNSOpts...)
 	if err != nil {
 		return err
 	}
@@ -188,6 +191,20 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 	err = portoClient.SetProperty(id, "sysctl", strings.Join(sysctls, ";"))
 	if err != nil {
 		return fmt.Errorf("failed set porto prop sysctl, pod %s: %w", id, err)
+	}
+
+	for k, v := range cfg.GetAnnotations() {
+		if k == filepath.Join(KubeResourceDomain, "net-tx") {
+			err = portoClient.SetProperty(id, "net_limit", fmt.Sprintf("%s: %s", ifPrefixName, v))
+			if err != nil {
+				return fmt.Errorf("failed set porto prop net_limit, pod %s: %w", id, err)
+			}
+		} else if k == filepath.Join(KubeResourceDomain, "net-rx") {
+			err = portoClient.SetProperty(id, "net_rx_limit", fmt.Sprintf("%s: %s", ifPrefixName, v))
+			if err != nil {
+				return fmt.Errorf("failed set porto prop net_rx_limit, pod %s: %w", id, err)
+			}
+		}
 	}
 
 	return nil
@@ -640,13 +657,6 @@ func getPodSandboxNetworkStatus(ctx context.Context, id string) *v1.PodSandboxNe
 	return &status
 }
 
-func makeCniLabels(id string, config *v1.PodSandboxConfig) map[string]string {
-	return map[string]string{
-		"PrjID":         config.GetAnnotations()["PrjID"],
-		"IgnoreUnknown": "1",
-	}
-}
-
 func parsePropertyNetNS(prop string) string {
 	netNSL := strings.Fields(prop)
 	if netNSL[0] == "netns" && len(netNSL) > 1 {
@@ -798,15 +808,14 @@ func (mapper *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req
 
 	// removes the network from the pod
 	netnsProp := parsePropertyNetNS(netProp)
-	if netnsProp == "" {
-		return nil, fmt.Errorf("%s: %s", getCurrentFuncName(), "netns property hasn't been set")
-	}
-	netnsPath := netns.LoadNetNS(filepath.Join(NetnsDir, netnsProp))
-	if err = mapper.netPlugin.Remove(ctx, id, netnsPath.GetPath(), cni.WithLabels(map[string]string{})); err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-	if err = netnsPath.Remove(); err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	if netnsProp != "" {
+		netnsPath := netns.LoadNetNS(filepath.Join(NetnsDir, netnsProp))
+		if err = mapper.netPlugin.Remove(ctx, id, netnsPath.GetPath(), cni.WithLabels(map[string]string{})); err != nil {
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
+		if err = netnsPath.Remove(); err != nil {
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
 	}
 	return &v1.RemovePodSandboxResponse{}, nil
 }

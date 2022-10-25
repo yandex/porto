@@ -14,4 +14,6 @@ const (
 	NetnsDir             = "/var/run/netns"
 	// paths
 	PortodshimLogPath = LogsDir + "/portodshim.log"
+	// k8s
+	KubeResourceDomain = "yandex.net"
 )
