@@ -27,7 +27,10 @@ struct THttpClient::TImpl {
                     return SingleRequest(location, response, headers, request);
                 }
             }
-            return TError::System("HTTP request to {} failed: status {}", Host + path, res->status);
+
+            auto error = TError::System("HTTP request to {} failed: status {}", Host + path, res->status);
+            error.Errno = res->status;
+            return error;
         }
 
         response = res->body;

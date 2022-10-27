@@ -133,14 +133,17 @@ TError TDockerImage::DownloadManifest(const THttpClient &client) {
     std::string manifests;
     error = client.MakeRequest(ManifestsUrl(Tag), manifests, headers);
     if (error) {
-        // retry if default repository is empty and we received code 404
-        Repository = "";
-        error = GetAuthToken();
-        if (error)
-            return error;
+        if (error.Errno == 404) {
+            // retry if default repository is empty and we received code 404
+            Repository = "";
+            error = GetAuthToken();
+            if (error)
+                return error;
 
-        error = client.MakeRequest(ManifestsUrl(Tag), manifests, headers);
-        if (error)
+            error = client.MakeRequest(ManifestsUrl(Tag), manifests, headers);
+            if (error)
+                return error;
+        } else
             return error;
     }
 
