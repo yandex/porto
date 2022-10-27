@@ -1435,7 +1435,7 @@ message TDockerImagePullRequest {
     required string name = 1;
     optional string place = 2;
     optional string auth_token = 3;
-    optional string auth_host = 4;
+    optional string auth_path = 4;
     optional string auth_service = 5;
 }
 

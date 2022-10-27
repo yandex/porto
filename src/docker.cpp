@@ -50,10 +50,37 @@ TPath TDockerImage::DigestPath(const TPath &place) const {
     return TPath(imagePath / DOCKER_TAGS_NAME / Tag).RealPath();
 }
 
+std::string TDockerImage::AuthServiceFromPath(const std::string &authPath, size_t schemaLen) {
+    auto authService = authPath.substr(schemaLen);
+    auto slashPos = authService.find('/');
+    if (slashPos != std::string::npos)
+        authService = authService.substr(0, slashPos);
+    return authService;
+}
+
 std::string TDockerImage::AuthUrl() const {
-    return fmt::format("https://{}/token?service={}&scope=repository:{}:pull",
-                       AuthHost.empty() ? DOCKER_AUTH_HOST : AuthHost,
-                       AuthService.empty() ? DOCKER_AUTH_SERVICE : AuthService,
+    std::string authPath(DOCKER_AUTH_PATH);
+    std::string authService(AuthService.empty() ? DOCKER_AUTH_SERVICE : AuthService);
+
+    if (!AuthPath.empty()) {
+        if (StringStartsWith(AuthPath, "https://")) {
+            authPath = AuthPath;
+            if (AuthService.empty())
+                authService = AuthServiceFromPath(AuthPath, sizeof("https://") - 1);
+        } else if (StringStartsWith(AuthPath, "http://")) {
+            authPath = AuthPath;
+            if (AuthService.empty())
+                authService = AuthServiceFromPath(AuthPath, sizeof("http://") - 1);
+        } else {
+            authPath = "https://" + AuthPath;
+            if (AuthService.empty())
+                authService = AuthServiceFromPath(AuthPath);
+        }
+    }
+
+    return fmt::format("{}?service={}&scope=repository:{}:pull",
+                       authPath,
+                       authService,
                        RepositoryAndName());
 }
 

@@ -893,7 +893,7 @@ int Connection::PullDockerImage(DockerImage &image,
                                 const std::string &name,
                                 const std::string &place,
                                 const std::string &auth_token,
-                                const std::string &auth_host,
+                                const std::string &auth_path,
                                 const std::string &auth_service) {
     auto req = Impl->Req.mutable_pulldockerimage();
     req->set_name(name);
@@ -901,8 +901,8 @@ int Connection::PullDockerImage(DockerImage &image,
         req->set_place(place);
     if (auth_token.size())
         req->set_auth_token(auth_token);
-    if (auth_host.size())
-        req->set_auth_host(auth_host);
+    if (auth_path.size())
+        req->set_auth_path(auth_path);
     if (auth_service.size())
         req->set_auth_service(auth_service);
     int ret = Impl->Call();

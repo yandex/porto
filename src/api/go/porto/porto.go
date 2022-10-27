@@ -172,7 +172,7 @@ type API interface {
 
 	DockerImageStatus(name, place string) (*rpc.TDockerImage, error)
 	ListDockerImages(place, mask string) ([]*rpc.TDockerImage, error)
-	PullDockerImage(name, place, authToken, authHost, authService string) (*rpc.TDockerImage, error)
+	PullDockerImage(name, place, authToken, authPath, authService string) (*rpc.TDockerImage, error)
 	RemoveDockerImage(name, place string) error
 
 	Close() error
@@ -922,7 +922,7 @@ func (conn *portoConnection) ListDockerImages(place, mask string) ([]*rpc.TDocke
 	return rsp.GetListDockerImages().GetImages(), nil
 }
 
-func (conn *portoConnection) PullDockerImage(name, place, authToken, authHost, authService string) (*rpc.TDockerImage, error) {
+func (conn *portoConnection) PullDockerImage(name, place, authToken, authPath, authService string) (*rpc.TDockerImage, error) {
 	req := &rpc.TContainerRequest{
 		PullDockerImage: &rpc.TDockerImagePullRequest{
 			Name: &name,
@@ -935,8 +935,8 @@ func (conn *portoConnection) PullDockerImage(name, place, authToken, authHost, a
 	if authToken != "" {
 		req.PullDockerImage.AuthToken = &authToken
 	}
-	if authHost != "" {
-		req.PullDockerImage.AuthHost = &authHost
+	if authPath != "" {
+		req.PullDockerImage.AuthPath = &authPath
 	}
 	if authService != "" {
 		req.PullDockerImage.AuthService = &authService

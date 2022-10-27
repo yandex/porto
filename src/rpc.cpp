@@ -288,8 +288,8 @@ void TRequest::Parse() {
             opts.push_back("place=" + Req.pulldockerimage().place());
         if (Req.pulldockerimage().has_auth_token())
             opts.push_back("auth_token=***");
-        if (Req.pulldockerimage().has_auth_host())
-            opts.push_back("auth_host=" + Req.pulldockerimage().auth_host());
+        if (Req.pulldockerimage().has_auth_path())
+            opts.push_back("auth_path=" + Req.pulldockerimage().auth_path());
         if (Req.pulldockerimage().has_auth_service())
             opts.push_back("auth_service=" + Req.pulldockerimage().auth_service());
     } else if (Req.has_removedockerimage()) {
@@ -1648,8 +1648,8 @@ noinline TError PullDockerImage(const rpc::TDockerImagePullRequest &req,
     TDockerImage image(req.name());
 
     if (!req.has_auth_token()) {
-        if (req.has_auth_host())
-            image.AuthHost = req.auth_host();
+        if (req.has_auth_path())
+            image.AuthPath = req.auth_path();
         if (req.has_auth_service())
             image.AuthService = req.auth_service();
 

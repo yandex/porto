@@ -30,7 +30,7 @@ Layer path has the following structure:
 #include <unordered_set>
 
 constexpr const char *DOCKER_REGISTRY_HOST = "registry-1.docker.io";
-constexpr const char *DOCKER_AUTH_HOST = "auth.docker.io";
+constexpr const char *DOCKER_AUTH_PATH = "https://auth.docker.io/token";
 constexpr const char *DOCKER_AUTH_SERVICE = "registry.docker.io";
 
 struct THttpClient;
@@ -64,7 +64,7 @@ struct TDockerImage {
     std::vector<std::string> Env;
 
     std::string AuthToken;
-    std::string AuthHost;
+    std::string AuthPath;
     std::string AuthService;
 
     TDockerImage(const std::string &name)
@@ -157,6 +157,8 @@ private:
 
     TPath ImagePath(const TPath &place) const;
     TPath DigestPath(const TPath &place) const;
+
+    static std::string AuthServiceFromPath(const std::string &authPath, size_t schemaLen = 0);
 
     std::string AuthUrl() const;
     std::string ManifestsUrl(const std::string &digest) const;
