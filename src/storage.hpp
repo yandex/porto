@@ -60,6 +60,7 @@ public:
 
 private:
     static TError Cleanup(const TPath &place, EStorageType type, unsigned perms);
+    static std::string TypeToString(EStorageType type);
     TPath TempPath(const std::string &kind);
     TError CheckUsage();
 };
