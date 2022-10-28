@@ -237,7 +237,18 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 	}
 	cmd = append(cmd, cfgArgs...)
 
-	return portoClient.SetProperty(id, "command", strings.Join(cmd, " "))
+	// Wrap non-absolute path command into call to /bin/sh -c
+	if len(cmd) < 1 {
+		return fmt.Errorf("got empty command for container %s", id)
+	}
+	if len(cmd[0]) < 1 {
+		return fmt.Errorf("got malformed command '%v' for container %s", cmd, id)
+	}
+	if cmd[0][0] != '/' {
+		cmd = append([]string{"/bin/sh", "-c"}, strings.Join(cmd, " "))
+	}
+
+	return portoClient.SetProperty(id, "command_argv", strings.Join(cmd, "\t"))
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) error {
