@@ -92,11 +92,6 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 		return nil, fmt.Errorf("chmod error: %s %v", server.socket, err)
 	}
 
-	err = os.Mkdir(VolumesDir, 0755)
-	if err != nil && !os.IsExist(err) {
-		return nil, err
-	}
-
 	server.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(serverInterceptor))
 	RegisterServer(&server)
 

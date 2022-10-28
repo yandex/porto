@@ -117,7 +117,9 @@ func (mapper *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.Pull
 
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	image, err := portoClient.PullDockerImage(req.GetImage().GetImage(), "", req.GetAuth().GetIdentityToken(), req.GetAuth().GetServerAddress(), req.GetAuth().GetAuth())
+	registry := GetImageRegistry(req.GetImage().GetImage())
+
+	image, err := portoClient.PullDockerImage(req.GetImage().GetImage(), "", registry.AuthToken, registry.AuthPath, registry.AuthService)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}

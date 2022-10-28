@@ -68,9 +68,21 @@ func main() {
 	}
 	_ = zap.ReplaceGlobals(logger)
 
+	err = os.Mkdir(VolumesDir, 0755)
+	if err != nil && !os.IsExist(err) {
+		zap.S().Fatalf("cannot create volumes dir: %v", err)
+		return
+	}
+
+	err = InitKnownRegistries()
+	if err != nil {
+		zap.S().Fatalf("cannot init known registries: %v", err)
+		return
+	}
+
 	server, err := NewPortodshimServer(PortodshimSocket)
 	if err != nil {
-		zap.S().Fatalf("init error: %v", err)
+		zap.S().Fatalf("server init error: %v", err)
 		return
 	}
 

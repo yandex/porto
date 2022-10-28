@@ -216,7 +216,8 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerImage(ctx context.Context
 	image, err := portoClient.DockerImageStatus(imageName, "")
 	if err != nil {
 		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
-			image, err = portoClient.PullDockerImage(imageName, "", "", "", "")
+			registry := GetImageRegistry(imageName)
+			image, err = portoClient.PullDockerImage(imageName, "", registry.AuthToken, registry.AuthPath, registry.AuthService)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 			}
