@@ -1,3 +1,19 @@
+yandex-porto (5.3.6) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * debian: restart portodshim service after install
+
+  [ Stanislav Ivanichkin ]
+  * portodshim: pass network limits through annotations
+
+  [ Dmitry Yakunin ]
+  * portodshim: add registries config
+  * http: return status as errno in errors
+  * docker: allow to customize docker registry auth path
+  * test: fix label test
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Fri, 28 Oct 2022 23:27:57 +0300
+
 yandex-porto (5.3.5) unstable; urgency=low
 
   [ Lev Pantyukhin ]
