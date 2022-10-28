@@ -286,6 +286,9 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	for _, mount := range mounts {
+		// pre-normalize volume path for porto as it expects "normal" path
+		mount.ContainerPath = filepath.Clean(mount.ContainerPath)
+		mount.HostPath = filepath.Clean(mount.HostPath)
 		if mount.ContainerPath == "/dev/termination-log" {
 			continue
 		}
