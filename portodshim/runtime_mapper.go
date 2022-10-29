@@ -284,7 +284,7 @@ func findEnvPathOrDefault(env []string) string {
 	return defaultEnvPath
 }
 
-func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, imgCmd, env []string) error {
+func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, imgCmd, env []string, disableLogShim bool) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	cmd := imgCmd
@@ -315,7 +315,9 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 		}
 	}
 
-	cmd = wrapCmdWithLogShim(cmd)
+	if !disableLogShim {
+		cmd = wrapCmdWithLogShim(cmd)
+	}
 
 	return portoClient.SetProperty(id, "command_argv", strings.Join(cmd, "\t"))
 }
@@ -852,7 +854,7 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	}
 
 	// command + args
-	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, []string{image.GetCommand()}, env); err != nil {
+	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, []string{image.GetCommand()}, env, false); err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -1102,7 +1104,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	}
 
 	// command + args
-	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), []string{image.GetCommand()}, env); err != nil {
+	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), []string{image.GetCommand()}, env, false); err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -1299,7 +1301,46 @@ func (mapper *PortodshimRuntimeMapper) ReopenContainerLog(ctx context.Context, r
 func (mapper *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSyncRequest) (*v1.ExecSyncResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	return nil, fmt.Errorf("not implemented ExecSync")
+	portoClient := ctx.Value("portoClient").(porto.API)
+	execContainerID := req.GetContainerId() + "/" + mapper.createId("exec-sync")
+	if err := portoClient.Create(execContainerID); err != nil {
+		return nil, fmt.Errorf("failed to create exec container %s: %w", execContainerID, err)
+	}
+	defer portoClient.Destroy(execContainerID)
+
+	env, err := portoClient.GetProperty(req.GetContainerId(), "env")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get parent container %s env prop: %w", req.GetContainerId(), err)
+	}
+	if err := portoClient.SetProperty(execContainerID, "env", env); err != nil {
+		return nil, fmt.Errorf("failed to set env for exec container %s: %w", execContainerID, err)
+	}
+	if err := mapper.prepareContainerCommand(ctx, execContainerID, req.GetCmd(), nil, nil, strings.Split(env, ";"), true); err != nil {
+		return nil, fmt.Errorf("failed to prepare command '%v' for exec container %s: %w", req.Cmd, execContainerID, err)
+	}
+
+	if err := portoClient.Start(execContainerID); err != nil {
+		return nil, fmt.Errorf("failed to start exec container %s command '%s': %w", execContainerID, strings.Join(req.Cmd, " "), err)
+	}
+	if _, err := portoClient.Wait([]string{execContainerID}, time.Duration(req.Timeout)*time.Millisecond); err != nil {
+		return nil, fmt.Errorf("failed to wait exec container %s exit: %w", execContainerID, err)
+	}
+
+	// TODO: maybe read whole stdout/stderr file not just tail from porto?
+	vars, err := portoClient.Get([]string{execContainerID}, []string{"stderr", "stdout", "exit_code"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container %s stdout, stderr and exit_code: %w", execContainerID, err)
+	}
+	code, err := strconv.ParseInt(vars[execContainerID]["exit_code"].Value, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse exit_code '%s': %w", vars[execContainerID]["exit_code"].Value, err)
+	}
+	rsp := &v1.ExecSyncResponse{
+		Stdout:   []byte(vars[execContainerID]["stdout"].Value),
+		Stderr:   []byte(vars[execContainerID]["stderr"].Value),
+		ExitCode: int32(code),
+	}
+	return rsp, nil
 }
 
 func (mapper *PortodshimRuntimeMapper) Exec(ctx context.Context, req *v1.ExecRequest) (*v1.ExecResponse, error) {
