@@ -228,6 +228,14 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerImage(ctx context.Context
 	return image, nil
 }
 
+func wrapCmdWithLogShim(cmd []string) []string {
+	// No logs needed for pause command
+	if cmd[0] != "/pause" {
+		cmd = append([]string{"/usr/sbin/logshim"}, cmd...)
+	}
+	return cmd
+}
+
 func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd []string, cfgArgs []string, imgCmd []string) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
@@ -247,6 +255,8 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 	if cmd[0][0] != '/' {
 		cmd = append([]string{"/bin/sh", "-c"}, strings.Join(cmd, " "))
 	}
+
+	cmd = wrapCmdWithLogShim(cmd)
 
 	return portoClient.SetProperty(id, "command_argv", strings.Join(cmd, "\t"))
 }
@@ -295,6 +305,15 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context,
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
+
+	// Mount logshim binary to container
+	mounts = append(mounts,
+		&v1.Mount{
+			ContainerPath: "/usr/sbin/logshim",
+			HostPath:      "/usr/sbin/logshim",
+			Readonly:      true,
+			Propagation:   v1.MountPropagation_PROPAGATION_PRIVATE,
+		})
 
 	for _, mount := range mounts {
 		// pre-normalize volume path for porto as it expects "normal" path

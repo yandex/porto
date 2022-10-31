@@ -1,10 +1,10 @@
-project(portodshim)
+project(logshim)
 cmake_minimum_required(VERSION 3.0)
 find_library(golang REQUIRED)
 
 set(GOPATH ${CMAKE_CURRENT_BINARY_DIR})
-set(SRCS config.go cri_api.go go.mod go.sum image_mapper.go main.go runtime_mapper.go server.go registry.go)
-set(TARGET portodshim)
+set(SRCS main.go)
+set(TARGET logshim)
 
 add_custom_command(
   OUTPUT ${TARGET}
@@ -13,11 +13,9 @@ add_custom_command(
   COMMAND env GOPATH=${GOPATH} GOCACHE=/tmp go build -modcacherw -buildmode=exe -o "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}"
 )
 
-add_custom_target(cri_plugin ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${TARGET})
+add_custom_target(logshim ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${TARGET})
 
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}
   DESTINATION sbin
 )
-
-add_subdirectory(logshim)
