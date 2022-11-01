@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 find_library(golang REQUIRED)
 
 set(GOPATH ${CMAKE_CURRENT_BINARY_DIR})
-set(SRCS config.go cri_api.go go.mod go.sum image_mapper.go main.go runtime_mapper.go server.go registry.go)
+set(SRCS config.go cri_api.go go.mod go.sum image_mapper.go main.go runtime_mapper.go server.go registry.go streaming.go)
 set(TARGET portodshim)
 
 add_custom_command(

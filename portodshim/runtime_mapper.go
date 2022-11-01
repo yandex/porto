@@ -18,6 +18,7 @@ import (
 	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 	"go.uber.org/zap"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 )
 
 const (
@@ -36,6 +37,7 @@ type PortodshimRuntimeMapper struct {
 	podStateMap       map[string]v1.PodSandboxState
 	randGenerator     *rand.Rand
 	netPlugin         cni.CNI
+	streamingServer   streaming.Server
 }
 
 func NewPortodshimRuntimeMapper() (*PortodshimRuntimeMapper, error) {
@@ -78,12 +80,23 @@ func NewPortodshimRuntimeMapper() (*PortodshimRuntimeMapper, error) {
 
 	runtimeMapper.randGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+	runtimeMapper.streamingServer, err = NewStreamingServer(runtimeMapper, fmt.Sprintf("%s:%s", StreamingServerAddress, StreamingServerPort))
+	if err != nil {
+		zap.S().Warnf("failed to create streaming server: %v", err)
+	}
+	go func() {
+		err = runtimeMapper.streamingServer.Start(true)
+		if err != nil {
+			zap.S().Warnf("failed to start streaming server: %v", err)
+		}
+	}()
+
 	return runtimeMapper, nil
 }
 
 // INTERNAL
 func (mapper *PortodshimRuntimeMapper) getContainerState(ctx context.Context, id string) v1.ContainerState {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	state, err := portoClient.GetProperty(id, "state")
 	if err != nil {
@@ -94,7 +107,7 @@ func (mapper *PortodshimRuntimeMapper) getContainerState(ctx context.Context, id
 }
 
 func (mapper *PortodshimRuntimeMapper) getPodState(ctx context.Context, id string) v1.PodSandboxState {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	state, err := portoClient.GetProperty(id, "state")
 	if err != nil {
@@ -114,7 +127,7 @@ func (mapper *PortodshimRuntimeMapper) createId(name string) string {
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Context, id string, cfg *v1.LinuxContainerResources) error {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	if cfg == nil {
 		return nil
@@ -140,7 +153,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerResources(ctx context.Con
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	nsOpts := cfg.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	if nsOpts.Network == v1.NamespaceMode_NODE {
@@ -213,7 +226,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Conte
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerImage(ctx context.Context, id string, imageName string) (*rpc.TDockerImage, error) {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	image, err := portoClient.DockerImageStatus(imageName, "")
 	if err != nil {
@@ -285,7 +298,7 @@ func findEnvPathOrDefault(env []string) string {
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, imgCmd, env []string, disableLogShim bool) error {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	cmd := imgCmd
 	if len(cfgCmd) > 0 {
@@ -323,7 +336,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) ([]string, error) {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	var envProp []string
 	// TDockerImage.Env is single string "foo=bar;baz=foo", so split it to parts.
@@ -337,7 +350,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerEnv(ctx context.Context, 
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context, id string, rootPath string, image string) (string, error) {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	rootAbsPath := filepath.Join(VolumesDir, id)
 	if rootPath == "" {
@@ -390,7 +403,7 @@ func prepareContainerMount(portoClient porto.API, id string, mount *v1.Mount) er
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	// Mount logshim binary to container
 	mounts = append(mounts,
@@ -428,7 +441,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerResolvConf(ctx context.Context, id string, cfg *v1.DNSConfig) error {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	if cfg != nil {
 		resolvConf := []string{}
@@ -444,7 +457,7 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerResolvConf(ctx context.Co
 }
 
 func getContainerNetNS(ctx context.Context, id string) (string, error) {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	netProp, err := portoClient.GetProperty(id, "net")
 	if err != nil {
@@ -512,7 +525,7 @@ func convertLabel(src string, toPorto bool, prefix string) string {
 }
 
 func setLabels(ctx context.Context, id string, labels map[string]string, prefix string) error {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	labelsString := ""
 	for label, value := range labels {
@@ -523,7 +536,7 @@ func setLabels(ctx context.Context, id string, labels map[string]string, prefix 
 }
 
 func getLabels(ctx context.Context, id string, prefix string) map[string]string {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	labels, err := portoClient.GetProperty(id, "labels")
 	if err != nil {
@@ -557,7 +570,7 @@ func getTimeProperty(ctx context.Context, id string, property string) int64 {
 }
 
 func getUintProperty(ctx context.Context, id string, property string) uint64 {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	valueString, err := portoClient.GetProperty(id, property)
 	if err != nil || valueString == "" {
@@ -574,7 +587,7 @@ func getUintProperty(ctx context.Context, id string, property string) uint64 {
 }
 
 func getIntProperty(ctx context.Context, id string, property string) int64 {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	valueString, err := portoClient.GetProperty(id, property)
 	if err != nil || valueString == "" {
@@ -591,7 +604,7 @@ func getIntProperty(ctx context.Context, id string, property string) int64 {
 }
 
 func getStringProperty(ctx context.Context, id string, property string) string {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	value, err := portoClient.GetProperty(id, property)
 	if err != nil {
@@ -614,7 +627,7 @@ func getPodMetadata(ctx context.Context, id string) *v1.PodSandboxMetadata {
 }
 
 func getPodStats(ctx context.Context, id string) *v1.PodSandboxStats {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	cpu := getUintProperty(ctx, id, "cpu_usage")
 	timestamp := time.Now().UnixNano()
@@ -721,7 +734,7 @@ func getContainerStats(ctx context.Context, id string) *v1.ContainerStats {
 }
 
 func getContainerImage(ctx context.Context, id string) string {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	if !isContainer(id) {
 		return ""
@@ -736,7 +749,7 @@ func getContainerImage(ctx context.Context, id string) string {
 }
 
 func getPodSandboxNetworkStatus(ctx context.Context, id string) *v1.PodSandboxNetworkStatus {
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	addresses, err := portoClient.GetProperty(id, "ip")
 	if err != nil {
@@ -778,7 +791,7 @@ func parsePropertyNetNS(prop string) string {
 func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.VersionRequest) (*v1.VersionResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	tag, _, err := portoClient.GetVersion()
 	if err != nil {
@@ -796,7 +809,7 @@ func (mapper *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.Vers
 func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.RunPodSandboxRequest) (*v1.RunPodSandboxResponse, error) {
 	zap.S().Debugf("call %s: %+v", getCurrentFuncName(), req.GetConfig())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	id := mapper.createId(req.GetConfig().GetMetadata().GetName())
 	err := portoClient.Create(id)
@@ -883,7 +896,7 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 func (mapper *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *v1.StopPodSandboxRequest) (*v1.StopPodSandboxResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	id := req.GetPodSandboxId()
 
@@ -900,7 +913,7 @@ func (mapper *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req *v1.RemovePodSandboxRequest) (*v1.RemovePodSandboxResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	id := req.GetPodSandboxId()
 	netProp, err := portoClient.GetProperty(id, "net")
@@ -978,7 +991,7 @@ func (mapper *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req 
 func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *v1.ListPodSandboxRequest) (*v1.ListPodSandboxResponse, error) {
 	zap.S().Debugf("call %s: %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetState().GetState().String(), req.GetFilter().GetLabelSelector())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	targetId := req.GetFilter().GetId()
 	targetState := req.GetFilter().GetState()
@@ -1038,7 +1051,7 @@ func (mapper *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.CreateContainerRequest) (*v1.CreateContainerResponse, error) {
 	zap.S().Debugf("call %s: %s %+v", getCurrentFuncName(), req.GetPodSandboxId(), req.GetConfig())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	// <id> := <podId>/<containerId>
 	podId := req.GetPodSandboxId()
@@ -1117,7 +1130,7 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 func (mapper *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *v1.StartContainerRequest) (*v1.StartContainerResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	id := req.GetContainerId()
 	if !isContainer(id) {
@@ -1135,7 +1148,7 @@ func (mapper *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v1.StopContainerRequest) (*v1.StopContainerResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	id := req.GetContainerId()
 	if !isContainer(id) {
@@ -1155,7 +1168,7 @@ func (mapper *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v
 func (mapper *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req *v1.RemoveContainerRequest) (*v1.RemoveContainerResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	id := req.GetContainerId()
 	if !isContainer(id) {
@@ -1179,7 +1192,7 @@ func (mapper *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req 
 func (mapper *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *v1.ListContainersRequest) (*v1.ListContainersResponse, error) {
 	zap.S().Debugf("call %s: %s %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetState().GetState().String(), req.GetFilter().GetPodSandboxId(), req.GetFilter().GetLabelSelector())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 	targetId := req.GetFilter().GetId()
 	targetState := req.GetFilter().GetState()
 	targetPodSandboxId := req.GetFilter().GetPodSandboxId()
@@ -1301,7 +1314,7 @@ func (mapper *PortodshimRuntimeMapper) ReopenContainerLog(ctx context.Context, r
 func (mapper *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSyncRequest) (*v1.ExecSyncResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 	execContainerID := req.GetContainerId() + "/" + mapper.createId("exec-sync")
 	if err := portoClient.Create(execContainerID); err != nil {
 		return nil, fmt.Errorf("failed to create exec container %s: %w", execContainerID, err)
@@ -1344,9 +1357,14 @@ func (mapper *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.Exe
 }
 
 func (mapper *PortodshimRuntimeMapper) Exec(ctx context.Context, req *v1.ExecRequest) (*v1.ExecResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
+	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req)
 
-	return nil, fmt.Errorf("not implemented Exec")
+	resp, err := mapper.streamingServer.GetExec(req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to prepare exec endpoint: %v", err)
+	}
+
+	return resp, nil
 }
 
 func (mapper *PortodshimRuntimeMapper) Attach(ctx context.Context, req *v1.AttachRequest) (*v1.AttachResponse, error) {
@@ -1377,7 +1395,7 @@ func (mapper *PortodshimRuntimeMapper) ContainerStats(ctx context.Context, req *
 func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, req *v1.ListContainerStatsRequest) (*v1.ListContainerStatsResponse, error) {
 	zap.S().Debugf("call %s: %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetPodSandboxId(), req.GetFilter().GetLabelSelector())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	targetId := req.GetFilter().GetId()
 	targetPodSandboxId := req.GetFilter().GetPodSandboxId()
@@ -1432,7 +1450,7 @@ func (mapper *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, r
 func (mapper *PortodshimRuntimeMapper) ListPodSandboxStats(ctx context.Context, req *v1.ListPodSandboxStatsRequest) (*v1.ListPodSandboxStatsResponse, error) {
 	zap.S().Debugf("call %s: %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetLabelSelector())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	targetId := req.GetFilter().GetId()
 	targetLabels := req.GetFilter().GetLabelSelector()
@@ -1484,7 +1502,7 @@ func (mapper *PortodshimRuntimeMapper) UpdateRuntimeConfig(ctx context.Context, 
 func (mapper *PortodshimRuntimeMapper) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
-	portoClient := ctx.Value("portoClient").(porto.API)
+	portoClient := getPortoClient(ctx)
 
 	if _, _, err := portoClient.GetVersion(); err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)

@@ -45,20 +45,31 @@ func unlinkStaleSocket(socketPath string) error {
 	}
 }
 
+func portoClientContext(ctx context.Context) (context.Context, error) {
+	portoClient, err := porto.Connect()
+	if err != nil {
+		return ctx, fmt.Errorf("connect to porto: %v", err)
+	}
+
+	return context.WithValue(ctx, "portoClient", portoClient), nil
+}
+
+func getPortoClient(ctx context.Context) porto.API {
+	return ctx.Value("portoClient").(porto.API)
+}
+
 func serverInterceptor(ctx context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler) (interface{}, error) {
 	start := time.Now()
 
-	portoClient, err := porto.Connect()
+	ctx, err := portoClientContext(ctx)
 	if err != nil {
-		zap.S().Fatalf("connect to porto: %v", err)
-		return nil, fmt.Errorf("connect to porto: %v", err)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	defer portoClient.Close()
 
-	h, err := handler(context.WithValue(ctx, "portoClient", portoClient), req)
+	h, err := handler(ctx, req)
 	zap.S().Debugf("request: %s\tduration: %s\terror: %v", info.FullMethod, time.Since(start), err)
 
 	return h, err

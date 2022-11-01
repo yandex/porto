@@ -16,4 +16,7 @@ const (
 	PortodshimLogPath = LogsDir + "/portodshim.log"
 	// k8s
 	KubeResourceDomain = "yandex.net"
+	// streaming
+	StreamingServerAddress = "[::]"
+	StreamingServerPort    = "7255"
 )
