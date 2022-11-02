@@ -24,9 +24,11 @@ const (
 	runtimeName = "porto"
 	pauseImage  = "k8s.gcr.io/pause:3.7"
 	// loopback + default
-	networkAttachCount = 2
-	ifPrefixName       = "veth"
-	defaultIfName      = "veth0"
+	networkAttachCount     = 2
+	ifPrefixName           = "veth"
+	defaultIfName          = "veth0"
+	maxSymlinkResolveDepth = 10
+	defaultEnvPath         = "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 )
 
 type PortodshimRuntimeMapper struct {
@@ -236,7 +238,53 @@ func wrapCmdWithLogShim(cmd []string) []string {
 	return cmd
 }
 
-func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd []string, cfgArgs []string, imgCmd []string) error {
+func isChrootPathExecutable(root, path string, depth int) (bool, error) {
+	if depth > maxSymlinkResolveDepth {
+		return false, fmt.Errorf("too many levels of symbolic links %d while maximum is %d", depth, maxSymlinkResolveDepth)
+	}
+	absPath := filepath.Join(root, path)
+	fi, err := os.Lstat(absPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to lstat path '%s' inside root '%s': %w", path, root, err)
+	}
+	if fi.Mode()&os.ModeSymlink > 0 {
+		target, err := os.Readlink(absPath)
+		if err != nil {
+			return false, fmt.Errorf("failed to read link '%s' inside root '%s': %w", path, root, err)
+		}
+		if len(target) > 0 && target[0] != '/' {
+			target = filepath.Join(filepath.Dir(path), target)
+		}
+		return isChrootPathExecutable(root, target, depth+1)
+	}
+	return fi.Mode()&0o100 > 0 && !fi.IsDir(), nil
+}
+
+func findChrootExecutable(path, root, cmd string) string {
+	var binaryPath string
+	paths := strings.Split(path, ":")
+	for _, p := range paths {
+		candidate := filepath.Join(p, cmd)
+		ok, err := isChrootPathExecutable(root, candidate, 1)
+		zap.S().Debugf("%s: checking candidate path '%s' for cmd '%s' in root '%s', ok: %t, err: %v", getCurrentFuncName(), candidate, cmd, root, ok, err)
+		if ok {
+			binaryPath = candidate
+			break
+		}
+	}
+	return binaryPath
+}
+
+func findEnvPathOrDefault(env []string) string {
+	for _, e := range env {
+		if len(e) > 5 && e[:5] == "PATH=" {
+			return e[5:]
+		}
+	}
+	return defaultEnvPath
+}
+
+func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, imgCmd, env []string) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
 	cmd := imgCmd
@@ -252,8 +300,19 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 	if len(cmd[0]) < 1 {
 		return fmt.Errorf("got malformed command '%v' for container %s", cmd, id)
 	}
+	// Try to find out binary path inside chroot if we have non-absolute command
 	if cmd[0][0] != '/' {
-		cmd = append([]string{"/bin/sh", "-c"}, strings.Join(cmd, " "))
+		rootPath, err := portoClient.GetProperty(id, "root_path")
+		if err != nil {
+			return fmt.Errorf("failed to get root_path for container %s: %w", id, err)
+		}
+		execPath := findChrootExecutable(findEnvPathOrDefault(env), rootPath, cmd[0])
+		if execPath != "" {
+			cmd[0] = execPath
+		} else {
+			// Last resort, we failed to find out command, so let sh decide.
+			cmd = append([]string{"/bin/sh", "-c"}, strings.Join(cmd, " "))
+		}
 	}
 
 	cmd = wrapCmdWithLogShim(cmd)
@@ -261,14 +320,18 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerCommand(ctx context.Conte
 	return portoClient.SetProperty(id, "command_argv", strings.Join(cmd, "\t"))
 }
 
-func (mapper *PortodshimRuntimeMapper) prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) error {
+func (mapper *PortodshimRuntimeMapper) prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) ([]string, error) {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
-	envProp := []string{image.GetEnv()}
+	var envProp []string
+	// TDockerImage.Env is single string "foo=bar;baz=foo", so split it to parts.
+	if imgEnv := image.GetEnv(); imgEnv != "" {
+		envProp = append(envProp, strings.Split(imgEnv, ";")...)
+	}
 	for _, i := range env {
 		envProp = append(envProp, fmt.Sprintf("%s=%s", i.Key, i.Value))
 	}
-	return portoClient.SetProperty(id, "env", strings.Join(envProp, ";"))
+	return envProp, portoClient.SetProperty(id, "env", strings.Join(envProp, ";"))
 }
 
 func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context, id string, rootPath string, image string) (string, error) {
@@ -746,18 +809,6 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	// command + args
-	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, []string{image.GetCommand()}); err != nil {
-		_ = portoClient.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-
-	// env
-	if err = mapper.prepareContainerEnv(ctx, id, []*v1.KeyValue{}, image); err != nil {
-		_ = portoClient.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-
 	// resources
 	res := req.GetConfig().GetLinux().GetResources()
 	if res != nil {
@@ -788,6 +839,20 @@ func (mapper *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v
 	// root
 	rootPath, err := mapper.prepareContainerRoot(ctx, id, "", pauseImage)
 	if err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// Container prepare order is mandatory!
+	// env and command MUST be prepared ONLY AFTER container chroot ready
+	env, err := mapper.prepareContainerEnv(ctx, id, []*v1.KeyValue{}, image)
+	if err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// command + args
+	if err = mapper.prepareContainerCommand(ctx, id, []string{}, []string{}, []string{image.GetCommand()}, env); err != nil {
 		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -991,18 +1056,6 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	// command + args
-	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), []string{image.GetCommand()}); err != nil {
-		_ = portoClient.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-
-	// env
-	if err = mapper.prepareContainerEnv(ctx, id, req.GetConfig().GetEnvs(), image); err != nil {
-		_ = portoClient.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-
 	// labels and annotations
 	labels := req.GetConfig().GetLabels()
 	if labels == nil {
@@ -1037,6 +1090,20 @@ func (mapper *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req 
 	if err = mapper.prepareContainerMounts(ctx, id, req.GetConfig().GetMounts()); err != nil {
 		_ = portoClient.Destroy(id)
 		_ = os.RemoveAll(rootPath)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// Container prepare order is mandatory!
+	// env and command MUST be prepared ONLY AFTER container chroot ready
+	env, err := mapper.prepareContainerEnv(ctx, id, req.GetConfig().GetEnvs(), image)
+	if err != nil {
+		_ = portoClient.Destroy(id)
+		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	// command + args
+	if err = mapper.prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), []string{image.GetCommand()}, env); err != nil {
+		_ = portoClient.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
