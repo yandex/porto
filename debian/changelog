@@ -1,3 +1,27 @@
+yandex-porto (5.3.7) unstable; urgency=low
+
+  [ Anton Suvorov ]
+  * portodshim: normalize container paths for volumes
+  * portodshim: use command_argv for porto
+  * portodshim: add logshim prototype
+
+  [ Dmitry Yakunin ]
+  * container: increase max label value size to 65536
+  * portodshim: always unlink volume from the root container
+
+  [ Anton Suvorov ]
+  * portodshim: resolve cmd absolute path in containers
+  * porodshim: implement ExecSync() API
+
+  [ Lev Pantyukhin ]
+  * storage: add logs to ImportArchive
+  * portodshim: add Exec() prototype
+  * portodshim: refactor mappers and streaming
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 03 Nov 2022 19:15:51 +0300
+
 yandex-porto (5.3.6) unstable; urgency=low
 
   [ Lev Pantyukhin ]
