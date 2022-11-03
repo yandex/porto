@@ -49,7 +49,7 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 	if err := pc.CreateWeak(id); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	if err := prepareContainerCommand(ctx, id, cmd, nil, nil, nil, false); err != nil {
+	if err := prepareContainerCommand(ctx, id, cmd, nil, nil, nil, true); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 	if err := pc.SetProperty(id, "isolate", "false"); err != nil {
