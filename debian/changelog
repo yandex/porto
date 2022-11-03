@@ -1,3 +1,12 @@
+yandex-porto (5.3.8) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * portodshim: disable logshim in Exec()
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 03 Nov 2022 19:57:04 +0300
+
 yandex-porto (5.3.7) unstable; urgency=low
 
   [ Anton Suvorov ]
