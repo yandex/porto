@@ -303,6 +303,27 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerRoot(ctx context.Context,
 	return rootAbsPath, nil
 }
 
+func prepareContainerMount(portoClient porto.API, id string, mount *v1.Mount) error {
+	volume, err := portoClient.CreateVolume("", map[string]string{
+		"backend": "bind",
+		"storage": mount.HostPath,
+	})
+	if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
+		return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+	}
+	defer func() {
+		err := portoClient.UnlinkVolume(volume.Path, "/", "")
+		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
+			zap.S().Errorf("failed to unlink volume %s from root container: %v", volume.Path, err)
+		}
+	}()
+	err = portoClient.LinkVolume(volume.Path, id, mount.ContainerPath, false, mount.Readonly)
+	if err != nil {
+		return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
+	}
+	return nil
+}
+
 func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
 	portoClient := ctx.Value("portoClient").(porto.API)
 
@@ -333,20 +354,9 @@ func (mapper *PortodshimRuntimeMapper) prepareContainerMounts(ctx context.Contex
 				time.Sleep(1000)
 			}
 		}
-		volume, err := portoClient.CreateVolume("", map[string]string{
-			"backend": "bind",
-			"storage": mount.HostPath,
-		})
-		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
-			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
-		}
-		err = portoClient.LinkVolume(volume.Path, id, mount.ContainerPath, false, mount.Readonly)
+		err := prepareContainerMount(portoClient, id, mount)
 		if err != nil {
-			return fmt.Errorf("%s: %s %s %s %v", getCurrentFuncName(), id, mount.HostPath, mount.ContainerPath, err)
-		}
-		err = portoClient.UnlinkVolume(volume.Path, "/", "")
-		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
-			return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
+			return err
 		}
 	}
 	return nil
