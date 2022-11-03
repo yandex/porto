@@ -19,7 +19,7 @@ assert Catch(c.SetLabel, 'a', 'A.a', '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'A' * 17 + '.a', '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'AAAAAAAA.' + 'a' * 150, '.') == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'AAAAAAAA.a', ' ') == porto.exceptions.InvalidLabel
-assert Catch(c.SetLabel, 'a', 'AAAAAAAA.a', 'a' * 5000) == porto.exceptions.InvalidLabel
+assert Catch(c.SetLabel, 'a', 'AAAAAAAA.a', 'a' * 66000) == porto.exceptions.InvalidLabel
 assert Catch(c.SetLabel, 'a', 'PORTO.a', '.') == porto.exceptions.InvalidLabel
 
 c.SetLabel('a', 'A' * 16 + '.a', '.')

@@ -122,7 +122,7 @@ constexpr uint64_t CONTAINER_COMMAND_MAX = 128 * 1024;    // ARG_MAX from includ
 constexpr const char *PORTO_NAME_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
 
 constexpr unsigned PORTO_LABEL_NAME_LEN_MAX = 128;
-constexpr unsigned PORTO_LABEL_VALUE_LEN_MAX = 4096;
+constexpr unsigned PORTO_LABEL_VALUE_LEN_MAX = 65536;
 constexpr const char *PORTO_LABEL_PREFIX_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 constexpr unsigned PORTO_LABEL_PREFIX_LEN_MIN = 2;
 constexpr unsigned PORTO_LABEL_PREFIX_LEN_MAX = 16;
