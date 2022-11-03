@@ -48,12 +48,12 @@ func getImageStruct(fullName string, tags []string) *v1.Image {
 }
 
 // IMAGE SERVICE INTERFACE
-func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImagesRequest) (*v1.ListImagesResponse, error) {
+func (m *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImagesRequest) (*v1.ListImagesResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetFilter().GetImage())
 
-	portoClient := getPortoClient(ctx)
+	pc := getPortoClient(ctx)
 
-	portoImages, err := portoClient.ListDockerImages("", "")
+	portoImages, err := pc.ListDockerImages("", "")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -76,12 +76,12 @@ func (mapper *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.Lis
 		Images: images,
 	}, nil
 }
-func (mapper *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageStatusRequest) (*v1.ImageStatusResponse, error) {
+func (m *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageStatusRequest) (*v1.ImageStatusResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetImage())
 
-	portoClient := getPortoClient(ctx)
+	pc := getPortoClient(ctx)
 
-	image, err := portoClient.DockerImageStatus(req.GetImage().GetImage(), "")
+	image, err := pc.DockerImageStatus(req.GetImage().GetImage(), "")
 	if err != nil {
 		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
 			return &v1.ImageStatusResponse{
@@ -94,7 +94,7 @@ func (mapper *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.Im
 
 	// TODO: add tags into TDockerImage and delete this
 	name, _, targetDigest := parseImageName(image.GetFullName())
-	images, err := portoClient.ListDockerImages("", name+"***")
+	images, err := pc.ListDockerImages("", name+"***")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -112,14 +112,14 @@ func (mapper *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.Im
 		Image: getImageStruct(image.GetFullName(), tags),
 	}, nil
 }
-func (mapper *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImageRequest) (*v1.PullImageResponse, error) {
+func (m *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImageRequest) (*v1.PullImageResponse, error) {
 	zap.S().Debugf("call %s: %s %s", getCurrentFuncName(), req.GetImage(), req.GetAuth())
 
-	portoClient := getPortoClient(ctx)
+	pc := getPortoClient(ctx)
 
 	registry := GetImageRegistry(req.GetImage().GetImage())
 
-	image, err := portoClient.PullDockerImage(req.GetImage().GetImage(), "", registry.AuthToken, registry.AuthPath, registry.AuthService)
+	image, err := pc.PullDockerImage(req.GetImage().GetImage(), "", registry.AuthToken, registry.AuthPath, registry.AuthService)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -128,19 +128,19 @@ func (mapper *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.Pull
 		ImageRef: image.GetFullName(),
 	}, nil
 }
-func (mapper *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.RemoveImageRequest) (*v1.RemoveImageResponse, error) {
+func (m *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.RemoveImageRequest) (*v1.RemoveImageResponse, error) {
 	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetImage())
 
-	portoClient := getPortoClient(ctx)
+	pc := getPortoClient(ctx)
 
-	err := portoClient.RemoveDockerImage(req.GetImage().GetImage(), "")
+	err := pc.RemoveDockerImage(req.GetImage().GetImage(), "")
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
 	return &v1.RemoveImageResponse{}, nil
 }
-func (mapper *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.ImageFsInfoRequest) (*v1.ImageFsInfoResponse, error) {
+func (m *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.ImageFsInfoRequest) (*v1.ImageFsInfoResponse, error) {
 	zap.S().Debugf("call %s", getCurrentFuncName())
 
 	stat := syscall.Statfs_t{}

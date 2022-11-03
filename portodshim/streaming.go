@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"time"
 
@@ -14,38 +15,25 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 )
 
-func fileIsClosed(file *os.File) bool {
-	if file == nil {
-		return true
-	}
-
-	_, err := file.Stat()
-	if err != nil {
-		return true
-	}
-
-	return false
-}
-
-func NewStreamingServer(m *PortodshimRuntimeMapper, addr string) (streaming.Server, error) {
+func NewStreamingServer(addr string) (streaming.Server, error) {
 	config := streaming.Config{
 		Addr:                            addr,
 		StreamIdleTimeout:               15 * time.Minute,
 		StreamCreationTimeout:           remotecommandconsts.DefaultStreamCreationTimeout,
 		SupportedRemoteCommandProtocols: remotecommandconsts.SupportedStreamingProtocols,
 	}
-	runtime, _ := NewStreamingRuntime(m)
+	runtime, _ := NewStreamingRuntime()
 	return streaming.NewServer(config, runtime)
 }
 
-func NewStreamingRuntime(m *PortodshimRuntimeMapper) (StreamingRuntime, error) {
+func NewStreamingRuntime() (StreamingRuntime, error) {
 	return StreamingRuntime{
-		mapper: m,
+		randGenerator: rand.New(rand.NewSource(time.Now().UnixNano())),
 	}, nil
 }
 
 type StreamingRuntime struct {
-	mapper *PortodshimRuntimeMapper
+	randGenerator *rand.Rand
 }
 
 func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, terminal bool, resize <-chan remotecommand.TerminalSize) error {
@@ -54,20 +42,20 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	portoClient := getPortoClient(ctx)
+	pc := getPortoClient(ctx)
 
-	id := containerID + sr.mapper.createId("/exec")
+	id := containerID + createId("/exec", sr.randGenerator)
 
-	if err := portoClient.CreateWeak(id); err != nil {
+	if err := pc.CreateWeak(id); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	if err := sr.mapper.prepareContainerCommand(ctx, id, cmd, nil, nil, nil, false); err != nil {
+	if err := prepareContainerCommand(ctx, id, cmd, nil, nil, nil, false); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	if err := portoClient.SetProperty(id, "isolate", "false"); err != nil {
+	if err := pc.SetProperty(id, "isolate", "false"); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
-	if err := portoClient.SetProperty(id, "net", "inherited"); err != nil {
+	if err := pc.SetProperty(id, "net", "inherited"); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
@@ -100,7 +88,7 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 			defer stdin_w.Close()
 		}
 
-		if err := portoClient.SetProperty(id, "stdin_path", fmt.Sprintf("/dev/fd/%d", stdin_r.Fd())); err != nil {
+		if err := pc.SetProperty(id, "stdin_path", fmt.Sprintf("/dev/fd/%d", stdin_r.Fd())); err != nil {
 			return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
 	}
@@ -118,7 +106,7 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 			defer stdout_w.Close()
 		}
 
-		if err := portoClient.SetProperty(id, "stdout_path", fmt.Sprintf("/dev/fd/%d", stdout_w.Fd())); err != nil {
+		if err := pc.SetProperty(id, "stdout_path", fmt.Sprintf("/dev/fd/%d", stdout_w.Fd())); err != nil {
 			return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
 	}
@@ -136,12 +124,12 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 			defer stderr_w.Close()
 		}
 
-		if err := portoClient.SetProperty(id, "stderr_path", fmt.Sprintf("/dev/fd/%d", stderr_w.Fd())); err != nil {
+		if err := pc.SetProperty(id, "stderr_path", fmt.Sprintf("/dev/fd/%d", stderr_w.Fd())); err != nil {
 			return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
 	}
 
-	if err := portoClient.Start(id); err != nil {
+	if err := pc.Start(id); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
@@ -189,7 +177,7 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 	}
 
 	defer cancel()
-	_, err = portoClient.Wait([]string{id}, -1)
+	_, err = pc.Wait([]string{id}, -1)
 	if err != nil {
 		zap.S().Warnf("failed to wait %s: %v", id, err)
 	}
