@@ -332,7 +332,13 @@ func prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, im
 		cmd = wrapCmdWithLogShim(cmd)
 	}
 
-	return pc.SetProperty(id, "command_argv", strings.Join(cmd, "\t"))
+	req := &rpc.TContainerSpec{
+		Name: &id,
+		CommandArgv: &rpc.TContainerCommandArgv{
+			Argv: cmd,
+		},
+	}
+	return pc.UpdateFromSpec(req)
 }
 
 func prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) ([]string, error) {
