@@ -81,6 +81,7 @@ public:
 
     std::string Container;
     std::map<std::string, std::string> Properties;
+    std::vector<std::string> Command;
     std::vector<std::string> Environment;
 
     Porto::Volume Volume;
@@ -153,6 +154,14 @@ public:
         std::string key = prop.substr(0, n);
         std::string val = prop.substr(n + 1);
         return SetProperty(key, val);
+    }
+
+    void SetCommand(const std::vector<std::string> &command) {
+        Command = command;
+    }
+
+    void SetEnvironment(const std::vector<std::string> &environment) {
+        Environment = environment;
     }
 
     TError ImportLayer(const TPath &path, std::string &id) {
@@ -398,6 +407,8 @@ public:
     }
 
     TError ApplyConfig() {
+        rpc::TContainerSpec spec;
+        spec.set_name(Container);
 
         if (ForwardTerminal) {
             std::string tty = "/dev/fd/" + std::to_string(SlavePty);
@@ -427,7 +438,21 @@ public:
         if (Api->SetProperty(Container, "virt_mode", VirtMode))
             goto err;
 
-        if (Api->SetProperty(Container, "env", MergeEscapeStrings(Environment, ';')))
+        for (const auto &env: Environment) {
+            auto equalPos = env.find('=');
+            auto var = spec.mutable_env()->add_var();
+            var->set_name(env.substr(0, equalPos));
+            if (equalPos != std::string::npos)
+                var->set_value(env.substr(equalPos + 1));
+        }
+
+        if (Properties.find("command") == Properties.end() &&
+                Properties.find("command_argv") == Properties.end()) {
+            for (const auto &command: Command)
+                spec.mutable_command_argv()->add_argv(command);
+        }
+
+        if (Api->UpdateFromSpec(spec))
             goto err;
 
         return OK;
@@ -2967,8 +2992,12 @@ public:
                     std::cout << "Layers:" << std::endl;
                     for (const auto &l: i.Layers)
                         std::cout << "\t" << l << std::endl;
-                    std::cout << "Command: " << i.Command << std::endl;
-                    std::cout << "Env: " << i.Env << std::endl;
+                    std::cout << "Command:" << std::endl;
+                    for (const auto &c: i.Command)
+                        std::cout << "\t" << c << std::endl;
+                    std::cout << "Env:" << std::endl;
+                    for (const auto &e: i.Env)
+                        std::cout << "\t" << e << std::endl;
                     std::cout << std::endl;
                 }
             }
@@ -3094,8 +3123,8 @@ public:
         launcher.NeedVolume = true;
         launcher.Container = args[0];
         launcher.Image = args[1];
-        launcher.SetProperty("command", image.Command);
-        launcher.SetProperty("env", image.Env);
+        launcher.SetCommand(image.Command);
+        launcher.SetEnvironment(image.Env);
 
         for (size_t i = 2; i < args.size(); ++i) {
             error = launcher.SetProperty(args[i]);

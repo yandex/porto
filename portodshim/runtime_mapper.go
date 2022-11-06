@@ -288,16 +288,16 @@ func findChrootExecutable(path, root, cmd string) string {
 	return binaryPath
 }
 
-func findEnvPathOrDefault(env []string) string {
+func findEnvPathOrDefault(env []*rpc.TContainerEnvVar) string {
 	for _, e := range env {
-		if len(e) > 5 && e[:5] == "PATH=" {
-			return e[5:]
+		if *e.Name == "PATH" {
+			return *e.Value
 		}
 	}
 	return defaultEnvPath
 }
 
-func prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, imgCmd, env []string, disableLogShim bool) error {
+func prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, imgCmd []string, env []*rpc.TContainerEnvVar, disableLogShim bool) error {
 	pc := getPortoClient(ctx)
 
 	cmd := imgCmd
@@ -341,18 +341,40 @@ func prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, im
 	return pc.UpdateFromSpec(req)
 }
 
-func prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) ([]string, error) {
+func envToVars(env []string) []*rpc.TContainerEnvVar {
+	var envVars []*rpc.TContainerEnvVar
+
+	for _, i := range env {
+		keyValue := strings.SplitN(i, "=", 2)
+		envVars = append(envVars, &rpc.TContainerEnvVar{
+			Name:  &keyValue[0],
+			Value: &keyValue[1],
+		})
+	}
+
+	return envVars
+}
+
+func prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) ([]*rpc.TContainerEnvVar, error) {
 	pc := getPortoClient(ctx)
 
-	var envProp []string
-	// TDockerImage.Env is single string "foo=bar;baz=foo", so split it to parts.
-	if imgEnv := image.GetEnv(); imgEnv != "" {
-		envProp = append(envProp, strings.Split(imgEnv, ";")...)
-	}
+	envVars := envToVars(image.GetEnv())
+
 	for _, i := range env {
-		envProp = append(envProp, fmt.Sprintf("%s=%s", i.Key, i.Value))
+		envVars = append(envVars, &rpc.TContainerEnvVar{
+			Name:  &i.Key,
+			Value: &i.Value,
+		})
 	}
-	return envProp, pc.SetProperty(id, "env", strings.Join(envProp, ";"))
+
+	req := &rpc.TContainerSpec{
+		Name: &id,
+		Env: &rpc.TContainerEnv{
+			Var: envVars,
+		},
+	}
+
+	return envVars, pc.UpdateFromSpec(req)
 }
 
 func prepareContainerRoot(ctx context.Context, id string, rootPath string, image string) (string, error) {
@@ -873,7 +895,7 @@ func (m *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.Run
 	}
 
 	// command + args
-	if err = prepareContainerCommand(ctx, id, []string{}, []string{}, []string{image.GetCommand()}, env, false); err != nil {
+	if err = prepareContainerCommand(ctx, id, []string{}, []string{}, image.GetCommand(), env, false); err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -1123,7 +1145,7 @@ func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.C
 	}
 
 	// command + args
-	if err = prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), []string{image.GetCommand()}, env, false); err != nil {
+	if err = prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), image.GetCommand(), env, false); err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -1334,7 +1356,7 @@ func (m *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSync
 	if err := pc.SetProperty(execContainerID, "env", env); err != nil {
 		return nil, fmt.Errorf("failed to set env for exec container %s: %w", execContainerID, err)
 	}
-	if err := prepareContainerCommand(ctx, execContainerID, req.GetCmd(), nil, nil, strings.Split(env, ";"), true); err != nil {
+	if err := prepareContainerCommand(ctx, execContainerID, req.GetCmd(), nil, nil, envToVars(strings.Split(env, ";")), true); err != nil {
 		return nil, fmt.Errorf("failed to prepare command '%v' for exec container %s: %w", req.Cmd, execContainerID, err)
 	}
 

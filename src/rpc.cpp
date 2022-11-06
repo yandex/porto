@@ -1596,8 +1596,10 @@ noinline TError DockerImageStatus(const rpc::TDockerImageStatusRequest &req,
     desc->set_full_name(image.FullName());
     for (const auto &layer: image.Layers)
         desc->add_layers(layer.Digest);
-    desc->set_command(MergeWithQuotes(image.Command, ' '));
-    desc->set_env(MergeEscapeStrings(image.Env, ';'));
+    for (const auto &command: image.Command)
+        desc->add_command(command);
+    for (const auto &env: image.Env)
+        desc->add_env(env);
 
     return OK;
 }
@@ -1625,8 +1627,10 @@ noinline TError ListDockerImages(const rpc::TDockerImageListRequest &req,
             desc->set_full_name(image.FullName(tag));
             for (const auto &layer: image.Layers)
                 desc->add_layers(layer.Digest);
-            desc->set_command(MergeWithQuotes(image.Command, ' '));
-            desc->set_env(MergeEscapeStrings(image.Env, ';'));
+            for (const auto &command: image.Command)
+                desc->add_command(command);
+            for (const auto &env: image.Env)
+                desc->add_env(env);
         }
     }
 
@@ -1667,8 +1671,10 @@ noinline TError PullDockerImage(const rpc::TDockerImagePullRequest &req,
     desc->set_full_name(image.FullName());
     for (const auto &layer: image.Layers)
         desc->add_layers(layer.Digest);
-    desc->set_command(MergeWithQuotes(image.Command, ' '));
-    desc->set_env(MergeEscapeStrings(image.Env, ';'));
+    for (const auto &command: image.Command)
+        desc->add_command(command);
+    for (const auto &env: image.Env)
+        desc->add_env(env);
 
     return OK;
 }

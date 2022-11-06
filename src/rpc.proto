@@ -1406,8 +1406,8 @@ message TStorageExportRequest {
 message TDockerImage {
     required string full_name = 1;
     repeated string layers = 2;
-    optional string command = 3;
-    optional string env = 4;
+    repeated string command = 3;
+    repeated string env = 4;
 }
 
 

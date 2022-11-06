@@ -59,8 +59,8 @@ struct Layer {
 struct DockerImage {
     std::string Name;
     std::vector<std::string> Layers;
-    std::string Command;
-    std::string Env;
+    std::vector<std::string> Command;
+    std::vector<std::string> Env;
 };
 
 struct Storage {

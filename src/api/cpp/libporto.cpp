@@ -860,8 +860,10 @@ int Connection::DockerImageStatus(DockerImage &image,
         image.Name = i.full_name();
         for (const auto &layer: i.layers())
             image.Layers.push_back(layer);
-        image.Command = i.command();
-        image.Env = i.env();
+        for (const auto &command: i.command())
+            image.Command.push_back(command);
+        for (const auto &env: i.env())
+            image.Env.push_back(env);
     }
     return ret;
 }
@@ -881,8 +883,10 @@ int Connection::ListDockerImages(std::vector<DockerImage> &images,
             image.Name = i.full_name();
             for (const auto &layer: i.layers())
                 image.Layers.push_back(layer);
-            image.Command = i.command();
-            image.Env = i.env();
+            for (const auto &command: i.command())
+                image.Command.push_back(command);
+            for (const auto &env: i.env())
+                image.Env.push_back(env);
             images.push_back(image);
         }
     }
@@ -911,8 +915,10 @@ int Connection::PullDockerImage(DockerImage &image,
         image.Name = i.full_name();
         for (const auto &layer: i.layers())
             image.Layers.push_back(layer);
-        image.Command = i.command();
-        image.Env = i.env();
+        for (const auto &command: i.command())
+            image.Command.push_back(command);
+        for (const auto &env: i.env())
+            image.Env.push_back(env);
     }
     return ret;
 }
