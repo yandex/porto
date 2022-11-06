@@ -20,6 +20,22 @@ pypi() {
     python setup.py sdist upload -r yandex
 }
 
+sync_upstream() {
+    BRANCH_TO_SYNC_WITH="${BRANCH_TO_SYNC_WITH:-master}"
+    last_commit=`git log --oneline upstream | head -n1 | cut -d' ' -f2-`
+    first_commit_to_sync=`git log --oneline ${BRANCH_TO_SYNC_WITH} | grep "${last_commit}" | cut -d' ' -f1`
+    commits_to_sync=`git log --pretty=format:"%h" ${BRANCH_TO_SYNC_WITH} ${first_commit_to_sync}..`
+    commits_to_sync=`echo "$commits_to_sync" | awk '{a[i++]=$0} END {for (j=i-1; j>=0;) print a[j--] }'`
+    git checkout upstream
+    git cherry-pick $commits_to_sync
+    git push
+    #git checkout github
+    #git pull
+    #git rebase upstream
+    #git push upstream github:master
+    #git checkout master
+}
+
 case "$1" in
 all)
 	commit
@@ -34,7 +50,10 @@ push)
 pypi)
 	pypi
 ;;
+sync_upstream)
+    sync_upstream
+;;
 "")
-	echo "Usage: $0 all|commit|push|pypi"
+	echo "Usage: $0 all|commit|push|pypi|sync_upstream"
 ;;
 esac
