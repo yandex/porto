@@ -142,6 +142,10 @@ type API interface {
 
 	GetData(name string, data string) (string, error)
 
+	// SpecAPI
+	CreateFromSpec(spec *rpc.TContainerSpec) error
+	UpdateFromSpec(spec *rpc.TContainerSpec) error
+
 	// VolumeAPI
 	ListVolumeProperties() ([]TProperty, error)
 	CreateVolume(path string, config map[string]string) (TVolumeDescription, error)
@@ -518,6 +522,27 @@ func (conn *portoConnection) GetData(name string, data string) (string, error) {
 	}
 
 	return resp.GetGetData().GetValue(), nil
+}
+
+// SpecAPI
+func (conn *portoConnection) CreateFromSpec(spec *rpc.TContainerSpec) error {
+	req := &rpc.TContainerRequest{
+		CreateFromSpec: &rpc.TCreateFromSpecRequest{
+			Container: spec,
+		},
+	}
+	_, err := conn.performRequest(req)
+	return err
+}
+
+func (conn *portoConnection) UpdateFromSpec(spec *rpc.TContainerSpec) error {
+	req := &rpc.TContainerRequest{
+		UpdateFromSpec: &rpc.TUpdateFromSpecRequest{
+			Container: spec,
+		},
+	}
+	_, err := conn.performRequest(req)
+	return err
 }
 
 // VolumeAPI
