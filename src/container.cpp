@@ -3065,6 +3065,8 @@ void TContainer::SanitizeCapabilities() {
                           "capabilities[SYS_ADMIN]") != EnabledExtraProperties.end() &&
                 (CapLimit.Permitted & SysAdminCapability.Permitted))
                 CapBound.Permitted |= SysAdminCapability.Permitted;
+            if (config().container().rt_priority())
+                CapBound.Permitted |= SysNiceCapability.Permitted;
             CapAllowed = CapBound;
 
             if (HasProp(EProperty::CAPABILITIES) &&

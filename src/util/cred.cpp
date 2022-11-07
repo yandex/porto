@@ -569,6 +569,7 @@ bool TCapabilities::HasSetUidGid() const {
 }
 
 TCapabilities SysAdminCapability;
+TCapabilities SysNiceCapability;
 
 TCapabilities NoCapabilities;
 TCapabilities PortoInitCapabilities;
@@ -591,6 +592,7 @@ void InitCapabilities() {
     }
 
     SysAdminCapability.Permitted = BIT(CAP_SYS_ADMIN);
+    SysNiceCapability.Permitted = BIT(CAP_SYS_NICE);
 
     HasAmbientCapabilities = prctl(PR_CAP_AMBIENT,
                                    PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) == 0;
@@ -642,7 +644,7 @@ void InitCapabilities() {
         ChrootCapBound.Permitted |
         SysAdminCapability.Permitted |
         BIT(CAP_LINUX_IMMUTABLE) |
-        BIT(CAP_SYS_NICE) |
+        SysNiceCapability.Permitted |
         BIT(CAP_SYS_BOOT) |
         BIT(CAP_SYS_RESOURCE);
 

@@ -11,6 +11,8 @@ PREV_VERSION = "5.0.11"
 TMPDIR = "/tmp/test-release-upgrade"
 prev_portod = TMPDIR + "/old/usr/sbin/portod"
 
+RT_PRIORITY = 0
+
 try:
     os.mkdir(TMPDIR)
 except BaseException as e:
@@ -59,6 +61,8 @@ def CheckCaps(r):
 
     # Host-chroot containers still have host bounding set
     os_caps += "" if root_path != '/' else "SYS_BOOT;"
+    if RT_PRIORITY:
+        os_caps += "SYS_NICE;"
     os_caps += "MKNOD;AUDIT_WRITE;SETFCAP"
 
     legacy_os_caps = "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_PTRACE; SYS_RESOURCE"
@@ -205,6 +209,7 @@ parent_knobs = [
 ]
 
 AsRoot()
+RT_PRIORITY = 10
 ConfigurePortod('test-prev_release_upgrade', """
 container {
     rt_priority: 10
@@ -378,6 +383,7 @@ try:
 
 finally:
     AsRoot()
+    RT_PRIORITY = 0
     ConfigurePortod('test-prev_release_upgrade', "")
 
 c.disconnect()
