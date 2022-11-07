@@ -6,7 +6,7 @@ require (
 	github.com/containerd/containerd v1.6.7
 	github.com/containerd/go-cni v1.1.7
 	github.com/creack/pty v1.1.9
-	github.com/yandex/porto/src/api/go/porto v0.0.0-20220919083929-639628186b7c
+	github.com/yandex/porto/src/api/go/porto v0.0.0-20221106192442-5a1af1dc7516
 	go.uber.org/zap v1.21.0
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 	google.golang.org/grpc v1.47.0
