@@ -35,11 +35,22 @@ var (
 func InitKnownRegistries() error {
 	for host, registry := range KnownRegistries {
 		if strings.HasPrefix(registry.AuthToken, "file:") {
-			content, err := os.ReadFile(registry.AuthToken[5:])
+			authTokenPath := registry.AuthToken[5:]
+			// if file doesn't exist then auth token is empty
+			_, err := os.Stat(authTokenPath)
 			if err != nil {
-				return err
+				if os.IsNotExist(err) {
+					registry.AuthToken = ""
+				} else {
+					return err
+				}
+			} else {
+				content, err := os.ReadFile(authTokenPath)
+				if err != nil {
+					return err
+				}
+				registry.AuthToken = strings.TrimSpace(string(content))
 			}
-			registry.AuthToken = strings.TrimSpace(string(content))
 			KnownRegistries[host] = registry
 		}
 	}

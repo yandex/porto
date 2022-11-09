@@ -225,24 +225,6 @@ func prepareContainerResources(ctx context.Context, id string, cfg *v1.LinuxCont
 	return nil
 }
 
-func prepareContainerImage(ctx context.Context, id string, imageName string) (*rpc.TDockerImage, error) {
-	pc := getPortoClient(ctx)
-
-	image, err := pc.DockerImageStatus(imageName, "")
-	if err != nil {
-		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
-			registry := GetImageRegistry(imageName)
-			image, err = pc.PullDockerImage(imageName, "", registry.AuthToken, registry.AuthPath, registry.AuthService)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-			}
-		} else {
-			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-		}
-	}
-	return image, nil
-}
-
 func wrapCmdWithLogShim(cmd []string) []string {
 	// No logs needed for pause command
 	if cmd[0] != "/pause" {
@@ -846,7 +828,7 @@ func (m *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.Run
 	}
 
 	// get image
-	image, err := prepareContainerImage(ctx, id, pauseImage)
+	image, err := pc.DockerImageStatus(pauseImage, "")
 	if err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -1093,7 +1075,7 @@ func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.C
 	// get image
 	// TODO: define imageName in rpc.TDockerImage
 	imageName := req.GetConfig().GetImage().GetImage()
-	image, err := prepareContainerImage(ctx, id, imageName)
+	image, err := pc.DockerImageStatus(imageName, "")
 	if err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)

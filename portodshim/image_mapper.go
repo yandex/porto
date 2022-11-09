@@ -118,8 +118,12 @@ func (m *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImage
 	pc := getPortoClient(ctx)
 
 	registry := GetImageRegistry(req.GetImage().GetImage())
+	authToken := registry.AuthToken
+	if authToken == "" && req.GetAuth() != nil && req.GetAuth().GetPassword() != "" {
+		authToken = req.GetAuth().GetPassword()
+	}
 
-	image, err := pc.PullDockerImage(req.GetImage().GetImage(), "", registry.AuthToken, registry.AuthPath, registry.AuthService)
+	image, err := pc.PullDockerImage(req.GetImage().GetImage(), "", authToken, registry.AuthPath, registry.AuthService)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
