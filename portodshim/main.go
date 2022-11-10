@@ -24,12 +24,11 @@ func main() {
 		return
 	}
 
-	logger, err := makeZapLogger(PortodshimLogPath, *debug)
+	err = CreateZapLogger(*debug)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "cannot create logger: %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "%v", err)
 		return
 	}
-	_ = zap.ReplaceGlobals(logger)
 
 	err = os.Mkdir(VolumesDir, 0755)
 	if err != nil && !os.IsExist(err) {

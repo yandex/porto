@@ -8,6 +8,9 @@ import (
 	v1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+type v1PullImageRequestType = *v1.PullImageRequest
+type v1alpha2PullImageRequestType = *v1alpha2.PullImageRequest
+
 func RegisterServer(server *PortodshimServer) {
 	v1Server := &v1Server{server}
 	v1.RegisterRuntimeServiceServer(server.grpcServer, v1Server)

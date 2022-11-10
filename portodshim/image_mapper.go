@@ -9,7 +9,6 @@ import (
 
 	"github.com/yandex/porto/src/api/go/porto"
 	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
-	"go.uber.org/zap"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -49,8 +48,6 @@ func getImageStruct(fullName string, tags []string) *v1.Image {
 
 // IMAGE SERVICE INTERFACE
 func (m *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImagesRequest) (*v1.ListImagesResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetFilter().GetImage())
-
 	pc := getPortoClient(ctx)
 
 	portoImages, err := pc.ListDockerImages("", "")
@@ -77,8 +74,6 @@ func (m *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImag
 	}, nil
 }
 func (m *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageStatusRequest) (*v1.ImageStatusResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetImage())
-
 	pc := getPortoClient(ctx)
 
 	image, err := pc.DockerImageStatus(req.GetImage().GetImage(), "")
@@ -113,8 +108,6 @@ func (m *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageSt
 	}, nil
 }
 func (m *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImageRequest) (*v1.PullImageResponse, error) {
-	zap.S().Debugf("call %s: %s %s", getCurrentFuncName(), req.GetImage(), req.GetAuth())
-
 	pc := getPortoClient(ctx)
 
 	registry := GetImageRegistry(req.GetImage().GetImage())
@@ -133,8 +126,6 @@ func (m *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImage
 	}, nil
 }
 func (m *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.RemoveImageRequest) (*v1.RemoveImageResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetImage())
-
 	pc := getPortoClient(ctx)
 
 	err := pc.RemoveDockerImage(req.GetImage().GetImage(), "")
@@ -145,8 +136,6 @@ func (m *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.RemoveI
 	return &v1.RemoveImageResponse{}, nil
 }
 func (m *PortodshimImageMapper) ImageFsInfo(ctx context.Context, req *v1.ImageFsInfoRequest) (*v1.ImageFsInfoResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	stat := syscall.Statfs_t{}
 	err := syscall.Statfs(ImagesDir, &stat)
 	if err != nil {

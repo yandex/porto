@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -13,7 +14,29 @@ import (
 	"golang.org/x/term"
 )
 
-func makeZapLogger(logPath string, debug bool) (*zap.Logger, error) {
+func DebugLog(ctx context.Context, template string, args ...interface{}) {
+	log(zap.S().Debugf, ctx, template, args...)
+}
+
+func InfoLog(ctx context.Context, template string, args ...interface{}) {
+	log(zap.S().Infof, ctx, template, args...)
+}
+
+func log(l func(string, ...interface{}), ctx context.Context, template string, args ...interface{}) {
+	logPrefix := fmt.Sprintf("[%s] ", getRequestId(ctx))
+	l(logPrefix+template, args...)
+}
+
+func CreateZapLogger(debug bool) error {
+	logger, err := newZapLogger(PortodshimLogPath, debug)
+	if err != nil {
+		return fmt.Errorf("cannot create logger: %v", err)
+	}
+	_ = zap.ReplaceGlobals(logger)
+	return nil
+}
+
+func newZapLogger(logPath string, debug bool) (*zap.Logger, error) {
 	sink, err := newSink(logPath, syscall.SIGHUP)
 	if err != nil {
 		return nil, err

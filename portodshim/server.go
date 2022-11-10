@@ -6,7 +6,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
+
+	"math/rand"
 
 	"github.com/yandex/porto/src/api/go/porto"
 	"go.uber.org/zap"
@@ -51,11 +54,18 @@ func portoClientContext(ctx context.Context) (context.Context, error) {
 		return ctx, fmt.Errorf("connect to porto: %v", err)
 	}
 
-	return context.WithValue(ctx, "portoClient", portoClient), nil
+	c := ctx
+	c = context.WithValue(c, "requestId", fmt.Sprintf("%08x", rand.Intn(4294967296)))
+	c = context.WithValue(c, "portoClient", portoClient)
+	return c, nil
 }
 
 func getPortoClient(ctx context.Context) porto.API {
 	return ctx.Value("portoClient").(porto.API)
+}
+
+func getRequestId(ctx context.Context) string {
+	return ctx.Value("requestId").(string)
 }
 
 func serverInterceptor(ctx context.Context,
@@ -69,8 +79,25 @@ func serverInterceptor(ctx context.Context,
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
+	startTime := time.Since(start).Milliseconds()
+
+	InfoLog(ctx, "%s", info.FullMethod)
+	if !strings.Contains(info.FullMethod, "PullImage") {
+		DebugLog(ctx, "%s", req)
+	} else {
+		if strings.Contains(info.FullMethod, "v1alpha2") {
+			reqPullImage := req.(v1alpha2PullImageRequestType)
+			DebugLog(ctx, "%s %s", reqPullImage.GetImage(), reqPullImage.GetAuth().GetUsername())
+		} else {
+			reqPullImage := req.(v1PullImageRequestType)
+			DebugLog(ctx, "%s %s", reqPullImage.GetImage(), reqPullImage.GetAuth().GetUsername())
+		}
+	}
+
 	h, err := handler(ctx, req)
-	zap.S().Debugf("request: %s\tduration: %s\terror: %v", info.FullMethod, time.Since(start), err)
+
+	DebugLog(ctx, "%+v", h)
+	InfoLog(ctx, "%s time: %d ms", info.FullMethod, time.Since(start).Milliseconds()-startTime)
 
 	return h, err
 }
@@ -105,6 +132,8 @@ func NewPortodshimServer(socketPath string) (*PortodshimServer, error) {
 
 	server.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(serverInterceptor))
 	RegisterServer(&server)
+
+	rand.Seed(time.Now().UnixNano())
 
 	zap.S().Info("portodshim is initialized")
 	return &server, nil

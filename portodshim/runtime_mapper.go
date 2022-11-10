@@ -37,15 +37,12 @@ var excludedMountSources = []string{"/dev", "/sys"}
 type PortodshimRuntimeMapper struct {
 	containerStateMap map[string]v1.ContainerState
 	podStateMap       map[string]v1.PodSandboxState
-	randGenerator     *rand.Rand
 	netPlugin         cni.CNI
 	streamingServer   streaming.Server
 }
 
 func NewPortodshimRuntimeMapper() (*PortodshimRuntimeMapper, error) {
-	rm := &PortodshimRuntimeMapper{
-		randGenerator: rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
+	rm := &PortodshimRuntimeMapper{}
 
 	netPlugin, err := cni.New(cni.WithMinNetworkCount(networkAttachCount),
 		cni.WithPluginConfDir(NetworkPluginConfDir),
@@ -119,13 +116,13 @@ func (m *PortodshimRuntimeMapper) getPodState(ctx context.Context, id string) v1
 	return m.podStateMap[state]
 }
 
-func createId(name string, r *rand.Rand) string {
+func createId(name string) string {
 	length := 58
 	if len(name) < length {
 		length = len(name)
 	}
 	// max length of return value is 58 + 1 + 4 = 63, so container id <= 127
-	return fmt.Sprintf("%s-%04x", name[:length], r.Uint32()%65536)
+	return fmt.Sprintf("%s-%04x", name[:length], rand.Intn(65536))
 }
 
 func (m *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
@@ -257,13 +254,13 @@ func isChrootPathExecutable(root, path string, depth int) (bool, error) {
 	return fi.Mode()&0o100 > 0 && !fi.IsDir(), nil
 }
 
-func findChrootExecutable(path, root, cmd string) string {
+func findChrootExecutable(ctx context.Context, path, root, cmd string) string {
 	var binaryPath string
 	paths := strings.Split(path, ":")
 	for _, p := range paths {
 		candidate := filepath.Join(p, cmd)
 		ok, err := isChrootPathExecutable(root, candidate, 1)
-		zap.S().Debugf("%s: checking candidate path '%s' for cmd '%s' in root '%s', ok: %t, err: %v", getCurrentFuncName(), candidate, cmd, root, ok, err)
+		DebugLog(ctx, "checking candidate path '%s' for cmd '%s' in root '%s', ok: %t, err: %v", candidate, cmd, root, ok, err)
 		if ok {
 			binaryPath = candidate
 			break
@@ -303,7 +300,7 @@ func prepareContainerCommand(ctx context.Context, id string, cfgCmd, cfgArgs, im
 		if err != nil {
 			return fmt.Errorf("failed to get root_path for container %s: %w", id, err)
 		}
-		execPath := findChrootExecutable(findEnvPathOrDefault(env), rootPath, cmd[0])
+		execPath := findChrootExecutable(ctx, findEnvPathOrDefault(env), rootPath, cmd[0])
 		if execPath != "" {
 			cmd[0] = execPath
 		} else {
@@ -812,8 +809,6 @@ func parsePropertyNetNS(prop string) string {
 
 // RUNTIME SERVICE INTERFACE
 func (m *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.VersionRequest) (*v1.VersionResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	pc := getPortoClient(ctx)
 
 	tag, _, err := pc.GetVersion()
@@ -830,11 +825,9 @@ func (m *PortodshimRuntimeMapper) Version(ctx context.Context, req *v1.VersionRe
 }
 
 func (m *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.RunPodSandboxRequest) (*v1.RunPodSandboxResponse, error) {
-	zap.S().Debugf("call %s: %+v", getCurrentFuncName(), req.GetConfig())
-
 	pc := getPortoClient(ctx)
 
-	id := createId(req.GetConfig().GetMetadata().GetName(), m.randGenerator)
+	id := createId(req.GetConfig().GetMetadata().GetName())
 	err := pc.Create(id)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
@@ -917,8 +910,6 @@ func (m *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.Run
 }
 
 func (m *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *v1.StopPodSandboxRequest) (*v1.StopPodSandboxResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
-
 	pc := getPortoClient(ctx)
 
 	id := req.GetPodSandboxId()
@@ -934,8 +925,6 @@ func (m *PortodshimRuntimeMapper) StopPodSandbox(ctx context.Context, req *v1.St
 }
 
 func (m *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req *v1.RemovePodSandboxRequest) (*v1.RemovePodSandboxResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
-
 	pc := getPortoClient(ctx)
 
 	id := req.GetPodSandboxId()
@@ -968,8 +957,6 @@ func (m *PortodshimRuntimeMapper) RemovePodSandbox(ctx context.Context, req *v1.
 }
 
 func (m *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req *v1.PodSandboxStatusRequest) (*v1.PodSandboxStatusResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
-
 	id := req.GetPodSandboxId()
 
 	netNSMode, err := getContainerNetNSMode(ctx, id)
@@ -997,13 +984,11 @@ func (m *PortodshimRuntimeMapper) PodSandboxStatus(ctx context.Context, req *v1.
 			Annotations: getLabels(ctx, id, "ANNOTATION"),
 		},
 	}
-	zap.S().Debugf("resp %s: %+v", getCurrentFuncName(), resp)
+
 	return resp, nil
 }
 
 func (m *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req *v1.PodSandboxStatsRequest) (*v1.PodSandboxStatsResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetPodSandboxId())
-
 	id := req.GetPodSandboxId()
 
 	return &v1.PodSandboxStatsResponse{
@@ -1012,8 +997,6 @@ func (m *PortodshimRuntimeMapper) PodSandboxStats(ctx context.Context, req *v1.P
 }
 
 func (m *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *v1.ListPodSandboxRequest) (*v1.ListPodSandboxResponse, error) {
-	zap.S().Debugf("call %s: %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetState().GetState().String(), req.GetFilter().GetLabelSelector())
-
 	pc := getPortoClient(ctx)
 
 	targetId := req.GetFilter().GetId()
@@ -1072,13 +1055,11 @@ func (m *PortodshimRuntimeMapper) ListPodSandbox(ctx context.Context, req *v1.Li
 }
 
 func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.CreateContainerRequest) (*v1.CreateContainerResponse, error) {
-	zap.S().Debugf("call %s: %s %+v", getCurrentFuncName(), req.GetPodSandboxId(), req.GetConfig())
-
 	pc := getPortoClient(ctx)
 
 	// <id> := <podId>/<containerId>
 	podId := req.GetPodSandboxId()
-	containerId := createId(req.GetConfig().GetMetadata().GetName(), m.randGenerator)
+	containerId := createId(req.GetConfig().GetMetadata().GetName())
 	id := filepath.Join(podId, containerId)
 	err := pc.Create(id)
 	if err != nil {
@@ -1151,8 +1132,6 @@ func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.C
 }
 
 func (m *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *v1.StartContainerRequest) (*v1.StartContainerResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
-
 	pc := getPortoClient(ctx)
 
 	id := req.GetContainerId()
@@ -1169,8 +1148,6 @@ func (m *PortodshimRuntimeMapper) StartContainer(ctx context.Context, req *v1.St
 }
 
 func (m *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v1.StopContainerRequest) (*v1.StopContainerResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
-
 	pc := getPortoClient(ctx)
 
 	id := req.GetContainerId()
@@ -1189,8 +1166,6 @@ func (m *PortodshimRuntimeMapper) StopContainer(ctx context.Context, req *v1.Sto
 }
 
 func (m *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req *v1.RemoveContainerRequest) (*v1.RemoveContainerResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
-
 	pc := getPortoClient(ctx)
 
 	id := req.GetContainerId()
@@ -1213,8 +1188,6 @@ func (m *PortodshimRuntimeMapper) RemoveContainer(ctx context.Context, req *v1.R
 }
 
 func (m *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *v1.ListContainersRequest) (*v1.ListContainersResponse, error) {
-	zap.S().Debugf("call %s: %s %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetState().GetState().String(), req.GetFilter().GetPodSandboxId(), req.GetFilter().GetLabelSelector())
-
 	pc := getPortoClient(ctx)
 	targetId := req.GetFilter().GetId()
 	targetState := req.GetFilter().GetState()
@@ -1290,8 +1263,6 @@ func (m *PortodshimRuntimeMapper) ListContainers(ctx context.Context, req *v1.Li
 }
 
 func (m *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req *v1.ContainerStatusRequest) (*v1.ContainerStatusResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
-
 	id := req.GetContainerId()
 	if !isContainer(id) {
 		return nil, fmt.Errorf("%s: specified ID belongs to pod", getCurrentFuncName())
@@ -1317,28 +1288,22 @@ func (m *PortodshimRuntimeMapper) ContainerStatus(ctx context.Context, req *v1.C
 			LogPath:     getValueForKubeLabel(ctx, id, "io.kubernetes.container.logpath", "LABEL"),
 		},
 	}
-	zap.S().Debugf("resp %s: %+v", getCurrentFuncName(), resp)
+
 	return resp, nil
 }
 
 func (m *PortodshimRuntimeMapper) UpdateContainerResources(ctx context.Context, req *v1.UpdateContainerResourcesRequest) (*v1.UpdateContainerResourcesResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	return nil, fmt.Errorf("not implemented UpdateContainerResources")
 }
 
 func (m *PortodshimRuntimeMapper) ReopenContainerLog(ctx context.Context, req *v1.ReopenContainerLogRequest) (*v1.ReopenContainerLogResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	// TODO: реализовать ReopenContainerLog
 	return &v1.ReopenContainerLogResponse{}, nil
 }
 
 func (m *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSyncRequest) (*v1.ExecSyncResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	pc := getPortoClient(ctx)
-	execContainerID := req.GetContainerId() + "/" + createId("exec-sync", m.randGenerator)
+	execContainerID := req.GetContainerId() + "/" + createId("exec-sync")
 	if err := pc.Create(execContainerID); err != nil {
 		return nil, fmt.Errorf("failed to create exec container %s: %w", execContainerID, err)
 	}
@@ -1385,8 +1350,6 @@ func (m *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSync
 }
 
 func (m *PortodshimRuntimeMapper) Exec(ctx context.Context, req *v1.ExecRequest) (*v1.ExecResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req)
-
 	resp, err := m.streamingServer.GetExec(req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to prepare exec endpoint: %v", err)
@@ -1396,20 +1359,14 @@ func (m *PortodshimRuntimeMapper) Exec(ctx context.Context, req *v1.ExecRequest)
 }
 
 func (m *PortodshimRuntimeMapper) Attach(ctx context.Context, req *v1.AttachRequest) (*v1.AttachResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	return nil, fmt.Errorf("not implemented Attach")
 }
 
 func (m *PortodshimRuntimeMapper) PortForward(ctx context.Context, req *v1.PortForwardRequest) (*v1.PortForwardResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	return nil, fmt.Errorf("not implemented PortForward")
 }
 
 func (m *PortodshimRuntimeMapper) ContainerStats(ctx context.Context, req *v1.ContainerStatsRequest) (*v1.ContainerStatsResponse, error) {
-	zap.S().Debugf("call %s: %s", getCurrentFuncName(), req.GetContainerId())
-
 	id := req.GetContainerId()
 	if !isContainer(id) {
 		return nil, fmt.Errorf("%s: specified ID belongs to pod", getCurrentFuncName())
@@ -1421,8 +1378,6 @@ func (m *PortodshimRuntimeMapper) ContainerStats(ctx context.Context, req *v1.Co
 }
 
 func (m *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, req *v1.ListContainerStatsRequest) (*v1.ListContainerStatsResponse, error) {
-	zap.S().Debugf("call %s: %s %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetPodSandboxId(), req.GetFilter().GetLabelSelector())
-
 	pc := getPortoClient(ctx)
 
 	targetId := req.GetFilter().GetId()
@@ -1476,8 +1431,6 @@ func (m *PortodshimRuntimeMapper) ListContainerStats(ctx context.Context, req *v
 }
 
 func (m *PortodshimRuntimeMapper) ListPodSandboxStats(ctx context.Context, req *v1.ListPodSandboxStatsRequest) (*v1.ListPodSandboxStatsResponse, error) {
-	zap.S().Debugf("call %s: %s %s", getCurrentFuncName(), req.GetFilter().GetId(), req.GetFilter().GetLabelSelector())
-
 	pc := getPortoClient(ctx)
 
 	targetId := req.GetFilter().GetId()
@@ -1522,14 +1475,10 @@ func (m *PortodshimRuntimeMapper) ListPodSandboxStats(ctx context.Context, req *
 }
 
 func (m *PortodshimRuntimeMapper) UpdateRuntimeConfig(ctx context.Context, req *v1.UpdateRuntimeConfigRequest) (*v1.UpdateRuntimeConfigResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	return nil, fmt.Errorf("not implemented UpdateRuntimeConfig")
 }
 
 func (m *PortodshimRuntimeMapper) Status(ctx context.Context, req *v1.StatusRequest) (*v1.StatusResponse, error) {
-	zap.S().Debugf("call %s", getCurrentFuncName())
-
 	pc := getPortoClient(ctx)
 
 	if _, _, err := pc.GetVersion(); err != nil {

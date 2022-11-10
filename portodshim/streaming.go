@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"time"
 
@@ -27,14 +26,10 @@ func NewStreamingServer(addr string) (streaming.Server, error) {
 }
 
 func NewStreamingRuntime() (StreamingRuntime, error) {
-	return StreamingRuntime{
-		randGenerator: rand.New(rand.NewSource(time.Now().UnixNano())),
-	}, nil
+	return StreamingRuntime{}, nil
 }
 
-type StreamingRuntime struct {
-	randGenerator *rand.Rand
-}
+type StreamingRuntime struct{}
 
 func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, terminal bool, resize <-chan remotecommand.TerminalSize) error {
 	ctx, err := portoClientContext(context.Background())
@@ -44,7 +39,7 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 
 	pc := getPortoClient(ctx)
 
-	id := containerID + createId("/exec", sr.randGenerator)
+	id := containerID + createId("/exec")
 
 	if err := pc.CreateWeak(id); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
