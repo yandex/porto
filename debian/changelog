@@ -1,3 +1,25 @@
+yandex-porto (5.3.9) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * release-porto: add sync_upstream subcommand
+  * api: go: add spec api methods
+  * portodshim: use UpdateSpec request to set command_argv
+  * api: change TDockerImage command and env fields to arrays
+  * portodshim: update porto in go.mod
+
+  [ Lev Pantyukhin ]
+  * portodshim: disable lumberjack logrotate
+
+  [ Dmitry Yakunin ]
+  * container: add SYS_NICE to bounding set if rt_priority is enabled in config
+
+  [ Lev Pantyukhin ]
+  * portodshim: change registry authentication to k8s secrets
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Thu, 10 Nov 2022 23:22:31 +0300
+
 yandex-porto (5.3.8) unstable; urgency=low
 
   [ Lev Pantyukhin ]
