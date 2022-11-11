@@ -392,8 +392,10 @@ TError TDockerImage::DetectImagePath(const TPath &place) {
                 if (!digestPath.Exists()) {
                     SchemaVersion = 1;
                     digestPath = DigestPath(place);
-                    if (!digestPath.Exists())
+                    if (!digestPath.Exists()) {
+                        Repository = "";
                         return TError(EError::DockerImageNotFound, FullName());
+                    }
                 }
             } else
                 return TError(EError::DockerImageNotFound, FullName());

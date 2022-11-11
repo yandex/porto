@@ -4880,22 +4880,22 @@ static void TestDockerImageParsing(Porto::Connection &) {
     };
 
     // nothing
-    test("ubuntu",                                                           { "registry-1.docker.io/library/ubuntu:latest@", "registry-1.docker.io", "library", "ubuntu", "latest", "" });
-    test("kndrvt/ubuntu",                                                    { "registry-1.docker.io/kndrvt/ubuntu:latest@", "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "" });
-    test("kndrvt/kek/ubuntu",                                                { "registry-1.docker.io/kndrvt/kek/ubuntu:latest@", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "" });
+    test("ubuntu",                                                           { "registry-1.docker.io/library/ubuntu:latest", "registry-1.docker.io", "library", "ubuntu", "latest", "" });
+    test("kndrvt/ubuntu",                                                    { "registry-1.docker.io/kndrvt/ubuntu:latest", "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "" });
+    test("kndrvt/kek/ubuntu",                                                { "registry-1.docker.io/kndrvt/kek/ubuntu:latest", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "" });
 
-    test("registry.yandex.net/ubuntu",                                       { "registry.yandex.net/library/ubuntu:latest@", "registry.yandex.net", "library", "ubuntu", "latest", "" });
-    test("registry.yandex.net/kndrvt/ubuntu",                                { "registry.yandex.net/kndrvt/ubuntu:latest@", "registry.yandex.net", "kndrvt", "ubuntu", "latest", "" });
-    test("registry.yandex.net/kndrvt/kek/ubuntu",                            { "registry.yandex.net/kndrvt/kek/ubuntu:latest@", "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "" });
+    test("registry.yandex.net/ubuntu",                                       { "registry.yandex.net/library/ubuntu:latest", "registry.yandex.net", "library", "ubuntu", "latest", "" });
+    test("registry.yandex.net/kndrvt/ubuntu",                                { "registry.yandex.net/kndrvt/ubuntu:latest", "registry.yandex.net", "kndrvt", "ubuntu", "latest", "" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu",                            { "registry.yandex.net/kndrvt/kek/ubuntu:latest", "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "" });
 
     // tag
-    test("ubuntu:xenial",                                                    { "registry-1.docker.io/library/ubuntu:xenial@", "registry-1.docker.io", "library", "ubuntu", "xenial", "" });
-    test("kndrvt/ubuntu:xenial",                                             { "registry-1.docker.io/kndrvt/ubuntu:xenial@", "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "" });
-    test("kndrvt/kek/ubuntu:xenial",                                         { "registry-1.docker.io/kndrvt/kek/ubuntu:xenial@", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "" });
+    test("ubuntu:xenial",                                                    { "registry-1.docker.io/library/ubuntu:xenial", "registry-1.docker.io", "library", "ubuntu", "xenial", "" });
+    test("kndrvt/ubuntu:xenial",                                             { "registry-1.docker.io/kndrvt/ubuntu:xenial", "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "" });
+    test("kndrvt/kek/ubuntu:xenial",                                         { "registry-1.docker.io/kndrvt/kek/ubuntu:xenial", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "" });
 
-    test("registry.yandex.net/ubuntu:xenial",                                { "registry.yandex.net/library/ubuntu:xenial@", "registry.yandex.net", "library", "ubuntu", "xenial", "" });
-    test("registry.yandex.net/kndrvt/ubuntu:xenial",                         { "registry.yandex.net/kndrvt/ubuntu:xenial@", "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "" });
-    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial",                     { "registry.yandex.net/kndrvt/kek/ubuntu:xenial@", "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/ubuntu:xenial",                                { "registry.yandex.net/library/ubuntu:xenial", "registry.yandex.net", "library", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/kndrvt/ubuntu:xenial",                         { "registry.yandex.net/kndrvt/ubuntu:xenial", "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial",                     { "registry.yandex.net/kndrvt/kek/ubuntu:xenial", "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "" });
 
     // digest
     test("ubuntu@df5de72bdb3b711",                                           { "registry-1.docker.io/library/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "library", "ubuntu", "latest", "df5de72bdb3b711" });

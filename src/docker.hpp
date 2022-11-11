@@ -101,7 +101,7 @@ struct TDockerImage {
     }
 
     inline std::string FullName(const std::string &tag) const {
-        return fmt::format("{}/{}:{}@{}", Registry, RepositoryAndName(), tag, Digest);
+        return fmt::format("{}/{}:{}{}", Registry, RepositoryAndName(), tag, Digest.empty() ? "" : "@" + Digest);
     }
 
     TError GetAuthToken();
