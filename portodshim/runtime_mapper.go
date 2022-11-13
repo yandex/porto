@@ -1345,22 +1345,27 @@ func (m *PortodshimRuntimeMapper) ExecSync(ctx context.Context, req *v1.ExecSync
 	if err := pc.Start(execContainerID); err != nil {
 		return nil, fmt.Errorf("failed to start exec container %s command '%s': %w", execContainerID, strings.Join(req.Cmd, " "), err)
 	}
-	if _, err := pc.Wait([]string{execContainerID}, time.Duration(req.Timeout)*time.Millisecond); err != nil {
+	if _, err := pc.Wait([]string{execContainerID}, time.Duration(req.Timeout)*time.Second); err != nil {
 		return nil, fmt.Errorf("failed to wait exec container %s exit: %w", execContainerID, err)
 	}
 
-	// TODO: maybe read whole stdout/stderr file not just tail from porto?
-	vars, err := pc.Get([]string{execContainerID}, []string{"stderr", "stdout", "exit_code"})
+	exit_code, err := pc.GetProperty(execContainerID, "exit_code")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container %s stdout, stderr and exit_code: %w", execContainerID, err)
+		return nil, fmt.Errorf("failed to get container %s exit_code: %w", execContainerID, err)
 	}
-	code, err := strconv.ParseInt(vars[execContainerID]["exit_code"].Value, 10, 32)
+	code, err := strconv.ParseInt(exit_code, 10, 32)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse exit_code '%s': %w", vars[execContainerID]["exit_code"].Value, err)
+		return nil, fmt.Errorf("failed to parse exit_code '%s': %w", exit_code, err)
+	}
+
+	// TODO: maybe read whole stdout/stderr file not just tail from porto?
+	streams, err := pc.Get([]string{execContainerID}, []string{"stdout", "stderr"})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container %s stdout and stderr: %w", execContainerID, err)
 	}
 	rsp := &v1.ExecSyncResponse{
-		Stdout:   []byte(vars[execContainerID]["stdout"].Value),
-		Stderr:   []byte(vars[execContainerID]["stderr"].Value),
+		Stdout:   []byte(streams[execContainerID]["stdout"].Value),
+		Stderr:   []byte(streams[execContainerID]["stderr"].Value),
 		ExitCode: int32(code),
 	}
 	return rsp, nil
