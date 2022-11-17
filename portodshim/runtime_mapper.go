@@ -32,6 +32,8 @@ const (
 	defaultEnvPath         = "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
 )
 
+var excludedMountSources = []string{"/dev", "/sys"}
+
 type PortodshimRuntimeMapper struct {
 	containerStateMap map[string]v1.ContainerState
 	podStateMap       map[string]v1.PodSandboxState
@@ -414,6 +416,16 @@ func prepareContainerMount(ctx context.Context, id string, mount *v1.Mount) erro
 	return nil
 }
 
+func sliceContainsString(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
+}
+
 func prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) error {
 	// Mount logshim binary to container
 	mounts = append(mounts,
@@ -428,9 +440,10 @@ func prepareContainerMounts(ctx context.Context, id string, mounts []*v1.Mount) 
 		// pre-normalize volume path for porto as it expects "normal" path
 		mount.ContainerPath = filepath.Clean(mount.ContainerPath)
 		mount.HostPath = filepath.Clean(mount.HostPath)
-		if mount.ContainerPath == "/dev/termination-log" {
+		if sliceContainsString(excludedMountSources, mount.HostPath) {
 			continue
 		}
+
 		// TODO: durty hack
 		if mount.ContainerPath == "/var/run/secrets/kubernetes.io/serviceaccount" {
 			for {
