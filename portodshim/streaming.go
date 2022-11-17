@@ -111,19 +111,19 @@ func (sr StreamingRuntime) Exec(containerID string, cmd []string, stdin io.Reade
 		}
 	}
 
-	if stderr != nil {
-		if terminal {
-			stderr_r = tty
-			stderr_w = pty
-		} else {
-			stderr_r, stderr_w, err = os.Pipe()
-			if err != nil {
-				return err
-			}
-			defer stderr_r.Close()
-			defer stderr_w.Close()
+	if terminal {
+		stderr_r = tty
+		stderr_w = pty
+	} else if stderr != nil {
+		stderr_r, stderr_w, err = os.Pipe()
+		if err != nil {
+			return err
 		}
+		defer stderr_r.Close()
+		defer stderr_w.Close()
+	}
 
+	if stderr_w != nil {
 		if err := pc.SetProperty(id, "stderr_path", fmt.Sprintf("/dev/fd/%d", stderr_w.Fd())); err != nil {
 			return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 		}
