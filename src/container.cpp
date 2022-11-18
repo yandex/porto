@@ -2449,8 +2449,8 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
     }
 
     if ((Controllers & CGROUP_CPU) &&
-            (TestPropDirty(EProperty::CPU_PERIOD) |
-             TestClearPropDirty(EProperty::CPU_GUARANTEE))) {
+            (TestPropDirty(EProperty::CPU_PERIOD) ||
+             TestPropDirty(EProperty::CPU_GUARANTEE))) {
         for (auto ct = this; ct; ct = ct->Parent.get()) {
             error = ct->ApplyCpuGuarantee();
             if (error)
@@ -2465,13 +2465,13 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
             error = ct->ApplyCpuShares();
     }
 
-    if (TestPropDirty(EProperty::CPU_LIMIT))
+    if (TestPropDirty(EProperty::CPU_LIMIT) || TestClearPropDirty(EProperty::CPU_GUARANTEE))
         PropagateCpuLimit();
 
     if ((Controllers & CGROUP_CPU) &&
-            (TestPropDirty(EProperty::CPU_POLICY) |
-             TestPropDirty(EProperty::CPU_WEIGHT) |
-             TestClearPropDirty(EProperty::CPU_LIMIT) |
+            (TestPropDirty(EProperty::CPU_POLICY) ||
+             TestPropDirty(EProperty::CPU_WEIGHT) ||
+             TestClearPropDirty(EProperty::CPU_LIMIT) ||
              TestClearPropDirty(EProperty::CPU_PERIOD))) {
         error = ApplyCpuLimit();
         if (error)
