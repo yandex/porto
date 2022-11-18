@@ -677,6 +677,12 @@ TError TDockerImage::Download(const TPath &place) {
 
 TError TDockerImage::InitStorage(const TPath &place, unsigned perms) {
     TError error;
+    TPath dockerPath = place / PORTO_DOCKER;
+    struct stat st;
+
+    error = dockerPath.MkdirAll(perms);
+    if (error)
+        return error;
 
     error = TPath(place / PORTO_DOCKER_IMAGES).MkdirAll(perms);
     if (error)
@@ -685,6 +691,16 @@ TError TDockerImage::InitStorage(const TPath &place, unsigned perms) {
     error = TPath(place / PORTO_DOCKER_LAYERS).MkdirAll(perms);
     if (error)
         return error;
+
+    error = dockerPath.StatStrict(st);
+    if (error)
+        return error;
+
+    if (st.st_uid != RootUser || st.st_gid != PortoGroup) {
+        error = dockerPath.ChownRecursive(RootUser, PortoGroup);
+        if (error)
+            return error;
+    }
 
     return OK;
 }
