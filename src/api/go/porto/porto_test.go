@@ -1,16 +1,12 @@
 package porto
 
 import (
-	"bytes"
-	"crypto/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
-
-	"github.com/yandex/porto/src/api/go/porto/pkg/rpc"
 )
 
 const (
@@ -23,36 +19,19 @@ const (
 	testPlace     = testTmpDir + "golang_place"
 )
 
-func FailOnError(t *testing.T, conn API, err error) {
-	if err == nil {
-		if conn != nil {
-			if conn.GetLastError() != 0 {
-				t.Error("GetLastError() return value isn't zero")
-				t.FailNow()
-			}
-			if conn.GetLastErrorMessage() != "" {
-				t.Error("GetLastErrorMesage() return value isn't empty")
-				t.FailNow()
-			}
-		}
-	} else {
-		if conn != nil && conn.GetLastError() != 0 {
-			t.Errorf("error %s (%s)",
-				rpc.EError_name[int32(conn.GetLastError())],
-				conn.GetLastErrorMessage())
-		} else {
-			t.Error(err)
-		}
+func FailOnError(t *testing.T, c API, err error) {
+	if err != nil {
+		t.Error(err)
 	}
 }
 
 func ConnectToPorto(t *testing.T) API {
-	conn, err := Connect()
-	if conn == nil {
+	c, err := Connect()
+	if c == nil {
 		t.Error(err)
 		t.FailNow()
 	}
-	return conn
+	return c
 }
 
 func makeTestContainerName(t *testing.T) string {
@@ -60,18 +39,18 @@ func makeTestContainerName(t *testing.T) string {
 }
 
 func TestGetVersion(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	maj, min, err := conn.GetVersion()
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	maj, min, err := c.GetVersion()
+	FailOnError(t, c, err)
 	t.Logf("Porto version %s.%s", maj, min)
 }
 
 func TestPlist(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	plist, err := conn.Plist()
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	plist, err := c.Plist()
+	FailOnError(t, c, err)
 	for i := range plist {
 		if plist[i].Name == "command" {
 			t.Logf("Porto supports command property: %s", plist[i].Description)
@@ -83,10 +62,10 @@ func TestPlist(t *testing.T) {
 }
 
 func TestDlist(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	dlist, err := conn.Dlist()
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	dlist, err := c.Dlist()
+	FailOnError(t, c, err)
 	for i := range dlist {
 		if dlist[i].Name == "state" {
 			t.Logf("Porto supports state data: %s", dlist[i].Description)
@@ -98,29 +77,29 @@ func TestDlist(t *testing.T) {
 }
 
 func TestCreateWeak(t *testing.T) {
-	conn := ConnectToPorto(t)
-	FailOnError(t, conn, conn.CreateWeak(testContainer))
-	conn.Close()
+	c := ConnectToPorto(t)
+	FailOnError(t, c, c.CreateWeak(testContainer))
+	c.Close()
 
-	conn = ConnectToPorto(t)
-	defer conn.Close()
-	err := conn.Destroy(testContainer)
+	c = ConnectToPorto(t)
+	defer c.Close()
+	err := c.Destroy(testContainer)
 	if err == nil {
 		t.Fail()
 	}
 }
 
 func TestCreate(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Create(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Create(testContainer))
 }
 
 func TestList(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	list, err := conn.List()
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	list, err := c.List()
+	FailOnError(t, c, err)
 	for i := range list {
 		if list[i] == testContainer {
 			return
@@ -131,16 +110,16 @@ func TestList(t *testing.T) {
 }
 
 func TestSetProperty(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.SetProperty(testContainer, "command", "sleep 10000"))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.SetProperty(testContainer, "command", "sleep 10000"))
 }
 
 func TestGetProperty(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	value, err := conn.GetProperty(testContainer, "command")
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	value, err := c.GetProperty(testContainer, "command")
+	FailOnError(t, c, err)
 	if value != "sleep 10000" {
 		t.Error("Got a wrong command value")
 		t.FailNow()
@@ -148,35 +127,35 @@ func TestGetProperty(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Start(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Start(testContainer))
 }
 
 func TestPause(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Pause(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Pause(testContainer))
 }
 
 func TestResume(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Resume(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Resume(testContainer))
 }
 
 func TestKill(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Kill(testContainer, syscall.SIGTERM))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Kill(testContainer, syscall.SIGTERM))
 }
 
 func TestWait(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 	containers := []string{testContainer}
-	container, err := conn.Wait(containers, -1)
-	FailOnError(t, conn, err)
+	container, err := c.Wait(containers, -1)
+	FailOnError(t, c, err)
 	if container != testContainer {
 		t.Error("Wait returned a wrong container")
 		t.FailNow()
@@ -184,10 +163,10 @@ func TestWait(t *testing.T) {
 }
 
 func TestGetData(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	value, err := conn.GetData(testContainer, "state")
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	value, err := c.GetData(testContainer, "state")
+	FailOnError(t, c, err)
 	if value != "dead" {
 		t.Error("Got a wrong state value")
 		t.FailNow()
@@ -195,12 +174,12 @@ func TestGetData(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 	containers := []string{testContainer}
 	variables := []string{"state", "exit_status"}
-	resp, err := conn.Get(containers, variables)
-	FailOnError(t, conn, err)
+	resp, err := c.Get(containers, variables)
+	FailOnError(t, c, err)
 	if resp[testContainer]["state"].Value != "dead" {
 		t.Error("Got a wrong state value")
 		t.FailNow()
@@ -212,10 +191,10 @@ func TestGet(t *testing.T) {
 }
 
 func TestConvertPath(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	resp, err := conn.ConvertPath("/", testContainer, testContainer)
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	resp, err := c.ConvertPath("/", testContainer, testContainer)
+	FailOnError(t, c, err)
 	if resp != "/" {
 		t.Error("Got wrong path conversion")
 		t.FailNow()
@@ -223,23 +202,23 @@ func TestConvertPath(t *testing.T) {
 }
 
 func TestStop(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Stop(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Stop(testContainer))
 }
 
 func TestDestroy(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Destroy(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Destroy(testContainer))
 }
 
 // VolumeAPI
 func TestListVolumeProperties(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	properties, err := conn.ListVolumeProperties()
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	properties, err := c.ListVolumeProperties()
+	FailOnError(t, c, err)
 	for i := range properties {
 		if properties[i].Name == "backend" {
 			return
@@ -250,21 +229,21 @@ func TestListVolumeProperties(t *testing.T) {
 }
 
 func TestCreateVolume(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 	os.Remove(testVolume)
 	os.Mkdir(testVolume, 0755)
 	config := make(map[string]string)
 	config["private"] = "golang test volume"
-	_, err := conn.CreateVolume(testVolume, config)
-	FailOnError(t, conn, err)
+	_, err := c.CreateVolume(testVolume, config)
+	FailOnError(t, c, err)
 }
 
 func TestListVolumes(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	volumes, err := conn.ListVolumes("", "")
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	volumes, err := c.ListVolumes("", "")
+	FailOnError(t, c, err)
 	for i := range volumes {
 		if volumes[i].Path == testVolume {
 			return
@@ -275,10 +254,10 @@ func TestListVolumes(t *testing.T) {
 }
 
 func TestLinkVolume(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.Create(testContainer))
-	FailOnError(t, conn, conn.LinkVolume(testVolume, testContainer, "", false, false))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.Create(testContainer))
+	FailOnError(t, c, c.LinkVolume(testVolume, testContainer, "", false, false))
 }
 
 func TestLinkVolumeTarget(t *testing.T) {
@@ -292,35 +271,35 @@ func TestLinkVolumeTarget(t *testing.T) {
 	defer os.RemoveAll(cntDir)
 	os.MkdirAll(cntMountDir, 0755)
 
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 
-	FailOnError(t, conn, conn.Create(cntName))
-	defer conn.Destroy(cntName)
-	FailOnError(t, conn, conn.SetProperty(cntName, "root", cntRootDir))
-	_, err := conn.CreateVolume(cntMountDir, map[string]string{
+	FailOnError(t, c, c.Create(cntName))
+	defer c.Destroy(cntName)
+	FailOnError(t, c, c.SetProperty(cntName, "root", cntRootDir))
+	_, err := c.CreateVolume(cntMountDir, map[string]string{
 		"backend": "bind",
 		"storage": cntMountDir,
 	})
-	FailOnError(t, conn, err)
-	FailOnError(t, conn, conn.LinkVolume(cntMountDir, cntName, "/dst", false, true))
-	FailOnError(t, conn, conn.UnlinkVolume(cntMountDir, "/", ""))
-	FailOnError(t, conn, conn.UnlinkVolume(cntMountDir, cntName, "/dst"))
+	FailOnError(t, c, err)
+	FailOnError(t, c, c.LinkVolume(cntMountDir, cntName, "/dst", false, true))
+	FailOnError(t, c, c.UnlinkVolume(cntMountDir, "/", ""))
+	FailOnError(t, c, c.UnlinkVolume(cntMountDir, cntName, "/dst"))
 }
 
 func TestExportLayer(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.ExportLayer(testVolume, "/tmp/goporto.tgz"))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.ExportLayer(testVolume, "/tmp/goporto.tgz"))
 	os.Remove("/tmp/goporto.tgz")
 }
 
 func TestUnlinkVolume(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.UnlinkVolume(testVolume, testContainer, ""))
-	FailOnError(t, conn, conn.UnlinkVolume(testVolume, "/", ""))
-	FailOnError(t, conn, conn.Destroy(testContainer))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.UnlinkVolume(testVolume, testContainer, ""))
+	FailOnError(t, c, c.UnlinkVolume(testVolume, "/", ""))
+	FailOnError(t, c, c.Destroy(testContainer))
 	os.Remove(testVolume)
 }
 
@@ -343,20 +322,20 @@ func TestImportLayer(t *testing.T) {
 	defer os.Remove(testTarball)
 
 	// Import
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 
-	FailOnError(t, conn,
-		conn.ImportLayer(testLayer, testTarball, false))
+	FailOnError(t, c,
+		c.ImportLayer(testLayer, testTarball, false))
 }
 
 func TestLayerPrivate(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 
-	FailOnError(t, conn, conn.SetLayerPrivate(testLayer, "", "456"))
-	private, err := conn.GetLayerPrivate(testLayer, "")
-	FailOnError(t, conn, err)
+	FailOnError(t, c, c.SetLayerPrivate(testLayer, "", "456"))
+	private, err := c.GetLayerPrivate(testLayer, "")
+	FailOnError(t, c, err)
 
 	if private == "456" {
 		return
@@ -367,10 +346,10 @@ func TestLayerPrivate(t *testing.T) {
 }
 
 func TestListLayers(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	layers, err := conn.ListLayers()
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	layers, err := c.ListLayers()
+	FailOnError(t, c, err)
 	for i := range layers {
 		if layers[i] == testLayer {
 			return
@@ -381,10 +360,10 @@ func TestListLayers(t *testing.T) {
 }
 
 func TestListLayers2(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	layers, err := conn.ListLayers2("", "")
-	FailOnError(t, conn, err)
+	c := ConnectToPorto(t)
+	defer c.Close()
+	layers, err := c.ListLayers2("", "")
+	FailOnError(t, c, err)
 	for i := range layers {
 		if layers[i].Name == testLayer &&
 			layers[i].PrivateValue == "456" &&
@@ -398,53 +377,31 @@ func TestListLayers2(t *testing.T) {
 }
 
 func TestRemoveLayer(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.RemoveLayer(testLayer))
-}
-
-func TestSendRecvData(t *testing.T) {
-	buff := new(bytes.Buffer)
-	data := make([]byte, 1024*1024+1024)
-	_, err := rand.Read(data)
-	if err != nil {
-		t.Fatalf("unable to generate random array: %v", err)
-	}
-
-	if err := sendData(buff, data); err != nil {
-		t.Fatalf("SendData returns unexpected error: %v", err)
-	}
-
-	result, err := recvData(buff)
-	if err != nil {
-		t.Fatalf("RecvData returns unexpected error: %v", err)
-	}
-
-	if !bytes.Equal(data, result) {
-		t.Fatalf("result is not the same as input")
-	}
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.RemoveLayer(testLayer))
 }
 
 func TestCreateStorage(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 
 	config := make(map[string]string)
 	config["backend"] = "native"
 	config["storage"] = testStorage
 	config["private"] = "12345"
 
-	volume, err := conn.CreateVolume("", config)
-	FailOnError(t, conn, err)
-	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", "", false))
+	volume, err := c.CreateVolume("", config)
+	FailOnError(t, c, err)
+	FailOnError(t, c, c.UnlinkVolume3(volume.Path, "", "", false))
 }
 
 func TestListStorage(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 
-	storages, err := conn.ListStorage("", "")
-	FailOnError(t, conn, err)
+	storages, err := c.ListStorage("", "")
+	FailOnError(t, c, err)
 
 	for i := range storages {
 		if storages[i].Name == testStorage &&
@@ -459,14 +416,14 @@ func TestListStorage(t *testing.T) {
 }
 
 func TestRemoveStorage(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	FailOnError(t, conn, conn.RemoveStorage(testStorage, ""))
+	c := ConnectToPorto(t)
+	defer c.Close()
+	FailOnError(t, c, c.RemoveStorage(testStorage, ""))
 }
 
 func TestPlace(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
+	c := ConnectToPorto(t)
+	defer c.Close()
 
 	os.RemoveAll(testPlace)
 	os.Mkdir(testPlace, 0755)
@@ -479,29 +436,29 @@ func TestPlace(t *testing.T) {
 	config["place"] = testPlace
 	config["storage"] = "abcd"
 
-	volume, err := conn.CreateVolume("", config)
-	FailOnError(t, conn, err)
-
+	volume, err := c.CreateVolume("", config)
+	FailOnError(t, c, err)
 	if !strings.Contains(volume.Path, testPlace) {
 		t.Error("Volume does not use desired place")
 		t.FailNow()
 	}
 
 	_, err = os.Stat(volume.Path)
-	FailOnError(t, conn, err)
+	FailOnError(t, c, err)
 
-	storages, err := conn.ListStorage(testPlace, "")
-	FailOnError(t, conn, err)
+	storages, err := c.ListStorage(testPlace, "")
+	FailOnError(t, c, err)
 
 	if len(storages) == 0 || storages[0].Name != "abcd" {
 		t.Error("Storage failed to be created in place")
 		t.FailNow()
 	}
 
-	FailOnError(t, conn, conn.UnlinkVolume3(volume.Path, "", "", false))
-	FailOnError(t, conn, conn.RemoveStorage("abcd", testPlace))
-	FailOnError(t, conn, os.Remove(testPlace+"/porto_volumes"))
-	FailOnError(t, conn, os.Remove(testPlace+"/porto_layers"))
-	FailOnError(t, conn, os.Remove(testPlace+"/porto_storage"))
-	FailOnError(t, conn, os.Remove(testPlace))
+	FailOnError(t, c, c.UnlinkVolume3(volume.Path, "", "", false))
+	FailOnError(t, c, c.RemoveStorage("abcd", testPlace))
+	FailOnError(t, c, os.Remove(testPlace+"/porto_volumes"))
+	FailOnError(t, c, os.Remove(testPlace+"/porto_layers"))
+	FailOnError(t, c, os.Remove(testPlace+"/porto_storage"))
+	FailOnError(t, c, os.RemoveAll(testPlace+"/porto_docker"))
+	FailOnError(t, c, os.Remove(testPlace))
 }
