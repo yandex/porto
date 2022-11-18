@@ -408,9 +408,11 @@ TError TStorage::List(EStorageType type, std::list<TStorage> &list) {
     if (Type == EStorageType::Place) {
         if (type == EStorageType::Layer)
             path = Place / PORTO_LAYERS;
-        else if (type == EStorageType::DockerLayer)
+        else if (type == EStorageType::DockerLayer) {
             path = Place / PORTO_DOCKER_LAYERS / "blobs";
-        else
+            if (!path.Exists())
+                return OK;
+        } else
             path = Place / PORTO_STORAGE;
     }
 
