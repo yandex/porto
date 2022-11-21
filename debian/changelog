@@ -1,3 +1,22 @@
+yandex-porto (5.3.10) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * portodshim: fix ExecSync timeout and exit_code handling
+
+  [ Lev Pantyukhin ]
+  * portodshim: fix stderr with tty
+  * portodshim: add path skipping in prepareContainerMounts
+  * docker: fix image fullname for DockerImageNotFound
+  * container: recalculate cpu_guarantee_bound when cpu_guarantee is applying
+  * portodshim: refactor logs
+  * storage: fix Storage::List for DockertLayer without blobs directory
+  * docker: change porto_docker and images directory owner
+  * api: refactor golang api for cpu optimization
+
+  [ Dmitry Yakunin ]
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Mon, 21 Nov 2022 21:32:58 +0300
+
 yandex-porto (5.3.9) unstable; urgency=low
 
   [ Dmitry Yakunin ]
