@@ -23,7 +23,8 @@ pypi() {
 sync_upstream() {
     BRANCH_TO_SYNC_WITH="${BRANCH_TO_SYNC_WITH:-master}"
     last_commit=`git log --oneline upstream | head -n1 | cut -d' ' -f2-`
-    first_commit_to_sync=`git log --oneline ${BRANCH_TO_SYNC_WITH} | grep "${last_commit}" | cut -d' ' -f1`
+    git checkout $BRANCH_TO_SYNC_WITH
+    first_commit_to_sync=`git log --oneline | grep "${last_commit}" | cut -d' ' -f1`
     commits_to_sync=`git log --pretty=format:"%h" ${BRANCH_TO_SYNC_WITH} ${first_commit_to_sync}..`
     commits_to_sync=`echo "$commits_to_sync" | awk '{a[i++]=$0} END {for (j=i-1; j>=0;) print a[j--] }'`
     git checkout upstream
