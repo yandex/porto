@@ -1,3 +1,11 @@
+yandex-porto (5.3.11) unstable; urgency=low
+
+  * release-porto: fix
+  * portodshim: update porto in go.mod and go.sum
+  * portodshim: fix build
+
+ -- Dmitry Yakunin <zeil@yandex-team.ru>  Tue, 22 Nov 2022 10:29:35 +0300
+
 yandex-porto (5.3.10) unstable; urgency=low
 
   [ Dmitry Yakunin ]
