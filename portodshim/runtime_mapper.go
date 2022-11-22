@@ -397,12 +397,12 @@ func prepareContainerMount(ctx context.Context, id string, mount *v1.Mount) erro
 		"backend": "bind",
 		"storage": mount.HostPath,
 	})
-	if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeAlreadyExists {
+	if err != nil && err.(*porto.Error).Code != rpc.EError_VolumeAlreadyExists {
 		return fmt.Errorf("%s: %s %s %v", getCurrentFuncName(), id, mount.HostPath, err)
 	}
 	defer func() {
 		err := pc.UnlinkVolume(volume.Path, "/", "")
-		if err != nil && err.(*porto.Error).Errno != rpc.EError_VolumeNotLinked {
+		if err != nil && err.(*porto.Error).Code != rpc.EError_VolumeNotLinked {
 			zap.S().Errorf("failed to unlink volume %s from root container: %v", volume.Path, err)
 		}
 	}()

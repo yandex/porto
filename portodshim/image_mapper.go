@@ -78,7 +78,7 @@ func (m *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageSt
 
 	image, err := pc.DockerImageStatus(req.GetImage().GetImage(), "")
 	if err != nil {
-		if err.(*porto.Error).Errno == rpc.EError_DockerImageNotFound {
+		if err.(*porto.Error).Code == rpc.EError_DockerImageNotFound {
 			return &v1.ImageStatusResponse{
 				Image: nil,
 				Info:  map[string]string{},
