@@ -18,11 +18,11 @@ def check_affinity(ct, affinity):
     with open('/sys/fs/cgroup/cpuset/porto%{}/cpuset.cpus'.format(ct)) as f:
         cg_affinity = str(f.read()).strip()
     if affinity.startswith('!'):
-        assert ct_affinity != affinity
-        assert cg_affinity != affinity
+        assert ct_affinity != affinity, '{} != {}'.format(ct_affinity, affinity)
+        assert cg_affinity != affinity, '{} != {}'.format(cg_affinity, affinity)
     else:
-        assert ct_affinity == affinity
-        assert cg_affinity == affinity
+        assert ct_affinity == affinity, '{} == {}'.format(ct_affinity, affinity)
+        assert cg_affinity == affinity, '{} == {}'.format(cg_affinity, affinity)
 
 try:
     # incorrect values
@@ -210,6 +210,30 @@ try:
     check_affinity(c, '0-2')
 
     c.Destroy()
+    b.Destroy()
+    a.Destroy()
+
+    # PORTO-1074
+
+    a = conn.Create('a')
+    a.SetProperty('cpu_set', 'node 0; jail 2')
+    a.Start()
+
+    b = conn.Create('b')
+    b.SetProperty('cpu_set', 'node 0; jail 2')
+    b.Start()
+
+    check_affinity(a, '0-1')
+    check_affinity(b, '2-3')
+
+    b.SetProperty('cpu_set', 'node 0')
+    check_affinity(a, '0-1')
+    check_affinity(b, '0-{}'.format(CPUNR - 1))
+
+    b.SetProperty('cpu_set', 'node 0; jail 2')
+    check_affinity(a, '0-1')
+    check_affinity(b, '2-3')
+
     b.Destroy()
     a.Destroy()
 

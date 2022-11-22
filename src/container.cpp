@@ -1790,7 +1790,10 @@ TError TContainer::JailCpus() {
     if ((unsigned)NewCpuJail != affinityWeight || nodeChanged) {
         auto lock = LockCpuAffinity();
 
-        if (affinityWeight < JailCpuPermutation.size())
+        if (node >= 0) {
+            if (affinityWeight < NodeThreads[node].Weight())
+                UpdateJailCpuStateLocked(affinity, true);
+        } else if (affinityWeight < JailCpuPermutation.size())
             UpdateJailCpuStateLocked(affinity, true);
 
         affinity.Clear();
