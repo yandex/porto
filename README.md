@@ -34,7 +34,7 @@ $ sudo dpkg -i ../yandex-porto_*.deb
 ```
 or
 ```
-$ sudo apt-get install cmake protobuf-compiler libprotobuf-dev libnl-3-dev libnl-route-3-dev libnl-idiag-3-dev libncurses5-dev pandoc
+$ sudo apt-get install g++ cmake protobuf-compiler libprotobuf-dev libnl-3-dev libnl-route-3-dev libnl-idiag-3-dev libncurses5-dev pandoc
 $ cmake .
 $ make
 $ make install DESTDIR=/usr/local
