@@ -1,3 +1,13 @@
+yandex-porto (5.3.12) unstable; urgency=low
+
+  [ Dmitry Yakunin ]
+  * README: add g++
+  * cpu: fix jail usage calculation on node -> node + jail cpu_set switching
+
+  [ Lev Pantyukhin ]
+
+ -- Lev Pantyukhin <kndrvt@yandex-team.ru>  Wed, 23 Nov 2022 14:00:33 +0300
+
 yandex-porto (5.3.11) unstable; urgency=low
 
   * release-porto: fix
