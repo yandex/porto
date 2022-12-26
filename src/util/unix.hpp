@@ -73,6 +73,7 @@ TError SetOomScoreAdj(int value);
 
 std::string FormatExitStatus(int status);
 int GetNumCores();
+int GetPageSize();
 void DumpMallocInfo();
 
 int SetIoPrio(pid_t pid, int ioprio);

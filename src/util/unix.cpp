@@ -242,12 +242,21 @@ std::string FormatExitStatus(int status) {
 int GetNumCores() {
     int ncores = sysconf(_SC_NPROCESSORS_CONF);
     if (ncores <= 0) {
-        TError error(EError::Unknown, "Can't get number of CPU cores");
-        L_ERR("{}", error);
+        L_ERR("Cannot get number of CPU cores");
         return 1;
     }
 
     return ncores;
+}
+
+int GetPageSize() {
+    int pagesize = sysconf(_SC_PAGESIZE);
+    if (pagesize <= 0) {
+        L_ERR("Cannot get size of page");
+        return 4096;
+    }
+
+    return pagesize;
 }
 
 void DumpMallocInfo() {

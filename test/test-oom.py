@@ -5,6 +5,12 @@ import time
 import porto
 from test_common import *
 
+ConfigurePortod('test-oom', """
+container {
+    memory_high_limit_proportion: 1
+}
+""")
+
 c = porto.Connection()
 stress_memory = "bash -c 'while true; do stress -m 1 ; done'"
 

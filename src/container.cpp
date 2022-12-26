@@ -2339,6 +2339,25 @@ TError TContainer::ApplyDynamicProperties(bool onRestore) {
                 L_ERR("Cannot set {}: {}", P_MEM_LIMIT, error);
             return error;
         }
+        if (MemorySubsystem.SupportHighLimit() && MemLimit) {
+            // https://bb.yandex-team.ru/projects/KERNEL/repos/linux/commits/434f0ca01640ab31c3c719101b2293f49776625e
+            //
+            // static unsigned long default_high_margin = 64;
+            // ...
+            // unsigned long margin = default_high_margin * num_online_cpus();
+            // memcg->high = max - min(max / 4, margin);
+
+            uint64_t defaultHighMargin = 64 * GetNumCores() * GetPageSize();
+            uint64_t highLimit = MemLimit - std::min(MemLimit / 4, defaultHighMargin);
+            if (config().container().memory_high_limit_proportion())
+                highLimit = config().container().memory_high_limit_proportion() * MemLimit;
+
+            error = MemorySubsystem.SetHighLimit(memcg, highLimit);
+            if (error) {
+                L_ERR("Cannot set high_limit_in_bytes: {}", error);
+                return error;
+            }
+        }
     }
 
     if (TestClearPropDirty(EProperty::ANON_LIMIT)) {

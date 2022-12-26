@@ -173,6 +173,7 @@ public:
     const std::string LIMIT = "memory.limit_in_bytes";
     const std::string SOFT_LIMIT = "memory.soft_limit_in_bytes";
     const std::string LOW_LIMIT = "memory.low_limit_in_bytes";
+    const std::string HIGH_LIMIT = "memory.high_limit_in_bytes";
     const std::string MEM_SWAP_LIMIT = "memory.memsw.limit_in_bytes";
     const std::string DIRTY_LIMIT = "memory.dirty_limit_in_bytes";
     const std::string DIRTY_RATIO = "memory.dirty_ratio";
@@ -209,6 +210,16 @@ public:
         if (!SupportGuarantee())
             return OK;
         return cg.SetUint64(LOW_LIMIT, guarantee);
+    }
+
+    bool SupportHighLimit() const {
+        return RootCgroup().Has(HIGH_LIMIT);
+    }
+
+    TError SetHighLimit(TCgroup &cg, uint64_t limit) const {
+        if (!SupportHighLimit())
+            return OK;
+        return cg.SetUint64(HIGH_LIMIT, limit);
     }
 
     bool SupportIoLimit() const {
