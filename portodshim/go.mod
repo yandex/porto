@@ -62,3 +62,5 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
 )
+
+replace github.com/yandex/porto/src/api/go/porto v0.0.0-20221121185031-c3318d6030a7 => ../src/api/go/porto

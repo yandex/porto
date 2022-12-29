@@ -1,10 +1,9 @@
 #include "libporto.hpp"
+#include "rpc.pb.h"
 
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/io/coded_stream.h>
-
-#include "rpc.pb.h"
 
 using ::rpc::EError;
 
@@ -847,6 +846,25 @@ int Connection::SetLayerPrivate(const std::string &private_value,
     return Impl->Call();
 }
 
+DockerImage::DockerImage(const ::rpc::TDockerImage &i) {
+    Id = i.id();
+    for (const auto &tag: i.tags())
+        Tags.emplace_back(tag);
+    for (const auto &digest: i.digests())
+        Digests.emplace_back(digest);
+    for (const auto &layer: i.layers())
+        Layers.emplace_back(layer);
+    if (i.has_size())
+        Size = i.size();
+    if (i.has_config()) {
+        auto &cfg = i.config();
+        for (const auto &cmd: cfg.cmd())
+            Config.Cmd.emplace_back(cmd);
+        for (const auto &env: cfg.env())
+            Config.Env.emplace_back(env);
+    }
+}
+
 int Connection::DockerImageStatus(DockerImage &image,
                                   const std::string &name,
                                   const std::string &place) {
@@ -855,16 +873,8 @@ int Connection::DockerImageStatus(DockerImage &image,
     if (!place.empty())
         req->set_place(place);
     int ret = Impl->Call();
-    if (!ret && Impl->Rsp.dockerimagestatus().has_image()) {
-        auto i = Impl->Rsp.dockerimagestatus().image();
-        image.Name = i.full_name();
-        for (const auto &layer: i.layers())
-            image.Layers.push_back(layer);
-        for (const auto &command: i.command())
-            image.Command.push_back(command);
-        for (const auto &env: i.env())
-            image.Env.push_back(env);
-    }
+    if (!ret && Impl->Rsp.dockerimagestatus().has_image())
+        image = DockerImage(Impl->Rsp.dockerimagestatus().image());
     return ret;
 }
 
@@ -878,17 +888,8 @@ int Connection::ListDockerImages(std::vector<DockerImage> &images,
         req->set_mask(mask);
     int ret = Impl->Call();
     if (!ret) {
-        for (const auto &i: Impl->Rsp.listdockerimages().images()) {
-            DockerImage image;
-            image.Name = i.full_name();
-            for (const auto &layer: i.layers())
-                image.Layers.push_back(layer);
-            for (const auto &command: i.command())
-                image.Command.push_back(command);
-            for (const auto &env: i.env())
-                image.Env.push_back(env);
-            images.push_back(image);
-        }
+        for (const auto &i: Impl->Rsp.listdockerimages().images())
+            images.emplace_back(i);
     }
     return ret;
 }
@@ -910,16 +911,8 @@ int Connection::PullDockerImage(DockerImage &image,
     if (auth_service.size())
         req->set_auth_service(auth_service);
     int ret = Impl->Call();
-    if (!ret && Impl->Rsp.pulldockerimage().has_image()) {
-        auto i = Impl->Rsp.pulldockerimage().image();
-        image.Name = i.full_name();
-        for (const auto &layer: i.layers())
-            image.Layers.push_back(layer);
-        for (const auto &command: i.command())
-            image.Command.push_back(command);
-        for (const auto &env: i.env())
-            image.Env.push_back(env);
-    }
+    if (!ret && Impl->Rsp.pulldockerimage().has_image())
+        image = DockerImage(Impl->Rsp.pulldockerimage().image());
     return ret;
 }
 

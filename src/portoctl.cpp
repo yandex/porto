@@ -2986,19 +2986,33 @@ public:
         if (ret) {
             PrintError("Can't list docker images");
         } else {
+            if (!verbose) {
+                std::cout << "ID           NAME" << std::endl;
+            }
             for (const auto &i: images) {
-                std::cout << i.Name << std::endl;
                 if (verbose) {
+                    std::cout << "Id: " << std::endl << "\t" << i.Id << std::endl;
+                    std::cout << "Tags:" << std::endl;
+                    for (const auto &t: i.Tags)
+                        std::cout << "\t" << t << std::endl;
+                    std::cout << "Digests:" << std::endl;
+                    for (const auto &d: i.Digests)
+                        std::cout << "\t" << d << std::endl;
                     std::cout << "Layers:" << std::endl;
                     for (const auto &l: i.Layers)
                         std::cout << "\t" << l << std::endl;
-                    std::cout << "Command:" << std::endl;
-                    for (const auto &c: i.Command)
-                        std::cout << "\t" << c << std::endl;
+                    std::cout << "Size:" << std::endl << "\t" << StringFormatSize(i.Size) << std::endl;
+                    std::cout << "Command:" << std::endl << "\t";
+                    for (const auto &c: i.Config.Cmd)
+                        std::cout << c << " ";
+                    std::cout << std::endl;
                     std::cout << "Env:" << std::endl;
-                    for (const auto &e: i.Env)
+                    for (const auto &e: i.Config.Env)
                         std::cout << "\t" << e << std::endl;
                     std::cout << std::endl;
+                } else {
+                    for (const auto &t: i.Tags)
+                        std::cout << i.Id.substr(0, 12) << " " << t << std::endl;
                 }
             }
         }
@@ -3042,7 +3056,7 @@ public:
         if (ret)
             PrintError("Can't pull docker image");
         else
-            std::cout << image.Name << std::endl;
+            std::cout << image.Id << std::endl;
 
         return ret;
     }
@@ -3115,7 +3129,7 @@ public:
             return ret;
         }
 
-        if (image.Name.empty()) {
+        if (image.Id.empty()) {
             std::cerr << "Cannot find docker image" << std::endl;
             return EXIT_FAILURE;
         }
@@ -3123,8 +3137,8 @@ public:
         launcher.NeedVolume = true;
         launcher.Container = args[0];
         launcher.Image = args[1];
-        launcher.SetCommand(image.Command);
-        launcher.SetEnvironment(image.Env);
+        launcher.SetCommand(image.Config.Cmd);
+        launcher.SetEnvironment(image.Config.Env);
 
         for (size_t i = 2; i < args.size(); ++i) {
             error = launcher.SetProperty(args[i]);

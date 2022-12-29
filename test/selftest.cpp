@@ -4869,51 +4869,53 @@ static void TestConvertPath(Porto::Connection &api) {
 
 static void TestDockerImageParsing(Porto::Connection &) {
     auto test = [](const std::string &name, const std::vector<std::string> &target) {
-        std::cerr << name << "  ->  " << target[0] << std::endl;
+        std::cerr << name << std::endl;
         TDockerImage image(name);
-        Expect(image.FullName() == target[0]);
-        Expect(image.Registry   == target[1]);
-        Expect(image.Repository == target[2]);
-        Expect(image.Name       == target[3]);
-        Expect(image.Tag        == target[4]);
-        Expect(image.Digest     == target[5]);
+        Expect(image.Registry   == target[0]);
+        Expect(image.Repository == target[1]);
+        Expect(image.Name       == target[2]);
+        Expect(image.Tag        == target[3]);
+        Expect(image.Digest     == target[4]);
     };
 
-    // nothing
-    test("ubuntu",                                                           { "registry-1.docker.io/library/ubuntu:latest", "registry-1.docker.io", "library", "ubuntu", "latest", "" });
-    test("kndrvt/ubuntu",                                                    { "registry-1.docker.io/kndrvt/ubuntu:latest", "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "" });
-    test("kndrvt/kek/ubuntu",                                                { "registry-1.docker.io/kndrvt/kek/ubuntu:latest", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "" });
+    // id
+    test("796f752061726520736f2063757465",                                                  { "registry-1.docker.io", "library", "", "latest", "796f752061726520736f2063757465" });
 
-    test("registry.yandex.net/ubuntu",                                       { "registry.yandex.net/library/ubuntu:latest", "registry.yandex.net", "library", "ubuntu", "latest", "" });
-    test("registry.yandex.net/kndrvt/ubuntu",                                { "registry.yandex.net/kndrvt/ubuntu:latest", "registry.yandex.net", "kndrvt", "ubuntu", "latest", "" });
-    test("registry.yandex.net/kndrvt/kek/ubuntu",                            { "registry.yandex.net/kndrvt/kek/ubuntu:latest", "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "" });
+    // nothing
+    test("ubuntu",                                                                          { "registry-1.docker.io", "library", "ubuntu", "latest", "" });
+    test("kndrvt/ubuntu",                                                                   { "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "" });
+    test("kndrvt/kek/ubuntu",                                                               { "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "" });
+
+    test("registry.yandex.net/ubuntu",                                                      { "registry.yandex.net", "library", "ubuntu", "latest", "" });
+    test("registry.yandex.net/kndrvt/ubuntu",                                               { "registry.yandex.net", "kndrvt", "ubuntu", "latest", "" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu",                                           { "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "" });
 
     // tag
-    test("ubuntu:xenial",                                                    { "registry-1.docker.io/library/ubuntu:xenial", "registry-1.docker.io", "library", "ubuntu", "xenial", "" });
-    test("kndrvt/ubuntu:xenial",                                             { "registry-1.docker.io/kndrvt/ubuntu:xenial", "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "" });
-    test("kndrvt/kek/ubuntu:xenial",                                         { "registry-1.docker.io/kndrvt/kek/ubuntu:xenial", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "" });
+    test("ubuntu:xenial",                                                                   { "registry-1.docker.io", "library", "ubuntu", "xenial", "" });
+    test("kndrvt/ubuntu:xenial",                                                            { "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "" });
+    test("kndrvt/kek/ubuntu:xenial",                                                        { "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "" });
 
-    test("registry.yandex.net/ubuntu:xenial",                                { "registry.yandex.net/library/ubuntu:xenial", "registry.yandex.net", "library", "ubuntu", "xenial", "" });
-    test("registry.yandex.net/kndrvt/ubuntu:xenial",                         { "registry.yandex.net/kndrvt/ubuntu:xenial", "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "" });
-    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial",                     { "registry.yandex.net/kndrvt/kek/ubuntu:xenial", "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/ubuntu:xenial",                                               { "registry.yandex.net", "library", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/kndrvt/ubuntu:xenial",                                        { "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial",                                    { "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "" });
 
     // digest
-    test("ubuntu@df5de72bdb3b711",                                           { "registry-1.docker.io/library/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "library", "ubuntu", "latest", "df5de72bdb3b711" });
-    test("kndrvt/ubuntu@df5de72bdb3b711",                                    { "registry-1.docker.io/kndrvt/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "df5de72bdb3b711" });
-    test("kndrvt/kek/ubuntu@df5de72bdb3b711",                                { "registry-1.docker.io/kndrvt/kek/ubuntu:latest@df5de72bdb3b711", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "df5de72bdb3b711" });
+    test("ubuntu@796f752061726520736f2063757465",                                           { "registry-1.docker.io", "library", "ubuntu", "latest", "796f752061726520736f2063757465" });
+    test("kndrvt/ubuntu@796f752061726520736f2063757465",                                    { "registry-1.docker.io", "kndrvt", "ubuntu", "latest", "796f752061726520736f2063757465" });
+    test("kndrvt/kek/ubuntu@796f752061726520736f2063757465",                                { "registry-1.docker.io", "kndrvt/kek", "ubuntu", "latest", "796f752061726520736f2063757465" });
 
-    test("registry.yandex.net/ubuntu@df5de72bdb3b711",                       { "registry.yandex.net/library/ubuntu:latest@df5de72bdb3b711", "registry.yandex.net", "library", "ubuntu", "latest", "df5de72bdb3b711" });
-    test("registry.yandex.net/kndrvt/ubuntu@df5de72bdb3b711",                { "registry.yandex.net/kndrvt/ubuntu:latest@df5de72bdb3b711", "registry.yandex.net", "kndrvt", "ubuntu", "latest", "df5de72bdb3b711" });
-    test("registry.yandex.net/kndrvt/kek/ubuntu@df5de72bdb3b711",            { "registry.yandex.net/kndrvt/kek/ubuntu:latest@df5de72bdb3b711", "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "df5de72bdb3b711" });
+    test("registry.yandex.net/ubuntu@796f752061726520736f2063757465",                       { "registry.yandex.net", "library", "ubuntu", "latest", "796f752061726520736f2063757465" });
+    test("registry.yandex.net/kndrvt/ubuntu@796f752061726520736f2063757465",                { "registry.yandex.net", "kndrvt", "ubuntu", "latest", "796f752061726520736f2063757465" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu@796f752061726520736f2063757465",            { "registry.yandex.net", "kndrvt/kek", "ubuntu", "latest", "796f752061726520736f2063757465" });
 
     // tag and digest
-    test("ubuntu:xenial@df5de72bdb3b711",                                    { "registry-1.docker.io/library/ubuntu:xenial@df5de72bdb3b711", "registry-1.docker.io", "library", "ubuntu", "xenial", "df5de72bdb3b711" });
-    test("kndrvt/ubuntu:xenial@df5de72bdb3b711",                             { "registry-1.docker.io/kndrvt/ubuntu:xenial@df5de72bdb3b711", "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "df5de72bdb3b711" });
-    test("kndrvt/kek/ubuntu:xenial@df5de72bdb3b711",                         { "registry-1.docker.io/kndrvt/kek/ubuntu:xenial@df5de72bdb3b711", "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "df5de72bdb3b711" });
+    test("ubuntu:xenial@796f752061726520736f2063757465",                                    { "registry-1.docker.io", "library", "ubuntu", "xenial", "796f752061726520736f2063757465" });
+    test("kndrvt/ubuntu:xenial@796f752061726520736f2063757465",                             { "registry-1.docker.io", "kndrvt", "ubuntu", "xenial", "796f752061726520736f2063757465" });
+    test("kndrvt/kek/ubuntu:xenial@796f752061726520736f2063757465",                         { "registry-1.docker.io", "kndrvt/kek", "ubuntu", "xenial", "796f752061726520736f2063757465" });
 
-    test("registry.yandex.net/ubuntu:xenial@df5de72bdb3b711",                { "registry.yandex.net/library/ubuntu:xenial@df5de72bdb3b711", "registry.yandex.net", "library", "ubuntu", "xenial", "df5de72bdb3b711" });
-    test("registry.yandex.net/kndrvt/ubuntu:xenial@df5de72bdb3b711",         { "registry.yandex.net/kndrvt/ubuntu:xenial@df5de72bdb3b711", "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "df5de72bdb3b711" });
-    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial@df5de72bdb3b711",     { "registry.yandex.net/kndrvt/kek/ubuntu:xenial@df5de72bdb3b711", "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "df5de72bdb3b711" });
+    test("registry.yandex.net/ubuntu:xenial@796f752061726520736f2063757465",                { "registry.yandex.net", "library", "ubuntu", "xenial", "796f752061726520736f2063757465" });
+    test("registry.yandex.net/kndrvt/ubuntu:xenial@796f752061726520736f2063757465",         { "registry.yandex.net", "kndrvt", "ubuntu", "xenial", "796f752061726520736f2063757465" });
+    test("registry.yandex.net/kndrvt/kek/ubuntu:xenial@796f752061726520736f2063757465",     { "registry.yandex.net", "kndrvt/kek", "ubuntu", "xenial", "796f752061726520736f2063757465" });
 }
 
 int SelfTest(std::vector<std::string> args) {

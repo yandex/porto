@@ -2,22 +2,22 @@
 
 /*
 
-Image path has the following structure:
+Tags path has the following structure:
 
-    /<place>/porto_docker/images/<schema version>/<registry>/<repository>/<image name>/
-        -> tags
-            -> /<tag> -> ../<digest>
-        -> <digest>/
-            -> manifest.json
-            -> config.json
-            -> tags
+    /<place>/porto_docker/<storage version>/images/<schema version>/<registry>/<repository>/<image name>/tags/<tag> -> <digest>
+
+Images path has the following structure:
+
+    /<place>/porto_docker/<storage version>/images/<digest prefix>/<digest>/
+        -> manifest.json
+        -> config.json
+        -> images
         -> layers/
             -> <layer hard link>
 
+Layers path has the following structure:
 
-Layer path has the following structure:
-
-    /<place>/porto_docker/layers/blobs/<digest prefix>/<digest>/
+    /<place>/porto_docker/<storage version>/layers/blobs/<digest prefix>/<digest>/
         -> <digest>.tar.gz
         -> content/
             -> *
@@ -27,7 +27,9 @@ Layer path has the following structure:
 #include "util/path.hpp"
 #include "util/mutex.hpp"
 
+#include <unordered_map>
 #include <unordered_set>
+#include <algorithm>
 
 constexpr const char *DOCKER_REGISTRY_HOST = "registry-1.docker.io";
 constexpr const char *DOCKER_AUTH_PATH = "https://auth.docker.io/token";
@@ -36,15 +38,13 @@ constexpr const char *DOCKER_AUTH_SERVICE = "registry.docker.io";
 struct THttpClient;
 
 struct TDockerImage {
+    std::string Digest;
+    std::unordered_map<std::string, std::unordered_set<std::string>> Images; // image:tags
+
     std::string Registry;
     std::string Repository;
     std::string Name;
-    std::string Digest;
     std::string Tag;
-
-    int SchemaVersion = 2;
-    std::string Manifest;
-    std::string Config;
 
     struct TLayer {
         std::string Digest;
@@ -57,15 +57,20 @@ struct TDockerImage {
 
         TError Remove(const TPath &place) const;
     };
-    std::unordered_set<std::string> Tags;
-    std::vector<TLayer> Layers;
 
-    std::vector<std::string> Command;
-    std::vector<std::string> Env;
+    std::vector<TLayer> Layers;
 
     std::string AuthToken;
     std::string AuthPath;
     std::string AuthService;
+
+    int SchemaVersion = 2;
+    std::string Manifest;
+    std::string Config;
+
+    uint64_t Size;
+    std::vector<std::string> Command;
+    std::vector<std::string> Env;
 
     TDockerImage(const std::string &name)
         : Registry(DOCKER_REGISTRY_HOST)
@@ -78,42 +83,25 @@ struct TDockerImage {
             Registry = DOCKER_REGISTRY_HOST;
     }
 
-    TDockerImage(const std::string &registry,
-                 const std::string &repository,
-                 const std::string &name,
-                 const std::string &digest,
-                 int schemaVersion)
-        : Registry(registry)
-        , Repository(repository)
-        , Name(name)
-        , Digest(digest)
-        , SchemaVersion(schemaVersion)
-    {}
+    TError GetAuthToken();
+    static TError InitStorage(const TPath &place, unsigned perms);
 
+    static TError List(const TPath &place, std::vector<TDockerImage> &images, const std::string &mask = "");
+    TError Status(const TPath &place);
+    TError Pull(const TPath &place);
+    TError Remove(const TPath &place, bool needLock = true);
+
+private:
     inline std::string RepositoryAndName() const {
         if (Repository.empty())
             return Name;
         return Repository + "/" + Name;
     }
 
-    inline std::string FullName() const {
-        return FullName(Tag);
+    inline std::string FullName(bool hideTag = false) const {
+        return fmt::format("{}/{}{}", Registry, RepositoryAndName(), hideTag ? "" : ":" + Tag);
     }
 
-    inline std::string FullName(const std::string &tag) const {
-        return fmt::format("{}/{}:{}{}", Registry, RepositoryAndName(), tag, Digest.empty() ? "" : "@" + Digest);
-    }
-
-    TError GetAuthToken();
-
-    TError Download(const TPath &place);
-    TError Status(const TPath &place);
-    TError Remove(const TPath &place, bool needLock = true);
-
-    static TError InitStorage(const TPath &place, unsigned perms);
-    static TError List(const TPath &place, std::vector<TDockerImage> &images, const std::string &mask = "");
-
-private:
     static inline std::string TrimDigest(const std::string &digest) {
         if (StringStartsWith(digest, "sha256:"))
             return digest.substr(7);
@@ -121,6 +109,11 @@ private:
     }
 
     void ParseName(const std::string &name) {
+        if (std::all_of(name.begin(), name.end(), ::isxdigit)) {
+            Digest = name;
+            return;
+        }
+
         std::string image = name;
 
         // <image> ::= [<registry>/][<repository>/]<name>[:<tag>][@<digest>]
@@ -155,27 +148,36 @@ private:
             Name = image;
     }
 
-    TPath ImagePath(const TPath &place) const;
+    TPath TagPath(const TPath &place) const;
     TPath DigestPath(const TPath &place) const;
 
-    static std::string AuthServiceFromPath(const std::string &authPath, size_t schemaLen = 0);
+    TError DetectImage(const TPath &place);
+    TError DetectTagPath(const TPath &place);
+    TError DetectDigestPath(const TPath &place);
 
+    static std::string AuthServiceFromPath(const std::string &authPath, size_t schemaLen = 0);
     std::string AuthUrl() const;
     std::string ManifestsUrl(const std::string &digest) const;
     std::string BlobsUrl(const std::string &digest) const;
 
-    std::vector<std::unique_ptr<TFileMutex>> Lock(const TPath &place);
+    std::vector<std::unique_ptr<TFileMutex>> Lock(const TPath &place, bool lockTagPath = true);
     TError DownloadManifest(const THttpClient &client);
     TError ParseManifest();
     TError DownloadConfig(const THttpClient &client);
     TError ParseConfig();
-    TError Save(const TPath &place) const;
-    TError DetectImagePath(const TPath &place);
-    TError Load(const TPath &place);
+
     TError DownloadLayers(const TPath &place) const;
     void RemoveLayers(const TPath &place) const;
 
     TError LinkTag(const TPath &place) const;
-    TError SaveTags(const TPath &place) const;
-    TError LoadTags(const TPath &place);
+    TError SaveImages(const TPath &place) const;
+    TError SaveImages(const TPath &imagesPath,
+                      const std::unordered_map<std::string, std::unordered_set<std::string>> &images) const;
+    TError LoadImages(const TPath &place);
+    TError LoadImages(const TPath &imagesPath,
+                      std::unordered_map<std::string, std::unordered_set<std::string>> &images) const;
+
+    TError Save(const TPath &place) const;
+    TError Load(const TPath &place);
+
 };

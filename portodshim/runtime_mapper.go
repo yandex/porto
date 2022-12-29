@@ -339,7 +339,7 @@ func envToVars(env []string) []*rpc.TContainerEnvVar {
 func prepareContainerEnv(ctx context.Context, id string, env []*v1.KeyValue, image *rpc.TDockerImage) ([]*rpc.TContainerEnvVar, error) {
 	pc := getPortoClient(ctx)
 
-	envVars := envToVars(image.GetEnv())
+	envVars := envToVars(image.GetConfig().GetEnv())
 
 	for _, i := range env {
 		envVars = append(envVars, &rpc.TContainerEnvVar{
@@ -883,7 +883,7 @@ func (m *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.Run
 	}
 
 	// command + args
-	if err = prepareContainerCommand(ctx, id, []string{}, []string{}, image.GetCommand(), env, false); err != nil {
+	if err = prepareContainerCommand(ctx, id, []string{}, []string{}, image.GetConfig().GetCmd(), env, false); err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -1121,7 +1121,7 @@ func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.C
 	}
 
 	// command + args
-	if err = prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), image.GetCommand(), env, false); err != nil {
+	if err = prepareContainerCommand(ctx, id, req.GetConfig().GetCommand(), req.GetConfig().GetArgs(), image.GetConfig().GetCmd(), env, false); err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}

@@ -101,9 +101,11 @@ constexpr const char *PORTO_PLACE = "/place";
 constexpr const char *PORTO_VOLUMES = "porto_volumes";
 constexpr const char *PORTO_LAYERS = "porto_layers";
 constexpr const char *PORTO_STORAGE = "porto_storage";
+
 constexpr const char *PORTO_DOCKER = "porto_docker";
-constexpr const char *PORTO_DOCKER_IMAGES = "porto_docker/images";
-constexpr const char *PORTO_DOCKER_LAYERS = "porto_docker/layers";
+constexpr const char *PORTO_DOCKER_TAGS = "porto_docker/v1/tags";
+constexpr const char *PORTO_DOCKER_IMAGES = "porto_docker/v1/images";
+constexpr const char *PORTO_DOCKER_LAYERS = "porto_docker/v1/layers";
 
 constexpr const char *PORTO_CHROOT_VOLUMES = "porto";
 

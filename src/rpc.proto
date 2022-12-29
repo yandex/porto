@@ -1402,12 +1402,18 @@ message TStorageExportRequest {
 
 // Docker
 
+message TDockerImageConfig {
+    repeated string cmd = 1;
+    repeated string env = 2;
+}
 
 message TDockerImage {
-    required string full_name = 1;
-    repeated string layers = 2;
-    repeated string command = 3;
-    repeated string env = 4;
+    required string id = 1;
+    repeated string tags = 2;
+    repeated string digests = 3;
+    repeated string layers = 4;
+    optional uint64 size = 5;
+    optional TDockerImageConfig config = 6;
 }
 
 

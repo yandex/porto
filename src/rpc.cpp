@@ -1575,6 +1575,22 @@ noinline TError ListLayers(const rpc::TLayerListRequest &req,
     return error;
 }
 
+static void imageToProtoImage(::rpc::TDockerImage* protoImage, const TDockerImage &image) {
+    protoImage->set_id(image.Digest);
+    for (const auto &i: image.Images)
+        for (const auto &tag: i.second)
+            protoImage->add_tags(i.first + ":" + tag);
+    protoImage->add_digests("sha256:" + image.Digest);
+    for (const auto &layer: image.Layers)
+        protoImage->add_layers(layer.Digest);
+    protoImage->set_size(image.Size);
+    const auto &cfg = protoImage->mutable_config();
+    for (const auto &cmd: image.Command)
+        cfg->add_cmd(cmd);
+    for (const auto &env: image.Env)
+        cfg->add_env(env);
+}
+
 noinline TError DockerImageStatus(const rpc::TDockerImageStatusRequest &req,
                                   rpc::TDockerImageStatusResponse &rsp) {
     TStorage place;
@@ -1592,14 +1608,7 @@ noinline TError DockerImageStatus(const rpc::TDockerImageStatusRequest &req,
     if (error)
         return error;
 
-    auto desc = rsp.mutable_image();
-    desc->set_full_name(image.FullName());
-    for (const auto &layer: image.Layers)
-        desc->add_layers(layer.Digest);
-    for (const auto &command: image.Command)
-        desc->add_command(command);
-    for (const auto &env: image.Env)
-        desc->add_env(env);
+    imageToProtoImage(rsp.mutable_image(), image);
 
     return OK;
 }
@@ -1621,18 +1630,8 @@ noinline TError ListDockerImages(const rpc::TDockerImageListRequest &req,
     if (error)
         return error;
 
-    for (const auto &image: images) {
-        for (const auto &tag: image.Tags) {
-            auto desc = rsp.add_images();
-            desc->set_full_name(image.FullName(tag));
-            for (const auto &layer: image.Layers)
-                desc->add_layers(layer.Digest);
-            for (const auto &command: image.Command)
-                desc->add_command(command);
-            for (const auto &env: image.Env)
-                desc->add_env(env);
-        }
-    }
+    for (auto &image: images)
+        imageToProtoImage(rsp.add_images(), image);
 
     return OK;
 }
@@ -1663,18 +1662,11 @@ noinline TError PullDockerImage(const rpc::TDockerImagePullRequest &req,
     } else
         image.AuthToken = req.auth_token();
 
-    error = image.Download(place.Place);
+    error = image.Pull(place.Place);
     if (error)
         return error;
 
-    auto desc = rsp.mutable_image();
-    desc->set_full_name(image.FullName());
-    for (const auto &layer: image.Layers)
-        desc->add_layers(layer.Digest);
-    for (const auto &command: image.Command)
-        desc->add_command(command);
-    for (const auto &env: image.Env)
-        desc->add_env(env);
+    imageToProtoImage(rsp.mutable_image(), image);
 
     return OK;
 }

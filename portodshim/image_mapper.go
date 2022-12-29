@@ -24,25 +24,17 @@ func parseImageName(name string) (string, string, string) {
 
 	return image, tag, digest
 }
-func getImageStruct(fullName string, tags []string) *v1.Image {
-	// default value of size, it must be > 0
-	size := uint64(4)
-
-	name, _, digest := parseImageName(fullName)
-
+func getImageStruct(image *rpc.TDockerImage) *v1.Image {
 	return &v1.Image{
-		Id:          name + "@sha256:" + digest,
-		RepoTags:    tags,
-		RepoDigests: []string{name + "@sha256:" + digest},
-		Size_:       size,
+		Id:          image.GetId(),
+		RepoTags:    image.GetTags(),
+		RepoDigests: image.GetDigests(),
+		Size_:       image.GetSize(),
 		Uid: &v1.Int64Value{
 			Value: 1,
 		},
 		Username: "",
-		Spec: &v1.ImageSpec{
-			Image:       name + "@sha256:" + digest,
-			Annotations: map[string]string{},
-		},
+		Spec:     nil,
 	}
 }
 
@@ -55,18 +47,9 @@ func (m *PortodshimImageMapper) ListImages(ctx context.Context, req *v1.ListImag
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	// image tags and digests collection
-	tagsMap := make(map[string][]string)
-	for _, image := range portoImages {
-		name, tag, digest := parseImageName(image.GetFullName())
-		tagsMap[digest] = append(tagsMap[digest], name+":"+tag)
-	}
-
-	// we have tags and digests for every image here
 	var images []*v1.Image
 	for _, image := range portoImages {
-		_, _, digest := parseImageName(image.GetFullName())
-		images = append(images, getImageStruct(image.GetFullName(), tagsMap[digest]))
+		images = append(images, getImageStruct(image))
 	}
 
 	return &v1.ListImagesResponse{
@@ -87,24 +70,8 @@ func (m *PortodshimImageMapper) ImageStatus(ctx context.Context, req *v1.ImageSt
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
-	// TODO: add tags into TDockerImage and delete this
-	name, _, targetDigest := parseImageName(image.GetFullName())
-	images, err := pc.ListDockerImages("", name+"***")
-	if err != nil {
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-
-	// image tags and digests collection
-	var tags []string
-	for _, image := range images {
-		name, tag, digest := parseImageName(image.GetFullName())
-		if digest == targetDigest {
-			tags = append(tags, name+":"+tag)
-		}
-	}
-
 	return &v1.ImageStatusResponse{
-		Image: getImageStruct(image.GetFullName(), tags),
+		Image: getImageStruct(image),
 	}, nil
 }
 func (m *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImageRequest) (*v1.PullImageResponse, error) {
@@ -122,7 +89,7 @@ func (m *PortodshimImageMapper) PullImage(ctx context.Context, req *v1.PullImage
 	}
 
 	return &v1.PullImageResponse{
-		ImageRef: image.GetFullName(),
+		ImageRef: image.GetId(),
 	}, nil
 }
 func (m *PortodshimImageMapper) RemoveImage(ctx context.Context, req *v1.RemoveImageRequest) (*v1.RemoveImageResponse, error) {

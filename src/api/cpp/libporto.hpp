@@ -20,6 +20,7 @@ namespace rpc {
     class TVolumeSpec;
     class TListContainersRequest;
     class TGetVolumeRequest;
+    class TDockerImage;
 }
 
 namespace Porto {
@@ -57,10 +58,24 @@ struct Layer {
 };
 
 struct DockerImage {
-    std::string Name;
+    std::string Id;
+    std::vector<std::string> Tags;
+    std::vector<std::string> Digests;
     std::vector<std::string> Layers;
-    std::vector<std::string> Command;
-    std::vector<std::string> Env;
+    uint64_t Size;
+    struct Config {
+        std::vector<std::string> Cmd;
+        std::vector<std::string> Env;
+    } Config;
+
+    DockerImage() = default;
+    DockerImage(const ::rpc::TDockerImage &i);
+
+    DockerImage(const DockerImage &i) = default;
+    DockerImage(DockerImage &&i) = default;
+
+    DockerImage& operator=(const DockerImage &i) = default;
+    DockerImage& operator=(DockerImage &&i) = default;
 };
 
 struct Storage {
