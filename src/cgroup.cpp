@@ -293,6 +293,7 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
     if (thread && IsCgroup2())
         return OK;
 
+    unsigned int now, startTime = GetCurrentTimeMs();
     do {
         error = thread ? cg.GetTasks(pids) : cg.GetProcesses(pids);
         if (error)
@@ -306,6 +307,12 @@ TError TCgroup::AttachAll(const TCgroup &cg) const {
             retry = retry || std::find(prev.begin(), prev.end(), pid) == prev.end();
         }
         prev = pids;
+
+        now = GetCurrentTimeMs();
+        if (startTime + 10000 < now) {
+            startTime = now;
+            L_WRN("Too long attachment of processes from {} to {}", cg, *this);
+        }
     } while (retry);
 
     if (IsRestore) {
