@@ -174,15 +174,19 @@ void TStorage::StopAsyncRemover() {
 void TStorage::IncPlaceLoad(const TPath &place) {
     auto lock = LockVolumes();
     auto id = place.ToString();
+
     if (!PlaceLoadLimit.count(id))
         id = "default";
+    L_ACT("Start waiting for place load slot, id={} limit={}", id, PlaceLoadLimit[id]);
     StorageCv.wait(lock, [&]{return PlaceLoad[id] < PlaceLoadLimit[id];});
     PlaceLoad[id]++;
+    L_ACT("Finish waiting for place load slot, id={}", id);
 }
 
 void TStorage::DecPlaceLoad(const TPath &place) {
     auto lock = LockVolumes();
     auto id = place.ToString();
+
     if (!PlaceLoadLimit.count(id))
         id = "default";
     if (PlaceLoad[id]-- <= 1)
