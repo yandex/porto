@@ -190,32 +190,11 @@ void TStorage::DecPlaceLoad(const TPath &place) {
     StorageCv.notify_all();
 }
 
-std::string TStorage::TypeToString(EStorageType type) {
-    switch (type) {
-    case EStorageType::Volume:
-        return "volume";
-    case EStorageType::Layer:
-        return "layer";
-    case EStorageType::DockerLayer:
-        return "docker layer";
-    case EStorageType::Storage:
-        return "storage";
-    case EStorageType::Meta:
-        return "meta";
-    case EStorageType::Place:
-        return "place";
-    default:
-        return "";
-    }
- }
-
 /* FIXME racy. rewrite with openat... etc */
 TError TStorage::Cleanup(const TPath &place, EStorageType type, unsigned perms) {
     TPath base;
     struct stat st;
     TError error;
-
-    L_ACT("Cleanup place {} type {}", place, TypeToString(type));
 
     switch (type) {
     case EStorageType::Volume:
