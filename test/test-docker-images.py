@@ -9,6 +9,7 @@ LAYER_NAME = "alpine"
 
 K8S_IMAGE_TAG = "k8s.gcr.io/pause:3.7"
 K8S_IMAGE_DIGEST = "221177c6082a88ea4f6240ab2450d540955ac6f4d5454f0e15751b653ebda165"
+K8S_IMAGE_ALT_TAG = "registry-1.docker.io/kndrvt/pause:latest"
 
 conn = porto.Connection(timeout=30)
 
@@ -18,30 +19,29 @@ daemon {
 }
 """)
 
-# api
-print("Check python api")
-
-def check_image(image, digest, tag):
+def check_image(image, digest, tags):
     ExpectEq(image.id, digest)
-    ExpectEq(len(image.tags), 1)
-    ExpectEq(image.tags[0], tag)
+    ExpectEq(set(image.tags), set(tags))
     ExpectEq(len(image.digests), 1)
     ExpectEq(image.digests[0], "sha256:" + digest)
 
 
+# api
+print("Check python api")
+
 image = conn.PullDockerImage(IMAGE_NAME)
-check_image(image, IMAGE_DIGEST, IMAGE_TAG)
+check_image(image, IMAGE_DIGEST, [IMAGE_TAG])
 
 for mask in (None, IMAGE_TAG[:-1]+"***", IMAGE_TAG):
     images = conn.ListDockerImages(mask=mask)
     Expect(image.id in list(map(lambda x: x.id, images)))
     if mask:
         ExpectEq(len(images), 1)
-        check_image(images[0], IMAGE_DIGEST, IMAGE_TAG)
+        check_image(images[0], IMAGE_DIGEST, [IMAGE_TAG])
 
 for name in (IMAGE_NAME, IMAGE_TAG, IMAGE_DIGEST, IMAGE_DIGEST[:12]):
     image = conn.DockerImageStatus(IMAGE_DIGEST[:12])
-    check_image(image, IMAGE_DIGEST, IMAGE_TAG)
+    check_image(image, IMAGE_DIGEST, [IMAGE_TAG])
 
 for name in (IMAGE_NAME, IMAGE_TAG, IMAGE_DIGEST, IMAGE_DIGEST[:12]):
     image = conn.PullDockerImage(IMAGE_NAME)
@@ -88,13 +88,29 @@ for name in (IMAGE_NAME, IMAGE_TAG, IMAGE_DIGEST, IMAGE_DIGEST[:12]):
 print("Check k8s pause image")
 
 image = conn.PullDockerImage(K8S_IMAGE_TAG)
-check_image(image, K8S_IMAGE_DIGEST, K8S_IMAGE_TAG)
+check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_TAG])
 
 for name in (K8S_IMAGE_TAG, K8S_IMAGE_DIGEST, K8S_IMAGE_DIGEST[:12]):
     image = conn.DockerImageStatus(name)
-    check_image(image, K8S_IMAGE_DIGEST, K8S_IMAGE_TAG)
+    check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_TAG])
 
 for name in (K8S_IMAGE_TAG, K8S_IMAGE_DIGEST, K8S_IMAGE_DIGEST[:12]):
     image = conn.PullDockerImage(K8S_IMAGE_TAG)
     conn.RemoveDockerImage(name)
     ExpectException(conn.DockerImageStatus, porto.exceptions.DockerImageNotFound, name)
+
+
+# tag adding
+print("Check tag adding")
+
+conn.PullDockerImage(K8S_IMAGE_TAG)
+image = conn.PullDockerImage(K8S_IMAGE_ALT_TAG)
+check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_TAG, K8S_IMAGE_ALT_TAG])
+
+ExpectException(conn.RemoveDockerImage, porto.exceptions.Docker, K8S_IMAGE_DIGEST)
+conn.RemoveDockerImage(K8S_IMAGE_TAG)
+image = conn.DockerImageStatus(K8S_IMAGE_ALT_TAG)
+check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_ALT_TAG])
+
+conn.RemoveDockerImage(K8S_IMAGE_ALT_TAG)
+ExpectException(conn.DockerImageStatus, porto.exceptions.DockerImageNotFound, K8S_IMAGE_ALT_TAG)

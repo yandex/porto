@@ -734,16 +734,14 @@ TError TDockerImage::Pull(const TPath &place) {
         if (error)
             return error;
 
-        if (Images.find(name) == Images.end())
-            return TError(EError::Docker, "Cannot find {} in images file", name);
-
-        if (Images[name].find(Tag) == Images[name].end()) {
+        if (Images.find(name) == Images.end() || Images[name].find(Tag) == Images[name].end()) {
             // it's a new tag
             error = LinkTag(place);
             if (error)
                 return error;
 
             Images[name].emplace(Tag);
+
             error = SaveImages(place);
             if (error)
                 return error;
