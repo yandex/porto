@@ -1,3 +1,9 @@
+yandex-porto (5.3.14) unstable; urgency=low
+
+  * docker: fix bug with new tag addition
+
+ -- Lev Pantyukhin <kndrvt@yandex-team.ru>  Thu, 12 Jan 2023 17:52:47 +0300
+
 yandex-porto (5.3.13) unstable; urgency=low
 
   [ Dmitry Yakunin ]
