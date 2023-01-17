@@ -107,10 +107,15 @@ conn.PullDockerImage(K8S_IMAGE_TAG)
 image = conn.PullDockerImage(K8S_IMAGE_ALT_TAG)
 check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_TAG, K8S_IMAGE_ALT_TAG])
 
-ExpectException(conn.RemoveDockerImage, porto.exceptions.Docker, K8S_IMAGE_DIGEST)
 conn.RemoveDockerImage(K8S_IMAGE_TAG)
 image = conn.DockerImageStatus(K8S_IMAGE_ALT_TAG)
 check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_ALT_TAG])
 
-conn.RemoveDockerImage(K8S_IMAGE_ALT_TAG)
+conn.PullDockerImage(K8S_IMAGE_TAG)
+image = conn.DockerImageStatus(K8S_IMAGE_TAG)
+check_image(image, K8S_IMAGE_DIGEST, [K8S_IMAGE_TAG, K8S_IMAGE_ALT_TAG])
+
+conn.RemoveDockerImage(K8S_IMAGE_DIGEST)
+ExpectException(conn.DockerImageStatus, porto.exceptions.DockerImageNotFound, K8S_IMAGE_TAG)
 ExpectException(conn.DockerImageStatus, porto.exceptions.DockerImageNotFound, K8S_IMAGE_ALT_TAG)
+ExpectException(conn.DockerImageStatus, porto.exceptions.DockerImageNotFound, K8S_IMAGE_DIGEST)

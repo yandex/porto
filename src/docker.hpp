@@ -130,7 +130,8 @@ private:
         if (repoPos != std::string::npos) {
             Repository = image.substr(0, repoPos);
             image = image.substr(repoPos + 1);
-        }
+        } else
+            Repository = "library";
 
         // <image> ::= <name>[:<tag>][@<digest>]
         auto digestPos = image.rfind('@');

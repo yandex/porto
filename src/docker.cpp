@@ -127,7 +127,6 @@ TError TDockerImage::DetectTagPath(const TPath &place) {
                     SchemaVersion = 1;
                     tagPath = TagPath(place);
                     if (!tagPath.Exists()) {
-                        Repository = "library";
                         return TError(EError::DockerImageNotFound, FullName());
                     }
                 }
@@ -779,17 +778,17 @@ TError TDockerImage::Remove(const TPath &place, bool needLock) {
         return error;
     }
 
+    TPath tagPath;
     if (tagSpecified) {
-        TPath tagPath = TagPath(place);
         std::string name = FullName(true);
-        std::unordered_set<std::string> tags = Images[name];
-        if (tags.size() > 1 || Images.size() > 1) {
+        if (Images.size() > 1 || Images[name].size() > 1) {
             // delete only tag
+            tagPath = TagPath(place);
             error = tagPath.Unlink();
             if (error)
                 return TError(EError::Docker, "Cannot remove tag {}", FullName());
 
-            if (tags.size() <= 1)
+            if (Images[name].size() <= 1)
                 Images.erase(name);
             else
                 Images[name].erase(Tag);
@@ -804,42 +803,36 @@ TError TDockerImage::Remove(const TPath &place, bool needLock) {
 
             return OK;
         }
-    } else {
-        if (Images.size() > 1)
-            return TError(EError::Docker, "Cannot remove digest {}: image is used by multiple tags", Digest);
+    }
 
-        if (Images.size() == 1 && (Images.begin()->second.size() > 1))
-            return TError(EError::Docker, "Cannot remove digest {}: image is used by multiple tags", Digest);
+    // delete tags
+    for (const auto &image: Images) {
+        ParseName(image.first);
+        for (const auto &tag: image.second) {
+            Tag = tag;
 
-        if (Images.empty() || Images.begin()->second.empty())
-            return TError(EError::Docker, "Cannot remove digest {}: images or tags are empty", Digest);
+            error = DetectTagPath(place);
+            if (error)
+                return error;
 
-        // load for tag path
-        ParseName(Images.begin()->first);
-        Tag = *Images.begin()->second.begin();
+            tagPath = TagPath(place);
+            error = tagPath.Unlink();
+            if (error)
+                L_ERR("Cannot unlink tag: {}", error);
 
-        // exclude cases with empty repository
-        error = DetectTagPath(place);
-        if (error)
-            return error;
+            error = tagPath.DirName().ClearEmptyDirectories(place / PORTO_DOCKER_TAGS);
+            if (error)
+                L_ERR("Cannot clear directories: {}", error);
+        }
     }
 
     // delete digest
     TPath digestPath = DigestPath(place);
-    TPath tagPath = TagPath(place);
     error = digestPath.RemoveAll();
     if (error)
         return error;
 
     error = digestPath.DirName().ClearEmptyDirectories(place / PORTO_DOCKER_IMAGES);
-    if (error)
-        L_ERR("Cannot clear directories: {}", error);
-
-    error = tagPath.Unlink();
-    if (error)
-        L_ERR("Cannot unlink tag: {}", error);
-
-    error = tagPath.DirName().ClearEmptyDirectories(place / PORTO_DOCKER_TAGS);
     if (error)
         L_ERR("Cannot clear directories: {}", error);
 
