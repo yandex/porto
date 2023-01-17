@@ -128,6 +128,12 @@ func createId(name string) string {
 func (m *PortodshimRuntimeMapper) prepareContainerNetwork(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
 	pc := getPortoClient(ctx)
 
+	if cfg == nil || cfg.GetLinux() == nil || cfg.GetLinux().GetSecurityContext() == nil ||
+		cfg.GetLinux().GetSecurityContext().GetNamespaceOptions() == nil {
+		zap.S().Warnf("cannot get network namespace options")
+		return nil
+	}
+
 	nsOpts := cfg.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	if nsOpts.Network == v1.NamespaceMode_NODE {
 		return nil
@@ -218,6 +224,63 @@ func prepareContainerResources(ctx context.Context, id string, cfg *v1.LinuxCont
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 	if err := pc.SetProperty(id, "memory_guarantee", strconv.FormatInt(cfg.MemoryLimitInBytes, 10)); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	return nil
+}
+
+func preparePodLabels(ctx context.Context, id string, cfg *v1.PodSandboxConfig) error {
+	labels := cfg.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	if _, found := labels["io.kubernetes.pod.name"]; !found {
+		if name := cfg.GetMetadata().GetName(); name != "" {
+			labels["io.kubernetes.pod.name"] = name
+		}
+	}
+	if _, found := labels["io.kubernetes.pod.uid"]; !found {
+		if uid := cfg.GetMetadata().GetUid(); uid != "" {
+			labels["io.kubernetes.pod.uid"] = uid
+		}
+	}
+	if _, found := labels["io.kubernetes.pod.namespace"]; !found {
+		if ns := cfg.GetMetadata().GetNamespace(); ns != "" {
+			labels["io.kubernetes.pod.namespace"] = ns
+		}
+	}
+	labels["attempt"] = fmt.Sprint(cfg.GetMetadata().GetAttempt())
+
+	if err := setLabels(ctx, id, labels, "LABEL"); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	if err := setLabels(ctx, id, cfg.GetAnnotations(), "ANNOTATION"); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	return nil
+}
+
+func prepareContainerLabels(ctx context.Context, id string, cfg *v1.ContainerConfig) error {
+	labels := cfg.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	if _, found := labels["io.kubernetes.container.name"]; !found {
+		if name := cfg.GetMetadata().GetName(); name != "" {
+			labels["io.kubernetes.container.name"] = name
+		}
+	}
+	labels["attempt"] = fmt.Sprint(cfg.GetMetadata().GetAttempt())
+	labels["io.kubernetes.container.logpath"] = filepath.Join("/place/porto/", id, "/stdout")
+
+	if err := setLabels(ctx, id, labels, "LABEL"); err != nil {
+		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+	}
+
+	if err := setLabels(ctx, id, cfg.GetAnnotations(), "ANNOTATION"); err != nil {
 		return fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
@@ -850,19 +913,7 @@ func (m *PortodshimRuntimeMapper) RunPodSandbox(ctx context.Context, req *v1.Run
 	}
 
 	// labels and annotations
-	labels := req.GetConfig().GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	if _, found := labels["io.kubernetes.pod.namespace"]; !found {
-		labels["io.kubernetes.pod.namespace"] = req.GetConfig().GetMetadata().GetNamespace()
-	}
-	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
-	if err = setLabels(ctx, id, labels, "LABEL"); err != nil {
-		_ = pc.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-	}
-	if err = setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION"); err != nil {
+	if err = preparePodLabels(ctx, id, req.GetConfig()); err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
@@ -1085,18 +1136,7 @@ func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.C
 	}
 
 	// labels and annotations
-	labels := req.GetConfig().GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	labels["attempt"] = fmt.Sprint(req.GetConfig().GetMetadata().GetAttempt())
-	labels["io.kubernetes.container.logpath"] = filepath.Join("/place/porto/", id, "/stdout")
-	if err = setLabels(ctx, id, labels, "LABEL"); err != nil {
-		_ = pc.Destroy(id)
-		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
-
-	}
-	if err = setLabels(ctx, id, req.GetConfig().GetAnnotations(), "ANNOTATION"); err != nil {
+	if err = prepareContainerLabels(ctx, id, req.GetConfig()); err != nil {
 		_ = pc.Destroy(id)
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
