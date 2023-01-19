@@ -1075,6 +1075,15 @@ func (m *PortodshimRuntimeMapper) CreateContainer(ctx context.Context, req *v1.C
 		return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
 	}
 
+	// resources
+	res := req.GetConfig().GetLinux().GetResources()
+	if res != nil {
+		if err = prepareContainerResources(ctx, id, res); err != nil {
+			_ = pc.Destroy(id)
+			return nil, fmt.Errorf("%s: %v", getCurrentFuncName(), err)
+		}
+	}
+
 	// labels and annotations
 	labels := req.GetConfig().GetLabels()
 	if labels == nil {
