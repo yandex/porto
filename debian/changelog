@@ -1,3 +1,18 @@
+yandex-porto (5.3.15) unstable; urgency=low
+
+  [ Lev Pantyukhin ]
+  * portodshim: add README.md
+
+  [ Dmitry Yakunin ]
+  * portodshim: set limits on containers too
+  * ci: add example of using update_tar_bases.sh with script
+
+  [ Lev Pantyukhin ]
+  * portodshim: add default metadata labels and add nil checks in prepareContainerNetwork
+  * porto: enable image removing using ID
+
+ -- Lev Pantyukhin <kndrvt@yandex-team.ru>  Fri, 20 Jan 2023 12:23:10 +0300
+
 yandex-porto (5.3.14) unstable; urgency=low
 
   * docker: fix bug with new tag addition
